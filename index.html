@@ -1978,6 +1978,9 @@ ${JSON.stringify(context, null, 2)}
 
             if (!theme) return;
 
+            // Store theme reference for renderer access (coverImage, dividerSvg, etc.)
+            window._zineTheme = theme;
+
             // Inject Google Fonts
             const fontFamilies = [theme.fonts?.body, theme.fonts?.heading].filter(Boolean);
             const uniqueFonts = [...new Set(fontFamilies)];
@@ -1993,9 +1996,8 @@ ${JSON.stringify(context, null, 2)}
             });
 
             // Layout Diversity computation
-            let stampWidth = '2px';
-            if (theme.layout?.stampStyle === 'light') stampWidth = '1px';
-            if (theme.layout?.stampStyle === 'none') stampWidth = '0px';
+            const stampMap = { heavy: '3px', light: '1px', double: '2px', redacted: '4px', distressed: '2px', none: '0px' };
+            let stampWidth = stampMap[theme.layout?.stampStyle] || '2px';
 
             let pagePadding = '0.5in';
             if (theme.layout?.defaultDensity === 'high') pagePadding = '0.3in';
@@ -2012,7 +2014,7 @@ ${JSON.stringify(context, null, 2)}
                     --muted: ${theme.colors?.muted || '#5a5a56'};
                     --font-body: ${theme.fonts?.body || "'Helvetica Neue', sans-serif"};
                     --font-heading: ${theme.fonts?.heading || "var(--font-body)"};
-                    
+
                     --page-padding: ${pagePadding};
                     --stamp-width: ${stampWidth};
                     --archive-separator: ${theme.layout?.archiveSeparator === 'none' ? 'none' : '1px solid var(--fog)'};
@@ -2028,6 +2030,27 @@ ${JSON.stringify(context, null, 2)}
                 ${(theme.customCss || '').replace(/</g, '').replace(/>/g, '')}
             `;
             document.head.appendChild(style);
+
+            // Apply visual treatment via data attribute
+            const treatment = theme.visualArchetype || 'institutional';
+            document.body.dataset.treatment = treatment;
+            const container = document.getElementById('zine-container');
+            if (container) container.dataset.treatment = treatment;
+
+            // Inject SVG grain filter for treatments that use it (noir, confessional)
+            if (!document.getElementById('zine-grain-svg')) {
+                const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svgEl.id = 'zine-grain-svg';
+                svgEl.setAttribute('width', '0');
+                svgEl.setAttribute('height', '0');
+                svgEl.style.position = 'absolute';
+                svgEl.innerHTML = '<filter id="zine-grain">'
+                    + '<feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/>'
+                    + '<feColorMatrix type="saturate" values="0"/>'
+                    + '<feBlend in="SourceGraphic" mode="multiply"/>'
+                    + '</filter>';
+                document.body.insertBefore(svgEl, document.body.firstChild);
+            }
         }
 
         function autoGeneratePages(data) {

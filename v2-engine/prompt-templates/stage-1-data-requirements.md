@@ -214,7 +214,7 @@ Produce a single JSON object with these exact top-level keys:
 
 ```json
 {
-  "visualArchetype": "STRING — one of: institutional, literary, corporate, terminal, noir, confessional, brutalist, clinical",
+  "visualArchetype": "STRING — one of: institutional, literary, corporate, terminal, noir, confessional, brutalist, clinical. CRITICAL: this drives the booklet's visual texture — not just naming, but how pages LOOK when printed. Choose based on the creative brief's emotional core and the diegetic medium (see Visual Identity in shared-creative-direction.md).",
   "colors": {
     "ink": "#HEX",
     "paper": "#HEX",
@@ -242,9 +242,10 @@ Produce a single JSON object with these exact top-level keys:
     "logBorder": "CSS_BORDER (default 1.5px solid) — outer table border style. Options: 1px solid, 2px double, 1px dashed, none"
   },
   "art": {
-    "style": "geometric | organic | technical | minimal | brutalist | interference | topographic | none",
-    "coverSvg": "STRING (optional) — inline SVG for cover art using currentColor",
-    "dividerSvg": "STRING (optional) — inline SVG for section dividers"
+    "style": "geometric | organic | technical | minimal | brutalist | interference | topographic | none — drives SVG generation style. Match to subject: geometric for maps/clocks/architecture, organic for nature/growth/decay, technical for sci-fi/engineering/systems, interference for glitch/signal/corruption, topographic for terrain/exploration. This is the visual LANGUAGE of inline illustrations, not a decoration toggle.",
+    "coverSvg": "STRING (optional) — inline SVG for cover art using currentColor. Abstract, atmospheric, diegetic. NOT literal scene illustration. Think: topographic contour lines for exploration, circuit traces for cyberpunk, institutional seal for bureaucracy, interference patterns for corruption.",
+    "coverImage": "STRING (optional) — base64 data URI for cover illustration. Only if user provides an image or uses an image generation tool. When present, takes priority over coverSvg. When absent, coverSvg is used.",
+    "dividerSvg": "STRING (optional) — inline SVG for section dividers using currentColor. Keep under 200 chars. Simple geometric or organic line that matches art.style."
   },
   "customCss": "STRING — 5-10 CSS rule sets. Target: .classification, .session-title-row, .fragment, .cover-title, .hud-zone, .rulebox, .page-num, .hr, section-specific like [data-section='archive']"
 }

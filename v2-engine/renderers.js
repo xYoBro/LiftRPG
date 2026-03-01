@@ -358,10 +358,20 @@ function renderFactionTrack(params) {
 // PAGE-LEVEL RENDERERS (used by box-packer page-type dispatcher)
 // ---------------------------------------------------------
 
-function createPage() {
+function createPage(pageType) {
     var p = document.createElement('div');
     p.className = 'zine-page';
+    if (pageType) p.dataset.pageType = pageType;
     return p;
+}
+
+function renderDivider(container) {
+    var theme = window._zineTheme;
+    if (!theme || !theme.art || !theme.art.dividerSvg) return;
+    var div = document.createElement('div');
+    div.className = 'section-divider';
+    div.innerHTML = sanitizeSvg(theme.art.dividerSvg);
+    container.appendChild(div);
 }
 
 function addPageNumber(page, num) {
@@ -373,7 +383,7 @@ function addPageNumber(page, num) {
 
 // -- Cover Page --
 function renderCoverPage(container, data) {
-    var page = createPage();
+    var page = createPage('cover');
     page.classList.add('cover-layout');
     var voice = (data.voice && data.voice.cover) || {};
     var meta = data.meta || {};
@@ -395,8 +405,18 @@ function renderCoverPage(container, data) {
         page.appendChild(dept);
     }
 
-    // Cover SVG art
-    if (theme.art && theme.art.coverSvg) {
+    // Cover image (base64/data URI — optional, for users with image AI)
+    if (theme.art && theme.art.coverImage) {
+        var imgWrap = document.createElement('div');
+        imgWrap.className = 'cover-image';
+        var img = document.createElement('img');
+        img.src = theme.art.coverImage;
+        img.alt = (meta.title || 'Cover art');
+        imgWrap.appendChild(img);
+        page.appendChild(imgWrap);
+    }
+    // Cover SVG art (fallback when no coverImage)
+    else if (theme.art && theme.art.coverSvg) {
         var artWrap = document.createElement('div');
         artWrap.className = 'cover-art';
         artWrap.innerHTML = sanitizeSvg(theme.art.coverSvg);
@@ -449,7 +469,7 @@ function renderManualPages(container, data, startPage) {
     var sections = voice.sections || [];
     var pageNum = startPage;
 
-    var page = createPage();
+    var page = createPage('rules-manual');
     container.appendChild(page);
     pageNum++;
 
@@ -481,7 +501,7 @@ function renderManualPages(container, data, startPage) {
             page.removeChild(block);
             addPageNumber(page, pageNum);
             pageNum++;
-            page = createPage();
+            page = createPage('rules-manual');
             container.appendChild(page);
             page.appendChild(block);
         }
@@ -497,7 +517,7 @@ function renderTrackerSheet(container, data, startPage) {
     var voice = data.voice || {};
     var pageNum = startPage + 1;
 
-    var page = createPage();
+    var page = createPage('tracker-sheet');
     page.classList.add('tracker-sheet');
     container.appendChild(page);
 
@@ -675,7 +695,7 @@ function renderTrackerSheet(container, data, startPage) {
 
         // Ensure there is a next page
         if (pages.length <= currentPageIndex + 1) {
-            var newPage = createPage();
+            var newPage = createPage('tracker-sheet');
             newPage.classList.add('tracker-sheet');
             container.appendChild(newPage);
             pages.push(newPage);
@@ -708,7 +728,7 @@ function renderSetupPage(container, data, startPage) {
     var setup = workout.setup || {};
     var pageNum = startPage + 1;
 
-    var page = createPage();
+    var page = createPage('setup');
     page.classList.add('setup-page');
     container.appendChild(page);
 
@@ -803,7 +823,7 @@ function renderEncounterSpread(container, data, week, startPage) {
     // -- LEFT PAGE: HUD --
     pageNum++;
     pagesCreated++;
-    var hudPage = createPage();
+    var hudPage = createPage('encounter-hud');
     hudPage.classList.add('encounter-hud');
     container.appendChild(hudPage);
 
@@ -972,7 +992,7 @@ function renderEncounterSpread(container, data, week, startPage) {
     // -- RIGHT PAGE: Session Logs + Encounter Narratives --
     pageNum++;
     pagesCreated++;
-    var logPage = createPage();
+    var logPage = createPage('encounter-log');
     logPage.classList.add('encounter-log');
     container.appendChild(logPage);
 
@@ -1186,7 +1206,7 @@ function renderEncounterSpread(container, data, week, startPage) {
 
         // Ensure there is a next page
         if (logPages.length <= currentPageIndex + 1) {
-            var newPage = createPage();
+            var newPage = createPage('encounter-log');
             newPage.classList.add('encounter-log');
             container.appendChild(newPage);
             logPages.push(newPage);
@@ -1505,7 +1525,7 @@ function renderRefPages(container, data, week, startPage) {
 
     // Helper: create and track a new ref page
     function newRefPage() {
-        var p = createPage();
+        var p = createPage('ref');
         p.classList.add('ref-page');
         container.appendChild(p);
         pageNum++;
@@ -1661,7 +1681,7 @@ function renderArchivePages(container, data, sectionKey, startPage) {
     var pageNum = startPage;
     var pagesCreated = 0;
 
-    var page = createPage();
+    var page = createPage('archive');
     page.classList.add('archive-page');
     page.setAttribute('data-archive-section', sectionKey);
     container.appendChild(page);
@@ -1736,7 +1756,7 @@ function renderArchivePages(container, data, sectionKey, startPage) {
             addPageNumber(page, pageNum);
             pageNum++;
             pagesCreated++;
-            page = createPage();
+            page = createPage('archive');
             page.classList.add('archive-page');
             container.appendChild(page);
             page.appendChild(nodeDiv);
@@ -1865,7 +1885,7 @@ function renderEndingsPages(container, data, startPage) {
     var pageNum = startPage;
     var pagesCreated = 0;
 
-    var page = createPage();
+    var page = createPage('endings');
     page.classList.add('endings-page');
     container.appendChild(page);
     pageNum++;
@@ -1925,7 +1945,7 @@ function renderEndingsPages(container, data, startPage) {
             addPageNumber(page, pageNum);
             pageNum++;
             pagesCreated++;
-            page = createPage();
+            page = createPage('endings');
             page.classList.add('endings-page');
             container.appendChild(page);
             page.appendChild(endDiv);
@@ -1949,7 +1969,7 @@ function renderEvidencePages(container, data, startPage) {
     var pageNum = startPage;
     var pagesCreated = 0;
 
-    var page = createPage();
+    var page = createPage('evidence');
     page.classList.add('evidence-page');
     container.appendChild(page);
     pageNum++;
@@ -2015,7 +2035,7 @@ function renderEvidencePages(container, data, startPage) {
                 pageNum++;
                 pagesCreated++;
 
-                page = createPage();
+                page = createPage('evidence');
                 page.classList.add('evidence-page');
                 container.appendChild(page);
                 page.appendChild(nodeDiv);
@@ -2033,7 +2053,7 @@ function renderFinalPage(container, data, startPage) {
     var meta = data.meta || {};
     var finalVoice = voice.finalPage || {};
 
-    var page = createPage();
+    var page = createPage('final');
     page.classList.add('final-page');
     container.appendChild(page);
 

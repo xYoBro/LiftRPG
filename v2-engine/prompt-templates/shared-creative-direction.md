@@ -94,3 +94,33 @@ To keep the player returning to their next workout session, employ these techniq
 2. **Endowed Progress:** If you generate a Track or Clock for Session 1, write a rule instructing the player to pre-fill the first 10-20% of the tracker immediately. The sense of progress already begun increases commitment.
 
 3. **Variable Rewards:** Completing a workout set should not grant a static point. Allow a dice roll or table check with unpredictable outcomes (good, neutral, bad). Uncertainty sustains engagement far longer than predictable rewards.
+
+---
+
+## 8. VISUAL IDENTITY (drives `theme.visualArchetype`)
+
+The creative brief determines not just what the zine SAYS but how it LOOKS when printed. The `visualArchetype` field in `theme` maps to a complete visual treatment system — background texture, border weight, stamp styling, edge treatment, and page atmosphere. Every page in the booklet will be rendered through this lens.
+
+**Step 1 — Identify the diegetic MEDIUM.** What physical object IS this booklet within the fiction?
+
+| If the artifact is... | Use archetype |
+|---|---|
+| A government file, temple record, institutional form | `institutional` |
+| A photocopied case file, surveillance log, crime report | `noir` |
+| A computer terminal printout, ship log, system readout | `terminal` |
+| A published memoir, literary journal, collected letters | `literary` |
+| A punk broadsheet, protest pamphlet, underground zine | `brutalist` |
+| A lab notebook, medical chart, specimen catalog | `clinical` |
+| A personal diary, found journal, handwritten confession | `confessional` |
+| A corporate dossier, classified briefing, intelligence report | `corporate` |
+
+**Step 2 — Assess the artifact's CONDITION.** How has this document been treated?
+
+- **Pristine** (institutional, literary, corporate) → Clean treatments, precise edges
+- **Handled/aged** (noir, confessional) → Grain, edge wear, imperfect stamps
+- **Mass-produced** (terminal, clinical) → Scan lines, halftone, mechanical precision
+- **Deliberately raw** (brutalist) → Stark contrast, heavy borders, confrontational weight
+
+**Step 3 — Commit.** The `visualArchetype` must match the diegetic fiction. A fantasy temple zine IS an institutional document from within the temple. A sci-fi ship log IS a terminal printout. A noir detective story IS a case file. The booklet is not *about* the artifact — it IS the artifact.
+
+**Do NOT default to `institutional`.** Read the brief. A story about a haunted lighthouse keeper's journal is `confessional`. A story about corporate espionage is `corporate`. A story about a punk band's cursed tour is `brutalist`. The archetype emerges from the fiction, not from a safe default.
