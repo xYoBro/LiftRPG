@@ -1269,12 +1269,14 @@ Examples:
                 });
                 if (!hasFeedback) w.push('No feedback loops or bidirectional wires — mechanics may feel disconnected');
 
+                var validWireTypes = ['threshold-gate', 'feedback-loop', 'conditional-routing', 'resource-cycle', 'escalation', 'unlock-chain'];
                 var wireIds = {};
                 obj.wiring.forEach(function (wi, idx) {
                     if (!wi.id) e.push('Wire ' + idx + ' missing id');
                     else if (wireIds[wi.id]) e.push('Duplicate wire id: ' + wi.id);
                     else wireIds[wi.id] = true;
                     if (!wi.type) e.push('Wire "' + (wi.id || idx) + '" missing type');
+                    else if (validWireTypes.indexOf(wi.type) === -1) e.push('Wire "' + (wi.id || idx) + '" has invalid type "' + wi.type + '". Must be one of: ' + validWireTypes.join(', '));
                     if (!wi.from) e.push('Wire "' + (wi.id || idx) + '" missing from');
                     if (!wi.to) e.push('Wire "' + (wi.id || idx) + '" missing to');
                     if (!wi.printInstruction) e.push('Wire "' + (wi.id || idx) + '" missing printInstruction');

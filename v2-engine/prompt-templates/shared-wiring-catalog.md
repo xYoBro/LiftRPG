@@ -1,6 +1,8 @@
 # WIRE TYPES — MECHANICAL INTERACTIONS CATALOG
 
-These are the types of connections between mechanical primitives. Select wires that serve your story&apos;s core tension. Each wire type describes HOW two mechanics relate — the specific mechanics involved come from your story analysis.
+These are the 6 valid wire types — the COMPLETE set of interaction patterns between mechanical primitives. Use only these types in your wiring blueprint. Do not invent new wire types.
+
+Select wires that serve your story&apos;s core tension. Each wire type describes HOW two mechanics relate — the specific mechanics involved come from your story analysis.
 
 ---
 
@@ -26,6 +28,7 @@ These are the types of connections between mechanical primitives. Select wires t
 **What:** Two mechanics that affect each other, creating oscillation or spiraling tension.
 **Feel:** Difficult choices, risk management, push-your-luck. The player must balance competing pressures.
 **Paper:** Paired instructions on both trackers, each referencing the other.
+**Schema note:** Set `"bidirectional": true` on feedback-loop wires. All other wire types should set `"bidirectional": false`.
 
 **Pairs well with:**
 - Drain clock + heat track (spending safety raises danger)
@@ -45,7 +48,7 @@ These are the types of connections between mechanical primitives. Select wires t
 **Paper:** Printed as conditional instructions in encounter text or on the HUD.
 
 **Pairs well with:**
-- Codewords → alternate REF branches (the designed-for pairing)
+- Codewords (Stage 1 schema, no complexity cost) → alternate REF branches (the designed-for pairing)
 - Faction standings → different encounter narrative
 - Heat thresholds → encounter text changes tone/stakes
 - Tug-of-war position → different ally/enemy stance
@@ -70,7 +73,7 @@ These are the types of connections between mechanical primitives. Select wires t
 **Example printInstructions:**
 - "Spend 1 INTEL to peek at any one sealed archive entry. Cross off the INTEL box."
 - "When you earn FAVOR, you may convert 2 FAVOR into 1 INFLUENCE."
-- "Each time you use ADRENALINE, step your RESERVES die down one size."
+- "Spend 2 ADRENALINE to restore 1 RESERVES box. Cross off both ADRENALINE boxes."
 
 ---
 
@@ -82,12 +85,12 @@ These are the types of connections between mechanical primitives. Select wires t
 **Pairs well with:**
 - Heat tracks (they ONLY escalate — perfect source)
 - Drain clocks (reduce starting value on reset)
-- Encounter difficulty (later weeks feel harder because earlier mechanics compressed the space)
+- Encounter visual weight (later weeks use `dense` or `crisis` variants as earlier mechanics compress the space)
 
 **Example printInstructions:**
 - "Each HEAT threshold crossed: permanently cross off the lowest remaining SUPPLIES box."
 - "When CORRUPTION triggers, reduce WILLPOWER clock size by 1 segment for the rest of the zine."
-- "Each time ALERT rises, the die range for CONTAINMENT BREACH widens by 1."
+- "Each ALERT threshold crossed: cross off the next number on the BREACH track. Your safe range shrinks."
 
 ---
 
