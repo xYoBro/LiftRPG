@@ -16,7 +16,7 @@ Every booklet is mechanically, visually, and narratively unique. The engine supp
 User (workout program + narrative brief + dice selection)
   |
   v
-Browser UI (public/index.html — builds system prompt from prompt-templates/)
+Browser UI (index.html — builds system prompt from prompt-templates/)
   |
   v
 [Stage W] Wiring Blueprint — designs mechanical topology
@@ -44,29 +44,24 @@ Saddle-stitch imposition (11" x 8.5" landscape spreads) → Print
 
 ```text
 LiftRPG/
-  public/                              Deploy this folder
-    index.html                         Browser UI: intake, wiring, 5-stage accordion, assembly, print
-    v2-engine/
-      box-packer.js                    Page-type dispatcher + post-render cross-references
-      renderers.js                     All DOM builders: story blocks, mechanic primitives, maps
-      base-theme.css                   Page dimensions, typography, component styles, print media
-      story-tables.js                  Randomizer data — curated story generator tables
-      prompt-templates/
-        stage-w-wiring.md              Mechanical wiring blueprint prompt (Stage W)
-        stage-1-data-requirements.md   Stage 1 JSON schema spec
-        stage-1-liftoscript.md         Workout script parsing (Stage 1 only)
-        shared-creative-direction.md   Genre-neutral creative framework (Stages 1-5)
-        shared-primitives-catalog.md   Mechanical menu with complexity budgets + wire compatibility
-        shared-wiring-catalog.md       Wire type catalog
-        shared-anti-isomorphism.md     Structural uniqueness check + wire topology audit
-        stage-2-voice-map.md           Voice layer + spatial map data
-        stage-3-archives.md            Found documents + endings
-        stage-4-story.md               Session narrative REF nodes
-        stage-5-evidence.md            Evidence tracks (optional)
-  docs/                                Research docs, design specs (reference only)
-  legacy-archive/                      Archived v1 engine, old prompts, reference JSON
-  package.json                         NPM manifest
-  netlify.toml                         Static deploy config
+  index.html                           Browser UI: intake, wiring, 5-stage accordion, assembly, print
+  v2-engine/
+    box-packer.js                      Page-type dispatcher + post-render cross-references
+    renderers.js                       All DOM builders: story blocks, mechanic primitives, maps
+    base-theme.css                     Page dimensions, typography, component styles, print media
+    story-tables.js                    Randomizer data — curated story generator tables
+    prompt-templates/
+      stage-w-wiring.md                Mechanical wiring blueprint prompt (Stage W)
+      stage-1-data-requirements.md     Stage 1 JSON schema spec
+      stage-1-liftoscript.md           Workout script parsing (Stage 1 only)
+      shared-creative-direction.md     Genre-neutral creative framework (Stages 1-5)
+      shared-primitives-catalog.md     Mechanical menu with complexity budgets + wire compatibility
+      shared-wiring-catalog.md         Wire type catalog
+      shared-anti-isomorphism.md       Structural uniqueness check + wire topology audit
+      stage-2-voice-map.md             Voice layer + spatial map data
+      stage-3-archives.md              Found documents + endings
+      stage-4-story.md                 Session narrative REF nodes
+      stage-5-evidence.md              Evidence tracks (optional)
   README.md                            This file
   LICENSE                              MIT License
 ```
@@ -155,7 +150,7 @@ Prepare two things:
 
 ### Step 2: Generate the JSON
 
-1. Run `npm start` and open `localhost:8080` in a browser
+1. Open [liftrpg.co](https://liftrpg.co) in a browser (or serve locally with any static file server)
 2. Enter your workout and narrative brief in the intake form
 3. Select your available dice (or "No Dice" for diceless mechanics)
 4. Click "Begin Generation" to unlock the Wiring Blueprint stage
@@ -198,31 +193,20 @@ All designs must work in B&W (never rely on hue alone).
 
 ## 5. Development
 
-### Quick Start
+This is a static site with no build step. To run locally, serve the repo root with any static file server:
 
 ```bash
-npm install
-npm start     # http-server on :8080, serves public/
+npx http-server . -p 8080
 ```
 
 Open `localhost:8080` in a browser.
 
-### Dependencies
-
-- **http-server** (dev) -- Local static file server
-
 ### Adding a New Primitive Renderer
 
-1. Write a render function in `public/v2-engine/renderers.js` that returns a DOM element
+1. Write a render function in `v2-engine/renderers.js` that returns a DOM element
 2. Add a case in the appropriate renderer to dispatch by primitive_id
-3. Add structural CSS in `public/v2-engine/base-theme.css`
-4. Update the primitives catalog in `public/v2-engine/prompt-templates/shared-primitives-catalog.md`
-
-### Known Limitations
-
-- `npm test` is a stub with no tests wired
-- Print rendering is still being refined
-- Legacy JSON files in `legacy-archive/` use the v1 schema and cannot be rendered by the v2 engine
+3. Add structural CSS in `v2-engine/base-theme.css`
+4. Update the primitives catalog in `v2-engine/prompt-templates/shared-primitives-catalog.md`
 
 ---
 
