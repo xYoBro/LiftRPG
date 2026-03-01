@@ -2001,6 +2001,24 @@ ${JSON.stringify(context, null, 2)}
                 if (!obj.voice?.cover) e.push('Missing voice.cover');
                 if (!obj.voice?.manual) e.push('Missing voice.manual');
                 if (!obj.voice?.classifications) e.push('Missing voice.classifications');
+
+                // Detect unresolved template variables in voice string fields
+                const templateVarPattern = /\{\{[^}]+\}\}|\[\[[^\]]+\]\]/g;
+                function scanForTemplateVars(object, path) {
+                    if (!object || typeof object !== 'object') return;
+                    for (const key of Object.keys(object)) {
+                        const val = object[key];
+                        if (typeof val === 'string') {
+                            const matches = val.match(templateVarPattern);
+                            if (matches) {
+                                w.push(`Unresolved template variable in ${path}.${key}: ${matches.join(', ')}`);
+                            }
+                        } else if (typeof val === 'object') {
+                            scanForTemplateVars(val, `${path}.${key}`);
+                        }
+                    }
+                }
+                if (obj.voice) scanForTemplateVars(obj.voice, 'voice');
             } else if (num === 3) {
                 if (!obj.storyArchives || typeof obj.storyArchives !== 'object') e.push('Missing storyArchives object');
                 if (!Array.isArray(obj.storyEndings) || !obj.storyEndings.length) e.push('Missing storyEndings array');
@@ -2021,18 +2039,40 @@ ${JSON.stringify(context, null, 2)}
                 });
             } else if (num === 4) {
                 const keys = Object.keys(obj);
-                if (!keys.length) w.push('No REF nodes found');
+                if (!keys.length) e.push('No REF nodes found');
 
                 const s1 = currentPipelineData[1] || {};
                 const s1Encounters = s1.story?.encounters || [];
-                // Count expected REF nodes: 1 router + N branches per encounter
-                let expectedRefCount = 0;
+                const refScheme = s1.story?.refScheme || { prefix: 'R', weekDigits: 1, sessionDigits: 1 };
+
+                // Compute exact expected REF IDs and check each one
+                const missingRouters = [];
+                const missingBranches = [];
                 s1Encounters.forEach(enc => {
-                    expectedRefCount += 1 + (enc.outcomes?.length || 0);
+                    const refCode = refScheme.prefix +
+                        String(enc.week).padStart(refScheme.weekDigits || 1, '0') +
+                        String(enc.day).padStart(refScheme.sessionDigits || 1, '0');
+
+                    // Router node
+                    if (!obj[refCode]) missingRouters.push(refCode);
+
+                    // Branch nodes (one per outcome suffix)
+                    (enc.outcomes || []).forEach(o => {
+                        const branchId = refCode + (o.suffix || '');
+                        if (!obj[branchId]) missingBranches.push(branchId);
+                    });
                 });
 
-                if (expectedRefCount > 0 && keys.length !== expectedRefCount) {
-                    w.push(`Expected ${expectedRefCount} REF nodes (${s1Encounters.length} routers + ${expectedRefCount - s1Encounters.length} branches), found ${keys.length}. Engine will render what exists.`);
+                const totalMissing = missingRouters.length + missingBranches.length;
+                if (totalMissing > 0) {
+                    const expectedTotal = s1Encounters.length + s1Encounters.reduce((sum, enc) => sum + (enc.outcomes?.length || 0), 0);
+                    e.push(`Stage 4 missing ${totalMissing} of ${expectedTotal} REF nodes. Every encounter x every outcome must have content — missing nodes render as empty fragments.`);
+                    if (missingRouters.length) {
+                        e.push(`Missing routers (${missingRouters.length}): ${missingRouters.slice(0, 10).join(', ')}${missingRouters.length > 10 ? '...' : ''}`);
+                    }
+                    if (missingBranches.length) {
+                        e.push(`Missing branches (${missingBranches.length}): ${missingBranches.slice(0, 10).join(', ')}${missingBranches.length > 10 ? '...' : ''}`);
+                    }
                 }
 
                 keys.forEach(k => {

@@ -58,44 +58,80 @@ function decodeEntities(str) {
 // ---------------------------------------------------------
 
 
-// 3A/3B: Fill & Drain Clocks
+// 3A/3B: Fill & Drain Clocks — SVG pie-wedge circles (Blades in the Dark style)
 function renderClock(params) {
     var size = params.size || 6;
+    var svgNS = 'http://www.w3.org/2000/svg';
+    var dim = 40;
+    var cx = dim / 2, cy = dim / 2;
+    var r = 17;
+
     var container = document.createElement('div');
     container.className = 'clock-container';
-    for (var i = 1; i <= size; i++) {
-        var seg = document.createElement('div');
-        seg.className = 'clock-segment';
-        container.appendChild(seg);
+
+    var svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + dim + ' ' + dim);
+    svg.setAttribute('class', 'clock-svg');
+
+    // Outer circle
+    var circle = document.createElementNS(svgNS, 'circle');
+    circle.setAttribute('cx', String(cx));
+    circle.setAttribute('cy', String(cy));
+    circle.setAttribute('r', String(r));
+    circle.style.fill = 'var(--paper, #fff)';
+    circle.style.stroke = 'var(--ink, #111)';
+    circle.style.strokeWidth = '2';
+    svg.appendChild(circle);
+
+    // Wedge divider lines from center to circumference
+    for (var i = 0; i < size; i++) {
+        var angle = (2 * Math.PI * i / size) - Math.PI / 2;
+        var x2 = cx + r * Math.cos(angle);
+        var y2 = cy + r * Math.sin(angle);
+        var line = document.createElementNS(svgNS, 'line');
+        line.setAttribute('x1', String(cx));
+        line.setAttribute('y1', String(cy));
+        line.setAttribute('x2', String(x2.toFixed(1)));
+        line.setAttribute('y2', String(y2.toFixed(1)));
+        line.style.stroke = 'var(--ink, #111)';
+        line.style.strokeWidth = '1.5';
+        svg.appendChild(line);
     }
+
+    // Center dot
+    var dot = document.createElementNS(svgNS, 'circle');
+    dot.setAttribute('cx', String(cx));
+    dot.setAttribute('cy', String(cy));
+    dot.setAttribute('r', '2');
+    dot.style.fill = 'var(--ink, #111)';
+    svg.appendChild(dot);
+
+    container.appendChild(svg);
     return container;
 }
 
-// 3C: Tug-of-War Track
+// 3C: Tug-of-War Track — visual scale with directional pull
 function renderTugOfWar(params) {
     var size = params.size || 5;
     var thresholds = params.thresholds || [];
     var container = document.createElement('div');
     container.className = 'tug-container';
 
-    // Sort thresholds to find endpoints reliably
     var sortedTh = thresholds.slice().sort(function (a, b) { return a.value - b.value; });
-
-    // Find absolute bounds for labels (min and max values)
     var leftTh = sortedTh.length > 0 ? sortedTh[0] : null;
     var rightTh = sortedTh.length > 0 ? sortedTh[sortedTh.length - 1] : null;
 
+    // Left faction label with directional arrow
     if (leftTh) {
         var leftLabel = document.createElement('span');
         leftLabel.className = 'tug-label tug-label-left';
-        leftLabel.textContent = decodeEntities(leftTh.effect);
+        leftLabel.textContent = '\u25C4 ' + decodeEntities(leftTh.effect);
         container.appendChild(leftLabel);
     }
 
     var track = document.createElement('div');
     track.className = 'tug-track';
 
-    // Create a map for quick threshold lookup
     var thresholdMap = {};
     thresholds.forEach(function (th) {
         thresholdMap[th.value] = th.effect;
@@ -104,28 +140,24 @@ function renderTugOfWar(params) {
     for (var i = -size; i <= size; i++) {
         var boxWrap = document.createElement('div');
         boxWrap.className = 'tug-box-wrapper';
-        boxWrap.style.display = 'flex';
-        boxWrap.style.flexDirection = 'column';
-        boxWrap.style.alignItems = 'center';
 
         var box = document.createElement('div');
         box.className = 'tug-box' + (i === 0 ? ' tug-center' : '');
-        box.textContent = i;
+        // Only show number on center and threshold cells for cleaner look
+        if (i === 0 || thresholdMap[i]) {
+            box.textContent = i;
+        }
 
         if (thresholdMap[i]) {
             box.classList.add('tug-threshold');
-            box.style.borderWidth = '2px';
-            box.style.borderColor = 'var(--accent, #c45c00)';
         }
 
         boxWrap.appendChild(box);
 
-        // Render intermediate threshold labels, skip endpoints as they're handled by tug-label
+        // Intermediate threshold labels (skip endpoints)
         if (thresholdMap[i] && (!leftTh || leftTh.value !== i) && (!rightTh || rightTh.value !== i)) {
             var label = document.createElement('div');
             label.className = 'threshold-label tug-inter-label';
-            label.style.fontSize = '8px';
-            label.style.marginTop = '2px';
             label.textContent = decodeEntities(thresholdMap[i]);
             boxWrap.appendChild(label);
         }
@@ -134,10 +166,11 @@ function renderTugOfWar(params) {
     }
     container.appendChild(track);
 
+    // Right faction label with directional arrow
     if (rightTh && leftTh !== rightTh) {
         var rightLabel = document.createElement('span');
         rightLabel.className = 'tug-label tug-label-right';
-        rightLabel.textContent = decodeEntities(rightTh.effect);
+        rightLabel.textContent = decodeEntities(rightTh.effect) + ' \u25BA';
         container.appendChild(rightLabel);
     }
 
@@ -211,7 +244,7 @@ function renderProgressTrack(params) {
     return container;
 }
 
-// 3E: Heat / Threat Counter
+// 3E: Heat / Threat Counter — ominous rising gauge
 // params.compact: if true, omit threshold descriptions (for HUD mini-tracks)
 function renderHeatTrack(params) {
     var size = params.size || 10;
@@ -226,8 +259,10 @@ function renderHeatTrack(params) {
     boxRow.className = 'heat-track';
 
     var thresholdMap = {};
+    var thresholdValues = [];
     thresholds.forEach(function (th) {
         thresholdMap[th.value] = th.effect;
+        thresholdValues.push(th.value);
     });
 
     for (var i = 1; i <= size; i++) {
@@ -237,19 +272,23 @@ function renderHeatTrack(params) {
 
         if (i <= startValue) {
             box.classList.add('heat-box-filled');
-            box.style.backgroundColor = 'var(--ink, #111)';
-            box.style.color = '#fff';
         }
 
         if (thresholdMap[i]) {
             box.classList.add('heat-box-threshold');
         }
 
+        // Danger zone: cells at or past the highest threshold get heavier treatment
+        var maxThreshold = thresholdValues.length ? Math.max.apply(null, thresholdValues) : size;
+        if (i >= maxThreshold) {
+            box.classList.add('heat-box-danger');
+        }
+
         boxRow.appendChild(box);
     }
     outer.appendChild(boxRow);
 
-    // Render threshold descriptions below the track with value labels
+    // Threshold descriptions below the track
     if (thresholds.length && !compact) {
         var descList = document.createElement('div');
         descList.className = 'heat-threshold-list';
@@ -820,11 +859,24 @@ function renderEncounterSpread(container, data, week, startPage) {
     var pageNum = startPage;
     var pagesCreated = 0;
 
+    // Determine visual weight for this week's encounters
+    var weekVisualWeight = 'standard';
+    if (weekEncounters.length) {
+        // Use the heaviest visualWeight among this week's encounters
+        var weights = { 'sparse': 0, 'standard': 1, 'dense': 2, 'crisis': 3 };
+        weekEncounters.forEach(function (enc) {
+            var w = enc.visualWeight || 'standard';
+            if ((weights[w] || 0) > (weights[weekVisualWeight] || 0)) weekVisualWeight = w;
+        });
+    }
+
     // -- LEFT PAGE: HUD --
     pageNum++;
     pagesCreated++;
     var hudPage = createPage('encounter-hud');
     hudPage.classList.add('encounter-hud');
+    hudPage.dataset.week = week;
+    hudPage.dataset.visualWeight = weekVisualWeight;
     container.appendChild(hudPage);
 
     // Week header / classification
@@ -833,6 +885,19 @@ function renderEncounterSpread(container, data, week, startPage) {
     var classText = (voice.classifications && voice.classifications.sessionLog) || 'WEEK {{week}}';
     weekClassification.textContent = decodeEntities(classText.replace(/\{\{week\}\}/g, week));
     hudPage.appendChild(weekClassification);
+
+    // Progress indicator
+    var totalWeeks = workout.totalWeeks || 6;
+    if (totalWeeks > 1) {
+        var progressDiv = document.createElement('div');
+        progressDiv.className = 'week-progress';
+        for (var pw = 1; pw <= totalWeeks; pw++) {
+            var pip = document.createElement('span');
+            pip.className = 'week-pip' + (pw <= week ? ' week-pip-filled' : '') + (pw === week ? ' week-pip-current' : '');
+            progressDiv.appendChild(pip);
+        }
+        hudPage.appendChild(progressDiv);
+    }
 
     // Week alert
     if (voice.weekAlerts && voice.weekAlerts[week]) {
@@ -968,16 +1033,12 @@ function renderEncounterSpread(container, data, week, startPage) {
                     lbl.textContent = decodeEntities(t.name);
                     row.appendChild(lbl);
 
-                    // Render mini-versions of the tracks
+                    // Render tracks at native size (HUD sizing handled by CSS)
                     if (t.type === 'heat') {
                         var heat = renderHeatTrack({ size: t.size || 10, startValue: t.startValue, thresholds: t.thresholds, compact: true });
-                        heat.style.transform = 'scale(0.8)';
-                        heat.style.transformOrigin = 'left center';
                         row.appendChild(heat);
                     } else if (t.type === 'tug') {
                         var tug = renderTugOfWar({ size: t.size || 5, thresholds: t.thresholds });
-                        tug.style.transform = 'scale(0.8)';
-                        tug.style.transformOrigin = 'left center';
                         row.appendChild(tug);
                     }
                     trackerDiv.appendChild(row);
@@ -994,6 +1055,8 @@ function renderEncounterSpread(container, data, week, startPage) {
     pagesCreated++;
     var logPage = createPage('encounter-log');
     logPage.classList.add('encounter-log');
+    logPage.dataset.week = week;
+    logPage.dataset.visualWeight = weekVisualWeight;
     container.appendChild(logPage);
 
     var logClassification = document.createElement('div');
@@ -1072,6 +1135,56 @@ function renderEncounterSpread(container, data, week, startPage) {
             }
         }
 
+        // Rest encounter rendering — visual breathing room
+        if (enc.special === 'rest') {
+            sessionDiv.classList.add('session-rest');
+        }
+
+        // Branch encounter rendering — player choice presentation
+        if (enc.special === 'branch') {
+            sessionDiv.classList.add('session-branch');
+
+            // If encounter has options array, render as player choices
+            if (enc.options && enc.options.length) {
+                var choiceBox = document.createElement('div');
+                choiceBox.className = 'branch-choice-box';
+
+                enc.options.forEach(function (opt) {
+                    var choiceLine = document.createElement('div');
+                    choiceLine.className = 'branch-choice';
+                    var choiceLabel = document.createElement('span');
+                    choiceLabel.className = 'branch-choice-label';
+                    choiceLabel.textContent = decodeEntities(opt.label || '');
+                    choiceLine.appendChild(choiceLabel);
+                    if (opt.ref) {
+                        var choiceRef = document.createElement('span');
+                        choiceRef.className = 'branch-choice-ref';
+                        choiceRef.textContent = opt.ref;
+                        choiceLine.appendChild(choiceRef);
+                    }
+                    if (opt.cost) {
+                        var choiceCost = document.createElement('span');
+                        choiceCost.className = 'branch-choice-cost';
+                        choiceCost.textContent = decodeEntities(opt.cost);
+                        choiceLine.appendChild(choiceCost);
+                    }
+                    choiceBox.appendChild(choiceLine);
+                });
+
+                sessionDiv.appendChild(choiceBox);
+            }
+        }
+
+        // Conditional instructions — printed "IF tracker state, THEN action" blocks
+        if (enc.conditionalInstructions && enc.conditionalInstructions.length) {
+            enc.conditionalInstructions.forEach(function (ci) {
+                var ciDiv = document.createElement('div');
+                ciDiv.className = 'conditional-instruction conditional-' + (ci.style || 'default');
+                ciDiv.textContent = decodeEntities(ci.instruction || '');
+                sessionDiv.appendChild(ciDiv);
+            });
+        }
+
         // Find matching session type for workout log
         var sType = sessionTypes.find(function (st) {
             return st.days && st.days.indexOf(enc.day) !== -1;
@@ -1115,6 +1228,13 @@ function renderEncounterSpread(container, data, week, startPage) {
                 tr.appendChild(tdName);
                 var tdWeight = document.createElement('td');
                 tdWeight.className = 'setup-input-cell';
+                // Show intensity hint as light placeholder text
+                if (intensity) {
+                    var hint = document.createElement('span');
+                    hint.className = 'burden-hint';
+                    hint.textContent = intensity + (workout.intensityUnit ? ' ' + workout.intensityUnit : '');
+                    tdWeight.appendChild(hint);
+                }
                 tr.appendChild(tdWeight);
                 var tdSets = document.createElement('td');
                 tdSets.className = 'workout-log-sets';
@@ -1239,6 +1359,7 @@ function renderFacilityGrid(mapData, week) {
     var levels = mapData.levels || [];
     var container = document.createElement('div');
     container.className = 'facility-grid';
+    container.dataset.week = week;
 
     rooms.forEach(function (floor, fi) {
         var floorDiv = document.createElement('div');
@@ -1338,6 +1459,7 @@ function renderPtpMapWeek(mapData, week) {
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', minX + ' ' + minY + ' ' + vbW + ' ' + vbH);
     svg.setAttribute('class', 'ptp-map');
+    svg.setAttribute('data-week', week);
     svg.style.width = '100%';
     svg.style.maxHeight = '3.8in';
 
@@ -1457,6 +1579,7 @@ function renderLinearTrackWeek(mapData, week) {
     var position = weekData.position || 0;
     var container = document.createElement('div');
     container.className = 'linear-track-map';
+    container.dataset.week = week;
 
     for (var i = 0; i < size; i++) {
         var box = document.createElement('div');
@@ -1989,9 +2112,13 @@ function renderEvidencePages(container, data, startPage) {
     page.appendChild(h1);
 
     if (archiveVoice.evidenceIntro) {
+        var refScheme = (data.story && data.story.refScheme) || { prefix: 'R', weekDigits: 1, sessionDigits: 1 };
+        var introText = archiveVoice.evidenceIntro
+            .replace(/\{\{prefix\}\}/g, refScheme.prefix)
+            .replace(/\[\[prefix\]\]/g, refScheme.prefix);
         var intro = document.createElement('div');
         intro.className = 'evidence-intro';
-        intro.textContent = decodeEntities(archiveVoice.evidenceIntro);
+        intro.textContent = decodeEntities(introText);
         page.appendChild(intro);
     }
 

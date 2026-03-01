@@ -243,7 +243,7 @@ Produce a single JSON object with these exact top-level keys:
   },
   "art": {
     "style": "geometric | organic | technical | minimal | brutalist | interference | topographic | none — drives SVG generation style. Match to subject: geometric for maps/clocks/architecture, organic for nature/growth/decay, technical for sci-fi/engineering/systems, interference for glitch/signal/corruption, topographic for terrain/exploration. This is the visual LANGUAGE of inline illustrations, not a decoration toggle.",
-    "coverSvg": "STRING (optional) — inline SVG for cover art using currentColor. Abstract, atmospheric, diegetic. NOT literal scene illustration. Think: topographic contour lines for exploration, circuit traces for cyberpunk, institutional seal for bureaucracy, interference patterns for corruption.",
+    "coverSvg": "STRING (optional) — inline SVG for cover art using currentColor. Abstract, atmospheric, diegetic. NOT literal scene illustration. Must be visually compelling at 5.5in × 8.5in. A simple geometric shape is not enough — layer elements that communicate the genre AND the emotional core of this zine. Think: a distorted floor plan with impossible angles, a scale with uneven arms, circuit traces that form a face, topographic lines that spiral inward. The cover is the player&apos;s first impression — make it feel like picking up an artifact.",
     "coverImage": "STRING (optional) — base64 data URI for cover illustration. Only if user provides an image or uses an image generation tool. When present, takes priority over coverSvg. When absent, coverSvg is used.",
     "dividerSvg": "STRING (optional) — inline SVG for section dividers using currentColor. Keep under 200 chars. Simple geometric or organic line that matches art.style."
   },
@@ -275,12 +275,27 @@ Produce a single JSON object with these exact top-level keys:
         }
       ],
       "special": "null | 'boss' | 'rest' | 'branch'",
+      "visualWeight": "STRING — 'standard' | 'sparse' | 'dense' | 'crisis'. Controls page density and typographic drama. See Encounter notes below.",
       "bossRules": {
         "title": "STRING (optional) — title for special boss rules block",
         "preamble": "STRING (optional) — flavor text describing mechanics constraint",
         "steps": ["STRING", ...],
         "stakes": "STRING (optional) — bottom summary of success/failure"
       },
+      "options": [
+        {
+          "label": "STRING — diegetic choice label",
+          "ref": "STRING — REF code for this choice path",
+          "cost": "STRING — tracker/resource cost (optional)"
+        }
+      ],
+      "conditionalInstructions": [
+        {
+          "condition": "STRING — tracker state trigger (e.g. 'DISSONANCE reaches 6')",
+          "instruction": "STRING — diegetic instruction for the player",
+          "style": "STRING — 'default' | 'alert'"
+        }
+      ],
       "marginalia": "STRING | null — optional sidebar flavor text"
     }
   ],
@@ -296,10 +311,21 @@ Produce a single JSON object with these exact top-level keys:
 
 - One encounter per lifting session across all weeks. 6-week, 3-day program = 18 encounters.
 - `title`: Diegetic encounter name from the fiction. NOT "Week 1 Day 1".
-- `narrative`: Ground the reader in physical space. No exposition dumps. Sensory details.
+- `narrative`: Ground the reader in physical space. No exposition dumps. Sensory details. **Narrative threading:** encounter narratives should form a visible thread across each week. Session 1 introduces a detail. Session 2 references it changed. Session 3 reveals why. The player should feel the world moving between sessions.
 - `outcomes[]`: Ranges MUST match `mechanics.dice.outcomes[]` ranges. Each outcome has genuinely different narrative — NOT just severity variations of the same event.
-- `special`: "boss" encounters should align with peak-intensity weeks.
+- `special`: **Minimum variety requirement** over a 6-week program:
+  - At least **1 boss** encounter (peak intensity week)
+  - At least **1 rest** encounter (deload or early week — larger narrative, lighter mechanical pressure)
+  - At least **1 branch** encounter (player chooses between paths — include `options[]` array)
+  - Remaining encounters are standard. A zine with 18 identical sessions is a failed design.
 - `bossRules`: **REQUIRED** when `special` is `"boss"`. Every boss encounter MUST have a `bossRules` object with at least `title` and `steps[]` (non-empty). This renders a distinct bordered procedure box. Without it, the boss encounter renders as a normal session with no special protocol — a silent failure.
+- `options[]`: **REQUIRED** when `special` is `"branch"`. Present 2-3 choices with distinct REF codes and costs. The renderer displays these as a choice box before the workout table.
+- `conditionalInstructions[]`: Optional. Printed "IF tracker state, THEN action" blocks that create immediate feedback when tracker thresholds are crossed. Use diegetic language. The renderer styles these as distinct instruction panels.
+- `visualWeight`: Assign based on the weekly arc:
+  - Establishment phase: mostly `"standard"`, allow `"sparse"` for rest encounters
+  - Escalation phase: mostly `"standard"`, include `"dense"` for key moments
+  - Crisis/peak weeks: `"dense"` or `"crisis"` for climactic sessions
+  - No more than 2 `"crisis"` encounters per zine. Boss encounters should be `"dense"` or `"crisis"`.
 
 ### `map` (optional — set to `null` if no spatial element)
 

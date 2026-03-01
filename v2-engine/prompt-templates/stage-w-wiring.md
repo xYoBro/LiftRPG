@@ -68,13 +68,28 @@ Declare your chosen arc shape, your phase boundaries (which weeks belong to whic
 ## CONSTRAINTS
 
 1. Total wires: **2 minimum, 8 maximum.** Fewer than 2 means no interactions. More than 8 exceeds paper-trackability.
-2. At least **1 wire must be a feedback-loop or bidirectional.** Without feedback, mechanics are parallel lines that never cross.
+2. **At least 2 wires must create cross-subsystem effects.** Wire A connects a tracker to another tracker (e.g., clock threshold → track shift). Wire B connects a tracker to map, archive, or encounter state. Single-system wires (clock fills → read archive of that clock) do not count toward this minimum. The player should feel that marking one tracker changes the pressure on another.
 3. **Week 1 complexity budget ≤ 4.** The player must learn the game while also learning their workout.
 4. **Peak complexity ≤ 10** (matches the primitives catalog budget).
 5. Every `printInstruction` must pass the **ZERO MATH** rule: no arithmetic, no addition, no "calculate X." Roll → lookup → mark. This also applies to wire `effect` fields — never write "add +N to rolls" or "subtract from track." If a wire needs to change how dice resolve, use a binary state swap: "treat all X results as Y instead."
 6. Every `printInstruction` must use **DIEGETIC NAMES** — fiction-appropriate labels, not game-design jargon. Not "fill clock" — "SIGNAL FIRE blazes higher."
 7. Pillar weights must sum to **8-15**, with **at least 2 pillars at weight 0**.
 8. **Mechanical breadth constraint:** `categoriesExcluded` must contain at least 1 category. Every zine has blind spots — declare yours.
+9. **Resource economy:** If "Choices Mattering" or "Progression" is weighted ≥2, you MUST include at least one resource system (Category 4 in the primitives catalog). Resources create the only print-compatible decision loop: earn by lifting → choose when/how to spend. Without resources, the player is a passenger.
+10. **Player agency floor:** At least one non-zero pillar must involve player decisions. A zine where the player never makes a choice — only lifts, rolls, and reads — is a zine where the player is a passenger, not a protagonist. If "Choices Mattering" is 0, ensure "Role-Playing" or "Exploration" provides some decision point.
+
+---
+
+## THE MASTER CLOCK
+
+The workout program is the clock that drives all systems. Every wire you design must trace back to the workout as its ultimate energy source:
+
+1. **Player lifts** → energy flows into the game
+2. **Dice roll** → energy distributes across trackers
+3. **Trackers cross thresholds** → wires fire, cascading effects through map/archive/encounter state
+4. **World changes** → player sees consequences at the next session
+
+If a system doesn&apos;t connect back to the workout, it&apos;s decoration. The workout IS the engine — everything else is downstream.
 
 ---
 

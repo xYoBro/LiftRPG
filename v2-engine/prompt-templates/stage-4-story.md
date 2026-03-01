@@ -66,6 +66,17 @@ At least 1 branch node per session should end with an unresolved image or detail
 
 ---
 
+## COMPLETENESS CHECK (MANDATORY)
+
+Before outputting your JSON, verify you have produced every required node:
+
+- **Total nodes needed** = (number of encounters) × (1 router + N outcome branches)
+- For a typical 6-week, 3-session program with 3 outcomes: 18 × 4 = **72 nodes**
+- **Every encounter MUST have its router AND all branch nodes.** Missing even one means the player rolls dice and gets nothing — the game breaks. The engine validates this and will reject incomplete output.
+- Count your output keys and compare against the expected total. If they don&apos;t match, find and fill the gaps before outputting.
+
+---
+
 ## OUTPUT
 
 Return ONLY a valid JSON object where each key is a REF ID and each value is `{ "type": "...", "html": "..." }`. No wrapping object, no commentary, no markdown fences.
