@@ -59,7 +59,7 @@ No modifier may require arithmetic. Modifiers change WHICH table you read or WHE
 ## 3. TRACKING MECHANICS (Pick 0-4)
 
 3A. Fill Clocks — N boxes, fill on tick, trigger at threshold. Complexity: 1. Wires: threshold-gate, unlock-chain, resource-cycle
-3B. Drain Clocks — Start full, remove on tick, trigger when empty. Feels like a fuse. Complexity: 1. Wires: escalation (reduce starting value), feedback-loop (restoration)
+3B. Drain Clocks — Start full, cross off one box per tick, trigger when all crossed off. Feels like a fuse. PENCIL RULE: "remove" means cross off (draw an X), never erase. The player must never need an eraser. If a wire restores segments, use a separate row of restoration boxes rather than un-crossing marks. Complexity: 1. Wires: escalation (reduce starting value), feedback-loop (restoration)
 3C. Tug-of-War Track — Single track, pointer at center, outcomes push left/right. Endpoints trigger events. Complexity: 2. Wires: conditional-routing (which side determines story path), feedback-loop
 3D. Progress Tracks (Ironsworn) — Fill 0-10 boxes, then roll against track value. Success uncertain even at full. Complexity: 2. Wires: threshold-gate, unlock-chain
 3E. Heat / Threat Level — Counter 0-10, rises on events, thresholds trigger escalating consequences, never resets. Complexity: 1. Wires: threshold-gate (only rises, perfect escalation source), escalation

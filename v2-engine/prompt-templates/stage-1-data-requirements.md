@@ -299,7 +299,7 @@ Produce a single JSON object with these exact top-level keys:
 - `narrative`: Ground the reader in physical space. No exposition dumps. Sensory details.
 - `outcomes[]`: Ranges MUST match `mechanics.dice.outcomes[]` ranges. Each outcome has genuinely different narrative — NOT just severity variations of the same event.
 - `special`: "boss" encounters should align with peak-intensity weeks.
-- `bossRules`: Include this object ONLY if `special` is `"boss"`. This renders a distinct bordered procedure box.
+- `bossRules`: **REQUIRED** when `special` is `"boss"`. Every boss encounter MUST have a `bossRules` object with at least `title` and `steps[]` (non-empty). This renders a distinct bordered procedure box. Without it, the boss encounter renders as a normal session with no special protocol — a silent failure.
 
 ### `map` (optional — set to `null` if no spatial element)
 
@@ -391,7 +391,7 @@ Available page types:
 
 Your `pages[]` structure is controlled by your `mechanicalProfile.pageVocabulary`. Design choices:
 
-- **Omit `tracker-sheet`** if mechanics are minimal enough to track inline (complexity ≤ 4)
+- **Omit `tracker-sheet`** only if total mechanic count (clocks + tracks + resources) is 4 or fewer. At 5+ mechanics, include `tracker-sheet` — the player needs a central reference page to see all game state at once, especially in a gym context
 - **Omit `setup`** if the workout doesn&apos;t require weight calculations
 - **Omit `ref-pages`** for a diceless zine where choices are embedded in encounters
 - **Interleave `archive` entries** between encounter weeks for discovery-paced reveals

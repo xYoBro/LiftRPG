@@ -1929,6 +1929,15 @@ ${JSON.stringify(context, null, 2)}
                             archiveKeysSeen.add(p.section);
                         }
                     });
+
+                    // Guardrail: tracker-sheet recommended when mechanic count > 4
+                    var hasTrackerSheet = (obj.pages || []).some(function (p) { return p.type === 'tracker-sheet'; });
+                    var mechanicCount = (obj.mechanics?.clocks?.length || 0) +
+                                        (obj.mechanics?.tracks?.length || 0) +
+                                        (obj.mechanics?.resources?.length || 0);
+                    if (mechanicCount > 4 && !hasTrackerSheet) {
+                        w.push(`${mechanicCount} mechanics defined but no tracker-sheet page in pages[]. Consider adding one for playability.`);
+                    }
                 }
 
                 if (obj.workout && Array.isArray(obj.workout.sessionTypes)) {
@@ -1967,6 +1976,12 @@ ${JSON.stringify(context, null, 2)}
                         const encOutcomes = enc.outcomes || [];
                         if (diceOutcomes.length > 0 && encOutcomes.length !== diceOutcomes.length) {
                             w.push(`Encounter index ${idx} outcomes length (${encOutcomes.length}) doesn't match dice outcomes (${diceOutcomes.length})`);
+                        }
+                        if (enc.special === 'boss' && !enc.bossRules) {
+                            w.push(`Encounter ${enc.id || idx} has special:"boss" but missing bossRules object`);
+                        }
+                        if (enc.bossRules && (!Array.isArray(enc.bossRules.steps) || !enc.bossRules.steps.length)) {
+                            w.push(`Encounter ${enc.id || idx} bossRules has missing or empty steps array`);
                         }
                     });
                 }

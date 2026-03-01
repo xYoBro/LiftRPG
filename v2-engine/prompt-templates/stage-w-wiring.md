@@ -71,7 +71,7 @@ Declare your chosen arc shape, your phase boundaries (which weeks belong to whic
 2. At least **1 wire must be a feedback-loop or bidirectional.** Without feedback, mechanics are parallel lines that never cross.
 3. **Week 1 complexity budget ≤ 4.** The player must learn the game while also learning their workout.
 4. **Peak complexity ≤ 10** (matches the primitives catalog budget).
-5. Every `printInstruction` must pass the **ZERO MATH** rule: no arithmetic, no addition, no "calculate X." Roll → lookup → mark.
+5. Every `printInstruction` must pass the **ZERO MATH** rule: no arithmetic, no addition, no "calculate X." Roll → lookup → mark. This also applies to wire `effect` fields — never write "add +N to rolls" or "subtract from track." If a wire needs to change how dice resolve, use a binary state swap: "treat all X results as Y instead."
 6. Every `printInstruction` must use **DIEGETIC NAMES** — fiction-appropriate labels, not game-design jargon. Not "fill clock" — "SIGNAL FIRE blazes higher."
 7. Pillar weights must sum to **8-15**, with **at least 2 pillars at weight 0**.
 8. **Mechanical breadth constraint:** `categoriesExcluded` must contain at least 1 category. Every zine has blind spots — declare yours.
