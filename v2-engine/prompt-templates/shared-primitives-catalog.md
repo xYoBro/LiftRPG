@@ -1,4 +1,4 @@
-# 4. MECHANICAL SELECTION (THE PRIMITIVES CATALOG)
+# MECHANICAL SELECTION (THE PRIMITIVES CATALOG)
 
 ## MECHANICAL PROFILE GATE
 
@@ -38,7 +38,7 @@ Include exactly ONE "Resolution" mechanic from the list below. All other tracks,
 All resolution systems are pure lookups: roll → find number in table → read result. No math.
 
 1A. Percentile / d100 Roll-Under — Roll d100, look up result in range table. Clinical, precise. Requires: d10, d%. Complexity: 1
-1B. 2d6 Bell Curve (PbtA) — Roll 2d6, sum them, look up result: 2-6=miss, 7-9=partial, 10-12=hit. Requires: d6. Complexity: 1
+1B. 2d6 Bell Curve (PbtA) — Roll 2d6, cross-reference on a printed 6×6 grid (rows = die 1, columns = die 2) to read result: miss / partial / hit. No addition needed — the grid does the math. Requires: d6. Complexity: 1
 1C. Single d6 Lookup — Roll 1d6, look up result in 6-row table. Fast, tactile. Requires: d6. Complexity: 1
 1D. Degrading Threshold — Roll 1d6, check if result is at or under current threshold mark. Threshold degrades over time (cross off numbers). Requires: d6. Complexity: 2
 1E. Advantage/Disadvantage — Roll 2d6, take higher (advantage) or lower (disadvantage). Stacks with any base system. Requires: d6. Complexity: 1
@@ -63,7 +63,7 @@ No modifier may require arithmetic. Modifiers change WHICH table you read or WHE
 3C. Tug-of-War Track — Single track, pointer at center, outcomes push left/right. Endpoints trigger events. Complexity: 2. Wires: conditional-routing (which side determines story path), feedback-loop
 3D. Progress Tracks (Ironsworn) — Fill 0-10 boxes, then roll against track value. Success uncertain even at full. Complexity: 2. Wires: threshold-gate, unlock-chain
 3E. Heat / Threat Level — Counter 0-10, rises on events, thresholds trigger escalating consequences, never resets. Complexity: 1. Wires: threshold-gate (only rises, perfect escalation source), escalation
-3F. Skill Tree / Unlock Path — Branching tree, unlock nodes by spending resources. Footprint: Large. Complexity: 3. Wires: unlock-chain (node completion activates new mechanics)
+3F. Skill Tree / Unlock Path — Branching tree, unlock nodes by spending resources. Footprint: Large. Complexity: 3. Wires: unlock-chain (node completion activates new mechanics). **ENGINE NOTE:** Renderer support is limited — skill trees render as flat node lists, not visual branching diagrams. For true branching visuals, prefer 5B (Point-to-Point Map) as the spatial expression of an unlock path.
 3G. Faction Reputation — Multiple faction tracks (2-4). Actions raise one, may lower another. Footprint: Large. Complexity: 3. Wires: conditional-routing (standing determines content access), resource-cycle
 
 ## 4. RESOURCE SYSTEMS (Pick 0-2)
@@ -80,7 +80,6 @@ Resources are tracked by filling or crossing off boxes. No running totals, no ne
 5A. Facility Grid Map — Pre-printed grid with rooms. Player marks position. Rooms reveal/lock over weeks. Footprint: Full Page. Complexity: 3. Wires: threshold-gate (locked rooms unlocked by tracker state)
 5B. Point-to-Point Map — Named locations connected by paths. Move along paths by dice/choices. Footprint: Full Page. Complexity: 3. Wires: threshold-gate (gated nodes), conditional-routing (path choice)
 5C. Track/Race — Linear track start to finish. Advance by session performance. Complexity: 2. Wires: threshold-gate (position-based triggers)
-5D. No Map — No spatial element. All narrative is text-based. Complexity: 0. Wires: none
 
 ## 6. NARRATIVE STRUCTURES (Pick 1-2)
 
@@ -99,9 +98,9 @@ Resources are tracked by filling or crossing off boxes. No running totals, no ne
 7D. Choose-Your-Action — After workout, choose from 2-3 available actions (investigate, fortify, rest). Complexity: 2
 7E. Push-or-Accept — After initial roll, push for better result at a cost. The between-sets decision. Complexity: 2
 
-## 8. END CONDITIONS (Pick 2-4, Complexity: 1 each)
+## 8. END CONDITIONS (Pick 2-4, Complexity: 1 total)
 
-Multiple endings triggered by different game states (clocks filled, resources depleted, choices made, thresholds crossed).
+Multiple endings triggered by different game states (clocks filled, resources depleted, choices made, thresholds crossed). End conditions are narrative triggers, not active mechanics — the full set costs 1 complexity regardless of how many endings you define.
 
 ## COMPLEXITY BUDGET
 
@@ -110,8 +109,8 @@ Goldilocks zone: 3-9. Minimalist zines (complexity 3-5) are valid designs — th
 
 Example combinations:
 
-- Survival Horror (8/10): 1D(2) + 2A(2) + 3B(1) + 4C(1) + 6E(1) + 7E(2) + 8(1) — 6 categories
-- Political Intrigue (9/10): 1B(1) + 3G(3) + 3C(2) + 6F(3) + 7D(2) + 8(1) — 5 categories
-- Noir Investigation (6/10): 1A(1) + 3E(1) + 4A(1) + 6D(2) + 7A(1) + 8(1) — 6 categories
-- Literary Thriller (3/10): 1G(1) + 6C(1) + 7A(1) + 8(1) — 4 categories, no trackers, no resources, no map
-- Cosmic Horror (5/10): 1C(1) + 3E(1) + 3B(1) + 6A(1) + 7C(1) + 8(1) — 4 categories, no modifiers, no resources, no map
+- Survival Horror (10/10): 1D(2) + 2A(2) + 3B(1) + 4C(1) + 6E(1) + 7E(2) + 8(1) — 7 categories
+- Political Intrigue (10/10): 1B(1) + 3G(3) + 3C(2) + 6C(1) + 7D(2) + 8(1) — 5 categories
+- Noir Investigation (7/10): 1A(1) + 3E(1) + 4A(1) + 6D(2) + 7A(1) + 8(1) — 6 categories
+- Literary Thriller (4/10): 1G(1) + 6C(1) + 7A(1) + 8(1) — 4 categories, no trackers, no resources, no map
+- Cosmic Horror (6/10): 1C(1) + 3E(1) + 3B(1) + 6A(1) + 7C(1) + 8(1) — 5 categories, no modifiers, no resources, no map
