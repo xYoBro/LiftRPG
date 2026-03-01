@@ -42,6 +42,17 @@ function sanitizeHtml(htmlStr) {
     return s;
 }
 
+// Decode the 5 standard XML entities in textContent strings from LLM JSON
+function decodeEntities(str) {
+    if (typeof str !== 'string') return '';
+    return str
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'");
+}
+
 // ---------------------------------------------------------
 // Primitive Component Renderers
 // ---------------------------------------------------------
@@ -77,7 +88,7 @@ function renderTugOfWar(params) {
     if (leftTh) {
         var leftLabel = document.createElement('span');
         leftLabel.className = 'tug-label tug-label-left';
-        leftLabel.textContent = leftTh.effect;
+        leftLabel.textContent = decodeEntities(leftTh.effect);
         container.appendChild(leftLabel);
     }
 
@@ -115,7 +126,7 @@ function renderTugOfWar(params) {
             label.className = 'threshold-label tug-inter-label';
             label.style.fontSize = '8px';
             label.style.marginTop = '2px';
-            label.textContent = thresholdMap[i];
+            label.textContent = decodeEntities(thresholdMap[i]);
             boxWrap.appendChild(label);
         }
 
@@ -126,7 +137,7 @@ function renderTugOfWar(params) {
     if (rightTh && leftTh !== rightTh) {
         var rightLabel = document.createElement('span');
         rightLabel.className = 'tug-label tug-label-right';
-        rightLabel.textContent = rightTh.effect;
+        rightLabel.textContent = decodeEntities(rightTh.effect);
         container.appendChild(rightLabel);
     }
 
@@ -175,7 +186,7 @@ function renderProgressTrack(params) {
             label.className = 'threshold-label';
             label.style.fontSize = '8px';
             label.style.marginTop = '2px';
-            label.textContent = thresholdMap[i];
+            label.textContent = decodeEntities(thresholdMap[i]);
             boxWrap.appendChild(label);
         }
 
@@ -249,7 +260,7 @@ function renderHeatTrack(params) {
             marker.className = 'heat-threshold-marker';
             marker.textContent = th.value + ':';
             desc.appendChild(marker);
-            desc.appendChild(document.createTextNode(' ' + th.effect));
+            desc.appendChild(document.createTextNode(' ' + decodeEntities(th.effect)));
             descList.appendChild(desc);
         });
         outer.appendChild(descList);
@@ -273,7 +284,7 @@ function renderSkillTree(params) {
         row.appendChild(checkbox);
         var label = document.createElement('span');
         label.className = 'skill-label';
-        label.textContent = (node.name || '') + ' (cost: ' + (node.cost || 0) + ')';
+        label.textContent = decodeEntities((node.name || '') + ' (cost: ' + (node.cost || 0) + ')');
         row.appendChild(label);
         if (node.requiresNodeId) {
             var req = document.createElement('span');
@@ -330,7 +341,7 @@ function renderFactionTrack(params) {
             label.style.marginTop = '4px';
             label.style.textAlign = 'center';
             label.style.wordBreak = 'break-word';
-            label.textContent = labelMap[i];
+            label.textContent = decodeEntities(labelMap[i]);
             boxWrap.appendChild(label);
         }
 
@@ -372,7 +383,7 @@ function renderCoverPage(container, data) {
     if (voice.classification) {
         var stamp = document.createElement('div');
         stamp.className = 'classification-stamp';
-        stamp.textContent = voice.classification;
+        stamp.textContent = decodeEntities(voice.classification);
         page.appendChild(stamp);
     }
 
@@ -380,7 +391,7 @@ function renderCoverPage(container, data) {
     if (voice.department) {
         var dept = document.createElement('div');
         dept.className = 'cover-department';
-        dept.textContent = voice.department;
+        dept.textContent = decodeEntities(voice.department);
         page.appendChild(dept);
     }
 
@@ -395,14 +406,14 @@ function renderCoverPage(container, data) {
     // Title
     var title = document.createElement('div');
     title.className = 'cover-title';
-    title.textContent = meta.title || 'UNTITLED ZINE';
+    title.textContent = decodeEntities(meta.title || 'UNTITLED ZINE');
     page.appendChild(title);
 
     // Subject line
     if (voice.subjectLine) {
         var subj = document.createElement('div');
         subj.className = 'cover-subject';
-        subj.textContent = voice.subjectLine;
+        subj.textContent = decodeEntities(voice.subjectLine);
         page.appendChild(subj);
     }
 
@@ -410,7 +421,7 @@ function renderCoverPage(container, data) {
     if (voice.tagline) {
         var tag = document.createElement('div');
         tag.className = 'cover-tagline';
-        tag.textContent = voice.tagline;
+        tag.textContent = decodeEntities(voice.tagline);
         page.appendChild(tag);
     }
 
@@ -425,7 +436,7 @@ function renderCoverPage(container, data) {
     // Author
     var author = document.createElement('div');
     author.className = 'cover-author';
-    author.textContent = meta.author || 'Iron & Aether Engine v2';
+    author.textContent = decodeEntities(meta.author || 'Iron & Aether Engine v2');
     page.appendChild(author);
 
     container.appendChild(page);
@@ -445,7 +456,7 @@ function renderManualPages(container, data, startPage) {
     // Manual title
     var h1 = document.createElement('h1');
     h1.className = 'manual-title';
-    h1.textContent = voice.title || 'OPERATIONAL BRIEF';
+    h1.textContent = decodeEntities(voice.title || 'OPERATIONAL BRIEF');
     page.appendChild(h1);
 
     for (var i = 0; i < sections.length; i++) {
@@ -455,7 +466,7 @@ function renderManualPages(container, data, startPage) {
 
         var heading = document.createElement('h2');
         heading.className = 'manual-heading';
-        heading.textContent = sec.heading || '';
+        heading.textContent = decodeEntities(sec.heading || '');
         block.appendChild(heading);
 
         var body = document.createElement('div');
@@ -491,7 +502,7 @@ function renderTrackerSheet(container, data, startPage) {
     container.appendChild(page);
 
     var h1 = document.createElement('h1');
-    h1.textContent = (voice.labels && voice.labels.mechanicsHeading) || 'CHARACTER DOSSIER';
+    h1.textContent = decodeEntities((voice.labels && voice.labels.mechanicsHeading) || 'CHARACTER DOSSIER');
     page.appendChild(h1);
 
     // Clocks
@@ -507,7 +518,7 @@ function renderTrackerSheet(container, data, startPage) {
             row.className = 'tracker-row';
             var label = document.createElement('span');
             label.className = 'tracker-label';
-            label.textContent = c.name;
+            label.textContent = decodeEntities(c.name);
             row.appendChild(label);
             var dirLabel = document.createElement('span');
             dirLabel.className = 'tracker-info';
@@ -531,13 +542,13 @@ function renderTrackerSheet(container, data, startPage) {
             }
             var triggerDiv = document.createElement('div');
             triggerDiv.className = 'tracker-trigger';
-            triggerDiv.textContent = triggerText;
+            triggerDiv.textContent = decodeEntities(triggerText);
             clockSection.appendChild(triggerDiv);
 
             if (c.flavor) {
                 var flav = document.createElement('div');
                 flav.className = 'tracker-flavor';
-                flav.textContent = c.flavor;
+                flav.textContent = decodeEntities(c.flavor);
                 clockSection.appendChild(flav);
             }
         });
@@ -557,7 +568,7 @@ function renderTrackerSheet(container, data, startPage) {
             row.className = 'tracker-row';
             var label = document.createElement('span');
             label.className = 'tracker-label';
-            label.textContent = t.name + ' (' + t.type + ')';
+            label.textContent = decodeEntities(t.name) + ' (' + t.type + ')';
             row.appendChild(label);
             trackSection.appendChild(row);
 
@@ -574,7 +585,7 @@ function renderTrackerSheet(container, data, startPage) {
             if (t.flavor) {
                 var flav = document.createElement('div');
                 flav.className = 'tracker-flavor';
-                flav.textContent = t.flavor;
+                flav.textContent = decodeEntities(t.flavor);
                 trackSection.appendChild(flav);
             }
         });
@@ -623,7 +634,7 @@ function renderTrackerSheet(container, data, startPage) {
             row.appendChild(nameLine);
             var effectLine = document.createElement('div');
             effectLine.className = 'codeword-effect';
-            effectLine.textContent = cw.effect;
+            effectLine.textContent = decodeEntities(cw.effect);
             row.appendChild(effectLine);
             cwSection.appendChild(row);
         });
@@ -635,7 +646,7 @@ function renderTrackerSheet(container, data, startPage) {
         var statSection = document.createElement('div');
         statSection.className = 'tracker-section';
         var statH = document.createElement('h2');
-        statH.textContent = mech.dice.stat.name || 'STAT';
+        statH.textContent = decodeEntities(mech.dice.stat.name || 'STAT');
         statSection.appendChild(statH);
         var statInfo = document.createElement('div');
         statInfo.className = 'tracker-row';
@@ -702,13 +713,13 @@ function renderSetupPage(container, data, startPage) {
     container.appendChild(page);
 
     var h1 = document.createElement('h1');
-    h1.textContent = setup.title || 'SETUP';
+    h1.textContent = decodeEntities(setup.title || 'SETUP');
     page.appendChild(h1);
 
     if (setup.instructions) {
         var instr = document.createElement('p');
         instr.className = 'setup-instructions';
-        instr.textContent = setup.instructions;
+        instr.textContent = decodeEntities(setup.instructions);
         page.appendChild(instr);
     }
 
@@ -739,7 +750,7 @@ function renderSetupPage(container, data, startPage) {
         setup.fields.forEach(function (f) {
             var tr = document.createElement('tr');
             var tdLabel = document.createElement('td');
-            tdLabel.textContent = f.label;
+            tdLabel.textContent = decodeEntities(f.label);
             tr.appendChild(tdLabel);
             var tdRM = document.createElement('td');
             tdRM.className = 'setup-input-cell';
@@ -800,7 +811,7 @@ function renderEncounterSpread(container, data, week, startPage) {
     var weekClassification = document.createElement('div');
     weekClassification.className = 'classification';
     var classText = (voice.classifications && voice.classifications.sessionLog) || 'WEEK {{week}}';
-    weekClassification.textContent = classText.replace(/\{\{week\}\}/g, week);
+    weekClassification.textContent = decodeEntities(classText.replace(/\{\{week\}\}/g, week));
     hudPage.appendChild(weekClassification);
 
     // Week alert
@@ -808,7 +819,7 @@ function renderEncounterSpread(container, data, week, startPage) {
         var alert = voice.weekAlerts[week];
         var alertDiv = document.createElement('div');
         alertDiv.className = 'week-alert week-alert-' + (alert.type || 'note');
-        if (alert.text) alertDiv.textContent = alert.text;
+        if (alert.text) alertDiv.textContent = decodeEntities(alert.text);
         else if (alert.type === 'intake') alertDiv.textContent = 'INTAKE';
         hudPage.appendChild(alertDiv);
     }
@@ -818,7 +829,7 @@ function renderEncounterSpread(container, data, week, startPage) {
         if (bossAlert.alert) {
             var bossAlertDiv = document.createElement('div');
             bossAlertDiv.className = 'week-alert week-alert-boss';
-            bossAlertDiv.textContent = bossAlert.alert;
+            bossAlertDiv.textContent = decodeEntities(bossAlert.alert);
             hudPage.appendChild(bossAlertDiv);
         }
     }
@@ -831,7 +842,7 @@ function renderEncounterSpread(container, data, week, startPage) {
         var mapTitle = document.createElement('div');
         mapTitle.className = 'hud-map-title';
         var mapTitleText = (voice.hud && voice.hud.mapTitle) || 'MAP — WEEK {{week}}';
-        mapTitle.textContent = mapTitleText.replace(/\{\{week\}\}/g, week);
+        mapTitle.textContent = decodeEntities(mapTitleText.replace(/\{\{week\}\}/g, week));
         mapContainer.appendChild(mapTitle);
 
         if (mapData.type === 'facility-grid') {
@@ -879,13 +890,13 @@ function renderEncounterSpread(container, data, week, startPage) {
             tdRange.textContent = o.range[0] + '-' + o.range[1];
             tr.appendChild(tdRange);
             var tdName = document.createElement('td');
-            tdName.textContent = o.name;
+            tdName.textContent = decodeEntities(o.name);
             tr.appendChild(tdName);
             var tdSuffix = document.createElement('td');
             tdSuffix.textContent = o.suffix || '';
             tr.appendChild(tdSuffix);
             var tdTick = document.createElement('td');
-            tdTick.textContent = o.ticks || '';
+            tdTick.textContent = decodeEntities(o.ticks || '');
             tr.appendChild(tdTick);
             dtBody.appendChild(tr);
         });
@@ -895,7 +906,7 @@ function renderEncounterSpread(container, data, week, startPage) {
         if (voice.hud && voice.hud.diceNote) {
             var dn = document.createElement('div');
             dn.className = 'hud-dice-note';
-            dn.textContent = voice.hud.diceNote;
+            dn.textContent = decodeEntities(voice.hud.diceNote);
             diceDiv.appendChild(dn);
         }
         hudPage.appendChild(diceDiv);
@@ -919,7 +930,7 @@ function renderEncounterSpread(container, data, week, startPage) {
                 row.className = 'hud-tracker-row';
                 var lbl = document.createElement('span');
                 lbl.className = 'hud-tracker-name';
-                lbl.textContent = c.name;
+                lbl.textContent = decodeEntities(c.name);
                 row.appendChild(lbl);
                 row.appendChild(renderClock({ size: c.size || 6, clearOnTrigger: c.clearOnTrigger }));
                 trackerDiv.appendChild(row);
@@ -934,7 +945,7 @@ function renderEncounterSpread(container, data, week, startPage) {
                     row.style.marginTop = '4px';
                     var lbl = document.createElement('span');
                     lbl.className = 'hud-tracker-name';
-                    lbl.textContent = t.name;
+                    lbl.textContent = decodeEntities(t.name);
                     row.appendChild(lbl);
 
                     // Render mini-versions of the tracks
@@ -968,7 +979,7 @@ function renderEncounterSpread(container, data, week, startPage) {
     var logClassification = document.createElement('div');
     logClassification.className = 'classification';
     var logClassText = (voice.classifications && voice.classifications.operationsLog) || 'OPERATIONS — WEEK {{week}}';
-    logClassification.textContent = logClassText.replace(/\{\{week\}\}/g, week);
+    logClassification.textContent = decodeEntities(logClassText.replace(/\{\{week\}\}/g, week));
     logPage.appendChild(logClassification);
 
     // Session types for this week
@@ -1008,14 +1019,14 @@ function renderEncounterSpread(container, data, week, startPage) {
                 if (enc.bossRules.title) {
                     var bossTitle = document.createElement('div');
                     bossTitle.className = 'boss-rules-title';
-                    bossTitle.textContent = enc.bossRules.title;
+                    bossTitle.textContent = decodeEntities(enc.bossRules.title);
                     bossBox.appendChild(bossTitle);
                 }
 
                 if (enc.bossRules.preamble) {
                     var bossPreamble = document.createElement('div');
                     bossPreamble.className = 'boss-rules-preamble';
-                    bossPreamble.textContent = enc.bossRules.preamble;
+                    bossPreamble.textContent = decodeEntities(enc.bossRules.preamble);
                     bossBox.appendChild(bossPreamble);
                 }
 
@@ -1024,7 +1035,7 @@ function renderEncounterSpread(container, data, week, startPage) {
                     bossSteps.className = 'boss-rules-steps';
                     enc.bossRules.steps.forEach(function (step) {
                         var li = document.createElement('li');
-                        li.textContent = step;
+                        li.textContent = decodeEntities(step);
                         bossSteps.appendChild(li);
                     });
                     bossBox.appendChild(bossSteps);
@@ -1033,7 +1044,7 @@ function renderEncounterSpread(container, data, week, startPage) {
                 if (enc.bossRules.stakes) {
                     var bossStakes = document.createElement('div');
                     bossStakes.className = 'boss-rules-stakes';
-                    bossStakes.textContent = enc.bossRules.stakes;
+                    bossStakes.textContent = decodeEntities(enc.bossRules.stakes);
                     bossBox.appendChild(bossStakes);
                 }
 
@@ -1080,7 +1091,7 @@ function renderEncounterSpread(container, data, week, startPage) {
                     console.warn('Oversized reps string detected in ' + ex.name + ' (truncating):', repsStr);
                     repsStr = repsStr.substring(0, 15) + '...';
                 }
-                tdName.textContent = ex.name + ' (' + repsStr + ')';
+                tdName.textContent = decodeEntities(ex.name) + ' (' + repsStr + ')';
                 tr.appendChild(tdName);
                 var tdWeight = document.createElement('td');
                 tdWeight.className = 'setup-input-cell';
@@ -1136,7 +1147,7 @@ function renderEncounterSpread(container, data, week, startPage) {
         checkinQuestions.forEach(function (q) {
             var line = document.createElement('div');
             line.className = 'checkin-line';
-            line.textContent = q;
+            line.textContent = decodeEntities(q);
             checkinDiv.appendChild(line);
         });
         logPage.appendChild(checkinDiv);
@@ -1520,7 +1531,7 @@ function renderRefPages(container, data, week, startPage) {
     var classText = (voice.classifications && voice.classifications.refs) || 'ROUTE CODES // WEEK {{week}}';
     var classification = document.createElement('div');
     classification.className = 'classification';
-    classification.textContent = classText.replace(/\{\{week\}\}/g, week);
+    classification.textContent = decodeEntities(classText.replace(/\{\{week\}\}/g, week));
     page.appendChild(classification);
 
     // Ref page alert (unchanged)
@@ -1556,7 +1567,7 @@ function renderRefPages(container, data, week, startPage) {
         if (enc.title) {
             var routerTitle = document.createElement('span');
             routerTitle.className = 'ref-router-title';
-            routerTitle.textContent = enc.title;
+            routerTitle.textContent = decodeEntities(enc.title);
             routerHeader.appendChild(routerTitle);
         }
 
@@ -1610,7 +1621,7 @@ function renderRefPages(container, data, week, startPage) {
         // Outcome label (name + dice range)
         var label = document.createElement('span');
         label.className = 'ref-entry-label';
-        label.textContent = entry.outcome.name + ' [' + entry.outcome.range[0] + '\u2013' + entry.outcome.range[1] + ']';
+        label.textContent = decodeEntities(entry.outcome.name) + ' [' + entry.outcome.range[0] + '\u2013' + entry.outcome.range[1] + ']';
         entryDiv.appendChild(label);
 
         // Content
@@ -1673,7 +1684,7 @@ function renderArchivePages(container, data, sectionKey, startPage) {
         var triggerLabel = document.createElement('div');
         triggerLabel.className = 'archive-trigger-label';
         var triggerVerb = triggerClock.direction === 'drain' ? 'empties' : 'fills';
-        triggerLabel.textContent = 'Read when ' + triggerClock.name + ' ' + triggerVerb;
+        triggerLabel.textContent = 'Read when ' + decodeEntities(triggerClock.name) + ' ' + triggerVerb;
         page.appendChild(triggerLabel);
     }
 
@@ -1682,14 +1693,14 @@ function renderArchivePages(container, data, sectionKey, startPage) {
     var classText = (voice.classifications && voice.classifications[classKey]) || sectionKey.toUpperCase();
     var classification = document.createElement('div');
     classification.className = 'classification';
-    classification.textContent = classText;
+    classification.textContent = decodeEntities(classText);
     page.appendChild(classification);
 
     // Section title
     var archiveVoice = voice.archive || {};
     var sectionTitle = archiveVoice[sectionKey + 'Title'] || sectionKey.toUpperCase();
     var h1 = document.createElement('h1');
-    h1.textContent = sectionTitle;
+    h1.textContent = decodeEntities(sectionTitle);
     page.appendChild(h1);
 
     // Section intro
@@ -1760,7 +1771,7 @@ function renderArchiveNode(node, format, config) {
     } else if (format === 'journal') {
         var dateH = document.createElement('div');
         dateH.className = 'journal-date';
-        dateH.textContent = node.title || '';
+        dateH.textContent = decodeEntities(node.title || '');
         div.appendChild(dateH);
         var body = document.createElement('div');
         body.className = 'journal-body';
@@ -1774,7 +1785,7 @@ function renderArchiveNode(node, format, config) {
         div.appendChild(channel);
         var idLine = document.createElement('div');
         idLine.className = 'transmission-id';
-        idLine.textContent = node.id || '';
+        idLine.textContent = decodeEntities(node.id || '');
         div.appendChild(idLine);
         var body = document.createElement('div');
         body.className = 'transmission-body';
@@ -1784,7 +1795,7 @@ function renderArchiveNode(node, format, config) {
     } else if (format === 'letter') {
         var fromLine = document.createElement('div');
         fromLine.className = 'letter-from';
-        fromLine.textContent = node.from || node.title || '';
+        fromLine.textContent = decodeEntities(node.from || node.title || '');
         div.appendChild(fromLine);
         var body = document.createElement('div');
         body.className = 'letter-body';
@@ -1794,11 +1805,11 @@ function renderArchiveNode(node, format, config) {
     } else if (format === 'clipping') {
         var headline = document.createElement('div');
         headline.className = 'clipping-headline';
-        headline.textContent = node.title || '';
+        headline.textContent = decodeEntities(node.title || '');
         div.appendChild(headline);
         var source = document.createElement('div');
         source.className = 'clipping-source';
-        source.textContent = (config && config.source) || '';
+        source.textContent = decodeEntities((config && config.source) || '');
         div.appendChild(source);
         var body = document.createElement('div');
         body.className = 'clipping-body';
@@ -1812,7 +1823,7 @@ function renderArchiveNode(node, format, config) {
         div.appendChild(severity);
         var title = document.createElement('div');
         title.className = 'ir-title';
-        title.textContent = node.title || node.id || '';
+        title.textContent = decodeEntities(node.title || node.id || '');
         div.appendChild(title);
         var body = document.createElement('div');
         body.className = 'ir-body';
@@ -1822,7 +1833,7 @@ function renderArchiveNode(node, format, config) {
     } else if (format === 'fragment-columns') {
         var title = document.createElement('div');
         title.className = 'fragment-columns-title';
-        title.textContent = node.title || node.id || '';
+        title.textContent = decodeEntities(node.title || node.id || '');
         div.appendChild(title);
         var body = document.createElement('div');
         body.className = 'fragment-columns-body';
@@ -1834,7 +1845,7 @@ function renderArchiveNode(node, format, config) {
         if (node.title) {
             var t = document.createElement('div');
             t.className = 'archive-title';
-            t.textContent = node.title;
+            t.textContent = decodeEntities(node.title);
             div.appendChild(t);
         }
         var body = document.createElement('div');
@@ -1864,12 +1875,12 @@ function renderEndingsPages(container, data, startPage) {
     var classText = (voice.classifications && voice.classifications.endings) || 'ENDINGS';
     var classification = document.createElement('div');
     classification.className = 'classification';
-    classification.textContent = classText;
+    classification.textContent = decodeEntities(classText);
     page.appendChild(classification);
 
     // Title
     var h1 = document.createElement('h1');
-    h1.textContent = archiveVoice.endingsTitle || 'ENDINGS';
+    h1.textContent = decodeEntities(archiveVoice.endingsTitle || 'ENDINGS');
     page.appendChild(h1);
 
     // Trigger conditions
@@ -1877,13 +1888,13 @@ function renderEndingsPages(container, data, startPage) {
         var trigDiv = document.createElement('div');
         trigDiv.className = 'endings-trigger';
         var trigH = document.createElement('h2');
-        trigH.textContent = archiveVoice.endingsTrigger.heading || 'WHEN TO READ';
+        trigH.textContent = decodeEntities(archiveVoice.endingsTrigger.heading || 'WHEN TO READ');
         trigDiv.appendChild(trigH);
         if (archiveVoice.endingsTrigger.lines) {
             var trigList = document.createElement('ul');
             archiveVoice.endingsTrigger.lines.forEach(function (line) {
                 var li = document.createElement('li');
-                li.textContent = line;
+                li.textContent = decodeEntities(line);
                 trigList.appendChild(li);
             });
             trigDiv.appendChild(trigList);
@@ -1898,7 +1909,7 @@ function renderEndingsPages(container, data, startPage) {
 
         var endTitle = document.createElement('h2');
         endTitle.className = 'ending-title';
-        endTitle.textContent = ending.title || ending.id || 'ENDING';
+        endTitle.textContent = decodeEntities(ending.title || ending.id || 'ENDING');
         endDiv.appendChild(endTitle);
 
         var endBody = document.createElement('div');
@@ -1949,18 +1960,18 @@ function renderEvidencePages(container, data, startPage) {
     if (classText) {
         var classification = document.createElement('div');
         classification.className = 'classification';
-        classification.textContent = classText;
+        classification.textContent = decodeEntities(classText);
         page.appendChild(classification);
     }
 
     var h1 = document.createElement('h1');
-    h1.textContent = archiveVoice.evidenceTitle || 'EVIDENCE LOG';
+    h1.textContent = decodeEntities(archiveVoice.evidenceTitle || 'EVIDENCE LOG');
     page.appendChild(h1);
 
     if (archiveVoice.evidenceIntro) {
         var intro = document.createElement('div');
         intro.className = 'evidence-intro';
-        intro.textContent = archiveVoice.evidenceIntro;
+        intro.textContent = decodeEntities(archiveVoice.evidenceIntro);
         page.appendChild(intro);
     }
 
@@ -2036,14 +2047,14 @@ function renderFinalPage(container, data, startPage) {
     if (finalVoice.subline) {
         var sub = document.createElement('div');
         sub.className = 'final-subline';
-        sub.textContent = finalVoice.subline;
+        sub.textContent = decodeEntities(finalVoice.subline);
         page.appendChild(sub);
     }
 
     if (finalVoice.instruction) {
         var instr = document.createElement('div');
         instr.className = 'final-instruction';
-        instr.textContent = finalVoice.instruction;
+        instr.textContent = decodeEntities(finalVoice.instruction);
         page.appendChild(instr);
     }
 
@@ -2059,12 +2070,13 @@ function renderFinalPage(container, data, startPage) {
 // Export for Node environments or attach to window in browser
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        escapeHtml,
+        escapeHtml, decodeEntities,
         renderCoverPage, renderManualPages, renderTrackerSheet, renderSetupPage,
         renderEncounterSpread, renderRefPages, renderArchivePages, renderEndingsPages, renderEvidencePages, renderFinalPage
     };
 } else {
     window.escapeHtml = escapeHtml;
+    window.decodeEntities = decodeEntities;
     window.renderCoverPage = renderCoverPage;
     window.renderManualPages = renderManualPages;
     window.renderTrackerSheet = renderTrackerSheet;

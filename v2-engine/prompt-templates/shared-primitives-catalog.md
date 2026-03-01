@@ -1,6 +1,14 @@
 # 4. MECHANICAL SELECTION (THE PRIMITIVES CATALOG)
 
-You must select game mechanics from the engine's menu.
+## MECHANICAL PROFILE GATE
+
+Your Stage W `mechanicalProfile.categoriesUsed` is your budget. **Only select primitives from those categories.** If a category appears in `categoriesExcluded`, skip it entirely — do not select any primitives from that category, even if examples below show them.
+
+This means some sections below may not apply to your zine. That is intentional. A zine with 3 categories and complexity 4 is a valid, focused design. Do not pad your selection to fill categories you excluded.
+
+---
+
+You must select game mechanics from the engine&apos;s menu.
 
 **STRICT RULE: THE COMPLEXITY BUDGET CANNOT EXCEED 10.**
 Do not give the player more mechanics than they can handle during a gym session.
@@ -48,7 +56,7 @@ No modifier may require arithmetic. Modifiers change WHICH table you read or WHE
 2B. Oracle Detail Tables — Small d6 tables within story nodes for variable details (roll a separate die, read flavor). Requires: d6. Complexity: 1
 2C. Performance Bonus — Workout completion affects game state directly (completed all sets = tick a bonus box; PR = circle a codeword). Requires: none. Complexity: 1
 
-## 3. TRACKING MECHANICS (Pick 1-4)
+## 3. TRACKING MECHANICS (Pick 0-4)
 
 3A. Fill Clocks — N boxes, fill on tick, trigger at threshold. Complexity: 1. Wires: threshold-gate, unlock-chain, resource-cycle
 3B. Drain Clocks — Start full, remove on tick, trigger when empty. Feels like a fuse. Complexity: 1. Wires: escalation (reduce starting value), feedback-loop (restoration)
@@ -98,11 +106,12 @@ Multiple endings triggered by different game states (clocks filled, resources de
 ## COMPLEXITY BUDGET
 
 Combined complexity of all selected primitives MUST NOT EXCEED 10.
-Goldilocks zone: 6-9.
+Goldilocks zone: 3-9. Minimalist zines (complexity 3-5) are valid designs — they create focused, fast-playing experiences. Not every zine needs 7+ mechanics.
 
 Example combinations:
 
-- Survival Horror (8/10): 1D(2) + 2A(2) + 3B(1) + 4C(1) + 6E(1) + 7E(2) + 8(1)
-- Political Intrigue (9/10): 1B(1) + 3G(3) + 3C(2) + 6F(3) + 7D(2) + 8(1)
-- Noir Investigation (6/10): 1A(1) + 3E(1) + 4A(1) + 6D(2) + 7A(1) + 8(1)
-- Exploration (10/10): 1C(1) + 3F(3) + 4B(2) + 5B(3) + 6D(2) + 7A(1) + 8(1)
+- Survival Horror (8/10): 1D(2) + 2A(2) + 3B(1) + 4C(1) + 6E(1) + 7E(2) + 8(1) — 6 categories
+- Political Intrigue (9/10): 1B(1) + 3G(3) + 3C(2) + 6F(3) + 7D(2) + 8(1) — 5 categories
+- Noir Investigation (6/10): 1A(1) + 3E(1) + 4A(1) + 6D(2) + 7A(1) + 8(1) — 6 categories
+- Literary Thriller (3/10): 1G(1) + 6C(1) + 7A(1) + 8(1) — 4 categories, no trackers, no resources, no map
+- Cosmic Horror (5/10): 1C(1) + 3E(1) + 3B(1) + 6A(1) + 7C(1) + 8(1) — 4 categories, no modifiers, no resources, no map

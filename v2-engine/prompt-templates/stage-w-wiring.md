@@ -41,7 +41,7 @@ Every zine emphasizes different player experiences. Weight each pillar 0-3 based
 | **Role-Playing** | Mechanics only | Named character exists | Character voice in encounters | Player makes in-character decisions that affect mechanics |
 | **Immersion** | Game feels like a game | Diegetic labels help | Found-document aesthetic throughout | The booklet IS a fictional artifact |
 
-Weights must sum to 8-15. A zine cannot be central in everything — that&apos;s a zine that&apos;s central in nothing.
+Weights must sum to 8-15. **At least 2 pillars MUST have weight 0.** A zine that tries to do everything is a zine that does nothing. Zeroing pillars is a design choice, not a failure — it focuses the experience.
 
 ---
 
@@ -51,13 +51,17 @@ Weights must sum to 8-15. A zine cannot be central in everything — that&apos;s
 
 ## WEEKLY ARC
 
-The six-week workout program has a natural intensity curve. Your mechanical complexity should follow it:
+The workout program has a natural intensity curve. Your mechanical complexity should follow a deliberate arc — but NOT always the same arc.
 
-- **Weeks 1-2**: Establish. Introduce core mechanics one at a time. Player learns the game. Complexity budget ≤ 4.
-- **Weeks 3-4**: Escalate. Activate wires — mechanics start interacting. New systems layer on. Peak complexity hits.
-- **Weeks 5-6**: Converge. All wires active. Consequences of earlier choices cascade. End conditions approach.
+**Available arc shapes** (choose one that serves your story):
 
-Declare which wires activate each week. A wire that activates in Week 1 creates a system the player manages from the start. A wire that activates in Week 4 is a mid-game surprise — the rules change because the story demands it.
+- **Three-Act** (establish → escalate → converge): Classic. Early weeks teach, middle weeks layer, final weeks resolve. Phase boundaries at weeks 2/4.
+- **Front-Loaded** (complex → simplify → resolve): All mechanics active from week 1. Later weeks remove options as consequences narrow the game. Good for survival stories.
+- **Slow-Burn** (minimal → minimal → ignite → cascade): Weeks 1-3 have very few mechanics. Week 4 triggers a cascade of new systems. Good for mystery/investigation.
+- **Crescendo** (steady build → peak at final week): Each week adds exactly one new mechanic. No plateau. Good for transformation/growth stories.
+- **Oscillating** (tension → release → tension → release): Alternate high-complexity weeks with low-complexity recovery weeks. Mirrors undulating workout periodization.
+
+Declare your chosen arc shape, your phase boundaries (which weeks belong to which phase), and which wires activate each week. You are NOT required to use 3 phases or to split at weeks 2/4.
 
 ---
 
@@ -69,7 +73,8 @@ Declare which wires activate each week. A wire that activates in Week 1 creates 
 4. **Peak complexity ≤ 10** (matches the primitives catalog budget).
 5. Every `printInstruction` must pass the **ZERO MATH** rule: no arithmetic, no addition, no "calculate X." Roll → lookup → mark.
 6. Every `printInstruction` must use **DIEGETIC NAMES** — fiction-appropriate labels, not game-design jargon. Not "fill clock" — "SIGNAL FIRE blazes higher."
-7. Pillar weights must sum to **8-15**.
+7. Pillar weights must sum to **8-15**, with **at least 2 pillars at weight 0**.
+8. **Mechanical breadth constraint:** `categoriesExcluded` must contain at least 1 category. Every zine has blind spots — declare yours.
 
 ---
 
@@ -88,15 +93,29 @@ Produce a single JSON object with these exact keys:
 ```
 
 ### `experientialPillars` (required)
-One entry per pillar. Each has `weight` (0-3) and `expression` (how this manifests mechanically).
+One entry per pillar. Each has `weight` (0-3) and `expression` (how this manifests mechanically). At least 2 pillars must be weight 0 — set `expression` to `"N/A"` for zeroed pillars.
+
+**Example A — Espionage thriller (pillars sum = 11, 2 zeroed):**
 ```json
 {
   "exploration": { "weight": 2, "expression": "Locked map nodes revealed by heat threshold" },
   "progression": { "weight": 2, "expression": "Unlock chain: filling INTEL clock activates NETWORK tracker" },
   "choicesMattering": { "weight": 3, "expression": "Codewords gate which REF branches are available in weeks 4-6" },
-  "selfReflection": { "weight": 1, "expression": "Weekly debrief prompt on tracker sheet" },
-  "rolePlaying": { "weight": 1, "expression": "Character stance choice affects which resource pool to spend from" },
+  "selfReflection": { "weight": 0, "expression": "N/A" },
+  "rolePlaying": { "weight": 0, "expression": "N/A" },
   "immersion": { "weight": 2, "expression": "All mechanics named as in-world documents and procedures" }
+}
+```
+
+**Example B — Literary noir (pillars sum = 8, 3 zeroed):**
+```json
+{
+  "exploration": { "weight": 0, "expression": "N/A" },
+  "progression": { "weight": 0, "expression": "N/A" },
+  "choicesMattering": { "weight": 3, "expression": "Codewords gate which ending is reachable" },
+  "selfReflection": { "weight": 2, "expression": "Weekly debrief asks what the detective believes happened" },
+  "rolePlaying": { "weight": 0, "expression": "N/A" },
+  "immersion": { "weight": 3, "expression": "The entire booklet is a case file" }
 }
 ```
 
@@ -137,6 +156,32 @@ One entry per pillar. Each has `weight` (0-3) and `expression` (how this manifes
   "peakWeek": 4
 }
 ```
+
+### `mechanicalProfile` (required)
+
+Declares which primitive categories this zine uses and which it excludes. This is the gatekeeper — Stage 1 can ONLY select primitives from `categoriesUsed`.
+
+```json
+{
+  "categoriesUsed": ["resolution", "tracking", "narrative", "session", "endCondition"],
+  "categoriesExcluded": [
+    { "category": "spatial", "reason": "The story takes place entirely through documents — physical space is irrelevant" },
+    { "category": "modifier", "reason": "Pure lookup resolution matches the clinical tone — no push/reroll decisions" },
+    { "category": "resource", "reason": "The tension comes from tracking, not from spending" }
+  ],
+  "pageVocabulary": ["cover", "rules-manual", "encounter-spread", "ref-pages", "archive", "endings", "final"],
+  "arcShape": "slow-burn",
+  "phaseBoundaries": { "1": [1, 2, 3], "2": [4, 5], "3": [6] }
+}
+```
+
+**Field definitions:**
+
+- `categoriesUsed`: Array of category names from the Primitives Catalog. Valid names: `"resolution"`, `"modifier"`, `"tracking"`, `"resource"`, `"spatial"`, `"narrative"`, `"session"`, `"endCondition"`.
+- `categoriesExcluded`: Array of `{ "category": STRING, "reason": STRING }`. Every category NOT in `categoriesUsed` MUST appear here with a story-motivated justification. Forcing justification makes the decision stick.
+- `pageVocabulary`: Array of page types this zine will use. Valid types: `"cover"`, `"rules-manual"`, `"tracker-sheet"`, `"setup"`, `"encounter-spread"`, `"ref-pages"`, `"archive"`, `"evidence"`, `"endings"`, `"final"`. Minimum: cover, encounter-spread, endings, final.
+- `arcShape`: One of `"three-act"`, `"front-loaded"`, `"slow-burn"`, `"crescendo"`, `"oscillating"`.
+- `phaseBoundaries`: Object mapping phase number (string) to array of week numbers. Allows non-standard phase boundaries.
 
 ---
 

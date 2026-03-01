@@ -88,6 +88,8 @@ Produce a single JSON object with these exact top-level keys:
 
 **Important**: Translate the user&apos;s workout program faithfully. Every day in `sessionTypes[].days` must be a unique number. Days are numbered 1 through N where N is sessions per week.
 
+**OPTIONAL ARRAYS:** The `modifiers`, `tracks`, `codewords`, and `resources` arrays are all optional. If your `mechanicalProfile` excludes their categories, OMIT these arrays entirely from your JSON. Do not include empty arrays `[]` — omit the key.
+
 ### `mechanics`
 
 ```json
@@ -309,10 +311,20 @@ Produce a single JSON object with these exact top-level keys:
 
 For Stage 1, include only `type` and `title`. Full map data (rooms, locations, weekly progression) is generated in Stage 2. Set to `null` if no spatial element fits the theme — do NOT force a map.
 
+### MECHANICAL PROFILE COMPLIANCE
+
+Your Stage W `mechanicalProfile` constrains your selections:
+
+1. **Categories:** Only select primitives from `categoriesUsed`. If `tracking` is excluded, omit the `clocks` and `tracks` arrays entirely. If `resource` is excluded, omit the `resources` array. If `modifier` is excluded, omit the `modifiers` array.
+2. **Complexity:** Your total complexity must not exceed `mechanicalProfile`&apos;s complexity ceiling (which matches `complexityProfile.peakActive`).
+3. **Pages:** Your `pages[]` array MUST match `mechanicalProfile.pageVocabulary` — include only the page types declared there.
+4. **Evidence guardrail:** If any track has an `id` field (faction or progress tracks), you MUST include `{ "type": "evidence" }` in your `pages[]` array.
+
 ### `pages`
 
-The `pages` array defines the page structure of the printed zine. The engine knows how to render each page type — you control which types appear and in what order.
+The `pages` array defines the page structure of the printed zine. The engine knows how to render each page type — you control which types appear and in what order. **Your `pages[]` must match your Stage W `mechanicalProfile.pageVocabulary`.** Do not include page types you did not declare.
 
+#### Standard (all page types, 9+ type vocabulary)
 ```json
 [
   { "type": "cover" },
@@ -325,6 +337,40 @@ The `pages` array defines the page structure of the printed zine. The engine kno
   { "type": "ref-pages", "week": 2 },
   ...
   { "type": "archive", "section": "SECTION_KEY" },
+  { "type": "evidence" },
+  { "type": "endings" },
+  { "type": "final" }
+]
+```
+
+#### Minimalist (5-type vocabulary — no tracker-sheet, no setup, no evidence)
+```json
+[
+  { "type": "cover" },
+  { "type": "rules-manual" },
+  { "type": "encounter-spread", "week": 1 },
+  { "type": "ref-pages", "week": 1 },
+  ...
+  { "type": "archive", "section": "SECTION_KEY" },
+  { "type": "endings" },
+  { "type": "final" }
+]
+```
+
+#### Discovery-paced (archives interleaved between encounter weeks)
+```json
+[
+  { "type": "cover" },
+  { "type": "rules-manual" },
+  { "type": "tracker-sheet" },
+  { "type": "setup" },
+  { "type": "encounter-spread", "week": 1 },
+  { "type": "ref-pages", "week": 1 },
+  { "type": "archive", "section": "SECTION_KEY_A" },
+  { "type": "encounter-spread", "week": 2 },
+  { "type": "ref-pages", "week": 2 },
+  { "type": "archive", "section": "SECTION_KEY_B" },
+  ...
   { "type": "endings" },
   { "type": "final" }
 ]
@@ -342,12 +388,14 @@ Available page types:
 - `endings`: All ending narratives with trigger conditions (from Stage 3)
 - `final`: Closing page
 
-You MAY vary this structure. Examples:
+Your `pages[]` structure is controlled by your `mechanicalProfile.pageVocabulary`. Design choices:
 
-- Interleave archives between encounter weeks for a discovery-paced feel
-- Omit `tracker-sheet` if mechanics are minimal enough to track inline
-- Omit `ref-pages` for a diceless zine where choices are embedded in encounters
-- Add multiple `archive` entries for separate document collections
+- **Omit `tracker-sheet`** if mechanics are minimal enough to track inline (complexity ≤ 4)
+- **Omit `setup`** if the workout doesn&apos;t require weight calculations
+- **Omit `ref-pages`** for a diceless zine where choices are embedded in encounters
+- **Interleave `archive` entries** between encounter weeks for discovery-paced reveals
+- **Add multiple `archive` entries** for separate document collections
+- **Include `evidence`** if any track has a faction or progress type with an `id` field
 
 ### `archiveLayout`
 
