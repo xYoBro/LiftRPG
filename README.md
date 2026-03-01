@@ -1,0 +1,251 @@
+# LiftRPG
+
+A generative Print & Play RPG Zine engine. Input a real workout program and a narrative brief, feed them to any LLM, get back structured JSON, and the engine renders a printable saddle-stitched booklet. Each booklet is a physical gamebook: a workout journal fused with a branching narrative TTRPG, designed to be written in with a pencil during actual gym sessions.
+
+The quality bar is indie TTRPG production -- Mothership, Mork Borg, Into the Odd. Found-document aesthetics, overwhelming information density, mechanical depth. The format IS fiction: the booklet reads like an artifact from the story's world.
+
+Every booklet is mechanically, visually, and narratively unique. The engine supports 7 resolution systems, 5 modifier mechanics, 7 tracking types, 5 spatial mechanics, and 6 narrative structures via a mechanical primitives catalog with a complexity budget system. A wiring engine designs how mechanics interact -- feedback loops, threshold gates, conditional routing -- so each booklet plays like its own game.
+
+---
+
+## 1. Architecture Overview
+
+### Pipeline
+
+```text
+User (workout program + narrative brief + dice selection)
+  |
+  v
+Browser UI (public/index.html — builds system prompt from prompt-templates/)
+  |
+  v
+[Stage W] Wiring Blueprint — designs mechanical topology
+  |
+  v
+[Stages 1-5] Foundation, Voice, Archives, Story, Evidence
+  |
+  v
+User pastes each prompt into any LLM (Claude, ChatGPT, Gemini, etc.)
+  |
+  v
+LLM generates JSON, pasted back and validated at each stage
+  |
+  v
+box-packer.js dispatches pages[] array to renderers.js
+  |
+  v
+DOM pages rendered at 5.5" x 8.5" (half-letter)
+  |
+  v
+Saddle-stitch imposition (11" x 8.5" landscape spreads) → Print
+```
+
+### File Map
+
+```text
+LiftRPG/
+  public/                              Deploy this folder
+    index.html                         Browser UI: intake, wiring, 5-stage accordion, assembly, print
+    v2-engine/
+      box-packer.js                    Page-type dispatcher + post-render cross-references
+      renderers.js                     All DOM builders: story blocks, mechanic primitives, maps
+      base-theme.css                   Page dimensions, typography, component styles, print media
+      story-tables.js                  Randomizer data — curated story generator tables
+      prompt-templates/
+        stage-w-wiring.md              Mechanical wiring blueprint prompt (Stage W)
+        stage-1-data-requirements.md   Stage 1 JSON schema spec
+        stage-1-liftoscript.md         Workout script parsing (Stage 1 only)
+        shared-creative-direction.md   Genre-neutral creative framework (Stages 1-5)
+        shared-primitives-catalog.md   Mechanical menu with complexity budgets + wire compatibility
+        shared-wiring-catalog.md       Wire type catalog
+        shared-anti-isomorphism.md     Structural uniqueness check + wire topology audit
+        stage-2-voice-map.md           Voice layer + spatial map data
+        stage-3-archives.md            Found documents + endings
+        stage-4-story.md               Session narrative REF nodes
+        stage-5-evidence.md            Evidence tracks (optional)
+  docs/                                Research docs, design specs (reference only)
+  legacy-archive/                      Archived v1 engine, old prompts, reference JSON
+  package.json                         NPM manifest
+  netlify.toml                         Static deploy config
+  README.md                            This file
+  LICENSE                              MIT License
+```
+
+### Schema: Page-Type Dispatch (v2)
+
+The v2 engine uses a **page-type model**. The LLM generates a `pages[]` array where each entry specifies a page type. The box-packer dispatches each page type to the corresponding renderer in `renderers.js`. The engine controls layout; the LLM provides content.
+
+Top-level JSON keys (assembled from all LLM stages):
+
+```json
+{
+  "meta": { "title": "...", "subtitle": "...", "author": "..." },
+  "workout": { "totalWeeks": 6, "sessionTypes": [...], "setup": {...} },
+  "mechanics": { "dice": {...}, "clocks": [...], "tracks": [...], "resources": [...] },
+  "theme": { "visualArchetype": "...", "colors": {...}, "fonts": {...} },
+  "story": { "encounters": [...], "refs": {...}, "archives": {...}, "endings": [...] },
+  "map": { "type": "facility-grid", "title": "..." },
+  "voice": { "cover": {...}, "manual": {...}, "classifications": {...} },
+  "pages": [
+    { "type": "cover" },
+    { "type": "rules-manual" },
+    { "type": "encounter-spread", "week": 1 },
+    ...
+  ],
+  "archiveLayout": [...]
+}
+```
+
+### Page Types (box-packer dispatch)
+
+| Type | Description |
+|------|-------------|
+| `cover` | Title page with classification stamp, intro text, cover art |
+| `rules-manual` | Instruction manual written in the fiction's voice |
+| `tracker-sheet` | Printable character dossier with clocks, tracks, resources, codewords |
+| `setup` | Workout setup page with 1RM fields, calculation grid |
+| `encounter-spread` | Weekly encounter pages: HUD + workout logs + narrative (requires `week`) |
+| `ref-pages` | Story REF branching nodes for a week (requires `week`) |
+| `archive` | Archive section pages: found documents (requires `section`) |
+| `evidence` | Faction/progress evidence pages (auto-skipped if no tracks) |
+| `endings` | All ending narratives with trigger conditions |
+| `final` | Closing page |
+
+Pages are padded to a multiple of 4 for saddle-stitch imposition.
+
+### Imposition (Saddle-Stitch)
+
+`index.html` reorders pages into 11" x 8.5" spreads for duplex printing:
+
+- Even spread index: Left = high page number, Right = low page number
+- Odd spread index: Left = low page number, Right = high page number
+
+Print duplex, fold in half, staple the spine.
+
+---
+
+## 2. Rendered Primitives
+
+The engine renders visual components for these mechanical primitive IDs:
+
+| Primitive | Renderer | CSS Class |
+|-----------|----------|-----------|
+| 3A/3B | Fill/drain clock boxes | `.clock-container` `.clock-segment` |
+| 3C | Tug-of-war track with center marker | `.tug-container` `.tug-track` `.tug-box` |
+| 3D | Progress track (fillable boxes) | `.progress-track` `.progress-box` |
+| 3E | Heat/threat counter (numbered boxes) | `.heat-track` `.heat-box` |
+| 3F | Skill tree with checkboxes and costs | `.skill-tree` `.skill-node` |
+| 3G | Faction reputation track with labels | `.faction-track` `.faction-boxes` |
+| 5A/5C | Grid map (facility/hex) | `.map-grid` `.map-cell` |
+| 5B | Point-to-point SVG map | `.ptp-map` |
+| 5D | Linear track (numbered positions) | `.linear-track` `.linear-box` |
+
+All other primitives (1x, 2x, 4x, 6x, 7x, 8x) render as text-only mechanic blocks with trigger/effect display.
+
+---
+
+## 3. How to Create a New Booklet
+
+### Step 1: Write Your Prompt
+
+Prepare two things:
+
+1. **Workout program**: exercises, sets, reps, schedule, weekly intensity progression, duration
+2. **Narrative brief**: genre, setting, tone, mood, inspirations, narrative voice -- or click "Randomize" to roll from the story generator tables
+
+### Step 2: Generate the JSON
+
+1. Run `npm start` and open `localhost:8080` in a browser
+2. Enter your workout and narrative brief in the intake form
+3. Select your available dice (or "No Dice" for diceless mechanics)
+4. Click "Begin Generation" to unlock the Wiring Blueprint stage
+5. For each stage (W, then 1-5):
+   - Click "Generate Prompt" to build and copy the LLM prompt
+   - Paste the prompt into any LLM (Claude, ChatGPT, Gemini)
+   - Copy the LLM's JSON response back into the "Paste LLM Output" textarea
+   - Click "Process & Save" to validate and advance
+   - Stage 5 auto-skips if no evidence tracks exist
+
+### Step 3: Assemble and Print
+
+1. Once all stages are validated, click "Validate & Assemble"
+2. The engine renders all pages and imposes them into saddle-stitch spreads
+3. Click "Print Spreads" (set paper to 11" x 8.5" landscape, margins to none)
+
+You can also export/import the pipeline JSON at any stage to save progress.
+
+---
+
+## 4. Theming
+
+Themes are generated inline by the LLM via `injectTheme()`. Each booklet gets a unique visual identity based on the narrative brief -- colors, fonts, layout variables.
+
+### CSS Custom Properties
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `--ink` | `#1a1a18` | Primary text/border color |
+| `--paper` | `#f0ede4` | Page background |
+| `--fog` | `#e6e2d8` | Alternating section background |
+| `--accent` | `#c45c00` | Primary highlight color |
+| `--muted` | `#5a5a56` | Secondary/quiet color |
+| `--font-body` | Helvetica Neue | Body text font |
+| `--font-heading` | (inherits body) | Heading font |
+
+All designs must work in B&W (never rely on hue alone).
+
+---
+
+## 5. Development
+
+### Quick Start
+
+```bash
+npm install
+npm start     # http-server on :8080, serves public/
+```
+
+Open `localhost:8080` in a browser.
+
+### Dependencies
+
+- **http-server** (dev) -- Local static file server
+
+### Adding a New Primitive Renderer
+
+1. Write a render function in `public/v2-engine/renderers.js` that returns a DOM element
+2. Add a case in the appropriate renderer to dispatch by primitive_id
+3. Add structural CSS in `public/v2-engine/base-theme.css`
+4. Update the primitives catalog in `public/v2-engine/prompt-templates/shared-primitives-catalog.md`
+
+### Known Limitations
+
+- `npm test` is a stub with no tests wired
+- Print rendering is still being refined
+- Legacy JSON files in `legacy-archive/` use the v1 schema and cannot be rendered by the v2 engine
+
+---
+
+## 6. License & Attribution
+
+**LiftRPG** is an open-source project released under the [MIT License](LICENSE).
+
+### Open Source AI Statement
+
+The architectural concept, mechanical systems planning, and creative direction of this engine were developed by xYoBro. However, the vast majority of the source code, styling, and algorithms in this repository were generated by a Large Language Model (AI).
+
+Furthermore, all narrative content, rules text, and layout data inside the PDF booklets produced *by* this engine are explicitly AI-generated. The output documents are not written by humans. We release this tool freely to the world so others can experiment with generative physical media.
+
+### Acknowledgments
+
+Workout input supports exports from [Liftosaur](https://www.liftosaur.com/) by Anton Astashov.
+
+---
+
+## 7. Feedback & Contributions
+
+This project is free and open source. If you find a bug, have an idea, or want to talk about generative physical media, open an issue:
+
+**[GitHub Issues](https://github.com/xYoBro/LiftRPG/issues)**
+
+No formal support is provided, but issues are read. If you build something inspired by this engine, I'd love to hear about it.

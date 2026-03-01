@@ -1,0 +1,2104 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LiftRPG — Zine Engine</title>
+    <meta name="description"
+        content="Generate printable RPG zine booklets from your workout program. Paste a workout and a story prompt into any LLM, get a saddle-stitched gamebook you play with a pencil at the gym." />
+    <meta property="og:title" content="LiftRPG — Generative Workout RPG Zine Engine" />
+    <meta property="og:description"
+        content="Turn your workout program into a printable tabletop RPG booklet. Any LLM, any genre, any workout. Free and open source." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://github.com/xYoBro/LiftRPG" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="LiftRPG — Generative Workout RPG Zine Engine" />
+    <meta name="twitter:description"
+        content="Turn your workout program into a printable tabletop RPG booklet. Any LLM, any genre, any workout." />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="v2-engine/base-theme.css">
+    <style>
+        :root {
+            --bg: #1c1c1e;
+            --surface: #2c2c2e;
+            --surface2: #3a3a3c;
+            --text: #e5e5ea;
+            --text2: #aeaeb2;
+            --accent: #ff3b30;
+            --green: #30d158;
+            --orange: #ff9f0a;
+            --blue: #0a84ff;
+            --font: 'JetBrains Mono', monospace;
+            --radius: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            padding: 24px 24px 100px;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 18px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .subtitle {
+            font-size: 11px;
+            color: var(--text2);
+            margin-bottom: 20px;
+        }
+
+        /* ── Progress Rail ── */
+        .progress-rail {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            margin-bottom: 24px;
+            padding: 12px 16px;
+            background: var(--surface);
+            border-radius: var(--radius);
+        }
+
+        .rail-dot {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            background: var(--surface2);
+            color: var(--text2);
+            flex-shrink: 0;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .rail-dot.done {
+            background: var(--green);
+            color: #000;
+        }
+
+        .rail-dot.active {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .rail-dot.locked {
+            opacity: 0.4;
+            cursor: default;
+        }
+
+        .rail-dot .rail-label {
+            position: absolute;
+            top: 36px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 8px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: var(--text2);
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        .rail-line {
+            flex: 1;
+            height: 2px;
+            background: var(--surface2);
+            transition: background 0.2s;
+        }
+
+        .rail-line.done {
+            background: var(--green);
+        }
+
+        /* ── Accordion Cards ── */
+        .stage-card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+            border: 1px solid transparent;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            overflow: hidden;
+        }
+
+        .stage-card.active {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 1px var(--blue);
+        }
+
+        .stage-card.valid {
+            border-color: var(--green);
+        }
+
+        .stage-card.invalid {
+            border-color: var(--accent);
+        }
+
+        .stage-card.locked {
+            display: none;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .card-header:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .card-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-number {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            background: var(--surface2);
+            color: var(--text2);
+            flex-shrink: 0;
+        }
+
+        .stage-card.valid .card-number {
+            background: var(--green);
+            color: #000;
+        }
+
+        .stage-card.active .card-number {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .card-title {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .card-summary {
+            font-size: 10px;
+            color: var(--text2);
+            margin-left: 34px;
+        }
+
+        .card-status {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 6px;
+            background: var(--surface2);
+            color: var(--text2);
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+
+        .card-status.ok {
+            background: rgba(48, 209, 88, .15);
+            color: var(--green);
+        }
+
+        .card-status.err {
+            background: rgba(255, 59, 48, .15);
+            color: var(--accent);
+        }
+
+        .card-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .card-body.open {
+            max-height: 5000px;
+            transition: max-height 0.5s ease-in;
+        }
+
+        .card-body-inner {
+            padding: 0 16px 16px;
+        }
+
+        /* ── Intake form (Stage 0) ── */
+        .form-group {
+            margin-bottom: 14px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text2);
+            margin-bottom: 6px;
+        }
+
+        .form-hint {
+            font-size: 10px;
+            color: var(--text2);
+            margin-bottom: 6px;
+            font-weight: 400;
+            letter-spacing: 0;
+            text-transform: none;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--surface2);
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-family: var(--font);
+            font-size: 12px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            border-color: var(--blue);
+        }
+
+        textarea {
+            resize: vertical;
+        }
+
+        textarea.tall {
+            height: 120px;
+        }
+
+        textarea.short {
+            height: 60px;
+        }
+
+        /* ── Dice Selector ── */
+        .dice-selector {
+            background: var(--bg);
+            border: 1px solid var(--surface2);
+            border-radius: 8px;
+            padding: 10px 12px;
+        }
+
+        .dice-group-label {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text2);
+            margin-bottom: 6px;
+            margin-top: 8px;
+        }
+
+        .dice-group-label:first-child {
+            margin-top: 0;
+        }
+
+        .dice-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+
+        .dice-chip {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border: 1px solid var(--surface2);
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text2);
+            cursor: pointer;
+            transition: all 0.15s;
+            user-select: none;
+        }
+
+        .dice-chip input[type="checkbox"] {
+            display: none;
+        }
+
+        .dice-chip:hover {
+            border-color: var(--blue);
+            color: var(--text);
+        }
+
+        .dice-chip.selected {
+            background: var(--blue);
+            border-color: var(--blue);
+            color: #fff;
+        }
+
+        .btn-randomize {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            border: 1px solid var(--surface2);
+            border-radius: 6px;
+            background: transparent;
+            font-size: 10px;
+            font-weight: 600;
+            font-family: inherit;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: var(--text2);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-randomize:hover {
+            border-color: var(--accent, var(--blue));
+            color: var(--accent, var(--blue));
+        }
+
+        .btn-randomize:active {
+            transform: scale(0.96);
+        }
+
+        /* ── Outbound / Inbound sections ── */
+        .section-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text2);
+            margin-bottom: 8px;
+            margin-top: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .section-label::before {
+            content: '';
+            display: block;
+            width: 8px;
+            height: 2px;
+            background: var(--text2);
+        }
+
+        .outbound-box {
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        .outbound-box textarea {
+            height: 200px;
+            font-size: 10px;
+            margin-top: 8px;
+            background: var(--surface2);
+        }
+
+        .outbound-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .outbound-instructions {
+            font-size: 10px;
+            color: var(--text2);
+            margin-top: 12px;
+            line-height: 1.4;
+        }
+
+        .inbound-box {
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .inbound-box textarea {
+            height: 100px;
+            font-size: 10px;
+            margin-bottom: 8px;
+            background: var(--surface2);
+        }
+
+        .inbound-status {
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            display: none;
+            margin-top: 8px;
+        }
+
+        .inbound-status.ok {
+            display: block;
+            background: rgba(48, 209, 88, .1);
+            color: var(--green);
+        }
+
+        .inbound-status.err {
+            display: block;
+            background: rgba(255, 59, 48, .1);
+            color: var(--accent);
+        }
+
+        /* ── Buttons ── */
+        button {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 9px;
+            font-family: var(--font);
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.15s, transform 0.1s;
+        }
+
+        button:hover {
+            opacity: 0.85;
+        }
+
+        button:active {
+            transform: scale(0.97);
+        }
+
+        button:disabled {
+            opacity: 0.3;
+            cursor: default;
+            transform: none;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: var(--surface2);
+            color: var(--text);
+        }
+
+        .btn-green {
+            background: var(--green);
+            color: #000;
+        }
+
+        .btn-blue {
+            background: var(--blue);
+            color: #fff;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 11px;
+        }
+
+        .continue-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 14px;
+            padding: 10px 18px;
+            background: var(--blue);
+            color: #fff;
+            border: none;
+            border-radius: 9px;
+            font-family: var(--font);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+
+        .continue-btn:disabled {
+            opacity: 0.3;
+            cursor: default;
+        }
+
+        /* ── Footer bar ── */
+        .footer-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--surface);
+            border-top: 1px solid var(--surface2);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            z-index: 100;
+        }
+
+        .footer-status {
+            font-size: 11px;
+            color: var(--text2);
+            font-weight: 700;
+            margin-right: auto;
+        }
+
+        #zine-container-wrapper {
+            margin-top: 24px;
+            display: none;
+            background: #333;
+            padding: 2rem;
+            border-radius: var(--radius);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="app-ui">
+        <h1>LiftRPG Stage Assembler</h1>
+        <p class="subtitle">Turn a workout program into a printable tabletop RPG booklet. Any LLM. Any genre. Any
+            workout.</p>
+
+        <div class="progress-rail" id="progressRail">
+            <!-- Rendered via JS -->
+        </div>
+
+        <div id="pipeline">
+            <!-- Stage 0: Intake form -->
+            <div class="stage-card active" id="stageCard-0">
+                <div class="card-header" onclick="toggleStage(0)">
+                    <div class="card-header-left">
+                        <div class="card-number">0</div>
+                        <div class="card-title">PROGRAM INTAKE</div>
+                    </div>
+                    <div class="card-status" id="stageStatus-0">WAITING</div>
+                </div>
+                <div class="card-body open" id="stageBody-0">
+                    <div class="card-body-inner">
+                        <div class="form-group">
+                            <label class="form-label">Workout / Liftoscript</label>
+                            <div class="form-hint">Paste your workout program, schedule, or exported script.</div>
+                            <textarea id="progWorkout" class="tall"
+                                placeholder="e.g. Liftoscript export, or 'Starting Strength: 3 days per week (Mon/Wed/Fri). Day A: Squat 3x5, Bench Press 3x5, Barbell Row 3x5. Day B: Squat 3x5, Overhead Press 3x5, Deadlift 1x5. Alternate A/B each session. 6 weeks.'"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <div style="display:flex; align-items:baseline; gap:0.5em;">
+                                <label class="form-label">Narrative Brief <span
+                                        style="color:var(--accent)">*</span></label>
+                                <button class="btn-randomize" onclick="randomizeNarrativeBrief()"
+                                    title="Roll random story prompt from generator tables">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="2" y="2" width="20" height="20" rx="3" />
+                                        <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none" />
+                                        <circle cx="16" cy="8" r="1.5" fill="currentColor" stroke="none" />
+                                        <circle cx="8" cy="16" r="1.5" fill="currentColor" stroke="none" />
+                                        <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none" />
+                                        <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                                    </svg>
+                                    Randomize
+                                </button>
+                            </div>
+                            <div class="form-hint">Genre, setting, tone, mood, inspirations, narrative voice &mdash;
+                                everything that makes your story yours. The more specific you are, the more distinctive
+                                the zine.</div>
+                            <textarea id="progNarrativeBrief" class="tall"
+                                placeholder="Describe the world, tone, and feel of your zine. Be specific. Name inspirations.
+
+Examples:
+&bull; &quot;1970s deep-sea research station. Tone of Solaris meets Annihilation &mdash; quiet wrongness, not jump scares. First-person field logs from a researcher who doesn&apos;t trust their own observations.&quot;
+
+&bull; &quot;Southern Gothic bayou community. Flannery O&apos;Connor meets True Detective S1. A returnee who left years ago, now back where they don&apos;t fit. Unreliable narrator, humid dread, family secrets. The land remembers.&quot;
+
+&bull; &quot;Cold War espionage, Le Carr&eacute; tone. Moral exhaustion, tradecraft, loyalty as illusion. Epistolary: intercepted cables, field reports, redacted memos. The truth costs more than silence.&quot;"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Available Dice</label>
+                            <div class="form-hint">Select the dice you own. The engine will only use mechanics
+                                compatible with your dice. Default: d10 + d% (percentile).</div>
+                            <div class="dice-selector" id="diceSelector">
+                                <div class="dice-group-label">Standard (D&amp;D)</div>
+                                <div class="dice-grid">
+                                    <label class="dice-chip"><input type="checkbox" value="d4"> d4</label>
+                                    <label class="dice-chip"><input type="checkbox" value="d6"> d6</label>
+                                    <label class="dice-chip"><input type="checkbox" value="d8"> d8</label>
+                                    <label class="dice-chip selected"><input type="checkbox" value="d10" checked>
+                                        d10</label>
+                                    <label class="dice-chip"><input type="checkbox" value="d12"> d12</label>
+                                    <label class="dice-chip"><input type="checkbox" value="d20"> d20</label>
+                                    <label class="dice-chip selected"><input type="checkbox" value="d%" checked>
+                                        d%</label>
+                                </div>
+                                <div class="dice-group-label">Zocchi (DCC)</div>
+                                <div class="dice-grid">
+                                    <label class="dice-chip"><input type="checkbox" value="d3"> d3</label>
+                                    <label class="dice-chip"><input type="checkbox" value="d5"> d5</label>
+                                    <label class="dice-chip"><input type="checkbox" value="d7"> d7</label>
+                                    <label class="dice-chip"><input type="checkbox" value="d14"> d14</label>
+                                    <label class="dice-chip"><input type="checkbox" value="d16"> d16</label>
+                                    <label class="dice-chip"><input type="checkbox" value="d24"> d24</label>
+                                    <label class="dice-chip"><input type="checkbox" value="d30"> d30</label>
+                                </div>
+                                <div class="dice-group-label">Other</div>
+                                <div class="dice-grid">
+                                    <label class="dice-chip"><input type="checkbox" value="coin"> Coin</label>
+                                    <label class="dice-chip"><input type="checkbox" value="none"> No Dice</label>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="continue-btn" onclick="completeIntake()">Begin Generation &rarr;</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stage W: Wiring Blueprint -->
+            <div class="stage-card locked" id="stageCard-W">
+                <div class="card-header" onclick="toggleStage('W')">
+                    <div class="card-header-left">
+                        <div class="card-number">W</div>
+                        <div class="card-title">WIRING BLUEPRINT</div>
+                    </div>
+                    <div class="card-status" id="stageStatus-W">LOCKED</div>
+                </div>
+                <div class="card-body" id="stageBody-W">
+                    <div class="card-body-inner">
+                        <div class="section-label">1. Copy Prompt</div>
+                        <div class="outbound-box">
+                            <button class="btn-blue btn-small" onclick="generateWiringPrompt()"
+                                id="btnPrompt-W">Generate Wiring Prompt</button>
+                            <textarea id="promptOut-W" readonly
+                                placeholder="Wiring blueprint prompt will appear here..."></textarea>
+                            <div class="outbound-instructions">This designs your zine&apos;s game system &mdash; how
+                                mechanics interact with each other. Copy the prompt and paste it into Claude/ChatGPT.
+                            </div>
+                        </div>
+                        <div class="section-label">2. Paste LLM Output</div>
+                        <div class="inbound-box">
+                            <textarea id="jsonIn-W" placeholder="Paste wiring blueprint JSON here..."></textarea>
+                            <div class="outbound-actions">
+                                <button class="btn-secondary btn-small" onclick="validateWiring()">Process & Save
+                                    Blueprint</button>
+                            </div>
+                            <div class="inbound-status" id="valStatus-W"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stages 1-5 Rendered via JS -->
+            <div id="dynamic-stages"></div>
+        </div>
+    </div> <!-- close app-ui -->
+
+    <div id="zine-container-wrapper">
+        <div id="zine-container"></div>
+    </div>
+
+    <div class="footer-bar" id="footerBar">
+        <a href="https://github.com/xYoBro/LiftRPG" target="_blank" rel="noopener"
+            style="font-size:11px; color:var(--text2); text-decoration:none; opacity:0.6;"
+            title="Source code, docs, and bug reports">GitHub</a>
+        <span class="footer-status" id="footerStatus">Waiting for input...</span>
+        <button class="btn-secondary" onclick="exportJson()">Export JSON</button>
+        <button class="btn-secondary" onclick="importJson()">Import JSON</button>
+        <input type="file" id="fileImport" style="display:none" accept=".json" onchange="handleFileImport(event)">
+        <button class="btn-primary" id="btnAssemble" onclick="assemble()" disabled>Validate & Assemble</button>
+        <button class="btn-green" id="btnPrint" onclick="window.print()" style="display:none">Print Spreads</button>
+    </div>
+
+    <!-- Load Engine Scripts -->
+    <script src="v2-engine/renderers.js"></script>
+    <script src="v2-engine/box-packer.js"></script>
+    <script src="v2-engine/story-tables.js"></script>
+
+    <script>
+        // Load our V2 prompt templates
+        const STAGES = [
+            { id: 'foundation', num: 1, title: 'STAGE 1: FOUNDATION' },
+            { id: 'voice-map', num: 2, title: 'STAGE 2: VOICE + MAP' },
+            { id: 'archives', num: 3, title: 'STAGE 3: ARCHIVES + ENDINGS' },
+            { id: 'story', num: 4, title: 'STAGE 4: STORY REF NODES' },
+            { id: 'evidence', num: 5, title: 'STAGE 5: EVIDENCE TRACKS' }
+        ];
+
+        let pipelineData = {};
+        let currentStage = 0;
+        let markdownTemplates = {};
+
+        async function init() {
+            renderRail();
+            renderDynamicStages();
+
+            // Fetch all markdown templates (shared + per-stage)
+            const names = [
+                'stage-w-wiring.md',
+                'shared-wiring-catalog.md',
+                'stage-1-data-requirements.md',
+                'shared-creative-direction.md',
+                'shared-primitives-catalog.md',
+                'shared-anti-isomorphism.md',
+                'stage-1-liftoscript.md',
+                'stage-2-voice-map.md',
+                'stage-3-archives.md',
+                'stage-4-story.md',
+                'stage-5-evidence.md'
+            ];
+
+            try {
+                const results = await Promise.all(
+                    names.map(n => fetch('v2-engine/prompt-templates/' + n).then(r => r.text()))
+                );
+                names.forEach((n, i) => {
+                    markdownTemplates[n] = results[i];
+                });
+            } catch (e) {
+                console.error("Failed to fetch templates:", e);
+                alert(`Must run on a local HTTP server to load markdown templates! (e.g. npm start)`);
+                document.getElementById('footerStatus').innerText = "ERROR: Failed to load templates. Must use HTTP server.";
+                document.getElementById('footerStatus').style.color = "var(--accent)";
+                document.querySelectorAll('button').forEach(b => b.disabled = true);
+                return;
+            }
+
+            initDiceSelector();
+        }
+
+        // ── Dice selector chip toggle ──
+        function initDiceSelector() {
+            document.querySelectorAll('.dice-chip').forEach(function (chip) {
+                chip.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    var cb = chip.querySelector('input[type="checkbox"]');
+                    cb.checked = !cb.checked;
+                    chip.classList.toggle('selected', cb.checked);
+
+                    if (cb.value === 'none' && cb.checked) {
+                        // "No Dice" selected — clear all others
+                        document.querySelectorAll('#diceSelector input[type="checkbox"]').forEach(function (other) {
+                            if (other !== cb) {
+                                other.checked = false;
+                                other.closest('.dice-chip').classList.remove('selected');
+                            }
+                        });
+                    } else if (cb.value !== 'none' && cb.checked) {
+                        // Any die selected — clear "No Dice"
+                        var noCb = document.querySelector('#diceSelector input[value="none"]');
+                        if (noCb) {
+                            noCb.checked = false;
+                            noCb.closest('.dice-chip').classList.remove('selected');
+                        }
+                    }
+                });
+            });
+        }
+
+        function getSelectedDice() {
+            var selected = [];
+            document.querySelectorAll('#diceSelector input[type="checkbox"]:checked').forEach(function (cb) {
+                selected.push(cb.value);
+            });
+            return selected;
+        }
+
+        function restoreDiceSelection(diceArray) {
+            if (!Array.isArray(diceArray)) return;
+            // Clear all first
+            document.querySelectorAll('#diceSelector input[type="checkbox"]').forEach(function (cb) {
+                cb.checked = false;
+                cb.closest('.dice-chip').classList.remove('selected');
+            });
+            // Set the ones from the array
+            diceArray.forEach(function (val) {
+                var cb = document.querySelector('#diceSelector input[value="' + val + '"]');
+                if (cb) {
+                    cb.checked = true;
+                    cb.closest('.dice-chip').classList.add('selected');
+                }
+            });
+        }
+
+        function renderRail() {
+            const container = document.getElementById('progressRail');
+            var wiringDone = !!pipelineData.wiring;
+            var wiringState = wiringDone ? 'done' : (currentStage === 0 && wiringDone ? 'done' : (pipelineData.intake ? 'active' : 'locked'));
+            if (wiringDone) wiringState = 'done';
+            else if (pipelineData.intake && !wiringDone) wiringState = 'active';
+            else wiringState = 'locked';
+
+            let html = `<div class="rail-dot ${currentStage >= 0 ? 'active' : ''}">0<div class="rail-label">Intake</div></div>`;
+            html += `<div class="rail-line ${wiringDone ? 'done' : ''}"></div>`;
+            html += `<div class="rail-dot ${wiringState}">W<div class="rail-label">Wiring</div></div>`;
+            for (let i = 1; i <= 5; i++) {
+                html += `<div class="rail-line ${currentStage > i ? 'done' : ''}"></div>`;
+                let state = (currentStage === i) ? 'active' : (currentStage > i ? 'done' : 'locked');
+                html += `<div class="rail-dot ${state}">${i}<div class="rail-label">Stage ${i}</div></div>`;
+            }
+            container.innerHTML = html;
+        }
+
+        function renderDynamicStages() {
+            const container = document.getElementById('dynamic-stages');
+            let html = '';
+            STAGES.forEach(s => {
+                html += `
+    <div class="stage-card locked" id="stageCard-${s.num}">
+      <div class="card-header" onclick="toggleStage(${s.num})">
+        <div class="card-header-left">
+          <div class="card-number">${s.num}</div>
+          <div class="card-title">${s.title}</div>
+        </div>
+        <div class="card-status" id="stageStatus-${s.num}">LOCKED</div>
+      </div>
+      <div class="card-body" id="stageBody-${s.num}">
+        <div class="card-body-inner">
+          <div class="section-label">1. Copy Prompt</div>
+          <div class="outbound-box">
+            <button class="btn-blue btn-small" onclick="generateStagePrompt(${s.num})" id="btnPrompt-${s.num}">Generate Prompt ${s.num}</button>
+            <textarea id="promptOut-${s.num}" readonly placeholder="Prompt will appear here..."></textarea>
+            <div class="outbound-instructions">Click the button above to generate the prompt. Copy the text and paste it into Claude/ChatGPT. Ensure it finishes generating.</div>
+          </div>
+          <div class="section-label">2. Paste LLM Output</div>
+          <div class="inbound-box">
+            <textarea id="jsonIn-${s.num}" placeholder="Paste JSON response from LLM here..."></textarea>
+            <div class="outbound-actions">
+              <button class="btn-secondary btn-small" onclick="validateStage(${s.num})">Process & Save JSON</button>
+            </div>
+            <div class="inbound-status" id="valStatus-${s.num}"></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function toggleStage(num) {
+            if (num !== 0 && document.getElementById(`stageCard-${num}`).classList.contains('locked')) return;
+
+            const body = document.getElementById(`stageBody-${num}`);
+            if (body.classList.contains('open')) {
+                body.classList.remove('open');
+            } else {
+                document.querySelectorAll('.card-body').forEach(el => el.classList.remove('open'));
+                body.classList.add('open');
+            }
+        }
+
+        function completeIntake() {
+            var workout = document.getElementById('progWorkout').value.trim();
+            var narrativeBrief = document.getElementById('progNarrativeBrief').value.trim();
+            if (!workout || !narrativeBrief) return alert("Please fill out workout and narrative brief.");
+
+            var dice = getSelectedDice();
+            pipelineData.intake = { workout, narrativeBrief: narrativeBrief, dice };
+            document.getElementById('stageStatus-0').innerText = 'OK';
+            document.getElementById('stageStatus-0').className = 'card-status ok';
+            document.getElementById('stageCard-0').classList.remove('active');
+            document.getElementById('stageCard-0').classList.add('valid');
+
+            unlockWiringStage();
+        }
+
+        function unlockStage(num) {
+            if (num > currentStage) currentStage = num;
+            renderRail();
+            const card = document.getElementById(`stageCard-${num}`);
+            card.classList.remove('locked');
+            card.classList.add('active');
+            document.getElementById(`stageStatus-${num}`).innerText = 'READY';
+            document.getElementById(`stageStatus-${num}`).className = 'card-status';
+            toggleStage(num);
+            document.getElementById('footerStatus').innerText = `Stage ${num} unlocked. Generate prompt.`;
+        }
+
+        // === Stage W: Wiring Blueprint ===
+
+        function unlockWiringStage() {
+            renderRail();
+            var card = document.getElementById('stageCard-W');
+            card.classList.remove('locked');
+            card.classList.add('active');
+            document.getElementById('stageStatus-W').innerText = 'READY';
+            document.getElementById('stageStatus-W').className = 'card-status';
+            toggleStage('W');
+            document.getElementById('footerStatus').innerText = 'Stage W unlocked. Generate wiring prompt.';
+        }
+
+        function generateWiringPrompt() {
+            var wiringTemplate = markdownTemplates['stage-w-wiring.md'] || '';
+            var wiringCatalog = markdownTemplates['shared-wiring-catalog.md'] || '';
+            var creativeDir = markdownTemplates['shared-creative-direction.md'] || '';
+
+            var briefParts = [pipelineData.intake.narrativeBrief || ''];
+            var intakeDice = pipelineData.intake.dice || ['d10', 'd%'];
+            if (intakeDice.indexOf('none') !== -1) {
+                briefParts.push('Available Dice: NONE — use only diceless mechanics.');
+            } else {
+                briefParts.push('Available Dice: ' + intakeDice.join(', ') + '.');
+            }
+            var narrativeBrief = briefParts.join('\n');
+
+            var promptText = wiringTemplate + '\n\n' + creativeDir;
+            promptText = promptText.replace(/\{\{shared-wiring-catalog\.md\}\}/g, wiringCatalog);
+            promptText = promptText.replace(/\{\{narrativeBrief\}\}/g, narrativeBrief);
+            promptText = promptText.replace(/\{\{workout\}\}/g, pipelineData.intake.workout || '');
+
+            var box = document.getElementById('promptOut-W');
+            box.value = promptText;
+            box.scrollTop = 0;
+            document.getElementById('footerStatus').innerText = 'Wiring prompt generated. Copy and paste into your LLM.';
+        }
+
+        function validateWiringBlueprint(obj) {
+            var e = [], w = [];
+
+            if (!obj.gameIdentity) e.push('Missing gameIdentity');
+            else {
+                if (!obj.gameIdentity.coreLoop) e.push('Missing gameIdentity.coreLoop');
+                if (!obj.gameIdentity.primaryTension) e.push('Missing gameIdentity.primaryTension');
+                if (!obj.gameIdentity.discoveryMechanism) w.push('Missing gameIdentity.discoveryMechanism');
+                if (!obj.gameIdentity.agencyModel) w.push('Missing gameIdentity.agencyModel');
+            }
+
+            if (!obj.experientialPillars) e.push('Missing experientialPillars');
+            else {
+                var pillars = ['exploration', 'progression', 'choicesMattering', 'selfReflection', 'rolePlaying', 'immersion'];
+                var totalWeight = 0;
+                pillars.forEach(function (p) {
+                    if (obj.experientialPillars[p]) {
+                        var wt = obj.experientialPillars[p].weight;
+                        if (typeof wt === 'number') totalWeight += wt;
+                        if (!obj.experientialPillars[p].expression) w.push('Pillar "' + p + '" missing expression');
+                    }
+                });
+                if (totalWeight < 8 || totalWeight > 15) {
+                    w.push('Pillar weights sum to ' + totalWeight + ' (expected 8-15)');
+                }
+            }
+
+            if (!Array.isArray(obj.wiring)) e.push('Missing wiring array');
+            else {
+                if (obj.wiring.length < 2) w.push('Only ' + obj.wiring.length + ' wire(s) — minimum 2 recommended');
+                if (obj.wiring.length > 8) w.push(obj.wiring.length + ' wires may exceed paper-trackability (max 8)');
+
+                var hasFeedback = obj.wiring.some(function (wi) {
+                    return wi.type === 'feedback-loop' || wi.bidirectional;
+                });
+                if (!hasFeedback) w.push('No feedback loops or bidirectional wires — mechanics may feel disconnected');
+
+                var wireIds = {};
+                obj.wiring.forEach(function (wi, idx) {
+                    if (!wi.id) e.push('Wire ' + idx + ' missing id');
+                    else if (wireIds[wi.id]) e.push('Duplicate wire id: ' + wi.id);
+                    else wireIds[wi.id] = true;
+                    if (!wi.type) e.push('Wire "' + (wi.id || idx) + '" missing type');
+                    if (!wi.from) e.push('Wire "' + (wi.id || idx) + '" missing from');
+                    if (!wi.to) e.push('Wire "' + (wi.id || idx) + '" missing to');
+                    if (!wi.printInstruction) e.push('Wire "' + (wi.id || idx) + '" missing printInstruction');
+                });
+            }
+
+            if (!Array.isArray(obj.weeklyArc)) w.push('Missing weeklyArc array');
+            else {
+                // Check that referenced wire IDs exist
+                var validWireIds = {};
+                (obj.wiring || []).forEach(function (wi) { if (wi.id) validWireIds[wi.id] = true; });
+                obj.weeklyArc.forEach(function (wa) {
+                    (wa.newWires || []).forEach(function (wid) {
+                        if (!validWireIds[wid]) w.push('weeklyArc references unknown wire id: ' + wid);
+                    });
+                });
+            }
+
+            if (!obj.complexityProfile) w.push('Missing complexityProfile');
+            else {
+                if (obj.complexityProfile.week1Active > 4) {
+                    w.push('week1Active is ' + obj.complexityProfile.week1Active + ' (recommended max 4)');
+                }
+                if (obj.complexityProfile.peakActive > 10) {
+                    w.push('peakActive is ' + obj.complexityProfile.peakActive + ' (exceeds complexity budget of 10)');
+                }
+            }
+
+            return { errors: e, warnings: w };
+        }
+
+        function validateWiring() {
+            var raw = document.getElementById('jsonIn-W').value.trim();
+            var statusEl = document.getElementById('valStatus-W');
+            if (!raw) { statusEl.innerHTML = '<span style="color:var(--accent)">No JSON pasted.</span>'; return; }
+
+            var obj;
+            try { obj = JSON.parse(raw); }
+            catch (ex) { statusEl.innerHTML = '<span style="color:var(--accent)">Invalid JSON: ' + ex.message + '</span>'; return; }
+
+            var result = validateWiringBlueprint(obj);
+            if (result.errors.length > 0) {
+                statusEl.innerHTML = '<span style="color:var(--accent)">ERRORS:<br>' + result.errors.join('<br>') + '</span>' +
+                    (result.warnings.length > 0 ? '<br><span style="color:var(--yellow, orange)">WARNINGS:<br>' + result.warnings.join('<br>') + '</span>' : '');
+                return;
+            }
+
+            pipelineData.wiring = obj;
+            document.getElementById('stageStatus-W').innerText = 'OK';
+            document.getElementById('stageStatus-W').className = 'card-status ok';
+            document.getElementById('stageCard-W').classList.remove('active');
+            document.getElementById('stageCard-W').classList.add('valid');
+            document.getElementById('stageBody-W').classList.remove('open');
+
+            if (result.warnings.length > 0) {
+                statusEl.innerHTML = '<span style="color:var(--yellow, orange)">Saved with warnings:<br>' + result.warnings.join('<br>') + '</span>';
+                console.warn('Wiring blueprint warnings:', result.warnings);
+            } else {
+                statusEl.innerHTML = '<span style="color:var(--green, #4a4)">Blueprint validated and saved.</span>';
+            }
+
+            unlockStage(1);
+        }
+
+        // === Stage Prompt Generation ===
+
+        function generateStagePrompt(num) {
+            let promptText = "";
+            var creativeDir = markdownTemplates['shared-creative-direction.md'] || '';
+            var primitives = markdownTemplates['shared-primitives-catalog.md'] || '';
+            var antiIso = markdownTemplates['shared-anti-isomorphism.md'] || '';
+
+            // Compose the narrative brief from intake
+            var briefParts = [pipelineData.intake.narrativeBrief || ''];
+            // Dice constraint
+            var intakeDice = pipelineData.intake.dice || ['d10', 'd%'];
+            if (intakeDice.indexOf('none') !== -1) {
+                briefParts.push('Available Dice: NONE — use only diceless mechanics (Resource-as-Resolution).');
+            } else {
+                briefParts.push('Available Dice: ' + intakeDice.join(', ') + '. Only use resolution systems and modifiers compatible with these dice.');
+            }
+            var narrativeBrief = briefParts.join('\n');
+
+            if (num === 1) {
+                var wiringSection = '';
+                if (pipelineData.wiring) {
+                    wiringSection = `
+
+## MECHANICAL WIRING BLUEPRINT (BINDING)
+
+The following blueprint defines the mechanical topology of this zine. You MUST select primitives that can express the declared wires. Every wire's \`printInstruction\` MUST appear somewhere in the final booklet — on the tracker sheet, in encounter marginalia, or in the rules manual.
+
+For EACH wire in the blueprint:
+1. Select a primitive from the catalog that serves as the wire's "from" source
+2. Select a primitive or content structure that serves as the wire's "to" target
+3. Name your mechanics to match the wire's \`from\` and \`to\` fields (diegetic names)
+4. Include the wire's \`printInstruction\` in the appropriate location:
+   - threshold-gate: in the clock/track's trigger text
+   - conditional-routing: in encounter outcome text or HUD marginalia
+   - resource-cycle: in the resource earn/spend rules
+   - escalation: in track threshold effects
+   - feedback-loop: in both source and target trigger descriptions
+   - unlock-chain: in the completing mechanic's trigger text
+5. Respect the \`activatesWeek\` field — mechanics for later-activating wires should exist in the schema but their wire instructions only appear on pages for that week onward.
+
+\`\`\`json
+${JSON.stringify(pipelineData.wiring, null, 2)}
+\`\`\`
+`;
+                }
+
+                promptText = `${markdownTemplates['stage-1-data-requirements.md']}
+
+${creativeDir}
+
+${primitives}
+${wiringSection}
+${antiIso}
+
+${markdownTemplates['stage-1-liftoscript.md']}
+
+## USER INPUT
+Workout/Script:
+${pipelineData.intake.workout}
+
+${narrativeBrief}`;
+            } else if (num === 2) {
+                const s1 = pipelineData[1] || {};
+                const context = {
+                    meta: s1.meta,
+                    workout: s1.workout,
+                    mechanics: s1.mechanics,
+                    theme: s1.theme,
+                    story: { encounters: s1.story?.encounters },
+                    map: s1.map,
+                    archiveLayout: s1.archiveLayout
+                };
+                promptText = `${markdownTemplates['stage-2-voice-map.md']}
+
+${creativeDir}
+
+## STAGE 1 CONTEXT
+\`\`\`json
+${JSON.stringify(context, null, 2)}
+\`\`\``;
+            } else if (num === 3) {
+                const s1 = pipelineData[1] || {};
+                const context = {
+                    meta: s1.meta,
+                    mechanics: s1.mechanics,
+                    story: { encounters: s1.story?.encounters, refScheme: s1.story?.refScheme },
+                    archiveLayout: s1.archiveLayout
+                };
+                promptText = `${markdownTemplates['stage-3-archives.md']}
+
+${creativeDir}
+
+## STAGE 1 CONTEXT
+\`\`\`json
+${JSON.stringify(context, null, 2)}
+\`\`\``;
+            } else if (num === 4) {
+                const s1 = pipelineData[1] || {};
+                const s3 = pipelineData[3] || {};
+                const context = {
+                    meta: s1.meta,
+                    mechanics: s1.mechanics,
+                    story: { encounters: s1.story?.encounters, refScheme: s1.story?.refScheme },
+                    archiveNodeIds: Object.keys(s3.storyArchives || {}).reduce((acc, sectionKey) => {
+                        const section = s3.storyArchives[sectionKey];
+                        if (section && section.nodes) acc[sectionKey] = section.nodes.map(n => n.id);
+                        return acc;
+                    }, {})
+                };
+                promptText = `${markdownTemplates['stage-4-story.md']}
+
+${creativeDir}
+
+## STAGE 1 + STAGE 3 CONTEXT
+\`\`\`json
+${JSON.stringify(context, null, 2)}
+\`\`\``;
+            } else if (num === 5) {
+                const s1 = pipelineData[1] || {};
+                const s3 = pipelineData[3] || {};
+                const evidenceTracks = (s1.mechanics?.tracks || []).filter(t => t.type === 'faction' || t.type === 'progress');
+                if (evidenceTracks.length === 0) {
+                    const box = document.getElementById(`promptOut-${num}`);
+                    box.value = "Stage 5 Not Applicable: No evidence tracks found in Stage 1 mechanics.";
+                    return;
+                }
+
+                const context = {
+                    meta: s1.meta,
+                    mechanics: { tracks: evidenceTracks, clocks: s1.mechanics?.clocks },
+                    archiveSections: Object.keys(s3.storyArchives || {}),
+                    workout: { totalWeeks: s1.workout?.totalWeeks }
+                };
+
+                promptText = `${markdownTemplates['stage-5-evidence.md']}
+
+${creativeDir}
+
+## STAGE 1 + STAGE 3 CONTEXT
+\`\`\`json
+${JSON.stringify(context, null, 2)}
+\`\`\``;
+            }
+
+            promptText = promptText.replace(/\{\{narrativeBrief\}\}/g, narrativeBrief);
+
+            const box = document.getElementById(`promptOut-${num}`);
+            box.value = promptText;
+            box.select();
+
+            navigator.clipboard.writeText(promptText).then(() => {
+                const btn = document.getElementById(`btnPrompt-${num}`);
+                btn.innerText = "\u2705 COPIED!";
+                setTimeout(() => { btn.innerText = `Generate Prompt ${num}`; }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy prompt: ', err);
+                const btn = document.getElementById(`btnPrompt-${num}`);
+                btn.innerText = "\u274c COPY ERROR";
+                setTimeout(() => { btn.innerText = `Generate Prompt ${num}`; }, 2000);
+            });
+        }
+
+        // ── Robust JSON extractor with LLM output repair ──────────────
+        //
+        // LLMs regularly produce malformed JSON. This pipeline:
+        //   1. Strips markdown fences and prose wrapper
+        //   2. Attempts JSON.parse (fast path for valid output)
+        //   3. On failure, runs incremental repair phases, re-trying
+        //      parse after each phase to minimize transformation risk
+        //
+        // Returns { result: Object, repairs: String[] }
+        // repairs[] lists which fixes were applied (empty if none).
+
+        var _lastExtractRepairs = [];
+
+        function safeExtract(raw) {
+            _lastExtractRepairs = [];
+            var str = raw.trim();
+
+            // Phase 0: Strip markdown fences and extract outermost structure
+            var fence = str.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+            if (fence) str = fence[1].trim();
+            var outerMatch = str.match(/(\{|\[)[\s\S]*(\}|\])/);
+            if (outerMatch) str = outerMatch[0];
+
+            // Fast path: try parsing as-is
+            try { return JSON.parse(str); } catch (e) { /* continue to repairs */ }
+
+            // ── Repair pipeline (incremental, re-parse after each phase) ──
+            //
+            // ORDER MATTERS: Unescaped quotes must be fixed before any
+            // phase that tracks string boundaries (comments, newlines,
+            // control chars, backslashes). Trailing commas use a simple
+            // regex without string tracking so they run first safely.
+
+            // Phase 1: Trailing commas (most common, safest fix — no string tracking)
+            var repaired = str.replace(/,\s*([}\]])/g, '$1');
+            if (repaired !== str) {
+                _lastExtractRepairs.push('trailing-commas');
+                str = repaired;
+                try { return JSON.parse(str); } catch (e) { /* continue */ }
+            }
+
+            // Phase 2: Unescaped double quotes inside string values
+            // (SVG attributes, HTML content — the #1 LLM JSON killer)
+            // Must run BEFORE comments/newlines/control chars since those
+            // depend on correct string boundary detection.
+            repaired = _repairUnescapedQuotes(str);
+            if (repaired !== str) {
+                _lastExtractRepairs.push('unescaped-quotes');
+                str = repaired;
+                try { return JSON.parse(str); } catch (e) { /* continue */ }
+            }
+
+            // Phase 3: Comments (// and /* */) outside strings
+            // Now safe because string boundaries are correct after Phase 2.
+            repaired = _stripComments(str);
+            if (repaired !== str) {
+                _lastExtractRepairs.push('comments');
+                str = repaired;
+                try { return JSON.parse(str); } catch (e) { /* continue */ }
+            }
+
+            // Phase 4: Literal newlines inside strings
+            repaired = _repairNewlinesInStrings(str);
+            if (repaired !== str) {
+                _lastExtractRepairs.push('newlines-in-strings');
+                str = repaired;
+                try { return JSON.parse(str); } catch (e) { /* continue */ }
+            }
+
+            // Phase 5: Control characters inside strings
+            repaired = _repairControlChars(str);
+            if (repaired !== str) {
+                _lastExtractRepairs.push('control-chars');
+                str = repaired;
+                try { return JSON.parse(str); } catch (e) { /* continue */ }
+            }
+
+            // Phase 6: Invalid backslash escapes inside strings
+            repaired = _repairBackslashes(str);
+            if (repaired !== str) {
+                _lastExtractRepairs.push('invalid-escapes');
+                str = repaired;
+                try { return JSON.parse(str); } catch (e) { /* continue */ }
+            }
+
+            // Phase 7: Truncation — close unclosed brackets/braces
+            repaired = _repairTruncation(str);
+            if (repaired !== str) {
+                _lastExtractRepairs.push('truncation');
+                str = repaired;
+                try { return JSON.parse(str); } catch (e) { /* continue */ }
+            }
+
+            // All repairs exhausted — final attempt, throw on failure
+            return JSON.parse(str);
+        }
+
+        // ── Repair helpers ──────────────────────────────────────────────
+
+        function _stripComments(str) {
+            var result = [];
+            var inString = false;
+            var i = 0;
+            while (i < str.length) {
+                var ch = str[i];
+                if (ch === '\\' && inString) {
+                    result.push(ch, str[i + 1] || '');
+                    i += 2;
+                    continue;
+                }
+                if (ch === '"') {
+                    inString = !inString;
+                    result.push(ch);
+                    i++;
+                    continue;
+                }
+                if (!inString && ch === '/' && str[i + 1] === '/') {
+                    while (i < str.length && str[i] !== '\n') i++;
+                    continue;
+                }
+                if (!inString && ch === '/' && str[i + 1] === '*') {
+                    i += 2;
+                    while (i < str.length - 1 && !(str[i] === '*' && str[i + 1] === '/')) i++;
+                    i += 2;
+                    continue;
+                }
+                result.push(ch);
+                i++;
+            }
+            return result.join('');
+        }
+
+        function _repairUnescapedQuotes(str) {
+            // Walk character-by-character tracking string state.
+            // A closing quote is "structural" if followed by : , } ] or EOF.
+            // Anything else means the quote is embedded content — escape it.
+            var result = [];
+            var inString = false;
+            var i = 0;
+            while (i < str.length) {
+                var ch = str[i];
+                if (ch === '\\' && inString) {
+                    result.push(ch, str[i + 1] || '');
+                    i += 2;
+                    continue;
+                }
+                if (ch === '"') {
+                    if (!inString) {
+                        inString = true;
+                        result.push(ch);
+                    } else {
+                        // Is this a structural close-quote?
+                        var rest = str.slice(i + 1).replace(/^\s+/, '');
+                        var next = rest[0];
+                        if (next === ':' || next === ',' || next === '}' ||
+                            next === ']' || rest.length === 0 || next === undefined) {
+                            inString = false;
+                            result.push(ch);
+                        } else {
+                            // Content quote — escape it
+                            result.push('\\"');
+                        }
+                    }
+                } else {
+                    result.push(ch);
+                }
+                i++;
+            }
+            return result.join('');
+        }
+
+        function _repairNewlinesInStrings(str) {
+            var result = [];
+            var inString = false;
+            for (var i = 0; i < str.length; i++) {
+                var ch = str[i];
+                if (ch === '\\' && inString) {
+                    result.push(ch, str[i + 1] || '');
+                    i++;
+                    continue;
+                }
+                if (ch === '"') {
+                    inString = !inString;
+                    result.push(ch);
+                    continue;
+                }
+                if ((ch === '\n' || ch === '\r') && inString) {
+                    if (ch === '\r' && str[i + 1] === '\n') i++;
+                    result.push('\\n');
+                } else {
+                    result.push(ch);
+                }
+            }
+            return result.join('');
+        }
+
+        function _repairControlChars(str) {
+            var result = [];
+            var inString = false;
+            var escaped = false;
+            for (var i = 0; i < str.length; i++) {
+                var ch = str[i];
+                var code = str.charCodeAt(i);
+                if (escaped) { result.push(ch); escaped = false; continue; }
+                if (ch === '\\' && inString) { result.push(ch); escaped = true; continue; }
+                if (ch === '"') { inString = !inString; result.push(ch); continue; }
+                if (inString && code < 0x20 && code !== 0x0A && code !== 0x0D) {
+                    if (code === 0x09) result.push('\\t');
+                    else if (code === 0x08) result.push('\\b');
+                    else if (code === 0x0C) result.push('\\f');
+                    else result.push('\\u' + ('0000' + code.toString(16)).slice(-4));
+                } else {
+                    result.push(ch);
+                }
+            }
+            return result.join('');
+        }
+
+        function _repairBackslashes(str) {
+            var result = [];
+            var inString = false;
+            var i = 0;
+            while (i < str.length) {
+                var ch = str[i];
+                if (ch === '"' && (i === 0 || str[i - 1] !== '\\')) {
+                    inString = !inString;
+                    result.push(ch);
+                    i++;
+                    continue;
+                }
+                if (inString && ch === '\\') {
+                    var nx = str[i + 1];
+                    if (nx && '"\\\/bfnrt'.indexOf(nx) !== -1) {
+                        result.push(ch, nx);
+                        i += 2;
+                        continue;
+                    }
+                    if (nx === 'u' && /^[0-9a-fA-F]{4}$/.test(str.substring(i + 2, i + 6))) {
+                        result.push(str.substring(i, i + 6));
+                        i += 6;
+                        continue;
+                    }
+                    result.push('\\\\');
+                    i++;
+                    continue;
+                }
+                result.push(ch);
+                i++;
+            }
+            return result.join('');
+        }
+
+        function _repairTruncation(str) {
+            var trimmed = str.trimEnd();
+
+            // Check for unclosed string (odd quote count)
+            var quoteCount = 0;
+            var esc = false;
+            for (var i = 0; i < trimmed.length; i++) {
+                if (esc) { esc = false; continue; }
+                if (trimmed[i] === '\\') { esc = true; continue; }
+                if (trimmed[i] === '"') quoteCount++;
+            }
+            if (quoteCount % 2 !== 0) {
+                // Truncate back to last structural character before the broken string
+                var lastGood = -1;
+                var inStr = false;
+                var isEsc = false;
+                for (var j = 0; j < trimmed.length; j++) {
+                    if (isEsc) { isEsc = false; continue; }
+                    if (trimmed[j] === '\\' && inStr) { isEsc = true; continue; }
+                    if (trimmed[j] === '"') inStr = !inStr;
+                    if (!inStr && (trimmed[j] === ',' || trimmed[j] === '{' ||
+                        trimmed[j] === '[' || trimmed[j] === ':')) {
+                        lastGood = j;
+                    }
+                }
+                if (lastGood > 0) {
+                    trimmed = trimmed.substring(0, lastGood + 1);
+                    trimmed = trimmed.replace(/[,:]\s*$/, '');
+                }
+            }
+
+            // Count unmatched openers, append closers
+            var stack = [];
+            var inString = false;
+            var isEscaped = false;
+            for (var k = 0; k < trimmed.length; k++) {
+                if (isEscaped) { isEscaped = false; continue; }
+                if (trimmed[k] === '\\' && inString) { isEscaped = true; continue; }
+                if (trimmed[k] === '"') { inString = !inString; continue; }
+                if (inString) continue;
+                if (trimmed[k] === '{') stack.push('}');
+                else if (trimmed[k] === '[') stack.push(']');
+                else if (trimmed[k] === '}' || trimmed[k] === ']') stack.pop();
+            }
+            if (stack.length > 0) {
+                return trimmed + stack.reverse().join('');
+            }
+            return trimmed;
+        }
+
+        function validateStage(num) {
+            const val = document.getElementById(`jsonIn-${num}`).value;
+            try {
+                const obj = safeExtract(val);
+                var jsonRepairs = _lastExtractRepairs.slice();
+                const { errors, warnings } = validateStageData(num, obj);
+
+                if (errors.length > 0) {
+                    throw new Error("Critical validation failed:\n- " + errors.join("\n- "));
+                }
+
+                pipelineData[num] = obj;
+
+                // Clear out later stages to prevent stale cross-stage references
+                for (let i = num + 1; i <= 5; i++) {
+                    delete pipelineData[i];
+                    const card = document.getElementById(`stageCard-${i}`);
+                    if (card) {
+                        card.classList.remove('valid', 'active');
+                        card.classList.add('locked');
+                        document.getElementById(`stageStatus-${i}`).innerText = "LOCKED";
+                        document.getElementById(`stageStatus-${i}`).className = "card-status";
+                        document.getElementById(`jsonIn-${i}`).value = "";
+                        document.getElementById(`valStatus-${i}`).className = "inbound-status";
+                        document.getElementById(`valStatus-${i}`).innerText = "";
+                        document.getElementById(`promptOut-${i}`).value = "";
+                    }
+                }
+                currentStage = num;
+
+                // Surface repair and validation warnings to user
+                var allWarnings = warnings.slice();
+                if (jsonRepairs.length) {
+                    allWarnings.unshift('JSON auto-repaired: ' + jsonRepairs.join(', '));
+                    console.warn('Stage ' + num + ' JSON repairs applied:', jsonRepairs);
+                }
+                if (jsonRepairs.indexOf('truncation') !== -1) {
+                    allWarnings.unshift('JSON was truncated — LLM may have hit output limit. Some content may be missing.');
+                }
+                const warnText = allWarnings.length ? ` (${allWarnings.length} warning${allWarnings.length > 1 ? 's' : ''})` : '';
+                document.getElementById(`valStatus-${num}`).innerText = "\u2705 JSON Validated & Saved" + warnText;
+                document.getElementById(`valStatus-${num}`).className = "inbound-status ok";
+                if (allWarnings.length) {
+                    console.warn(`Stage ${num} validation warnings:`, allWarnings);
+                }
+                document.getElementById(`stageStatus-${num}`).innerText = "OK";
+                document.getElementById(`stageStatus-${num}`).className = "card-status ok";
+                document.getElementById(`stageCard-${num}`).classList.remove('active');
+                document.getElementById(`stageCard-${num}`).classList.add('valid');
+
+                // Collapse this stage
+                document.getElementById(`stageBody-${num}`).classList.remove('open');
+
+                if (num < 5) {
+                    // Auto-skip Stage 5 if no evidence tracks exist
+                    if (num === 4) {
+                        var s1 = pipelineData[1] || {};
+                        var evidenceTracks = (s1.mechanics?.tracks || []).filter(function (t) { return t.type === 'faction' || t.type === 'progress'; });
+                        if (evidenceTracks.length === 0) {
+                            pipelineData[5] = {};
+                            currentStage = 6;
+                            renderRail();
+                            var card5 = document.getElementById('stageCard-5');
+                            card5.classList.remove('locked', 'active');
+                            card5.classList.add('valid');
+                            document.getElementById('stageStatus-5').innerText = 'SKIPPED';
+                            document.getElementById('stageStatus-5').className = 'card-status ok';
+                            document.getElementById('btnAssemble').disabled = false;
+                            document.getElementById('footerStatus').innerText = 'Stage 5 skipped (no evidence tracks). Ready to assemble.';
+                            document.getElementById('btnAssemble').classList.add('btn-primary');
+                            return;
+                        }
+                    }
+                    unlockStage(num + 1);
+                } else {
+                    currentStage = 6;
+                    renderRail();
+                    document.getElementById('btnAssemble').disabled = false;
+                    document.getElementById('footerStatus').innerText = "All stages complete. Ready to assemble.";
+                    document.getElementById('btnAssemble').classList.add('btn-primary');
+                }
+            } catch (e) {
+                document.getElementById(`valStatus-${num}`).innerText = "\u274c JSON Error: " + e.message;
+                document.getElementById(`valStatus-${num}`).className = "inbound-status err";
+                document.getElementById(`stageStatus-${num}`).innerText = "ERROR";
+                document.getElementById(`stageStatus-${num}`).className = "card-status err";
+            }
+        }
+
+        function validateStageData(num, obj, currentPipelineData = pipelineData) {
+            const e = [];
+            const w = [];
+            if (num === 1) {
+                if (!obj.meta?.title) e.push('Missing meta.title');
+                if (!obj.workout?.totalWeeks) e.push('Missing workout.totalWeeks');
+                if (!obj.workout?.sessionTypes?.length) e.push('Missing workout.sessionTypes[]');
+                if (!obj.mechanics?.dice) e.push('Missing mechanics.dice');
+                if (!obj.mechanics?.endConditions?.length) e.push('Missing mechanics.endConditions[]');
+                if (!obj.theme?.colors) e.push('Missing theme.colors');
+                else {
+                    for (const k of ['ink', 'paper', 'fog', 'accent', 'muted']) {
+                        if (!obj.theme.colors[k]) e.push(`Missing theme.colors.${k}`);
+                        else if (!/^#[0-9a-fA-F]{6}$/.test(obj.theme.colors[k])) e.push(`theme.colors.${k} is not valid hex: ${obj.theme.colors[k]}`);
+                    }
+                }
+                if (!obj.theme?.fonts) e.push('Missing theme.fonts');
+
+                const validTypes = ['cover', 'rules-manual', 'tracker-sheet', 'setup', 'encounter-spread', 'ref-pages', 'archive', 'endings', 'evidence', 'final'];
+                if (!obj.pages?.length) e.push('Missing pages[] array');
+                else {
+                    const archiveKeysSeen = new Set();
+                    obj.pages.forEach((p, idx) => {
+                        if (!validTypes.includes(p.type)) e.push(`pages[${idx}].type is invalid: "${p.type}"`);
+                        if (p.type === 'archive' && p.section) {
+                            if (archiveKeysSeen.has(p.section)) {
+                                w.push(`Duplicate archive page found for section "${p.section}" in pages[] array.`);
+                            }
+                            archiveKeysSeen.add(p.section);
+                        }
+                    });
+                }
+
+                if (obj.workout && Array.isArray(obj.workout.sessionTypes)) {
+                    obj.workout.sessionTypes.forEach(st => {
+                        if (Array.isArray(st.exercises)) {
+                            st.exercises.forEach(ex => {
+                                if (ex.reps && String(ex.reps).length > 20) {
+                                    w.push(`Exercise "${ex.name}" has oversized reps string (${String(ex.reps).length} chars). Keep it to simple counts (e.g. 5, "3-5").`);
+                                }
+                            });
+                        }
+                    });
+                }
+
+                if (!obj.story?.encounters?.length) e.push('Missing story.encounters[]');
+                else {
+                    // Derive sessions-per-week from unique day numbers across all
+                    // sessionTypes (spec: "Days are numbered 1 through N where N is
+                    // sessions per week"). Falls back to sessionTypes.length if no
+                    // days data — but days is a required field in the schema.
+                    var allDays = new Set();
+                    (obj.workout?.sessionTypes || []).forEach(function (st) {
+                        (st.days || []).forEach(function (d) { allDays.add(d); });
+                    });
+                    let sessPerWeek = allDays.size > 0
+                        ? allDays.size
+                        : (obj.workout?.sessionTypes || []).length;
+                    if (sessPerWeek > 0 && obj.workout?.totalWeeks) {
+                        let expected = sessPerWeek * obj.workout.totalWeeks;
+                        if (obj.story.encounters.length !== expected) {
+                            w.push(`Expected ${expected} encounters (${sessPerWeek} sessions × ${obj.workout.totalWeeks} weeks), found ${obj.story.encounters.length}. Engine will render what exists.`);
+                        }
+                    }
+                    const diceOutcomes = obj.mechanics?.dice?.outcomes || [];
+                    obj.story.encounters.forEach((enc, idx) => {
+                        const encOutcomes = enc.outcomes || [];
+                        if (diceOutcomes.length > 0 && encOutcomes.length !== diceOutcomes.length) {
+                            w.push(`Encounter index ${idx} outcomes length (${encOutcomes.length}) doesn't match dice outcomes (${diceOutcomes.length})`);
+                        }
+                    });
+                }
+
+                // Cross-ref: clocks -> archiveLayout
+                const archiveKeys = (obj.archiveLayout || []).flatMap(s => [...(s.left || []), ...(s.right || [])]);
+                (obj.mechanics?.clocks || []).forEach(c => {
+                    if (c.onTrigger?.section && !archiveKeys.includes(c.onTrigger.section)) {
+                        w.push(`Clock "${c.name}" references section "${c.onTrigger.section}" not in archiveLayout`);
+                    }
+                });
+            } else if (num === 2) {
+                const reqKeys = ['cover', 'manual', 'classifications', 'hud', 'weekPage', 'archive', 'finalPage', 'labels', 'weekAlerts'];
+                reqKeys.forEach(k => {
+                    if (!obj.voice?.[k]) w.push(`Missing voice.${k}`);
+                });
+                if (!obj.voice?.cover) e.push('Missing voice.cover');
+                if (!obj.voice?.manual) e.push('Missing voice.manual');
+                if (!obj.voice?.classifications) e.push('Missing voice.classifications');
+            } else if (num === 3) {
+                if (!obj.storyArchives || typeof obj.storyArchives !== 'object') e.push('Missing storyArchives object');
+                if (!Array.isArray(obj.storyEndings) || !obj.storyEndings.length) e.push('Missing storyEndings array');
+
+                const s1 = currentPipelineData[1] || {};
+                const endIds = (s1.mechanics?.endConditions || []).map(end => end.id);
+                (obj.storyEndings || []).forEach(end => {
+                    if (endIds.length && !endIds.includes(end.id)) e.push(`Ending id "${end.id}" not in Stage 1 endConditions`);
+                });
+
+                const archiveKeys = (s1.archiveLayout || []).flatMap(s => [...(s.left || []), ...(s.right || [])]);
+                const storyArchiveKeys = Object.keys(obj.storyArchives || {});
+                storyArchiveKeys.forEach(k => {
+                    if (archiveKeys.length && !archiveKeys.includes(k)) e.push(`Archive section key "${k}" not in Stage 1 archiveLayout`);
+                });
+                archiveKeys.forEach(k => {
+                    if (!storyArchiveKeys.includes(k)) e.push(`ArchiveLayout key "${k}" has no matching section in storyArchives`);
+                });
+            } else if (num === 4) {
+                const keys = Object.keys(obj);
+                if (!keys.length) w.push('No REF nodes found');
+
+                const s1 = currentPipelineData[1] || {};
+                const s1Encounters = s1.story?.encounters || [];
+                // Count expected REF nodes: 1 router + N branches per encounter
+                let expectedRefCount = 0;
+                s1Encounters.forEach(enc => {
+                    expectedRefCount += 1 + (enc.outcomes?.length || 0);
+                });
+
+                if (expectedRefCount > 0 && keys.length !== expectedRefCount) {
+                    w.push(`Expected ${expectedRefCount} REF nodes (${s1Encounters.length} routers + ${expectedRefCount - s1Encounters.length} branches), found ${keys.length}. Engine will render what exists.`);
+                }
+
+                keys.forEach(k => {
+                    const node = obj[k];
+                    if (!node.type) w.push(`REF "${k}" missing type`);
+                    if (!node.html) w.push(`REF "${k}" missing html`);
+                });
+            } else if (num === 5) {
+                const keys = Object.keys(obj);
+
+                const s1 = currentPipelineData[1] || {};
+                const tracks = (s1.mechanics?.tracks || []).filter(t => t.type === 'faction' || t.type === 'progress');
+                const expectedEvidenceCount = tracks.length * (s1.workout?.totalWeeks || 0);
+
+                if (expectedEvidenceCount > 0 && keys.length !== expectedEvidenceCount) {
+                    w.push(`Expected ${expectedEvidenceCount} evidence nodes (${tracks.length} tracks * ${s1.workout?.totalWeeks || 0} weeks), found ${keys.length}. Engine will render what exists.`);
+                }
+
+                keys.forEach(k => {
+                    const node = obj[k];
+                    if (!node.type) w.push(`Evidence node "${k}" missing type`);
+                    if (!node.html) w.push(`Evidence node "${k}" missing html`);
+                });
+            }
+            return { errors: e, warnings: w };
+        }
+
+        function exportJson() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(pipelineData, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            const title = pipelineData[1]?.meta?.title ? pipelineData[1].meta.title.toLowerCase().replace(/[^a-z0-9]/g, '-') : 'liftrpg-pipeline';
+            dlAnchorElem.setAttribute("download", `${title}-${Date.now()}.json`);
+            document.body.appendChild(dlAnchorElem);
+            dlAnchorElem.click();
+            document.body.removeChild(dlAnchorElem);
+            document.getElementById('footerStatus').innerText = "JSON exported successfully.";
+        }
+
+        function importJson() {
+            document.getElementById('fileImport').click();
+        }
+
+        function handleFileImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+
+                    // Validate each stage before accepting the import
+                    const importErrors = [];
+                    for (let num = 1; num <= 5; num++) {
+                        if (importedData[num]) {
+                            const { errors } = validateStageData(num, importedData[num], importedData);
+                            if (errors.length > 0) {
+                                importErrors.push(`Stage ${num}: ${errors.join(', ')}`);
+                            }
+                        }
+                    }
+                    if (importErrors.length > 0) {
+                        alert("Import blocked — validation errors:\n\n" + importErrors.join("\n"));
+                        return;
+                    }
+
+                    if (Object.keys(pipelineData).length > 0 && !confirm("This will overwrite your current progress. Continue?")) {
+                        return;
+                    }
+
+                    pipelineData = importedData;
+
+                    // Repopulate form
+                    if (pipelineData.intake) {
+                        // Backward compat: old JSON files use 'genre' + 'creativeDirection' as separate fields
+                        if (!pipelineData.intake.narrativeBrief && (pipelineData.intake.genre || pipelineData.intake.creativeDirection || pipelineData.intake.theme)) {
+                            var parts = [];
+                            if (pipelineData.intake.genre || pipelineData.intake.theme) parts.push(pipelineData.intake.genre || pipelineData.intake.theme);
+                            if (pipelineData.intake.creativeDirection) parts.push(pipelineData.intake.creativeDirection);
+                            pipelineData.intake.narrativeBrief = parts.join('. ');
+                        }
+                        if (pipelineData.intake.workout) document.getElementById('progWorkout').value = pipelineData.intake.workout;
+                        if (pipelineData.intake.narrativeBrief) document.getElementById('progNarrativeBrief').value = pipelineData.intake.narrativeBrief;
+                        if (pipelineData.intake.dice) restoreDiceSelection(pipelineData.intake.dice);
+                        document.getElementById('stageStatus-0').innerText = 'OK';
+                        document.getElementById('stageStatus-0').className = 'card-status ok';
+                        document.getElementById('stageCard-0').classList.remove('active');
+                        document.getElementById('stageCard-0').classList.add('valid');
+                    }
+
+                    // Restore wiring blueprint
+                    if (pipelineData.wiring) {
+                        document.getElementById('jsonIn-W').value = JSON.stringify(pipelineData.wiring, null, 2);
+                        document.getElementById('stageStatus-W').innerText = 'OK';
+                        document.getElementById('stageStatus-W').className = 'card-status ok';
+                        document.getElementById('stageCard-W').classList.remove('locked', 'active');
+                        document.getElementById('stageCard-W').classList.add('valid');
+                    } else if (pipelineData.intake) {
+                        // Intake done but no wiring — unlock wiring stage
+                        document.getElementById('stageCard-W').classList.remove('locked');
+                        document.getElementById('stageCard-W').classList.add('active');
+                        document.getElementById('stageStatus-W').innerText = 'READY';
+                    }
+
+                    // Repopulate text areas and validate stages
+                    for (let num = 1; num <= 5; num++) {
+                        if (pipelineData[num]) {
+                            document.getElementById(`jsonIn-${num}`).value = JSON.stringify(pipelineData[num], null, 2);
+                            document.getElementById(`valStatus-${num}`).innerText = "✅ JSON Validated & Saved";
+                            document.getElementById(`valStatus-${num}`).className = "inbound-status ok";
+                            document.getElementById(`stageStatus-${num}`).innerText = "OK";
+                            document.getElementById(`stageStatus-${num}`).className = "card-status ok";
+                            document.getElementById(`stageCard-${num}`).classList.remove('locked', 'active');
+                            document.getElementById(`stageCard-${num}`).classList.add('valid');
+                            document.getElementById(`stageBody-${num}`).classList.remove('open');
+                        }
+                    }
+
+                    // Determine highest completed stage
+                    let maxCompleted = 0;
+                    for (let i = 1; i <= 5; i++) {
+                        if (pipelineData[i]) maxCompleted = i;
+                    }
+
+                    if (maxCompleted === 5) {
+                        currentStage = 6;
+                        document.getElementById('btnAssemble').disabled = false;
+                        document.getElementById('btnAssemble').classList.add('btn-primary');
+                        document.getElementById('footerStatus').innerText = "Import successful. Ready to assemble.";
+                        // Close all bodies
+                        document.querySelectorAll('.card-body').forEach(el => el.classList.remove('open'));
+                    } else if (maxCompleted > 0) {
+                        unlockStage(maxCompleted + 1);
+                        document.getElementById('footerStatus').innerText = `Import successful. Next step: Stage ${maxCompleted + 1}.`;
+                    } else {
+                        unlockStage(1);
+                        document.getElementById('footerStatus').innerText = "Import successful. Ready to begin Stage 1.";
+                    }
+
+                    renderRail();
+
+                } catch (error) {
+                    alert("Error importing JSON: " + error.message);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
+        }
+
+        function assemble() {
+            document.getElementById('btnAssemble').disabled = true;
+            document.getElementById('btnAssemble').innerText = "Assembling...";
+
+            try {
+                // Build the final payload from all 5 stages
+                const s1 = pipelineData[1] || {};
+                const s2 = pipelineData[2] || {};
+                const s3 = pipelineData[3] || {};
+                const s4 = pipelineData[4] || {};
+                const s5 = pipelineData[5] || {};
+
+                let finalPayload = {
+                    meta: s1.meta,
+                    workout: s1.workout,
+                    mechanics: s1.mechanics,
+                    theme: s1.theme,
+                    pages: s1.pages,
+                    archiveLayout: s1.archiveLayout,
+                    map: s2.map || s1.map,
+                    voice: s2.voice,
+                    story: {
+                        encounters: s1.story?.encounters || [],
+                        refScheme: s1.story?.refScheme,
+                        refs: {},
+                        archives: s3.storyArchives || {},
+                        endings: s3.storyEndings || []
+                    }
+                };
+
+                // Merge REF nodes from stages 4 and 5
+                if (s4) Object.assign(finalPayload.story.refs, s4);
+                if (s5) {
+                    Object.assign(finalPayload.story.refs, s5);
+                    finalPayload.story.evidence = s5;
+                }
+
+                // Inject theme as CSS custom properties
+                injectTheme(finalPayload.theme);
+
+                // If no pages[] array (e.g. legacy import), auto-generate page order
+                if (!finalPayload.pages || !finalPayload.pages.length) {
+                    finalPayload.pages = autoGeneratePages(finalPayload);
+                }
+
+                document.getElementById('app-ui').style.display = 'none';
+                document.getElementById('footerBar').style.position = 'relative';
+                document.getElementById('zine-container-wrapper').style.display = 'flex';
+                document.getElementById('btnPrint').style.display = 'block';
+
+                window.runPacker(finalPayload);
+                imposeToSpreads();
+
+                document.getElementById('footerStatus').innerText = "Assemble complete! Review the zine below.";
+            } catch (e) {
+                alert("Layout Error: " + e.message + "\nCheck dev console for more details.");
+                console.error(e);
+                document.getElementById('btnAssemble').disabled = false;
+                document.getElementById('btnAssemble').innerText = "Validate & Assemble";
+            }
+        }
+
+        function injectTheme(theme) {
+            // Remove previous theme style if any
+            const existing = document.getElementById('zine-theme');
+            if (existing) existing.remove();
+
+            if (!theme) return;
+
+            // Inject Google Fonts
+            const fontFamilies = [theme.fonts?.body, theme.fonts?.heading].filter(Boolean);
+            const uniqueFonts = [...new Set(fontFamilies)];
+            uniqueFonts.forEach(f => {
+                const familyName = f.split(',')[0].replace(/['"]/g, '').trim();
+                if (familyName && !document.querySelector(`link[data-font="${familyName}"]`)) {
+                    const link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(familyName)}:ital,wght@0,400;0,600;0,700;1,400&display=swap`;
+                    link.dataset.font = familyName;
+                    document.head.appendChild(link);
+                }
+            });
+
+            // Layout Diversity computation
+            let stampWidth = '2px';
+            if (theme.layout?.stampStyle === 'light') stampWidth = '1px';
+            if (theme.layout?.stampStyle === 'none') stampWidth = '0px';
+
+            let pagePadding = '0.5in';
+            if (theme.layout?.defaultDensity === 'high') pagePadding = '0.3in';
+            if (theme.layout?.defaultDensity === 'low') pagePadding = '0.7in';
+
+            const style = document.createElement('style');
+            style.id = 'zine-theme';
+            style.textContent = `
+                :root {
+                    --ink: ${theme.colors?.ink || '#1a1a18'};
+                    --paper: ${theme.colors?.paper || '#f0ede4'};
+                    --fog: ${theme.colors?.fog || '#e6e2d8'};
+                    --accent: ${theme.colors?.accent || '#c45c00'};
+                    --muted: ${theme.colors?.muted || '#5a5a56'};
+                    --font-body: ${theme.fonts?.body || "'Helvetica Neue', sans-serif"};
+                    --font-heading: ${theme.fonts?.heading || "var(--font-body)"};
+                    
+                    --page-padding: ${pagePadding};
+                    --stamp-width: ${stampWidth};
+                    --archive-separator: ${theme.layout?.archiveSeparator === 'none' ? 'none' : '1px solid var(--fog)'};
+                    --text-transform-headings: ${theme.layout?.textTransformHeadings || 'uppercase'};
+                    --text-transform-labels: ${theme.layout?.textTransformLabels || 'uppercase'};
+
+                    --log-name-width: ${theme.layout?.logNameWidth || '35%'};
+                    --log-sets-width: ${theme.layout?.logSetsWidth || '50%'};
+                    --log-box-width: ${theme.layout?.logBoxWidth || '1.8rem'};
+                    --log-box-height: ${theme.layout?.logBoxHeight || '1.1rem'};
+                    --log-border: ${theme.layout?.logBorder || '1.5px solid var(--ink)'};
+                }
+                ${(theme.customCss || '').replace(/</g, '').replace(/>/g, '')}
+            `;
+            document.head.appendChild(style);
+        }
+
+        function autoGeneratePages(data) {
+            const pages = [{ type: 'cover' }, { type: 'rules-manual' }, { type: 'tracker-sheet' }];
+            if (data.workout?.setup) pages.push({ type: 'setup' });
+            const totalWeeks = data.workout?.totalWeeks || 0;
+            for (let w = 1; w <= totalWeeks; w++) {
+                pages.push({ type: 'encounter-spread', week: w });
+                pages.push({ type: 'ref-pages', week: w });
+            }
+            // Archive pages from archiveLayout
+            const archiveSections = (data.archiveLayout || []).flatMap(s => [...(s.left || []), ...(s.right || [])]);
+            const uniqueSections = [...new Set(archiveSections)];
+            uniqueSections.forEach(s => pages.push({ type: 'archive', section: s }));
+
+            // Add Evidence
+            if (data.mechanics?.tracks?.filter(t => t.type === 'faction' || t.type === 'progress').length > 0) {
+                pages.push({ type: 'evidence' });
+            }
+
+            pages.push({ type: 'endings' });
+            pages.push({ type: 'final' });
+            return pages;
+        }
+
+        // Take layout pages and impose them for saddle stitch printing
+        function imposeToSpreads() {
+            const container = document.getElementById('zine-container');
+            const pages = Array.from(container.querySelectorAll('.zine-page'));
+            const totalPages = pages.length;
+            if (totalPages % 4 !== 0) console.warn(`Total pages(${totalPages}) is not a multiple of 4.`);
+            container.innerHTML = '';
+            const numSpreads = Math.ceil(totalPages / 2);
+            for (let i = 0; i < numSpreads; i++) {
+                const spread = document.createElement('div');
+                spread.className = 'zine-spread';
+
+                let leftIndex, rightIndex;
+                if (i % 2 === 0) { leftIndex = totalPages - 1 - i; rightIndex = i; }
+                else { leftIndex = i; rightIndex = totalPages - 1 - i; }
+
+                const leftPage = pages[leftIndex];
+                const rightPage = pages[rightIndex];
+
+                // Remove individual outlines for print spreads
+                if (leftPage) {
+                    leftPage.style.position = 'absolute';
+                    leftPage.style.left = '0';
+                    leftPage.style.top = '0';
+                    leftPage.style.width = '5.5in';
+                    leftPage.style.height = '8.5in';
+                    leftPage.style.outline = 'none';
+                    leftPage.style.overflow = 'hidden';
+                    spread.appendChild(leftPage);
+                }
+                if (rightPage) {
+                    rightPage.style.position = 'absolute';
+                    rightPage.style.left = '5.5in';
+                    rightPage.style.top = '0';
+                    rightPage.style.width = '5.5in';
+                    rightPage.style.height = '8.5in';
+                    rightPage.style.outline = 'none';
+                    rightPage.style.overflow = 'hidden';
+                    spread.appendChild(rightPage);
+                }
+                container.appendChild(spread);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,1716 @@
+/* ==========================================================
+   Base Theme Scaffolding — Iron & Aether Engine v2
+   All colors/fonts use CSS custom properties so theme
+   injection from LLM-generated theme data overrides them.
+   ========================================================== */
+
+:root {
+    --page-width: 5.5in;
+    --page-height: 8.5in;
+    --page-padding: 0.5in;
+
+    /* Theme-overridable properties (defaults) */
+    --ink: #1a1a18;
+    --paper: #f0ede4;
+    --fog: #e6e2d8;
+    --accent: #c45c00;
+    --muted: #5a5a56;
+    --font-body: 'Helvetica Neue', Helvetica, sans-serif;
+    --font-heading: var(--font-body);
+    --font-mono: 'Courier New', Courier, monospace;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: var(--font-body);
+    color: var(--ink);
+    box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+@media screen {
+    body {
+        background: var(--surface2, #ccc);
+        padding: 2rem;
+        gap: 1rem;
+    }
+
+    .zine-page {
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+}
+
+/* ---- Core Page ---- */
+#zine-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.zine-page {
+    width: var(--page-width);
+    height: var(--page-height);
+    padding: var(--page-padding);
+    background: var(--paper);
+    color: var(--ink);
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    font-family: var(--font-body);
+    overflow-wrap: break-word;
+}
+
+/* Prevent any child from overflowing the page content area */
+.zine-page>* {
+    max-width: 100%;
+    overflow-wrap: break-word;
+}
+
+.zine-page table {
+    max-width: 100%;
+    table-layout: fixed;
+}
+
+.page-number {
+    position: absolute;
+    bottom: 0.25in;
+    right: 0.5in;
+    font-family: var(--font-mono);
+    font-size: 9pt;
+    color: var(--muted);
+}
+
+/* ---- Print ---- */
+@media print {
+    body {
+        background: white;
+        padding: 0;
+        align-items: flex-start;
+    }
+
+    #app-ui,
+    .footer-bar {
+        display: none !important;
+    }
+
+    #zine-container {
+        gap: 0;
+        width: 100vw;
+    }
+
+    #zine-container-wrapper {
+        display: block !important;
+        margin: 0;
+        padding: 0;
+        background: white;
+    }
+
+    .zine-spread {
+        box-shadow: none;
+        border: none;
+        page-break-after: always;
+        margin: 0;
+    }
+
+    .zine-page {
+        box-shadow: none;
+        border: none;
+        page-break-after: always;
+    }
+
+    .zine-spread .zine-page {
+        page-break-after: avoid;
+        width: 5.5in !important;
+        height: 8.5in !important;
+        overflow: hidden !important;
+        max-width: 5.5in !important;
+    }
+
+    @page {
+        size: 11in 8.5in landscape;
+        margin: 0;
+    }
+}
+
+/* ---- Spread Container for Imposition ---- */
+.zine-spread {
+    width: 11in;
+    height: 8.5in;
+    display: flex;
+    flex-direction: row;
+    background: var(--paper);
+    overflow: hidden;
+    position: relative;
+    box-sizing: border-box;
+    page-break-after: always;
+}
+
+@media screen {
+    .zine-spread {
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+}
+
+/* ---- Typography ---- */
+h1 {
+    font-family: var(--font-heading);
+    font-size: 22pt;
+    margin: 0 0 0.75rem 0;
+    text-transform: var(--text-transform-headings, uppercase);
+    border-bottom: var(--stamp-width, 2px) solid var(--ink);
+    padding-bottom: 0.4rem;
+    letter-spacing: 0.05em;
+}
+
+h2 {
+    font-family: var(--font-heading);
+    font-size: 12pt;
+    margin: 1rem 0 0.4rem 0;
+    text-transform: var(--text-transform-headings, uppercase);
+    border-bottom: 1px solid var(--muted);
+    letter-spacing: 0.03em;
+}
+
+p {
+    font-size: 9.5pt;
+    line-height: 1.45;
+    margin: 0 0 0.4rem 0;
+}
+
+ul,
+ol {
+    font-size: 9.5pt;
+    margin: 0 0 0.4rem 0;
+    padding-left: 1.5rem;
+}
+
+li {
+    margin-bottom: 0.2rem;
+}
+
+.flavor {
+    font-style: italic;
+    font-size: 8.5pt;
+    color: var(--muted);
+    padding-left: 0.75rem;
+    border-left: 2px solid var(--muted);
+    margin-bottom: 0.4rem;
+}
+
+.rule {
+    font-weight: bold;
+    background: var(--fog);
+    padding: 0.4rem;
+    margin-bottom: 0.4rem;
+    font-size: 9pt;
+}
+
+/* ---- Classification Stamp ---- */
+.classification {
+    font-family: var(--font-heading);
+    font-size: 8pt;
+    text-transform: var(--text-transform-labels, uppercase);
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--muted);
+    padding-bottom: 0.15rem;
+    margin-bottom: 0.5rem;
+}
+
+.classification-stamp {
+    font-family: var(--font-heading);
+    font-size: 7pt;
+    text-transform: var(--text-transform-labels, uppercase);
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 0.15rem 0.4rem;
+    display: inline-block;
+    margin-bottom: 0.75rem;
+}
+
+/* ==========================================================
+   COVER PAGE
+   ========================================================== */
+.cover-layout {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.cover-department {
+    font-family: var(--font-heading);
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    margin-bottom: 1rem;
+}
+
+.cover-title {
+    font-family: var(--font-heading);
+    font-size: 28pt;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.3rem;
+    line-height: 1.1;
+}
+
+.cover-subject {
+    font-family: var(--font-heading);
+    font-size: 10pt;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+}
+
+.cover-tagline {
+    font-size: 9pt;
+    font-style: italic;
+    color: var(--muted);
+    margin-bottom: 1rem;
+}
+
+.cover-intro {
+    font-size: 9pt;
+    line-height: 1.5;
+    max-width: 80%;
+    margin: 0 auto 1.5rem;
+    text-align: left;
+}
+
+.cover-art {
+    margin: 1rem auto;
+    max-width: 60%;
+}
+
+.cover-art svg {
+    width: 100%;
+    height: auto;
+    color: var(--ink);
+}
+
+.cover-author {
+    font-size: 8pt;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: auto;
+    color: var(--muted);
+}
+
+/* ==========================================================
+   RULES MANUAL
+   ========================================================== */
+.manual-title {
+    font-size: 18pt;
+    margin-bottom: 0.75rem;
+}
+
+.manual-section {
+    margin-bottom: 0.6rem;
+}
+
+.manual-heading {
+    font-size: 10pt;
+    margin: 0.5rem 0 0.2rem 0;
+    border-bottom: 1px solid var(--muted);
+}
+
+.manual-body {
+    font-size: 9pt;
+    line-height: 1.45;
+}
+
+.manual-body p {
+    margin-bottom: 0.3rem;
+}
+
+/* ==========================================================
+   TRACKER SHEET (Character Dossier)
+   ========================================================== */
+.tracker-sheet h1 {
+    font-size: 16pt;
+    margin-bottom: 0.5rem;
+}
+
+.tracker-section {
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px dotted var(--muted);
+}
+
+.tracker-section h2 {
+    font-size: 9pt;
+    margin: 0.3rem 0 0.2rem 0;
+    border-bottom: none;
+    color: var(--accent);
+}
+
+.tracker-row {
+    font-size: 8.5pt;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.15rem;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.tracker-row>* {
+    min-width: 0;
+}
+
+.tracker-label {
+    font-weight: bold;
+}
+
+.tracker-info {
+    font-family: var(--font-mono);
+    font-size: 7.5pt;
+    color: var(--muted);
+}
+
+.tracker-trigger {
+    font-family: var(--font-mono);
+    font-size: 7.5pt;
+    font-weight: bold;
+    color: var(--accent, #c45c00);
+    margin-top: 0.15rem;
+    margin-bottom: 0.1rem;
+}
+
+.tracker-flavor {
+    font-size: 7.5pt;
+    font-style: italic;
+    color: var(--muted);
+    margin: 0.1rem 0 0.3rem 0;
+}
+
+.resource-row {
+    flex-wrap: wrap;
+    display: block;
+    font-size: 8pt;
+    line-height: 1.4;
+    overflow-wrap: break-word;
+}
+
+.codeword-row {
+    display: block;
+    margin-bottom: 0.5rem;
+    overflow: visible;
+}
+
+.codeword-name {
+    font-family: var(--font-mono);
+    font-size: 9pt;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+}
+
+.codeword-name strong {
+    white-space: nowrap;
+}
+
+.codeword-effect {
+    font-size: 7.5pt;
+    line-height: 1.3;
+    margin-left: 1.2em;
+    color: var(--muted, #666);
+    overflow-wrap: break-word;
+}
+
+/* ==========================================================
+   SETUP PAGE
+   ========================================================== */
+.setup-instructions {
+    font-size: 9pt;
+    margin-bottom: 0.5rem;
+    line-height: 1.5;
+}
+
+.setup-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+    margin-bottom: 0.5rem;
+}
+
+.setup-table th {
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    padding: 0.2rem 0.3rem;
+    border: 1px solid var(--ink);
+}
+
+.setup-table td {
+    border: 1px solid var(--ink);
+    padding: 0.2rem 0.3rem;
+}
+
+.setup-input-cell {
+    min-width: 1.5rem;
+    min-height: 1rem;
+}
+
+.setup-note {
+    font-size: 8.5pt;
+    background: var(--fog);
+    padding: 0.3rem;
+    margin-bottom: 0.5rem;
+}
+
+.setup-page {
+    /* Made it a flex container implicitly if we specify flex on children, or just rely on inherited flex */
+}
+
+.setup-page .setup-notes-area {
+    flex-grow: 1;
+}
+
+.setup-notes-area {
+    margin-top: 0.5rem;
+}
+
+.setup-note-line {
+    height: 1.2rem;
+    border-bottom: 1px solid var(--muted);
+}
+
+/* ==========================================================
+   ENCOUNTER SPREAD
+   ========================================================== */
+
+.encounter-hud {
+    justify-content: space-between;
+}
+
+.encounter-hud,
+.encounter-log {
+    font-size: 9pt;
+}
+
+.week-alert {
+    font-family: var(--font-heading);
+    font-size: 8pt;
+    text-transform: var(--text-transform-labels, uppercase);
+    padding: 0.2rem 0.4rem;
+    margin-bottom: 0.4rem;
+    border-left: 3px solid var(--accent);
+    background: var(--fog);
+}
+
+.week-alert-intake {
+    border-left-color: var(--muted);
+    background: transparent;
+}
+
+/* HUD Map */
+.hud-map {
+    margin-bottom: 0.4rem;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.hud-map-title {
+    font-family: var(--font-heading);
+    font-size: 7.5pt;
+    text-transform: var(--text-transform-labels, uppercase);
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.2rem;
+}
+
+/* HUD Dice Table */
+.hud-dice {
+    margin-bottom: 0.4rem;
+}
+
+.hud-dice-label {
+    font-family: var(--font-heading);
+    font-size: 7.5pt;
+    text-transform: var(--text-transform-labels, uppercase);
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.15rem;
+}
+
+.dice-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8pt;
+    font-family: var(--font-mono);
+}
+
+.dice-table th {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 0.15rem 0.3rem;
+    font-size: 7pt;
+    text-transform: uppercase;
+    border: 1px solid var(--ink);
+}
+
+.dice-table td {
+    border: 1px solid var(--ink);
+    padding: 0.15rem 0.3rem;
+}
+
+.hud-dice-note {
+    font-size: 7pt;
+    font-style: italic;
+    color: var(--muted);
+    margin-top: 0.1rem;
+}
+
+/* HUD Trackers (compact) */
+.hud-trackers {
+    margin-bottom: 0.3rem;
+}
+
+.hud-trackers-label {
+    font-family: var(--font-heading);
+    font-size: 7.5pt;
+    text-transform: var(--text-transform-labels, uppercase);
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.15rem;
+}
+
+.hud-tracker-row {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-bottom: 0.15rem;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.hud-tracker-name {
+    font-size: 7.5pt;
+    font-weight: bold;
+    min-width: 4rem;
+}
+
+/* Session Block */
+.session-block {
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--fog);
+}
+
+.session-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.2rem;
+    gap: 0.3rem;
+    overflow: hidden;
+}
+
+.session-day {
+    font-family: var(--font-heading);
+    font-size: 9pt;
+    font-weight: bold;
+    text-transform: var(--text-transform-labels, uppercase);
+    flex-shrink: 0;
+}
+
+.encounter-title {
+    font-family: var(--font-heading);
+    font-size: 7.5pt;
+    text-transform: var(--text-transform-labels, uppercase);
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.encounter-narrative {
+    font-size: 8.5pt;
+    font-style: italic;
+    line-height: 1.4;
+    margin-bottom: 0.3rem;
+    padding-left: 0.5rem;
+    border-left: 2px solid var(--accent);
+    overflow-wrap: break-word;
+    max-width: 100%;
+}
+
+.session-intensity {
+    font-family: var(--font-mono);
+    font-size: 7pt;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.15rem;
+}
+
+.session-ref {
+    font-family: var(--font-mono);
+    font-size: 7.5pt;
+    text-align: right;
+    color: var(--accent);
+    margin-top: 0.2rem;
+}
+
+/* Boss Encounter */
+.session-boss {
+    border: 2px solid var(--accent);
+    padding: 0.3rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(to bottom, var(--fog) 0%, var(--paper) 15%);
+}
+
+.session-boss .session-title-row {
+    border-bottom: 2px solid var(--accent);
+}
+
+.boss-rules-box {
+    background: var(--fog);
+    border: 1.5px solid var(--ink);
+    padding: 0.3rem 0.4rem;
+    margin: 0.3rem 0;
+    font-size: 8pt;
+}
+
+.boss-rules-title {
+    font-family: var(--font-heading);
+    font-size: 9pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.2rem;
+    border-bottom: 1px solid var(--ink);
+    padding-bottom: 0.15rem;
+}
+
+.boss-rules-preamble {
+    font-style: italic;
+    font-size: 8pt;
+    margin-bottom: 0.2rem;
+}
+
+.boss-rules-steps {
+    font-size: 7.5pt;
+    line-height: 1.4;
+    margin: 0.2rem 0;
+    padding-left: 1.2rem;
+}
+
+.boss-rules-steps li {
+    margin-bottom: 0.15rem;
+}
+
+.boss-rules-stakes {
+    font-weight: bold;
+    font-size: 8pt;
+    text-align: center;
+    margin-top: 0.2rem;
+    padding-top: 0.15rem;
+    border-top: 1px solid var(--muted);
+}
+
+.week-alert-boss {
+    border-left: 3px solid var(--ink);
+    background: var(--accent);
+    color: var(--paper);
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* Workout Log Table */
+.workout-log-table {
+    width: 100%;
+    border: var(--log-border, 1.5px solid var(--ink));
+    border-collapse: collapse;
+    margin: 0.3rem 0;
+    font-family: var(--font-mono);
+}
+
+.workout-log-table th {
+    background: var(--ink);
+    color: var(--paper);
+    text-transform: uppercase;
+    font-size: 7pt;
+    padding: 0.15rem 0.3rem;
+    border: 1px solid var(--ink);
+    text-align: left;
+}
+
+.workout-log-table td {
+    border: 1px solid var(--ink);
+    padding: 0.15rem 0.3rem;
+    vertical-align: middle;
+    font-size: 8pt;
+}
+
+.workout-log-name {
+    font-weight: bold;
+    width: var(--log-name-width, 35%);
+}
+
+.workout-log-sets {
+    width: var(--log-sets-width, 50%);
+}
+
+.workout-log-set-container {
+    display: flex;
+    gap: 0.15rem;
+    flex-wrap: wrap;
+}
+
+.workout-log-box {
+    width: var(--log-box-width, 1.8rem);
+    height: var(--log-box-height, 1.1rem);
+    border: 1px solid var(--ink);
+    background: var(--paper);
+}
+
+/* Week-end checkin */
+.week-checkin {
+    margin-top: 0.3rem;
+}
+
+.week-checkin-label {
+    font-family: var(--font-heading);
+    font-size: 7.5pt;
+    text-transform: var(--text-transform-labels, uppercase);
+    color: var(--muted);
+    margin-bottom: 0.15rem;
+}
+
+.checkin-line {
+    font-size: 8pt;
+    padding: 0.1rem 0;
+    border-bottom: 1px dotted var(--muted);
+}
+
+/* ==========================================================
+   FACILITY GRID MAP
+   ========================================================== */
+.facility-grid {
+    margin-bottom: 0.3rem;
+}
+
+.facility-floor {
+    margin-bottom: 0.2rem;
+}
+
+.floor-label {
+    font-family: var(--font-heading);
+    font-size: 7pt;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.1rem;
+}
+
+.floor-rooms {
+    display: grid;
+    gap: 2px;
+}
+
+.facility-room {
+    border: 1px solid var(--ink);
+    padding: 0.15rem;
+    text-align: center;
+    font-size: 7pt;
+    background: var(--paper);
+    min-height: 1.2rem;
+}
+
+.room-label {
+    font-weight: bold;
+    font-family: var(--font-heading);
+}
+
+.room-sub {
+    font-size: 6pt;
+    color: var(--muted);
+}
+
+.room-you {
+    background: var(--accent);
+    color: var(--paper);
+}
+
+.room-corridor {
+    background: var(--fog);
+    border-style: dashed;
+}
+
+.room-locked {
+    background: var(--muted);
+    color: var(--paper);
+    opacity: 0.5;
+}
+
+.room-redacted {
+    background: var(--ink);
+    color: transparent;
+    user-select: none;
+}
+
+.facility-divider {
+    font-family: var(--font-mono);
+    font-size: 7pt;
+    text-align: center;
+    color: var(--muted);
+    margin: 0.15rem 0;
+    padding: 0.1rem;
+    border: 1px dashed var(--muted);
+}
+
+.divider-alert {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+/* ==========================================================
+   POINT-TO-POINT MAP
+   ========================================================== */
+.ptp-map {
+    border: 1.5px solid var(--ink);
+    background: var(--paper);
+    max-width: 100%;
+    max-height: 3.8in;
+    overflow: hidden;
+}
+
+/* ==========================================================
+   LINEAR TRACK MAP
+   ========================================================== */
+.linear-track-map {
+    display: flex;
+    gap: 1px;
+    font-family: var(--font-mono);
+}
+
+.linear-track-cell {
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 1.5px solid var(--ink);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 7pt;
+    background: var(--paper);
+}
+
+.linear-player {
+    background: var(--accent);
+    color: var(--paper);
+}
+
+.linear-label {
+    font-size: 5pt;
+}
+
+/* ==========================================================
+   REF PAGES
+   ========================================================== */
+.ref-page {
+    font-size: 9pt;
+}
+
+.ref-page-alert {
+    font-size: 8pt;
+    font-style: italic;
+    color: var(--accent);
+    padding: 0.2rem 0;
+    margin-bottom: 0.3rem;
+    border-bottom: 1px solid var(--fog);
+}
+
+.ref-router {
+    margin-bottom: 0.3rem;
+}
+
+.ref-router-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5em;
+}
+
+.ref-router-title {
+    font-size: 8pt;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+}
+
+.ref-id {
+    font-family: var(--font-mono);
+    font-size: 10pt;
+    font-weight: bold;
+    color: var(--accent);
+    margin-bottom: 0.1rem;
+}
+
+.ref-content {
+    font-size: 9pt;
+    line-height: 1.45;
+}
+
+.ref-branch {
+    margin-bottom: 0.25rem;
+    padding-left: 0.5rem;
+    border-left: 2px solid var(--fog);
+}
+
+.ref-branch-header {
+    font-family: var(--font-mono);
+    font-size: 7.5pt;
+    font-weight: bold;
+    color: var(--muted);
+    margin-bottom: 0.1rem;
+    overflow-wrap: break-word;
+}
+
+.ref-separator {
+    border: none;
+    border-top: 1px solid var(--fog);
+    margin: 0.4rem 0;
+}
+
+/* Narrative type decorations */
+.ref-type-kinetic {
+    border-left: 2px solid var(--accent);
+    padding-left: 0.3rem;
+}
+
+.ref-type-philosophical {
+    font-style: italic;
+}
+
+.ref-type-echo,
+.ref-type-artifact {
+    font-family: var(--font-mono);
+    font-size: 8.5pt;
+}
+
+.ref-type-steinbeck,
+.ref-type-dirt {
+    letter-spacing: 0.01em;
+}
+
+.ref-type-apex {
+    font-weight: bold;
+    border-left: 3px solid var(--ink);
+    padding-left: 0.3rem;
+}
+
+/* Scrambled paragraph book layout */
+.ref-router-section {
+    margin-bottom: 0.3rem;
+    padding-bottom: 0.2rem;
+}
+
+.ref-zone-divider {
+    border: none;
+    border-top: 2px solid var(--ink);
+    margin: 0.3rem 0;
+}
+
+.ref-entry {
+    margin-bottom: 0.1rem;
+    overflow-wrap: break-word;
+}
+
+.ref-entry-id {
+    font-family: var(--font-mono);
+    font-size: 9pt;
+    font-weight: bold;
+    color: var(--accent);
+    margin-right: 0.4em;
+}
+
+.ref-entry-label {
+    font-family: var(--font-mono);
+    font-size: 7pt;
+    color: var(--muted);
+    vertical-align: baseline;
+}
+
+/* Missing REF content placeholder */
+.ref-redacted {
+    font-family: var(--font-mono);
+    font-size: 7.5pt;
+    font-style: italic;
+    color: var(--muted);
+    opacity: 0.5;
+    padding: 0.1rem 0;
+}
+
+/* ==========================================================
+   ARCHIVE PAGES
+   ========================================================== */
+.archive-page {
+    font-size: 9pt;
+}
+
+.archive-page::before {
+    content: '';
+    display: block;
+    border-top: 2px solid var(--accent);
+    margin-bottom: 0.3rem;
+}
+
+.archive-trigger-label {
+    font-family: var(--font-mono);
+    font-size: 7pt;
+    font-weight: bold;
+    color: var(--accent, #c45c00);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.3rem;
+    padding: 0.15rem 0.3rem;
+    border: 1px solid var(--accent, #c45c00);
+    display: inline-block;
+}
+
+.archive-intro {
+    font-style: italic;
+    font-size: 8.5pt;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+}
+
+.archive-node {
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.4rem;
+    border-bottom: var(--archive-separator, 1px dotted var(--muted));
+    overflow-wrap: break-word;
+    max-width: 100%;
+    break-inside: avoid;
+}
+
+.archive-fragment-columns {
+    break-inside: avoid;
+}
+
+/* Memo format */
+.archive-memo .memo-header {
+    font-family: var(--font-mono);
+    font-size: 7.5pt;
+    margin-bottom: 0.3rem;
+    padding: 0.2rem;
+    background: var(--fog);
+}
+
+.memo-field {
+    margin-bottom: 0.05rem;
+}
+
+.memo-body {
+    font-size: 9pt;
+    line-height: 1.45;
+    overflow-wrap: break-word;
+}
+
+/* Journal format */
+.archive-journal {
+    border-left: 2px dashed var(--muted);
+    padding-left: 0.5rem;
+    font-style: italic;
+}
+
+.journal-date {
+    font-style: normal;
+    font-weight: bold;
+    font-size: 8pt;
+    color: var(--muted);
+    margin-bottom: 0.15rem;
+}
+
+.journal-body {
+    font-size: 9pt;
+    line-height: 1.5;
+}
+
+/* Transmission format */
+.archive-transmission {
+    font-family: var(--font-mono);
+    font-size: 8pt;
+    background: var(--fog);
+    padding: 0.3rem;
+}
+
+.transmission-channel {
+    font-size: 7pt;
+    color: var(--accent);
+    margin-bottom: 0.1rem;
+}
+
+.transmission-id {
+    font-weight: bold;
+    margin-bottom: 0.1rem;
+}
+
+.transmission-body {
+    line-height: 1.4;
+}
+
+/* Letter format */
+.archive-letter {
+    border: 1px dashed var(--muted);
+    padding: 0.4rem;
+}
+
+.letter-from {
+    font-style: italic;
+    font-size: 8pt;
+    color: var(--muted);
+    margin-bottom: 0.2rem;
+}
+
+.letter-body {
+    font-size: 9pt;
+    line-height: 1.5;
+}
+
+/* Clipping format */
+.archive-clipping {
+    border: 2px solid var(--ink);
+    padding: 0.3rem;
+}
+
+.clipping-headline {
+    font-family: var(--font-heading);
+    font-size: 11pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-bottom: 0.1rem;
+    line-height: 1.2;
+}
+
+.clipping-source {
+    font-size: 7pt;
+    color: var(--muted);
+    font-style: italic;
+    margin-bottom: 0.2rem;
+}
+
+.clipping-body {
+    font-size: 8.5pt;
+    line-height: 1.4;
+}
+
+/* Incident Report format */
+.archive-incident-report {
+    border-left: 3px solid var(--accent);
+    padding-left: 0.4rem;
+}
+
+.ir-severity {
+    font-family: var(--font-mono);
+    font-size: 7pt;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 0.1rem;
+}
+
+.ir-title {
+    font-weight: bold;
+    font-size: 9pt;
+    margin-bottom: 0.15rem;
+}
+
+.ir-body {
+    font-size: 9pt;
+    line-height: 1.45;
+}
+
+/* Fragment Columns format */
+.archive-fragment-columns {
+    column-count: 2;
+    column-gap: 0.5rem;
+    column-rule: 1px dotted var(--fog);
+    font-size: 8pt;
+}
+
+.fragment-columns-title {
+    column-span: all;
+    font-weight: bold;
+    font-style: italic;
+    margin-bottom: 0.3rem;
+    color: var(--muted);
+}
+
+.fragment-columns-body {
+    line-height: 1.4;
+}
+
+/* Generic archive fallback */
+.archive-title {
+    font-weight: bold;
+    margin-bottom: 0.15rem;
+}
+
+.archive-body {
+    font-size: 9pt;
+    line-height: 1.45;
+}
+
+/* ==========================================================
+   ENDINGS PAGES
+   ========================================================== */
+.endings-page {
+    font-size: 9pt;
+}
+
+.endings-trigger {
+    margin-bottom: 0.5rem;
+    background: var(--fog);
+    padding: 0.3rem;
+}
+
+.endings-trigger h2 {
+    font-size: 9pt;
+    margin: 0 0 0.2rem 0;
+    border-bottom: none;
+}
+
+.endings-trigger ul {
+    font-size: 8pt;
+    margin: 0;
+    padding-left: 1rem;
+}
+
+.ending-block {
+    margin-bottom: 0.6rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--muted);
+}
+
+.ending-title {
+    font-size: 11pt;
+    margin: 0.3rem 0 0.2rem 0;
+    color: var(--accent);
+}
+
+.ending-body {
+    font-size: 9pt;
+    line-height: 1.5;
+}
+
+/* ==========================================================
+   EVIDENCE PAGES
+   ========================================================== */
+.evidence-page {
+    font-size: 9pt;
+}
+
+.evidence-intro {
+    font-style: italic;
+    font-size: 8.5pt;
+    color: var(--muted);
+    margin-bottom: 1rem;
+}
+
+.evidence-week-header {
+    font-size: 10pt;
+    color: var(--accent);
+    border-bottom: 1px solid var(--accent);
+    margin-top: 1rem;
+}
+
+.evidence-node {
+    margin-bottom: 0.5rem;
+    padding-left: 0.4rem;
+    border-left: 2px solid var(--fog);
+}
+
+.evidence-node-header {
+    margin-bottom: 0.2rem;
+}
+
+.evidence-track-name {
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 8pt;
+}
+
+.evidence-node-id {
+    font-family: var(--font-mono);
+    font-size: 7.5pt;
+    color: var(--muted);
+}
+
+.evidence-node-body {
+    font-size: 8.5pt;
+    line-height: 1.45;
+}
+
+/* ==========================================================
+   FINAL PAGE
+   ========================================================== */
+.final-page {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.final-heading {
+    font-family: var(--font-heading);
+    font-size: 20pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+}
+
+.final-subline {
+    font-size: 10pt;
+    color: var(--muted);
+    margin-bottom: 1rem;
+}
+
+.final-instruction {
+    font-size: 9pt;
+    font-style: italic;
+    margin-bottom: 2rem;
+}
+
+.final-footer {
+    margin-top: auto;
+    font-size: 7pt;
+    color: var(--muted);
+    text-transform: uppercase;
+    text-align: center;
+}
+
+.final-engine {
+    margin-bottom: 0.2rem;
+}
+
+.final-note {
+    font-size: 6pt;
+}
+
+/* ==========================================================
+   BACK COVER & NOTES (padding pages)
+   ========================================================== */
+.back-cover {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border: 6px solid var(--ink);
+    text-align: center;
+}
+
+.back-cover-content {
+    text-align: center;
+}
+
+.back-cover-title {
+    font-family: var(--font-heading);
+    font-size: 22pt;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.back-cover-sub {
+    font-family: var(--font-mono);
+    font-size: 10pt;
+    margin-top: 0.75rem;
+}
+
+.back-cover-version {
+    font-family: var(--font-mono);
+    font-size: 8pt;
+    margin-top: 1.5rem;
+}
+
+.back-cover-footer {
+    margin-top: auto;
+    font-family: var(--font-mono);
+    font-size: 6pt;
+    color: var(--muted);
+    text-transform: uppercase;
+}
+
+.notes-page {
+    background-image: repeating-linear-gradient(transparent, transparent 1.4rem, var(--fog) 1.4rem, var(--fog) 1.45rem);
+    background-position-y: 2rem;
+}
+
+.notes-heading {
+    color: var(--fog);
+    border-bottom: none;
+    text-align: center;
+    margin-top: 40%;
+    background: transparent;
+}
+
+/* ==========================================================
+   EXISTING PRIMITIVE COMPONENTS (kept for tracker sheet)
+   ========================================================== */
+.clock-container {
+    display: flex;
+    gap: 2px;
+}
+
+.clock-segment {
+    width: 0.9rem;
+    height: 0.9rem;
+    border: 1.5px solid var(--ink);
+    background: var(--paper);
+}
+
+/* clearable distinction removed — all segments look the same for clarity */
+
+.tug-container {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-family: var(--font-mono);
+    font-size: 7pt;
+}
+
+.tug-label {
+    font-size: 6.5pt;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.tug-track {
+    display: flex;
+    gap: 1px;
+}
+
+.tug-box-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.tug-box {
+    width: 0.9rem;
+    height: 0.9rem;
+    border: 1px solid var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 6.5pt;
+    background: var(--paper);
+}
+
+.tug-center {
+    background: var(--ink);
+    color: var(--paper);
+    font-weight: bold;
+}
+
+.tug-threshold {
+    border-color: var(--accent);
+    border-width: 2px;
+}
+
+.threshold-label {
+    font-size: 6pt;
+    color: var(--muted);
+    margin-top: 1px;
+}
+
+.tug-inter-label {
+    margin: 0 1px;
+}
+
+.progress-track {
+    display: flex;
+    gap: 2px;
+}
+
+.progress-box-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.progress-box {
+    width: 0.9rem;
+    height: 0.9rem;
+    border: 1.5px solid var(--ink);
+    background: var(--paper);
+}
+
+.progress-box-filled {
+    background: var(--ink);
+}
+
+.progress-box-threshold {
+    border-color: var(--accent);
+    border-width: 2px;
+}
+
+.progress-threshold-list {
+    margin-top: 0.15rem;
+}
+
+.progress-threshold-desc {
+    font-size: 7pt;
+    color: var(--muted);
+    line-height: 1.3;
+    margin-bottom: 0.1rem;
+    overflow-wrap: break-word;
+}
+
+.progress-threshold-marker {
+    font-family: var(--font-mono);
+    color: var(--ink);
+    font-weight: bold;
+}
+
+.heat-track-container {
+    margin-bottom: 0.3rem;
+}
+
+.heat-track {
+    display: flex;
+    gap: 1px;
+    font-family: var(--font-mono);
+    flex-wrap: wrap;
+}
+
+.heat-box {
+    width: 0.9rem;
+    height: 0.9rem;
+    border: 1px solid var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 6.5pt;
+    background: var(--paper);
+}
+
+.heat-box-filled {
+    background: var(--accent);
+    color: var(--paper);
+}
+
+.heat-box-threshold {
+    border-color: var(--ink);
+    border-width: 2px;
+}
+
+.heat-threshold-list {
+    margin-top: 0.2rem;
+    display: block;
+}
+
+.heat-threshold-desc {
+    font-size: 7pt;
+    color: var(--muted);
+    line-height: 1.3;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    margin-bottom: 0.1rem;
+}
+
+.heat-threshold-marker {
+    font-family: var(--font-mono);
+    color: var(--ink);
+}
+
+.faction-boxes {
+    display: flex;
+    gap: 1px;
+    font-family: var(--font-mono);
+}
+
+.faction-box-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.faction-box {
+    width: 0.9rem;
+    height: 0.9rem;
+    border: 1px solid var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 6.5pt;
+    background: var(--paper);
+}
+
+.faction-label {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.15rem;
+    font-size: 6.5pt;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+}
+
+.linear-track {
+    display: flex;
+    gap: 1px;
+    font-family: var(--font-mono);
+}
+
+.skill-tree {
+    font-family: var(--font-mono);
+    font-size: 8pt;
+}
+
+.skill-node {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.1rem 0;
+    border-bottom: 1px dotted var(--muted);
+}
+
+.skill-checkbox {
+    font-size: 10pt;
+    line-height: 1;
+}
+
+.skill-label {
+    flex: 1;
+}
+
+.skill-requires {
+    font-size: 6.5pt;
+    color: var(--muted);
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+    table-layout: fixed;
+}
+
+th,
+td {
+    border: 1px solid var(--ink);
+    padding: 0.2rem 0.3rem;
+    text-align: left;
+}
+
+th {
+    background: var(--fog);
+}
