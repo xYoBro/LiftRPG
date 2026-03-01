@@ -365,6 +365,91 @@
             color: #fff;
         }
 
+        /* ── Cover Image Drop Zone ── */
+        .cover-dropzone {
+            background: var(--bg);
+            border: 2px dashed var(--surface2);
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            position: relative;
+        }
+        .cover-dropzone:hover,
+        .cover-dropzone.drag-over {
+            border-color: var(--blue);
+            background: rgba(10, 132, 255, 0.04);
+        }
+        .cover-dropzone-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            color: var(--text2);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            padding: 8px 0;
+        }
+        .cover-dropzone-preview {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .cover-dropzone-preview img {
+            max-height: 120px;
+            max-width: 100%;
+            border-radius: 4px;
+            object-fit: contain;
+        }
+        .cover-remove-btn {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 1px solid var(--surface2);
+            background: var(--surface);
+            color: var(--text2);
+            font-size: 14px;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+        }
+        .cover-remove-btn:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        /* ── Cover Image Prompt Box ── */
+        .cover-prompt-box {
+            background: var(--surface);
+            border: 1px solid var(--surface2);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            margin-bottom: 8px;
+        }
+        .cover-prompt-header {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+        .cover-prompt-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text2);
+        }
+
         .btn-randomize {
             display: inline-flex;
             align-items: center;
@@ -675,6 +760,22 @@ Examples:
                                 </div>
                             </div>
                         </div>
+                        <div class="form-group">
+                            <label class="form-label">Cover Image <span style="font-weight:400; text-transform:none; color:var(--text2)">(optional)</span></label>
+                            <div class="form-hint">Drop an image or click to browse. PNG, JPG, or WebP. Full resolution preserved for print.</div>
+                            <div class="cover-dropzone" id="coverDropzone">
+                                <div class="cover-dropzone-empty" id="coverDropzoneEmpty">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                    <span>Drop cover image here</span>
+                                </div>
+                                <div class="cover-dropzone-preview" id="coverDropzonePreview" style="display:none">
+                                    <img id="coverPreviewImg" alt="Cover preview">
+                                    <button class="cover-remove-btn" id="coverRemoveBtn" title="Remove image">&times;</button>
+                                </div>
+                                <input type="file" id="coverFileInput" accept="image/png,image/jpeg,image/webp" style="display:none">
+                            </div>
+                            <div id="coverSizeWarning" style="display:none; color:var(--orange); font-size:10px; margin-top:4px;"></div>
+                        </div>
                         <button class="continue-btn" onclick="completeIntake()">Begin Generation &rarr;</button>
                     </div>
                 </div>
@@ -790,6 +891,7 @@ Examples:
             }
 
             initDiceSelector();
+            initCoverDropzone();
         }
 
         // ── Dice selector chip toggle ──
@@ -843,6 +945,145 @@ Examples:
                     cb.checked = true;
                     cb.closest('.dice-chip').classList.add('selected');
                 }
+            });
+        }
+
+        // ── Cover Image Drop Zone ──────────────────────────
+        function initCoverDropzone() {
+            var dropzone = document.getElementById('coverDropzone');
+            var fileInput = document.getElementById('coverFileInput');
+            var removeBtn = document.getElementById('coverRemoveBtn');
+
+            dropzone.addEventListener('click', function(e) {
+                if (e.target === removeBtn || e.target.closest('.cover-remove-btn')) return;
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', function(e) {
+                if (e.target.files[0]) handleCoverFile(e.target.files[0]);
+                e.target.value = '';
+            });
+
+            dropzone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                dropzone.classList.add('drag-over');
+            });
+            dropzone.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                dropzone.classList.remove('drag-over');
+            });
+            dropzone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                dropzone.classList.remove('drag-over');
+                var file = e.dataTransfer.files[0];
+                if (file && file.type.match(/^image\/(png|jpeg|webp)$/)) {
+                    handleCoverFile(file);
+                }
+            });
+
+            removeBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                clearCoverImage();
+            });
+        }
+
+        function handleCoverFile(file) {
+            if (!file.type.match(/^image\/(png|jpeg|webp)$/)) return;
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var dataUrl = e.target.result;
+                setCoverImage(dataUrl);
+                var sizeMB = (dataUrl.length / 1024 / 1024).toFixed(1);
+                var warning = document.getElementById('coverSizeWarning');
+                if (parseFloat(sizeMB) > 2) {
+                    warning.style.display = 'block';
+                    warning.textContent = 'Image is ' + sizeMB + ' MB as base64. Exported JSON will be large.';
+                } else {
+                    warning.style.display = 'none';
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function setCoverImage(dataUrl) {
+            document.getElementById('coverPreviewImg').src = dataUrl;
+            document.getElementById('coverDropzoneEmpty').style.display = 'none';
+            document.getElementById('coverDropzonePreview').style.display = 'flex';
+            window._pendingCoverImage = dataUrl;
+            if (pipelineData.intake) {
+                pipelineData.intake.coverImage = dataUrl;
+            }
+        }
+
+        function clearCoverImage() {
+            document.getElementById('coverPreviewImg').src = '';
+            document.getElementById('coverDropzoneEmpty').style.display = 'flex';
+            document.getElementById('coverDropzonePreview').style.display = 'none';
+            document.getElementById('coverSizeWarning').style.display = 'none';
+            window._pendingCoverImage = null;
+            if (pipelineData.intake) {
+                delete pipelineData.intake.coverImage;
+            }
+        }
+
+        // ── Cover Image Prompt (post-Stage 1) ──────────────
+        function showCoverImagePrompt(s1) {
+            var existing = document.getElementById('coverImagePromptBox');
+            if (existing) existing.remove();
+
+            var meta = s1.meta || {};
+            var theme = s1.theme || {};
+            var art = theme.art || {};
+
+            var parts = [];
+            parts.push('Create a cover illustration for a print zine titled "' + (meta.title || 'Untitled') + '".');
+            if (art.style && art.style !== 'none') {
+                parts.push('Visual style: ' + art.style + '.');
+            }
+            if (theme.visualArchetype) {
+                parts.push('Aesthetic: ' + theme.visualArchetype + ' — textured, atmospheric, printable in black and white.');
+            }
+            if (theme.colors && theme.colors.ink && theme.colors.paper) {
+                parts.push('Color palette: ink ' + theme.colors.ink + ' on paper ' + theme.colors.paper + ', accent ' + (theme.colors.accent || '#c45c00') + '.');
+            }
+            if (meta.subtitle) {
+                parts.push('Subject: ' + meta.subtitle + '.');
+            }
+            parts.push('Format: half-letter page (5.5 x 8.5 inches), portrait orientation. Title and author text will be overlaid — leave space at top and bottom.');
+            parts.push('Output: PNG image, no text in the image.');
+
+            var promptText = parts.join('\n');
+
+            var box = document.createElement('div');
+            box.id = 'coverImagePromptBox';
+            box.className = 'cover-prompt-box';
+            box.innerHTML = '<div class="cover-prompt-header">' +
+                '<span class="cover-prompt-label">COVER IMAGE PROMPT</span>' +
+                '<span class="form-hint" style="margin:0">Optional — paste into ChatGPT, Midjourney, or DALL-E, then upload the result above.</span>' +
+                '</div>' +
+                '<textarea id="coverImagePromptText" readonly class="short"></textarea>' +
+                '<button class="btn-secondary btn-small" id="btnCopyCoverPrompt" style="margin-top:6px" onclick="copyCoverImagePrompt()">Copy Prompt</button>';
+
+            var stageCard1 = document.getElementById('stageCard-1');
+            if (stageCard1 && stageCard1.nextSibling) {
+                stageCard1.parentNode.insertBefore(box, stageCard1.nextSibling);
+            } else if (stageCard1) {
+                stageCard1.parentNode.appendChild(box);
+            }
+
+            document.getElementById('coverImagePromptText').value = promptText;
+        }
+
+        function copyCoverImagePrompt() {
+            var text = document.getElementById('coverImagePromptText').value;
+            navigator.clipboard.writeText(text).then(function() {
+                var btn = document.getElementById('btnCopyCoverPrompt');
+                btn.innerText = '\u2705 COPIED!';
+                setTimeout(function() { btn.innerText = 'Copy Prompt'; }, 2000);
+            }).catch(function() {
+                var btn = document.getElementById('btnCopyCoverPrompt');
+                btn.innerText = '\u274c COPY ERROR';
+                setTimeout(function() { btn.innerText = 'Copy Prompt'; }, 2000);
             });
         }
 
@@ -919,7 +1160,10 @@ Examples:
             if (!workout || !narrativeBrief) return alert("Please fill out workout and narrative brief.");
 
             var dice = getSelectedDice();
-            pipelineData.intake = { workout, narrativeBrief: narrativeBrief, dice };
+            pipelineData.intake = { workout: workout, narrativeBrief: narrativeBrief, dice: dice };
+            if (window._pendingCoverImage) {
+                pipelineData.intake.coverImage = window._pendingCoverImage;
+            }
             document.getElementById('stageStatus-0').innerText = 'OK';
             document.getElementById('stageStatus-0').className = 'card-status ok';
             document.getElementById('stageCard-0').classList.remove('active');
@@ -974,8 +1218,18 @@ Examples:
 
             var box = document.getElementById('promptOut-W');
             box.value = promptText;
-            box.scrollTop = 0;
-            document.getElementById('footerStatus').innerText = 'Wiring prompt generated. Copy and paste into your LLM.';
+            box.select();
+
+            navigator.clipboard.writeText(promptText).then(function() {
+                var btn = document.getElementById('btnPrompt-W');
+                btn.innerText = "\u2705 COPIED!";
+                setTimeout(function() { btn.innerText = 'Generate Wiring Prompt'; }, 2000);
+            }).catch(function(err) {
+                console.error('Failed to copy prompt: ', err);
+                var btn = document.getElementById('btnPrompt-W');
+                btn.innerText = "\u274c COPY ERROR";
+                setTimeout(function() { btn.innerText = 'Generate Wiring Prompt'; }, 2000);
+            });
         }
 
         function validateWiringBlueprint(obj) {
@@ -1600,6 +1854,11 @@ ${JSON.stringify(context, null, 2)}
                 document.getElementById(`stageCard-${num}`).classList.remove('active');
                 document.getElementById(`stageCard-${num}`).classList.add('valid');
 
+                // Show suggested cover image prompt after Stage 1 validation
+                if (num === 1) {
+                    showCoverImagePrompt(obj);
+                }
+
                 // Collapse this stage
                 document.getElementById(`stageBody-${num}`).classList.remove('open');
 
@@ -1806,6 +2065,10 @@ ${JSON.stringify(context, null, 2)}
             const file = event.target.files[0];
             if (!file) return;
 
+            // Clean up any existing cover prompt box
+            var coverPrompt = document.getElementById('coverImagePromptBox');
+            if (coverPrompt) coverPrompt.remove();
+
             const reader = new FileReader();
             reader.onload = function (e) {
                 try {
@@ -1844,6 +2107,11 @@ ${JSON.stringify(context, null, 2)}
                         if (pipelineData.intake.workout) document.getElementById('progWorkout').value = pipelineData.intake.workout;
                         if (pipelineData.intake.narrativeBrief) document.getElementById('progNarrativeBrief').value = pipelineData.intake.narrativeBrief;
                         if (pipelineData.intake.dice) restoreDiceSelection(pipelineData.intake.dice);
+                        if (pipelineData.intake.coverImage) {
+                            setCoverImage(pipelineData.intake.coverImage);
+                        } else {
+                            clearCoverImage();
+                        }
                         document.getElementById('stageStatus-0').innerText = 'OK';
                         document.getElementById('stageStatus-0').className = 'card-status ok';
                         document.getElementById('stageCard-0').classList.remove('active');
@@ -1876,6 +2144,11 @@ ${JSON.stringify(context, null, 2)}
                             document.getElementById(`stageCard-${num}`).classList.add('valid');
                             document.getElementById(`stageBody-${num}`).classList.remove('open');
                         }
+                    }
+
+                    // Show suggested cover image prompt if Stage 1 data exists
+                    if (pipelineData[1]) {
+                        showCoverImagePrompt(pipelineData[1]);
                     }
 
                     // Determine highest completed stage
@@ -1944,6 +2217,14 @@ ${JSON.stringify(context, null, 2)}
                 if (s5) {
                     Object.assign(finalPayload.story.refs, s5);
                     finalPayload.story.evidence = s5;
+                }
+
+                // User-uploaded cover image overrides LLM-generated one
+                if (pipelineData.intake && pipelineData.intake.coverImage) {
+                    if (!finalPayload.theme.art) finalPayload.theme.art = {};
+                    finalPayload.theme.art.coverImage = pipelineData.intake.coverImage;
+                } else if (finalPayload.theme && finalPayload.theme.art) {
+                    delete finalPayload.theme.art.coverImage;
                 }
 
                 // Inject theme as CSS custom properties
