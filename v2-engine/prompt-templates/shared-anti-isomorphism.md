@@ -1,4 +1,4 @@
-# 7. STRUCTURAL FINGERPRINT CHECK (MANDATORY)
+# STRUCTURAL FINGERPRINT CHECK (MANDATORY)
 
 Before finalizing your JSON, compute your STRUCTURAL FINGERPRINT. This is the shape of your zine — not its theme, not its names, not its dice.
 
@@ -11,7 +11,6 @@ Before finalizing your JSON, compute your STRUCTURAL FINGERPRINT. This is the sh
 | **Arc shape** | Which arc shape did you declare? (from `mechanicalProfile.arcShape`) |
 | **Zeroed pillars** | How many experiential pillars have weight 0? |
 | **Wire topology** | List wire types used (threshold-gate, feedback-loop, etc.). What is the dominant type? |
-| **Tracker profile** | What mix of tracker types? (e.g., "2 fill, 1 heat" or "1 tug only" or "none") |
 
 Your fingerprint string: `{categoryCount}-{pageVocabSize}-{arcShape}-{zeroPillarCount}-{dominantWireType}`
 
@@ -19,9 +18,9 @@ Example: `3-7-slow-burn-3-threshold-gate` or `6-9-three-act-2-feedback-loop`
 
 ## Step 2: Check against the default template
 
-The DEFAULT TEMPLATE fingerprint is: `6-9-three-act-0-threshold-gate`
+The DEFAULT TEMPLATE fingerprint is: `6-10-three-act-2-threshold-gate`
 
-This means: 6+ categories, all 9 page types, three-act arc, no zeroed pillars, mostly threshold-gate wires.
+This means: 6+ categories, all 10 page types, three-act arc, exactly 2 zeroed pillars (the Stage W minimum), mostly threshold-gate wires.
 
 **If your fingerprint matches the default template on 4 or more of the 5 dimensions, you MUST redesign.** Change at least 2 dimensions to create genuine structural difference:
 
@@ -33,8 +32,11 @@ This means: 6+ categories, all 9 page types, three-act arc, no zeroed pillars, m
 
 ## Step 3: Wire topology audit
 
+Valid wire types (from the wiring catalog): `threshold-gate`, `feedback-loop`, `conditional-routing`, `resource-cycle`, `escalation`, `unlock-chain`.
+
 List your wire implementation from the Stage W blueprint:
-- How many threshold-gates? Feedback-loops? Conditional routes? Escalation wires? Unlock-chains?
+- How many of each wire type? (e.g., "2 threshold-gate, 1 feedback-loop, 1 escalation")
+- What is your tracker mix? (e.g., "2 fill clocks, 1 heat track" or "1 tug-of-war only" or "none") — if all trackers are the same type, consider whether the blueprint actually demands that uniformity.
 - Confirm each wire from the blueprint is implemented: name the mechanic that serves as `from`, the target that serves as `to`, and where the `printInstruction` appears in your output.
 - If a wire was specified in the blueprint but you did not implement it, explain why.
 
