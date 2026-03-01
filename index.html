@@ -1344,6 +1344,11 @@ Examples:
         function generateStagePrompt(num) {
             let promptText = "";
             var creativeDir = markdownTemplates['shared-creative-direction.md'] || '';
+            // Section 8 (Visual Identity) only matters for Stage 1 / Stage W — archetype
+            // is already chosen by Stages 2-5. Strip it to save LLM context tokens.
+            if (num >= 2) {
+                creativeDir = creativeDir.replace(/\n---\n\n## 8\. VISUAL IDENTITY[\s\S]*$/, '');
+            }
             var primitives = markdownTemplates['shared-primitives-catalog.md'] || '';
             var antiIso = markdownTemplates['shared-anti-isomorphism.md'] || '';
 
@@ -1915,6 +1920,13 @@ ${JSON.stringify(context, null, 2)}
                     }
                 }
                 if (!obj.theme?.fonts) e.push('Missing theme.fonts');
+
+                var validArchetypes = ['institutional', 'noir', 'terminal', 'literary', 'brutalist', 'clinical', 'confessional', 'corporate'];
+                if (!obj.theme?.visualArchetype) {
+                    w.push('Missing theme.visualArchetype — engine will fall back to "institutional". Set explicitly based on the creative brief.');
+                } else if (!validArchetypes.includes(obj.theme.visualArchetype)) {
+                    e.push(`theme.visualArchetype "${obj.theme.visualArchetype}" is not valid. Must be one of: ${validArchetypes.join(', ')}`);
+                }
 
                 const validTypes = ['cover', 'rules-manual', 'tracker-sheet', 'setup', 'encounter-spread', 'ref-pages', 'archive', 'endings', 'evidence', 'final'];
                 if (!obj.pages?.length) e.push('Missing pages[] array');

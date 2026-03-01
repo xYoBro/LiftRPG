@@ -45,12 +45,12 @@ The narrative world must be entirely self-contained. The player exists in both r
 
 Game mechanics must BE the theme, not just represent it.
 
-- A theme about urgency uses Drain Clocks — something is burning down
-- A theme about corruption uses Heat Tracks — the counter rises, never resets
-- A theme about competing loyalties uses Tug-of-War — every gain costs something
-- A theme about scarcity uses Dual Economy — earning one resource depletes another
-- A theme about discovery uses Fill Clocks — knowledge accumulates toward revelation
-- A theme about trust uses Faction Tracks — relationships shift with every choice
+- A theme about urgency uses Drain Clocks (3B) — something is burning down
+- A theme about corruption uses a Heat Track (3E) — the counter rises, never resets
+- A theme about competing loyalties uses a Tug-of-War Track (3C) — every gain costs something
+- A theme about scarcity uses Dual Economy (4D) — earning one resource depletes another
+- A theme about discovery uses Fill Clocks (3A) — knowledge accumulates toward revelation
+- A theme about trust uses Faction Reputation (3G) — relationships shift with every choice
 
 Read the user's brief. What is the central tension? Build mechanics that embody it.
 
@@ -124,3 +124,5 @@ The creative brief determines not just what the zine SAYS but how it LOOKS when 
 **Step 3 — Commit.** The `visualArchetype` must match the diegetic fiction. A fantasy temple zine IS an institutional document from within the temple. A sci-fi ship log IS a terminal printout. A noir detective story IS a case file. The booklet is not *about* the artifact — it IS the artifact.
 
 **Do NOT default to `institutional`.** Read the brief. A story about a haunted lighthouse keeper's journal is `confessional`. A story about corporate espionage is `corporate`. A story about a punk band's cursed tour is `brutalist`. The archetype emerges from the fiction, not from a safe default.
+
+**Tiebreaker — when multiple archetypes fit:** Choose the one that matches the document's *emotional register*, not its setting. A scientist's private fears → `confessional`. A scientist's data logs → `clinical`. A soldier's field journal → `confessional`. A military after-action report → `institutional`. Ask: "What is the *author's posture* in this document?" — detached observation, institutional authority, personal confession, raw confrontation? That posture picks the archetype.
