@@ -491,8 +491,193 @@ function validateStageData(num, obj, currentPipelineData) {
     return { errors: e, warnings: w };
 }
 
+// --- Atom Inventory Validation (Layout Governor Phase 1) ---
+
+/**
+ * Validate an atom inventory for completeness, integrity, and graph consistency.
+ * @param {AtomInventory} inventory  Output from atomize()
+ * @returns {{ errors: string[], warnings: string[] }}
+ */
+function validateAtomInventory(inventory) {
+    var e = [];
+    var w = [];
+
+    if (!inventory || typeof inventory !== 'object') {
+        e.push('Atom inventory is null or not an object');
+        return { errors: e, warnings: w };
+    }
+
+    var atoms = inventory.atoms || {};
+    var relationships = inventory.relationships || [];
+    var groups = inventory.groups || [];
+    var atomIds = Object.keys(atoms);
+
+    // ── 1. Required fields on every atom ────────────────────
+
+    var requiredFields = ['id', 'type', 'content', 'breakPolicy', 'sizeHint', 'priority'];
+    var validSizeHints = ['minimal', 'standard', 'generous'];
+
+    for (var ai = 0; ai < atomIds.length; ai++) {
+        var id = atomIds[ai];
+        var atom = atoms[id];
+
+        for (var fi = 0; fi < requiredFields.length; fi++) {
+            if (atom[requiredFields[fi]] === undefined || atom[requiredFields[fi]] === null) {
+                e.push('Atom "' + id + '" missing required field: ' + requiredFields[fi]);
+            }
+        }
+
+        if (atom.id !== id) {
+            e.push('Atom key "' + id + '" does not match atom.id "' + atom.id + '"');
+        }
+
+        if (atom.breakPolicy) {
+            if (typeof atom.breakPolicy.keepTogetherStrength !== 'number') {
+                w.push('Atom "' + id + '" breakPolicy.keepTogetherStrength is not a number');
+            }
+            if (typeof atom.breakPolicy.mustNotSplit !== 'boolean') {
+                w.push('Atom "' + id + '" breakPolicy.mustNotSplit is not a boolean');
+            }
+        }
+
+        if (atom.sizeHint && validSizeHints.indexOf(atom.sizeHint) === -1) {
+            w.push('Atom "' + id + '" has invalid sizeHint: "' + atom.sizeHint + '"');
+        }
+
+        if (typeof atom.priority === 'number' && (atom.priority < 0 || atom.priority > 1)) {
+            w.push('Atom "' + id + '" priority ' + atom.priority + ' outside 0-1 range');
+        }
+    }
+
+    // ── 2. Relationship target resolution ───────────────────
+
+    for (var ri = 0; ri < relationships.length; ri++) {
+        var rel = relationships[ri];
+        if (!rel.from) {
+            e.push('Relationship ' + ri + ' missing "from" field');
+        } else if (!atoms[rel.from]) {
+            // Dice-table is shared and may be referenced even though it's structural
+            // Only error if it's truly missing
+            if (rel.from !== 'dice-table' || !atoms['dice-table']) {
+                w.push('Relationship ' + ri + ' "from" references missing atom: "' + rel.from + '"');
+            }
+        }
+        if (!rel.to) {
+            e.push('Relationship ' + ri + ' missing "to" field');
+        } else if (!atoms[rel.to]) {
+            w.push('Relationship ' + ri + ' "to" references missing atom: "' + rel.to + '"');
+        }
+        if (!rel.type) {
+            e.push('Relationship ' + ri + ' missing "type" field');
+        }
+    }
+
+    // ── 3. Group integrity ──────────────────────────────────
+
+    var validGroupTypes = ['session', 'week', 'archive-section', 'ref-week', 'evidence-series', 'rules-manual', 'tracker-sheet'];
+    var groupIdsSeen = {};
+
+    for (var gi = 0; gi < groups.length; gi++) {
+        var grp = groups[gi];
+
+        if (!grp.id) {
+            e.push('Group ' + gi + ' missing id');
+        } else if (groupIdsSeen[grp.id]) {
+            e.push('Duplicate group id: "' + grp.id + '"');
+        } else {
+            groupIdsSeen[grp.id] = true;
+        }
+
+        if (!grp.groupType || validGroupTypes.indexOf(grp.groupType) === -1) {
+            w.push('Group "' + (grp.id || gi) + '" has invalid groupType: "' + grp.groupType + '"');
+        }
+
+        if (!Array.isArray(grp.members) || grp.members.length === 0) {
+            w.push('Group "' + (grp.id || gi) + '" has empty or missing members array');
+        } else {
+            for (var gmi = 0; gmi < grp.members.length; gmi++) {
+                var memberId = grp.members[gmi];
+                if (!atoms[memberId]) {
+                    // dice-table is a shared reference, tolerate it
+                    if (memberId !== 'dice-table' || !atoms['dice-table']) {
+                        w.push('Group "' + grp.id + '" references missing atom: "' + memberId + '"');
+                    }
+                }
+            }
+        }
+    }
+
+    // ── 4. Session group completeness ───────────────────────
+    // Every session group must have at least scaffold + workout
+
+    for (var sgi = 0; sgi < groups.length; sgi++) {
+        if (groups[sgi].groupType !== 'session') continue;
+        var members = groups[sgi].members;
+        var hasScaffold = false;
+        var hasWorkout = false;
+        for (var smi = 0; smi < members.length; smi++) {
+            var memberAtom = atoms[members[smi]];
+            if (memberAtom && memberAtom.type === 'encounter-scaffold') hasScaffold = true;
+            if (memberAtom && memberAtom.type === 'workout-session') hasWorkout = true;
+        }
+        if (!hasScaffold) {
+            e.push('Session group "' + groups[sgi].id + '" missing encounter-scaffold atom');
+        }
+        if (!hasWorkout) {
+            e.push('Session group "' + groups[sgi].id + '" missing workout-session atom');
+        }
+    }
+
+    // ── 5. Encounter coverage ───────────────────────────────
+    // Every encounter-scaffold should have at least one ref-router
+
+    var scaffoldIds = atomIds.filter(function(id) { return atoms[id].type === 'encounter-scaffold'; });
+    var routerFromRels = {};
+    for (var bri = 0; bri < relationships.length; bri++) {
+        if (relationships[bri].type === 'branch-destination' && atoms[relationships[bri].from] &&
+            atoms[relationships[bri].from].type === 'encounter-scaffold') {
+            routerFromRels[relationships[bri].from] = true;
+        }
+    }
+    for (var sci = 0; sci < scaffoldIds.length; sci++) {
+        if (!routerFromRels[scaffoldIds[sci]]) {
+            w.push('Encounter scaffold "' + scaffoldIds[sci] + '" has no REF router linked (missing Stage 4 data?)');
+        }
+    }
+
+    // ── 6. Archive trigger resolution ───────────────────────
+    // Every trigger-unlock relationship should have a valid target
+
+    for (var tri = 0; tri < relationships.length; tri++) {
+        if (relationships[tri].type === 'trigger-unlock') {
+            if (!atoms[relationships[tri].to]) {
+                w.push('Archive trigger "' + relationships[tri].from + '" targets missing archive node: "' + relationships[tri].to + '"');
+            }
+        }
+    }
+
+    // ── Summary ─────────────────────────────────────────────
+
+    var typeCounts = {};
+    for (var tci = 0; tci < atomIds.length; tci++) {
+        var t = atoms[atomIds[tci]].type;
+        typeCounts[t] = (typeCounts[t] || 0) + 1;
+    }
+
+    if (atomIds.length === 0) {
+        e.push('Atom inventory is empty');
+    } else {
+        w.push('Atom inventory: ' + atomIds.length + ' atoms, ' + relationships.length +
+            ' relationships, ' + groups.length + ' groups. Types: ' +
+            Object.keys(typeCounts).map(function(t) { return t + '(' + typeCounts[t] + ')'; }).join(', '));
+    }
+
+    return { errors: e, warnings: w };
+}
+
 // Expose on window for cross-file access
 window.scanBannedWords = scanBannedWords;
 window.hexLuminance = hexLuminance;
 window.validateWiringBlueprint = validateWiringBlueprint;
 window.validateStageData = validateStageData;
+window.validateAtomInventory = validateAtomInventory;

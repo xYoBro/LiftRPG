@@ -392,6 +392,19 @@ async function assemble() {
             await document.fonts.ready;
         }
 
+        // Atomize content for Layout Governor (Phase 1 — inventory only)
+        if (typeof window.atomize === 'function') {
+            var inventory = window.atomize(finalPayload);
+            window._atomInventory = inventory;
+            var atomResult = window.validateAtomInventory(inventory);
+            if (atomResult.errors.length) {
+                console.error('[atomizer] Validation errors:', atomResult.errors);
+            }
+            if (atomResult.warnings.length) {
+                console.info('[atomizer]', atomResult.warnings[atomResult.warnings.length - 1]);
+            }
+        }
+
         // If no pages[] array (e.g. legacy import), auto-generate page order
         if (!finalPayload.pages || !finalPayload.pages.length) {
             finalPayload.pages = autoGeneratePages(finalPayload);
