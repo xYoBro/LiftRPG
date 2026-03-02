@@ -1542,6 +1542,880 @@ LayoutTemplates.register({
     }
 });
 
+// ── Helper: break-policy-aware append ────────────────────────
+
+/**
+ * Check if a page with a column-count container is overflowing.
+ * CSS column-count inflates page.scrollHeight (reports single-column height),
+ * creating phantom overflows. This function computes the balanced column height
+ * and checks against the actual available space.
+ *
+ * @param {HTMLElement} page
+ * @param {HTMLElement} colContainer  The column-count container element
+ * @param {number} [colCount]  Number of columns (default: 2)
+ * @returns {boolean}  true if content genuinely overflows
+ */
+function isColumnPageOverflowing(page, colContainer, colCount) {
+    colCount = colCount || 2;
+    var padBottom = parseFloat(window.getComputedStyle(page).paddingBottom) || 0;
+    var available = page.clientHeight - colContainer.offsetTop - padBottom;
+    var singleColH = colContainer.scrollHeight;
+    var balancedH = Math.ceil(singleColH / colCount);
+    return balancedH > available;
+}
+
+/**
+ * Append an element to a page, respecting break policies.
+ * Tracks the last appended atom for keepWithNext enforcement.
+ *
+ * @param {HTMLElement} page
+ * @param {HTMLElement} el
+ * @param {Atom} atom
+ * @param {HTMLElement} container
+ * @param {string} pageType
+ * @param {Object} pageNum  { value: number }
+ * @param {Object} plan     Layout plan for repair logging (optional)
+ * @param {Object} state    { lastAtom, lastEl } mutable tracking state
+ * @returns {HTMLElement} current page (may be new)
+ */
+function appendWithBreakPolicy(page, el, atom, container, pageType, pageNum, plan, state) {
+    page.appendChild(el);
+    if (page.scrollHeight <= page.clientHeight) {
+        // Fits — update state
+        if (state) { state.lastAtom = atom; state.lastEl = el; }
+        return page;
+    }
+
+    // Overflow detected
+    var bp = (atom && atom.breakPolicy) || {};
+
+    // mustNotSplit: atom too large for a page — leave it and warn
+    if (bp.mustNotSplit && page.children.length === 1) {
+        console.warn('[layout-templates] mustNotSplit atom exceeds page:', atom.id);
+        if (state) { state.lastAtom = atom; state.lastEl = el; }
+        return page;
+    }
+
+    page.removeChild(el);
+
+    // keepWithNext: if previous atom wants to stay with this one, pull both
+    if (state && state.lastAtom && state.lastEl) {
+        var prevStrength = (state.lastAtom.breakPolicy && state.lastAtom.breakPolicy.keepWithNextStrength) || 0;
+        if (prevStrength >= 50 && state.lastEl.parentNode === page) {
+            page.removeChild(state.lastEl);
+            addPageNumber(page, pageNum.value);
+            pageNum.value++;
+            var newPage = createPage(pageType);
+            container.appendChild(newPage);
+            newPage.appendChild(state.lastEl);
+            newPage.appendChild(el);
+
+            if (plan) {
+                plan.repairLog.push({
+                    type: 'keep-with-next',
+                    atom: atom.id,
+                    prevAtom: state.lastAtom.id,
+                    strength: prevStrength,
+                    reason: 'keepWithNextStrength >= 50, pulled pair to new page'
+                });
+            }
+            if (state) { state.lastAtom = atom; state.lastEl = el; }
+            return newPage;
+        }
+    }
+
+    // Normal break: move overflowing element to new page
+    addPageNumber(page, pageNum.value);
+    pageNum.value++;
+    var nextPage = createPage(pageType);
+    container.appendChild(nextPage);
+    nextPage.appendChild(el);
+
+    if (plan && atom && bp.keepWithNextStrength > 0) {
+        plan.repairLog.push({
+            type: 'break-relaxation',
+            atom: atom.id,
+            strength: bp.keepWithNextStrength || 0,
+            reason: 'overflow, broke before this atom'
+        });
+    }
+
+    if (state) { state.lastAtom = atom; state.lastEl = el; }
+    return nextPage;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ENCOUNTER TEMPLATE: MAGAZINE (multi-column dense layout)
+// ══════════════════════════════════════════════════════════════
+
+LayoutTemplates.register({
+    id: 'encounter-magazine',
+    groupType: 'encounter-spread',
+    score: function (atoms, ctx) {
+        // Prefer for dense/crisis weeks with 3+ sessions
+        var sessionCount = 0;
+        var maxWeight = 0;
+        var weights = { 'sparse': 0, 'standard': 1, 'dense': 2, 'crisis': 3 };
+        atoms.forEach(function (a) {
+            if (a.type === 'encounter-scaffold') {
+                sessionCount++;
+                var w = (a.content && a.content.visualWeight) || 'standard';
+                if ((weights[w] || 0) > maxWeight) maxWeight = weights[w] || 0;
+            }
+        });
+        if (sessionCount >= 3 && maxWeight >= 2) return 0.92;  // dense/crisis + many sessions
+        if (sessionCount >= 3) return 0.75;  // many sessions, standard weight
+        return 0.3;  // not enough content to justify 2 columns
+    },
+    estimate: function (atoms, measurements, ctx) {
+        var ph = measurements.pageHeight;
+        var pw = GovernorMeasure.getContentWidth();
+        var leftW = Math.floor(pw * 0.55);
+        var rightW = pw - leftW;
+        var overhead = 80;  // classification + pips + footer reservation
+        var footerH = 0;
+
+        var leftHeights = [];
+        var rightHeights = [];
+
+        for (var i = 0; i < measurements.measurements.length; i++) {
+            var m = measurements.measurements[i];
+            var t = m.atom.type;
+            if (t === 'facility-grid' || t === 'point-to-point' || t === 'linear-track' || t === 'week-checkin') {
+                footerH += GovernorMeasure.measure(m.atom, ctx, pw);
+            } else if (t === 'workout-session') {
+                rightHeights.push(GovernorMeasure.measure(m.atom, ctx, rightW));
+            } else if (t === 'encounter-scaffold' || t === 'condition-check') {
+                leftHeights.push(GovernorMeasure.measure(m.atom, ctx, leftW));
+            }
+        }
+
+        var available = ph - overhead - footerH;
+        if (available <= 0) available = ph * 0.5;
+
+        var leftTotal = 0;
+        for (var j = 0; j < leftHeights.length; j++) leftTotal += leftHeights[j];
+        var rightTotal = 0;
+        for (var k = 0; k < rightHeights.length; k++) rightTotal += rightHeights[k];
+
+        var tallColumn = Math.max(leftTotal, rightTotal);
+        var pages = Math.ceil(tallColumn / available) || 1;
+        var fillRatios = [];
+        for (var p = 0; p < pages; p++) {
+            var pageContent = Math.min(tallColumn - (p * available), available);
+            fillRatios.push(Math.min((pageContent + overhead + footerH / pages) / ph, 1.0));
+        }
+
+        return {
+            templateId: 'encounter-magazine',
+            pages: pages,
+            fillRatios: fillRatios,
+            confidence: 0.6,
+            multiSlot: true
+        };
+    },
+    renderPages: function (container, atoms, ctx) {
+        var data = ctx.data;
+        var voice = data.voice || {};
+        var mech = data.mechanics || {};
+        var workout = data.workout || {};
+        var week = ctx.week;
+        var pagesCreated = 0;
+        var pageNum = ctx.startPage;
+
+        // Categorize atoms
+        var scaffoldAtoms = [];
+        var workoutAtoms = {};
+        var conditionAtoms = {};
+        var mapAtom = null;
+        var checkinAtom = null;
+        var diceAtom = null;
+
+        atoms.forEach(function (a) {
+            if (a.type === 'encounter-scaffold') scaffoldAtoms.push(a);
+            else if (a.type === 'workout-session') workoutAtoms[a.session] = a;
+            else if (a.type === 'condition-check') {
+                if (!conditionAtoms[a.session]) conditionAtoms[a.session] = [];
+                conditionAtoms[a.session].push(a);
+            }
+            else if (a.type === 'facility-grid' || a.type === 'point-to-point' || a.type === 'linear-track') mapAtom = a;
+            else if (a.type === 'week-checkin') checkinAtom = a;
+            else if (a.type === 'dice-table') diceAtom = a;
+        });
+
+        // Determine visual weight
+        var weekVisualWeight = 'standard';
+        var weightMap = { 'sparse': 0, 'standard': 1, 'dense': 2, 'crisis': 3 };
+        scaffoldAtoms.forEach(function (a) {
+            var w = (a.content && a.content.visualWeight) || 'standard';
+            if ((weightMap[w] || 0) > (weightMap[weekVisualWeight] || 0)) weekVisualWeight = w;
+        });
+
+        // ── PAGE: Magazine layout ──
+        pageNum++;
+        pagesCreated++;
+        var page = createPage('encounter-log');
+        page.classList.add('encounter-log');
+        page.dataset.week = week;
+        page.dataset.visualWeight = weekVisualWeight;
+        container.appendChild(page);
+
+        // Classification
+        var classText = (voice.classifications && voice.classifications.sessionLog) || 'WEEK {{week}}';
+        var cls = document.createElement('div');
+        cls.className = 'classification';
+        cls.textContent = decodeEntities(classText.replace(/\{\{week\}\}/g, week));
+        page.appendChild(cls);
+
+        // Progress pips
+        var totalWeeks = workout.totalWeeks || 6;
+        if (totalWeeks > 1) {
+            var progressDiv = document.createElement('div');
+            progressDiv.className = 'week-progress';
+            for (var pw = 1; pw <= totalWeeks; pw++) {
+                var pip = document.createElement('span');
+                pip.className = 'week-pip' + (pw <= week ? ' week-pip-filled' : '') + (pw === week ? ' week-pip-current' : '');
+                progressDiv.appendChild(pip);
+            }
+            page.appendChild(progressDiv);
+        }
+
+        // Grid container
+        var grid = document.createElement('div');
+        grid.className = 'encounter-magazine-grid';
+
+        // Left column: scaffolds + conditions
+        var leftCol = document.createElement('div');
+        leftCol.className = 'encounter-magazine-left';
+
+        var refScheme = (data.story && data.story.refScheme) || { prefix: 'R', weekDigits: 1, sessionDigits: 1 };
+
+        scaffoldAtoms.forEach(function (scaffAtom) {
+            var day = scaffAtom.session;
+            var sessionDiv = document.createElement('div');
+            sessionDiv.className = 'session-block';
+            if (scaffAtom.content.special === 'boss') sessionDiv.classList.add('session-boss');
+            if (scaffAtom.content.special === 'rest') sessionDiv.classList.add('session-rest');
+            if (scaffAtom.content.special === 'branch') sessionDiv.classList.add('session-branch');
+
+            var scaffEl = AtomRenderers.render(scaffAtom, ctx);
+            while (scaffEl.firstChild) sessionDiv.appendChild(scaffEl.firstChild);
+
+            var conds = conditionAtoms[day] || [];
+            conds.forEach(function (ca) {
+                sessionDiv.appendChild(AtomRenderers.render(ca, ctx));
+            });
+
+            // REF code
+            var refCode = refScheme.prefix +
+                String(week).padStart(refScheme.weekDigits || 1, '0') +
+                String(day).padStart(refScheme.sessionDigits || 1, '0');
+            var refDiv = document.createElement('div');
+            refDiv.className = 'session-ref';
+            var refLabel = (voice.labels && voice.labels.sessionRef) || 'REF {{ref}}';
+            refDiv.textContent = refLabel.replace(/\{\{ref\}\}/g, refCode);
+            sessionDiv.appendChild(refDiv);
+
+            leftCol.appendChild(sessionDiv);
+        });
+
+        // Right column: workout logs
+        var rightCol = document.createElement('div');
+        rightCol.className = 'encounter-magazine-right';
+
+        scaffoldAtoms.forEach(function (scaffAtom) {
+            var day = scaffAtom.session;
+            var wkAtom = workoutAtoms[day];
+            if (wkAtom) {
+                var wkEl = AtomRenderers.render(wkAtom, ctx);
+                rightCol.appendChild(wkEl);
+            }
+        });
+
+        grid.appendChild(leftCol);
+        grid.appendChild(rightCol);
+
+        // Footer: map + checkin
+        var footer = document.createElement('div');
+        footer.className = 'encounter-magazine-footer';
+        if (mapAtom) footer.appendChild(AtomRenderers.render(mapAtom, ctx));
+        if (checkinAtom) footer.appendChild(AtomRenderers.render(checkinAtom, ctx));
+        if (footer.children.length) grid.appendChild(footer);
+
+        page.appendChild(grid);
+
+        // Overflow: if either column overflows, move last session-block pair to new page
+        while (page.scrollHeight > page.clientHeight) {
+            var leftBlocks = leftCol.querySelectorAll('.session-block');
+            var rightItems = rightCol.children;
+            if (leftBlocks.length <= 1 && rightItems.length <= 1) {
+                console.warn('CONTENT OVERFLOW: Magazine layout — single session exceeds page.');
+                break;
+            }
+
+            // Move last session-block from left and corresponding workout from right
+            var lastLeft = leftBlocks[leftBlocks.length - 1];
+            leftCol.removeChild(lastLeft);
+            var lastRight = rightItems.length > 0 ? rightItems[rightItems.length - 1] : null;
+            if (lastRight) rightCol.removeChild(lastRight);
+
+            // Create continuation page
+            pageNum++;
+            pagesCreated++;
+            var contPage = createPage('encounter-log');
+            contPage.classList.add('encounter-log');
+            contPage.dataset.week = week;
+            contPage.dataset.visualWeight = weekVisualWeight;
+            container.appendChild(contPage);
+
+            var contGrid = document.createElement('div');
+            contGrid.className = 'encounter-magazine-grid';
+            var contLeft = document.createElement('div');
+            contLeft.className = 'encounter-magazine-left';
+            contLeft.appendChild(lastLeft);
+            var contRight = document.createElement('div');
+            contRight.className = 'encounter-magazine-right';
+            if (lastRight) contRight.appendChild(lastRight);
+            contGrid.appendChild(contLeft);
+            contGrid.appendChild(contRight);
+            contPage.appendChild(contGrid);
+
+            // Replace current page/grid references for next iteration
+            page = contPage;
+            grid = contGrid;
+            leftCol = contLeft;
+            rightCol = contRight;
+        }
+
+        addPageNumber(page, pageNum);
+        return pagesCreated;
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  TRACKER TEMPLATE: GRID (2-column responsive grid)
+// ══════════════════════════════════════════════════════════════
+
+LayoutTemplates.register({
+    id: 'tracker-grid',
+    groupType: 'tracker-sheet',
+    score: function (atoms) {
+        // Prefer grid when 4+ sections exist
+        var sectionCount = 0;
+        atoms.forEach(function (a) {
+            if (a.type === 'clock-display' || a.type === 'track-display' ||
+                a.type === 'resource-display' || a.type === 'modifier-display') sectionCount++;
+        });
+        if (sectionCount >= 4) return 0.9;
+        if (sectionCount >= 3) return 0.7;
+        return 0.3;
+    },
+    estimate: function (atoms, measurements, ctx) {
+        var ph = measurements.pageHeight;
+        var pw = GovernorMeasure.getContentWidth();
+        var colW = Math.floor(pw / 2);
+        var overhead = 60;  // h1 heading
+
+        // Measure atoms at half-width
+        var heights = [];
+        for (var i = 0; i < atoms.length; i++) {
+            heights.push(GovernorMeasure.measure(atoms[i], ctx, colW));
+        }
+
+        // Pair heights into rows (2 per row, take max)
+        var rowHeights = [];
+        for (var j = 0; j < heights.length; j += 2) {
+            var h1 = heights[j];
+            var h2 = (j + 1 < heights.length) ? heights[j + 1] : 0;
+            rowHeights.push(Math.max(h1, h2));
+        }
+
+        var fillRatios = GovernorScore.computeFillRatios(rowHeights, ph, overhead);
+        return {
+            templateId: 'tracker-grid',
+            pages: fillRatios.length,
+            fillRatios: fillRatios,
+            confidence: 0.65,
+            multiSlot: true
+        };
+    },
+    renderPages: function (container, atoms, ctx) {
+        var data = ctx.data;
+        var voice = data.voice || {};
+        var mech = data.mechanics || {};
+        var pageNum = { value: ctx.startPage };
+        var pagesCreated = 0;
+
+        pageNum.value++;
+        pagesCreated++;
+        var page = createPage('tracker-sheet');
+        page.classList.add('tracker-sheet');
+        container.appendChild(page);
+
+        // Heading
+        var h1 = document.createElement('h1');
+        h1.textContent = decodeEntities((voice.labels && voice.labels.mechanicsHeading) || 'CHARACTER DOSSIER');
+        page.appendChild(h1);
+
+        // Group atoms by type into sections (same as tracker-vertical)
+        var clockAtoms = [];
+        var trackAtoms = [];
+        var resourceAtoms = [];
+        var modifierAtoms = [];
+        var triggerAtoms = [];
+
+        atoms.forEach(function (a) {
+            if (a.type === 'clock-display') clockAtoms.push(a);
+            else if (a.type === 'archive-trigger') triggerAtoms.push(a);
+            else if (a.type === 'track-display') trackAtoms.push(a);
+            else if (a.type === 'resource-display') resourceAtoms.push(a);
+            else if (a.type === 'modifier-display') modifierAtoms.push(a);
+        });
+
+        // Build sections
+        var sections = [];
+
+        function buildSection(heading, sectionAtoms) {
+            if (!sectionAtoms.length) return;
+            var div = document.createElement('div');
+            div.className = 'tracker-section';
+            var h2 = document.createElement('h2');
+            h2.textContent = decodeEntities(heading);
+            div.appendChild(h2);
+            sectionAtoms.forEach(function (a) {
+                var el = AtomRenderers.render(a, ctx);
+                while (el.firstChild) div.appendChild(el.firstChild);
+            });
+            sections.push(div);
+        }
+
+        buildSection((voice.labels && voice.labels.clocksHeading) || 'CLOCKS', clockAtoms);
+        buildSection('TRACKS', trackAtoms);
+        buildSection((voice.labels && voice.labels.resourceHeading) || 'RESOURCES', resourceAtoms);
+        buildSection('MODIFIERS', modifierAtoms);
+
+        // Codewords (from ctx.data.mechanics, not atoms)
+        if (mech.codewords && mech.codewords.length) {
+            var cwDiv = document.createElement('div');
+            cwDiv.className = 'tracker-section';
+            var cwH = document.createElement('h2');
+            cwH.textContent = 'CODEWORDS';
+            cwDiv.appendChild(cwH);
+            mech.codewords.forEach(function (cw) {
+                var row = document.createElement('div');
+                row.className = 'tracker-row codeword-row';
+                var nameLine = document.createElement('div');
+                nameLine.className = 'codeword-name';
+                nameLine.innerHTML = '\u25A1 <strong>' + escapeHtml(cw.id) + '</strong>';
+                row.appendChild(nameLine);
+                if (cw.effect) {
+                    var effectLine = document.createElement('div');
+                    effectLine.className = 'codeword-effect';
+                    effectLine.textContent = decodeEntities(cw.effect);
+                    row.appendChild(effectLine);
+                }
+                cwDiv.appendChild(row);
+            });
+            sections.push(cwDiv);
+        }
+
+        // Dice stat section
+        if (mech.dice && mech.dice.stat) {
+            var diceDiv = document.createElement('div');
+            diceDiv.className = 'tracker-section';
+            var diceH = document.createElement('h2');
+            diceH.textContent = decodeEntities(mech.dice.stat.toUpperCase());
+            diceDiv.appendChild(diceH);
+            var diceRow = document.createElement('div');
+            diceRow.className = 'tracker-row dice-stat-row';
+            diceRow.innerHTML = '<div class="dice-stat-box">' + escapeHtml(mech.dice.stat) +
+                ': <span class="dice-stat-value">____</span></div>';
+            diceDiv.appendChild(diceRow);
+            sections.push(diceDiv);
+        }
+
+        // Place sections in grid
+        var gridDiv = document.createElement('div');
+        gridDiv.className = 'tracker-grid-layout';
+        sections.forEach(function (s) { gridDiv.appendChild(s); });
+        page.appendChild(gridDiv);
+
+        // Trigger labels (outside grid, at bottom)
+        if (triggerAtoms.length) {
+            triggerAtoms.forEach(function (ta) {
+                page.appendChild(AtomRenderers.render(ta, ctx));
+            });
+        }
+
+        // Overflow: redistribute sections across pages
+        var pages = [page];
+        var currentIdx = 0;
+        while (pages[currentIdx].scrollHeight > pages[currentIdx].clientHeight) {
+            var gridEl = pages[currentIdx].querySelector('.tracker-grid-layout');
+            var gridChildren = gridEl ? gridEl.querySelectorAll('.tracker-section') : [];
+            if (gridChildren.length <= 1) {
+                console.warn('CONTENT OVERFLOW: Single tracker section exceeds page.');
+                break;
+            }
+            var lastSection = gridChildren[gridChildren.length - 1];
+            gridEl.removeChild(lastSection);
+
+            if (pages.length <= currentIdx + 1) {
+                var newPage = createPage('tracker-sheet');
+                newPage.classList.add('tracker-sheet');
+                container.appendChild(newPage);
+                var newGrid = document.createElement('div');
+                newGrid.className = 'tracker-grid-layout';
+                newPage.appendChild(newGrid);
+                pages.push(newPage);
+                pagesCreated++;
+            }
+            var targetGrid = pages[currentIdx + 1].querySelector('.tracker-grid-layout');
+            targetGrid.insertBefore(lastSection, targetGrid.firstChild);
+            if (pages[currentIdx].scrollHeight <= pages[currentIdx].clientHeight) currentIdx++;
+        }
+
+        pages.forEach(function (p, idx) {
+            addPageNumber(p, pageNum.value + idx);
+        });
+        return pagesCreated;
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  ARCHIVE TEMPLATE: GAZETTE (2-column found documents)
+// ══════════════════════════════════════════════════════════════
+
+LayoutTemplates.register({
+    id: 'archive-gazette',
+    groupType: 'archive',
+    score: function (atoms) {
+        // Prefer gazette for 3+ documents
+        var docCount = 0;
+        atoms.forEach(function (a) {
+            if (a.type !== 'classification-badge') docCount++;
+        });
+        if (docCount >= 3) return 0.85;
+        return 0.3;
+    },
+    estimate: function (atoms, measurements, ctx) {
+        var ph = measurements.pageHeight;
+        var pw = GovernorMeasure.getContentWidth();
+        var colW = Math.floor(pw / 2);
+        var overhead = 100;  // trigger + classification + title + intro
+
+        // Measure documents at half-width
+        var heights = [];
+        for (var i = 0; i < measurements.measurements.length; i++) {
+            if (measurements.measurements[i].atom.type !== 'classification-badge') {
+                heights.push(GovernorMeasure.measure(measurements.measurements[i].atom, ctx, colW));
+            }
+        }
+
+        // CSS columns: total height = sum / 2 (balanced between columns)
+        var totalH = 0;
+        for (var j = 0; j < heights.length; j++) totalH += heights[j];
+        var balancedH = totalH / 2;
+        var available = ph - overhead;
+        var pages = Math.ceil(balancedH / available) || 1;
+
+        var fillRatios = [];
+        for (var p = 0; p < pages; p++) {
+            var pageFill = Math.min(balancedH - (p * available), available);
+            fillRatios.push(Math.min((pageFill + overhead) / ph, 1.0));
+        }
+
+        return {
+            templateId: 'archive-gazette',
+            pages: pages,
+            fillRatios: fillRatios,
+            confidence: 0.6,
+            multiSlot: true
+        };
+    },
+    renderPages: function (container, atoms, ctx) {
+        var data = ctx.data;
+        var sectionKey = ctx.sectionKey;
+        var pageNum = { value: ctx.startPage };
+        var pagesCreated = 0;
+        var plan = window._layoutPlan || null;
+        var bpState = { lastAtom: null, lastEl: null };
+
+        var page = createPage('archive');
+        page.classList.add('archive-page');
+        page.setAttribute('data-archive-section', sectionKey);
+        container.appendChild(page);
+        pageNum.value++;
+        pagesCreated++;
+
+        // Find badge and document atoms
+        var badgeAtom = null;
+        var docAtoms = [];
+        atoms.forEach(function (a) {
+            if (a.type === 'classification-badge') badgeAtom = a;
+            else docAtoms.push(a);
+        });
+
+        // Trigger label
+        var mech = (data && data.mechanics) || {};
+        var triggerClock = null;
+        if (mech.clocks) {
+            mech.clocks.forEach(function (c) {
+                if (c.onTrigger && c.onTrigger.section === sectionKey) triggerClock = c;
+            });
+        }
+        if (triggerClock) {
+            var trigLabel = document.createElement('div');
+            trigLabel.className = 'archive-trigger-label';
+            var trigVerb = triggerClock.direction === 'drain' ? 'empties' : 'fills';
+            trigLabel.textContent = 'Read when ' + decodeEntities(triggerClock.name) + ' ' + trigVerb;
+            page.appendChild(trigLabel);
+        }
+
+        // Badge (classification + title + intro)
+        if (badgeAtom) {
+            var badgeEl = AtomRenderers.render(badgeAtom, ctx);
+            while (badgeEl.firstChild) page.appendChild(badgeEl.firstChild);
+        }
+
+        if (docAtoms.length === 0) {
+            var err = document.createElement('div');
+            err.className = 'archive-node archive-error';
+            err.textContent = '[ERROR: MISSING ARCHIVE SECTION: ' + sectionKey + ']';
+            page.appendChild(err);
+            addPageNumber(page, pageNum.value);
+            return pagesCreated;
+        }
+
+        // Gazette columns container
+        var colContainer = document.createElement('div');
+        colContainer.className = 'archive-gazette-columns';
+
+        docAtoms.forEach(function (da) {
+            var el = AtomRenderers.render(da, ctx);
+            colContainer.appendChild(el);
+        });
+
+        page.appendChild(colContainer);
+
+        // Overflow: collect excess docs, then distribute across new pages.
+        var spilledDocs = [];
+        while (isColumnPageOverflowing(page, colContainer)) {
+            var docs = colContainer.querySelectorAll('.archive-node');
+            if (docs.length <= 1) {
+                console.warn('CONTENT OVERFLOW: Single archive document exceeds page.');
+                break;
+            }
+            var lastDoc = docs[docs.length - 1];
+            colContainer.removeChild(lastDoc);
+            spilledDocs.unshift(lastDoc);
+        }
+
+        if (spilledDocs.length > 0) {
+            addPageNumber(page, pageNum.value);
+            pageNum.value++;
+            pagesCreated++;
+            page = createPage('archive');
+            page.classList.add('archive-page');
+            container.appendChild(page);
+            colContainer = document.createElement('div');
+            colContainer.className = 'archive-gazette-columns';
+            page.appendChild(colContainer);
+
+            for (var di = 0; di < spilledDocs.length; di++) {
+                colContainer.appendChild(spilledDocs[di]);
+                if (isColumnPageOverflowing(page, colContainer)) {
+                    colContainer.removeChild(spilledDocs[di]);
+                    addPageNumber(page, pageNum.value);
+                    pageNum.value++;
+                    pagesCreated++;
+                    page = createPage('archive');
+                    page.classList.add('archive-page');
+                    container.appendChild(page);
+                    colContainer = document.createElement('div');
+                    colContainer.className = 'archive-gazette-columns';
+                    page.appendChild(colContainer);
+                    colContainer.appendChild(spilledDocs[di]);
+                }
+            }
+        }
+
+        addPageNumber(page, pageNum.value);
+        return pagesCreated;
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  REF TEMPLATE: GAZETTE (2-column compact REF layout)
+// ══════════════════════════════════════════════════════════════
+
+LayoutTemplates.register({
+    id: 'ref-gazette',
+    groupType: 'ref-pages',
+    score: function (atoms) {
+        // Prefer gazette when many routers with few outcomes each (compact content)
+        var routerCount = 0;
+        var outcomeCount = 0;
+        atoms.forEach(function (a) {
+            if (a.type === 'ref-router') routerCount++;
+            else if (a.type === 'ref-outcome') outcomeCount++;
+        });
+        var avgOutcomes = routerCount > 0 ? outcomeCount / routerCount : 99;
+        if (avgOutcomes <= 4 && routerCount >= 2) return 0.8;
+        return 0.3;
+    },
+    estimate: function (atoms, measurements, ctx) {
+        var ph = measurements.pageHeight;
+        var pw = GovernorMeasure.getContentWidth();
+        var colW = Math.floor(pw / 2);
+        var overhead = 60;  // classification
+
+        // Measure at half-width
+        var heights = [];
+        for (var i = 0; i < measurements.measurements.length; i++) {
+            heights.push(GovernorMeasure.measure(measurements.measurements[i].atom, ctx, colW));
+        }
+
+        var totalH = 0;
+        for (var j = 0; j < heights.length; j++) totalH += heights[j];
+        var balancedH = totalH / 2;
+        var available = ph - overhead;
+        var pages = Math.ceil(balancedH / available) || 1;
+
+        var fillRatios = [];
+        for (var p = 0; p < pages; p++) {
+            var pageFill = Math.min(balancedH - (p * available), available);
+            fillRatios.push(Math.min((pageFill + overhead) / ph, 1.0));
+        }
+
+        return {
+            templateId: 'ref-gazette',
+            pages: pages,
+            fillRatios: fillRatios,
+            confidence: 0.6,
+            multiSlot: true
+        };
+    },
+    renderPages: function (container, atoms, ctx) {
+        var data = ctx.data;
+        var voice = data.voice || {};
+        var mech = data.mechanics || {};
+        var week = ctx.week;
+        var outcomes = (mech.dice && mech.dice.outcomes) || [];
+        var pageNum = { value: ctx.startPage };
+        var pagesCreated = 0;
+
+        // Separate routers from outcomes
+        var routerAtoms = [];
+        var outcomeAtoms = [];
+        atoms.forEach(function (a) {
+            if (a.type === 'ref-router') routerAtoms.push(a);
+            else if (a.type === 'ref-outcome') outcomeAtoms.push(a);
+        });
+
+        function newPage() {
+            var p = createPage('ref');
+            p.classList.add('ref-page');
+            container.appendChild(p);
+            pageNum.value++;
+            pagesCreated++;
+            return p;
+        }
+
+        var page = newPage();
+
+        // Classification
+        var classText = (voice.classifications && voice.classifications.refs) || 'ROUTE CODES // WEEK {{week}}';
+        var cls = document.createElement('div');
+        cls.className = 'classification';
+        cls.textContent = decodeEntities(classText.replace(/\{\{week\}\}/g, week));
+        page.appendChild(cls);
+
+        // Routers section (full-width, above columns)
+        var routerSection = document.createElement('div');
+        routerSection.className = 'ref-router-section';
+        routerAtoms.forEach(function (ra) {
+            routerSection.appendChild(AtomRenderers.render(ra, ctx));
+        });
+        page.appendChild(routerSection);
+
+        // Zone divider
+        var divider = document.createElement('hr');
+        divider.className = 'ref-zone-divider';
+        page.appendChild(divider);
+
+        // Build scrambled entries
+        var allBranches = [];
+        outcomeAtoms.forEach(function (oa) {
+            allBranches.push({
+                atom: oa,
+                branchId: oa.content.refCode,
+                refCode: oa.content.refCode.replace(/[A-Za-z]+$/, ''),
+                outcome: { name: oa.content.outcomeName, range: oa.content.range }
+            });
+        });
+        var scrambled = scrambleBranches(allBranches, routerAtoms.length, outcomes.length);
+
+        // 2-column container for outcomes
+        var colContainer = document.createElement('div');
+        colContainer.className = 'ref-gazette-columns';
+
+        scrambled.forEach(function (entry, idx) {
+            var el = AtomRenderers.render(entry.atom, ctx);
+            if (idx < scrambled.length - 1) {
+                var sep = document.createElement('hr');
+                sep.className = 'ref-separator';
+                el.appendChild(sep);
+            }
+            colContainer.appendChild(el);
+        });
+
+        page.appendChild(colContainer);
+
+        // Overflow: collect excess entries, then distribute across new pages.
+        // Must drain the CURRENT page fully before moving to new pages,
+        // since reassigning `page` would skip re-checking the original.
+        var spilledEntries = [];
+        while (isColumnPageOverflowing(page, colContainer)) {
+            var entries = colContainer.children;
+            if (entries.length <= 1) {
+                console.warn('CONTENT OVERFLOW: Single REF entry exceeds page.');
+                break;
+            }
+            var lastEntry = entries[entries.length - 1];
+            colContainer.removeChild(lastEntry);
+            spilledEntries.unshift(lastEntry);  // maintain order
+        }
+
+        // Distribute spilled entries across continuation pages
+        if (spilledEntries.length > 0) {
+            addPageNumber(page, pageNum.value);
+            page = newPage();
+            colContainer = document.createElement('div');
+            colContainer.className = 'ref-gazette-columns';
+            page.appendChild(colContainer);
+
+            for (var si = 0; si < spilledEntries.length; si++) {
+                colContainer.appendChild(spilledEntries[si]);
+                if (isColumnPageOverflowing(page, colContainer)) {
+                    colContainer.removeChild(spilledEntries[si]);
+                    addPageNumber(page, pageNum.value);
+                    page = newPage();
+                    colContainer = document.createElement('div');
+                    colContainer.className = 'ref-gazette-columns';
+                    page.appendChild(colContainer);
+                    colContainer.appendChild(spilledEntries[si]);
+                }
+            }
+        }
+
+        addPageNumber(page, pageNum.value);
+        return pagesCreated;
+    }
+});
+
 // ── Expose ───────────────────────────────────────────────────
 
 window.LayoutTemplates = LayoutTemplates;
+window.appendWithBreakPolicy = appendWithBreakPolicy;
+window.isColumnPageOverflowing = isColumnPageOverflowing;

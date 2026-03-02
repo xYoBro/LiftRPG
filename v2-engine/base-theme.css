@@ -2487,3 +2487,88 @@ td {
 th {
     background: var(--fog);
 }
+
+/* ==========================================================
+   MULTI-SLOT TEMPLATE LAYOUTS (Layout Governor Phase 4)
+   ========================================================== */
+
+/* ── Encounter Magazine: 2-column layout for dense weeks ── */
+.encounter-magazine-grid {
+    display: grid;
+    grid-template-columns: 55% 45%;
+    grid-template-rows: 1fr auto;
+    gap: 0.15in;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+.encounter-magazine-left {
+    grid-column: 1;
+    grid-row: 1;
+    overflow: hidden;
+}
+.encounter-magazine-right {
+    grid-column: 2;
+    grid-row: 1;
+    overflow: hidden;
+}
+.encounter-magazine-footer {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    border-top: 1px solid var(--fog, #ccc);
+    padding-top: 0.1in;
+}
+
+/* Session blocks inside magazine columns */
+.encounter-magazine-left .session-block,
+.encounter-magazine-right .session-block {
+    margin-bottom: 0.1in;
+}
+.encounter-magazine-right .session-log {
+    font-size: 8pt;
+}
+
+/* ── Tracker Grid: 2-column grid for tracker sheets ── */
+.tracker-grid-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.15in;
+    flex: 1;
+    min-height: 0;
+}
+.tracker-grid-layout .tracker-section {
+    break-inside: avoid;
+    margin-bottom: 0;
+}
+.tracker-grid-layout .tracker-section h2 {
+    margin-top: 0;
+}
+
+/* ── Archive Gazette: 2-column found documents ── */
+.archive-gazette-columns {
+    column-count: 2;
+    column-gap: 0.2in;
+    column-rule: 1px solid var(--fog, #ccc);
+    flex: 1;
+    min-height: 0;
+}
+.archive-gazette-columns .archive-node {
+    break-inside: avoid;
+    margin-bottom: 0.15in;
+}
+
+/* ── REF Gazette: 2-column REF entries ── */
+.ref-gazette-columns {
+    column-count: 2;
+    column-gap: 0.2in;
+    column-rule: 1px dotted var(--fog, #ccc);
+    flex: 1;
+    min-height: 0;
+}
+.ref-gazette-columns .ref-router {
+    break-inside: avoid;
+    margin-bottom: 0.15in;
+}
+.ref-gazette-columns .ref-outcome {
+    break-inside: avoid;
+}

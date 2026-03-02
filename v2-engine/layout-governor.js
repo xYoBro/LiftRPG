@@ -283,6 +283,7 @@ function recordPageInPlan(plan, pageIndex, templateId, groupType, fillRatio) {
 
 /**
  * Finalize plan metrics after all groups are composed.
+ * Phase 4: enhanced with break quality, density sequence, spread pairs.
  */
 function finalizePlanMetrics(plan) {
     var uniqueTemplates = Object.keys(plan.metrics.templateUsage);
@@ -298,6 +299,53 @@ function finalizePlanMetrics(plan) {
         }
     }
     plan.metrics.avgFillRatio = fillCount > 0 ? (fillSum / fillCount) : 0;
+
+    // Phase 4: Break quality metrics from repairLog
+    var relaxationCount = 0;
+    var totalStrength = 0;
+    var violatedStrength = 0;
+    for (var r = 0; r < plan.repairLog.length; r++) {
+        var entry = plan.repairLog[r];
+        if (entry.type === 'break-relaxation') {
+            relaxationCount++;
+            violatedStrength += entry.strength || 0;
+        }
+        if (entry.type === 'break-relaxation' || entry.type === 'break-honored') {
+            totalStrength += entry.strength || 0;
+        }
+    }
+    plan.metrics.relaxationCount = relaxationCount;
+    plan.metrics.breakQualityScore = totalStrength > 0
+        ? 1.0 - (violatedStrength / totalStrength)
+        : 1.0;  // Perfect score when no break policies encountered
+
+    // Phase 4: Density sequence — per-page fill/weight for analysis
+    plan.metrics.densitySequence = [];
+    for (var d = 0; d < plan.pages.length; d++) {
+        plan.metrics.densitySequence.push({
+            page: d,
+            groupType: plan.pages[d].groupType,
+            fillRatio: plan.pages[d].fillRatio,
+            template: plan.pages[d].template
+        });
+    }
+
+    // Phase 4: Spread pairs — which pages face each other in saddle-stitch
+    // In a saddle-stitched booklet with N pages (multiple of 4):
+    //   Sheet k (front): page(N-1-2k) | page(2k)
+    //   Sheet k (back):  page(2k+1)   | page(N-2-2k)
+    var totalPages = plan.pages.length;
+    plan.metrics.spreadPairs = [];
+    if (totalPages >= 4 && totalPages % 4 === 0) {
+        var sheets = totalPages / 4;
+        for (var k = 0; k < sheets; k++) {
+            plan.metrics.spreadPairs.push({
+                sheet: k,
+                front: [totalPages - 1 - 2 * k, 2 * k],
+                back: [2 * k + 1, totalPages - 2 - 2 * k]
+            });
+        }
+    }
 
     // Run the global scorer if available
     if (typeof GovernorScore !== 'undefined' && GovernorScore.evaluate) {

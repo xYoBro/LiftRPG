@@ -30,7 +30,8 @@ GovernorScore.WEIGHTS = {
     templateRepeat: 3,      // same template 3+ consecutive
     pacingDense: 2,         // 3+ consecutive dense pages (>85%)
     balanceBonus: 2,        // per page in 0.45-0.85 sweet spot
-    pageCountPenalty: 0.5   // per extra page (slight preference for compact)
+    pageCountPenalty: 0.5,  // per extra page (slight preference for compact)
+    multiSlotBonus: 1       // slight preference for multi-slot layouts (visual diversity)
 };
 
 // ── Full Sequence Evaluation ─────────────────────────────────
@@ -163,6 +164,11 @@ GovernorScore.scoreCandidate = function (estimate, context) {
             fillRatios.length > 0 && fillRatios[0] > 0.85) {
             score -= W.pacingDense;
         }
+    }
+
+    // Multi-slot bonus: slight preference for visual diversity
+    if (estimate.multiSlot) {
+        score += W.multiSlotBonus;
     }
 
     return score;
