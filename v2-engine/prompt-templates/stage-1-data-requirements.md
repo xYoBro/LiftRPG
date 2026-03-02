@@ -2,7 +2,7 @@
 
 You are generating a Print & Play RPG Zine — a physical booklet that combines a real workout program with a branching narrative game. The user will print it, grab a pencil and dice, and play through it during their actual gym sessions.
 
-Your output will be a single JSON object with these top-level keys: `meta`, `workout`, `mechanics`, `theme`, `story` (encounters only), `map` (optional), `pages`, and `archiveLayout`. A rendering engine turns this JSON into printable A4 spreads. A validator checks every cross-reference. **Precision matters.**
+Your output will be a single JSON object with these top-level keys: `meta`, `workout`, `mechanics`, `theme`, `story` (encounters only), `map` (optional), `pages`, and `archiveLayout`. A rendering engine turns this JSON into printable half-letter spreads (5.5″ × 8.5″ pages). A validator checks every cross-reference. **Precision matters.**
 
 The engine uses an **encounter-based page model**: each workout session is an "encounter" with its own narrative and outcomes. The engine picks page layouts automatically — you never specify layout or CSS. You provide content; the engine provides form.
 
@@ -170,8 +170,6 @@ Produce a single JSON object with these exact top-level keys:
       "effect": "STRING — what changes when circled"
     }
   ],
-  "sessionMechanic": "STRING — roll-per-session | roll-per-set | choose-action | accumulate | push-or-accept",
-  "storyRollSessions": "STRING — 'lifting' | 'all' | 'conditioning'",
   "endConditions": [
     {
       "id": "STRING — e.g. 'E-DESCENT'",
@@ -199,6 +197,7 @@ Produce a single JSON object with these exact top-level keys:
 - `tracks[].standings[]`: Only for faction tracks.
 - `resources[].linkedResource`: Only for dual economy pairs. Both must reference each other.
 - `modifiers`, `tracks`, `codewords`, `resources`: All optional arrays. Omit if not using.
+- `exampleTurn`, `archiveRouting`, `replayability`: These fields inform Stage 2 rules-manual voice generation. They do not appear directly in the rendered booklet — they are inter-stage communication fields.
 - Clock sizes should be between 4 and 12.
 - **Outcome count**: You may have 2, 3, 4, 5, or more outcomes. Do NOT default to 3. Match outcome count to your dice type and theme complexity.
 - **ZERO MATH**: No outcome, modifier, or resource rule may require the player to add, subtract, or compute anything. Roll → lookup → act. That is the entire loop.
@@ -291,8 +290,8 @@ Produce a single JSON object with these exact top-level keys:
       ],
       "conditionalInstructions": [
         {
-          "condition": "STRING — tracker state trigger (e.g. 'DISSONANCE reaches 6')",
-          "instruction": "STRING — diegetic instruction for the player",
+          "condition": "STRING — tracker state trigger, for LLM reasoning only (not printed separately)",
+          "instruction": "STRING — diegetic instruction for the player (this is the printed text)",
           "style": "STRING — 'default' | 'alert'"
         }
       ],
@@ -461,7 +460,7 @@ If no wiring blueprint is provided, design mechanics freely using the primitives
 
 1. All `html` fields use HTML, not markdown
 2. Use `&apos;` not bare apostrophes in JSON strings
-3. No BANNED WORDS (terrifying, chilling, dark, shadow, void, madness, insane, sinister, evil, looming, epic, badass, sudden, suddenly)
+3. No BANNED WORDS (terrifying, chilling, sinister, evil, looming, epic, badass, sudden, suddenly, eerie, ominous, foreboding, mysterious)
 4. Every `outcomes[].ticks` MUST reference a valid clock or track name
 5. Encounter `outcomes[].range` must match ranges in `mechanics.dice.outcomes[]`
 6. `endConditions[].id` values will be used as ending IDs in Stage 3

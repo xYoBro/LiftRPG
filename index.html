@@ -1372,7 +1372,7 @@ Examples:
 
 ## MECHANICAL WIRING BLUEPRINT (BINDING)
 
-The following blueprint defines the mechanical topology of this zine. You MUST select primitives that can express the declared wires. Every wire's \`printInstruction\` MUST appear somewhere in the final booklet — on the tracker sheet, in encounter marginalia, or in the rules manual.
+The following blueprint defines the mechanical topology of this zine. You MUST select primitives that can express the declared wires. Every wire's \`printInstruction\` MUST appear somewhere in the final booklet — on the tracker sheet, in encounter conditional instructions, or in the rules manual.
 
 For EACH wire in the blueprint:
 1. Select a primitive from the catalog that serves as the wire's "from" source
@@ -1380,7 +1380,7 @@ For EACH wire in the blueprint:
 3. Name your mechanics to match the wire's \`from\` and \`to\` fields (diegetic names)
 4. Include the wire's \`printInstruction\` in the appropriate location:
    - threshold-gate: in the clock/track's trigger text
-   - conditional-routing: in encounter outcome text or HUD marginalia
+   - conditional-routing: in encounter outcome text or conditional instructions
    - resource-cycle: in the resource earn/spend rules
    - escalation: in track threshold effects
    - feedback-loop: in both source and target trigger descriptions
@@ -1997,7 +1997,21 @@ ${JSON.stringify(context, null, 2)}
                         if (enc.bossRules && (!Array.isArray(enc.bossRules.steps) || !enc.bossRules.steps.length)) {
                             w.push(`Encounter ${enc.id || idx} bossRules has missing or empty steps array`);
                         }
+                        if (enc.special === 'branch' && (!Array.isArray(enc.options) || !enc.options.length)) {
+                            w.push(`Encounter ${enc.id || idx} has special:"branch" but missing or empty options[] array`);
+                        }
                     });
+
+                    // Encounter variety check — minimum special type distribution
+                    var specialCounts = { boss: 0, rest: 0, branch: 0 };
+                    obj.story.encounters.forEach(function (enc) {
+                        if (enc.special && specialCounts.hasOwnProperty(enc.special)) specialCounts[enc.special]++;
+                    });
+                    if (obj.workout?.totalWeeks >= 4) {
+                        if (specialCounts.boss === 0) w.push('No boss encounters found. At least 1 boss encounter is recommended for peak intensity weeks.');
+                        if (specialCounts.rest === 0) w.push('No rest encounters found. At least 1 rest encounter is recommended for deload or early weeks.');
+                        if (specialCounts.branch === 0) w.push('No branch encounters found. At least 1 branch encounter is recommended for player agency.');
+                    }
                 }
 
                 // Cross-ref: clocks -> archiveLayout

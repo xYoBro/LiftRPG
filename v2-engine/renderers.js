@@ -1185,6 +1185,14 @@ function renderEncounterSpread(container, data, week, startPage) {
             });
         }
 
+        // Marginalia — sidebar flavor text / margin annotations
+        if (enc.marginalia) {
+            var margDiv = document.createElement('div');
+            margDiv.className = 'encounter-marginalia';
+            margDiv.textContent = decodeEntities(enc.marginalia);
+            sessionDiv.appendChild(margDiv);
+        }
+
         // Find matching session type for workout log
         var sType = sessionTypes.find(function (st) {
             return st.days && st.days.indexOf(enc.day) !== -1;
