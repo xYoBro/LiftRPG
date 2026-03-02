@@ -2181,6 +2181,19 @@ li {
     width: 2.5rem;
     height: 2.5rem;
 }
+.clock-svg > circle:first-of-type {
+    fill: var(--paper, #fff);
+    stroke: var(--ink, #111);
+    stroke-width: 2;
+}
+.clock-svg > circle:last-of-type {
+    fill: var(--ink, #111);
+    stroke: none;
+}
+.clock-svg > line {
+    stroke: var(--ink, #111);
+    stroke-width: 1.5;
+}
 
 /* HUD context: slightly smaller clocks */
 .hud-tracker-row .clock-svg {
@@ -2398,6 +2411,7 @@ li {
     display: flex;
     flex-direction: column;
     align-items: center;
+    flex: 1;
 }
 
 .faction-box {
@@ -2418,6 +2432,8 @@ li {
     font-size: 6.5pt;
     font-family: var(--font-mono);
     text-transform: uppercase;
+    text-align: center;
+    word-break: break-word;
 }
 
 .linear-track {

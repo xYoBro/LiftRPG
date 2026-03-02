@@ -82,6 +82,7 @@ function completeIntake() {
     if (!workout || !narrativeBrief) return alert("Please fill out workout and narrative brief.");
 
     var dice = getSelectedDice();
+    if (dice.length === 0) dice = ['d10', 'd%'];
     var intake = { workout: workout, narrativeBrief: narrativeBrief, dice: dice };
     if (window._pendingCoverImage) {
         intake.coverImage = window._pendingCoverImage;

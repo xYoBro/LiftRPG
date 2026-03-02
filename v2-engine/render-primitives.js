@@ -29,9 +29,6 @@ function renderClock(params) {
     circle.setAttribute('cx', String(cx));
     circle.setAttribute('cy', String(cy));
     circle.setAttribute('r', String(r));
-    circle.style.fill = 'var(--paper, #fff)';
-    circle.style.stroke = 'var(--ink, #111)';
-    circle.style.strokeWidth = '2';
     svg.appendChild(circle);
 
     // Wedge divider lines from center to circumference
@@ -44,8 +41,6 @@ function renderClock(params) {
         line.setAttribute('y1', String(cy));
         line.setAttribute('x2', String(x2.toFixed(1)));
         line.setAttribute('y2', String(y2.toFixed(1)));
-        line.style.stroke = 'var(--ink, #111)';
-        line.style.strokeWidth = '1.5';
         svg.appendChild(line);
     }
 
@@ -54,7 +49,6 @@ function renderClock(params) {
     dot.setAttribute('cx', String(cx));
     dot.setAttribute('cy', String(cy));
     dot.setAttribute('r', '2');
-    dot.style.fill = 'var(--ink, #111)';
     svg.appendChild(dot);
 
     container.appendChild(svg);
@@ -146,21 +140,16 @@ function renderProgressTrack(params) {
     for (var i = 1; i <= size; i++) {
         var boxWrap = document.createElement('div');
         boxWrap.className = 'progress-box-wrapper';
-        boxWrap.style.display = 'flex';
-        boxWrap.style.flexDirection = 'column';
-        boxWrap.style.alignItems = 'center';
 
         var box = document.createElement('div');
         box.className = 'progress-box';
 
         if (i <= startValue) {
             box.classList.add('progress-box-filled');
-            box.style.backgroundColor = 'var(--ink, #111)';
         }
 
         if (thresholdMap[i]) {
             box.classList.add('progress-box-threshold');
-            box.style.borderWidth = '2px';
         }
 
         boxWrap.appendChild(box);
@@ -168,8 +157,6 @@ function renderProgressTrack(params) {
         if (thresholdMap[i]) {
             var label = document.createElement('div');
             label.className = 'threshold-label';
-            label.style.fontSize = '8px';
-            label.style.marginTop = '2px';
             label.textContent = decodeEntities(thresholdMap[i]);
             boxWrap.appendChild(label);
         }
@@ -314,10 +301,6 @@ function renderFactionTrack(params) {
     for (var i = 0; i <= size; i++) {
         var boxWrap = document.createElement('div');
         boxWrap.className = 'faction-box-wrapper';
-        boxWrap.style.display = 'flex';
-        boxWrap.style.flexDirection = 'column';
-        boxWrap.style.alignItems = 'center';
-        boxWrap.style.flex = '1';
 
         var box = document.createElement('div');
         box.className = 'faction-box';
@@ -327,10 +310,6 @@ function renderFactionTrack(params) {
         if (labelMap[i]) {
             var label = document.createElement('div');
             label.className = 'faction-label';
-            label.style.fontSize = '8px';
-            label.style.marginTop = '4px';
-            label.style.textAlign = 'center';
-            label.style.wordBreak = 'break-word';
             label.textContent = decodeEntities(labelMap[i]);
             boxWrap.appendChild(label);
         }

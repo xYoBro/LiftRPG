@@ -115,99 +115,108 @@ function validateWiringBlueprint(obj) {
 }
 
 function validateStageData(num, obj, currentPipelineData) {
-    const e = [];
-    const w = [];
+    var e = [];
+    var w = [];
     if (num === 1) {
-        if (!obj.meta?.title) e.push('Missing meta.title');
-        if (!obj.workout?.totalWeeks) e.push('Missing workout.totalWeeks');
-        if (!obj.workout?.sessionTypes?.length) e.push('Missing workout.sessionTypes[]');
-        if (!obj.mechanics?.dice) e.push('Missing mechanics.dice');
-        if (!obj.mechanics?.endConditions?.length) e.push('Missing mechanics.endConditions[]');
-        if (!obj.theme?.colors) e.push('Missing theme.colors');
+        if (!(obj.meta && obj.meta.title)) e.push('Missing meta.title');
+        if (!(obj.workout && obj.workout.totalWeeks)) e.push('Missing workout.totalWeeks');
+        if (!(obj.workout && obj.workout.sessionTypes && obj.workout.sessionTypes.length)) e.push('Missing workout.sessionTypes[]');
+        if (!(obj.mechanics && obj.mechanics.dice)) e.push('Missing mechanics.dice');
+        if (!(obj.mechanics && obj.mechanics.endConditions && obj.mechanics.endConditions.length)) e.push('Missing mechanics.endConditions[]');
+        if (!(obj.theme && obj.theme.colors)) e.push('Missing theme.colors');
         else {
-            for (const k of ['ink', 'paper', 'fog', 'accent', 'muted']) {
-                if (!obj.theme.colors[k]) e.push(`Missing theme.colors.${k}`);
-                else if (!/^#[0-9a-fA-F]{6}$/.test(obj.theme.colors[k])) e.push(`theme.colors.${k} is not valid hex: ${obj.theme.colors[k]}`);
+            var colorKeys = ['ink', 'paper', 'fog', 'accent', 'muted'];
+            for (var ci = 0; ci < colorKeys.length; ci++) {
+                var k = colorKeys[ci];
+                if (!obj.theme.colors[k]) e.push('Missing theme.colors.' + k);
+                else if (!/^#[0-9a-fA-F]{6}$/.test(obj.theme.colors[k])) e.push('theme.colors.' + k + ' is not valid hex: ' + obj.theme.colors[k]);
             }
         }
-        if (!obj.theme?.fonts) e.push('Missing theme.fonts');
+        if (!(obj.theme && obj.theme.fonts)) e.push('Missing theme.fonts');
 
         var validArchetypes = ['institutional', 'noir', 'terminal', 'literary', 'brutalist', 'clinical', 'confessional', 'corporate'];
-        if (!obj.theme?.visualArchetype) {
+        if (!(obj.theme && obj.theme.visualArchetype)) {
             w.push('Missing theme.visualArchetype — engine will fall back to "institutional". Set explicitly based on the creative brief.');
-        } else if (!validArchetypes.includes(obj.theme.visualArchetype)) {
-            e.push(`theme.visualArchetype "${obj.theme.visualArchetype}" is not valid. Must be one of: ${validArchetypes.join(', ')}`);
+        } else if (validArchetypes.indexOf(obj.theme.visualArchetype) === -1) {
+            e.push('theme.visualArchetype "' + obj.theme.visualArchetype + '" is not valid. Must be one of: ' + validArchetypes.join(', '));
         }
 
-        const validTypes = ['cover', 'rules-manual', 'tracker-sheet', 'setup', 'encounter-spread', 'ref-pages', 'archive', 'endings', 'evidence', 'final'];
-        if (!obj.pages?.length) e.push('Missing pages[] array');
+        var validTypes = ['cover', 'rules-manual', 'tracker-sheet', 'setup', 'encounter-spread', 'ref-pages', 'archive', 'endings', 'evidence', 'final'];
+        if (!(obj.pages && obj.pages.length)) e.push('Missing pages[] array');
         else {
-            const archiveKeysSeen = new Set();
-            obj.pages.forEach((p, idx) => {
-                if (!validTypes.includes(p.type)) e.push(`pages[${idx}].type is invalid: "${p.type}"`);
+            var archiveKeysSeen = {};
+            obj.pages.forEach(function(p, idx) {
+                if (validTypes.indexOf(p.type) === -1) e.push('pages[' + idx + '].type is invalid: "' + p.type + '"');
                 if (p.type === 'archive' && p.section) {
-                    if (archiveKeysSeen.has(p.section)) {
-                        w.push(`Duplicate archive page found for section "${p.section}" in pages[] array.`);
+                    if (archiveKeysSeen[p.section]) {
+                        w.push('Duplicate archive page found for section "' + p.section + '" in pages[] array.');
                     }
-                    archiveKeysSeen.add(p.section);
+                    archiveKeysSeen[p.section] = true;
                 }
             });
 
             // Guardrail: tracker-sheet recommended when mechanic count > 4
             var hasTrackerSheet = (obj.pages || []).some(function (p) { return p.type === 'tracker-sheet'; });
-            var mechanicCount = (obj.mechanics?.clocks?.length || 0) +
-                                (obj.mechanics?.tracks?.length || 0) +
-                                (obj.mechanics?.resources?.length || 0);
+            var mechanicCount = ((obj.mechanics && obj.mechanics.clocks && obj.mechanics.clocks.length) || 0) +
+                                ((obj.mechanics && obj.mechanics.tracks && obj.mechanics.tracks.length) || 0) +
+                                ((obj.mechanics && obj.mechanics.resources && obj.mechanics.resources.length) || 0);
             if (mechanicCount > 4 && !hasTrackerSheet) {
-                w.push(`${mechanicCount} mechanics defined but no tracker-sheet page in pages[]. Consider adding one for playability.`);
+                w.push(mechanicCount + ' mechanics defined but no tracker-sheet page in pages[]. Consider adding one for playability.');
             }
         }
 
         if (obj.workout && Array.isArray(obj.workout.sessionTypes)) {
-            obj.workout.sessionTypes.forEach(st => {
+            obj.workout.sessionTypes.forEach(function(st) {
                 if (Array.isArray(st.exercises)) {
-                    st.exercises.forEach(ex => {
+                    st.exercises.forEach(function(ex) {
                         if (ex.reps && String(ex.reps).length > 20) {
-                            w.push(`Exercise "${ex.name}" has oversized reps string (${String(ex.reps).length} chars). Keep it to simple counts (e.g. 5, "3-5").`);
+                            w.push('Exercise "' + ex.name + '" has oversized reps string (' + String(ex.reps).length + ' chars). Keep it to simple counts (e.g. 5, "3-5").');
                         }
                     });
                 }
             });
         }
 
-        if (!obj.story?.encounters?.length) e.push('Missing story.encounters[]');
+        if (!(obj.story && obj.story.encounters && obj.story.encounters.length)) e.push('Missing story.encounters[]');
         else {
             // Derive sessions-per-week from unique day numbers across all
             // sessionTypes (spec: "Days are numbered 1 through N where N is
             // sessions per week"). Falls back to sessionTypes.length if no
             // days data — but days is a required field in the schema.
-            var allDays = new Set();
-            (obj.workout?.sessionTypes || []).forEach(function (st) {
-                (st.days || []).forEach(function (d) { allDays.add(d); });
+            var allDays = {};
+            var allDaysCount = 0;
+            var sessionTypes = (obj.workout && obj.workout.sessionTypes) || [];
+            sessionTypes.forEach(function(st) {
+                (st.days || []).forEach(function(d) {
+                    if (!allDays[d]) {
+                        allDays[d] = true;
+                        allDaysCount++;
+                    }
+                });
             });
-            let sessPerWeek = allDays.size > 0
-                ? allDays.size
-                : (obj.workout?.sessionTypes || []).length;
-            if (sessPerWeek > 0 && obj.workout?.totalWeeks) {
-                let expected = sessPerWeek * obj.workout.totalWeeks;
+            var sessPerWeek = allDaysCount > 0
+                ? allDaysCount
+                : sessionTypes.length;
+            if (sessPerWeek > 0 && obj.workout && obj.workout.totalWeeks) {
+                var expected = sessPerWeek * obj.workout.totalWeeks;
                 if (obj.story.encounters.length !== expected) {
-                    w.push(`Expected ${expected} encounters (${sessPerWeek} sessions × ${obj.workout.totalWeeks} weeks), found ${obj.story.encounters.length}. Engine will render what exists.`);
+                    w.push('Expected ' + expected + ' encounters (' + sessPerWeek + ' sessions × ' + obj.workout.totalWeeks + ' weeks), found ' + obj.story.encounters.length + '. Engine will render what exists.');
                 }
             }
-            const diceOutcomes = obj.mechanics?.dice?.outcomes || [];
-            obj.story.encounters.forEach((enc, idx) => {
-                const encOutcomes = enc.outcomes || [];
+            var diceOutcomes = (obj.mechanics && obj.mechanics.dice && obj.mechanics.dice.outcomes) || [];
+            obj.story.encounters.forEach(function(enc, idx) {
+                var encOutcomes = enc.outcomes || [];
                 if (diceOutcomes.length > 0 && encOutcomes.length !== diceOutcomes.length) {
-                    w.push(`Encounter index ${idx} outcomes length (${encOutcomes.length}) doesn't match dice outcomes (${diceOutcomes.length})`);
+                    w.push('Encounter index ' + idx + ' outcomes length (' + encOutcomes.length + ') doesn\'t match dice outcomes (' + diceOutcomes.length + ')');
                 }
                 if (enc.special === 'boss' && !enc.bossRules) {
-                    w.push(`Encounter ${enc.id || idx} has special:"boss" but missing bossRules object`);
+                    w.push('Encounter ' + (enc.id || idx) + ' has special:"boss" but missing bossRules object');
                 }
                 if (enc.bossRules && (!Array.isArray(enc.bossRules.steps) || !enc.bossRules.steps.length)) {
-                    w.push(`Encounter ${enc.id || idx} bossRules has missing or empty steps array`);
+                    w.push('Encounter ' + (enc.id || idx) + ' bossRules has missing or empty steps array');
                 }
                 if (enc.special === 'branch' && (!Array.isArray(enc.options) || !enc.options.length)) {
-                    w.push(`Encounter ${enc.id || idx} has special:"branch" but missing or empty options[] array`);
+                    w.push('Encounter ' + (enc.id || idx) + ' has special:"branch" but missing or empty options[] array');
                 }
             });
 
@@ -216,7 +225,7 @@ function validateStageData(num, obj, currentPipelineData) {
             obj.story.encounters.forEach(function (enc) {
                 if (enc.special && specialCounts.hasOwnProperty(enc.special)) specialCounts[enc.special]++;
             });
-            if (obj.workout?.totalWeeks >= 4) {
+            if (obj.workout && obj.workout.totalWeeks >= 4) {
                 if (specialCounts.boss === 0) w.push('No boss encounters found. At least 1 boss encounter is recommended for peak intensity weeks.');
                 if (specialCounts.rest === 0) w.push('No rest encounters found. At least 1 rest encounter is recommended for deload or early weeks.');
                 if (specialCounts.branch === 0) w.push('No branch encounters found. At least 1 branch encounter is recommended for player agency.');
@@ -224,10 +233,13 @@ function validateStageData(num, obj, currentPipelineData) {
         }
 
         // Cross-ref: clocks -> archiveLayout
-        const archiveKeys = (obj.archiveLayout || []).flatMap(s => [...(s.left || []), ...(s.right || [])]);
-        (obj.mechanics?.clocks || []).forEach(c => {
-            if (c.onTrigger?.section && !archiveKeys.includes(c.onTrigger.section)) {
-                w.push(`Clock "${c.name}" references section "${c.onTrigger.section}" not in archiveLayout`);
+        var archiveKeys = (obj.archiveLayout || []).reduce(function(acc, s) {
+            return acc.concat(s.left || []).concat(s.right || []);
+        }, []);
+        var clocks = (obj.mechanics && obj.mechanics.clocks) || [];
+        clocks.forEach(function(c) {
+            if (c.onTrigger && c.onTrigger.section && archiveKeys.indexOf(c.onTrigger.section) === -1) {
+                w.push('Clock "' + c.name + '" references section "' + c.onTrigger.section + '" not in archiveLayout');
             }
         });
 
@@ -238,33 +250,33 @@ function validateStageData(num, obj, currentPipelineData) {
         scanBannedWords(obj.mechanics, 'mechanics', w);
 
         // Complexity budget check (vs wiring blueprint)
-        if (currentPipelineData.wiring?.complexityProfile) {
+        if (currentPipelineData.wiring && currentPipelineData.wiring.complexityProfile) {
             var peak = currentPipelineData.wiring.complexityProfile.peakActive || 10;
             var complexity = 0;
-            (obj.mechanics?.clocks || []).forEach(function(c) {
+            ((obj.mechanics && obj.mechanics.clocks) || []).forEach(function(c) {
                 complexity += (c.type === 'tug' ? 2 : 1);
             });
-            (obj.mechanics?.tracks || []).forEach(function(t) {
+            ((obj.mechanics && obj.mechanics.tracks) || []).forEach(function(t) {
                 complexity += (t.type === 'faction' || t.type === 'skill-tree' ? 3 :
                                t.type === 'heat' ? 2 : 1);
             });
-            (obj.mechanics?.resources || []).forEach(function() { complexity += 2; });
+            ((obj.mechanics && obj.mechanics.resources) || []).forEach(function() { complexity += 2; });
             if (complexity > peak) {
                 w.push('Mechanic complexity (' + complexity + ') exceeds blueprint peakActive (' + peak + '). Consider simplifying.');
             }
         }
 
         // Wire compliance check
-        if (currentPipelineData.wiring?.wiring) {
-            var mechanicNames = [
-                ...(obj.mechanics?.clocks || []).map(function(c) { return c.name ? c.name.toLowerCase() : ''; }),
-                ...(obj.mechanics?.tracks || []).map(function(t) { return t.name ? t.name.toLowerCase() : ''; }),
-                ...(obj.mechanics?.resources || []).map(function(r) { return r.name ? r.name.toLowerCase() : ''; })
-            ].filter(Boolean);
+        if (currentPipelineData.wiring && currentPipelineData.wiring.wiring) {
+            var mechanicNames = []
+                .concat(((obj.mechanics && obj.mechanics.clocks) || []).map(function(c) { return c.name ? c.name.toLowerCase() : ''; }))
+                .concat(((obj.mechanics && obj.mechanics.tracks) || []).map(function(t) { return t.name ? t.name.toLowerCase() : ''; }))
+                .concat(((obj.mechanics && obj.mechanics.resources) || []).map(function(r) { return r.name ? r.name.toLowerCase() : ''; }))
+                .filter(Boolean);
             currentPipelineData.wiring.wiring.forEach(function(wire) {
                 var from = (wire.from || '').toLowerCase();
                 if (!from) return;
-                var found = mechanicNames.some(function(n) { return from.includes(n) || n.includes(from); });
+                var found = mechanicNames.some(function(n) { return from.indexOf(n) !== -1 || n.indexOf(from) !== -1; });
                 if (!found) {
                     w.push('Wire "' + wire.id + '" references "' + wire.from + '" \u2014 no matching mechanic found. Check naming.');
                 }
@@ -272,7 +284,7 @@ function validateStageData(num, obj, currentPipelineData) {
         }
 
         // Color contrast check (WCAG AA 4.5:1)
-        if (obj.theme?.colors?.ink && obj.theme?.colors?.paper &&
+        if (obj.theme && obj.theme.colors && obj.theme.colors.ink && obj.theme.colors.paper &&
             /^#[0-9a-fA-F]{6}$/.test(obj.theme.colors.ink) && /^#[0-9a-fA-F]{6}$/.test(obj.theme.colors.paper)) {
             var inkL = hexLuminance(obj.theme.colors.ink);
             var paperL = hexLuminance(obj.theme.colors.paper);
@@ -283,49 +295,57 @@ function validateStageData(num, obj, currentPipelineData) {
         }
 
         // Visual weight distribution
-        if (obj.story?.encounters?.length > 6) {
-            var weights = new Set();
+        if (obj.story && obj.story.encounters && obj.story.encounters.length > 6) {
+            var weights = {};
+            var weightsCount = 0;
             obj.story.encounters.forEach(function(enc) {
-                weights.add(enc.visualWeight || 'standard');
+                var wt = enc.visualWeight || 'standard';
+                if (!weights[wt]) {
+                    weights[wt] = true;
+                    weightsCount++;
+                }
             });
-            if (weights.size < 2) {
-                w.push('All encounters use the same visual weight ("' + [...weights][0] + '"). Mix sparse/standard/dense/crisis for density variation.');
+            if (weightsCount < 2) {
+                var firstWeight = Object.keys(weights)[0];
+                w.push('All encounters use the same visual weight ("' + firstWeight + '"). Mix sparse/standard/dense/crisis for density variation.');
             }
         }
 
         // Endowed progress check
         var hasEndowed = false;
-        (obj.mechanics?.clocks || []).forEach(function(c) {
+        ((obj.mechanics && obj.mechanics.clocks) || []).forEach(function(c) {
             if (c.startValue && c.startValue > 0) hasEndowed = true;
         });
-        (obj.mechanics?.tracks || []).forEach(function(t) {
+        ((obj.mechanics && obj.mechanics.tracks) || []).forEach(function(t) {
             if (t.startValue && t.startValue > 0) hasEndowed = true;
         });
         if (!hasEndowed) {
             w.push('No clock or track has startValue > 0. Endowed progress (pre-filling 10-20%) increases player commitment.');
         }
     } else if (num === 2) {
-        const reqKeys = ['cover', 'manual', 'classifications', 'hud', 'weekPage', 'archive', 'finalPage', 'labels', 'weekAlerts'];
-        reqKeys.forEach(k => {
-            if (!obj.voice?.[k]) w.push(`Missing voice.${k}`);
+        var reqKeys = ['cover', 'manual', 'classifications', 'hud', 'weekPage', 'archive', 'finalPage', 'labels', 'weekAlerts'];
+        reqKeys.forEach(function(k) {
+            if (!(obj.voice && obj.voice[k])) w.push('Missing voice.' + k);
         });
-        if (!obj.voice?.cover) e.push('Missing voice.cover');
-        if (!obj.voice?.manual) e.push('Missing voice.manual');
-        if (!obj.voice?.classifications) e.push('Missing voice.classifications');
+        if (!(obj.voice && obj.voice.cover)) e.push('Missing voice.cover');
+        if (!(obj.voice && obj.voice.manual)) e.push('Missing voice.manual');
+        if (!(obj.voice && obj.voice.classifications)) e.push('Missing voice.classifications');
 
         // Detect unresolved template variables in voice string fields
-        const templateVarPattern = /\{\{[^}]+\}\}|\[\[[^\]]+\]\]/g;
+        var templateVarPattern = /\{\{[^}]+\}\}|\[\[[^\]]+\]\]/g;
         function scanForTemplateVars(object, path) {
             if (!object || typeof object !== 'object') return;
-            for (const key of Object.keys(object)) {
-                const val = object[key];
+            var keys = Object.keys(object);
+            for (var i = 0; i < keys.length; i++) {
+                var key = keys[i];
+                var val = object[key];
                 if (typeof val === 'string') {
-                    const matches = val.match(templateVarPattern);
+                    var matches = val.match(templateVarPattern);
                     if (matches) {
-                        w.push(`Unresolved template variable in ${path}.${key}: ${matches.join(', ')}`);
+                        w.push('Unresolved template variable in ' + path + '.' + key + ': ' + matches.join(', '));
                     }
                 } else if (typeof val === 'object') {
-                    scanForTemplateVars(val, `${path}.${key}`);
+                    scanForTemplateVars(val, path + '.' + key);
                 }
             }
         }
@@ -337,19 +357,21 @@ function validateStageData(num, obj, currentPipelineData) {
         if (!obj.storyArchives || typeof obj.storyArchives !== 'object') e.push('Missing storyArchives object');
         if (!Array.isArray(obj.storyEndings) || !obj.storyEndings.length) e.push('Missing storyEndings array');
 
-        const s1 = currentPipelineData[1] || {};
-        const endIds = (s1.mechanics?.endConditions || []).map(end => end.id);
-        (obj.storyEndings || []).forEach(end => {
-            if (endIds.length && !endIds.includes(end.id)) e.push(`Ending id "${end.id}" not in Stage 1 endConditions`);
+        var s1 = currentPipelineData[1] || {};
+        var endIds = ((s1.mechanics && s1.mechanics.endConditions) || []).map(function(end) { return end.id; });
+        (obj.storyEndings || []).forEach(function(end) {
+            if (endIds.length && endIds.indexOf(end.id) === -1) e.push('Ending id "' + end.id + '" not in Stage 1 endConditions');
         });
 
-        const archiveKeys = (s1.archiveLayout || []).flatMap(s => [...(s.left || []), ...(s.right || [])]);
-        const storyArchiveKeys = Object.keys(obj.storyArchives || {});
-        storyArchiveKeys.forEach(k => {
-            if (archiveKeys.length && !archiveKeys.includes(k)) e.push(`Archive section key "${k}" not in Stage 1 archiveLayout`);
+        var archiveKeysS3 = (s1.archiveLayout || []).reduce(function(acc, s) {
+            return acc.concat(s.left || []).concat(s.right || []);
+        }, []);
+        var storyArchiveKeys = Object.keys(obj.storyArchives || {});
+        storyArchiveKeys.forEach(function(k) {
+            if (archiveKeysS3.length && archiveKeysS3.indexOf(k) === -1) e.push('Archive section key "' + k + '" not in Stage 1 archiveLayout');
         });
-        archiveKeys.forEach(k => {
-            if (!storyArchiveKeys.includes(k)) e.push(`ArchiveLayout key "${k}" has no matching section in storyArchives`);
+        archiveKeysS3.forEach(function(k) {
+            if (storyArchiveKeys.indexOf(k) === -1) e.push('ArchiveLayout key "' + k + '" has no matching section in storyArchives');
         });
 
         // --- Quality Governor: Stage 3 ---
@@ -358,27 +380,34 @@ function validateStageData(num, obj, currentPipelineData) {
 
         // Archive format diversity
         if (obj.storyArchives && typeof obj.storyArchives === 'object') {
-            var formats = new Set();
-            Object.values(obj.storyArchives).forEach(function(section) {
-                if (section.format) formats.add(section.format);
-            });
-            if (formats.size < 2 && Object.keys(obj.storyArchives).length > 1) {
-                w.push('All archive sections use format "' + [...formats][0] + '". Use at least 2 different formats for document variety.');
+            var formats = {};
+            var formatsCount = 0;
+            var archiveValues = Object.keys(obj.storyArchives);
+            for (var fi = 0; fi < archiveValues.length; fi++) {
+                var section = obj.storyArchives[archiveValues[fi]];
+                if (section.format && !formats[section.format]) {
+                    formats[section.format] = true;
+                    formatsCount++;
+                }
+            }
+            if (formatsCount < 2 && Object.keys(obj.storyArchives).length > 1) {
+                var firstFormat = Object.keys(formats)[0];
+                w.push('All archive sections use format "' + firstFormat + '". Use at least 2 different formats for document variety.');
             }
         }
     } else if (num === 4) {
-        const keys = Object.keys(obj);
+        var keys = Object.keys(obj);
         if (!keys.length) e.push('No REF nodes found');
 
-        const s1 = currentPipelineData[1] || {};
-        const s1Encounters = s1.story?.encounters || [];
-        const refScheme = s1.story?.refScheme || { prefix: 'R', weekDigits: 1, sessionDigits: 1 };
+        var s1 = currentPipelineData[1] || {};
+        var s1Encounters = (s1.story && s1.story.encounters) || [];
+        var refScheme = (s1.story && s1.story.refScheme) || { prefix: 'R', weekDigits: 1, sessionDigits: 1 };
 
         // Compute exact expected REF IDs and check each one
-        const missingRouters = [];
-        const missingBranches = [];
-        s1Encounters.forEach(enc => {
-            const refCode = refScheme.prefix +
+        var missingRouters = [];
+        var missingBranches = [];
+        s1Encounters.forEach(function(enc) {
+            var refCode = refScheme.prefix +
                 String(enc.week).padStart(refScheme.weekDigits || 1, '0') +
                 String(enc.day).padStart(refScheme.sessionDigits || 1, '0');
 
@@ -386,28 +415,28 @@ function validateStageData(num, obj, currentPipelineData) {
             if (!obj[refCode]) missingRouters.push(refCode);
 
             // Branch nodes (one per outcome suffix)
-            (enc.outcomes || []).forEach(o => {
-                const branchId = refCode + (o.suffix || '');
+            (enc.outcomes || []).forEach(function(o) {
+                var branchId = refCode + (o.suffix || '');
                 if (!obj[branchId]) missingBranches.push(branchId);
             });
         });
 
-        const totalMissing = missingRouters.length + missingBranches.length;
+        var totalMissing = missingRouters.length + missingBranches.length;
         if (totalMissing > 0) {
-            const expectedTotal = s1Encounters.length + s1Encounters.reduce((sum, enc) => sum + (enc.outcomes?.length || 0), 0);
-            e.push(`Stage 4 missing ${totalMissing} of ${expectedTotal} REF nodes. Every encounter x every outcome must have content — missing nodes render as empty fragments.`);
+            var expectedTotal = s1Encounters.length + s1Encounters.reduce(function(sum, enc) { return sum + ((enc.outcomes && enc.outcomes.length) || 0); }, 0);
+            e.push('Stage 4 missing ' + totalMissing + ' of ' + expectedTotal + ' REF nodes. Every encounter x every outcome must have content — missing nodes render as empty fragments.');
             if (missingRouters.length) {
-                e.push(`Missing routers (${missingRouters.length}): ${missingRouters.slice(0, 10).join(', ')}${missingRouters.length > 10 ? '...' : ''}`);
+                e.push('Missing routers (' + missingRouters.length + '): ' + missingRouters.slice(0, 10).join(', ') + (missingRouters.length > 10 ? '...' : ''));
             }
             if (missingBranches.length) {
-                e.push(`Missing branches (${missingBranches.length}): ${missingBranches.slice(0, 10).join(', ')}${missingBranches.length > 10 ? '...' : ''}`);
+                e.push('Missing branches (' + missingBranches.length + '): ' + missingBranches.slice(0, 10).join(', ') + (missingBranches.length > 10 ? '...' : ''));
             }
         }
 
-        keys.forEach(k => {
-            const node = obj[k];
-            if (!node.type) w.push(`REF "${k}" missing type`);
-            if (!node.html) w.push(`REF "${k}" missing html`);
+        keys.forEach(function(k) {
+            var node = obj[k];
+            if (!node.type) w.push('REF "' + k + '" missing type');
+            if (!node.html) w.push('REF "' + k + '" missing html');
         });
 
         // --- Quality Governor: Stage 4 ---
@@ -419,7 +448,7 @@ function validateStageData(num, obj, currentPipelineData) {
         var validRouterTypes = ['kinetic', 'philosophical', 'echo', 'artifact', 'steinbeck', 'dirt', 'apex'];
         keys.forEach(function(k) {
             var node = obj[k];
-            if (node.type && validRouterTypes.includes(node.type)) {
+            if (node.type && validRouterTypes.indexOf(node.type) !== -1) {
                 routerTypes[node.type] = (routerTypes[node.type] || 0) + 1;
                 routerCount++;
             }
@@ -440,20 +469,20 @@ function validateStageData(num, obj, currentPipelineData) {
             }
         }
     } else if (num === 5) {
-        const keys = Object.keys(obj);
+        var keys = Object.keys(obj);
 
-        const s1 = currentPipelineData[1] || {};
-        const tracks = (s1.mechanics?.tracks || []).filter(t => t.type === 'faction' || t.type === 'progress');
-        const expectedEvidenceCount = tracks.length * (s1.workout?.totalWeeks || 0);
+        var s1 = currentPipelineData[1] || {};
+        var tracks = ((s1.mechanics && s1.mechanics.tracks) || []).filter(function(t) { return t.type === 'faction' || t.type === 'progress'; });
+        var expectedEvidenceCount = tracks.length * ((s1.workout && s1.workout.totalWeeks) || 0);
 
         if (expectedEvidenceCount > 0 && keys.length !== expectedEvidenceCount) {
-            w.push(`Expected ${expectedEvidenceCount} evidence nodes (${tracks.length} tracks * ${s1.workout?.totalWeeks || 0} weeks), found ${keys.length}. Engine will render what exists.`);
+            w.push('Expected ' + expectedEvidenceCount + ' evidence nodes (' + tracks.length + ' tracks * ' + ((s1.workout && s1.workout.totalWeeks) || 0) + ' weeks), found ' + keys.length + '. Engine will render what exists.');
         }
 
-        keys.forEach(k => {
-            const node = obj[k];
-            if (!node.type) w.push(`Evidence node "${k}" missing type`);
-            if (!node.html) w.push(`Evidence node "${k}" missing html`);
+        keys.forEach(function(k) {
+            var node = obj[k];
+            if (!node.type) w.push('Evidence node "' + k + '" missing type');
+            if (!node.html) w.push('Evidence node "' + k + '" missing html');
         });
 
         // --- Quality Governor: Stage 5 ---

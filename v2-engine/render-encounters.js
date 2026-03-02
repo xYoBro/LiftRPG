@@ -105,7 +105,7 @@ function renderEncounterSpread(container, data, week, startPage) {
         diceDiv.className = 'hud-dice';
         var diceLabel = document.createElement('div');
         diceLabel.className = 'hud-dice-label';
-        diceLabel.textContent = (voice.hud && voice.hud.diceLabel) || 'DICE RESOLUTION';
+        diceLabel.textContent = decodeEntities((voice.hud && voice.hud.diceLabel) || 'DICE RESOLUTION');
         diceDiv.appendChild(diceLabel);
 
         var diceTable = document.createElement('table');
@@ -166,7 +166,7 @@ function renderEncounterSpread(container, data, week, startPage) {
         trackerDiv.className = 'hud-trackers';
         var trackerLabel = document.createElement('div');
         trackerLabel.className = 'hud-trackers-label';
-        trackerLabel.textContent = (voice.hud && voice.hud.clocksLabel) || 'TRACKERS';
+        trackerLabel.textContent = decodeEntities((voice.hud && voice.hud.clocksLabel) || 'TRACKERS');
         trackerDiv.appendChild(trackerLabel);
 
         if (hasClocks) {
@@ -236,7 +236,7 @@ function renderEncounterSpread(container, data, week, startPage) {
         // Session title
         var sessionTitle = document.createElement('div');
         sessionTitle.className = 'session-title-row';
-        var dayLabel = (voice.weekPage && voice.weekPage.sessions && voice.weekPage.sessions[enc.day]) || ('SESSION ' + enc.day);
+        var dayLabel = decodeEntities((voice.weekPage && voice.weekPage.sessions && voice.weekPage.sessions[enc.day]) || ('SESSION ' + enc.day));
         sessionTitle.innerHTML = '<span class="session-day">' + escapeHtml(dayLabel) + '</span>' +
             '<span class="encounter-title">' + escapeHtml(enc.title || '') + '</span>';
         sessionDiv.appendChild(sessionTitle);
@@ -362,7 +362,7 @@ function renderEncounterSpread(container, data, week, startPage) {
             if (intensity) {
                 var intDiv = document.createElement('div');
                 intDiv.className = 'session-intensity';
-                intDiv.textContent = 'INTENSITY: ' + intensity + (workout.intensityUnit ? ' ' + workout.intensityUnit : '');
+                intDiv.textContent = 'INTENSITY: ' + decodeEntities(intensity) + (workout.intensityUnit ? ' ' + decodeEntities(workout.intensityUnit) : '');
                 sessionDiv.appendChild(intDiv);
             }
 
@@ -371,10 +371,10 @@ function renderEncounterSpread(container, data, week, startPage) {
             var lHead = document.createElement('thead');
             var lHr = document.createElement('tr');
             var lth1 = document.createElement('th');
-            lth1.textContent = (voice.labels && voice.labels.liftColumn) || 'LIFT';
+            lth1.textContent = decodeEntities((voice.labels && voice.labels.liftColumn) || 'LIFT');
             lHr.appendChild(lth1);
             var lth2 = document.createElement('th');
-            lth2.textContent = (voice.labels && voice.labels.weightColumn) || workout.weightColumnLabel || 'WEIGHT';
+            lth2.textContent = decodeEntities((voice.labels && voice.labels.weightColumn) || workout.weightColumnLabel || 'WEIGHT');
             lHr.appendChild(lth2);
             var lth3 = document.createElement('th');
             lth3.textContent = 'SETS';
@@ -547,7 +547,7 @@ function renderFacilityGrid(mapData, week) {
     if (weekData.divider) {
         var div = document.createElement('div');
         div.className = 'facility-divider' + (weekData.dividerAlert ? ' divider-alert' : '');
-        div.textContent = weekData.divider;
+        div.textContent = decodeEntities(weekData.divider);
         container.appendChild(div);
     }
 

@@ -11,7 +11,9 @@
 //          window.renderFinalPage
 
 // -- Cover Page --
-function renderCoverPage(container, data) {
+// startPage accepted for signature consistency with box-packer dispatch;
+// unused because the cover page intentionally has no page number.
+function renderCoverPage(container, data, startPage) {
     var page = createPage('cover');
     page.classList.add('cover-layout');
     var voice = (data.voice && data.voice.cover) || {};
@@ -159,7 +161,7 @@ function renderTrackerSheet(container, data, startPage) {
         var clockSection = document.createElement('div');
         clockSection.className = 'tracker-section';
         var clockH = document.createElement('h2');
-        clockH.textContent = (voice.labels && voice.labels.clocksHeading) || 'CLOCKS';
+        clockH.textContent = decodeEntities((voice.labels && voice.labels.clocksHeading) || 'CLOCKS');
         clockSection.appendChild(clockH);
 
         mech.clocks.forEach(function (c) {
@@ -227,6 +229,8 @@ function renderTrackerSheet(container, data, startPage) {
                 trackSection.appendChild(renderHeatTrack({ size: t.size || 10, startValue: t.startValue, thresholds: t.thresholds }));
             } else if (t.type === 'faction') {
                 trackSection.appendChild(renderFactionTrack({ size: t.size || 10, labels: [], standings: t.standings }));
+            } else if (t.type === 'skill-tree') {
+                trackSection.appendChild(renderSkillTree({ nodes: t.nodes || [] }));
             } else {
                 trackSection.appendChild(renderProgressTrack({ size: t.size || 10, startValue: t.startValue, thresholds: t.thresholds }));
             }
@@ -246,7 +250,7 @@ function renderTrackerSheet(container, data, startPage) {
         var resSection = document.createElement('div');
         resSection.className = 'tracker-section';
         var resH = document.createElement('h2');
-        resH.textContent = (voice.labels && voice.labels.resourceHeading) || 'RESOURCES';
+        resH.textContent = decodeEntities((voice.labels && voice.labels.resourceHeading) || 'RESOURCES');
         resSection.appendChild(resH);
 
         mech.resources.forEach(function (r) {
@@ -614,6 +618,8 @@ function renderEvidencePages(container, data, startPage) {
 }
 
 // -- Final Page --
+// startPage accepted for signature consistency with box-packer dispatch;
+// unused because the final page intentionally has no page number.
 function renderFinalPage(container, data, startPage) {
     var voice = data.voice || {};
     var meta = data.meta || {};

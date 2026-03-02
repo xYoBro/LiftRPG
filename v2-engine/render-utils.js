@@ -35,9 +35,9 @@ function sanitizeSvg(svgStr) {
 function sanitizeHtml(htmlStr) {
     if (typeof htmlStr !== 'string') return '';
     // Strip dangerous tags — paired (with content)
-    var s = htmlStr.replace(/<(script|iframe|object|embed|applet)\b[^<]*(?:(?!<\/\1>)<[^<]*)*<\/\1>/gi, '');
+    var s = htmlStr.replace(/<(script|iframe|object|embed|applet|style|form|base|link|meta)\b[^<]*(?:(?!<\/\1>)<[^<]*)*<\/\1>/gi, '');
     // Strip dangerous tags — opening/self-closing (no closing tag)
-    s = s.replace(/<(script|iframe|object|embed|applet)\b[^>]*\/?>/gi, '');
+    s = s.replace(/<(script|iframe|object|embed|applet|style|form|base|link|meta)\b[^>]*\/?>/gi, '');
     // Strip inline event handlers — quoted and unquoted
     s = s.replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '');
     // Strip javascript: URIs (quoted and unquoted)

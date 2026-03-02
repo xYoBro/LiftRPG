@@ -27,11 +27,13 @@ function generateWiringPrompt() {
         var btn = document.getElementById('btnPrompt-W');
         btn.innerText = "\u2705 COPIED!";
         setTimeout(function() { btn.innerText = 'Generate Wiring Prompt'; }, 2000);
-    }).catch(function(err) {
-        console.error('Failed to copy prompt: ', err);
+    }).catch(function() {
+        // Clipboard API unavailable (non-HTTPS or denied) — select text for manual copy
+        box.focus();
+        box.select();
         var btn = document.getElementById('btnPrompt-W');
-        btn.innerText = "\u274c COPY ERROR";
-        setTimeout(function() { btn.innerText = 'Generate Wiring Prompt'; }, 2000);
+        btn.innerText = "SELECT ALL \u2192 Ctrl/\u2318+C";
+        setTimeout(function() { btn.innerText = 'Generate Wiring Prompt'; }, 3000);
     });
 }
 
@@ -49,11 +51,13 @@ function generateStagePrompt(num) {
         var btn = document.getElementById('btnPrompt-' + num);
         btn.innerText = "\u2705 COPIED!";
         setTimeout(function() { btn.innerText = 'Generate Prompt ' + num; }, 2000);
-    }).catch(function(err) {
-        console.error('Failed to copy prompt: ', err);
+    }).catch(function() {
+        // Clipboard API unavailable (non-HTTPS or denied) — select text for manual copy
+        box.focus();
+        box.select();
         var btn = document.getElementById('btnPrompt-' + num);
-        btn.innerText = "\u274c COPY ERROR";
-        setTimeout(function() { btn.innerText = 'Generate Prompt ' + num; }, 2000);
+        btn.innerText = "SELECT ALL \u2192 Ctrl/\u2318+C";
+        setTimeout(function() { btn.innerText = 'Generate Prompt ' + num; }, 3000);
     });
 }
 
@@ -63,13 +67,14 @@ function validateWiring() {
     if (!raw) { statusEl.innerHTML = '<span style="color:var(--accent)">No JSON pasted.</span>'; return; }
 
     var obj;
-    try { obj = JSON.parse(raw); }
-    catch (ex) { statusEl.innerHTML = '<span style="color:var(--accent)">Invalid JSON: ' + ex.message + '</span>'; return; }
+    try { obj = safeExtract(raw); }
+    catch (ex) { statusEl.innerHTML = '<span style="color:var(--accent)">Invalid JSON: ' + escapeHtml(ex.message) + '</span>'; return; }
 
+    var jsonRepairs = _lastExtractRepairs.slice();
     var result = validateWiringBlueprint(obj);
     if (result.errors.length > 0) {
-        statusEl.innerHTML = '<span style="color:var(--accent)">ERRORS:<br>' + result.errors.join('<br>') + '</span>' +
-            (result.warnings.length > 0 ? '<br><span style="color:var(--yellow, orange)">WARNINGS:<br>' + result.warnings.join('<br>') + '</span>' : '');
+        statusEl.innerHTML = '<span style="color:var(--accent)">ERRORS:<br>' + result.errors.map(escapeHtml).join('<br>') + '</span>' +
+            (result.warnings.length > 0 ? '<br><span style="color:var(--yellow, orange)">WARNINGS:<br>' + result.warnings.map(escapeHtml).join('<br>') + '</span>' : '');
         return;
     }
 
@@ -80,9 +85,15 @@ function validateWiring() {
     document.getElementById('stageCard-W').classList.add('valid');
     document.getElementById('stageBody-W').classList.remove('open');
 
-    if (result.warnings.length > 0) {
-        statusEl.innerHTML = '<span style="color:var(--yellow, orange)">Saved with warnings:<br>' + result.warnings.join('<br>') + '</span>';
-        console.warn('Wiring blueprint warnings:', result.warnings);
+    var allWiringWarnings = result.warnings.slice();
+    if (jsonRepairs.length) {
+        allWiringWarnings.unshift('JSON auto-repaired: ' + jsonRepairs.join(', '));
+        console.warn('Wiring blueprint JSON repairs applied:', jsonRepairs);
+    }
+
+    if (allWiringWarnings.length > 0) {
+        statusEl.innerHTML = '<span style="color:var(--yellow, orange)">Saved with warnings:<br>' + allWiringWarnings.map(escapeHtml).join('<br>') + '</span>';
+        console.warn('Wiring blueprint warnings:', allWiringWarnings);
     } else {
         statusEl.innerHTML = '<span style="color:var(--green, #4a4)">Blueprint validated and saved.</span>';
     }

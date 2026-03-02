@@ -31,7 +31,7 @@ User pastes each prompt into any LLM (Claude, ChatGPT, Gemini, etc.)
 LLM generates JSON, pasted back and validated at each stage
   |
   v
-box-packer.js dispatches pages[] array to renderers.js
+box-packer.js dispatches pages[] array to render-*.js modules
   |
   v
 DOM pages rendered at 5.5" x 8.5" (half-letter)
@@ -44,12 +44,24 @@ Saddle-stitch imposition (11" x 8.5" landscape spreads) → Print
 
 ```text
 LiftRPG/
-  index.html                           Browser UI: intake, wiring, 5-stage accordion, assembly, print
+  index.html                           Browser UI: HTML structure + boot script (init, template fetch)
+  app-ui.css                           App UI styles — dark theme, progress rail, accordion, forms, footer
   v2-engine/
+    base-theme.css                     Page dimensions, typography, components, print media, visual treatments
     box-packer.js                      Page-type dispatcher + post-render cross-references
-    renderers.js                       All DOM builders: story blocks, mechanic primitives, maps
-    base-theme.css                     Page dimensions, typography, component styles, print media
+    render-utils.js                    Sanitizers (escapeHtml, sanitizeSvg, sanitizeHtml, decodeEntities) + page boilerplate
+    render-primitives.js               Tracker widgets — SVG clocks, tug-of-war, progress, heat, skill tree, faction
+    render-pages.js                    Structural pages — cover, rules manual, tracker sheet, setup, endings, evidence, final
+    render-narrative.js                REF pages (scrambled paragraph-book) + archive pages (7 document formats)
+    render-encounters.js               Encounter spread (HUD + session log) + map renderers (grid, PTP, linear)
     story-tables.js                    Randomizer data — curated story generator tables
+    json-repair.js                     LLM JSON repair pipeline — safeExtract() with 7 repair phases
+    validators.js                      Schema validation + Quality Governor (banned words, complexity, WCAG, etc.)
+    prompt-assembler.js                Prompt text builders — template substitution + cross-stage context
+    pipeline-state.js                  Central state container — window.Pipeline API
+    intake-ui.js                       Dice selector + cover image UI (dropzone, file handling)
+    ui-state.js                        UI state machine — progress rail, accordion, stage lifecycle
+    pipeline-io.js                     Pipeline I/O — validation orchestration, import/export, assembly + imposition
     prompt-templates/
       stage-w-wiring.md                Mechanical wiring blueprint prompt (Stage W)
       stage-1-data-requirements.md     Stage 1 JSON schema spec
@@ -62,13 +74,14 @@ LiftRPG/
       stage-3-archives.md              Found documents + endings
       stage-4-story.md                 Session narrative REF nodes
       stage-5-evidence.md              Evidence tracks (optional)
+  .gitignore                           Ignores .DS_Store
   README.md                            This file
   LICENSE                              MIT License
 ```
 
 ### Schema: Page-Type Dispatch (v2)
 
-The v2 engine uses a **page-type model**. The LLM generates a `pages[]` array where each entry specifies a page type. The box-packer dispatches each page type to the corresponding renderer in `renderers.js`. The engine controls layout; the LLM provides content.
+The v2 engine uses a **page-type model**. The LLM generates a `pages[]` array where each entry specifies a page type. The box-packer dispatches each page type to the corresponding renderer in the `render-*.js` modules. The engine controls layout; the LLM provides content.
 
 Top-level JSON keys (assembled from all LLM stages):
 
@@ -110,7 +123,7 @@ Pages are padded to a multiple of 4 for saddle-stitch imposition.
 
 ### Imposition (Saddle-Stitch)
 
-`index.html` reorders pages into 11" x 8.5" spreads for duplex printing:
+`pipeline-io.js` reorders pages into 11" x 8.5" spreads for duplex printing:
 
 - Even spread index: Left = high page number, Right = low page number
 - Odd spread index: Left = low page number, Right = high page number
@@ -135,7 +148,7 @@ The engine renders visual components for these mechanical primitive IDs:
 | 5B | Point-to-point SVG map | `.ptp-map` |
 | 5D | Linear track (numbered positions) | `.linear-track` `.linear-box` |
 
-All other primitives (1x, 2x, 4x, 6x, 7x, 8x) render as text-only mechanic blocks with trigger/effect display.
+All other primitives (1x, 2x, 4x, 6x, 7x, 8x) are prompt-only -- no dedicated renderers.
 
 ---
 
@@ -203,8 +216,8 @@ Open `localhost:8080` in a browser.
 
 ### Adding a New Primitive Renderer
 
-1. Write a render function in `v2-engine/renderers.js` that returns a DOM element
-2. Add a case in the appropriate renderer to dispatch by primitive_id
+1. Write a render function in `v2-engine/render-primitives.js` (for tracker widgets) or `v2-engine/render-pages.js` (for page-level renderers) that returns a DOM element
+2. Add a dispatch case in `v2-engine/box-packer.js` for new page types, or wire the primitive into the appropriate page renderer
 3. Add structural CSS in `v2-engine/base-theme.css`
 4. Update the primitives catalog in `v2-engine/prompt-templates/shared-primitives-catalog.md`
 

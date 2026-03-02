@@ -232,7 +232,7 @@ Examples:
 
             try {
                 var results = await Promise.all(
-                    names.map(function (n) { return fetch('v2-engine/prompt-templates/' + n).then(function (r) { return r.text(); }); })
+                    names.map(function (n) { return fetch('v2-engine/prompt-templates/' + n).then(function (r) { if (!r.ok) throw new Error(n + ': HTTP ' + r.status); return r.text(); }); })
                 );
                 var templates = {};
                 names.forEach(function (n, i) {

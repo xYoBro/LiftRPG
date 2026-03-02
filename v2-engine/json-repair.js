@@ -11,7 +11,7 @@
 var _lastExtractRepairs = [];
 
 function safeExtract(raw) {
-    _lastExtractRepairs = [];
+    _lastExtractRepairs.length = 0;
     var str = raw.trim();
 
     // Phase 0: Strip markdown fences and extract outermost structure
