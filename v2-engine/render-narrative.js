@@ -416,3 +416,5 @@ function renderArchiveNode(node, format, config) {
 // Expose on window for cross-file access
 window.renderRefPages = renderRefPages;
 window.renderArchivePages = renderArchivePages;
+window.renderArchiveNode = renderArchiveNode;
+window.scrambleBranches = scrambleBranches;

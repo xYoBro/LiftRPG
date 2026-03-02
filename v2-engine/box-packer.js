@@ -1,15 +1,36 @@
 /**
  * Page-type dispatcher for the v2 engine.
- * Reads the pages[] array from the assembled payload and renders each
- * page type using the corresponding domain renderer from renderers.js.
+ *
+ * Primary path: Layout Governor (atom-driven composition via templates).
+ * Fallback: Legacy pages[]-driven dispatch to monolithic renderers.
+ *
+ * The governor path is used when an atom inventory exists
+ * (set by content-atomizer.js during assembly). The legacy path
+ * remains for backwards compatibility.
  */
 
 window.runPacker = function (data) {
     if (!data) data = {};
     var container = document.getElementById('zine-container');
     container.innerHTML = '';
-    var pageCount = 0;
 
+    // ── Governor path: atom-driven composition ──
+    var inventory = window._atomInventory;
+    if (inventory && window.LayoutGovernor && window.LayoutTemplates && window.AtomRenderers) {
+        try {
+            var pageCount = window.LayoutGovernor.compose(inventory, container, data);
+            padToMultipleOf4(container, pageCount, data);
+            crossReferenceArchivePages(container);
+            console.info('[box-packer] Governor composed', pageCount, 'pages');
+            return;
+        } catch (err) {
+            console.error('[box-packer] Governor failed, falling back to legacy:', err);
+            container.innerHTML = '';
+        }
+    }
+
+    // ── Legacy path: pages[]-driven dispatch ──
+    var pageCount = 0;
     var pages = data.pages || [];
 
     if (pages.length === 0) {

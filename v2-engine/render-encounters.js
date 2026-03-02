@@ -755,3 +755,6 @@ function renderLinearTrackWeek(mapData, week) {
 
 // Expose on window for cross-file access
 window.renderEncounterSpread = renderEncounterSpread;
+window.renderFacilityGrid = renderFacilityGrid;
+window.renderPtpMapWeek = renderPtpMapWeek;
+window.renderLinearTrackWeek = renderLinearTrackWeek;
