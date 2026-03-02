@@ -99,6 +99,20 @@ Produce 2-5 endings. Each corresponds to an `endConditions` entry from Stage 1.
 
 ---
 
+## SELF-EVALUATION (MANDATORY)
+
+Before outputting, verify your archives and endings against these quality checks:
+
+- **Found-document test:** Read each archive node. Does it feel like an excerpt from a real document — or like a story summary wearing a document&apos;s clothes? Real documents have headers, dates, recipients, classification marks, incomplete information, and institutional blind spots.
+- **Format diversity:** Count your `format` values across sections. Are there at least 2 different formats? If every section is a memo, the found-document illusion collapses.
+- **Voice differentiation:** Could you identify which archive section a node belongs to by voice alone? A corporate memo sounds nothing like a field journal. If they all sound the same, rewrite the outliers.
+- **Physical detail anchors:** Does every archive node contain at least one concrete detail — a date, a measurement, a name, a location, a material? Abstractions don&apos;t feel found.
+- **Ending consequence:** Do endings describe lasting consequences rather than generic victory/defeat? "The files were sealed" is consequence. "You won" is not.
+- **Workout acknowledgment:** Does every ending acknowledge that the player trained for N weeks — without celebration or fanfare? The physical achievement is real. State it plainly.
+- **Failure as narrative:** Do "bad" endings feel like the story went somewhere different, not like punishment? A player who fails should still feel their time was meaningful.
+
+---
+
 ## OUTPUT
 
 Return ONLY a valid JSON object with two keys: `storyArchives` and `storyEndings`. No commentary, no markdown fences.

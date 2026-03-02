@@ -221,6 +221,19 @@ All map types: show progression — more areas revealed, position advancing, or 
 
 ---
 
+## SELF-EVALUATION (MANDATORY)
+
+Before outputting, verify your voice layer against these quality checks:
+
+- **Diegetic integrity:** Read every classification label, HUD header, and manual section title. Could each one exist as a real label inside the fiction? "INCIDENT LOG" in a corporate world passes. "Story Fragments" fails.
+- **Voice register match:** Does the overall voice match the diegetic artifact&apos;s author? A military after-action report is clipped and procedural. A personal journal is intimate and unpolished. A terminal printout is terse and timestamped. Who WROTE this document?
+- **Week alert escalation:** Do your `weekAlerts` intensify across the program? Week 1 should orient. Middle weeks should complicate. Final weeks should feel urgent. Flat alerts = flat tension.
+- **Manual brevity:** Is your rules manual ≤5 sections, each 1-3 sentences? The manual teaches through layout, not through explanation. If you need a paragraph to explain a mechanic, the mechanic is too complex.
+- **Session naming variety:** Do `weekPage.sessions` labels vary across session types, or are they all "Session A / Session B"? Each name is a micro-moment of worldbuilding.
+- **Map progression:** If you produce a map, does it show change across weeks? Static maps waste the weekly reveal opportunity.
+
+---
+
 ## OUTPUT
 
 Return ONLY a valid JSON object with two keys: `voice` and `map`. No commentary, no markdown fences.

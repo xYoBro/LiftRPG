@@ -78,6 +78,16 @@ Before outputting your JSON, verify you have produced every required node:
 
 ---
 
+## SELF-EVALUATION (MANDATORY)
+
+Before outputting, verify your evidence tracks against these quality checks:
+
+- **Arc coherence:** Read each track in week order. Does it tell a recognizable story (establish → complicate → open thread), or is it a random collection of fragments?
+- **Cross-track connections:** Do at least 2 nodes across different tracks reference the same concrete detail (a date, a name, a location) but interpret it differently?
+- **Voice distinction:** If you read a node with the track ID hidden, could you identify which track it belongs to? Each track should have a distinct vocabulary and set of concerns.
+
+---
+
 ## OUTPUT
 
 Return ONLY a valid JSON object. No wrapping, no commentary, no markdown fences.

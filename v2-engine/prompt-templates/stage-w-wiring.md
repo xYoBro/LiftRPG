@@ -80,6 +80,20 @@ Declare your chosen arc shape, your phase boundaries (which weeks belong to whic
 
 ---
 
+## SELF-EVALUATION (MANDATORY)
+
+Before outputting, verify your blueprint against these quality checks:
+
+- **Structural Diversity:** Does your fingerprint differ from the default template (`6-10-three-act-2-threshold-gate`) on at least 2 of 5 dimensions? If not, redesign.
+- **Mechanical expression:** Does the `primaryTension` in `gameIdentity` name a tension the MECHANICS embody — not just a story theme? "Will the contamination spread?" is mechanical. "A scary adventure" is not.
+- **Cross-subsystem wires:** Do at least 2 wires connect DIFFERENT subsystems (tracker→tracker, tracker→map, tracker→archive)? Single-system wires (clock→its own archive) don&apos;t count.
+- **Workout as engine:** Can you trace every wire back to the workout as its energy source? If a system activates without the player lifting, it&apos;s decoration.
+- **Arc-intensity alignment:** Do high-complexity weeks in your `weeklyArc` correspond to the workout program&apos;s peak intensity weeks? Heavy training = mechanical crisis.
+- **Decision points:** Does at least one wire create a moment where the player CHOOSES (spend a resource, pick a path, sacrifice one tracker for another)? Passive observation is not gameplay.
+- **Pillar zeroes are meaningful:** Do your weight-0 pillars represent genuine exclusions that shape the zine&apos;s identity, or did you just zero the least familiar ones?
+
+---
+
 ## THE MASTER CLOCK
 
 The workout program is the clock that drives all systems. Every wire you design must trace back to the workout as its ultimate energy source:

@@ -474,6 +474,22 @@ If no wiring blueprint is provided, design mechanics freely using the primitives
 
 ---
 
+## SELF-EVALUATION (MANDATORY)
+
+Before outputting, verify your foundation against these quality checks:
+
+- **Ludonarrative consonance:** For each mechanic, ask: "Does this mechanic EMBODY the theme, or just TRACK a number?" A drain clock for urgency embodies it. A "story progress" bar just tracks. Redesign any tracker that&apos;s merely bookkeeping.
+- **Intensity-tension parallel:** Map your encounter `visualWeight` values against the workout program&apos;s intensity. Heavy training weeks should have `dense` or `crisis` encounters. Deload weeks should have `sparse` or rest encounters. If Week 1 and Week 6 have the same weight, the fusion is broken.
+- **Diegetic naming:** Read every mechanic name, clock label, and track name aloud. Does each one sound like a thing FROM the fiction? "PROTOCOL STATUS" passes. "Clock 1" fails.
+- **Blueprint compliance:** Sum your active mechanic complexities. Is the total ≤ `peakActive` from the wiring blueprint? Do all wire `from` targets match a mechanic you actually created?
+- **Endowed progress:** Does at least one clock or track have `startValue > 0`? Players who see progress already begun commit faster than those starting from zero.
+- **Visual weight distribution:** Do your encounters include at least 2 different `visualWeight` values? All-standard is a flat booklet. Mix sparse, standard, dense, and crisis.
+- **Archive format planning:** Look at your `archiveLayout` sections. Will the archive content use at least 2 different document formats? All-memo is a missed opportunity.
+- **Color contrast:** Do your `ink` and `paper` hex values produce readable text in B&W print? Dark ink on light paper. If your accent color is close to your fog color, they&apos;ll merge.
+- **Page vocabulary:** Does your `pages[]` array use page types beyond the minimum set? A tracker-sheet, setup page, or evidence section adds structural variety when the content warrants it.
+
+---
+
 ## OUTPUT
 
 Return ONLY a valid JSON object. No commentary, no markdown fences. Just the raw JSON.

@@ -92,6 +92,19 @@ Before outputting your JSON, verify you have produced every required node:
 
 ---
 
+## SELF-EVALUATION (MANDATORY)
+
+Before outputting, verify your narrative against these quality checks:
+
+- **Zeigarnik hooks:** Check the LAST branch node of each week&apos;s final session. Does it end with an unresolved image, an unanswered question, or an incomplete action? If the week ends with resolution, the player has no reason to return Monday.
+- **Intensity-tension parallel:** Are your `crisis` and `dense` encounters concentrated in the weeks with the heaviest workout loads? Are `sparse` and rest encounters in lighter weeks? Narrative tension should mirror physical effort.
+- **Type distribution:** Count your router node types. Is any single type above 40%? Are at least 3 different types represented? Is `apex` used at most 1-2 times total?
+- **Diegetic mechanic references:** When branch nodes reference clocks, tracks, or resources, do they use the DIEGETIC names from Stage 1 — not game terms? "The signal fire dims" passes. "Mark 1 tick on Clock A" fails.
+- **Branch divergence:** For each encounter, are the branch outcomes genuinely different paths — not just severity levels of the same event? "You succeed / you partially succeed / you fail" is three intensities, not three stories.
+- **Show, don&apos;t tell:** Scan your html fields. Are there any banned words? Any sentences that tell the reader how to feel rather than describing what happens?
+
+---
+
 ## OUTPUT
 
 Return ONLY a valid JSON object where each key is a REF ID and each value is `{ "type": "...", "html": "..." }`. No wrapping object, no commentary, no markdown fences.
