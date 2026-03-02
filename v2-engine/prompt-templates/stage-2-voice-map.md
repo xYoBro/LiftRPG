@@ -209,7 +209,7 @@ All map types: show progression — more areas revealed, position advancing, or 
 
 ---
 
-## CRITICAL REQUIREMENTS
+## CONSTRAINTS
 
 - `classifications` MUST have an entry for every archive section key from Stage 1
 - `weekPage.sessions` MUST have an entry for every day number across ALL `workout.sessionTypes[].days`
@@ -226,5 +226,17 @@ All map types: show progression — more areas revealed, position advancing, or 
 Return ONLY a valid JSON object with two keys: `voice` and `map`. No commentary, no markdown fences.
 
 ---
+
+## STAGE 1 CONTEXT (required fields)
+
+The following Stage 1 fields are needed to generate voice and map:
+
+- `meta` — title, subtitle, inspiration (for diegetic naming)
+- `workout` — totalWeeks, sessionTypes with days (defines weekPage sessions and weekAlerts)
+- `mechanics` — clocks, tracks, resources (for tracker labels, HUD content)
+- `theme` — visualArchetype, colorPalette, fonts (for voice tone matching)
+- `story.encounters[]` — encounter IDs and brief descriptions (for session naming)
+- `map` — spatial data if present, `null` otherwise
+- `archiveLayout[]` — archive section keys (for classifications and archive voice fields)
 
 ## PASTE YOUR STAGE 1 CONTEXT BELOW THIS LINE
