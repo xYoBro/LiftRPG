@@ -4,11 +4,21 @@
 // Templates handle page creation, slot arrangement, and overflow.
 // The governor selects the best template for each atom group.
 //
-// Phase 2 of the Layout Governor v3.0 architecture.
+// Phase 2-3 of the Layout Governor v3.0 architecture.
+//
+// Template interface:
+//   id: string               Template identifier
+//   groupType: string        Which group type this template handles
+//   score(atoms, ctx):       Heuristic score (0-1) for quick selection
+//   estimate(atoms, measurements, ctx):  Measurement-based estimate:
+//     { templateId, pages, fillRatios: number[], confidence: 0-1 }
+//   renderPages(container, atoms, ctx):  Render pages, returns page count
 //
 // Depends on: render-utils.js (createPage, addPageNumber, decodeEntities,
 //             escapeHtml), atom-renderers.js (AtomRenderers),
-//             render-primitives.js (renderClock, etc.)
+//             render-primitives.js (renderClock, etc.),
+//             governor-measure.js (GovernorMeasure) [optional],
+//             governor-score.js (GovernorScore) [optional]
 //
 // Exposed: window.LayoutTemplates
 
@@ -18,7 +28,7 @@ var LayoutTemplates = {
 
 /**
  * Register a template.
- * @param {Object} tmpl  { id, groupType, score(atoms, ctx), renderPages(container, atoms, ctx) }
+ * @param {Object} tmpl  { id, groupType, score, estimate, renderPages }
  */
 LayoutTemplates.register = function (tmpl) {
     if (!LayoutTemplates._registry[tmpl.groupType]) {
@@ -29,9 +39,14 @@ LayoutTemplates.register = function (tmpl) {
 
 /**
  * Select the best template for a group type.
+ *
+ * When GovernorMeasure and GovernorScore are available AND templates
+ * have estimate() methods, uses measurement-based scoring for
+ * intelligent selection. Falls back to heuristic score() otherwise.
+ *
  * @param {string} groupType
  * @param {Atom[]} atoms
- * @param {Object} ctx
+ * @param {Object} ctx  { data, startPage, week, scoringContext }
  * @returns {Object} template
  */
 LayoutTemplates.select = function (groupType, atoms, ctx) {
@@ -42,6 +57,36 @@ LayoutTemplates.select = function (groupType, atoms, ctx) {
     }
     if (candidates.length === 1) return candidates[0];
 
+    // Measurement-based selection (Phase 3+)
+    var hasMeasure = typeof GovernorMeasure !== 'undefined' && GovernorMeasure.getPageHeight;
+    var hasScore = typeof GovernorScore !== 'undefined' && GovernorScore.scoreCandidate;
+    var allHaveEstimate = true;
+    for (var c = 0; c < candidates.length; c++) {
+        if (!candidates[c].estimate) { allHaveEstimate = false; break; }
+    }
+
+    if (hasMeasure && hasScore && allHaveEstimate) {
+        var measurements = GovernorMeasure.measureGroup(atoms, ctx);
+        var scoringCtx = ctx.scoringContext || null;
+        var best = candidates[0];
+        var bestEstimate = best.estimate(atoms, measurements, ctx);
+        var bestScore = GovernorScore.scoreCandidate(bestEstimate, scoringCtx);
+
+        for (var i = 1; i < candidates.length; i++) {
+            var est = candidates[i].estimate(atoms, measurements, ctx);
+            var s = GovernorScore.scoreCandidate(est, scoringCtx);
+            if (s > bestScore) {
+                best = candidates[i];
+                bestEstimate = est;
+                bestScore = s;
+            }
+        }
+        // Stash the winning estimate on ctx for the governor's plan artifact
+        ctx._selectedEstimate = bestEstimate;
+        return best;
+    }
+
+    // Heuristic fallback (Phase 2 behavior)
     var best = candidates[0];
     var bestScore = best.score ? best.score(atoms, ctx) : 0;
     for (var i = 1; i < candidates.length; i++) {
@@ -78,6 +123,9 @@ LayoutTemplates.register({
     id: 'cover-standard',
     groupType: 'cover',
     score: function () { return 1; },
+    estimate: function (atoms, measurements, ctx) {
+        return { templateId: 'cover-standard', pages: 1, fillRatios: [0.7], confidence: 0.9 };
+    },
     renderPages: function (container, atoms, ctx) {
         var page = createPage('cover');
         page.classList.add('cover-layout');
@@ -104,6 +152,16 @@ LayoutTemplates.register({
     id: 'rules-single-column',
     groupType: 'rules-manual',
     score: function () { return 1; },
+    estimate: function (atoms, measurements, ctx) {
+        var ph = measurements.pageHeight;
+        var titleOverhead = 60;  // h1 title
+        var heights = [];
+        for (var i = 0; i < measurements.measurements.length; i++) {
+            heights.push(measurements.measurements[i].height);
+        }
+        var fillRatios = GovernorScore.computeFillRatios(heights, ph, titleOverhead);
+        return { templateId: 'rules-single-column', pages: fillRatios.length, fillRatios: fillRatios, confidence: 0.8 };
+    },
     renderPages: function (container, atoms, ctx) {
         var voice = (ctx.data && ctx.data.voice && ctx.data.voice.manual) || {};
         var pageNum = { value: ctx.startPage };
@@ -136,6 +194,22 @@ LayoutTemplates.register({
     id: 'tracker-vertical',
     groupType: 'tracker-sheet',
     score: function () { return 1; },
+    estimate: function (atoms, measurements, ctx) {
+        var ph = measurements.pageHeight;
+        var overhead = 80;  // h1 + section headings
+        var totalH = measurements.totalHeight + overhead;
+        // Codewords and dice stat add ~80px each
+        var mech = (ctx.data && ctx.data.mechanics) || {};
+        if (mech.codewords && mech.codewords.length) totalH += 30 + mech.codewords.length * 45;
+        if (mech.dice && mech.dice.stat && mech.dice.stat.name && mech.dice.stat.name.toLowerCase() !== 'none') totalH += 80;
+        var pages = Math.ceil(totalH / ph) || 1;
+        var fillRatios = [];
+        for (var p = 0; p < pages; p++) {
+            var rem = totalH - (p * ph);
+            fillRatios.push(Math.min(rem / ph, 1.0));
+        }
+        return { templateId: 'tracker-vertical', pages: pages, fillRatios: fillRatios, confidence: 0.7 };
+    },
     renderPages: function (container, atoms, ctx) {
         var voice = (ctx.data && ctx.data.voice) || {};
         var mech = (ctx.data && ctx.data.mechanics) || {};
@@ -281,6 +355,9 @@ LayoutTemplates.register({
     id: 'setup-standard',
     groupType: 'setup',
     score: function () { return 1; },
+    estimate: function (atoms, measurements, ctx) {
+        return { templateId: 'setup-standard', pages: 1, fillRatios: [0.75], confidence: 0.8 };
+    },
     renderPages: function (container, atoms, ctx) {
         var page = createPage('setup');
         page.classList.add('setup-page');
@@ -306,6 +383,50 @@ LayoutTemplates.register({
     score: function (atoms, ctx) {
         // Default template, scores highest for standard encounters
         return 0.8;
+    },
+    estimate: function (atoms, measurements, ctx) {
+        var ph = measurements.pageHeight;
+        // HUD page: template overhead (classification, pips, alerts, trackers) + map + dice
+        var hudOverhead = 180;  // classification + pips + alert space + tracker labels
+        var mapH = 0, diceH = 0;
+        var logAtomHeights = [];
+        var mech = (ctx.data && ctx.data.mechanics) || {};
+
+        for (var i = 0; i < measurements.measurements.length; i++) {
+            var m = measurements.measurements[i];
+            var t = m.atom.type;
+            if (t === 'facility-grid' || t === 'point-to-point' || t === 'linear-track') {
+                mapH = m.height;
+            } else if (t === 'dice-table') {
+                diceH = m.height;
+            } else if (t === 'encounter-scaffold' || t === 'workout-session' ||
+                       t === 'condition-check' || t === 'week-checkin') {
+                logAtomHeights.push(m.height);
+            }
+        }
+        // Mini trackers: ~35px per clock, ~45px per heat/tug track
+        var trackerH = 0;
+        if (mech.clocks) trackerH += mech.clocks.length * 35;
+        if (mech.tracks) {
+            for (var j = 0; j < mech.tracks.length; j++) {
+                if (mech.tracks[j].type === 'heat' || mech.tracks[j].type === 'tug') trackerH += 45;
+            }
+        }
+        var hudFill = Math.min((hudOverhead + mapH + diceH + trackerH) / ph, 1.0);
+
+        // Log pages: bin-pack session atoms
+        var logOverhead = 40;  // classification
+        var logFills = GovernorScore.computeFillRatios(logAtomHeights, ph, logOverhead);
+
+        var fillRatios = [hudFill];
+        for (var k = 0; k < logFills.length; k++) fillRatios.push(logFills[k]);
+
+        return {
+            templateId: 'encounter-classic',
+            pages: 1 + logFills.length,
+            fillRatios: fillRatios,
+            confidence: 0.7
+        };
     },
     renderPages: function (container, atoms, ctx) {
         var data = ctx.data;
@@ -571,6 +692,16 @@ LayoutTemplates.register({
     id: 'ref-codex',
     groupType: 'ref-pages',
     score: function () { return 1; },
+    estimate: function (atoms, measurements, ctx) {
+        var ph = measurements.pageHeight;
+        var overhead = 60;  // classification + zone divider
+        var heights = [];
+        for (var i = 0; i < measurements.measurements.length; i++) {
+            heights.push(measurements.measurements[i].height);
+        }
+        var fillRatios = GovernorScore.computeFillRatios(heights, ph, overhead);
+        return { templateId: 'ref-codex', pages: fillRatios.length, fillRatios: fillRatios, confidence: 0.75 };
+    },
     renderPages: function (container, atoms, ctx) {
         var data = ctx.data;
         var voice = data.voice || {};
@@ -680,6 +811,18 @@ LayoutTemplates.register({
     id: 'archive-classic',
     groupType: 'archive',
     score: function () { return 1; },
+    estimate: function (atoms, measurements, ctx) {
+        var ph = measurements.pageHeight;
+        var overhead = 100;  // trigger label + classification + title + intro
+        var heights = [];
+        for (var i = 0; i < measurements.measurements.length; i++) {
+            if (measurements.measurements[i].atom.type !== 'classification-badge') {
+                heights.push(measurements.measurements[i].height);
+            }
+        }
+        var fillRatios = GovernorScore.computeFillRatios(heights, ph, overhead);
+        return { templateId: 'archive-classic', pages: fillRatios.length, fillRatios: fillRatios, confidence: 0.75 };
+    },
     renderPages: function (container, atoms, ctx) {
         var data = ctx.data;
         var sectionKey = ctx.sectionKey;
@@ -761,6 +904,16 @@ LayoutTemplates.register({
     id: 'endings-standard',
     groupType: 'endings',
     score: function () { return 1; },
+    estimate: function (atoms, measurements, ctx) {
+        var ph = measurements.pageHeight;
+        var overhead = 120;  // classification + title + trigger conditions
+        var heights = [];
+        for (var i = 0; i < measurements.measurements.length; i++) {
+            heights.push(measurements.measurements[i].height);
+        }
+        var fillRatios = GovernorScore.computeFillRatios(heights, ph, overhead);
+        return { templateId: 'endings-standard', pages: fillRatios.length, fillRatios: fillRatios, confidence: 0.75 };
+    },
     renderPages: function (container, atoms, ctx) {
         var voice = (ctx.data && ctx.data.voice) || {};
         var archiveVoice = voice.archive || {};
@@ -834,6 +987,16 @@ LayoutTemplates.register({
     id: 'evidence-standard',
     groupType: 'evidence',
     score: function () { return 1; },
+    estimate: function (atoms, measurements, ctx) {
+        var ph = measurements.pageHeight;
+        var overhead = 100;  // classification + title + intro
+        var heights = [];
+        for (var i = 0; i < measurements.measurements.length; i++) {
+            heights.push(measurements.measurements[i].height);
+        }
+        var fillRatios = GovernorScore.computeFillRatios(heights, ph, overhead);
+        return { templateId: 'evidence-standard', pages: fillRatios.length, fillRatios: fillRatios, confidence: 0.75 };
+    },
     renderPages: function (container, atoms, ctx) {
         var data = ctx.data;
         var voice = data.voice || {};
@@ -912,6 +1075,9 @@ LayoutTemplates.register({
     id: 'final-standard',
     groupType: 'final',
     score: function () { return 1; },
+    estimate: function (atoms, measurements, ctx) {
+        return { templateId: 'final-standard', pages: 1, fillRatios: [0.5], confidence: 0.9 };
+    },
     renderPages: function (container, atoms, ctx) {
         var page = createPage('final');
         page.classList.add('final-page');
@@ -923,6 +1089,456 @@ LayoutTemplates.register({
         }
 
         return 1;
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  ENCOUNTER SPREAD TEMPLATE: INTEGRATED (compact, no HUD page)
+// ══════════════════════════════════════════════════════════════
+//
+// For sparse/standard weeks with ≤2 sessions. Map and dice are
+// inline with session content — no dedicated HUD page. Produces
+// fewer pages at the cost of losing the HUD visual separation.
+
+LayoutTemplates.register({
+    id: 'encounter-integrated',
+    groupType: 'encounter-spread',
+    score: function (atoms, ctx) {
+        // Score high for sparse weeks with few sessions
+        var scaffolds = 0;
+        var weight = 'standard';
+        for (var i = 0; i < atoms.length; i++) {
+            if (atoms[i].type === 'encounter-scaffold') {
+                scaffolds++;
+                var vw = (atoms[i].content && atoms[i].content.visualWeight) || 'standard';
+                if (vw === 'dense' || vw === 'crisis') weight = vw;
+            }
+        }
+        if (weight === 'dense' || weight === 'crisis') return 0.2;  // Not for dense weeks
+        if (scaffolds <= 2) return 0.9;  // Best for compact weeks
+        return 0.4;  // Can handle 3+ but classic is better
+    },
+    estimate: function (atoms, measurements, ctx) {
+        var ph = measurements.pageHeight;
+        var overhead = 60;  // classification + map title
+        var heights = [];
+        for (var i = 0; i < measurements.measurements.length; i++) {
+            heights.push(measurements.measurements[i].height);
+        }
+        var fillRatios = GovernorScore.computeFillRatios(heights, ph, overhead);
+        return {
+            templateId: 'encounter-integrated',
+            pages: fillRatios.length,
+            fillRatios: fillRatios,
+            confidence: 0.7
+        };
+    },
+    renderPages: function (container, atoms, ctx) {
+        var data = ctx.data;
+        var voice = data.voice || {};
+        var mech = data.mechanics || {};
+        var workout = data.workout || {};
+        var week = ctx.week;
+        var pagesCreated = 0;
+        var pageNum = { value: ctx.startPage };
+
+        // Categorize atoms
+        var scaffoldAtoms = [];
+        var workoutAtoms = {};
+        var conditionAtoms = {};
+        var mapAtom = null;
+        var checkinAtom = null;
+        var diceAtom = null;
+
+        atoms.forEach(function (a) {
+            if (a.type === 'encounter-scaffold') scaffoldAtoms.push(a);
+            else if (a.type === 'workout-session') workoutAtoms[a.session] = a;
+            else if (a.type === 'condition-check') {
+                if (!conditionAtoms[a.session]) conditionAtoms[a.session] = [];
+                conditionAtoms[a.session].push(a);
+            }
+            else if (a.type === 'facility-grid' || a.type === 'point-to-point' || a.type === 'linear-track') mapAtom = a;
+            else if (a.type === 'week-checkin') checkinAtom = a;
+            else if (a.type === 'dice-table') diceAtom = a;
+        });
+
+        var weekVisualWeight = 'standard';
+        var weights = { 'sparse': 0, 'standard': 1, 'dense': 2, 'crisis': 3 };
+        scaffoldAtoms.forEach(function (a) {
+            var w = (a.content && a.content.visualWeight) || 'standard';
+            if ((weights[w] || 0) > (weights[weekVisualWeight] || 0)) weekVisualWeight = w;
+        });
+
+        // Single page type: integrated encounter
+        pageNum.value++;
+        pagesCreated++;
+        var page = createPage('encounter-log');
+        page.classList.add('encounter-log', 'encounter-integrated');
+        page.dataset.week = week;
+        page.dataset.visualWeight = weekVisualWeight;
+        container.appendChild(page);
+
+        // Classification
+        var classText = (voice.classifications && voice.classifications.sessionLog) || 'WEEK {{week}}';
+        var cls = document.createElement('div');
+        cls.className = 'classification';
+        cls.textContent = decodeEntities(classText.replace(/\{\{week\}\}/g, week));
+        page.appendChild(cls);
+
+        // Progress pips (compact)
+        var totalWeeks = workout.totalWeeks || 6;
+        if (totalWeeks > 1) {
+            var progressDiv = document.createElement('div');
+            progressDiv.className = 'week-progress';
+            for (var pw = 1; pw <= totalWeeks; pw++) {
+                var pip = document.createElement('span');
+                pip.className = 'week-pip' + (pw <= week ? ' week-pip-filled' : '') + (pw === week ? ' week-pip-current' : '');
+                progressDiv.appendChild(pip);
+            }
+            page.appendChild(progressDiv);
+        }
+
+        // Inline map (smaller, at top)
+        if (mapAtom) {
+            var mapWrap = document.createElement('div');
+            mapWrap.className = 'integrated-map';
+            var mapTitle = document.createElement('div');
+            mapTitle.className = 'hud-map-title';
+            var mapTitleText = (voice.hud && voice.hud.mapTitle) || 'MAP — WEEK {{week}}';
+            mapTitle.textContent = decodeEntities(mapTitleText.replace(/\{\{week\}\}/g, week));
+            mapWrap.appendChild(mapTitle);
+            mapWrap.appendChild(AtomRenderers.render(mapAtom, ctx));
+            page.appendChild(mapWrap);
+        }
+
+        var refScheme = (data.story && data.story.refScheme) || { prefix: 'R', weekDigits: 1, sessionDigits: 1 };
+
+        // Session blocks (scaffold + conditions + workout inline)
+        scaffoldAtoms.forEach(function (scaffAtom) {
+            var day = scaffAtom.session;
+            var sessionDiv = document.createElement('div');
+            sessionDiv.className = 'session-block';
+            if (scaffAtom.content.special === 'boss') sessionDiv.classList.add('session-boss');
+            if (scaffAtom.content.special === 'rest') sessionDiv.classList.add('session-rest');
+            if (scaffAtom.content.special === 'branch') sessionDiv.classList.add('session-branch');
+
+            var scaffEl = AtomRenderers.render(scaffAtom, ctx);
+            while (scaffEl.firstChild) sessionDiv.appendChild(scaffEl.firstChild);
+
+            var conds = conditionAtoms[day] || [];
+            conds.forEach(function (ca) {
+                sessionDiv.appendChild(AtomRenderers.render(ca, ctx));
+            });
+
+            var wkAtom = workoutAtoms[day];
+            if (wkAtom) {
+                var wkEl = AtomRenderers.render(wkAtom, ctx);
+                while (wkEl.firstChild) sessionDiv.appendChild(wkEl.firstChild);
+            }
+
+            var refCode = refScheme.prefix +
+                String(week).padStart(refScheme.weekDigits || 1, '0') +
+                String(day).padStart(refScheme.sessionDigits || 1, '0');
+            var refDiv = document.createElement('div');
+            refDiv.className = 'session-ref';
+            var refLabel = (voice.labels && voice.labels.sessionRef) || 'REF {{ref}}';
+            refDiv.textContent = refLabel.replace(/\{\{ref\}\}/g, refCode);
+            sessionDiv.appendChild(refDiv);
+
+            page.appendChild(sessionDiv);
+        });
+
+        // Inline dice reference (compact, after sessions)
+        if (!diceAtom && mech.dice && mech.dice.outcomes) {
+            diceAtom = { type: 'dice-table', id: 'dice-inline', content: mech.dice };
+        }
+        if (diceAtom) {
+            var diceWrap = document.createElement('div');
+            diceWrap.className = 'integrated-dice';
+            var diceLabel = document.createElement('div');
+            diceLabel.className = 'hud-dice-label';
+            diceLabel.textContent = decodeEntities((voice.hud && voice.hud.diceLabel) || 'DICE');
+            diceWrap.appendChild(diceLabel);
+            diceWrap.appendChild(AtomRenderers.render(diceAtom, ctx));
+            page.appendChild(diceWrap);
+        }
+
+        // Week checkin
+        if (checkinAtom) {
+            page.appendChild(AtomRenderers.render(checkinAtom, ctx));
+        }
+
+        // Overflow: redistribute blocks across pages
+        var pages = [page];
+        var currentPageIndex = 0;
+        while (pages[currentPageIndex].scrollHeight > pages[currentPageIndex].clientHeight) {
+            var currPage = pages[currentPageIndex];
+            var blocks = currPage.querySelectorAll('.session-block, .week-checkin, .integrated-dice');
+            if (blocks.length <= 1) {
+                console.warn('[encounter-integrated] Single block exceeds page height.');
+                break;
+            }
+            var lastBlock = blocks[blocks.length - 1];
+            if (pages.length <= currentPageIndex + 1) {
+                var newPage = createPage('encounter-log');
+                newPage.classList.add('encounter-log', 'encounter-integrated');
+                newPage.dataset.week = week;
+                container.appendChild(newPage);
+                pages.push(newPage);
+                pagesCreated++;
+            }
+            pages[currentPageIndex + 1].insertBefore(lastBlock, pages[currentPageIndex + 1].firstChild);
+            if (currPage.scrollHeight <= currPage.clientHeight) currentPageIndex++;
+        }
+
+        pages.forEach(function (p, idx) {
+            addPageNumber(p, pageNum.value + idx);
+        });
+        return pagesCreated;
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  ENCOUNTER SPREAD TEMPLATE: DOSSIER (dramatic boss layout)
+// ══════════════════════════════════════════════════════════════
+//
+// For boss encounters. Gives the boss rules dramatic presentation
+// with a dedicated page. Scores high when there's a boss encounter.
+
+LayoutTemplates.register({
+    id: 'encounter-dossier',
+    groupType: 'encounter-spread',
+    score: function (atoms, ctx) {
+        // Only score high if there's a boss encounter
+        var hasBoss = false;
+        for (var i = 0; i < atoms.length; i++) {
+            if (atoms[i].type === 'encounter-scaffold' &&
+                atoms[i].content && atoms[i].content.special === 'boss') {
+                hasBoss = true;
+                break;
+            }
+        }
+        return hasBoss ? 0.95 : 0.1;
+    },
+    estimate: function (atoms, measurements, ctx) {
+        var ph = measurements.pageHeight;
+        // Dossier always uses 2+ pages: HUD + boss session(s) dedicated
+        var hudOverhead = 200;
+        var mapH = 0, diceH = 0;
+        var logAtomHeights = [];
+        var mech = (ctx.data && ctx.data.mechanics) || {};
+
+        for (var i = 0; i < measurements.measurements.length; i++) {
+            var m = measurements.measurements[i];
+            var t = m.atom.type;
+            if (t === 'facility-grid' || t === 'point-to-point' || t === 'linear-track') {
+                mapH = m.height;
+            } else if (t === 'dice-table') {
+                diceH = m.height;
+            } else {
+                logAtomHeights.push(m.height);
+            }
+        }
+        var trackerH = 0;
+        if (mech.clocks) trackerH += mech.clocks.length * 35;
+
+        var hudFill = Math.min((hudOverhead + mapH + diceH + trackerH) / ph, 1.0);
+        var logOverhead = 60;
+        var logFills = GovernorScore.computeFillRatios(logAtomHeights, ph, logOverhead);
+        var fillRatios = [hudFill];
+        for (var k = 0; k < logFills.length; k++) fillRatios.push(logFills[k]);
+
+        return {
+            templateId: 'encounter-dossier',
+            pages: 1 + logFills.length,
+            fillRatios: fillRatios,
+            confidence: 0.65
+        };
+    },
+    renderPages: function (container, atoms, ctx) {
+        // Dossier reuses classic rendering but with enhanced boss styling
+        // The visual differentiation comes from CSS classes
+        var data = ctx.data;
+        var voice = data.voice || {};
+        var mech = data.mechanics || {};
+        var workout = data.workout || {};
+        var week = ctx.week;
+        var pagesCreated = 0;
+        var pageNum = ctx.startPage;
+
+        var scaffoldAtoms = [];
+        var workoutAtoms = {};
+        var conditionAtoms = {};
+        var mapAtom = null;
+        var checkinAtom = null;
+
+        atoms.forEach(function (a) {
+            if (a.type === 'encounter-scaffold') scaffoldAtoms.push(a);
+            else if (a.type === 'workout-session') workoutAtoms[a.session] = a;
+            else if (a.type === 'condition-check') {
+                if (!conditionAtoms[a.session]) conditionAtoms[a.session] = [];
+                conditionAtoms[a.session].push(a);
+            }
+            else if (a.type === 'facility-grid' || a.type === 'point-to-point' || a.type === 'linear-track') mapAtom = a;
+            else if (a.type === 'week-checkin') checkinAtom = a;
+        });
+
+        // ── HUD PAGE (same as classic but with dossier class) ──
+        pageNum++;
+        pagesCreated++;
+        var hudPage = createPage('encounter-hud');
+        hudPage.classList.add('encounter-hud', 'encounter-dossier');
+        hudPage.dataset.week = week;
+        hudPage.dataset.visualWeight = 'crisis';  // Always dramatic
+        container.appendChild(hudPage);
+
+        var classText = (voice.classifications && voice.classifications.sessionLog) || 'WEEK {{week}}';
+        var cls = document.createElement('div');
+        cls.className = 'classification';
+        cls.textContent = decodeEntities(classText.replace(/\{\{week\}\}/g, week));
+        hudPage.appendChild(cls);
+
+        var totalWeeks = workout.totalWeeks || 6;
+        if (totalWeeks > 1) {
+            var progressDiv = document.createElement('div');
+            progressDiv.className = 'week-progress';
+            for (var pw = 1; pw <= totalWeeks; pw++) {
+                var pip = document.createElement('span');
+                pip.className = 'week-pip' + (pw <= week ? ' week-pip-filled' : '') + (pw === week ? ' week-pip-current' : '');
+                progressDiv.appendChild(pip);
+            }
+            hudPage.appendChild(progressDiv);
+        }
+
+        // Boss alert (prominent in dossier)
+        if (voice.weekBosses && voice.weekBosses[week]) {
+            var bossAlert = voice.weekBosses[week];
+            if (bossAlert.alert) {
+                var bossAlertDiv = document.createElement('div');
+                bossAlertDiv.className = 'week-alert week-alert-boss dossier-boss-alert';
+                bossAlertDiv.textContent = decodeEntities(bossAlert.alert);
+                hudPage.appendChild(bossAlertDiv);
+            }
+        }
+
+        // Week alert
+        if (voice.weekAlerts && voice.weekAlerts[week]) {
+            var alert = voice.weekAlerts[week];
+            var alertDiv = document.createElement('div');
+            alertDiv.className = 'week-alert week-alert-' + (alert.type || 'note');
+            if (alert.text) alertDiv.textContent = decodeEntities(alert.text);
+            hudPage.appendChild(alertDiv);
+        }
+
+        if (mapAtom) {
+            var mapContainer = document.createElement('div');
+            mapContainer.className = 'hud-map';
+            var mapTitle = document.createElement('div');
+            mapTitle.className = 'hud-map-title';
+            var mapTitleText = (voice.hud && voice.hud.mapTitle) || 'MAP — WEEK {{week}}';
+            mapTitle.textContent = decodeEntities(mapTitleText.replace(/\{\{week\}\}/g, week));
+            mapContainer.appendChild(mapTitle);
+            mapContainer.appendChild(AtomRenderers.render(mapAtom, ctx));
+            hudPage.appendChild(mapContainer);
+        }
+
+        var diceAtom = null;
+        atoms.forEach(function (a) { if (a.type === 'dice-table') diceAtom = a; });
+        if (!diceAtom && mech.dice && mech.dice.outcomes) {
+            diceAtom = { type: 'dice-table', id: 'dice-inline', content: mech.dice };
+        }
+        if (diceAtom) {
+            var diceDiv = document.createElement('div');
+            diceDiv.className = 'hud-dice';
+            var diceLabel = document.createElement('div');
+            diceLabel.className = 'hud-dice-label';
+            diceLabel.textContent = decodeEntities((voice.hud && voice.hud.diceLabel) || 'DICE RESOLUTION');
+            diceDiv.appendChild(diceLabel);
+            diceDiv.appendChild(AtomRenderers.render(diceAtom, ctx));
+            hudPage.appendChild(diceDiv);
+        }
+
+        addPageNumber(hudPage, pageNum);
+
+        // ── LOG PAGE(S) ──
+        pageNum++;
+        pagesCreated++;
+        var logPage = createPage('encounter-log');
+        logPage.classList.add('encounter-log', 'encounter-dossier');
+        logPage.dataset.week = week;
+        logPage.dataset.visualWeight = 'crisis';
+        container.appendChild(logPage);
+
+        var logClassText = (voice.classifications && voice.classifications.operationsLog) || 'OPERATIONS — WEEK {{week}}';
+        var logCls = document.createElement('div');
+        logCls.className = 'classification';
+        logCls.textContent = decodeEntities(logClassText.replace(/\{\{week\}\}/g, week));
+        logPage.appendChild(logCls);
+
+        var refScheme = (data.story && data.story.refScheme) || { prefix: 'R', weekDigits: 1, sessionDigits: 1 };
+
+        scaffoldAtoms.forEach(function (scaffAtom) {
+            var day = scaffAtom.session;
+            var sessionDiv = document.createElement('div');
+            sessionDiv.className = 'session-block';
+            if (scaffAtom.content.special === 'boss') sessionDiv.classList.add('session-boss', 'dossier-boss-session');
+            if (scaffAtom.content.special === 'rest') sessionDiv.classList.add('session-rest');
+            if (scaffAtom.content.special === 'branch') sessionDiv.classList.add('session-branch');
+
+            var scaffEl = AtomRenderers.render(scaffAtom, ctx);
+            while (scaffEl.firstChild) sessionDiv.appendChild(scaffEl.firstChild);
+
+            var conds = conditionAtoms[day] || [];
+            conds.forEach(function (ca) {
+                sessionDiv.appendChild(AtomRenderers.render(ca, ctx));
+            });
+
+            var wkAtom = workoutAtoms[day];
+            if (wkAtom) {
+                var wkEl = AtomRenderers.render(wkAtom, ctx);
+                while (wkEl.firstChild) sessionDiv.appendChild(wkEl.firstChild);
+            }
+
+            var refCode = refScheme.prefix +
+                String(week).padStart(refScheme.weekDigits || 1, '0') +
+                String(day).padStart(refScheme.sessionDigits || 1, '0');
+            var refDiv = document.createElement('div');
+            refDiv.className = 'session-ref';
+            var refLabel = (voice.labels && voice.labels.sessionRef) || 'REF {{ref}}';
+            refDiv.textContent = refLabel.replace(/\{\{ref\}\}/g, refCode);
+            sessionDiv.appendChild(refDiv);
+
+            logPage.appendChild(sessionDiv);
+        });
+
+        if (checkinAtom) {
+            logPage.appendChild(AtomRenderers.render(checkinAtom, ctx));
+        }
+
+        // Overflow handling
+        var logPages = [logPage];
+        var currentPageIndex = 0;
+        while (logPages[currentPageIndex].scrollHeight > logPages[currentPageIndex].clientHeight) {
+            var currPage = logPages[currentPageIndex];
+            var blocks = currPage.querySelectorAll('.session-block, .week-checkin');
+            if (blocks.length <= 1) break;
+            var lastBlock = blocks[blocks.length - 1];
+            if (logPages.length <= currentPageIndex + 1) {
+                var newPage = createPage('encounter-log');
+                newPage.classList.add('encounter-log', 'encounter-dossier');
+                newPage.dataset.week = week;
+                container.appendChild(newPage);
+                logPages.push(newPage);
+                pagesCreated++;
+            }
+            logPages[currentPageIndex + 1].insertBefore(lastBlock, logPages[currentPageIndex + 1].firstChild);
+            if (currPage.scrollHeight <= currPage.clientHeight) currentPageIndex++;
+        }
+
+        logPages.forEach(function (p, idx) {
+            addPageNumber(p, pageNum + idx);
+        });
+        return pagesCreated;
     }
 });
 

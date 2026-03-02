@@ -4,11 +4,16 @@
 // Replaces the pages[]-driven dispatch in box-packer.js with
 // atom-driven composition via the template registry.
 //
-// Phase 2 of the Layout Governor v3.0 architecture.
+// Phase 2-3 of the Layout Governor v3.0 architecture.
+//
+// Phase 2: grouping, template selection, basic composition.
+// Phase 3: measurement-aware selection, scoring, repair, plan metrics.
 //
 // Depends on: content-atomizer.js (atomize), atom-renderers.js
 //             (AtomRenderers), layout-templates.js (LayoutTemplates),
 //             render-utils.js (createPage, addPageNumber),
+//             governor-measure.js (GovernorMeasure) [optional],
+//             governor-score.js (GovernorScore) [optional],
 //             box-packer.js (crossReferenceArchivePages, padToMultipleOf4)
 //
 // Exposed: window.LayoutGovernor
@@ -25,7 +30,11 @@ var LayoutGovernor = {};
 function buildGovernorContext(data) {
     return {
         data: data,
-        startPage: 0
+        startPage: 0,
+        week: null,
+        sectionKey: null,
+        scoringContext: null,    // Populated during compose for scoring
+        _selectedEstimate: null  // Set by LayoutTemplates.select when scoring
     };
 }
 
@@ -203,37 +212,193 @@ function groupByAffinity(inventory, data) {
 
 /**
  * Create the layout plan artifact for debugging/inspection.
+ * Phase 3: includes fill ratios, scoring data, and repair log.
  */
 function createLayoutPlan() {
     return {
         pages: [],
+        groups: [],
         metrics: {
             totalPages: 0,
             overflowCount: 0,
             templateUsage: {},
-            groupCount: 0
+            groupCount: 0,
+            // Phase 3 metrics
+            measurementCacheHits: 0,
+            avgFillRatio: 0,
+            minFillRatio: 1.0,
+            maxFillRatio: 0,
+            templateDiversity: 0,
+            repairCount: 0,
+            scoringEnabled: false
         },
         repairLog: []
     };
 }
 
-function recordPageInPlan(plan, pageIndex, templateId, groupType, atomCount) {
-    plan.pages.push({
-        index: pageIndex,
+/**
+ * Record a group's rendering result in the layout plan.
+ */
+function recordGroupInPlan(plan, groupIndex, templateId, groupType, atomCount, pagesCreated, estimate) {
+    var entry = {
+        index: groupIndex,
         template: templateId,
         groupType: groupType,
-        atomCount: atomCount
-    });
+        atomCount: atomCount,
+        pagesCreated: pagesCreated
+    };
+
+    // Phase 3: include estimate data if available
+    if (estimate) {
+        entry.estimatedPages = estimate.pages;
+        entry.estimatedFillRatios = estimate.fillRatios;
+        entry.confidence = estimate.confidence;
+        entry.pagesMatch = (estimate.pages === pagesCreated);
+    }
+
+    plan.groups.push(entry);
+
     if (!plan.metrics.templateUsage[templateId]) {
         plan.metrics.templateUsage[templateId] = 0;
     }
     plan.metrics.templateUsage[templateId]++;
 }
 
+/**
+ * Record per-page data in the plan (for post-render fill ratio calculation).
+ */
+function recordPageInPlan(plan, pageIndex, templateId, groupType, fillRatio) {
+    plan.pages.push({
+        index: pageIndex,
+        template: templateId,
+        groupType: groupType,
+        fillRatio: fillRatio || null
+    });
+
+    if (fillRatio !== null && fillRatio !== undefined) {
+        if (fillRatio < plan.metrics.minFillRatio) plan.metrics.minFillRatio = fillRatio;
+        if (fillRatio > plan.metrics.maxFillRatio) plan.metrics.maxFillRatio = fillRatio;
+    }
+}
+
+/**
+ * Finalize plan metrics after all groups are composed.
+ */
+function finalizePlanMetrics(plan) {
+    var uniqueTemplates = Object.keys(plan.metrics.templateUsage);
+    plan.metrics.templateDiversity = uniqueTemplates.length;
+
+    // Compute average fill ratio from estimated data
+    var fillSum = 0;
+    var fillCount = 0;
+    for (var i = 0; i < plan.pages.length; i++) {
+        if (plan.pages[i].fillRatio !== null) {
+            fillSum += plan.pages[i].fillRatio;
+            fillCount++;
+        }
+    }
+    plan.metrics.avgFillRatio = fillCount > 0 ? (fillSum / fillCount) : 0;
+
+    // Run the global scorer if available
+    if (typeof GovernorScore !== 'undefined' && GovernorScore.evaluate) {
+        var pageEstimates = [];
+        for (var j = 0; j < plan.pages.length; j++) {
+            pageEstimates.push({
+                templateId: plan.pages[j].template,
+                fillRatio: plan.pages[j].fillRatio || 0.5,
+                atomCount: 1,
+                groupType: plan.pages[j].groupType
+            });
+        }
+        var globalScore = GovernorScore.evaluate(pageEstimates);
+        plan.metrics.globalScore = globalScore.score;
+        plan.metrics.scoreBreakdown = globalScore.breakdown;
+    }
+}
+
+// ── Repair: Deterministic Template Swap ──────────────────────
+
+/**
+ * Attempt to repair an overflow by selecting a different template.
+ * Returns the alternative template, or null if no repair possible.
+ *
+ * Repair ordering (from plan spec):
+ * 1. Template swap within same group type (try next-best scored)
+ * 2. (Future phases: variant switch, break relaxation, atom push)
+ * 3. Give up — use the original template and let overflow handling work
+ *
+ * @param {string} groupType
+ * @param {Object} failedTemplate
+ * @param {Atom[]} atoms
+ * @param {Object} ctx
+ * @param {Object} plan
+ * @returns {Object|null} alternative template
+ */
+function attemptRepair(groupType, failedTemplate, atoms, ctx, plan) {
+    var candidates = LayoutTemplates._registry[groupType] || [];
+    if (candidates.length <= 1) return null;
+
+    // Try each candidate except the failed one
+    var hasMeasure = typeof GovernorMeasure !== 'undefined' && GovernorMeasure.getPageHeight;
+    var hasScore = typeof GovernorScore !== 'undefined' && GovernorScore.scoreCandidate;
+
+    for (var i = 0; i < candidates.length; i++) {
+        if (candidates[i].id === failedTemplate.id) continue;
+
+        // If we have scoring, check that the alternative estimates no overflow
+        if (hasMeasure && hasScore && candidates[i].estimate) {
+            var measurements = GovernorMeasure.measureGroup(atoms, ctx);
+            var est = candidates[i].estimate(atoms, measurements, ctx);
+            var maxFill = 0;
+            for (var j = 0; j < est.fillRatios.length; j++) {
+                if (est.fillRatios[j] > maxFill) maxFill = est.fillRatios[j];
+            }
+            // Only accept if no estimated overflow
+            if (maxFill <= 1.0) {
+                plan.repairLog.push({
+                    type: 'template-swap',
+                    groupType: groupType,
+                    from: failedTemplate.id,
+                    to: candidates[i].id,
+                    reason: 'overflow detected, alternative scores better',
+                    estimatedMaxFill: maxFill
+                });
+                plan.metrics.repairCount++;
+                return candidates[i];
+            }
+        } else {
+            // No scoring — just try the alternative
+            plan.repairLog.push({
+                type: 'template-swap',
+                groupType: groupType,
+                from: failedTemplate.id,
+                to: candidates[i].id,
+                reason: 'overflow detected, trying alternative (no scoring)'
+            });
+            plan.metrics.repairCount++;
+            return candidates[i];
+        }
+    }
+
+    return null;
+}
+
 // ── Main Compose Function ────────────────────────────────────
 
 /**
  * Compose an atom inventory into a rendered booklet.
+ *
+ * Phase 3 flow:
+ * 1. Initialize measurement harness (if available)
+ * 2. Group atoms by affinity
+ * 3. For each group:
+ *    a. Build scoring context from previous groups
+ *    b. Select template (measurement-aware if possible)
+ *    c. Render pages via template
+ *    d. Verify actual vs estimated page count
+ *    e. If mismatch: log repair opportunity
+ * 4. Finalize plan metrics
+ * 5. Clean up measurement harness
  *
  * @param {AtomInventory} inventory  From atomize() or window._atomInventory
  * @param {HTMLElement} container    The #zine-container element
@@ -246,7 +411,19 @@ LayoutGovernor.compose = function (inventory, container, data) {
     var plan = createLayoutPlan();
     plan.metrics.groupCount = pageGroups.length;
 
+    // Phase 3: Initialize measurement harness
+    var hasMeasure = typeof GovernorMeasure !== 'undefined' && GovernorMeasure.init;
+    if (hasMeasure) {
+        GovernorMeasure.init();
+        plan.metrics.scoringEnabled = true;
+    }
+
     var totalPages = 0;
+
+    // Scoring context: tracks previous template IDs and fill ratios
+    // for diversity and pacing scoring
+    var prevTemplateIds = [];
+    var prevFillRatios = [];
 
     for (var i = 0; i < pageGroups.length; i++) {
         var group = pageGroups[i];
@@ -255,33 +432,102 @@ LayoutGovernor.compose = function (inventory, container, data) {
         ctx.startPage = totalPages;
         ctx.week = group.meta.week || null;
         ctx.sectionKey = group.meta.sectionKey || null;
+        ctx._selectedEstimate = null;
 
-        // Select template
+        // Phase 3: Build scoring context
+        ctx.scoringContext = {
+            prevTemplateIds: prevTemplateIds.slice(-4),
+            prevFillRatios: prevFillRatios.slice(-4)
+        };
+
+        // Select template (measurement-aware when possible)
         var template = LayoutTemplates.select(group.groupType, group.atoms, ctx);
         if (!template) {
             console.warn('[layout-governor] No template for group:', group.groupType);
             continue;
         }
 
+        var estimate = ctx._selectedEstimate || null;
+
         // Render pages via template
         var pagesCreated = 0;
         try {
             pagesCreated = template.renderPages(container, group.atoms, ctx);
         } catch (err) {
-            console.error('[layout-governor] Template crashed:', template.id, 'group:', group.groupType, 'error:', err);
-            var errPage = document.createElement('div');
-            errPage.className = 'zine-page';
-            errPage.innerHTML = '<h2 style="color:red">GOVERNOR ERROR</h2><p>Template "' +
-                escapeHtml(template.id) + '" failed for ' + escapeHtml(group.groupType) + '</p>';
-            container.appendChild(errPage);
-            pagesCreated = 1;
+            console.error('[layout-governor] Template crashed:', template.id,
+                'group:', group.groupType, 'error:', err);
+
+            // Repair: try alternative template
+            var altTemplate = attemptRepair(group.groupType, template, group.atoms, ctx, plan);
+            if (altTemplate) {
+                try {
+                    pagesCreated = altTemplate.renderPages(container, group.atoms, ctx);
+                    template = altTemplate;
+                    estimate = ctx._selectedEstimate || null;
+                } catch (err2) {
+                    console.error('[layout-governor] Repair also failed:', altTemplate.id, err2);
+                    var errPage = document.createElement('div');
+                    errPage.className = 'zine-page';
+                    errPage.innerHTML = '<h2 style="color:red">GOVERNOR ERROR</h2><p>Template "' +
+                        escapeHtml(template.id) + '" failed for ' + escapeHtml(group.groupType) + '</p>';
+                    container.appendChild(errPage);
+                    pagesCreated = 1;
+                }
+            } else {
+                var errPage = document.createElement('div');
+                errPage.className = 'zine-page';
+                errPage.innerHTML = '<h2 style="color:red">GOVERNOR ERROR</h2><p>Template "' +
+                    escapeHtml(template.id) + '" failed for ' + escapeHtml(group.groupType) + '</p>';
+                container.appendChild(errPage);
+                pagesCreated = 1;
+            }
         }
 
-        recordPageInPlan(plan, totalPages, template.id, group.groupType, group.atoms.length);
+        // Phase 3: Verify actual vs estimated and record estimate mismatch
+        if (estimate && estimate.pages !== pagesCreated) {
+            plan.repairLog.push({
+                type: 'estimate-mismatch',
+                groupType: group.groupType,
+                template: template.id,
+                estimated: estimate.pages,
+                actual: pagesCreated,
+                confidence: estimate.confidence
+            });
+        }
+
+        // Record in plan
+        recordGroupInPlan(plan, i, template.id, group.groupType, group.atoms.length, pagesCreated, estimate);
+
+        // Record per-page entries with fill ratios from estimate
+        for (var p = 0; p < pagesCreated; p++) {
+            var fillRatio = null;
+            if (estimate && estimate.fillRatios && p < estimate.fillRatios.length) {
+                fillRatio = estimate.fillRatios[p];
+            }
+            recordPageInPlan(plan, totalPages + p, template.id, group.groupType, fillRatio);
+        }
+
+        // Update scoring context
+        prevTemplateIds.push(template.id);
+        if (estimate && estimate.fillRatios) {
+            for (var fr = 0; fr < estimate.fillRatios.length; fr++) {
+                prevFillRatios.push(estimate.fillRatios[fr]);
+            }
+        }
+
         totalPages += pagesCreated;
     }
 
     plan.metrics.totalPages = totalPages;
+
+    // Phase 3: Finalize metrics (global score, fill ratio stats)
+    finalizePlanMetrics(plan);
+
+    // Phase 3: Record measurement cache stats
+    if (hasMeasure) {
+        plan.metrics.measurementCacheHits = GovernorMeasure.cacheSize();
+        GovernorMeasure.destroy();
+    }
 
     // Store layout plan as global artifact
     window._layoutPlan = plan;
