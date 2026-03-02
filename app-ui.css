@@ -1,0 +1,644 @@
+:root {
+    --bg: #1c1c1e;
+    --surface: #2c2c2e;
+    --surface2: #3a3a3c;
+    --text: #e5e5ea;
+    --text2: #aeaeb2;
+    --accent: #ff3b30;
+    --green: #30d158;
+    --orange: #ff9f0a;
+    --blue: #0a84ff;
+    --font: 'JetBrains Mono', monospace;
+    --radius: 12px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px 24px 100px;
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+h1 {
+    font-size: 18px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.subtitle {
+    font-size: 11px;
+    color: var(--text2);
+    margin-bottom: 20px;
+}
+
+/* ── Progress Rail ── */
+.progress-rail {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 24px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-radius: var(--radius);
+}
+
+.rail-dot {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--surface2);
+    color: var(--text2);
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.rail-dot.done {
+    background: var(--green);
+    color: #000;
+}
+
+.rail-dot.active {
+    background: var(--accent);
+    color: #fff;
+}
+
+.rail-dot.locked {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.rail-dot .rail-label {
+    position: absolute;
+    top: 36px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 8px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--text2);
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.rail-line {
+    flex: 1;
+    height: 2px;
+    background: var(--surface2);
+    transition: background 0.2s;
+}
+
+.rail-line.done {
+    background: var(--green);
+}
+
+/* ── Accordion Cards ── */
+.stage-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    border: 1px solid transparent;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    overflow: hidden;
+}
+
+.stage-card.active {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 1px var(--blue);
+}
+
+.stage-card.valid {
+    border-color: var(--green);
+}
+
+.stage-card.invalid {
+    border-color: var(--accent);
+}
+
+.stage-card.locked {
+    display: none;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.card-header:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.card-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.card-number {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    background: var(--surface2);
+    color: var(--text2);
+    flex-shrink: 0;
+}
+
+.stage-card.valid .card-number {
+    background: var(--green);
+    color: #000;
+}
+
+.stage-card.active .card-number {
+    background: var(--accent);
+    color: #fff;
+}
+
+.card-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.card-summary {
+    font-size: 10px;
+    color: var(--text2);
+    margin-left: 34px;
+}
+
+.card-status {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: var(--surface2);
+    color: var(--text2);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.card-status.ok {
+    background: rgba(48, 209, 88, .15);
+    color: var(--green);
+}
+
+.card-status.err {
+    background: rgba(255, 59, 48, .15);
+    color: var(--accent);
+}
+
+.card-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+}
+
+.card-body.open {
+    max-height: 5000px;
+    transition: max-height 0.5s ease-in;
+}
+
+.card-body-inner {
+    padding: 0 16px 16px;
+}
+
+/* ── Intake form (Stage 0) ── */
+.form-group {
+    margin-bottom: 14px;
+}
+
+.form-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text2);
+    margin-bottom: 6px;
+}
+
+.form-hint {
+    font-size: 10px;
+    color: var(--text2);
+    margin-bottom: 6px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+input[type="text"],
+input[type="number"],
+select,
+textarea {
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--surface2);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-family: var(--font);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--blue);
+}
+
+textarea {
+    resize: vertical;
+}
+
+textarea.tall {
+    height: 120px;
+}
+
+textarea.short {
+    height: 60px;
+}
+
+/* ── Dice Selector ── */
+.dice-selector {
+    background: var(--bg);
+    border: 1px solid var(--surface2);
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+
+.dice-group-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text2);
+    margin-bottom: 6px;
+    margin-top: 8px;
+}
+
+.dice-group-label:first-child {
+    margin-top: 0;
+}
+
+.dice-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.dice-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border: 1px solid var(--surface2);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+}
+
+.dice-chip input[type="checkbox"] {
+    display: none;
+}
+
+.dice-chip:hover {
+    border-color: var(--blue);
+    color: var(--text);
+}
+
+.dice-chip.selected {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+}
+
+/* ── Cover Image Drop Zone ── */
+.cover-dropzone {
+    background: var(--bg);
+    border: 2px dashed var(--surface2);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    position: relative;
+}
+.cover-dropzone:hover,
+.cover-dropzone.drag-over {
+    border-color: var(--blue);
+    background: rgba(10, 132, 255, 0.04);
+}
+.cover-dropzone-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: var(--text2);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    padding: 8px 0;
+}
+.cover-dropzone-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+.cover-dropzone-preview img {
+    max-height: 120px;
+    max-width: 100%;
+    border-radius: 4px;
+    object-fit: contain;
+}
+.cover-remove-btn {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--surface2);
+    background: var(--surface);
+    color: var(--text2);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+.cover-remove-btn:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+/* ── Cover Image Prompt Box ── */
+.cover-prompt-box {
+    background: var(--surface);
+    border: 1px solid var(--surface2);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 8px;
+}
+.cover-prompt-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+.cover-prompt-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text2);
+}
+
+.btn-randomize {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border: 1px solid var(--surface2);
+    border-radius: 6px;
+    background: transparent;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: inherit;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-randomize:hover {
+    border-color: var(--accent, var(--blue));
+    color: var(--accent, var(--blue));
+}
+
+.btn-randomize:active {
+    transform: scale(0.96);
+}
+
+/* ── Outbound / Inbound sections ── */
+.section-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text2);
+    margin-bottom: 8px;
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.section-label::before {
+    content: '';
+    display: block;
+    width: 8px;
+    height: 2px;
+    background: var(--text2);
+}
+
+.outbound-box {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.outbound-box textarea {
+    height: 200px;
+    font-size: 10px;
+    margin-top: 8px;
+    background: var(--surface2);
+}
+
+.outbound-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.outbound-instructions {
+    font-size: 10px;
+    color: var(--text2);
+    margin-top: 12px;
+    line-height: 1.4;
+}
+
+.inbound-box {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.inbound-box textarea {
+    height: 100px;
+    font-size: 10px;
+    margin-bottom: 8px;
+    background: var(--surface2);
+}
+
+.inbound-status {
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    display: none;
+    margin-top: 8px;
+}
+
+.inbound-status.ok {
+    display: block;
+    background: rgba(48, 209, 88, .1);
+    color: var(--green);
+}
+
+.inbound-status.err {
+    display: block;
+    background: rgba(255, 59, 48, .1);
+    color: var(--accent);
+}
+
+/* ── Buttons ── */
+button {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 9px;
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+}
+
+button:hover {
+    opacity: 0.85;
+}
+
+button:active {
+    transform: scale(0.97);
+}
+
+button:disabled {
+    opacity: 0.3;
+    cursor: default;
+    transform: none;
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: #fff;
+}
+
+.btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+}
+
+.btn-green {
+    background: var(--green);
+    color: #000;
+}
+
+.btn-blue {
+    background: var(--blue);
+    color: #fff;
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 11px;
+}
+
+.continue-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 14px;
+    padding: 10px 18px;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 9px;
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.continue-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+/* ── Footer bar ── */
+.footer-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--surface2);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    z-index: 100;
+}
+
+.footer-status {
+    font-size: 11px;
+    color: var(--text2);
+    font-weight: 700;
+    margin-right: auto;
+}
+
+#zine-container-wrapper {
+    margin-top: 24px;
+    display: none;
+    background: #333;
+    padding: 2rem;
+    border-radius: var(--radius);
+}
