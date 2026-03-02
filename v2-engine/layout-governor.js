@@ -196,7 +196,79 @@ function groupByAffinity(inventory, data) {
         }
     }
 
-    // ── 9. Final ──
+    // ── 9. Structural Atoms (quote-page, pacing-breath) ──
+    // Collect structural groups and resolve placement hints.
+    var structuralInserts = [];
+    for (var gk in groups) {
+        var grp = groups[gk];
+        if (!grp || !grp.id || grp.id.indexOf('group.structural.') !== 0) continue;
+        if (!grp.atomIds || grp.atomIds.length === 0) continue;
+        var structAtom = atoms[grp.atomIds[0]];
+        if (!structAtom) continue;
+        var placement = structAtom._placement || {};
+        var afterHint = placement.after || null;
+
+        // Resolve placement: find index in pageGroups to insert after
+        var insertIdx = -1;
+        if (afterHint) {
+            // "week-N" → insert after that week's ref-pages group
+            var weekMatch = afterHint.match(/^week-(\d+)$/);
+            if (weekMatch) {
+                var targetWeek = parseInt(weekMatch[1], 10);
+                for (var pi = pageGroups.length - 1; pi >= 0; pi--) {
+                    if (pageGroups[pi].meta && pageGroups[pi].meta.week === targetWeek &&
+                        (pageGroups[pi].groupType === 'ref-pages' || pageGroups[pi].groupType === 'encounter-spread')) {
+                        insertIdx = pi + 1;
+                        break;
+                    }
+                }
+            }
+            // "archives" → insert after last archive group
+            if (afterHint === 'archives') {
+                for (var ai = pageGroups.length - 1; ai >= 0; ai--) {
+                    if (pageGroups[ai].groupType === 'archive') { insertIdx = ai + 1; break; }
+                }
+            }
+            // "setup" → insert after setup group
+            if (afterHint === 'setup') {
+                for (var si = 0; si < pageGroups.length; si++) {
+                    if (pageGroups[si].groupType === 'setup') { insertIdx = si + 1; break; }
+                }
+            }
+        }
+
+        structuralInserts.push({
+            idx: insertIdx,
+            group: {
+                groupType: grp.groupType,
+                atoms: [structAtom],
+                meta: { structural: true }
+            }
+        });
+    }
+
+    // Sort by index descending to avoid shift issues during splice
+    structuralInserts.sort(function (a, b) { return b.idx - a.idx; });
+    for (var ins = 0; ins < structuralInserts.length; ins++) {
+        var si2 = structuralInserts[ins];
+        if (si2.idx >= 0 && si2.idx <= pageGroups.length) {
+            pageGroups.splice(si2.idx, 0, si2.group);
+        } else {
+            // No hint or unresolved → insert before endings (last content position)
+            // Find endings index or just push before final
+            var endingsIdx = -1;
+            for (var ei = 0; ei < pageGroups.length; ei++) {
+                if (pageGroups[ei].groupType === 'endings') { endingsIdx = ei; break; }
+            }
+            if (endingsIdx >= 0) {
+                pageGroups.splice(endingsIdx, 0, si2.group);
+            } else {
+                pageGroups.push(si2.group);
+            }
+        }
+    }
+
+    // ── 10. Final ──
     if (atoms['final']) {
         pageGroups.push({
             groupType: 'final',

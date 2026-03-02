@@ -1107,14 +1107,17 @@ LayoutTemplates.register({
         // Score high for sparse weeks with few sessions
         var scaffolds = 0;
         var weight = 'standard';
+        var hasBreather = false;
         for (var i = 0; i < atoms.length; i++) {
             if (atoms[i].type === 'encounter-scaffold') {
                 scaffolds++;
                 var vw = (atoms[i].content && atoms[i].content.visualWeight) || 'standard';
                 if (vw === 'dense' || vw === 'crisis') weight = vw;
+                if (atoms[i].content && atoms[i].content.pacingHint === 'breather') hasBreather = true;
             }
         }
         if (weight === 'dense' || weight === 'crisis') return 0.2;  // Not for dense weeks
+        if (hasBreather && scaffolds <= 2) return 0.95;  // Ideal for breather pacing
         if (scaffolds <= 2) return 0.9;  // Best for compact weeks
         return 0.4;  // Can handle 3+ but classic is better
     },
@@ -1309,16 +1312,18 @@ LayoutTemplates.register({
     id: 'encounter-dossier',
     groupType: 'encounter-spread',
     score: function (atoms, ctx) {
-        // Only score high if there's a boss encounter
+        // Only score high if there's a boss encounter or crescendo pacing
         var hasBoss = false;
+        var hasCrescendo = false;
         for (var i = 0; i < atoms.length; i++) {
-            if (atoms[i].type === 'encounter-scaffold' &&
-                atoms[i].content && atoms[i].content.special === 'boss') {
-                hasBoss = true;
-                break;
+            if (atoms[i].type === 'encounter-scaffold' && atoms[i].content) {
+                if (atoms[i].content.special === 'boss') hasBoss = true;
+                if (atoms[i].content.pacingHint === 'crescendo') hasCrescendo = true;
             }
         }
-        return hasBoss ? 0.95 : 0.1;
+        if (hasBoss) return 0.95;
+        if (hasCrescendo) return 0.85;  // Dramatic treatment for crescendo pacing
+        return 0.1;
     },
     estimate: function (atoms, measurements, ctx) {
         var ph = measurements.pageHeight;
@@ -1655,15 +1660,18 @@ LayoutTemplates.register({
         // Prefer for dense/crisis weeks with 3+ sessions
         var sessionCount = 0;
         var maxWeight = 0;
+        var hasCrescendo = false;
         var weights = { 'sparse': 0, 'standard': 1, 'dense': 2, 'crisis': 3 };
         atoms.forEach(function (a) {
             if (a.type === 'encounter-scaffold') {
                 sessionCount++;
                 var w = (a.content && a.content.visualWeight) || 'standard';
                 if ((weights[w] || 0) > maxWeight) maxWeight = weights[w] || 0;
+                if (a.content && a.content.pacingHint === 'crescendo') hasCrescendo = true;
             }
         });
         if (sessionCount >= 3 && maxWeight >= 2) return 0.92;  // dense/crisis + many sessions
+        if (hasCrescendo && sessionCount >= 3) return 0.88;  // crescendo + many sessions
         if (sessionCount >= 3) return 0.75;  // many sessions, standard weight
         return 0.3;  // not enough content to justify 2 columns
     },
@@ -2411,6 +2419,58 @@ LayoutTemplates.register({
 
         addPageNumber(page, pageNum.value);
         return pagesCreated;
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  QUOTE PAGE TEMPLATE
+// ══════════════════════════════════════════════════════════════
+
+LayoutTemplates.register({
+    id: 'quote-page-standard',
+    groupType: 'quote-page',
+    score: function () { return 1; },
+    estimate: function (atoms, measurements, ctx) {
+        return { templateId: 'quote-page-standard', pages: 1, fillRatios: [0.4], confidence: 0.9 };
+    },
+    renderPages: function (container, atoms, ctx) {
+        var page = createPage('quote-page');
+        page.classList.add('structural-quote-layout');
+        container.appendChild(page);
+
+        if (atoms[0]) {
+            var el = AtomRenderers.render(atoms[0], ctx);
+            page.appendChild(el);
+        }
+
+        addPageNumber(page, ctx.startPage);
+        return 1;
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  PACING BREATH TEMPLATE
+// ══════════════════════════════════════════════════════════════
+
+LayoutTemplates.register({
+    id: 'pacing-breath-standard',
+    groupType: 'pacing-breath',
+    score: function () { return 1; },
+    estimate: function (atoms, measurements, ctx) {
+        return { templateId: 'pacing-breath-standard', pages: 1, fillRatios: [0.15], confidence: 0.9 };
+    },
+    renderPages: function (container, atoms, ctx) {
+        var page = createPage('pacing-breath');
+        page.classList.add('structural-breath-layout');
+        container.appendChild(page);
+
+        if (atoms[0]) {
+            var el = AtomRenderers.render(atoms[0], ctx);
+            page.appendChild(el);
+        }
+
+        addPageNumber(page, ctx.startPage);
+        return 1;
     }
 });
 

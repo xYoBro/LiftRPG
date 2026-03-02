@@ -2572,3 +2572,106 @@ th {
 .ref-gazette-columns .ref-outcome {
     break-inside: avoid;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   STRUCTURAL ATOMS (Layout Governor Phase 3 — LLM Prompt Redesign)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Quote Page ────────────────────────────────────────────── */
+
+.structural-quote-layout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.structural-quote-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 0.5in;
+    box-sizing: border-box;
+}
+
+.quote-page-text {
+    font-family: var(--heading-font, Georgia, serif);
+    font-size: 1.4rem;
+    line-height: 1.5;
+    text-align: center;
+    margin: 0;
+    padding: 0;
+    border: none;
+    max-width: 4in;
+    color: var(--ink);
+}
+
+.structural-quote-offset .quote-page-text {
+    text-align: left;
+    border-left: 3px solid var(--accent, #333);
+    padding-left: 0.3in;
+}
+
+.structural-quote-full-bleed .quote-page-text {
+    font-size: 2rem;
+    max-width: none;
+    line-height: 1.3;
+}
+
+.quote-page-attribution {
+    font-family: var(--body-font, 'Courier New', monospace);
+    font-size: 0.7rem;
+    font-variant: small-caps;
+    letter-spacing: 0.05em;
+    color: var(--muted, #666);
+    margin-top: 0.3in;
+    text-align: center;
+}
+
+.structural-quote-offset .quote-page-attribution {
+    text-align: left;
+    padding-left: 0.3in;
+}
+
+/* ── Pacing Breath ─────────────────────────────────────────── */
+
+.structural-breath-layout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.structural-pacing-breath {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.breath-flavor {
+    font-style: italic;
+    font-size: 0.8rem;
+    color: var(--muted, #666);
+    text-align: center;
+    max-width: 3.5in;
+}
+
+.breath-divider {
+    max-height: 0.5in;
+    margin: 0.3in auto;
+    text-align: center;
+}
+
+.breath-divider svg {
+    max-height: 0.5in;
+    max-width: 3in;
+}
+
+.structural-breath-texture {
+    background-color: var(--fog, #f0f0f0);
+    opacity: 0.15;
+}

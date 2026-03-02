@@ -308,7 +308,8 @@ function atomize(finalPayload) {
                     visualWeight: enc.visualWeight || 'standard',
                     bossRules: enc.bossRules || null,
                     options: enc.options || null,
-                    marginalia: enc.marginalia || null
+                    marginalia: enc.marginalia || null,
+                    pacingHint: enc.pacingHint || null
                 },
                 week: w, session: day,
                 breakPolicy: {
@@ -638,6 +639,36 @@ function atomize(finalPayload) {
         breakPolicy: { keepTogetherStrength: 100, keepWithNextStrength: 0, mustNotSplit: true },
         sizeHint: 'standard', priority: 1
     });
+
+    // ── 8. Structural Atoms (quote-page, pacing-breath) ────────
+
+    var structuralAtoms = data.structuralAtoms || [];
+    for (var sai = 0; sai < structuralAtoms.length; sai++) {
+        var sa = structuralAtoms[sai];
+        var saType = sa.type;
+        var saPlacement = sa.placement || {};
+        var saId = 'structural.' + saType + '.' + sai;
+
+        add({
+            id: saId,
+            type: saType,
+            content: sa.content || {},
+            week: null, session: null,
+            breakPolicy: { keepTogetherStrength: 100, keepWithNextStrength: 0, mustNotSplit: true },
+            sizeHint: saType === 'quote-page' ? 'generous' : 'minimal',
+            priority: typeof saPlacement.priority === 'number' ? saPlacement.priority : 0.5
+        });
+
+        // Store placement hint for governor's groupByAffinity
+        atoms[saId]._placement = saPlacement;
+
+        // Group: one group per structural atom
+        groups['group.structural.' + sai] = {
+            id: 'group.structural.' + sai,
+            groupType: saType,
+            atomIds: [saId]
+        };
+    }
 
     // ── Return ──────────────────────────────────────────────
 

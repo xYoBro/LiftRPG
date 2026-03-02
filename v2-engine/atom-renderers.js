@@ -831,6 +831,64 @@ AtomRenderers['back-cover'] = function (atom, ctx) {
     return div;
 };
 
+// ── Structural Atoms ─────────────────────────────────────────
+
+/**
+ * Quote page — full-page blockquote with optional attribution.
+ * Style variants: centered (default), offset, full-bleed.
+ */
+AtomRenderers['quote-page'] = function (atom, ctx) {
+    var c = atom.content || {};
+    var style = c.style || 'centered';
+    var div = document.createElement('div');
+    div.className = 'structural-quote-page structural-quote-' + style;
+
+    var bq = document.createElement('blockquote');
+    bq.className = 'quote-page-text';
+    bq.textContent = decodeEntities(c.text || '');
+    div.appendChild(bq);
+
+    if (c.attribution) {
+        var attr = document.createElement('div');
+        attr.className = 'quote-page-attribution';
+        attr.textContent = decodeEntities(c.attribution);
+        div.appendChild(attr);
+    }
+
+    return div;
+};
+
+/**
+ * Pacing breath — intentional whitespace with optional flavor.
+ * Visual variants: blank (default), divider, texture.
+ */
+AtomRenderers['pacing-breath'] = function (atom, ctx) {
+    var c = atom.content || {};
+    var visual = c.visual || 'blank';
+    var div = document.createElement('div');
+    div.className = 'structural-pacing-breath structural-breath-' + visual;
+
+    if (c.flavor) {
+        var flavor = document.createElement('div');
+        flavor.className = 'breath-flavor';
+        flavor.textContent = decodeEntities(c.flavor);
+        div.appendChild(flavor);
+    }
+
+    if (visual === 'divider') {
+        var theme = window._zineTheme || {};
+        var svgStr = (theme.art && theme.art.dividerSvg) || '';
+        if (svgStr) {
+            var divider = document.createElement('div');
+            divider.className = 'breath-divider';
+            divider.innerHTML = sanitizeSvg(svgStr);
+            div.appendChild(divider);
+        }
+    }
+
+    return div;
+};
+
 // ── Map Atoms ────────────────────────────────────────────────
 
 /**
