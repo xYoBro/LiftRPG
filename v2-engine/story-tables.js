@@ -454,7 +454,24 @@ voice: [
 "The naive or innocent narrator \u2014 horror in the gap between their account and reality",
 "Non-human or posthuman POV \u2014 AI, animal, alien, a different relationship to consciousness",
 "Fragmented / non-linear \u2014 time out of order, the reader assembles the sequence",
-"The metafictional narrator \u2014 knows they are in a story and has opinions about it"
+"The metafictional narrator \u2014 knows they are in a story and has opinions about it",
+"Second-person imperative \u2014 commands directed at the reader, creating immediacy and complicity in every action",
+"Unreliable first-person plural \u2014 a \u2018we\u2019 that includes the reader against their will, collective guilt assumed",
+"Field notes \u2014 clinical observation layered with creeping subjectivity, the scientist losing objectivity",
+"Interrogation transcript \u2014 question-and-answer format where the gaps and silences are as meaningful as answers",
+"Therapy session notes \u2014 professional distance masking personal collapse, diagnosis as deflection",
+"Radio chatter \u2014 clipped, coded, interrupted by static, urgency compressed into jargon",
+"After-action report \u2014 past tense, clinical, deliberately omitting the emotional content that would make it human",
+"Internal monologue \u2014 stream of consciousness, self-interrupting, recursive, the mind arguing with itself",
+"Eulogy \u2014 speaking to or about the dead, memorial tone, the living rewriting the departed",
+"Mythic retelling \u2014 oral tradition structure, repetition as emphasis, parable logic, the story older than the teller",
+"Confessional letter \u2014 addressed to a specific someone who will never read it, honesty without consequence",
+"Courtroom testimony \u2014 controlled, precise, occasionally cracking under cross-examination, truth as performance",
+"Survival manual \u2014 instructional tone masking desperation, the how-to as prayer",
+"War correspondent dispatch \u2014 eyewitness urgency, moral witness, forced brevity, what the editor will cut",
+"Museum exhibit placard \u2014 curatorial distance, archival voice, clinical appreciation of the terrible",
+"Ship\u2019s log \u2014 date-stamped entries growing shorter, formality eroding as conditions deteriorate",
+"Witness deposition \u2014 legal language constraining a story that keeps trying to escape its format"
 ]
 
 };

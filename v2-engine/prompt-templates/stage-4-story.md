@@ -39,11 +39,12 @@ Read BEFORE rolling. Sets the scene. 1-3 sentences.
 
 Format: `{ "type": "NARRATIVE_TYPE", "html": "<strong>WEEK W / SESSION D.</strong> Content..." }`
 
-Router `type` values — choose the type matching dramatic function:
+Router `type` values (6 types) — choose the type matching dramatic function:
 - `"kinetic"` — action, urgency, physical motion
 - `"philosophical"` — reflection, observation, the world&apos;s rules
-- `"echo"` or `"artifact"` — found evidence, a document, a recording
-- `"steinbeck"` or `"dirt"` — raw physical detail, minimal framing
+- `"echo"` — found evidence, a document, a recording
+- `"artifact"` — physical object, relic, environmental detail as story
+- `"steinbeck"` — raw physical detail, minimal framing, sensory-first prose (`"dirt"` is accepted as an alias)
 - `"apex"` — climactic reveal (use 1-2 per zine MAX)
 
 ### Branch nodes
@@ -77,7 +78,7 @@ At least 1 branch node per session should end with an unresolved image or detail
 5. HTML only — no markdown.
 6. `&apos;` not bare apostrophes.
 7. No BANNED WORDS (terrifying, chilling, sinister, evil, looming, epic, badass, sudden, suddenly, eerie, ominous, foreboding, mysterious).
-8. Node type distribution: no type >40% of routers, at least 3 types used, apex at most 1-2 total regardless of program length.
+8. Node type distribution: 6 router types available (kinetic, philosophical, echo, artifact, steinbeck, apex). No type >40% of routers, at least 3 types used, apex at most 1-2 total regardless of program length.
 
 ---
 

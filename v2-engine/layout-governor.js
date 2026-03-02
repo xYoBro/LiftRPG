@@ -202,8 +202,8 @@ function groupByAffinity(inventory, data) {
     for (var gk in groups) {
         var grp = groups[gk];
         if (!grp || !grp.id || grp.id.indexOf('group.structural.') !== 0) continue;
-        if (!grp.atomIds || grp.atomIds.length === 0) continue;
-        var structAtom = atoms[grp.atomIds[0]];
+        if (!grp.members || grp.members.length === 0) continue;
+        var structAtom = atoms[grp.members[0]];
         if (!structAtom) continue;
         var placement = structAtom._placement || {};
         var afterHint = placement.after || null;

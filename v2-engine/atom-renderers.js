@@ -504,7 +504,7 @@ AtomRenderers['ref-outcome'] = function (atom, ctx) {
 
     if (c.html) {
         var content = document.createElement('div');
-        content.className = 'ref-content ref-type-' + (c.nodeType || c.outcomeName.toLowerCase());
+        content.className = 'ref-content ref-type-' + (c.nodeType || (c.outcomeName || 'unknown').toLowerCase());
         content.innerHTML = sanitizeHtml(c.html);
         div.appendChild(content);
     } else {
@@ -561,6 +561,12 @@ AtomRenderers['classification-badge'] = function (atom, ctx) {
  */
 function renderFoundDocumentAtom(atom, ctx) {
     var c = atom.content;
+    if (typeof renderArchiveNode !== 'function') {
+        var stub = document.createElement('div');
+        stub.className = 'atom-unknown';
+        stub.textContent = '[MISSING: renderArchiveNode not loaded]';
+        return stub;
+    }
     return renderArchiveNode(c.node, c.format, c.formatConfig || {});
 }
 
@@ -895,14 +901,17 @@ AtomRenderers['pacing-breath'] = function (atom, ctx) {
  * Map atoms delegate to existing map renderers.
  */
 AtomRenderers['facility-grid'] = function (atom, ctx) {
+    if (typeof renderFacilityGrid !== 'function') return document.createElement('div');
     return renderFacilityGrid(atom.content.mapData, atom.content.week);
 };
 
 AtomRenderers['point-to-point'] = function (atom, ctx) {
+    if (typeof renderPtpMapWeek !== 'function') return document.createElement('div');
     return renderPtpMapWeek(atom.content.mapData, atom.content.week);
 };
 
 AtomRenderers['linear-track'] = function (atom, ctx) {
+    if (typeof renderLinearTrackWeek !== 'function') return document.createElement('div');
     return renderLinearTrackWeek(atom.content.mapData, atom.content.week);
 };
 

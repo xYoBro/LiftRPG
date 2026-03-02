@@ -254,10 +254,14 @@ function validateStageData(num, obj, currentPipelineData) {
                 complexity += (c.type === 'tug' ? 2 : 1);
             });
             ((obj.mechanics && obj.mechanics.tracks) || []).forEach(function(t) {
-                complexity += (t.type === 'faction' || t.type === 'skill-tree' ? 3 :
-                               t.type === 'heat' ? 2 : 1);
+                if (t.type === 'faction' || t.type === 'skill-tree') complexity += 3;
+                else if (t.type === 'heat') complexity += 1;
+                else complexity += 1;
             });
-            ((obj.mechanics && obj.mechanics.resources) || []).forEach(function() { complexity += 2; });
+            ((obj.mechanics && obj.mechanics.resources) || []).forEach(function(r) {
+                if (r.type === 'dual-economy' || r.type === 'supply') complexity += 2;
+                else complexity += 1;
+            });
             if (complexity > peak) {
                 w.push('Mechanic complexity (' + complexity + ') exceeds blueprint peakActive (' + peak + '). Consider simplifying.');
             }
@@ -341,9 +345,16 @@ function validateStageData(num, obj, currentPipelineData) {
                         w.push('structuralAtoms[' + idx + '].placement.priority should be 0-1');
                     }
                 }
+                if (sa.placement && sa.placement.after) {
+                    var validPlacements = ['setup', 'archives'];
+                    var weekPattern = /^week-\d+$/;
+                    if (validPlacements.indexOf(sa.placement.after) === -1 && !weekPattern.test(sa.placement.after)) {
+                        w.push('structuralAtom[' + idx + '] has unrecognized placement.after value: "' + sa.placement.after + '". Valid: "week-N", "archives", "setup"');
+                    }
+                }
             });
-            if (obj.structuralAtoms.length > 6) {
-                w.push('structuralAtoms has ' + obj.structuralAtoms.length + ' entries (recommended max: 6). Each atom is a full page.');
+            if (obj.structuralAtoms.length > 4) {
+                w.push('structuralAtoms has ' + obj.structuralAtoms.length + ' entries (recommended max: 4). Each atom is a full page.');
             }
         }
 
@@ -367,6 +378,7 @@ function validateStageData(num, obj, currentPipelineData) {
 
         // Detect unresolved template variables in voice string fields
         var templateVarPattern = /\{\{[^}]+\}\}|\[\[[^\]]+\]\]/g;
+        var runtimeTokens = ['{{week}}', '{{prefix}}'];
         function scanForTemplateVars(object, path) {
             if (!object || typeof object !== 'object') return;
             var keys = Object.keys(object);
@@ -376,7 +388,11 @@ function validateStageData(num, obj, currentPipelineData) {
                 if (typeof val === 'string') {
                     var matches = val.match(templateVarPattern);
                     if (matches) {
-                        w.push('Unresolved template variable in ' + path + '.' + key + ': ' + matches.join(', '));
+                        matches.forEach(function (m) {
+                            if (runtimeTokens.indexOf(m) === -1) {
+                                w.push('Unresolved template variable in ' + path + '.' + key + ': ' + m);
+                            }
+                        });
                     }
                 } else if (typeof val === 'object') {
                     scanForTemplateVars(val, path + '.' + key);
@@ -398,17 +414,9 @@ function validateStageData(num, obj, currentPipelineData) {
         });
 
         // Derive archive section keys from clocks (primary) or archiveLayout (legacy fallback)
-        var s1Clocks = (s1.mechanics && s1.mechanics.clocks) || [];
-        var clockKeysS3 = [];
-        s1Clocks.forEach(function(c) {
-            if (c.onTrigger && c.onTrigger.section && clockKeysS3.indexOf(c.onTrigger.section) === -1) {
-                clockKeysS3.push(c.onTrigger.section);
-            }
-        });
-        var archiveKeysS3 = clockKeysS3.length > 0 ? clockKeysS3 :
-            (s1.archiveLayout || []).reduce(function(acc, s) {
-                return acc.concat(s.left || []).concat(s.right || []);
-            }, []);
+        var archiveKeysS3 = typeof window.deriveArchiveSectionKeys === 'function'
+            ? window.deriveArchiveSectionKeys(currentPipelineData)
+            : [];
         var storyArchiveKeys = Object.keys(obj.storyArchives || {});
         storyArchiveKeys.forEach(function(k) {
             if (archiveKeysS3.length && archiveKeysS3.indexOf(k) === -1) e.push('Archive section key "' + k + '" not in Stage 1 clock triggers');
@@ -617,7 +625,7 @@ function validateAtomInventory(inventory) {
 
     // ── 3. Group integrity ──────────────────────────────────
 
-    var validGroupTypes = ['session', 'week', 'archive-section', 'ref-week', 'evidence-series', 'rules-manual', 'tracker-sheet'];
+    var validGroupTypes = ['session', 'week', 'archive-section', 'ref-week', 'evidence-series', 'rules-manual', 'tracker-sheet', 'quote-page', 'pacing-breath'];
     var groupIdsSeen = {};
 
     for (var gi = 0; gi < groups.length; gi++) {

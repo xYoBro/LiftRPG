@@ -113,18 +113,20 @@ GovernorMeasure.measure = function (atom, ctx, slotWidth) {
         widthChanged = true;
     }
 
-    var fragment = AtomRenderers.render(atom, ctx);
-    if (!fragment) {
-        _measureCache[key] = 0;
+    var fragment, height = 0;
+    try {
+        fragment = AtomRenderers.render(atom, ctx);
+        if (!fragment) {
+            _measureCache[key] = 0;
+            return 0;
+        }
+
+        _harness.appendChild(fragment);
+        height = fragment.offsetHeight;
+        _harness.removeChild(fragment);
+    } finally {
         if (widthChanged) _harness.style.width = '';
-        return 0;
     }
-
-    _harness.appendChild(fragment);
-    var height = fragment.offsetHeight;
-    _harness.removeChild(fragment);
-
-    if (widthChanged) _harness.style.width = '';
 
     _measureCache[key] = height;
     return height;

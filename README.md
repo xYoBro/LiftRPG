@@ -6,6 +6,8 @@ The quality bar is indie TTRPG production -- Mothership, Mork Borg, Into the Odd
 
 Every booklet is mechanically, visually, and narratively unique. The engine supports 7 resolution systems, 5 modifier mechanics, 7 tracking types, 5 spatial mechanics, and 6 narrative structures via a mechanical primitives catalog with a complexity budget system. A wiring engine designs how mechanics interact -- feedback loops, threshold gates, conditional routing -- so each booklet plays like its own game.
 
+**Current version: v3.0.0-alpha.6**
+
 ---
 
 ## 1. Architecture Overview
@@ -16,10 +18,10 @@ Every booklet is mechanically, visually, and narratively unique. The engine supp
 User (workout program + narrative brief + dice selection)
   |
   v
-Browser UI (index.html — builds system prompt from prompt-templates/)
+Browser UI (index.html -- builds system prompt from prompt-templates/)
   |
   v
-[Stage W] Wiring Blueprint — designs mechanical topology
+[Stage W] Wiring Blueprint -- designs mechanical topology
   |
   v
 [Stages 1-5] Foundation, Voice, Archives, Story, Evidence
@@ -31,13 +33,18 @@ User pastes each prompt into any LLM (Claude, ChatGPT, Gemini, etc.)
 LLM generates JSON, pasted back and validated at each stage
   |
   v
-box-packer.js dispatches pages[] array to render-*.js modules
+content-atomizer.js decomposes finalPayload into typed atom inventory
+  |
+  v
+box-packer.js routes to rendering path:
+  Governor (primary) -- groupByAffinity -> template selection -> atom rendering
+  Legacy (fallback)  -- pages[] dispatch via switch/case to render-*.js modules
   |
   v
 DOM pages rendered at 5.5" x 8.5" (half-letter)
   |
   v
-Saddle-stitch imposition (11" x 8.5" landscape spreads) → Print
+Saddle-stitch imposition (11" x 8.5" landscape spreads) -> Print
 ```
 
 ### File Map
@@ -45,23 +52,29 @@ Saddle-stitch imposition (11" x 8.5" landscape spreads) → Print
 ```text
 LiftRPG/
   index.html                           Browser UI: HTML structure + boot script (init, template fetch)
-  app-ui.css                           App UI styles — dark theme, progress rail, accordion, forms, footer
+  app-ui.css                           App UI styles -- dark theme, progress rail, accordion, forms, footer
   v2-engine/
     base-theme.css                     Page dimensions, typography, components, print media, visual treatments
-    box-packer.js                      Page-type dispatcher + post-render cross-references
+    box-packer.js                      Governor primary / legacy fallback -- routes to Layout Governor or pages[] dispatch
     render-utils.js                    Sanitizers (escapeHtml, sanitizeSvg, sanitizeHtml, decodeEntities) + page boilerplate
-    render-primitives.js               Tracker widgets — SVG clocks, tug-of-war, progress, heat, skill tree, faction
-    render-pages.js                    Structural pages — cover, rules manual, tracker sheet, setup, endings, evidence, final
+    render-primitives.js               Tracker widgets -- SVG clocks, tug-of-war, progress, heat, skill tree, faction
+    render-pages.js                    Structural pages -- cover, rules manual, tracker sheet, setup, endings, evidence, final
     render-narrative.js                REF pages (scrambled paragraph-book) + archive pages (7 document formats)
     render-encounters.js               Encounter spread (HUD + session log) + map renderers (grid, PTP, linear)
-    story-tables.js                    Randomizer data — curated story generator tables
-    json-repair.js                     LLM JSON repair pipeline — safeExtract() with 7 repair phases
-    validators.js                      Schema validation + Quality Governor (banned words, complexity, WCAG, etc.)
-    prompt-assembler.js                Prompt text builders — template substitution + cross-stage context
-    pipeline-state.js                  Central state container — window.Pipeline API
+    content-atomizer.js                Content decomposition -- converts finalPayload into typed atom inventory
+    atom-renderers.js                  DOM fragment producers for 22+ atom types
+    layout-governor.js                 Composition engine -- affinity grouping + template selection + overflow handling
+    layout-templates.js                18 page-composition templates with registry (multi-slot, single-slot, structural)
+    governor-measure.js                Offscreen measurement harness -- caches atom heights for scoring
+    governor-score.js                  Layout quality scoring -- fill ratios, diversity bonuses, overflow penalties
+    story-tables.js                    Randomizer data -- curated story generator tables
+    json-repair.js                     LLM JSON repair pipeline -- safeExtract() with 7 repair phases
+    validators.js                      Schema validation + Quality Governor + atom inventory validation
+    prompt-assembler.js                Prompt text builders -- template substitution + cross-stage context
+    pipeline-state.js                  Central state container -- window.Pipeline API
     intake-ui.js                       Dice selector + cover image UI (dropzone, file handling)
-    ui-state.js                        UI state machine — progress rail, accordion, stage lifecycle
-    pipeline-io.js                     Pipeline I/O — validation orchestration, import/export, assembly + imposition
+    ui-state.js                        UI state machine -- progress rail, accordion, stage lifecycle
+    pipeline-io.js                     Pipeline I/O -- validation orchestration, import/export, assembly + imposition
     prompt-templates/
       stage-w-wiring.md                Mechanical wiring blueprint prompt (Stage W)
       stage-1-data-requirements.md     Stage 1 JSON schema spec
@@ -79,28 +92,24 @@ LiftRPG/
   LICENSE                              MIT License
 ```
 
-### Schema: Page-Type Dispatch (v2)
+### Schema: Dual Rendering Path (v3)
 
-The v2 engine uses a **page-type model**. The LLM generates a `pages[]` array where each entry specifies a page type. The box-packer dispatches each page type to the corresponding renderer in the `render-*.js` modules. The engine controls layout; the LLM provides content.
+The v3 engine uses a **dual rendering architecture**. The primary path (Layout Governor) decomposes LLM-generated JSON into a typed atom inventory, groups atoms by affinity, selects from 18 page-composition templates, and renders with measurement-aware scoring for optimal page fill. The legacy fallback path dispatches a `pages[]` array to `render-*.js` modules when the atom inventory is unavailable.
+
+**New in v3:** The `pages[]` array is deprecated -- the engine auto-generates page ordering from the atom inventory. `structuralAtoms[]` (quote-page, pacing-breath) provide LLM-directed full-page creative elements with placement hints. `pacingHint` on encounters drives template selection (breather, crescendo, transition).
 
 Top-level JSON keys (assembled from all LLM stages):
 
 ```json
 {
   "meta": { "title": "...", "subtitle": "...", "author": "..." },
-  "workout": { "totalWeeks": 6, "sessionTypes": [...], "setup": {...} },
-  "mechanics": { "dice": {...}, "clocks": [...], "tracks": [...], "resources": [...] },
-  "theme": { "visualArchetype": "...", "colors": {...}, "fonts": {...} },
-  "story": { "encounters": [...], "refs": {...}, "archives": {...}, "endings": [...] },
+  "workout": { "totalWeeks": 6, "sessionTypes": ["..."], "setup": {} },
+  "mechanics": { "dice": {}, "clocks": [], "tracks": [], "resources": [] },
+  "theme": { "visualArchetype": "...", "colors": {}, "fonts": {} },
+  "story": { "encounters": [], "refs": {}, "archives": {}, "endings": [] },
   "map": { "type": "facility-grid", "title": "..." },
-  "voice": { "cover": {...}, "manual": {...}, "classifications": {...} },
-  "pages": [
-    { "type": "cover" },
-    { "type": "rules-manual" },
-    { "type": "encounter-spread", "week": 1 },
-    ...
-  ],
-  "archiveLayout": [...]
+  "voice": { "cover": {}, "manual": {}, "classifications": {} },
+  "structuralAtoms": [{ "type": "quote-page", "content": {}, "placement": {} }]
 }
 ```
 

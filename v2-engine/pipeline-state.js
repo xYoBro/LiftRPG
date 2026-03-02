@@ -39,9 +39,14 @@
             delete pipelineData[key];
         },
 
-        // Direct reference for read-heavy consumers
+        // Shallow clone for read-heavy consumers — prevents accidental
+        // top-level property additions but nested objects are shared.
         data: function () {
-            return pipelineData;
+            var clone = {};
+            for (var key in pipelineData) {
+                if (pipelineData.hasOwnProperty(key)) clone[key] = pipelineData[key];
+            }
+            return clone;
         },
 
         // Full replacement (import case)

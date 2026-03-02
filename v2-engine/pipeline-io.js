@@ -13,10 +13,34 @@
 //             json-repair.js (safeExtract, _lastExtractRepairs),
 //             box-packer.js (runPacker)
 //
-// Exposed: window.generateWiringPrompt, window.generateStagePrompt,
+// Exposed: window.deriveArchiveSectionKeys,
+//          window.generateWiringPrompt, window.generateStagePrompt,
 //          window.validateWiring, window.validateStage,
 //          window.exportJson, window.importJson,
 //          window.handleFileImport, window.assemble
+
+// ── Shared helper: derive archive section keys from data ─────
+// Works with both finalPayload shape (mechanics at top level)
+// and pipeline data shape (mechanics under data[1]).
+window.deriveArchiveSectionKeys = function (data) {
+    var keys = [];
+    var mechanics = data.mechanics || (data[1] && data[1].mechanics) || {};
+    var clocks = mechanics.clocks || [];
+    clocks.forEach(function (c) {
+        if (c.onTrigger && c.onTrigger.section) {
+            if (keys.indexOf(c.onTrigger.section) === -1) keys.push(c.onTrigger.section);
+        }
+    });
+    if (keys.length === 0) {
+        var archiveLayout = data.archiveLayout || (data[1] && data[1].archiveLayout) || [];
+        archiveLayout.forEach(function (s) {
+            (s.left || []).concat(s.right || []).forEach(function (sec) {
+                if (keys.indexOf(sec) === -1) keys.push(sec);
+            });
+        });
+    }
+    return keys;
+};
 
 function generateWiringPrompt() {
     var promptText = buildWiringPrompt(Pipeline.templates, Pipeline.get('intake'));
@@ -228,8 +252,16 @@ function handleFileImport(event) {
         try {
             var importedData = JSON.parse(e.target.result);
 
-            // Validate each stage before accepting the import
+            // Validate wiring blueprint if present
             var importErrors = [];
+            if (importedData.wiring) {
+                var wiringResult = validateWiringBlueprint(importedData.wiring);
+                if (wiringResult.errors.length) {
+                    importErrors.push('Wiring: ' + wiringResult.errors.join('; '));
+                }
+            }
+
+            // Validate each stage before accepting the import
             for (var num = 1; num <= 5; num++) {
                 if (importedData[num]) {
                     var result = validateStageData(num, importedData[num], importedData);
@@ -248,6 +280,7 @@ function handleFileImport(event) {
             }
 
             Pipeline.replace(importedData);
+            Pipeline.stage = 0;
 
             // Repopulate form
             if (importedData.intake) {
@@ -378,6 +411,7 @@ async function assemble() {
         // User-uploaded cover image overrides LLM-generated one
         var intake = Pipeline.get('intake');
         if (intake && intake.coverImage) {
+            if (!finalPayload.theme) finalPayload.theme = {};
             if (!finalPayload.theme.art) finalPayload.theme.art = {};
             finalPayload.theme.art.coverImage = intake.coverImage;
         } else if (finalPayload.theme && finalPayload.theme.art) {
@@ -399,6 +433,11 @@ async function assemble() {
             var atomResult = window.validateAtomInventory(inventory);
             if (atomResult.errors.length) {
                 console.error('[atomizer] Validation errors:', atomResult.errors);
+                alert('Atom inventory has ' + atomResult.errors.length + ' error(s):\n\n' + atomResult.errors.slice(0, 5).join('\n') + '\n\nCheck dev console for full details.');
+                document.getElementById('app-ui').style.display = '';
+                document.getElementById('btnAssemble').disabled = false;
+                document.getElementById('btnAssemble').innerText = "Validate & Assemble";
+                return;
             }
             if (atomResult.warnings.length) {
                 console.info('[atomizer]', atomResult.warnings[atomResult.warnings.length - 1]);
@@ -420,6 +459,7 @@ async function assemble() {
 
         document.getElementById('footerStatus').innerText = "Assemble complete! Review the zine below.";
     } catch (e) {
+        document.getElementById('app-ui').style.display = '';
         alert("Layout Error: " + e.message + "\nCheck dev console for more details.");
         console.error(e);
         document.getElementById('btnAssemble').disabled = false;
@@ -526,23 +566,7 @@ function autoGeneratePages(data) {
         pages.push({ type: 'ref-pages', week: w });
     }
     // Archive pages: derive from clocks (primary) or archiveLayout (legacy fallback)
-    var clockSections = [];
-    var autoClocks = (data.mechanics && data.mechanics.clocks) || [];
-    autoClocks.forEach(function (c) {
-        if (c.onTrigger && c.onTrigger.section && clockSections.indexOf(c.onTrigger.section) === -1) {
-            clockSections.push(c.onTrigger.section);
-        }
-    });
-    var archiveSections = clockSections;
-    if (archiveSections.length === 0) {
-        // Legacy fallback: derive from archiveLayout
-        var archiveLayout = data.archiveLayout || [];
-        archiveLayout.forEach(function (s) {
-            (s.left || []).concat(s.right || []).forEach(function (sec) {
-                if (archiveSections.indexOf(sec) === -1) archiveSections.push(sec);
-            });
-        });
-    }
+    var archiveSections = window.deriveArchiveSectionKeys(data);
     archiveSections.forEach(function (s) { pages.push({ type: 'archive', section: s }); });
 
     // Add Evidence

@@ -213,17 +213,19 @@ h1 {
 }
 
 .card-body {
-    max-height: 0;
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.3s ease-out;
     overflow: hidden;
-    transition: max-height 0.3s ease-out;
 }
 
 .card-body.open {
-    max-height: 5000px;
-    transition: max-height 0.5s ease-in;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 0.5s ease-in;
 }
 
 .card-body-inner {
+    min-height: 0;
     padding: 0 16px 16px;
 }
 
@@ -565,6 +567,15 @@ button:disabled {
     transform: none;
 }
 
+button:focus-visible,
+.rail-dot:focus-visible,
+.dice-chip:focus-visible,
+.card-header:focus-visible,
+.continue-btn:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+}
+
 .btn-primary {
     background: var(--accent);
     color: #fff;
@@ -641,4 +652,9 @@ button:disabled {
     background: #333;
     padding: 2rem;
     border-radius: var(--radius);
+}
+
+/* ── Print safety net — hide app UI when printing ── */
+@media print {
+    #app-ui, .footer-bar { display: none !important; }
 }

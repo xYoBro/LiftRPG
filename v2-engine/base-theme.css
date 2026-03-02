@@ -99,14 +99,10 @@ body {
     z-index: 1;
 }
 
-/* Ensure page content sits above texture layers */
+/* Ensure page content sits above texture layers + prevent overflow */
 .zine-page > * {
     position: relative;
     z-index: 2;
-}
-
-/* Prevent any child from overflowing the page content area */
-.zine-page>* {
     max-width: 100%;
     overflow-wrap: break-word;
 }
@@ -1304,13 +1300,29 @@ li {
     bottom: 10px;
     left: 10px;
     right: 10px;
-    background-color: #c45c00;
+    background-color: var(--accent);
     color: #fff;
     padding: 4px;
     font-size: 9px;
     font-weight: bold;
     text-align: center;
     z-index: 100;
+}
+
+/* ---- Governor Error States ---- */
+.atom-unknown {
+    border: 1px dashed #c45c00;
+    padding: 0.5rem;
+    font-style: italic;
+    font-size: 8pt;
+    color: var(--muted);
+}
+
+.archive-error {
+    border: 1px dashed var(--accent, #c45c00);
+    padding: 0.25rem 0.5rem;
+    font-style: italic;
+    color: var(--muted);
 }
 
 /* ---- Burden Hint ---- */
@@ -1345,11 +1357,6 @@ li {
 }
 
 /* ---- Badge/Stamp Variants ---- */
-.zine-page[data-page-type="encounter-hud"] .classification-stamp,
-.zine-page[data-page-type="encounter-log"] .classification-stamp {
-    /* Standard encounter stamps — default bordered style */
-}
-
 .session-boss .session-title-row .encounter-title {
     font-weight: bold;
 }
@@ -1646,6 +1653,16 @@ li {
     border-bottom: 1px solid var(--fog);
 }
 
+.ref-alert-warning {
+    border-left-width: 3px;
+    border-left-color: var(--accent);
+}
+
+.ref-alert-intake {
+    font-family: var(--font-mono);
+    letter-spacing: 0.03em;
+}
+
 .ref-router {
     margin-bottom: 0.3rem;
 }
@@ -1673,21 +1690,6 @@ li {
 .ref-content {
     font-size: 9pt;
     line-height: 1.45;
-}
-
-.ref-branch {
-    margin-bottom: 0.25rem;
-    padding-left: 0.5rem;
-    border-left: 2px solid var(--fog);
-}
-
-.ref-branch-header {
-    font-family: var(--font-mono);
-    font-size: 7.5pt;
-    font-weight: bold;
-    color: var(--muted);
-    margin-bottom: 0.1rem;
-    overflow-wrap: break-word;
 }
 
 .ref-separator {
@@ -2436,12 +2438,6 @@ li {
     word-break: break-word;
 }
 
-.linear-track {
-    display: flex;
-    gap: 1px;
-    font-family: var(--font-mono);
-}
-
 .skill-tree {
     font-family: var(--font-mono);
     font-size: 8pt;
@@ -2528,6 +2524,16 @@ th {
     font-size: 8pt;
 }
 
+/* ── Encounter Template Variants (Governor) ── */
+.encounter-integrated .session-block {
+    padding: 0.3rem 0.4rem;
+}
+
+.encounter-dossier .encounter-title {
+    font-size: 14pt;
+    border-bottom-width: 3px;
+}
+
 /* ── Tracker Grid: 2-column grid for tracker sheets ── */
 .tracker-grid-layout {
     display: grid;
@@ -2579,12 +2585,6 @@ th {
 
 /* ── Quote Page ────────────────────────────────────────────── */
 
-.structural-quote-layout {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
 .structural-quote-page {
     display: flex;
     flex-direction: column;
@@ -2597,7 +2597,7 @@ th {
 }
 
 .quote-page-text {
-    font-family: var(--heading-font, Georgia, serif);
+    font-family: var(--font-heading, Georgia, serif);
     font-size: 1.4rem;
     line-height: 1.5;
     text-align: center;
@@ -2621,7 +2621,7 @@ th {
 }
 
 .quote-page-attribution {
-    font-family: var(--body-font, 'Courier New', monospace);
+    font-family: var(--font-body, 'Courier New', monospace);
     font-size: 0.7rem;
     font-variant: small-caps;
     letter-spacing: 0.05em;
@@ -2636,12 +2636,6 @@ th {
 }
 
 /* ── Pacing Breath ─────────────────────────────────────────── */
-
-.structural-breath-layout {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
 
 .structural-pacing-breath {
     display: flex;
@@ -2672,6 +2666,18 @@ th {
 }
 
 .structural-breath-texture {
+    position: relative;
+}
+.structural-breath-texture::before {
+    content: '';
+    position: absolute;
+    inset: 0;
     background-color: var(--fog, #f0f0f0);
     opacity: 0.15;
+    z-index: 0;
+}
+.structural-breath-texture .breath-flavor,
+.structural-breath-texture .breath-divider {
+    position: relative;
+    z-index: 1;
 }

@@ -316,6 +316,7 @@ function renderTrackerSheet(container, data, startPage) {
     var currentPageIndex = 0;
 
     while (pages[currentPageIndex].scrollHeight > pages[currentPageIndex].clientHeight) {
+        if (pages[currentPageIndex].clientHeight === 0) break;
         var currPage = pages[currentPageIndex];
 
         // Find the last section
@@ -569,18 +570,21 @@ function renderEvidencePages(container, data, startPage) {
     var totalWeeks = (data.workout && data.workout.totalWeeks) || 0;
     for (var w = 1; w <= totalWeeks; w++) {
         var weekHeaderCreated = false;
+        var weekHeaderEl = null;
 
         factionProgressTracks.forEach(function (track) {
             var nodeKey = 'ev-' + track.id + '-w' + w;
             var node = evidence[nodeKey];
             if (!node) return;
 
+            var headerJustAdded = false;
             if (!weekHeaderCreated) {
-                var weekH = document.createElement('h2');
-                weekH.className = 'evidence-week-header';
-                weekH.textContent = 'WEEK ' + w;
-                page.appendChild(weekH);
+                weekHeaderEl = document.createElement('h2');
+                weekHeaderEl.className = 'evidence-week-header';
+                weekHeaderEl.textContent = 'WEEK ' + w;
+                page.appendChild(weekHeaderEl);
                 weekHeaderCreated = true;
+                headerJustAdded = true;
             }
 
             var nodeDiv = document.createElement('div');
@@ -598,9 +602,14 @@ function renderEvidencePages(container, data, startPage) {
 
             page.appendChild(nodeDiv);
 
-            // Overflow
+            // Overflow — move nodeDiv (and orphaned week header) to new page
             if (page.scrollHeight > page.clientHeight) {
                 page.removeChild(nodeDiv);
+                // If the week header was just added on this iteration, it would be
+                // orphaned on the old page with no content under it — move it too
+                if (headerJustAdded && weekHeaderEl && weekHeaderEl.parentNode === page) {
+                    page.removeChild(weekHeaderEl);
+                }
                 addPageNumber(page, pageNum);
                 pageNum++;
                 pagesCreated++;
@@ -608,6 +617,10 @@ function renderEvidencePages(container, data, startPage) {
                 page = createPage('evidence');
                 page.classList.add('evidence-page');
                 container.appendChild(page);
+                // Re-add the week header on the new page if it was orphaned
+                if (headerJustAdded && weekHeaderEl) {
+                    page.appendChild(weekHeaderEl);
+                }
                 page.appendChild(nodeDiv);
             }
         });

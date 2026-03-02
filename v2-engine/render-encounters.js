@@ -467,6 +467,7 @@ function renderEncounterSpread(container, data, week, startPage) {
 
     while (logPages[currentPageIndex].scrollHeight > logPages[currentPageIndex].clientHeight) {
         var currPage = logPages[currentPageIndex];
+        if (currPage.clientHeight === 0) break;
 
         // Find the last section
         var blocks = currPage.querySelectorAll('.session-block, .week-checkin');
@@ -486,6 +487,8 @@ function renderEncounterSpread(container, data, week, startPage) {
             var newPage = createPage('encounter-log');
             newPage.classList.add('encounter-log');
             container.appendChild(newPage);
+            if (logPage.dataset.week) newPage.dataset.week = logPage.dataset.week;
+            if (logPage.dataset.visualWeight) newPage.dataset.visualWeight = logPage.dataset.visualWeight;
             logPages.push(newPage);
             pagesCreated++;
         }
@@ -721,7 +724,7 @@ function renderPtpMapWeek(mapData, week) {
         text.setAttribute('font-size', String(fontSize));
         text.setAttribute('font-family', 'var(--font-heading, monospace)');
         text.setAttribute('fill', isLocked ? 'var(--muted, #999)' : 'var(--ink, #111)');
-        text.textContent = labelText;
+        text.textContent = decodeEntities(labelText);
         svg.appendChild(text);
     });
 
@@ -745,7 +748,7 @@ function renderLinearTrackWeek(mapData, week) {
         if (labels[i]) {
             var lbl = document.createElement('div');
             lbl.className = 'linear-label';
-            lbl.textContent = labels[i];
+            lbl.textContent = decodeEntities(labels[i]);
             box.appendChild(lbl);
         }
         container.appendChild(box);

@@ -16,7 +16,7 @@ window.runPacker = function (data) {
 
     // ── Governor path: atom-driven composition ──
     var inventory = window._atomInventory;
-    if (inventory && window.LayoutGovernor && window.LayoutTemplates && window.AtomRenderers) {
+    if (inventory && window.LayoutGovernor && window.LayoutTemplates && window.AtomRenderers && window.GovernorMeasure && window.GovernorScore) {
         try {
             var pageCount = window.LayoutGovernor.compose(inventory, container, data);
             padToMultipleOf4(container, pageCount, data);
@@ -93,7 +93,8 @@ window.runPacker = function (data) {
             console.error('[box-packer] Renderer crashed on page type:', pageDef.type, 'index:', i, 'error:', err);
             var errPage = document.createElement('div');
             errPage.className = 'zine-page';
-            errPage.innerHTML = '<h2 style="color:red">RENDER ERROR</h2><p>Page failed to render: ' + escapeHtml(pageDef.type) + '</p>';
+            var safeType = typeof escapeHtml === 'function' ? escapeHtml(pageDef.type) : String(pageDef.type || 'unknown');
+            errPage.innerHTML = '<h2 style="color:red">RENDER ERROR</h2><p>Page failed to render: ' + safeType + '</p>';
             container.appendChild(errPage);
             pageCount++;
         }
@@ -122,6 +123,7 @@ function crossReferenceArchivePages(container) {
     var triggers = container.querySelectorAll('.tracker-trigger');
     triggers.forEach(function (trigger) {
         var text = trigger.textContent;
+        if (text.indexOf(' (pg ') !== -1) return; // already annotated
         // Match "read next SECTION_NAME" to find the section key
         for (var key in sectionPageMap) {
             if (sectionPageMap.hasOwnProperty(key)) {

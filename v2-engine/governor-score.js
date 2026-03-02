@@ -137,7 +137,7 @@ GovernorScore.scoreCandidate = function (estimate, context) {
         score -= underfill * underfill * W.underfill;
 
         // Near-empty penalty
-        if (fr < 0.15) score -= W.emptyPage;
+        if (fr < 0.10) score -= W.emptyPage;
     }
 
     // Slight preference for fewer pages (compact layouts)
@@ -180,12 +180,12 @@ GovernorScore.scoreCandidate = function (estimate, context) {
  * @param {Object} estimateA  From template.estimate()
  * @param {Object} estimateB  From template.estimate()
  * @param {Object} [context]  Scoring context
- * @returns {number} 0 if A is better, 1 if B is better
+ * @returns {number} -1 if A is better, 1 if B is better, 0 if tie
  */
 GovernorScore.compareCandidates = function (estimateA, estimateB, context) {
     var scoreA = GovernorScore.scoreCandidate(estimateA, context);
     var scoreB = GovernorScore.scoreCandidate(estimateB, context);
-    return scoreB > scoreA ? 1 : 0;
+    return scoreA > scoreB ? -1 : scoreB > scoreA ? 1 : 0;
 };
 
 // ── Utility: Compute Fill Ratios ─────────────────────────────

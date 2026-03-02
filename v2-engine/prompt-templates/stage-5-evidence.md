@@ -37,12 +37,12 @@ A flat JSON object where each key is an evidence node ID. The keys MUST exactly 
 
 ```json
 {
-  "ev-TRACKID-w1": { "type": "evidence-TRACKID_LOWERCASE", "html": "..." },
-  "ev-TRACKID-w2": { "type": "evidence-TRACKID_LOWERCASE", "html": "..." }
+  "ev-FACTION-A-w1": { "type": "evidence-faction-a", "html": "..." },
+  "ev-FACTION-A-w2": { "type": "evidence-faction-a", "html": "..." }
 }
 ```
 
-The `type` field: `"evidence-TRACKID_LOWERCASE"` (e.g., `"evidence-a"`, `"evidence-b"`).
+**NOTE:** The track ID in the `id` field MUST preserve the exact casing from Stage 1 (e.g., `ev-FACTION-A-w1` if the track ID is `FACTION-A`). The `type` field ALWAYS uses lowercase (e.g., `evidence-faction-a`). These two fields follow different casing rules — do not lowercase the key&apos;s track ID portion, and do not preserve original casing in the type field.
 
 ### Node content
 
@@ -56,9 +56,9 @@ The `type` field: `"evidence-TRACKID_LOWERCASE"` (e.g., `"evidence-a"`, `"eviden
 
 ## CONSTRAINTS
 
-1. Produce EXACTLY one node ID per week for each track provided. E.g., if there are 2 tracks and 6 total weeks, produce 12 node IDs total. IDs MUST perfectly match the format `ev-{TRACK_ID}-w{WEEK_NUMBER}` (where `TRACK_ID` is the track's id from Stage 1). Example: `ev-A-w1`, `ev-A-w2`.
+1. Produce EXACTLY one node ID per week for each track provided. E.g., if there are 2 tracks and 6 total weeks, produce 12 node IDs total. IDs MUST perfectly match the format `ev-{TRACK_ID}-w{WEEK_NUMBER}` where `TRACK_ID` preserves the EXACT casing from Stage 1 (e.g., `ev-FACTION-A-w1` if the track ID is `FACTION-A`).
 2. Every node must have `"type"` and `"html"` fields
-3. Type format: `"evidence-TRACKID_LOWERCASE"`
+3. Type format: `"evidence-{trackid_lowercase}"` — always lowercased (e.g., `"evidence-faction-a"` even if the track ID is `FACTION-A`)
 4. HTML only — no markdown
 5. `&apos;` not bare apostrophes
 6. No BANNED WORDS (terrifying, chilling, sinister, evil, looming, epic, badass, sudden, suddenly, eerie, ominous, foreboding, mysterious)

@@ -94,7 +94,7 @@ function renderRefPages(container, data, week, startPage) {
         var rpAlert = voice.refPageAlerts[week];
         var rpDiv = document.createElement('div');
         rpDiv.className = 'ref-page-alert ref-alert-' + (rpAlert.type || 'note');
-        rpDiv.textContent = rpAlert.text || '';
+        rpDiv.textContent = decodeEntities(rpAlert.text || '');
         page.appendChild(rpDiv);
     }
 
@@ -182,7 +182,7 @@ function renderRefPages(container, data, week, startPage) {
         // Content
         if (entry.node && entry.node.html) {
             var content = document.createElement('div');
-            content.className = 'ref-content ref-type-' + (entry.node.type || entry.outcome.name.toLowerCase());
+            content.className = 'ref-content ref-type-' + (entry.node.type || (entry.outcome.name || 'unknown').toLowerCase());
             content.innerHTML = sanitizeHtml(entry.node.html);
             entryDiv.appendChild(content);
         } else {
@@ -293,6 +293,7 @@ function renderArchivePages(container, data, sectionKey, startPage) {
             pagesCreated++;
             page = createPage('archive');
             page.classList.add('archive-page');
+            page.setAttribute('data-archive-section', sectionKey);
             container.appendChild(page);
             page.appendChild(nodeDiv);
         }

@@ -390,8 +390,8 @@ function atomize(finalPayload) {
                         }
                     }
                 }
-                if (!suffix && diceOutcomes[oi]) {
-                    suffix = diceOutcomes[oi].suffix;
+                if (!suffix) {
+                    suffix = String(oi + 1);
                 }
                 suffix = suffix || '';
                 var branchCode = refCode + suffix;
@@ -663,11 +663,11 @@ function atomize(finalPayload) {
         atoms[saId]._placement = saPlacement;
 
         // Group: one group per structural atom
-        groups['group.structural.' + sai] = {
+        groups.push({
             id: 'group.structural.' + sai,
             groupType: saType,
-            atomIds: [saId]
-        };
+            members: [saId]
+        });
     }
 
     // ── Return ──────────────────────────────────────────────

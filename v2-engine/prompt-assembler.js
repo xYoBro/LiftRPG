@@ -39,9 +39,10 @@ function buildStagePrompt(num, templates, pipelineData) {
     var antiIso = templates['shared-anti-isomorphism.md'] || '';
 
     // Compose the narrative brief from intake
-    var briefParts = [pipelineData.intake.narrativeBrief || ''];
+    var intake = pipelineData.intake || {};
+    var briefParts = [intake.narrativeBrief || ''];
     // Dice constraint
-    var intakeDice = pipelineData.intake.dice || ['d10', 'd%'];
+    var intakeDice = intake.dice || ['d10', 'd%'];
     if (intakeDice.indexOf('none') !== -1) {
         briefParts.push('Available Dice: NONE — use only diceless mechanics (Resource-as-Resolution).');
     } else {
@@ -52,149 +53,103 @@ function buildStagePrompt(num, templates, pipelineData) {
     if (num === 1) {
         var wiringSection = '';
         if (pipelineData.wiring) {
-            wiringSection = `
-
-## MECHANICAL WIRING BLUEPRINT (BINDING)
-
-The following blueprint defines the mechanical topology of this zine. You MUST select primitives that can express the declared wires. Every wire's \`printInstruction\` MUST appear somewhere in the final booklet — on the tracker sheet, in encounter conditional instructions, or in the rules manual.
-
-For EACH wire in the blueprint:
-1. Select a primitive from the catalog that serves as the wire's "from" source
-2. Select a primitive or content structure that serves as the wire's "to" target
-3. Name your mechanics to match the wire's \`from\` and \`to\` fields (diegetic names)
-4. Include the wire's \`printInstruction\` in the appropriate location:
-   - threshold-gate: in the clock/track's trigger text
-   - conditional-routing: in encounter outcome text or conditional instructions
-   - resource-cycle: in the resource earn/spend rules
-   - escalation: in track threshold effects
-   - feedback-loop: in both source and target trigger descriptions
-   - unlock-chain: in the completing mechanic's trigger text
-5. Respect the \`activatesWeek\` field — mechanics for later-activating wires should exist in the schema but their wire instructions only appear on pages for that week onward.
-
-\`\`\`json
-${JSON.stringify(pipelineData.wiring, null, 2)}
-\`\`\`
-`;
+            wiringSection = '\n\n## MECHANICAL WIRING BLUEPRINT (BINDING)\n\n'
+                + 'The following blueprint defines the mechanical topology of this zine. You MUST select primitives that can express the declared wires. Every wire\'s `printInstruction` MUST appear somewhere in the final booklet — on the tracker sheet, in encounter conditional instructions, or in the rules manual.\n\n'
+                + 'For EACH wire in the blueprint:\n'
+                + '1. Select a primitive from the catalog that serves as the wire\'s "from" source\n'
+                + '2. Select a primitive or content structure that serves as the wire\'s "to" target\n'
+                + '3. Name your mechanics to match the wire\'s `from` and `to` fields (diegetic names)\n'
+                + '4. Include the wire\'s `printInstruction` in the appropriate location:\n'
+                + '   - threshold-gate: in the clock/track\'s trigger text\n'
+                + '   - conditional-routing: in encounter outcome text or conditional instructions\n'
+                + '   - resource-cycle: in the resource earn/spend rules\n'
+                + '   - escalation: in track threshold effects\n'
+                + '   - feedback-loop: in both source and target trigger descriptions\n'
+                + '   - unlock-chain: in the completing mechanic\'s trigger text\n'
+                + '5. Respect the `activatesWeek` field — mechanics for later-activating wires should exist in the schema but their wire instructions only appear on pages for that week onward.\n\n'
+                + '```json\n' + JSON.stringify(pipelineData.wiring, null, 2) + '\n```\n';
         }
 
-        promptText = `${templates['stage-1-data-requirements.md']}
-
-${creativeDir}
-
-${primitives}
-${wiringSection}
-${antiIso}
-
-${templates['stage-1-liftoscript.md']}
-
-## USER INPUT
-Workout/Script:
-${pipelineData.intake.workout}
-
-${narrativeBrief}`;
+        promptText = (templates['stage-1-data-requirements.md'] || '') + '\n\n'
+            + creativeDir + '\n\n'
+            + primitives + '\n'
+            + wiringSection + '\n'
+            + antiIso + '\n\n'
+            + (templates['stage-1-liftoscript.md'] || '') + '\n\n'
+            + '## USER INPUT\nWorkout/Script:\n'
+            + (intake.workout || '') + '\n\n'
+            + narrativeBrief;
     } else if (num === 2) {
-        const s1 = pipelineData[1] || {};
-        // Derive archive section keys from clocks (primary) or archiveLayout (legacy fallback)
-        const s1Clocks = (s1.mechanics && s1.mechanics.clocks) || [];
-        const clockSections = [];
-        s1Clocks.forEach(function(c) {
-            if (c.onTrigger && c.onTrigger.section && clockSections.indexOf(c.onTrigger.section) === -1) {
-                clockSections.push(c.onTrigger.section);
-            }
-        });
-        const archiveSectionKeys = clockSections.length > 0 ? clockSections :
-            (s1.archiveLayout || []).reduce(function(acc, s) {
-                return acc.concat(s.left || []).concat(s.right || []);
-            }, []);
-        const context = {
+        var s1 = pipelineData[1] || {};
+        var archiveSectionKeys = window.deriveArchiveSectionKeys(pipelineData);
+        var context = {
             meta: s1.meta,
             workout: s1.workout,
             mechanics: s1.mechanics,
             theme: s1.theme,
-            story: { encounters: s1.story?.encounters },
+            story: { encounters: (s1.story && s1.story.encounters) },
             map: s1.map,
             archiveSectionKeys: archiveSectionKeys
         };
-        promptText = `${templates['stage-2-voice-map.md']}
-
-${creativeDir}
-
-## STAGE 1 CONTEXT
-\`\`\`json
-${JSON.stringify(context, null, 2)}
-\`\`\``;
+        promptText = (templates['stage-2-voice-map.md'] || '') + '\n\n'
+            + creativeDir + '\n\n'
+            + '## STAGE 1 CONTEXT\n```json\n'
+            + JSON.stringify(context, null, 2) + '\n```';
     } else if (num === 3) {
-        const s1 = pipelineData[1] || {};
-        // Derive archive section keys from clocks (primary) or archiveLayout (legacy fallback)
-        const s1ClocksS3 = (s1.mechanics && s1.mechanics.clocks) || [];
-        const clockSectionsS3 = [];
-        s1ClocksS3.forEach(function(c) {
-            if (c.onTrigger && c.onTrigger.section && clockSectionsS3.indexOf(c.onTrigger.section) === -1) {
-                clockSectionsS3.push(c.onTrigger.section);
-            }
-        });
-        const archiveSectionKeysS3 = clockSectionsS3.length > 0 ? clockSectionsS3 :
-            (s1.archiveLayout || []).reduce(function(acc, s) {
-                return acc.concat(s.left || []).concat(s.right || []);
-            }, []);
-        const context = {
+        var s1 = pipelineData[1] || {};
+        var archiveSectionKeysS3 = window.deriveArchiveSectionKeys(pipelineData);
+        var context = {
             meta: s1.meta,
             mechanics: s1.mechanics,
-            story: { encounters: s1.story?.encounters, refScheme: s1.story?.refScheme },
+            story: { encounters: (s1.story && s1.story.encounters), refScheme: (s1.story && s1.story.refScheme) },
             archiveSectionKeys: archiveSectionKeysS3
         };
-        promptText = `${templates['stage-3-archives.md']}
-
-${creativeDir}
-
-## STAGE 1 CONTEXT
-\`\`\`json
-${JSON.stringify(context, null, 2)}
-\`\`\``;
+        promptText = (templates['stage-3-archives.md'] || '') + '\n\n'
+            + creativeDir + '\n\n'
+            + '## STAGE 1 CONTEXT\n```json\n'
+            + JSON.stringify(context, null, 2) + '\n```';
     } else if (num === 4) {
-        const s1 = pipelineData[1] || {};
-        const s3 = pipelineData[3] || {};
-        const context = {
+        var s1 = pipelineData[1] || {};
+        var s3 = pipelineData[3] || {};
+        var archiveNodeIds = {};
+        var s3ArchiveKeys = Object.keys(s3.storyArchives || {});
+        for (var ani = 0; ani < s3ArchiveKeys.length; ani++) {
+            var sectionKey = s3ArchiveKeys[ani];
+            var section = s3.storyArchives[sectionKey];
+            if (section && section.nodes) {
+                archiveNodeIds[sectionKey] = section.nodes.map(function (n) { return n.id; });
+            }
+        }
+        var context = {
             meta: s1.meta,
             mechanics: s1.mechanics,
-            story: { encounters: s1.story?.encounters, refScheme: s1.story?.refScheme },
-            archiveNodeIds: Object.keys(s3.storyArchives || {}).reduce((acc, sectionKey) => {
-                const section = s3.storyArchives[sectionKey];
-                if (section && section.nodes) acc[sectionKey] = section.nodes.map(n => n.id);
-                return acc;
-            }, {})
+            story: { encounters: (s1.story && s1.story.encounters), refScheme: (s1.story && s1.story.refScheme) },
+            archiveNodeIds: archiveNodeIds
         };
-        promptText = `${templates['stage-4-story.md']}
-
-${creativeDir}
-
-## STAGE 1 + STAGE 3 CONTEXT
-\`\`\`json
-${JSON.stringify(context, null, 2)}
-\`\`\``;
+        promptText = (templates['stage-4-story.md'] || '') + '\n\n'
+            + creativeDir + '\n\n'
+            + '## STAGE 1 + STAGE 3 CONTEXT\n```json\n'
+            + JSON.stringify(context, null, 2) + '\n```';
     } else if (num === 5) {
-        const s1 = pipelineData[1] || {};
-        const s3 = pipelineData[3] || {};
-        const evidenceTracks = (s1.mechanics?.tracks || []).filter(t => t.type === 'faction' || t.type === 'progress');
+        var s1 = pipelineData[1] || {};
+        var s3 = pipelineData[3] || {};
+        var s1Tracks = (s1.mechanics && s1.mechanics.tracks) || [];
+        var evidenceTracks = s1Tracks.filter(function (t) { return t.type === 'faction' || t.type === 'progress'; });
         if (evidenceTracks.length === 0) {
             return null; // Signal to caller that Stage 5 is not applicable
         }
 
-        const context = {
+        var context = {
             meta: s1.meta,
-            mechanics: { tracks: evidenceTracks, clocks: s1.mechanics?.clocks },
+            mechanics: { tracks: evidenceTracks, clocks: (s1.mechanics && s1.mechanics.clocks) },
             archiveSections: Object.keys(s3.storyArchives || {}),
-            workout: { totalWeeks: s1.workout?.totalWeeks }
+            workout: { totalWeeks: (s1.workout && s1.workout.totalWeeks) }
         };
 
-        promptText = `${templates['stage-5-evidence.md']}
-
-${creativeDir}
-
-## STAGE 1 + STAGE 3 CONTEXT
-\`\`\`json
-${JSON.stringify(context, null, 2)}
-\`\`\``;
+        promptText = (templates['stage-5-evidence.md'] || '') + '\n\n'
+            + creativeDir + '\n\n'
+            + '## STAGE 1 + STAGE 3 CONTEXT\n```json\n'
+            + JSON.stringify(context, null, 2) + '\n```';
     }
 
     promptText = promptText.replace(/\{\{narrativeBrief\}\}/g, narrativeBrief);

@@ -886,6 +886,7 @@ LayoutTemplates.register({
                 pagesCreated++;
                 page = createPage('archive');
                 page.classList.add('archive-page');
+                if (sectionKey) page.setAttribute('data-archive-section', sectionKey);
                 container.appendChild(page);
                 page.appendChild(el);
             }
@@ -1586,7 +1587,14 @@ function isColumnPageOverflowing(page, colContainer, colCount) {
 function appendWithBreakPolicy(page, el, atom, container, pageType, pageNum, plan, state) {
     page.appendChild(el);
     if (page.scrollHeight <= page.clientHeight) {
-        // Fits — update state
+        // Fits — log break-honored if previous atom had keepWithNext
+        if (plan && plan.repairLog && state && state.lastAtom) {
+            var prevStrength = (state.lastAtom.breakPolicy && state.lastAtom.breakPolicy.keepWithNextStrength) || 0;
+            if (prevStrength >= 50) {
+                plan.repairLog.push({ type: 'break-honored', strength: prevStrength, atom: atom.id || 'unknown' });
+            }
+        }
+        // Update state
         if (state) { state.lastAtom = atom; state.lastEl = el; }
         return page;
     }
@@ -1867,6 +1875,9 @@ LayoutTemplates.register({
             var lastRight = rightItems.length > 0 ? rightItems[rightItems.length - 1] : null;
             if (lastRight) rightCol.removeChild(lastRight);
 
+            // Number current page before creating continuation
+            addPageNumber(page, pageNum);
+
             // Create continuation page
             pageNum++;
             pagesCreated++;
@@ -2032,11 +2043,11 @@ LayoutTemplates.register({
             var diceDiv = document.createElement('div');
             diceDiv.className = 'tracker-section';
             var diceH = document.createElement('h2');
-            diceH.textContent = decodeEntities(mech.dice.stat.toUpperCase());
+            diceH.textContent = decodeEntities((mech.dice.stat.name || '').toUpperCase());
             diceDiv.appendChild(diceH);
             var diceRow = document.createElement('div');
             diceRow.className = 'tracker-row dice-stat-row';
-            diceRow.innerHTML = '<div class="dice-stat-box">' + escapeHtml(mech.dice.stat) +
+            diceRow.innerHTML = '<div class="dice-stat-box">' + escapeHtml(mech.dice.stat.name || '') +
                 ': <span class="dice-stat-value">____</span></div>';
             diceDiv.appendChild(diceRow);
             sections.push(diceDiv);
@@ -2226,6 +2237,7 @@ LayoutTemplates.register({
             page = createPage('archive');
             page.classList.add('archive-page');
             container.appendChild(page);
+            if (sectionKey) page.setAttribute('data-archive-section', sectionKey);
             colContainer = document.createElement('div');
             colContainer.className = 'archive-gazette-columns';
             page.appendChild(colContainer);
@@ -2240,6 +2252,7 @@ LayoutTemplates.register({
                     page = createPage('archive');
                     page.classList.add('archive-page');
                     container.appendChild(page);
+                    if (sectionKey) page.setAttribute('data-archive-section', sectionKey);
                     colContainer = document.createElement('div');
                     colContainer.className = 'archive-gazette-columns';
                     page.appendChild(colContainer);
@@ -2443,7 +2456,7 @@ LayoutTemplates.register({
             page.appendChild(el);
         }
 
-        addPageNumber(page, ctx.startPage);
+        addPageNumber(page, ctx.startPage + 1);
         return 1;
     }
 });
@@ -2469,7 +2482,7 @@ LayoutTemplates.register({
             page.appendChild(el);
         }
 
-        addPageNumber(page, ctx.startPage);
+        addPageNumber(page, ctx.startPage + 1);
         return 1;
     }
 });

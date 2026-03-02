@@ -266,7 +266,7 @@ function renderSkillTree(params) {
         if (node.requiresNodeId) {
             var req = document.createElement('span');
             req.className = 'skill-requires';
-            req.textContent = ' \u2190 ' + node.requiresNodeId;
+            req.textContent = ' \u2190 ' + decodeEntities(node.requiresNodeId);
             row.appendChild(req);
         }
         container.appendChild(row);
