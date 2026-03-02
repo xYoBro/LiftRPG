@@ -55,6 +55,7 @@ Two sections: `voice` and `map` (map is optional — set to `null` if not approp
     "mechanics": "STRING — mechanics reference header",
     "ARCHIVE_KEY": "STRING — one entry per archive section key from Stage 1",
     "refs": "STRING with {{week}} — REF pages header",
+    "evidence": "STRING — evidence pages header (only if Stage 1 has faction/progress tracks)",
     "endings": "STRING — endings page header",
     "endOfFile": "STRING — final page header"
   },
