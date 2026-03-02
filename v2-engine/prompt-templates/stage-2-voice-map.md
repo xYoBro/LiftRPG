@@ -79,14 +79,8 @@ Two sections: `voice` and `map` (map is optional — set to `null` if not approp
   "archive": {
     "SECTION_KEYTitle": "STRING — one per archive section key",
     "SECTION_KEYIntro": "STRING — one per archive section key",
-    "evidenceIntro": "STRING with {{prefix}} (if using evidence tracks)",
-    "evidenceHeaders": {
-      "TRACK_ID": {
-        "title": "STRING",
-        "headerHtml": "STRING (HTML)"
-      }
-    },
-    "theoriesIntro": "STRING (HTML)",
+    "evidenceTitle": "STRING — diegetic title for evidence pages (e.g. 'EVIDENCE LOG', 'FIELD OBSERVATIONS')",
+    "evidenceIntro": "STRING with {{prefix}} — {{prefix}} is replaced at render time with the REF code prefix from Stage 1 refScheme",
     "endingsTitle": "STRING",
     "endingsTrigger": {
       "heading": "STRING",
@@ -95,8 +89,8 @@ Two sections: `voice` and `map` (map is optional — set to `null` if not approp
   },
   "weekAlerts": {
     "WEEK_NUMBER": {
-      "type": "intake | alert | note",
-      "text": "STRING — 'intake' type has no text"
+      "type": "intake | alert | note — intake = first-session setup (text defaults to 'INTAKE'), alert = in-fiction warning, note = in-fiction observation",
+      "text": "STRING"
     }
   },
   "refPageAlerts": {
@@ -116,32 +110,14 @@ Two sections: `voice` and `map` (map is optional — set to `null` if not approp
     "instruction": "STRING"
   },
   "labels": {
-    "mechanicsHeading": "STRING",
-    "diceResolution": "STRING",
-    "clocksHeading": "STRING",
-    "clockTriggerTemplate": "STRING — uses {{name}}, {{triggerAt}}, {{section}}, {{order}}, {{clear}}",
-    "clockPanelTrigger": "STRING",
-    "resourceHeading": "STRING",
-    "resourceEarn": "STRING",
-    "resourceSpend": "STRING",
-    "resourceExpiry": "STRING",
-    "exampleTurn": "STRING",
-    "archiveRoutingHeading": "STRING",
-    "archiveAccess": "STRING",
-    "endingsLabel": "STRING",
-    "replayability": "STRING",
-    "notesHeading": "STRING",
-    "programArc": "STRING",
-    "setupNotes": "STRING",
-    "weekEndCheckin": "STRING",
-    "liftColumn": "STRING",
-    "weightColumn": "STRING",
-    "dieResult": "STRING",
-    "sessionRef": "STRING — uses {{ref}}",
-    "diceNote": "STRING",
-    "refsHeading": "STRING — uses {{week}}, {{sessions}}"
-  },
-  "printNotes": "STRING — printing instructions"
+    "mechanicsHeading": "STRING — tracker sheet page heading (default: 'CHARACTER DOSSIER')",
+    "clocksHeading": "STRING — clocks section heading (default: 'CLOCKS')",
+    "resourceHeading": "STRING — resources section heading (default: 'RESOURCES')",
+    "liftColumn": "STRING — exercise name column header (default: 'LIFT')",
+    "weightColumn": "STRING — weight column header (default: 'WEIGHT')",
+    "sessionRef": "STRING — REF code label, uses {{ref}} token (default: 'REF {{ref}}')",
+    "weekEndCheckin": "STRING — week-end check-in heading (default: 'WEEK-END CHECK-IN')"
+  }
 }
 ```
 
@@ -168,12 +144,12 @@ Write these IN THE FICTION&apos;S VOICE. Not "roll a d6" but whatever the fictio
 
 The engine has defaults for every rendered string. Only override those where the default doesn&apos;t fit the world. Match the user&apos;s genre:
 
-- Military: `"mechanicsHeading": "RULES OF ENGAGEMENT"`, `"notesHeading": "FIELD NOTES"`
-- Scientific: `"diceResolution": "PROBABILITY RESOLUTION"`, `"weekEndCheckin": "DATA COLLECTION"`
-- Literary: `"liftColumn": "MOVEMENT"`, `"programArc": "YOUR JOURNEY"`
-- Fantasy: `"mechanicsHeading": "THE RITES"`, `"notesHeading": "MARGINALIA"`
-- Noir: `"mechanicsHeading": "HOW THIS WORKS"`, `"notesHeading": "CASE NOTES"`
-- Fairy Tale: `"diceResolution": "WHAT THE FOREST DECIDES"`, `"weekEndCheckin": "REFLECTION"`
+- Military: `"mechanicsHeading": "RULES OF ENGAGEMENT"`, `"weekEndCheckin": "DEBRIEF"`
+- Scientific: `"clocksHeading": "INSTRUMENTS"`, `"weekEndCheckin": "DATA COLLECTION"`
+- Literary: `"liftColumn": "MOVEMENT"`, `"weightColumn": "LOAD"`
+- Fantasy: `"mechanicsHeading": "THE RITES"`, `"resourceHeading": "RELICS"`
+- Noir: `"mechanicsHeading": "HOW THIS WORKS"`, `"liftColumn": "EXERCISE"`
+- Fairy Tale: `"clocksHeading": "ENCHANTMENTS"`, `"weekEndCheckin": "REFLECTION"`
 
 ### `map` (optional)
 
@@ -240,7 +216,7 @@ All map types: show progression — more areas revealed, position advancing, or 
 - `weekAlerts`: Week 1 should typically be `"type": "intake"`
 - All `html`/`body` fields use HTML, not markdown
 - Use `&apos;` not bare apostrophes
-- No BANNED WORDS
+- No BANNED WORDS (terrifying, chilling, sinister, evil, looming, epic, badass, sudden, suddenly, eerie, ominous, foreboding, mysterious)
 
 ---
 
