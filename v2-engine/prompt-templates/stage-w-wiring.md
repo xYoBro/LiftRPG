@@ -205,8 +205,8 @@ Declares which primitive categories this zine uses and which it excludes. This i
 
 **Field definitions:**
 
-- `categoriesUsed`: Array of category names from the Primitives Catalog. Valid names: `"resolution"`, `"modifier"`, `"tracking"`, `"resource"`, `"spatial"`, `"narrative"`, `"session"`, `"endCondition"`.
-- `categoriesExcluded`: Array of `{ "category": STRING, "reason": STRING }`. Every category NOT in `categoriesUsed` MUST appear here with a story-motivated justification. Forcing justification makes the decision stick.
+- `categoriesUsed`: Array of category names from the Primitives Catalog. Valid names: `"resolution"`, `"modifier"`, `"tracking"`, `"resource"`, `"spatial"`, `"narrative"`, `"session"`, `"endCondition"`. **Note:** `"resolution"` and `"endCondition"` are mandatory — they must ALWAYS appear in `categoriesUsed` and NEVER in `categoriesExcluded`. Resolution drives the core loop; end conditions define what endings Stage 3 generates.
+- `categoriesExcluded`: Array of `{ "category": STRING, "reason": STRING }`. Every category NOT in `categoriesUsed` MUST appear here with a story-motivated justification. Forcing justification makes the decision stick. **Cannot contain** `"resolution"` or `"endCondition"` — these are non-excludable.
 - `arcShape`: One of `"three-act"`, `"front-loaded"`, `"slow-burn"`, `"crescendo"`, `"oscillating"`.
 - `phaseBoundaries`: Object mapping phase number (string) to array of week numbers. Allows non-standard phase boundaries.
 

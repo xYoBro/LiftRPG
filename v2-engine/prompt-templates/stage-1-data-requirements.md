@@ -90,6 +90,8 @@ Produce a single JSON object with these exact top-level keys:
 
 **OPTIONAL ARRAYS:** The `modifiers`, `tracks`, `codewords`, and `resources` arrays are all optional. If your `mechanicalProfile` excludes their categories, OMIT these arrays entirely from your JSON. Do not include empty arrays `[]` — omit the key.
 
+**REQUIRED ARRAYS:** `mechanics.dice.outcomes[]` and `mechanics.endConditions[]` are **always required** — the validator will reject Stage 1 JSON that omits either. These are non-excludable even if Stage W&apos;s `categoriesExcluded` appears to omit them. End conditions define WHAT happens at the end of the program (final states), not WHETHER the player can quit early. A zine where the player must endure all 6 weeks still needs `endConditions` describing the different final outcomes.
+
 ### `mechanics`
 
 ```json
@@ -424,7 +426,7 @@ If no wiring blueprint is provided, design mechanics freely using the primitives
 3. No BANNED WORDS (terrifying, chilling, sinister, evil, looming, epic, badass, sudden, suddenly, eerie, ominous, foreboding, mysterious)
 4. Every `outcomes[].ticks` MUST reference a valid clock or track name
 5. Encounter `outcomes[].range` must match ranges in `mechanics.dice.outcomes[]`
-6. `endConditions[].id` values will be used as ending IDs in Stage 3
+6. **`endConditions[]` is REQUIRED** — include 2-4 entries. Their `.id` values will be used as ending IDs in Stage 3. A missing `endConditions[]` will fail validation and block the pipeline. This overrides any Stage W `categoriesExcluded` entry for `endCondition` — end conditions are non-excludable.
 7. `clocks[].onTrigger.section` values define archive section keys
 8. `theme.colors` must have all 5 keys, all valid 6-digit hex (e.g. #1a1a18)
 9. Encounter count must equal (unique training days per week) × totalWeeks. Days per week = count of unique day numbers across all sessionTypes[].days

@@ -98,9 +98,11 @@ Resources are tracked by filling or crossing off boxes. No running totals, no ne
 7D. Choose-Your-Action — After workout, choose from 2-3 available actions (investigate, fortify, rest). Complexity: 2
 7E. Push-or-Accept — After initial roll, push for better result at a cost. The between-sets decision. Complexity: 2
 
-## 8. END CONDITIONS (Pick 2-4, Complexity: 1 total)
+## 8. END CONDITIONS (ALWAYS REQUIRED — 2-4 entries, Complexity: 1 total)
 
 Multiple endings triggered by different game states (clocks filled, resources depleted, choices made, thresholds crossed). End conditions are narrative triggers, not active mechanics — the full set costs 1 complexity regardless of how many endings you define.
+
+**NON-EXCLUDABLE:** End conditions cannot appear in `categoriesExcluded`. Every zine needs ending definitions because Stage 3 cross-references `endConditions[].id` to generate endings. Even if the player cannot "lose early" or exit the program prematurely, end conditions define WHAT happens when the program concludes — they describe final states, not escape hatches. A 6-week survival horror where "the horror is you must finish" still needs end conditions like "Complete Week 6 with SIGHT at TOTAL SATURATION" vs "Complete Week 6 with the map fully charted."
 
 ## COMPLEXITY BUDGET
 

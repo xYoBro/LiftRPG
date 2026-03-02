@@ -107,6 +107,21 @@ function validateWiringBlueprint(obj) {
     if (!obj.mechanicalProfile) w.push('Missing mechanicalProfile');
     else {
         if (!Array.isArray(obj.mechanicalProfile.categoriesUsed)) w.push('mechanicalProfile.categoriesUsed should be an array');
+        else {
+            // resolution and endCondition are non-excludable — must always be in categoriesUsed
+            if (obj.mechanicalProfile.categoriesUsed.indexOf('endCondition') < 0) {
+                e.push('mechanicalProfile.categoriesUsed must include "endCondition" — end conditions are non-excludable (Stage 3 cross-references ending IDs)');
+            }
+            if (obj.mechanicalProfile.categoriesUsed.indexOf('resolution') < 0) {
+                e.push('mechanicalProfile.categoriesUsed must include "resolution" — resolution is non-excludable');
+            }
+        }
+        if (Array.isArray(obj.mechanicalProfile.categoriesExcluded)) {
+            obj.mechanicalProfile.categoriesExcluded.forEach(function(exc) {
+                if (exc.category === 'endCondition') e.push('categoriesExcluded cannot contain "endCondition" — end conditions are non-excludable');
+                if (exc.category === 'resolution') e.push('categoriesExcluded cannot contain "resolution" — resolution is non-excludable');
+            });
+        }
         if (!obj.mechanicalProfile.arcShape) w.push('Missing mechanicalProfile.arcShape');
         // pageVocabulary is deprecated (v3.0.0-alpha.5) — tolerate if present, no warning if absent
     }
