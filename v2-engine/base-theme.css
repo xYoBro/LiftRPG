@@ -952,7 +952,8 @@ li {
 }
 
 .setup-page {
-    /* Made it a flex container implicitly if we specify flex on children, or just rely on inherited flex */
+    display: flex;
+    flex-direction: column;
 }
 
 .setup-page .setup-notes-area {
@@ -1295,6 +1296,21 @@ li {
     padding: 0.15rem 0 0.15rem 0.4rem;
     margin: 0.3rem 0;
     border-left: 1.5px solid var(--fog);
+}
+
+/* ---- Content Overflow Warning ---- */
+.content-overflow-warning {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+    background-color: #c45c00;
+    color: #fff;
+    padding: 4px;
+    font-size: 9px;
+    font-weight: bold;
+    text-align: center;
+    z-index: 100;
 }
 
 /* ---- Burden Hint ---- */
@@ -2357,6 +2373,16 @@ li {
 
 /* HUD context: slightly tighter heat boxes */
 .hud-tracker-row .heat-box {
+    width: 1rem;
+    height: 1rem;
+    font-size: 6.5pt;
+}
+.hud-tracker-row .progress-box {
+    width: 1rem;
+    height: 1rem;
+    font-size: 6.5pt;
+}
+.hud-tracker-row .faction-box {
     width: 1rem;
     height: 1rem;
     font-size: 6.5pt;

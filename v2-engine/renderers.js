@@ -972,7 +972,8 @@ function renderEncounterSpread(container, data, week, startPage) {
         mech.dice.outcomes.forEach(function (o) {
             var tr = document.createElement('tr');
             var tdRange = document.createElement('td');
-            tdRange.textContent = o.range[0] + '-' + o.range[1];
+            tdRange.textContent = (Array.isArray(o.range) && o.range.length >= 2)
+                ? (o.range[0] + '-' + o.range[1]) : '?';
             tr.appendChild(tdRange);
             var tdName = document.createElement('td');
             tdName.textContent = decodeEntities(o.name);
@@ -1017,7 +1018,7 @@ function renderEncounterSpread(container, data, week, startPage) {
                 lbl.className = 'hud-tracker-name';
                 lbl.textContent = decodeEntities(c.name);
                 row.appendChild(lbl);
-                row.appendChild(renderClock({ size: c.size || 6, clearOnTrigger: c.clearOnTrigger }));
+                row.appendChild(renderClock({ size: c.size || 6 }));
                 trackerDiv.appendChild(row);
             });
         }
@@ -1314,19 +1315,8 @@ function renderEncounterSpread(container, data, week, startPage) {
             // Can't split further, a single block is larger than the page
             console.warn('CONTENT OVERFLOW: A single session block is taller than the page. Regenerate with shorter exercise data to fix.');
             var overflowWarn = document.createElement('div');
-            overflowWarn.style.position = 'absolute';
-            overflowWarn.style.bottom = '10px';
-            overflowWarn.style.left = '10px';
-            overflowWarn.style.right = '10px';
-            overflowWarn.style.backgroundColor = 'var(--accent, #c45c00)';
-            overflowWarn.style.color = '#fff';
-            overflowWarn.style.padding = '4px';
-            overflowWarn.style.fontSize = '9px';
-            overflowWarn.style.fontWeight = 'bold';
-            overflowWarn.style.textAlign = 'center';
-            overflowWarn.style.zIndex = '100';
+            overflowWarn.className = 'content-overflow-warning';
             overflowWarn.textContent = '[CONTENT OVERFLOW — REGENERATE WITH SHORTER EXERCISE DATA]';
-            currPage.style.position = 'relative'; // ensure absolute positioning works
             currPage.appendChild(overflowWarn);
             break;
         }
@@ -1423,6 +1413,7 @@ function renderPtpMapWeek(mapData, week) {
 
     // Collect visible nodes to compute tight viewBox
     var visibleLocs = locations.filter(function (loc) { return visibleIds.has(loc.id); });
+    var nodeCount = visibleLocs.length;
 
     // Compute bounding box of visible nodes — more padding for sparse maps
     var PAD_X = nodeCount <= 6 ? 25 : 18;
@@ -1446,7 +1437,6 @@ function renderPtpMapWeek(mapData, week) {
     var vbH = Math.max(maxY - minY, 40);
 
     // Scale font and node sizes based on node proximity
-    var nodeCount = visibleLocs.length;
     var minDist = Infinity;
     for (var i = 0; i < visibleLocs.length; i++) {
         for (var j = i + 1; j < visibleLocs.length; j++) {

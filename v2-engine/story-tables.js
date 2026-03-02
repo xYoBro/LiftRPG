@@ -483,5 +483,6 @@ window.randomizeNarrativeBrief = function() {
         + 'Narrative voice: ' + pov + '. '
         + 'Tonal touchstone: ' + tone + '.';
 
-    document.getElementById('progNarrativeBrief').value = brief;
+    var el = document.getElementById('progNarrativeBrief');
+    if (el) el.value = brief;
 };

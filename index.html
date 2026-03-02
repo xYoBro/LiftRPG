@@ -1090,9 +1090,9 @@ Examples:
         function renderRail() {
             const container = document.getElementById('progressRail');
             var wiringDone = !!pipelineData.wiring;
-            var wiringState = wiringDone ? 'done' : (currentStage === 0 && wiringDone ? 'done' : (pipelineData.intake ? 'active' : 'locked'));
+            var wiringState;
             if (wiringDone) wiringState = 'done';
-            else if (pipelineData.intake && !wiringDone) wiringState = 'active';
+            else if (pipelineData.intake) wiringState = 'active';
             else wiringState = 'locked';
 
             let html = `<div class="rail-dot ${currentStage >= 0 ? 'active' : ''}">0<div class="rail-label">Intake</div></div>`;
@@ -2420,7 +2420,7 @@ ${JSON.stringify(context, null, 2)}
             event.target.value = ''; // Reset input
         }
 
-        function assemble() {
+        async function assemble() {
             document.getElementById('btnAssemble').disabled = true;
             document.getElementById('btnAssemble').innerText = "Assembling...";
 
@@ -2467,6 +2467,11 @@ ${JSON.stringify(context, null, 2)}
 
                 // Inject theme as CSS custom properties
                 injectTheme(finalPayload.theme);
+
+                // Wait for Google Fonts to load before rendering
+                if (document.fonts && document.fonts.ready) {
+                    await document.fonts.ready;
+                }
 
                 // If no pages[] array (e.g. legacy import), auto-generate page order
                 if (!finalPayload.pages || !finalPayload.pages.length) {
