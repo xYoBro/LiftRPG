@@ -13,11 +13,26 @@ These fragments ARE the story. They accumulate across 18+ sessions into a comple
 - **Phase 3 (~15%): Crisis** — Breaking point. Assumptions fail. Maximum stakes.
 - **Phase 4 (~10%): Convergence** — Climax. Mechanics and narrative permanently converge.
 
+These percentages are defaults. The encounters&apos; week distribution and `narrativePhase` labels from the wiring blueprint take precedence — adapt pacing to match.
+
 ---
 
 ## WHAT YOU ARE PRODUCING
 
 For each session REF, produce exactly **1 router node + N branch nodes** (N = number of dice outcomes from Stage 1).
+
+### REF ID formula
+
+Construct IDs from the encounter&apos;s `week`, `day`, and the `refScheme` from Stage 1:
+
+- **Router ID:** `refScheme.prefix` + `week` (zero-padded to `weekDigits`) + `day` (zero-padded to `sessionDigits`)
+- **Branch ID:** router ID + `outcome.suffix`
+
+Example: prefix `R`, weekDigits 1, sessionDigits 1, week 2, day 1, outcomes with suffixes `-T`, `-S`, `-H`:
+- Router key: `R21`
+- Branch keys: `R21-T`, `R21-S`, `R21-H`
+
+The engine validates every expected ID exists. **One wrong key = hard rejection of the entire stage.**
 
 ### Router node
 Read BEFORE rolling. Sets the scene. 1-3 sentences.
@@ -61,8 +76,8 @@ At least 1 branch node per session should end with an unresolved image or detail
 4. Branch types are the dice outcome names in lowercase.
 5. HTML only — no markdown.
 6. `&apos;` not bare apostrophes.
-7. No BANNED WORDS.
-8. Node type distribution: no type >40% of routers, at least 3 types used, apex at most 1-2 total.
+7. No BANNED WORDS (terrifying, chilling, sinister, evil, looming, epic, badass, sudden, suddenly, eerie, ominous, foreboding, mysterious).
+8. Node type distribution: no type >40% of routers, at least 3 types used, apex at most 1-2 total regardless of program length.
 
 ---
 
@@ -82,5 +97,18 @@ Before outputting your JSON, verify you have produced every required node:
 Return ONLY a valid JSON object where each key is a REF ID and each value is `{ "type": "...", "html": "..." }`. No wrapping object, no commentary, no markdown fences.
 
 ---
+
+## STAGE 1 + STAGE 3 CONTEXT (required fields)
+
+The following fields are needed to generate REF nodes:
+
+**From Stage 1:**
+- `meta` — title, setting context
+- `mechanics` — clocks, tracks, dice outcomes, codewords, endConditions (for narrative reference)
+- `story.encounters[]` — week, day, title, narrative, challenge, outcomes with suffixes (defines every REF ID you must produce)
+- `story.refScheme` — prefix, weekDigits, sessionDigits (the REF ID formula inputs)
+
+**From Stage 3:**
+- Archive node IDs grouped by section key (for optional cross-references in narrative)
 
 ## PASTE YOUR STAGE 1 + STAGE 3 CONTEXT BELOW THIS LINE
