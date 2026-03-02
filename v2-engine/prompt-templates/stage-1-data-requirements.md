@@ -2,7 +2,7 @@
 
 You are generating a Print & Play RPG Zine — a physical booklet that combines a real workout program with a branching narrative game. The user will print it, grab a pencil and dice, and play through it during their actual gym sessions.
 
-Your output will be a single JSON object with these top-level keys: `meta`, `workout`, `mechanics`, `theme`, `story` (encounters only), `map` (optional), `pages`, and `archiveLayout`. A rendering engine turns this JSON into printable half-letter spreads (5.5″ × 8.5″ pages). A validator checks every cross-reference. **Precision matters.**
+Your output will be a single JSON object with these top-level keys: `meta`, `workout`, `mechanics`, `theme`, `story` (encounters only), and `map` (optional). A rendering engine turns this JSON into printable half-letter spreads (5.5″ × 8.5″ pages). The engine composes page order automatically from your content. A validator checks every cross-reference. **Precision matters.**
 
 The engine uses an **encounter-based page model**: each workout session is an "encounter" with its own narrative and outcomes. The engine picks page layouts automatically — you never specify layout or CSS. You provide content; the engine provides form.
 
@@ -207,7 +207,7 @@ Produce a single JSON object with these exact top-level keys:
 - Every `outcomes[].ticks` value MUST reference a valid clock or track name.
 - `endConditions[].id` values are used as ending IDs in Stage 3.
 - If using dual economy, both `linkedResource` fields must reference each other by name.
-- `clocks[].onTrigger.section` values define archive section keys — they MUST match the keys in `archiveLayout`.
+- `clocks[].onTrigger.section` values define archive section keys — each clock trigger section becomes an archive section in the booklet.
 
 ### `theme`
 
@@ -295,7 +295,8 @@ Produce a single JSON object with these exact top-level keys:
           "style": "STRING — 'default' | 'alert'"
         }
       ],
-      "marginalia": "STRING | null — optional sidebar flavor text"
+      "marginalia": "STRING | null — optional sidebar flavor text",
+      "pacingHint": "STRING | null — 'breather' | 'crescendo' | 'transition' | null"
     }
   ],
   "refScheme": {
@@ -325,6 +326,11 @@ Produce a single JSON object with these exact top-level keys:
   - Escalation phase: mostly `"standard"`, include `"dense"` for key moments
   - Crisis/peak weeks: `"dense"` or `"crisis"` for climactic sessions
   - No more than 2 `"crisis"` encounters per zine. Boss encounters should be `"dense"` or `"crisis"`.
+- `pacingHint`: Optional. Tells the layout engine how to treat this encounter visually:
+  - `"breather"`: Reduced visual density — ideal for deload, recovery, or rest encounters
+  - `"crescendo"`: Maximum visual intensity — ideal for boss fights, peak weeks, climactic sessions
+  - `"transition"`: Narrative phase shift — marks a tonal boundary between story arcs
+  - `null` / omitted: Standard — engine decides layout independently
 
 ### `map` (optional — set to `null` if no spatial element)
 
@@ -343,97 +349,52 @@ Your Stage W `mechanicalProfile` constrains your selections:
 
 1. **Categories:** Only select primitives from `categoriesUsed`. If `tracking` is excluded, omit the `clocks` and `tracks` arrays entirely. If `resource` is excluded, omit the `resources` array. If `modifier` is excluded, omit the `modifiers` array.
 2. **Complexity:** Your total complexity must not exceed `mechanicalProfile`&apos;s complexity ceiling (which matches `complexityProfile.peakActive`).
-3. **Pages:** Your `pages[]` array MUST match `mechanicalProfile.pageVocabulary` — include only the page types declared there.
-4. **Evidence guardrail:** If any track has an `id` field (faction or progress tracks), you MUST include `{ "type": "evidence" }` in your `pages[]` array.
+3. **Evidence:** If any track has an `id` field (faction or progress tracks), the engine automatically generates evidence pages.
 
-### `pages`
+### `structuralAtoms` (optional — 0-4 entries)
 
-The `pages` array defines the page structure of the printed zine. The engine knows how to render each page type — you control which types appear and in what order. **Your `pages[]` must match your Stage W `mechanicalProfile.pageVocabulary`.** Do not include page types you did not declare.
-
-#### Standard (all page types, 9+ type vocabulary)
-```json
-[
-  { "type": "cover" },
-  { "type": "rules-manual" },
-  { "type": "tracker-sheet" },
-  { "type": "setup" },
-  { "type": "encounter-spread", "week": 1 },
-  { "type": "ref-pages", "week": 1 },
-  { "type": "encounter-spread", "week": 2 },
-  { "type": "ref-pages", "week": 2 },
-  ...
-  { "type": "archive", "section": "SECTION_KEY" },
-  { "type": "evidence" },
-  { "type": "endings" },
-  { "type": "final" }
-]
-```
-
-#### Minimalist (5-type vocabulary — no tracker-sheet, no setup, no evidence)
-```json
-[
-  { "type": "cover" },
-  { "type": "rules-manual" },
-  { "type": "encounter-spread", "week": 1 },
-  { "type": "ref-pages", "week": 1 },
-  ...
-  { "type": "archive", "section": "SECTION_KEY" },
-  { "type": "endings" },
-  { "type": "final" }
-]
-```
-
-#### Discovery-paced (archives interleaved between encounter weeks)
-```json
-[
-  { "type": "cover" },
-  { "type": "rules-manual" },
-  { "type": "tracker-sheet" },
-  { "type": "setup" },
-  { "type": "encounter-spread", "week": 1 },
-  { "type": "ref-pages", "week": 1 },
-  { "type": "archive", "section": "SECTION_KEY_A" },
-  { "type": "encounter-spread", "week": 2 },
-  { "type": "ref-pages", "week": 2 },
-  { "type": "archive", "section": "SECTION_KEY_B" },
-  ...
-  { "type": "endings" },
-  { "type": "final" }
-]
-```
-
-Available page types:
-
-- `cover`: Title page with classification stamp, intro text, cover art
-- `rules-manual`: Instruction manual in the fiction&apos;s voice (from Stage 2)
-- `tracker-sheet`: Printable character dossier with all clocks, tracks, resources, codewords
-- `setup`: Workout setup page with 1RM fields, calculation grid
-- `encounter-spread`: Weekly encounter pages — HUD (map + trackers + dice table) + workout logs + narrative
-- `ref-pages`: Story REF branching nodes for that week (router + outcome branches, from Stage 4)
-- `archive`: Archive section pages (from Stage 3). Requires `"section"` key matching an archive key.
-- `endings`: All ending narratives with trigger conditions (from Stage 3)
-- `final`: Closing page
-
-Your `pages[]` structure is controlled by your `mechanicalProfile.pageVocabulary`. Design choices:
-
-- **Omit `tracker-sheet`** only if total mechanic count (clocks + tracks + resources) is 4 or fewer. At 5+ mechanics, include `tracker-sheet` — the player needs a central reference page to see all game state at once, especially in a gym context
-- **Omit `setup`** if the workout doesn&apos;t require weight calculations
-- **Omit `ref-pages`** for a diceless zine where choices are embedded in encounters
-- **Interleave `archive` entries** between encounter weeks for discovery-paced reveals
-- **Add multiple `archive` entries** for separate document collections
-- **Include `evidence`** if any track has a faction or progress type with an `id` field
-
-### `archiveLayout`
-
-Defines how archive pages are organized into two-page spreads:
+Structural atoms are full-page creative elements that break visual monotony. The engine places them at hinted positions. These are NOT content pages — they are pacing devices.
 
 ```json
 [
-  { "left": ["SECTION_KEY"], "right": ["SECTION_KEY"] }
+  {
+    "type": "quote-page",
+    "content": {
+      "text": "STRING — the quote or typographic statement",
+      "attribution": "STRING (optional) — source attribution",
+      "style": "centered | offset | full-bleed"
+    },
+    "placement": { "after": "week-2", "priority": 0.7 }
+  },
+  {
+    "type": "pacing-breath",
+    "content": {
+      "flavor": "STRING | null — optional single line of atmospheric text",
+      "visual": "blank | divider | texture"
+    },
+    "placement": { "after": "archives", "priority": 0.3 }
+  }
 ]
 ```
 
-Each entry = one spread. Keys MUST match `clocks[].onTrigger.section` values.
+**Types:**
+- `quote-page`: Full-page typographic statement. A line from the fiction, a thematic epigraph, or a diegetic inscription. Styles: `centered` (default), `offset` (left-aligned with accent border), `full-bleed` (enormous text filling the page).
+- `pacing-breath`: Intentional whitespace. A pause between acts. Visuals: `blank` (empty page), `divider` (theme divider SVG), `texture` (subtle background texture).
+
+**Placement hints:**
+- `after`: Where to insert — `"week-N"` (after that week&apos;s ref-pages), `"archives"` (after archive sections), `"setup"` (after setup/tracker). Engine treats this as a hint, not a command.
+- `priority`: 0-1 float. Higher priority atoms are placed closer to their hint. At 0, the engine may reposition freely for pagination.
+
+**Guidelines:** 0-4 structural atoms per zine. Use sparingly — every atom is a full page. A quote-page after a climactic week amplifies impact. A pacing-breath before archives creates a tonal shift. Overuse dilutes the effect.
+
+### `pages` (DEPRECATED — optional, ignored by engine)
+
+The engine composes page order automatically from your content.
+If present, `pages[]` is ignored. Omit it to save tokens.
+
+### `archiveLayout` (DEPRECATED — optional, ignored by engine)
+
+Archive sections are derived from `mechanics.clocks[].onTrigger.section`.
 
 ---
 
@@ -466,11 +427,10 @@ If no wiring blueprint is provided, design mechanics freely using the primitives
 6. `endConditions[].id` values will be used as ending IDs in Stage 3
 7. `clocks[].onTrigger.section` values define archive section keys
 8. `theme.colors` must have all 5 keys, all valid 6-digit hex (e.g. #1a1a18)
-9. `pages[]` must include at minimum: cover, at least one encounter-spread, endings, final
-10. Encounter count must equal (unique training days per week) × totalWeeks. Days per week = count of unique day numbers across all sessionTypes[].days
-11. You MUST ESCAPE ALL DOUBLE QUOTES inside strings (e.g. `\"`), or use single quotes for HTML/SVG attributes and CSS selectors. Unescaped double quotes will break JSON parsing.
-12. **ZERO MATH**: No mechanic may require addition, subtraction, or any computation during play. Roll → lookup → mark. If a stat has no function, omit it entirely (do not set name to "none").
-13. **INTUITIVE DESIGN**: Every tracker must be usable by someone who has never read the rules page. The physical layout (boxes, arrows, labels, thresholds) must communicate how to use it. If you need to explain a mechanic in prose, the mechanic is too complex — simplify it.
+9. Encounter count must equal (unique training days per week) × totalWeeks. Days per week = count of unique day numbers across all sessionTypes[].days
+10. You MUST ESCAPE ALL DOUBLE QUOTES inside strings (e.g. `\"`), or use single quotes for HTML/SVG attributes and CSS selectors. Unescaped double quotes will break JSON parsing.
+11. **ZERO MATH**: No mechanic may require addition, subtraction, or any computation during play. Roll → lookup → mark. If a stat has no function, omit it entirely (do not set name to "none").
+12. **INTUITIVE DESIGN**: Every tracker must be usable by someone who has never read the rules page. The physical layout (boxes, arrows, labels, thresholds) must communicate how to use it. If you need to explain a mechanic in prose, the mechanic is too complex — simplify it.
 
 ---
 
@@ -484,9 +444,8 @@ Before outputting, verify your foundation against these quality checks:
 - **Blueprint compliance:** Sum your active mechanic complexities. Is the total ≤ `peakActive` from the wiring blueprint? Do all wire `from` targets match a mechanic you actually created?
 - **Endowed progress:** Does at least one clock or track have `startValue > 0`? Players who see progress already begun commit faster than those starting from zero.
 - **Visual weight distribution:** Do your encounters include at least 2 different `visualWeight` values? All-standard is a flat booklet. Mix sparse, standard, dense, and crisis.
-- **Archive format planning:** Look at your `archiveLayout` sections. Will the archive content use at least 2 different document formats? All-memo is a missed opportunity.
+- **Archive format planning:** Look at your `clocks[].onTrigger.section` keys. Will the archive content use at least 2 different document formats? All-memo is a missed opportunity.
 - **Color contrast:** Do your `ink` and `paper` hex values produce readable text in B&W print? Dark ink on light paper. If your accent color is close to your fog color, they&apos;ll merge.
-- **Page vocabulary:** Does your `pages[]` array use page types beyond the minimum set? A tracker-sheet, setup page, or evidence section adds structural variety when the content warrants it.
 
 ---
 

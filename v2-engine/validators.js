@@ -108,7 +108,7 @@ function validateWiringBlueprint(obj) {
     else {
         if (!Array.isArray(obj.mechanicalProfile.categoriesUsed)) w.push('mechanicalProfile.categoriesUsed should be an array');
         if (!obj.mechanicalProfile.arcShape) w.push('Missing mechanicalProfile.arcShape');
-        if (!Array.isArray(obj.mechanicalProfile.pageVocabulary)) w.push('mechanicalProfile.pageVocabulary should be an array');
+        // pageVocabulary is deprecated (v3.0.0-alpha.5) — tolerate if present, no warning if absent
     }
 
     return { errors: e, warnings: w };
@@ -141,9 +141,10 @@ function validateStageData(num, obj, currentPipelineData) {
             e.push('theme.visualArchetype "' + obj.theme.visualArchetype + '" is not valid. Must be one of: ' + validArchetypes.join(', '));
         }
 
+        // pages[] is deprecated (v3.0.0-alpha.5) — engine composes page order automatically.
+        // Validate types if present, no error if absent.
         var validTypes = ['cover', 'rules-manual', 'tracker-sheet', 'setup', 'encounter-spread', 'ref-pages', 'archive', 'endings', 'evidence', 'final'];
-        if (!(obj.pages && obj.pages.length)) e.push('Missing pages[] array');
-        else {
+        if (obj.pages && obj.pages.length) {
             var archiveKeysSeen = {};
             obj.pages.forEach(function(p, idx) {
                 if (validTypes.indexOf(p.type) === -1) e.push('pages[' + idx + '].type is invalid: "' + p.type + '"');
@@ -154,15 +155,6 @@ function validateStageData(num, obj, currentPipelineData) {
                     archiveKeysSeen[p.section] = true;
                 }
             });
-
-            // Guardrail: tracker-sheet recommended when mechanic count > 4
-            var hasTrackerSheet = (obj.pages || []).some(function (p) { return p.type === 'tracker-sheet'; });
-            var mechanicCount = ((obj.mechanics && obj.mechanics.clocks && obj.mechanics.clocks.length) || 0) +
-                                ((obj.mechanics && obj.mechanics.tracks && obj.mechanics.tracks.length) || 0) +
-                                ((obj.mechanics && obj.mechanics.resources && obj.mechanics.resources.length) || 0);
-            if (mechanicCount > 4 && !hasTrackerSheet) {
-                w.push(mechanicCount + ' mechanics defined but no tracker-sheet page in pages[]. Consider adding one for playability.');
-            }
         }
 
         if (obj.workout && Array.isArray(obj.workout.sessionTypes)) {
@@ -232,16 +224,21 @@ function validateStageData(num, obj, currentPipelineData) {
             }
         }
 
-        // Cross-ref: clocks -> archiveLayout
-        var archiveKeys = (obj.archiveLayout || []).reduce(function(acc, s) {
-            return acc.concat(s.left || []).concat(s.right || []);
-        }, []);
+        // Cross-ref: collect archive section keys from clocks (primary) or archiveLayout (legacy fallback)
         var clocks = (obj.mechanics && obj.mechanics.clocks) || [];
+        var clockSectionKeys = [];
         clocks.forEach(function(c) {
-            if (c.onTrigger && c.onTrigger.section && archiveKeys.indexOf(c.onTrigger.section) === -1) {
-                w.push('Clock "' + c.name + '" references section "' + c.onTrigger.section + '" not in archiveLayout');
+            if (c.onTrigger && c.onTrigger.section) {
+                if (clockSectionKeys.indexOf(c.onTrigger.section) === -1) {
+                    clockSectionKeys.push(c.onTrigger.section);
+                }
             }
         });
+        // Legacy fallback: derive from archiveLayout if no clock triggers found
+        var archiveKeys = clockSectionKeys.length > 0 ? clockSectionKeys :
+            (obj.archiveLayout || []).reduce(function(acc, s) {
+                return acc.concat(s.left || []).concat(s.right || []);
+            }, []);
 
         // --- Quality Governor: Stage 1 ---
 
@@ -322,6 +319,43 @@ function validateStageData(num, obj, currentPipelineData) {
         if (!hasEndowed) {
             w.push('No clock or track has startValue > 0. Endowed progress (pre-filling 10-20%) increases player commitment.');
         }
+
+        // Structural atoms validation (v3.0.0-alpha.5)
+        if (Array.isArray(obj.structuralAtoms)) {
+            var validAtomTypes = ['quote-page', 'pacing-breath'];
+            obj.structuralAtoms.forEach(function(sa, idx) {
+                if (!sa.type || validAtomTypes.indexOf(sa.type) === -1) {
+                    e.push('structuralAtoms[' + idx + '].type is invalid: "' + (sa.type || 'undefined') + '". Must be one of: ' + validAtomTypes.join(', '));
+                }
+                if (sa.type === 'quote-page' && (!sa.content || !sa.content.text)) {
+                    e.push('structuralAtoms[' + idx + '] (quote-page) missing content.text');
+                }
+                if (sa.type === 'pacing-breath' && sa.content && sa.content.visual) {
+                    var validVisuals = ['blank', 'divider', 'texture'];
+                    if (validVisuals.indexOf(sa.content.visual) === -1) {
+                        w.push('structuralAtoms[' + idx + '] (pacing-breath) has invalid visual: "' + sa.content.visual + '"');
+                    }
+                }
+                if (sa.placement && sa.placement.priority !== undefined) {
+                    if (typeof sa.placement.priority !== 'number' || sa.placement.priority < 0 || sa.placement.priority > 1) {
+                        w.push('structuralAtoms[' + idx + '].placement.priority should be 0-1');
+                    }
+                }
+            });
+            if (obj.structuralAtoms.length > 6) {
+                w.push('structuralAtoms has ' + obj.structuralAtoms.length + ' entries (recommended max: 6). Each atom is a full page.');
+            }
+        }
+
+        // Encounter pacingHint validation (v3.0.0-alpha.5)
+        if (obj.story && obj.story.encounters) {
+            var validPacingHints = ['breather', 'crescendo', 'transition'];
+            obj.story.encounters.forEach(function(enc, idx) {
+                if (enc.pacingHint && validPacingHints.indexOf(enc.pacingHint) === -1) {
+                    w.push('Encounter ' + (enc.id || idx) + ' has invalid pacingHint: "' + enc.pacingHint + '". Must be one of: ' + validPacingHints.join(', '));
+                }
+            });
+        }
     } else if (num === 2) {
         var reqKeys = ['cover', 'manual', 'classifications', 'hud', 'weekPage', 'archive', 'finalPage', 'labels', 'weekAlerts'];
         reqKeys.forEach(function(k) {
@@ -363,15 +397,24 @@ function validateStageData(num, obj, currentPipelineData) {
             if (endIds.length && endIds.indexOf(end.id) === -1) e.push('Ending id "' + end.id + '" not in Stage 1 endConditions');
         });
 
-        var archiveKeysS3 = (s1.archiveLayout || []).reduce(function(acc, s) {
-            return acc.concat(s.left || []).concat(s.right || []);
-        }, []);
+        // Derive archive section keys from clocks (primary) or archiveLayout (legacy fallback)
+        var s1Clocks = (s1.mechanics && s1.mechanics.clocks) || [];
+        var clockKeysS3 = [];
+        s1Clocks.forEach(function(c) {
+            if (c.onTrigger && c.onTrigger.section && clockKeysS3.indexOf(c.onTrigger.section) === -1) {
+                clockKeysS3.push(c.onTrigger.section);
+            }
+        });
+        var archiveKeysS3 = clockKeysS3.length > 0 ? clockKeysS3 :
+            (s1.archiveLayout || []).reduce(function(acc, s) {
+                return acc.concat(s.left || []).concat(s.right || []);
+            }, []);
         var storyArchiveKeys = Object.keys(obj.storyArchives || {});
         storyArchiveKeys.forEach(function(k) {
-            if (archiveKeysS3.length && archiveKeysS3.indexOf(k) === -1) e.push('Archive section key "' + k + '" not in Stage 1 archiveLayout');
+            if (archiveKeysS3.length && archiveKeysS3.indexOf(k) === -1) e.push('Archive section key "' + k + '" not in Stage 1 clock triggers');
         });
         archiveKeysS3.forEach(function(k) {
-            if (storyArchiveKeys.indexOf(k) === -1) e.push('ArchiveLayout key "' + k + '" has no matching section in storyArchives');
+            if (storyArchiveKeys.indexOf(k) === -1) e.push('Clock trigger section "' + k + '" has no matching section in storyArchives');
         });
 
         // --- Quality Governor: Stage 3 ---

@@ -250,6 +250,6 @@ The following Stage 1 fields are needed to generate voice and map:
 - `theme` — visualArchetype, colorPalette, fonts (for voice tone matching)
 - `story.encounters[]` — encounter IDs and brief descriptions (for session naming)
 - `map` — spatial data if present, `null` otherwise
-- `archiveLayout[]` — archive section keys (for classifications and archive voice fields)
+- `mechanics.clocks[].onTrigger.section` — archive section keys (for classifications and archive voice fields)
 
 ## PASTE YOUR STAGE 1 CONTEXT BELOW THIS LINE

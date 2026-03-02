@@ -525,20 +525,25 @@ function autoGeneratePages(data) {
         pages.push({ type: 'encounter-spread', week: w });
         pages.push({ type: 'ref-pages', week: w });
     }
-    // Archive pages from archiveLayout
-    var archiveLayout = data.archiveLayout || [];
-    var archiveSections = [];
-    archiveLayout.forEach(function (s) {
-        (s.left || []).concat(s.right || []).forEach(function (sec) {
-            archiveSections.push(sec);
+    // Archive pages: derive from clocks (primary) or archiveLayout (legacy fallback)
+    var clockSections = [];
+    var autoClocks = (data.mechanics && data.mechanics.clocks) || [];
+    autoClocks.forEach(function (c) {
+        if (c.onTrigger && c.onTrigger.section && clockSections.indexOf(c.onTrigger.section) === -1) {
+            clockSections.push(c.onTrigger.section);
+        }
+    });
+    var archiveSections = clockSections;
+    if (archiveSections.length === 0) {
+        // Legacy fallback: derive from archiveLayout
+        var archiveLayout = data.archiveLayout || [];
+        archiveLayout.forEach(function (s) {
+            (s.left || []).concat(s.right || []).forEach(function (sec) {
+                if (archiveSections.indexOf(sec) === -1) archiveSections.push(sec);
+            });
         });
-    });
-    var seen = {};
-    var uniqueSections = [];
-    archiveSections.forEach(function (s) {
-        if (!seen[s]) { seen[s] = true; uniqueSections.push(s); }
-    });
-    uniqueSections.forEach(function (s) { pages.push({ type: 'archive', section: s }); });
+    }
+    archiveSections.forEach(function (s) { pages.push({ type: 'archive', section: s }); });
 
     // Add Evidence
     var tracks = (data.mechanics && data.mechanics.tracks) || [];

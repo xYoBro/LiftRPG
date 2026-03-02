@@ -28,7 +28,7 @@ Each document should contain at least one concrete physical detail — a date, a
 
 ### 1. `storyArchives` — the archive sections
 
-Each archive section matches a clock trigger from Stage 1. Section keys MUST match both `mechanics.clocks[].onTrigger.section` and `archiveLayout` keys — these are the same set.
+Each archive section matches a clock trigger from Stage 1. Section keys MUST match `mechanics.clocks[].onTrigger.section` values.
 
 ```json
 {
@@ -91,7 +91,7 @@ Produce 2-5 endings. Each corresponds to an `endConditions` entry from Stage 1.
 1. All `html` fields use HTML, not markdown
 2. Use `&apos;` not bare apostrophes
 3. No BANNED WORDS (terrifying, chilling, sinister, evil, looming, epic, badass, sudden, suddenly, eerie, ominous, foreboding, mysterious)
-4. Archive section keys MUST match `archiveLayout` keys AND `clocks[].onTrigger.section` from Stage 1
+4. Archive section keys MUST match `clocks[].onTrigger.section` from Stage 1
 5. Ending IDs MUST match `endConditions[].id` from Stage 1
 6. Each archive node: 1-6 sentences. Each ending: 3-8 sentences.
 7. Notes/letters using `"from"` instead of `"title"` — check format spec
@@ -125,7 +125,7 @@ The following Stage 1 fields are needed to generate archives and endings:
 
 - `mechanics.clocks[]` — clock names, sizes, directions, and `onTrigger.section` keys (defines which archive sections to produce)
 - `mechanics.endConditions[]` — ending IDs and trigger conditions (defines which endings to produce)
-- `archiveLayout[]` — left/right section key assignments (confirms the complete set of section keys)
+- `mechanics.clocks[].onTrigger.section` — archive section keys (confirms the complete set of sections to produce)
 - `story.refScheme` — REF code prefix (for consistent cross-reference naming)
 
 ## PASTE YOUR STAGE 1 CONTEXT BELOW THIS LINE

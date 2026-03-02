@@ -94,6 +94,18 @@ ${pipelineData.intake.workout}
 ${narrativeBrief}`;
     } else if (num === 2) {
         const s1 = pipelineData[1] || {};
+        // Derive archive section keys from clocks (primary) or archiveLayout (legacy fallback)
+        const s1Clocks = (s1.mechanics && s1.mechanics.clocks) || [];
+        const clockSections = [];
+        s1Clocks.forEach(function(c) {
+            if (c.onTrigger && c.onTrigger.section && clockSections.indexOf(c.onTrigger.section) === -1) {
+                clockSections.push(c.onTrigger.section);
+            }
+        });
+        const archiveSectionKeys = clockSections.length > 0 ? clockSections :
+            (s1.archiveLayout || []).reduce(function(acc, s) {
+                return acc.concat(s.left || []).concat(s.right || []);
+            }, []);
         const context = {
             meta: s1.meta,
             workout: s1.workout,
@@ -101,7 +113,7 @@ ${narrativeBrief}`;
             theme: s1.theme,
             story: { encounters: s1.story?.encounters },
             map: s1.map,
-            archiveLayout: s1.archiveLayout
+            archiveSectionKeys: archiveSectionKeys
         };
         promptText = `${templates['stage-2-voice-map.md']}
 
@@ -113,11 +125,23 @@ ${JSON.stringify(context, null, 2)}
 \`\`\``;
     } else if (num === 3) {
         const s1 = pipelineData[1] || {};
+        // Derive archive section keys from clocks (primary) or archiveLayout (legacy fallback)
+        const s1ClocksS3 = (s1.mechanics && s1.mechanics.clocks) || [];
+        const clockSectionsS3 = [];
+        s1ClocksS3.forEach(function(c) {
+            if (c.onTrigger && c.onTrigger.section && clockSectionsS3.indexOf(c.onTrigger.section) === -1) {
+                clockSectionsS3.push(c.onTrigger.section);
+            }
+        });
+        const archiveSectionKeysS3 = clockSectionsS3.length > 0 ? clockSectionsS3 :
+            (s1.archiveLayout || []).reduce(function(acc, s) {
+                return acc.concat(s.left || []).concat(s.right || []);
+            }, []);
         const context = {
             meta: s1.meta,
             mechanics: s1.mechanics,
             story: { encounters: s1.story?.encounters, refScheme: s1.story?.refScheme },
-            archiveLayout: s1.archiveLayout
+            archiveSectionKeys: archiveSectionKeysS3
         };
         promptText = `${templates['stage-3-archives.md']}
 

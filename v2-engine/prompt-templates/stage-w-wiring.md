@@ -198,7 +198,6 @@ Declares which primitive categories this zine uses and which it excludes. This i
     { "category": "modifier", "reason": "Pure lookup resolution matches the clinical tone — no push/reroll decisions" },
     { "category": "resource", "reason": "The tension comes from tracking, not from spending" }
   ],
-  "pageVocabulary": ["cover", "rules-manual", "encounter-spread", "ref-pages", "archive", "endings", "final"],
   "arcShape": "slow-burn",
   "phaseBoundaries": { "1": [1, 2, 3], "2": [4, 5], "3": [6] }
 }
@@ -208,7 +207,6 @@ Declares which primitive categories this zine uses and which it excludes. This i
 
 - `categoriesUsed`: Array of category names from the Primitives Catalog. Valid names: `"resolution"`, `"modifier"`, `"tracking"`, `"resource"`, `"spatial"`, `"narrative"`, `"session"`, `"endCondition"`.
 - `categoriesExcluded`: Array of `{ "category": STRING, "reason": STRING }`. Every category NOT in `categoriesUsed` MUST appear here with a story-motivated justification. Forcing justification makes the decision stick.
-- `pageVocabulary`: Array of page types this zine will use. Valid types: `"cover"`, `"rules-manual"`, `"tracker-sheet"`, `"setup"`, `"encounter-spread"`, `"ref-pages"`, `"archive"`, `"evidence"`, `"endings"`, `"final"`. Minimum: cover, encounter-spread, endings, final.
 - `arcShape`: One of `"three-act"`, `"front-loaded"`, `"slow-burn"`, `"crescendo"`, `"oscillating"`.
 - `phaseBoundaries`: Object mapping phase number (string) to array of week numbers. Allows non-standard phase boundaries.
 
