@@ -28,7 +28,7 @@ Each document should contain at least one concrete physical detail — a date, a
 
 ### 1. `storyArchives` — the archive sections
 
-Each archive section matches a clock trigger from Stage 1. The `mechanics.clocks` array tells you which section each clock unlocks via `onTrigger.section`.
+Each archive section matches a clock trigger from Stage 1. Section keys MUST match both `mechanics.clocks[].onTrigger.section` and `archiveLayout` keys — these are the same set.
 
 ```json
 {
@@ -37,8 +37,9 @@ Each archive section matches a clock trigger from Stage 1. The `mechanics.clocks
     "formatConfig": {},
     "nodes": [
       {
-        "id": "STRING — e.g. 'D01', 'CR01'",
-        "title": "STRING — short document title",
+        "id": "STRING — e.g. 'D01', 'CR01'. IDs are passed to Stage 4 as cross-reference targets — use stable, meaningful prefixes per section.",
+        "title": "STRING — short document title (letter format uses 'from' instead)",
+        "from": "STRING (OPTIONAL) — letter format only: sender name displayed as attribution",
         "html": "STRING (HTML) — the document content"
       }
     ]
@@ -53,7 +54,7 @@ Each archive section matches a clock trigger from Stage 1. The `mechanics.clocks
 - `transmission`: `{ "channel": "STRING" }`. Monospace, timestamped.
 - `journal`: `{}`. Italic, dashed borders. Nodes use `"title"` as date-like heading.
 - `clipping`: `{ "source": "STRING" }`. Headline-driven, attributed.
-- `fragment-columns`: For evidence tracks with sub-structure.
+- `fragment-columns`: `{}`. Renders title + body in a simple block layout — use for structured data fragments, catalogues, or indexed entries that don&apos;t fit other formats.
 
 **How many archive nodes per section:**
 - Clock with `sequential-loop`: 4-8 nodes
@@ -89,8 +90,8 @@ Produce 2-5 endings. Each corresponds to an `endConditions` entry from Stage 1.
 
 1. All `html` fields use HTML, not markdown
 2. Use `&apos;` not bare apostrophes
-3. No BANNED WORDS (terrifying, chilling, dark, shadow, void, madness, insane, sinister, evil, looming, epic, badass, sudden, suddenly)
-4. Archive section keys MUST match `clocks[].onTrigger.section` from Stage 1
+3. No BANNED WORDS (terrifying, chilling, sinister, evil, looming, epic, badass, sudden, suddenly, eerie, ominous, foreboding, mysterious)
+4. Archive section keys MUST match `archiveLayout` keys AND `clocks[].onTrigger.section` from Stage 1
 5. Ending IDs MUST match `endConditions[].id` from Stage 1
 6. Each archive node: 1-6 sentences. Each ending: 3-8 sentences.
 7. Notes/letters using `"from"` instead of `"title"` — check format spec
@@ -103,5 +104,14 @@ Produce 2-5 endings. Each corresponds to an `endConditions` entry from Stage 1.
 Return ONLY a valid JSON object with two keys: `storyArchives` and `storyEndings`. No commentary, no markdown fences.
 
 ---
+
+## STAGE 1 CONTEXT (required fields)
+
+The following Stage 1 fields are needed to generate archives and endings:
+
+- `mechanics.clocks[]` — clock names, sizes, directions, and `onTrigger.section` keys (defines which archive sections to produce)
+- `mechanics.endConditions[]` — ending IDs and trigger conditions (defines which endings to produce)
+- `archiveLayout[]` — left/right section key assignments (confirms the complete set of section keys)
+- `story.refScheme` — REF code prefix (for consistent cross-reference naming)
 
 ## PASTE YOUR STAGE 1 CONTEXT BELOW THIS LINE
