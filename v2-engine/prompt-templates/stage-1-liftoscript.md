@@ -1,9 +1,9 @@
-# PARSING THE WORKOUT SCRIPT
+# PARSING THE WORKOUT INPUT
 
-The user has provided a raw workout script (such as an exported Liftoscript) below. You must parse this script to define the narrative ARC and pacing of the Zine.
+The user has provided a workout description below. This may be a structured script (e.g., a Liftosaur/Liftoscript export with progression syntax) or a plain-text description (e.g., "Starting Strength, 3 days/week, 6 weeks"). Parse whichever format is present.
 
-1. **Analyze the Movements:** Map the specific exercises defined in the script to the mechanical/narrative challenges of the game. If the script focuses on Heavy Deadlifts, the narrative challenges should reflect extreme physical strain, pulling, or resisting gravity.
-2. **Analyze the Progression:** Identify the intended duration of the program based on the script's progression logic (e.g., how many weeks until a deload or how many total sessions are meant to be performed).
-3. **Align the 3-Act Structure:** The narrative pacing (Act 1: Acclimation, Act 2: The Grind, Act 3: The Climax) MUST align with the progression volume and intensity described in the script. The Climax should occur during the heaviest/most difficult weeks of the script.
-4. **Diegetic Reference:** Do not mention the script syntax or the name "Liftosaur" in the final Zine output. Translate the mathematical progression into narrative escalation seamlessly.
-5. **Generate Workout Logs:** You MUST generate the `workout.sessionTypes[].exercises[]` entries for every single session described in the script. The `exercises[]` list must match the exercises (e.g., `[{ "name": "Squat", "sets": 3, "reps": 5 }]`).
+1. **Analyze the Intensity Pattern:** Use the program&apos;s intensity curve (heavy vs. light weeks, volume ramps, deload phases) to shape the narrative arc&apos;s tension curve. Heavy weeks should align with peak narrative tension; deload weeks should align with breathing room. Do NOT map specific exercises to narrative events — the workout is real, the story is fiction. They fuse through timing and tension, not literal mapping.
+2. **Analyze the Progression:** Identify the intended duration of the program based on the input&apos;s progression logic (e.g., how many weeks until a deload or how many total sessions are meant to be performed). If the input does not specify a duration, default to 6 weeks.
+3. **Align the Narrative Arc:** If a wiring blueprint is provided, its `weeklyArc` phases define the structure — follow them. Otherwise, infer phase boundaries from the program&apos;s volume and intensity pattern. The peak narrative intensity should occur during the heaviest training weeks.
+4. **Diegetic Reference:** Do not mention script syntax, the name "Liftosaur," or any app-specific terminology in the final Zine output. Translate the program structure into narrative pacing seamlessly.
+5. **Generate Workout Logs:** You MUST generate the `workout.sessionTypes[].exercises[]` entries for every session type described in the input. Follow the full schema in the SCHEMA SPECIFICATION section above — include `category`, `protocol`, and `rounds` where applicable.
