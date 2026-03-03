@@ -426,7 +426,7 @@ function validateStageData(num, obj, currentPipelineData) {
             Object.keys(weeks).forEach(function(wk) {
                 var rooms = weeks[wk].rooms;
                 if (Array.isArray(rooms) && rooms.length !== expectedFloors) {
-                    e.push('Map week ' + wk + ' has ' + rooms.length + ' floor(s) in rooms[] but levels declares ' + expectedFloors + '. rooms[].length must equal levels.length.');
+                    w.push('Map week ' + wk + ' has ' + rooms.length + ' floor(s) in rooms[] but levels declares ' + expectedFloors + '. rooms[].length should equal levels.length.');
                 }
             });
         }
