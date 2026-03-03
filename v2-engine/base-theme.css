@@ -1929,6 +1929,34 @@ li {
     padding-left: 0.3rem;
 }
 
+/* Outcome branch type decorations (kebab-cased from dice outcome names) */
+/* These are examples — each zine generates its own outcome names.       */
+/* The structural pattern: urgent outcomes get tighter type,              */
+/* degraded outcomes get monospace, clean outcomes get wider spacing.     */
+.ref-type-system-shock,
+.ref-type-critical-failure {
+    letter-spacing: -0.01em;
+    font-size: 8.5pt;
+}
+
+.ref-type-static-interference,
+.ref-type-signal-loss {
+    font-family: var(--font-mono);
+    font-size: 8.5pt;
+    opacity: 0.85;
+}
+
+.ref-type-data-retrieval,
+.ref-type-partial-success {
+    line-height: 1.5;
+}
+
+.ref-type-coherent-burst,
+.ref-type-full-success {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
 /* Scrambled paragraph book layout */
 .ref-router-section {
     margin-bottom: 0.3rem;

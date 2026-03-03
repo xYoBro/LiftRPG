@@ -8,6 +8,11 @@
 //
 // Exposed: window.renderRefPages, window.renderArchivePages
 
+// Sanitize type strings into valid CSS class fragments (kebab-case)
+function toKebabClass(str) {
+    return (str || 'unknown').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+}
+
 // -- Scramble branch nodes for paragraph-book layout --
 // Ensures no two adjacent entries share the same encounter or outcome.
 // Uses round-robin interleave with rotation per outcome group.
@@ -130,7 +135,7 @@ function renderRefPages(container, data, week, startPage) {
 
         if (routerNode && routerNode.html) {
             var routerContent = document.createElement('div');
-            routerContent.className = 'ref-content ref-type-' + (routerNode.type || 'kinetic');
+            routerContent.className = 'ref-content ref-type-' + toKebabClass(routerNode.type || 'kinetic');
             routerContent.innerHTML = sanitizeHtml(routerNode.html);
             routerDiv.appendChild(routerContent);
         }
@@ -182,7 +187,7 @@ function renderRefPages(container, data, week, startPage) {
         // Content
         if (entry.node && entry.node.html) {
             var content = document.createElement('div');
-            content.className = 'ref-content ref-type-' + (entry.node.type || (entry.outcome.name || 'unknown').toLowerCase());
+            content.className = 'ref-content ref-type-' + toKebabClass(entry.node.type || entry.outcome.name);
             content.innerHTML = sanitizeHtml(entry.node.html);
             entryDiv.appendChild(content);
         } else {
