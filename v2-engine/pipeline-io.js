@@ -390,6 +390,7 @@ async function assemble() {
             theme: s1.theme,
             pages: s1.pages,
             archiveLayout: s1.archiveLayout,
+            structuralAtoms: s1.structuralAtoms || [],
             map: s2.map || s1.map,
             voice: s2.voice,
             story: {
