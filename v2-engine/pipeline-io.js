@@ -528,7 +528,7 @@ function injectTheme(theme) {
         + '--archive-separator: ' + (layout.archiveSeparator === 'none' ? 'none' : '1px solid var(--fog)') + ';'
         + '--text-transform-headings: ' + (layout.textTransformHeadings || 'uppercase') + ';'
         + '--text-transform-labels: ' + (layout.textTransformLabels || 'uppercase') + ';'
-        + '--log-name-width: ' + (layout.logNameWidth || '35%') + ';'
+        + '--log-name-width: ' + (layout.logNameWidth || '40%') + ';'
         + '--log-sets-width: ' + (layout.logSetsWidth || '50%') + ';'
         + '--log-box-width: ' + (layout.logBoxWidth || '1.8rem') + ';'
         + '--log-box-height: ' + (layout.logBoxHeight || '1.1rem') + ';'
