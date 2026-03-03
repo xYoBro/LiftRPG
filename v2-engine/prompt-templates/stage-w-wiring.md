@@ -77,6 +77,7 @@ Declare your chosen arc shape, your phase boundaries (which weeks belong to whic
 8. **Mechanical breadth constraint:** `categoriesExcluded` must contain at least 1 category. Every zine has blind spots — declare yours.
 9. **Resource economy:** If "Choices Mattering" or "Progression" is weighted ≥2, you MUST include at least one resource system (Category 4 in the primitives catalog). Resources create the only print-compatible decision loop: earn by lifting → choose when/how to spend. Without resources, the player is a passenger.
 10. **Player agency floor:** At least one non-zero pillar must involve player decisions. A zine where the player never makes a choice — only lifts, rolls, and reads — is a zine where the player is a passenger, not a protagonist. If "Choices Mattering" is 0, ensure "Role-Playing" or "Exploration" provides some decision point.
+11. **Decision wire requirement (mandatory):** At least one wire MUST create a moment where the player CHOOSES, not merely observes. Qualifying wire types: `feedback-loop` (spend a resource vs. accept a consequence), `resource-cycle` (earn one resource, decide when to convert it), or `conditional-routing` with a player-triggered activation (spend a codeword, pick a branch). A `threshold-gate` wire that fires automatically when a tracker crosses a number does NOT qualify — the player has no agency over when or whether it fires. A blueprint where every wire is a threshold-gate is a blueprint where the player watches a clock tick and reads what the clock unlocks. That is a story machine, not a game.
 
 ---
 
@@ -90,6 +91,7 @@ Before outputting, verify your blueprint against these quality checks:
 - **Workout as engine:** Can you trace every wire back to the workout as its energy source? If a system activates without the player lifting, it&apos;s decoration.
 - **Arc-intensity alignment:** Do high-complexity weeks in your `weeklyArc` correspond to the workout program&apos;s peak intensity weeks? Heavy training = mechanical crisis.
 - **Decision points:** Does at least one wire create a moment where the player CHOOSES (spend a resource, pick a path, sacrifice one tracker for another)? Passive observation is not gameplay.
+- **Decision wire compliance (constraint 11):** Is at least one wire a `feedback-loop`, `resource-cycle`, or player-triggered `conditional-routing`? If EVERY wire in your blueprint is a `threshold-gate`, you are in violation — redesign at least one wire to require a player decision before it fires.
 - **Pillar zeroes are meaningful:** Do your weight-0 pillars represent genuine exclusions that shape the zine&apos;s identity, or did you just zero the least familiar ones?
 
 ---
@@ -112,6 +114,7 @@ If a system doesn&apos;t connect back to the workout, it&apos;s decoration. The 
 Produce a single JSON object with these exact keys:
 
 ### `gameIdentity` (required)
+
 ```json
 {
   "coreLoop": "STRING — the action→consequence→discovery cycle in one sentence",
@@ -122,9 +125,11 @@ Produce a single JSON object with these exact keys:
 ```
 
 ### `experientialPillars` (required)
+
 One entry per pillar. Each has `weight` (0-3) and `expression` (how this manifests mechanically). At least 2 pillars must be weight 0 — set `expression` to `"N/A"` for zeroed pillars.
 
 **Example A — Espionage thriller (pillars sum = 11, 2 zeroed):**
+
 ```json
 {
   "exploration": { "weight": 2, "expression": "Locked map nodes revealed by heat threshold" },
@@ -137,6 +142,7 @@ One entry per pillar. Each has `weight` (0-3) and `expression` (how this manifes
 ```
 
 **Example B — Literary noir (pillars sum = 8, 3 zeroed):**
+
 ```json
 {
   "exploration": { "weight": 0, "expression": "N/A" },
@@ -149,6 +155,7 @@ One entry per pillar. Each has `weight` (0-3) and `expression` (how this manifes
 ```
 
 ### `wiring` (required, array of 2-8 wire objects)
+
 ```json
 [
   {
@@ -166,6 +173,7 @@ One entry per pillar. Each has `weight` (0-3) and `expression` (how this manifes
 ```
 
 ### `weeklyArc` (required, one entry per workout week)
+
 ```json
 [
   {
@@ -178,6 +186,7 @@ One entry per pillar. Each has `weight` (0-3) and `expression` (how this manifes
 ```
 
 ### `complexityProfile` (required)
+
 ```json
 {
   "week1Active": 3,

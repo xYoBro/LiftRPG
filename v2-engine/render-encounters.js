@@ -359,25 +359,43 @@ function renderEncounterSpread(container, data, week, startPage) {
         });
         if (sType && sType.exercises) {
             var intensity = (workout.weekIntensities && workout.weekIntensities[week - 1]) || '';
-            if (intensity) {
+            var isConditioning = sType.category === 'conditioning';
+
+            // Intensity label: only meaningful for lifting sessions
+            if (intensity && !isConditioning) {
                 var intDiv = document.createElement('div');
                 intDiv.className = 'session-intensity';
                 intDiv.textContent = 'INTENSITY: ' + decodeEntities(intensity) + (workout.intensityUnit ? ' ' + decodeEntities(workout.intensityUnit) : '');
                 sessionDiv.appendChild(intDiv);
             }
+            // For conditioning: show protocol label if one is defined
+            if (isConditioning && sType.protocol) {
+                var condDiv = document.createElement('div');
+                condDiv.className = 'session-intensity';
+                condDiv.textContent = 'PROTOCOL: ' + decodeEntities(sType.protocol);
+                sessionDiv.appendChild(condDiv);
+            }
 
             var logTable = document.createElement('table');
-            logTable.className = 'workout-log-table';
+            logTable.className = 'workout-log-table' + (isConditioning ? ' conditioning-log-table' : '');
             var lHead = document.createElement('thead');
             var lHr = document.createElement('tr');
+
+            // Column 1: exercise name
             var lth1 = document.createElement('th');
-            lth1.textContent = decodeEntities((voice.labels && voice.labels.liftColumn) || 'LIFT');
+            lth1.textContent = decodeEntities((voice.labels && voice.labels.liftColumn) || (isConditioning ? 'EXERCISE' : 'LIFT'));
             lHr.appendChild(lth1);
-            var lth2 = document.createElement('th');
-            lth2.textContent = decodeEntities((voice.labels && voice.labels.weightColumn) || workout.weightColumnLabel || 'WEIGHT');
-            lHr.appendChild(lth2);
+
+            // Column 2: weight (lifting only — conditioning has no 1RM percentage)
+            if (!isConditioning) {
+                var lth2 = document.createElement('th');
+                lth2.textContent = decodeEntities((voice.labels && voice.labels.weightColumn) || workout.weightColumnLabel || 'WEIGHT');
+                lHr.appendChild(lth2);
+            }
+
+            // Column 3: sets/rounds
             var lth3 = document.createElement('th');
-            lth3.textContent = 'SETS';
+            lth3.textContent = isConditioning ? (sType.protocol ? 'PROTOCOL' : 'ROUNDS') : 'SETS';
             lHr.appendChild(lth3);
             lHead.appendChild(lHr);
             logTable.appendChild(lHead);
@@ -387,33 +405,54 @@ function renderEncounterSpread(container, data, week, startPage) {
                 var tr = document.createElement('tr');
                 var tdName = document.createElement('td');
                 tdName.className = 'workout-log-name';
-                var repsStr = String(ex.reps);
-                if (repsStr.length > 20) {
-                    console.warn('Oversized reps string detected in ' + ex.name + ' (truncating):', repsStr);
-                    repsStr = repsStr.substring(0, 15) + '...';
+
+                if (isConditioning) {
+                    // Conditioning: name only — rounds shown in dedicated column
+                    tdName.textContent = decodeEntities(ex.name);
+                } else {
+                    // Lifting: name + reps in parens
+                    var repsStr = String(ex.reps);
+                    if (repsStr.length > 20) {
+                        console.warn('Oversized reps string detected in ' + ex.name + ' (truncating):', repsStr);
+                        repsStr = repsStr.substring(0, 15) + '...';
+                    }
+                    tdName.textContent = decodeEntities(ex.name) + ' (' + repsStr + ')';
                 }
-                tdName.textContent = decodeEntities(ex.name) + ' (' + repsStr + ')';
                 tr.appendChild(tdName);
-                var tdWeight = document.createElement('td');
-                tdWeight.className = 'setup-input-cell';
-                // Show intensity hint as light placeholder text
-                if (intensity) {
-                    var hint = document.createElement('span');
-                    hint.className = 'burden-hint';
-                    hint.textContent = intensity + (workout.intensityUnit ? ' ' + workout.intensityUnit : '');
-                    tdWeight.appendChild(hint);
+
+                if (!isConditioning) {
+                    // Lifting: weight input cell with burden-hint
+                    var tdWeight = document.createElement('td');
+                    tdWeight.className = 'setup-input-cell';
+                    if (intensity) {
+                        var hint = document.createElement('span');
+                        hint.className = 'burden-hint';
+                        hint.textContent = intensity + (workout.intensityUnit ? ' ' + workout.intensityUnit : '');
+                        tdWeight.appendChild(hint);
+                    }
+                    tr.appendChild(tdWeight);
                 }
-                tr.appendChild(tdWeight);
+
                 var tdSets = document.createElement('td');
-                tdSets.className = 'workout-log-sets';
-                var setContainer = document.createElement('div');
-                setContainer.className = 'workout-log-set-container';
-                for (var s = 0; s < (ex.sets || 1); s++) {
-                    var box = document.createElement('div');
-                    box.className = 'workout-log-box';
-                    setContainer.appendChild(box);
+                if (isConditioning) {
+                    // Conditioning: show rounds/reps as plain text (no checkboxes — the player just does the rounds)
+                    tdSets.className = 'workout-log-rounds';
+                    var roundsText = ex.rounds ? String(ex.rounds)
+                        : (sType.rounds ? String(sType.rounds)
+                            : (ex.reps !== undefined ? String(ex.reps) : '—'));
+                    tdSets.textContent = decodeEntities(roundsText);
+                } else {
+                    // Lifting: render set checkboxes
+                    tdSets.className = 'workout-log-sets';
+                    var setContainer = document.createElement('div');
+                    setContainer.className = 'workout-log-set-container';
+                    for (var s = 0; s < (ex.sets || 1); s++) {
+                        var box = document.createElement('div');
+                        box.className = 'workout-log-box';
+                        setContainer.appendChild(box);
+                    }
+                    tdSets.appendChild(setContainer);
                 }
-                tdSets.appendChild(setContainer);
                 tr.appendChild(tdSets);
                 lBody.appendChild(tr);
             });

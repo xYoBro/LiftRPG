@@ -29,17 +29,20 @@ Construct IDs from the encounter&apos;s `week`, `day`, and the `refScheme` from 
 - **Branch ID:** router ID + `outcome.suffix`
 
 Example: prefix `R`, weekDigits 1, sessionDigits 1, week 2, day 1, outcomes with suffixes `-T`, `-S`, `-H`:
+
 - Router key: `R21`
 - Branch keys: `R21-T`, `R21-S`, `R21-H`
 
 The engine validates every expected ID exists. **One wrong key = hard rejection of the entire stage.**
 
 ### Router node
+
 Read BEFORE rolling. Sets the scene. 1-3 sentences.
 
 Format: `{ "type": "NARRATIVE_TYPE", "html": "<strong>WEEK W / SESSION D.</strong> Content..." }`
 
 Router `type` values (6 types) — choose the type matching dramatic function:
+
 - `"kinetic"` — action, urgency, physical motion
 - `"philosophical"` — reflection, observation, the world&apos;s rules
 - `"echo"` — found evidence, a document, a recording
@@ -48,20 +51,24 @@ Router `type` values (6 types) — choose the type matching dramatic function:
 - `"apex"` — climactic reveal (use 1-2 per zine MAX)
 
 ### Branch nodes
+
 Read AFTER rolling. Each branch = a different version of what happens. Not severity variations — genuinely different paths.
 
 Format: `{ "type": "OUTCOME_NAME_LOWERCASE", "html": "<strong>OUTCOME_NAME.</strong> Content..." }`
 
-### Rules for all nodes:
+### Rules for all nodes
+
 - 1-3 sentences each. Rarely 4. Never 5+.
 - HTML only. Use `<strong>`, `<em>`, `<br>`.
 - Use `&apos;` not bare apostrophes.
 - Cross-reference archive nodes sparingly: 0-2 times per week.
 
 ### Zeigarnik hooks
+
 At least 1 branch node per session should end with an unresolved image or detail that implies something the reader hasn&apos;t seen. The LAST session of each week should leave the strongest open thread.
 
 ### Codeword usage (if Stage 1 includes codewords)
+
 - **Award** codewords in branch nodes (after rolling)
 - **Check** codewords in router nodes (before rolling)
 - 1-2 awards per week. 1 check per week max.
@@ -86,10 +93,10 @@ At least 1 branch node per session should end with an unresolved image or detail
 
 Before outputting your JSON, verify you have produced every required node:
 
-- **Total nodes needed** = (number of encounters) × (1 router + N outcome branches)
-- For a typical 6-week, 3-session program with 3 outcomes: 18 × 4 = **72 nodes**
+- **Total nodes needed** = (count of encounters in your `story.encounters[]` input) × (1 router + N branches, where N = count of `mechanics.dice.outcomes[]`)
+- **COMPUTE THIS FROM YOUR INPUT — do NOT use the example below as your target number.** Count every encounter object in the Stage 1 context you received. Example for reference only: a 6-week, 3-lifting + 2-conditioning day program = 30 encounters × 4 nodes = **120 nodes**.
 - **Every encounter MUST have its router AND all branch nodes.** Missing even one means the player rolls dice and gets nothing — the game breaks. The engine validates this and will reject incomplete output.
-- Count your output keys and compare against the expected total. If they don&apos;t match, find and fill the gaps before outputting.
+- Count your output keys and compare against your computed total. If they don&apos;t match, find and fill the gaps before outputting.
 
 ---
 
@@ -117,12 +124,14 @@ Return ONLY a valid JSON object where each key is a REF ID and each value is `{ 
 The following fields are needed to generate REF nodes:
 
 **From Stage 1:**
+
 - `meta` — title, setting context
 - `mechanics` — clocks, tracks, dice outcomes, codewords, endConditions (for narrative reference)
 - `story.encounters[]` — week, day, title, narrative, challenge, outcomes with suffixes (defines every REF ID you must produce)
 - `story.refScheme` — prefix, weekDigits, sessionDigits (the REF ID formula inputs)
 
 **From Stage 3:**
+
 - Archive node IDs grouped by section key (for optional cross-references in narrative)
 
 ## PASTE YOUR STAGE 1 + STAGE 3 CONTEXT BELOW THIS LINE
