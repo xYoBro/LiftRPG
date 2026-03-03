@@ -33,6 +33,24 @@ Include exactly ONE "Resolution" mechanic from the list below. All other tracks,
 
 **DICE CONSTRAINT:** The user's narrative brief includes an "Available Dice" line listing which dice they own. You MUST only select resolution systems and modifiers whose `Requires:` dice are ALL present in the user's available dice list. If no resolution system matches, default to 1F (Resource-as-Resolution / no dice). If "none" is listed, use only 1F.
 
+---
+
+## ⚠ SPATIAL PRIORITY — select your map BEFORE selecting any tracker
+
+**Does your Stage W blueprint declare `"spatial"` in `categoriesUsed`?**
+
+If YES: **select your spatial mechanic here, before sections 2-4.** Spatial mechanics cost 3 complexity. If you read sections 1-4 first and use up 5-7 complexity on resolution + trackers, you will have nothing left for the map and it will be silently dropped — even though Stage W declared it. **Budget for the map first. Then select supporting trackers from whatever remains.**
+
+| Story has... | Choose this spatial mechanic |
+|---|---|
+| A space explored section by section (ship, dungeon, facility) | **5A — Facility Grid Map** (complexity: 3) |
+| Named locations connected by routes (wilderness, city, decks) | **5B — Point-to-Point Map** (complexity: 3) |
+| A linear journey, chase, or siege | **5C — Linear Track** (complexity: 2) |
+
+If NO: continue to section 1 and select normally.
+
+---
+
 ## 1. RESOLUTION SYSTEMS (Pick ONE)
 
 All resolution systems are pure lookups: roll → find number in table → read result. No math.

@@ -51,6 +51,12 @@ Game mechanics must BE the theme, not just represent it.
 - A theme about scarcity uses Dual Economy (4D) — earning one resource depletes another
 - A theme about discovery uses Fill Clocks (3A) — knowledge accumulates toward revelation
 - A theme about trust uses Faction Reputation (3G) — relationships shift with every choice
+- **A theme about exploration uses a Point-to-Point Map (5B)** — the world expands as the player advances; fog-of-war is discovery, made visible
+- **A theme about escape or containment uses a Facility Grid (5A)** — locked rooms unlock as conditions are met; the player can SEE what they cannot yet reach
+- **A theme about investigation or puzzle-solving uses Evidence Track + Modular Reveal (4A + 6D)** — clues accumulate, player chooses which thread to pull, archive sections unlock out of order
+- **A theme about a journey uses a Linear Track (5C)** — position on the track IS how far the character has come; the player marks it physically after every session
+
+**The test:** Strip the story text. Can you still feel the genre from the page design, mechanic names, and tracker shapes? A corruption story with a heat track that only rises feels like dread even without the words. An exploration story with a map that reveals week by week feels like discovery even without the words. A tracker-only blueprint for an escape-room story fails this test.
 
 Read the user's brief. What is the central tension? Build mechanics that embody it.
 
@@ -73,13 +79,13 @@ The naming should match the user's genre and tone. Clinical names for clinical w
 
 Distribute these writing approaches across your narrative blocks to prevent monotonous tone. Adapt the specific flavor of each style to match the user's genre:
 
-* **Sensory Detail:** Hyper-specific environmental observation. Smell, texture, temperature, light quality, weight, sound. (In horror: the smell of ozone. In fairy tale: the exact green of moss after rain. In noir: cigarette smoke layering over cheap cologne.)
+- **Sensory Detail:** Hyper-specific environmental observation. Smell, texture, temperature, light quality, weight, sound. (In horror: the smell of ozone. In fairy tale: the exact green of moss after rain. In noir: cigarette smoke layering over cheap cologne.)
 
-* **Kinetic Action:** Explosive physical verbs. Things breaking, moving, colliding. Economy of motion. (In horror: a door buckling inward. In fairy tale: a glass slipper shattering on marble. In noir: a briefcase hitting a desk.)
+- **Kinetic Action:** Explosive physical verbs. Things breaking, moving, colliding. Economy of motion. (In horror: a door buckling inward. In fairy tale: a glass slipper shattering on marble. In noir: a briefcase hitting a desk.)
 
-* **Philosophical Observation:** Deadpan realization. A rule the world operates by, stated flatly. (In horror: "The facility was never meant to contain it. It was meant to attract it." In fairy tale: "The forest gives back exactly what you bring in." In noir: "Everybody in this city owes somebody.")
+- **Philosophical Observation:** Deadpan realization. A rule the world operates by, stated flatly. (In horror: "The facility was never meant to contain it. It was meant to attract it." In fairy tale: "The forest gives back exactly what you bring in." In noir: "Everybody in this city owes somebody.")
 
-* **Found Evidence:** Physical evidence from previous events. Objects, old records, forensic lore, artifacts. (In horror: a scratched tally on a wall. In fairy tale: a letter pinned to a tree with a silver nail. In noir: a receipt dated three days after the victim's funeral.)
+- **Found Evidence:** Physical evidence from previous events. Objects, old records, forensic lore, artifacts. (In horror: a scratched tally on a wall. In fairy tale: a letter pinned to a tree with a silver nail. In noir: a receipt dated three days after the victim's funeral.)
 
 **Distribution:** No single style should exceed 40% of narrative blocks. At least 3 styles must appear across the zine.
 

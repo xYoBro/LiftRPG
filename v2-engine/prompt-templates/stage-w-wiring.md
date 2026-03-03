@@ -26,6 +26,20 @@ Do NOT start by selecting game mechanics. Start with the user&apos;s creative br
 3. **What INTERACTIONS between systems create the experience?** A lone clock ticking is a timer. Two clocks racing each other is dread. A clock that affects what you see on a map is discovery.
 4. **THEN — which primitives can express those interactions?** The mechanics serve the story, not the other way around.
 
+### SPATIAL MECHANICS TRIGGER — ask this before choosing ANY tracker
+
+Before you reach for a fill clock or heat track, answer this question: **Does this story take place in a physical space that changes?**
+
+- A ship being explored section by section → **Facility Grid Map (5A)**
+- A wilderness or dungeon with locations connected by paths → **Point-to-Point Map (5B)**
+- A chase, a siege, a journey with a clear start-to-finish → **Linear Track (5C)**
+- An escape room, a locked facility, rooms that unlock → **Facility Grid Map (5A)** with `"mod": "locked"` rooms
+- An investigation with sites to visit in any order → **Point-to-Point Map (5B)** with fog-of-war
+
+**If the story involves a changing physical space, declare `"spatial"` in `categoriesUsed` BEFORE selecting tracking mechanics.** A spatial mechanic costs 3 complexity — budget for it first by selecting fewer trackers, not fewer mechanics. A map that reveals week by week IS an engagement hook. A facility grid with locked rooms IS a puzzle. These mechanics already exist and are fully rendered by the engine — they are not experimental features.
+
+**Do NOT default to tracking-only blueprints because maps feel complex.** The engine renders all map types automatically from your JSON. Your job is to design; the renderer&apos;s job is to draw it.
+
 ---
 
 ## EXPERIENTIAL PILLARS
@@ -34,7 +48,7 @@ Every zine emphasizes different player experiences. Weight each pillar 0-3 based
 
 | Pillar | 0 = Absent | 1 = Background | 2 = Present | 3 = Central |
 |--------|-----------|----------------|-------------|-------------|
-| **Exploration** | No hidden content | Some locked entries | Map with gated nodes | Discovering the unknown IS the game |
+| **Exploration** | No hidden content | Some locked entries | Map with gated nodes — declare `spatial` in `categoriesUsed` | Discovering the unknown IS the game — spatial mechanic required |
 | **Progression** | Static from week 1 | Mild power growth | Unlock chains open new systems | Character transformation drives everything |
 | **Choices Mattering** | Outcomes are cosmetic | Some branching text | Codewords gate major content | Every decision permanently alters the game state |
 | **Self-Reflection** | Pure fiction | Occasional journaling prompt | Regular character introspection | The player&apos;s real experience bleeds into the fiction |
