@@ -13,6 +13,11 @@
 //
 // Exposed: window.AtomRenderers
 
+// Sanitize type strings into valid CSS class fragments (kebab-case)
+function toKebabClass(str) {
+    return (str || 'unknown').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+}
+
 var AtomRenderers = {};
 
 /**
@@ -485,7 +490,7 @@ AtomRenderers['ref-router'] = function (atom, ctx) {
 
     if (c.html) {
         var content = document.createElement('div');
-        content.className = 'ref-content ref-type-' + (c.nodeType || 'kinetic');
+        content.className = 'ref-content ref-type-' + toKebabClass(c.nodeType || 'kinetic');
         content.innerHTML = sanitizeHtml(c.html);
         div.appendChild(content);
     }
@@ -518,7 +523,7 @@ AtomRenderers['ref-outcome'] = function (atom, ctx) {
 
     if (c.html) {
         var content = document.createElement('div');
-        content.className = 'ref-content ref-type-' + (c.nodeType || (c.outcomeName || 'unknown').toLowerCase());
+        content.className = 'ref-content ref-type-' + toKebabClass(c.nodeType || c.outcomeName);
         content.innerHTML = sanitizeHtml(c.html);
         div.appendChild(content);
     } else {
@@ -790,7 +795,7 @@ AtomRenderers['ending-block'] = function (atom, ctx) {
 AtomRenderers['evidence-node'] = function (atom, ctx) {
     var c = atom.content;
     var div = document.createElement('div');
-    div.className = 'evidence-node ref-type-' + (c.nodeType || 'kinetic');
+    div.className = 'evidence-node ref-type-' + toKebabClass(c.nodeType || 'kinetic');
     var header = document.createElement('div');
     header.className = 'evidence-node-header';
     header.innerHTML = '<span class="evidence-track-name">' + escapeHtml(c.trackName) + '</span> &mdash; <span class="evidence-node-id">[' + escapeHtml(c.key) + ']</span>';
