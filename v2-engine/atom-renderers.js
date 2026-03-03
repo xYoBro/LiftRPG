@@ -140,7 +140,9 @@ AtomRenderers['encounter-scaffold'] = function (atom, ctx) {
 };
 
 /**
- * Workout session: intensity label + exercise log table.
+ * Workout session: header bar + exercise log table.
+ * The header bar is the primary visual landmark — a bold inverted strip
+ * that makes every workout instantly findable when flipping through pages.
  */
 AtomRenderers['workout-session'] = function (atom, ctx) {
     var c = atom.content;
@@ -153,17 +155,29 @@ AtomRenderers['workout-session'] = function (atom, ctx) {
 
     if (!sType || !sType.exercises) return div;
 
-    // Intensity
-    var intensity = c.weekIntensity || '';
-    if (intensity) {
-        var intDiv = document.createElement('div');
-        intDiv.className = 'session-intensity';
-        intDiv.textContent = 'INTENSITY: ' + decodeEntities(intensity) +
-            (c.intensityUnit ? ' ' + decodeEntities(c.intensityUnit) : '');
-        div.appendChild(intDiv);
-    }
+    var intensity = (c.weekIntensity != null) ? String(c.weekIntensity) : '';
+    var weekNum = atom.week || '';
 
-    // Workout log table
+    // ── Header bar: the at-a-glance landmark ──
+    var header = document.createElement('div');
+    header.className = 'workout-log-header';
+    var headerLeft = document.createElement('span');
+    headerLeft.className = 'workout-log-header-name';
+    headerLeft.textContent = decodeEntities(sType.name || 'WORKOUT');
+    header.appendChild(headerLeft);
+    if (weekNum || intensity) {
+        var headerRight = document.createElement('span');
+        headerRight.className = 'workout-log-header-meta';
+        var metaParts = [];
+        if (weekNum) metaParts.push('WEEK ' + weekNum);
+        if (intensity) metaParts.push(decodeEntities(intensity) +
+            (c.intensityUnit ? ' ' + decodeEntities(c.intensityUnit) : ''));
+        headerRight.textContent = metaParts.join(' \u00B7 ');
+        header.appendChild(headerRight);
+    }
+    div.appendChild(header);
+
+    // ── Exercise log table ──
     var table = document.createElement('table');
     table.className = 'workout-log-table';
     var thead = document.createElement('thead');

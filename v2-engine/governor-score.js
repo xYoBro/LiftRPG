@@ -27,11 +27,13 @@ var GovernorScore = {};
 GovernorScore.WEIGHTS = {
     underfill: 10,          // (1 - fill)² × this
     emptyPage: 5,           // pages < 15% fill
-    templateRepeat: 3,      // same template 3+ consecutive
+    templateRepeat: 3,      // same template 3+ consecutive (within same groupType)
     pacingDense: 2,         // 3+ consecutive dense pages (>85%)
     balanceBonus: 2,        // per page in 0.45-0.85 sweet spot
-    pageCountPenalty: 0.5,  // per extra page (slight preference for compact)
-    multiSlotBonus: 1       // slight preference for multi-slot layouts (visual diversity)
+    pageCountPenalty: 0.2,  // per extra page (mild preference for compact)
+    multiSlotBonus: 1,      // slight preference for multi-slot layouts (visual diversity)
+    pacingAlignment: 3.0,   // bonus for template matching encounter pacingHint
+    hudPageBonus: 1.0       // bonus for templates with dedicated HUD page (classic, dossier)
 };
 
 // ── Full Sequence Evaluation ─────────────────────────────────
@@ -169,6 +171,17 @@ GovernorScore.scoreCandidate = function (estimate, context) {
     // Multi-slot bonus: slight preference for visual diversity
     if (estimate.multiSlot) {
         score += W.multiSlotBonus;
+    }
+
+    // Pacing alignment: bonus for templates matching encounter pacingHint
+    if (estimate.pacingAlignment != null) {
+        score += estimate.pacingAlignment * W.pacingAlignment;
+    }
+
+    // HUD page bonus: templates with dedicated HUD command-center page
+    var hudTemplates = { 'encounter-classic': true, 'encounter-dossier': true };
+    if (hudTemplates[estimate.templateId]) {
+        score += W.hudPageBonus;
     }
 
     return score;

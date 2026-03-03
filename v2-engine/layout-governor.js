@@ -540,9 +540,10 @@ LayoutGovernor.compose = function (inventory, container, data) {
 
     var totalPages = 0;
 
-    // Scoring context: tracks previous template IDs and fill ratios
-    // for diversity and pacing scoring
-    var prevTemplateIds = [];
+    // Scoring context: tracks previous template IDs per group type
+    // (so encounter templates aren't penalized for "repeating" across
+    // unrelated group types like archives or ref-pages)
+    var prevTemplateIdsByType = {};
     var prevFillRatios = [];
 
     for (var i = 0; i < pageGroups.length; i++) {
@@ -554,9 +555,10 @@ LayoutGovernor.compose = function (inventory, container, data) {
         ctx.sectionKey = group.meta.sectionKey || null;
         ctx._selectedEstimate = null;
 
-        // Phase 3: Build scoring context
+        // Phase 3: Build scoring context (per-groupType template tracking)
+        var typeHistory = prevTemplateIdsByType[group.groupType] || [];
         ctx.scoringContext = {
-            prevTemplateIds: prevTemplateIds.slice(-4),
+            prevTemplateIds: typeHistory.slice(-4),
             prevFillRatios: prevFillRatios.slice(-4)
         };
 
@@ -627,8 +629,11 @@ LayoutGovernor.compose = function (inventory, container, data) {
             recordPageInPlan(plan, totalPages + p, template.id, group.groupType, fillRatio);
         }
 
-        // Update scoring context
-        prevTemplateIds.push(template.id);
+        // Update scoring context (per-groupType template tracking)
+        if (!prevTemplateIdsByType[group.groupType]) {
+            prevTemplateIdsByType[group.groupType] = [];
+        }
+        prevTemplateIdsByType[group.groupType].push(template.id);
         if (estimate && estimate.fillRatios) {
             for (var fr = 0; fr < estimate.fillRatios.length; fr++) {
                 prevFillRatios.push(estimate.fillRatios[fr]);

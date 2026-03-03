@@ -373,6 +373,34 @@ LayoutTemplates.register({
     }
 });
 
+// ── Encounter Pacing Alignment Helper ─────────────────────────
+// Returns 0.0–1.0 indicating how well a template matches
+// the atoms' pacingHint. Used by encounter estimate() methods
+// to inform the scorer's pacingAlignment dimension.
+
+function encounterPacingAlignment(templateId, atoms) {
+    var hint = null;
+    for (var i = 0; i < atoms.length; i++) {
+        if (atoms[i].type === 'encounter-scaffold' && atoms[i].content && atoms[i].content.pacingHint) {
+            hint = atoms[i].content.pacingHint;
+            break;
+        }
+    }
+    if (!hint) return 0.5;  // neutral — no hint given
+
+    // Alignment matrix: templateId × pacingHint → score
+    var alignment = {
+        'encounter-classic':    { breather: 0.3, transition: 0.8, crescendo: 0.5 },
+        'encounter-integrated': { breather: 1.0, transition: 0.6, crescendo: 0.1 },
+        'encounter-dossier':    { breather: 0.1, transition: 0.4, crescendo: 1.0 },
+        'encounter-magazine':   { breather: 0.2, transition: 0.7, crescendo: 0.9 }
+    };
+
+    var row = alignment[templateId];
+    if (!row) return 0.5;
+    return row[hint] != null ? row[hint] : 0.5;
+}
+
 // ══════════════════════════════════════════════════════════════
 //  ENCOUNTER SPREAD TEMPLATE: CLASSIC (HUD + LOG)
 // ══════════════════════════════════════════════════════════════
@@ -425,7 +453,8 @@ LayoutTemplates.register({
             templateId: 'encounter-classic',
             pages: 1 + logFills.length,
             fillRatios: fillRatios,
-            confidence: 0.7
+            confidence: 0.7,
+            pacingAlignment: encounterPacingAlignment('encounter-classic', atoms)
         };
     },
     renderPages: function (container, atoms, ctx) {
@@ -1134,7 +1163,8 @@ LayoutTemplates.register({
             templateId: 'encounter-integrated',
             pages: fillRatios.length,
             fillRatios: fillRatios,
-            confidence: 0.7
+            confidence: 0.7,
+            pacingAlignment: encounterPacingAlignment('encounter-integrated', atoms)
         };
     },
     renderPages: function (container, atoms, ctx) {
@@ -1358,7 +1388,8 @@ LayoutTemplates.register({
             templateId: 'encounter-dossier',
             pages: 1 + logFills.length,
             fillRatios: fillRatios,
-            confidence: 0.65
+            confidence: 0.65,
+            pacingAlignment: encounterPacingAlignment('encounter-dossier', atoms)
         };
     },
     renderPages: function (container, atoms, ctx) {
@@ -1552,22 +1583,26 @@ LayoutTemplates.register({
 
 /**
  * Check if a page with a column-count container is overflowing.
- * CSS column-count inflates page.scrollHeight (reports single-column height),
- * creating phantom overflows. This function computes the balanced column height
- * and checks against the actual available space.
+ * The gazette containers use flex:1 inside a fixed-height flex page,
+ * so offsetHeight is clamped to the available space (hides real overflow).
+ * We temporarily remove the flex constraint so CSS column-count auto-balances
+ * naturally (respecting break-inside:avoid), measure that height, then restore.
  *
  * @param {HTMLElement} page
  * @param {HTMLElement} colContainer  The column-count container element
- * @param {number} [colCount]  Number of columns (default: 2)
  * @returns {boolean}  true if content genuinely overflows
  */
-function isColumnPageOverflowing(page, colContainer, colCount) {
-    colCount = colCount || 2;
+function isColumnPageOverflowing(page, colContainer) {
     var padBottom = parseFloat(window.getComputedStyle(page).paddingBottom) || 0;
     var available = page.clientHeight - colContainer.offsetTop - padBottom;
-    var singleColH = colContainer.scrollHeight;
-    var balancedH = Math.ceil(singleColH / colCount);
-    return balancedH > available;
+    // Remove flex constraint to get the natural CSS-balanced column height.
+    // With flex:1, offsetHeight is clamped; with flex:none, CSS column-count
+    // auto-balances content and offsetHeight reflects the real tallest column.
+    var savedFlex = colContainer.style.flex;
+    colContainer.style.flex = 'none';
+    var naturalHeight = colContainer.offsetHeight;
+    colContainer.style.flex = savedFlex;
+    return naturalHeight > available;
 }
 
 /**
@@ -1686,13 +1721,10 @@ LayoutTemplates.register({
     estimate: function (atoms, measurements, ctx) {
         var ph = measurements.pageHeight;
         var pw = GovernorMeasure.getContentWidth();
-        var leftW = Math.floor(pw * 0.55);
-        var rightW = pw - leftW;
-        var overhead = 80;  // classification + pips + footer reservation
+        var overhead = 80;  // classification + pips
         var footerH = 0;
-
-        var leftHeights = [];
-        var rightHeights = [];
+        var contentH = 0;
+        var seenWorkoutTypes = {};
 
         for (var i = 0; i < measurements.measurements.length; i++) {
             var m = measurements.measurements[i];
@@ -1700,34 +1732,30 @@ LayoutTemplates.register({
             if (t === 'facility-grid' || t === 'point-to-point' || t === 'linear-track' || t === 'week-checkin') {
                 footerH += GovernorMeasure.measure(m.atom, ctx, pw);
             } else if (t === 'workout-session') {
-                rightHeights.push(GovernorMeasure.measure(m.atom, ctx, rightW));
-            } else if (t === 'encounter-scaffold' || t === 'condition-check') {
-                leftHeights.push(GovernorMeasure.measure(m.atom, ctx, leftW));
+                // Deduplicate: only count one card per unique session type
+                var typeName = (m.atom.content.sessionType && m.atom.content.sessionType.name) || m.atom.id;
+                if (!seenWorkoutTypes[typeName]) {
+                    seenWorkoutTypes[typeName] = true;
+                    contentH += GovernorMeasure.measure(m.atom, ctx, pw);
+                }
+            } else {
+                contentH += GovernorMeasure.measure(m.atom, ctx, pw);
             }
         }
 
-        var available = ph - overhead - footerH;
-        if (available <= 0) available = ph * 0.5;
-
-        var leftTotal = 0;
-        for (var j = 0; j < leftHeights.length; j++) leftTotal += leftHeights[j];
-        var rightTotal = 0;
-        for (var k = 0; k < rightHeights.length; k++) rightTotal += rightHeights[k];
-
-        var tallColumn = Math.max(leftTotal, rightTotal);
-        var pages = Math.ceil(tallColumn / available) || 1;
-        var fillRatios = [];
-        for (var p = 0; p < pages; p++) {
-            var pageContent = Math.min(tallColumn - (p * available), available);
-            fillRatios.push(Math.min((pageContent + overhead + footerH / pages) / ph, 1.0));
-        }
+        var totalH = contentH + overhead + footerH;
+        var pages = Math.ceil(totalH / ph) || 1;
+        var fillRatios = GovernorScore.computeFillRatios(
+            [contentH + overhead, footerH], ph, 0
+        );
 
         return {
             templateId: 'encounter-magazine',
             pages: pages,
             fillRatios: fillRatios,
-            confidence: 0.6,
-            multiSlot: true
+            confidence: 0.65,
+            multiSlot: false,  // no longer a multi-slot grid
+            pacingAlignment: encounterPacingAlignment('encounter-magazine', atoms)
         };
     },
     renderPages: function (container, atoms, ctx) {
@@ -1796,13 +1824,13 @@ LayoutTemplates.register({
             page.appendChild(progressDiv);
         }
 
-        // Grid container
+        // Stacked layout: narratives → workout cards → footer
         var grid = document.createElement('div');
         grid.className = 'encounter-magazine-grid';
 
-        // Left column: scaffolds + conditions
-        var leftCol = document.createElement('div');
-        leftCol.className = 'encounter-magazine-left';
+        // ── Narrative zone: scaffolds + conditions ──
+        var narrativeZone = document.createElement('div');
+        narrativeZone.className = 'encounter-magazine-narratives';
 
         var refScheme = (data.story && data.story.refScheme) || { prefix: 'R', weekDigits: 1, sessionDigits: 1 };
 
@@ -1832,26 +1860,31 @@ LayoutTemplates.register({
             refDiv.textContent = refLabel.replace(/\{\{ref\}\}/g, refCode);
             sessionDiv.appendChild(refDiv);
 
-            leftCol.appendChild(sessionDiv);
+            narrativeZone.appendChild(sessionDiv);
         });
+        grid.appendChild(narrativeZone);
 
-        // Right column: workout logs
-        var rightCol = document.createElement('div');
-        rightCol.className = 'encounter-magazine-right';
+        // ── Workout zone: full-width cards ──
+        var workoutZone = document.createElement('div');
+        workoutZone.className = 'encounter-magazine-workouts';
 
+        // Deduplicate: only render one card per unique sessionType name
+        var renderedTypes = {};
         scaffoldAtoms.forEach(function (scaffAtom) {
             var day = scaffAtom.session;
             var wkAtom = workoutAtoms[day];
             if (wkAtom) {
-                var wkEl = AtomRenderers.render(wkAtom, ctx);
-                rightCol.appendChild(wkEl);
+                var typeName = (wkAtom.content.sessionType && wkAtom.content.sessionType.name) || day;
+                if (!renderedTypes[typeName]) {
+                    renderedTypes[typeName] = true;
+                    var wkEl = AtomRenderers.render(wkAtom, ctx);
+                    workoutZone.appendChild(wkEl);
+                }
             }
         });
+        grid.appendChild(workoutZone);
 
-        grid.appendChild(leftCol);
-        grid.appendChild(rightCol);
-
-        // Footer: map + checkin
+        // ── Footer: map + checkin ──
         var footer = document.createElement('div');
         footer.className = 'encounter-magazine-footer';
         if (mapAtom) footer.appendChild(AtomRenderers.render(mapAtom, ctx));
@@ -1860,20 +1893,28 @@ LayoutTemplates.register({
 
         page.appendChild(grid);
 
-        // Overflow: if either column overflows, move last session-block pair to new page
+        // Overflow: move last element from the heaviest zone to a new page
         while (page.scrollHeight > page.clientHeight) {
-            var leftBlocks = leftCol.querySelectorAll('.session-block');
-            var rightItems = rightCol.children;
-            if (leftBlocks.length <= 1 && rightItems.length <= 1) {
+            var narrativeBlocks = narrativeZone.querySelectorAll('.session-block');
+            var workoutCards = workoutZone.children;
+            if (narrativeBlocks.length <= 1 && workoutCards.length === 0) {
                 console.warn('CONTENT OVERFLOW: Magazine layout — single session exceeds page.');
                 break;
             }
 
-            // Move last session-block from left and corresponding workout from right
-            var lastLeft = leftBlocks[leftBlocks.length - 1];
-            leftCol.removeChild(lastLeft);
-            var lastRight = rightItems.length > 0 ? rightItems[rightItems.length - 1] : null;
-            if (lastRight) rightCol.removeChild(lastRight);
+            // Prefer moving last narrative block (keeps workout cards together)
+            var spilled = null;
+            var spillTarget = 'narrative';
+            if (narrativeBlocks.length > 1) {
+                spilled = narrativeBlocks[narrativeBlocks.length - 1];
+                narrativeZone.removeChild(spilled);
+            } else if (workoutCards.length > 0) {
+                spilled = workoutCards[workoutCards.length - 1];
+                workoutZone.removeChild(spilled);
+                spillTarget = 'workout';
+            } else {
+                break;
+            }
 
             // Number current page before creating continuation
             addPageNumber(page, pageNum);
@@ -1889,21 +1930,23 @@ LayoutTemplates.register({
 
             var contGrid = document.createElement('div');
             contGrid.className = 'encounter-magazine-grid';
-            var contLeft = document.createElement('div');
-            contLeft.className = 'encounter-magazine-left';
-            contLeft.appendChild(lastLeft);
-            var contRight = document.createElement('div');
-            contRight.className = 'encounter-magazine-right';
-            if (lastRight) contRight.appendChild(lastRight);
-            contGrid.appendChild(contLeft);
-            contGrid.appendChild(contRight);
+            var contNarr = document.createElement('div');
+            contNarr.className = 'encounter-magazine-narratives';
+            var contWork = document.createElement('div');
+            contWork.className = 'encounter-magazine-workouts';
+
+            if (spillTarget === 'narrative') contNarr.appendChild(spilled);
+            else contWork.appendChild(spilled);
+
+            contGrid.appendChild(contNarr);
+            contGrid.appendChild(contWork);
             contPage.appendChild(contGrid);
 
-            // Replace current page/grid references for next iteration
+            // Replace references for next iteration
             page = contPage;
             grid = contGrid;
-            leftCol = contLeft;
-            rightCol = contRight;
+            narrativeZone = contNarr;
+            workoutZone = contWork;
         }
 
         addPageNumber(page, pageNum);

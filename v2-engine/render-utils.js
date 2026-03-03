@@ -48,7 +48,7 @@ function sanitizeHtml(htmlStr) {
 
 // Decode the 5 standard XML entities in textContent strings from LLM JSON
 function decodeEntities(str) {
-    if (typeof str !== 'string') return '';
+    if (typeof str !== 'string') return str == null ? '' : String(str);
     return str
         .replace(/&amp;/g, '&')
         .replace(/&lt;/g, '<')
