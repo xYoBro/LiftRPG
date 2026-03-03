@@ -100,7 +100,7 @@ body {
 }
 
 /* Ensure page content sits above texture layers + prevent overflow */
-.zine-page > * {
+.zine-page>* {
     position: relative;
     z-index: 2;
     max-width: 100%;
@@ -188,9 +188,6 @@ body {
     margin-bottom: 0.5rem;
 }
 
-[data-visual-weight="sparse"] .workout-session-atom {
-    opacity: 0.85;
-}
 
 /* -- Dense: packed, urgent -- */
 [data-visual-weight="dense"] .session-block {
@@ -233,12 +230,6 @@ body {
     border-bottom-color: var(--ink);
 }
 
-[data-visual-weight="crisis"] .workout-session-atom {
-    box-shadow:
-        0 2px 4px rgba(0,0,0,0.12),
-        0 6px 16px rgba(0,0,0,0.14);
-    border-color: var(--ink);
-}
 
 [data-visual-weight="crisis"] .boss-rules-box {
     border-width: 2.5px;
@@ -361,9 +352,9 @@ body {
 
 /* -- INSTITUTIONAL: Government forms, heavy stamps, vignette -- */
 [data-treatment="institutional"] .zine-page {
-    --texture-bg: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.06) 100%);
+    --texture-bg: radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.06) 100%);
     --texture-opacity: 1;
-    --edge-shadow: inset 0 0 15px rgba(0,0,0,0.04);
+    --edge-shadow: inset 0 0 15px rgba(0, 0, 0, 0.04);
     --border-accent-width: 3px;
 }
 
@@ -378,9 +369,9 @@ body {
 
 /* -- NOIR: Photocopied case files, grain, ink bleed, high contrast -- */
 [data-treatment="noir"] .zine-page {
-    --texture-bg: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.12) 100%);
+    --texture-bg: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.12) 100%);
     --texture-opacity: 1;
-    --edge-shadow: inset 0 0 20px rgba(0,0,0,0.08);
+    --edge-shadow: inset 0 0 20px rgba(0, 0, 0, 0.08);
     filter: url(#zine-grain) contrast(1.03);
 }
 
@@ -402,10 +393,8 @@ body {
 
 /* -- TERMINAL: Computer printout, scan lines, monospace -- */
 [data-treatment="terminal"] .zine-page {
-    --texture-bg: repeating-linear-gradient(
-        transparent, transparent 3px,
-        rgba(0,0,0,0.025) 3px, rgba(0,0,0,0.025) 4px
-    );
+    --texture-bg: repeating-linear-gradient(transparent, transparent 3px,
+            rgba(0, 0, 0, 0.025) 3px, rgba(0, 0, 0, 0.025) 4px);
     --texture-opacity: 1;
     --edge-shadow: none;
 }
@@ -539,9 +528,9 @@ body {
 
 /* -- CONFESSIONAL: Found diary, aged paper, worn edges -- */
 [data-treatment="confessional"] .zine-page {
-    --texture-bg: radial-gradient(ellipse at 30% 70%, rgba(139,119,82,0.08), transparent 70%);
+    --texture-bg: radial-gradient(ellipse at 30% 70%, rgba(139, 119, 82, 0.08), transparent 70%);
     --texture-opacity: 1;
-    --edge-shadow: inset 0 0 25px rgba(0,0,0,0.06);
+    --edge-shadow: inset 0 0 25px rgba(0, 0, 0, 0.06);
     filter: url(#zine-grain);
 }
 
@@ -571,10 +560,10 @@ body {
 /* -- CORPORATE: Classified briefing, grid underlay, indexed tabs -- */
 [data-treatment="corporate"] .zine-page {
     --texture-bg:
-        repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(0,0,0,0.025) 19px, rgba(0,0,0,0.025) 20px),
-        repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(0,0,0,0.025) 19px, rgba(0,0,0,0.025) 20px);
+        repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(0, 0, 0, 0.025) 19px, rgba(0, 0, 0, 0.025) 20px),
+        repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(0, 0, 0, 0.025) 19px, rgba(0, 0, 0, 0.025) 20px);
     --texture-opacity: 1;
-    --edge-shadow: inset 0 0 8px rgba(0,0,0,0.03);
+    --edge-shadow: inset 0 0 8px rgba(0, 0, 0, 0.03);
 }
 
 [data-treatment="corporate"] .classification-stamp {
@@ -1381,26 +1370,53 @@ li {
 
 /* ══════════════════════════════════════════════════════════════
    WORKOUT CARD SYSTEM
-   Apple-inspired elevated card: shadow + radius + clean hierarchy.
-   Must be instantly recognizable in every theme/treatment.
+   Physical artifact feel: grain, ruled lines, pressed-in boxes.
+   Must print cleanly in B&W; all texture uses ink/paper/fog
+   variables, never color-only contrast.
    ══════════════════════════════════════════════════════════════ */
 
 /* ── Card container ── */
-/* Shadow provides elevation; radius provides identity.
-   overflow:hidden clips the header bar to the card radius. */
+/* Paper grain via SVG noise + layered shadows for genuine lift.
+   The grain is subtle at 2% opacity — visible under a loupe,
+   felt subconsciously at reading distance. */
 .workout-session-atom {
-    border-radius: 8px;
+    border-radius: 6px;
     background: var(--paper);
+    /* Paper grain: repeating SVG turbulence at 3% opacity */
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
     box-shadow:
-        0 1px 2px rgba(0,0,0,0.07),
-        0 4px 12px rgba(0,0,0,0.10);
-    border: 1px solid var(--fog, rgba(0,0,0,0.10));
+        0 1px 0 rgba(255, 255, 255, 0.9) inset,
+        /* top specular — paper edge */
+        0 1px 2px rgba(0, 0, 0, 0.08),
+        0 3px 10px rgba(0, 0, 0, 0.10),
+        0 8px 20px rgba(0, 0, 0, 0.07);
+    /* ambient lift */
+    border: 1px solid var(--fog, rgba(0, 0, 0, 0.12));
+    border-bottom-color: rgba(0, 0, 0, 0.18);
+    /* heavier base edge — card sits on surface */
     margin-bottom: 0.15in;
     overflow: hidden;
+    position: relative;
+}
+
+/* Corner registration mark — top right, like a log sheet corner stamp */
+.workout-session-atom::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 12px 12px 0;
+    border-color: transparent var(--fog, rgba(0, 0, 0, 0.12)) transparent transparent;
+    pointer-events: none;
 }
 
 /* ── Header bar ── */
-/* Inverted strip: the at-a-glance landmark when flipping pages. */
+/* Inverted strip: the at-a-glance landmark when flipping pages.
+   Slight grain treatment so it doesn't read as a screen element. */
 .workout-log-header {
     display: flex;
     justify-content: space-between;
@@ -1412,13 +1428,18 @@ li {
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    padding: 0.3rem 0.5rem;
+    padding: 0.3rem 0.5rem 0.3rem 0.6rem;
+    /* Thin inner-top highlight: looks letterpress-printed */
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07) inset;
+    position: relative;
 }
+
 .workout-log-header-name {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
 .workout-log-header-meta {
     white-space: nowrap;
     font-weight: normal;
@@ -1428,34 +1449,59 @@ li {
 }
 
 /* ── Column headers ── */
-/* Subtle muted bar — secondary to the header, not competing. */
+/* Tight ruled bar with a left-margin line — like a real log sheet. */
 .workout-log-table {
     width: 100%;
     border-collapse: collapse;
     margin: 0;
     font-family: var(--font-mono);
+    /* Ruled lines behind the data rows: one line per ~1.55rem row */
+    background-image: repeating-linear-gradient(to bottom,
+            transparent 0,
+            transparent calc(1.55rem - 1px),
+            var(--fog, rgba(0, 0, 0, 0.07)) calc(1.55rem - 1px),
+            var(--fog, rgba(0, 0, 0, 0.07)) 1.55rem);
+    background-attachment: local;
 }
+
 .workout-log-table th {
     background: var(--fog, #e8e8e8);
+    /* Fog column header — sits on top of ruled lines */
+    background-image: none;
     color: var(--ink);
     text-transform: uppercase;
     font-size: 6pt;
     font-weight: bold;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     padding: 0.15rem 0.5rem;
-    border-bottom: 1px solid var(--fog, rgba(0,0,0,0.12));
+    border-bottom: 1.5px solid rgba(0, 0, 0, 0.18);
     text-align: left;
 }
 
 /* ── Data rows ── */
 .workout-log-table td {
-    border-bottom: 1px solid var(--fog, rgba(0,0,0,0.08));
+    border-bottom: none;
+    /* ruled lines from background-image handle this */
     padding: 0.25rem 0.5rem;
     vertical-align: middle;
     font-size: 9pt;
 }
+
 .workout-log-table tbody tr:last-child td {
     border-bottom: none;
+    padding-bottom: 0.4rem;
+    /* breathing room at card base */
+}
+
+/* Left margin accent — the red margin line of a real log book */
+.workout-log-table td:first-child {
+    border-left: 2px solid var(--accent, #c45c00);
+    padding-left: 0.6rem;
+}
+
+.workout-log-table th:first-child {
+    border-left: 2px solid var(--accent, #c45c00);
+    padding-left: 0.6rem;
 }
 
 /* Exercise name */
@@ -1473,19 +1519,114 @@ li {
     width: var(--log-sets-width, 50%);
 }
 
+/* Rounds column (conditioning) */
+.workout-log-rounds {
+    width: var(--log-sets-width, 50%);
+    font-family: var(--font-mono);
+    font-size: 9pt;
+    color: var(--ink);
+    text-align: center;
+}
+
+/* Conditioning table: lighter treatment — no write-in boxes, no margin line urgency */
+.conditioning-log-table td:first-child,
+.conditioning-log-table th:first-child {
+    border-left: 2px solid var(--fog, rgba(0, 0, 0, 0.15));
+}
+
 /* ── Set boxes (write-in targets) ── */
+/* Inset shadow makes them feel pressed into the paper surface.
+   Double border reads as a printed box on a physical card. */
 .workout-log-set-container {
     display: flex;
     gap: 0.2rem;
     flex-wrap: wrap;
 }
+
 .workout-log-box {
     width: var(--log-box-width, 2rem);
     height: var(--log-box-height, 1.3rem);
-    border: 1px solid var(--fog, rgba(0,0,0,0.20));
-    border-radius: 3px;
+    border: 1px solid rgba(0, 0, 0, 0.22);
+    border-bottom-color: rgba(0, 0, 0, 0.30);
+    /* heavier bottom — looks printed */
+    border-right-color: rgba(0, 0, 0, 0.28);
+    border-radius: 2px;
     background: var(--paper);
+    /* Inset: the box is pressed INTO the paper, not sitting on it */
+    box-shadow:
+        1px 1px 0 rgba(255, 255, 255, 0.9),
+        /* bottom-right highlight */
+        inset 1px 1px 2px rgba(0, 0, 0, 0.10),
+        /* top-left shadow (depth) */
+        inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+    /* interior feather */
 }
+
+/* ── Visual-weight escalation ── */
+/* Sparse: card softens, pulls back */
+[data-visual-weight="sparse"] .workout-session-atom {
+    opacity: 0.88;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.9) inset,
+        0 1px 2px rgba(0, 0, 0, 0.05),
+        0 2px 6px rgba(0, 0, 0, 0.07);
+}
+
+/* Crisis: card pushes forward, border sharpens to ink */
+[data-visual-weight="crisis"] .workout-session-atom {
+    border-color: var(--ink);
+    border-width: 1.5px;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.9) inset,
+        0 2px 4px rgba(0, 0, 0, 0.12),
+        0 6px 18px rgba(0, 0, 0, 0.16),
+        0 12px 30px rgba(0, 0, 0, 0.10);
+}
+
+[data-visual-weight="crisis"] .workout-log-box {
+    border-color: var(--ink);
+    border-width: 1.5px;
+}
+
+[data-visual-weight="crisis"] .workout-log-table td:first-child,
+[data-visual-weight="crisis"] .workout-log-table th:first-child {
+    border-left-width: 3px;
+}
+
+/* ── Weight column input cell ── */
+/* Override: weight cell gets underline-only treatment —
+   like a blank ink line, not a box. More physical. */
+.setup-input-cell {
+    min-width: 2.5rem;
+    border-bottom: 1.5px solid var(--ink) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding-bottom: 0.1rem !important;
+}
+
+/* ── Print: keep grain, lose interactive shadows ── */
+@media print {
+    .workout-session-atom {
+        box-shadow:
+            0 0 0 1px rgba(0, 0, 0, 0.18),
+            0 0 0 0.5pt var(--fog) inset;
+        /* just border + faint inner edge */
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .workout-log-box {
+        box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.08);
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .workout-session-atom::after {
+        display: none;
+        /* corner fold looks odd in print */
+    }
+}
+
 
 /* Week-end checkin */
 .week-checkin {
@@ -1645,7 +1786,7 @@ li {
 /* PTP map evolution: connections destabilize in later weeks */
 .ptp-map[data-week="5"] line,
 .ptp-map[data-week="6"] line {
-    stroke-dasharray: 4,2;
+    stroke-dasharray: 4, 2;
 }
 
 .ptp-map[data-week="5"] circle,
@@ -2246,16 +2387,19 @@ li {
     width: 2.5rem;
     height: 2.5rem;
 }
-.clock-svg > circle:first-of-type {
+
+.clock-svg>circle:first-of-type {
     fill: var(--paper, #fff);
     stroke: var(--ink, #111);
     stroke-width: 2;
 }
-.clock-svg > circle:last-of-type {
+
+.clock-svg>circle:last-of-type {
     fill: var(--ink, #111);
     stroke: none;
 }
-.clock-svg > line {
+
+.clock-svg>line {
     stroke: var(--ink, #111);
     stroke-width: 1.5;
 }
@@ -2337,10 +2481,12 @@ li {
     height: 1rem;
     font-size: 6.5pt;
 }
+
 .hud-tracker-row .tug-center {
     width: 1.15rem;
     height: 1.15rem;
 }
+
 .hud-tracker-row .tug-label {
     font-size: 6pt;
 }
@@ -2455,11 +2601,13 @@ li {
     height: 1rem;
     font-size: 6.5pt;
 }
+
 .hud-tracker-row .progress-box {
     width: 1rem;
     height: 1rem;
     font-size: 6.5pt;
 }
+
 .hud-tracker-row .faction-box {
     width: 1rem;
     height: 1rem;
@@ -2560,17 +2708,21 @@ th {
     min-height: 0;
     overflow: hidden;
 }
+
 /* Narrative zone: all encounter scaffolds */
 .encounter-magazine-narratives {
     margin-bottom: 0.1in;
 }
+
 .encounter-magazine-narratives .session-block {
     margin-bottom: 0.1in;
 }
+
 /* Workout zone: full-width cards */
 .encounter-magazine-workouts {
     margin-bottom: 0.1in;
 }
+
 /* Footer: map + checkin */
 .encounter-magazine-footer {
     border-top: 1px solid var(--fog, #ccc);
@@ -2580,8 +2732,13 @@ th {
 /* (Workout card styles are now in the WORKOUT CARD SYSTEM section above) */
 
 /* Legacy compat (unused but retained for fallback path) */
-.encounter-magazine-left { overflow: hidden; }
-.encounter-magazine-right { overflow: hidden; }
+.encounter-magazine-left {
+    overflow: hidden;
+}
+
+.encounter-magazine-right {
+    overflow: hidden;
+}
 
 /* ── Encounter Template Variants (Governor) ── */
 .encounter-integrated .session-block {
@@ -2601,10 +2758,12 @@ th {
     flex: 1;
     min-height: 0;
 }
+
 .tracker-grid-layout .tracker-section {
     break-inside: avoid;
     margin-bottom: 0;
 }
+
 .tracker-grid-layout .tracker-section h2 {
     margin-top: 0;
 }
@@ -2617,6 +2776,7 @@ th {
     flex: 1;
     min-height: 0;
 }
+
 .archive-gazette-columns .archive-node {
     break-inside: avoid;
     margin-bottom: 0.15in;
@@ -2630,10 +2790,12 @@ th {
     flex: 1;
     min-height: 0;
 }
+
 .ref-gazette-columns .ref-router {
     break-inside: avoid;
     margin-bottom: 0.15in;
 }
+
 .ref-gazette-columns .ref-outcome {
     break-inside: avoid;
 }
@@ -2727,6 +2889,7 @@ th {
 .structural-breath-texture {
     position: relative;
 }
+
 .structural-breath-texture::before {
     content: '';
     position: absolute;
@@ -2735,6 +2898,7 @@ th {
     opacity: 0.15;
     z-index: 0;
 }
+
 .structural-breath-texture .breath-flavor,
 .structural-breath-texture .breath-divider {
     position: relative;
