@@ -177,6 +177,8 @@ If the theme involves a physical location that changes over the program, include
 
 Room `mod` values: `""` (normal), `"you"` (player), `"corridor"`, `"locked"`, `"redacted"`.
 
+**FLOOR INTEGRITY RULE (HARD):** `rooms[]` MUST contain exactly `levels.length` sub-arrays for every week. If `levels` declares 2 floors, every week&apos;s `rooms` must be `[[...floor1 rooms...], [...floor2 rooms...]]`. The engine validates this and will reject mismatches. This is the #1 map generation failure — declaring floors then not populating them.
+
 **`type: "point-to-point"`** — location network with fog-of-war.
 
 ```json
@@ -231,6 +233,7 @@ Before outputting, verify your voice layer against these quality checks:
 - **Manual brevity:** Is your rules manual ≤5 sections, each 1-3 sentences? The manual teaches through layout, not through explanation. If you need a paragraph to explain a mechanic, the mechanic is too complex.
 - **Session naming variety:** Do `weekPage.sessions` labels vary across session types, or are they all "Session A / Session B"? Each name is a micro-moment of worldbuilding.
 - **Map progression:** If you produce a map, does it show change across weeks? Static maps waste the weekly reveal opportunity.
+- **Floor integrity (facility-grid only):** Verify `rooms[].length === levels.length` in EVERY week entry. If you declared 2 floors, every week must have 2 sub-arrays in `rooms`. This is the #1 map generation failure mode.
 
 ---
 

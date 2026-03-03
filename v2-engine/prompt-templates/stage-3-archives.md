@@ -49,7 +49,7 @@ Each archive section matches a clock trigger from Stage 1. Section keys MUST mat
 
 **Format configs:**
 - `memo`: `{ "fields": ["TO","FROM","RE","REF"], "defaults": { "TO": "...", "FROM": "..." } }`
-- `incident-report`: `{ "severityDefault": "STRING" }`
+- `incident-report`: `{ "severityDefault": "STRING — fallback ONLY for entries that omit severity" }`. Each archive node SHOULD include its own `"severity"` field in the HTML (e.g., `<strong>SEVERITY: ELEVATED</strong>`). Vary severity across entries — mix ROUTINE, ELEVATED, CRITICAL, CLASSIFIED (or diegetic equivalents). If every entry reads the same severity, the archive feels generated, not found. The `severityDefault` exists as a fallback, NOT as a global override.
 - `letter`: `{ "border": "dashed" | "solid" }`. Nodes use `"from"` instead of `"title"`.
 - `transmission`: `{ "channel": "STRING" }`. Monospace, timestamped.
 - `journal`: `{}`. Italic, dashed borders. Nodes use `"title"` as date-like heading.
@@ -105,6 +105,7 @@ Before outputting, verify your archives and endings against these quality checks
 
 - **Found-document test:** Read each archive node. Does it feel like an excerpt from a real document — or like a story summary wearing a document&apos;s clothes? Real documents have headers, dates, recipients, classification marks, incomplete information, and institutional blind spots.
 - **Format diversity:** Count your `format` values across sections. Are there at least 2 different formats? If every section is a memo, the found-document illusion collapses.
+- **Severity diversity (incident-report sections):** Count distinct severity values across incident-report entries. If all entries share the same severity, redistribute — real incident reports have varying urgency levels. Aim for at least 3 different severity values.
 - **Voice differentiation:** Could you identify which archive section a node belongs to by voice alone? A corporate memo sounds nothing like a field journal. If they all sound the same, rewrite the outliers.
 - **Physical detail anchors:** Does every archive node contain at least one concrete detail — a date, a measurement, a name, a location, a material? Abstractions don&apos;t feel found.
 - **Ending consequence:** Do endings describe lasting consequences rather than generic victory/defeat? "The files were sealed" is consequence. "You won" is not.

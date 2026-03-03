@@ -297,7 +297,7 @@ Produce a single JSON object with these exact top-level keys:
           "style": "STRING — 'default' | 'alert'"
         }
       ],
-      "marginalia": "STRING | null — optional sidebar flavor text. **CONSISTENCY RULE:** Either use `marginalia` on ALL encounters (to establish a recurring diegetic annotation motif) or on NONE. Do NOT add it to a single encounter and omit it on the rest — partial use renders inconsistently.",
+      "marginalia": "STRING | null — sidebar flavor text (handwritten annotation, margin scrawl, diegetic footnote). Generate marginalia for AT LEAST 60% of encounters to establish a recurring annotator voice DISTINCT from the main narrative. The marginalia voice is a second character — an unseen annotator, a system log, a margin scribble. Set to null ONLY for encounters where silence in the margins IS the dramatic choice (e.g., a rest encounter, a moment of narrative void). Do NOT leave all encounters without marginalia — that is the #1 visual sameness problem.",
       "pacingHint": "STRING | null — 'breather' | 'crescendo' | 'transition' | null"
     }
   ],
@@ -450,6 +450,7 @@ Before outputting, verify your foundation against these quality checks:
 - **Visual weight distribution:** Do your encounters include at least 2 different `visualWeight` values? All-standard is a flat booklet. Mix sparse, standard, dense, and crisis.
 - **Archive format planning:** Look at your `clocks[].onTrigger.section` keys. Will the archive content use at least 2 different document formats? All-memo is a missed opportunity.
 - **Color contrast:** Do your `ink` and `paper` hex values produce readable text in B&W print? Dark ink on light paper. If your accent color is close to your fog color, they&apos;ll merge.
+- **Marginalia coverage:** Count encounters with non-null `marginalia`. If fewer than 60%, add more — marginalia is how encounter pages get visual texture. If exactly 100%, consider whether 1-2 strategic silences (null marginalia) would be more dramatically effective.
 
 ---
 

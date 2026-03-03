@@ -65,6 +65,9 @@ function validateWiringBlueprint(obj) {
 
     if (!Array.isArray(obj.wiring)) e.push('Missing wiring array');
     else {
+        if (obj.wiring.length === 0) {
+            w.push('Wiring array is empty. The zine will have no mechanical topology \u2014 all mechanical choices will be ad-hoc. Every zine without wiring looks structurally identical.');
+        }
         if (obj.wiring.length < 2) w.push('Only ' + obj.wiring.length + ' wire(s) — minimum 2 recommended');
         if (obj.wiring.length > 8) w.push(obj.wiring.length + ' wires may exceed paper-trackability (max 8)');
 
@@ -415,6 +418,18 @@ function validateStageData(num, obj, currentPipelineData) {
             }
         }
         if (obj.voice) scanForTemplateVars(obj.voice, 'voice');
+
+        // Facility-grid floor integrity check
+        if (obj.map && obj.map.type === 'facility-grid' && Array.isArray(obj.map.levels)) {
+            var expectedFloors = obj.map.levels.length;
+            var weeks = obj.map.weeks || {};
+            Object.keys(weeks).forEach(function(wk) {
+                var rooms = weeks[wk].rooms;
+                if (Array.isArray(rooms) && rooms.length !== expectedFloors) {
+                    e.push('Map week ' + wk + ' has ' + rooms.length + ' floor(s) in rooms[] but levels declares ' + expectedFloors + '. rooms[].length must equal levels.length.');
+                }
+            });
+        }
 
         // --- Quality Governor: Stage 2 ---
         scanBannedWords(obj.voice, 'voice', w);

@@ -74,6 +74,17 @@ At least 1 branch node per session should end with an unresolved image or detail
 - 1-2 awards per week. 1 check per week max.
 - Codewords unlock alternate content, never gate progression.
 
+### Branch-choice destination nodes
+
+Some encounters have `"special": "branch"` with an `options[]` array. Each option has a `ref` field (e.g., `"R15-F"`, `"R43-H"`). These are ADDITIONAL nodes you must write — separate from the dice-outcome branches.
+
+For each `option.ref` in the encounter data:
+- Key your node by the exact `ref` string
+- `type`: choose a router type that fits the choice&apos;s narrative flavor (kinetic, philosophical, echo, artifact, steinbeck, apex)
+- `html`: 1-3 sentences describing what happens when the player chooses this path
+
+**HARD RULE:** Every `ref` mentioned in any encounter&apos;s `options[].ref` MUST have a corresponding node in your output. Missing branch destinations mean the player makes a choice and finds a blank page — the game breaks.
+
 ---
 
 ## CONSTRAINTS
@@ -97,6 +108,7 @@ Before outputting your JSON, verify you have produced every required node:
 - **COMPUTE THIS FROM YOUR INPUT — do NOT use the example below as your target number.** Count every encounter object in the Stage 1 context you received. Example for reference only: a 6-week, 3-lifting + 2-conditioning day program = 30 encounters × 4 nodes = **120 nodes**.
 - **Every encounter MUST have its router AND all branch nodes.** Missing even one means the player rolls dice and gets nothing — the game breaks. The engine validates this and will reject incomplete output.
 - Count your output keys and compare against your computed total. If they don&apos;t match, find and fill the gaps before outputting.
+- **Plus any branch-choice destinations:** Count all unique `options[].ref` values across branch encounters. Each is an additional node beyond the router+branch formula above.
 
 ---
 
@@ -110,6 +122,7 @@ Before outputting, verify your narrative against these quality checks:
 - **Diegetic mechanic references:** When branch nodes reference clocks, tracks, or resources, do they use the DIEGETIC names from Stage 1 — not game terms? "The signal fire dims" passes. "Mark 1 tick on Clock A" fails.
 - **Branch divergence:** For each encounter, are the branch outcomes genuinely different paths — not just severity levels of the same event? "You succeed / you partially succeed / you fail" is three intensities, not three stories.
 - **Show, don&apos;t tell:** Scan your html fields. Are there any banned words? Any sentences that tell the reader how to feel rather than describing what happens?
+- **Branch-choice completeness:** Scan all encounters for `options[].ref` values. Every ref string must appear as a key in your output. Missing branch destinations are the #1 branch generation failure — the player picks a path and finds nothing.
 
 ---
 

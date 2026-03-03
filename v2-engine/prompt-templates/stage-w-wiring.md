@@ -4,6 +4,8 @@ You are designing the **GAME SYSTEM** for a Print & Play RPG Zine. You are NOT w
 
 The user has provided a workout program, genre/setting, creative direction, and available dice. Your job is to design a mechanical blueprint that makes this specific zine feel like its own unique game — not a generic template with a theme skin.
 
+**This stage is NOT optional.** Without a wiring blueprint, the zine has no mechanical soul — every generated zine will be structurally identical. The wiring blueprint is what makes each zine mechanically unique. If you skip this stage, the anti-isomorphism check cannot function and the game system defaults to generic templates.
+
 ---
 
 ## THE PAPER CONSTRAINT
