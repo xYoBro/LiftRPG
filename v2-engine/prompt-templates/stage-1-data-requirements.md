@@ -297,7 +297,7 @@ Produce a single JSON object with these exact top-level keys:
           "style": "STRING — 'default' | 'alert'"
         }
       ],
-      "marginalia": "STRING | null — optional sidebar flavor text",
+      "marginalia": "STRING | null — optional sidebar flavor text. **CONSISTENCY RULE:** Either use `marginalia` on ALL encounters (to establish a recurring diegetic annotation motif) or on NONE. Do NOT add it to a single encounter and omit it on the rest — partial use renders inconsistently.",
       "pacingHint": "STRING | null — 'breather' | 'crescendo' | 'transition' | null"
     }
   ],
@@ -311,7 +311,7 @@ Produce a single JSON object with these exact top-level keys:
 
 **Encounter notes:**
 
-- One encounter per lifting session across all weeks. 6-week, 3-day program = 18 encounters.
+- One encounter per **training session** (lifting AND conditioning) across all weeks. A 6-week program with 3 lifting days + 2 conditioning days per week = **30 encounters** (5 sessions × 6 weeks). Do NOT skip conditioning days — every day in every `sessionType.days[]` must have an encounter for every week.
 - `title`: Diegetic encounter name from the fiction. NOT "Week 1 Day 1".
 - `narrative`: Ground the reader in physical space. No exposition dumps. Sensory details. **Narrative threading:** encounter narratives should form a visible thread across each week. Session 1 introduces a detail. Session 2 references it changed. Session 3 reveals why. The player should feel the world moving between sessions.
 - `outcomes[]`: Ranges MUST match `mechanics.dice.outcomes[]` ranges. Each outcome has genuinely different narrative — NOT just severity variations of the same event.
@@ -380,10 +380,12 @@ Structural atoms are full-page creative elements that break visual monotony. The
 ```
 
 **Types:**
+
 - `quote-page`: Full-page typographic statement. A line from the fiction, a thematic epigraph, or a diegetic inscription. Styles: `centered` (default), `offset` (left-aligned with accent border), `full-bleed` (enormous text filling the page).
 - `pacing-breath`: Intentional whitespace. A pause between acts. Visuals: `blank` (empty page), `divider` (theme divider SVG), `texture` (subtle background texture).
 
 **Placement hints:**
+
 - `after`: Where to insert — `"week-N"` (after that week&apos;s ref-pages), `"archives"` (after archive sections), `"setup"` (after setup/tracker). Engine treats this as a hint, not a command.
 - `priority`: 0-1 float. Higher priority atoms are placed closer to their hint. At 0, the engine may reposition freely for pagination.
 
@@ -429,7 +431,7 @@ If no wiring blueprint is provided, design mechanics freely using the primitives
 6. **`endConditions[]` is REQUIRED** — include 2-4 entries. Their `.id` values will be used as ending IDs in Stage 3. A missing `endConditions[]` will fail validation and block the pipeline. This overrides any Stage W `categoriesExcluded` entry for `endCondition` — end conditions are non-excludable.
 7. `clocks[].onTrigger.section` values define archive section keys
 8. `theme.colors` must have all 5 keys, all valid 6-digit hex (e.g. #1a1a18)
-9. Encounter count must equal (unique training days per week) × totalWeeks. Days per week = count of unique day numbers across all sessionTypes[].days
+9. Encounter count must equal (unique training days per week) × totalWeeks. Days per week = count of unique day numbers across ALL `sessionTypes[].days` — this includes conditioning, rest, and accessory days, not just lifting. Every session type that has a `days[]` array contributes encounters for each of those day numbers, every week.
 10. You MUST ESCAPE ALL DOUBLE QUOTES inside strings (e.g. `\"`), or use single quotes for HTML/SVG attributes and CSS selectors. Unescaped double quotes will break JSON parsing.
 11. **ZERO MATH**: No mechanic may require addition, subtraction, or any computation during play. Roll → lookup → mark. If a stat has no function, omit it entirely (do not set name to "none").
 12. **INTUITIVE DESIGN**: Every tracker must be usable by someone who has never read the rules page. The physical layout (boxes, arrows, labels, thresholds) must communicate how to use it. If you need to explain a mechanic in prose, the mechanic is too complex — simplify it.
