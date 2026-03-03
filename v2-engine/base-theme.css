@@ -2522,7 +2522,9 @@ li {
 /* --- Progress Track (3D): Ironsworn-style boxes --- */
 .progress-track {
     display: flex;
+    flex-wrap: wrap;
     gap: 2px;
+    overflow: hidden;
 }
 
 .progress-box-wrapper {
