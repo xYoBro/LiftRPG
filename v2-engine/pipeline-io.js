@@ -454,6 +454,7 @@ async function assemble() {
         document.getElementById('footerBar').style.position = 'relative';
         document.getElementById('zine-container-wrapper').style.display = 'flex';
         document.getElementById('btnPrint').style.display = 'block';
+        document.getElementById('inkSaverLabel').style.display = '';
 
         window.runPacker(finalPayload);
         imposeToSpreads();
@@ -635,3 +636,13 @@ window.exportJson = exportJson;
 window.importJson = importJson;
 window.handleFileImport = handleFileImport;
 window.assemble = assemble;
+
+function toggleInkSaver(on) {
+    var wrapper = document.getElementById('zine-container-wrapper');
+    if (on) {
+        wrapper.setAttribute('data-ink-saver', '');
+    } else {
+        wrapper.removeAttribute('data-ink-saver');
+    }
+}
+window.toggleInkSaver = toggleInkSaver;

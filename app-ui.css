@@ -654,6 +654,20 @@ button:focus-visible,
     border-radius: var(--radius);
 }
 
+.ink-saver-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text2);
+    cursor: pointer;
+    user-select: none;
+}
+
+.ink-saver-toggle input[type="checkbox"] {
+    cursor: pointer;
+}
+
 /* ── Print safety net — hide app UI when printing ── */
 @media print {
     #app-ui, .footer-bar { display: none !important; }

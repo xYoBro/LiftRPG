@@ -189,6 +189,7 @@ Examples:
         <input type="file" id="fileImport" style="display:none" accept=".json" onchange="handleFileImport(event)">
         <button class="btn-primary" id="btnAssemble" onclick="assemble()" disabled>Validate & Assemble</button>
         <button class="btn-green" id="btnPrint" onclick="window.print()" style="display:none">Print Spreads</button>
+        <label class="ink-saver-toggle" id="inkSaverLabel" style="display:none"><input type="checkbox" id="inkSaver" onchange="toggleInkSaver(this.checked)"> Ink Saver</label>
     </div>
 
     <!-- Load Engine Scripts -->

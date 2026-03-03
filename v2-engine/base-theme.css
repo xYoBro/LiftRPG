@@ -2932,3 +2932,21 @@ th {
     position: relative;
     z-index: 1;
 }
+
+/* ── Ink Saver: force high-contrast B&W for laser printers ── */
+[data-ink-saver] .zine-page {
+    --paper: #ffffff !important;
+    --ink: #111111 !important;
+    --fog: #e0e0e0 !important;
+    --accent: #333333 !important;
+    --muted: #666666 !important;
+}
+
+[data-ink-saver] .zine-page::before,
+[data-ink-saver] .zine-page::after {
+    display: none !important;
+}
+
+[data-ink-saver] .zine-page {
+    background: #ffffff !important;
+}
