@@ -1507,7 +1507,7 @@ li {
 /* Exercise name */
 .workout-log-name {
     font-weight: 600;
-    width: var(--log-name-width, 35%);
+    width: var(--log-name-width, 40%);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2790,6 +2790,8 @@ th {
 .tracker-grid-layout .tracker-section {
     break-inside: avoid;
     margin-bottom: 0;
+    overflow-wrap: break-word;
+    min-width: 0;
 }
 
 .tracker-grid-layout .tracker-section h2 {
