@@ -26,7 +26,6 @@
 
 /**
  * @typedef {Object} BreakPolicy
- * @property {number}  keepTogetherStrength  0-100, resistance to splitting
  * @property {number}  keepWithNextStrength  0-100, affinity to next atom
  * @property {boolean} mustNotSplit          true = genuinely indivisible
  */
@@ -48,7 +47,6 @@
  *                                       ref-week | evidence-series |
  *                                       rules-manual | tracker-sheet
  * @property {string[]} members          Ordered atom IDs
- * @property {boolean}  mustBeContiguous Whether members must stay together
  */
 
 /**
@@ -119,7 +117,7 @@ function atomize(finalPayload) {
             visualArchetype: theme.visualArchetype
         },
         week: null, session: null,
-        breakPolicy: { keepTogetherStrength: 100, keepWithNextStrength: 0, mustNotSplit: true },
+        breakPolicy: { keepWithNextStrength: 0, mustNotSplit: true },
         sizeHint: 'standard', priority: 1
     });
 
@@ -137,12 +135,12 @@ function atomize(finalPayload) {
                 isFirst: mi === 0
             },
             week: null, session: null,
-            breakPolicy: { keepTogetherStrength: 60, keepWithNextStrength: 40, mustNotSplit: false },
+            breakPolicy: { keepWithNextStrength: 40, mustNotSplit: false },
             sizeHint: 'standard', priority: 0.9
         }));
     }
     if (manualIds.length) {
-        groups.push({ id: 'group.rules-manual', groupType: 'rules-manual', members: manualIds, mustBeContiguous: true });
+        groups.push({ id: 'group.rules-manual', groupType: 'rules-manual', members: manualIds });
     }
 
     // Setup block
@@ -152,7 +150,7 @@ function atomize(finalPayload) {
             type: 'setup-block',
             content: workout.setup,
             week: null, session: null,
-            breakPolicy: { keepTogetherStrength: 90, keepWithNextStrength: 0, mustNotSplit: true },
+            breakPolicy: { keepWithNextStrength: 0, mustNotSplit: true },
             sizeHint: 'standard', priority: 0.9
         });
     }
@@ -169,7 +167,7 @@ function atomize(finalPayload) {
             type: 'clock-display',
             content: clocks[ci],
             week: null, session: null,
-            breakPolicy: { keepTogetherStrength: 80, keepWithNextStrength: 30, mustNotSplit: true },
+            breakPolicy: { keepWithNextStrength: 30, mustNotSplit: true },
             sizeHint: 'minimal', priority: 0.85
         }));
 
@@ -186,7 +184,7 @@ function atomize(finalPayload) {
                     order: clocks[ci].onTrigger.order
                 },
                 week: null, session: null,
-                breakPolicy: { keepTogetherStrength: 70, keepWithNextStrength: 50, mustNotSplit: true },
+                breakPolicy: { keepWithNextStrength: 50, mustNotSplit: true },
                 sizeHint: 'minimal', priority: 0.8
             }));
             // Link trigger to first archive node in that section
@@ -203,7 +201,7 @@ function atomize(finalPayload) {
             type: 'track-display',
             content: tracks[ti],
             week: null, session: null,
-            breakPolicy: { keepTogetherStrength: 80, keepWithNextStrength: 30, mustNotSplit: true },
+            breakPolicy: { keepWithNextStrength: 30, mustNotSplit: true },
             sizeHint: 'minimal', priority: 0.85
         }));
     }
@@ -215,7 +213,7 @@ function atomize(finalPayload) {
             type: 'resource-display',
             content: resources[ri],
             week: null, session: null,
-            breakPolicy: { keepTogetherStrength: 80, keepWithNextStrength: 30, mustNotSplit: true },
+            breakPolicy: { keepWithNextStrength: 30, mustNotSplit: true },
             sizeHint: 'minimal', priority: 0.85
         }));
     }
@@ -227,14 +225,14 @@ function atomize(finalPayload) {
             type: 'modifier-display',
             content: modifiers[modi],
             week: null, session: null,
-            breakPolicy: { keepTogetherStrength: 60, keepWithNextStrength: 20, mustNotSplit: true },
+            breakPolicy: { keepWithNextStrength: 20, mustNotSplit: true },
             sizeHint: 'minimal', priority: 0.7
         }));
     }
 
     // Tracker sheet group
     if (trackerIds.length) {
-        groups.push({ id: 'group.tracker-sheet', groupType: 'tracker-sheet', members: trackerIds, mustBeContiguous: true });
+        groups.push({ id: 'group.tracker-sheet', groupType: 'tracker-sheet', members: trackerIds });
     }
 
     // Dice table (shared mechanic, referenced per session)
@@ -244,7 +242,7 @@ function atomize(finalPayload) {
             type: 'dice-table',
             content: mechanics.dice,
             week: null, session: null,
-            breakPolicy: { keepTogetherStrength: 90, keepWithNextStrength: 0, mustNotSplit: true },
+            breakPolicy: { keepWithNextStrength: 0, mustNotSplit: true },
             sizeHint: 'minimal', priority: 0.9
         });
     }
@@ -313,7 +311,6 @@ function atomize(finalPayload) {
                 },
                 week: w, session: day,
                 breakPolicy: {
-                    keepTogetherStrength: enc.special === 'boss' ? 95 : 70,
                     keepWithNextStrength: 60,
                     mustNotSplit: enc.special === 'boss'
                 },
@@ -333,7 +330,7 @@ function atomize(finalPayload) {
                     weightColumnLabel: workout.weightColumnLabel
                 },
                 week: w, session: day,
-                breakPolicy: { keepTogetherStrength: 90, keepWithNextStrength: 0, mustNotSplit: true },
+                breakPolicy: { keepWithNextStrength: 0, mustNotSplit: true },
                 sizeHint: 'standard', priority: 1
             });
 
@@ -346,7 +343,7 @@ function atomize(finalPayload) {
                     type: 'condition-check',
                     content: conds[condi],
                     week: w, session: day,
-                    breakPolicy: { keepTogetherStrength: 50, keepWithNextStrength: 20, mustNotSplit: true },
+                    breakPolicy: { keepWithNextStrength: 20, mustNotSplit: true },
                     sizeHint: 'minimal', priority: 0.7
                 }));
             }
@@ -369,7 +366,7 @@ function atomize(finalPayload) {
                         nodeType: story.refs[refCode].type
                     },
                     week: w, session: day,
-                    breakPolicy: { keepTogetherStrength: 70, keepWithNextStrength: 50, mustNotSplit: true },
+                    breakPolicy: { keepWithNextStrength: 50, mustNotSplit: true },
                     sizeHint: 'standard', priority: 0.95
                 });
                 encRefIds.push(routerAtomId);
@@ -407,7 +404,7 @@ function atomize(finalPayload) {
                             range: encOutcomes[oi].range
                         },
                         week: w, session: day,
-                        breakPolicy: { keepTogetherStrength: 60, keepWithNextStrength: 40, mustNotSplit: true },
+                        breakPolicy: { keepWithNextStrength: 40, mustNotSplit: true },
                         sizeHint: 'standard', priority: 0.9
                     });
                     encRefIds.push(brAtomId);
@@ -426,7 +423,7 @@ function atomize(finalPayload) {
                 id: 'group.' + sk,
                 groupType: 'session',
                 members: sessMembers,
-                mustBeContiguous: true
+
             });
 
             // Keep-together: boss encounter + its rules
@@ -445,7 +442,7 @@ function atomize(finalPayload) {
                 type: mapType,
                 content: { mapData: mapData, week: w },
                 week: w, session: null,
-                breakPolicy: { keepTogetherStrength: 80, keepWithNextStrength: 0, mustNotSplit: true },
+                breakPolicy: { keepWithNextStrength: 0, mustNotSplit: true },
                 sizeHint: 'standard', priority: 0.8
             });
             weekAtomIds.push(mapId);
@@ -474,7 +471,7 @@ function atomize(finalPayload) {
                     label: (voice.labels && voice.labels.weekEndCheckin) || 'WEEK-END CHECK-IN'
                 },
                 week: w, session: null,
-                breakPolicy: { keepTogetherStrength: 60, keepWithNextStrength: 0, mustNotSplit: true },
+                breakPolicy: { keepWithNextStrength: 0, mustNotSplit: true },
                 sizeHint: 'minimal', priority: 0.7
             });
             weekAtomIds.push(checkinId);
@@ -485,7 +482,7 @@ function atomize(finalPayload) {
             id: 'group.wk' + w,
             groupType: 'week',
             members: weekAtomIds,
-            mustBeContiguous: true
+
         });
 
         // REF week group
@@ -494,7 +491,7 @@ function atomize(finalPayload) {
                 id: 'group.ref.wk' + w,
                 groupType: 'ref-week',
                 members: weekRefIds,
-                mustBeContiguous: true
+
             });
         }
     }
@@ -519,7 +516,7 @@ function atomize(finalPayload) {
                 classification: voice.classifications
             },
             week: null, session: null,
-            breakPolicy: { keepTogetherStrength: 70, keepWithNextStrength: 60, mustNotSplit: true },
+            breakPolicy: { keepWithNextStrength: 60, mustNotSplit: true },
             sizeHint: 'minimal', priority: 0.8
         }));
 
@@ -546,7 +543,7 @@ function atomize(finalPayload) {
                     sectionKey: sectionKey
                 },
                 week: null, session: null,
-                breakPolicy: { keepTogetherStrength: 70, keepWithNextStrength: 30, mustNotSplit: true },
+                breakPolicy: { keepWithNextStrength: 30, mustNotSplit: true },
                 sizeHint: 'standard', priority: 0.85
             }));
         }
@@ -555,7 +552,7 @@ function atomize(finalPayload) {
             id: 'group.archive.' + sectionKey,
             groupType: 'archive-section',
             members: archiveAtomIds,
-            mustBeContiguous: true
+
         });
     }
 
@@ -572,7 +569,7 @@ function atomize(finalPayload) {
                 isFirst: endi === 0
             },
             week: null, session: null,
-            breakPolicy: { keepTogetherStrength: 70, keepWithNextStrength: 40, mustNotSplit: true },
+            breakPolicy: { keepWithNextStrength: 40, mustNotSplit: true },
             sizeHint: 'standard', priority: 0.9
         });
     }
@@ -601,7 +598,7 @@ function atomize(finalPayload) {
                         nodeType: evidence[evKey].type
                     },
                     week: ew, session: null,
-                    breakPolicy: { keepTogetherStrength: 60, keepWithNextStrength: 40, mustNotSplit: true },
+                    breakPolicy: { keepWithNextStrength: 40, mustNotSplit: true },
                     sizeHint: 'standard', priority: 0.8
                 });
                 evSeriesIds.push(evAtomId);
@@ -613,12 +610,14 @@ function atomize(finalPayload) {
                 id: 'group.evidence.' + evTrack.id,
                 groupType: 'evidence-series',
                 members: evSeriesIds,
-                mustBeContiguous: false
+
             });
         }
     }
 
-    // ── 7. Final + Back Cover ───────────────────────────────
+    // ── 7. Final Page ─────────────────────────────────────────
+    // Back cover is handled by padToMultipleOf4() in box-packer.js,
+    // not atomized — it's a fixed template, not LLM-generated content.
 
     if (voice.finalPage) {
         add({
@@ -626,19 +625,10 @@ function atomize(finalPayload) {
             type: 'final',
             content: voice.finalPage,
             week: null, session: null,
-            breakPolicy: { keepTogetherStrength: 100, keepWithNextStrength: 0, mustNotSplit: true },
+            breakPolicy: { keepWithNextStrength: 0, mustNotSplit: true },
             sizeHint: 'standard', priority: 1
         });
     }
-
-    add({
-        id: 'back-cover',
-        type: 'back-cover',
-        content: {},
-        week: null, session: null,
-        breakPolicy: { keepTogetherStrength: 100, keepWithNextStrength: 0, mustNotSplit: true },
-        sizeHint: 'standard', priority: 1
-    });
 
     // ── 8. Structural Atoms (quote-page, pacing-breath) ────────
 
@@ -654,7 +644,7 @@ function atomize(finalPayload) {
             type: saType,
             content: sa.content || {},
             week: null, session: null,
-            breakPolicy: { keepTogetherStrength: 100, keepWithNextStrength: 0, mustNotSplit: true },
+            breakPolicy: { keepWithNextStrength: 0, mustNotSplit: true },
             sizeHint: saType === 'quote-page' ? 'generous' : 'minimal',
             priority: typeof saPlacement.priority === 'number' ? saPlacement.priority : 0.5
         });

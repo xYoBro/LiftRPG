@@ -393,7 +393,7 @@ function encounterPacingAlignment(templateId, atoms) {
         'encounter-classic':    { breather: 0.3, transition: 0.8, crescendo: 0.5 },
         'encounter-integrated': { breather: 1.0, transition: 0.6, crescendo: 0.1 },
         'encounter-dossier':    { breather: 0.1, transition: 0.4, crescendo: 1.0 },
-        'encounter-magazine':   { breather: 0.2, transition: 0.7, crescendo: 0.9 }
+        'encounter-stacked':   { breather: 0.2, transition: 0.7, crescendo: 0.9 }
     };
 
     var row = alignment[templateId];
@@ -1693,11 +1693,11 @@ function appendWithBreakPolicy(page, el, atom, container, pageType, pageNum, pla
 }
 
 // ══════════════════════════════════════════════════════════════
-//  ENCOUNTER TEMPLATE: MAGAZINE (multi-column dense layout)
+//  ENCOUNTER TEMPLATE: STACKED (stacked flex dense layout)
 // ══════════════════════════════════════════════════════════════
 
 LayoutTemplates.register({
-    id: 'encounter-magazine',
+    id: 'encounter-stacked',
     groupType: 'encounter-spread',
     score: function (atoms, ctx) {
         // Prefer for dense/crisis weeks with 3+ sessions
@@ -1750,12 +1750,11 @@ LayoutTemplates.register({
         );
 
         return {
-            templateId: 'encounter-magazine',
+            templateId: 'encounter-stacked',
             pages: pages,
             fillRatios: fillRatios,
             confidence: 0.65,
-            multiSlot: false,  // no longer a multi-slot grid
-            pacingAlignment: encounterPacingAlignment('encounter-magazine', atoms)
+            pacingAlignment: encounterPacingAlignment('encounter-stacked', atoms)
         };
     },
     renderPages: function (container, atoms, ctx) {
@@ -1826,11 +1825,11 @@ LayoutTemplates.register({
 
         // Stacked layout: narratives → workout cards → footer
         var grid = document.createElement('div');
-        grid.className = 'encounter-magazine-grid';
+        grid.className = 'encounter-stacked-grid';
 
         // ── Narrative zone: scaffolds + conditions ──
         var narrativeZone = document.createElement('div');
-        narrativeZone.className = 'encounter-magazine-narratives';
+        narrativeZone.className = 'encounter-stacked-narratives';
 
         var refScheme = (data.story && data.story.refScheme) || { prefix: 'R', weekDigits: 1, sessionDigits: 1 };
 
@@ -1866,7 +1865,7 @@ LayoutTemplates.register({
 
         // ── Workout zone: full-width cards ──
         var workoutZone = document.createElement('div');
-        workoutZone.className = 'encounter-magazine-workouts';
+        workoutZone.className = 'encounter-stacked-workouts';
 
         // Deduplicate: only render one card per unique sessionType name
         var renderedTypes = {};
@@ -1886,7 +1885,7 @@ LayoutTemplates.register({
 
         // ── Footer: map + checkin ──
         var footer = document.createElement('div');
-        footer.className = 'encounter-magazine-footer';
+        footer.className = 'encounter-stacked-footer';
         if (mapAtom) footer.appendChild(AtomRenderers.render(mapAtom, ctx));
         if (checkinAtom) footer.appendChild(AtomRenderers.render(checkinAtom, ctx));
         if (footer.children.length) grid.appendChild(footer);
@@ -1929,11 +1928,11 @@ LayoutTemplates.register({
             container.appendChild(contPage);
 
             var contGrid = document.createElement('div');
-            contGrid.className = 'encounter-magazine-grid';
+            contGrid.className = 'encounter-stacked-grid';
             var contNarr = document.createElement('div');
-            contNarr.className = 'encounter-magazine-narratives';
+            contNarr.className = 'encounter-stacked-narratives';
             var contWork = document.createElement('div');
-            contWork.className = 'encounter-magazine-workouts';
+            contWork.className = 'encounter-stacked-workouts';
 
             if (spillTarget === 'narrative') contNarr.appendChild(spilled);
             else contWork.appendChild(spilled);

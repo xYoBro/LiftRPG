@@ -5,7 +5,7 @@
 //
 // Exposed: window.escapeHtml, window.sanitizeSvg, window.sanitizeHtml,
 //          window.decodeEntities, window.createPage, window.renderDivider,
-//          window.addPageNumber
+//          window.addPageNumber, window.toKebabClass
 
 // -- Sanitization helper (prevents XSS from untrusted JSON) --
 function escapeHtml(str) {
@@ -82,6 +82,11 @@ function addPageNumber(page, num) {
     page.appendChild(n);
 }
 
+// Sanitize type strings into valid CSS class fragments (kebab-case)
+function toKebabClass(str) {
+    return (str || 'unknown').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+}
+
 // Expose on window for cross-file access
 window.escapeHtml = escapeHtml;
 window.sanitizeSvg = sanitizeSvg;
@@ -90,3 +95,4 @@ window.decodeEntities = decodeEntities;
 window.createPage = createPage;
 window.renderDivider = renderDivider;
 window.addPageNumber = addPageNumber;
+window.toKebabClass = toKebabClass;

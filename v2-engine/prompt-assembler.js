@@ -91,10 +91,34 @@ function buildStagePrompt(num, templates, pipelineData) {
             map: s1.map,
             archiveSectionKeys: archiveSectionKeys
         };
+        // Inject wiring blueprint so map generation knows about mechanical topology
+        var wiringContext = '';
+        if (pipelineData.wiring && Array.isArray(pipelineData.wiring.wiring) && pipelineData.wiring.wiring.length > 0) {
+            var spatialWires = pipelineData.wiring.wiring.filter(function (wi) {
+                return (wi.from && wi.from.toLowerCase().indexOf('map') !== -1) ||
+                       (wi.to && wi.to.toLowerCase().indexOf('map') !== -1) ||
+                       (wi.to && wi.to.toLowerCase().indexOf('room') !== -1) ||
+                       (wi.to && wi.to.toLowerCase().indexOf('location') !== -1) ||
+                       (wi.to && wi.to.toLowerCase().indexOf('sector') !== -1) ||
+                       (wi.to && wi.to.toLowerCase().indexOf('floor') !== -1) ||
+                       (wi.type === 'unlock-chain' || wi.type === 'conditional-routing');
+            });
+            wiringContext = '\n\n## MECHANICAL WIRING CONTEXT\n\n'
+                + 'The Stage W blueprint declared the following mechanical topology. Your map and voice must support these wires — rooms, locations, and map progression should reflect the mechanical interactions below.\n\n'
+                + '**All wires:**\n```json\n' + JSON.stringify(pipelineData.wiring.wiring, null, 2) + '\n```\n';
+            if (spatialWires.length > 0) {
+                wiringContext += '\n**Spatially-relevant wires** (these directly affect map design):\n';
+                spatialWires.forEach(function (sw) {
+                    wiringContext += '- Wire `' + sw.id + '` (' + sw.type + '): ' + sw.from + ' → ' + sw.to + ' — "' + sw.printInstruction + '"\n';
+                });
+                wiringContext += '\nEnsure these spatial connections are reflected in your map rooms/locations.\n';
+            }
+        }
         promptText = (templates['stage-2-voice-map.md'] || '') + '\n\n'
             + creativeDir + '\n\n'
             + '## STAGE 1 CONTEXT\n```json\n'
-            + JSON.stringify(context, null, 2) + '\n```';
+            + JSON.stringify(context, null, 2) + '\n```'
+            + wiringContext;
     } else if (num === 3) {
         var s1 = pipelineData[1] || {};
         var archiveSectionKeysS3 = window.deriveArchiveSectionKeys(pipelineData);

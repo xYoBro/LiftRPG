@@ -161,34 +161,6 @@ GovernorMeasure.measureGroup = function (atoms, ctx, slotWidth) {
     };
 };
 
-/**
- * Measure the template overhead for a page type.
- * Renders a blank page with the given type and any header elements,
- * returns the consumed height before atom content starts.
- *
- * @param {string} pageType  e.g. 'encounter-hud', 'encounter-log'
- * @param {Function} [headerBuilder]  Optional function(page) that adds header elements
- * @returns {number} overhead height in pixels
- */
-GovernorMeasure.measureOverhead = function (pageType, headerBuilder) {
-    if (!_harness) GovernorMeasure.init();
-
-    // Create a temporary page inside the harness
-    var tempPage = document.createElement('div');
-    tempPage.className = 'zine-page';
-    tempPage.style.cssText = 'position:relative;width:100%;';
-
-    if (headerBuilder) {
-        headerBuilder(tempPage);
-    }
-
-    _harness.appendChild(tempPage);
-    var overhead = tempPage.scrollHeight;
-    _harness.removeChild(tempPage);
-
-    return overhead;
-};
-
 // ── Cache Management ─────────────────────────────────────────
 
 /**

@@ -673,6 +673,7 @@ function renderPtpMapWeek(mapData, week) {
         line.setAttribute('y1', from.y);
         line.setAttribute('x2', to.x);
         line.setAttribute('y2', to.y);
+        line.setAttribute('class', 'ptp-edge');
         line.setAttribute('stroke', 'var(--ink, #111)');
         line.setAttribute('stroke-width', '0.6');
         if (locked.indexOf(conn.from) !== -1 || locked.indexOf(conn.to) !== -1) {
@@ -701,6 +702,7 @@ function renderPtpMapWeek(mapData, week) {
         circle.setAttribute('cx', loc.x);
         circle.setAttribute('cy', loc.y);
         circle.setAttribute('r', isPlayer ? playerR : nodeR);
+        circle.setAttribute('class', 'ptp-node' + (isPlayer ? ' ptp-node-player' : (isLocked ? ' ptp-node-locked' : '')));
         circle.setAttribute('fill', isPlayer ? 'var(--accent, #c45c00)' : (isLocked ? 'var(--muted, #999)' : 'var(--paper, #fff)'));
         circle.setAttribute('stroke', 'var(--ink, #111)');
         circle.setAttribute('stroke-width', strokeW);
@@ -762,6 +764,7 @@ function renderPtpMapWeek(mapData, week) {
         text.setAttribute('text-anchor', anchor);
         text.setAttribute('font-size', String(fontSize));
         text.setAttribute('font-family', 'var(--font-heading, monospace)');
+        text.setAttribute('class', 'ptp-label' + (isLocked ? ' ptp-label-locked' : ''));
         text.setAttribute('fill', isLocked ? 'var(--muted, #999)' : 'var(--ink, #111)');
         text.textContent = decodeEntities(labelText);
         svg.appendChild(text);

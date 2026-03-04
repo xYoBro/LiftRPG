@@ -4,14 +4,9 @@
 // (found documents in various formats).
 //
 // Depends on: render-utils.js (escapeHtml, sanitizeHtml, decodeEntities,
-//             createPage, addPageNumber)
+//             createPage, addPageNumber, toKebabClass)
 //
 // Exposed: window.renderRefPages, window.renderArchivePages
-
-// Sanitize type strings into valid CSS class fragments (kebab-case)
-function toKebabClass(str) {
-    return (str || 'unknown').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-}
 
 // -- Scramble branch nodes for paragraph-book layout --
 // Ensures no two adjacent entries share the same encounter or outcome.

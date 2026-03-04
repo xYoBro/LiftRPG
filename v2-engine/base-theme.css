@@ -2729,8 +2729,8 @@ th {
    MULTI-SLOT TEMPLATE LAYOUTS (Layout Governor Phase 4)
    ========================================================== */
 
-/* ── Encounter Magazine: stacked layout (narrative → workout cards → footer) ── */
-.encounter-magazine-grid {
+/* ── Encounter Stacked: stacked flex layout (narrative → workout cards → footer) ── */
+.encounter-stacked-grid {
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -2740,35 +2740,27 @@ th {
 }
 
 /* Narrative zone: all encounter scaffolds */
-.encounter-magazine-narratives {
+.encounter-stacked-narratives {
     margin-bottom: 0.1in;
 }
 
-.encounter-magazine-narratives .session-block {
+.encounter-stacked-narratives .session-block {
     margin-bottom: 0.1in;
 }
 
 /* Workout zone: full-width cards */
-.encounter-magazine-workouts {
+.encounter-stacked-workouts {
     margin-bottom: 0.1in;
 }
 
 /* Footer: map + checkin */
-.encounter-magazine-footer {
+.encounter-stacked-footer {
     border-top: 1px solid var(--fog, #ccc);
     padding-top: 0.1in;
 }
 
 /* (Workout card styles are now in the WORKOUT CARD SYSTEM section above) */
 
-/* Legacy compat (unused but retained for fallback path) */
-.encounter-magazine-left {
-    overflow: hidden;
-}
-
-.encounter-magazine-right {
-    overflow: hidden;
-}
 
 /* ── Encounter Template Variants (Governor) ── */
 .encounter-integrated .session-block {
@@ -2937,20 +2929,59 @@ th {
     z-index: 1;
 }
 
-/* ── Ink Saver: force high-contrast B&W for laser printers ── */
+/* ── High-Contrast / Ink Saver: printable on any laser printer ── */
 [data-ink-saver] .zine-page {
-    --paper: #ffffff !important;
+    --paper: #FDFCF0 !important;
     --ink: #111111 !important;
-    --fog: #e0e0e0 !important;
-    --accent: #333333 !important;
-    --muted: #666666 !important;
+    --fog: #E8E5DA !important;
+    --accent: #2A2A2A !important;
+    --muted: #4A4A4A !important;
+    background: #FDFCF0 !important;
 }
 
+/* Kill texture layers — pseudo-element grain, edge shadows */
 [data-ink-saver] .zine-page::before,
 [data-ink-saver] .zine-page::after {
     display: none !important;
 }
 
-[data-ink-saver] .zine-page {
-    background: #ffffff !important;
+/* SVG maps: force high-contrast fills via CSS (overrides inline attributes) */
+[data-ink-saver] .ptp-edge {
+    stroke: #111111 !important;
+}
+
+[data-ink-saver] .ptp-node {
+    fill: #FDFCF0 !important;
+    stroke: #111111 !important;
+}
+
+[data-ink-saver] .ptp-node-player {
+    fill: #2A2A2A !important;
+    stroke: #111111 !important;
+}
+
+[data-ink-saver] .ptp-node-locked {
+    fill: #E8E5DA !important;
+    stroke: #4A4A4A !important;
+}
+
+[data-ink-saver] .ptp-label {
+    fill: #111111 !important;
+}
+
+[data-ink-saver] .ptp-label-locked {
+    fill: #4A4A4A !important;
+}
+
+/* Force LLM-generated SVG (dividers, cover art) to grayscale under ink-saver */
+[data-ink-saver] .section-divider,
+[data-ink-saver] .cover-art {
+    filter: grayscale(1) contrast(1.2) !important;
+}
+
+/* Workout card shadows: flatten for clean print */
+[data-ink-saver] .workout-session-atom {
+    box-shadow: none !important;
+    border: 1.5px solid #111111 !important;
+    background-image: none !important;
 }

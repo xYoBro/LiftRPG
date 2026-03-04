@@ -76,6 +76,15 @@ function validateWiringBlueprint(obj) {
         });
         if (!hasFeedback) w.push('No feedback loops or bidirectional wires — mechanics may feel disconnected');
 
+        // Decision-wire enforcement: at least one wire must create player agency
+        var decisionWireTypes = ['feedback-loop', 'resource-cycle', 'conditional-routing'];
+        var hasDecisionWire = obj.wiring.some(function (wi) {
+            return decisionWireTypes.indexOf(wi.type) !== -1;
+        });
+        if (obj.wiring.length > 0 && !hasDecisionWire) {
+            w.push('No decision wires found. At least one wire must be feedback-loop, resource-cycle, or conditional-routing — threshold-gates alone create a story machine, not a game. The player must CHOOSE, not merely observe.');
+        }
+
         var validWireTypes = ['threshold-gate', 'feedback-loop', 'conditional-routing', 'resource-cycle', 'escalation', 'unlock-chain'];
         var wireIds = {};
         obj.wiring.forEach(function (wi, idx) {
@@ -426,7 +435,7 @@ function validateStageData(num, obj, currentPipelineData) {
             Object.keys(weeks).forEach(function(wk) {
                 var rooms = weeks[wk].rooms;
                 if (Array.isArray(rooms) && rooms.length !== expectedFloors) {
-                    w.push('Map week ' + wk + ' has ' + rooms.length + ' floor(s) in rooms[] but levels declares ' + expectedFloors + '. rooms[].length should equal levels.length.');
+                    e.push('Map week ' + wk + ' has ' + rooms.length + ' floor(s) in rooms[] but levels declares ' + expectedFloors + '. rooms[].length must equal levels.length.');
                 }
             });
         }
@@ -512,6 +521,22 @@ function validateStageData(num, obj, currentPipelineData) {
             if (missingBranches.length) {
                 e.push('Missing branches (' + missingBranches.length + '): ' + missingBranches.slice(0, 10).join(', ') + (missingBranches.length > 10 ? '...' : ''));
             }
+        }
+
+        // Branch-choice destination REF completeness check
+        // Every options[].ref in branch encounters must have a corresponding REF node
+        var missingChoiceRefs = [];
+        s1Encounters.forEach(function(enc) {
+            if (enc.special === 'branch' && Array.isArray(enc.options)) {
+                enc.options.forEach(function(opt) {
+                    if (opt.ref && !obj[opt.ref]) {
+                        missingChoiceRefs.push(opt.ref);
+                    }
+                });
+            }
+        });
+        if (missingChoiceRefs.length) {
+            e.push('Missing ' + missingChoiceRefs.length + ' branch-choice destination REF node(s): ' + missingChoiceRefs.join(', ') + '. Every options[].ref in branch encounters must have a generated REF node — the player chooses a path and finds nothing.');
         }
 
         keys.forEach(function(k) {
@@ -613,9 +638,6 @@ function validateAtomInventory(inventory) {
         }
 
         if (atom.breakPolicy) {
-            if (typeof atom.breakPolicy.keepTogetherStrength !== 'number') {
-                w.push('Atom "' + id + '" breakPolicy.keepTogetherStrength is not a number');
-            }
             if (typeof atom.breakPolicy.mustNotSplit !== 'boolean') {
                 w.push('Atom "' + id + '" breakPolicy.mustNotSplit is not a boolean');
             }
