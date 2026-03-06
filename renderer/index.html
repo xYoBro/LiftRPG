@@ -1103,18 +1103,49 @@ function renderOracle(o){
 
   var isFull = (o.mode === 'full');
 
-  block.appendChild(span('oracle-instruction', o.instruction));
+  var instrText = isFull
+    ? 'Roll d10 + d10 during any rest period. First die: cluster (0\u20139). Second die: entry within cluster (0\u20139).'
+    : o.instruction;
+  block.appendChild(span('oracle-instruction', instrText));
 
   var entries = el('div','oracle-entries');
 
   if(isFull){
-    /* Mode B: 10 range entries, render linearly */
+    /* Mode B: group entries by cluster field (0-9) */
+    var clusters = {};
     o.entries.forEach(function(e){
-      var row = el('div','oracle-entry-b');
-      row.appendChild(span('oracle-roll', String(e.roll)));
-      row.appendChild(span('oracle-text', e.text));
-      if(e.fragmentRef){ row.appendChild(span('oracle-fragref', '\u2192 ' + e.fragmentRef)); }
-      entries.appendChild(row);
+      var c = e.cluster;
+      if(!clusters[c]) clusters[c] = [];
+      clusters[c].push(e);
+    });
+    /* Render each cluster */
+    [0,1,2,3,4,5,6,7,8,9].forEach(function(c){
+      if(!clusters[c]) return;
+      clusters[c].forEach(function(e){
+        var row = document.createElement('div');
+        row.className = 'oracle-entry-b';
+        var roll = document.createElement('span');
+        roll.className = 'oracle-roll';
+        roll.textContent = e.roll.toString().padStart(2,'0');
+        var text = document.createElement('span');
+        text.className = 'oracle-text';
+        text.textContent = e.text;
+        row.appendChild(roll);
+        row.appendChild(text);
+        if(e.fragmentRef){
+          var ref = document.createElement('span');
+          ref.className = 'oracle-fragref';
+          ref.textContent = '\u2192 ' + e.fragmentRef;
+          row.appendChild(ref);
+        }
+        entries.appendChild(row);
+      });
+      /* Cluster separator after each cluster except the last */
+      if(c < 9){
+        var sep = document.createElement('div');
+        sep.className = 'oracle-cluster-sep';
+        entries.appendChild(sep);
+      }
     });
   } else {
     /* Mode A (simple) and fallback */
