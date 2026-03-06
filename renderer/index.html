@@ -199,16 +199,21 @@ body{
 
 /* ── RIGHT PAGE ────────────────────────────────── */
 .section-heading{
-  font-family:var(--mono);font-size:5.5pt;color:var(--accent);
-  letter-spacing:.22em;text-transform:uppercase;
+  font-family:var(--mono);font-size:7pt;color:var(--muted);
+  letter-spacing:.2em;text-transform:uppercase;
   display:block;margin-bottom:3px;
 }
 
 /* ── MAP ───────────────────────────────────────── */
 .map-block{flex-shrink:0;margin-bottom:8px;}
 .map-floor-label{
-  font-family:var(--mono);font-size:6pt;color:var(--ink);
-  letter-spacing:.08em;margin-bottom:4px;display:block;
+  font-family:var(--display);font-style:italic;font-size:11pt;
+  color:var(--ink);
+  margin-bottom:12px;display:block;line-height:1.2;
+}
+.map-grid-wrap{
+  border:1px solid var(--rule);padding:16px;
+  margin-bottom:4px;
 }
 .map-grid{
   display:grid;gap:2px;width:100%;
@@ -231,10 +236,10 @@ body{
 }
 .tile-locked{
   background:
-    radial-gradient(circle, var(--muted) .75px, transparent .75px);
-  background-size:5px 5px;
-  background-color:var(--box-bg);
-  border-color:var(--fog);
+    radial-gradient(circle, var(--rule) .4px, transparent .4px);
+  background-size:9px 9px;
+  background-color:var(--paper);
+  border-color:rgba(204,197,182,.3);
   color:var(--muted);
 }
 .tile-anomaly{
@@ -281,13 +286,13 @@ body{
 }
 .cipher-display{
   font-family:var(--mono);font-size:6pt;color:var(--ink);
-  line-height:1.55;white-space:pre-wrap;margin-bottom:4px;
+  line-height:1.55;white-space:pre-wrap;margin-bottom:2.5px;
 }
 .cipher-key{
   font-family:var(--mono);font-size:5.5pt;color:var(--muted);
-  line-height:1.45;margin-bottom:4px;font-style:italic;
+  line-height:1.45;margin-bottom:2.5px;font-style:italic;
 }
-.workspace{margin-bottom:3px;}
+.workspace{margin-bottom:2px;max-height:60px;overflow:hidden;}
 .workspace-boxgrid{display:flex;flex-wrap:wrap;gap:2px;}
 .workspace-ruled-line{
   border-bottom:1px solid var(--rule);height:16px;
@@ -299,13 +304,13 @@ body{
   border:1px solid var(--fog);border-radius:2px;
 }
 .cipher-instruction{
-  font-family:var(--mono);font-size:5pt;color:var(--muted);
+  font-family:var(--mono);font-size:7.5pt;color:var(--muted);
   letter-spacing:.04em;line-height:1.45;
-  border-top:1px dotted var(--rule);padding-top:3px;
+  border-top:1px solid var(--rule);padding-top:4px;margin-top:1px;
 }
 
 /* ── ORACLE ────────────────────────────────────── */
-.oracle-block{flex:1;display:flex;flex-direction:column;min-height:0;}
+.oracle-block{flex:1;display:flex;flex-direction:column;min-height:0;border-top:1px solid var(--rule);padding-top:5px;}
 .oracle-title{
   font-family:var(--mono);font-size:5.5pt;color:var(--ink);
   letter-spacing:.08em;margin-bottom:1px;display:block;
@@ -324,11 +329,31 @@ body{
 .oracle-entry:last-child{border-bottom:none;}
 .oracle-roll{
   font-family:var(--mono);font-size:5.5pt;font-weight:700;
-  color:var(--accent);text-align:right;
+  color:var(--ink);text-align:right;
 }
 .oracle-text{
   font-family:var(--mono);font-size:5.5pt;color:var(--ink);
   line-height:1.4;
+}
+
+/* ── ORACLE MODE B (d100 clusters) ─────────────── */
+.oracle-cluster-hdr{
+  font-family:var(--mono);font-size:5pt;color:var(--muted);
+  letter-spacing:.1em;text-transform:uppercase;
+  padding:2px 0 1px;border-bottom:1px solid var(--fog);
+  margin-top:4px;
+}
+.oracle-entries .oracle-cluster-hdr:first-child{ margin-top:0; }
+.oracle-entry-b{
+  display:grid;grid-template-columns:22px 1fr auto;gap:3px;
+  padding:1px 0;border-bottom:1px dotted var(--rule);
+  align-items:baseline;
+}
+.oracle-entry-b:last-child{ border-bottom:none; }
+.oracle-entry-b .oracle-roll{ color:var(--muted); }
+.oracle-fragref{
+  font-family:var(--mono);font-size:5pt;color:var(--accent);
+  text-align:right;white-space:nowrap;
 }
 
 /* ── PRINT ─────────────────────────────────────── */
@@ -634,7 +659,6 @@ function renderRightPage(week){
 /* ── MAP ───────────────────────────────────────── */
 function renderMap(ms){
   var block = el('div','map-block');
-  block.appendChild(span('section-heading','Survey Grid'));
   block.appendChild(span('map-floor-label', ms.floorLabel));
 
   var grid = el('div','map-grid');
@@ -658,7 +682,9 @@ function renderMap(ms){
       grid.appendChild(cell);
     }
   }
-  block.appendChild(grid);
+  var gridWrap = el('div','map-grid-wrap');
+  gridWrap.appendChild(grid);
+  block.appendChild(gridWrap);
 
   /* Annotations as margin-style notes below grid */
   if(annotations.length){
@@ -731,24 +757,58 @@ function renderOracle(o){
   var block = el('div','oracle-block');
   block.appendChild(span('section-heading','Incident Classification'));
   block.appendChild(span('oracle-title', o.title));
-  block.appendChild(span('oracle-instruction', o.instruction));
+
+  var n = o.entries.length;
+  var isModeA = (n === 11);   /* 2d6 — rolls 2–12 */
+  var isModeB = (n === 100);  /* d100 — 10 clusters of 10 */
+
+  /* Instruction — auto-text for Mode B */
+  var instrText = isModeB
+    ? 'Roll d100. Find cluster matching your tens digit, row matching your ones digit.'
+    : o.instruction;
+  block.appendChild(span('oracle-instruction', instrText));
 
   var entries = el('div','oracle-entries');
-  o.entries.forEach(function(e){
-    var row = el('div','oracle-entry');
 
-    row.appendChild(span('oracle-roll', String(e.roll)));
-
-    var textEl = span('oracle-text','');
-    var fullText = e.text;
-    if(e.fragmentRef){
-      fullText += ' \u2192 ' + e.fragmentRef;
+  if(isModeB){
+    /* Mode B: 10 clusters of 10 */
+    for(var cluster = 0; cluster < 10; cluster++){
+      var lo = cluster * 10;
+      var hi = lo + 9;
+      var hdr = el('div','oracle-cluster-hdr');
+      hdr.textContent = (lo < 10 ? '0' + lo : String(lo)) + '\u2013' + String(hi);
+      entries.appendChild(hdr);
+      var slice = o.entries.slice(lo, hi + 1);
+      slice.forEach(function(e){
+        var row = el('div','oracle-entry-b');
+        row.appendChild(span('oracle-roll', (e.roll < 10 ? '0' + e.roll : String(e.roll))));
+        row.appendChild(span('oracle-text', e.text));
+        row.appendChild(span('oracle-fragref', e.fragmentRef ? '\u2192 ' + e.fragmentRef : ''));
+        entries.appendChild(row);
+      });
     }
-    textEl.textContent = fullText;
-    row.appendChild(textEl);
+  } else if(isModeA){
+    /* Mode A: standard 2d6 table */
+    o.entries.forEach(function(e){
+      var row = el('div','oracle-entry');
+      row.appendChild(span('oracle-roll', String(e.roll)));
+      var fullText = e.text;
+      if(e.fragmentRef){ fullText += ' \u2192 ' + e.fragmentRef; }
+      var textEl = span('oracle-text','');
+      textEl.textContent = fullText;
+      row.appendChild(textEl);
+      entries.appendChild(row);
+    });
+  } else {
+    /* Fallback: any other count — simple numbered list */
+    o.entries.forEach(function(e){
+      var row = el('div','oracle-entry');
+      row.appendChild(span('oracle-roll', String(e.roll)));
+      row.appendChild(span('oracle-text', e.text || ''));
+      entries.appendChild(row);
+    });
+  }
 
-    entries.appendChild(row);
-  });
   block.appendChild(entries);
   return block;
 }
