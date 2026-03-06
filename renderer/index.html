@@ -346,18 +346,21 @@ body{
 
 /* ── ORACLE MODE B (d100 clusters) ─────────────── */
 .oracle-cluster-sep{
-  border-top:1px solid var(--rule);margin:3px 0;
+  display:block;height:0;
+  border-top:1px solid var(--rule);margin:4px 0;
 }
 .oracle-entry-b{
   display:grid;grid-template-columns:2.5em 1fr auto;gap:3px;
   padding:1px 0;border-bottom:1px dotted var(--rule);
-  align-items:baseline;
+  align-items:start;
 }
 .oracle-entry-b:last-child{ border-bottom:none; }
-.oracle-entry-b .oracle-roll{ color:var(--muted);font-weight:400; }
+.oracle-entry-b .oracle-roll{
+  font-family:var(--mono);color:var(--muted);font-weight:400;align-self:start;
+}
 .oracle-entry-b .oracle-text{
-  font-family:var(--serif);font-size:8.5pt;
-  color:var(--ink);line-height:1.35;
+  font-family:var(--serif);font-size:8pt;
+  color:var(--ink);line-height:1.4;
 }
 .oracle-fragref{
   font-family:var(--mono);font-size:5pt;color:var(--accent);
@@ -1765,7 +1768,7 @@ function renderOracle(o){
       if(ci > 0){ entries.appendChild(el('div','oracle-cluster-sep')); }
       clusters[c].forEach(function(e){
         var row = el('div','oracle-entry-b');
-        row.appendChild(span('oracle-roll', String(e.roll)));
+        row.appendChild(span('oracle-roll', e.roll.toString().padStart(2,'0')));
         row.appendChild(span('oracle-text', e.text));
         if(e.fragmentRef){ row.appendChild(span('oracle-fragref', '\u2192 ' + e.fragmentRef)); }
         entries.appendChild(row);
