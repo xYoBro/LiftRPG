@@ -312,55 +312,696 @@
         "oracleTable": {
           "mode": "full",
           "title": "Survey Incident Classification Table · MSA Form 7-R",
-          "instruction": "Roll d10 × d10. Read as 01–00. First die = tens digit.",
+          "instruction": "Roll d10 + d10 during any rest period. First die: cluster (0–9). Second die: entry within cluster (0–9).",
           "entries": [
             {
-              "roll": "01-10",
+              "cluster": 0,
+              "roll": "00",
+              "type": "fragment",
               "text": "Survey form MSA-7 requires building designation in Field 3. The building has no designation on file. Field 3 has been left blank for eleven working days.",
               "fragmentRef": "F.01"
             },
             {
-              "roll": "11-20",
+              "cluster": 0,
+              "roll": "01",
+              "type": "fragment",
+              "text": "Standard survey duration for a building of this footprint is four to six days. No completion date has been entered in the assignment record.",
+              "fragmentRef": "F.08"
+            },
+            {
+              "cluster": 0,
+              "roll": "02",
+              "type": "fragment",
+              "text": "The assignment brief references Attachment A. Attachment A was not included. Requests for Attachment A have not received a response.",
+              "fragmentRef": "F.01"
+            },
+            {
+              "cluster": 0,
+              "roll": "03",
+              "type": "fragment",
+              "text": "Form 99 requires a submission address. The address printed on Form 99 does not correspond to any MSA office in the current directory.",
+              "fragmentRef": "F.08"
+            },
+            {
+              "cluster": 0,
+              "roll": "04",
+              "type": "fragment",
+              "text": "The survey equipment log shows the measuring tape was calibrated on Day 1. It has not been recalibrated. The measurements it is producing are exact to two decimal places. Both decimal places are zero.",
+              "fragmentRef": "F.02"
+            },
+            {
+              "cluster": 0,
+              "roll": "05",
+              "type": "fragment",
+              "text": "Building inspection records for this address were requested from the municipal archive. The archive confirmed receipt of the request. No records have been provided.",
+              "fragmentRef": "F.07"
+            },
+            {
+              "cluster": 0,
+              "roll": "06",
+              "type": "fragment",
+              "text": "The survey log requires a daily sign-in. You have been signing in. There are more signatures in the log than there are days you have been present.",
+              "fragmentRef": "F.03"
+            },
+            {
+              "cluster": 0,
+              "roll": "07",
+              "type": "fragment",
+              "text": "MSA procedure requires that anomalous findings be escalated to the zone coordinator within 24 hours. The zone coordinator's contact information was not provided in the assignment brief.",
+              "fragmentRef": "F.08"
+            },
+            {
+              "cluster": 0,
+              "roll": "08",
+              "type": "fragment",
+              "text": "The building permit on file with the municipal authority expired in a year that has not yet occurred. This was filed as a documentation discrepancy.",
+              "fragmentRef": "F.07"
+            },
+            {
+              "cluster": 0,
+              "roll": "09",
+              "type": "fragment",
+              "text": "Your timesheet for this assignment requires a cost centre code. The cost centre code provided in the assignment brief does not appear in the MSA financial directory.",
+              "fragmentRef": "F.08"
+            },
+            {
+              "cluster": 1,
+              "roll": "10",
+              "type": "fragment",
               "text": "Sector 1-C measures 4.00m × 6.00m from the north entrance. It measures 4.00m × 7.40m from the east entrance. Both measurements were taken with the same tape. Both measurements are correct.",
               "fragmentRef": "F.02"
             },
             {
-              "roll": "21-30",
+              "cluster": 1,
+              "roll": "11",
+              "type": "fragment",
+              "text": "The stairwell between Floor 1 and Floor 2 contains seventeen steps. The floor-to-ceiling height that seventeen steps implies does not match the exterior elevation of the building.",
+              "fragmentRef": "F.04"
+            },
+            {
+              "cluster": 1,
+              "roll": "12",
+              "type": "fragment",
+              "text": "Room 1-F has four walls. The angles at the four corners sum to 374 degrees. The survey form does not have a field for this.",
+              "fragmentRef": "F.02"
+            },
+            {
+              "cluster": 1,
+              "roll": "13",
+              "type": "fragment",
+              "text": "The corridor on the south side of Floor 1 is 40 metres long when measured walking east. It is 38 metres long when measured walking west. The tape does not lie in either direction.",
+              "fragmentRef": "F.04"
+            },
+            {
+              "cluster": 1,
+              "roll": "14",
+              "type": "fragment",
+              "text": "Sector 1-A has been verified. Its dimensions are exact and concordant. It is the only sector whose dimensions are exact and concordant. You have checked three times.",
+              "fragmentRef": "F.02"
+            },
+            {
+              "cluster": 1,
+              "roll": "15",
+              "type": "fragment",
+              "text": "The building has six floors visible from the exterior. The interior stairwell has access to nine floors. Floors 7, 8, and 9 are not locked. They are simply not mentioned in the assignment brief.",
+              "fragmentRef": "F.07"
+            },
+            {
+              "cluster": 1,
+              "roll": "16",
+              "type": "fragment",
+              "text": "The lobby is larger than the building. This is not a rounding error. The difference is approximately 40 square metres. You have filed it as recorded.",
+              "fragmentRef": "F.02"
+            },
+            {
+              "cluster": 1,
+              "roll": "17",
+              "type": "fragment",
+              "text": "Room 1-B has a window. The window faces west. The building's west exterior wall has no windows. Both observations are correct.",
+              "fragmentRef": "F.04"
+            },
+            {
+              "cluster": 1,
+              "roll": "18",
+              "type": "fragment",
+              "text": "The building's shadow at noon is longer than the building is tall. This is geometrically impossible at this latitude in this season. You measured the shadow once and did not measure it again.",
+              "fragmentRef": "F.04"
+            },
+            {
+              "cluster": 1,
+              "roll": "19",
+              "type": "fragment",
+              "text": "Floor 1 has a total surveyed area of 847 square metres. The building's footprint, measured from the exterior, is 340 square metres. The survey form does not have a field for the difference.",
+              "fragmentRef": "F.02"
+            },
+            {
+              "cluster": 2,
+              "roll": "20",
+              "type": "fragment",
               "text": "The survey log contains a signature that is not yours. It is dated three days before your assignment began. The handwriting is neat. The name is not legible.",
               "fragmentRef": "F.03"
             },
             {
-              "roll": "31-40",
+              "cluster": 2,
+              "roll": "21",
+              "type": "fragment",
+              "text": "You have encountered another person in the building on four occasions. On each occasion they were carrying MSA-standard equipment. On each occasion they appeared to be conducting a survey.",
+              "fragmentRef": "F.03"
+            },
+            {
+              "cluster": 2,
+              "roll": "22",
+              "type": "fragment",
+              "text": "Personnel Records confirmed that no MSA staff other than yourself are assigned to this building. They confirmed this in writing. The confirmation is dated the same day as the unidentified signature in the log.",
+              "fragmentRef": "F.03"
+            },
+            {
+              "cluster": 2,
+              "roll": "23",
+              "type": "fragment",
+              "text": "The other surveyor's equipment is identical to yours. The serial numbers are different. You checked.",
+              "fragmentRef": "F.03"
+            },
+            {
+              "cluster": 2,
+              "roll": "24",
+              "type": "fragment",
+              "text": "On Day 7 the other surveyor was in Sector 3-B when you arrived. They did not appear surprised to see you. You asked if they had been assigned here. They said yes. You asked by whom. They said the same office that assigned you.",
+              "fragmentRef": "F.03"
+            },
+            {
+              "cluster": 2,
+              "roll": "25",
+              "type": "fragment",
+              "text": "The other surveyor's survey notes, which you were briefly able to see, contain measurements for rooms that are not on your assignment map. The rooms have designations. The designations are in a format you do not recognise.",
+              "fragmentRef": "F.03"
+            },
+            {
+              "cluster": 2,
+              "roll": "26",
+              "type": "fragment",
+              "text": "You have not seen the other surveyor in three days. Their equipment is still in the lobby. Their survey log is still open on the table. The last entry is dated the day before yesterday.",
+              "fragmentRef": "F.03"
+            },
+            {
+              "cluster": 2,
+              "roll": "27",
+              "type": "fragment",
+              "text": "The other surveyor's most recent log entry reads: 'Sector 4-B confirmed. Second set of footprints. Not mine.' The entry is in your handwriting.",
+              "fragmentRef": "F.03"
+            },
+            {
+              "cluster": 2,
+              "roll": "28",
+              "type": "fragment",
+              "text": "MSA Personnel Records, contacted again, confirmed there is no employee with the name provided. They asked where you obtained that name. You told them. They did not respond to the follow-up.",
+              "fragmentRef": "F.03"
+            },
+            {
+              "cluster": 2,
+              "roll": "29",
+              "type": "fragment",
+              "text": "The other surveyor's equipment has been removed from the lobby. You did not see anyone remove it. The survey log they were using is also gone. The table where they worked is clean.",
+              "fragmentRef": "F.03"
+            },
+            {
+              "cluster": 3,
+              "roll": "30",
+              "type": "fragment",
               "text": "You have measured Sector 1-C four times. The measurements agree with each other. They do not agree with the dimensions implied by the surrounding sectors.",
               "fragmentRef": "F.02"
             },
             {
-              "roll": "41-50",
-              "text": "A previous survey report for this building was found in a filing cabinet on Floor 2. It is dated six years ago. The surveyor’s name on the report is redacted. The measurements in the report are identical to yours.",
+              "cluster": 3,
+              "roll": "31",
+              "type": "fragment",
+              "text": "Your measuring tape has a maximum length of 30 metres. On Day 4 you extended it fully in a corridor. Both ends were inside the corridor. The corridor appeared to continue in both directions.",
+              "fragmentRef": "F.04"
+            },
+            {
+              "cluster": 3,
+              "roll": "32",
+              "type": "fragment",
+              "text": "The survey form requires measurements to the nearest centimetre. Every measurement you have taken in this building is a whole number of centimetres. You have been surveying for eleven years. This has never happened before.",
+              "fragmentRef": "F.02"
+            },
+            {
+              "cluster": 3,
+              "roll": "33",
+              "type": "fragment",
+              "text": "Room 1-E has been measured three times by three different methods. All three methods agree. The room is exactly the size it should be. You do not trust it.",
+              "fragmentRef": "F.04"
+            },
+            {
+              "cluster": 3,
+              "roll": "34",
+              "type": "fragment",
+              "text": "The laser distance measure and the tape measure give identical readings in every room except Sector 1-C. In Sector 1-C they agree with each other and disagree with every other measurement.",
+              "fragmentRef": "F.02"
+            },
+            {
+              "cluster": 3,
+              "roll": "35",
+              "type": "fragment",
+              "text": "You have begun taking measurements twice in every room — once in each direction. The second measurement is always slightly different from the first. Not by enough to matter. By exactly enough to notice.",
+              "fragmentRef": "F.04"
+            },
+            {
+              "cluster": 3,
+              "roll": "36",
+              "type": "fragment",
+              "text": "Sector 2-A, which you have not yet surveyed, appears on your working map as already cleared with a tick mark. You did not put the tick there. The dimensions noted beside it are in your handwriting.",
+              "fragmentRef": "F.05"
+            },
+            {
+              "cluster": 3,
+              "roll": "37",
+              "type": "fragment",
+              "text": "Your survey notes from Day 3 describe a room in detail that you have no memory of entering. The room is designated 1-G. There is no Sector 1-G on the assignment map.",
+              "fragmentRef": "F.05"
+            },
+            {
+              "cluster": 3,
+              "roll": "38",
+              "type": "fragment",
+              "text": "You have been using a pencil to mark the survey map. The marks are in ink.",
+              "fragmentRef": "F.05"
+            },
+            {
+              "cluster": 3,
+              "roll": "39",
+              "type": "fragment",
+              "text": "The building is exactly the right size. Every room is exactly where it should be. You have been checking. You have been checking for eleven days. It has been exactly the right size for eleven days and you still do not believe it.",
+              "fragmentRef": "F.02"
+            },
+            {
+              "cluster": 4,
+              "roll": "40",
+              "type": "fragment",
+              "text": "A previous survey report for this building was found in a filing cabinet on Floor 2. It is dated six years ago. The surveyor's name on the report is redacted. The measurements in the report are identical to yours.",
               "fragmentRef": "F.06"
             },
             {
-              "roll": "51-60",
+              "cluster": 4,
+              "roll": "41",
+              "type": "fragment",
+              "text": "The previous survey report is 47 pages long. Your current survey is on Day 11 and your report is 43 pages. You have not yet surveyed Floors 3 through 9.",
+              "fragmentRef": "F.06"
+            },
+            {
+              "cluster": 4,
+              "roll": "42",
+              "type": "fragment",
+              "text": "Page 31 of the previous survey report describes a room that does not appear on any floor plan. The description matches a room you have been in. You did not include it in your report because it does not appear on the assignment map.",
+              "fragmentRef": "F.06"
+            },
+            {
+              "cluster": 4,
+              "roll": "43",
+              "type": "fragment",
+              "text": "The building contains a noticeboard with MSA internal memos pinned to it. The memos are dated. The most recent is dated four months from now.",
+              "fragmentRef": "F.07"
+            },
+            {
+              "cluster": 4,
+              "roll": "44",
+              "type": "fragment",
+              "text": "One of the memos on the noticeboard is addressed to you by name. It concerns your current assignment. It is dated six weeks from now. It uses the past tense throughout.",
+              "fragmentRef": "F.07"
+            },
+            {
+              "cluster": 4,
+              "roll": "45",
+              "type": "fragment",
+              "text": "The memo addressed to you references a final report that you will submit. It describes the report's conclusions in two sentences. Both sentences are redacted.",
+              "fragmentRef": "F.07"
+            },
+            {
+              "cluster": 4,
+              "roll": "46",
+              "type": "fragment",
+              "text": "A second copy of your assignment brief was found in a desk drawer on Floor 3. It is identical to the original in every respect except that Attachment A is included. Attachment A is a floor plan of a building at a different address.",
+              "fragmentRef": "F.01"
+            },
+            {
+              "cluster": 4,
+              "roll": "47",
+              "type": "fragment",
+              "text": "The floor plan in Attachment A shows a building with nine floors and a total area of 4,200 square metres. The address on the floor plan is the address of the building you are currently surveying.",
+              "fragmentRef": "F.01"
+            },
+            {
+              "cluster": 4,
+              "roll": "48",
+              "type": "fragment",
+              "text": "The building has a visitors log in the lobby. You have been signing it daily. The visitors log goes back four years. In four years there has been one other visitor. The name is redacted. The date is redacted. The purpose of visit is listed as: survey.",
+              "fragmentRef": "F.06"
+            },
+            {
+              "cluster": 4,
+              "roll": "49",
+              "type": "fragment",
+              "text": "Your copy of the assignment brief has developed a new page since you last read it. The page is numbered 0. It contains one line: 'This building is aware that it is being surveyed.'",
+              "fragmentRef": "F.01"
+            },
+            {
+              "cluster": 5,
+              "roll": "50",
+              "type": "fragment",
               "text": "You have been in this building for 22 days. It has been 19 days since you last counted the windows from the outside. You do not know why you stopped.",
               "fragmentRef": "F.05"
             },
             {
-              "roll": "61-70",
+              "cluster": 5,
+              "roll": "51",
+              "type": "fragment",
+              "text": "Your phone shows the correct date and time. The clock on the wall of Room 1-D shows a time that is 43 minutes ahead. The clock has not been adjusted. It is running at the correct speed.",
+              "fragmentRef": "F.05"
+            },
+            {
+              "cluster": 5,
+              "roll": "52",
+              "type": "fragment",
+              "text": "Your survey log covers 22 days. Your phone calendar shows you began this assignment 14 days ago. Both records are in your handwriting. Both records are correct.",
+              "fragmentRef": "F.05"
+            },
+            {
+              "cluster": 5,
+              "roll": "53",
+              "type": "fragment",
+              "text": "On Day 8 you noted that the light in the building does not change with the time of day. The building has windows. The light comes through them. It does not move.",
+              "fragmentRef": "F.05"
+            },
+            {
+              "cluster": 5,
+              "roll": "54",
+              "type": "fragment",
+              "text": "You arrived at the building this morning at 8:47am. Your survey log shows you arrived at 8:47am. The previous day's entry ends at 8:46am. There is no gap.",
+              "fragmentRef": "F.05"
+            },
+            {
+              "cluster": 5,
+              "roll": "55",
+              "type": "fragment",
+              "text": "The building was constructed, according to the permit on the noticeboard, in a year that is eleven years in the future. The permit is yellowed and worn. The ink is faded.",
+              "fragmentRef": "F.07"
+            },
+            {
+              "cluster": 5,
+              "roll": "56",
+              "type": "fragment",
+              "text": "You have been on assignment for what feels like three weeks. Your phone shows fourteen days. Your survey log shows twenty-two days. You have stopped trying to reconcile these figures.",
+              "fragmentRef": "F.05"
+            },
+            {
+              "cluster": 5,
+              "roll": "57",
+              "type": "fragment",
+              "text": "On Day 14 you made a note to yourself: 'Check exterior again. Count floors. Count windows. Do this today.' The note is in your handwriting. It is dated Day 3.",
+              "fragmentRef": "F.05"
+            },
+            {
+              "cluster": 5,
+              "roll": "58",
+              "type": "fragment",
+              "text": "The filing cabinet on Floor 2 contains a survey report dated six years ago. It also contains a survey report dated six years from now. You have not read the second report. It is very thick.",
+              "fragmentRef": "F.06"
+            },
+            {
+              "cluster": 5,
+              "roll": "59",
+              "type": "fragment",
+              "text": "Your assignment brief says the survey should take four to six days. You have been here for three weeks by at least one measure of time. The building is not finished.",
+              "fragmentRef": "F.08"
+            },
+            {
+              "cluster": 6,
+              "roll": "60",
+              "type": "consequence",
               "text": "Sector 1-C measurement variance confirmed on second reading. The building has logged this. Mark Sector 1-C as anomaly on your survey grid if you have not already done so."
             },
             {
-              "roll": "71-80",
-              "text": "The building smells of fresh concrete on Floor 1 and old paper on Floor 2. Floor 3 smells of neither. You have not been able to identify what Floor 3 smells of. You have written ‘no anomaly’ in the smell field of the survey form.",
+              "cluster": 6,
+              "roll": "61",
+              "type": "consequence",
+              "text": "The corridor between Sectors 1-B and 1-C has been reclassified. The classification is not in your standard taxonomy. Mark it as inaccessible on your survey grid and note the date."
+            },
+            {
+              "cluster": 6,
+              "roll": "62",
+              "type": "consequence",
+              "text": "Your survey log is running short on pages. This is not an incident. Record today's session count in the margin of your password log, p.02."
+            },
+            {
+              "cluster": 6,
+              "roll": "63",
+              "type": "consequence",
+              "text": "The lock on the stairwell to Floor 2 was open this morning. It is standard procedure to note access changes. Mark Floor 2 access as pending on your survey grid."
+            },
+            {
+              "cluster": 6,
+              "roll": "64",
+              "type": "consequence",
+              "text": "The annotation on F.02 now makes sense. If you have read F.02, circle the measurement figure in the third paragraph. If you have not read F.02, read it now, then circle it."
+            },
+            {
+              "cluster": 6,
+              "roll": "65",
+              "type": "consequence",
+              "text": "Room 1-D has been re-examined. The clock discrepancy was noted in a previous survey report. Add a mark to the 1-D tile on your survey grid — a small dot in the upper right corner. Do not label it."
+            },
+            {
+              "cluster": 6,
+              "roll": "66",
+              "type": "consequence",
+              "text": "Standard procedure after a spatial anomaly report is to mark the adjacent sectors for verification. Place a small question mark beside each sector that shares a wall with Sector 1-C on your survey grid."
+            },
+            {
+              "cluster": 6,
+              "roll": "67",
+              "type": "consequence",
+              "text": "The lobby tile has been examined. The lobby is your current position and your primary reference point. Draw a small circle inside the LOBBY tile on your survey grid. This is your anchor."
+            },
+            {
+              "cluster": 6,
+              "roll": "68",
+              "type": "consequence",
+              "text": "Verification of Sector 1-A is complete. It is the only sector that checks out. Mark it with a double tick on your survey grid to distinguish it from sectors that are merely cleared."
+            },
+            {
+              "cluster": 6,
+              "roll": "69",
+              "type": "consequence",
+              "text": "Your survey record on p.02 requires a date of first anomaly. If you have not filled this in, write today's date. If you have, verify it is correct. The building has a record too."
+            },
+            {
+              "cluster": 7,
+              "roll": "70",
+              "type": "fragment",
+              "text": "The building smells of fresh concrete on Floor 1 and old paper on Floor 2. Floor 3 smells of neither. You have not been able to identify what Floor 3 smells of. You have written 'no anomaly' in the smell field of the survey form.",
               "fragmentRef": "F.04"
             },
             {
-              "roll": "81-90",
+              "cluster": 7,
+              "roll": "71",
+              "type": "fragment",
+              "text": "There are no other buildings visible from the windows of Floor 1. The building is located in the centre of a populated district. You have looked out every window. There are no other buildings.",
+              "fragmentRef": "F.04"
+            },
+            {
+              "cluster": 7,
+              "roll": "72",
+              "type": "fragment",
+              "text": "The building is quiet. Not the quiet of an empty building — the quiet of a building that is paying attention.",
+              "fragmentRef": "F.05"
+            },
+            {
+              "cluster": 7,
+              "roll": "73",
+              "type": "fragment",
+              "text": "On Day 5 you began counting your steps between rooms. The counts are consistent. The distances they imply are not consistent with the measured dimensions. You stopped counting your steps on Day 6.",
+              "fragmentRef": "F.02"
+            },
+            {
+              "cluster": 7,
+              "roll": "74",
+              "type": "fragment",
+              "text": "The dust in this building is distributed evenly across all surfaces including the ones that face upward and the ones that face downward. You wrote 'uniform particulate distribution' in the environmental notes. You did not write what you were actually thinking.",
+              "fragmentRef": "F.04"
+            },
+            {
+              "cluster": 7,
+              "roll": "75",
+              "type": "fragment",
+              "text": "You have not found any evidence that anyone has worked in this building. No desks, no chairs, no equipment, no waste, no wear on the floor. The building has been occupied by the survey log in the lobby and nothing else.",
+              "fragmentRef": "F.06"
+            },
+            {
+              "cluster": 7,
+              "roll": "76",
+              "type": "fragment",
+              "text": "The light switches in this building do not control the lights. The lights are on when you arrive and on when you leave. The switches move when you press them. Nothing else happens.",
+              "fragmentRef": "F.04"
+            },
+            {
+              "cluster": 7,
+              "roll": "77",
+              "type": "fragment",
+              "text": "The temperature in the building is exactly 19 degrees Celsius in every room. Not approximately. Exactly. Your thermometer is calibrated.",
+              "fragmentRef": "F.04"
+            },
+            {
+              "cluster": 7,
+              "roll": "78",
+              "type": "fragment",
+              "text": "There are no signs in this building. No floor numbers, no room designations, no exit signs, no fire safety notices. You have been adding your own designations as you survey. You wonder if the building had designations before you arrived.",
+              "fragmentRef": "F.05"
+            },
+            {
+              "cluster": 7,
+              "roll": "79",
+              "type": "fragment",
+              "text": "You eat your lunch in the lobby every day. You have been doing this for three weeks. The lobby is exactly as you found it on Day 1. There is no evidence that you have ever been here.",
+              "fragmentRef": "F.05"
+            },
+            {
+              "cluster": 8,
+              "roll": "80",
+              "type": "fragment",
               "text": "The rooms you have already surveyed are slightly different each time you re-enter them. Not dramatically. By exactly enough to require a second measurement. The second measurement always confirms the first.",
               "fragmentRef": "F.02"
             },
             {
-              "roll": "91-00",
+              "cluster": 8,
+              "roll": "81",
+              "type": "fragment",
+              "text": "The building has begun appearing in your dreams. In the dreams the survey is complete. The dimensions are concordant. You wake up before you can read the final measurements.",
+              "fragmentRef": "F.05"
+            },
+            {
+              "cluster": 8,
+              "roll": "82",
+              "type": "fragment",
+              "text": "Sector 1-C was the first room where the measurements did not agree. It has not been the last. The anomalies are spreading outward from Sector 1-C at a rate of approximately one sector per week.",
+              "fragmentRef": "F.02"
+            },
+            {
+              "cluster": 8,
+              "roll": "83",
+              "type": "fragment",
+              "text": "The building's response time to your presence has decreased. On Day 1 the anomalies were confined to Sector 1-C. By Day 14 they were present in six sectors. By Day 22 you have stopped counting sectors without anomalies.",
+              "fragmentRef": "F.02"
+            },
+            {
+              "cluster": 8,
+              "roll": "84",
+              "type": "fragment",
+              "text": "You have the strong impression that the building was not like this before you arrived. You have no evidence for this impression. You have been unable to find evidence against it.",
+              "fragmentRef": "F.01"
+            },
+            {
+              "cluster": 8,
+              "roll": "85",
+              "type": "fragment",
+              "text": "The filing cabinet on Floor 2 was empty on Day 3. On Day 7 it contained the previous survey report. On Day 14 it contained a second document you have not opened. On Day 22 it contained four documents. You have not opened the new ones.",
+              "fragmentRef": "F.06"
+            },
+            {
+              "cluster": 8,
+              "roll": "86",
+              "type": "fragment",
+              "text": "The building has a maintenance schedule posted in the utility corridor on Floor 1. The schedule covers weekly tasks through a date eight months from now. Every task listed for weeks 1 through 3 has a tick beside it. The ticks are fresh.",
+              "fragmentRef": "F.07"
+            },
+            {
+              "cluster": 8,
+              "roll": "87",
+              "type": "fragment",
+              "text": "The anomaly in Sector 1-C has not changed since Day 3. Every other anomaly in the building is still developing. Sector 1-C was the first. It appears to be finished.",
+              "fragmentRef": "F.02"
+            },
+            {
+              "cluster": 8,
+              "roll": "88",
+              "type": "fragment",
+              "text": "On Day 19 you noticed that your survey map, when viewed from across the room, resembles the floor plan in Attachment A. You have not been able to see this resemblance since. You have been trying.",
+              "fragmentRef": "F.01"
+            },
+            {
+              "cluster": 8,
+              "roll": "89",
+              "type": "fragment",
+              "text": "The building knows you are going to submit your report. You do not know how you know this. You know it the same way you know the measurements are correct — not because you checked, but because the building has confirmed it.",
+              "fragmentRef": "F.01"
+            },
+            {
+              "cluster": 9,
+              "roll": "90",
+              "type": "fragment",
               "text": "Your zone coordinator has not responded to any communication since Day 4. The out-of-office message says they are on leave until a date that has already passed.",
+              "fragmentRef": "F.08"
+            },
+            {
+              "cluster": 9,
+              "roll": "91",
+              "type": "fragment",
+              "text": "A second assignment brief arrived on Day 8 by internal post. It is addressed to you at this building's address. The building's address is not in the MSA directory.",
+              "fragmentRef": "F.01"
+            },
+            {
+              "cluster": 9,
+              "roll": "92",
+              "type": "fragment",
+              "text": "The second brief is identical to the first with one addition: a handwritten note in the margin of page 1 that reads 'Do not measure the lobby twice.' You have measured the lobby four times.",
+              "fragmentRef": "F.01"
+            },
+            {
+              "cluster": 9,
+              "roll": "93",
+              "type": "fragment",
+              "text": "MSA Central Dispatch was contacted on Day 11 to request clarification on the assignment scope. They confirmed the assignment. They confirmed the duration as standard. They did not ask for a progress update. They already knew you were there.",
+              "fragmentRef": "F.08"
+            },
+            {
+              "cluster": 9,
+              "roll": "94",
+              "type": "fragment",
+              "text": "The address on Form 99 — where your final report is to be submitted — was cross-referenced against the city directory. The address exists. It is a vacant lot. The lot has been vacant for six years.",
+              "fragmentRef": "F.08"
+            },
+            {
+              "cluster": 9,
+              "roll": "95",
+              "type": "fragment",
+              "text": "Your assignment was approved by a department head whose name appears on the brief but not in the MSA organisational chart. The HR department confirmed this person does not work for MSA. The assignment brief is genuine.",
+              "fragmentRef": "F.08"
+            },
+            {
+              "cluster": 9,
+              "roll": "96",
+              "type": "fragment",
+              "text": "The budget code on your assignment brief was traced to a departmental account. The department is listed in MSA records as dissolved four years ago. The account is still active. It was used to fund your survey.",
+              "fragmentRef": "F.08"
+            },
+            {
+              "cluster": 9,
+              "roll": "97",
+              "type": "fragment",
+              "text": "A request was submitted under the Freedom of Information Act for all records relating to this building's address. The request was acknowledged. The response, received two days later, was a single page: 'No records held.' The response was signed by your zone coordinator.",
+              "fragmentRef": "F.08"
+            },
+            {
+              "cluster": 9,
+              "roll": "98",
+              "type": "fragment",
+              "text": "The previous survey of this building was conducted six years ago. The surveyor submitted their report and was reassigned. Personnel Records shows no record of the reassignment. Personnel Records shows no record of the surveyor.",
+              "fragmentRef": "F.06"
+            },
+            {
+              "cluster": 9,
+              "roll": "99",
+              "type": "fragment",
+              "text": "Your assignment has no end date. This is standard for complex surveys. The assignment brief does not define 'complete.' You have been surveying for three weeks. The building is not running out of rooms.",
               "fragmentRef": "F.08"
             }
           ]
