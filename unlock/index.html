@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LiftRPG — Unlock</title>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Share+Tech+Mono&family=Playfair+Display:ital,wght@0,700;1,400;1,700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --ink:#181714;
+  --paper:#f1ebe0;
+  --fog:#ddd6c5;
+  --accent:#8b2a2a;
+  --muted:#857d72;
+  --rule:#ccc5b6;
+  --warm:#e8dfc8;
+  --card:#ece6d8;
+  --mono:'Share Tech Mono',monospace;
+  --serif:'Libre Baskerville',Georgia,serif;
+  --display:'Playfair Display',Georgia,serif;
+  --green:#2a6b3a;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: #1a1714;
+  font-family: var(--serif);
+  color: var(--ink);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Grain overlay on dark background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.88' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+}
+
+/* ── ENTRY SCREEN ─────────────────────────────────────────────────── */
+
+#entry-screen {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  opacity: 1;
+  transition: opacity 0.6s ease;
+}
+
+#entry-screen.fading {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.entry-kicker {
+  font-family: var(--mono);
+  font-size: 7pt;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.entry-title {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 42pt;
+  color: var(--paper);
+  line-height: 1;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.entry-rule {
+  width: 100%;
+  height: 1px;
+  background: #3a3530;
+  margin: 28px 0;
+}
+
+.entry-prompt {
+  font-family: var(--serif);
+  font-size: 9.5pt;
+  line-height: 1.7;
+  color: #a09880;
+  text-align: center;
+  margin-bottom: 32px;
+  font-style: italic;
+}
+
+/* Password input */
+.input-group {
+  width: 100%;
+  position: relative;
+  margin-bottom: 12px;
+}
+
+#password-input {
+  width: 100%;
+  padding: 14px 18px;
+  background: #0e0c0a;
+  border: 1px solid #3a3530;
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 14pt;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  outline: none;
+  text-align: center;
+  transition: border-color 0.2s ease;
+  -webkit-appearance: none;
+}
+
+#password-input::placeholder {
+  color: #3a3530;
+  letter-spacing: 0.15em;
+  font-size: 10pt;
+}
+
+#password-input:focus {
+  border-color: var(--accent);
+}
+
+#password-input.error {
+  border-color: #8b2a2a;
+  animation: shake 0.4s ease;
+}
+
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-6px)}
+  40%{transform:translateX(6px)}
+  60%{transform:translateX(-4px)}
+  80%{transform:translateX(4px)}
+}
+
+/* Encrypted blob input (hidden by default, shown via link) */
+#blob-section {
+  width: 100%;
+  margin-bottom: 12px;
+  display: none;
+}
+
+#blob-section.visible {
+  display: block;
+}
+
+#blob-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: #0e0c0a;
+  border: 1px solid #2a2520;
+  color: #a09880;
+  font-family: var(--mono);
+  font-size: 7.5pt;
+  letter-spacing: 0.05em;
+  outline: none;
+  resize: vertical;
+  min-height: 70px;
+  transition: border-color 0.2s ease;
+}
+
+#blob-input:focus {
+  border-color: #3a3530;
+}
+
+#blob-input::placeholder {
+  color: #2a2520;
+}
+
+/* Submit button */
+#unlock-btn {
+  width: 100%;
+  padding: 14px 18px;
+  background: var(--accent);
+  border: none;
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 8.5pt;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s ease, opacity 0.2s ease;
+  margin-bottom: 20px;
+}
+
+#unlock-btn:hover {
+  background: #a33333;
+}
+
+#unlock-btn:active {
+  background: #7a1a1a;
+}
+
+#unlock-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+#unlock-btn.working {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Error / status messages */
+#status-msg {
+  font-family: var(--mono);
+  font-size: 7.5pt;
+  letter-spacing: 0.12em;
+  text-align: center;
+  min-height: 18px;
+  color: var(--accent);
+  transition: opacity 0.3s ease;
+}
+
+#status-msg.success-msg {
+  color: var(--green);
+}
+
+/* Blob toggle link */
+.blob-toggle {
+  font-family: var(--mono);
+  font-size: 6.5pt;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #3a3530;
+  text-decoration: none;
+  text-align: center;
+  display: block;
+  margin-top: 12px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.blob-toggle:hover {
+  color: #5a5550;
+}
+
+.entry-footer {
+  margin-top: 40px;
+  font-family: var(--mono);
+  font-size: 6pt;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #2e2b27;
+  text-align: center;
+}
+
+
+/* ── REVEAL SCREEN ────────────────────────────────────────────────── */
+
+#reveal-screen {
+  display: none;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 680px;
+  opacity: 0;
+}
+
+#reveal-screen.visible {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#reveal-screen.revealed {
+  animation: reveal-in 1.2s ease forwards;
+}
+
+@keyframes reveal-in {
+  0%   { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* The revealed document */
+.reveal-document {
+  width: 100%;
+  background: var(--paper);
+  padding: 56px 60px;
+  position: relative;
+  box-shadow: 0 20px 80px rgba(0,0,0,0.8);
+}
+
+/* Paper grain on the document */
+.reveal-document::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.88' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+}
+
+.reveal-document > * {
+  position: relative;
+  z-index: 1;
+}
+
+.reveal-document-header {
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 16px;
+  margin-bottom: 28px;
+}
+
+.reveal-document-kicker {
+  font-family: var(--mono);
+  font-size: 6.5pt;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.reveal-document-title {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 22pt;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.reveal-content {
+  font-family: var(--serif);
+  font-size: 9.5pt;
+  line-height: 1.75;
+  color: var(--ink);
+}
+
+.reveal-content p {
+  margin-bottom: 14px;
+}
+
+.reveal-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* Password echo — shown below the document */
+.password-echo {
+  margin-top: 28px;
+  text-align: center;
+}
+
+.password-echo-label {
+  font-family: var(--mono);
+  font-size: 6pt;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #5a5550;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.password-echo-word {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 28pt;
+  color: var(--paper);
+  letter-spacing: 0.05em;
+  opacity: 0;
+  animation: word-appear 0.8s ease 0.8s forwards;
+}
+
+@keyframes word-appear {
+  0%   { opacity: 0; letter-spacing: 0.3em; }
+  100% { opacity: 1; letter-spacing: 0.05em; }
+}
+
+.reveal-footer {
+  margin-top: 24px;
+  font-family: var(--mono);
+  font-size: 6pt;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #2e2b27;
+  text-align: center;
+}
+
+
+/* ── WAITING / PROCESSING STATE ──────────────────────────────────── */
+
+.processing-dots::after {
+  content: '';
+  animation: dots 1.2s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0%   { content: ''; }
+  25%  { content: '.'; }
+  50%  { content: '..'; }
+  75%  { content: '...'; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- ── ENTRY SCREEN ─────────────────────────────────────────────── -->
+<div id="entry-screen">
+
+  <span class="entry-kicker">Unlock your ending</span>
+  <div class="entry-title">LiftRPG</div>
+
+  <div class="entry-rule"></div>
+
+  <p class="entry-prompt">
+    You carried the answer through the whole block.<br>
+    Enter it here.
+  </p>
+
+  <div id="blob-section">
+    <textarea
+      id="blob-input"
+      placeholder="Paste your encrypted ending here…"
+      spellcheck="false"
+      autocomplete="off"
+    ></textarea>
+  </div>
+
+  <div class="input-group">
+    <input
+      id="password-input"
+      type="text"
+      placeholder="— your password —"
+      spellcheck="false"
+      autocomplete="off"
+      autocapitalize="characters"
+      maxlength="64"
+    />
+  </div>
+
+  <button id="unlock-btn" onclick="attemptUnlock()">
+    Unlock
+  </button>
+
+  <div id="status-msg"></div>
+
+  <span class="blob-toggle" id="blob-toggle" onclick="toggleBlob()">
+    Paste encrypted ending
+  </span>
+
+  <div class="entry-footer">liftrpg.co · client-side only · nothing is stored</div>
+
+</div>
+
+
+<!-- ── REVEAL SCREEN ─────────────────────────────────────────────── -->
+<div id="reveal-screen">
+  <div class="reveal-document">
+    <div class="reveal-document-header">
+      <span class="reveal-document-kicker" id="reveal-kicker">Final document</span>
+      <div class="reveal-document-title" id="reveal-title">—</div>
+    </div>
+    <div class="reveal-content" id="reveal-content">
+      <!-- Decrypted HTML injected here -->
+    </div>
+  </div>
+
+  <div class="password-echo">
+    <span class="password-echo-label">The password was</span>
+    <div class="password-echo-word" id="password-echo-word">—</div>
+  </div>
+
+  <div class="reveal-footer">liftrpg.co · nothing was stored · you earned this</div>
+</div>
+
+
+<script>
+// ── CRYPTO CONSTANTS ───────────────────────────────────────────────
+const ALGO       = 'AES-GCM';
+const KEY_BITS   = 256;
+const SALT_BYTES = 32;
+const IV_BYTES   = 12;
+const ITER       = 200000;
+
+// ── URL PARAM HANDLING ─────────────────────────────────────────────
+// Encrypted blob can arrive as ?blob=<base64url> in the URL.
+// If present, pre-populate the blob input and show it.
+(function initFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  const blobParam = params.get('blob');
+  if (blobParam) {
+    const blobInput = document.getElementById('blob-input');
+    blobInput.value = blobParam;
+    document.getElementById('blob-section').classList.add('visible');
+    document.getElementById('blob-toggle').textContent = 'Hide encrypted ending';
+    // Focus the password field
+    document.getElementById('password-input').focus();
+  }
+})();
+
+// ── BLOB TOGGLE ────────────────────────────────────────────────────
+function toggleBlob() {
+  const section = document.getElementById('blob-section');
+  const toggle  = document.getElementById('blob-toggle');
+  const visible = section.classList.toggle('visible');
+  toggle.textContent = visible ? 'Hide encrypted ending' : 'Paste encrypted ending';
+}
+
+// ── NORMALISE PASSWORD ─────────────────────────────────────────────
+// Strip whitespace, uppercase, remove punctuation — matches generation normalisation.
+function normalise(raw) {
+  return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+// ── KEY DERIVATION ─────────────────────────────────────────────────
+async function deriveKey(password, salt) {
+  const enc    = new TextEncoder();
+  const keyMat = await crypto.subtle.importKey(
+    'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: ITER, hash: 'SHA-256' },
+    keyMat,
+    { name: ALGO, length: KEY_BITS },
+    false,
+    ['decrypt']
+  );
+}
+
+// ── DECRYPT ────────────────────────────────────────────────────────
+// Encrypted blob format (base64url-encoded):
+//   [ salt (32 bytes) | iv (12 bytes) | ciphertext (variable) ]
+async function decrypt(blobBase64url, password) {
+  // Decode base64url → ArrayBuffer
+  const b64 = blobBase64url.replace(/-/g,'+').replace(/_/g,'/');
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+
+  const salt       = buf.slice(0, SALT_BYTES);
+  const iv         = buf.slice(SALT_BYTES, SALT_BYTES + IV_BYTES);
+  const ciphertext = buf.slice(SALT_BYTES + IV_BYTES);
+
+  const key = await deriveKey(password, salt);
+
+  const plainBuf = await crypto.subtle.decrypt(
+    { name: ALGO, iv },
+    key,
+    ciphertext
+  );
+
+  return new TextDecoder().decode(plainBuf);
+}
+
+// ── ATTEMPT UNLOCK ─────────────────────────────────────────────────
+async function attemptUnlock() {
+  const passwordRaw = document.getElementById('password-input').value;
+  const blobRaw     = document.getElementById('blob-input').value.trim();
+  const password    = normalise(passwordRaw);
+  const statusEl    = document.getElementById('status-msg');
+  const btn         = document.getElementById('unlock-btn');
+  const inputEl     = document.getElementById('password-input');
+
+  // Validate inputs
+  if (!password) {
+    setStatus('Enter your password.', false);
+    inputEl.classList.add('error');
+    setTimeout(() => inputEl.classList.remove('error'), 500);
+    return;
+  }
+
+  if (!blobRaw) {
+    // Auto-show blob section if it's hidden
+    document.getElementById('blob-section').classList.add('visible');
+    document.getElementById('blob-toggle').textContent = 'Hide encrypted ending';
+    setStatus('Paste your encrypted ending above.', false);
+    return;
+  }
+
+  // Working state
+  btn.disabled = true;
+  btn.classList.add('working');
+  btn.textContent = '';
+  btn.innerHTML = '<span class="processing-dots">Working</span>';
+  setStatus('');
+
+  try {
+    const plaintext = await decrypt(blobRaw, password);
+
+    // Parse the decrypted payload
+    // Expected JSON: { kicker, title, content (HTML string) }
+    let payload;
+    try {
+      payload = JSON.parse(plaintext);
+    } catch {
+      // Fallback: treat as raw HTML content
+      payload = {
+        kicker: 'Final page',
+        title: 'The ending',
+        content: plaintext,
+      };
+    }
+
+    // Transition to reveal
+    revealEnding(payload, password);
+
+  } catch (err) {
+    // Decryption failed — wrong password or corrupted blob
+    btn.disabled = false;
+    btn.classList.remove('working');
+    btn.textContent = 'Unlock';
+    inputEl.classList.add('error');
+    setTimeout(() => inputEl.classList.remove('error'), 500);
+    setStatus('That password didn\'t open this block.');
+  }
+}
+
+// ── REVEAL ─────────────────────────────────────────────────────────
+function revealEnding(payload, password) {
+  // Fade out entry screen
+  const entryScreen  = document.getElementById('entry-screen');
+  const revealScreen = document.getElementById('reveal-screen');
+
+  entryScreen.classList.add('fading');
+
+  setTimeout(() => {
+    entryScreen.style.display = 'none';
+
+    // Populate reveal content
+    document.getElementById('reveal-kicker').textContent = payload.kicker  || 'Final document';
+    document.getElementById('reveal-title').textContent  = payload.title   || '—';
+    document.getElementById('reveal-content').innerHTML  = payload.content || '';
+    document.getElementById('password-echo-word').textContent = password;
+
+    // Show and animate reveal screen
+    revealScreen.classList.add('visible');
+    // Small delay to let display:flex take effect before animation
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        revealScreen.classList.add('revealed');
+      });
+    });
+
+  }, 600);
+}
+
+// ── STATUS HELPER ──────────────────────────────────────────────────
+function setStatus(msg, isSuccess = false) {
+  const el = document.getElementById('status-msg');
+  el.textContent = msg;
+  el.className = isSuccess ? 'success-msg' : '';
+}
+
+// ── ENTER KEY ──────────────────────────────────────────────────────
+document.getElementById('password-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') attemptUnlock();
+});
+
+</script>
+</body>
+</html>
