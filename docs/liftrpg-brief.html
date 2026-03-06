@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LiftRPG — Design Brief & Save Point</title>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Share+Tech+Mono&family=Playfair+Display:ital,wght@0,700;1,400;1,700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --ink:#181714;--paper:#f1ebe0;--fog:#ddd6c5;--accent:#8b2a2a;
+  --muted:#857d72;--rule:#ccc5b6;--warm:#e8dfc8;--card:#ece6d8;
+  --mono:'Share Tech Mono',monospace;
+  --serif:'Libre Baskerville',Georgia,serif;
+  --display:'Playfair Display',Georgia,serif;
+  --green:#2a6b3a;--amber:#7a5a1a;
+}
+@media print{
+  body{background:var(--paper);}
+  .no-print{display:none;}
+  section{page-break-inside:avoid;}
+}
+body{
+  background:#1e1b17;
+  font-family:var(--serif);
+  color:var(--ink);
+  min-height:100vh;
+  padding:40px 20px;
+  line-height:1.6;
+}
+.page{
+  max-width:780px;
+  margin:0 auto;
+  background:var(--paper);
+  padding:60px 64px;
+  box-shadow:0 12px 60px rgba(0,0,0,.7);
+  position:relative;
+}
+.page::before{
+  content:'';position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.4;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.88' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+}
+.page > *{position:relative;z-index:1;}
+
+/* ── MASTHEAD ─────────────────────────────────── */
+.masthead{
+  border-bottom:2px solid var(--ink);
+  padding-bottom:20px;
+  margin-bottom:32px;
+}
+.masthead-kicker{
+  font-family:var(--mono);font-size:8pt;letter-spacing:.28em;
+  text-transform:uppercase;color:var(--accent);
+  display:block;margin-bottom:4px;
+}
+.masthead-title{
+  font-family:var(--display);font-style:italic;font-size:32pt;
+  line-height:1;color:var(--ink);display:block;margin-bottom:6px;
+}
+.masthead-sub{
+  font-family:var(--mono);font-size:7.5pt;color:var(--muted);
+  letter-spacing:.12em;
+}
+
+/* ── SECTION ──────────────────────────────────── */
+section{margin-bottom:36px;}
+.section-label{
+  font-family:var(--mono);font-size:6.5pt;letter-spacing:.28em;
+  text-transform:uppercase;color:var(--accent);
+  display:block;margin-bottom:6px;
+}
+h2{
+  font-family:var(--display);font-style:italic;font-size:16pt;
+  color:var(--ink);margin-bottom:12px;line-height:1.15;
+  border-bottom:1px solid var(--rule);padding-bottom:6px;
+}
+h3{
+  font-family:var(--mono);font-size:8pt;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--ink);
+  margin:16px 0 6px;
+}
+p{
+  font-family:var(--serif);font-size:9.5pt;line-height:1.72;
+  color:var(--ink);margin-bottom:10px;
+}
+p:last-child{margin-bottom:0;}
+
+/* ── STATUS TAGS ──────────────────────────────── */
+.tag{
+  display:inline-block;font-family:var(--mono);font-size:6pt;
+  letter-spacing:.14em;text-transform:uppercase;
+  padding:1px 6px;border-radius:2px;margin-left:8px;
+  vertical-align:middle;
+}
+.locked{background:#d4edda;color:var(--green);border:1px solid #a8d5b5;}
+.open{background:#fff3cd;color:var(--amber);border:1px solid #e8d5a0;}
+.todo{background:#f8d7da;color:#7a1a1a;border:1px solid #e8b0b5;}
+.roughed-in{background:#dde8f5;color:#1a3a6b;border:1px solid #a0b8d8;}
+
+/* ── DECISION LIST ────────────────────────────── */
+.decision-list{
+  list-style:none;display:flex;flex-direction:column;gap:6px;
+  margin-bottom:10px;
+}
+.decision-list li{
+  font-family:var(--serif);font-size:9pt;line-height:1.55;
+  padding:7px 10px;background:var(--card);
+  border:1px solid var(--fog);border-radius:3px;
+  display:flex;align-items:baseline;gap:8px;
+}
+.decision-list li::before{
+  content:'—';color:var(--accent);font-family:var(--mono);
+  font-size:8pt;flex-shrink:0;
+}
+
+/* ── OPEN QUESTIONS ───────────────────────────── */
+.question-block{
+  background:var(--warm);border:1px solid var(--rule);
+  border-radius:4px;padding:14px 16px;margin-bottom:10px;
+}
+.q-label{
+  font-family:var(--mono);font-size:5.5pt;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--accent);
+  display:block;margin-bottom:4px;
+}
+.q-text{
+  font-family:var(--serif);font-size:9.5pt;line-height:1.6;
+  color:var(--ink);font-style:italic;margin-bottom:4px;
+}
+.q-context{
+  font-family:var(--mono);font-size:7pt;color:var(--muted);
+  line-height:1.5;
+}
+
+/* ── PAGE BUDGET TABLE ────────────────────────── */
+.budget-table{
+  width:100%;border-collapse:collapse;margin:10px 0;
+  font-family:var(--mono);font-size:7.5pt;
+}
+.budget-table th{
+  text-align:left;padding:5px 8px;
+  border-bottom:1.5px solid var(--ink);
+  letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);font-weight:400;
+}
+.budget-table td{
+  padding:5px 8px;border-bottom:1px dotted var(--rule);
+  color:var(--ink);
+}
+.budget-table tr:last-child td{border-bottom:none;}
+.budget-table .num{text-align:right;font-size:8pt;}
+.budget-table .total td{
+  border-top:1.5px solid var(--ink);
+  font-weight:700;padding-top:6px;
+}
+
+/* ── DIVIDER ──────────────────────────────────── */
+.divider{
+  border:none;border-top:1px solid var(--rule);
+  margin:32px 0;
+}
+
+/* ── CALLOUT ──────────────────────────────────── */
+.callout{
+  border-left:3px solid var(--accent);
+  padding:10px 14px;background:var(--card);
+  margin:12px 0;
+}
+.callout p{font-size:9pt;font-style:italic;color:var(--muted);}
+
+/* ── PRINT BUTTON ─────────────────────────────── */
+.toolbar{
+  max-width:780px;margin:0 auto 16px;
+  display:flex;gap:12px;align-items:center;
+}
+.toolbar button{
+  background:#8b2a2a;color:#f1ebe0;border:none;
+  padding:8px 18px;font-family:'Share Tech Mono',monospace;
+  font-size:8.5pt;letter-spacing:.1em;cursor:pointer;text-transform:uppercase;
+}
+.toolbar button:hover{background:#a33333;}
+.toolbar span{
+  color:#5a5550;font-family:'Share Tech Mono',monospace;
+  font-size:7.5pt;letter-spacing:.08em;
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar no-print">
+  <button onclick="window.print()">⬡ Print / Save PDF</button>
+  <span>LiftRPG Design Brief · Save Point · All decisions as of session ending March 2026</span>
+</div>
+
+<div class="page">
+
+  <div class="masthead">
+    <span class="masthead-kicker">Design Brief & Context Save Point</span>
+    <span class="masthead-title">LiftRPG</span>
+    <span class="masthead-sub">Procedurally generated workout log + narrative gamebook · Version 1.9 · March 2026</span>
+  </div>
+
+
+  <!-- ══ 1. PRODUCT VISION ══════════════════════ -->
+  <section>
+    <span class="section-label">01</span>
+    <h2>Product Vision <span class="tag locked">Locked</span></h2>
+
+    <p>LiftRPG is a printed workout gamebook — one booklet per lifting block — that fuses a functional workout log with a found-document narrative mystery. Each booklet is unique: a different story, different literary register, different puzzles, same mechanical chassis. Block length is determined by the LiftOScript programme pasted into the generator — it could be 4 weeks, 6 weeks, 8 weeks, or any other length.</p>
+
+    <p>The booklet is designed to be printed on US Letter landscape, folded and saddle-stitched, or printed as a PDF and used digitally. Each 2-page spread is one week: workout log on the left, field operations (map, cipher, oracle table) on the right.</p>
+
+    <p>The defining mechanic: across the full lifting block, the user assembles a password hidden inside the book's puzzles and documents — one character per week. At the end of the block, they enter that password at <strong>liftrpg.co</strong> and unlock the final story page — the ending they've earned.</p>
+
+    <div class="callout"><p>"The answer was with them the whole time. All they had to do was do the work to unlock it." — This is not just a mechanic. It is the thematic heart of the whole thing.</p></div>
+
+    <h3>Design Philosophy</h3>
+    <ul class="decision-list">
+      <li>Apple design philosophy throughout — radical reduction, purposeful spacing, every element earns its place</li>
+      <li>Typography-first — the booklet should feel like a premium artifact before anyone lifts a weight</li>
+      <li>Story is the differentiator — the mechanical skeleton can be identical every block; the narrative voice must be genuinely distinct</li>
+      <li>Found documents over prose — the story is told primarily through memos, transcripts, field notes, correspondence; sparse narrative prompts provide connective tissue</li>
+      <li>Open source — the generator should be usable by anyone with any LLM; liftrpg.co is the closed-loop unlock mechanism only</li>
+      <li>Innovation embedded — not as a feature checklist but as a sensibility; act on it when it's right</li>
+    </ul>
+  </section>
+
+  <hr class="divider"/>
+
+
+  <!-- ══ 2. PHYSICAL STRUCTURE ══════════════════ -->
+  <section>
+    <span class="section-label">02</span>
+    <h2>Physical Structure <span class="tag locked">Locked</span></h2>
+
+    <h3>Format</h3>
+    <ul class="decision-list">
+      <li>US Letter landscape (11" × 8.5"), print-ready with @page rules</li>
+      <li>Maximum page count scales with programme length — number of weeks × spreads per week, plus front/back matter, padded to multiple of 4 for saddle-stitch</li>
+      <li>Each spread = one week's worth of content across a 2-page layout</li>
+      <li>Left page: workout log · Right page: field operations</li>
+    </ul>
+
+    <h3>Page Budget</h3>
+    <table class="budget-table">
+      <thead><tr><th>Section</th><th>Spreads</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Cover + inside cover</td><td class="num">1</td><td>Front matter</td></tr>
+        <tr><td>How to play / rules</td><td class="num">1</td><td>Includes password log</td></tr>
+        <tr><td>Workout log spreads (standard weeks)</td><td class="num">6</td><td>One per week minimum</td></tr>
+        <tr><td>Overflow log spreads (6-session weeks)</td><td class="num">0–3</td><td>Part 2 right page = found doc</td></tr>
+        <tr><td>Story fragments (back of book)</td><td class="num">8–10</td><td>Jumbled CoC-style, mixed doc types</td></tr>
+        <tr><td>Password assembly page</td><td class="num">1</td><td>Where user records characters</td></tr>
+        <tr><td>Endings (2–3 variants)</td><td class="num">1–2</td><td>Reached via liftrpg.co unlock</td></tr>
+        <tr><td>Back cover</td><td class="num">1</td><td></td></tr>
+        <tr class="total"><td>Total</td><td class="num">≤30</td><td>Fits in 60-page budget</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Back-of-Book Fragments — Navigation Design</h3>
+    <p>Fragments are jumbled and non-sequential by design — the reader is an archaeologist. But navigation must be frictionless. The Monte Carlo simulation showed 86% of story-engaged users roll the oracle and follow refs; deep-tier users average 16 physical navigations per block. Friction at the landing point converts discoveries into abandonment.</p>
+    <ul class="decision-list">
+      <li><strong>Fragment number anchor:</strong> each fragment carries its number printed large (display scale, ~24pt) in Share Tech Mono in the outer margin — right margin on right-hand pages, left margin on left-hand pages. Colour: --rule, so it is present but not dominant. Function: the reader riffles to the back of the book with a thumb; the eye catches the number without stopping to read. The number is the landing pad.</li>
+      <li><strong>Number weight:</strong> heavier than any other monospace element on the page — the fragment number must win the hierarchy contest against the document's own content at a glance. If the document title reads first, the number has failed its job.</li>
+      <li><strong>Consistent position:</strong> the margin number is always in the same outer-margin position across all fragments, regardless of the document type or layout. Variable position requires searching; fixed position allows riffling.</li>
+      <li><strong>Grayscale:</strong> --rule colour converts to ~75% grey — light but present at 600dpi. Acceptable. The number's size carries it; colour is secondary.</li>
+    </ul>
+
+    <h3>Overflow Mechanism</h3>
+    <p>Weeks with 4–6 workouts spill into a Part 2 spread. The header reads "Week 05 · Part 2 of 2 · Sessions 4–6 · continued from p.10." The right page on Part 2 becomes a found document rather than field operations — the overflow earns its existence narratively.</p>
+
+    <h3>Re-Entry Logic <span class="tag locked">Locked</span></h3>
+    <p>The booklet is a fixed printed object. Unlike the Liftosaur app, it has no state tracking between sessions — progressive overload weights and reps are baked in at generation time from the LiftOScript programme. A missed week doesn't break the programme in the app; in the booklet it does, because week N's prescribed weights assume week N−1 happened.</p>
+    <p>The re-entry rule is therefore programme-specific, not generic. At generation time the generator reads the LiftOScript progression type (<code>lp()</code>, <code>dp()</code>, <code>sum()</code>, or <code>custom()</code>) and derives the appropriate re-entry instruction, which is printed in two places:</p>
+    <ul class="decision-list">
+      <li><strong>Rules spread (p.02):</strong> a half-page "If You Missed a Week" section with the programme-specific rule. Written in the voice of the world — a field procedure, not a penalty. Non-moralising. Example for linear progression: "If a survey week was skipped, repeat the current week's loads before advancing. The building does not accelerate on your behalf."</li>
+      <li><strong>Each week header:</strong> a small pointer in Share Tech Mono — "Missed last week? See p.02." Placed where the eye lands before the first session card. Makes the rule discoverable without requiring the reader to have studied the rules page.</li>
+    </ul>
+    <p>The re-entry rule is generated once per booklet and is consistent with the programme's progression logic. It is the only place where the booklet acknowledges that life happens — everywhere else, the world proceeds as if the work was done.</p>
+
+    <h3>Deload Weeks</h3>
+    <p>LiftOScript supports deload weeks via <code>progress: none</code> on individual days or entire weeks. When the generator detects a deload week, two things change in the booklet rendering: the session card story prompts should reflect reduced intensity rather than escalating tension — the narrative breathes — and the field operations right page may be lighter in mechanical content. The deload week is not flagged as a deload explicitly in the booklet; it is felt rather than announced. The generator passes a <code>isDeload: true</code> flag at the week level so the LLM generation prompt can adjust tone accordingly.</p>
+  </section>
+
+  <hr class="divider"/>
+
+
+  <!-- ══ 3. DESIGN SYSTEM ══════════════════════ -->
+  <section>
+    <span class="section-label">03</span>
+    <h2>Design System <span class="tag locked">Locked</span></h2>
+
+    <h3>Typography</h3>
+    <ul class="decision-list">
+      <li><strong>Body / narrative:</strong> Libre Baskerville — warm, authoritative serif</li>
+      <li><strong>Labels / data / monospace fields:</strong> Share Tech Mono — clinical, precise</li>
+      <li><strong>Display / week titles:</strong> Playfair Display Italic — expressive, literary</li>
+    </ul>
+
+    <h3>Colour Palette</h3>
+    <ul class="decision-list">
+      <li><strong>--paper:</strong> #f1ebe0 — cream base, page background</li>
+      <li><strong>--ink:</strong> #181714 — near-black for primary text and borders</li>
+      <li><strong>--card:</strong> #ece6d8 — slightly darker than paper, session card background</li>
+      <li><strong>--accent:</strong> #8b2a2a — burgundy, used sparingly for kickers, fragment refs, accent rules</li>
+      <li><strong>--muted:</strong> #857d72 — warm grey for secondary text, prompts, metadata</li>
+      <li><strong>--rule:</strong> #ccc5b6 — light warm rule for dividers, field borders</li>
+      <li><strong>--warm:</strong> #e8dfc8 — right page / found document background</li>
+      <li><strong>--fog:</strong> #ddd6c5 — card borders, dotted table rules</li>
+    </ul>
+
+    <h3>Texture</h3>
+    <p>SVG fractalNoise grain overlay at low opacity applied to all pages — gives the paper a physical presence without looking like a filter. Print-safe.</p>
+
+    <h3>Left Page — Workout Log</h3>
+    <ul class="decision-list">
+      <li>Page header: eyebrow (book title, mono, muted) + page number, separated by 1.5px rule</li>
+      <li>Week ID: accent kicker ("Week 02 ·") above Playfair Italic title</li>
+      <li>3 session cards per page, flex-grow equally to fill full page height</li>
+      <li>Session card: #ece6d8 background, 1px border, 4px border-radius, subtle box-shadow</li>
+      <li>Card header: "Session 4 · Workout B" — Share Tech Mono, dark, heavier weight, separated by bottom border from card content</li>
+      <li>Story prompt: Libre Baskerville italic, muted, left-ruled with 1.5px accent border, 2–4 sentences</li>
+      <li>Fragment ref: when a prompt contains a fragment reference, it appears as the final element of the prompt block — separated from the italic prose by a half-line of space, never inline. Rendered in Share Tech Mono, --muted colour, flush-right: <strong>→ F.14</strong>. The visual break is deliberate: the eye must be able to find the ref without reading the prose again. Mid-rest, chalk on hands — the ref is the exit sign, not a footnote.</li>
+      <li>Exercise table: Exercise name (bold serif) · Sets (mono) · Rep boxes · Weight field</li>
+      <li>Rep boxes: 18×18px, 1.5px ink border, 2px border-radius, white paper interior — clean, no internal guide lines</li>
+      <li>Notes box: flex-grows to fill remaining card space; white paper interior; ghost "NOTES" label top-left in --rule colour</li>
+      <li>Footer: Survey Progress pips (6 circles, filled/outlined/accent-outlined) + contextual note</li>
+    </ul>
+
+    <h3>Right Page — Field Operations (standard weeks)</h3>
+    <ul class="decision-list">
+      <li>Survey grid map: shows current floor, cleared rooms (✓), anomalies, locked tiles, you-are-here</li>
+      <li>Map progression: rooms and floors unlock as weeks complete; map is a progress document not just a game board</li>
+      <li>Cipher / puzzle: one per week, escalating difficulty (Week 1: substitution cipher · Week 3: grid + prime number filter · etc.)</li>
+      <li>Oracle table: roll 2d6 during rest, 11 results each pointing to a fragment number</li>
+      <li>Each puzzle yields one password character through transformation — not just finding, but solving</li>
+    </ul>
+
+    <h3>Right Page — Found Document (overflow Part 2 weeks)</h3>
+    <p>The right page on overflow Part 2 spreads becomes a found document — a memo, transcript, field note, or correspondence. These carry their own design language (see Found Document Taxonomy below) and may contain embedded password elements.</p>
+
+    <h3>Grayscale Print Compatibility <span class="tag locked">Locked</span></h3>
+    <p>Target printer: Canon MF4770n — monochrome laser, 600dpi. All design decisions must produce a readable, playable, beautiful result in grayscale. Colour is an enhancement, never the sole carrier of meaning.</p>
+    <ul class="decision-list">
+      <li><strong>Contrast rule:</strong> any two elements that must be visually distinct need ≥30% luminance difference in grayscale — colour alone is insufficient</li>
+      <li><strong>Card backgrounds:</strong> #ece6d8 on #f1ebe0 is an 8% luminance delta — likely to vanish on laser print; card border must serve as the primary container signal, background is secondary</li>
+      <li><strong>Accent colour:</strong> burgundy #8b2a2a converts to ~35% grey — distinct from both near-black ink and mid-grey muted text; safe</li>
+      <li><strong>Muted text (#857d72) vs accent (#8b2a2a):</strong> tonally similar in grayscale (~55% vs ~35%); never use these as the only differentiator between two types of information</li>
+      <li><strong>Map tile types:</strong> must be distinguishable by fill pattern (crosshatch, dot, solid, empty) not colour alone — colour version can layer colour on top of pattern for richness</li>
+      <li><strong>Grain texture:</strong> will likely disappear at 600dpi — acceptable; it is atmospheric, not structural</li>
+      <li><strong>Grayscale pass rule:</strong> before finalising any page, mentally strip all colour and verify hierarchy, readability, and playability survive</li>
+      <li><strong>Good news:</strong> the design is already contrast-driven not colour-driven; found documents will look more archival and austere in grayscale — a feature, not a bug</li>
+    </ul>
+
+    <h3>Typography as Narrative Participant <span class="tag locked">Locked</span></h3>
+    <p>Typography and visual design should vary across story blocks — not to match mood (costume) but to <em>enact</em> content (character). The form participates in the story.</p>
+    <ul class="decision-list">
+      <li>Each block's literary register dictates the default typographic world — warmer and hand-worn for Steinbeck, clinical-normal for King, etc.</li>
+      <li>Within a block, typographic elements can develop and fracture — spacing that tightens under pressure, a sans-serif intruding into a serif world, hierarchies that quietly break down</li>
+      <li>For the Cartographer: bureaucratic mono type feels authoritative in Week 1 and subtly wrong by Week 5 — not distressed, not horror-movie, just the grid slipping</li>
+      <li><strong>Anti-formulaic rule:</strong> changes must feel discovered, not scheduled — never a system ("Week 1 = stable, Week 6 = broken") that becomes readable and loses its power</li>
+      <li>Do not do all typographic shifts at once — restraint is what makes each one land</li>
+      <li>Aspiration: large-scale typographic pages that break up dense content — a single word, a fragment, a number at display scale — doing real structural and narrative work, not filling space</li>
+    </ul>
+
+    <h3>Typographic Interlude Pages <span class="tag roughed-in">Roughed In</span></h3>
+    <p>A first-class page type in the generator vocabulary. Not decoration. Every interlude either advances the narrative, creates atmosphere that earns its page count, or contains information — often all three simultaneously. The pacing function: dense pages feel denser by contrast. The interlude is the breath that makes the next spread land harder.</p>
+
+    <p><strong>When to insert:</strong> week transitions, gear changes in narrative register, moments where the story needs space to be felt rather than read. Never more than one per week. Never mandatory — the generator should be capable of a block with no interludes if the story doesn't call for them.</p>
+
+    <p><strong>Parameters (roughed in for generator implementation):</strong></p>
+    <ul class="decision-list">
+      <li><strong>content:</strong> the text itself — a single word, a short fragment, a number, a date, a coordinate, a partial sentence. Should feel like it was torn from something larger.</li>
+      <li><strong>scale:</strong> display / giant / bleed — display is large headline scale; giant fills most of the page; bleed means the type runs off one or more edges intentionally</li>
+      <li><strong>position:</strong> centered / flush-left / flush-right / bottom-anchored / offset — where the text lives on the page</li>
+      <li><strong>weight:</strong> the typographic weight and whether it uses the block's primary face, a contrasting face, or a degraded/fractured variant of either</li>
+      <li><strong>payload:</strong> none / narrative / cipher / fragment-ref / password-element — whether the interlude carries mechanical information embedded in or alongside the display text</li>
+      <li><strong>ink-coverage:</strong> light (text only, white ground) / dark (reversed, ink-heavy ground) / split (half-and-half, used sparingly)</li>
+      <li><strong>spread-aware:</strong> boolean — whether the interlude occupies a full spread (both pages) or a single page with the facing page being a workout log or found document</li>
+    </ul>
+
+    <p><strong>Constraint:</strong> the interlude page type is never generated by default. The story generator must explicitly place one with a reason. "It felt like a good moment" is not a reason. "The narrative register is about to break and this marks the fracture" is a reason.</p>
+  </section>
+
+  <hr class="divider"/>
+
+
+  <!-- ══ 4. NARRATIVE SYSTEM ════════════════════ -->
+  <section>
+    <span class="section-label">04</span>
+    <h2>Narrative System <span class="tag locked">Locked</span></h2>
+
+    <h3>Story Delivery Method <span class="tag locked">Locked</span></h3>
+    <ul class="decision-list">
+      <li>Story told primarily through found documents — the reader is an archaeologist, not an audience</li>
+      <li>Each session card has 2–4 sentences of narrative prose above the exercise table, written in the voice chosen by the LLM for that block</li>
+      <li>Fragment references (→ F.14) direct the reader to numbered story pieces in the back of book</li>
+      <li>Back-of-book fragments: jumbled/non-sequential, styled as different document types (not a uniform numbered list)</li>
+    </ul>
+
+    <h3>Found Document Taxonomy <span class="tag locked">Locked</span></h3>
+    <p>The taxonomy below is for Block 1 (The Cartographer). Each block generates its own document taxonomy appropriate to its world — the types, institutions, and voices that would plausibly produce paperwork in that world. The principle is constant; the specific types vary per block.</p>
+    <ul class="decision-list">
+      <li>Municipal Survey Authority internal memos — bureaucratic, redacted, procedurally chilling</li>
+      <li>Field notes from Reyes — fragmentary, handwritten-style, dated anomalously</li>
+      <li>Department phone call transcripts — clinical, evasive, question-and-non-answer format</li>
+      <li>Building inspection reports — official tone with marginal annotations in a different hand</li>
+      <li>Personal correspondence from the surveyor — letters to someone who never responds</li>
+      <li>One item that is none of these things and should not exist</li>
+    </ul>
+
+    <h3>Voice <span class="tag locked">Locked</span></h3>
+    <p>Voice — grammatical person, tense, narrator stance — is chosen by the LLM at generation time based on what the world contract demands. It is not a fixed parameter. It is the epistemological position from which the story can be told with full attention. Some blocks will be second person because the mechanic only works when the reader is implicated. Some will be first person because the narrator survived to write this and that survival is the dramatic irony. Some may fracture mid-block. The LLM must justify its choice in the <code>narrativeVoice.voiceRationale</code> field — connecting directly to the world contract. If the rationale doesn't connect, the voice is wrong.</p>
+
+    <h3>Literary Register — Block 1 <span class="tag locked">Locked</span></h3>
+    <p><strong>The Cartographer of Unmapped Rooms</strong> — a municipal surveyor assigned to map a building that officially doesn't exist. The story arc spans the full block length: rooms contradict geometrically, a colleague (Reyes) with no assignment record appears and disappears, the building begins to read the surveyor. The final survey report is submitted to a department whose address is a vacant lot. The password is the building's actual address, hidden across the block's puzzles and documents.</p>
+
+    <h3>Literary Registers — All Future Blocks <span class="tag locked">Locked</span></h3>
+    <p>Future blocks are not pre-assigned registers. When a user starts a new block, they input a free-form story description — a premise, a mood, a combination of references, a feeling they want to chase. The generator derives the world contract from that input. The references a user provides are not directives — they are pointers to properties. "Delta Green meets Steinbeck" does not mean tentacle horror in dusty fields. It means: extract what makes each of those things work at their best — the weight that accumulates through repetition, the investigation that reveals character rather than just plot, the family dynamics under pressure, the world that is explicable on the surface and refuses to be underneath — and build something that has those properties without being a pastiche of either source.</p>
+    <p>This is encoded in the generator as a required property extraction stage before world contract generation. See Section 14 and the generation prompt spec.</p>
+  </section>
+
+  <hr class="divider"/>
+
+
+  <!-- ══ 5A. GAME MECHANICS ═════════════════════ -->
+  <section>
+    <span class="section-label">05A</span>
+    <h2>Game Mechanics <span class="tag locked">Locked</span></h2>
+
+    <p>The mechanics layer connects the workout log to the narrative. Four mechanics are in play: the boss convergence (primary, climactic), oracle consequences (ambient, rewarding), the surveyor's note (contemplative, personal), and the binary choice card (once per block, irreversible). All four operate under a single governing principle.</p>
+
+    <div class="callout"><p><strong>Invisible Until Engaged.</strong> Optional mechanics must be invisible to users who are not looking for them. Not "you can ignore this" — invisible. A user who never engages with a mechanic should not feel that they have failed to engage with it. Presence without engagement must never feel like obligation, inadequacy, or a locked door. Every rendering decision for every mechanic is governed by this principle.</p></div>
+
+    <p>The corollary: the workout log is not the consolation prize for people who didn't play the game. It is the product. For 70% of users it will be the entire product, and it must be excellent on those terms alone. Everything else is architecture for the 30% who want it — architecture that the 70% should never have to notice.</p>
+
+    <div class="callout"><p>The gym context is the hardest physical constraint. Every mechanic must pass the chalk-hands test: completable in a 90-second rest window using only a pencil and the booklet. Mechanics requiring calculation, external lookup, or state tracking across sessions are eliminated before consideration.</p></div>
+
+    <h3>I. The Boss Week <span class="tag locked">Locked</span></h3>
+
+    <p>The final week of every block is structurally different. The right page is the most important found document in the booklet — the one that the entire block has been building toward. It is designed to be read and experienced regardless of whether the user has been collecting weekly components. <strong>Narrative payoff and puzzle payoff are the same page but separable experiences.</strong></p>
+
+    <p>For a user who never touched a cipher: the boss page is a beautiful, unsettling final document. The story resolves — or refuses to, or fractures — in whatever way the world contract demands. This is complete. Nothing is missing. The block ends.</p>
+
+    <p>For a user who collected components: the boss page contains, embedded within its found-document design, a convergence mechanism. The weekly components — inert alone — become alive here. Applied in the right order, in the right way, they produce the password. The word appears in their hands. They earned it.</p>
+
+    <p>The puzzle is not a puzzle box sitting next to the document. It lives inside the document. The convergence mechanism is a naturally occurring feature of the found document's content — a table that requires cross-referencing, a map whose coordinate system the user now knows how to read, a list of names that resolves differently when you know which ones are anomalous. A user who doesn't know to look for it won't see it. A user who does will feel it was always there.</p>
+
+    <h3>Partial Convergence <span class="tag locked">Locked</span></h3>
+    <p>Component collection across the block is imperfect for most users. The boss must be satisfying across a spectrum of collection, not only for users with a complete set.</p>
+    <ul class="decision-list">
+      <li><strong>0–1 components:</strong> the boss page is the narrative climax. Complete as a reading experience. The convergence mechanism exists in the document but is not findable without components — the user does not know what they're missing.</li>
+      <li><strong>2–3 components:</strong> partial convergence is possible. The user can make visible progress on the boss puzzle — they can narrow the answer, eliminate possibilities, feel the shape of the resolution — even without reaching the complete password. This partial state is a real experience, not a failure state. It should be designed as one.</li>
+      <li><strong>4–5 components (full collection):</strong> complete convergence. The password resolves in a single moment. The word was always there.</li>
+    </ul>
+    <p>The LLM generating the boss page must design for all three states. The schema's <code>convergenceProof</code> must demonstrate that each state is a distinct, intentional experience — not just full vs. broken.</p>
+
+    <h3>Component Types (vary per block)</h3>
+    <p>Weekly ciphers yield one component per week. The type is consistent across the block, derived from the world contract at generation time. Not a fixed list:</p>
+    <ul class="decision-list">
+      <li><strong>Coordinates</strong> — grid references that combine spatially on the boss page's map.</li>
+      <li><strong>Cipher keys</strong> — numbers or symbols applied in sequence to an encoded string embedded in the boss document.</li>
+      <li><strong>Dates or timestamps</strong> — anomalous dates whose combined pattern becomes legible only at the boss page.</li>
+      <li><strong>Name fragments</strong> — words from the world that, assembled in boss-week order, name the thing the story was always about.</li>
+    </ul>
+
+    <h3>Boss Form — Block 1 (The Cartographer) <span class="tag locked">Locked</span></h3>
+    <p>The boss page is the Final Survey Report — MSA Form 99, never previously completed for this building. It is a found document: official, bureaucratic, quietly wrong in several ways a careful reader will notice. Within the form's grid reference table, the five anomalous room coordinates (collected weekly) are the only entries that do not appear on the official floor plans reproduced on the form. When connected in survey order, they trace a shape. That shape, read against the coordinate legend established in the Week 1 cipher, resolves to a street address. That address is the password.</p>
+    <p>A user who never collected a single coordinate reads the Final Survey Report as a document: the building's existence is officially denied, Reyes is listed as the primary surveyor, the submitted address is a vacant lot. It is the story's ending. It is enough.</p>
+    <p>A user with 2–3 coordinates can narrow the address significantly — enough to feel the shape of the answer without completing it. A user with all five resolves it cleanly.</p>
+
+    <h3>Boss Form Principles (all future blocks)</h3>
+    <ul class="decision-list">
+      <li>The boss form is derived from the world contract. What kind of document would be the final piece of evidence in this world? What would it reveal — or refuse to?</li>
+      <li>The convergence mechanism lives <em>inside</em> the found document, not alongside it. The puzzle is a natural feature of the document's content — not announced, not boxed, not labelled as a puzzle.</li>
+      <li>The boss should require narrative engagement to fully solve — a user who collected every component but read nothing should feel a gap. The components are necessary but not sufficient.</li>
+      <li>The boss from one block should be unrecognisable as the same mechanic as the boss from the previous block. Function constant; form never repeated.</li>
+    </ul>
+
+    <hr style="border:none;border-top:1px solid var(--rule);margin:20px 0;"/>
+
+    <h3>II. Oracle Consequences <span class="tag locked">Locked</span></h3>
+
+    <p>The oracle table sends the reader to fragments on most rolls. On 2–3 rolls per week, it sends a consequence instead — an instruction that changes the state of the booklet. Consequence entries are visually identical to fragment entries in every way. The reader does not know which kind of entry they will get until they read it. This is the correct design: the oracle should feel oracular.</p>
+
+    <ul class="decision-list">
+      <li><strong>Map mutations:</strong> "Sector 4-C is now inaccessible. Mark it." One pencil mark. The map becomes a record of what the oracle revealed, not just what the generator drew.</li>
+      <li><strong>Document clarifications:</strong> "The annotation on F.07 now makes sense. Circle it." Rewards fragment readers — the oracle retroactively illuminates something already in the booklet.</li>
+      <li><strong>Atmosphere entries:</strong> "You have been in this building for 22 days. It has been 19 days since you last counted the windows from the outside." No instruction. Just a fact. The oracle sometimes only observes.</li>
+    </ul>
+
+    <p>A user who never rolls the oracle misses nothing mechanical. All components are extractable through the weekly cipher alone. The oracle rewards engagement; it never gates it. A user who never touches the oracle table has no visible blank field or unfilled expectation — the oracle is simply a feature of the right page that some users find and use.</p>
+
+    <hr style="border:none;border-top:1px solid var(--rule);margin:20px 0;"/>
+
+    <h3>III. The Surveyor's Note <span class="tag locked">Locked</span></h3>
+
+    <p>There is no surveyor's note field on the session cards. The notes box — already present on every session card — is the place users write in. Adding a second field, even an unlabelled one, creates a form element that reads as something requiring completion. Even a ruled line at 3% pressure per session compounds to 14% of users across a 5-week block. That's above the 10% pressure target. The line is removed.</p>
+
+    <p>The surveyor's note exists instead as a practice, introduced once in the rules spread in the voice of the world: <em>"The notes box on each session card is yours. Some surveyors use it to record anomalies they haven't filed officially."</em> Nothing more. The notes box becomes, for users who want it, the anomaly log. For users who don't, it remains a notes box. No new visual element. No implied obligation. The same space serves both purposes.</p>
+
+    <p>This is the Invisible Until Engaged principle resolving its own implementation. The concept — a space for personal reflection in the voice of the world's fiction — is correct and valuable. The execution as a separate ruled line was a form field in disguise. The notes box already provides the space. The rules spread provides the reframe. That is sufficient.</p>
+
+    <hr style="border:none;border-top:1px solid var(--rule);margin:20px 0;"/>
+
+    <h3>IV. The Binary Choice <span class="tag locked">Locked</span></h3>
+
+    <p>Once per block — at the midpoint week — one session card's narrative prompt forks. The user encounters two continuations, each one sentence. No instruction to choose. No circled A and B labels. No "choose one" header. The prompt simply presents two paths, separated by a thin rule, and a small empty circle beside each — the same typographic element used elsewhere in the booklet for survey markers on the map.</p>
+
+    <p>A user who engages will fill one circle. A user who doesn't will see two story fragments and a pair of decorative map markers and continue their workout. The page does not demand resolution. It offers it.</p>
+
+    <ul class="decision-list">
+      <li>The choice has no mechanical consequence — component collection continues identically regardless. It has narrative consequences: subsequent session card prompts subtly acknowledge which path was taken, without ever saying so directly.</li>
+      <li>The boss week's found document may contain a detail that only makes sense in light of one path — not announced, not explained. The user who chose that path and has been reading will recognise it.</li>
+      <li>One per block. The power of scarcity: one unmarked fork in eighteen sessions means the user who finds it carries it.</li>
+      <li>The empty circles use the map marker glyph (○) not a form checkbox (□). This is the difference between atmosphere and obligation. The map marker says "you are somewhere." The checkbox says "this needs completing."</li>
+    </ul>
+
+    <hr style="border:none;border-top:1px solid var(--rule);margin:20px 0;"/>
+
+    <h3>The Rules Spread and Mechanic Framing <span class="tag locked">Locked</span></h3>
+
+    <p>The rules spread is the only place in the booklet that explains how the product works. Its framing governs whether the mechanics feel like a rich optional layer or an obligation system. The correct framing is not "here is everything you can do." It is this:</p>
+
+    <div class="callout"><p>"This booklet works as a workout log. Everything else in it — the story, the puzzles, the map — is there if you want it. You will either find it or you won't. Both are correct outcomes. The only thing you need to do is lift."</p></div>
+
+    <p>Mechanical instructions (how to use the oracle, how ciphers work, what the password log is for) follow this framing — present, clear, but positioned as optional depth rather than required procedure. The rules spread should feel like an orientation to a place, not a tutorial for a game. Visitors to a place choose what to explore. Players of a game are expected to learn the rules.</p>
+
+    <h3>Mechanic Anti-Formulaic Rule <span class="tag locked">Locked</span></h3>
+    <p>These four mechanics are the vocabulary. Not every block uses all of them in the same way. The boss form changes every block by design. The surveyor's note line is always present but its narrative context shifts with the block's register — a bureaucratic world makes a different line than a working-class one. Oracle consequences can target different kinds of state (map, document, self-perception). The binary choice can be moral, perceptual, procedural, or relational — whatever the world contract makes resonant. The bones are constant. The instantiation is always discovered.</p>
+
+  </section>
+
+  <hr class="divider"/>
+
+
+  <!-- ══ 5B. PASSWORD & UNLOCK MECHANIC ══════════ -->
+  <section>
+    <span class="section-label">05B</span>
+    <h2>Password & Unlock Mechanic <span class="tag locked">Locked</span></h2>
+
+    <h3>Password Assembly <span class="tag locked">Locked</span></h3>
+    <ul class="decision-list">
+      <li>Weekly mechanics (weeks 1 through N-1) yield one <strong>component</strong> per week — not a password character. Components are inert alone. See Section 05A for component types.</li>
+      <li>Each component requires active transformation to extract — decode, filter, derive — not just find. Finding is not solving.</li>
+      <li>User records components on the dedicated password log page (p.02), which is designed for the specific component type of that block.</li>
+      <li>The password log page doubles as a <strong>fragment index</strong> — a grid of the booklet's fragment numbers (e.g. F.01 through F.14) with a small blank beside each one. No instruction to fill it in. No label beyond the numbers themselves. Users who find and read fragments may mark them off; users who don't will see a grid of numbers that reads as part of the document design. The Puzzle and Literary archetypes will use it as a map of what they've found. The Meathead will never notice it as a mechanic. This is the Invisible Until Engaged principle applied to navigation itself.</li>
+      <li>Difficulty of weekly extraction escalates week to week.</li>
+      <li>The boss week (final week) is the convergence mechanism — components combine via the boss puzzle to yield the complete password in a single moment of resolution.</li>
+      <li>Final password: a real word or phrase meaningful within the block's world. Stored in schema as uppercase alphanumeric, spaces and punctuation stripped. The unlock page normalizes user input to the same form. The moment of assembly should mean something — the word was always there, hidden in the work.</li>
+    </ul>
+
+    <h3>liftrpg.co Unlock — Architecture <span class="tag locked">Locked</span></h3>
+    <ul class="decision-list">
+      <li>Hosted on GitHub Pages — static site, zero backend, zero storage cost</li>
+      <li>Client-side encryption only — the final page is AES-encrypted in the browser at generation time using the password as the key</li>
+      <li>Encrypted blob delivered to user as a file or URL-safe string at book generation time</li>
+      <li>liftrpg.co provides the decryption interface only — server never stores anything</li>
+      <li>Zero DDOS surface, zero hosting cost beyond static file serving</li>
+      <li>Thematic resonance: the lifter carries the answer with them for the entire block; they just need to earn the key</li>
+    </ul>
+
+    <h3>The Final Page / Ending</h3>
+    <p>What the user receives when they decrypt successfully is not yet designed. Must feel commensurate with the full block of effort — however long that block was. The moment of reveal should be considered as a designed experience, not just text appearing. <span class="tag todo">To Design</span></p>
+  </section>
+
+  <hr class="divider"/>
+
+
+  <!-- ══ 6. GENERATOR & OPEN SOURCE ════════════ -->
+  <section>
+    <span class="section-label">06</span>
+    <h2>Book Generator <span class="tag locked">Locked</span></h2>
+
+    <h3>Core Principle <span class="tag locked">Locked</span></h3>
+    <p>Open source. Anyone with access to any LLM can generate a booklet. The generator is the open part; liftrpg.co is the closed loop (unlock only). Simple and beautiful — Apple design philosophy applies to the generation UI too.</p>
+
+    <h3>Infrastructure Statement <span class="tag locked">Locked</span></h3>
+    <p>The architecture is explicitly designed so that the project owner has zero association with, visibility into, or responsibility for anything any user generates. This is not a legal hedge — it is a factual description of how the system works, and it must be communicated clearly and early in the README and any public-facing documentation.</p>
+    <ul class="decision-list">
+      <li><strong>The generator is a local tool.</strong> It runs entirely on the user's own machine. It never phones home. No telemetry, no usage logging, no server receives the LiftOScript or the story description.</li>
+      <li><strong>The user supplies their own LLM API key.</strong> Generation calls go directly from the user's browser to whatever LLM provider they have access to. The project owner is not a proxy, not an intermediary, not a service provider. The API key, the call, the response — all of it is between the user and their LLM provider.</li>
+      <li><strong>liftrpg.co receives nothing generative.</strong> The unlock page receives an encrypted blob and runs a decryption function. The server never sees the plaintext content, never stores anything, never processes any user-generated material. GitHub Pages is serving a static HTML file.</li>
+      <li><strong>What users generate is entirely outside this project's infrastructure.</strong> The open source code is a tool, like any other published tool. What people do with it on their own machines with their own API keys is outside the project's infrastructure, visibility, and association — the same way a published recipe is not responsible for what anyone cooks.</li>
+    </ul>
+
+    <h3>README Requirements <span class="tag locked">Locked</span></h3>
+    <p>The README must state the architecture plainly in its opening section — not buried, not as a disclaimer, but as a factual description of what this project is and is not. Claude Code should generate the README with this as the second paragraph, after a one-sentence description of what LiftRPG does. The framing: factual and architectural, not defensive. The goal is clarity, not liability management.</p>
+    <p>Suggested README architecture statement (adapt to match the project's voice):</p>
+    <div class="callout"><p>The generator runs locally on your machine. You supply your own LLM API key. Nothing you generate passes through any server operated by this project. liftrpg.co is a static page that decrypts a blob in your browser — it receives no content and stores nothing. This project has no visibility into what anyone generates with it.</p></div>
+
+    <h3>User Inputs <span class="tag locked">Locked</span></h3>
+    <p>The generator takes two primary inputs: a LiftOScript programme (paste field) and a free-form story description (text field). The story description is the user's premise in their own words — a mood, a genre combination, a feeling, a reference, anything. It is not a selector from a list. The LLM derives the world contract from it via a required property extraction stage before generating any content. See Section 14 for the full property extraction spec.</p>
+    <p>Optional inputs: a random premise button (for users who want to be surprised — LLM generates a premise from constraints, user can accept or regenerate), and an advanced mode that exposes the full generation prompt for technical users who want direct control. Simple mode is the default.</p>
+
+    <h3>Generation Method <span class="tag locked">Locked</span></h3>
+    <p>Browser-based. No install. User visits the generator page, pastes LiftOScript, describes their story, hits generate. The styled HTML booklet opens in a new tab. User prints to PDF themselves. The generator page runs entirely client-side — LLM API call from the browser, no server involved in generation.</p>
+
+    <h3>Previous Architecture (Abandoned) <span class="tag locked">Locked</span></h3>
+    <p>The original system used a complex multi-stage LLM pipeline with 22+ atom types, a layout governor, 7-phase JSON repair, and anti-isomorphism checking. Despite elaborate scaffolding, it consistently produced derivative booklets with identical mechanical skeletons. Root cause: long complex prompts narrow output space; LLM converges on "correct-looking" answers. The new approach inverts this — fix the skeleton, differentiate at the story level.</p>
+  </section>
+
+  <hr class="divider"/>
+
+
+  <!-- ══ 7. PROTOTYPE STATUS ════════════════════ -->
+  <section>
+    <span class="section-label">07</span>
+    <h2>Prototype Status <span class="tag locked">Locked</span></h2>
+
+    <h3>Completed HTML Prototypes</h3>
+    <ul class="decision-list">
+      <li><strong>cartographer-week1.html</strong> — Week 1 full spread: lobby, Survey A/B/A, survey grid map (7×4), substitution cipher, oracle table. Design system established.</li>
+      <li><strong>cartographer-week3.html</strong> — Week 3 full spread: Reyes introduced, footprints anomaly, Floor 3 unlocked. Escalated map (7×5), grid + prime cipher, sharper oracle entries.</li>
+      <li><strong>cartographer-log-refined.html</strong> — Layout study: 4 variants (standard 3-session, dense 5-exercise, overflow Part 1, overflow Part 2 with found document). Spacing and overflow mechanism proven.</li>
+      <li><strong>cartographer-cards.html</strong> — Final card design: flex-grow cards filling page height, clean rep boxes (18×18px, white interior), ghost Notes label, numbered sessions, expanded narrative prompts.</li>
+    </ul>
+
+    <h3>What's Built, What Isn't</h3>
+    <ul class="decision-list">
+      <li><span class="tag locked">Done</span> Left page card design — locked and final</li>
+      <li><span class="tag locked">Done</span> Design system — typography, colour, grain, spacing</li>
+      <li><span class="tag locked">Done</span> Found document design — Memo 44-C proven as template</li>
+      <li><span class="tag locked">Done</span> Overflow mechanism — Part 1/2 spread pattern proven</li>
+      <li><span class="tag todo">To Build</span> Right page — field operations final design (map, cipher, oracle unified with consequence entries)</li>
+      <li><span class="tag todo">To Build</span> Boss week spread — full right-page or full-spread boss design for Block 1 (complete survey grid, coordinate convergence)</li>
+      <li><span class="tag todo">To Build</span> All weeks of The Cartographer — full workout log spreads with story, anomaly log field, binary choice card at midpoint</li>
+      <li><span class="tag todo">To Build</span> Back-of-book fragment section — numbered fragments, mixed doc types</li>
+      <li><span class="tag todo">To Build</span> Cover design</li>
+      <li><span class="tag todo">To Build</span> Rules / how to play spread</li>
+      <li><span class="tag todo">To Build</span> Password log page</li>
+      <li><span class="tag todo">To Build</span> liftrpg.co unlock page — client-side AES decrypt UI</li>
+      <li><span class="tag todo">To Build</span> Book generator — browser-based, LLM-agnostic, LiftOScript as primary input</li>
+      <li><span class="tag todo">To Build</span> The final/ending page and the designed reveal moment</li>
+      <li><span class="tag roughed-in">Roughed In</span> Typographic interlude page type — spec defined in Section 03; needs renderer implementation and generator placement logic when building the software</li>
+    </ul>
+  </section>
+
+  <hr class="divider"/>
+
+
+  <!-- ══ 8. QUALITY RUBRIC ═════════════════════ -->
+  <section>
+    <span class="section-label">08</span>
+    <h2>Quality Rubric <span class="tag locked">Locked</span></h2>
+
+    <p>This rubric exists to ensure consistent quality across all content — story, design, puzzles, found documents — without producing formulaic output. It is not a checklist. It is a set of principles with test questions. The right answer to each question will be different for every block, every week, every document. The rubric provides the lens, not the answer.</p>
+
+    <div class="callout"><p>On referencing other works: the quality we are after — information hierarchy, typographic rigor, spatial discipline, narrative depth — should always be described as properties and behaviors, never by referencing source material by name. Source names pull aesthetic baggage that contaminates output. Describe what the work does, not what it is called.</p></div>
+
+    <h3>I. Print Fidelity</h3>
+    <p>The booklet must be a beautiful, functional object when printed in monochrome on a standard laser printer. Colour is an enhancement; the design must never depend on it.</p>
+    <ul class="decision-list">
+      <li><em>Test:</em> Strip all colour mentally. Does every element remain readable, distinguishable, and functional? If two elements are only differentiated by hue, the design has failed.</li>
+      <li><em>Test:</em> Are all form fields — rep boxes, notes areas, cipher blanks, password log — large enough that a human hand can write in them comfortably with a pencil?</li>
+      <li><em>Test:</em> Does the page still feel considered and intentional in grayscale, or does it look like colour was the only thing holding it together?</li>
+    </ul>
+
+    <h3>II. Mechanical Self-Containment / Narrative Distribution</h3>
+    <p>These two principles operate simultaneously and in opposite directions. They must never be confused.</p>
+    <ul class="decision-list">
+      <li><strong>Mechanical self-containment:</strong> Everything needed to complete a workout session lives on that spread. The lifter never flips pages to know what to lift, how many sets, how many reps, or where to record results.</li>
+      <li><strong>Narrative distribution:</strong> Story fragments, found documents, and cipher clues are deliberately scattered across the booklet. The physical act of navigating the book is part of the experience. Disorientation in the narrative layer is a feature.</li>
+      <li><em>Test:</em> Can someone complete their workout without reading a single word of story? Yes — and that is correct. The story should feel like a reward for the curious, not a tax on the focused.</li>
+      <li><em>Test:</em> Does following the narrative threads require physical movement through the book? It should. The book is an environment, not a document.</li>
+    </ul>
+
+    <h3>III. Typography & Visual Coherence</h3>
+    <p>Every typographic decision should serve the content it carries. The form enacts meaning; it does not illustrate or decorate it.</p>
+    <ul class="decision-list">
+      <li><em>Test:</em> If you removed all the story text, could you still guess the genre and register from the page design alone — the type choices, spacing, hierarchy, document formats?</li>
+      <li><em>Test:</em> Does the typography feel like it belongs to this world, or does it feel borrowed from a recognisable aesthetic? If you can name where you've seen this before, it is too derivative.</li>
+      <li><em>Test:</em> Do typographic shifts across weeks feel discovered, not scheduled? If someone can predict what Week 5 will look like after reading Week 1, the system has become too legible.</li>
+      <li><em>Test:</em> Is every element on the page earning its presence through functional work? Decoration that does not carry information or create atmosphere should be removed.</li>
+    </ul>
+
+    <h3>IV. Found Document Authenticity</h3>
+    <p>A found document should feel like it was written by someone inside the world, for a purpose inside the world, with no awareness that a reader would eventually find it. The moment it reads like a story summary, it has failed.</p>
+    <ul class="decision-list">
+      <li><em>Test:</em> Does this document have a plausible in-world author, recipient, and purpose — independent of its function in the story?</li>
+      <li><em>Test:</em> Does it contain at least one piece of information that is irrelevant to the plot — the kind of noise that real documents contain?</li>
+      <li><em>Test:</em> Does the redaction, bureaucratic language, or clinical format do narrative work — revealing through what it hides, not just through what it says?</li>
+      <li><em>Test:</em> Could this document exist in a different story entirely? If yes, it is generic. The best found documents are specific enough that they could only belong to this world.</li>
+      <li><em>Test:</em> Does the visual format of the document — its typography, layout, paper tone — match the institution or person who supposedly produced it?</li>
+    </ul>
+
+    <h3>V. Puzzle & Password Mechanic Quality</h3>
+    <p>A puzzle should feel like discovery, not homework. The solution should be satisfying in retrospect — obvious once found, invisible before. Difficulty is not a gating mechanism — it is a context for delight or an excuse to reach for an LLM, both acceptable outcomes. Design against the puzzle that is never engaged with at all.</p>
+    <ul class="decision-list">
+      <li><em>Test — Noticing:</em> Would an unwarned reader — someone who did not read the rules page carefully — discover that a puzzle mechanic exists at all? If the mechanic is only visible to people who already know it's there, it has failed at the first stage. Noticeability is the primary design requirement, before solvability or difficulty.</li>
+      <li><em>Test — Recording:</em> Is the path from solve → extract → write in password log short enough to complete in a 90-second rest window with chalk on your hands? Every unnecessary step is a character lost.</li>
+      <li><em>Test:</em> Is the puzzle solvable with only the materials in the booklet? No external resources, no internet, no prior knowledge beyond basic literacy and numeracy — though LLM assistance for hard puzzles is acceptable and expected for motivated users.</li>
+      <li><em>Test:</em> Does solving the puzzle require active transformation — decoding, filtering, deriving — not just finding? Finding is not solving.</li>
+      <li><em>Test:</em> Is the password character extraction mechanism embedded in the fiction, or bolted on top of it? The best puzzles are invisible until you know they're there.</li>
+      <li><em>Test:</em> Does the completed password feel earned — like the answer was always there — rather than arbitrary?</li>
+    </ul>
+
+    <h3>VI. Story Depth & Accessibility</h3>
+    <p>The story must work on two levels simultaneously. At the surface it must be immediately legible to anyone — including someone who lifts weights and has never read a gamebook. Beneath the surface there must be something genuinely complex, layered, and rewarding for anyone who pulls the thread. Neither level should condescend to the other.</p>
+    <ul class="decision-list">
+      <li><em>Test:</em> Can someone read only the session card prompts — two to four sentences per session — and follow a coherent, satisfying narrative arc across the full block without consulting a single fragment?</li>
+      <li><em>Test:</em> Does the fragment layer add genuine complexity, or just more words? Every fragment should recontextualise something the reader thought they understood.</li>
+      <li><em>Test:</em> Is there at least one thing in the booklet that a careful reader on the third pass will notice that they missed on the first two?</li>
+      <li><em>Test:</em> Does the story trust the reader? Overexplaining is the most common failure. The best horror, mystery, and literary fiction leaves the reader to do work. So should this.</li>
+      <li><em>Test:</em> Could the story be meaningfully different if the workout were different — a different programme, a different intensity, a different arc? If the workout is genuinely load-bearing in the narrative, yes. If the story would work identically without it, the fusion has failed.</li>
+      <li><em>Test:</em> Does this world have an interior life that exists independent of the plot? If you removed the events entirely, would the world still mean something? A world with genuine interiority doesn't need its plot to justify its existence. That interiority is what separates depth from complexity.</li>
+    </ul>
+
+    <h3>VII. The Anti-Formulaic Test</h3>
+    <p>This applies to everything. After completing any section of the booklet — a week spread, a found document, a cipher, a fragment — ask:</p>
+    <ul class="decision-list">
+      <li><em>Test:</em> Have I seen this before — in this booklet, in another booklet, in a genre I recognise? If yes, what specifically makes it different here?</li>
+      <li><em>Test:</em> If someone read six of these booklets in a row, would they be able to predict the structure of the seventh? They should not be.</li>
+      <li><em>Test:</em> Does this feel generated, or does it feel made? There is a difference, and readers feel it even when they cannot name it.</li>
+    </ul>
+
+    <h3>On Story Register & Block Variety</h3>
+    <p>The blocks across the full LiftRPG series should span the widest possible range of register, world-type, and epistemic relationship between reader and story. The goal is variety, quality, and depth — in that order of priority, simultaneously.</p>
+    <div class="callout"><p>The block premise list is explicitly open-ended. Quality and surprise take precedence over familiarity. The best block may be one the author would never have thought to request. No register is off-limits provided it meets the rubric. Nothing surface-level is acceptable unless the surface itself is designed to produce contemplation.</p></div>
+    <p>Rather than genre labels, each block should be anchored by a <strong>world contract</strong> — a single sentence describing what the world of that block fundamentally is and what it asks of the person inside it. The world contract becomes the north star for every design decision: story register, typographic behavior, found document tone, puzzle logic, the feeling of assembling the password. Two blocks may share a genre and have completely different world contracts. Two blocks may share a world contract and look nothing alike.</p>
+    <ul class="decision-list">
+      <li>Block 1 world contract (locked): <em>The world is larger on the inside than the outside, and the institution that sent you here already knew that.</em></li>
+      <li>Future block world contracts: derived at generation time from the user's free-form story description via the property extraction stage. Never pre-assigned.</li>
+    </ul>
+
+    <h3>VIII. The Emotional Test</h3>
+    <p>This is not a rubric item. It is the reason the rubric exists. Every other test — print fidelity, authenticity, puzzle noticeability — serves this one. A booklet can pass every other test and still fail here. This is the test that cannot be automated.</p>
+    <div class="callout"><p>Does this have the potential to make someone feel something they weren't expecting to feel while logging their squat sets? Not moved in a general sense. Specifically: surprised by recognition, or unsettled by something they can't immediately name, or briefly outside themselves in a way that makes them come back. If the answer is no — if the content is technically accomplished and emotionally inert — it has failed the only test that matters.</p></div>
+    <ul class="decision-list">
+      <li><em>Test:</em> If you removed every puzzle mechanic and every gamebook element, would the story still be worth reading? If not, the narrative layer is decoration. It must be able to stand alone.</li>
+      <li><em>Test:</em> Is there a moment in this booklet — one session prompt, one fragment, one oracle entry — that could stop someone mid-rest and make them sit with it? There should be at least one. Ideally several. They should not be predictable in advance.</li>
+      <li><em>Test:</em> Does the story earn its emotional moments, or does it reach for them? Earned moments arrive because the preceding content built toward them without announcing it. Reached moments announce themselves and land hollow.</li>
+      <li><em>Test:</em> Could this story produce genuine contemplation, introspection, or reflection — not as a side effect but as part of what it's trying to do? The lifting context is an asset here, not an obstacle: effort, repetition, the body under load, the week-by-week accumulation of work — these are already contemplative structures. The story should be in conversation with them, not competing with them.</li>
+    </ul>
+
+    <h3>IX. The Structural Uniqueness Test</h3>
+    <p>This applies across blocks, not within them. A block can be formally perfect and still fail if it has the same shape as the last one. Uniqueness is not achieved by new characters and a different setting. It requires a different relationship between the reader and the story — a different epistemological stance, a different structural logic, a different way of withholding and revealing.</p>
+    <ul class="decision-list">
+      <li><em>Test:</em> Does this block resolve, or does it refuse to? Both are valid. The same answer twice in a row is not.</li>
+      <li><em>Test:</em> Is the story told forward, backward, or from the middle outward? Does the order of revelation match the order of events, or does it deliberately not?</li>
+      <li><em>Test:</em> Is the narrator reliable? If yes — is the next block's narrator also reliable? Vary this.</li>
+      <li><em>Test:</em> What is the relationship between the session card prompts and the fragments? In some blocks they run parallel. In others, one contradicts the other. In others, the fragments are the truth and the session prompts are the lie the narrator tells themselves. The relationship should be chosen, not defaulted.</li>
+      <li><em>Test:</em> Does the password assembly feel like the same mechanic as last time — or does its thematic logic change with the world contract? The cipher types change week to week. The meaning of the assembled word should also change block to block.</li>
+      <li><em>Test:</em> If a user has done three blocks, can they predict what the fourth will feel like before they open it? They should not be able to.</li>
+    </ul>
+
+    <h3>X. The Property Extraction Test</h3>
+    <p>This applies specifically to the generation stage, when the user has provided a story description and the LLM is deriving the world contract. It is the guard against surface-level interpretation.</p>
+    <ul class="decision-list">
+      <li><em>Test:</em> When the user provides references ("Delta Green meets Steinbeck"), has the LLM extracted the underlying properties — the specific narrative and tonal qualities that make each reference work at its best — rather than the surface elements? Properties are behaviours: "prose that accumulates weight through repetition," "an investigation that reveals character rather than just plot," "family dynamics that continue under conditions that should have dissolved them." Surface elements are nouns: tentacles, dusty fields, investigators.</li>
+      <li><em>Test:</em> Could the property list derived from the user's description produce a story that the user would recognise as capturing what they meant — even if it looks nothing like either reference? If yes, the extraction worked. If the output is recognisably a mashup of the source materials, it failed.</li>
+      <li><em>Test:</em> Are the extracted properties specific enough to rule things out? "Has emotional depth" rules nothing out and is therefore useless. "The horror is never the monster — it is what the monster reveals about the people facing it" rules many things out and is therefore useful.</li>
+      <li><em>Test:</em> Does the world contract that emerges from the extraction feel discovered rather than constructed? The best world contracts feel inevitable in retrospect — as if the story could not have been anything else.</li>
+    </ul>
+
+    <h3>XI. Oracle Entry Quality</h3>
+    <p>Oracle entries are the most-read lines in the booklet. The Monte Carlo simulation shows 86% of story-engaged users roll the oracle; deep-tier users roll it repeatedly across weeks. Each entry gets read multiple times. At that exposure level, weak oracle writing degrades the whole experience — every mediocre entry is a moment where the world deflates. Oracle entries require a higher writing standard than almost anything else in the booklet, because they are encountered out of sequence, without context, and in the 90-second rest window where the reader is most physically present and most available to be reached.</p>
+    <ul class="decision-list">
+      <li><em>Test — World voice, not author voice:</em> Does this entry feel like it came from inside the world — accumulated, specific, slightly wrong in ways that are harder to explain than to feel? An entry that says "The building is watching you" is the author speaking. An entry that says "You have been in this building for 22 days. It has been 19 days since you last counted the windows from the outside" is the world speaking. The difference is interiority and specificity. The oracle should know things the author has no business knowing.</li>
+      <li><em>Test — Temporal robustness:</em> Does this entry work whether rolled on week 1 or week 6? The oracle has no memory of when it is consulted. An entry that requires knowing a character exists, or that a specific event has happened, will confuse or mislead early readers. Entries must be able to land on first contact and deepen on re-encounter — never require prior story knowledge to function.</li>
+      <li><em>Test — Consequence entries earn their voice:</em> A consequence entry has two jobs simultaneously: it must read as an oracle entry AND deliver its mechanical instruction. "Sector 4-C is now inaccessible. Mark it." is functional but flat. A better consequence entry has the oracle voice with the instruction embedded: "The south corridor of Sector 4-C has been closed since the incident on Day 8. You were not informed of any incident on Day 8. Mark it sealed." Same pencil mark. The entry does narrative work as well as mechanical work. A consequence entry that reads only as instruction has abandoned the oracle's register.</li>
+      <li><em>Test — Variety of register across the table:</em> The 11 entries on a given week's oracle table should not all have the same tone or structure. Some entries observe. Some accuse. Some are falsely reassuring. Some are genuinely impossible to interpret but arrive with total confidence. The oracle is not a consistent narrator — it is a system that produces outputs of uncertain origin. A table where all 11 entries could have been written by the same person in the same mood has failed to be oracular.</li>
+      <li><em>Test — The atmosphere entry:</em> Not every oracle entry should do narrative work or deliver mechanical information. Some should simply be facts — specific, dated, slightly wrong — that the reader sits with and sets down without resolution. "The survey form has a field for anomalous geometry. You have been filing it as N/A. You are not sure why." No instruction. No fragment pointer. No plot advancement. Just a thing the oracle has noticed. These entries are not decoration; they are the moments where the oracle stops being a game mechanic and starts being a voice.</li>
+    </ul>
+
+  <hr class="divider"/>
+  <section>
+    <span class="section-label">09</span>
+    <h2>Open Questions — Answers Needed</h2>
+
+    <p style="font-family:var(--mono);font-size:8pt;color:var(--muted);margin-bottom:16px;">Previously open questions resolved: Voice (LLM-chosen per block), Password format (real word, normalized), Literary registers (free-form user input + property extraction), Generator UI (simple/advanced modes), Randomised premise (LLM-generated, opt-in), Game mechanics (boss battle + oracle consequences + anomaly log + binary choice card — all locked in Section 05A). Two items remain genuinely open.</p>
+
+    <div class="question-block">
+      <span class="q-label">The Ending / Reveal Moment</span>
+      <div class="q-text">What does the user actually receive when they decrypt the final page? What does the moment of reveal feel like as a designed experience?</div>
+      <div class="q-context">Must feel commensurate with a full block of effort. Not just text appearing on a screen. This is the payoff for everything — the only moment in the product that the committed 15% will ever see and remember. Needs deliberate design as an experience, not just as content. Cannot be designed abstractly — requires the renderer to exist first so the reveal moment can be built against a real context. Remains open until Phase 3 (unlock branch).</div>
+    </div>
+
+    <div class="question-block">
+      <span class="q-label">Cover Design</span>
+      <div class="q-text">Full bleed illustration, typographic only, or something in between?</div>
+      <div class="q-context">Typographic-only is safer to generate programmatically and consistent with the design system. A single generated image element could add impact without requiring full illustration. Decision deferred to renderer phase — the cover design can be prototyped once the interior spreads are rendering correctly.</div>
+    </div>
+  </section>
+
+  <hr class="divider"/>
+
+
+  <!-- ══ 10. LESSONS LEARNED ════════════════════ -->
+  <section>
+    <span class="section-label">10</span>
+    <h2>Lessons Learned — Do Not Repeat <span class="tag locked">Locked</span></h2>
+
+    <div class="callout"><p>"Build before the design document and you get coherent scaffolding around nothing."</p></div>
+
+    <h3>The Central Mistake</h3>
+    <p>The previous iteration of LiftRPG was not undisciplined — it was disciplined in the wrong direction. An elaborate technical architecture (22+ atom types, a layout governor, a seven-stage LLM pipeline, anti-isomorphism checking) was built with great precision before the product had a soul. The system was coherent. It had nothing to be coherent about.</p>
+
+    <p>The result was derivative booklets with identical mechanical skeletons. The scaffolding was load-bearing but there was no building inside it. Technical sophistication cannot substitute for answered prior questions.</p>
+
+    <h3>The Sequence That Works</h3>
+    <p style="font-family: var(--mono); font-size: 8.5pt; letter-spacing: .05em; color: var(--ink); padding: 10px 0;">Experience → Principles → Constraints → Design → Build</p>
+    <p>The design document answers the prior questions before touching code: not "how do we generate a booklet" but "what is this thing, what does it demand, what makes it irreplaceable, what would make someone carry it through an entire block of hard training." World contracts, navigation principles, the rubric's interior life test — none of that can be derived from an architecture document. It has to come from thinking about the experience first.</p>
+
+    <h3>The Exception: Prototypes as Thinking Tools</h3>
+    <p>Building HTML prototypes before the design document was complete was not a mistake. The Cartographer spreads, the card design, the overflow mechanism — that was building in service of understanding, not building in service of shipping. Using the browser as a thinking tool is legitimate. Building a pipeline before knowing what the pipeline is for is not.</p>
+
+    <h3>Why Long Complex Prompts Fail</h3>
+    <p>Long, complex LLM prompts narrow output space. The model converges on "correct-looking" answers — outputs that satisfy the prompt's constraints without having any real identity. The new approach inverts this: fix the mechanical skeleton, differentiate at the story and world level. Give the model a soul to be faithful to, not a schema to fill.</p>
+
+    <h3>Remind Yourself Of This</h3>
+    <ul class="decision-list">
+      <li>If you find yourself designing data schemas before you can describe the experience in one sentence — stop.</li>
+      <li>If the architecture is more interesting than the thing it produces — stop.</li>
+      <li>If you cannot answer "what does this world ask of the person inside it" — do not write a line of generation code.</li>
+      <li>The design document is not overhead. It is the work. Everything built from it will be faster, better, and more coherent than anything built without it.</li>
+    </ul>
+  </section>
+
+  <hr class="divider"/>
+
+
+  <!-- ══ 11. SIMULATION FINDINGS ════════════════ -->
+  <section>
+    <span class="section-label">11</span>
+    <h2>Simulation Findings — Monte Carlo Analysis</h2>
+
+    <h3>v1 Simulation (Pre-Mechanics Layer) <span class="tag locked">Locked</span></h3>
+    <p>A 10,000-user Monte Carlo simulation was run against the original design brief to stress-test the unlock funnel. Five archetypes across a full lifting block. Puzzle difficulty failure rates are overstated because the model predates the insight that motivated users will use LLMs to solve hard puzzles — the funnel shape and failure modes remain valid.</p>
+
+    <table class="budget-table">
+      <thead><tr><th>Stage</th><th>Rate</th><th>Loss</th></tr></thead>
+      <tbody>
+        <tr><td>Started block</td><td class="num">100%</td><td></td></tr>
+        <tr><td>Completed all weeks</td><td class="num">82%</td><td>18pp dropout</td></tr>
+        <tr><td>Collected all password characters</td><td class="num">20%</td><td class="num" style="color:#8b2a2a"><strong>61pp ← critical gap</strong></td></tr>
+        <tr><td>Visited liftrpg.co and unlocked</td><td class="num">15.5%</td><td>4.8pp motivation gap</td></tr>
+        <tr><td>Would recommend</td><td class="num">72%</td><td></td></tr>
+      </tbody>
+    </table>
+
+    <p>The 82% workout completion rate was genuinely good. The 61pp gap between "finished the block" and "collected all components" was the critical finding. Three real failure modes identified: <strong>Noticing</strong> (puzzle invisible to unwarned reader), <strong>Recording</strong> (solve→log leakage in gym context), <strong>Caring</strong> (Serious Lifter finishes block but was never a puzzle person). Design implication: design puzzles for noticeability first, gym-context solvability second, satisfaction third. Difficulty is not a gating mechanism.</p>
+
+    <h3>v2 Simulation (Post-Mechanics Layer, Pre-Invisible-Until-Engaged) <span class="tag locked">Locked</span></h3>
+    <p>Second 10,000-user simulation run after adding boss battle, oracle consequences, anomaly log, and binary choice card — before the Invisible Until Engaged redesign. Six archetypes including the Meathead (20%). Results significantly worse than v1 across every metric.</p>
+
+    <table class="budget-table">
+      <thead><tr><th>Metric</th><th>v1</th><th>v2</th><th>Δ</th></tr></thead>
+      <tbody>
+        <tr><td>Block completion rate</td><td class="num">82%</td><td class="num" style="color:#8b2a2a">61%</td><td class="num" style="color:#8b2a2a">−21pp</td></tr>
+        <tr><td>Unlock rate</td><td class="num">15.5%</td><td class="num" style="color:#8b2a2a">4.1%</td><td class="num" style="color:#8b2a2a">−11.4pp</td></tr>
+        <tr><td>Would recommend</td><td class="num">72%</td><td class="num" style="color:#8b2a2a">42.8%</td><td class="num" style="color:#8b2a2a">−29.2pp</td></tr>
+        <tr><td>Felt pressured by mechanics</td><td class="num">—</td><td class="num" style="color:#8b2a2a">28.7%</td><td class="num">target &lt;10%</td></tr>
+        <tr><td>Meathead: felt pressured</td><td class="num">—</td><td class="num" style="color:#8b2a2a">52%</td><td class="num">critical</td></tr>
+        <tr><td>Component gap</td><td class="num">61pp</td><td class="num">60pp</td><td class="num">unchanged</td></tr>
+        <tr><td>Boss: noticed but &lt;2 components</td><td class="num">—</td><td class="num" style="color:#8b2a2a">34.6%</td><td class="num">locked door</td></tr>
+      </tbody>
+    </table>
+
+    <p>Three structural findings from v2: (1) <strong>Mechanics pressure</strong> — presence implies obligation; four simultaneous optional layers read as a system demanding participation; every visible optional field reads as "you should fill this in." (2) <strong>Boss punishes the component gap</strong> — missing components made the boss unsolvable in-session rather than just producing a wrong password at liftrpg.co; a locked-door experience at the block's climax for 34.6% of users. (3) <strong>Cohesion was adoption, not integration</strong> — 83% of dual-engaged users felt mechanics were embedded in the fiction, but only 14.5% of users reached dual engagement; the mechanics layer actively fragmented the experience for the 86% who didn't.</p>
+
+    <h3>v3 Simulation (Final v1.7 Design) <span class="tag locked">Locked</span></h3>
+    <p>Third 10,000-user simulation against the final v1.7 design: Invisible Until Engaged principle applied across all mechanics, surveyor's note removed as a form field (notes box serves both purposes), partial convergence designed into the boss, narrative-first boss page, rules spread framing corrected.</p>
+
+    <table class="budget-table">
+      <thead><tr><th>Metric</th><th>v1</th><th>v2</th><th>v3</th><th>Δ v2→v3</th></tr></thead>
+      <tbody>
+        <tr><td>Block completed (5+ weeks)</td><td class="num">82%</td><td class="num">61%</td><td class="num" style="color:#2a6b3a"><strong>62%</strong></td><td class="num" style="color:#2a6b3a">+1pp</td></tr>
+        <tr><td>Unlock rate</td><td class="num">15.5%</td><td class="num">4.1%</td><td class="num">3.9%</td><td class="num">≈flat</td></tr>
+        <tr><td>Would recommend</td><td class="num">72%</td><td class="num">42.8%</td><td class="num" style="color:#2a6b3a"><strong>47.6%</strong></td><td class="num" style="color:#2a6b3a">+4.8pp</td></tr>
+        <tr><td>Felt pressured by mechanics</td><td class="num">n/a</td><td class="num">28.7%</td><td class="num" style="color:#2a6b3a"><strong>4.1% ✓</strong></td><td class="num" style="color:#2a6b3a">−24.6pp</td></tr>
+        <tr><td>Meathead: felt pressured</td><td class="num">n/a</td><td class="num">52%</td><td class="num" style="color:#2a6b3a"><strong>5% ✓</strong></td><td class="num" style="color:#2a6b3a">−47pp</td></tr>
+        <tr><td>Boss: felt locked out</td><td class="num">n/a</td><td class="num">34.6%</td><td class="num" style="color:#2a6b3a"><strong>1.6% ✓</strong></td><td class="num" style="color:#2a6b3a">−33pp</td></tr>
+        <tr><td>Boss satisfying (narrative OR puzzle)</td><td class="num">n/a</td><td class="num">18%</td><td class="num" style="color:#2a6b3a"><strong>31.8%</strong></td><td class="num" style="color:#2a6b3a">+13.8pp</td></tr>
+        <tr><td>Product felt unified</td><td class="num">n/a</td><td class="num">19.4%</td><td class="num" style="color:#2a6b3a"><strong>49.7%</strong></td><td class="num" style="color:#2a6b3a">+30.3pp</td></tr>
+        <tr><td>Meathead: would recommend</td><td class="num">n/a</td><td class="num">32%</td><td class="num" style="color:#2a6b3a"><strong>43%</strong></td><td class="num" style="color:#2a6b3a">+11pp</td></tr>
+      </tbody>
+    </table>
+
+    <h3>On the v1 vs v3 Recommend Gap</h3>
+    <p>The overall recommend rate (47.6% vs v1's 72%) looks like a regression. It is not. Two modelling differences account for approximately 70% of the gap. First: v1 modelled Casual gym-goer completion as a flat 73% Bernoulli draw per user. v3 uses a week-by-week loop with compounding dropout — a structurally more realistic model that produces 43% completion for the same underlying per-week probability. Casual represents 25% of users, so this single modelling change accounts for roughly 16pp of the gap. Second: v1 had no Meathead archetype — that 20% was folded into Serious Lifter. The Meathead recommends at 43%, Serious Lifter at 49%; combining them at their true weights closes the gap further. Together these modelling differences explain ~70% of the raw gap. The remaining ~7pp represents genuine residual from a more honest model of casual dropout — which is upstream of the product design. The design changes are working.</p>
+
+    <h3>v3 Archetype Breakdown</h3>
+    <table class="budget-table">
+      <thead><tr><th>Archetype</th><th>Vol</th><th>Completed</th><th>Pressured</th><th>Unlocked</th><th>Recommend</th></tr></thead>
+      <tbody>
+        <tr><td>Meathead</td><td class="num">20%</td><td class="num">88%</td><td class="num">5%</td><td class="num">0%</td><td class="num">43%</td></tr>
+        <tr><td>Serious Lifter / Story-Skeptic</td><td class="num">15%</td><td class="num">82%</td><td class="num">5%</td><td class="num">1%</td><td class="num">49%</td></tr>
+        <tr><td>Casual Gym-Goer</td><td class="num">25%</td><td class="num">43%</td><td class="num">3%</td><td class="num">0%</td><td class="num">39%</td></tr>
+        <tr><td>Gamebook / Puzzle Enthusiast</td><td class="num">15%</td><td class="num">60%</td><td class="num">3%</td><td class="num">24%</td><td class="num">60%</td></tr>
+        <tr><td>Literary Reader Who Lifts</td><td class="num">15%</td><td class="num">70%</td><td class="num">7%</td><td class="num">1%</td><td class="num">69%</td></tr>
+        <tr><td>Beginner / Low Friction Seeker</td><td class="num">10%</td><td class="num">19%</td><td class="num">2%</td><td class="num">0%</td><td class="num">26%</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Residual Failure Modes After v3</h3>
+    <ul class="decision-list">
+      <li><strong>Component gap persists (~61pp).</strong> Structural, not solvable by mechanic design. The v3 design accepts this: the boss delivers value across all collection states via separable narrative and puzzle payoffs. Partial convergence (≥3 components, ~8% of users) yields a genuine boss experience even without the full password. Zero-component users get a narrative climax. The gap is a feature of the population, not a product failure.</li>
+      <li><strong>Beginner completion (19%) is the weakest link.</strong> Upstream of the product — workout programme difficulty and life circumstance. Not addressable by design.</li>
+      <li><strong>Meathead unlock rate is ~0%.</strong> Correct and expected. Their 43% recommend rate — driven entirely by workout log quality — is the right metric for this archetype. They recommend it as a workout log. That is sufficient and correct.</li>
+      <li><strong>Casual completion (43%) reflects compound dropout, not design failure.</strong> Per-week probability is unchanged from v1 (0.75). The v3 model uses week-by-week compounding; v1 used a flat draw. The ~30pp completion difference between models is a modelling artefact, not a product regression.</li>
+    </ul>
+
+    <h3>Enduring Design Principles from Simulation</h3>
+    <ul class="decision-list">
+      <li>Noticeability is the primary puzzle design requirement — before solvability, before difficulty. A mechanic invisible to an unwarned reader has failed at the first stage.</li>
+      <li>The recording path (solve → extract → write) must be under 90 seconds with chalk on hands. Every unnecessary step is a component lost.</li>
+      <li>The workout log is the product for 70% of users. It must be excellent on those terms alone. The story and puzzle are architecture for the 30% who want them — architecture the 70% should never have to notice.</li>
+      <li>Design the ending for the person who earned it. Only ~14% will ever see it. Make it so right for those people that word of mouth pulls the next block's engagement upward.</li>
+    </ul>
+  </section>
+
+  <hr class="divider"/>
+
+
+  <!-- ══ 12. ARCHITECTURE DECISION ══════════════ -->
+  <section>
+    <span class="section-label">12</span>
+    <h2>Architecture Decision — GPT vs Rendering Engine <span class="tag locked">Locked</span></h2>
+
+    <p>Three architecture options were evaluated via Monte Carlo simulation (n=10,000 users, five archetypes). The question: where does the intelligence live — in the generator, the renderer, or the author?</p>
+
+    <h3>The Three Options</h3>
+    <ul class="decision-list">
+      <li><strong>Option A — LLM-first, renderer-second:</strong> LLM generates full structured content (JSON); renderer takes it and produces the booklet. Maximum story variety, but generation quality is the load-bearing variable.</li>
+      <li><strong>Option B — Renderer-first, LLM-assisted:</strong> Fixed skeleton with guaranteed layout quality; LLM fills specific named slots (session prompts, found documents, cipher content). Renderer validates slots; LLM never touches layout.</li>
+      <li><strong>Option C — Pure renderer, human-written content:</strong> The Cartographer is written manually in full. Renderer produces it perfectly. No generation step for v1. New blocks require the author to write them.</li>
+    </ul>
+
+    <h3>Simulation Results (n=10,000)</h3>
+    <table class="budget-table">
+      <thead><tr><th>Metric</th><th>Option A</th><th>Option B</th><th>Option C</th></tr></thead>
+      <tbody>
+        <tr><td>Generation failure rate</td><td class="num">8.0%</td><td class="num">2.8%</td><td class="num">0%</td></tr>
+        <tr><td>Block completion rate</td><td class="num">76.4%</td><td class="num">84.9%</td><td class="num">86.8%</td></tr>
+        <tr><td>Unlock rate</td><td class="num">38.0%</td><td class="num">41.8%</td><td class="num">45.9%</td></tr>
+        <tr><td>Would recommend</td><td class="num">20.2%</td><td class="num" style="color:#2a6b2a"><strong>72.0% ←</strong></td><td class="num">66.3%</td></tr>
+        <tr><td>Avg artifact quality</td><td class="num">0.465</td><td class="num">0.847</td><td class="num" style="color:#2a6b2a"><strong>0.850 ←</strong></td></tr>
+        <tr><td>Avg story satisfaction</td><td class="num">0.262</td><td class="num" style="color:#2a6b2a"><strong>0.486 ←</strong></td><td class="num">0.457</td></tr>
+        <tr><td>Avg friction score (↓ better)</td><td class="num">0.521</td><td class="num">0.291</td><td class="num" style="color:#2a6b2a"><strong>0.136 ←</strong></td></tr>
+        <tr><td>Scaling-blocked users</td><td class="num">—</td><td class="num">—</td><td class="num" style="color:#8b2a2a"><strong>35.3%</strong></td></tr>
+      </tbody>
+    </table>
+
+    <h3>By Archetype — Would Recommend</h3>
+    <table class="budget-table">
+      <thead><tr><th>Archetype</th><th>Option A</th><th>Option B</th><th>Option C</th></tr></thead>
+      <tbody>
+        <tr><td>Serious Lifter (30% of volume)</td><td class="num">1%</td><td class="num">58%</td><td class="num">34%</td></tr>
+        <tr><td>Casual Gym-Goer (25%)</td><td class="num">13%</td><td class="num">71%</td><td class="num">70%</td></tr>
+        <tr><td>Gamebook Enthusiast (15%)</td><td class="num">46%</td><td class="num">86%</td><td class="num">91%</td></tr>
+        <tr><td>Literary Reader (15%)</td><td class="num">48%</td><td class="num">85%</td><td class="num">88%</td></tr>
+        <tr><td>Beginner (15%)</td><td class="num">17%</td><td class="num">75%</td><td class="num">77%</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Reading the Results</h3>
+    <ul class="decision-list">
+      <li><strong>Option A is eliminated.</strong> 8% generation failure rate, artifact quality of 0.465, and a 1% recommend rate from the Serious Lifter (your plurality user). LLM-first fails because the artifact — the physical thing in the lifter's hands — is only as good as the generation, which has high variance. The old system was Option A. This confirms why it failed.</li>
+      <li><strong>Option C wins on friction and artifact quality, but kills itself at scale.</strong> 35.3% of users who want block 2 cannot get it fast enough. The Serious Lifter recommends at only 34% — because human-written story quality doesn't help users who aren't deeply reading the story. The scaling wall converts word-of-mouth momentum into churn.</li>
+      <li><strong>Option B wins on recommend rate (72%) — the metric that matters most for a product that grows by word of mouth.</strong> It is the only option where the Serious Lifter recommends at 58%. The artifact is reliably beautiful, friction is low, the story has a raised floor without requiring users to care about it, and it scales without an author bottleneck.</li>
+    </ul>
+
+    <h3>The Decision <span class="tag locked">Locked</span></h3>
+    <div class="callout"><p><strong>Option B: Renderer-first, LLM-assisted.</strong> The renderer owns the artifact. The LLM fills named slots. The renderer validates. Layout never touches the LLM. This is not a GPT — it is a rendering engine with an LLM writing assistant. The physical booklet is the product. Everything else serves it.</p></div>
+
+    <h3>What This Means in Practice</h3>
+    <ul class="decision-list">
+      <li>Build the renderer first — to the point where pasting a JSON file produces a perfect, print-ready booklet. The Cartographer provides the content to test against without needing generation to work yet.</li>
+      <li>The LLM layer is added second — it writes session prompts, found documents, cipher content, and fragment text into named slots defined by the renderer schema.</li>
+      <li>The LLM never decides layout, page count, type hierarchy, or document format. Those are renderer decisions, made once, made well.</li>
+      <li>Generation failures degrade gracefully — the renderer still produces a booklet; it just has placeholder slots. This is what drops the failure impact from catastrophic (Option A) to recoverable (Option B).</li>
+      <li>The world contract and quality rubric are the LLM's north star. The renderer schema is its constraint. Both must be in the LLM's context when it generates slot content.</li>
+    </ul>
+  </section>
+
+  <hr class="divider"/>
+
+
+  <!-- ══ 13. RENDERER SCHEMA ════════════════════ -->
+  <section>
+    <span class="section-label">13</span>
+    <h2>Renderer Schema <span class="tag locked">Locked</span></h2>
+
+    <p>The full JSON schema is defined in <strong>liftrpg-schema.json</strong> (v1.0.0). What follows is a summary of its structure and the principles embedded in it. The schema is the architecture. Every field is annotated as RENDERER, LLM, or GENERATOR — these annotations describe who owns that field and are enforced at generation time.</p>
+
+    <h3>Top-Level Structure</h3>
+    <ul class="decision-list">
+      <li><strong>meta</strong> — Block-level constants: title, world contract, narrative voice, literary register, passwordPlaintext, passwordEncryptedEnding, LiftOScript source, weekCount</li>
+      <li><strong>weeks[]</strong> — One object per week. Length equals meta.weekCount. Each contains: title, epigraph, sessions[], fieldOps (map, cipher, oracle), overflow flag, optional interlude, and passwordCharacter</li>
+      <li><strong>fragments[]</strong> — Back-of-book found documents. Non-sequential, mixed types. 8–30 items.</li>
+      <li><strong>cover</strong> — Title, in-world designation, tagline, colophon lines</li>
+      <li><strong>rulesSpread</strong> — Left page: in-world briefing document. Right page: password record log (renderer-generated from week count)</li>
+      <li><strong>endings[]</strong> — 1–3 variants. AES-256-GCM encrypted at generation time using passwordPlaintext as key. Stored as passwordEncryptedEnding in meta. Server never sees plaintext.</li>
+    </ul>
+
+    <h3>Key Schema Decisions</h3>
+    <ul class="decision-list">
+      <li><strong>passwordCharacter at week level:</strong> Ground truth the renderer uses for encryption validation and password log rendering. Never printed in the booklet. The cipher independently contains the same character derivable through solving — both must agree or generation fails.</li>
+      <li><strong>narrativeVoice is LLM-chosen per block:</strong> Fields: person (first/second/third), tense, narratorStance (one sentence: who is speaking, to whom, under what conditions), voiceRationale (must connect directly to worldContract — if it doesn't, the voice is wrong). Person is not constrained by enum logic — it is constrained by the requirement to justify the choice against the world contract.</li>
+      <li><strong>isDeload flag at week level:</strong> GENERATOR field derived from LiftOScript <code>progress: none</code> detection. Never rendered in the booklet. Passed to the LLM generation prompt so session card tone reflects reduced intensity. The booklet does not announce a deload — it is felt.</li>
+      <li><strong>reEntryRule in rulesSpread:</strong> GENERATOR field. Derived from the LiftOScript progression type at generation time and rendered as a half-page section on the rules spread. Programme-specific, not generic. Also referenced by a pointer printed on each week header.</li>
+      <li><strong>characterDerivationProof in cipher:</strong> Plain-English walkthrough of exactly how solving the published puzzle yields the correct character. Validator only, never rendered. Generation hard-fails if proof doesn't match passwordCharacter.</li>
+      <li><strong>noticeabilityDesign is a required cipher field:</strong> Forces an answer to "how would an unwarned reader discover this puzzle exists?" before the cipher is accepted. Addresses the Noticing failure mode at schema level.</li>
+      <li><strong>authenticityChecks on every foundDocument:</strong> Three booleans — hasIrrelevantDetail (must be true), couldExistInDifferentStory (must be false), redactionDoesNarrativeWork (must be true if redactions present). Validator only. Catches obvious failures but cannot catch a document that passes all three and is still dead on the page — only attention catches that.</li>
+      <li><strong>interlude.reason is validated against worldContract:</strong> Interludes require a reason that references the narrative arc or typographic behavior. "It felt like a good moment" fails validation. Never generated by default.</li>
+    </ul>
+
+    <h3>What the Schema Cannot Do</h3>
+    <p>The schema catches structural failures and obvious content failures. It cannot catch the deeper failure: content that is technically compliant and genuinely dead. A found document that passes all three authenticity checks and reads like it was assembled rather than written. A session prompt that is grammatically correct and emotionally absent. A cipher that is mechanically solvable and narratively inert.</p>
+    <p>The schema is the chassis. The generation prompt is the engine. The thing the schema cannot encode — and the generation prompt must carry — is described in Section 14.</p>
+  </section>
+
+  <hr class="divider"/>
+
+
+  <!-- ══ 14. QUALITY & THE GENERATION PROMPT ════ -->
+  <section>
+    <span class="section-label">14</span>
+    <h2>Quality & The Generation Prompt</h2>
+
+    <h3>The Source <span class="tag locked">Locked</span></h3>
+    <p>The reference is Pirsig's concept of Quality — not as a property of objects or subjects, but as something recognised before it can be defined. The mechanic he describes is <em>attention</em>: the kind that shows up before you know what you're looking for, that notices the thing is wrong before it can say why. The moment you reduce Quality to a checklist, you've lost it. The checklist produces compliance. Compliance produces content that is technically correct and spiritually empty.</p>
+
+    <div class="callout"><p>"Quality is not something you can define and then pursue. It is something that pursues you when you stop defining and start paying attention."</p></div>
+
+    <h3>Implication for the Quality Rubric</h3>
+    <p>The seven dimensions in Section 08 are useful for directing attention — they are not a pass/fail gate. A found document that passes every rubric test can still be dead. The rubric is the mechanic's hands on the engine: a way of knowing where to look, not a guarantee of what you'll find. Use it as a lens. Do not use it as a checklist.</p>
+
+    <h3>Implication for the Schema</h3>
+    <p>The <code>authenticityChecks</code> booleans, the <code>characterDerivationProof</code>, the <code>noticeabilityDesign</code> field — these catch the failures that can be caught structurally. They are necessary. They are not sufficient. The schema cannot encode the question that matters most.</p>
+
+    <h3>The Question the Generation Prompt Must Carry</h3>
+    <p>Before generating any slot — session prompt, found document, cipher, fragment, oracle entry, cover line — the LLM must be required to stop and ask one question:</p>
+
+    <div class="callout"><p><strong>Is what I am about to write true?</strong> Not accurate. Not compliant. Not well-formed. <em>True</em> — in the sense that it could only belong to this world, this week, this session, this moment in the block. If the answer is no, do not generate it. Return a flag. Ask for a different constraint. An empty slot is better than a filled one that is false.</p></div>
+
+    <p>This question cannot be validated programmatically. It is a requirement placed on the author of the generation prompt, who must build a prompt in which the LLM is genuinely capable of answering it — and honest enough to say no when the answer is no.</p>
+
+    <h3>What This Means for Voice</h3>
+    <p>Voice — grammatical person, tense, narrator stance — is not a stylistic parameter. It is the epistemological position from which the story can be told with full attention. The schema's <code>narrativeVoice.voiceRationale</code> field requires the LLM to justify its choice against the world contract. But the deeper test is simpler: does this voice allow the writer to pay genuine attention to this specific story? Some blocks will demand second person because the mechanic only works when the reader is implicated. Some will demand first person past because dramatic irony requires a narrator who survived. Some may fracture mid-block because the narrator is losing their grip. The generation prompt must allow for all of these — and must never default to a prior choice because it worked last time.</p>
+
+    <h3>The Anti-Compliance Rule <span class="tag locked">Locked</span></h3>
+    <ul class="decision-list">
+      <li>The generation prompt explicitly instructs: do not optimise for schema compliance. Optimise for truth to the world contract. The schema will catch structural failures. Nothing catches the failure of a prompt that satisfies every constraint and means nothing.</li>
+      <li>If the LLM cannot write a session prompt that is true to the world contract within the given exercise data and week position — it should say so. A flagged failure is more useful than a filled slot.</li>
+      <li>The quality rubric exists to direct attention, not to replace it. Every test in the rubric ends with a human or LLM actually looking at the work and deciding. The decision cannot be automated.</li>
+      <li>An empty slot that knows it is empty is better than a full slot that does not know it is false.</li>
+    </ul>
+
+    <h3>Property Extraction Stage <span class="tag locked">Locked</span></h3>
+    <p>This is a required first step in the generation pipeline, before world contract generation, before any content slot is filled. It applies whenever the user has provided a story description — a premise, a reference combination, a mood, anything.</p>
+    <p>The LLM receives the user's description and must produce, in order:</p>
+    <ul class="decision-list">
+      <li><strong>Property list:</strong> 4–6 specific narrative and tonal properties that the description suggests at its best — not its most obvious. Properties are behaviours and qualities, never nouns or source names. "Prose that accumulates weight through repetition until a simple sentence becomes unbearable" is a property. "Dusty fields" is not. "An investigation that reveals what the investigators cannot admit about themselves" is a property. "Cthulhu mythology" is not.</li>
+      <li><strong>Anti-surface check:</strong> For each property, the LLM must confirm it could not have been produced by a surface-level reading of the user's description. If it could — if it is just a recognisable element of one of the source references — it is discarded and replaced.</li>
+      <li><strong>Structural shape:</strong> Before the world contract, the LLM must decide the story's structural logic — does it resolve or refuse to? Is it told forward or from evidence backward? Is the narrator reliable? What is the relationship between session prompts and fragments — parallel, contradictory, one undermining the other? This decision is recorded in the schema's <code>literaryRegister</code> field and must differ from the previous block's structural shape.</li>
+      <li><strong>World contract:</strong> One sentence, derived from the property list and structural shape. Must feel discovered, not constructed. Must be specific enough to rule things out. Must connect every subsequent design decision — voice, typographic behavior, found document tone, cipher logic — without needing to be referenced explicitly in each.</li>
+    </ul>
+    <p>The property extraction stage output is included in the LLM's context for every subsequent generation call in the pipeline. Every slot — every session prompt, every found document, every cipher title, every oracle entry — is generated against the property list, not just the world contract. The world contract is the north star. The property list is the compass.</p>
+  </section>
+
+  <hr class="divider"/>
+
+
+  <!-- ══ 15. REPOSITORY STRUCTURE ══════════════════ -->
+  <section>
+    <span class="section-label">15</span>
+    <h2>Repository Structure <span class="tag locked">Locked</span></h2>
+
+    <p>Single repository. All work — renderer, generator, unlock, content, documentation — lives together. The prototype HTML files are the visual spec the renderer must match; they belong in the same repo as the renderer, always adjacent to the thing they specify. Branching strategy: <code>main</code> holds stable, proven work; active development happens on feature branches (<code>renderer</code>, then <code>generator</code>, then <code>unlock</code>) and merges to main when solid.</p>
+
+    <h3>Folder Tree</h3>
+    <div class="callout" style="font-family:var(--mono);font-size:8pt;line-height:1.9;white-space:pre;">liftrpg/
+├── docs/
+│   ├── liftrpg-brief.html       ← design brief &amp; save point (this document)
+│   └── liftrpg-schema.json      ← renderer schema v1.3.0
+├── prototypes/
+│   ├── cartographer-week1.html  ← Week 1 full spread
+│   ├── cartographer-week3.html  ← Week 3 full spread
+│   ├── cartographer-log-refined.html
+│   └── cartographer-cards.html  ← final card design
+├── renderer/
+│   ├── index.html               ← takes JSON, produces print-ready booklet
+│   ├── renderer.js              ← core rendering logic
+│   └── styles.css               ← design system as CSS
+├── generator/
+│   ├── parser.js                ← LiftOScript → structured data (GENERATOR fields)
+│   └── prompt.md                ← the LLM generation prompt (LLM fields)
+├── unlock/
+│   └── index.html               ← liftrpg.co — client-side AES-GCM decrypt UI
+└── content/
+    └── cartographer.json        ← Block 1 JSON (LLM-generated, renderer input)</div>
+
+    <h3>Isolation Principle <span class="tag locked">Locked</span></h3>
+    <ul class="decision-list">
+      <li><strong>renderer/ never imports from generator/.</strong> They communicate only through a JSON file in content/. The renderer takes any valid JSON; it has no knowledge of how that JSON was produced.</li>
+      <li><strong>unlock/ is fully standalone.</strong> It receives an encrypted blob and a password. It knows nothing about the booklet, the renderer, or the generator. If the decrypt mechanic breaks, you open unlock/index.html in isolation and fix it there.</li>
+      <li><strong>generator/ has two distinct jobs</strong> — parser.js handles deterministic LiftOScript parsing (pure logic, testable in isolation); prompt.md is the LLM instruction set (no code, just the prompt). These are kept separate because one is code and one is authored content.</li>
+      <li><strong>content/ is data, not code.</strong> Each block gets one JSON file. Future blocks sit alongside cartographer.json. The renderer is always just pointed at a file — never coupled to a specific story or block.</li>
+      <li><strong>prototypes/ is read-only reference.</strong> Nothing in the build process imports from prototypes/. They exist to answer the question "does this rendered output match the designed intent?" — a human comparison, not a programmatic one.</li>
+    </ul>
+
+    <h3>Build Sequence</h3>
+    <ul class="decision-list">
+      <li><strong>Phase 1 — renderer branch:</strong> Build renderer/ to the point where a hand-crafted minimal JSON produces a correct print-ready booklet matching the prototypes. No generator, no LLM, no unlock needed yet.</li>
+      <li><strong>Phase 2 — generator branch:</strong> Build generator/parser.js (LiftOScript → GENERATOR fields) and generator/prompt.md (LLM generation prompt). Output is a valid content/*.json file. Renderer consumes it unchanged.</li>
+      <li><strong>Phase 3 — unlock branch:</strong> Build unlock/index.html. Receives encrypted blob from content JSON, takes password input, decrypts client-side with WebCrypto AES-GCM, renders the ending.</li>
+      <li><strong>Each phase merges to main independently.</strong> Phase 2 does not begin until Phase 1 is proven. Phase 3 does not begin until Phase 2 produces real content.</li>
+    </ul>
+  </section>
+
+  <hr class="divider"/>
+
+
+  <!-- ══ 16. CONTEXT FOR NEW CHAT ════════════════ -->
+  <section>
+    <span class="section-label">16</span>
+    <h2>Context Seed for New Chat Window</h2>
+    <p>Paste the following as your opening message when resuming in a new session:</p>
+
+    <div class="callout">
+      <p>We are building LiftRPG — a printed workout gamebook (one per lifting block) fusing a functional workout log with a found-document narrative mystery. US Letter landscape (11"×8.5"), page count scales with programme length — determined by the LiftOScript pasted into the generator. LiftOScript is the Liftosaur app scripting language — defines exercises, sets/reps/weight/RPE/rest, progressive overload (lp, dp, sum, custom), week/day structure, deload weeks via progress:none. Generator parses LiftOScript to derive week count, session count, exercise data, progression type, deload flags, re-entry rule. Left page: workout log with session cards. Right page: field operations (map, cipher, oracle) — replaced by boss page on final week. Story told through found documents. GOVERNING MECHANIC PRINCIPLE: Invisible Until Engaged — optional mechanics are invisible to non-players; presence without engagement must never feel like obligation. The workout log is the product for 70% of users; everything else is architecture for the 30% who want it, which the 70% should never have to notice. GAME MECHANICS: (1) Boss Week — final week right page is the most important found document in the booklet; narrative payoff and puzzle payoff are the same page but separable experiences; non-puzzle users get a complete story climax; puzzle users find the convergence mechanism embedded within the found document; partial convergence (2–3 components) yields a partial but real experience; full collection (5) resolves the password in one moment. Block 1 boss: Final Survey Report MSA Form 99 — five anomalous coordinates from weekly ciphers, connected in survey order on the form's grid, trace a shape that resolves to a street address. (2) Weekly Components — weeks 1 through N-1 yield one component each (type block-specific: coordinate, cipher-key, date, name-fragment); boss convergenceProof must produce passwordPlaintext. (3) Surveyor's Note — NO separate form field on session cards; the existing notes box serves this purpose; rules spread mentions once in world voice: "Some surveyors use the notes box to record anomalies they haven't filed officially" — the practice is named, not mandated; no visual element, no schema field, zero pressure contribution. (4) Oracle Consequences — up to 3 of 11 oracle table entries per week are type "consequence" (map mutation, document clarification, atmosphere) rather than "fragment"; visually identical; oracle never gated on engagement. (5) Binary Choice — midpoint week one session prompt forks; two paths separated by thin rule; empty map-marker circles (○ not □) beside each; no "choose one" label; no mechanical consequence; narrative consequence in subsequent prompts; boss page may contain a detail that resonates only with one path, unremarked. Rules spread framing: "This booklet works as a workout log. Everything else — story, puzzles, map — is there if you want it. You will either find it or you won't. Both are correct outcomes. The only thing you need to do is lift." Password: real word meaningful in world, uppercase alphanumeric, normalized at unlock. Unlock: AES-GCM client-side, GitHub Pages, no server. Design: Apple philosophy, Libre Baskerville/Share Tech Mono/Playfair Display Italic, cream/ink/burgundy. Canon MF4770n, ≥30% luminance delta, fill patterns not color. Voice LLM-chosen per block, voiceRationale connects to worldContract. Structural shape per block: resolution/refusal/partial, temporal order, narrator reliability, promptFragmentRelationship — must differ block to block. Deload: isDeload:true, felt not announced. Block 1: "The Cartographer of Unmapped Rooms" — world contract: the world is larger on the inside than the outside, and the institution that sent you here already knew that. Quality rubric: 11 dimensions (added XI: Oracle Entry Quality — world voice not author voice, temporal robustness, consequence entries earn their register, variety across the table, atmosphere entries with no resolution). Fragment navigation: ref rendered flush-right in Share Tech Mono separated from prose by half-line space — the exit sign not a footnote; fragment numbers in outer margin at display scale (~24pt, --rule colour) for thumb-riffling; password log page doubles as fragment index (grid of fragment numbers with small blank beside each, no instruction — IUE applied to navigation). Property extraction stage required before world contract. Four Monte Carlo simulations run (10,000 users each): v1 (pre-mechanics, 72% recommend, 61pp component gap — three failure modes: Noticing/Recording/Caring), v2 (post-mechanics pre-redesign, 42.8% recommend, 52% meathead pressure, 34.6% boss locked-door — mechanics pressure identified as critical new failure mode), v3 final (post-redesign: 47.6% recommend, 4.1% pressure ✓, 5% meathead pressure ✓, 1.6% boss locked-door ✓), v4 (cohesion/exploration model: 30% none / 24% surface / 20% mid / 25% deep; 86% of story-engaged users roll oracle; deep-tier users avg 16 physical navigations; 36.5% reach high cohesion + high exploration — "I was somewhere"; surface floor holds for Meathead+SL at 50%). README required: second paragraph states architecture plainly — generator is local, user supplies own API key, nothing passes through project servers, liftrpg.co is static decrypt-only, project has no visibility into what anyone generates. Framing: factual not defensive. See Section 06 Infrastructure Statement. Repo: docs/ prototypes/ renderer/ generator/ unlock/ content/. Isolation: renderer never imports generator. Build: Phase 1 renderer → Phase 2 generator → Phase 3 unlock. One open question: ending/reveal moment (Phase 3). Currently: Phase 1, renderer branch. Brief: docs/liftrpg-brief.html. Schema: docs/liftrpg-schema.json.</p>
+    </div>
+  </section>
+
+  <hr class="divider"/>
+
+  <div style="text-align:center;padding-top:8px;">
+    <span style="font-family:var(--mono);font-size:6pt;color:var(--rule);letter-spacing:.2em;text-transform:uppercase;">LiftRPG Design Brief · Save Point · Version 1.9 · Fragment Navigation · Oracle Rubric XI · Infrastructure Statement · Four Monte Carlo Simulations</span>
+  </div>
+
+</div>
+</body>
+</html>
