@@ -27,6 +27,10 @@
     main{
       max-width:460px;
       width:100%;
+      transition:max-width .5s cubic-bezier(.4,0,.2,1);
+    }
+    main.is-expanded{
+      max-width:680px;
     }
 
     /* ── 3D flip scene ─────────────── */
@@ -64,7 +68,7 @@
     /* ── Card base ─────────────────── */
     .card{
       background:var(--paper);
-      padding:48px 52px;
+      padding:32px 42px;
       width:100%;
       box-shadow:0 8px 40px rgba(0,0,0,.6);
     }
@@ -73,32 +77,32 @@
       letter-spacing:.3em;
       text-transform:uppercase;
       color:var(--accent);
-      margin-bottom:10px;
+      margin-bottom:6px;
     }
     h1{
       font-family:var(--display);
       font-style:italic;
-      font-size:34pt;
+      font-size:27pt;
       line-height:1.05;
       color:var(--ink);
-      margin-bottom:14px;
+      margin-bottom:8px;
     }
     .rule{
       width:40px;
       height:2px;
       background:var(--accent);
-      margin-bottom:20px;
+      margin-bottom:12px;
     }
     p{
-      font-size:9pt;
-      line-height:1.7;
+      font-size:8.5pt;
+      line-height:1.65;
       color:var(--muted);
-      margin-bottom:28px;
+      margin-bottom:14px;
     }
     nav{
       display:flex;
       flex-direction:column;
-      gap:8px;
+      gap:5px;
     }
     nav a{
       display:block;
@@ -108,7 +112,7 @@
       text-transform:uppercase;
       color:var(--ink);
       text-decoration:none;
-      padding:14px 16px;
+      padding:9px 14px;
       border:1.5px solid var(--ink);
       transition:background .12s,color .12s;
     }
@@ -122,7 +126,7 @@
       text-transform:none;
       color:var(--muted);
       display:block;
-      margin-top:4px;
+      margin-top:2px;
     }
     nav a:hover .link-sub{
       color:var(--rule);
@@ -132,8 +136,8 @@
       letter-spacing:.3em;
       text-transform:uppercase;
       color:var(--accent);
-      margin-top:28px;
-      margin-bottom:10px;
+      margin-top:16px;
+      margin-bottom:5px;
     }
     .downloads a{
       border-style:dashed;
@@ -151,9 +155,9 @@
       color:var(--paper);
       background:var(--ink);
       border:1.5px solid var(--ink);
-      padding:14px 16px;
+      padding:9px 14px;
       cursor:pointer;
-      margin-top:12px;
+      margin-top:10px;
       transition:background .15s,border-color .15s;
     }
     .flip-trigger:hover{
@@ -179,9 +183,9 @@
       color:var(--ink);
       background:none;
       border:1.5px solid var(--ink);
-      padding:14px 16px;
+      padding:9px 14px;
       cursor:pointer;
-      margin-top:20px;
+      margin-top:14px;
       transition:background .12s,color .12s;
     }
     .flip-return:hover{
@@ -191,9 +195,9 @@
 
     /* ── Details / How it Works ─────── */
     details{
-      margin-top:28px;
+      margin-top:16px;
       border-top:1px solid var(--rule);
-      padding-top:20px;
+      padding-top:10px;
     }
     summary{
       font-size:7pt;
@@ -228,9 +232,9 @@
       color:var(--ink);
     }
     footer{
-      margin-top:28px;
+      margin-top:16px;
       border-top:1px solid var(--rule);
-      padding-top:16px;
+      padding-top:8px;
       font-size:6pt;
       letter-spacing:.04em;
       color:var(--muted);
@@ -245,6 +249,9 @@
     }
 
     /* ── Back face preview ─────────── */
+    .card-back{
+      padding:24px 28px;
+    }
     .preview img{
       width:100%;
       display:block;
@@ -259,8 +266,8 @@
 
     /* ── Responsive ────────────────── */
     @media (max-width:520px){
-      .card{ padding:32px 28px; }
-      h1{ font-size:26pt; }
+      .card{ padding:24px 20px; }
+      h1{ font-size:22pt; }
     }
   </style>
 </head>
@@ -341,6 +348,7 @@
   <script>
   (function(){
     var flipper = document.getElementById('card-flip');
+    var main = document.querySelector('main');
     var front = flipper.querySelector('.card-front');
     var back = flipper.querySelector('.card-back');
     var details = front.querySelector('details');
@@ -355,7 +363,10 @@
       btn.addEventListener('click', function(){
         flipped = !flipped;
         flipper.classList.toggle('is-flipped', flipped);
+        main.classList.toggle('is-expanded', flipped);
         measure();
+        // Re-measure after width transition settles
+        setTimeout(measure, 520);
       });
     });
 
