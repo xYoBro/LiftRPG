@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LiftRPG</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,700&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    :root{
+      --ink:#181714;
+      --paper:#f1ebe0;
+      --accent:#8b2a2a;
+      --muted:#857d72;
+      --rule:#ccc5b6;
+      --mono:'Share Tech Mono',monospace;
+      --display:'Playfair Display',Georgia,serif;
+    }
+    body{
+      background:#1e1b17;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-family:var(--mono);
+      padding:20px;
+    }
+    .card{
+      background:var(--paper);
+      padding:48px 52px;
+      max-width:460px;
+      width:100%;
+    }
+    .kicker{
+      font-size:7pt;
+      letter-spacing:.3em;
+      text-transform:uppercase;
+      color:var(--accent);
+      margin-bottom:10px;
+    }
+    h1{
+      font-family:var(--display);
+      font-style:italic;
+      font-size:34pt;
+      line-height:1.05;
+      color:var(--ink);
+      margin-bottom:14px;
+    }
+    .rule{
+      width:40px;
+      height:2px;
+      background:var(--accent);
+      margin-bottom:20px;
+    }
+    p{
+      font-size:9pt;
+      line-height:1.7;
+      color:var(--muted);
+      margin-bottom:28px;
+    }
+    nav{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    a{
+      display:block;
+      font-family:var(--mono);
+      font-size:8pt;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+      color:var(--ink);
+      text-decoration:none;
+      padding:14px 16px;
+      border:1.5px solid var(--ink);
+      transition:background .12s,color .12s;
+    }
+    a:hover{
+      background:var(--ink);
+      color:var(--paper);
+    }
+    .link-sub{
+      font-size:6pt;
+      letter-spacing:.04em;
+      text-transform:none;
+      color:var(--muted);
+      display:block;
+      margin-top:4px;
+    }
+    a:hover .link-sub{
+      color:var(--rule);
+    }
+    @media (max-width:520px){
+      .card{ padding:32px 28px; }
+      h1{ font-size:26pt; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="kicker">Print &amp; Play</div>
+    <h1>LiftRPG</h1>
+    <div class="rule"></div>
+    <p>A workout journal fused with a branching narrative TTRPG. Six weeks of real training. One encrypted ending. Written in pencil.</p>
+    <nav>
+      <a href="renderer/">
+        Renderer
+        <span class="link-sub">Upload your JSON &rarr; printable booklet</span>
+      </a>
+      <a href="unlock/">
+        Unlock
+        <span class="link-sub">Enter your assembled password &rarr; discover the ending</span>
+      </a>
+    </nav>
+  </div>
+</body>
+</html>
