@@ -143,6 +143,33 @@
       border-style:dashed;
     }
 
+    /* ── Workflow generator button ──── */
+    .workflow-btn{
+      display:block;
+      width:100%;
+      font-family:var(--mono);
+      font-size:8pt;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+      text-align:left;
+      color:var(--ink);
+      background:none;
+      border:1.5px solid var(--ink);
+      padding:9px 14px;
+      cursor:pointer;
+      transition:background .12s,color .12s;
+    }
+    .workflow-btn:hover{
+      background:var(--ink);
+      color:var(--paper);
+    }
+    .workflow-btn:hover .link-sub{
+      color:var(--rule);
+    }
+    .workflow{
+      margin-top:16px;
+    }
+
     /* ── Flip trigger (front — inverted to stand out) ── */
     .flip-trigger{
       display:block;
@@ -222,6 +249,9 @@
     .how-content ol li{
       padding-left:4px;
     }
+    .how-content strong{
+      color:var(--ink);
+    }
     .how-content a{
       color:var(--accent);
       text-decoration:underline;
@@ -292,29 +322,20 @@
             <div class="how-content">
               <ol>
                 <li>Write a workout program in <a href="https://www.liftosaur.com/" target="_blank" rel="noopener">Liftosaur</a> or plain text</li>
-                <li>Feed the template JSON + your program into any LLM (Claude, ChatGPT, Gemini)</li>
-                <li>Upload the generated JSON to the <a href="renderer/">Renderer</a></li>
-                <li>Print as a saddle-stitch booklet (half-letter, double-sided)</li>
+                <li>Use the <strong>Prompt Generator</strong> to build your LLM prompt</li>
+                <li>Paste the prompt into any LLM (Claude, ChatGPT, Gemini)</li>
+                <li>Upload the JSON to the <a href="renderer/">Renderer</a> &mdash; print as a booklet</li>
                 <li>Train the program, pencil in hand</li>
                 <li>Assemble the password. <a href="unlock/">Unlock</a> the ending.</li>
               </ol>
             </div>
           </details>
 
-          <div class="section-label">Example</div>
-          <nav class="downloads">
-            <a href="liftrpg-eastern-shore.json" download="liftrpg-eastern-shore.json">
-              The Drowning Season
-              <span class="link-sub">Complete 6-week example &mdash; download JSON</span>
-            </a>
-            <a href="liftrpg-template.json" download="liftrpg-template.json">
-              Blank Template
-              <span class="link-sub">Empty schema &mdash; start your own</span>
-            </a>
-          </nav>
-
-          <div class="section-label">Tools</div>
-          <nav>
+          <nav class="workflow">
+            <button class="workflow-btn" id="open-generator" type="button">
+              Generate a Prompt
+              <span class="link-sub">Build an LLM prompt from your workout + story idea</span>
+            </button>
             <a href="renderer/">
               Renderer
               <span class="link-sub">Upload your JSON &rarr; printable booklet</span>
@@ -322,6 +343,14 @@
             <a href="unlock/">
               Unlock
               <span class="link-sub">Enter your assembled password &rarr; discover the ending</span>
+            </a>
+          </nav>
+
+          <div class="section-label">Example</div>
+          <nav class="downloads">
+            <a href="liftrpg-eastern-shore.json" download="liftrpg-eastern-shore.json">
+              The Drowning Season
+              <span class="link-sub">Complete example &mdash; download JSON</span>
             </a>
           </nav>
 
