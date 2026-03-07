@@ -82,7 +82,7 @@
       endingsFallbackTitle: l.endingsFallbackTitle || 'The Journey Is Complete',
       endingsFallbackBody: l.endingsFallbackBody ||
         'You have completed the program. Assemble your password components ' +
-        'and enter the password in the toolbar to discover what awaits.',
+        'and return to liftrpg.co \u2192 Render to discover what awaits.',
     };
   }
 
@@ -167,7 +167,7 @@
 
     var subtitle = data.rulesSpread.rightPage && data.rulesSpread.rightPage.instruction
       ? data.rulesSpread.rightPage.instruction
-      : 'Record each week\'s component below. When all positions are filled, enter your password in the toolbar to unlock the ending.';
+      : 'Record each week\'s component below. When all positions are filled, return to liftrpg.co \u2192 Render to unlock the ending.';
     inner.appendChild(txt('div', 'password-log-subtitle', subtitle));
 
     // One row per week
@@ -818,9 +818,12 @@
     }
     final_.appendChild(finalRow);
 
-    // Unlock instruction
-    final_.appendChild(txt('div', 'password-unlock-instruction',
-      'When all positions are filled, enter your password in the toolbar above to unlock the ending.'));
+    // Unlock instruction (must make sense on printed paper, not just on screen)
+    var instrDiv = el('div', 'password-unlock-instruction');
+    instrDiv.appendChild(txt('span', '', 'When all positions are filled, return to '));
+    instrDiv.appendChild(txt('strong', '', 'liftrpg.co \u2192 Render'));
+    instrDiv.appendChild(txt('span', '', '. Upload your JSON and enter this password to unlock the final page.'));
+    final_.appendChild(instrDiv);
 
     inner.appendChild(final_);
 
@@ -840,8 +843,11 @@
       inner.classList.add('endings-locked');
       inner.appendChild(txt('div', 'endings-locked-icon', '\uD83D\uDD12'));
       inner.appendChild(txt('h2', 'endings-title', 'This Document Is Sealed'));
-      inner.appendChild(txt('div', 'endings-locked-msg',
-        'Assemble your password from the weekly gauge readings, then enter it in the toolbar to unlock the final correspondence.'));
+      var lockMsg = el('div', 'endings-locked-msg');
+      lockMsg.appendChild(txt('span', '', 'Assemble your password from the weekly gauge readings. Return to '));
+      lockMsg.appendChild(txt('strong', '', 'liftrpg.co \u2192 Render'));
+      lockMsg.appendChild(txt('span', '', ' and enter it to unlock this page.'));
+      inner.appendChild(lockMsg);
     } else if (data.endings && data.endings.length && data.endings[0].content) {
       // Plaintext fallback (development/debug)
       var ending = data.endings[0].content;
