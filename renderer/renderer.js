@@ -530,40 +530,52 @@
 
       var entries = el('div', 'oracle-entries');
       if (oracle.entries) {
-        // Group by cluster — show one representative entry per cluster range
-        var clusters = {};
-        oracle.entries.forEach(function (entry, oracleIdx) {
-          var c;
-          if (entry.cluster != null) {
-            c = entry.cluster;
-          } else {
-            var parsed = parseInt(entry.roll, 10);
-            // Fallback to entry index if roll is non-numeric (prevents NaN cluster key)
-            c = isNaN(parsed) ? oracleIdx : Math.floor(parsed / 10);
-          }
-          if (!clusters[c]) clusters[c] = [];
-          clusters[c].push(entry);
-        });
+        if (oracle.mode === 'simple') {
+          // 2d6 mode — show every entry individually (rolls 2-12)
+          oracle.entries.forEach(function (entry) {
+            var entryEl = el('div', 'oracle-entry oracle-case');
+            entryEl.appendChild(txt('span', 'oracle-case-num', entry.roll));
+            entryEl.appendChild(txt('span', 'oracle-text', entry.text));
+            if (entry.fragmentRef) {
+              entryEl.appendChild(txt('span', 'frag-ref', '\u2192 ' + entry.fragmentRef));
+            }
+            entries.appendChild(entryEl);
+          });
+        } else {
+          // d100/full mode — group by cluster into decade ranges
+          var clusters = {};
+          oracle.entries.forEach(function (entry, oracleIdx) {
+            var c;
+            if (entry.cluster != null) {
+              c = entry.cluster;
+            } else {
+              var parsed = parseInt(entry.roll, 10);
+              c = isNaN(parsed) ? oracleIdx : Math.floor(parsed / 10);
+            }
+            if (!clusters[c]) clusters[c] = [];
+            clusters[c].push(entry);
+          });
 
-        var clusterKeys = Object.keys(clusters).sort(function (a, b) { return a - b; });
-        clusterKeys.forEach(function (key) {
-          var group = clusters[key];
-          var first = group[0];
-          var last = group[group.length - 1];
-          var entryEl = el('div', 'oracle-entry oracle-case');
+          var clusterKeys = Object.keys(clusters).sort(function (a, b) { return a - b; });
+          clusterKeys.forEach(function (key) {
+            var group = clusters[key];
+            var first = group[0];
+            var last = group[group.length - 1];
+            var entryEl = el('div', 'oracle-entry oracle-case');
 
-          var rangeStr = 'Case ' + first.roll + '\u2013' + last.roll;
-          entryEl.appendChild(txt('span', 'oracle-case-num', rangeStr));
+            var rangeStr = group.length > 1
+              ? first.roll + '\u2013' + last.roll
+              : first.roll;
+            entryEl.appendChild(txt('span', 'oracle-case-num', rangeStr));
+            entryEl.appendChild(txt('span', 'oracle-text', first.text));
 
-          // Use first entry's text as representative
-          entryEl.appendChild(txt('span', 'oracle-text', first.text));
+            if (first.fragmentRef) {
+              entryEl.appendChild(txt('span', 'frag-ref', '\u2192 ' + first.fragmentRef));
+            }
 
-          if (first.fragmentRef) {
-            entryEl.appendChild(txt('span', 'frag-ref', '\u2192 ' + first.fragmentRef));
-          }
-
-          entries.appendChild(entryEl);
-        });
+            entries.appendChild(entryEl);
+          });
+        }
       }
       oracleZone.appendChild(entries);
     }
