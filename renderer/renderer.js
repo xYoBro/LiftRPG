@@ -82,7 +82,7 @@
       endingsFallbackTitle: l.endingsFallbackTitle || 'The Journey Is Complete',
       endingsFallbackBody: l.endingsFallbackBody ||
         'You have completed the program. Assemble your password components ' +
-        'and visit the unlock page to discover what awaits.',
+        'and enter the password in the toolbar to discover what awaits.',
     };
   }
 
@@ -167,7 +167,7 @@
 
     var subtitle = data.rulesSpread.rightPage && data.rulesSpread.rightPage.instruction
       ? data.rulesSpread.rightPage.instruction
-      : 'Record each week\'s component below. When all positions are filled, assemble the complete password and visit the unlock URL.';
+      : 'Record each week\'s component below. When all positions are filled, enter your password in the toolbar to unlock the ending.';
     inner.appendChild(txt('div', 'password-log-subtitle', subtitle));
 
     // One row per week
@@ -820,11 +820,7 @@
 
     // Unlock instruction
     final_.appendChild(txt('div', 'password-unlock-instruction',
-      'When all positions are filled, visit the unlock page to discover what the survey found.'));
-    var urlText = data.rulesSpread.rightPage && data.rulesSpread.rightPage.unlockUrl
-      ? data.rulesSpread.rightPage.unlockUrl
-      : 'liftrpg.co/unlock';
-    final_.appendChild(txt('span', 'password-unlock-url', urlText));
+      'When all positions are filled, enter your password in the toolbar above to unlock the ending.'));
 
     inner.appendChild(final_);
 
@@ -835,10 +831,19 @@
   // ═══ ENDINGS PAGE ═══
   function renderEndingsPage(data, labels) {
     var p = page('endings');
+    p.setAttribute('id', 'endings-page');
     var inner = el('div', 'endings-page');
 
-    // Use actual ending data from JSON if available
-    if (data.endings && data.endings.length && data.endings[0].content) {
+    // If there's an encrypted ending, show locked state
+    if (data.meta && data.meta.passwordEncryptedEnding &&
+        data.meta.passwordEncryptedEnding !== 'PLACEHOLDER_ENCRYPTED_BLOB_REPLACE_AT_GENERATION_TIME') {
+      inner.classList.add('endings-locked');
+      inner.appendChild(txt('div', 'endings-locked-icon', '\uD83D\uDD12'));
+      inner.appendChild(txt('h2', 'endings-title', 'This Document Is Sealed'));
+      inner.appendChild(txt('div', 'endings-locked-msg',
+        'Assemble your password from the weekly gauge readings, then enter it in the toolbar to unlock the final correspondence.'));
+    } else if (data.endings && data.endings.length && data.endings[0].content) {
+      // Plaintext fallback (development/debug)
       var ending = data.endings[0].content;
       if (ending.body) {
         var bodyDiv = el('div', 'endings-body');
@@ -851,15 +856,9 @@
         inner.appendChild(txt('div', 'endings-final-line', ending.finalLine));
       }
     } else {
-      // Fallback — generic text from labels (overridable via data.meta.labels)
       inner.appendChild(txt('h2', 'endings-title', labels.endingsFallbackTitle));
       inner.appendChild(txt('div', 'endings-body', labels.endingsFallbackBody));
     }
-
-    var urlText = data.rulesSpread.rightPage && data.rulesSpread.rightPage.unlockUrl
-      ? data.rulesSpread.rightPage.unlockUrl
-      : 'liftrpg.co/unlock';
-    inner.appendChild(txt('div', 'endings-url', urlText));
 
     p.appendChild(inner);
     return p;
@@ -1105,6 +1104,12 @@
       status.textContent = 'Rendered ' + pages.length + ' pages (' +
         (jsonData.weeks ? jsonData.weeks.length : 0) + ' weeks, ' +
         (jsonData.fragments ? jsonData.fragments.length : 0) + ' fragments) in ' + mode + ' mode';
+
+      // Show unlock row if encrypted ending exists
+      if (jsonData.meta && jsonData.meta.passwordEncryptedEnding &&
+          jsonData.meta.passwordEncryptedEnding !== 'PLACEHOLDER_ENCRYPTED_BLOB_REPLACE_AT_GENERATION_TIME') {
+        showUnlockRow();
+      }
     } catch (err) {
       status.textContent = 'Render error: ' + err.message;
       console.error(err);
@@ -1119,6 +1124,138 @@
 
   if (layoutSelect) {
     layoutSelect.addEventListener('change', doRender);
+  }
+
+  // ── CRYPTO (AES-256-GCM, matches unlock/index.html) ─────────────
+  var CRYPTO_SALT_BYTES = 32;
+  var CRYPTO_IV_BYTES = 12;
+  var CRYPTO_ITER = 200000;
+
+  function normalisePassword(raw) {
+    return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
+
+  function deriveKey(password, salt) {
+    var enc = new TextEncoder();
+    return crypto.subtle.importKey(
+      'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
+    ).then(function (keyMat) {
+      return crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt: salt, iterations: CRYPTO_ITER, hash: 'SHA-256' },
+        keyMat,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['decrypt']
+      );
+    });
+  }
+
+  function decryptBlob(blobBase64url, password) {
+    var b64 = blobBase64url.replace(/-/g, '+').replace(/_/g, '/');
+    var bin = atob(b64);
+    var buf = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+
+    var salt = buf.slice(0, CRYPTO_SALT_BYTES);
+    var iv = buf.slice(CRYPTO_SALT_BYTES, CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES);
+    var ciphertext = buf.slice(CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES);
+
+    return deriveKey(password, salt).then(function (key) {
+      return crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, ciphertext);
+    }).then(function (plainBuf) {
+      return new TextDecoder().decode(plainBuf);
+    });
+  }
+
+  // ── UNLOCK TOOLBAR LOGIC ─────────────────────────────────────────
+  function showUnlockRow() {
+    var row = document.getElementById('unlock-row');
+    if (row) row.style.display = '';
+  }
+
+  function hideUnlockRow() {
+    var row = document.getElementById('unlock-row');
+    if (row) row.style.display = 'none';
+  }
+
+  function attemptUnlock() {
+    var passwordEl = document.getElementById('unlock-password');
+    var statusEl = document.getElementById('unlock-status');
+    var btn = document.getElementById('unlock-btn');
+    var raw = passwordEl.value;
+    var password = normalisePassword(raw);
+
+    if (!password) {
+      statusEl.textContent = 'Enter your password';
+      passwordEl.classList.add('shake');
+      setTimeout(function () { passwordEl.classList.remove('shake'); }, 500);
+      return;
+    }
+
+    if (!jsonData || !jsonData.meta || !jsonData.meta.passwordEncryptedEnding) {
+      statusEl.textContent = 'No encrypted ending in this JSON';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Working\u2026';
+    statusEl.textContent = '';
+
+    decryptBlob(jsonData.meta.passwordEncryptedEnding, password)
+      .then(function (plaintext) {
+        var payload;
+        try {
+          payload = JSON.parse(plaintext);
+        } catch (e) {
+          payload = { kicker: 'Final page', title: 'The ending', content: plaintext };
+        }
+
+        // Replace the endings page content
+        var endingsPage = document.getElementById('endings-page');
+        if (endingsPage) {
+          var inner = endingsPage.querySelector('.endings-page');
+          if (inner) {
+            inner.classList.remove('endings-locked');
+            inner.innerHTML = '';
+
+            // Render the decrypted ending as booklet content
+            var bodyDiv = document.createElement('div');
+            bodyDiv.className = 'endings-body endings-unlocked';
+            bodyDiv.innerHTML = payload.content;
+            inner.appendChild(bodyDiv);
+          }
+        }
+
+        // Update toolbar state
+        btn.textContent = '\u2713 Unlocked';
+        btn.disabled = true;
+        btn.classList.add('unlocked');
+        passwordEl.disabled = true;
+        passwordEl.value = password;
+        statusEl.textContent = '';
+        var icon = document.querySelector('.unlock-icon');
+        if (icon) icon.textContent = '\uD83D\uDD13';
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = 'Unlock';
+        passwordEl.classList.add('shake');
+        setTimeout(function () { passwordEl.classList.remove('shake'); }, 500);
+        statusEl.textContent = 'Wrong password';
+        console.error('Decrypt failed:', err);
+      });
+  }
+
+  // Wire up unlock button and Enter key
+  var unlockBtn = document.getElementById('unlock-btn');
+  var unlockInput = document.getElementById('unlock-password');
+  if (unlockBtn) {
+    unlockBtn.addEventListener('click', attemptUnlock);
+  }
+  if (unlockInput) {
+    unlockInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') attemptUnlock();
+    });
   }
 
   // Expose for debugging

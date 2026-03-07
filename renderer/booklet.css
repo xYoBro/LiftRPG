@@ -40,8 +40,9 @@ body {
   border-bottom: 1px solid #444;
   padding: 12px 24px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 20px;
+  gap: 12px 20px;
   position: sticky;
   top: 0;
   z-index: 1000;
@@ -1701,6 +1702,151 @@ body {
   font-size: 5.5pt;
   color: var(--muted);
   letter-spacing: .06em;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   UNLOCK TOOLBAR
+   ══════════════════════════════════════════════════════════════ */
+.app-unlock {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+
+.unlock-icon {
+  font-size: 12pt;
+  line-height: 1;
+}
+
+#unlock-password {
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 10pt;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-align: center;
+  outline: none;
+}
+
+#unlock-password:focus {
+  border-color: var(--accent);
+}
+
+#unlock-password::placeholder {
+  text-transform: none;
+  letter-spacing: 0.05em;
+  font-size: 8pt;
+  color: var(--muted);
+}
+
+#unlock-btn {
+  padding: 6px 16px;
+  background: var(--accent);
+  border: none;
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 7.5pt;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#unlock-btn:hover {
+  background: #a33333;
+}
+
+#unlock-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#unlock-btn.unlocked {
+  background: #2a6b3a;
+  opacity: 1;
+}
+
+.unlock-status {
+  font-family: var(--mono);
+  font-size: 7pt;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+
+.shake {
+  animation: shake 0.4s ease;
+}
+
+/* Locked endings page */
+.endings-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding: 60px 40px;
+}
+
+.endings-locked-icon {
+  font-size: 36pt;
+  margin-bottom: 20px;
+  opacity: 0.6;
+}
+
+.endings-locked .endings-title {
+  font-family: var(--mono);
+  font-size: 9pt;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+
+.endings-locked-msg {
+  font-family: var(--serif);
+  font-size: 8.5pt;
+  font-style: italic;
+  line-height: 1.6;
+  color: var(--muted);
+  max-width: 300px;
+}
+
+/* Unlocked endings */
+.endings-unlocked {
+  padding: 20px 0;
+}
+
+.endings-unlocked p {
+  margin-bottom: 12px;
+  font-family: var(--serif);
+  font-size: 8pt;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.endings-unlocked .final-line {
+  margin-top: 20px;
+  font-size: 9pt;
+  font-style: italic;
+  color: var(--accent);
 }
 
 /* ══════════════════════════════════════════════════════════════
