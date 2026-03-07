@@ -493,6 +493,7 @@ body {
   flex-direction: column;
   min-height: 0;
   flex: 1;
+  overflow: hidden;
 }
 
 .session-header {
@@ -519,6 +520,7 @@ body {
   margin-bottom: 5px;
   min-height: 0;
   flex-shrink: 1;
+  overflow: hidden;
 }
 
 /* Fragment Reference (shared class) */
