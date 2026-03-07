@@ -222,7 +222,7 @@ body{
 }
 .map-grid-wrap{
   border:1px solid var(--rule);padding:8px;
-  margin-bottom:4px;
+  margin-bottom:4px;max-height:1.6in;overflow:hidden;
 }
 .map-grid{
   display:grid;gap:2px;width:100%;
@@ -347,7 +347,7 @@ body{
   margin-bottom:1px;display:block;line-height:1.4;
 }
 .oracle-entries{
-  flex:1;min-height:0;
+  flex:1;min-height:0;overflow-y:hidden;
   display:grid;grid-template-columns:1fr 1fr;column-gap:10px;
   align-content:start;
 }
@@ -368,7 +368,7 @@ body{
   white-space:nowrap;
 }
 .oracle-text{
-  font-family:var(--serif);font-size:7pt;color:var(--ink);
+  font-family:var(--mono) !important;font-size:5.5pt !important;color:var(--ink);
   line-height:1.3;
 }
 
