@@ -1702,6 +1702,34 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   DEMO MODE (embedded preview, no toolbar)
+   ══════════════════════════════════════════════════════════════ */
+body.demo-mode {
+  background: #1e1b17;
+  overflow-x: hidden;
+}
+
+body.demo-mode #booklet-container {
+  padding: 20px 0;
+  gap: 24px;
+}
+
+body.demo-mode .print-spread {
+  zoom: calc((100vw - 24px) / 11in);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, .6);
+}
+
+body.demo-mode .demo-error {
+  font-family: var(--mono);
+  font-size: 10pt;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+  padding: 60px 20px;
+}
+
+/* ══════════════════════════════════════════════════════════════
    PRINT MEDIA QUERIES
    ══════════════════════════════════════════════════════════════ */
 @page {

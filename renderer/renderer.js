@@ -1004,6 +1004,47 @@
   // ── APP INITIALIZATION ─────────────────────────────────────
 
   var jsonData = null;
+
+  // ── DEMO MODE ──────────────────────────────────────────────
+  var demoParam = new URLSearchParams(window.location.search).get('demo');
+  if (demoParam) {
+    var chrome = document.querySelector('.app-chrome');
+    if (chrome) chrome.style.display = 'none';
+    document.body.classList.add('demo-mode');
+
+    fetch('../' + encodeURIComponent(demoParam) + '.json')
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        var pages = render(data);
+        var container = document.getElementById('booklet-container');
+        container.innerHTML = '';
+        container.classList.add('spread-view');
+
+        for (var s = 0; s < pages.length; s += 2) {
+          var wrap = document.createElement('div');
+          wrap.className = 'print-spread';
+          wrap.appendChild(pages[s]);
+          if (pages[s + 1]) wrap.appendChild(pages[s + 1]);
+          container.appendChild(wrap);
+        }
+      })
+      .catch(function (err) {
+        var container = document.getElementById('booklet-container');
+        container.innerHTML = '';
+        var msg = document.createElement('div');
+        msg.className = 'demo-error';
+        msg.textContent = 'Preview unavailable';
+        container.appendChild(msg);
+        console.error('Demo load failed:', err);
+      });
+
+    return; // Skip normal app initialization
+  }
+  // ── END DEMO MODE ──────────────────────────────────────────
+
   var fileInput = document.getElementById('json-input');
   var renderBtn = document.getElementById('render-btn');
   var printBtn = document.getElementById('print-btn');
