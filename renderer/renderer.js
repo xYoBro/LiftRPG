@@ -1021,14 +1021,9 @@
         var pages = render(data);
         var container = document.getElementById('booklet-container');
         container.innerHTML = '';
-        container.classList.add('spread-view');
 
-        for (var s = 0; s < pages.length; s += 2) {
-          var wrap = document.createElement('div');
-          wrap.className = 'print-spread';
-          wrap.appendChild(pages[s]);
-          if (pages[s + 1]) wrap.appendChild(pages[s + 1]);
-          container.appendChild(wrap);
+        for (var i = 0; i < pages.length; i++) {
+          container.appendChild(pages[i]);
         }
       })
       .catch(function (err) {

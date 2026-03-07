@@ -1712,12 +1712,15 @@ body.demo-mode {
 }
 
 body.demo-mode #booklet-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   padding: 20px 0;
   gap: 24px;
 }
 
-body.demo-mode .print-spread {
-  zoom: calc((100vw - 24px) / 11in);
+body.demo-mode .booklet-page {
+  zoom: calc((100vw - 24px) / 5.5in);
   box-shadow: 0 2px 16px rgba(0, 0, 0, .6);
 }
 
