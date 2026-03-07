@@ -3,7 +3,7 @@
    Reads schema v1.3 JSON → produces printable DOM pages.
    Browser-native JS. No build step.
    ══════════════════════════════════════════════════════════════ */
-(function() {
+(function () {
   'use strict';
 
   // ── UTILITIES ──────────────────────────────────────────────
@@ -29,7 +29,7 @@
     } else if (content && content.nodeType) {
       e.appendChild(content);
     } else if (Array.isArray(content)) {
-      content.forEach(function(c) {
+      content.forEach(function (c) {
         if (c && c.nodeType) e.appendChild(c);
         else if (typeof c === 'string') e.innerHTML += c;
       });
@@ -63,7 +63,7 @@
   /** Parse multiline cipher text into structured sections */
   function parseCipherDisplay(displayText) {
     if (!displayText) return { lines: [] };
-    return { lines: displayText.split('\n').filter(function(l) { return l.trim(); }) };
+    return { lines: displayText.split('\n').filter(function (l) { return l.trim(); }) };
   }
 
   // ── LABELS ──────────────────────────────────────────────────
@@ -74,13 +74,13 @@
     var m = (data && data.meta) || {};
     var l = m.labels || {};
     return {
-      blockTitle:            m.blockTitle                 || 'Field Journal',
-      fieldOpsHeader:        l.fieldOpsHeader             || 'Field Operations',
-      finalSurveyHeader:     l.finalSurveyHeader          || 'Final Week',
-      bossFallbackNarrative: l.bossFallbackNarrative      || 'The final challenge awaits.',
-      passwordAssemblyTitle: l.passwordAssemblyTitle      || 'Password Record \u2014 Final Assembly',
-      endingsFallbackTitle:  l.endingsFallbackTitle       || 'The Journey Is Complete',
-      endingsFallbackBody:   l.endingsFallbackBody        ||
+      blockTitle: m.blockTitle || 'Field Journal',
+      fieldOpsHeader: l.fieldOpsHeader || 'Field Operations',
+      finalSurveyHeader: l.finalSurveyHeader || 'Final Week',
+      bossFallbackNarrative: l.bossFallbackNarrative || 'The final challenge awaits.',
+      passwordAssemblyTitle: l.passwordAssemblyTitle || 'Password Record \u2014 Final Assembly',
+      endingsFallbackTitle: l.endingsFallbackTitle || 'The Journey Is Complete',
+      endingsFallbackBody: l.endingsFallbackBody ||
         'You have completed the program. Assemble your password components ' +
         'and visit the unlock page to discover what awaits.',
     };
@@ -104,7 +104,7 @@
 
     var colophon = el('div', 'cover-colophon');
     if (data.cover.colophonLines && data.cover.colophonLines.length) {
-      data.cover.colophonLines.forEach(function(line) {
+      data.cover.colophonLines.forEach(function (line) {
         colophon.appendChild(txt('div', '', line));
       });
     }
@@ -122,7 +122,7 @@
     // Header
     var header = el('div', 'rules-header');
     header.appendChild(txt('span', '', data.meta.blockTitle));
-    header.appendChild(txt('span', 'page-num', 'p.02'));
+    header.appendChild(txt('span', 'page-num', ''));
     inner.appendChild(header);
 
     // Title
@@ -133,19 +133,19 @@
     // Body content
     var body = el('div', 'rules-body');
     if (data.rulesSpread.leftPage.sections) {
-      data.rulesSpread.leftPage.sections.forEach(function(section) {
+      data.rulesSpread.leftPage.sections.forEach(function (section) {
         if (section.heading) {
           body.appendChild(txt('h3', '', section.heading));
         }
         var sectionBody = section.text || section.body || '';
         if (sectionBody) {
-          sectionBody.split('\n').forEach(function(para) {
+          sectionBody.split('\n').forEach(function (para) {
             if (para.trim()) body.appendChild(txt('p', '', para.trim()));
           });
         }
       });
     } else if (data.rulesSpread.leftPage.body) {
-      data.rulesSpread.leftPage.body.split('\n').forEach(function(para) {
+      data.rulesSpread.leftPage.body.split('\n').forEach(function (para) {
         if (para.trim()) body.appendChild(txt('p', '', para.trim()));
       });
     }
@@ -212,8 +212,7 @@
     // Page header
     var hdr = el('div', 'page-header');
     hdr.appendChild(txt('span', '', labels.blockTitle));
-    var pageNum = 2 + (weekNum * 2);
-    hdr.appendChild(txt('span', 'page-num', 'p.' + (pageNum < 10 ? '0' + pageNum : pageNum)));
+    hdr.appendChild(txt('span', 'page-num', ''));
     inner.appendChild(hdr);
 
     // Overflow continuation note
@@ -244,8 +243,8 @@
 
     // Session cards
     var cardsContainer = el('div', 'session-cards');
-    sessions.forEach(function(session) {
-      var maxExercises = Math.max.apply(null, sessions.map(function(s) { return s.exercises.length; }));
+    sessions.forEach(function (session) {
+      var maxExercises = Math.max.apply(null, sessions.map(function (s) { return s.exercises.length; }));
       var density = cardDensity(maxExercises);
       var card = el('div', 'session-card' + (density ? ' ' + density : ''));
 
@@ -283,7 +282,7 @@
       // Exercise table
       var table = document.createElement('table');
       table.className = 'exercise-table';
-      session.exercises.forEach(function(ex) {
+      session.exercises.forEach(function (ex) {
         var tr = document.createElement('tr');
 
         // Name
@@ -298,33 +297,62 @@
         tdDots.style.width = '100%';
         tr.appendChild(tdDots);
 
+        // Weight
+        if (ex.weightField) {
+          var tdWeightLine = document.createElement('td');
+          tdWeightLine.style.verticalAlign = 'bottom';
+
+          var faintText = typeof ex.weightField === 'string' ? ex.weightField : null;
+          if (!faintText && ex.notes) {
+            faintText = ex.notes;
+          }
+
+          var wLine = document.createElement('div');
+          wLine.className = 'weight-line';
+          if (faintText) wLine.textContent = faintText;
+          else wLine.innerHTML = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
+          tdWeightLine.appendChild(wLine);
+          tr.appendChild(tdWeightLine);
+
+          var tdWeightLabel = document.createElement('td');
+          tdWeightLabel.style.verticalAlign = 'bottom';
+          var wLabel = document.createElement('div');
+          wLabel.className = 'weight-label';
+          wLabel.innerHTML = 'lbs &times;';
+          tdWeightLabel.appendChild(wLabel);
+          tr.appendChild(tdWeightLabel);
+        }
+
         // Rep boxes
         var tdReps = document.createElement('td');
+        tdReps.style.verticalAlign = 'bottom';
         var repsDiv = document.createElement('div');
         repsDiv.className = 'rep-boxes';
+
         var sets = ex.sets || 3;
         var reps = ex.repsPerSet;
         if (typeof reps === 'number') {
-          // One box per rep (e.g., repsPerSet=5 → 5 boxes; sets shown as "3×" separately)
-          for (var b = 0; b < reps; b++) {
-            repsDiv.appendChild(el('div', 'rep-box'));
+          for (var s = 0; s < sets; s++) {
+            var rBox = document.createElement('div');
+            rBox.className = 'rep-box';
+            rBox.textContent = String(reps);
+            repsDiv.appendChild(rBox);
           }
         } else if (reps != null) {
-          // String reps (AMRAP, 5/3/1, etc) — single wide label
-          var repLabel = txt('span', 'exercise-weight', String(reps));
-          repsDiv.appendChild(repLabel);
+          var numSets = typeof sets === 'number' ? sets : 1;
+          for (var s2 = 0; s2 < numSets; s2++) {
+            var rBoxString = document.createElement('div');
+            rBoxString.className = 'rep-box';
+            rBoxString.textContent = String(reps);
+            if (String(reps).length > 2) {
+              rBoxString.style.fontSize = '4.5pt';
+            }
+            repsDiv.appendChild(rBoxString);
+          }
         }
         // else: repsPerSet is null/undefined — render no boxes (weight field still shows)
         tdReps.appendChild(repsDiv);
         tr.appendChild(tdReps);
-
-        // Weight
-        if (ex.weightField) {
-          var tdWeight = document.createElement('td');
-          tdWeight.className = 'exercise-weight';
-          tdWeight.textContent = typeof ex.weightField === 'boolean' ? '___lb' : ex.weightField;
-          tr.appendChild(tdWeight);
-        }
 
         table.appendChild(tr);
       });
@@ -332,12 +360,6 @@
 
       // Notes box (hidden in dense mode via CSS)
       var notesBox = el('div', 'notes-box');
-      var notesLines = el('div', 'notes-lines');
-      var lineCount = density === 'density-compact' ? 1 : 2;
-      for (var n = 0; n < lineCount; n++) {
-        notesLines.appendChild(el('div', 'notes-line'));
-      }
-      notesBox.appendChild(notesLines);
       card.appendChild(notesBox);
 
       cardsContainer.appendChild(card);
@@ -373,8 +395,7 @@
     // Header
     var hdr = el('div', 'rp-header');
     hdr.appendChild(txt('span', '', labels.fieldOpsHeader));
-    var pageNum = 3 + (weekNum * 2);
-    hdr.appendChild(txt('span', '', 'p.' + (pageNum < 10 ? '0' + pageNum : pageNum)));
+    hdr.appendChild(txt('span', 'page-num', ''));
     inner.appendChild(hdr);
 
     // Content grid
@@ -398,7 +419,7 @@
         var lines = cipher.body.displayText.split('\n');
         var currentSection = null;
 
-        lines.forEach(function(line) {
+        lines.forEach(function (line) {
           var trimmed = line.trim();
           if (!trimmed) return;
 
@@ -461,7 +482,7 @@
       // Build tile lookup
       var tileLookup = {};
       if (mapState.tiles) {
-        mapState.tiles.forEach(function(tile) {
+        mapState.tiles.forEach(function (tile) {
           tileLookup[tile.col + ',' + tile.row] = tile;
         });
       }
@@ -483,7 +504,7 @@
 
       // Map annotations
       if (mapState.tiles) {
-        mapState.tiles.forEach(function(tile) {
+        mapState.tiles.forEach(function (tile) {
           if (tile.annotation) {
             mapZone.appendChild(txt('div', 'map-annotation',
               (tile.label || '') + ': ' + tile.annotation));
@@ -511,7 +532,7 @@
       if (oracle.entries) {
         // Group by cluster — show one representative entry per cluster range
         var clusters = {};
-        oracle.entries.forEach(function(entry, oracleIdx) {
+        oracle.entries.forEach(function (entry, oracleIdx) {
           var c;
           if (entry.cluster != null) {
             c = entry.cluster;
@@ -524,8 +545,8 @@
           clusters[c].push(entry);
         });
 
-        var clusterKeys = Object.keys(clusters).sort(function(a,b) { return a - b; });
-        clusterKeys.forEach(function(key) {
+        var clusterKeys = Object.keys(clusters).sort(function (a, b) { return a - b; });
+        clusterKeys.forEach(function (key) {
           var group = clusters[key];
           var first = group[0];
           var last = group[group.length - 1];
@@ -560,8 +581,9 @@
     var boss = week.bossEncounter;
 
     // Header
-    var hdr = el('div', 'boss-header');
-    hdr.textContent = 'Week ' + (weekNum < 10 ? '0' + weekNum : weekNum) + ' \u00b7 ' + labels.finalSurveyHeader;
+    var hdr = el('div', 'boss-header rp-header');
+    hdr.appendChild(txt('span', '', 'Week ' + (weekNum < 10 ? '0' + weekNum : weekNum) + ' \u00b7 ' + labels.finalSurveyHeader));
+    hdr.appendChild(txt('span', 'page-num', ''));
     inner.appendChild(hdr);
 
     if (boss) {
@@ -586,7 +608,7 @@
         var compSection = el('div', 'boss-components');
         compSection.appendChild(txt('div', 'boss-components-label', 'Required Components'));
         var compList = el('div', 'boss-component-list');
-        boss.componentInputs.forEach(function(comp, idx) {
+        boss.componentInputs.forEach(function (comp, idx) {
           var item = el('div', 'boss-component-item');
           // Handle both object format {weekNumber, description} and string format "H"
           if (typeof comp === 'object' && comp !== null) {
@@ -677,7 +699,7 @@
     var bodySource = doc.bodyText || doc.body || doc.content || '';
     if (bodySource) {
       var bodyContent = typeof bodySource === 'string' ? bodySource : JSON.stringify(bodySource);
-      bodyContent.split('\n').forEach(function(para) {
+      bodyContent.split('\n').forEach(function (para) {
         if (para.trim()) body.appendChild(txt('p', '', para.trim()));
       });
     }
@@ -703,7 +725,7 @@
     hdr.appendChild(txt('span', 'page-num', ''));
     inner.appendChild(hdr);
 
-    fragments.forEach(function(frag, idx) {
+    fragments.forEach(function (frag, idx) {
       var block = el('div', 'fragment-block');
 
       // Large fragment number
@@ -736,7 +758,7 @@
       var body = el('div', 'fragment-doc-body');
       var bodyText = frag.bodyText || frag.body || frag.content || '';
       if (typeof bodyText === 'string') {
-        bodyText.split('\n').forEach(function(para) {
+        bodyText.split('\n').forEach(function (para) {
           if (para.trim()) body.appendChild(txt('p', '', para.trim()));
         });
       }
@@ -820,7 +842,7 @@
       var ending = data.endings[0].content;
       if (ending.body) {
         var bodyDiv = el('div', 'endings-body');
-        ending.body.split('\n').forEach(function(para) {
+        ending.body.split('\n').forEach(function (para) {
           if (para.trim()) bodyDiv.appendChild(txt('p', '', para.trim()));
         });
         inner.appendChild(bodyDiv);
@@ -868,7 +890,7 @@
       throw new Error('Render failed: expected a JSON object, got ' + typeof data);
     }
     var _required = ['meta', 'cover', 'rulesSpread', 'weeks'];
-    _required.forEach(function(key) {
+    _required.forEach(function (key) {
       if (!data[key]) throw new Error('Render failed: missing required field "' + key + '"');
     });
     if (!Array.isArray(data.weeks) || data.weeks.length === 0) {
@@ -966,6 +988,16 @@
       pages.push(blank);
     }
 
+    // Set dynamic page numbers directly mapped to the array index (page 1 is index 0)
+    pages.forEach(function (renderedPage, pgIdx) {
+      if (!renderedPage) return;
+      var numEl = renderedPage.querySelector('.page-num');
+      if (numEl) {
+        var naturalPageNum = pgIdx + 1;
+        numEl.textContent = 'p.' + (naturalPageNum < 10 ? '0' + naturalPageNum : naturalPageNum);
+      }
+    });
+
     return pages;
   }
 
@@ -977,48 +1009,81 @@
   var printBtn = document.getElementById('print-btn');
   var container = document.getElementById('booklet-container');
   var status = document.getElementById('status');
-  var spreadToggle = document.getElementById('spread-toggle');
+  var layoutSelect = document.getElementById('layout-mode');
 
-  fileInput.addEventListener('change', function(e) {
+  fileInput.addEventListener('change', function (e) {
     var file = e.target.files[0];
     if (!file) return;
     var reader = new FileReader();
-    reader.onload = function(ev) {
+    reader.onload = function (ev) {
       try {
         jsonData = JSON.parse(ev.target.result);
         renderBtn.disabled = false;
         status.textContent = 'Loaded: ' + (jsonData.meta ? jsonData.meta.blockTitle : 'unknown') +
           ' (' + (jsonData.weeks ? jsonData.weeks.length : 0) + ' weeks)';
-      } catch(err) {
+      } catch (err) {
         status.textContent = 'JSON error: ' + err.message;
       }
     };
     reader.readAsText(file);
   });
 
-  renderBtn.addEventListener('click', function() {
+  function doRender() {
     if (!jsonData) return;
     container.innerHTML = '';
+    container.className = ''; // reset container
     try {
       var pages = render(jsonData);
-      pages.forEach(function(p) { container.appendChild(p); });
+      var mode = layoutSelect ? layoutSelect.value : 'single';
+
+      if (mode === 'booklet' || mode === 'spread') {
+        container.classList.add('spread-view');
+        var imposed = [];
+        if (mode === 'booklet') {
+          var half = Math.ceil(pages.length / 2);
+          for (var p = 0; p < half; p++) {
+            var leftIdx = (p % 2 === 0) ? pages.length - 1 - p : p;
+            var rightIdx = (p % 2 === 0) ? p : pages.length - 1 - p;
+
+            var wrap = document.createElement('div');
+            wrap.className = 'print-spread';
+            if (pages[leftIdx]) wrap.appendChild(pages[leftIdx]);
+            if (pages[rightIdx]) wrap.appendChild(pages[rightIdx]);
+            imposed.push(wrap);
+          }
+        } else {
+          for (var s = 0; s < pages.length; s += 2) {
+            var wrap2 = document.createElement('div');
+            wrap2.className = 'print-spread';
+            wrap2.appendChild(pages[s]);
+            if (pages[s + 1]) wrap2.appendChild(pages[s + 1]);
+            imposed.push(wrap2);
+          }
+        }
+        imposed.forEach(function (spr) { container.appendChild(spr); });
+      } else {
+        pages.forEach(function (p) { container.appendChild(p); });
+      }
+
       printBtn.disabled = false;
       status.textContent = 'Rendered ' + pages.length + ' pages (' +
         (jsonData.weeks ? jsonData.weeks.length : 0) + ' weeks, ' +
-        (jsonData.fragments ? jsonData.fragments.length : 0) + ' fragments)';
-    } catch(err) {
+        (jsonData.fragments ? jsonData.fragments.length : 0) + ' fragments) in ' + mode + ' mode';
+    } catch (err) {
       status.textContent = 'Render error: ' + err.message;
       console.error(err);
     }
-  });
+  }
 
-  printBtn.addEventListener('click', function() {
+  renderBtn.addEventListener('click', doRender);
+
+  printBtn.addEventListener('click', function () {
     window.print();
   });
 
-  spreadToggle.addEventListener('change', function() {
-    container.classList.toggle('spread-view', this.checked);
-  });
+  if (layoutSelect) {
+    layoutSelect.addEventListener('change', doRender);
+  }
 
   // Expose for debugging
   window.LiftRPGRenderer = { render: render };
