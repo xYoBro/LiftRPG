@@ -205,22 +205,30 @@ body{
   display:block;margin-bottom:3px;
 }
 
+/* ── FIELD OPS TOP HALF ───────────────────────── */
+.field-ops-top{
+  display:flex;gap:10px;flex-shrink:0;margin-bottom:0;
+  align-items:flex-start;
+}
+.field-ops-top .cipher-block{flex:1;min-width:0;margin-bottom:0;}
+.field-ops-top .map-block{flex:0 0 auto;margin-bottom:0;max-width:40%;}
+
 /* ── MAP ───────────────────────────────────────── */
-.map-block{flex-shrink:0;margin-bottom:8px;}
+.map-block{flex-shrink:0;margin-bottom:6px;}
 .map-floor-label{
-  font-family:var(--display);font-style:italic;font-size:14pt;
+  font-family:var(--display);font-style:italic;font-size:10pt;
   color:var(--ink);
-  margin-bottom:10px;display:block;line-height:1.15;
+  margin-bottom:4px;display:block;line-height:1.15;
 }
 .map-grid-wrap{
-  border:1px solid var(--rule);padding:16px;
+  border:1px solid var(--rule);padding:8px;
   margin-bottom:4px;
 }
 .map-grid{
   display:grid;gap:2px;width:100%;
 }
 .map-tile{
-  aspect-ratio:1.2;border:1px solid var(--rule);
+  aspect-ratio:1;border:1px solid var(--rule);
   display:flex;align-items:center;justify-content:center;
   font-family:var(--mono);font-size:5.5pt;color:var(--ink);
   position:relative;line-height:1;
@@ -280,7 +288,7 @@ body{
 }
 
 /* ── CIPHER ────────────────────────────────────── */
-.cipher-block{flex-shrink:0;margin-bottom:8px;}
+.cipher-block{flex-shrink:0;margin-bottom:4px;}
 .cipher-title{
   font-family:var(--mono);font-size:5.5pt;color:var(--ink);
   letter-spacing:.08em;margin-bottom:3px;display:block;
@@ -294,9 +302,9 @@ body{
   line-height:1.45;margin-bottom:2.5px;font-style:italic;
 }
 .workspace{
-  max-height:60px;overflow:hidden;max-width:70%;
+  max-height:44px;overflow:hidden;max-width:70%;
   background:#fff;border:1px solid var(--rule);
-  padding:4px 6px;margin-bottom:6px;
+  padding:4px 6px;margin-bottom:4px;
 }
 .workspace-boxgrid{
   width:100%;height:44px;
@@ -317,51 +325,51 @@ body{
   border-top:1px solid var(--rule);padding-top:4px;margin-top:1px;
 }
 
+/* ── FIELD OPS DIVIDER ────────────────────────── */
+.field-ops-divider{
+  border:none;border-top:1px solid var(--rule);
+  margin:6px 0 4px;position:relative;flex-shrink:0;
+}
+.field-ops-divider-label{
+  position:absolute;top:-6px;right:0;
+  font-family:var(--mono);font-size:4.5pt;color:var(--muted);
+  letter-spacing:.08em;background:var(--warm);padding:0 4px;
+}
+
 /* ── ORACLE ────────────────────────────────────── */
-.oracle-block{flex:1;display:flex;flex-direction:column;min-height:0;border-top:1px solid var(--rule);padding-top:5px;}
+.oracle-block{flex:1;display:flex;flex-direction:column;min-height:0;padding-top:2px;}
 .oracle-title{
   font-family:var(--mono);font-size:5.5pt;color:var(--ink);
   letter-spacing:.08em;margin-bottom:1px;display:block;
 }
 .oracle-instruction{
   font-family:var(--mono);font-size:5pt;color:var(--muted);
-  margin-bottom:4px;display:block;line-height:1.4;
+  margin-bottom:6px;display:block;line-height:1.4;
 }
-.oracle-entries{flex:1;min-height:0;}
+.oracle-entries{
+  flex:1;min-height:0;
+  display:grid;grid-template-columns:1fr 1fr;column-gap:10px;
+  align-content:start;
+}
 .oracle-entry{
-  display:grid;grid-template-columns:16px 1fr;gap:4px;
-  padding:1.5px 0;border-bottom:1px dotted var(--rule);
-  align-items:baseline;
+  padding:3px 0;border-bottom:1px dotted var(--rule);
 }
-.oracle-entry:nth-child(even){background:rgba(0,0,0,.03);}
 .oracle-entry:last-child{border-bottom:none;}
-.oracle-roll{
-  font-family:var(--mono);font-size:5.5pt;font-weight:700;
-  color:var(--ink);text-align:right;
+.oracle-entry-header{
+  display:flex;justify-content:space-between;align-items:baseline;
+  margin-bottom:1px;
 }
-.oracle-text{
-  font-family:var(--mono);font-size:5.5pt;color:var(--ink);
-  line-height:1.4;
-}
-
-/* ── ORACLE MODE B (d100 ranges) ─────────────── */
-.oracle-entry-b{
-  display:grid;grid-template-columns:3.5em 1fr auto;gap:4px;
-  padding:1.5px 0;border-bottom:1px dotted var(--rule);
-  align-items:baseline;
-}
-.oracle-entry-b:last-child{ border-bottom:none; }
-.oracle-entry-b .oracle-roll{
-  font-family:var(--mono);font-size:5.5pt;font-weight:400;
-  color:var(--muted);text-align:right;
-}
-.oracle-entry-b .oracle-text{
-  font-family:var(--serif);font-size:8pt;
-  color:var(--ink);line-height:1.4;
+.oracle-range-label{
+  font-family:var(--mono);font-size:5pt;color:var(--muted);
+  letter-spacing:.04em;
 }
 .oracle-fragref{
   font-family:var(--mono);font-size:5pt;color:var(--accent);
-  text-align:right;white-space:nowrap;
+  white-space:nowrap;
+}
+.oracle-text{
+  font-family:var(--serif);font-size:8pt;color:var(--ink);
+  line-height:1.4;
 }
 
 /* ── PRINT ─────────────────────────────────────── */
@@ -510,13 +518,19 @@ function renderRightPage(week){
   hdr.appendChild(span('page-header-num', 'p.04'));
   page.appendChild(hdr);
 
-  /* Map */
-  page.appendChild(renderMap(fo.mapState));
+  /* Top half: cipher + compact map side-by-side */
+  var top = el('div','field-ops-top');
+  top.appendChild(renderCipher(fo.cipher));
+  top.appendChild(renderMap(fo.mapState));
+  page.appendChild(top);
 
-  /* Cipher */
-  page.appendChild(renderCipher(fo.cipher));
+  /* Diegetic divider */
+  var divider = el('div','field-ops-divider');
+  var divLabel = span('field-ops-divider-label', fo.oracleTable.title.split('\u00b7')[1] ? fo.oracleTable.title.split('\u00b7')[1].trim() : 'Form 7-R');
+  divider.appendChild(divLabel);
+  page.appendChild(divider);
 
-  /* Oracle */
+  /* Bottom half: oracle table */
   page.appendChild(renderOracle(fo.oracleTable));
 
   return page;
@@ -618,66 +632,28 @@ function renderOracle(o){
   var block = el('div','oracle-block');
   block.appendChild(span('section-heading','Incident Classification'));
   block.appendChild(span('oracle-title', o.title));
-
-  var isFull = (o.mode === 'full');
-
-  var instrText = isFull
-    ? 'Roll d10 + d10 during any rest period. First die: cluster (0\u20139). Second die: entry within cluster (0\u20139).'
-    : o.instruction;
-  block.appendChild(span('oracle-instruction', instrText));
+  block.appendChild(span('oracle-instruction', o.instruction));
 
   var entries = el('div','oracle-entries');
 
-  if(isFull){
-    /* Mode B: group entries by cluster field (0-9) */
-    var clusters = {};
-    o.entries.forEach(function(e){
-      var c = e.cluster;
-      if(!clusters[c]) clusters[c] = [];
-      clusters[c].push(e);
-    });
-    /* Render each cluster */
-    [0,1,2,3,4,5,6,7,8,9].forEach(function(c){
-      if(!clusters[c]) return;
-      clusters[c].forEach(function(e){
-        var row = document.createElement('div');
-        row.className = 'oracle-entry-b';
-        var roll = document.createElement('span');
-        roll.className = 'oracle-roll';
-        roll.textContent = e.roll.toString().padStart(2,'0');
-        var text = document.createElement('span');
-        text.className = 'oracle-text';
-        text.textContent = e.text;
-        row.appendChild(roll);
-        row.appendChild(text);
-        if(e.fragmentRef){
-          var ref = document.createElement('span');
-          ref.className = 'oracle-fragref';
-          ref.textContent = '\u2192 ' + e.fragmentRef;
-          row.appendChild(ref);
-        }
-        entries.appendChild(row);
-      });
-      /* Cluster separator after each cluster except the last */
-      if(c < 9){
-        var sep = document.createElement('div');
-        sep.className = 'oracle-cluster-sep';
-        entries.appendChild(sep);
-      }
-    });
-  } else {
-    /* Mode A (simple) and fallback */
-    o.entries.forEach(function(e){
-      var row = el('div','oracle-entry');
-      row.appendChild(span('oracle-roll', String(e.roll)));
-      var fullText = e.text;
-      if(e.fragmentRef){ fullText += ' \u2192 ' + e.fragmentRef; }
-      var textEl = span('oracle-text','');
-      textEl.textContent = fullText;
-      row.appendChild(textEl);
-      entries.appendChild(row);
-    });
-  }
+  o.entries.forEach(function(e){
+    var row = el('div','oracle-entry');
+
+    /* Header line: range label + fragment ref */
+    var header = el('div','oracle-entry-header');
+    header.appendChild(span('oracle-range-label', e.rangeLabel));
+    if(e.fragmentRef){
+      header.appendChild(span('oracle-fragref', '\u2192 ' + e.fragmentRef));
+    }
+    row.appendChild(header);
+
+    /* Entry text */
+    var textEl = span('oracle-text','');
+    textEl.textContent = e.text;
+    row.appendChild(textEl);
+
+    entries.appendChild(row);
+  });
 
   block.appendChild(entries);
   return block;
