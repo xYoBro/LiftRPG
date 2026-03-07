@@ -282,16 +282,21 @@
     .card-back{
       padding:24px 28px;
     }
-    .preview img{
+    .preview-frame{
       width:100%;
-      display:block;
+      height:600px;
+      border:none;
+      border-radius:4px;
+      background:#1e1b17;
     }
-    .preview-caption{
+    .preview-hint{
+      font-family:var(--mono);
       font-size:6pt;
-      letter-spacing:.2em;
+      letter-spacing:.14em;
       text-transform:uppercase;
       color:var(--muted);
-      margin-top:14px;
+      text-align:center;
+      margin-top:10px;
     }
 
     /* ── Generator modal ──────────── */
@@ -527,14 +532,6 @@
             </a>
           </nav>
 
-          <div class="section-label">Example</div>
-          <nav class="downloads">
-            <a href="liftrpg-eastern-shore.json" download="liftrpg-eastern-shore.json">
-              The Drowning Season
-              <span class="link-sub">Complete example &mdash; download JSON</span>
-            </a>
-          </nav>
-
           <footer>
             <a href="LICENSE">MIT License</a> &middot; <a href="https://github.com/xYoBro/LiftRPG" target="_blank" rel="noopener">GitHub</a>
           </footer>
@@ -545,10 +542,14 @@
           <button class="flip-return flip-btn" type="button">&#x21BB; Back</button>
           <div class="kicker">The Drowning Season</div>
           <div class="rule"></div>
-          <figure class="preview">
-            <img src="images/spread-preview.jpg" alt="A booklet spread from The Drowning Season — field operations page with cipher puzzle and farm survey grid on the left, workout session cards with narrative prompts on the right"/>
-          </figure>
-          <div class="preview-caption">Field operations + training sessions &mdash; Week 1</div>
+          <iframe id="preview-frame" class="preview-frame" title="Live booklet preview"></iframe>
+          <nav class="downloads" style="margin-top:16px;">
+            <a href="liftrpg-eastern-shore.json" download="liftrpg-eastern-shore.json">
+              Download JSON
+              <span class="link-sub">Upload to Renderer to print your own copy</span>
+            </a>
+          </nav>
+          <div class="preview-hint">Scroll to explore the full booklet</div>
         </div>
 
       </div>
@@ -615,6 +616,15 @@
         flipped = !flipped;
         flipper.classList.toggle('is-flipped', flipped);
         main.classList.toggle('is-expanded', flipped);
+
+        // Load preview iframe on first flip to back
+        if (flipped) {
+          var frame = document.getElementById('preview-frame');
+          if (frame && !frame.getAttribute('src')) {
+            frame.src = 'renderer/?demo=liftrpg-eastern-shore';
+          }
+        }
+
         measure();
         // Re-measure after width transition settles
         setTimeout(measure, 520);
