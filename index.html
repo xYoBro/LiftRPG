@@ -527,7 +527,7 @@
             <summary>How it Works</summary>
             <div class="how-content">
               <ol>
-                <li><strong>Generate a Prompt</strong> &mdash; enter your workout and a story idea</li>
+                <li><a href="#" id="how-generate"><strong>Generate a Prompt</strong></a> &mdash; enter your workout (<a href="https://www.liftosaur.com/" target="_blank" rel="noopener">Liftosaur</a> or plain text) and a story idea</li>
                 <li>Paste it into any LLM &mdash; Claude, ChatGPT, or Gemini &mdash; and save the JSON it returns</li>
                 <li>Upload the JSON to <a href="renderer/">Render</a> &mdash; print your saddle-stitched booklet</li>
                 <li>Train the program for six weeks, pencil in hand</li>
@@ -575,10 +575,10 @@
       <div class="kicker">Prompt Generator</div>
       <div class="rule"></div>
 
-      <label class="field-label" for="gen-workout">Workout Programme</label>
+      <label class="field-label" for="gen-workout">Workout Program</label>
       <textarea id="gen-workout" class="gen-input" rows="6"
-        placeholder="Paste your Liftosaur export or describe your programme in plain text"></textarea>
-      <div class="field-error" id="workout-error">A workout programme is required</div>
+        placeholder="Paste your Liftosaur Liftoscript export, or describe your program in plain text"></textarea>
+      <div class="field-error" id="workout-error">A workout program is required</div>
 
       <label class="field-label" for="gen-brief">Creative Direction</label>
       <textarea id="gen-brief" class="gen-input" rows="4"
@@ -680,6 +680,8 @@
 
     // Open
     openBtn.addEventListener('click', openModal);
+    var howGenerate = document.getElementById('how-generate');
+    if(howGenerate) howGenerate.addEventListener('click', function(e){ e.preventDefault(); openModal(); });
 
     // Close: button, overlay click, escape
     closeBtn.addEventListener('click', closeModal);
