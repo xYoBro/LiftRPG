@@ -25,17 +25,18 @@
       padding:20px;
     }
     main{
-      display:flex;
-      flex-direction:column;
-      align-items:center;
+      display:grid;
+      grid-template-columns:minmax(0,460px) minmax(0,680px);
       gap:40px;
+      align-items:start;
+      max-width:1200px;
       width:100%;
     }
     .card{
       background:var(--paper);
       padding:48px 52px;
-      max-width:460px;
       width:100%;
+      box-shadow:0 8px 40px rgba(0,0,0,.6);
     }
     .kicker{
       font-size:7pt;
@@ -161,21 +162,27 @@
       color:var(--ink);
     }
     .preview{
-      max-width:720px;
-      width:100%;
       text-align:center;
     }
     .preview img{
       width:100%;
       display:block;
       box-shadow:0 8px 40px rgba(0,0,0,.6);
+      border:1px solid rgba(241,235,224,.08);
     }
     .preview figcaption{
       font-size:6pt;
       letter-spacing:.2em;
       text-transform:uppercase;
-      color:#5a554d;
+      color:#7a756d;
       margin-top:14px;
+    }
+    @media (max-width:960px){
+      main{
+        grid-template-columns:1fr;
+        max-width:460px;
+        gap:32px;
+      }
     }
     @media (max-width:520px){
       .card{ padding:32px 28px; }
@@ -193,7 +200,7 @@
       <nav>
         <a href="renderer/">
           Renderer
-          <span class="link-sub">Upload your JSON &rarr; printable booklet &middot; try The Drowning Season below</span>
+          <span class="link-sub">Upload your JSON &rarr; printable booklet</span>
         </a>
         <a href="unlock/">
           Unlock
