@@ -19,9 +19,8 @@
     body{
       background:#1e1b17;
       min-height:100vh;
-      display:flex;
-      align-items:center;
-      justify-content:center;
+      display:grid;
+      place-items:center;
       font-family:var(--mono);
       padding:20px;
     }
@@ -63,7 +62,7 @@
       flex-direction:column;
       gap:8px;
     }
-    a{
+    nav a{
       display:block;
       font-family:var(--mono);
       font-size:8pt;
@@ -75,7 +74,7 @@
       border:1.5px solid var(--ink);
       transition:background .12s,color .12s;
     }
-    a:hover{
+    nav a:hover{
       background:var(--ink);
       color:var(--paper);
     }
@@ -87,8 +86,72 @@
       display:block;
       margin-top:4px;
     }
-    a:hover .link-sub{
+    nav a:hover .link-sub{
       color:var(--rule);
+    }
+    .section-label{
+      font-size:7pt;
+      letter-spacing:.3em;
+      text-transform:uppercase;
+      color:var(--accent);
+      margin-top:28px;
+      margin-bottom:10px;
+    }
+    .downloads a{
+      border-style:dashed;
+    }
+    details{
+      margin-top:28px;
+      border-top:1px solid var(--rule);
+      padding-top:20px;
+    }
+    summary{
+      font-size:7pt;
+      letter-spacing:.3em;
+      text-transform:uppercase;
+      color:var(--accent);
+      cursor:pointer;
+      list-style:none;
+    }
+    summary::-webkit-details-marker{display:none;}
+    summary::before{content:'+ ';}
+    details[open] summary::before{content:'\2212  ';}
+    .how-content{
+      margin-top:16px;
+    }
+    .how-content ol{
+      padding-left:20px;
+      font-size:8pt;
+      line-height:1.9;
+      color:var(--muted);
+    }
+    .how-content ol li{
+      padding-left:4px;
+    }
+    .how-content a{
+      color:var(--accent);
+      text-decoration:underline;
+      text-decoration-color:var(--rule);
+      text-underline-offset:2px;
+    }
+    .how-content a:hover{
+      color:var(--ink);
+    }
+    footer{
+      margin-top:28px;
+      border-top:1px solid var(--rule);
+      padding-top:16px;
+      font-size:6pt;
+      letter-spacing:.04em;
+      color:var(--muted);
+    }
+    footer a{
+      color:var(--muted);
+      text-decoration:none;
+      border-bottom:1px solid var(--rule);
+    }
+    footer a:hover{
+      color:var(--ink);
     }
     @media (max-width:520px){
       .card{ padding:32px 28px; }
@@ -112,6 +175,36 @@
         <span class="link-sub">Enter your assembled password &rarr; discover the ending</span>
       </a>
     </nav>
+
+    <div class="section-label">Example</div>
+    <nav class="downloads">
+      <a href="liftrpg-eastern-shore.json" download="liftrpg-eastern-shore.json">
+        The Drowning Season
+        <span class="link-sub">Complete 6-week example &mdash; download JSON</span>
+      </a>
+      <a href="liftrpg-template.json" download="liftrpg-template.json">
+        Blank Template
+        <span class="link-sub">Empty schema &mdash; start your own</span>
+      </a>
+    </nav>
+
+    <details>
+      <summary>How it Works</summary>
+      <div class="how-content">
+        <ol>
+          <li>Write a workout program in <a href="https://www.liftosaur.com/" target="_blank" rel="noopener">Liftosaur</a> or plain text</li>
+          <li>Feed the template JSON + your program into any LLM (Claude, ChatGPT, Gemini)</li>
+          <li>Upload the generated JSON to the <a href="renderer/">Renderer</a></li>
+          <li>Print as a saddle-stitch booklet (half-letter, double-sided)</li>
+          <li>Train for six weeks, pencil in hand</li>
+          <li>Assemble the password. <a href="unlock/">Unlock</a> the ending.</li>
+        </ol>
+      </div>
+    </details>
+
+    <footer>
+      <a href="LICENSE">MIT License</a> &middot; <a href="https://github.com/xYoBro/LiftRPG" target="_blank" rel="noopener">GitHub</a>
+    </footer>
   </div>
 </body>
 </html>

@@ -1,0 +1,81 @@
+{
+  "meta": {
+    "campaignTitle": "CAMPAIGN TITLE",
+    "passwordPlaintext": "PASSWORD123",
+    "passwordHint": "Describe what the password means",
+    "blockTitle": "SURVEY LOG",
+    "weekCount": 6,
+    "labels": {
+      "finalSurveyHeader": "FINAL SURVEY",
+      "bossFallbackNarrative": "A closing descriptive narrative of the conclusion goes here.",
+      "passwordAssemblyTitle": "CREDENTIAL ASSEMBLY",
+      "endingsFallbackTitle": "CONCLUSION",
+      "endingsFallbackBody": "This is what happens when you finish."
+    }
+  },
+  "cover": {
+    "title": "CAMPAIGN TITLE",
+    "subtitle": "A briefing or operation subtitle goes here.",
+    "attribution": "Who authored this document?",
+    "bottomText": "DATE OR VERSIONING",
+    "stampText": "CLASSIFIED",
+    "stampRotation": "-15deg"
+  },
+  "rulesSpread": {
+    "leftPage": {
+      "body": "Welcome to LiftRPG. \n\nThis is your rulebook or briefing. You should explain the setting, what the player must do, and what the ultimate goal is.\n\nYou can use multiple paragraphs."
+    },
+    "rightPage": {
+      "title": "Survey Record",
+      "instruction": "Record each week's component below. When all positions are filled, assemble the complete password.",
+      "unlockUrl": "liftrpg.co/unlock"
+    }
+  },
+  "weeks": [
+    {
+      "weekNumber": 1,
+      "title": "WEEK 1 TITLE",
+      "epigraph": {
+        "text": "A thematic quote or narrative hook for the week.",
+        "attribution": "— Character Name"
+      },
+      "sessions": [
+        {
+          "sessionNumber": 1,
+          "label": "SESSION 1",
+          "storyPrompt": "A very brief narrative moment right before the exercise.",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": "Target Weight",
+              "notes": "Target Weight"
+            }
+          ]
+        }
+      ],
+      "fieldOps": {
+        "mapState": {
+          "floorLabel": "Location Explorer",
+          "tiles": [
+            { "cell": "0,0", "tileClass": "clear", "label": "Start", "annotation": "The beginning" }
+          ],
+          "mapNote": "A brief note about this map."
+        },
+        "oracleTable": {
+          "title": "Investigation Table",
+          "instruction": "Roll 1d6 when investigating the location.",
+          "entries": [
+            { "roll": "1-3", "text": "Nothing found." },
+            { "roll": "4-6", "text": "You find a clue." }
+          ]
+        }
+      },
+      "weeklyComponent": {
+        "type": "Clue",
+        "value": "A"
+      }
+    }
+  ]
+}

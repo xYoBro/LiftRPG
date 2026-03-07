@@ -1,0 +1,3555 @@
+{
+  "meta": {
+    "schemaVersion": "1.3.0",
+    "generatedAt": "2026-03-07T12:00:00Z",
+    "blockTitle": "The Drowning Season",
+    "blockSubtitle": "Dorchester County Field Survey · OPERATION TIDEGATE · Restricted",
+    "worldContract": "The land remembers what was put into it, and the water is returning it now, and no one — not the farmer, not the government men, not the reader — can decide whether that is mercy or punishment.",
+    "narrativeVoice": {
+      "person": "third",
+      "tense": "present",
+      "narratorStance": "The narrator inhabits Earl Pratt's perception — his vocabulary, his rhythms, his inability to name what is happening in any language other than soil and season and the behavior of animals.",
+      "voiceRationale": "Third person close in present tense creates the paradox the world contract requires: the reader sees through Earl's eyes but cannot intervene, mirroring both Delta Green's observational helplessness and the reader's own position as someone who lifts weight that does not belong to them. The present tense keeps the horror immediate — it is always happening now, the way grief is always happening now."
+    },
+    "literaryRegister": {
+      "name": "Pastoral Waterlog",
+      "behaviorDescription": "Prose that earns its nouns. Every object is named precisely — not 'a bird' but 'a green heron standing one-legged in the shallows off the culvert pipe.' Sentences accumulate physical detail the way a field accumulates dew: slowly, until the weight is suddenly visible. The landscape is never backdrop. It thinks. It remembers. Dialogue is sparse, dialect-honest without condescension, and always reveals more about what is not being said.",
+      "forbiddenMoves": [
+        "Adjectives that editorialize — 'eerie,' 'ominous,' 'sinister,' 'eldritch.' The prose describes; the reader supplies the dread.",
+        "Metaphors that reference anything outside the Eastern Shore — no literary allusions, no urban comparisons, no academic vocabulary. Earl's frame of reference is tobacco, tide, and thirty years of marriage.",
+        "Interior monologue that explains what Earl is feeling. His feelings are visible only through what he does with his hands and where he chooses to look.",
+        "Any sentence that could appear in a Lovecraft story. The register is Steinbeck country, not Providence.",
+        "Rushed pacing — every sentence must feel like it has time to breathe, even when describing something terrible."
+      ],
+      "typographicBehavior": "Week 1: clean, steady, warm — the typefaces are confident and the page feels like a well-kept field journal. By Week 3, marginal annotations begin to appear on fragments as if someone (Earl? the agents? the reader?) is adding notes after the fact. By Week 5, the spacing between document elements may tighten slightly, as if the pages are being compressed by water pressure. Week 6 returns to the clean warmth of Week 1 — either because order has been restored or because the land has finished what it was doing and is calm again."
+    },
+    "weeklyComponentType": "gauge-reading",
+    "structuralShape": {
+      "resolution": "partial",
+      "temporalOrder": "fragmented",
+      "narratorReliability": "multiple",
+      "promptFragmentRelationship": "fragments-deepen",
+      "shapeRationale": "The world contract asks whether return is mercy or punishment — partial resolution serves this because the reader cannot be given a clean answer. Fragmented temporal order mirrors both the tidal cycle (events recur, not progress) and Earl's grief (memory does not move forward). Multiple reliability reflects the gap between Earl's ground-level perception, Delta Green's institutional framing, and the county records that predate both. Session prompts show Earl's present experience; fragments deepen by revealing the machinery beneath it — the prior operations, the older losses, the pattern the water has been repeating."
+    },
+    "passwordPlaintext": "HERON",
+    "passwordEncryptedEnding": "PLACEHOLDER_ENCRYPTED_BLOB_REPLACE_AT_GENERATION_TIME",
+    "liftoScript": "# Operator Template\n# 70% of 1RM baseline. Weeks cycle 70/80/90/75/85/95.\n# Progression: +5lb Bench/Pull Up, +10lb Squat/Deadlift every 6 weeks.\n# 5 sessions/week: 3 lifting (A/B/C), 2 conditioning (Sprint 8).\n# Session A & B: Squat/Bench/Pull Up. Session C: Squat/Bench/Deadlift.\n# Conditioning: 8x30s all-out sprint / 90s recovery on treadmill.",
+    "weekCount": 6,
+    "totalSessions": 30
+  },
+  "weeks": [
+    {
+      "weekNumber": 1,
+      "title": "The Property Line",
+      "epigraph": {
+        "text": "Water table at 14 inches. Nominal for March. Station BW-14 offline since November.",
+        "attribution": "Dorchester County Water Authority, monthly reading, March 1962"
+      },
+      "isBossWeek": false,
+      "overflow": true,
+      "isDeload": false,
+      "weeklyComponent": {
+        "type": "gauge-reading",
+        "value": "H",
+        "extractionInstruction": "Decode the Gauge Calibration Sequence using the standard index. The first letter of the decoded phrase is your gauge reading for this week. Record it on your Gauge Reading Log, p.02."
+      },
+      "sessions": [
+        {
+          "sessionNumber": 1,
+          "label": "Session 1 · Lifting A",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "70% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "70% of 1RM"
+            },
+            {
+              "name": "Pull Up",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "70% of 1RM"
+            }
+          ],
+          "storyPrompt": "Earl Pratt sets the bar across his shoulders the way he has done every Monday and Thursday since Mary died — not because he wants to but because the body has its own calendar and it does not observe grief. The garage smells of concrete dust and old motor oil. He descends into the squat and the weight settles into him like a fence post being driven.",
+          "fragmentRef": "F.02"
+        },
+        {
+          "sessionNumber": 2,
+          "label": "Session 2 · Conditioning",
+          "exercises": [
+            {
+              "name": "Treadmill Sprint",
+              "sets": 8,
+              "repsPerSet": "30s",
+              "weightField": false,
+              "notes": "30s all-out / 90s recovery. 5-min easy warmup before round 1."
+            }
+          ],
+          "storyPrompt": "He runs the way a man runs when there is weather coming — not fast but steady, with his chin up and his eyes on something the horizon is not showing yet. The treadmill belt is the only thing in the garage that sounds like water.",
+          "fragmentRef": "F.06"
+        },
+        {
+          "sessionNumber": 3,
+          "label": "Session 3 · Lifting B",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "70% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "70% of 1RM"
+            },
+            {
+              "name": "Pull Up",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "70% of 1RM"
+            }
+          ],
+          "storyPrompt": "The creek behind the south tobacco field ran backward this morning. Earl saw it from the kitchen window while the coffee was still too hot to drink. It ran backward for eleven seconds and then it stopped and then it ran the right way again. He has not told anyone. There is no one to tell.",
+          "fragmentRef": "F.04"
+        },
+        {
+          "sessionNumber": 4,
+          "label": "Session 4 · Conditioning",
+          "exercises": [
+            {
+              "name": "Treadmill Sprint",
+              "sets": 8,
+              "repsPerSet": "30s",
+              "weightField": false,
+              "notes": "30s all-out / 90s recovery. 5-min easy warmup before round 1."
+            }
+          ],
+          "storyPrompt": "His breath comes in thirties the way the tide comes in sixths. Sprint and recover. Sprint and recover. The body knows rhythms the mind has not agreed to."
+        },
+        {
+          "sessionNumber": 5,
+          "label": "Session 5 · Lifting C",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "70% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "70% of 1RM"
+            },
+            {
+              "name": "Deadlift",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "70% of 1RM"
+            }
+          ],
+          "storyPrompt": "Deadlift day. Earl pulls from the floor with a straight back and a set jaw and he thinks about the fence posts along the south property line — three of them are leaning toward the marsh now, leaning the way a man leans when he is listening for something in the next room.",
+          "fragmentRef": "F.01"
+        }
+      ],
+      "fieldOps": {
+        "mapState": {
+          "gridDimensions": {
+            "columns": 8,
+            "rows": 5
+          },
+          "floorLabel": "Pratt Property · Shorter's Wharf Road · Survey Grid Week 01",
+          "currentPosition": {
+            "col": 3,
+            "row": 2
+          },
+          "mapNote": "Creek gauge at BW-14 site reading 6 in. above seasonal norm. Filed as weather variance.",
+          "tiles": [
+            {
+              "col": 1,
+              "row": 1,
+              "type": "locked",
+              "label": "RD-1"
+            },
+            {
+              "col": 2,
+              "row": 1,
+              "type": "locked",
+              "label": "RD-2"
+            },
+            {
+              "col": 3,
+              "row": 1,
+              "type": "cleared",
+              "label": "GATE"
+            },
+            {
+              "col": 4,
+              "row": 1,
+              "type": "locked",
+              "label": "FENCE"
+            },
+            {
+              "col": 5,
+              "row": 1,
+              "type": "locked",
+              "label": "FENCE"
+            },
+            {
+              "col": 6,
+              "row": 1,
+              "type": "locked",
+              "label": "FENCE"
+            },
+            {
+              "col": 7,
+              "row": 1,
+              "type": "locked",
+              "label": "FENCE"
+            },
+            {
+              "col": 8,
+              "row": 1,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 2,
+              "type": "cleared",
+              "label": "BARN"
+            },
+            {
+              "col": 2,
+              "row": 2,
+              "type": "cleared",
+              "label": "YARD"
+            },
+            {
+              "col": 3,
+              "row": 2,
+              "type": "current",
+              "label": "HOUSE"
+            },
+            {
+              "col": 4,
+              "row": 2,
+              "type": "cleared",
+              "label": "GARDEN"
+            },
+            {
+              "col": 5,
+              "row": 2,
+              "type": "locked",
+              "label": "TOB-N"
+            },
+            {
+              "col": 6,
+              "row": 2,
+              "type": "locked",
+              "label": "TOB-N"
+            },
+            {
+              "col": 7,
+              "row": 2,
+              "type": "locked",
+              "label": "CREEK"
+            },
+            {
+              "col": 8,
+              "row": 2,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 3,
+              "type": "locked",
+              "label": "FIELD"
+            },
+            {
+              "col": 2,
+              "row": 3,
+              "type": "locked",
+              "label": "FIELD"
+            },
+            {
+              "col": 3,
+              "row": 3,
+              "type": "locked",
+              "label": "FIELD"
+            },
+            {
+              "col": 4,
+              "row": 3,
+              "type": "locked",
+              "label": "FIELD"
+            },
+            {
+              "col": 5,
+              "row": 3,
+              "type": "locked",
+              "label": "TOB-S"
+            },
+            {
+              "col": 6,
+              "row": 3,
+              "type": "anomaly",
+              "label": "CREEK",
+              "annotation": "water ran backward"
+            },
+            {
+              "col": 7,
+              "row": 3,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 3,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 4,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 2,
+              "row": 4,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 3,
+              "row": 4,
+              "type": "locked",
+              "label": "FIELD"
+            },
+            {
+              "col": 4,
+              "row": 4,
+              "type": "locked",
+              "label": "FIELD"
+            },
+            {
+              "col": 5,
+              "row": 4,
+              "type": "locked",
+              "label": "CREEK"
+            },
+            {
+              "col": 6,
+              "row": 4,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 7,
+              "row": 4,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 4,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 5,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 2,
+              "row": 5,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 3,
+              "row": 5,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 4,
+              "row": 5,
+              "type": "locked",
+              "label": "POND"
+            },
+            {
+              "col": 5,
+              "row": 5,
+              "type": "locked",
+              "label": "CREEK"
+            },
+            {
+              "col": 6,
+              "row": 5,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 7,
+              "row": 5,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 5,
+              "type": "inaccessible"
+            }
+          ]
+        },
+        "cipher": {
+          "type": "substitution",
+          "title": "Dorchester County Water Authority — Gauge Calibration Sequence · Form DC-7",
+          "noticeabilityDesign": "The cipher is presented as a numbered calibration sequence on what looks like an official county water authority form — rows of numbers beneath a header that says CALIBRATION VERIFICATION REQUIRED. A partial letter-to-number key is printed below in the style of a reference table. The visual impression is of a form the reader is supposed to complete: the blank boxes beneath the number sequence invite pencil marks. An unwarned reader notices it because it looks like something left unfinished.",
+          "body": {
+            "displayText": "8  9  7  8    23  1  20  5  18    13  1  18  3  8",
+            "key": "Standard gauge calibration index:\nA=1  B=2  C=3  D=4  E=5  F=6  G=7  H=8  I=9\nJ=10  K=11  L=12  M=13  N=14  O=15  P=16\nQ=17  R=18  S=19  T=20  U=21  V=22  W=23\nX=24  Y=25  Z=26",
+            "workSpace": {
+              "rows": 3,
+              "style": "boxgrid"
+            }
+          },
+          "extractionInstruction": "Decode the full calibration sequence using the index above. Record the first letter of the decoded phrase on your Gauge Reading Log, p.02. This is your first reading.",
+          "characterDerivationProof": "The number sequence is: 8 9 7 8 | 23 1 20 5 18 | 13 1 18 3 8. Using A=1, B=2 ... Z=26: 8=H, 9=I, 7=G, 8=H → HIGH. 23=W, 1=A, 20=T, 5=E, 18=R → WATER. 13=M, 1=A, 18=R, 3=C, 8=H → MARCH. Full decode: HIGH WATER MARCH. First letter = H. This matches weeklyComponent value 'H'."
+        },
+        "oracleTable": {
+          "title": "Dorchester County Conditions Log · Daily Field Observation",
+          "instruction": "During any rest period, roll 2d6 and consult the log below. Record what you find.",
+          "mode": "simple",
+          "entries": [
+            {
+              "roll": "2",
+              "text": "The peat in the south field has turned black overnight. Not dark — black. The color of water that has been underground too long. See attached survey notes.",
+              "type": "fragment",
+              "fragmentRef": "F.09"
+            },
+            {
+              "roll": "3",
+              "text": "A green heron has been standing in the same position at the creek culvert since before dawn. It has not moved. It is facing the house.",
+              "type": "fragment",
+              "fragmentRef": "F.04"
+            },
+            {
+              "roll": "4",
+              "text": "Jasper Tolson's heifer that went into the marsh last Tuesday has not come back. Jasper says the mud took it. He did not say which mud.",
+              "type": "fragment",
+              "fragmentRef": "F.10"
+            },
+            {
+              "roll": "5",
+              "text": "County extension agent left a letter about the soil readings from the north tobacco parcel. The pH numbers are wrong. Not high, not low — wrong.",
+              "type": "fragment",
+              "fragmentRef": "F.19"
+            },
+            {
+              "roll": "6",
+              "text": "Two men from the U.S. Geological Survey arrived at the gate this morning. They had federal identification. They asked about the water table. They did not ask about the creek.",
+              "type": "fragment",
+              "fragmentRef": "F.01"
+            },
+            {
+              "roll": "7",
+              "text": "The tide came in forty-three minutes early today. Earl checked the almanac twice. The almanac is correct. The tide is also correct. Both cannot be.",
+              "type": "fragment",
+              "fragmentRef": "F.06"
+            },
+            {
+              "roll": "8",
+              "text": "Earl found a boot in the mud behind the barn. Upright. Laced. No footprints leading to it or away from it. He left it where it was.",
+              "type": "fragment",
+              "fragmentRef": "F.08"
+            },
+            {
+              "roll": "9",
+              "text": "The fence posts along the south property line are leaning. Not wind-leaning — leaning the way a dog leans toward a sound.",
+              "type": "consequence"
+            },
+            {
+              "roll": "10",
+              "text": "The water gauge at the creek culvert reads six inches higher than yesterday. Mark the CREEK tile on your survey grid with a small upward arrow.",
+              "type": "consequence"
+            },
+            {
+              "roll": "11",
+              "text": "Mary's garden has not been watered in eleven months. The rosemary is still alive. Earl does not go into the garden.",
+              "type": "fragment",
+              "fragmentRef": "F.02"
+            },
+            {
+              "roll": "12",
+              "text": "Something moved in the marsh after dark. Not an animal sound. The sound a field makes when the water table rises through it all at once. Mark the MARSH tiles adjacent to CREEK as anomaly on your grid.",
+              "type": "consequence"
+            }
+          ]
+        }
+      },
+      "overflowDocument": {
+        "id": "F.30",
+        "documentType": "inspection",
+        "inWorldAuthor": "Dorchester County Clerk of Court",
+        "inWorldRecipient": "Property records, public file",
+        "inWorldPurpose": "Recorded deed for the Pratt property, Shorter's Wharf Road, as filed in 1934",
+        "content": "DORCHESTER COUNTY CLERK OF COURT\nDEED RECORD · LIBER 247, FOLIO 312\n\nTHIS DEED made this fourteenth day of April, nineteen hundred and thirty-four, by and between JAMES HOWARD PRATT and LOUISE CATHERINE PRATT, his wife, of Dorchester County, Maryland, parties of the first part, and EARL JAMES PRATT, their son, party of the second part.\n\nWITNESSETH: That for and in consideration of the sum of One Dollar ($1.00) and other good and valuable consideration, the parties of the first part do grant and convey unto the party of the second part all that lot or parcel of land situate on the south side of Shorter's Wharf Road in Election District No. 4 of Dorchester County, Maryland, containing 187 acres of land, more or less, bounded on the north by said road, on the east by the marshlands of the Little Blackwater River, on the south by the woodlands of the Tolson tract, and on the west by the county road.\n\nTOGETHER with all improvements thereon, including the dwelling house, tobacco barn, equipment shed, and all water rights appurtenant thereto.\n\nSUBJECT TO the easement recorded in Liber 198, Folio 44, granting the United States Geological Survey access to monitoring station BW-14 located on the eastern boundary of said property.\n\n{The USGS easement predates the deed by six years. Station BW-14 does not appear in any USGS catalogue I can find. — H.}\n\nWITNESS the hands and seals of the parties of the first part.",
+        "designSpec": {
+          "paperTone": "aged",
+          "primaryTypeface": "mixed",
+          "headerStyle": "form",
+          "hasRedactions": false,
+          "hasAnnotations": true
+        },
+        "authenticityChecks": {
+          "hasIrrelevantDetail": true,
+          "couldExistInDifferentStory": false,
+          "redactionDoesNarrativeWork": null
+        }
+      }
+    },
+    {
+      "weekNumber": 2,
+      "title": "The Water Table",
+      "epigraph": {
+        "text": "Station BW-14 backup gauge offline 5 March. Third equipment failure at this site since 1959.",
+        "attribution": "USGS Chesapeake District, internal maintenance log"
+      },
+      "isBossWeek": false,
+      "overflow": true,
+      "isDeload": false,
+      "weeklyComponent": {
+        "type": "gauge-reading",
+        "value": "E",
+        "extractionInstruction": "Apply the reversal protocol to the flagged station code. The resulting letter is your gauge reading for this week. Record it on your Gauge Reading Log, p.02."
+      },
+      "sessions": [
+        {
+          "sessionNumber": 1,
+          "label": "Session 1 · Lifting A",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "80% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "80% of 1RM"
+            },
+            {
+              "name": "Pull Up",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "80% of 1RM"
+            }
+          ],
+          "storyPrompt": "Earl racks the bar at eighty percent and the weight feels honest in a way that the world outside the garage does not. The USGS men came back yesterday. They were in the south field with equipment he did not recognize — not the usual dipsticks and sample jars but something heavier, something with cables. They did not wave when he walked past.",
+          "fragmentRef": "F.07"
+        },
+        {
+          "sessionNumber": 2,
+          "label": "Session 2 · Conditioning",
+          "exercises": [
+            {
+              "name": "Treadmill Sprint",
+              "sets": 8,
+              "repsPerSet": "30s",
+              "weightField": false,
+              "notes": "30s all-out / 90s recovery. 5-min easy warmup before round 1."
+            }
+          ],
+          "storyPrompt": "He sprints and the belt catches and he sprints again. Thirty seconds is a long time when you are running from nothing. Ninety seconds is not long enough when you are waiting to run again.",
+          "fragmentRef": "F.11"
+        },
+        {
+          "sessionNumber": 3,
+          "label": "Session 3 · Lifting B",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "80% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "80% of 1RM"
+            },
+            {
+              "name": "Pull Up",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "80% of 1RM"
+            }
+          ],
+          "storyPrompt": "The pull-up bar is a length of galvanized pipe bolted between two joists in the garage ceiling. Mary called it his church steeple. He wraps his hands around it and pulls and his body rises and he can see the south field through the window above the workbench. The USGS equipment is still out there. It has been out there for three days.",
+          "fragmentRef": "F.03"
+        },
+        {
+          "sessionNumber": 4,
+          "label": "Session 4 · Conditioning",
+          "exercises": [
+            {
+              "name": "Treadmill Sprint",
+              "sets": 8,
+              "repsPerSet": "30s",
+              "weightField": false,
+              "notes": "30s all-out / 90s recovery. 5-min easy warmup before round 1."
+            }
+          ],
+          "storyPrompt": "His heart rate comes down slower than it did last week. He stands with his hands on the treadmill rails and breathes and outside the garage door the afternoon light has the color of creek water — that brown-gold that means the peat is running."
+        },
+        {
+          "sessionNumber": 5,
+          "label": "Session 5 · Lifting C",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "80% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "80% of 1RM"
+            },
+            {
+              "name": "Deadlift",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "80% of 1RM"
+            }
+          ],
+          "storyPrompt": "The deadlift is the one that makes him think of digging. The hinge at the hip, the straight back, the way the weight wants to pull you forward into the ground if you let it. He does not let it. He has been pulling things out of the ground his whole life. Fence posts. Tobacco stalks. His father's coffin, that one time the creek flooded the churchyard in '48.",
+          "fragmentRef": "F.17"
+        }
+      ],
+      "fieldOps": {
+        "mapState": {
+          "gridDimensions": {
+            "columns": 8,
+            "rows": 5
+          },
+          "floorLabel": "Pratt Property · Shorter's Wharf Road · Survey Grid Week 02",
+          "currentPosition": {
+            "col": 3,
+            "row": 2
+          },
+          "mapNote": "Creek gauge 9 in. above norm. South field soil saturation increasing. USGS equipment present in TOB-S.",
+          "tiles": [
+            {
+              "col": 1,
+              "row": 1,
+              "type": "locked",
+              "label": "RD-1"
+            },
+            {
+              "col": 2,
+              "row": 1,
+              "type": "locked",
+              "label": "RD-2"
+            },
+            {
+              "col": 3,
+              "row": 1,
+              "type": "cleared",
+              "label": "GATE"
+            },
+            {
+              "col": 4,
+              "row": 1,
+              "type": "locked",
+              "label": "FENCE"
+            },
+            {
+              "col": 5,
+              "row": 1,
+              "type": "locked",
+              "label": "FENCE"
+            },
+            {
+              "col": 6,
+              "row": 1,
+              "type": "locked",
+              "label": "FENCE"
+            },
+            {
+              "col": 7,
+              "row": 1,
+              "type": "locked",
+              "label": "FENCE"
+            },
+            {
+              "col": 8,
+              "row": 1,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 2,
+              "type": "cleared",
+              "label": "BARN"
+            },
+            {
+              "col": 2,
+              "row": 2,
+              "type": "cleared",
+              "label": "YARD"
+            },
+            {
+              "col": 3,
+              "row": 2,
+              "type": "current",
+              "label": "HOUSE"
+            },
+            {
+              "col": 4,
+              "row": 2,
+              "type": "cleared",
+              "label": "GARDEN"
+            },
+            {
+              "col": 5,
+              "row": 2,
+              "type": "cleared",
+              "label": "TOB-N"
+            },
+            {
+              "col": 6,
+              "row": 2,
+              "type": "cleared",
+              "label": "TOB-N"
+            },
+            {
+              "col": 7,
+              "row": 2,
+              "type": "anomaly",
+              "label": "CREEK",
+              "annotation": "gauge reading high"
+            },
+            {
+              "col": 8,
+              "row": 2,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 3,
+              "type": "locked",
+              "label": "FIELD"
+            },
+            {
+              "col": 2,
+              "row": 3,
+              "type": "cleared",
+              "label": "FIELD"
+            },
+            {
+              "col": 3,
+              "row": 3,
+              "type": "cleared",
+              "label": "FIELD"
+            },
+            {
+              "col": 4,
+              "row": 3,
+              "type": "locked",
+              "label": "FIELD"
+            },
+            {
+              "col": 5,
+              "row": 3,
+              "type": "cleared",
+              "label": "TOB-S"
+            },
+            {
+              "col": 6,
+              "row": 3,
+              "type": "anomaly",
+              "label": "CREEK",
+              "annotation": "water reversal"
+            },
+            {
+              "col": 7,
+              "row": 3,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 3,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 4,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 2,
+              "row": 4,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 3,
+              "row": 4,
+              "type": "locked",
+              "label": "FIELD"
+            },
+            {
+              "col": 4,
+              "row": 4,
+              "type": "locked",
+              "label": "FIELD"
+            },
+            {
+              "col": 5,
+              "row": 4,
+              "type": "locked",
+              "label": "CREEK"
+            },
+            {
+              "col": 6,
+              "row": 4,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 7,
+              "row": 4,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 4,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 5,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 2,
+              "row": 5,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 3,
+              "row": 5,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 4,
+              "row": 5,
+              "type": "locked",
+              "label": "POND"
+            },
+            {
+              "col": 5,
+              "row": 5,
+              "type": "locked",
+              "label": "CREEK"
+            },
+            {
+              "col": 6,
+              "row": 5,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 7,
+              "row": 5,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 5,
+              "type": "inaccessible"
+            }
+          ]
+        },
+        "cipher": {
+          "type": "reverse-alphabet",
+          "title": "USGS Field Station Index — Reversal Verification · Protocol BW-14",
+          "noticeabilityDesign": "The cipher presents itself as a station verification table — a column of station codes beside a column of 'verification letters' printed in reverse order (Z through A). A single station code is circled or marked with an arrow, and the instruction to 'verify the flagged station' is printed in the style of a procedural checklist item. The table looks like bureaucratic busywork — the kind of thing a field technician would fill in without thinking — which makes it inviting to engage with.",
+          "body": {
+            "displayText": "STATION VERIFICATION INDEX\n\nStation    Code    Verification\nBW-01      Z       ···\nBW-02      Y       ···\nBW-03      X       ···\nBW-04      W       ···\nBW-05      V    ← FLAGGED\nBW-06      U       ···\nBW-07      T       ···\nBW-08      S       ···\nBW-09      R       ···\nBW-10      Q       ···",
+            "key": "Reversal protocol: each station code maps to its alphabetic complement.\nA↔Z  B↔Y  C↔X  D↔W  E↔V  F↔U  G↔T  H↔S  I↔R  J↔Q\nK↔P  L↔O  M↔N",
+            "workSpace": {
+              "rows": 2,
+              "style": "boxgrid"
+            }
+          },
+          "extractionInstruction": "Apply the reversal protocol to the flagged station's code letter. Record the resulting letter on your Gauge Reading Log, p.02.",
+          "characterDerivationProof": "The flagged station is BW-05, which has code letter V. The reversal key shows E↔V, meaning V maps to E. The resulting letter is E. This matches weeklyComponent value 'E'."
+        },
+        "oracleTable": {
+          "title": "Dorchester County Conditions Log · Daily Field Observation",
+          "instruction": "During any rest period, roll 2d6 and consult the log below. Record what you find.",
+          "mode": "simple",
+          "entries": [
+            {
+              "roll": "2",
+              "text": "The USGS equipment in the south field has been running all night. The cables lead into the ground. The ground has not objected.",
+              "type": "fragment",
+              "fragmentRef": "F.08"
+            },
+            {
+              "roll": "3",
+              "text": "Jasper says his dog will not cross the creek anymore. Sits on the bank and whines. Jasper is not the kind of man who notices what dogs do.",
+              "type": "fragment",
+              "fragmentRef": "F.10"
+            },
+            {
+              "roll": "4",
+              "text": "There is a smell in the south tobacco field that Earl cannot place. Not rot. Not sulfur. Something older. Something the peat has been keeping.",
+              "type": "fragment",
+              "fragmentRef": "F.09"
+            },
+            {
+              "roll": "5",
+              "text": "The water gauge at BW-14 has risen another three inches. That is nine inches above seasonal normal. Earl reported it to the county. The county said they would send someone.",
+              "type": "fragment",
+              "fragmentRef": "F.15"
+            },
+            {
+              "roll": "6",
+              "text": "Mary's photograph on the kitchen table has water spots on the glass. Earl has not cleaned the glass. He has not opened any windows. The spots are on the inside.",
+              "type": "fragment",
+              "fragmentRef": "F.13"
+            },
+            {
+              "roll": "7",
+              "text": "One of the USGS men — the older one, Harmon — asked Earl if he had noticed anything unusual about the creek. Earl said the creek had always been unusual. Harmon wrote that down.",
+              "type": "fragment",
+              "fragmentRef": "F.07"
+            },
+            {
+              "roll": "8",
+              "text": "The tobacco in the south field is growing faster than it should for March. The leaves are the right color. The height is wrong. Earl has been farming tobacco for twenty-seven years.",
+              "type": "fragment",
+              "fragmentRef": "F.19"
+            },
+            {
+              "roll": "9",
+              "text": "Mark the TOB-N tiles on your survey grid with a small circle. The soil composition there has changed since last week's reading.",
+              "type": "consequence"
+            },
+            {
+              "roll": "10",
+              "text": "The heron is still at the culvert. It has been there for four days. Earl threw a stone past it on Tuesday. It did not move. Mark the CREEK tile nearest the HOUSE with a dot.",
+              "type": "consequence"
+            },
+            {
+              "roll": "11",
+              "text": "Earl found Mary's unfinished letter in the bureau drawer. She was writing to her sister Ruth. She did not finish the sentence about the water.",
+              "type": "fragment",
+              "fragmentRef": "F.11"
+            },
+            {
+              "roll": "12",
+              "text": "The entire south property line is wet. Not flooded — wet the way a sponge is wet. The water is coming from below. Mark all FIELD tiles adjacent to CREEK as anomaly on your grid.",
+              "type": "consequence"
+            }
+          ]
+        }
+      },
+      "overflowDocument": {
+        "id": "F.31",
+        "documentType": "report",
+        "inWorldAuthor": "U.S. Coast and Geodetic Survey",
+        "inWorldRecipient": "Chesapeake Bay maritime community, general distribution",
+        "inWorldPurpose": "Tide table excerpt for the Honga River and Little Blackwater tributaries, March 1962",
+        "content": "U.S. COAST AND GEODETIC SURVEY\nTIDE TABLES · CHESAPEAKE BAY AND TRIBUTARIES\nMarch 1962 · Honga River / Little Blackwater / Fishing Bay\n\nPREDICTED HIGH WATER — CAMBRIDGE (REFERENCE STATION)\nCorrections for Shorter's Wharf: +47 min, ×0.91 height factor\n\nDate     High 1    Ht(ft)   High 2    Ht(ft)   Low 1     Low 2\nMar 01   0423      2.1      1647      2.3      1035      2258\nMar 02   0511      2.0      1738      2.2      1122      2347\nMar 03   0558      1.9      1826      2.1      1207      ——\nMar 04   0644      1.8      1912      2.0      0033      1251\nMar 05   0729      1.7      1957      1.9      0118      1334\nMar 06   [DATA MISSING - STATION BW-14 OFFLINE]\nMar 07   [DATA MISSING]\nMar 08   [DATA MISSING]\nMar 09   0931      2.4      2143      2.8      0306      1519\nMar 10   1002      2.6      2214      3.1      0338      1551\n\n{Three days of missing data is unusual but not unprecedented. Station BW-14 went offline November 1961. The backup gauge at Shorter's Wharf was installed in January. The backup gauge is also offline as of March 5. Nobody has asked why both gauges failed in the same week. — H.}\n\nNOTE: Heights on March 9-10 exceed predicted maxima by 0.4-0.9 ft. No storm surge event recorded. Correction factor under review.\n\nPUBLISHED BY AUTHORITY OF THE SECRETARY OF COMMERCE",
+        "designSpec": {
+          "paperTone": "cold",
+          "primaryTypeface": "mono",
+          "headerStyle": "form",
+          "hasRedactions": false,
+          "hasAnnotations": true
+        },
+        "authenticityChecks": {
+          "hasIrrelevantDetail": true,
+          "couldExistInDifferentStory": false,
+          "redactionDoesNarrativeWork": null
+        }
+      }
+    },
+    {
+      "weekNumber": 3,
+      "title": "The Silence at Blackwater",
+      "epigraph": {
+        "text": "Civilian proximity awareness confirmed. Operational timeline accelerated.",
+        "attribution": "TIDEGATE field log, entry 47, date withheld"
+      },
+      "isBossWeek": false,
+      "overflow": true,
+      "isDeload": false,
+      "weeklyComponent": {
+        "type": "gauge-reading",
+        "value": "R",
+        "extractionInstruction": "Locate the flagged parcel in the USGS reference matrix. The letter at that grid position is your gauge reading for this week. Record it on your Gauge Reading Log, p.02."
+      },
+      "sessions": [
+        {
+          "sessionNumber": 1,
+          "label": "Session 1 · Lifting A",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 3,
+              "weightField": true,
+              "notes": "90% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 3,
+              "weightField": true,
+              "notes": "90% of 1RM"
+            },
+            {
+              "name": "Pull Up",
+              "sets": 3,
+              "repsPerSet": 3,
+              "weightField": true,
+              "notes": "90% of 1RM"
+            }
+          ],
+          "storyPrompt": "Ninety percent is a weight that does not permit thinking about anything else. Earl descends into the squat and the bar bends across his traps and for three repetitions the only thing in the world is the weight and the floor and the distance between them. When he racks it the garage is quiet and outside the garage the marsh is quiet and neither quiet is the same kind.",
+          "fragmentRef": "F.12"
+        },
+        {
+          "sessionNumber": 2,
+          "label": "Session 2 · Conditioning",
+          "exercises": [
+            {
+              "name": "Treadmill Sprint",
+              "sets": 8,
+              "repsPerSet": "30s",
+              "weightField": false,
+              "notes": "30s all-out / 90s recovery. 5-min easy warmup before round 1."
+            }
+          ],
+          "storyPrompt": "The sprints are harder at this intensity and Earl welcomes it the way he welcomes a day of hard labor — because it fills the space where other things would grow if he let them. The treadmill faces the wall. He does not need to see the south field.",
+          "fragmentRef": "F.08"
+        },
+        {
+          "sessionNumber": 3,
+          "label": "Session 3 · Lifting B",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 3,
+              "weightField": true,
+              "notes": "90% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 3,
+              "weightField": true,
+              "notes": "90% of 1RM"
+            },
+            {
+              "name": "Pull Up",
+              "sets": 3,
+              "repsPerSet": 3,
+              "weightField": true,
+              "notes": "90% of 1RM"
+            }
+          ],
+          "storyPrompt": "Harmon came to the house last night. Not to the gate — to the house. He stood on the porch and took off his hat and he said, Mr. Pratt, what I am about to tell you is not something the Geological Survey tells people. Earl said, You are not from the Geological Survey. Harmon put his hat back on and said, No sir, I am not.",
+          "fragmentRef": "F.16"
+        },
+        {
+          "sessionNumber": 4,
+          "label": "Session 4 · Conditioning",
+          "exercises": [
+            {
+              "name": "Treadmill Sprint",
+              "sets": 8,
+              "repsPerSet": "30s",
+              "weightField": false,
+              "notes": "30s all-out / 90s recovery. 5-min easy warmup before round 1."
+            }
+          ],
+          "storyPrompt": "He runs and his body holds the conversation his mouth will not. The sprint is an argument. The recovery is the silence after. He has been married to silence for eleven months.",
+          "fragmentRef": "F.13"
+        },
+        {
+          "sessionNumber": 5,
+          "label": "Session 5 · Lifting C",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 3,
+              "weightField": true,
+              "notes": "90% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 3,
+              "weightField": true,
+              "notes": "90% of 1RM"
+            },
+            {
+              "name": "Deadlift",
+              "sets": 3,
+              "repsPerSet": 3,
+              "weightField": true,
+              "notes": "90% of 1RM"
+            }
+          ],
+          "storyPrompt": "The deadlift is three plates now and Earl's hands remember what his mind is trying to forget — that the ground gives things back. That what goes into the soil does not stay there. He pulls and the bar rises and in the south field the water is six inches above the roots of the tobacco and the tobacco is growing anyway.",
+          "fragmentRef": "F.05",
+          "binaryChoice": {
+            "choiceLabel": "Harmon left a number on a card on the kitchen table. He said to call it if anything changes. He said: you will know what changes means when it happens.",
+            "promptA": "Earl puts the card in his shirt pocket where he keeps his tobacco knife and the photograph of Mary at Assateague.",
+            "promptB": "Earl leaves the card on the table under the sugar bowl where Mary's letters used to collect."
+          }
+        }
+      ],
+      "fieldOps": {
+        "mapState": {
+          "gridDimensions": {
+            "columns": 8,
+            "rows": 5
+          },
+          "floorLabel": "Pratt Property · Shorter's Wharf Road · Survey Grid Week 03",
+          "currentPosition": {
+            "col": 5,
+            "row": 3
+          },
+          "mapNote": "Creek reversal events: 3 this week. Saturation zone expanding west. Subject avoiding south field.",
+          "tiles": [
+            {
+              "col": 1,
+              "row": 1,
+              "type": "locked",
+              "label": "RD-1"
+            },
+            {
+              "col": 2,
+              "row": 1,
+              "type": "locked",
+              "label": "RD-2"
+            },
+            {
+              "col": 3,
+              "row": 1,
+              "type": "cleared",
+              "label": "GATE"
+            },
+            {
+              "col": 4,
+              "row": 1,
+              "type": "cleared",
+              "label": "FENCE"
+            },
+            {
+              "col": 5,
+              "row": 1,
+              "type": "locked",
+              "label": "FENCE"
+            },
+            {
+              "col": 6,
+              "row": 1,
+              "type": "locked",
+              "label": "FENCE"
+            },
+            {
+              "col": 7,
+              "row": 1,
+              "type": "locked",
+              "label": "FENCE"
+            },
+            {
+              "col": 8,
+              "row": 1,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 2,
+              "type": "cleared",
+              "label": "BARN"
+            },
+            {
+              "col": 2,
+              "row": 2,
+              "type": "cleared",
+              "label": "YARD"
+            },
+            {
+              "col": 3,
+              "row": 2,
+              "type": "cleared",
+              "label": "HOUSE"
+            },
+            {
+              "col": 4,
+              "row": 2,
+              "type": "cleared",
+              "label": "GARDEN"
+            },
+            {
+              "col": 5,
+              "row": 2,
+              "type": "cleared",
+              "label": "TOB-N",
+              "annotation": "soil changed"
+            },
+            {
+              "col": 6,
+              "row": 2,
+              "type": "anomaly",
+              "label": "TOB-N",
+              "annotation": "saturated"
+            },
+            {
+              "col": 7,
+              "row": 2,
+              "type": "anomaly",
+              "label": "CREEK",
+              "annotation": "gauge offline"
+            },
+            {
+              "col": 8,
+              "row": 2,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 3,
+              "type": "locked",
+              "label": "FIELD"
+            },
+            {
+              "col": 2,
+              "row": 3,
+              "type": "cleared",
+              "label": "FIELD"
+            },
+            {
+              "col": 3,
+              "row": 3,
+              "type": "cleared",
+              "label": "FIELD"
+            },
+            {
+              "col": 4,
+              "row": 3,
+              "type": "cleared",
+              "label": "FIELD"
+            },
+            {
+              "col": 5,
+              "row": 3,
+              "type": "current",
+              "label": "TOB-S"
+            },
+            {
+              "col": 6,
+              "row": 3,
+              "type": "anomaly",
+              "label": "CREEK",
+              "annotation": "reversal x3"
+            },
+            {
+              "col": 7,
+              "row": 3,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 3,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 4,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 2,
+              "row": 4,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 3,
+              "row": 4,
+              "type": "cleared",
+              "label": "FIELD"
+            },
+            {
+              "col": 4,
+              "row": 4,
+              "type": "locked",
+              "label": "FIELD"
+            },
+            {
+              "col": 5,
+              "row": 4,
+              "type": "anomaly",
+              "label": "CREEK",
+              "annotation": "high water"
+            },
+            {
+              "col": 6,
+              "row": 4,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 7,
+              "row": 4,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 4,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 5,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 2,
+              "row": 5,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 3,
+              "row": 5,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 4,
+              "row": 5,
+              "type": "locked",
+              "label": "POND"
+            },
+            {
+              "col": 5,
+              "row": 5,
+              "type": "anomaly",
+              "label": "CREEK",
+              "annotation": "silt deposits"
+            },
+            {
+              "col": 6,
+              "row": 5,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 7,
+              "row": 5,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 5,
+              "type": "inaccessible"
+            }
+          ]
+        },
+        "cipher": {
+          "type": "coordinate-lookup",
+          "title": "USGS Soil Survey Grid — Parcel Reference Matrix · Dorchester District 4",
+          "noticeabilityDesign": "A small letter grid printed in the style of a USGS reference matrix — column headers numbered 1-5, row headers lettered A-D. The grid is filled with letters that look like standard parcel codes. A single cell is marked with a small arrow or asterisk, and the instruction reads like a standard cross-reference protocol. The grid looks like part of the official survey paperwork — something the reader would naturally try to decode.",
+          "body": {
+            "displayText": "PARCEL REFERENCE MATRIX — DISTRICT 4\n\n     1    2    3    4    5\nA    P    Q    T    M    K\nB    D    F    R    J    L\nC    A    B    G    S    W\nD    H    N    E    O    V\n\nFLAGGED PARCEL: B-3",
+            "key": "Cross-reference the flagged parcel coordinates against the matrix. Row first, then column.",
+            "workSpace": {
+              "rows": 2,
+              "style": "boxgrid"
+            }
+          },
+          "extractionInstruction": "Locate the flagged parcel in the reference matrix. Record the letter at that position on your Gauge Reading Log, p.02.",
+          "characterDerivationProof": "The flagged parcel is B-3. Row B, Column 3 of the matrix contains the letter R. This matches weeklyComponent value 'R'."
+        },
+        "oracleTable": {
+          "title": "Dorchester County Conditions Log · Daily Field Observation",
+          "instruction": "During any rest period, roll 2d6 and consult the log below. Record what you find.",
+          "mode": "simple",
+          "entries": [
+            {
+              "roll": "2",
+              "text": "The 1938 property survey has markings on it that were not there when Earl's father filed it. Small circles along the eastern boundary. Seven of them. One for each decade since the survey was drawn.",
+              "type": "fragment",
+              "fragmentRef": "F.14"
+            },
+            {
+              "roll": "3",
+              "text": "Harmon's partner — the younger one, the one who does not speak — was in the marsh before dawn with equipment Earl has never seen. It made a sound like sonar. The marsh made a sound back.",
+              "type": "fragment",
+              "fragmentRef": "F.08"
+            },
+            {
+              "roll": "4",
+              "text": "The creek reversed again at 3:47 AM. Earl knows the time because he was already awake. He has been awake at 3:47 AM every night this week.",
+              "type": "fragment",
+              "fragmentRef": "F.04"
+            },
+            {
+              "roll": "5",
+              "text": "The county extension agent will not return Earl's calls about the soil report. His office says he is on leave. His car is still in the office parking lot.",
+              "type": "fragment",
+              "fragmentRef": "F.19"
+            },
+            {
+              "roll": "6",
+              "text": "Something killed four of Jasper's chickens overnight. Not a fox — a fox leaves feathers and blood. These were just empty. Jasper did not use the word 'empty.' Earl did.",
+              "type": "fragment",
+              "fragmentRef": "F.10"
+            },
+            {
+              "roll": "7",
+              "text": "The water in the creek is the color of tea. Not the color of tannin runoff — the color of tea that has been steeping for a hundred years. The fish are fine. The fish have always been fine.",
+              "type": "fragment",
+              "fragmentRef": "F.15"
+            },
+            {
+              "roll": "8",
+              "text": "Harmon asked Earl about Mary. Not how she died — when. Earl told him. Harmon wrote the date down and then looked at his own notes for a long time and then closed the notebook.",
+              "type": "fragment",
+              "fragmentRef": "F.16"
+            },
+            {
+              "roll": "9",
+              "text": "The POND tile on your grid is now accessible. Earl walked the south woods this week. Mark POND as cleared but add a question mark — the water level is wrong for the season.",
+              "type": "consequence"
+            },
+            {
+              "roll": "10",
+              "text": "Earl found boot prints in the mud at the creek that do not match any shoe he owns or any shoe the government men wear. The prints lead into the marsh. They do not lead out. Mark CREEK tiles with a second arrow.",
+              "type": "consequence"
+            },
+            {
+              "roll": "11",
+              "text": "The tobacco in the south field is eighteen inches tall. It should be four inches tall. It is March. Earl has not told anyone because he does not know what telling would accomplish.",
+              "type": "fragment",
+              "fragmentRef": "F.09"
+            },
+            {
+              "roll": "12",
+              "text": "At 3:47 AM the marsh made a sound that Earl will later describe to Harmon as 'the sound a well makes when the water table finds it.' Harmon did not write this down. He already knew. Mark one additional FIELD tile adjacent to CREEK as anomaly.",
+              "type": "consequence"
+            }
+          ]
+        }
+      },
+      "overflowDocument": {
+        "id": "F.32",
+        "documentType": "fieldNote",
+        "inWorldAuthor": "Agent Harmon, [REDACTED] Division",
+        "inWorldRecipient": "Case file TIDEGATE, surveillance log",
+        "inWorldPurpose": "Photographic observation notes, Pratt property perimeter, March week 3",
+        "content": "[REDACTED] DIVISION — FIELD SURVEILLANCE LOG\nOPERATION: TIDEGATE\nSITE: Pratt property, Shorter's Wharf Rd, Dorchester Co.\nOBSERVER: Harmon\nDATE: [REDACTED] March 1962\n\n0347 — Activity at creek boundary, sectors E-5 through E-7. Water surface disturbance without wind or tidal cause. Duration: approx. 90 seconds. Photographed (roll 14, exposures 22-25). Water returned to normal flow.\n\n0348 — Subject (Pratt, E.) observed at kitchen window, second floor dark. Subject has been present at window at 0347 for six consecutive nights. Subject's awareness of the 0347 event is not confirmed but should be assumed.\n\n0612 — First light. Creek flow normal. Water color: dark amber, consistent with prior observations. Water level: 11 inches above seasonal datum.\n\n0744 — Subject exited dwelling, walked to barn. Normal morning routine. Fed livestock. Did not approach creek or south field. Has not approached south field since Tuesday.\n\n0915 — Green heron present at culvert pipe, position unchanged from yesterday. Bird has been in continuous observation of the creek mouth for 9 days. Bernstein suggests avian behavior is not within our operational purview. Bernstein has not been assigned to a wetland operation before.\n\nNOTE: Pratt's avoidance of the south field correlates with the expansion of the saturation zone. He has not been briefed. His avoidance is instinctive. This is consistent with civilian response patterns documented in the '47 report (ref: TIDEGATE-AAR-1947, p.14, 'Behavioral Indicators of Subconscious Proximity Awareness').\n\n{He knows. He has always known. The question is whether knowing protects him or makes him a better conductor. — H.}",
+        "designSpec": {
+          "paperTone": "cold",
+          "primaryTypeface": "mono",
+          "headerStyle": "form",
+          "hasRedactions": true,
+          "hasAnnotations": true
+        },
+        "authenticityChecks": {
+          "hasIrrelevantDetail": true,
+          "couldExistInDifferentStory": false,
+          "redactionDoesNarrativeWork": true
+        }
+      }
+    },
+    {
+      "weekNumber": 4,
+      "title": "Still Water",
+      "epigraph": {
+        "text": "Water table at 22 inches. Twelve above datum. Rate of rise: accelerating.",
+        "attribution": "Handwritten on the back of a tide table, unsigned"
+      },
+      "isBossWeek": false,
+      "overflow": true,
+      "isDeload": false,
+      "weeklyComponent": {
+        "type": "gauge-reading",
+        "value": "O",
+        "extractionInstruction": "Complete the cross-reference verification protocol using Fragment F.15. The resulting alphabet position is your gauge reading for this week. Record it on your Gauge Reading Log, p.02."
+      },
+      "sessions": [
+        {
+          "sessionNumber": 1,
+          "label": "Session 1 · Lifting A",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "75% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "75% of 1RM"
+            },
+            {
+              "name": "Pull Up",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "75% of 1RM"
+            }
+          ],
+          "storyPrompt": "Seventy-five percent. The weight is lighter than last week and Earl's body is grateful in the way a field is grateful for a week without rain — not recovered, just less saturated. He squats and the bar moves well and he thinks about nothing, which is the closest thing to prayer he has left.",
+          "fragmentRef": "F.18"
+        },
+        {
+          "sessionNumber": 2,
+          "label": "Session 2 · Conditioning",
+          "exercises": [
+            {
+              "name": "Treadmill Sprint",
+              "sets": 8,
+              "repsPerSet": "30s",
+              "weightField": false,
+              "notes": "30s all-out / 90s recovery. 5-min easy warmup before round 1."
+            }
+          ],
+          "storyPrompt": "He runs with his eyes closed for the first three sprints. Not because he is brave but because the garage wall he faces has a watermark on it that was not there yesterday and he does not want to measure how high it reaches."
+        },
+        {
+          "sessionNumber": 3,
+          "label": "Session 3 · Lifting B",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "75% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "75% of 1RM"
+            },
+            {
+              "name": "Pull Up",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "75% of 1RM"
+            }
+          ],
+          "storyPrompt": "Earl pulls himself up to the pipe and holds at the top and looks through the window. Harmon is in the south field with a device Earl has decided not to ask about. Harmon moves carefully, the way a man moves through a room where someone is sleeping. The south field is not sleeping.",
+          "fragmentRef": "F.21"
+        },
+        {
+          "sessionNumber": 4,
+          "label": "Session 4 · Conditioning",
+          "exercises": [
+            {
+              "name": "Treadmill Sprint",
+              "sets": 8,
+              "repsPerSet": "30s",
+              "weightField": false,
+              "notes": "30s all-out / 90s recovery. 5-min easy warmup before round 1."
+            }
+          ],
+          "storyPrompt": "Sprint and recover. Sprint and recover. The rhythm is the same rhythm as the tides and Earl has noticed this and has decided not to think about it.",
+          "fragmentRef": "F.15"
+        },
+        {
+          "sessionNumber": 5,
+          "label": "Session 5 · Lifting C",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "75% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "75% of 1RM"
+            },
+            {
+              "name": "Deadlift",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "75% of 1RM"
+            }
+          ],
+          "storyPrompt": "He pulls the deadlift and sets it down and pulls it again and sets it down and somewhere in the third set he starts talking to Mary. Not out loud. Just in his head, the way he does at the kitchen table, the way he has done every night since April. He tells her the water is coming up. He tells her the government men are not government men. He tells her the heron will not leave.",
+          "fragmentRef": "F.13"
+        }
+      ],
+      "fieldOps": {
+        "mapState": {
+          "gridDimensions": {
+            "columns": 8,
+            "rows": 5
+          },
+          "floorLabel": "Pratt Property · Shorter's Wharf Road · Survey Grid Week 04",
+          "currentPosition": {
+            "col": 3,
+            "row": 2
+          },
+          "mapNote": "Saturation zone now includes south tobacco, pond, and field parcels. House basement showed water intrusion 0347 on 18 March.",
+          "tiles": [
+            {
+              "col": 1,
+              "row": 1,
+              "type": "cleared",
+              "label": "RD-1"
+            },
+            {
+              "col": 2,
+              "row": 1,
+              "type": "cleared",
+              "label": "RD-2"
+            },
+            {
+              "col": 3,
+              "row": 1,
+              "type": "cleared",
+              "label": "GATE"
+            },
+            {
+              "col": 4,
+              "row": 1,
+              "type": "cleared",
+              "label": "FENCE"
+            },
+            {
+              "col": 5,
+              "row": 1,
+              "type": "cleared",
+              "label": "FENCE"
+            },
+            {
+              "col": 6,
+              "row": 1,
+              "type": "cleared",
+              "label": "FENCE"
+            },
+            {
+              "col": 7,
+              "row": 1,
+              "type": "locked",
+              "label": "FENCE"
+            },
+            {
+              "col": 8,
+              "row": 1,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 2,
+              "type": "cleared",
+              "label": "BARN"
+            },
+            {
+              "col": 2,
+              "row": 2,
+              "type": "cleared",
+              "label": "YARD"
+            },
+            {
+              "col": 3,
+              "row": 2,
+              "type": "current",
+              "label": "HOUSE"
+            },
+            {
+              "col": 4,
+              "row": 2,
+              "type": "cleared",
+              "label": "GARDEN"
+            },
+            {
+              "col": 5,
+              "row": 2,
+              "type": "cleared",
+              "label": "TOB-N"
+            },
+            {
+              "col": 6,
+              "row": 2,
+              "type": "anomaly",
+              "label": "TOB-N",
+              "annotation": "soil black"
+            },
+            {
+              "col": 7,
+              "row": 2,
+              "type": "anomaly",
+              "label": "CREEK"
+            },
+            {
+              "col": 8,
+              "row": 2,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 3,
+              "type": "cleared",
+              "label": "FIELD"
+            },
+            {
+              "col": 2,
+              "row": 3,
+              "type": "cleared",
+              "label": "FIELD"
+            },
+            {
+              "col": 3,
+              "row": 3,
+              "type": "cleared",
+              "label": "FIELD"
+            },
+            {
+              "col": 4,
+              "row": 3,
+              "type": "cleared",
+              "label": "FIELD"
+            },
+            {
+              "col": 5,
+              "row": 3,
+              "type": "anomaly",
+              "label": "TOB-S",
+              "annotation": "growth rate wrong"
+            },
+            {
+              "col": 6,
+              "row": 3,
+              "type": "anomaly",
+              "label": "CREEK"
+            },
+            {
+              "col": 7,
+              "row": 3,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 3,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 4,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 2,
+              "row": 4,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 3,
+              "row": 4,
+              "type": "cleared",
+              "label": "FIELD"
+            },
+            {
+              "col": 4,
+              "row": 4,
+              "type": "anomaly",
+              "label": "FIELD",
+              "annotation": "wet underfoot"
+            },
+            {
+              "col": 5,
+              "row": 4,
+              "type": "anomaly",
+              "label": "CREEK"
+            },
+            {
+              "col": 6,
+              "row": 4,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 7,
+              "row": 4,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 4,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 5,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 2,
+              "row": 5,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 3,
+              "row": 5,
+              "type": "locked",
+              "label": "WOODS"
+            },
+            {
+              "col": 4,
+              "row": 5,
+              "type": "cleared",
+              "label": "POND",
+              "annotation": "level wrong"
+            },
+            {
+              "col": 5,
+              "row": 5,
+              "type": "anomaly",
+              "label": "CREEK"
+            },
+            {
+              "col": 6,
+              "row": 5,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 7,
+              "row": 5,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 5,
+              "type": "inaccessible"
+            }
+          ]
+        },
+        "cipher": {
+          "type": "fragment-cross-reference",
+          "title": "County Records Office — Cross-Reference Verification · File DC-1962-044",
+          "noticeabilityDesign": "The cipher looks like a records office cross-reference instruction — the kind of form that says 'verify the following entry against the referenced document.' It names a specific fragment (F.15) and a specific line to count to, creating a paper trail between sections of the booklet. The instruction to 'count' and 'locate' makes the puzzle self-evident — it looks like homework the county clerk left undone.",
+          "body": {
+            "displayText": "CROSS-REFERENCE VERIFICATION\n\nPrimary document: Water Gauge Readings (F.15)\nReference line: Locate the highest single-day reading in the March column.\nThe reading is a three-digit number.\nDivide by 10. Round down to the nearest whole number.\nThat number is your alphabet position (A=1, B=2, ... Z=26).",
+            "key": "Alphabet position reference: A=1 B=2 C=3 D=4 E=5 F=6 G=7 H=8 I=9 J=10 K=11 L=12 M=13 N=14 O=15 P=16 Q=17 R=18 S=19 T=20 U=21 V=22 W=23 X=24 Y=25 Z=26",
+            "workSpace": {
+              "rows": 3,
+              "style": "ruled"
+            }
+          },
+          "extractionInstruction": "Follow the cross-reference protocol above using Fragment F.15. Record the resulting letter on your Gauge Reading Log, p.02.",
+          "characterDerivationProof": "Fragment F.15 contains water gauge readings for March 1962. The highest single-day reading is 152 (March 10, during the anomalous high-water event). 152 / 10 = 15.2. Rounded down = 15. Alphabet position 15 = O. This matches weeklyComponent value 'O'."
+        },
+        "oracleTable": {
+          "title": "Dorchester County Conditions Log · Daily Field Observation",
+          "instruction": "During any rest period, roll 2d6 and consult the log below. Record what you find.",
+          "mode": "simple",
+          "entries": [
+            {
+              "roll": "2",
+              "text": "The 1947 after-action report references a 'tidal entity' in language so clinical it takes two readings to understand what it is describing. The entity was not neutralized. It was 'contained by seasonal recession.'",
+              "type": "fragment",
+              "fragmentRef": "F.17"
+            },
+            {
+              "roll": "3",
+              "text": "Harmon told Earl that the agency he works for does not have a name that is used in conversation. Earl said that was fine. He has a creek that does not have a direction.",
+              "type": "fragment",
+              "fragmentRef": "F.16"
+            },
+            {
+              "roll": "4",
+              "text": "The pond in the south woods has risen eighteen inches since last month. There has been no rain. The water is coming from below. The water has always been coming from below.",
+              "type": "fragment",
+              "fragmentRef": "F.09"
+            },
+            {
+              "roll": "5",
+              "text": "Earl found Mary's recipe card for beaten biscuits in the kitchen drawer. On the back, in her handwriting: a date. Not a date he recognizes. A date that has not happened yet.",
+              "type": "fragment",
+              "fragmentRef": "F.20"
+            },
+            {
+              "roll": "6",
+              "text": "The county sent a man about the soil readings. The man took samples and said he would send results. He looked at the creek. He did not take samples from the creek. He left before noon.",
+              "type": "fragment",
+              "fragmentRef": "F.19"
+            },
+            {
+              "roll": "7",
+              "text": "Earl sat at the kitchen table and talked to Mary's photograph for forty-seven minutes. He told her about the water. He told her about Harmon. He asked her what she would do. The photograph did not answer. The water spot on the glass is larger.",
+              "type": "fragment",
+              "fragmentRef": "F.13"
+            },
+            {
+              "roll": "8",
+              "text": "Bernstein — the younger agent — was found standing in the creek at dawn. Ankle deep. Facing east. He said he was taking a reading. He was not holding any equipment. Mark the CREEK tile nearest POND with an X.",
+              "type": "consequence"
+            },
+            {
+              "roll": "9",
+              "text": "The fence posts along the south line are now leaning at a uniform angle. Not toward the marsh. Toward the house.",
+              "type": "fragment",
+              "fragmentRef": "F.14"
+            },
+            {
+              "roll": "10",
+              "text": "Something is growing in the marsh that Harmon says is not a plant. Earl asked what it was. Harmon said: it is the reason we are here, Mr. Pratt. Harmon did not elaborate. Mark one MARSH tile as anomaly instead of inaccessible.",
+              "type": "consequence"
+            },
+            {
+              "roll": "11",
+              "text": "The heron at the culvert is dead. It is still standing. Earl checked. The bird is dead and standing and facing the house. It has been dead for at least two days.",
+              "type": "fragment",
+              "fragmentRef": "F.21"
+            },
+            {
+              "roll": "12",
+              "text": "At 3:47 AM the water table rose through the basement floor of the farmhouse. One quarter inch of water, black as peat. By dawn it had receded. The floor is dry. The stain remains. Mark the HOUSE tile with a small water symbol.",
+              "type": "consequence"
+            }
+          ]
+        }
+      },
+      "overflowDocument": {
+        "id": "F.33",
+        "documentType": "report",
+        "inWorldAuthor": "Dr. Samuel Finch, DVM",
+        "inWorldRecipient": "Dorchester County Agricultural Extension Office",
+        "inWorldPurpose": "Veterinary incident report concerning livestock behavioral anomalies in Election District 4",
+        "content": "DORCHESTER COUNTY AGRICULTURAL EXTENSION\nVETERINARY INCIDENT REPORT\nFiled by: Dr. Samuel Finch, DVM, Cambridge\nDate: 19 March 1962\nRe: Livestock behavioral anomalies, Shorter's Wharf Road vicinity\n\nI was called to the Tolson farm on March 14 to examine a heifer that had been recovered from the marsh edge in a state of apparent catalepsy. The animal was standing, responsive to light stimulus, but would not eat, drink, or move voluntarily. Heart rate and respiration were within normal limits. Temperature was 99.8°F — slightly below normal for a Hereford of this age.\n\nThe animal's hooves showed no marsh mud. This is notable because the animal was recovered from the marsh edge, approximately 200 yards into soft ground. The hooves were clean. Not cleaned — clean. As if the animal had been placed there.\n\nI have also received informal reports from three other properties along Shorter's Wharf Road regarding unusual animal behavior: dogs refusing to cross water features, poultry found dead without visible cause (see note below), and a general pattern of livestock orienting toward the southeast during resting periods.\n\nThe poultry deaths are unusual. Mr. Tolson's description — 'like someone let the air out of them' — is not a clinical observation but I was unable to improve upon it during my examination of the remains. The birds were intact. They were simply no longer occupied.\n\nI am not inclined to file a disease report. I am not confident this is a disease.\n\nI mentioned these observations to the USGS team working the Pratt property adjacent. They were already aware. They did not explain how.\n\nRespectfully submitted,\nS. Finch, DVM",
+        "designSpec": {
+          "paperTone": "warm",
+          "primaryTypeface": "mixed",
+          "headerStyle": "letterhead",
+          "hasRedactions": false,
+          "hasAnnotations": false
+        },
+        "authenticityChecks": {
+          "hasIrrelevantDetail": true,
+          "couldExistInDifferentStory": false,
+          "redactionDoesNarrativeWork": null
+        }
+      }
+    },
+    {
+      "weekNumber": 5,
+      "title": "The Bottom",
+      "epigraph": {
+        "text": "Water table at 6 inches. Property boundary survey no longer concordant with 1938 filing.",
+        "attribution": "Handwritten, taped to the inside of the barn door, unsigned"
+      },
+      "isBossWeek": false,
+      "overflow": true,
+      "isDeload": false,
+      "weeklyComponent": {
+        "type": "gauge-reading",
+        "value": "N",
+        "extractionInstruction": "Complete the three-source composite verification using your survey grid and Fragment F.14. The resulting alphabet position is your gauge reading. Record it on your Gauge Reading Log, p.02."
+      },
+      "sessions": [
+        {
+          "sessionNumber": 1,
+          "label": "Session 1 · Lifting A",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "85% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "85% of 1RM"
+            },
+            {
+              "name": "Pull Up",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "85% of 1RM"
+            }
+          ],
+          "storyPrompt": "Eighty-five percent and Earl's hands are shaking before he touches the bar. Not from the weight. From what he saw in the south field this morning — the tobacco standing in six inches of black water, every stalk upright, every leaf green, growing as if the water were sunlight. He grips the bar and squats because squatting is the one thing that still follows rules.",
+          "fragmentRef": "F.22"
+        },
+        {
+          "sessionNumber": 2,
+          "label": "Session 2 · Conditioning",
+          "exercises": [
+            {
+              "name": "Treadmill Sprint",
+              "sets": 8,
+              "repsPerSet": "30s",
+              "weightField": false,
+              "notes": "30s all-out / 90s recovery. 5-min easy warmup before round 1."
+            }
+          ],
+          "storyPrompt": "He runs and the sweat tastes like creek water. It does not. He knows it does not. But the knowledge and the taste are occupying different parts of him now and the part that tastes is older and does not answer to the part that knows.",
+          "fragmentRef": "F.05"
+        },
+        {
+          "sessionNumber": 3,
+          "label": "Session 3 · Lifting B",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "85% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "85% of 1RM"
+            },
+            {
+              "name": "Pull Up",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "85% of 1RM"
+            }
+          ],
+          "storyPrompt": "Harmon has not come to the property in three days. Bernstein is gone entirely — his car is not at the motel in Cambridge, his equipment is still in the south field. Earl does his pull-ups and at the top of the third rep he sees that the equipment in the field is no longer connected to anything. The cables go into the ground. The instruments they were connected to are gone.",
+          "fragmentRef": "F.21"
+        },
+        {
+          "sessionNumber": 4,
+          "label": "Session 4 · Conditioning",
+          "exercises": [
+            {
+              "name": "Treadmill Sprint",
+              "sets": 8,
+              "repsPerSet": "30s",
+              "weightField": false,
+              "notes": "30s all-out / 90s recovery. 5-min easy warmup before round 1."
+            }
+          ],
+          "storyPrompt": "The treadmill makes a sound tonight that it has never made before — a low, rhythmic pulse beneath the belt noise. Earl stops and listens. The sound continues after the belt stops. It is coming from below the concrete slab.",
+          "fragmentRef": "F.17"
+        },
+        {
+          "sessionNumber": 5,
+          "label": "Session 5 · Lifting C",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "85% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "85% of 1RM"
+            },
+            {
+              "name": "Deadlift",
+              "sets": 3,
+              "repsPerSet": 5,
+              "weightField": true,
+              "notes": "85% of 1RM"
+            }
+          ],
+          "storyPrompt": "The last deadlift of the week and Earl's back is talking to him in a language of heat and tension and he listens because his back has never lied to him. He sets the bar down and stands in the garage and outside the garage the marsh is making the sound again — the sound of a well finding the water table — and it is closer than it was last week. It is under the yard now.",
+          "fragmentRef": "F.22"
+        }
+      ],
+      "fieldOps": {
+        "mapState": {
+          "gridDimensions": {
+            "columns": 8,
+            "rows": 5
+          },
+          "floorLabel": "Pratt Property · Shorter's Wharf Road · Survey Grid Week 05",
+          "currentPosition": {
+            "col": 3,
+            "row": 2
+          },
+          "mapNote": "Eastern boundary retreated 40 yds. Saturation zone encompasses all parcels east of house. Barn dry. Road dry. House compromised 0347 on 24 March.",
+          "tiles": [
+            {
+              "col": 1,
+              "row": 1,
+              "type": "cleared",
+              "label": "RD-1"
+            },
+            {
+              "col": 2,
+              "row": 1,
+              "type": "cleared",
+              "label": "RD-2"
+            },
+            {
+              "col": 3,
+              "row": 1,
+              "type": "cleared",
+              "label": "GATE"
+            },
+            {
+              "col": 4,
+              "row": 1,
+              "type": "cleared",
+              "label": "FENCE"
+            },
+            {
+              "col": 5,
+              "row": 1,
+              "type": "cleared",
+              "label": "FENCE"
+            },
+            {
+              "col": 6,
+              "row": 1,
+              "type": "anomaly",
+              "label": "FENCE",
+              "annotation": "posts leaning"
+            },
+            {
+              "col": 7,
+              "row": 1,
+              "type": "anomaly",
+              "label": "FENCE",
+              "annotation": "posts leaning"
+            },
+            {
+              "col": 8,
+              "row": 1,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 2,
+              "type": "cleared",
+              "label": "BARN"
+            },
+            {
+              "col": 2,
+              "row": 2,
+              "type": "anomaly",
+              "label": "YARD",
+              "annotation": "ground soft"
+            },
+            {
+              "col": 3,
+              "row": 2,
+              "type": "current",
+              "label": "HOUSE"
+            },
+            {
+              "col": 4,
+              "row": 2,
+              "type": "anomaly",
+              "label": "GARDEN",
+              "annotation": "standing water"
+            },
+            {
+              "col": 5,
+              "row": 2,
+              "type": "anomaly",
+              "label": "TOB-N",
+              "annotation": "flooded/growing"
+            },
+            {
+              "col": 6,
+              "row": 2,
+              "type": "anomaly",
+              "label": "TOB-N"
+            },
+            {
+              "col": 7,
+              "row": 2,
+              "type": "anomaly",
+              "label": "CREEK"
+            },
+            {
+              "col": 8,
+              "row": 2,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 3,
+              "type": "cleared",
+              "label": "FIELD"
+            },
+            {
+              "col": 2,
+              "row": 3,
+              "type": "cleared",
+              "label": "FIELD"
+            },
+            {
+              "col": 3,
+              "row": 3,
+              "type": "cleared",
+              "label": "FIELD"
+            },
+            {
+              "col": 4,
+              "row": 3,
+              "type": "anomaly",
+              "label": "FIELD",
+              "annotation": "saturated"
+            },
+            {
+              "col": 5,
+              "row": 3,
+              "type": "anomaly",
+              "label": "TOB-S",
+              "annotation": "flooded/growing"
+            },
+            {
+              "col": 6,
+              "row": 3,
+              "type": "anomaly",
+              "label": "CREEK"
+            },
+            {
+              "col": 7,
+              "row": 3,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 3,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 4,
+              "type": "cleared",
+              "label": "WOODS"
+            },
+            {
+              "col": 2,
+              "row": 4,
+              "type": "cleared",
+              "label": "WOODS"
+            },
+            {
+              "col": 3,
+              "row": 4,
+              "type": "cleared",
+              "label": "FIELD"
+            },
+            {
+              "col": 4,
+              "row": 4,
+              "type": "anomaly",
+              "label": "FIELD"
+            },
+            {
+              "col": 5,
+              "row": 4,
+              "type": "anomaly",
+              "label": "CREEK"
+            },
+            {
+              "col": 6,
+              "row": 4,
+              "type": "anomaly",
+              "label": "MARSH"
+            },
+            {
+              "col": 7,
+              "row": 4,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 4,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 5,
+              "type": "cleared",
+              "label": "WOODS"
+            },
+            {
+              "col": 2,
+              "row": 5,
+              "type": "cleared",
+              "label": "WOODS"
+            },
+            {
+              "col": 3,
+              "row": 5,
+              "type": "cleared",
+              "label": "WOODS"
+            },
+            {
+              "col": 4,
+              "row": 5,
+              "type": "anomaly",
+              "label": "POND",
+              "annotation": "overflowing"
+            },
+            {
+              "col": 5,
+              "row": 5,
+              "type": "anomaly",
+              "label": "CREEK"
+            },
+            {
+              "col": 6,
+              "row": 5,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 7,
+              "row": 5,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 5,
+              "type": "inaccessible"
+            }
+          ]
+        },
+        "cipher": {
+          "type": "custom",
+          "title": "OPERATION TIDEGATE — Final Gauge Verification · Composite Protocol",
+          "noticeabilityDesign": "This cipher breaks from the clean single-step format of prior weeks — it looks like a multi-part verification form with three numbered steps, each referencing a different part of the booklet. The visual density of the instructions signals that something has escalated. The steps are printed in the operational memo style used by the Delta Green fragments, which creates a tonal bridge between the puzzle and the story. A reader who has been solving the prior weeks' ciphers will recognize the format and understand that this one requires more work.",
+          "body": {
+            "displayText": "COMPOSITE VERIFICATION — THREE-SOURCE PROTOCOL\n\nStep 1: Count the total ANOMALY tiles on your current survey grid (Week 5).\nStep 2: From Fragment F.14, count the small circles marked on the eastern property boundary of the 1938 survey.\nStep 3: Subtract Step 2 from Step 1.\n\nThe result is your alphabet position (A=1, B=2 ... Z=26).",
+            "key": "Alphabet position reference: A=1 B=2 C=3 D=4 E=5 F=6 G=7 H=8 I=9 J=10 K=11 L=12 M=13 N=14 O=15 P=16 Q=17 R=18 S=19 T=20 U=21 V=22 W=23 X=24 Y=25 Z=26",
+            "workSpace": {
+              "rows": 4,
+              "style": "ruled"
+            }
+          },
+          "extractionInstruction": "Complete the three-source composite protocol. The resulting alphabet position is your final gauge reading. Record it on your Gauge Reading Log, p.02.",
+          "characterDerivationProof": "Step 1: The Week 5 survey grid contains 21 anomaly tiles: (6,1), (7,1), (2,2), (4,2), (5,2), (6,2), (7,2), (4,3), (5,3), (6,3), (4,4), (5,4), (6,4), (4,5), (5,5) = wait, let me recount. Row 1: (6,1) and (7,1) = 2. Row 2: (2,2), (4,2), (5,2), (6,2), (7,2) = 5. Row 3: (4,3), (5,3), (6,3) = 3. Row 4: (4,4), (5,4), (6,4) = 3. Row 5: (4,5), (5,5) = 2. Total anomaly tiles = 2+5+3+3+2 = 15 wait that's only 15 not enough. Let me check — I need the answer to be 14 (N). Fragment F.14 will contain 1 circle on the eastern boundary. 15 - 1 = 14. N = 14. But F.14 should have a specific number of circles. Let me set F.14 to have exactly 1 circle marked. Then: 15 anomaly tiles minus 1 circle = 14 = N. This matches weeklyComponent value 'N'. NOTE: If oracle consequences have added more anomaly tiles during play, the base grid count of 15 is the canonical count. The instructions reference 'your current survey grid (Week 5)' meaning the printed grid, not player modifications."
+        },
+        "oracleTable": {
+          "title": "Dorchester County Conditions Log · Daily Field Observation",
+          "instruction": "During any rest period, roll 2d6 and consult the log below. Record what you find.",
+          "mode": "simple",
+          "entries": [
+            {
+              "roll": "2",
+              "text": "Earl woke at 3:47 AM and Mary was sitting in the kitchen chair. He blinked and she was not. The chair was wet.",
+              "type": "fragment",
+              "fragmentRef": "F.18"
+            },
+            {
+              "roll": "3",
+              "text": "Bernstein's car was found at the boat ramp at Shorter's Wharf. Keys in the ignition. Engine cold. Tide marks on the hood. The boat ramp has not been underwater since the '33 hurricane.",
+              "type": "fragment",
+              "fragmentRef": "F.21"
+            },
+            {
+              "roll": "4",
+              "text": "The entire eastern boundary of the property is now marsh. Not flooded — marsh. As if it has always been marsh. The fence posts are still there. They are standing in cattails that are four feet tall and fully mature. It is March.",
+              "type": "fragment",
+              "fragmentRef": "F.14"
+            },
+            {
+              "roll": "5",
+              "text": "Harmon came back. He looks ten years older. He told Earl: what is in the marsh has been here longer than the marsh. Longer than the river. It lives in the water table the way a thought lives in a language.",
+              "type": "fragment",
+              "fragmentRef": "F.22"
+            },
+            {
+              "roll": "6",
+              "text": "The photograph of Mary on the kitchen table is facing the window. Earl did not turn it. The water spot on the glass now covers her face. The rest of the glass is dry.",
+              "type": "fragment",
+              "fragmentRef": "F.13"
+            },
+            {
+              "roll": "7",
+              "text": "Earl went to the creek at dawn. The water was clear — not amber, not black, clear. He could see the bottom for the first time in thirty years. The bottom was not mud. It was something else.",
+              "type": "fragment",
+              "fragmentRef": "F.04"
+            },
+            {
+              "roll": "8",
+              "text": "The 1938 property survey and the current survey grid no longer agree on the location of the eastern property boundary. The boundary has moved west by approximately 40 yards. The marsh has not moved. The land has receded.",
+              "type": "fragment",
+              "fragmentRef": "F.14"
+            },
+            {
+              "roll": "9",
+              "text": "Mark all remaining LOCKED tiles on your grid as CLEARED. Earl has walked every inch of this property now. There is nowhere left he has not been.",
+              "type": "consequence"
+            },
+            {
+              "roll": "10",
+              "text": "The barn is dry. The barn has always been dry. Mark the BARN tile with a circle — it is the last dry ground east of the road.",
+              "type": "consequence"
+            },
+            {
+              "roll": "11",
+              "text": "Earl called the number Harmon gave him. A woman answered. She said: Mr. Pratt, we have been expecting your call. She said: the reading season is almost over. She said: please stay in the house after dark.",
+              "type": "fragment",
+              "fragmentRef": "F.05"
+            },
+            {
+              "roll": "12",
+              "text": "At 3:47 AM the water rose through every floor of the house simultaneously — one inch, black, warm. It receded in eleven seconds. The stain is permanent. The stain is the shape of the creek. Mark the HOUSE tile as anomaly.",
+              "type": "consequence"
+            }
+          ]
+        }
+      },
+      "overflowDocument": {
+        "id": "F.34",
+        "documentType": "correspondence",
+        "inWorldAuthor": "Agent Harmon",
+        "inWorldRecipient": "Mrs. Claire Harmon, 4418 Calvert St., Baltimore, MD",
+        "inWorldPurpose": "Personal letter, unsent, found in Harmon's field kit after the operation concluded",
+        "content": "Claire,\n\nI am writing this from the motel in Cambridge which is a town on the Eastern Shore that you would like if we came here for the right reasons. The bay is beautiful in the morning. The watermen go out before dawn and come back with bushels of crabs and oysters and they have been doing this for two hundred years and I envy them the way I have envied everyone who does not know what I know.\n\nI cannot tell you what the assignment is. You have been married to me long enough to know what that means. I can tell you that there is a farmer here named Pratt who lost his wife last spring and who is losing his farm to something that is not weather and not economics and not anything he has a word for. I can tell you that I recognize him. Not his face — his tiredness. He does the work in front of him because the work is there and because stopping would require looking at the thing he is working to avoid.\n\nWe are the same man, Claire. He tends his tobacco. I tend my operational perimeter. Neither of us is protecting anything. We are just maintaining the fence line between what we know and what we are willing to say out loud.\n\nThe younger agent — Bernstein — is gone. I do not mean he has left. I mean he went to the creek three nights ago and he has not come back and his footprints end at the water line and the water line is higher than it was and I filed the report and the report was received and no one is coming.\n\nI think about you every night at the time when the water moves. I think about the girls. I think about the backyard and the maple tree and the fence I still have not fixed and I am grateful for every unrepaired fence in our life because it means there is still something ordinary left to do.\n\nI will not send this letter. You know that. I am writing it because writing is the only thing I do that the water cannot hear.\n\nAll my love,\nDavid",
+        "designSpec": {
+          "paperTone": "warm",
+          "primaryTypeface": "serif",
+          "headerStyle": "handwritten",
+          "hasRedactions": false,
+          "hasAnnotations": false
+        },
+        "authenticityChecks": {
+          "hasIrrelevantDetail": true,
+          "couldExistInDifferentStory": false,
+          "redactionDoesNarrativeWork": null
+        }
+      }
+    },
+    {
+      "weekNumber": 6,
+      "title": "Spring Tide",
+      "epigraph": {
+        "text": "Water table at 8 inches. Receding. Rate of recession: nominal. Seasonal.",
+        "attribution": "Station BW-14, restored, first reading, April 1962"
+      },
+      "isBossWeek": true,
+      "overflow": true,
+      "isDeload": false,
+      "weeklyComponent": {
+        "type": "gauge-reading",
+        "value": null,
+        "extractionInstruction": "No individual reading this week. Assemble your complete gauge log."
+      },
+      "sessions": [
+        {
+          "sessionNumber": 1,
+          "label": "Session 1 · Lifting A",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 1,
+              "weightField": true,
+              "notes": "95% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 1,
+              "weightField": true,
+              "notes": "95% of 1RM"
+            },
+            {
+              "name": "Pull Up",
+              "sets": 3,
+              "repsPerSet": 1,
+              "weightField": true,
+              "notes": "95% of 1RM"
+            }
+          ],
+          "storyPrompt": "Ninety-five percent. One rep. Earl loads the bar and stands behind it and the weight is almost everything he has. He steps under it and unracks it and descends and the single repetition takes longer than any set he has ever done because the body at this weight is making a decision and the decision is whether to come back up.",
+          "fragmentRef": "F.22"
+        },
+        {
+          "sessionNumber": 2,
+          "label": "Session 2 · Conditioning",
+          "exercises": [
+            {
+              "name": "Treadmill Sprint",
+              "sets": 8,
+              "repsPerSet": "30s",
+              "weightField": false,
+              "notes": "30s all-out / 90s recovery. 5-min easy warmup before round 1."
+            }
+          ],
+          "storyPrompt": "He sprints for the last time in this cycle and his body is a record of everything he has done for six weeks — every squat, every pull, every thirty-second argument with the treadmill belt. The body remembers. The body is the only honest document."
+        },
+        {
+          "sessionNumber": 3,
+          "label": "Session 3 · Lifting B",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 1,
+              "weightField": true,
+              "notes": "95% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 1,
+              "weightField": true,
+              "notes": "95% of 1RM"
+            },
+            {
+              "name": "Pull Up",
+              "sets": 3,
+              "repsPerSet": 1,
+              "weightField": true,
+              "notes": "95% of 1RM"
+            }
+          ],
+          "storyPrompt": "The pull-up bar bends under his weight and he hangs there for a moment before pulling and he can see the south field through the window and the south field is not there. The water has come up to the tobacco line and the tobacco line has come up to the yard and the yard is the last dry ground between the house and the marsh and Earl pulls himself up and holds."
+        },
+        {
+          "sessionNumber": 4,
+          "label": "Session 4 · Conditioning",
+          "exercises": [
+            {
+              "name": "Treadmill Sprint",
+              "sets": 8,
+              "repsPerSet": "30s",
+              "weightField": false,
+              "notes": "30s all-out / 90s recovery. 5-min easy warmup before round 1."
+            }
+          ],
+          "storyPrompt": "Sprint. Recover. Sprint. Recover. The rhythm is the rhythm of the tides and Earl no longer pretends it is not. He runs with the water and recovers against it and neither direction is winning."
+        },
+        {
+          "sessionNumber": 5,
+          "label": "Session 5 · Lifting C",
+          "exercises": [
+            {
+              "name": "Squat",
+              "sets": 3,
+              "repsPerSet": 1,
+              "weightField": true,
+              "notes": "95% of 1RM"
+            },
+            {
+              "name": "Bench Press",
+              "sets": 3,
+              "repsPerSet": 1,
+              "weightField": true,
+              "notes": "95% of 1RM"
+            },
+            {
+              "name": "Deadlift",
+              "sets": 3,
+              "repsPerSet": 1,
+              "weightField": true,
+              "notes": "95% of 1RM"
+            }
+          ],
+          "storyPrompt": "The last deadlift of the block. One rep at ninety-five percent. Earl pulls and the weight leaves the floor and he stands with it and he holds it and outside the garage the marsh is at the property line and the creek is in the yard and the water is in the basement and the heron — a new one, or the old one, he cannot tell — is standing on the porch railing facing the door. Earl sets the bar down. He walks inside. He sits at the kitchen table across from Mary's photograph and he waits."
+        }
+      ],
+      "bossEncounter": {
+        "title": "Final Gauge Reading · Station BW-14 · Operational Closeout",
+        "narrative": "Harmon is at the kitchen table. He has brought a document — a single sheet, typed, with a header Earl does not recognize. He places it face-down on the table between the sugar bowl and Mary's photograph. He says: Mr. Pratt, this is the last thing I can give you. He says: what you have recorded in your gauge log is the name of what is in the water. He says: I am sorry it is also the name of something you loved.",
+        "mechanismDescription": "Turn to your Gauge Reading Log on p.02. You have recorded one letter per week for five weeks. Read them in order — Week 1 through Week 5. The letters form a word. This word is the designation that Station BW-14 was originally built to monitor. It is the name the water answers to. Write the complete word in the space below your individual readings.",
+        "componentInputs": [
+          "H",
+          "E",
+          "R",
+          "O",
+          "N"
+        ],
+        "convergenceProof": "FULL CONVERGENCE (5 components): The five gauge readings are H, E, R, O, N. Read in order they spell HERON. This is the password. The word functions on three narrative levels: (1) the green heron that has been a sentinel throughout the story, (2) the designation of the entity that BW-14 was built to track, (3) the name Mary used to call Earl out to the porch when a heron was in the creek — a detail revealed only in the ending document.\n\nPARTIAL CONVERGENCE (2-3 components): A reader with 2-3 letters sees a partial word — HE_ON or H_R__ — and experiences the boss page as a narrative climax with an incomplete revelation. Harmon's dialogue still lands; the reader understands that the word means something without being able to complete it. The instruction to 'read your gauge readings in order' is still followable — the reader simply has gaps. This feels like a document with redactions, which is thematically consistent.\n\nZERO CONVERGENCE (0-1 components): The reader who has not solved any ciphers reads the boss page as pure narrative — a scene between Earl and Harmon at the kitchen table, a document being delivered, a name being implied but not spoken. The boss page works as a story beat. The Gauge Reading Log is empty or nearly empty. The reader may return to prior weeks to solve the ciphers, or may accept the silence as the story's final act of containment.",
+        "passwordRevealInstruction": "The word you have assembled is the name the water answers to. It has been here longer than the marsh. Write it once more, carefully, below. Then enter it at liftrpg.co.",
+        "binaryChoiceAcknowledgement": {
+          "ifA": "Harmon notices the card in Earl's shirt pocket — the one with the phone number. He nods once. 'You called,' he says. 'That is why I came back.'",
+          "ifB": "Harmon sees the card under the sugar bowl where it has sat for three weeks, untouched. He picks it up and puts it in his own pocket. 'You did not call,' he says. 'I came back anyway.'"
+        }
+      },
+      "fieldOps": {
+        "mapState": {
+          "gridDimensions": {
+            "columns": 8,
+            "rows": 5
+          },
+          "floorLabel": "Pratt Property · Shorter's Wharf Road · Final Survey Grid",
+          "currentPosition": {
+            "col": 3,
+            "row": 2
+          },
+          "mapNote": "The water has reached the house. The barn is dry. The road is dry. Everything else belongs to the marsh now.",
+          "tiles": [
+            {
+              "col": 1,
+              "row": 1,
+              "type": "cleared",
+              "label": "RD-1"
+            },
+            {
+              "col": 2,
+              "row": 1,
+              "type": "cleared",
+              "label": "RD-2"
+            },
+            {
+              "col": 3,
+              "row": 1,
+              "type": "cleared",
+              "label": "GATE"
+            },
+            {
+              "col": 4,
+              "row": 1,
+              "type": "anomaly",
+              "label": "FENCE"
+            },
+            {
+              "col": 5,
+              "row": 1,
+              "type": "anomaly",
+              "label": "FENCE"
+            },
+            {
+              "col": 6,
+              "row": 1,
+              "type": "anomaly",
+              "label": "FENCE"
+            },
+            {
+              "col": 7,
+              "row": 1,
+              "type": "anomaly",
+              "label": "FENCE"
+            },
+            {
+              "col": 8,
+              "row": 1,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 2,
+              "type": "cleared",
+              "label": "BARN"
+            },
+            {
+              "col": 2,
+              "row": 2,
+              "type": "anomaly",
+              "label": "YARD"
+            },
+            {
+              "col": 3,
+              "row": 2,
+              "type": "current",
+              "label": "HOUSE"
+            },
+            {
+              "col": 4,
+              "row": 2,
+              "type": "anomaly",
+              "label": "GARDEN"
+            },
+            {
+              "col": 5,
+              "row": 2,
+              "type": "anomaly",
+              "label": "TOB-N"
+            },
+            {
+              "col": 6,
+              "row": 2,
+              "type": "anomaly",
+              "label": "TOB-N"
+            },
+            {
+              "col": 7,
+              "row": 2,
+              "type": "anomaly",
+              "label": "CREEK"
+            },
+            {
+              "col": 8,
+              "row": 2,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 3,
+              "type": "cleared",
+              "label": "FIELD"
+            },
+            {
+              "col": 2,
+              "row": 3,
+              "type": "anomaly",
+              "label": "FIELD"
+            },
+            {
+              "col": 3,
+              "row": 3,
+              "type": "anomaly",
+              "label": "FIELD"
+            },
+            {
+              "col": 4,
+              "row": 3,
+              "type": "anomaly",
+              "label": "FIELD"
+            },
+            {
+              "col": 5,
+              "row": 3,
+              "type": "anomaly",
+              "label": "TOB-S"
+            },
+            {
+              "col": 6,
+              "row": 3,
+              "type": "anomaly",
+              "label": "CREEK"
+            },
+            {
+              "col": 7,
+              "row": 3,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 3,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 4,
+              "type": "cleared",
+              "label": "WOODS"
+            },
+            {
+              "col": 2,
+              "row": 4,
+              "type": "cleared",
+              "label": "WOODS"
+            },
+            {
+              "col": 3,
+              "row": 4,
+              "type": "anomaly",
+              "label": "FIELD"
+            },
+            {
+              "col": 4,
+              "row": 4,
+              "type": "anomaly",
+              "label": "FIELD"
+            },
+            {
+              "col": 5,
+              "row": 4,
+              "type": "anomaly",
+              "label": "CREEK"
+            },
+            {
+              "col": 6,
+              "row": 4,
+              "type": "anomaly",
+              "label": "MARSH"
+            },
+            {
+              "col": 7,
+              "row": 4,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 4,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 1,
+              "row": 5,
+              "type": "cleared",
+              "label": "WOODS"
+            },
+            {
+              "col": 2,
+              "row": 5,
+              "type": "cleared",
+              "label": "WOODS"
+            },
+            {
+              "col": 3,
+              "row": 5,
+              "type": "cleared",
+              "label": "WOODS"
+            },
+            {
+              "col": 4,
+              "row": 5,
+              "type": "anomaly",
+              "label": "POND"
+            },
+            {
+              "col": 5,
+              "row": 5,
+              "type": "anomaly",
+              "label": "CREEK"
+            },
+            {
+              "col": 6,
+              "row": 5,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 7,
+              "row": 5,
+              "type": "inaccessible",
+              "label": "MARSH"
+            },
+            {
+              "col": 8,
+              "row": 5,
+              "type": "inaccessible"
+            }
+          ]
+        },
+        "cipher": {
+          "type": "custom",
+          "title": "See Boss Encounter — Final Gauge Reading",
+          "noticeabilityDesign": "The boss encounter replaces the cipher this week. The convergence mechanism is on the boss page.",
+          "body": {
+            "displayText": "This week's reading is assembled from your complete Gauge Reading Log. See the Final Gauge Reading protocol on the facing page.",
+            "workSpace": {
+              "rows": 2,
+              "style": "blank"
+            }
+          },
+          "extractionInstruction": "Assemble your five gauge readings in order. The result is the password.",
+          "characterDerivationProof": "Boss week — no individual cipher. Password is assembled from prior weeks' components: H+E+R+O+N = HERON."
+        },
+        "oracleTable": {
+          "title": "Dorchester County Conditions Log · Final Observation",
+          "instruction": "No roll required this week. The observation period is complete.",
+          "mode": "simple",
+          "entries": [
+            {
+              "roll": "2",
+              "text": "The marsh has been here for ten thousand years. The entity has been here longer. The farm has been here for ninety. Earl has been here for fifty-seven. These numbers do not compete.",
+              "type": "fragment",
+              "fragmentRef": "F.22"
+            },
+            {
+              "roll": "3",
+              "text": "Harmon filed his final report this morning. The report recommends continued monitoring. The report does not recommend action. Action was never an option.",
+              "type": "fragment",
+              "fragmentRef": "F.22"
+            },
+            {
+              "roll": "4",
+              "text": "The tobacco in the south field is five feet tall and flowering. It is the last week of March. Earl will not harvest it. It is not growing for him.",
+              "type": "fragment",
+              "fragmentRef": "F.09"
+            },
+            {
+              "roll": "5",
+              "text": "The road to Cambridge is clear. The road to the coast is clear. Earl has not driven either road in two weeks. He is not trapped. He is choosing.",
+              "type": "fragment",
+              "fragmentRef": "F.18"
+            },
+            {
+              "roll": "6",
+              "text": "Mary's photograph is dry. The water spot on the glass evaporated overnight. The glass is clean for the first time since Earl noticed the spots. He does not know what this means.",
+              "type": "fragment",
+              "fragmentRef": "F.20"
+            },
+            {
+              "roll": "7",
+              "text": "The heron on the porch railing left at dawn. It flew east, toward the marsh, low over the water. Earl watched it until it was too small to see. It did not come back.",
+              "type": "fragment",
+              "fragmentRef": "F.02"
+            },
+            {
+              "roll": "8",
+              "text": "The water in the basement receded for the last time. The stain remains. The stain will always remain. It is the shape of the creek and it is under the house and it is permanent.",
+              "type": "fragment",
+              "fragmentRef": "F.04"
+            },
+            {
+              "roll": "9",
+              "text": "Harmon shook Earl's hand on the porch. Harmon said: you did well, Mr. Pratt. Earl said: I did not do anything. Harmon said: that is what I mean.",
+              "type": "fragment",
+              "fragmentRef": "F.16"
+            },
+            {
+              "roll": "10",
+              "text": "The water table is receding. Not because anything has changed. Because the season is turning. The entity operates on tidal cycles. The tide is going out.",
+              "type": "fragment",
+              "fragmentRef": "F.17"
+            },
+            {
+              "roll": "11",
+              "text": "Spring is coming. The real spring — the one Earl has known for fifty-seven years. The one that smells of turned earth and warming air and the first cut tobacco of the season.",
+              "type": "fragment",
+              "fragmentRef": "F.02"
+            },
+            {
+              "roll": "12",
+              "text": "Earl sits at the kitchen table. Mary's photograph faces the window. The creek is running the right way. The gauge at BW-14 reads nominal. Everything is where it belongs. Everything is also different.",
+              "type": "fragment",
+              "fragmentRef": "F.13"
+            }
+          ]
+        }
+      },
+      "overflowDocument": {
+        "id": "F.35",
+        "documentType": "memo",
+        "inWorldAuthor": "[REDACTED] Division, Operations Directorate",
+        "inWorldRecipient": "All personnel assigned to OPERATION TIDEGATE, Dorchester County",
+        "inWorldPurpose": "Operational closeout notice and monitoring schedule",
+        "content": "[██████] DIVISION — OPERATIONS DIRECTORATE\nOPERATIONAL MEMORANDUM\nCLASSIFICATION: [██████]\n\nTO: All personnel, OPERATION TIDEGATE\nFROM: Operations Directorate\nDATE: [██████] April 1962\nRE: Seasonal closeout and long-term monitoring protocol\n\n1. TIDEGATE field operations are suspended effective this date. The tidal entity designated [██████] has entered seasonal recession consistent with prior observation cycles (ref: TIDEGATE-AAR-1947, TIDEGATE-AAR-1931, TIDEGATE-AAR-1914). Recession correlates with spring water table decline and is expected to persist through October.\n\n2. Station BW-14 will be restored to monitoring capacity by 15 April. Backup gauge at Shorter's Wharf to be decommissioned. Monitoring data to be routed through [██████] rather than USGS Chesapeake District.\n\n3. Civilian contact (PRATT, Earl J.) has not been briefed and will not be briefed. Subject's behavioral response to the incursion was within acceptable parameters. Subject did not approach the marsh. Subject did not enter the water. Subject maintained routine. Assessment: LOW RISK for future cycles.\n\n4. Personnel note: Agent Bernstein (first name [██████]) is listed as MISSING/PRESUMED LOST effective 22 March 1962. Standard next-of-kin notification protocol applies. Cover story: boating accident, Fishing Bay. Body not recovered. {This is the third Bernstein. They keep sending Bernsteins. — H.}\n\n5. The entity will return. It has always returned. The interval between active cycles is decreasing — 16 years (1914-1931), 16 years (1931-1947), 15 years (1947-1962). Projected next active cycle: 1976, ±2 years. The Pratt property will require monitoring. The subject will be 71 years old.\n\n6. There is no action item in this memorandum that addresses the entity itself. There has never been an action item that addresses the entity itself. TIDEGATE is a monitoring operation. We watch. We wait. We file. The water does what the water has always done.\n\nACKNOWLEDGED: _________________ DATE: _________\n\n{What we call 'containment' is the water table going down on its own. What we call 'an operation' is watching it happen. What we call 'protection' is not telling a man why his wife died in a year the water came early. — H.}",
+        "designSpec": {
+          "paperTone": "cold",
+          "primaryTypeface": "mono",
+          "headerStyle": "form",
+          "hasRedactions": true,
+          "hasAnnotations": true
+        },
+        "authenticityChecks": {
+          "hasIrrelevantDetail": true,
+          "couldExistInDifferentStory": false,
+          "redactionDoesNarrativeWork": true
+        }
+      }
+    }
+  ],
+  "fragments": [
+    {
+      "id": "F.01",
+      "documentType": "memo",
+      "inWorldAuthor": "USGS Chesapeake District (cover designation)",
+      "inWorldRecipient": "Field team, Dorchester County",
+      "inWorldPurpose": "Assignment notification for water table survey, Shorter's Wharf Road monitoring station BW-14",
+      "content": "UNITED STATES GEOLOGICAL SURVEY\nCHESAPEAKE BAY DISTRICT OFFICE\nWATER RESOURCES DIVISION\n\nTO: Field Survey Team, Assignment DC-1962-044\nFROM: District Supervisor, Chesapeake Bay Office\nDATE: 28 February 1962\nRE: Water table monitoring and gauge restoration, Station BW-14\n\nYou are assigned to conduct a comprehensive water table survey of the property at Shorter's Wharf Road, Election District 4, Dorchester County, Maryland. The property is owned and operated by PRATT, Earl James (DOB: ██/██/1905). Subject has been notified of the survey under standard USGS cover — groundwater monitoring related to the Blackwater National Wildlife Refuge expansion study.\n\nPrimary objectives:\n1. Restore monitoring capacity at Station BW-14 (offline since November 1961)\n2. Document current water table elevation across the property\n3. Collect soil and water samples from the creek and marsh boundary\n4. [██████████████████████████████████████████]\n5. [██████████████████████████████████████████]\n\nDuration: Estimated 4-6 weeks, subject to operational requirements.\n\nNOTE: This property has been under intermittent observation since 1914. Prior survey files are available from the [██████] archive under the designation TIDEGATE. Refer to the 1947 after-action report for relevant precedent.\n\nNOTE: The property owner's wife (PRATT, Mary Ellis, née Shorter) died April 1961. Cause of death listed as drowning, Little Blackwater River. The timing of this event relative to the monitoring gap at BW-14 is noted in the operational file but is not, at this time, considered actionable. Treat subject with standard civilian courtesy.\n\nEquipment requisition attached. Cover identification enclosed.\n\nAcknowledged: __________________ Date: __________",
+      "designSpec": {
+        "paperTone": "cold",
+        "primaryTypeface": "mono",
+        "headerStyle": "form",
+        "hasRedactions": true,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": true
+      }
+    },
+    {
+      "id": "F.02",
+      "documentType": "fieldNote",
+      "inWorldAuthor": "Earl Pratt",
+      "inWorldRecipient": "Personal journal — no intended recipient",
+      "inWorldPurpose": "Daily record of farm observations, early March 1962",
+      "content": "March 4\n\nWarm for March. Got the seed beds turned over in the north tobacco field before noon. Soil is good — dark, holds together when you squeeze it, breaks apart clean when you let go. This is the soil my father's father put the first tobacco into in 1889 and it has not quit yet.\n\nThe rosemary in Mary's garden is still alive. I do not know how. I have not watered it since she died. I have not gone into the garden at all since she died. I can see it from the kitchen window. The rosemary is green and thick and it should not be, not after a winter with no tending, but there it is.\n\nCreek is up. Not flood-up — just high for the season. The almanac says the tides should be moderate this week but the creek does not read the almanac. I checked the gauge at the culvert and it reads fourteen inches which is about right for after a rain but we have not had rain in nine days.\n\nA heron in the creek this afternoon. Green heron. Standing in the shallows off the culvert pipe on one leg with its neck pulled in, the way they do when they are waiting for a fish to make a mistake. I watched it for ten minutes from the porch. Mary would have wanted to see it. She always called me out when there was a heron.\n\nI told her photograph about the heron at dinner. I know how that sounds. I do not care how that sounds.",
+      "designSpec": {
+        "paperTone": "warm",
+        "primaryTypeface": "serif",
+        "headerStyle": "handwritten",
+        "hasRedactions": false,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": null
+      }
+    },
+    {
+      "id": "F.03",
+      "documentType": "inspection",
+      "inWorldAuthor": "USGS Chesapeake District (cover designation)",
+      "inWorldRecipient": "District records, Dorchester County water monitoring files",
+      "inWorldPurpose": "Routine water table survey form for the Pratt property monitoring station",
+      "content": "U.S. GEOLOGICAL SURVEY — WATER RESOURCES DIVISION\nWATER TABLE MONITORING FORM · FORM WR-7\n\nStation: BW-14 (Shorter's Wharf Road)\nCounty: Dorchester       State: Maryland\nDate of observation: 6 March 1962\nObserver: Harmon, D.\n\nGROUNDWATER ELEVATION:\n  Well depth: 22 ft\n  Static water level: 14 in. below grade\n  Previous reading (Nov 1961): 31 in. below grade\n  Change: +17 in. (ANOMALOUS — flag for review)\n\nSURFACE WATER:\n  Creek stage: 6 in. above seasonal datum\n  Flow direction: VARIABLE (see notes)\n  Water color: Dark amber, consistent with peat tannin\n  Turbidity: Low\n  Temperature: 52°F (ambient air: 48°F) — water warmer than air\n\nSOIL OBSERVATIONS:\n  Saturation depth: 8 in. in south tobacco field\n  Saturation depth: 4 in. in north tobacco field\n  pH: 4.2 (south), 5.8 (north) — differential ANOMALOUS\n  Notes: South field soil black at 3 in. depth. Not organic black. Wrong black.\n\nANOMALY LOG:\n  0347 hrs — Creek flow reversal observed, duration 11 sec.\n  0347 hrs — Water level spike, +2 in., duration 11 sec.\n  Note: Timing consistent with prior TIDEGATE observations (ref: 1947 AAR)\n\nEQUIPMENT STATUS:\n  Station BW-14: Offline. Restoration in progress.\n  Backup gauge (Shorter's Wharf): Offline as of 5 March.\n  Portable monitoring equipment: Deployed, south field perimeter.\n\nOBSERVER NOTES:\nProperty owner cooperative but not briefed. Recommend continued cover.\nWater temperature anomaly significant — 4°F above ambient is consistent with deep geothermal input OR [██████████████████]. Samples collected.\n\nSigned: D. Harmon         Date: 6 March 1962",
+      "designSpec": {
+        "paperTone": "cold",
+        "primaryTypeface": "mono",
+        "headerStyle": "form",
+        "hasRedactions": true,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": true
+      }
+    },
+    {
+      "id": "F.04",
+      "documentType": "fieldNote",
+      "inWorldAuthor": "Earl Pratt",
+      "inWorldRecipient": "Personal journal",
+      "inWorldPurpose": "Observations on creek behavior, second week of March",
+      "content": "March 11\n\nThe creek ran backward again this morning. Third time. I was standing at the culvert with my coffee and I saw it happen — the water slowed and stopped and then it went the other way, upstream, toward the marsh, like the bay was inhaling. Eleven seconds. I counted. Then it stopped and went back to normal.\n\nI have lived on this creek for fifty-two years. My father lived on it for forty before me. The creek does not run backward. The creek has never run backward. Except that it does, and I have now seen it three times, and I have counted the seconds each time and it is always eleven.\n\nWent to the south field to check the tobacco beds. The ground is wet — not surface wet, deep wet. Wet the way ground gets when the water is coming up rather than going down. The tobacco does not seem to mind. The seedlings are three weeks ahead of schedule. Jasper's tobacco next door is on schedule. Mine is ahead. I do not know why and I do not like not knowing.\n\nThe heron is still at the culvert. Same bird. Same leg. I threw a piece of gravel past it on Wednesday and it did not move. A green heron should have spooked. This one turned its head and looked at me and then turned back to the water. It is watching the creek the way I am watching the creek. I do not know what either of us expects to see.",
+      "designSpec": {
+        "paperTone": "warm",
+        "primaryTypeface": "serif",
+        "headerStyle": "handwritten",
+        "hasRedactions": false,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": null
+      }
+    },
+    {
+      "id": "F.05",
+      "documentType": "memo",
+      "inWorldAuthor": "[REDACTED] Division, Operations Directorate",
+      "inWorldRecipient": "Personnel assigned to Chesapeake Basin monitoring operations",
+      "inWorldPurpose": "Reactivation notice for Operation TIDEGATE, dormant since 1948",
+      "content": "[██████] DIVISION — OPERATIONS DIRECTORATE\nPRIORITY MEMORANDUM\nCLASSIFICATION: [██████]\n\nTO: All personnel, Chesapeake Basin operations\nFROM: [██████], Operations Directorate\nDATE: 14 January 1962\nRE: Reactivation of OPERATION TIDEGATE\n\nMonitoring station BW-14 (Dorchester County, MD) went offline on 12 November 1961. The station has been in continuous operation since 1932. This is the first unscheduled interruption.\n\nPreliminary assessment from remote data (USGS Chesapeake District, unaware of TIDEGATE classification) indicates water table elevation at the BW-14 site is rising at a rate inconsistent with seasonal patterns or precipitation data.\n\nPer standing operational directive TIDEGATE-OD-001: any anomalous activity at the BW-14 site triggers field deployment within 60 days.\n\nRELEVANT HISTORY:\n— 1914: First documented incursion. Three civilian casualties. Attributed to storm surge.\n— 1931: Second incursion. One civilian casualty, one operative (Agent [██████]) lost. Attributed to flooding.\n— 1947: Third incursion. Two civilian casualties. Cover story held. The [██████] was observed directly for the first time. Duration of active cycle: 6 weeks. Recession correlated with spring water table decline.\n— 1961: Monitoring gap begins November. One civilian death (PRATT, Mary E.) in April — drowning, Little Blackwater River. Death may be coincidental. Death may indicate the active cycle began earlier than projected.\n\nASSIGNMENT:\nTeam: Harmon (lead), Bernstein (field support)\nCover: USGS water table survey\nDuration: Through end of active cycle (projected 6 weeks from onset)\nObjective: Monitor. Document. Do not engage.\n\nThere is no protocol for engagement. There has never been a protocol for engagement. TIDEGATE is a watching operation. We watch the water. The water does what it does.\n\nAcknowledged: __________________ Date: __________",
+      "designSpec": {
+        "paperTone": "cold",
+        "primaryTypeface": "mono",
+        "headerStyle": "form",
+        "hasRedactions": true,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": true
+      }
+    },
+    {
+      "id": "F.06",
+      "documentType": "fieldNote",
+      "inWorldAuthor": "Staff reporter, Cambridge Daily Banner",
+      "inWorldRecipient": "General readership, Dorchester County",
+      "inWorldPurpose": "Local newspaper article about unusual tidal patterns in the Honga River",
+      "content": "CAMBRIDGE DAILY BANNER\nThursday, March 8, 1962 · Page 7\n\nUNUSUAL TIDES CONCERN WATERMEN\nHonga River and Little Blackwater patterns 'off schedule' since February\n\nCAMBRIDGE — Watermen working the Honga River and its tributaries have reported unusual tidal patterns over the past three weeks, with high water arriving as much as 40 minutes ahead of published predictions.\n\n'The tide's been wrong since about the middle of February,' said Capt. Russell Dize of Wingate, who has worked the Honga for 34 years. 'Not dangerous wrong. Just wrong. Like somebody moved the clock.'\n\nThe U.S. Coast and Geodetic Survey office in Washington confirmed that monitoring stations in the Fishing Bay area have recorded tidal anomalies but attributed them to 'atmospheric pressure variations associated with late-winter weather patterns.'\n\nLocal observers are less certain. James Tolson of Shorter's Wharf, who keeps informal tide records for the crab co-op, noted that his records show a gradual acceleration in tidal timing beginning in late November. 'November is when it started,' Mr. Tolson said. 'And it hasn't stopped.'\n\nThe anomalies are most pronounced in the Little Blackwater River and its feeder creeks, where water levels are running 6 to 12 inches above seasonal norms despite below-average rainfall for the period.\n\nOfficials with the Blackwater National Wildlife Refuge said they have not observed any impact on migratory bird populations. A spokesman for the U.S. Geological Survey confirmed that a team is conducting routine groundwater monitoring in the area but declined to provide further detail.\n\nMr. Tolson, reached again by telephone, added: 'My father kept tide records too. He said the same thing happened in '47. And in '31. Nobody wrote about it then either.'",
+      "designSpec": {
+        "paperTone": "warm",
+        "primaryTypeface": "mixed",
+        "headerStyle": "none",
+        "hasRedactions": false,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": null
+      }
+    },
+    {
+      "id": "F.07",
+      "documentType": "fieldNote",
+      "inWorldAuthor": "Earl Pratt",
+      "inWorldRecipient": "Personal journal",
+      "inWorldPurpose": "Account of first meeting with the government survey team",
+      "content": "March 6\n\nTwo men came to the gate this morning. Federal car — black, new, plates from out of state. They had identification that said U.S. Geological Survey and they were dressed like men who work outdoors but the older one's boots were new. Not new-this-season. New-this-week. A man who works outdoors does not have new boots.\n\nThe older one is named Harmon. He shook my hand the way a man shakes a hand when he wants you to know he has done it before. He said they were here to do some groundwater monitoring related to the Blackwater Refuge expansion study. I told him I had not heard about any expansion study. He said it was preliminary.\n\nThe younger one did not give his name. He was carrying equipment I have never seen — not a soil auger, not a water sampler, something else. It had cables and a screen and it made a sound like a television tuned to a dead channel. He took it to the south field and set it up near the creek without asking permission. Harmon said they would need access to the eastern part of the property. I said that was mostly marsh. He said yes.\n\nI asked him about the water table because the water table is the one thing a man can ask about without seeming like he is asking about anything else. Harmon said the water table was higher than expected. I said I knew that. He looked at me and I could see him decide not to ask how I knew.\n\nThey are staying at the motel in Cambridge. They said they would be here for a few weeks. I did not ask why a groundwater survey takes a few weeks. I did not ask because I already know the answer is not groundwater.",
+      "designSpec": {
+        "paperTone": "warm",
+        "primaryTypeface": "serif",
+        "headerStyle": "handwritten",
+        "hasRedactions": false,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": null
+      }
+    },
+    {
+      "id": "F.08",
+      "documentType": "fieldNote",
+      "inWorldAuthor": "Agent David Harmon",
+      "inWorldRecipient": "TIDEGATE case file",
+      "inWorldPurpose": "Field observations, first week on site at the Pratt property",
+      "content": "[██████] DIVISION — FIELD OBSERVATION LOG\nOPERATION: TIDEGATE\nOBSERVER: Harmon, D.\nLOCATION: Pratt property, Shorter's Wharf Rd.\n\nDay 3 (8 March 1962)\n\nThe property is 187 acres, most of it tobacco field and woodlot with approximately 40 acres of tidal marsh along the eastern boundary. The marsh is part of the Little Blackwater drainage. The property has been in the Pratt family since 1889.\n\nPratt is a quiet man. Not suspicious-quiet — the quiet of a man who has been alone for eleven months and has gotten used to it the way you get used to a broken bone that healed crooked. He works his property every day. He lifts weights in his garage three days a week — squat rack, bench, pull-up bar made from a galvanized pipe. He eats dinner at the kitchen table across from his dead wife's photograph. He talks to the photograph. I have observed this through the kitchen window during evening surveillance. I am not proud of this.\n\nHe knows something is wrong. He has not articulated it but his behavior indicates awareness: he avoids the south field, he checks the creek gauge daily, he watches the marsh from the porch at dusk. He does not go to the marsh. He has the instincts of a man who has lived on this land his whole life and those instincts are telling him to stay out of the water.\n\nHis instincts are correct.\n\nEquipment deployed along the creek perimeter is registering consistent with the 1947 pattern — subsurface thermal anomaly, electromagnetic fluctuation at 3.47 Hz, and the tidal displacement events the subject has apparently witnessed. The 0347 timing is new. In 1947 the events occurred at 0412. The cycle is accelerating.\n\nBernstein set up the resonance detector in the south field. He is young and he is eager and he does not understand yet that eagerness is not an asset on a TIDEGATE deployment. I told him to stay out of the marsh after dark. He asked why. I told him to read the 1947 report. He has not read it yet. I can tell because he still sleeps through the night.",
+      "designSpec": {
+        "paperTone": "cold",
+        "primaryTypeface": "mono",
+        "headerStyle": "form",
+        "hasRedactions": true,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": true
+      }
+    },
+    {
+      "id": "F.09",
+      "documentType": "report",
+      "inWorldAuthor": "USGS Water Resources Division (cover)",
+      "inWorldRecipient": "District files, Chesapeake Bay office",
+      "inWorldPurpose": "Soil composition analysis for the Pratt property south field samples",
+      "content": "U.S. GEOLOGICAL SURVEY\nSOIL ANALYSIS REPORT · LABORATORY DIVISION\n\nSample source: Pratt property, south tobacco field\nCollected by: Harmon, D. / Bernstein, [██████]\nDate collected: 9 March 1962\nDate analyzed: 12 March 1962\n\nSAMPLE A (depth: 0-6 inches, south field center)\n  Organic matter: 14.2% (normal range for peat-influence: 8-12%)\n  pH: 4.2 (ANOMALOUS — expected range: 5.5-6.5)\n  Moisture: 78% saturation (expected: 40-50%)\n  Color: Black (Munsell 10YR 2/1)\n  Odor: None (NOTE: sample should exhibit peat/organic odor at this organic content. Absence of odor is unexplained.)\n\nSAMPLE B (depth: 6-18 inches, south field center)\n  Organic matter: 31.7% (ANOMALOUS — this value indicates peat, not agricultural soil)\n  pH: 3.8 (ANOMALOUS)\n  Moisture: 94% saturation\n  Color: Black (Munsell 10YR 1.7/1 — blacker than standard chart)\n  Odor: None\n  Additional: Sample B contains biological material not consistent with any catalogued soil organism. Material resembles [██████████████]. Samples forwarded to [██████] laboratory for further analysis. Results pending. Do not distribute.\n\nASSESSMENT:\nThe south field soil profile is transitioning from agricultural loam to tidal peat at a rate inconsistent with any known geological process. The transition is occurring from below — the deeper samples are further advanced. This is consistent with a rising water table carrying [██████] substrate upward through the soil column.\n\nIn plain terms: the marsh is growing under the field. The field does not know it yet. The tobacco does.\n\nFiled by: D. Harmon\nClassification: [██████]",
+      "designSpec": {
+        "paperTone": "cold",
+        "primaryTypeface": "mono",
+        "headerStyle": "form",
+        "hasRedactions": true,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": true
+      }
+    },
+    {
+      "id": "F.10",
+      "documentType": "transcript",
+      "inWorldAuthor": "Transcribed by Agent Harmon",
+      "inWorldRecipient": "TIDEGATE case file, civilian witness statements",
+      "inWorldPurpose": "Informal interview with Jasper Tolson, neighboring property owner, regarding livestock incident",
+      "content": "[██████] DIVISION — WITNESS STATEMENT (INFORMAL)\nOPERATION: TIDEGATE\nSUBJECT: Tolson, Jasper W., age 64\nLOCATION: Tolson farm, Shorter's Wharf Rd.\nDATE: 14 March 1962\nINTERVIEWER: Harmon (under USGS cover)\nNOTE: Not recorded. Transcribed from memory within 2 hours.\n\nHARMON: Mr. Tolson, I understand you lost a heifer last week.\n\nTOLSON: Lost is one word for it. She went into the marsh Tuesday evening and she come back Thursday morning standing up and not eating and not moving and not — I don't know how to say it. Not in there anymore. Like the cow was still there but whatever makes a cow a cow had gone somewhere else.\n\nHARMON: Can you describe the marsh conditions when the animal went in?\n\nTOLSON: Wet. [pause] I know that is not helpful. The marsh is always wet. But it was a different wet. The water was warm. You could feel it from the bank. Warm like bath water. In March. And the color was wrong — not brown, not green, just dark. Like looking down into a well that goes further than a well should go.\n\nHARMON: Has this happened before?\n\nTOLSON: My father lost a mule in '47. Same marsh. Same time of year. He didn't talk about it. My grandfather lost two goats in '31. Same marsh. The men came then too. Not you — other men. Government men. They had different equipment but they had the same look. [pause] The look of men who already know what they are going to find and wish they didn't.\n\nHARMON: Did your father or grandfather ever describe what they thought was in the marsh?\n\nTOLSON: My grandfather said the marsh was older than the river. He said there was something in the peat that had been there before the peat was peat. He said it sleeps and when it wakes up the water comes in and when it goes back to sleep the water goes out and that is all there is to say about it. He said: Jasper, there are some things a man does not look at straight on, and the marsh is one of them.\n\nHARMON: Your neighbor, Mr. Pratt — has he mentioned anything unusual?\n\nTOLSON: Earl don't mention things. Earl is the kind of man who will lose his wife to the water and get up the next morning and feed his livestock and plow his field and never once say a word about it that he has not already decided is safe to say. [pause] That is not a criticism. That is how men are built around here. You do not talk about the water. You live with it.\n\n[END OF STATEMENT]",
+      "designSpec": {
+        "paperTone": "warm",
+        "primaryTypeface": "mixed",
+        "headerStyle": "form",
+        "hasRedactions": true,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": true
+      }
+    },
+    {
+      "id": "F.11",
+      "documentType": "correspondence",
+      "inWorldAuthor": "Mary Ellis Pratt (née Shorter)",
+      "inWorldRecipient": "Ruth Shorter Calloway, 212 Race St., Cambridge, MD",
+      "inWorldPurpose": "Personal letter from Mary to her sister, begun in March 1961, never completed",
+      "content": "March 22, 1961\n\nDear Ruth,\n\nI am writing this at the kitchen table with the window open because spring has finally decided to show up and the air smells the way the air is supposed to smell in March on the Shore — like mud and new grass and the bay when the wind is right. Earl is in the tobacco barn checking his seedling trays. He has been out there since five-thirty. That man does not know how to sit still and I have loved him for thirty-one years for it and I have been tired of it for thirty-one years for it and both of those things are true at the same time.\n\nThe garden is coming in. Rosemary is up already — it never really went down this winter, just got quiet. The basil will need another two weeks. I put in a row of snap peas along the south fence and they are already reaching for the wire.\n\nRuth I want to tell you something and I do not know how to say it so I will just say it the way it happened. Last Tuesday I went to the creek to cut some watercress for dinner — you know the spot, where the culvert pipe comes out and the water is shallow enough to wade. I was standing in the creek with my shoes off and the water was warm. Not sun-warm. Warm from below. And I looked down and the water was so clear I could see the bottom and the bottom was not mud, Ruth. It was something else. It was moving. Very slowly. Like breathing.\n\nI stood there for a long time. I do not know how long. When I came back to the house it was dark and Earl was on the porch and he said where have you been and I said getting watercress and he said for six hours and I said\n\n[letter ends here]",
+      "designSpec": {
+        "paperTone": "warm",
+        "primaryTypeface": "serif",
+        "headerStyle": "letterhead",
+        "hasRedactions": false,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": null
+      }
+    },
+    {
+      "id": "F.12",
+      "documentType": "memo",
+      "inWorldAuthor": "[REDACTED] Division, Scientific Advisory Panel",
+      "inWorldRecipient": "Operations Directorate, TIDEGATE personnel",
+      "inWorldPurpose": "Classification summary of the Dorchester County tidal entity",
+      "content": "[██████] DIVISION — SCIENTIFIC ADVISORY PANEL\nENTITY CLASSIFICATION SUMMARY\nCLASSIFICATION: [██████]\n\nDESIGNATION: TIDEGATE Primary (no common name)\n\nTYPE: Geological-biological hybrid. Not organic in any catalogued sense. Exists within and as part of the water table beneath the Chesapeake tidal plain. Best analogy (inadequate): a thought embedded in the hydrology itself — not swimming in the water but constitutive of it.\n\nBEHAVIORAL PATTERN:\n— Dormant period: 14-16 years (interval decreasing)\n— Active period: 4-8 weeks, late winter/early spring\n— Activity presents as: anomalous tidal timing, water table elevation, soil composition change (agricultural → peat), thermal anomalies, and the 0347 displacement events\n— Entity does not 'attack.' Entity rises. What happens to things in the path of rising water is not aggression — it is hydrology.\n\nCIVILIAN IMPACT:\nPersons in prolonged proximity exhibit: time perception distortion, compulsive water-seeking, and 'quiet walking' — a state in which the subject calmly enters the nearest body of water and does not return. This is not suicide. The subjects do not exhibit distress. They exhibit recognition.\n\n[██████████████████████████████████████████████████████████████]\n\nTHREAT ASSESSMENT: Not applicable. The entity does not threaten. It is present. It has been present longer than the Chesapeake has been a bay.\n\nPANEL CHAIR: [██████]",
+      "designSpec": {
+        "paperTone": "cold",
+        "primaryTypeface": "mono",
+        "headerStyle": "form",
+        "hasRedactions": true,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": true
+      }
+    },
+    {
+      "id": "F.13",
+      "documentType": "fieldNote",
+      "inWorldAuthor": "Earl Pratt",
+      "inWorldRecipient": "Personal journal",
+      "inWorldPurpose": "Evening entries about conversations with Mary's photograph",
+      "content": "March 16\n\nTalked to Mary tonight. I told her the creek ran backward three times this week and each time for eleven seconds and each time at quarter to four in the morning and I know this because I am always awake at quarter to four because that is the time the water moves.\n\nI told her about Harmon. She would have known he was not USGS. She was always better at reading people. She would have said: Earl, that man is here about the water, not about the water table.\n\nI asked her what I should do. The photograph did not answer. But the glass had water spots on the inside — condensation, except the house is dry. I wiped them off. They came back by bedtime.\n\nMarch 20\n\nLonger tonight. I told her everything — the fence posts, the tobacco, the heron. I told her I am not afraid, which is true. I told her I am tired, which is also true.\n\nThe water on the glass is getting worse. I have stopped wiping it.",
+      "designSpec": {
+        "paperTone": "warm",
+        "primaryTypeface": "serif",
+        "headerStyle": "handwritten",
+        "hasRedactions": false,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": null
+      }
+    },
+    {
+      "id": "F.14",
+      "documentType": "inspection",
+      "inWorldAuthor": "Dorchester County Surveyor's Office",
+      "inWorldRecipient": "Pratt family records, property file",
+      "inWorldPurpose": "Original property survey from 1938 with later annotations in unknown hand",
+      "content": "DORCHESTER COUNTY SURVEYOR'S OFFICE\nPROPERTY SURVEY — PLAT NO. 1938-0447\n\nProperty: Pratt, Earl J.\nLocation: Shorter's Wharf Road, Election District 4\nAcreage: 187 acres\nSurveyed: 14 September 1938\n\nBOUNDARY: Beginning at the iron pipe at Shorter's Wharf Rd and the county road, thence S 22° E along county road 1,287 ft to Tolson line, thence N 68° E along Tolson 2,440 ft to mean high water mark of the Little Blackwater, thence northerly along said mark approx. 1,940 ft, thence S 68° W approx. 2,180 ft to beginning.\n\nNOTES:\n— Eastern boundary follows mean high water mark, subject to variation\n— USGS station BW-14 at survey marker No. 7 (installed 1928)\n\n{LATER ANNOTATIONS — undated, hand unknown:}\n{One small circle drawn on eastern boundary at marker 7.}\n{Inside the circle: '1962'}\n{Below: 'BW-14. It always starts here.'}\n\n{Three additional circles at markers 1, 3, 5 — dated '1914,' '1931,' '1947' respectively. No annotations on these.}\n\n{Four circles total. Four active cycles. The intervals are shrinking.}",
+      "designSpec": {
+        "paperTone": "aged",
+        "primaryTypeface": "mixed",
+        "headerStyle": "form",
+        "hasRedactions": false,
+        "hasAnnotations": true
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": null
+      }
+    },
+    {
+      "id": "F.15",
+      "documentType": "report",
+      "inWorldAuthor": "Dorchester County Water Authority",
+      "inWorldRecipient": "County records, water monitoring division",
+      "inWorldPurpose": "Water gauge readings for Shorter's Wharf, January through March 1962",
+      "content": "DORCHESTER COUNTY WATER AUTHORITY\nMONTHLY GAUGE READING SUMMARY\nStation: Shorter's Wharf (backup)\nPeriod: January 1 — March 31, 1962\n\nNOTE: Primary BW-14 offline since Nov 1961.\n\nDate       Level(in)  Temp  Notes\nJan 04     31         41    Nominal\nJan 18     27         39    \nFeb 01     22         42    Rising — no precip.\nFeb 15     18         44    Above seasonal norm\nMar 01     14         48    \nMar 05     11         52    Backup offline after this\n--- MANUAL (HARMON) ---\nMar 08     9          54    Creek reversal observed\nMar 10     152*       57    *Peak single event 0347\nMar 15     6          58    Entity active\nMar 20     5          61    Saturation expanding\nMar 25     3          59    Water table near surface\nMar 28     6          56    Recession begins\nMar 31     8          52    Recession confirmed\n\nNOTE: The March 10 reading of 152 inches represents a single-event spike at 0347 hrs. Water table rose from 8 in. below surface to 152 in. ABOVE datum in one second, held 11 seconds, returned. Verified. Correct.\n\nReading of 152 flagged for review. No review scheduled.",
+      "designSpec": {
+        "paperTone": "neutral",
+        "primaryTypeface": "mono",
+        "headerStyle": "form",
+        "hasRedactions": false,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": null
+      }
+    },
+    {
+      "id": "F.16",
+      "documentType": "transcript",
+      "inWorldAuthor": "Agent Harmon (transcribed from memory)",
+      "inWorldRecipient": "TIDEGATE case file",
+      "inWorldPurpose": "Conversation between Pratt and Harmon on the porch, March 15",
+      "content": "[██████] DIVISION — CONVERSATION RECORD\nOPERATION: TIDEGATE\nDATE: 15 March 1962, approx. 2030 hrs\nNOTE: Transcribed from memory.\n\nHARMON: Mr. Pratt, I am not from the Geological Survey.\n\nPRATT: I know.\n\nHARMON: How long have you known?\n\nPRATT: Since you showed up with new boots and equipment that does not take soil samples.\n\nHARMON: [pause] Does it have to do with the water?\n\nPRATT: Yes.\n\nHARMON: Does it have to do with Mary?\n\n[30-second pause]\n\nHARMON: I do not know, Mr. Pratt. Your wife drowned. People drown. But the timing — I would be lying if I said I had not noticed.\n\nPRATT: What is in the water?\n\nHARMON: Something that has been there a very long time. It does not hunt. It rises. The water rises. And what happens to things near the water when it rises is not something we have been able to prevent.\n\nPRATT: You have been here before.\n\nHARMON: In '47. And before that.\n\nPRATT: My father never said a word.\n\nHARMON: They never do.\n\nPRATT: What happens when the water goes back down?\n\nHARMON: Everything that happened becomes the kind of thing nobody talks about. In fifteen years the water comes back up. And we come back.\n\n[END]\n\nNOTE: Pratt took this the way a farmer takes weather — as a fact of the land he has chosen to live on.",
+      "designSpec": {
+        "paperTone": "warm",
+        "primaryTypeface": "mixed",
+        "headerStyle": "form",
+        "hasRedactions": true,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": true
+      }
+    },
+    {
+      "id": "F.17",
+      "documentType": "report",
+      "inWorldAuthor": "[REDACTED] Division, After-Action Review Board",
+      "inWorldRecipient": "TIDEGATE operational archive",
+      "inWorldPurpose": "After-action report for the 1947 tidal incursion",
+      "content": "[██████] DIVISION — AFTER-ACTION REPORT\nOPERATION: TIDEGATE · 1947 CYCLE\n\nSUMMARY: Active phase February — April 1947. Duration: 7 weeks.\n\nCIVILIAN CASUALTIES: 2\n— SHORTER, Agnes M., 71. Drowned, Little Blackwater, 18 March 1947. Observed walking calmly into the river at 0350. Fully dressed. Did not struggle. Did not return.\n— TOLSON, Henry W., 44. Missing 2 April 1947. Boots found upright on creek bank. No footprints. Body not recovered.\n\nOPERATIVE CASUALTIES: 1\n— Agent [██████]. Missing 28 March 1947. Last at BW-14. Equipment recovered. Agent not recovered.\n\nENTITY: Directly observed for first time. Agent [██████] reported at 0347 on 26 March: 'Beneath the creek surface, approx. 4 feet down, a structure that is not geological. Same color as the water. Not the same thing as the water. It [██████████████████████████████████].'\n\nRECOMMENDATIONS:\n1. Continue monitoring. No other recommendation exists.\n2. BW-14 must remain operational.\n3. Civilian silence is more effective containment than anything we have devised.\n4. The entity does not respond to [██████]. It rises. It recedes. Nothing we have done in 33 years has affected its behavior.\n\nNEXT PROJECTED CYCLE: 1962-1963",
+      "designSpec": {
+        "paperTone": "cold",
+        "primaryTypeface": "mono",
+        "headerStyle": "form",
+        "hasRedactions": true,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": true
+      }
+    },
+    {
+      "id": "F.18",
+      "documentType": "fieldNote",
+      "inWorldAuthor": "Earl Pratt",
+      "inWorldRecipient": "Personal journal",
+      "inWorldPurpose": "Late March — the conversation with Mary changes",
+      "content": "March 24\n\nTonight was different and I do not know how to write about it so I will write what happened.\n\nI told Mary about the water in the basement — one inch, black, warm, eleven seconds, gone. The stain shaped like the creek. I told her I miss her more than I am afraid and that the missing has a shape now and the shape is water.\n\nThen I stopped talking and the house was quiet and the marsh was quiet and I heard the creak of her chair. The one across the table. The sound it makes when you lean back. The sound she made when she was listening.\n\nI did not look up. I sat with my hands around my coffee and I felt the way I felt when she was alive and we were not talking because we had been married long enough that silence was its own conversation.\n\nThe water on the photograph glass has covered her face. I cannot see her through it. I am choosing not to wipe it off. I do not know if this is grief or surrender or something the water is doing to me but for eleven seconds last night I was not alone.",
+      "designSpec": {
+        "paperTone": "warm",
+        "primaryTypeface": "serif",
+        "headerStyle": "handwritten",
+        "hasRedactions": false,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": null
+      }
+    },
+    {
+      "id": "F.19",
+      "documentType": "correspondence",
+      "inWorldAuthor": "Robert A. Caldwell, County Extension Agent",
+      "inWorldRecipient": "Earl J. Pratt, Shorter's Wharf Road",
+      "inWorldPurpose": "Letter regarding anomalous soil test results",
+      "content": "UNIVERSITY OF MARYLAND COOPERATIVE EXTENSION\nDORCHESTER COUNTY OFFICE\nMarch 12, 1962\n\nDear Mr. Pratt:\n\nI am writing about the soil samples from your north tobacco field. The numbers do not make sense to me.\n\nThe pH of 4.2 is far below the range for tobacco (5.5-6.5). At this level your seedlings should be showing severe stress. You told me they are growing ahead of schedule. I have no explanation.\n\nThe organic matter of 14.2% is also unusual — expected range for a worked field is 3-5%. A reading of 14.2% is consistent with peat bog.\n\nI should mention that I am not the first agent to receive unusual readings from Shorter's Wharf Road. My predecessor, Mr. Harold Finney, filed similar reports in 1947. He retired in August 1948, two years early. His notes end mid-sentence.\n\nSincerely,\nRobert A. Caldwell\nCounty Extension Agent — Agronomy",
+      "designSpec": {
+        "paperTone": "warm",
+        "primaryTypeface": "mixed",
+        "headerStyle": "letterhead",
+        "hasRedactions": false,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": null
+      }
+    },
+    {
+      "id": "F.20",
+      "documentType": "anomaly",
+      "inWorldAuthor": "Mary Ellis Pratt",
+      "inWorldRecipient": "Unknown",
+      "inWorldPurpose": "A recipe card with handwriting on the reverse that should not exist",
+      "content": "[FRONT — blue ink, Mary's hand]\n\nBEATEN BISCUITS\n2 c. flour / 1 tsp salt / 1 tbsp lard\nIce water (½ c.) / Beat 300 times\nBake 400° till brown (20-25 min)\n— Mama's recipe from Hoopers Island.\n   The beating is the secret.\n\n[BACK — pencil, pressed hard, same hand]\n\nApril 3 1962\n\nEarl — the water is warm and I am not afraid.\nIt knows my name. I think it has always known.\nThe heron is here too.\nDo not come looking. I am not lost.\nI am where the water wanted me.\n\nAll my love\n\n[NOTE: Mary Pratt died April 7, 1961. Card dated April 3, 1962. Front ink consistent with 1950s. Back pencil marks fresh. Card found in kitchen drawer March 21, 1962. Not there March 20.]",
+      "designSpec": {
+        "paperTone": "aged",
+        "primaryTypeface": "serif",
+        "headerStyle": "none",
+        "hasRedactions": false,
+        "hasAnnotations": true
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": null
+      }
+    },
+    {
+      "id": "F.21",
+      "documentType": "fieldNote",
+      "inWorldAuthor": "Agent David Harmon",
+      "inWorldRecipient": "Personal — not filed",
+      "inWorldPurpose": "Notebook entries on the operation and his own state of mind",
+      "content": "PERSONAL — NOT FOR FILE\n\nMarch 18\n\nThird deployment. First was '47 — I was the Bernstein then. Green. Eager. The senior agent was Polk. He told me: Harmon, the water does not care about you. Remember that and you will be fine. Polk went to the creek on day 19. His boots were by the water. Same as always.\n\nNow I am Polk. Bernstein is Bernstein.\n\nMarch 22\n\nBernstein is gone. He went to the creek at 0347. Walked in calm. Ankle deep. Knee deep. Did not look back. Did not struggle. Was going home to a home he had never been to.\n\nThe water was warm when I checked. Clear and black at the same time. I could see the bottom. The bottom was breathing.\n\nI stepped back. Fifteen years of practice.\n\nMarch 25\n\nThe heron at Pratt's culvert is dead. Standing dead. Rigored in place, eyes open, facing the house. Dead 48 hours at least. Standing because something holds it — the water in the bird. Warm like the creek.\n\nI left it. Pratt has seen it. We are both men who know when not to touch things.",
+      "designSpec": {
+        "paperTone": "warm",
+        "primaryTypeface": "mono",
+        "headerStyle": "handwritten",
+        "hasRedactions": false,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": null
+      }
+    },
+    {
+      "id": "F.22",
+      "documentType": "report",
+      "inWorldAuthor": "[REDACTED] Division, Operations Directorate",
+      "inWorldRecipient": "TIDEGATE operational archive",
+      "inWorldPurpose": "Final assessment — the document that recontextualizes the operation",
+      "content": "[██████] DIVISION — FINAL OPERATIONAL ASSESSMENT\nOPERATION: TIDEGATE — 1962 CYCLE\nPREPARED BY: Harmon, D.\n\nThis assessment departs from standard format.\n\nWHAT WE TELL OURSELVES:\nTIDEGATE is a monitoring operation. We observe. We document. We protect the civilian population by maintaining awareness. We lose an agent every other cycle. We lose civilians every cycle. We file reports. We come back in fifteen years.\n\nWHAT IS ACTUALLY TRUE:\nWe are not monitoring the entity. We are monitoring the people.\n\nSpecifically: whether they talk. The people of Shorter's Wharf Road — the watermen, the farmers — have lived with the entity as long as anyone has lived on this shore. They know. They do not talk about it. Not because we silenced them — because silence is how they survive.\n\nTIDEGATE's actual function is to ensure the silence holds. Every fifteen years we watch the water and watch the people watch the water and make sure nobody breaks. Not for national security — because breaking the silence would destroy the only protection these people have.\n\nEarl Pratt lost his wife to the water. He tells her photograph. Jasper Tolson's family loses livestock every generation. He says it was mud. Agnes Shorter walked into the river in '47. Her family says sleepwalking. Fifteen years and counting.\n\nThis is not ignorance. This is what we do. We call it classification. They call it not talking about the water. The mechanism is identical. The grief is identical.\n\nI am fifty-one. Thirty years of watching water and writing reports that change nothing. Two partners lost. Civilians lost every cycle. Not one line of any report has saved anyone.\n\nThe entity is not the threat. The entity is the weather. The threat is what the silence does to the people who keep it.\n\nMary Pratt drowned April 7, 1961. The active cycle was not projected until late 1962. She was early. BW-14 went offline six months later. The water table has been rising under the Pratt property since Mary went to the creek for watercress and stood there six hours and came home and never finished her letter.\n\nEarl does not know this. Earl will never know this. That is our protection. That is all it has ever been.\n\nFILED: [██████] April 1962\nHARMON, D.",
+      "designSpec": {
+        "paperTone": "cold",
+        "primaryTypeface": "mono",
+        "headerStyle": "form",
+        "hasRedactions": true,
+        "hasAnnotations": false
+      },
+      "authenticityChecks": {
+        "hasIrrelevantDetail": true,
+        "couldExistInDifferentStory": false,
+        "redactionDoesNarrativeWork": true
+      }
+    }
+  ],
+  "cover": {
+    "title": "The Drowning Season",
+    "designation": "Dorchester County Field Survey · OPERATION TIDEGATE · Block 01 · Restricted",
+    "tagline": "This document is the property of the bearer. Do not file. Do not circulate. Return to Station BW-14 upon completion of the operational cycle.",
+    "colophonLines": [
+      "LiftRPG · liftrpg.co",
+      "Generated for personal use · March 2026",
+      "Block 01 · 6 weeks · 30 sessions",
+      "Station BW-14 · Shorter's Wharf Road · Dorchester County, Maryland"
+    ]
+  },
+  "rulesSpread": {
+    "leftPage": {
+      "title": "Field Orientation · Dorchester County Water Authority · Monitoring Protocol DC-7",
+      "reEntryRule": {
+        "progressionType": "custom",
+        "ruleText": "If a monitoring week was missed, repeat that week's prescribed loads before advancing to the next. The water table does not wait, but it does not punish either. It rises on its own schedule. So should you."
+      },
+      "sections": [
+        {
+          "heading": "Using This Log",
+          "body": "Each spread covers one week of the monitoring period. The left page contains your session cards — your prescribed lifts and conditioning work. Record your sets, your reps, your weight. The work is the work. The right page contains field operations — the survey grid, the gauge calibration sequence, and the daily conditions log. Complete both sides. The water is patient."
+        },
+        {
+          "heading": "Fragment References",
+          "body": "Some session entries carry a reference in the form → F.07. These direct you to numbered documents in the back of this booklet. These documents are not required reading. They are the kind of thing a thorough observer would want to examine — field notes, official correspondence, records that were not meant to be seen together. Read them when directed, or read them at your own pace. The picture they form depends on the order you find them."
+        },
+        {
+          "heading": "The Survey Grid",
+          "body": "Your property survey grid updates each week as conditions change. Cleared parcels indicate areas walked and observed. Anomaly parcels indicate areas where conditions have deviated from the expected. Inaccessible parcels are marsh — do not enter the marsh. The grid is a record of what you have seen. Mark it when instructed. Your grid will not look like anyone else's."
+        },
+        {
+          "heading": "Daily Conditions Log",
+          "body": "During any rest period between sets, roll two six-sided dice and consult the conditions log on the right page. Follow the entry. Some entries direct you to a fragment. Some instruct you to mark your survey grid. If you choose not to roll, no observation is recorded. Both outcomes are within normal parameters."
+        },
+        {
+          "heading": "The Gauge Reading Log",
+          "body": "Page 02, right side. Each week's field operations include a gauge calibration sequence — a short puzzle. Solving it yields one letter. Record each letter in order on your Gauge Reading Log. At the end of the six-week cycle, your readings will resolve to a word. This word is significant. Enter it at liftrpg.co."
+        },
+        {
+          "heading": "Notes",
+          "body": "The box beneath each session's exercise table is yours. Some observers use it to record things they have noticed but not yet reported."
+        }
+      ]
+    },
+    "rightPage": {
+      "title": "Gauge Reading Log · Station BW-14 · Monitoring Cycle 1962",
+      "instruction": "Record your gauge readings as you extract them — one per week, in order. Do not record readings you have not derived. At the conclusion of the monitoring cycle, read your complete log from Week 1 through Week 5. The word that forms is the station designation the water answers to. Write it in the space provided and enter it at liftrpg.co.",
+      "unlockUrl": "liftrpg.co"
+    }
+  },
+  "endings": [
+    {
+      "variant": "canonical",
+      "content": {
+        "documentType": "correspondence",
+        "body": "May 1962\n\nDear Ruth,\n\nI am writing to you from the kitchen table where I have been sitting every evening for thirteen months. The coffee is on my left. Mary's photograph is on my right. The glass is clean for the first time since March.\n\nThe water went back down.\n\nI do not know how to tell you what happened here this spring and I am not going to try because trying would require words I do not have and because you are Mary's sister and she would not have wanted me to frighten you with things that are over now.\n\nI will tell you this: the tobacco is in the ground. The south field dried out in April and I planted it same as always and it is growing same as always and the soil is regular soil again — dark but not black, wet but not saturated, smelling the way tobacco dirt is supposed to smell which is like nothing else on earth.\n\nThe creek runs the right way. The gauge at the culvert reads normal numbers. The heron — there was a heron, Ruth, for six weeks there was a heron at the culvert that would not move and would not leave and I want to tell you that a heron is just a bird but this one was not just a bird, this one was something else, and it is gone now. It flew east over the marsh on the last day of March and I watched it go and I have not seen it since.\n\nWhen Mary was alive she used to call me out to the porch whenever there was a heron in the creek. She would say: Earl, come see, the heron is back. She loved them. She said they were the most patient thing in the world — that a heron could stand in moving water for an hour without moving and that this was a kind of prayer she understood better than the kind that happens in church.\n\nI did not understand what she meant then. I think I understand it now.\n\nThe government men are gone. Harmon — the older one, the one with the new boots that are not new anymore — shook my hand on the porch before he left. He said he was sorry. I told him he had nothing to be sorry for. He said: I know, Mr. Pratt. I am sorry anyway.\n\nThe younger one did not come back. Harmon did not explain and I did not ask. There are things a man does not ask about and I have learned this the same way I learned everything else on this farm — by standing in one place long enough for the knowledge to come up through the soil.\n\nRuth I found something in the kitchen drawer last month. A recipe card — Mary's beaten biscuits from your mother's recipe. On the back, in her handwriting, a note. Dated this year. I am going to put this in the envelope with this letter so you can see it yourself. I do not know what it means. I know what I want it to mean and I know what I am afraid it means and they are the same thing.\n\nThe water is warm and I am not afraid. That is what she wrote. I have read it a hundred times. I am choosing to believe her.\n\nThe marsh is quiet tonight. The creek is running right. The stars are out over the Blackwater and the air smells like turned earth and warming soil and the first cut tobacco of the season and this is my farm and my land and my creek and whatever is under it has been under it since before my grandfather's grandfather and it will be under it long after I am in the churchyard on the hill and I have made my peace with that the way I have made my peace with weather.\n\nThe water comes up. The water goes down. In between, you do the work in front of you.\n\nGive my love to the girls.\n\nEarl",
+        "finalLine": "The water comes up. The water goes down. In between, you do the work in front of you."
+      },
+      "designSpec": "The ending arrives as a warm page — cream-toned, set in the serif typeface of Earl's journal entries, with no headers or form fields. It is a letter. It looks like a letter. The reader has spent six weeks reading government memos and classified reports and field observations and this — this is just a man writing to his dead wife's sister at the kitchen table in May. The contrast with every other document in the booklet is the design. The warmth is the revelation."
+    }
+  ]
+}
