@@ -25,13 +25,43 @@
       padding:20px;
     }
     main{
-      display:grid;
-      grid-template-columns:minmax(0,460px) minmax(0,680px);
-      gap:40px;
-      align-items:start;
-      max-width:1200px;
+      max-width:460px;
       width:100%;
     }
+
+    /* ── 3D flip scene ─────────────── */
+    .card-scene{
+      -webkit-perspective:1200px;
+      perspective:1200px;
+      width:100%;
+    }
+    .card-flip{
+      position:relative;
+      -webkit-transform-style:preserve-3d;
+      transform-style:preserve-3d;
+      transition:transform .65s cubic-bezier(.4,0,.2,1),
+                 height .45s cubic-bezier(.4,0,.2,1) .08s;
+    }
+    .card-flip.is-flipped{
+      transform:rotateY(180deg);
+    }
+    .card-front,
+    .card-back{
+      -webkit-backface-visibility:hidden;
+      backface-visibility:hidden;
+      width:100%;
+    }
+    .card-front{
+      position:relative;
+    }
+    .card-back{
+      position:absolute;
+      top:0;
+      left:0;
+      transform:rotateY(180deg);
+    }
+
+    /* ── Card base ─────────────────── */
     .card{
       background:var(--paper);
       padding:48px 52px;
@@ -108,6 +138,58 @@
     .downloads a{
       border-style:dashed;
     }
+
+    /* ── Flip trigger (front — inverted to stand out) ── */
+    .flip-trigger{
+      display:block;
+      width:100%;
+      font-family:var(--mono);
+      font-size:8pt;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+      text-align:left;
+      color:var(--paper);
+      background:var(--ink);
+      border:1.5px solid var(--ink);
+      padding:14px 16px;
+      cursor:pointer;
+      margin-top:12px;
+      transition:background .15s,border-color .15s;
+    }
+    .flip-trigger:hover{
+      background:var(--accent);
+      border-color:var(--accent);
+    }
+    .flip-trigger .link-sub{
+      color:var(--rule);
+    }
+    .flip-trigger:hover .link-sub{
+      color:rgba(241,235,224,.7);
+    }
+
+    /* ── Flip return (back) ────────── */
+    .flip-return{
+      display:block;
+      width:100%;
+      font-family:var(--mono);
+      font-size:8pt;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+      text-align:left;
+      color:var(--ink);
+      background:none;
+      border:1.5px solid var(--ink);
+      padding:14px 16px;
+      cursor:pointer;
+      margin-top:20px;
+      transition:background .12s,color .12s;
+    }
+    .flip-return:hover{
+      background:var(--ink);
+      color:var(--paper);
+    }
+
+    /* ── Details / How it Works ─────── */
     details{
       margin-top:28px;
       border-top:1px solid var(--rule);
@@ -161,29 +243,21 @@
     footer a:hover{
       color:var(--ink);
     }
-    .preview{
-      text-align:center;
-    }
+
+    /* ── Back face preview ─────────── */
     .preview img{
       width:100%;
       display:block;
-      box-shadow:0 8px 40px rgba(0,0,0,.6);
-      border:1px solid rgba(241,235,224,.08);
     }
-    .preview figcaption{
+    .preview-caption{
       font-size:6pt;
       letter-spacing:.2em;
       text-transform:uppercase;
-      color:#7a756d;
+      color:var(--muted);
       margin-top:14px;
     }
-    @media (max-width:960px){
-      main{
-        grid-template-columns:1fr;
-        max-width:460px;
-        gap:32px;
-      }
-    }
+
+    /* ── Responsive ────────────────── */
     @media (max-width:520px){
       .card{ padding:32px 28px; }
       h1{ font-size:26pt; }
@@ -192,57 +266,109 @@
 </head>
 <body>
   <main>
-    <div class="card">
-      <div class="kicker">Print &amp; Play</div>
-      <h1>LiftRPG</h1>
-      <div class="rule"></div>
-      <p>A workout journal fused with a branching narrative TTRPG. Six weeks of real training. One encrypted ending. Written in pencil.</p>
-      <nav>
-        <a href="renderer/">
-          Renderer
-          <span class="link-sub">Upload your JSON &rarr; printable booklet</span>
-        </a>
-        <a href="unlock/">
-          Unlock
-          <span class="link-sub">Enter your assembled password &rarr; discover the ending</span>
-        </a>
-      </nav>
+    <div class="card-scene">
+      <div class="card-flip" id="card-flip">
 
-      <div class="section-label">Example</div>
-      <nav class="downloads">
-        <a href="liftrpg-eastern-shore.json" download="liftrpg-eastern-shore.json">
-          The Drowning Season
-          <span class="link-sub">Complete 6-week example &mdash; download JSON</span>
-        </a>
-        <a href="liftrpg-template.json" download="liftrpg-template.json">
-          Blank Template
-          <span class="link-sub">Empty schema &mdash; start your own</span>
-        </a>
-      </nav>
+        <!-- ── FRONT ─────────────────── -->
+        <div class="card card-front">
+          <div class="kicker">Print &amp; Play</div>
+          <h1>LiftRPG</h1>
+          <div class="rule"></div>
+          <p>A workout journal fused with a branching narrative TTRPG. Six weeks of real training. One encrypted ending. Written in pencil.</p>
+          <button class="flip-trigger flip-btn" type="button">
+            See the Booklet &#x21BB;
+            <span class="link-sub">A spread from The Drowning Season</span>
+          </button>
 
-      <details>
-        <summary>How it Works</summary>
-        <div class="how-content">
-          <ol>
-            <li>Write a workout program in <a href="https://www.liftosaur.com/" target="_blank" rel="noopener">Liftosaur</a> or plain text</li>
-            <li>Feed the template JSON + your program into any LLM (Claude, ChatGPT, Gemini)</li>
-            <li>Upload the generated JSON to the <a href="renderer/">Renderer</a></li>
-            <li>Print as a saddle-stitch booklet (half-letter, double-sided)</li>
-            <li>Train for six weeks, pencil in hand</li>
-            <li>Assemble the password. <a href="unlock/">Unlock</a> the ending.</li>
-          </ol>
+          <details>
+            <summary>How it Works</summary>
+            <div class="how-content">
+              <ol>
+                <li>Write a workout program in <a href="https://www.liftosaur.com/" target="_blank" rel="noopener">Liftosaur</a> or plain text</li>
+                <li>Feed the template JSON + your program into any LLM (Claude, ChatGPT, Gemini)</li>
+                <li>Upload the generated JSON to the <a href="renderer/">Renderer</a></li>
+                <li>Print as a saddle-stitch booklet (half-letter, double-sided)</li>
+                <li>Train for six weeks, pencil in hand</li>
+                <li>Assemble the password. <a href="unlock/">Unlock</a> the ending.</li>
+              </ol>
+            </div>
+          </details>
+
+          <div class="section-label">Example</div>
+          <nav class="downloads">
+            <a href="liftrpg-eastern-shore.json" download="liftrpg-eastern-shore.json">
+              The Drowning Season
+              <span class="link-sub">Complete 6-week example &mdash; download JSON</span>
+            </a>
+            <a href="liftrpg-template.json" download="liftrpg-template.json">
+              Blank Template
+              <span class="link-sub">Empty schema &mdash; start your own</span>
+            </a>
+          </nav>
+
+          <div class="section-label">Tools</div>
+          <nav>
+            <a href="renderer/">
+              Renderer
+              <span class="link-sub">Upload your JSON &rarr; printable booklet</span>
+            </a>
+            <a href="unlock/">
+              Unlock
+              <span class="link-sub">Enter your assembled password &rarr; discover the ending</span>
+            </a>
+          </nav>
+
+          <footer>
+            <a href="LICENSE">MIT License</a> &middot; <a href="https://github.com/xYoBro/LiftRPG" target="_blank" rel="noopener">GitHub</a>
+          </footer>
         </div>
-      </details>
 
-      <footer>
-        <a href="LICENSE">MIT License</a> &middot; <a href="https://github.com/xYoBro/LiftRPG" target="_blank" rel="noopener">GitHub</a>
-      </footer>
+        <!-- ── BACK ──────────────────── -->
+        <div class="card card-back">
+          <div class="kicker">The Drowning Season</div>
+          <div class="rule"></div>
+          <figure class="preview">
+            <img src="images/spread-preview.jpg" alt="A booklet spread from The Drowning Season — field operations page with cipher puzzle and farm survey grid on the left, workout session cards with narrative prompts on the right"/>
+          </figure>
+          <div class="preview-caption">Field operations + training sessions &mdash; Week 1</div>
+          <button class="flip-return flip-btn" type="button">&#x21BB; Back</button>
+        </div>
+
+      </div>
     </div>
-
-    <figure class="preview">
-      <img src="images/spread-preview.jpg" alt="A booklet spread from The Drowning Season — field operations page with cipher puzzle and farm survey grid on the left, workout session cards with narrative prompts on the right"/>
-      <figcaption>A spread from The Drowning Season &mdash; field operations + training sessions</figcaption>
-    </figure>
   </main>
+
+  <script>
+  (function(){
+    var flipper = document.getElementById('card-flip');
+    var front = flipper.querySelector('.card-front');
+    var back = flipper.querySelector('.card-back');
+    var details = front.querySelector('details');
+    var flipped = false;
+
+    function measure(){
+      var face = flipped ? back : front;
+      flipper.style.height = face.scrollHeight + 'px';
+    }
+
+    flipper.querySelectorAll('.flip-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        flipped = !flipped;
+        flipper.classList.toggle('is-flipped', flipped);
+        measure();
+      });
+    });
+
+    if(details){
+      details.addEventListener('toggle', function(){
+        if(!flipped) measure();
+      });
+    }
+
+    measure();
+    window.addEventListener('resize', measure);
+    window.addEventListener('load', measure);
+  })();
+  </script>
 </body>
 </html>
