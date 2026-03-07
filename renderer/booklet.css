@@ -225,9 +225,11 @@ body{
    RULES SPREAD (LEFT: BRIEFING · RIGHT: PASSWORD LOG)
    ══════════════════════════════════════════════════════════════ */
 .rules-left{
-  padding:32px 36px 28px 40px;
+  padding:24px 36px 20px 40px;
   display:flex;
   flex-direction:column;
+  height:100%;
+  overflow:hidden;
 }
 .rules-header{
   display:flex;
@@ -266,7 +268,7 @@ body{
   letter-spacing:.14em;
   text-transform:uppercase;
   color:var(--accent);
-  margin:14px 0 6px;
+  margin:10px 0 4px;
 }
 
 /* Password Record (rules right) */
@@ -985,9 +987,36 @@ body{
 
 /* Overflow right: found document */
 .overflow-doc-right{
-  padding:32px 36px 28px 36px;
+  padding:24px 30px 20px 30px;
   display:flex;
   flex-direction:column;
+  height:100%;
+  overflow:hidden;
+}
+/* Tighter found-doc styles within overflow pages */
+.overflow-doc-right .found-doc{
+  padding:16px 20px;
+  flex:1;
+  overflow:hidden;
+}
+.overflow-doc-right .found-doc-title{
+  font-size:11pt;
+  margin-bottom:6px;
+}
+.overflow-doc-right .found-doc-body{
+  font-size:6.5pt;
+  line-height:1.4;
+}
+.overflow-doc-right .found-doc-body p{
+  margin-bottom:2px;
+}
+.overflow-doc-right .found-doc-from,
+.overflow-doc-right .found-doc-to{
+  font-size:6pt;
+  margin-bottom:1px;
+}
+.overflow-doc-right .found-doc-sig{
+  font-size:5.5pt;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1237,12 +1266,11 @@ body{
    ENDINGS / UNLOCK PAGE
    ══════════════════════════════════════════════════════════════ */
 .endings-page{
-  padding:40px 44px;
+  padding:28px 36px 20px 36px;
   display:flex;
   flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  text-align:center;
+  height:100%;
+  overflow:hidden;
 }
 .endings-title{
   font-family:var(--display);
@@ -1250,22 +1278,38 @@ body{
   font-size:22pt;
   color:var(--ink);
   margin-bottom:12px;
+  text-align:center;
 }
 .endings-body{
   font-family:var(--serif);
+  font-size:7pt;
+  line-height:1.45;
+  color:var(--ink);
+  flex:1;
+  overflow:hidden;
+}
+.endings-body p{
+  margin-bottom:3px;
+}
+.endings-final-line{
+  font-family:var(--display);
+  font-style:italic;
   font-size:9pt;
-  line-height:1.65;
-  color:var(--muted);
-  max-width:80%;
-  margin-bottom:24px;
+  color:var(--ink);
+  margin-top:10px;
+  text-align:center;
+  padding-top:8px;
+  border-top:1px solid var(--rule);
 }
 .endings-url{
   font-family:var(--mono);
-  font-size:10pt;
+  font-size:8pt;
   letter-spacing:.08em;
   color:var(--ink);
   font-weight:700;
-  padding:8px 16px;
+  text-align:center;
+  margin-top:8px;
+  padding:6px 12px;
   border:2px solid var(--ink);
   border-radius:3px;
 }

@@ -530,7 +530,7 @@
   }
 
   // ═══ BOSS RIGHT (replaces field ops on final week) ═══
-  function renderBossRight(week, weekNum, totalWeeks) {
+  function renderBossRight(data, week, weekNum, totalWeeks) {
     var p = page('boss');
     var inner = el('div', 'boss-right');
     var boss = week.bossEncounter;
@@ -562,11 +562,18 @@
         var compSection = el('div', 'boss-components');
         compSection.appendChild(txt('div', 'boss-components-label', 'Required Components'));
         var compList = el('div', 'boss-component-list');
-        boss.componentInputs.forEach(function(comp) {
+        boss.componentInputs.forEach(function(comp, idx) {
           var item = el('div', 'boss-component-item');
-          item.appendChild(txt('span', 'boss-component-week', 'Week ' + (comp.weekNumber < 10 ? '0' + comp.weekNumber : comp.weekNumber)));
-          item.appendChild(el('div', 'boss-component-box'));
-          item.appendChild(txt('span', '', comp.description || ''));
+          // Handle both object format {weekNumber, description} and string format "H"
+          if (typeof comp === 'object' && comp !== null) {
+            var wn = comp.weekNumber || (idx + 1);
+            item.appendChild(txt('span', 'boss-component-week', 'Week ' + (wn < 10 ? '0' + wn : wn)));
+            item.appendChild(el('div', 'boss-component-box'));
+            item.appendChild(txt('span', '', comp.description || ''));
+          } else {
+            item.appendChild(txt('span', 'boss-component-week', 'Week ' + ((idx + 1) < 10 ? '0' + (idx + 1) : (idx + 1))));
+            item.appendChild(el('div', 'boss-component-box'));
+          }
           compList.appendChild(item);
         });
         compSection.appendChild(compList);
@@ -576,11 +583,14 @@
       // Convergence (password assembly)
       var convergence = el('div', 'boss-convergence');
       convergence.appendChild(txt('div', 'boss-convergence-label', 'Convergence'));
-      if (boss.convergenceInstruction) {
-        convergence.appendChild(txt('div', 'boss-convergence-instruction', boss.convergenceInstruction));
+      var convergenceText = boss.convergenceInstruction || boss.passwordRevealInstruction || '';
+      if (convergenceText) {
+        convergence.appendChild(txt('div', 'boss-convergence-instruction', convergenceText));
       }
       var pwBoxes = el('div', 'boss-password-boxes');
-      var pwLen = 10; // THORNFIELD length
+      // Derive password length from meta or componentInputs
+      var pwLen = (data.meta && data.meta.passwordPlaintext) ? data.meta.passwordPlaintext.length
+        : (boss.componentInputs ? boss.componentInputs.length : 6);
       for (var i = 0; i < pwLen; i++) {
         pwBoxes.appendChild(el('div', 'boss-password-box'));
       }
@@ -640,13 +650,9 @@
     }
 
     var body = el('div', 'found-doc-body');
-    if (doc.bodyText) {
-      doc.bodyText.split('\n').forEach(function(para) {
-        if (para.trim()) body.appendChild(txt('p', '', para.trim()));
-      });
-    } else if (doc.body) {
-      // Alternate field name
-      var bodyContent = typeof doc.body === 'string' ? doc.body : JSON.stringify(doc.body);
+    var bodySource = doc.bodyText || doc.body || doc.content || '';
+    if (bodySource) {
+      var bodyContent = typeof bodySource === 'string' ? bodySource : JSON.stringify(bodySource);
       bodyContent.split('\n').forEach(function(para) {
         if (para.trim()) body.appendChild(txt('p', '', para.trim()));
       });
@@ -785,10 +791,26 @@
     var p = page('endings');
     var inner = el('div', 'endings-page');
 
-    inner.appendChild(txt('h2', 'endings-title', 'The Survey Is Complete'));
-    inner.appendChild(txt('div', 'endings-body',
-      'You have completed your survey assignment. Your password has been assembled from the components you recorded each week. ' +
-      'Enter it at the address below to access the final survey report.'));
+    // Use actual ending data from JSON if available
+    if (data.endings && data.endings.length && data.endings[0].content) {
+      var ending = data.endings[0].content;
+      if (ending.body) {
+        var bodyDiv = el('div', 'endings-body');
+        ending.body.split('\n').forEach(function(para) {
+          if (para.trim()) bodyDiv.appendChild(txt('p', '', para.trim()));
+        });
+        inner.appendChild(bodyDiv);
+      }
+      if (ending.finalLine) {
+        inner.appendChild(txt('div', 'endings-final-line', ending.finalLine));
+      }
+    } else {
+      // Fallback
+      inner.appendChild(txt('h2', 'endings-title', 'The Survey Is Complete'));
+      inner.appendChild(txt('div', 'endings-body',
+        'You have completed your survey assignment. Your password has been assembled from the components you recorded each week. ' +
+        'Enter it at the address below to access the final survey report.'));
+    }
 
     var urlText = data.rulesSpread.rightPage && data.rulesSpread.rightPage.unlockUrl
       ? data.rulesSpread.rightPage.unlockUrl
@@ -841,7 +863,7 @@
 
       // Right page: field ops or boss
       if (week.isBossWeek) {
-        pages.push(renderBossRight(week, weekNum, totalWeeks));
+        pages.push(renderBossRight(data, week, weekNum, totalWeeks));
       } else {
         pages.push(renderFieldOpsRight(week, weekNum));
       }
