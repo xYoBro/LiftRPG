@@ -24,6 +24,13 @@
       font-family:var(--mono);
       padding:20px;
     }
+    main{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:40px;
+      width:100%;
+    }
     .card{
       background:var(--paper);
       padding:48px 52px;
@@ -153,6 +160,23 @@
     footer a:hover{
       color:var(--ink);
     }
+    .preview{
+      max-width:720px;
+      width:100%;
+      text-align:center;
+    }
+    .preview img{
+      width:100%;
+      display:block;
+      box-shadow:0 8px 40px rgba(0,0,0,.6);
+    }
+    .preview figcaption{
+      font-size:6pt;
+      letter-spacing:.2em;
+      text-transform:uppercase;
+      color:#5a554d;
+      margin-top:14px;
+    }
     @media (max-width:520px){
       .card{ padding:32px 28px; }
       h1{ font-size:26pt; }
@@ -160,51 +184,58 @@
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="kicker">Print &amp; Play</div>
-    <h1>LiftRPG</h1>
-    <div class="rule"></div>
-    <p>A workout journal fused with a branching narrative TTRPG. Six weeks of real training. One encrypted ending. Written in pencil.</p>
-    <nav>
-      <a href="renderer/">
-        Renderer
-        <span class="link-sub">Upload your JSON &rarr; printable booklet &middot; try The Drowning Season below</span>
-      </a>
-      <a href="unlock/">
-        Unlock
-        <span class="link-sub">Enter your assembled password &rarr; discover the ending</span>
-      </a>
-    </nav>
+  <main>
+    <div class="card">
+      <div class="kicker">Print &amp; Play</div>
+      <h1>LiftRPG</h1>
+      <div class="rule"></div>
+      <p>A workout journal fused with a branching narrative TTRPG. Six weeks of real training. One encrypted ending. Written in pencil.</p>
+      <nav>
+        <a href="renderer/">
+          Renderer
+          <span class="link-sub">Upload your JSON &rarr; printable booklet &middot; try The Drowning Season below</span>
+        </a>
+        <a href="unlock/">
+          Unlock
+          <span class="link-sub">Enter your assembled password &rarr; discover the ending</span>
+        </a>
+      </nav>
 
-    <div class="section-label">Example</div>
-    <nav class="downloads">
-      <a href="liftrpg-eastern-shore.json" download="liftrpg-eastern-shore.json">
-        The Drowning Season
-        <span class="link-sub">Complete 6-week example &mdash; download JSON</span>
-      </a>
-      <a href="liftrpg-template.json" download="liftrpg-template.json">
-        Blank Template
-        <span class="link-sub">Empty schema &mdash; start your own</span>
-      </a>
-    </nav>
+      <div class="section-label">Example</div>
+      <nav class="downloads">
+        <a href="liftrpg-eastern-shore.json" download="liftrpg-eastern-shore.json">
+          The Drowning Season
+          <span class="link-sub">Complete 6-week example &mdash; download JSON</span>
+        </a>
+        <a href="liftrpg-template.json" download="liftrpg-template.json">
+          Blank Template
+          <span class="link-sub">Empty schema &mdash; start your own</span>
+        </a>
+      </nav>
 
-    <details>
-      <summary>How it Works</summary>
-      <div class="how-content">
-        <ol>
-          <li>Write a workout program in <a href="https://www.liftosaur.com/" target="_blank" rel="noopener">Liftosaur</a> or plain text</li>
-          <li>Feed the template JSON + your program into any LLM (Claude, ChatGPT, Gemini)</li>
-          <li>Upload the generated JSON to the <a href="renderer/">Renderer</a></li>
-          <li>Print as a saddle-stitch booklet (half-letter, double-sided)</li>
-          <li>Train for six weeks, pencil in hand</li>
-          <li>Assemble the password. <a href="unlock/">Unlock</a> the ending.</li>
-        </ol>
-      </div>
-    </details>
+      <details>
+        <summary>How it Works</summary>
+        <div class="how-content">
+          <ol>
+            <li>Write a workout program in <a href="https://www.liftosaur.com/" target="_blank" rel="noopener">Liftosaur</a> or plain text</li>
+            <li>Feed the template JSON + your program into any LLM (Claude, ChatGPT, Gemini)</li>
+            <li>Upload the generated JSON to the <a href="renderer/">Renderer</a></li>
+            <li>Print as a saddle-stitch booklet (half-letter, double-sided)</li>
+            <li>Train for six weeks, pencil in hand</li>
+            <li>Assemble the password. <a href="unlock/">Unlock</a> the ending.</li>
+          </ol>
+        </div>
+      </details>
 
-    <footer>
-      <a href="LICENSE">MIT License</a> &middot; <a href="https://github.com/xYoBro/LiftRPG" target="_blank" rel="noopener">GitHub</a>
-    </footer>
-  </div>
+      <footer>
+        <a href="LICENSE">MIT License</a> &middot; <a href="https://github.com/xYoBro/LiftRPG" target="_blank" rel="noopener">GitHub</a>
+      </footer>
+    </div>
+
+    <figure class="preview">
+      <img src="images/spread-preview.jpg" alt="A booklet spread from The Drowning Season — field operations page with cipher puzzle and farm survey grid on the left, workout session cards with narrative prompts on the right"/>
+      <figcaption>A spread from The Drowning Season &mdash; field operations + training sessions</figcaption>
+    </figure>
+  </main>
 </body>
 </html>
