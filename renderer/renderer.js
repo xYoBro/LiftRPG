@@ -919,17 +919,24 @@
       var fragPageIdx = 0;
       while (f < frags.length) {
         var frag1 = frags[f];
-        var content1Len = (frag1.content || frag1.body || frag1.bodyText || '').length;
+        // Use same field priority as renderers: bodyText → body → content (I7)
+        var content1Len = (frag1.bodyText || frag1.body || frag1.content || '').length;
         var frag2 = frags[f + 1];
-        var content2Len = frag2 ? (frag2.content || frag2.body || frag2.bodyText || '').length : 0;
+        var content2Len = frag2 ? (frag2.bodyText || frag2.body || frag2.content || '').length : 0;
 
-        // If combined content is very long (>1200 chars), put 1 per page
+        // If combined content is very long (>1200 chars), determine split strategy (C4)
         if (frag2 && (content1Len + content2Len > 1200)) {
-          // Long fragment — give it its own page
           if (content1Len > 600) {
+            // frag1 alone is long — give it its own page; frag2 re-queues
             pages.push(renderFragmentPage([frag1], f, fragPageIdx++));
             f += 1;
+          } else if (content2Len > 600) {
+            // frag2 alone is long — each gets its own page
+            pages.push(renderFragmentPage([frag1], f, fragPageIdx++));
+            pages.push(renderFragmentPage([frag2], f + 1, fragPageIdx++));
+            f += 2;
           } else {
+            // Neither alone exceeds threshold — pair them
             pages.push(renderFragmentPage([frag1, frag2], f, fragPageIdx++));
             f += 2;
           }
