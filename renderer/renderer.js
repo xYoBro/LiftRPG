@@ -15,7 +15,12 @@
     return d.innerHTML;
   }
 
-  /** Create a DOM element with optional class and children */
+  /**
+   * Create a DOM element with optional class and content.
+   * CAUTION: string `content` is set via innerHTML — only pass
+   * developer-controlled literal strings here. For LLM-generated text,
+   * use txt() which uses safe textContent.
+   */
   function el(tag, className, content) {
     var e = document.createElement(tag);
     if (className) e.className = className;
@@ -59,6 +64,26 @@
   function parseCipherDisplay(displayText) {
     if (!displayText) return { lines: [] };
     return { lines: displayText.split('\n').filter(function(l) { return l.trim(); }) };
+  }
+
+  // ── LABELS ──────────────────────────────────────────────────
+  // Built once per render() from data.meta. Schema may override
+  // defaults via data.meta.labels — if absent, neutral fallbacks
+  // apply so any booklet renders correctly regardless of theme.
+  function buildLabels(data) {
+    var m = (data && data.meta) || {};
+    var l = m.labels || {};
+    return {
+      blockTitle:            m.blockTitle                 || 'Field Journal',
+      fieldOpsHeader:        l.fieldOpsHeader             || 'Field Operations',
+      finalSurveyHeader:     l.finalSurveyHeader          || 'Final Week',
+      bossFallbackNarrative: l.bossFallbackNarrative      || 'The final challenge awaits.',
+      passwordAssemblyTitle: l.passwordAssemblyTitle      || 'Password Record \u2014 Final Assembly',
+      endingsFallbackTitle:  l.endingsFallbackTitle       || 'The Journey Is Complete',
+      endingsFallbackBody:   l.endingsFallbackBody        ||
+        'You have completed the program. Assemble your password components ' +
+        'and visit the unlock page to discover what awaits.',
+    };
   }
 
   // ── PAGE RENDERERS ─────────────────────────────────────────
@@ -180,13 +205,13 @@
   }
 
   // ═══ WORKOUT LEFT (Session Cards) ═══
-  function renderWorkoutLeft(week, weekNum, sessions, totalWeeks, isOverflow) {
+  function renderWorkoutLeft(week, weekNum, sessions, totalWeeks, isOverflow, labels) {
     var p = page('workout-left');
     var inner = el('div', 'workout-left');
 
     // Page header
     var hdr = el('div', 'page-header');
-    hdr.appendChild(txt('span', '', 'The Cartographer of Unmapped Rooms'));
+    hdr.appendChild(txt('span', '', labels.blockTitle));
     var pageNum = 2 + (weekNum * 2);
     hdr.appendChild(txt('span', 'page-num', 'p.' + (pageNum < 10 ? '0' + pageNum : pageNum)));
     inner.appendChild(hdr);
@@ -280,31 +305,16 @@
         var sets = ex.sets || 3;
         var reps = ex.repsPerSet;
         if (typeof reps === 'number') {
-          for (var r = 0; r < reps; r++) {
-            for (var s = 0; s < sets; s++) {
-              // One box per set (not per rep) — each set gets repsPerSet boxes?
-              // Actually: the schema says sets × repsPerSet boxes total
-              // But for space: render sets rows of reps boxes
-              // Simplified: render (sets) boxes per exercise row
-            }
-          }
-          // Actually: for each set, render repsPerSet boxes in a row
-          // The prototype shows 3 sets of 5 rep boxes = 15 boxes per exercise
-          // That's way too many for the space. Let me check the prototype...
-          // The prototype shows 5 boxes (one per rep in a set) per row.
-          // Actually for a 3x5, it shows 5 rep boxes (for one set's reps)
-          // and there are 3 rows (one per set). No — looking at Week 1 data,
-          // it shows a single row of 5 boxes. The sets column shows "3×5".
-          // So it's: Exercise Name ... [5 boxes] Weight
-          // Where 5 = repsPerSet, and "3×" is shown separately.
+          // One box per rep (e.g., repsPerSet=5 → 5 boxes; sets shown as "3×" separately)
           for (var b = 0; b < reps; b++) {
             repsDiv.appendChild(el('div', 'rep-box'));
           }
-        } else {
-          // String reps (AMRAP, 5/3/1, etc) — single wide field
+        } else if (reps != null) {
+          // String reps (AMRAP, 5/3/1, etc) — single wide label
           var repLabel = txt('span', 'exercise-weight', String(reps));
           repsDiv.appendChild(repLabel);
         }
+        // else: repsPerSet is null/undefined — render no boxes (weight field still shows)
         tdReps.appendChild(repsDiv);
         tr.appendChild(tdReps);
 
@@ -347,7 +357,7 @@
       }
       footer.appendChild(pips);
       footer.appendChild(txt('span', 'survey-footer-note',
-        'Survey week ' + weekNum + ' of ' + tw));
+        'Week ' + weekNum + ' of ' + tw));
       inner.appendChild(footer);
     }
 
@@ -356,19 +366,26 @@
   }
 
   // ═══ FIELD OPS RIGHT (Map + Cipher + Oracle) ═══
-  function renderFieldOpsRight(week, weekNum) {
+  function renderFieldOpsRight(week, weekNum, labels) {
     var p = page('field-ops');
     var inner = el('div', 'field-ops-right');
 
     // Header
     var hdr = el('div', 'rp-header');
-    hdr.appendChild(txt('span', '', 'Field Operations'));
+    hdr.appendChild(txt('span', '', labels.fieldOpsHeader));
     var pageNum = 3 + (weekNum * 2);
     hdr.appendChild(txt('span', '', 'p.' + (pageNum < 10 ? '0' + pageNum : pageNum)));
     inner.appendChild(hdr);
 
     // Content grid
     var content = el('div', 'rp-content');
+
+    // Guard: gracefully handle missing fieldOps (e.g., malformed JSON)
+    if (!week.fieldOps) {
+      inner.appendChild(content);
+      p.appendChild(inner);
+      return p;
+    }
 
     // ── Cipher Zone ──
     var cipherZone = el('div', 'cipher-zone');
@@ -414,7 +431,7 @@
       }
 
       // Workspace (plaintext grid)
-      if (cipher.body.workSpace) {
+      if (cipher.body && cipher.body.workSpace) {
         var grid = el('div', 'plaintext-grid');
         var cells = cipher.body.workSpace.rows * 10; // approximate
         for (var c = 0; c < cells; c++) {
@@ -494,8 +511,15 @@
       if (oracle.entries) {
         // Group by cluster — show one representative entry per cluster range
         var clusters = {};
-        oracle.entries.forEach(function(entry) {
-          var c = entry.cluster != null ? entry.cluster : Math.floor(parseInt(entry.roll) / 10);
+        oracle.entries.forEach(function(entry, oracleIdx) {
+          var c;
+          if (entry.cluster != null) {
+            c = entry.cluster;
+          } else {
+            var parsed = parseInt(entry.roll, 10);
+            // Fallback to entry index if roll is non-numeric (prevents NaN cluster key)
+            c = isNaN(parsed) ? oracleIdx : Math.floor(parsed / 10);
+          }
           if (!clusters[c]) clusters[c] = [];
           clusters[c].push(entry);
         });
@@ -530,14 +554,14 @@
   }
 
   // ═══ BOSS RIGHT (replaces field ops on final week) ═══
-  function renderBossRight(data, week, weekNum, totalWeeks) {
+  function renderBossRight(data, week, weekNum, totalWeeks, labels) {
     var p = page('boss');
     var inner = el('div', 'boss-right');
     var boss = week.bossEncounter;
 
     // Header
     var hdr = el('div', 'boss-header');
-    hdr.textContent = 'Week ' + (weekNum < 10 ? '0' + weekNum : weekNum) + ' \u00b7 Final Survey';
+    hdr.textContent = 'Week ' + (weekNum < 10 ? '0' + weekNum : weekNum) + ' \u00b7 ' + labels.finalSurveyHeader;
     inner.appendChild(hdr);
 
     if (boss) {
@@ -598,8 +622,8 @@
       inner.appendChild(convergence);
     } else {
       // Fallback if no boss data
-      inner.appendChild(txt('div', 'boss-title', 'Final Survey'));
-      inner.appendChild(txt('div', 'boss-narrative', 'The building is waiting.'));
+      inner.appendChild(txt('div', 'boss-title', labels.finalSurveyHeader));
+      inner.appendChild(txt('div', 'boss-narrative', labels.bossFallbackNarrative));
     }
 
     p.appendChild(inner);
@@ -607,8 +631,8 @@
   }
 
   // ═══ OVERFLOW LEFT (sessions 4+) ═══
-  function renderOverflowLeft(week, weekNum, overflowSessions, totalWeeks) {
-    return renderWorkoutLeft(week, weekNum, overflowSessions, totalWeeks, true);
+  function renderOverflowLeft(week, weekNum, overflowSessions, totalWeeks, labels) {
+    return renderWorkoutLeft(week, weekNum, overflowSessions, totalWeeks, true, labels);
   }
 
   // ═══ OVERFLOW RIGHT (found document) ═══
@@ -732,11 +756,11 @@
   }
 
   // ═══ PASSWORD ASSEMBLY PAGE ═══
-  function renderPasswordAssembly(data) {
+  function renderPasswordAssembly(data, labels) {
     var p = page('password-assembly');
     var inner = el('div', 'password-assembly-page');
 
-    inner.appendChild(txt('h2', 'password-assembly-title', 'Survey Record \u2014 Final Assembly'));
+    inner.appendChild(txt('h2', 'password-assembly-title', labels.passwordAssemblyTitle));
     inner.appendChild(txt('div', 'password-assembly-subtitle',
       'Transfer each week\'s recorded component to the grid below. The complete sequence is your access credential.'));
 
@@ -787,7 +811,7 @@
   }
 
   // ═══ ENDINGS PAGE ═══
-  function renderEndingsPage(data) {
+  function renderEndingsPage(data, labels) {
     var p = page('endings');
     var inner = el('div', 'endings-page');
 
@@ -805,11 +829,9 @@
         inner.appendChild(txt('div', 'endings-final-line', ending.finalLine));
       }
     } else {
-      // Fallback
-      inner.appendChild(txt('h2', 'endings-title', 'The Survey Is Complete'));
-      inner.appendChild(txt('div', 'endings-body',
-        'You have completed your survey assignment. Your password has been assembled from the components you recorded each week. ' +
-        'Enter it at the address below to access the final survey report.'));
+      // Fallback — generic text from labels (overridable via data.meta.labels)
+      inner.appendChild(txt('h2', 'endings-title', labels.endingsFallbackTitle));
+      inner.appendChild(txt('div', 'endings-body', labels.endingsFallbackBody));
     }
 
     var urlText = data.rulesSpread.rightPage && data.rulesSpread.rightPage.unlockUrl
@@ -841,8 +863,22 @@
   // ── MAIN ORCHESTRATOR ──────────────────────────────────────
 
   function render(data) {
+    // ── Defensive validation — fail fast with actionable messages ──
+    if (!data || typeof data !== 'object') {
+      throw new Error('Render failed: expected a JSON object, got ' + typeof data);
+    }
+    var _required = ['meta', 'cover', 'rulesSpread', 'weeks'];
+    _required.forEach(function(key) {
+      if (!data[key]) throw new Error('Render failed: missing required field "' + key + '"');
+    });
+    if (!Array.isArray(data.weeks) || data.weeks.length === 0) {
+      throw new Error('Render failed: data.weeks must be a non-empty array');
+    }
+    // ─────────────────────────────────────────────────────────────
+
     var pages = [];
     var totalWeeks = data.weeks.length;
+    var labels = buildLabels(data);
 
     // 1. Cover
     pages.push(renderCover(data));
@@ -859,19 +895,19 @@
       var visibleSessions = sessions.slice(0, 3);
 
       // Left page: session cards (first 3)
-      pages.push(renderWorkoutLeft(week, weekNum, visibleSessions, totalWeeks, false));
+      pages.push(renderWorkoutLeft(week, weekNum, visibleSessions, totalWeeks, false, labels));
 
       // Right page: field ops or boss
       if (week.isBossWeek) {
-        pages.push(renderBossRight(data, week, weekNum, totalWeeks));
+        pages.push(renderBossRight(data, week, weekNum, totalWeeks, labels));
       } else {
-        pages.push(renderFieldOpsRight(week, weekNum));
+        pages.push(renderFieldOpsRight(week, weekNum, labels));
       }
 
       // Overflow: sessions 4+
       if (week.overflow && sessions.length > 3) {
         var overflowSessions = sessions.slice(3);
-        pages.push(renderOverflowLeft(week, weekNum, overflowSessions, totalWeeks));
+        pages.push(renderOverflowLeft(week, weekNum, overflowSessions, totalWeeks, labels));
         pages.push(renderOverflowRight(week));
       }
     }
@@ -908,10 +944,10 @@
     }
 
     // Password assembly
-    pages.push(renderPasswordAssembly(data));
+    pages.push(renderPasswordAssembly(data, labels));
 
     // Endings
-    pages.push(renderEndingsPage(data));
+    pages.push(renderEndingsPage(data, labels));
 
     // Back cover
     pages.push(renderBackCover(data));
