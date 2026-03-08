@@ -1916,8 +1916,9 @@ body {
 .notes-page {
   display: flex;
   flex-direction: column;
-  height: 100%;
   padding: 28px 32px;
+  /* height inherited from .booklet-page (8.5in) — do NOT set height: 100% here,
+     it overrides the fixed dimension and collapses to parent container height */
 }
 
 .notes-page-header {
