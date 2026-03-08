@@ -432,13 +432,13 @@
           "noticeabilityDesign": "The cipher is presented as a numbered calibration sequence on what looks like an official county water authority form — rows of numbers beneath a header that says CALIBRATION VERIFICATION REQUIRED. A partial letter-to-number key is printed below in the style of a reference table. The visual impression is of a form the reader is supposed to complete: the blank boxes beneath the number sequence invite pencil marks. An unwarned reader notices it because it looks like something left unfinished.",
           "body": {
             "displayText": "8  9  7  8    23  1  20  5  18    13  1  18  3  8",
-            "key": "Standard gauge calibration index:\nA=1  B=2  C=3  D=4  E=5  F=6  G=7  H=8  I=9\nJ=10  K=11  L=12  M=13  N=14  O=15  P=16\nQ=17  R=18  S=19  T=20  U=21  V=22  W=23\nX=24  Y=25  Z=26",
+            "key": "Calibration readings logged at BW-14, 06:00 hrs. Sequence is continuous — no interpolation.",
             "workSpace": {
               "rows": 3,
               "style": "boxgrid"
             }
           },
-          "extractionInstruction": "Decode the calibration sequence using the index above. The first number in the decoded sequence is your gauge reading. Record it on your Gauge Reading Log, p.02.",
+          "extractionInstruction": "The first number in the calibration sequence is your gauge reading. Record it on your Gauge Reading Log, p.02.",
           "characterDerivationProof": "The number sequence is: 8 9 7 8 | 23 1 20 5 18 | 13 1 18 3 8. Using A=1, B=2 ... Z=26: 8=H, 9=I, 7=G, 8=H → HIGH. 23=W, 1=A, 20=T, 5=E, 18=R → WATER. 13=M, 1=A, 18=R, 3=C, 8=H → MARCH. Full decode: HIGH WATER MARCH. The first number in the original sequence is 8. This matches weeklyComponent value '8'."
         },
         "oracleTable": {
@@ -1931,8 +1931,8 @@
           "title": "County Records Office — Cross-Reference Verification · File DC-1962-044",
           "noticeabilityDesign": "The cipher looks like a records office cross-reference instruction — the kind of form that says 'verify the following entry against the referenced document.' It names a specific fragment (F.15) and a specific line to count to, creating a paper trail between sections of the booklet. The instruction to 'count' and 'locate' makes the puzzle self-evident — it looks like homework the county clerk left undone.",
           "body": {
-            "displayText": "CROSS-REFERENCE VERIFICATION\n\nPrimary document: Water Gauge Readings (F.15)\nReference line: Locate the highest single-day reading in the March column.\nThe reading is a three-digit number.\nDivide by 10. Round down to the nearest whole number.\nThat number is your alphabet position (A=1, B=2, ... Z=26).",
-            "key": "Alphabet position reference: A=1 B=2 C=3 D=4 E=5 F=6 G=7 H=8 I=9 J=10 K=11 L=12 M=13 N=14 O=15 P=16 Q=17 R=18 S=19 T=20 U=21 V=22 W=23 X=24 Y=25 Z=26",
+            "displayText": "CROSS-REFERENCE VERIFICATION\n\nPrimary document: Water Gauge Readings (F.15)\nReference line: Locate the highest single-day reading in the March column.\nThe reading is a three-digit number.\nDivide by 10. Round down to the nearest whole number.\nThat number is your gauge reading.",
+            "key": "Record your result on the Gauge Reading Log, p.02.",
             "workSpace": {
               "rows": 3,
               "style": "ruled"
@@ -2434,8 +2434,8 @@
           "title": "OPERATION TIDEGATE — Final Gauge Verification · Composite Protocol",
           "noticeabilityDesign": "This cipher breaks from the clean single-step format of prior weeks — it looks like a multi-part verification form with three numbered steps, each referencing a different part of the booklet. The visual density of the instructions signals that something has escalated. The steps are printed in the operational memo style used by the Delta Green fragments, which creates a tonal bridge between the puzzle and the story. A reader who has been solving the prior weeks' ciphers will recognize the format and understand that this one requires more work.",
           "body": {
-            "displayText": "COMPOSITE VERIFICATION — THREE-SOURCE PROTOCOL\n\nStep 1: Count the total ANOMALY tiles on your current survey grid (Week 5).\nStep 2: From Fragment F.14, count the small circles marked on the eastern property boundary of the 1938 survey.\nStep 3: Subtract Step 2 from Step 1.\n\nThe result is your alphabet position (A=1, B=2 ... Z=26).",
-            "key": "Alphabet position reference: A=1 B=2 C=3 D=4 E=5 F=6 G=7 H=8 I=9 J=10 K=11 L=12 M=13 N=14 O=15 P=16 Q=17 R=18 S=19 T=20 U=21 V=22 W=23 X=24 Y=25 Z=26",
+            "displayText": "COMPOSITE VERIFICATION — THREE-SOURCE PROTOCOL\n\nStep 1: Count the total ANOMALY tiles on your current survey grid (Week 5).\nStep 2: From Fragment F.14, count the small circles marked on the eastern property boundary of the 1938 survey.\nStep 3: Subtract Step 2 from Step 1.\n\nThe result is your gauge reading.",
+            "key": "Record your result on the Gauge Reading Log, p.02.",
             "workSpace": {
               "rows": 4,
               "style": "ruled"
@@ -2678,7 +2678,7 @@
           "14"
         ],
         "decodingKey": {
-          "instruction": "Each gauge reading corresponds to a position in the standard alphabetic calibration index. The same index printed on your Week 1 cipher page. Convert each number to its letter.",
+          "instruction": "Each gauge reading corresponds to a position in the standard alphabetic calibration index. Convert each number to its letter using the reference table below.",
           "referenceTable": "1=A  2=B  3=C  4=D  5=E  6=F  7=G  8=H  9=I\n10=J  11=K  12=L  13=M  14=N  15=O  16=P\n17=Q  18=R  19=S  20=T  21=U  22=V  23=W\n24=X  25=Y  26=Z"
         },
         "convergenceProof": "FULL CONVERGENCE (5 components): The five gauge readings are 8, 5, 18, 15, 14. Using the decoding key (alphabetic calibration index): 8=H, 5=E, 18=R, 15=O, 14=N. Read in order they spell HERON. This is the password. The word functions on three narrative levels: (1) the green heron that has been a sentinel throughout the story, (2) the designation of the entity that BW-14 was built to track, (3) the name Mary used to call Earl out to the porch when a heron was in the creek — a detail revealed only in the ending document.\n\nDELAYED INTERPRETATION: During weeks 1-5, the values 8, 5, 18, 15, 14 are non-semantic — they read as gauge readings, station numbers, grid coordinates. The boss page reveals the decoding key that transforms numbers into letters, creating an 'aha' moment. A player cannot guess the password from partial values because the numbers carry no alphabetic meaning until the key is revealed.\n\nPARTIAL CONVERGENCE (2-3 components): A reader with 2-3 numbers and the decoding key gets partial letters — H_R__ or _E__N — and experiences incomplete revelation. Harmon's dialogue still lands; the reader understands that the numbers mean something without being able to complete the word. This feels like a document with redactions, which is thematically consistent.\n\nZERO CONVERGENCE (0-1 components): The reader who has not solved any ciphers sees the decoding key but has no values to decode. The boss page works as pure narrative — a scene between Earl and Harmon at the kitchen table, a document being delivered, a name being implied but not spoken. The Gauge Reading Log is empty. The reader may return to prior weeks to solve the ciphers, or may accept the silence as the story's final act of containment.",
@@ -3531,7 +3531,7 @@
         },
         {
           "heading": "The Gauge Reading Log",
-          "body": "Page 02, right side. Each week's field operations include a gauge calibration sequence — a short puzzle. Solving it yields one letter. Record each letter in order on your Gauge Reading Log. At the end of the six-week cycle, your readings will resolve to a word. This word is significant. Enter it at liftrpg.co."
+          "body": "Page 02, right side. Each week's field operations include a gauge calibration sequence — a short puzzle. Solving it yields one reading. Record each reading in order on your Gauge Reading Log. These readings are required for the Final Gauge Reading protocol in your last week of operations."
         },
         {
           "heading": "Notes",
@@ -3541,7 +3541,7 @@
     },
     "rightPage": {
       "title": "Gauge Reading Log · Station BW-14 · Monitoring Cycle 1962",
-      "instruction": "Record your gauge readings as you extract them — one per week, in order. Do not record readings you have not derived. At the conclusion of the monitoring cycle, read your complete log from Week 1 through Week 5. The word that forms is the station designation the water answers to. Write it in the space provided and enter it at liftrpg.co.",
+      "instruction": "Record your gauge readings as you extract them — one per week, in order. Do not record readings you have not derived. These readings are required for the Final Gauge Reading protocol in your last week of operations.",
       "unlockUrl": "liftrpg.co"
     }
   },

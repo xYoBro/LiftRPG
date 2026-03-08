@@ -1136,9 +1136,10 @@
 
       // Document
       var docType = frag.documentType || 'memo';
-      var doc = el('div', 'fragment-doc ' + docType);
+      var docTypeClass = docType.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+      var doc = el('div', 'fragment-doc ' + docTypeClass);
 
-      doc.appendChild(txt('div', 'fragment-doc-type', (docType || '').replace(/-/g, ' ')));
+      doc.appendChild(txt('div', 'fragment-doc-type', (docTypeClass || '').replace(/-/g, ' ')));
 
       // Header metadata
       var headerLines = [];

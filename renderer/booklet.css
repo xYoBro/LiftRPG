@@ -1654,6 +1654,39 @@ body {
   font-weight: 700;
 }
 
+/* Inspection variant — clinical, observational */
+.fragment-doc.inspection {
+  border-left: 3px double var(--rule);
+}
+
+.fragment-doc.inspection .fragment-doc-body {
+  font-family: var(--mono);
+  font-size: 7.5pt;
+  line-height: 1.5;
+}
+
+/* Correspondence variant — personal, handwritten feel */
+.fragment-doc.correspondence {
+  border-style: none;
+  background: white;
+  padding: 16px 20px;
+}
+
+.fragment-doc.correspondence .fragment-doc-body {
+  font-style: italic;
+}
+
+/* Anomaly variant — flagged, warning */
+.fragment-doc.anomaly {
+  border: 2px solid var(--accent);
+  background: var(--card);
+}
+
+.fragment-doc.anomaly .fragment-doc-type {
+  color: var(--accent);
+  font-weight: 700;
+}
+
 /* ══════════════════════════════════════════════════════════════
    PASSWORD ASSEMBLY PAGE
    ══════════════════════════════════════════════════════════════ */
