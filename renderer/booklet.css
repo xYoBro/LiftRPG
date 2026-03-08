@@ -2302,6 +2302,99 @@ body.demo-mode .demo-error {
   padding: 60px 20px;
 }
 
+/* ── DEMO UNLOCK BAR ─────────────────────────────────────────── */
+.demo-unlock-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: rgba(30, 27, 23, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 1000;
+  animation: demo-bar-slide-up 0.4s ease-out;
+}
+
+@keyframes demo-bar-slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.demo-unlock-label {
+  font-family: var(--mono);
+  font-size: 8pt;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+}
+
+.demo-unlock-spoiler {
+  font-family: var(--mono);
+  font-size: 10pt;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: transparent;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 4px 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.demo-unlock-spoiler:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.demo-unlock-spoiler.revealed {
+  color: var(--paper, #f5f1eb);
+  text-shadow: none;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: default;
+}
+
+.demo-unlock-btn {
+  padding: 6px 18px;
+  background: var(--accent, #8b3a3a);
+  border: none;
+  border-radius: 4px;
+  color: #f5f1eb;
+  font-family: var(--mono);
+  font-size: 7.5pt;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s ease;
+}
+
+.demo-unlock-btn:hover {
+  background: #a33333;
+}
+
+.demo-unlock-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.demo-unlock-success .demo-unlock-btn {
+  background: #2a6b3a;
+}
+
+.demo-unlock-success .demo-unlock-spoiler {
+  opacity: 0.4;
+}
+
 /* ══════════════════════════════════════════════════════════════
    PRINT MEDIA QUERIES
    ══════════════════════════════════════════════════════════════ */
@@ -2770,7 +2863,8 @@ body.demo-mode .demo-error {
   }
 
   .no-print,
-  .app-chrome {
+  .app-chrome,
+  .demo-unlock-bar {
     display: none !important;
   }
 

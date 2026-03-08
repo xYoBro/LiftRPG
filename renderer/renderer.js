@@ -1647,6 +1647,11 @@
 
   var jsonData = null;
 
+  // Crypto constants (must be before demo mode for decrypt access)
+  var CRYPTO_SALT_BYTES = 32;
+  var CRYPTO_IV_BYTES = 12;
+  var CRYPTO_ITER = 200000;
+
   // ── DEMO MODE ──────────────────────────────────────────────
   var demoParam = new URLSearchParams(window.location.search).get('demo');
   if (demoParam) {
@@ -1660,6 +1665,7 @@
         return res.json();
       })
       .then(function (data) {
+        jsonData = data;
         var pages = render(data);
         var container = document.getElementById('booklet-container');
         container.innerHTML = '';
@@ -1669,6 +1675,70 @@
         }
         container.querySelectorAll('.cover-designation').forEach(function (d) { fitTextToLine(d, 10); });
         container.querySelectorAll('.booklet-page').forEach(enforcePageFit);
+
+        // Show demo unlock bar if this booklet has an encrypted ending
+        if (data.meta && data.meta.passwordEncryptedEnding &&
+            data.meta.passwordEncryptedEnding !== 'PLACEHOLDER_ENCRYPTED_BLOB_REPLACE_AT_GENERATION_TIME' &&
+            data.meta.passwordPlaintext) {
+          var bar = document.createElement('div');
+          bar.className = 'demo-unlock-bar';
+
+          var label = document.createElement('span');
+          label.className = 'demo-unlock-label';
+          label.textContent = '\uD83D\uDD12 Try decrypting the ending:';
+
+          var spoiler = document.createElement('button');
+          spoiler.className = 'demo-unlock-spoiler';
+          spoiler.setAttribute('aria-label', 'Reveal password');
+          spoiler.textContent = data.meta.passwordPlaintext;
+          spoiler.addEventListener('click', function () {
+            spoiler.classList.add('revealed');
+          });
+
+          var unlockBtn = document.createElement('button');
+          unlockBtn.className = 'demo-unlock-btn';
+          unlockBtn.textContent = 'Unlock';
+          unlockBtn.addEventListener('click', function () {
+            if (!spoiler.classList.contains('revealed')) {
+              spoiler.classList.add('revealed');
+              return;
+            }
+            unlockBtn.disabled = true;
+            unlockBtn.textContent = 'Working\u2026';
+            decryptBlob(data.meta.passwordEncryptedEnding, normalisePassword(data.meta.passwordPlaintext))
+              .then(function (plaintext) {
+                var payload;
+                try { payload = JSON.parse(plaintext); } catch (e) {
+                  payload = { content: plaintext };
+                }
+                var endingsPage = document.getElementById('endings-page');
+                if (endingsPage) {
+                  var inner = endingsPage.querySelector('.endings-page');
+                  if (inner) {
+                    inner.classList.remove('endings-locked');
+                    inner.innerHTML = '';
+                    var bodyDiv = document.createElement('div');
+                    bodyDiv.className = 'endings-body endings-unlocked';
+                    bodyDiv.innerHTML = payload.content;
+                    inner.appendChild(bodyDiv);
+                  }
+                  endingsPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                bar.classList.add('demo-unlock-success');
+                unlockBtn.textContent = '\u2713 Unlocked';
+                label.textContent = '\uD83D\uDD13 Ending decrypted';
+              })
+              .catch(function () {
+                unlockBtn.disabled = false;
+                unlockBtn.textContent = 'Unlock';
+              });
+          });
+
+          bar.appendChild(label);
+          bar.appendChild(spoiler);
+          bar.appendChild(unlockBtn);
+          document.body.appendChild(bar);
+        }
       })
       .catch(function (err) {
         var container = document.getElementById('booklet-container');
@@ -1856,9 +1926,7 @@
   }
 
   // ── CRYPTO (AES-256-GCM, matches unlock/index.html + liftrpg-encrypt.js) ──
-  var CRYPTO_SALT_BYTES = 32;
-  var CRYPTO_IV_BYTES = 12;
-  var CRYPTO_ITER = 200000;
+  // Constants declared at top of IIFE (before demo mode) for hoisting
 
   function normalisePassword(raw) {
     return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
