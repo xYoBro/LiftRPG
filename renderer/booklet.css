@@ -1003,6 +1003,176 @@ body {
   margin-top: 2px;
 }
 
+/* ── Point-to-Point Map ─────────────────────────────── */
+.ptp-map {
+  width: 100%;
+  max-height: 3.5in;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.ptp-edge {
+  stroke: var(--ink);
+  stroke-width: 0.8;
+}
+
+.ptp-edge-locked {
+  stroke: var(--muted);
+  stroke-dasharray: 2,2;
+}
+
+.ptp-node {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.2;
+}
+
+.ptp-node-current {
+  fill: var(--ink);
+  stroke: var(--ink);
+}
+
+.ptp-node-locked {
+  fill: var(--fog);
+  stroke: var(--muted);
+}
+
+.ptp-node-anomaly {
+  fill: var(--ink);
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.ptp-label {
+  font-family: var(--mono);
+  font-size: 5.5pt;
+  fill: var(--ink);
+}
+
+.ptp-label-locked {
+  fill: var(--muted);
+}
+
+.ptp-edge-label {
+  font-family: var(--mono);
+  font-size: 4.5pt;
+  fill: var(--muted);
+  font-style: italic;
+}
+
+/* ── Linear Track ───────────────────────────────────── */
+.linear-track {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.linear-track-vertical {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.linear-position {
+  min-width: 20px;
+  min-height: 20px;
+  padding: 2px 3px;
+  border: 1px solid var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 5.5pt;
+  color: var(--ink);
+}
+
+.linear-position.empty { border-color: var(--rule); }
+.linear-position.cleared {
+  background: repeating-linear-gradient(45deg,
+      var(--paper), var(--paper) 3px,
+      var(--fog) 3px, var(--fog) 4px);
+}
+.linear-position.locked {
+  background: repeating-radial-gradient(circle at 50% 50%,
+      transparent 0, transparent 2px,
+      var(--fog) 2px, var(--fog) 3px);
+  color: var(--rule);
+}
+.linear-position.anomaly {
+  background:
+    repeating-linear-gradient(45deg, transparent, transparent 2px, var(--ink) 2px, var(--ink) 3px),
+    repeating-linear-gradient(-45deg, transparent, transparent 2px, var(--ink) 2px, var(--ink) 3px);
+  color: white;
+  font-weight: 700;
+  border-width: 2px;
+}
+.linear-position.current {
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 700;
+}
+.linear-position.inaccessible {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.linear-connector {
+  width: 8px;
+  height: 1px;
+  background: var(--rule);
+  flex-shrink: 0;
+}
+
+.linear-track-vertical .linear-connector {
+  width: 1px;
+  height: 8px;
+}
+
+/* ── Player-Drawn Canvas ────────────────────────────── */
+.canvas-container {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.canvas-blank {
+  border: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.canvas-dot-grid {
+  gap: 0;
+  padding: 4px;
+}
+
+.canvas-dot {
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--rule);
+  opacity: 0.4;
+  margin: auto;
+}
+
+.canvas-graph {
+  gap: 0;
+}
+
+.canvas-graph-cell {
+  aspect-ratio: 1;
+  border: 1px solid var(--rule);
+  opacity: 0.25;
+}
+
+.canvas-prompt {
+  font-family: var(--mono);
+  font-size: 5.5pt;
+  line-height: 1.25;
+  color: var(--muted);
+  font-style: italic;
+  margin-top: 2px;
+}
+
 /* ── Oracle ──────────────────────────────────────────── */
 .oracle-header {
   font-family: var(--mono);

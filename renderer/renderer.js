@@ -470,21 +470,265 @@
   }
 
   function renderPtpMap(container, mapState) {
-    // Placeholder — implemented in Task 2
+    // ── PTP Guardrail Constants ──────────────────────────────
+    // Adjust these to fix layout issues.
+    // Schema constraints live in generator.js SCHEMA_SPATIAL.
+    var MAX_NODES = 8;          // max visible — clamp, don't crash
+    var FONT_SIZE = 5.5;        // pt — floor, never shrink below this
+    var EDGE_FONT_SIZE = 4.5;   // pt — edge labels
+    var NODE_R = 3;             // SVG units — node circle radius
+    var PLAYER_R = 4.5;         // SVG units — current node radius
+    var PLAYER_STROKE = 2.5;    // SVG units — double-ring stroke width
+    var EDGE_W = 0.8;           // SVG units — edge stroke width
+    var LABEL_GAP = 5;          // SVG units — node center to label baseline
+    var VB_PAD = 12;            // SVG units — viewBox padding all sides
+    // ─────────────────────────────────────────────────────────
+
     container.appendChild(txt('div', 'map-title', mapState.title || 'Location Map'));
-    container.appendChild(txt('div', 'map-note', '[point-to-point map — renderer pending]'));
+
+    var nodes = (mapState.nodes || []).slice(0, MAX_NODES);
+    var edges = mapState.edges || [];
+    var currentNode = mapState.currentNode;
+
+    if (nodes.length === 0) return;
+
+    // Build node lookup
+    var nodeLookup = {};
+    nodes.forEach(function (n) { nodeLookup[n.id] = n; });
+
+    // SVG — fixed viewBox, nodes at 0-100 map directly
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox',
+      (0 - VB_PAD) + ' ' + (0 - VB_PAD) + ' ' +
+      (100 + VB_PAD * 2) + ' ' + (100 + VB_PAD * 2));
+    svg.setAttribute('class', 'ptp-map');
+    svg.style.width = '100%';
+    svg.style.maxHeight = '3.5in';
+
+    // Draw edges first (behind nodes)
+    edges.forEach(function (edge) {
+      var from = nodeLookup[edge.from];
+      var to = nodeLookup[edge.to];
+      if (!from || !to) return;
+
+      var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', from.x);
+      line.setAttribute('y1', from.y);
+      line.setAttribute('x2', to.x);
+      line.setAttribute('y2', to.y);
+      line.setAttribute('class', 'ptp-edge' +
+        (edge.state === 'locked' ? ' ptp-edge-locked' : ''));
+      svg.appendChild(line);
+
+      // Optional edge label at midpoint
+      if (edge.label) {
+        var mx = (from.x + to.x) / 2;
+        var my = (from.y + to.y) / 2;
+        var elbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        elbl.setAttribute('x', mx);
+        elbl.setAttribute('y', my - 2);
+        elbl.setAttribute('text-anchor', 'middle');
+        elbl.setAttribute('class', 'ptp-edge-label');
+        elbl.textContent = (edge.label || '').substring(0, 10);
+        svg.appendChild(elbl);
+      }
+    });
+
+    // Track placed labels for collision detection
+    var placedLabels = [];
+
+    // Draw nodes
+    nodes.forEach(function (node) {
+      var isCurrent = node.id === currentNode;
+      var isLocked = node.state === 'locked';
+      var isAnomaly = node.state === 'anomaly';
+
+      // Node circle
+      var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', node.x);
+      circle.setAttribute('cy', node.y);
+      circle.setAttribute('r', isCurrent ? PLAYER_R : NODE_R);
+      circle.setAttribute('class', 'ptp-node' +
+        (isCurrent ? ' ptp-node-current' : '') +
+        (isLocked ? ' ptp-node-locked' : '') +
+        (isAnomaly ? ' ptp-node-anomaly' : ''));
+      if (isCurrent) circle.setAttribute('stroke-width', PLAYER_STROKE);
+      svg.appendChild(circle);
+
+      // Label — always below node, centered
+      var labelText = (node.label || node.id).substring(0, 14);
+      var labelY = node.y + LABEL_GAP + NODE_R;
+      var labelX = node.x;
+
+      // Clamp inside viewBox
+      var estHalfWidth = labelText.length * FONT_SIZE * 0.35;
+      if (labelX - estHalfWidth < 0) labelX = estHalfWidth + 1;
+      if (labelX + estHalfWidth > 100) labelX = 100 - estHalfWidth - 1;
+      if (labelY > 100 + VB_PAD - 2) labelY = node.y - LABEL_GAP;
+
+      // Collision check against placed labels
+      var collides = false;
+      for (var i = 0; i < placedLabels.length; i++) {
+        var prev = placedLabels[i];
+        if (Math.abs(labelX - prev.x) < (estHalfWidth + prev.hw) &&
+            Math.abs(labelY - prev.y) < FONT_SIZE * 1.2) {
+          collides = true;
+          break;
+        }
+      }
+
+      var lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      lbl.setAttribute('x', labelX);
+      lbl.setAttribute('y', labelY);
+      lbl.setAttribute('text-anchor', 'middle');
+      lbl.setAttribute('class', 'ptp-label' + (isLocked ? ' ptp-label-locked' : ''));
+
+      if (collides) {
+        // Collision fallback: numbered reference + legend below SVG
+        var refNum = placedLabels.length + 1;
+        lbl.textContent = '[' + refNum + ']';
+        lbl._legendText = refNum + ': ' + labelText;
+        placedLabels.push({ x: labelX, y: labelY, hw: FONT_SIZE * 1.2 });
+      } else {
+        lbl.textContent = labelText;
+        placedLabels.push({ x: labelX, y: labelY, hw: estHalfWidth });
+      }
+      svg.appendChild(lbl);
+    });
+
+    container.appendChild(svg);
+
+    // Render legend entries for collision-displaced labels
+    svg.querySelectorAll('text.ptp-label').forEach(function (t) {
+      if (t._legendText) {
+        container.appendChild(txt('div', 'map-annotation', t._legendText));
+      }
+    });
+
+    // Map note
+    if (mapState.mapNote) {
+      container.appendChild(txt('div', 'map-note', mapState.mapNote));
+    }
   }
 
   function renderLinearTrack(container, mapState) {
-    // Placeholder — implemented in Task 3
+    // ── Linear Track Constants ───────────────────────────────
+    var MAX_POSITIONS = 12;
+    var MIN_POSITIONS = 3;
+    // ─────────────────────────────────────────────────────────
+
     container.appendChild(txt('div', 'map-title', mapState.title || 'Progress Track'));
-    container.appendChild(txt('div', 'map-note', '[linear track — renderer pending]'));
+
+    var positions = (mapState.positions || []).slice(0, MAX_POSITIONS);
+    if (positions.length < MIN_POSITIONS) return;
+
+    var isVertical = mapState.direction === 'vertical';
+    var track = el('div', 'linear-track' + (isVertical ? ' linear-track-vertical' : ''));
+    var currentPos = mapState.currentPosition;
+
+    positions.forEach(function (pos, idx) {
+      // Connector between positions (not before first)
+      if (idx > 0) {
+        track.appendChild(el('div', 'linear-connector'));
+      }
+
+      var posEl = el('div', 'linear-position');
+      var state = pos.state || 'empty';
+      if (pos.index === currentPos) state = 'current';
+      posEl.classList.add(state);
+      posEl.textContent = (pos.label || String(pos.index)).substring(0, 8);
+      track.appendChild(posEl);
+    });
+
+    container.appendChild(track);
+
+    // Annotations
+    positions.forEach(function (pos) {
+      if (pos.annotation) {
+        container.appendChild(txt('div', 'map-annotation',
+          (pos.label || String(pos.index)) + ': ' + pos.annotation));
+      }
+    });
+
+    // Map note
+    if (mapState.mapNote) {
+      container.appendChild(txt('div', 'map-note', mapState.mapNote));
+    }
   }
 
   function renderPlayerDrawn(container, mapState) {
-    // Placeholder — implemented in Task 4
+    // ── Player-Drawn Constants ───────────────────────────────
+    var MAX_PROMPTS = 4;
+    var MAX_SEEDS = 3;
+    // ─────────────────────────────────────────────────────────
+
     container.appendChild(txt('div', 'map-title', mapState.title || 'Survey Canvas'));
-    container.appendChild(txt('div', 'map-note', '[player-drawn canvas — renderer pending]'));
+
+    var canvasType = mapState.canvasType || 'dot-grid';
+    var dims = mapState.dimensions || { columns: 10, rows: 8 };
+    var cols = Math.min(16, Math.max(8, dims.columns));
+    var rows = Math.min(12, Math.max(6, dims.rows));
+
+    // Seed marker annotations (listed above canvas for reference)
+    var seeds = (mapState.seedMarkers || []).slice(0, MAX_SEEDS);
+    if (seeds.length > 0) {
+      seeds.forEach(function (seed) {
+        container.appendChild(txt('div', 'map-annotation',
+          '\u25CF ' + (seed.label || '').substring(0, 8) +
+          ' \u2014 col ' + seed.col + ', row ' + seed.row));
+      });
+    }
+
+    var canvas = el('div', 'canvas-container');
+
+    if (canvasType === 'blank') {
+      canvas.classList.add('canvas-blank');
+      canvas.style.height = (rows * 14) + 'px';
+
+    } else if (canvasType === 'graph-paper') {
+      canvas.classList.add('canvas-graph');
+      canvas.style.display = 'grid';
+      canvas.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+      for (var gi = 0; gi < cols * rows; gi++) {
+        canvas.appendChild(el('div', 'canvas-graph-cell'));
+      }
+
+    } else if (canvasType === 'hex-dot') {
+      // Hex dot pattern — offset every other row
+      canvas.classList.add('canvas-dot-grid canvas-hex');
+      canvas.style.display = 'grid';
+      canvas.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+      for (var hr = 0; hr < rows; hr++) {
+        for (var hc = 0; hc < cols; hc++) {
+          var hexDot = el('div', 'canvas-dot');
+          if (hr % 2 === 1) hexDot.style.transform = 'translateX(50%)';
+          canvas.appendChild(hexDot);
+        }
+      }
+
+    } else {
+      // dot-grid (default)
+      canvas.classList.add('canvas-dot-grid');
+      canvas.style.display = 'grid';
+      canvas.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+      for (var di = 0; di < cols * rows; di++) {
+        canvas.appendChild(el('div', 'canvas-dot'));
+      }
+    }
+
+    container.appendChild(canvas);
+
+    // Drawing prompts
+    var prompts = (mapState.prompts || []).slice(0, MAX_PROMPTS);
+    prompts.forEach(function (prompt) {
+      container.appendChild(txt('div', 'canvas-prompt',
+        '\u25B8 ' + prompt.substring(0, 60)));
+    });
+
+    // Map note
+    if (mapState.mapNote) {
+      container.appendChild(txt('div', 'map-note', mapState.mapNote));
+    }
   }
 
   // ═══ FIELD OPS RIGHT (Map + Cipher + Oracle) ═══
