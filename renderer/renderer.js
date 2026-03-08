@@ -586,25 +586,44 @@
     return p;
   }
 
-  // ── Oracle overflow fix (called after page is in DOM) ──
-  function fixOracleOverflow(page) {
-    var content = page.querySelector('.rp-content');
-    if (!content) return;
-    var oracleEntries = page.querySelector('.oracle-entries');
-    if (!oracleEntries) return;
-    // Progressively shrink oracle text until it fits
-    var sizes = [5, 4.5, 4];
-    for (var s = 0; s < sizes.length; s++) {
-      if (content.scrollHeight <= content.offsetHeight + 2) break;
-      var entries = oracleEntries.querySelectorAll('.oracle-text');
-      var nums = oracleEntries.querySelectorAll('.oracle-case-num');
-      for (var i = 0; i < entries.length; i++) {
-        entries[i].style.fontSize = sizes[s] + 'pt';
-      }
-      for (var j = 0; j < nums.length; j++) {
-        nums[j].style.fontSize = sizes[s] + 'pt';
-      }
+  // ── Print-safe area enforcement (runs after pages are in DOM) ──
+  var SAFE_INSET = 24; // px — matches --safe-inset in CSS (0.25in)
+  var MIN_SCALE = 0.82; // floor — below this, content is fundamentally too large
+
+  function enforcePageFit(page) {
+    var inner = page.children[0];
+    if (!inner) return;
+
+    // Measure true content height:
+    // Inner wrappers use height:100% — temporarily unset to get natural content height
+    var origPageOverflow = page.style.overflow;
+    var origInnerOverflow = inner.style.overflow;
+    var origHeight = inner.style.height;
+    var computedHeight = window.getComputedStyle(inner).height;
+    page.style.overflow = 'visible';
+    inner.style.overflow = 'visible';
+    inner.style.height = 'auto';
+
+    var pageH = page.offsetHeight;
+    var safeH = pageH - (2 * SAFE_INSET);
+    var trueH = inner.scrollHeight;
+
+    inner.style.height = origHeight || '';
+    page.style.overflow = origPageOverflow;
+    inner.style.overflow = origInnerOverflow;
+
+    if (trueH <= safeH) return; // fits — no action needed
+
+    var scale = safeH / trueH;
+    if (scale < MIN_SCALE) {
+      console.warn('enforcePageFit: page would need scale ' + scale.toFixed(3) +
+        ' (below ' + MIN_SCALE + ' floor). Content may be clipped. Inner class: ' + inner.className);
+      scale = MIN_SCALE;
     }
+
+    inner.style.transform = 'scale(' + scale + ')';
+    inner.style.transformOrigin = 'top left';
+    inner.style.width = (100 / scale) + '%';
   }
 
   // ═══ BOSS RIGHT (replaces field ops on final week) ═══
@@ -1078,7 +1097,7 @@
         for (var i = 0; i < pages.length; i++) {
           container.appendChild(pages[i]);
         }
-        container.querySelectorAll('.booklet-page').forEach(fixOracleOverflow);
+        container.querySelectorAll('.booklet-page').forEach(enforcePageFit);
       })
       .catch(function (err) {
         var container = document.getElementById('booklet-container');
@@ -1153,7 +1172,7 @@
       }
 
       // Fix oracle tables that overflow their page
-      container.querySelectorAll('.booklet-page').forEach(fixOracleOverflow);
+      container.querySelectorAll('.booklet-page').forEach(enforcePageFit);
 
       printBtn.disabled = false;
       status.textContent = 'Rendered ' + pages.length + ' pages (' +

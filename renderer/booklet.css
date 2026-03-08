@@ -23,6 +23,7 @@
   --mono: 'Share Tech Mono', monospace;
   --serif: 'Libre Baskerville', Georgia, serif;
   --display: 'Playfair Display', Georgia, serif;
+  --safe-inset: 24px;
 }
 
 /* ── APP CHROME (screen only) ────────────────────────────── */
@@ -275,7 +276,7 @@ body {
    RULES SPREAD (LEFT: BRIEFING · RIGHT: PASSWORD LOG)
    ══════════════════════════════════════════════════════════════ */
 .rules-left {
-  padding: 24px 36px 20px 40px;
+  padding: 24px 36px 24px 40px;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -428,7 +429,7 @@ body {
    Adapted from cartographer-week1.html prototype (proven fit)
    ══════════════════════════════════════════════════════════════ */
 .workout-left {
-  padding: 28px 32px 20px 36px;
+  padding: 28px 32px 24px 36px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -753,7 +754,7 @@ body {
    Adapted from cartographer-week1.html prototype (proven fit)
    ══════════════════════════════════════════════════════════════ */
 .field-ops-right {
-  padding: 24px 32px 16px 32px;
+  padding: 24px 32px 24px 32px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -783,7 +784,7 @@ body {
   grid-template-areas:
     "cipher map"
     "oracle oracle";
-  gap: 8px;
+  gap: 10px;
   flex: 1;
   min-height: 0;
 }
@@ -800,9 +801,7 @@ body {
 .oracle-zone {
   grid-area: oracle;
   border-top: 1px solid var(--rule);
-  padding-top: 4px;
-  min-height: 0;
-  overflow: hidden;
+  padding-top: 6px;
 }
 
 /* ── Cipher ──────────────────────────────────────────── */
@@ -972,23 +971,23 @@ body {
 /* ── Oracle ──────────────────────────────────────────── */
 .oracle-header {
   font-family: var(--mono);
-  font-size: 6pt;
+  font-size: 7pt;
   letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--ink);
   font-weight: 700;
-  padding-bottom: 2px;
+  padding-bottom: 3px;
   border-bottom: 1px solid var(--rule);
-  margin-bottom: 2px;
+  margin-bottom: 6px;
 }
 
 .oracle-instruction {
   font-family: var(--serif);
-  font-size: 6pt;
+  font-size: 7pt;
   font-style: italic;
   color: var(--muted);
-  margin-bottom: 2px;
-  line-height: 1.3;
+  margin-bottom: 4px;
+  line-height: 1.4;
 }
 
 .oracle-entries {
@@ -999,7 +998,7 @@ body {
 .oracle-entry {
   display: flex;
   align-items: baseline;
-  gap: 4px;
+  gap: 6px;
   padding: 1px 0;
   border-bottom: 1px dotted var(--rule);
   break-inside: avoid;
@@ -1011,7 +1010,7 @@ body {
 
 .oracle-case-num {
   font-family: var(--mono);
-  font-size: 5pt;
+  font-size: 5.5pt;
   color: var(--muted);
   white-space: nowrap;
   letter-spacing: .04em;
@@ -1019,8 +1018,8 @@ body {
 
 .oracle-text {
   font-family: var(--serif);
-  font-size: 5pt;
-  line-height: 1.25;
+  font-size: 5.5pt;
+  line-height: 1.3;
   color: var(--ink);
   flex: 1;
 }
@@ -1186,7 +1185,7 @@ body {
 
 /* Overflow right: found document */
 .overflow-doc-right {
-  padding: 24px 30px 20px 30px;
+  padding: 24px 30px 24px 30px;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -1228,7 +1227,7 @@ body {
    FRAGMENT PAGES (back of book)
    ══════════════════════════════════════════════════════════════ */
 .fragment-page {
-  padding: 24px 36px 20px 36px;
+  padding: 24px 36px 24px 36px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1497,7 +1496,7 @@ body {
    ENDINGS / UNLOCK PAGE
    ══════════════════════════════════════════════════════════════ */
 .endings-page {
-  padding: 28px 36px 20px 36px;
+  padding: 28px 36px 24px 36px;
   display: flex;
   flex-direction: column;
   height: 100%;
