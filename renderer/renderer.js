@@ -1134,57 +1134,75 @@
   // ── Safari detection (WebKit bug #15548: @page size ignored) ──
   var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
+  // Chrome: native print (works perfectly with @page size)
   function doPrint() {
     if (layoutSelect) layoutSelect.value = 'booklet';
     doRender();
     setTimeout(function () { window.print(); }, 200);
   }
 
-  function showSafariPrintModal() {
-    // Remove any existing modal
-    var existing = document.querySelector('.safari-print-modal');
-    if (existing) existing.remove();
+  // Safari: generate PDF (bypasses Safari's broken print engine)
+  function doSavePDF() {
+    if (!jsonData) return;
+    if (typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
+      status.textContent = 'PDF libraries not loaded. Try refreshing the page.';
+      return;
+    }
 
-    var overlay = document.createElement('div');
-    overlay.className = 'safari-print-modal';
+    // Switch to booklet spreads and render
+    if (layoutSelect) layoutSelect.value = 'booklet';
+    doRender();
 
-    var panel = document.createElement('div');
-    panel.className = 'safari-print-panel';
+    var spreads = container.querySelectorAll('.print-spread');
+    if (!spreads.length) {
+      status.textContent = 'No spreads to export.';
+      return;
+    }
 
-    panel.innerHTML =
-      '<h2>Print Setup for Safari</h2>' +
-      '<p>Safari requires manual print settings. In the print dialog:</p>' +
-      '<ol>' +
-      '<li>Set orientation to <strong>Landscape</strong></li>' +
-      '<li>Uncheck <strong>Print headers and footers</strong></li>' +
-      '<li>Set <strong>Scale</strong> to <strong>100%</strong></li>' +
-      '</ol>' +
-      '<p class="safari-print-note">Chrome handles this automatically if you have it available.</p>' +
-      '<div class="safari-print-actions">' +
-      '<button class="safari-print-continue" type="button">Continue to Print</button>' +
-      '<button class="safari-print-cancel" type="button">Cancel</button>' +
-      '</div>';
+    var jsPDF = window.jspdf.jsPDF;
+    var pdf = new jsPDF({ orientation: 'landscape', unit: 'in', format: 'letter' });
+    var total = spreads.length;
 
-    overlay.appendChild(panel);
-    document.body.appendChild(overlay);
+    printBtn.disabled = true;
+    status.textContent = 'Generating PDF: page 1 of ' + total + '...';
 
-    panel.querySelector('.safari-print-continue').addEventListener('click', function () {
-      overlay.remove();
-      doPrint();
-    });
+    function renderSpread(index) {
+      if (index >= total) {
+        var title = (jsonData.meta && jsonData.meta.blockTitle)
+          ? jsonData.meta.blockTitle.replace(/[^a-zA-Z0-9\- ]/g, '').replace(/\s+/g, '-')
+          : 'booklet';
+        pdf.save(title + '.pdf');
+        printBtn.disabled = false;
+        status.textContent = 'PDF saved: ' + total + ' pages. Open in Preview and print.';
+        return;
+      }
 
-    panel.querySelector('.safari-print-cancel').addEventListener('click', function () {
-      overlay.remove();
-    });
+      status.textContent = 'Generating PDF: page ' + (index + 1) + ' of ' + total + '...';
 
-    overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) overlay.remove();
-    });
+      html2canvas(spreads[index], {
+        scale: 2, // ~150dpi at 11in = good print quality
+        useCORS: true,
+        logging: false,
+        backgroundColor: null
+      }).then(function (canvas) {
+        var imgData = canvas.toDataURL('image/jpeg', 0.95);
+        if (index > 0) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, 0, 11, 8.5);
+        renderSpread(index + 1);
+      }).catch(function (err) {
+        status.textContent = 'PDF error on page ' + (index + 1) + ': ' + err.message;
+        printBtn.disabled = false;
+        console.error(err);
+      });
+    }
+
+    // Small delay to let doRender() finish
+    setTimeout(function () { renderSpread(0); }, 300);
   }
 
   printBtn.addEventListener('click', function () {
     if (isSafari) {
-      showSafariPrintModal();
+      doSavePDF();
     } else {
       doPrint();
     }
