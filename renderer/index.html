@@ -8,7 +8,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Share+Tech+Mono&family=Playfair+Display:ital,wght@0,700;1,400;1,700&display=swap"
     rel="stylesheet" />
-  <link rel="stylesheet" href="booklet.css?v=3" />
+  <link rel="stylesheet" href="booklet.css?v=4" />
 </head>
 
 <body>
@@ -21,6 +21,15 @@
     </div>
 
     <div class="app-toolbar">
+      <div id="encrypt-row" class="app-encrypt" style="display:none;">
+        <span class="encrypt-icon">&#x1F510;</span>
+        <input id="encrypt-password" type="text" placeholder="Enter password" spellcheck="false" autocomplete="off"
+          autocapitalize="characters" />
+        <button id="encrypt-btn" type="button">Encrypt</button>
+        <button id="encrypt-download" type="button" style="display:none;">Download JSON</button>
+        <span id="encrypt-status" class="encrypt-status"></span>
+      </div>
+
       <div id="unlock-row" class="app-unlock" style="display:none;">
         <span class="unlock-icon">&#x1F512;</span>
         <input id="unlock-password" type="text" placeholder="Enter password" spellcheck="false" autocomplete="off"
@@ -56,7 +65,7 @@
   <!-- PDF generation (Safari can't print booklet spreads via CSS) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
-  <script src="renderer.js?v=3"></script>
+  <script src="renderer.js?v=4"></script>
 </body>
 
 </html>

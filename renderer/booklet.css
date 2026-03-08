@@ -1701,6 +1701,101 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   ENCRYPT TOOLBAR
+   ══════════════════════════════════════════════════════════════ */
+.app-encrypt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: rgba(42, 107, 58, 0.2);
+  border-radius: 4px;
+  margin-right: 12px;
+}
+
+.encrypt-icon {
+  font-size: 12pt;
+  line-height: 1;
+}
+
+#encrypt-password {
+  width: 140px;
+  padding: 6px 10px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 10pt;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-align: center;
+  outline: none;
+}
+
+#encrypt-password:focus {
+  border-color: #2a6b3a;
+}
+
+#encrypt-password::placeholder {
+  text-transform: none;
+  letter-spacing: 0.05em;
+  font-size: 8pt;
+  color: var(--muted);
+}
+
+#encrypt-btn {
+  padding: 6px 16px;
+  background: #2a6b3a;
+  border: none;
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 7.5pt;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#encrypt-btn:hover {
+  background: #1e5a2d;
+}
+
+#encrypt-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#encrypt-btn.encrypted {
+  background: #2a6b3a;
+  opacity: 1;
+}
+
+#encrypt-download {
+  padding: 6px 16px;
+  background: var(--accent);
+  border: none;
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 7.5pt;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#encrypt-download:hover {
+  background: #a33333;
+}
+
+.encrypt-status {
+  font-family: var(--mono);
+  font-size: 7pt;
+  letter-spacing: 0.1em;
+  color: #2a6b3a;
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════════════
    UNLOCK TOOLBAR
    ══════════════════════════════════════════════════════════════ */
 .app-unlock {

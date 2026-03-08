@@ -906,13 +906,28 @@
     if (!data || typeof data !== 'object') {
       throw new Error('Render failed: expected a JSON object, got ' + typeof data);
     }
+
+    // Top-level required fields
     var _required = ['meta', 'cover', 'rulesSpread', 'weeks'];
     _required.forEach(function (key) {
       if (!data[key]) throw new Error('Render failed: missing required field "' + key + '"');
     });
+
+    // Structural checks — catch the things that cause cryptic crashes
     if (!Array.isArray(data.weeks) || data.weeks.length === 0) {
       throw new Error('Render failed: data.weeks must be a non-empty array');
     }
+    if (!data.meta.blockTitle) {
+      throw new Error('Render failed: meta.blockTitle is required');
+    }
+    if (!data.rulesSpread.leftPage || !data.rulesSpread.rightPage) {
+      throw new Error('Render failed: rulesSpread must have leftPage and rightPage');
+    }
+    data.weeks.forEach(function (wk, i) {
+      if (!Array.isArray(wk.sessions)) {
+        throw new Error('Render failed: weeks[' + i + '].sessions must be an array');
+      }
+    });
     // ─────────────────────────────────────────────────────────────
 
     var pages = [];
@@ -1120,9 +1135,13 @@
         (jsonData.weeks ? jsonData.weeks.length : 0) + ' weeks, ' +
         (jsonData.fragments ? jsonData.fragments.length : 0) + ' fragments) in ' + mode + ' mode';
 
-      // Show unlock row if encrypted ending exists
-      if (jsonData.meta && jsonData.meta.passwordEncryptedEnding &&
+      // Show encrypt row if endings need encryption, or unlock row if already encrypted
+      if (needsEncryption(jsonData)) {
+        hideUnlockRow();
+        showEncryptRow();
+      } else if (jsonData.meta && jsonData.meta.passwordEncryptedEnding &&
           jsonData.meta.passwordEncryptedEnding !== 'PLACEHOLDER_ENCRYPTED_BLOB_REPLACE_AT_GENERATION_TIME') {
+        hideEncryptRow();
         showUnlockRow();
       }
     } catch (err) {
@@ -1212,7 +1231,7 @@
     layoutSelect.addEventListener('change', doRender);
   }
 
-  // ── CRYPTO (AES-256-GCM, matches unlock/index.html) ─────────────
+  // ── CRYPTO (AES-256-GCM, matches unlock/index.html + liftrpg-encrypt.js) ──
   var CRYPTO_SALT_BYTES = 32;
   var CRYPTO_IV_BYTES = 12;
   var CRYPTO_ITER = 200000;
@@ -1221,7 +1240,7 @@
     return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   }
 
-  function deriveKey(password, salt) {
+  function deriveKey(password, salt, usage) {
     var enc = new TextEncoder();
     return crypto.subtle.importKey(
       'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
@@ -1231,7 +1250,7 @@
         keyMat,
         { name: 'AES-GCM', length: 256 },
         false,
-        ['decrypt']
+        [usage || 'decrypt']
       );
     });
   }
@@ -1246,10 +1265,33 @@
     var iv = buf.slice(CRYPTO_SALT_BYTES, CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES);
     var ciphertext = buf.slice(CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES);
 
-    return deriveKey(password, salt).then(function (key) {
+    return deriveKey(password, salt, 'decrypt').then(function (key) {
       return crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, ciphertext);
     }).then(function (plainBuf) {
       return new TextDecoder().decode(plainBuf);
+    });
+  }
+
+  // ── ENCRYPT (AES-256-GCM, mirrors liftrpg-encrypt.js) ─────────
+  function encryptBlob(payload, password) {
+    var enc = new TextEncoder();
+    var plaintext = enc.encode(JSON.stringify(payload));
+    var salt = crypto.getRandomValues(new Uint8Array(CRYPTO_SALT_BYTES));
+    var iv = crypto.getRandomValues(new Uint8Array(CRYPTO_IV_BYTES));
+
+    return deriveKey(password, salt, 'encrypt').then(function (key) {
+      return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, plaintext);
+    }).then(function (cipherBuf) {
+      var cipherArr = new Uint8Array(cipherBuf);
+      var combined = new Uint8Array(CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES + cipherArr.length);
+      combined.set(salt, 0);
+      combined.set(iv, CRYPTO_SALT_BYTES);
+      combined.set(cipherArr, CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES);
+
+      // base64url encode
+      var bin = '';
+      for (var i = 0; i < combined.length; i++) bin += String.fromCharCode(combined[i]);
+      return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
     });
   }
 
@@ -1342,6 +1384,146 @@
     unlockInput.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') attemptUnlock();
     });
+  }
+
+  // ── ENCRYPT TOOLBAR LOGIC ──────────────────────────────────────
+
+  function showEncryptRow() {
+    var row = document.getElementById('encrypt-row');
+    if (row) row.style.display = '';
+  }
+
+  function hideEncryptRow() {
+    var row = document.getElementById('encrypt-row');
+    if (row) row.style.display = 'none';
+  }
+
+  /**
+   * Returns true when the JSON has endings that need encryption:
+   * endings[] present, but passwordEncryptedEnding missing or placeholder.
+   */
+  function needsEncryption(data) {
+    if (!data || !data.endings || !data.endings.length) return false;
+    var blob = data.meta && data.meta.passwordEncryptedEnding;
+    return !blob || blob === 'PLACEHOLDER_ENCRYPTED_BLOB_REPLACE_AT_GENERATION_TIME';
+  }
+
+  function attemptEncrypt() {
+    var passwordEl = document.getElementById('encrypt-password');
+    var statusEl = document.getElementById('encrypt-status');
+    var btn = document.getElementById('encrypt-btn');
+    var dlBtn = document.getElementById('encrypt-download');
+    var raw = passwordEl.value;
+    var password = normalisePassword(raw);
+
+    if (!password) {
+      statusEl.textContent = 'Enter your password';
+      passwordEl.classList.add('shake');
+      setTimeout(function () { passwordEl.classList.remove('shake'); }, 500);
+      return;
+    }
+
+    if (!jsonData || !jsonData.endings || !jsonData.endings.length) {
+      statusEl.textContent = 'No endings to encrypt';
+      return;
+    }
+
+    // Build the ending payload — same format as liftrpg-encrypt.js
+    var ending = jsonData.endings[0];
+    var payload = ending.content || ending;
+
+    btn.disabled = true;
+    btn.textContent = 'Working\u2026';
+    statusEl.textContent = '';
+
+    encryptBlob(payload, password)
+      .then(function (blob) {
+        // Round-trip verify: decrypt with same password
+        return decryptBlob(blob, password).then(function (plain) {
+          var recovered = JSON.parse(plain);
+          if (JSON.stringify(recovered) !== JSON.stringify(payload)) {
+            throw new Error('Round-trip verification failed');
+          }
+          return blob;
+        });
+      })
+      .then(function (blob) {
+        // Store blob in the live data
+        jsonData.meta.passwordEncryptedEnding = blob;
+
+        // Update toolbar state
+        btn.textContent = '\u2713 Encrypted';
+        btn.disabled = true;
+        btn.classList.add('encrypted');
+        passwordEl.disabled = true;
+        passwordEl.value = password;
+        statusEl.textContent = 'Ending sealed \u2014 download to save';
+        var icon = document.querySelector('.encrypt-icon');
+        if (icon) icon.textContent = '\uD83D\uDD10';
+
+        // Show download button
+        if (dlBtn) dlBtn.style.display = '';
+
+        // Update endings page in-place to show sealed state
+        var endingsPage = document.getElementById('endings-page');
+        if (endingsPage) {
+          var inner = endingsPage.querySelector('.endings-page');
+          if (inner) {
+            inner.className = 'endings-page endings-locked';
+            inner.innerHTML = '';
+            inner.appendChild(document.createTextNode(''));
+            var lockIcon = document.createElement('div');
+            lockIcon.className = 'endings-locked-icon';
+            lockIcon.textContent = '\uD83D\uDD12';
+            inner.appendChild(lockIcon);
+            var h2 = document.createElement('h2');
+            h2.className = 'endings-title';
+            h2.textContent = 'This Document Is Sealed';
+            inner.appendChild(h2);
+            var lockMsg = document.createElement('div');
+            lockMsg.className = 'endings-locked-msg';
+            lockMsg.innerHTML = 'Assemble your password from the weekly gauge readings. Return to <strong>liftrpg.co \u2192 Render</strong> and enter it to unlock this page.';
+            inner.appendChild(lockMsg);
+          }
+        }
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = 'Encrypt';
+        statusEl.textContent = 'Encrypt failed: ' + err.message;
+        console.error('Encrypt failed:', err);
+      });
+  }
+
+  function downloadEncryptedJSON() {
+    if (!jsonData) return;
+    var jsonStr = JSON.stringify(jsonData, null, 2);
+    var blob = new Blob([jsonStr], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var title = (jsonData.meta && jsonData.meta.blockTitle)
+      ? jsonData.meta.blockTitle.replace(/[^a-zA-Z0-9\- ]/g, '').replace(/\s+/g, '-')
+      : 'booklet';
+    a.href = url;
+    a.download = title + '-encrypted.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Wire up encrypt button and Enter key
+  var encryptBtn = document.getElementById('encrypt-btn');
+  var encryptInput = document.getElementById('encrypt-password');
+  var encryptDl = document.getElementById('encrypt-download');
+  if (encryptBtn) {
+    encryptBtn.addEventListener('click', attemptEncrypt);
+  }
+  if (encryptInput) {
+    encryptInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') attemptEncrypt();
+    });
+  }
+  if (encryptDl) {
+    encryptDl.addEventListener('click', downloadEncryptedJSON);
   }
 
   // Expose for debugging
