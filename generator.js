@@ -55,11 +55,14 @@
     return copy.slice(0, n);
   }
 
-  /* ─── Schema Specification ─────────────────────────────────────────
-     Distilled from liftrpg-schema.json v1.3. This is what the LLM
-     reads to understand the JSON structure it must produce.
+  /* ─── Schema Sections ───────────────────────────────────────────
+     Each section is independently editable. To fix a map issue,
+     find SCHEMA_SPATIAL. To fix a cipher issue, stay in SCHEMA_WEEKS
+     (cipher is part of fieldOps). To fix meta fields, find SCHEMA_META.
+     Distilled from liftrpg-schema.json v1.3.
      ─────────────────────────────────────────────────────────────── */
-  var SCHEMA_SPEC = [
+
+  var SCHEMA_HEADER = [
     '# LiftRPG Booklet Schema v1.3 — Generation Reference',
     '',
     'You are generating a complete LiftRPG booklet as a single JSON object.',
@@ -75,8 +78,10 @@
     '- `fragments` — Array of found documents (back-of-book, non-sequential)',
     '- `cover` — Title page fields',
     '- `rulesSpread` — How-to-play briefing + password record page',
-    '- `endings` — Encrypted ending content (1-3 variants)',
-    '',
+    '- `endings` — Encrypted ending content (1-3 variants)'
+  ];
+
+  var SCHEMA_META = [
     '## meta (object)',
     '',
     'Required fields:',
@@ -106,8 +111,10 @@
     '- `passwordEncryptedEnding` (string): AES-256-GCM encrypted blob of the endings array, keyed on passwordPlaintext. Base64url encoded. Generate the endings first, then encrypt.',
     '- `liftoScript` (string): The raw workout programme pasted by the user. Store verbatim.',
     '- `weekCount` (integer, 4-16): Number of training weeks. Derived from the workout programme.',
-    '- `totalSessions` (integer): Total sessions across all weeks.',
-    '',
+    '- `totalSessions` (integer): Total sessions across all weeks.'
+  ];
+
+  var SCHEMA_WEEKS_PRE = [
     '## weeks (array of objects)',
     '',
     'One object per week. Length must equal meta.weekCount.',
@@ -125,8 +132,45 @@
     '  - `storyPrompt` (string): 2-4 sentences. Advances the story. Creates a thread the reader follows. Never summarizes.',
     '  - `fragmentRef` (string, optional): Pattern "F.N". Points to a fragment. Only when the prompt creates a thread a specific fragment resolves.',
     '  - `binaryChoice` (object, optional): Present on EXACTLY one session per block at the midpoint week. Two genuine narrative continuations with map-marker circles. { choiceLabel, promptA, promptB }',
-    '- `fieldOps` (object, required on non-boss weeks):',
-    '  - `mapState` (object): The survey grid — { gridDimensions: {columns: 5-12, rows: 4-8}, tiles: [{col, row, type, label?, annotation?}], currentPosition: {col, row}, floorLabel, mapNote? }. Tile types: "empty"|"cleared"|"locked"|"anomaly"|"current"|"inaccessible".',
+    '- `fieldOps` (object, required on non-boss weeks):'
+  ];
+
+  // ── Spatial element schema ──────────────────────────────────────
+  // To fix map rendering issues: adjust constraints here, not in renderer.js.
+  // The renderer enforces a font floor and viewBox — everything else lives here.
+  var SCHEMA_SPATIAL = [
+    '  - `mapState` (object): The spatial element for this week.',
+    '    - `mapType` (string): "grid" | "point-to-point" | "linear-track" | "player-drawn". Default "grid".',
+    '    - `title` (string): Diegetic map heading.',
+    '    - `mapNote` (string, optional): Footer flavor text.',
+    '    Shared tile/node/position states: "empty"|"cleared"|"locked"|"anomaly"|"current"|"inaccessible".',
+    '',
+    '    GRID (mapType = "grid"):',
+    '      gridDimensions: {columns: 5-12, rows: 4-8}.',
+    '      tiles: [{col, row, type, label?, annotation?}].',
+    '      currentPosition: {col, row}.',
+    '',
+    '    POINT-TO-POINT (mapType = "point-to-point"):',
+    '      nodes: [{id, label (max 14 chars), x (0-100), y (0-100), state}].',
+    '      edges: [{from, to, label? (max 10 chars), state?}].',
+    '      currentNode: string (node id).',
+    '      LIMITS: max 8 visible nodes/week, max 12 total, max 3 edges/node,',
+    '      max 10 edges/week, min inter-node distance 15 units.',
+    '',
+    '    LINEAR TRACK (mapType = "linear-track"):',
+    '      positions: [{index, label (max 8 chars), state, annotation?}].',
+    '      currentPosition: number (index).',
+    '      direction: "horizontal" (default) | "vertical".',
+    '      LIMITS: 3-12 positions.',
+    '',
+    '    PLAYER-DRAWN (mapType = "player-drawn"):',
+    '      canvasType: "dot-grid" | "graph-paper" | "hex-dot" | "blank".',
+    '      dimensions: {columns: 8-16, rows: 6-12}.',
+    '      prompts: [string] — drawing instructions (max 4, max 60 chars each).',
+    '      seedMarkers: [{col, row, label (max 8 chars)}] — pre-placed landmarks (max 3).'
+  ];
+
+  var SCHEMA_WEEKS_POST = [
     '  - `cipher` (object): The puzzle yielding the weekly component — { type, title, body: {displayText, key?, workSpace: {rows, style}}, noticeabilityDesign, extractionInstruction, characterDerivationProof }.',
     '    `type` (string): A descriptive label for the cipher technique. Choose from these categories:',
     '    - Classical Cryptography: substitution, reverse-alphabet, Caesar-shift, Atbash, Vigenère-short-key',
@@ -149,8 +193,10 @@
     '- `overflow` (boolean): True when sessions.length > 3. Triggers Part 2 spread.',
     '- `isDeload` (boolean): True for deload weeks. Tonal flag — "deload" never appears in booklet.',
     '- `overflowDocument` (foundDocument, required when overflow is true): Found document for the Part 2 right page.',
-    '- `interlude` (object, optional): Typographic interlude page. Must have explicit reason referencing worldContract or literaryRegister.',
-    '',
+    '- `interlude` (object, optional): Typographic interlude page. Must have explicit reason referencing worldContract or literaryRegister.'
+  ];
+
+  var SCHEMA_FRAGMENTS = [
     '## fragments (array of foundDocument, 8-30 items)',
     '',
     'Back-of-book found documents. Non-sequential, mixed types. Each is a distinct document artifact.',
@@ -163,8 +209,10 @@
     '- `inWorldPurpose` (string): Why this document exists in the world — independent of story function.',
     '- `content` (string): Full text including headers, form fields, redactions [██████], annotations {in braces}.',
     '- `designSpec` (object): { paperTone ("warm"|"neutral"|"cold"|"aged"), primaryTypeface ("mono"|"serif"|"mixed"), headerStyle ("form"|"letterhead"|"handwritten"|"none"), hasRedactions (bool), hasAnnotations (bool) }',
-    '- `authenticityChecks` (object): { hasIrrelevantDetail (must be true), couldExistInDifferentStory (must be false), redactionDoesNarrativeWork (true if redactions present, null if not) }',
-    '',
+    '- `authenticityChecks` (object): { hasIrrelevantDetail (must be true), couldExistInDifferentStory (must be false), redactionDoesNarrativeWork (true if redactions present, null if not) }'
+  ];
+
+  var SCHEMA_TAIL = [
     '## cover (object)',
     '',
     '- `title` (string): Same as meta.blockTitle',
@@ -186,7 +234,17 @@
     '- `variant` (string): What determines which ending shows.',
     '- `content` (object): { documentType, body (full ending text), finalLine (the last line — designed as discrete unit) }',
     '- `designSpec` (string): How the ending page feels to arrive at.'
-  ].join('\n');
+  ];
+
+  var SCHEMA_SPEC = [].concat(
+    SCHEMA_HEADER, [''],
+    SCHEMA_META, [''],
+    SCHEMA_WEEKS_PRE,
+    SCHEMA_SPATIAL,
+    SCHEMA_WEEKS_POST, [''],
+    SCHEMA_FRAGMENTS, [''],
+    SCHEMA_TAIL
+  ).join('\n');
 
   /* ─── Generation Instructions ──────────────────────────────────── */
   var INSTRUCTIONS = [
@@ -265,6 +323,19 @@
     '- Fragment IDs ("F.1", "F.2", ...) must be unique and referenced consistently by fragmentRef pointers.',
     '- Oracle table: simple mode = 11 entries (2d6), full mode = 10 entries (d10xd10).',
     '- Maximum 3 consequence-type oracle entries per week.',
+    '',
+    '## Spatial Design',
+    '- Vary map types across weeks when the narrative justifies it.',
+    '  Grid: structured spaces (buildings, properties, floor plans).',
+    '  Point-to-point: connected locations (investigations, dungeon rooms).',
+    '  Linear track: journeys, chases, countdowns.',
+    '  Player-drawn: exploration, discovery (player constructs the map).',
+    '- You MAY use one map type all weeks if the story demands it.',
+    '- You MAY mix types across weeks (grid 1-3, then PTP 4-6).',
+    '- PTP: use 4-6 nodes per week. 7-8 only for climax. Labels 1-2 words.',
+    '  Space nodes generously (min distance 15). Reveal 2-3 new nodes/week.',
+    '- Cipher-map cross-reference: ciphers that reference map coordinates',
+    '  or node labels link both zones. Use when narratively fitting.',
     '',
     '## Exercise Data',
     '- Copy exercise data EXACTLY from the workout programme provided below.',
