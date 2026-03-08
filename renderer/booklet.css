@@ -2062,7 +2062,10 @@ body.demo-mode .demo-error {
     break-after: auto;
   }
 
-  /* Spread / Booklet Print (11 x 8.5 landscape) */
+  /* Spread / Booklet Print (11 x 8.5 landscape)
+     zoom:0.94 scales the 11×8.5 spread to ~10.34×7.99 to fit
+     within Safari's hardcoded non-printable margins (~0.25in/side).
+     Chrome already fits at 100% but 6% reduction is imperceptible. */
   #booklet-container.spread-view .print-spread {
     display: flex;
     flex-direction: row;
@@ -2070,6 +2073,7 @@ body.demo-mode .demo-error {
     height: 8.5in;
     margin: 0;
     overflow: hidden;
+    zoom: 0.94;
     page-break-after: always;
     page-break-inside: avoid;
     break-after: page;
