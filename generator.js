@@ -212,6 +212,30 @@
     '- `authenticityChecks` (object): { hasIrrelevantDetail (must be true), couldExistInDifferentStory (must be false), redactionDoesNarrativeWork (true if redactions present, null if not) }'
   ];
 
+  var SCHEMA_THEME = [
+    '## theme (object)',
+    '',
+    'Visual identity for the booklet. The renderer applies these as CSS custom properties and a treatment archetype.',
+    '',
+    'Required fields:',
+    '- `visualArchetype` (string): One of "institutional" | "noir" | "terminal" | "literary" | "brutalist" | "clinical" | "confessional" | "corporate".',
+    '  - institutional: Government forms, heavy stamps, vignette edges. Bureaucracies, military, academia.',
+    '  - noir: Photocopied case files, grain, ink bleed, high contrast. Crime, mystery, investigation.',
+    '  - terminal: Computer printout, scan lines, monospace. Sci-fi, hacking, data systems.',
+    '  - literary: Published book, clean and refined, elegant spacing. Literary fiction, journals, memoirs.',
+    '  - brutalist: Punk zine, stark heavy borders, oversized type. Rebellion, underground, activism.',
+    '  - clinical: Lab report, halftone dots, hairline precision. Medical, scientific, forensic.',
+    '  - confessional: Found diary, aged paper, worn edges. Personal, intimate, handwritten feel.',
+    '  - corporate: Classified briefing, grid underlay, indexed tabs. Business, espionage, corporate intrigue.',
+    '- `palette` (object): 6 hex color values (#rrggbb). Must work in B&W (adequate contrast).',
+    '  - `ink` (string): Primary text color. Dark.',
+    '  - `paper` (string): Page background. Light.',
+    '  - `accent` (string): Stamps, highlights, key elements.',
+    '  - `muted` (string): Secondary text, annotations.',
+    '  - `rule` (string): Borders, dividers.',
+    '  - `fog` (string): Subtle backgrounds, card fills.'
+  ];
+
   var SCHEMA_TAIL = [
     '## cover (object)',
     '',
@@ -243,6 +267,7 @@
     SCHEMA_SPATIAL,
     SCHEMA_WEEKS_POST, [''],
     SCHEMA_FRAGMENTS, [''],
+    SCHEMA_THEME, [''],
     SCHEMA_TAIL
   ).join('\n');
 
@@ -336,6 +361,13 @@
     '  Space nodes generously (min distance 15). Reveal 2-3 new nodes/week.',
     '- Cipher-map cross-reference: ciphers that reference map coordinates',
     '  or node labels link both zones. Use when narratively fitting.',
+    '',
+    '## Visual Theme',
+    '- Choose a visualArchetype that reinforces the world contract.',
+    '- A bureaucratic world → institutional or corporate. A mystery → noir. A journal → confessional or literary.',
+    '- The palette must have sufficient contrast for B&W printing (ink on paper ≥ 4.5:1 ratio).',
+    '- palette.paper should be a light warm/neutral tone (not pure white). palette.ink should be near-black.',
+    '- palette.accent is the signature color — stamps, borders, key headings.',
     '',
     '## Exercise Data',
     '- Copy exercise data EXACTLY from the workout programme provided below.',

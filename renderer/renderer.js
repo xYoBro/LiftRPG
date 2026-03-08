@@ -86,6 +86,16 @@
     element.style.fontSize = lo + 'pt';
   }
 
+  /** Mix two hex colors (a → b) by ratio t (0 = pure a, 1 = pure b) */
+  function mixHex(a, b, t) {
+    var pa = parseInt(a.replace('#', ''), 16);
+    var pb = parseInt(b.replace('#', ''), 16);
+    var r = Math.round(((pa >> 16) & 0xff) * (1 - t) + ((pb >> 16) & 0xff) * t);
+    var g = Math.round(((pa >> 8) & 0xff) * (1 - t) + ((pb >> 8) & 0xff) * t);
+    var bl = Math.round((pa & 0xff) * (1 - t) + (pb & 0xff) * t);
+    return '#' + ((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1);
+  }
+
   /** Parse multiline cipher text into structured sections */
   function parseCipherDisplay(displayText) {
     if (!displayText) return { lines: [] };
@@ -1278,6 +1288,27 @@
     });
     // ─────────────────────────────────────────────────────────────
 
+    // Apply visual theme if present
+    var themeContainer = document.getElementById('booklet-container');
+    if (themeContainer && data.theme) {
+      var arch = data.theme.visualArchetype;
+      if (arch) themeContainer.setAttribute('data-treatment', arch);
+      var pal = data.theme.palette;
+      if (pal) {
+        if (pal.ink)    themeContainer.style.setProperty('--ink', pal.ink);
+        if (pal.paper)  themeContainer.style.setProperty('--paper', pal.paper);
+        if (pal.accent) themeContainer.style.setProperty('--accent', pal.accent);
+        if (pal.muted)  themeContainer.style.setProperty('--muted', pal.muted);
+        if (pal.rule)   themeContainer.style.setProperty('--rule', pal.rule);
+        if (pal.fog)    themeContainer.style.setProperty('--fog', pal.fog);
+        // Derive --warm and --card from fog and paper
+        if (pal.fog && pal.paper) {
+          themeContainer.style.setProperty('--warm', mixHex(pal.paper, pal.fog, 0.35));
+          themeContainer.style.setProperty('--card', mixHex(pal.paper, pal.fog, 0.25));
+        }
+      }
+    }
+
     var pages = [];
     var totalWeeks = data.weeks.length;
     var labels = buildLabels(data);
@@ -1447,6 +1478,8 @@
     if (!jsonData) return;
     container.innerHTML = '';
     container.className = ''; // reset container
+    container.removeAttribute('data-treatment');
+    container.removeAttribute('style');
     try {
       var pages = render(jsonData);
       var mode = layoutSelect ? layoutSelect.value : 'single';
