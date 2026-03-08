@@ -1,50 +1,59 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>LiftRPG &mdash; Render</title>
-<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Share+Tech+Mono&family=Playfair+Display:ital,wght@0,700;1,400;1,700&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="booklet.css"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LiftRPG &mdash; Render</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Share+Tech+Mono&family=Playfair+Display:ital,wght@0,700;1,400;1,700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="booklet.css" />
 </head>
+
 <body>
 
-<!-- ── APP CONTROLS (hidden in print) ─────────────── -->
-<div class="app-chrome no-print">
-  <div class="app-header">
-    <span class="app-logo">LIFTRPG</span>
-    <span class="app-version">Render</span>
+  <!-- ── APP CONTROLS (hidden in print) ─────────────── -->
+  <div class="app-chrome no-print">
+    <div class="app-header">
+      <span class="app-logo">LIFTRPG</span>
+      <span class="app-version">Render</span>
+    </div>
+
+    <div class="app-toolbar">
+      <div id="unlock-row" class="app-unlock" style="display:none;">
+        <span class="unlock-icon">&#x1F512;</span>
+        <input id="unlock-password" type="text" placeholder="Enter password" spellcheck="false" autocomplete="off"
+          autocapitalize="characters" />
+        <button id="unlock-btn" type="button">Unlock</button>
+        <span id="unlock-status" class="unlock-status"></span>
+      </div>
+
+      <label class="upload-btn" for="json-input">
+        <span class="upload-icon">&#x2B06;</span> Load JSON
+        <input type="file" id="json-input" accept=".json" hidden />
+      </label>
+      <button id="print-btn" disabled>Print Booklet</button>
+      <label class="view-toggle">
+        Preview:
+        <select id="layout-mode"
+          style="background:var(--paper); color:var(--ink); font-family:var(--mono); font-size:7pt; border:1px solid var(--rule); border-radius:3px; padding:2px 4px; margin-left:4px; outline:none; cursor:pointer;">
+          <option value="single">Single Page</option>
+          <option value="spread">Reader Spread</option>
+          <option value="booklet">Printer Spread</option>
+        </select>
+      </label>
+    </div>
+
+
+
+    <div id="status" class="app-status"></div>
   </div>
 
-  <div class="app-toolbar">
-    <label class="upload-btn" for="json-input">
-      <span class="upload-icon">&#x2B06;</span> Load JSON
-      <input type="file" id="json-input" accept=".json" hidden/>
-    </label>
-    <button id="print-btn" disabled>Print Booklet</button>
-    <label class="view-toggle">
-      Preview:
-      <select id="layout-mode" style="background:var(--paper); color:var(--ink); font-family:var(--mono); font-size:7pt; border:1px solid var(--rule); border-radius:3px; padding:2px 4px; margin-left:4px; outline:none; cursor:pointer;">
-        <option value="single">Single Page</option>
-        <option value="spread">Reader Spread</option>
-        <option value="booklet">Printer Spread</option>
-      </select>
-    </label>
-  </div>
+  <!-- ── BOOKLET OUTPUT ─────────────────────────────── -->
+  <div id="booklet-container"></div>
 
-  <div id="unlock-row" class="app-unlock" style="display:none;">
-    <span class="unlock-icon">&#x1F512;</span>
-    <input id="unlock-password" type="text" placeholder="Enter password to unlock the ending" spellcheck="false" autocomplete="off" autocapitalize="characters"/>
-    <button id="unlock-btn" type="button">Unlock</button>
-    <span id="unlock-status" class="unlock-status"></span>
-  </div>
-
-  <div id="status" class="app-status"></div>
-</div>
-
-<!-- ── BOOKLET OUTPUT ─────────────────────────────── -->
-<div id="booklet-container"></div>
-
-<script src="renderer.js"></script>
+  <script src="renderer.js"></script>
 </body>
+
 </html>

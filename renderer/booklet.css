@@ -1709,13 +1709,13 @@ body {
    UNLOCK TOOLBAR
    ══════════════════════════════════════════════════════════════ */
 .app-unlock {
-  flex-basis: 100%;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
+  padding: 4px 10px;
   background: rgba(0, 0, 0, 0.15);
   border-radius: 4px;
+  margin-right: 12px;
 }
 
 .unlock-icon {
@@ -1724,8 +1724,7 @@ body {
 }
 
 #unlock-password {
-  flex: 1;
-  max-width: 240px;
+  width: 140px;
   padding: 6px 10px;
   background: var(--paper);
   border: 1px solid var(--rule);
