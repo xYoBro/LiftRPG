@@ -1699,10 +1699,7 @@
           unlockBtn.className = 'demo-unlock-btn';
           unlockBtn.textContent = 'Unlock';
           unlockBtn.addEventListener('click', function () {
-            if (!spoiler.classList.contains('revealed')) {
-              spoiler.classList.add('revealed');
-              return;
-            }
+            spoiler.classList.add('revealed');
             unlockBtn.disabled = true;
             unlockBtn.textContent = 'Working\u2026';
             decryptBlob(data.meta.passwordEncryptedEnding, normalisePassword(data.meta.passwordPlaintext))
