@@ -1219,22 +1219,17 @@ body {
   position: relative;
 }
 
-/* Large fragment number in margin */
+/* Large fragment number — always top-right of doc card */
 .fragment-number {
   font-family: var(--mono);
-  font-size: 16pt;
+  font-size: 14pt;
   color: var(--rule);
   position: absolute;
-  top: 0;
-  right: -4px;
+  top: -2px;
+  right: 8px;
   line-height: 1;
   letter-spacing: -.02em;
-}
-
-/* Left-hand pages: number on left margin */
-.fragment-page[data-side="verso"] .fragment-number {
-  right: auto;
-  left: -8px;
+  z-index: 1;
 }
 
 /* Fragment document types */
