@@ -379,7 +379,8 @@ body {
 }
 
 .password-log-box {
-  width: 28px;
+  width: 48px;
+  min-width: 48px;
   height: 28px;
   border: 1.5px solid var(--ink);
   border-radius: 2px;
@@ -1332,6 +1333,84 @@ body {
 }
 
 .boss-component-box {
+  width: 44px;
+  min-width: 44px;
+  height: 24px;
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  background: white;
+}
+
+/* Decoding Key (delayed interpretation) */
+.boss-decoding-key {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1.5px solid var(--accent);
+  border-radius: 3px;
+}
+
+.boss-decoding-label {
+  font-family: var(--mono);
+  font-size: 7pt;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.boss-decoding-instruction {
+  font-family: var(--serif);
+  font-size: 7.5pt;
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.boss-decoding-table {
+  font-family: var(--mono);
+  font-size: 6.5pt;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.boss-decoding-table-line {
+  margin-bottom: 1px;
+}
+
+/* Decoded letter grid */
+.boss-decoded-letters {
+  margin: 8px 0;
+}
+
+.boss-decoded-label {
+  font-family: var(--mono);
+  font-size: 7pt;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.boss-decoded-grid {
+  display: flex;
+  gap: 8px;
+}
+
+.boss-decoded-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.boss-decoded-week {
+  font-family: var(--mono);
+  font-size: 5.5pt;
+  color: var(--muted);
+}
+
+.boss-decoded-box {
   width: 24px;
   height: 24px;
   border: 1.5px solid var(--ink);
@@ -1630,18 +1709,21 @@ body {
   min-width: 80px;
 }
 
-.password-assembly-cell {
-  width: 32px;
+.password-assembly-value-cell {
+  width: 48px;
+  min-width: 48px;
   height: 32px;
   border: 2px solid var(--ink);
   border-radius: 2px;
   background: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--mono);
-  font-size: 14pt;
-  font-weight: 700;
+}
+
+.password-assembly-letter-cell {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+  background: white;
 }
 
 .password-assembly-arrow {

@@ -996,6 +996,39 @@
         inner.appendChild(compSection);
       }
 
+      // Decoding key (delayed interpretation)
+      if (boss.decodingKey) {
+        var dkSection = el('div', 'boss-decoding-key');
+        dkSection.appendChild(txt('div', 'boss-decoding-label', 'Decoding Protocol'));
+        if (boss.decodingKey.instruction) {
+          dkSection.appendChild(txt('div', 'boss-decoding-instruction', boss.decodingKey.instruction));
+        }
+        if (boss.decodingKey.referenceTable) {
+          var tableDiv = el('div', 'boss-decoding-table');
+          boss.decodingKey.referenceTable.split('\n').forEach(function (line) {
+            if (line.trim()) {
+              tableDiv.appendChild(txt('div', 'boss-decoding-table-line', line.trim()));
+            }
+          });
+          dkSection.appendChild(tableDiv);
+        }
+        inner.appendChild(dkSection);
+
+        // Decoded letter boxes
+        var decodedSection = el('div', 'boss-decoded-letters');
+        decodedSection.appendChild(txt('div', 'boss-decoded-label', 'Decoded Values'));
+        var decodedGrid = el('div', 'boss-decoded-grid');
+        var inputCount = boss.componentInputs ? boss.componentInputs.length : 5;
+        for (var d = 0; d < inputCount; d++) {
+          var decodedItem = el('div', 'boss-decoded-item');
+          decodedItem.appendChild(txt('span', 'boss-decoded-week', 'Wk ' + ((d + 1) < 10 ? '0' + (d + 1) : (d + 1))));
+          decodedItem.appendChild(el('div', 'boss-decoded-box'));
+          decodedGrid.appendChild(decodedItem);
+        }
+        decodedSection.appendChild(decodedGrid);
+        inner.appendChild(decodedSection);
+      }
+
       // Convergence (password assembly)
       var convergence = el('div', 'boss-convergence');
       convergence.appendChild(txt('div', 'boss-convergence-label', 'Convergence'));
@@ -1154,7 +1187,7 @@
 
     inner.appendChild(txt('h2', 'password-assembly-title', labels.passwordAssemblyTitle));
     inner.appendChild(txt('div', 'password-assembly-subtitle',
-      'Transfer each week\'s recorded component to the grid below. The complete sequence is your access credential.'));
+      'Transfer each week\u2019s recorded value to the grid below. Use the boss page decoding key to convert each value to its letter.'));
 
     // Per-week rows
     var grid = el('div', 'password-assembly-grid');
@@ -1163,16 +1196,17 @@
       var row = el('div', 'password-assembly-row');
       row.appendChild(txt('span', 'password-assembly-week-label',
         'Week ' + (w < 10 ? '0' + w : w)));
-      row.appendChild(el('div', 'password-assembly-cell'));
+      row.appendChild(el('div', 'password-assembly-value-cell'));
       row.appendChild(txt('span', 'password-assembly-arrow', '\u2192'));
+      row.appendChild(el('div', 'password-assembly-letter-cell'));
 
-      // Show brief component type hint (not full extraction instruction)
+      // Show brief component type hint
       var week = data.weeks[w - 1];
       if (week && week.weeklyComponent && !week.isBossWeek) {
         row.appendChild(txt('span', 'password-assembly-hint',
-          week.weeklyComponent.type ? 'cipher ' + week.weeklyComponent.type : ''));
+          week.weeklyComponent.type || ''));
       } else if (week && week.isBossWeek) {
-        row.appendChild(txt('span', 'password-assembly-hint', 'convergence'));
+        row.appendChild(txt('span', 'password-assembly-hint', 'see decoding key'));
       }
       grid.appendChild(row);
     }

@@ -50,8 +50,8 @@
       "isDeload": false,
       "weeklyComponent": {
         "type": "gauge-reading",
-        "value": "H",
-        "extractionInstruction": "Decode the Gauge Calibration Sequence using the standard index. The first letter of the decoded phrase is your gauge reading for this week. Record it on your Gauge Reading Log, p.02."
+        "value": "8",
+        "extractionInstruction": "The initial calibration integer is the first value in the sequence. Record this number on your Gauge Reading Log, p.02."
       },
       "sessions": [
         {
@@ -438,8 +438,8 @@
               "style": "boxgrid"
             }
           },
-          "extractionInstruction": "Decode the full calibration sequence using the index above. Record the first letter of the decoded phrase on your Gauge Reading Log, p.02. This is your first reading.",
-          "characterDerivationProof": "The number sequence is: 8 9 7 8 | 23 1 20 5 18 | 13 1 18 3 8. Using A=1, B=2 ... Z=26: 8=H, 9=I, 7=G, 8=H → HIGH. 23=W, 1=A, 20=T, 5=E, 18=R → WATER. 13=M, 1=A, 18=R, 3=C, 8=H → MARCH. Full decode: HIGH WATER MARCH. First letter = H. This matches weeklyComponent value 'H'."
+          "extractionInstruction": "Decode the calibration sequence using the index above. The first number in the decoded sequence is your gauge reading. Record it on your Gauge Reading Log, p.02.",
+          "characterDerivationProof": "The number sequence is: 8 9 7 8 | 23 1 20 5 18 | 13 1 18 3 8. Using A=1, B=2 ... Z=26: 8=H, 9=I, 7=G, 8=H → HIGH. 23=W, 1=A, 20=T, 5=E, 18=R → WATER. 13=M, 1=A, 18=R, 3=C, 8=H → MARCH. Full decode: HIGH WATER MARCH. The first number in the original sequence is 8. This matches weeklyComponent value '8'."
         },
         "oracleTable": {
           "title": "Dorchester County Conditions Log · Daily Field Observation",
@@ -545,8 +545,8 @@
       "isDeload": false,
       "weeklyComponent": {
         "type": "gauge-reading",
-        "value": "E",
-        "extractionInstruction": "Apply the reversal protocol to the flagged station code. The resulting letter is your gauge reading for this week. Record it on your Gauge Reading Log, p.02."
+        "value": "5",
+        "extractionInstruction": "Record the station number of the flagged station. This is your gauge reading for this week. Record it on your Gauge Reading Log, p.02."
       },
       "sessions": [
         {
@@ -934,8 +934,8 @@
               "style": "boxgrid"
             }
           },
-          "extractionInstruction": "Apply the reversal protocol to the flagged station's code letter. Record the resulting letter on your Gauge Reading Log, p.02.",
-          "characterDerivationProof": "The flagged station is BW-05, which has code letter V. The reversal key shows E↔V, meaning V maps to E. The resulting letter is E. This matches weeklyComponent value 'E'."
+          "extractionInstruction": "The flagged station's number is your gauge reading. Record it on your Gauge Reading Log, p.02.",
+          "characterDerivationProof": "The flagged station is BW-05. The station number is 05, yielding the value 5. This matches weeklyComponent value '5'."
         },
         "oracleTable": {
           "title": "Dorchester County Conditions Log · Daily Field Observation",
@@ -1041,8 +1041,8 @@
       "isDeload": false,
       "weeklyComponent": {
         "type": "gauge-reading",
-        "value": "R",
-        "extractionInstruction": "Locate the flagged parcel in the USGS reference matrix. The letter at that grid position is your gauge reading for this week. Record it on your Gauge Reading Log, p.02."
+        "value": "18",
+        "extractionInstruction": "Locate the flagged parcel in the USGS reference matrix. The value at that grid position is your gauge reading for this week. Record it on your Gauge Reading Log, p.02."
       },
       "sessions": [
         {
@@ -1433,15 +1433,15 @@
           "title": "USGS Soil Survey Grid — Parcel Reference Matrix · Dorchester District 4",
           "noticeabilityDesign": "A small letter grid printed in the style of a USGS reference matrix — column headers numbered 1-5, row headers lettered A-D. The grid is filled with letters that look like standard parcel codes. A single cell is marked with a small arrow or asterisk, and the instruction reads like a standard cross-reference protocol. The grid looks like part of the official survey paperwork — something the reader would naturally try to decode.",
           "body": {
-            "displayText": "PARCEL REFERENCE MATRIX — DISTRICT 4\n\n     1    2    3    4    5\nA    P    Q    T    M    K\nB    D    F    R    J    L\nC    A    B    G    S    W\nD    H    N    E    O    V\n\nFLAGGED PARCEL: B-3",
-            "key": "Cross-reference the flagged parcel coordinates against the matrix. Row first, then column.",
+            "displayText": "PARCEL REFERENCE MATRIX — DISTRICT 4\n\n      1     2     3     4     5\nA    16    17    20    13    11\nB     4     6    18    10    12\nC     1     2     7    19    23\nD     8    14     5    15    22\n\nFLAGGED PARCEL: B-3",
+            "key": "Cross-reference the flagged parcel coordinates against the matrix. Row first, then column. Record the value.",
             "workSpace": {
               "rows": 2,
               "style": "boxgrid"
             }
           },
-          "extractionInstruction": "Locate the flagged parcel in the reference matrix. Record the letter at that position on your Gauge Reading Log, p.02.",
-          "characterDerivationProof": "The flagged parcel is B-3. Row B, Column 3 of the matrix contains the letter R. This matches weeklyComponent value 'R'."
+          "extractionInstruction": "Locate the flagged parcel in the reference matrix. The value at that position is your gauge reading. Record it on your Gauge Reading Log, p.02.",
+          "characterDerivationProof": "The flagged parcel is B-3. Row B, Column 3 of the matrix contains the value 18. This matches weeklyComponent value '18'."
         },
         "oracleTable": {
           "title": "Dorchester County Conditions Log · Daily Field Observation",
@@ -1547,8 +1547,8 @@
       "isDeload": false,
       "weeklyComponent": {
         "type": "gauge-reading",
-        "value": "O",
-        "extractionInstruction": "Complete the cross-reference verification protocol using Fragment F.15. The resulting alphabet position is your gauge reading for this week. Record it on your Gauge Reading Log, p.02."
+        "value": "15",
+        "extractionInstruction": "Complete the cross-reference verification protocol using Fragment F.15. The resulting number is your gauge reading for this week. Record it on your Gauge Reading Log, p.02."
       },
       "sessions": [
         {
@@ -1938,8 +1938,8 @@
               "style": "ruled"
             }
           },
-          "extractionInstruction": "Follow the cross-reference protocol above using Fragment F.15. Record the resulting letter on your Gauge Reading Log, p.02.",
-          "characterDerivationProof": "Fragment F.15 contains water gauge readings for March 1962. The highest single-day reading is 152 (March 10, during the anomalous high-water event). 152 / 10 = 15.2. Rounded down = 15. Alphabet position 15 = O. This matches weeklyComponent value 'O'."
+          "extractionInstruction": "Follow the cross-reference protocol above using Fragment F.15. The resulting number is your gauge reading. Record it on your Gauge Reading Log, p.02.",
+          "characterDerivationProof": "Fragment F.15 contains water gauge readings for March 1962. The highest single-day reading is 152 (March 10, during the anomalous high-water event). 152 / 10 = 15.2. Rounded down = 15. The gauge reading is 15. This matches weeklyComponent value '15'."
         },
         "oracleTable": {
           "title": "Dorchester County Conditions Log · Daily Field Observation",
@@ -2045,8 +2045,8 @@
       "isDeload": false,
       "weeklyComponent": {
         "type": "gauge-reading",
-        "value": "N",
-        "extractionInstruction": "Complete the three-source composite verification using your survey grid and Fragment F.14. The resulting alphabet position is your gauge reading. Record it on your Gauge Reading Log, p.02."
+        "value": "14",
+        "extractionInstruction": "Complete the three-source composite verification using your survey grid and Fragment F.14. The resulting number is your gauge reading. Record it on your Gauge Reading Log, p.02."
       },
       "sessions": [
         {
@@ -2441,8 +2441,8 @@
               "style": "ruled"
             }
           },
-          "extractionInstruction": "Complete the three-source composite protocol. The resulting alphabet position is your final gauge reading. Record it on your Gauge Reading Log, p.02.",
-          "characterDerivationProof": "Step 1: The Week 5 survey grid contains 21 anomaly tiles: (6,1), (7,1), (2,2), (4,2), (5,2), (6,2), (7,2), (4,3), (5,3), (6,3), (4,4), (5,4), (6,4), (4,5), (5,5) = wait, let me recount. Row 1: (6,1) and (7,1) = 2. Row 2: (2,2), (4,2), (5,2), (6,2), (7,2) = 5. Row 3: (4,3), (5,3), (6,3) = 3. Row 4: (4,4), (5,4), (6,4) = 3. Row 5: (4,5), (5,5) = 2. Total anomaly tiles = 2+5+3+3+2 = 15 wait that's only 15 not enough. Let me check — I need the answer to be 14 (N). Fragment F.14 will contain 1 circle on the eastern boundary. 15 - 1 = 14. N = 14. But F.14 should have a specific number of circles. Let me set F.14 to have exactly 1 circle marked. Then: 15 anomaly tiles minus 1 circle = 14 = N. This matches weeklyComponent value 'N'. NOTE: If oracle consequences have added more anomaly tiles during play, the base grid count of 15 is the canonical count. The instructions reference 'your current survey grid (Week 5)' meaning the printed grid, not player modifications."
+          "extractionInstruction": "Complete the three-source composite protocol. The resulting number is your gauge reading. Record it on your Gauge Reading Log, p.02.",
+          "characterDerivationProof": "Step 1: The Week 5 survey grid contains 15 anomaly tiles. Row 1: (6,1) and (7,1) = 2. Row 2: (2,2), (4,2), (5,2), (6,2), (7,2) = 5. Row 3: (4,3), (5,3), (6,3) = 3. Row 4: (4,4), (5,4), (6,4) = 3. Row 5: (4,5), (5,5) = 2. Total = 2+5+3+3+2 = 15. Step 2: Fragment F.14 contains 1 circle marked on the eastern boundary. Step 3: 15 anomaly tiles minus 1 circle = 14. The gauge reading is 14. This matches weeklyComponent value '14'. NOTE: The base grid count of 15 is the canonical count — oracle consequences during play do not alter the cipher calculation."
         },
         "oracleTable": {
           "title": "Dorchester County Conditions Log · Daily Field Observation",
@@ -2549,7 +2549,7 @@
       "weeklyComponent": {
         "type": "gauge-reading",
         "value": null,
-        "extractionInstruction": "No individual reading this week. Assemble your complete gauge log."
+        "extractionInstruction": "No individual reading this week. Assemble your complete gauge log and use the boss page decoding key."
       },
       "sessions": [
         {
@@ -2669,16 +2669,20 @@
       "bossEncounter": {
         "title": "Final Gauge Reading · Station BW-14 · Operational Closeout",
         "narrative": "Harmon is at the kitchen table. He has brought a document — a single sheet, typed, with a header Earl does not recognize. He places it face-down on the table between the sugar bowl and Mary's photograph. He says: Mr. Pratt, this is the last thing I can give you. He says: what you have recorded in your gauge log is the name of what is in the water. He says: I am sorry it is also the name of something you loved.",
-        "mechanismDescription": "Turn to your Gauge Reading Log on p.02. You have recorded one letter per week for five weeks. Read them in order — Week 1 through Week 5. The letters form a word. This word is the designation that Station BW-14 was originally built to monitor. It is the name the water answers to. Write the complete word in the space below your individual readings.",
+        "mechanismDescription": "Turn to your Gauge Reading Log on p.02. You have recorded one gauge reading per week for five weeks — each a number. Use the Decoding Protocol below to convert each number to its corresponding letter. Read the letters in order — Week 1 through Week 5. They form a word. This word is the designation that Station BW-14 was originally built to monitor. It is the name the water answers to. Write the complete word in the space below your decoded letters.",
         "componentInputs": [
-          "H",
-          "E",
-          "R",
-          "O",
-          "N"
+          "8",
+          "5",
+          "18",
+          "15",
+          "14"
         ],
-        "convergenceProof": "FULL CONVERGENCE (5 components): The five gauge readings are H, E, R, O, N. Read in order they spell HERON. This is the password. The word functions on three narrative levels: (1) the green heron that has been a sentinel throughout the story, (2) the designation of the entity that BW-14 was built to track, (3) the name Mary used to call Earl out to the porch when a heron was in the creek — a detail revealed only in the ending document.\n\nPARTIAL CONVERGENCE (2-3 components): A reader with 2-3 letters sees a partial word — HE_ON or H_R__ — and experiences the boss page as a narrative climax with an incomplete revelation. Harmon's dialogue still lands; the reader understands that the word means something without being able to complete it. The instruction to 'read your gauge readings in order' is still followable — the reader simply has gaps. This feels like a document with redactions, which is thematically consistent.\n\nZERO CONVERGENCE (0-1 components): The reader who has not solved any ciphers reads the boss page as pure narrative — a scene between Earl and Harmon at the kitchen table, a document being delivered, a name being implied but not spoken. The boss page works as a story beat. The Gauge Reading Log is empty or nearly empty. The reader may return to prior weeks to solve the ciphers, or may accept the silence as the story's final act of containment.",
-        "passwordRevealInstruction": "The word you have assembled is the name the water answers to. It has been here longer than the marsh. Write it once more, carefully, below. Then enter it at liftrpg.co.",
+        "decodingKey": {
+          "instruction": "Each gauge reading corresponds to a position in the standard alphabetic calibration index. The same index printed on your Week 1 cipher page. Convert each number to its letter.",
+          "referenceTable": "1=A  2=B  3=C  4=D  5=E  6=F  7=G  8=H  9=I\n10=J  11=K  12=L  13=M  14=N  15=O  16=P\n17=Q  18=R  19=S  20=T  21=U  22=V  23=W\n24=X  25=Y  26=Z"
+        },
+        "convergenceProof": "FULL CONVERGENCE (5 components): The five gauge readings are 8, 5, 18, 15, 14. Using the decoding key (alphabetic calibration index): 8=H, 5=E, 18=R, 15=O, 14=N. Read in order they spell HERON. This is the password. The word functions on three narrative levels: (1) the green heron that has been a sentinel throughout the story, (2) the designation of the entity that BW-14 was built to track, (3) the name Mary used to call Earl out to the porch when a heron was in the creek — a detail revealed only in the ending document.\n\nDELAYED INTERPRETATION: During weeks 1-5, the values 8, 5, 18, 15, 14 are non-semantic — they read as gauge readings, station numbers, grid coordinates. The boss page reveals the decoding key that transforms numbers into letters, creating an 'aha' moment. A player cannot guess the password from partial values because the numbers carry no alphabetic meaning until the key is revealed.\n\nPARTIAL CONVERGENCE (2-3 components): A reader with 2-3 numbers and the decoding key gets partial letters — H_R__ or _E__N — and experiences incomplete revelation. Harmon's dialogue still lands; the reader understands that the numbers mean something without being able to complete the word. This feels like a document with redactions, which is thematically consistent.\n\nZERO CONVERGENCE (0-1 components): The reader who has not solved any ciphers sees the decoding key but has no values to decode. The boss page works as pure narrative — a scene between Earl and Harmon at the kitchen table, a document being delivered, a name being implied but not spoken. The Gauge Reading Log is empty. The reader may return to prior weeks to solve the ciphers, or may accept the silence as the story's final act of containment.",
+        "passwordRevealInstruction": "The word you have decoded is the name the water answers to. It has been here longer than the marsh. Write it once more, carefully, below. Then enter it at liftrpg.co.",
         "binaryChoiceAcknowledgement": {
           "ifA": "Harmon notices the card in Earl's shirt pocket — the one with the phone number. He nods once. 'You called,' he says. 'That is why I came back.'",
           "ifB": "Harmon sees the card under the sugar bowl where it has sat for three weeks, untouched. He picks it up and puts it in his own pocket. 'You did not call,' he says. 'I came back anyway.'"
@@ -2949,8 +2953,8 @@
               "style": "blank"
             }
           },
-          "extractionInstruction": "Assemble your five gauge readings in order. The result is the password.",
-          "characterDerivationProof": "Boss week — no individual cipher. Password is assembled from prior weeks' components: H+E+R+O+N = HERON."
+          "extractionInstruction": "Assemble your five gauge readings and use the decoding key on the boss page to convert each to a letter. The letters form the password.",
+          "characterDerivationProof": "Boss week — no individual cipher. Gauge readings 8, 5, 18, 15, 14 are decoded via the alphabetic calibration index: 8=H, 5=E, 18=R, 15=O, 14=N → HERON."
         },
         "oracleTable": {
           "title": "Dorchester County Conditions Log · Final Observation",
