@@ -1439,14 +1439,15 @@ body {
 
 .password-final-row {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 5px;
   margin-bottom: 16px;
 }
 
 .password-final-cell {
-  width: 32px;
-  height: 32px;
-  border: 2px solid var(--ink);
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid var(--ink);
   border-radius: 2px;
   background: white;
 }
@@ -1957,42 +1958,49 @@ body.demo-mode .demo-error {
   }
 
   /* Spread / Booklet Print Behavior (Landscape)
-     Safari: flex doesn't paginate or position correctly in print.
-     Using display:block + float instead of flex for page pairing.
-     This is the most reliable cross-browser print layout. */
+     Safari's print engine famously ignores page-break-avoid inside Flexbox and 
+     forces fractional float drops. By using absolute positioning, we completely 
+     bypass WebKit's pagination flow constraint. The pages MUST render side-by-side. */
   #booklet-container.spread-view .print-spread {
-    display: block;
-    width: 11in;
-    height: 8.49in;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    page-break-after: always;
-    page-break-inside: avoid;
-    break-after: page;
-    break-inside: avoid;
-    box-shadow: none;
-  }
-
-  #booklet-container.spread-view .print-spread::after {
-    content: '';
-    display: table;
-    clear: both;
+    display: block !important;
+    position: relative !important;
+    width: 11in !important;
+    height: 8.5in !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    page-break-after: always !important;
+    page-break-inside: avoid !important;
+    break-after: page !important;
+    break-inside: avoid !important;
+    box-shadow: none !important;
+    border: none !important;
   }
 
   #booklet-container.spread-view .print-spread:last-child {
-    page-break-after: auto;
-    break-after: auto;
+    page-break-after: auto !important;
+    break-after: auto !important;
   }
 
   #booklet-container.spread-view .booklet-page {
-    float: left;
-    width: 50%;
-    height: 8.49in;
-    margin: 0;
+    position: absolute !important;
+    top: 0 !important;
+    width: 50% !important;
+    height: 8.5in !important;
+    margin: 0 !important;
+    padding: 0 !important;
     page-break-after: avoid !important;
     page-break-inside: avoid !important;
     break-after: avoid !important;
     break-inside: avoid !important;
+    float: none !important;
+  }
+
+  #booklet-container.spread-view .print-spread .booklet-page:first-child {
+    left: 0 !important;
+  }
+
+  #booklet-container.spread-view .print-spread .booklet-page:last-child {
+    right: 0 !important;
   }
 }
