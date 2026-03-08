@@ -1724,6 +1724,7 @@ body {
 
 #unlock-password {
   flex: 1;
+  max-width: 240px;
   padding: 6px 10px;
   background: var(--paper);
   border: 1px solid var(--rule);
@@ -1783,11 +1784,27 @@ body {
 }
 
 @keyframes shake {
-  0%,100% { transform: translateX(0); }
-  20% { transform: translateX(-4px); }
-  40% { transform: translateX(4px); }
-  60% { transform: translateX(-3px); }
-  80% { transform: translateX(3px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  20% {
+    transform: translateX(-4px);
+  }
+
+  40% {
+    transform: translateX(4px);
+  }
+
+  60% {
+    transform: translateX(-3px);
+  }
+
+  80% {
+    transform: translateX(3px);
+  }
 }
 
 .shake {
@@ -1885,7 +1902,7 @@ body.demo-mode .demo-error {
    ══════════════════════════════════════════════════════════════ */
 @media print {
   @page {
-    size: letter landscape;
+    size: 11in 8.5in;
     margin: 0;
   }
 
@@ -1926,7 +1943,7 @@ body.demo-mode .demo-error {
   /* Single Page Print Behavior (5.5 x 8.5) */
   #booklet-container:not(.spread-view) .booklet-page {
     width: 5.5in;
-    height: 8.5in;
+    height: 8.49in;
     margin: 0;
     page-break-after: always;
     page-break-inside: avoid;
@@ -1946,7 +1963,7 @@ body.demo-mode .demo-error {
   #booklet-container.spread-view .print-spread {
     display: block;
     width: 11in;
-    height: 8.5in;
+    height: 8.49in;
     margin: 0;
     padding: 0;
     overflow: hidden;
@@ -1970,8 +1987,8 @@ body.demo-mode .demo-error {
 
   #booklet-container.spread-view .booklet-page {
     float: left;
-    width: 5.5in;
-    height: 8.5in;
+    width: 50%;
+    height: 8.49in;
     margin: 0;
     page-break-after: avoid !important;
     page-break-inside: avoid !important;
