@@ -1058,7 +1058,6 @@
   // ── END DEMO MODE ──────────────────────────────────────────
 
   var fileInput = document.getElementById('json-input');
-  var renderBtn = document.getElementById('render-btn');
   var printBtn = document.getElementById('print-btn');
   var container = document.getElementById('booklet-container');
   var status = document.getElementById('status');
@@ -1071,9 +1070,7 @@
     reader.onload = function (ev) {
       try {
         jsonData = JSON.parse(ev.target.result);
-        renderBtn.disabled = false;
-        status.textContent = 'Loaded: ' + (jsonData.meta ? jsonData.meta.blockTitle : 'unknown') +
-          ' (' + (jsonData.weeks ? jsonData.weeks.length : 0) + ' weeks)';
+        doRender(); // auto-render on load
       } catch (err) {
         status.textContent = 'JSON error: ' + err.message;
       }
@@ -1134,10 +1131,12 @@
     }
   }
 
-  renderBtn.addEventListener('click', doRender);
-
   printBtn.addEventListener('click', function () {
-    window.print();
+    // Switch to booklet (printer spreads) and re-render before printing
+    if (layoutSelect) layoutSelect.value = 'booklet';
+    doRender();
+    // Small delay to let the DOM settle before print dialog
+    setTimeout(function () { window.print(); }, 200);
   });
 
   if (layoutSelect) {

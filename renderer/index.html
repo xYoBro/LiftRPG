@@ -21,14 +21,13 @@
       <span class="upload-icon">&#x2B06;</span> Load JSON
       <input type="file" id="json-input" accept=".json" hidden/>
     </label>
-    <button id="render-btn" disabled>Render Booklet</button>
-    <button id="print-btn" disabled>Print</button>
+    <button id="print-btn" disabled>Print Booklet</button>
     <label class="view-toggle">
-      Layout:
+      Preview:
       <select id="layout-mode" style="background:var(--paper); color:var(--ink); font-family:var(--mono); font-size:7pt; border:1px solid var(--rule); border-radius:3px; padding:2px 4px; margin-left:4px; outline:none; cursor:pointer;">
         <option value="single">Single Page</option>
-        <option value="spread">Readers Spread</option>
-        <option value="booklet">Booklet (Printer Spreads)</option>
+        <option value="spread">Reader Spread</option>
+        <option value="booklet">Printer Spread</option>
       </select>
     </label>
   </div>
