@@ -1940,24 +1940,27 @@ body.demo-mode .demo-error {
   }
 
   /* Spread / Booklet Print Behavior (Landscape)
-     Safari enforces non-printable margins even with @page margin:0,
-     so content at full 8.5in overflows the printable area. Using
-     zoom:0.94 scales the spread to ~10.34 × 7.99in which fits
-     within typical printable areas. zoom (unlike transform) affects
-     layout so pagination and page breaks work correctly. */
+     Safari: flex doesn't paginate or position correctly in print.
+     Using display:block + float instead of flex for page pairing.
+     This is the most reliable cross-browser print layout. */
   #booklet-container.spread-view .print-spread {
-    display: flex;
-    flex-direction: row;
+    display: block;
     width: 11in;
     height: 8.5in;
     margin: 0;
+    padding: 0;
     overflow: hidden;
-    zoom: 0.94;
     page-break-after: always;
     page-break-inside: avoid;
     break-after: page;
     break-inside: avoid;
     box-shadow: none;
+  }
+
+  #booklet-container.spread-view .print-spread::after {
+    content: '';
+    display: table;
+    clear: both;
   }
 
   #booklet-container.spread-view .print-spread:last-child {
@@ -1966,9 +1969,9 @@ body.demo-mode .demo-error {
   }
 
   #booklet-container.spread-view .booklet-page {
+    float: left;
     width: 5.5in;
     height: 8.5in;
-    flex-shrink: 0;
     margin: 0;
     page-break-after: avoid !important;
     page-break-inside: avoid !important;
