@@ -415,6 +415,78 @@
     return p;
   }
 
+  // ═══ MAP RENDERERS ═══════════════════════════════════════════════
+  // Each map type is self-contained. Fix one without touching the others.
+  // Guardrail constants at the top of each function.
+  // Schema constraints live in generator.js SCHEMA_SPATIAL.
+
+  function renderGridMap(container, mapState) {
+    container.appendChild(txt('div', 'map-title', mapState.title || mapState.floorLabel || 'Floor Map'));
+
+    if (!mapState.gridDimensions) return;
+
+    var mapGrid = el('div', 'map-grid');
+    var cols = mapState.gridDimensions.columns;
+    var rows = mapState.gridDimensions.rows;
+    mapGrid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+
+    // Build tile lookup
+    var tileLookup = {};
+    if (mapState.tiles) {
+      mapState.tiles.forEach(function (tile) {
+        tileLookup[tile.col + ',' + tile.row] = tile;
+      });
+    }
+
+    for (var r = 1; r <= rows; r++) {
+      for (var col = 1; col <= cols; col++) {
+        var tile = tileLookup[col + ',' + r];
+        var cell = el('div', 'map-cell');
+        if (tile) {
+          cell.classList.add(tile.type || 'empty');
+          if (tile.label) cell.textContent = tile.label;
+        } else {
+          cell.classList.add('empty');
+        }
+        mapGrid.appendChild(cell);
+      }
+    }
+    container.appendChild(mapGrid);
+
+    // Annotations
+    if (mapState.tiles) {
+      mapState.tiles.forEach(function (tile) {
+        if (tile.annotation) {
+          container.appendChild(txt('div', 'map-annotation',
+            (tile.label || '') + ': ' + tile.annotation));
+        }
+      });
+    }
+
+    // Map note
+    if (mapState.mapNote) {
+      container.appendChild(txt('div', 'map-note', mapState.mapNote));
+    }
+  }
+
+  function renderPtpMap(container, mapState) {
+    // Placeholder — implemented in Task 2
+    container.appendChild(txt('div', 'map-title', mapState.title || 'Location Map'));
+    container.appendChild(txt('div', 'map-note', '[point-to-point map — renderer pending]'));
+  }
+
+  function renderLinearTrack(container, mapState) {
+    // Placeholder — implemented in Task 3
+    container.appendChild(txt('div', 'map-title', mapState.title || 'Progress Track'));
+    container.appendChild(txt('div', 'map-note', '[linear track — renderer pending]'));
+  }
+
+  function renderPlayerDrawn(container, mapState) {
+    // Placeholder — implemented in Task 4
+    container.appendChild(txt('div', 'map-title', mapState.title || 'Survey Canvas'));
+    container.appendChild(txt('div', 'map-note', '[player-drawn canvas — renderer pending]'));
+  }
+
   // ═══ FIELD OPS RIGHT (Map + Cipher + Oracle) ═══
   function renderFieldOpsRight(week, weekNum, labels) {
     var p = page('field-ops');
@@ -500,49 +572,13 @@
     var mapZone = el('div', 'map-zone');
     var mapState = week.fieldOps.mapState;
     if (mapState) {
-      mapZone.appendChild(txt('div', 'map-title', mapState.floorLabel || 'Floor Map'));
-
-      var mapGrid = el('div', 'map-grid');
-      var cols = mapState.gridDimensions.columns;
-      var rows = mapState.gridDimensions.rows;
-      mapGrid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
-
-      // Build tile lookup
-      var tileLookup = {};
-      if (mapState.tiles) {
-        mapState.tiles.forEach(function (tile) {
-          tileLookup[tile.col + ',' + tile.row] = tile;
-        });
-      }
-
-      for (var r = 1; r <= rows; r++) {
-        for (var col = 1; col <= cols; col++) {
-          var tile = tileLookup[col + ',' + r];
-          var cell = el('div', 'map-cell');
-          if (tile) {
-            cell.classList.add(tile.type || 'empty');
-            if (tile.label) cell.textContent = tile.label;
-          } else {
-            cell.classList.add('empty');
-          }
-          mapGrid.appendChild(cell);
-        }
-      }
-      mapZone.appendChild(mapGrid);
-
-      // Map annotations
-      if (mapState.tiles) {
-        mapState.tiles.forEach(function (tile) {
-          if (tile.annotation) {
-            mapZone.appendChild(txt('div', 'map-annotation',
-              (tile.label || '') + ': ' + tile.annotation));
-          }
-        });
-      }
-
-      // Map note
-      if (mapState.mapNote) {
-        mapZone.appendChild(txt('div', 'map-note', mapState.mapNote));
+      var mapType = mapState.mapType || 'grid';
+      switch (mapType) {
+        case 'grid':           renderGridMap(mapZone, mapState); break;
+        case 'point-to-point': renderPtpMap(mapZone, mapState); break;
+        case 'linear-track':   renderLinearTrack(mapZone, mapState); break;
+        case 'player-drawn':   renderPlayerDrawn(mapZone, mapState); break;
+        default:               renderGridMap(mapZone, mapState); break;
       }
     }
     content.appendChild(mapZone);
