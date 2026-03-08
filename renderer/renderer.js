@@ -586,6 +586,27 @@
     return p;
   }
 
+  // ── Oracle overflow fix (called after page is in DOM) ──
+  function fixOracleOverflow(page) {
+    var content = page.querySelector('.rp-content');
+    if (!content) return;
+    var oracleEntries = page.querySelector('.oracle-entries');
+    if (!oracleEntries) return;
+    // Progressively shrink oracle text until it fits
+    var sizes = [5, 4.5, 4];
+    for (var s = 0; s < sizes.length; s++) {
+      if (content.scrollHeight <= content.offsetHeight + 2) break;
+      var entries = oracleEntries.querySelectorAll('.oracle-text');
+      var nums = oracleEntries.querySelectorAll('.oracle-case-num');
+      for (var i = 0; i < entries.length; i++) {
+        entries[i].style.fontSize = sizes[s] + 'pt';
+      }
+      for (var j = 0; j < nums.length; j++) {
+        nums[j].style.fontSize = sizes[s] + 'pt';
+      }
+    }
+  }
+
   // ═══ BOSS RIGHT (replaces field ops on final week) ═══
   function renderBossRight(data, week, weekNum, totalWeeks, labels) {
     var p = page('boss');
@@ -1057,6 +1078,7 @@
         for (var i = 0; i < pages.length; i++) {
           container.appendChild(pages[i]);
         }
+        container.querySelectorAll('.booklet-page').forEach(fixOracleOverflow);
       })
       .catch(function (err) {
         var container = document.getElementById('booklet-container');
@@ -1129,6 +1151,9 @@
       } else {
         pages.forEach(function (p) { container.appendChild(p); });
       }
+
+      // Fix oracle tables that overflow their page
+      container.querySelectorAll('.booklet-page').forEach(fixOracleOverflow);
 
       printBtn.disabled = false;
       status.textContent = 'Rendered ' + pages.length + ' pages (' +
