@@ -1,4 +1,60 @@
 (function(){
+  /* ─── Anti-Trope Defense ─────────────────────────────────────────
+     Ban list + randomized genre pool. When the user leaves creative
+     direction blank, we actively steer the LLM away from default
+     tropes and toward genuinely unusual territory.
+     ─────────────────────────────────────────────────────────────── */
+  var BANNED_TROPES = [
+    'gladiator arena or Roman colosseum settings',
+    'space marine or military sci-fi',
+    'post-apocalyptic survival',
+    'chosen one or prophecy fulfillment',
+    'zombie outbreak',
+    'generic medieval fantasy (dragon slaying, dungeon crawling)',
+    'superhero origin story'
+  ];
+
+  var GENRE_POOL = [
+    'Corporate Accounting Horror — an audit trail that audits you back',
+    'Competitive Birdwatching Noir — binoculars, betrayal, and rare sightings',
+    'Municipal Zoning Board Cosmic Horror — the variance was never approved',
+    'Insurance Fraud Romance — two adjusters, one suspicious claim',
+    'Deep-Sea Botanical Survey — cataloguing organisms that shouldn\'t photosynthesize',
+    'Antarctic Radio Station Mystery — the signal predates the station',
+    'Venetian Glassblowing Espionage — secrets encoded in crystal',
+    '1970s Brutalist Architecture Thriller — the building is watching',
+    'Lost Pet Investigation told through flyers and hand-drawn maps',
+    'HOA Meeting Minutes That Get Increasingly Disturbing',
+    'Recipe Collection Hiding a Conspiracy — the ingredients don\'t exist',
+    'Veterinary Clinic Case Files Gone Wrong — the animals remember',
+    'Sumerian Tax Collector\'s Diary — debts older than writing',
+    'Byzantine Bureaucratic Intrigue — forms within forms within forms',
+    'Victorian Sewer Cartography — mapping what lives below',
+    'Cold War Library Science — banned books as dead drops',
+    'Competitive Origami Underground — folding is a blood sport',
+    'Elevator Inspector\'s Existential Crisis — between floors, between worlds',
+    'Weather Station at the Edge of Reality — the forecast is always wrong',
+    'Lighthouse Keeper\'s Union Dispute — the light must not go out',
+    'Plague Doctor\'s Apprentice Journal — the cure is the disease',
+    'Archaeological Dig Site Procedural — every layer is a lie',
+    'Train Conductor\'s Logbook on a Route That Shouldn\'t Exist',
+    'Beekeeping Cooperative Thriller — the hive has a plan',
+    'Cartographer of Impossible Coastlines — the shore moves at night',
+    'Deep Space Janitor\'s Maintenance Log — someone has to clean up after first contact',
+    'Monastery Brewery Conspiracy — the recipe is a prayer is a weapon',
+    'Professional Cheese Cave Inspector — aging reveals terrible truths',
+    'Retired Circus Performer\'s Memoir — the tent is still standing somewhere'
+  ];
+
+  function shufflePick(arr, n) {
+    var copy = arr.slice();
+    for (var i = copy.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = copy[i]; copy[i] = copy[j]; copy[j] = tmp;
+    }
+    return copy.slice(0, n);
+  }
+
   /* ─── Schema Specification ─────────────────────────────────────────
      Distilled from liftrpg-schema.json v1.3. This is what the LLM
      reads to understand the JSON structure it must produce.
@@ -192,7 +248,24 @@
       '',
       '## Creative Direction',
       '',
-      brief || '(No specific creative direction provided. Use the workout programme to inspire the world, setting, and narrative tone. Surprise me.)',
+      brief || (function(){
+        var picks = shufflePick(GENRE_POOL, 4);
+        return [
+          'No specific creative direction provided.',
+          '',
+          'DO NOT default to these overused genres: ' + BANNED_TROPES.join('; ') + '.',
+          'These are the most common LLM defaults and produce identical-feeling booklets.',
+          '',
+          'Instead, consider one of these unusual directions (or invent something equally unexpected):',
+          '- ' + picks[0],
+          '- ' + picks[1],
+          '- ' + picks[2],
+          '- ' + picks[3],
+          '',
+          'The world contract should feel genuinely surprising. Use the workout programme\'s',
+          'structure (heavy weeks, deload weeks, exercise selection) to inspire the fiction\'s texture.'
+        ].join('\n');
+      })(),
       '',
       '## Dice Selection',
       '',
