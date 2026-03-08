@@ -1900,9 +1900,117 @@ body.demo-mode .demo-error {
 /* ══════════════════════════════════════════════════════════════
    PRINT MEDIA QUERIES
    ══════════════════════════════════════════════════════════════ */
+/* ── SAFARI PRINT INSTRUCTION MODAL ─────────────────────────── */
+.safari-print-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.safari-print-panel {
+  background: #2a2722;
+  color: var(--paper);
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 28px 32px;
+  max-width: 420px;
+  width: 90%;
+  font-family: var(--serif);
+  line-height: 1.6;
+}
+
+.safari-print-panel h2 {
+  font-family: var(--mono);
+  font-size: 11pt;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fog);
+  margin-bottom: 12px;
+}
+
+.safari-print-panel p {
+  font-size: 9.5pt;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.safari-print-panel ol {
+  padding-left: 20px;
+  margin-bottom: 16px;
+}
+
+.safari-print-panel li {
+  font-size: 10pt;
+  color: var(--paper);
+  margin-bottom: 6px;
+}
+
+.safari-print-panel strong {
+  color: #fff;
+}
+
+.safari-print-note {
+  font-size: 8.5pt;
+  font-style: italic;
+  color: var(--muted);
+  margin-bottom: 20px;
+}
+
+.safari-print-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.safari-print-continue {
+  font-family: var(--mono);
+  font-size: 8pt;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 8px 18px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.safari-print-continue:hover {
+  background: #a33;
+}
+
+.safari-print-cancel {
+  font-family: var(--mono);
+  font-size: 8pt;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 8px 18px;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid #555;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.safari-print-cancel:hover {
+  border-color: var(--muted);
+  color: var(--paper);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PRINT MEDIA QUERIES
+   Chrome respects @page size — Safari ignores it entirely
+   (WebKit bug #15548, open since 2007). Safari users must
+   configure Landscape + no headers/footers in the print dialog.
+   The renderer shows instructions when Safari is detected.
+   ══════════════════════════════════════════════════════════════ */
 @media print {
   @page {
-    size: 11in 8.5in;
+    size: letter landscape;
     margin: 0;
   }
 
@@ -1920,16 +2028,14 @@ body.demo-mode .demo-error {
     display: none !important;
   }
 
-  /* CRITICAL — Safari: flex containers don't paginate properly.
-     Switching to block lets the browser break between children. */
   #booklet-container {
-    display: block !important;
+    display: block;
     padding: 0;
+    margin: 0;
   }
 
-  /* Shared Print Reset */
   .booklet-page {
-    box-shadow: none !important;
+    box-shadow: none;
     border-radius: 0;
     overflow: hidden;
     -webkit-print-color-adjust: exact;
@@ -1940,10 +2046,10 @@ body.demo-mode .demo-error {
     background: white;
   }
 
-  /* Single Page Print Behavior (5.5 x 8.5) */
+  /* Single Page Print (5.5 x 8.5 portrait) */
   #booklet-container:not(.spread-view) .booklet-page {
     width: 5.5in;
-    height: 8.49in;
+    height: 8.5in;
     margin: 0;
     page-break-after: always;
     page-break-inside: avoid;
@@ -1956,50 +2062,39 @@ body.demo-mode .demo-error {
     break-after: auto;
   }
 
-  /* Spread / Booklet Print Behavior (Landscape)
-     Safari's print engine famously ignores page-break-avoid inside Flexbox and 
-     forces fractional float drops. By using absolute positioning, we completely 
-     bypass WebKit's pagination flow constraint. The pages MUST render side-by-side. */
+  /* Spread / Booklet Print (11 x 8.5 landscape) */
   #booklet-container.spread-view .print-spread {
-    display: block !important;
-    position: relative !important;
-    width: 11in !important;
-    height: 8.5in !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: hidden !important;
-    page-break-after: always !important;
-    page-break-inside: avoid !important;
-    break-after: page !important;
-    break-inside: avoid !important;
-    box-shadow: none !important;
-    border: none !important;
+    display: flex;
+    flex-direction: row;
+    width: 11in;
+    height: 8.5in;
+    margin: 0;
+    overflow: hidden;
+    page-break-after: always;
+    page-break-inside: avoid;
+    break-after: page;
+    break-inside: avoid;
+    box-shadow: none;
   }
 
   #booklet-container.spread-view .print-spread:last-child {
-    page-break-after: auto !important;
-    break-after: auto !important;
+    page-break-after: auto;
+    break-after: auto;
   }
 
   #booklet-container.spread-view .booklet-page {
-    position: absolute !important;
-    top: 0 !important;
-    width: 50% !important;
-    height: 8.5in !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    page-break-after: avoid !important;
-    page-break-inside: avoid !important;
-    break-after: avoid !important;
-    break-inside: avoid !important;
-    float: none !important;
+    width: 5.5in;
+    height: 8.5in;
+    flex-shrink: 0;
+    margin: 0;
+    page-break-after: avoid;
+    page-break-inside: avoid;
+    break-after: avoid;
+    break-inside: avoid;
   }
 
-  #booklet-container.spread-view .print-spread .booklet-page:first-child {
-    left: 0 !important;
-  }
-
-  #booklet-container.spread-view .print-spread .booklet-page:last-child {
-    right: 0 !important;
+  /* Safari print instruction modal — hidden in print */
+  .safari-print-modal {
+    display: none !important;
   }
 }

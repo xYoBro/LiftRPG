@@ -1131,12 +1131,63 @@
     }
   }
 
-  printBtn.addEventListener('click', function () {
-    // Switch to booklet (printer spreads) and re-render before printing
+  // ── Safari detection (WebKit bug #15548: @page size ignored) ──
+  var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+  function doPrint() {
     if (layoutSelect) layoutSelect.value = 'booklet';
     doRender();
-    // Small delay to let the DOM settle before print dialog
     setTimeout(function () { window.print(); }, 200);
+  }
+
+  function showSafariPrintModal() {
+    // Remove any existing modal
+    var existing = document.querySelector('.safari-print-modal');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.className = 'safari-print-modal';
+
+    var panel = document.createElement('div');
+    panel.className = 'safari-print-panel';
+
+    panel.innerHTML =
+      '<h2>Print Setup for Safari</h2>' +
+      '<p>Safari requires manual print settings. In the print dialog:</p>' +
+      '<ol>' +
+      '<li>Set orientation to <strong>Landscape</strong></li>' +
+      '<li>Uncheck <strong>Print headers and footers</strong></li>' +
+      '<li>Set <strong>Scale</strong> to <strong>100%</strong></li>' +
+      '</ol>' +
+      '<p class="safari-print-note">Chrome handles this automatically if you have it available.</p>' +
+      '<div class="safari-print-actions">' +
+      '<button class="safari-print-continue" type="button">Continue to Print</button>' +
+      '<button class="safari-print-cancel" type="button">Cancel</button>' +
+      '</div>';
+
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+
+    panel.querySelector('.safari-print-continue').addEventListener('click', function () {
+      overlay.remove();
+      doPrint();
+    });
+
+    panel.querySelector('.safari-print-cancel').addEventListener('click', function () {
+      overlay.remove();
+    });
+
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) overlay.remove();
+    });
+  }
+
+  printBtn.addEventListener('click', function () {
+    if (isSafari) {
+      showSafariPrintModal();
+    } else {
+      doPrint();
+    }
   });
 
   if (layoutSelect) {
