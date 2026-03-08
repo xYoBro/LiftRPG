@@ -1939,13 +1939,18 @@ body.demo-mode .demo-error {
     break-after: auto;
   }
 
-  /* Spread / Booklet Print Behavior (11 x 8.5 Landscape) */
+  /* Spread / Booklet Print Behavior (Landscape)
+     Use viewport units instead of fixed inches — Safari enforces
+     non-printable margins even with @page margin:0, so fixed 8.5in
+     overflows the actual printable area. 100vw/100vh adapt to the
+     real printable dimensions on any browser/printer combo. */
   #booklet-container.spread-view .print-spread {
     display: flex;
     flex-direction: row;
-    width: 11in;
-    height: 8.5in;
+    width: 100vw;
+    height: 100vh;
     margin: 0;
+    overflow: hidden;
     page-break-after: always;
     page-break-inside: avoid;
     break-after: page;
@@ -1959,8 +1964,8 @@ body.demo-mode .demo-error {
   }
 
   #booklet-container.spread-view .booklet-page {
-    width: 5.5in;
-    height: 8.5in;
+    width: 50%;
+    height: 100%;
     flex-shrink: 0;
     margin: 0;
     page-break-after: avoid !important;
