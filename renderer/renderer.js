@@ -515,7 +515,7 @@
     svg.style.width = '100%';
     svg.style.maxHeight = '3.5in';
 
-    // Draw edges first (behind nodes)
+    // Draw edge lines first (behind nodes) — labels deferred until after node labels
     edges.forEach(function (edge) {
       var from = nodeLookup[edge.from];
       var to = nodeLookup[edge.to];
@@ -529,25 +529,13 @@
       line.setAttribute('class', 'ptp-edge' +
         (edge.state === 'locked' ? ' ptp-edge-locked' : ''));
       svg.appendChild(line);
-
-      // Optional edge label at midpoint
-      if (edge.label) {
-        var mx = (from.x + to.x) / 2;
-        var my = (from.y + to.y) / 2;
-        var elbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        elbl.setAttribute('x', mx);
-        elbl.setAttribute('y', my - 2);
-        elbl.setAttribute('text-anchor', 'middle');
-        elbl.setAttribute('class', 'ptp-edge-label');
-        elbl.textContent = (edge.label || '').substring(0, 10);
-        svg.appendChild(elbl);
-      }
     });
 
-    // Track placed labels for collision detection
+    // Track placed labels for collision detection (shared by node + edge labels)
     var placedLabels = [];
+    var legendEntries = [];
 
-    // Draw nodes
+    // Draw nodes + node labels
     nodes.forEach(function (node) {
       var isCurrent = node.id === currentNode;
       var isLocked = node.state === 'locked';
@@ -564,6 +552,9 @@
         (isAnomaly ? ' ptp-node-anomaly' : ''));
       if (isCurrent) circle.setAttribute('stroke-width', PLAYER_STROKE);
       svg.appendChild(circle);
+
+      // Also register node body as occupied space for edge label collision
+      placedLabels.push({ x: node.x, y: node.y, hw: isCurrent ? PLAYER_R : NODE_R });
 
       // Label — always below node, centered
       var labelText = (node.label || node.id).substring(0, 14);
@@ -594,10 +585,9 @@
       lbl.setAttribute('class', 'ptp-label' + (isLocked ? ' ptp-label-locked' : ''));
 
       if (collides) {
-        // Collision fallback: numbered reference + legend below SVG
-        var refNum = placedLabels.length + 1;
+        var refNum = legendEntries.length + 1;
         lbl.textContent = '[' + refNum + ']';
-        lbl._legendText = refNum + ': ' + labelText;
+        legendEntries.push(refNum + ': ' + labelText);
         placedLabels.push({ x: labelX, y: labelY, hw: FONT_SIZE * 1.2 });
       } else {
         lbl.textContent = labelText;
@@ -606,13 +596,73 @@
       svg.appendChild(lbl);
     });
 
+    // Draw edge labels AFTER node labels — checked against placedLabels[]
+    edges.forEach(function (edge) {
+      if (!edge.label) return;
+      var from = nodeLookup[edge.from];
+      var to = nodeLookup[edge.to];
+      if (!from || !to) return;
+
+      var edgeLabelText = (edge.label || '').substring(0, 8);
+      var mx = (from.x + to.x) / 2;
+      var my = (from.y + to.y) / 2;
+
+      // Perpendicular offset away from edge line
+      var dx = to.x - from.x;
+      var dy = to.y - from.y;
+      var len = Math.sqrt(dx * dx + dy * dy) || 1;
+      var perpX = -dy / len * LABEL_GAP;
+      var perpY = dx / len * LABEL_GAP;
+      var elX = mx + perpX;
+      var elY = my + perpY - 1;
+
+      // Clamp inside viewBox
+      var elHalfWidth = edgeLabelText.length * EDGE_FONT_SIZE * 0.35;
+      if (elX - elHalfWidth < 0) elX = elHalfWidth + 1;
+      if (elX + elHalfWidth > 100) elX = 100 - elHalfWidth - 1;
+      if (elY < -VB_PAD + 2) elY = -VB_PAD + 2;
+      if (elY > 100 + VB_PAD - 2) elY = 100 + VB_PAD - 2;
+
+      // Collision check against all placed labels (nodes + prior edge labels)
+      var collides = false;
+      for (var i = 0; i < placedLabels.length; i++) {
+        var prev = placedLabels[i];
+        if (Math.abs(elX - prev.x) < (elHalfWidth + prev.hw) &&
+            Math.abs(elY - prev.y) < EDGE_FONT_SIZE * 1.4) {
+          collides = true;
+          break;
+        }
+      }
+
+      if (collides) {
+        // Legend fallback — [N] in SVG + text below
+        var refNum = legendEntries.length + 1;
+        var elbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        elbl.setAttribute('x', mx);
+        elbl.setAttribute('y', my - 2);
+        elbl.setAttribute('text-anchor', 'middle');
+        elbl.setAttribute('class', 'ptp-edge-label');
+        elbl.textContent = '[' + refNum + ']';
+        svg.appendChild(elbl);
+        legendEntries.push(refNum + ': ' + edgeLabelText);
+        placedLabels.push({ x: mx, y: my - 2, hw: EDGE_FONT_SIZE * 1.2 });
+      } else {
+        var elbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        elbl.setAttribute('x', elX);
+        elbl.setAttribute('y', elY);
+        elbl.setAttribute('text-anchor', 'middle');
+        elbl.setAttribute('class', 'ptp-edge-label');
+        elbl.textContent = edgeLabelText;
+        svg.appendChild(elbl);
+        placedLabels.push({ x: elX, y: elY, hw: elHalfWidth });
+      }
+    });
+
     container.appendChild(svg);
 
     // Render legend entries for collision-displaced labels
-    svg.querySelectorAll('text.ptp-label').forEach(function (t) {
-      if (t._legendText) {
-        container.appendChild(txt('div', 'map-annotation', t._legendText));
-      }
+    legendEntries.forEach(function (entry) {
+      container.appendChild(txt('div', 'map-annotation', entry));
     });
 
     // Map note
@@ -1275,6 +1325,20 @@
     return p;
   }
 
+  // ═══ NOTES PAGE ═══
+  function renderNotesPage() {
+    var p = page('notes');
+    p.classList.add('notes-page');
+
+    var header = txt('div', 'notes-page-header', 'Field Notes');
+    p.appendChild(header);
+
+    var ruled = el('div', 'notes-ruled-area');
+    p.appendChild(ruled);
+
+    return p;
+  }
+
   // ═══ BACK COVER ═══
   function renderBackCover(data) {
     var p = page('back-cover');
@@ -1578,24 +1642,36 @@
     }
 
     // Fragment pages — pack 2 per page, but split to 1 if content is very long
+    // Weighted heuristic accounts for document type CSS differences (mono fonts, borders)
+    function fragWeight(frag) {
+      var text = frag.bodyText || frag.body || frag.content || '';
+      var len = text.length;
+      var type = (frag.documentType || 'memo').replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+      if (type === 'field-note' || type === 'inspection') len *= 1.3;  // larger mono font
+      if (type === 'transcript') len *= 1.2;   // dialogue spacing
+      if (type === 'anomaly') len *= 1.15;     // extra border/padding
+      if (frag.inWorldAuthor) len += 40;       // sender line
+      if (frag.inWorldRecipient) len += 40;    // recipient line
+      return len;
+    }
+
     if (data.fragments && data.fragments.length) {
       var frags = data.fragments;
       var f = 0;
       var fragPageIdx = 0;
       while (f < frags.length) {
         var frag1 = frags[f];
-        // Use same field priority as renderers: bodyText → body → content (I7)
-        var content1Len = (frag1.bodyText || frag1.body || frag1.content || '').length;
+        var weight1 = fragWeight(frag1);
         var frag2 = frags[f + 1];
-        var content2Len = frag2 ? (frag2.bodyText || frag2.body || frag2.content || '').length : 0;
+        var weight2 = frag2 ? fragWeight(frag2) : 0;
 
-        // If combined content is very long (>1200 chars), determine split strategy (C4)
-        if (frag2 && (content1Len + content2Len > 1200)) {
-          if (content1Len > 600) {
+        // Lowered thresholds: 900 combined / 500 single (was 1200/600)
+        if (frag2 && (weight1 + weight2 > 900)) {
+          if (weight1 > 500) {
             // frag1 alone is long — give it its own page; frag2 re-queues
             pages.push(renderFragmentPage([frag1], f, fragPageIdx++));
             f += 1;
-          } else if (content2Len > 600) {
+          } else if (weight2 > 500) {
             // frag2 alone is long — each gets its own page
             pages.push(renderFragmentPage([frag1], f, fragPageIdx++));
             pages.push(renderFragmentPage([frag2], f + 1, fragPageIdx++));
@@ -1621,15 +1697,14 @@
     // Endings
     pages.push(renderEndingsPage(data, labels));
 
-    // Back cover
-    pages.push(renderBackCover(data));
-
-    // Pad to multiple of 4 for saddle-stitch
-    while (pages.length % 4 !== 0) {
-      var blank = page('blank');
-      blank.classList.add('blank-page');
-      pages.push(blank);
+    // Pad with ruled notes pages, then back cover always last
+    // (pages.length + 1 accounts for the back cover we're about to add)
+    while ((pages.length + 1) % 4 !== 0) {
+      pages.push(renderNotesPage());
     }
+
+    // Back cover — always the very last page (colophon on physical back cover)
+    pages.push(renderBackCover(data));
 
     // Set dynamic page numbers directly mapped to the array index (page 1 is index 0)
     pages.forEach(function (renderedPage, pgIdx) {

@@ -647,6 +647,12 @@ body {
   border: 1px solid var(--rule);
   border-radius: 3px;
   background: var(--paper);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent, transparent 13px,
+    var(--rule) 13px, var(--rule) 14px
+  );
+  background-position: 0 18px; /* offset below NOTES label */
   padding: 3px 8px;
   position: relative;
   overflow: hidden;
@@ -816,14 +822,13 @@ body {
 .rp-content {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto;
+  grid-template-rows: auto 1fr;
   grid-template-areas:
     "cipher map"
     "oracle oracle";
   gap: 6px;
   flex: 1;
   min-height: 0;
-  align-content: start;
 }
 
 /* Zone containers */
@@ -1205,7 +1210,7 @@ body {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  padding: 1px 0;
+  padding: 3px 0;
   border-bottom: 1px dotted var(--rule);
   break-inside: avoid;
 }
@@ -1216,7 +1221,7 @@ body {
 
 .oracle-case-num {
   font-family: var(--mono);
-  font-size: 5.5pt;
+  font-size: 6pt;
   color: var(--muted);
   white-space: nowrap;
   letter-spacing: .04em;
@@ -1224,8 +1229,8 @@ body {
 
 .oracle-text {
   font-family: var(--serif);
-  font-size: 5.5pt;
-  line-height: 1.3;
+  font-size: 6.5pt;
+  line-height: 1.4;
   color: var(--ink);
   flex: 1;
 }
@@ -1898,11 +1903,43 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   BLANK PAGE (padding to multiple of 4)
+   BLANK PAGE (padding to multiple of 4) — kept for backward compat
    ══════════════════════════════════════════════════════════════ */
 .blank-page {
   /* intentionally empty — just the grain texture */
   display: block;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   NOTES PAGE (replaces blank padding pages)
+   ══════════════════════════════════════════════════════════════ */
+.notes-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 28px 32px;
+}
+
+.notes-page-header {
+  font-family: var(--mono);
+  font-size: 7pt;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.notes-ruled-area {
+  flex: 1;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--paper);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent, transparent 17px,
+    var(--rule) 17px, var(--rule) 18px
+  );
+  background-position: 0 4px;
 }
 
 /* ══════════════════════════════════════════════════════════════
