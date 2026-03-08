@@ -55,9 +55,35 @@
 
   /** Card density tier based on exercise count */
   function cardDensity(exerciseCount) {
+    if (exerciseCount >= 8) return 'density-ultra';
     if (exerciseCount >= 6) return 'density-dense';
     if (exerciseCount >= 4) return 'density-compact';
     return '';
+  }
+
+  /**
+   * Auto-fit text to a single line by scaling font-size up to maxPt.
+   * Element must have white-space: nowrap in CSS.
+   * Reusable for any single-line label (designation, badge, header).
+   */
+  function fitTextToLine(element, maxPt) {
+    if (!element || !element.parentNode) return;
+    maxPt = maxPt || 10;
+    var container = element.parentNode;
+    var available = container.clientWidth - (parseFloat(getComputedStyle(container).paddingLeft) || 0)
+                  - (parseFloat(getComputedStyle(container).paddingRight) || 0);
+    // Binary search for largest font size that fits
+    var lo = 4, hi = maxPt;
+    while (hi - lo > 0.25) {
+      var mid = (lo + hi) / 2;
+      element.style.fontSize = mid + 'pt';
+      if (element.scrollWidth > available) {
+        hi = mid;
+      } else {
+        lo = mid;
+      }
+    }
+    element.style.fontSize = lo + 'pt';
   }
 
   /** Parse multiline cipher text into structured sections */
@@ -94,7 +120,8 @@
     var inner = el('div', 'cover-page');
 
     if (data.cover.designation) {
-      inner.appendChild(txt('div', 'cover-designation', data.cover.designation));
+      var desig = txt('div', 'cover-designation', data.cover.designation);
+      inner.appendChild(desig);
     }
     inner.appendChild(txt('h1', 'cover-title', data.meta.blockTitle));
     if (data.cover.tagline) {
@@ -295,6 +322,7 @@
         var tdDots = document.createElement('td');
         tdDots.innerHTML = '<div class="exercise-dots"></div>';
         tdDots.style.width = '100%';
+        tdDots.style.paddingRight = '10px';
         tr.appendChild(tdDots);
 
         // Weight
@@ -1097,6 +1125,7 @@
         for (var i = 0; i < pages.length; i++) {
           container.appendChild(pages[i]);
         }
+        container.querySelectorAll('.cover-designation').forEach(function (d) { fitTextToLine(d, 10); });
         container.querySelectorAll('.booklet-page').forEach(enforcePageFit);
       })
       .catch(function (err) {
@@ -1171,6 +1200,8 @@
         pages.forEach(function (p) { container.appendChild(p); });
       }
 
+      // Auto-fit single-line labels
+      container.querySelectorAll('.cover-designation').forEach(function (d) { fitTextToLine(d, 10); });
       // Fix oracle tables that overflow their page
       container.querySelectorAll('.booklet-page').forEach(enforcePageFit);
 

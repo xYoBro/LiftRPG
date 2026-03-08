@@ -236,6 +236,7 @@ body {
   text-transform: uppercase;
   color: var(--accent);
   margin-bottom: 8px;
+  white-space: nowrap;
 }
 
 .cover-title {
@@ -567,7 +568,7 @@ body {
 
 .exercise-table td {
   padding: 2px 0;
-  vertical-align: middle;
+  vertical-align: bottom;
   font-size: 7.5pt;
 }
 
@@ -590,8 +591,8 @@ body {
 .exercise-dots {
   width: 100%;
   border-bottom: 1px dotted var(--rule);
-  height: 1px;
-  margin: 0 6px;
+  height: 0;
+  margin: 0 6px 0 6px;
 }
 
 .rep-boxes {
@@ -604,22 +605,20 @@ body {
 .rep-box {
   width: 16px;
   height: 16px;
-  border: 1.5px solid var(--ink);
+  border: 1px solid var(--muted);
   border-radius: 2px;
   background: var(--paper);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--muted);
-  opacity: 0.8;
+  color: var(--rule);
   font-family: var(--mono);
   font-size: 6.5pt;
 }
 
 .weight-line {
-  border-bottom: 1px dotted var(--rule);
-  color: var(--muted);
-  opacity: 0.8;
+  border-bottom: 1px solid var(--rule);
+  color: var(--rule);
   font-family: var(--mono);
   font-size: 6.5pt;
   line-height: .9;
@@ -632,7 +631,8 @@ body {
 .weight-label {
   font-family: var(--mono);
   font-size: 7.5pt;
-  color: var(--ink);
+  color: var(--muted);
+  opacity: 0.6;
   margin-left: 2px;
   margin-right: 4px;
   display: flex;
@@ -741,12 +741,47 @@ body {
 .session-card.density-dense .rep-box {
   width: 13px;
   height: 13px;
-  border-width: 1px;
   font-size: 4.5pt;
 }
 
 .session-card.density-dense .notes-box {
   display: none;
+}
+
+/* Ultra (8+ exercises): stripped to pure function — no prompt, no notes, minimal row height */
+.session-card.density-ultra .story-prompt,
+.session-card.density-ultra .frag-ref,
+.session-card.density-ultra .notes-box {
+  display: none;
+}
+
+.session-card.density-ultra .session-header {
+  font-size: 7pt;
+  padding: 3px 8px;
+}
+
+.session-card.density-ultra .exercise-table td {
+  padding: 0.5px 0;
+  font-size: 6pt;
+}
+
+.session-card.density-ultra .exercise-name {
+  font-size: 6.5pt;
+}
+
+.session-card.density-ultra .weight-line {
+  min-width: 24px;
+  font-size: 4.5pt;
+}
+
+.session-card.density-ultra .weight-label {
+  font-size: 5.5pt;
+}
+
+.session-card.density-ultra .rep-box {
+  width: 11px;
+  height: 11px;
+  font-size: 4pt;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -780,13 +815,14 @@ body {
 .rp-content {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: min-content 1fr;
+  grid-template-rows: auto auto;
   grid-template-areas:
     "cipher map"
     "oracle oracle";
   gap: 6px;
   flex: 1;
   min-height: 0;
+  align-content: start;
 }
 
 /* Zone containers */
