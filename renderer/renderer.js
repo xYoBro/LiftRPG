@@ -1291,6 +1291,191 @@
     return p;
   }
 
+  // ── BOOKLET VALIDATION ────────────────────────────────────
+  // Structural checks beyond crash-prevention. Errors block render;
+  // warnings log to console and show count in status bar.
+
+  function validateBooklet(data) {
+    var errors = [];
+    var warnings = [];
+    var weeks = data.weeks;
+    var meta = data.meta;
+
+    // ── Hard errors (block render) ──────────────────────────
+
+    // 1. weekCount must match weeks array length
+    if (meta.weekCount != null && meta.weekCount !== weeks.length) {
+      errors.push('meta.weekCount (' + meta.weekCount + ') does not match weeks array length (' + weeks.length + ')');
+    }
+
+    // 2. Exactly one boss week, must be final
+    var bossIndices = [];
+    weeks.forEach(function (wk, i) { if (wk.isBossWeek) bossIndices.push(i); });
+    if (bossIndices.length === 0) {
+      errors.push('No boss week found (exactly one week must have isBossWeek: true)');
+    } else if (bossIndices.length > 1) {
+      errors.push('Multiple boss weeks found at indices ' + bossIndices.join(', ') + ' (exactly one allowed)');
+    } else if (bossIndices[0] !== weeks.length - 1) {
+      errors.push('Boss week is at index ' + bossIndices[0] + ' but must be the final week (index ' + (weeks.length - 1) + ')');
+    }
+
+    // 3. Non-boss weeks must have fieldOps
+    weeks.forEach(function (wk, i) {
+      if (!wk.isBossWeek && !wk.fieldOps) {
+        errors.push('Week ' + (i + 1) + ' is not a boss week but has no fieldOps');
+      }
+    });
+
+    // 4. Boss week must have bossEncounter
+    weeks.forEach(function (wk, i) {
+      if (wk.isBossWeek && !wk.bossEncounter) {
+        errors.push('Week ' + (i + 1) + ' is a boss week but has no bossEncounter');
+      }
+    });
+
+    // ── Warnings (render continues) ─────────────────────────
+
+    // 5. totalSessions mismatch
+    if (meta.totalSessions != null) {
+      var actualTotal = 0;
+      weeks.forEach(function (wk) { actualTotal += (wk.sessions ? wk.sessions.length : 0); });
+      if (meta.totalSessions !== actualTotal) {
+        warnings.push('meta.totalSessions (' + meta.totalSessions + ') does not match actual session count (' + actualTotal + ')');
+      }
+    }
+
+    // 6. weeklyComponent.type consistency
+    if (meta.weeklyComponentType) {
+      weeks.forEach(function (wk, i) {
+        if (!wk.isBossWeek && wk.weeklyComponent && wk.weeklyComponent.type &&
+            wk.weeklyComponent.type !== meta.weeklyComponentType) {
+          warnings.push('Week ' + (i + 1) + ' weeklyComponent.type "' + wk.weeklyComponent.type + '" does not match meta.weeklyComponentType "' + meta.weeklyComponentType + '"');
+        }
+      });
+    }
+
+    // 7. Binary choice: exactly one, not on boss week
+    var choiceCount = 0;
+    var choiceOnBoss = false;
+    weeks.forEach(function (wk) {
+      (wk.sessions || []).forEach(function (s) {
+        if (s.binaryChoice) {
+          choiceCount++;
+          if (wk.isBossWeek) choiceOnBoss = true;
+        }
+      });
+    });
+    if (choiceCount === 0) {
+      warnings.push('No binaryChoice found in any session (exactly one expected)');
+    } else if (choiceCount > 1) {
+      warnings.push('Found ' + choiceCount + ' binaryChoice entries (exactly one expected)');
+    }
+    if (choiceOnBoss) {
+      warnings.push('binaryChoice found on boss week (should be at midpoint, never on boss)');
+    }
+
+    // 8-9. Fragment ID uniqueness + fragmentRef resolution
+    var fragments = data.fragments || [];
+    var fragIds = {};
+    fragments.forEach(function (f) {
+      if (f.id) {
+        if (fragIds[f.id]) {
+          warnings.push('Duplicate fragment ID: "' + f.id + '"');
+        }
+        fragIds[f.id] = true;
+      }
+    });
+    weeks.forEach(function (wk, wi) {
+      (wk.sessions || []).forEach(function (s, si) {
+        if (s.fragmentRef && !fragIds[s.fragmentRef]) {
+          warnings.push('Week ' + (wi + 1) + ' session ' + (si + 1) + ' fragmentRef "' + s.fragmentRef + '" does not resolve to any fragment');
+        }
+      });
+      // Also check oracle table entries for fragmentRef
+      var cipher = wk.fieldOps && wk.fieldOps.cipher;
+      var oracle = (wk.fieldOps && wk.fieldOps.oracleTable) || {};
+      (oracle.entries || []).forEach(function (e) {
+        if (e.fragmentRef && !fragIds[e.fragmentRef]) {
+          warnings.push('Week ' + (wi + 1) + ' oracle entry fragmentRef "' + e.fragmentRef + '" does not resolve to any fragment');
+        }
+      });
+    });
+
+    // 10-11. componentInputs validation
+    var bossWeek = bossIndices.length === 1 ? weeks[bossIndices[0]] : null;
+    if (bossWeek && bossWeek.bossEncounter) {
+      var boss = bossWeek.bossEncounter;
+      var inputs = boss.componentInputs;
+      if (inputs) {
+        var expectedLen = weeks.length - 1;
+        if (inputs.length !== expectedLen) {
+          warnings.push('bossEncounter.componentInputs has ' + inputs.length + ' entries, expected ' + expectedLen + ' (one per non-boss week)');
+        }
+        // Check values match prior weeklyComponent.values
+        var priorValues = [];
+        weeks.forEach(function (wk) {
+          if (!wk.isBossWeek && wk.weeklyComponent) {
+            priorValues.push(wk.weeklyComponent.value);
+          }
+        });
+        for (var ci = 0; ci < Math.min(inputs.length, priorValues.length); ci++) {
+          if (inputs[ci] !== priorValues[ci] && String(inputs[ci]) !== String(priorValues[ci])) {
+            warnings.push('componentInputs[' + ci + '] = "' + inputs[ci] + '" but weeklyComponent.value for week ' + (ci + 1) + ' = "' + priorValues[ci] + '"');
+          }
+        }
+      }
+    }
+
+    // 12. Password plaintext leak scan
+    if (meta.passwordPlaintext && meta.passwordPlaintext.length >= 3) {
+      var pw = meta.passwordPlaintext.toUpperCase();
+      var leakFound = false;
+      function scanForLeak(text, location) {
+        if (text && typeof text === 'string' && text.toUpperCase().indexOf(pw) !== -1) {
+          if (!leakFound) {
+            warnings.push('passwordPlaintext "' + pw + '" found in printed content: ' + location);
+            leakFound = true;
+          }
+        }
+      }
+      weeks.forEach(function (wk, wi) {
+        scanForLeak(wk.title, 'week ' + (wi + 1) + ' title');
+        (wk.sessions || []).forEach(function (s, si) {
+          scanForLeak(s.storyPrompt, 'week ' + (wi + 1) + ' session ' + (si + 1) + ' storyPrompt');
+        });
+        if (wk.bossEncounter) {
+          scanForLeak(wk.bossEncounter.narrative, 'boss narrative');
+          scanForLeak(wk.bossEncounter.mechanismDescription, 'boss mechanismDescription');
+        }
+        if (wk.fieldOps && wk.fieldOps.cipher) {
+          var cb = wk.fieldOps.cipher.body;
+          if (cb) scanForLeak(cb.displayText, 'week ' + (wi + 1) + ' cipher displayText');
+        }
+      });
+      fragments.forEach(function (f) {
+        scanForLeak(f.content, 'fragment ' + (f.id || '?'));
+      });
+    }
+
+    // 13. Oracle entry counts
+    weeks.forEach(function (wk, wi) {
+      var oracle = (wk.fieldOps && wk.fieldOps.oracleTable) || {};
+      var entries = oracle.entries || [];
+      if (oracle.mode === 'simple' && entries.length !== 11) {
+        warnings.push('Week ' + (wi + 1) + ' oracle mode "simple" has ' + entries.length + ' entries (expected 11)');
+      } else if (oracle.mode === 'full' && entries.length !== 10) {
+        warnings.push('Week ' + (wi + 1) + ' oracle mode "full" has ' + entries.length + ' entries (expected 10)');
+      }
+    });
+
+    // 14. Boss week value should be null
+    if (bossWeek && bossWeek.weeklyComponent && bossWeek.weeklyComponent.value != null) {
+      warnings.push('Boss week weeklyComponent.value should be null, got "' + bossWeek.weeklyComponent.value + '"');
+    }
+
+    return { errors: errors, warnings: warnings };
+  }
+
   // ── MAIN ORCHESTRATOR ──────────────────────────────────────
 
   function render(data) {
@@ -1320,6 +1505,18 @@
         throw new Error('Render failed: weeks[' + i + '].sessions must be an array');
       }
     });
+    // ─────────────────────────────────────────────────────────────
+
+    // ── Structural validation — catch schema violations ──────────
+    var validation = validateBooklet(data);
+    if (validation.errors.length > 0) {
+      throw new Error('Validation failed: ' + validation.errors[0]);
+    }
+    window._lastValidationWarnings = validation.warnings;
+    if (validation.warnings.length > 0) {
+      console.warn('⚠ Booklet validation warnings (' + validation.warnings.length + '):');
+      validation.warnings.forEach(function (w) { console.warn('  • ' + w); });
+    }
     // ─────────────────────────────────────────────────────────────
 
     // Apply visual theme if present
@@ -1553,9 +1750,14 @@
       container.querySelectorAll('.booklet-page').forEach(enforcePageFit);
 
       printBtn.disabled = false;
-      status.textContent = 'Rendered ' + pages.length + ' pages (' +
+      var statusMsg = 'Rendered ' + pages.length + ' pages (' +
         (jsonData.weeks ? jsonData.weeks.length : 0) + ' weeks, ' +
         (jsonData.fragments ? jsonData.fragments.length : 0) + ' fragments) in ' + mode + ' mode';
+      var vw = window._lastValidationWarnings;
+      if (vw && vw.length > 0) {
+        statusMsg += ' \u26A0 ' + vw.length + ' validation warning' + (vw.length > 1 ? 's' : '') + ' (see console)';
+      }
+      status.textContent = statusMsg;
 
       // Show encrypt row if endings need encryption, or unlock row if already encrypted
       if (needsEncryption(jsonData)) {

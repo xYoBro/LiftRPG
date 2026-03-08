@@ -314,6 +314,8 @@
     '- passwordPlaintext: a meaningful word in the world, 4-12 chars, uppercase alphanumeric only.',
     '- The decodingKey on the bossEncounter converts recorded values to letters. Design it as a revelation moment, not an instruction sheet.',
     '- Generate endings content, then encrypt with AES-256-GCM keyed on passwordPlaintext, store as base64url in passwordEncryptedEnding.',
+    '- Prefer passwords that become legible only when the boss document teaches the player how to read what they already recorded.',
+    '- Avoid passwords that are the most guessable noun in the setting. The password should be inevitable in retrospect, not predictable in advance.',
     '',
     '## Convergence Design',
     '',
@@ -323,6 +325,7 @@
     '- The moment of decoding should feel like a narrative revelation — the values suddenly have meaning.',
     '- The patterns below describe how the DECODED LETTERS assemble into the password.',
     '- The boss convergenceProof must demonstrate: (a) raw values, (b) decoded via decodingKey to letters, (c) assembled into passwordPlaintext.',
+    '- Prefer boss convergence that adds one more transform beyond simple reveal: reorder, filter, spatial lookup, cross-reference.',
     '',
     '### Pattern 1: Sequential Assembly',
     '- Decoded letters concatenate in week order to form the password.',
@@ -383,7 +386,23 @@
     '## Exercise Data',
     '- Copy exercise data EXACTLY from the workout programme provided below.',
     '- Do not rename, reorder, or modify exercises.',
-    '- sets, repsPerSet, weightField, and notes come directly from the programme.'
+    '- sets, repsPerSet, weightField, and notes come directly from the programme.',
+    '',
+    '## Self-Verification',
+    '',
+    'Before returning JSON, verify every item:',
+    '- meta.weekCount === weeks.length',
+    '- meta.totalSessions === actual total of all session arrays',
+    '- weeklyComponent.type === meta.weeklyComponentType for every non-boss week',
+    '- Exactly one isBossWeek: true, on the final week only',
+    '- Exactly one binaryChoice in the entire block, at the midpoint week, never on boss week',
+    '- Boss week weeklyComponent.value is null; all others are non-null',
+    '- Every non-boss week has fieldOps; boss week has bossEncounter',
+    '- Every fragmentRef resolves to a real fragment ID; all fragment IDs are unique',
+    '- bossEncounter.componentInputs matches prior weekly weeklyComponent.values in order',
+    '- passwordPlaintext does not appear in any printed content (prompts, fragments, titles, labels)',
+    '- Pre-boss components do not form recognizable plaintext in collection order',
+    '- Oracle entry counts: simple mode = exactly 11, full mode = exactly 10; max 3 consequence entries per week'
   ].join('\n');
 
   /* ─── Public API ───────────────────────────────────────────────── */
