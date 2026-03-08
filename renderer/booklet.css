@@ -54,12 +54,35 @@ body {
   gap: 8px;
 }
 
-.app-logo {
+.app-back {
   font-family: var(--mono);
   font-size: 11pt;
   letter-spacing: .3em;
   color: var(--paper);
   font-weight: 700;
+  text-decoration: none;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  transition: opacity .2s;
+}
+
+.app-back:hover {
+  opacity: .7;
+}
+
+.back-chevron {
+  font-size: 16pt;
+  font-weight: 300;
+  line-height: 1;
+  margin-right: 2px;
+  opacity: .6;
+  transition: opacity .2s, transform .2s;
+}
+
+.app-back:hover .back-chevron {
+  opacity: 1;
+  transform: translateX(-2px);
 }
 
 .app-version {
