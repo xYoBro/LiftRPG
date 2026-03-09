@@ -848,6 +848,145 @@ body {
   padding-top: 6px;
 }
 
+/* ── Layout Family: Survey (map dominant) ─────────────── */
+.field-ops-right[data-layout="survey"] .rp-content {
+  grid-template-areas:
+    "map map"
+    "cipher oracle";
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 3fr 2fr;
+}
+
+.field-ops-right[data-layout="survey"] .oracle-zone {
+  border-top: none;
+  padding-top: 0;
+  border-left: 1px solid var(--rule);
+  padding-left: 6px;
+}
+
+.field-ops-right[data-layout="survey"] .map-zone {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 6px;
+}
+
+.field-ops-right[data-layout="survey"] .cipher-zone .puzzle-title {
+  font-size: 7pt;
+  margin-bottom: 1px;
+}
+
+.field-ops-right[data-layout="survey"] .cipher-zone .cipher-key,
+.field-ops-right[data-layout="survey"] .cipher-zone .position-sequence,
+.field-ops-right[data-layout="survey"] .cipher-zone .cipher-sequence {
+  font-size: 5.5pt;
+  line-height: 1.3;
+}
+
+.field-ops-right[data-layout="survey"] .cipher-zone .cipher-instruction {
+  font-size: 5.5pt;
+}
+
+.field-ops-right[data-layout="survey"] .cipher-zone .password-extract {
+  font-size: 5.5pt;
+}
+
+/* ── Layout Family: Console (cipher dominant) ─────────── */
+.field-ops-right[data-layout="console"] .rp-content {
+  grid-template-areas:
+    "cipher map"
+    "cipher oracle";
+  grid-template-columns: 3fr 2fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.field-ops-right[data-layout="console"] .map-zone {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 4px;
+}
+
+.field-ops-right[data-layout="console"] .oracle-zone {
+  border-top: none;
+  padding-top: 0;
+}
+
+/* Oracle as log strip: single column, monospace, tighter */
+.field-ops-right[data-layout="console"] .oracle-entries {
+  column-count: 1;
+}
+
+.field-ops-right[data-layout="console"] .oracle-entry {
+  padding: 2px 0;
+}
+
+.field-ops-right[data-layout="console"] .oracle-text {
+  font-family: var(--mono);
+  font-size: 6pt;
+  line-height: 1.35;
+}
+
+.field-ops-right[data-layout="console"] .oracle-case-num {
+  font-size: 5.5pt;
+}
+
+/* ── Layout Family: Dossier (oracle dominant) ─────────── */
+.field-ops-right[data-layout="dossier"] .rp-content {
+  grid-template-areas:
+    "oracle map"
+    "cipher cipher";
+  grid-template-columns: 3fr 2fr;
+  grid-template-rows: 3fr 1fr;
+}
+
+.field-ops-right[data-layout="dossier"] .oracle-zone {
+  border-top: none;
+  padding-top: 0;
+}
+
+.field-ops-right[data-layout="dossier"] .map-zone {
+  border-left: 1px solid var(--rule);
+  padding-left: 6px;
+}
+
+/* Oracle as evidence entries: single column, generous spacing */
+.field-ops-right[data-layout="dossier"] .oracle-entries {
+  column-count: 1;
+}
+
+.field-ops-right[data-layout="dossier"] .oracle-entry {
+  padding: 4px 0;
+}
+
+.field-ops-right[data-layout="dossier"] .oracle-text {
+  font-size: 7pt;
+  line-height: 1.5;
+}
+
+/* Cipher as attachment: border + diegetic label */
+.field-ops-right[data-layout="dossier"] .cipher-zone {
+  border-top: 1px solid var(--rule);
+  padding-top: 6px;
+  position: relative;
+}
+
+.field-ops-right[data-layout="dossier"] .cipher-zone::before {
+  content: var(--cipher-attachment-label, "ATTACHMENT");
+  position: absolute;
+  top: -1px;
+  right: 0;
+  font-family: var(--mono);
+  font-size: 5pt;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--paper);
+  padding: 0 4px;
+  transform: translateY(-50%);
+}
+
+.field-ops-right[data-layout="dossier"] .cipher-zone .puzzle-title {
+  font-size: 7pt;
+  margin-bottom: 1px;
+}
+
 /* ── Cipher ──────────────────────────────────────────── */
 .puzzle-title {
   font-family: var(--display);
@@ -2884,6 +3023,7 @@ body.demo-mode .demo-error {
     radial-gradient(circle at 50% 45%, transparent 34%, rgba(0,0,0,0.15) 100%),
     linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.05));
   --theme-page-noise-opacity: 0.14;
+  --cipher-attachment-label: "EXHIBIT A";
 }
 
 /* Noir refinements */
@@ -2989,6 +3129,7 @@ body.demo-mode .demo-error {
   --theme-field-rule: 0.75px solid var(--rule);
   --theme-page-overlay: none;
   --theme-page-noise-opacity: 0;
+  --cipher-attachment-label: "APPENDIX";
 }
 
 /* Literary refinements — small-caps, no borders on docs */
@@ -3186,6 +3327,7 @@ body.demo-mode .demo-error {
   --theme-page-overlay:
     radial-gradient(ellipse at 30% 70%, rgba(139,119,82,0.09), transparent 70%);
   --theme-page-noise-opacity: 0.11;
+  --cipher-attachment-label: "ENCLOSURE";
 }
 
 /* Confessional refinements */
