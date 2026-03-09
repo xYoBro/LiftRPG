@@ -836,16 +836,22 @@ body {
 /* Zone containers */
 .cipher-zone {
   grid-area: cipher;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .map-zone {
   grid-area: map;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .oracle-zone {
   grid-area: oracle;
   border-top: 1px solid var(--rule);
   padding-top: 6px;
+  overflow: hidden;
+  min-height: 0;
 }
 
 /* ── Layout Family: Survey (map dominant) ─────────────── */
@@ -854,7 +860,7 @@ body {
     "map map"
     "cipher oracle";
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: 3fr 2fr;
+  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
 }
 
 .field-ops-right[data-layout="survey"] .oracle-zone {
@@ -895,7 +901,7 @@ body {
     "cipher map"
     "cipher oracle";
   grid-template-columns: 3fr 2fr;
-  grid-template-rows: 1fr 1fr;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .field-ops-right[data-layout="console"] .map-zone {
@@ -933,7 +939,7 @@ body {
     "oracle map"
     "cipher cipher";
   grid-template-columns: 3fr 2fr;
-  grid-template-rows: 3fr 1fr;
+  grid-template-rows: minmax(0, 3fr) minmax(0, 1fr);
 }
 
 .field-ops-right[data-layout="dossier"] .oracle-zone {
