@@ -875,44 +875,21 @@ body {
   padding-left: 6px;
 }
 
-.field-ops-right[data-layout="survey"] .cipher-zone .puzzle-title {
-  font-size: 7pt;
-  margin-bottom: 1px;
+/* Survey cipher: compact — override zone variables */
+.field-ops-right[data-layout="survey"] .cipher-zone {
+  --cipher-title-size: 7pt;
+  --cipher-body-size: 5.5pt;
+  --cipher-label-size: 5.5pt;
+  --cipher-body-lh: 1.3;
 }
 
-.field-ops-right[data-layout="survey"] .cipher-zone .cipher-key,
-.field-ops-right[data-layout="survey"] .cipher-zone .position-sequence,
-.field-ops-right[data-layout="survey"] .cipher-zone .cipher-sequence {
-  font-size: 5.5pt;
-  line-height: 1.3;
-}
-
-.field-ops-right[data-layout="survey"] .cipher-zone .cipher-instruction {
-  font-size: 5.5pt;
-}
-
-.field-ops-right[data-layout="survey"] .cipher-zone .password-extract {
-  font-size: 5.5pt;
-}
-
-/* Survey oracle: compact for compressed bottom row */
-.field-ops-right[data-layout="survey"] .oracle-text {
-  font-size: 6pt;
-  line-height: 1.25;
-}
-
-.field-ops-right[data-layout="survey"] .oracle-case-num {
-  font-size: 5.5pt;
-}
-
-.field-ops-right[data-layout="survey"] .oracle-entry {
-  padding: 1px 0;
-}
-
-.field-ops-right[data-layout="survey"] .oracle-instruction {
-  font-size: 6pt;
-  line-height: 1.25;
-  margin-bottom: 2px;
+/* Survey oracle: compact — override zone variables, not element styles */
+.field-ops-right[data-layout="survey"] .oracle-zone {
+  --oracle-text-size: 6pt;
+  --oracle-text-lh: 1.25;
+  --oracle-num-size: 5.5pt;
+  --oracle-instruction-size: 6pt;
+  --oracle-entry-padding: 1px 0;
 }
 
 /* ── Layout Family: Console (cipher dominant) ─────────── */
@@ -934,23 +911,17 @@ body {
   padding-top: 0;
 }
 
-/* Oracle as log strip: single column, monospace, tighter */
-.field-ops-right[data-layout="console"] .oracle-entries {
-  column-count: 1;
-}
-
-.field-ops-right[data-layout="console"] .oracle-entry {
-  padding: 2px 0;
+/* Console oracle: log strip — override zone variables */
+.field-ops-right[data-layout="console"] .oracle-zone {
+  --oracle-text-size: 6pt;
+  --oracle-text-lh: 1.35;
+  --oracle-num-size: 5.5pt;
+  --oracle-entry-padding: 2px 0;
+  --oracle-columns: 1;
 }
 
 .field-ops-right[data-layout="console"] .oracle-text {
   font-family: var(--mono);
-  font-size: 6pt;
-  line-height: 1.35;
-}
-
-.field-ops-right[data-layout="console"] .oracle-case-num {
-  font-size: 5.5pt;
 }
 
 /* ── Layout Family: Dossier (oracle dominant) ─────────── */
@@ -972,18 +943,12 @@ body {
   padding-left: 6px;
 }
 
-/* Oracle as evidence entries: single column, generous spacing */
-.field-ops-right[data-layout="dossier"] .oracle-entries {
-  column-count: 1;
-}
-
-.field-ops-right[data-layout="dossier"] .oracle-entry {
-  padding: 4px 0;
-}
-
-.field-ops-right[data-layout="dossier"] .oracle-text {
-  font-size: 7pt;
-  line-height: 1.5;
+/* Dossier oracle: evidence entries — override zone variables */
+.field-ops-right[data-layout="dossier"] .oracle-zone {
+  --oracle-text-size: 7pt;
+  --oracle-text-lh: 1.5;
+  --oracle-entry-padding: 4px 0;
+  --oracle-columns: 1;
 }
 
 /* Cipher as attachment: border + diegetic label */
@@ -1008,9 +973,12 @@ body {
   transform: translateY(-50%);
 }
 
-.field-ops-right[data-layout="dossier"] .cipher-zone .puzzle-title {
-  font-size: 7pt;
-  margin-bottom: 1px;
+/* Dossier cipher: attachment — override zone variables */
+.field-ops-right[data-layout="dossier"] .cipher-zone {
+  --cipher-title-size: 7pt;
+  --cipher-body-size: 6pt;
+  --cipher-label-size: 5.5pt;
+  --cipher-body-lh: 1.3;
 }
 
 /* ── Boss Document-First Layout ───────────────────────── */
@@ -1056,10 +1024,18 @@ body {
 }
 
 /* ── Cipher ──────────────────────────────────────────── */
+/* Cipher zone typography — variable-driven for layout family override. */
+.cipher-zone {
+  --cipher-title-size: 9pt;
+  --cipher-body-size: 8pt;
+  --cipher-label-size: 7pt;
+  --cipher-body-lh: 1.5;
+}
+
 .puzzle-title {
   font-family: var(--display);
   font-style: italic;
-  font-size: 9pt;
+  font-size: var(--cipher-title-size);
   color: var(--ink);
   margin-bottom: 2px;
   line-height: 1.15;
@@ -1067,8 +1043,8 @@ body {
 
 .cipher-sequence {
   font-family: var(--mono);
-  font-size: 8pt;
-  line-height: 1.5;
+  font-size: var(--cipher-body-size);
+  line-height: var(--cipher-body-lh);
   color: var(--ink);
   margin-bottom: 4px;
   word-break: break-all;
@@ -1080,8 +1056,8 @@ body {
 
 .key-grid {
   font-family: var(--mono);
-  font-size: 7.5pt;
-  line-height: 1.5;
+  font-size: var(--cipher-label-size);
+  line-height: var(--cipher-body-lh);
   color: var(--ink);
   white-space: pre-wrap;
 }
@@ -1092,15 +1068,15 @@ body {
 
 .pos-numbers {
   font-family: var(--mono);
-  font-size: 8pt;
-  line-height: 1.5;
+  font-size: var(--cipher-body-size);
+  line-height: var(--cipher-body-lh);
   color: var(--ink);
   letter-spacing: .08em;
 }
 
 .cipher-instruction {
   font-family: var(--mono);
-  font-size: 7pt;
+  font-size: var(--cipher-label-size);
   line-height: 1.35;
   color: var(--muted);
   margin-bottom: 4px;
@@ -1126,7 +1102,7 @@ body {
 /* Password extract instruction */
 .password-extract {
   font-family: var(--mono);
-  font-size: 7.5pt;
+  font-size: var(--cipher-label-size);
   line-height: 1.35;
   color: var(--ink);
   border-left: 2px solid var(--accent);
@@ -1401,17 +1377,28 @@ body {
   margin-bottom: 6px;
 }
 
+/* Oracle zone typography — variable-driven for layout family override.
+   Layout families set these properties; themes can further override. */
+.oracle-zone {
+  --oracle-text-size: 6.5pt;
+  --oracle-text-lh: 1.4;
+  --oracle-num-size: 6pt;
+  --oracle-instruction-size: 7pt;
+  --oracle-entry-padding: 3px 0;
+  --oracle-columns: 2;
+}
+
 .oracle-instruction {
   font-family: var(--serif);
-  font-size: 7pt;
+  font-size: var(--oracle-instruction-size);
   font-style: italic;
   color: var(--muted);
   margin-bottom: 4px;
-  line-height: 1.4;
+  line-height: var(--oracle-text-lh);
 }
 
 .oracle-entries {
-  column-count: 2;
+  column-count: var(--oracle-columns);
   column-gap: 12px;
 }
 
@@ -1419,7 +1406,7 @@ body {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  padding: 3px 0;
+  padding: var(--oracle-entry-padding);
   border-bottom: 1px dotted var(--rule);
   break-inside: avoid;
 }
@@ -1430,7 +1417,7 @@ body {
 
 .oracle-case-num {
   font-family: var(--mono);
-  font-size: 6pt;
+  font-size: var(--oracle-num-size);
   color: var(--muted);
   white-space: nowrap;
   letter-spacing: .04em;
@@ -1438,14 +1425,14 @@ body {
 
 .oracle-text {
   font-family: var(--serif);
-  font-size: 6.5pt;
-  line-height: 1.4;
+  font-size: var(--oracle-text-size);
+  line-height: var(--oracle-text-lh);
   color: var(--ink);
   flex: 1;
 }
 
 .oracle-case .frag-ref {
-  font-size: 6.5pt;
+  font-size: var(--oracle-text-size);
   text-align: right;
   margin: 0;
   white-space: nowrap;
