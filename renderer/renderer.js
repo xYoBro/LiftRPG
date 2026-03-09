@@ -96,6 +96,14 @@
     return '#' + ((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1);
   }
 
+  /** Normalize a camelCase or mixed-case token to kebab-case CSS class */
+  function normalizeThemeToken(value) {
+    return String(value || '')
+      .replace(/([a-z])([A-Z])/g, '$1-$2')
+      .replace(/[^a-zA-Z0-9]+/g, '-')
+      .toLowerCase();
+  }
+
   /** Parse multiline cipher text into structured sections */
   function parseCipherDisplay(displayText) {
     if (!displayText) return { lines: [] };
@@ -1213,7 +1221,7 @@
 
       // Document
       var docType = frag.documentType || 'memo';
-      var docTypeClass = docType.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+      var docTypeClass = normalizeThemeToken(docType);
       var doc = el('div', 'fragment-doc ' + docTypeClass);
 
       doc.appendChild(txt('div', 'fragment-doc-type', (docTypeClass || '').replace(/-/g, ' ')));
@@ -1357,7 +1365,7 @@
     var p = page('notes');
     p.classList.add('notes-page');
 
-    var header = txt('div', 'notes-page-header', 'Field Notes');
+    var header = txt('div', 'notes-page-header', 'Notes');
     p.appendChild(header);
 
     var ruled = el('div', 'notes-ruled-area');
@@ -1611,25 +1619,30 @@
     }
     // ─────────────────────────────────────────────────────────────
 
-    // Apply visual theme if present
+    // Apply visual theme — default to pastoral if missing
     var themeContainer = document.getElementById('booklet-container');
-    if (themeContainer && data.theme) {
-      var arch = data.theme.visualArchetype;
-      if (arch) themeContainer.setAttribute('data-treatment', arch);
-      var pal = data.theme.palette;
-      if (pal) {
-        if (pal.ink)    themeContainer.style.setProperty('--ink', pal.ink);
-        if (pal.paper)  themeContainer.style.setProperty('--paper', pal.paper);
-        if (pal.accent) themeContainer.style.setProperty('--accent', pal.accent);
-        if (pal.muted)  themeContainer.style.setProperty('--muted', pal.muted);
-        if (pal.rule)   themeContainer.style.setProperty('--rule', pal.rule);
-        if (pal.fog)    themeContainer.style.setProperty('--fog', pal.fog);
-        // Derive --warm and --card from fog and paper
-        if (pal.fog && pal.paper) {
-          themeContainer.style.setProperty('--warm', mixHex(pal.paper, pal.fog, 0.35));
-          themeContainer.style.setProperty('--card', mixHex(pal.paper, pal.fog, 0.25));
-        }
-      }
+    if (themeContainer) {
+      var theme = data.theme || {};
+      var arch = theme.visualArchetype || 'pastoral';
+      themeContainer.setAttribute('data-treatment', arch);
+      var pal = theme.palette || {};
+      var ink    = pal.ink    || '#181714';
+      var paper  = pal.paper  || '#f1ebe0';
+      var accent = pal.accent || '#8b2a2a';
+      var muted  = pal.muted  || '#857d72';
+      var rule   = pal.rule   || '#ccc5b6';
+      var fog    = pal.fog    || '#ddd6c5';
+      themeContainer.style.setProperty('--ink', ink);
+      themeContainer.style.setProperty('--paper', paper);
+      themeContainer.style.setProperty('--accent', accent);
+      themeContainer.style.setProperty('--muted', muted);
+      themeContainer.style.setProperty('--rule', rule);
+      themeContainer.style.setProperty('--fog', fog);
+      themeContainer.style.setProperty('--warm', mixHex(paper, fog, 0.35));
+      themeContainer.style.setProperty('--card', mixHex(paper, fog, 0.25));
+      themeContainer.style.setProperty('--paper-2', mixHex(paper, fog, 0.52));
+      themeContainer.style.setProperty('--line-soft', mixHex(ink, paper, 0.82));
+      themeContainer.style.setProperty('--accent-soft', mixHex(accent, paper, 0.78));
     }
 
     var pages = [];
@@ -1673,7 +1686,7 @@
     function fragWeight(frag) {
       var text = frag.bodyText || frag.body || frag.content || '';
       var len = text.length;
-      var type = (frag.documentType || 'memo').replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+      var type = normalizeThemeToken(frag.documentType || 'memo');
       if (type === 'field-note' || type === 'inspection') len *= 1.3;  // larger mono font
       if (type === 'transcript') len *= 1.2;   // dialogue spacing
       if (type === 'anomaly') len *= 1.15;     // extra border/padding

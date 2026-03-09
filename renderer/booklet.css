@@ -20,9 +20,17 @@
   --rule: #ccc5b6;
   --warm: #e8dfc8;
   --card: #ece6d8;
-  --mono: 'Share Tech Mono', monospace;
+  /* Font stacks — upgraded families with legacy fallbacks */
+  --mono: 'IBM Plex Mono', 'Share Tech Mono', monospace;
   --serif: 'Libre Baskerville', Georgia, serif;
   --display: 'Playfair Display', Georgia, serif;
+  --sans: 'IBM Plex Sans', Arial, sans-serif;
+  --condensed: 'IBM Plex Sans Condensed', 'Arial Narrow', sans-serif;
+  --expanded: 'Archivo Expanded', 'Arial Black', sans-serif;
+  /* Legacy stacks — pastoral uses these directly */
+  --legacy-mono: 'Share Tech Mono', monospace;
+  --legacy-serif: 'Libre Baskerville', Georgia, serif;
+  --legacy-display: 'Playfair Display', Georgia, serif;
   --safe-inset: 24px;
 }
 
@@ -545,7 +553,7 @@ body {
   border-left: 1.5px solid var(--accent);
   padding: 2px 0 2px 10px;
   margin-bottom: 3px;
-  min-height: 0;
+  min-height: 28px;
   flex-shrink: 1;
   overflow: hidden;
 }
@@ -604,8 +612,8 @@ body {
 }
 
 .rep-box {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border: 1px solid var(--muted);
   border-radius: 2px;
   background: var(--paper);
@@ -633,7 +641,7 @@ body {
   font-family: var(--mono);
   font-size: 7.5pt;
   color: var(--muted);
-  opacity: 0.6;
+  font-weight: normal;
   margin-left: 2px;
   margin-right: 4px;
   display: flex;
@@ -643,7 +651,7 @@ body {
 
 /* Notes Box */
 .notes-box {
-  min-height: 24px;
+  min-height: 16px;
   border: 1px solid var(--rule);
   border-radius: 3px;
   background: var(--paper);
@@ -699,14 +707,14 @@ body {
 }
 
 .session-card.density-compact .rep-box {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   font-size: 5pt;
 }
 
 .session-card.density-compact .notes-box {
   height: auto;
-  min-height: 16px;
+  min-height: 12px;
 }
 
 /* Dense (6+ exercises): no notes box, minimal prompt */
@@ -740,8 +748,8 @@ body {
 }
 
 .session-card.density-dense .rep-box {
-  width: 13px;
-  height: 13px;
+  width: 15px;
+  height: 15px;
   font-size: 4.5pt;
 }
 
@@ -780,8 +788,8 @@ body {
 }
 
 .session-card.density-ultra .rep-box {
-  width: 11px;
-  height: 11px;
+  width: 12px;
+  height: 12px;
   font-size: 4pt;
 }
 
@@ -1917,24 +1925,28 @@ body {
 
 .notes-page-header {
   font-family: var(--mono);
-  font-size: 7pt;
-  letter-spacing: .18em;
+  font-size: 6pt;
+  letter-spacing: .22em;
   text-transform: uppercase;
   color: var(--muted);
-  margin-bottom: 8px;
+  opacity: 0.6;
+  margin-bottom: 6px;
 }
 
 .notes-ruled-area {
   flex: 1;
   border: 1px solid var(--rule);
-  border-radius: 4px;
+  border-radius: 3px;
   background: var(--paper);
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent, transparent 17px,
-    var(--rule) 17px, var(--rule) 18px
-  );
-  background-position: 0 4px;
+  /* Japanese stationery dot grid — radial dots at 18px intervals,
+     fainter than the box outline. Uses --muted (lighter than --rule)
+     at 0.5px — visible in print, whisper on screen */
+  background-image:
+    radial-gradient(circle, var(--muted) 0.5px, transparent 0.5px);
+  background-size: 18px 18px;
+  background-position: 9px 9px;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -2565,135 +2577,422 @@ body.demo-mode .demo-error {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   VISUAL TREATMENTS — Genre-Adaptive Page Atmosphere
-   Applied via data-treatment attribute on #booklet-container.
-   Each treatment is a complete visual language: texture,
-   borders, stamps, and typography.
-   LLM selects visualArchetype; CSS does the rest.
+   THEME SYSTEM V2 — CSS Variable Architecture
+   Base: variable defaults + element selectors on #booklet-container
+   Per-archetype: variable overrides via [data-treatment="xxx"]
+   Refinements: per-element targeted selectors for unique effects
    ══════════════════════════════════════════════════════════════ */
 
-/* -- INSTITUTIONAL: Government forms, heavy stamps, vignette -- */
-[data-treatment="institutional"] .booklet-page {
-  --texture-opacity: 1;
+/* ── Base variable defaults ──────────────────────────────────── */
+#booklet-container {
+  --paper-2: var(--warm);
+  --line-soft: var(--rule);
+  --accent-soft: var(--accent);
+  /* Title typography */
+  --theme-title-family: var(--display);
+  --theme-title-style: italic;
+  --theme-title-weight: 650;
+  --theme-title-case: none;
+  --theme-title-spacing: -0.012em;
+  /* Body typography */
+  --theme-body-family: var(--serif);
+  --theme-body-leading: 1.54;
+  /* Label typography */
+  --theme-label-family: var(--mono);
+  --theme-label-style: normal;
+  --theme-label-weight: 600;
+  --theme-label-case: uppercase;
+  --theme-label-spacing: 0.18em;
+  /* Surfaces */
+  --theme-panel-fill: transparent;
+  --theme-panel-border: 1px solid var(--rule);
+  --theme-panel-radius: 3px;
+  --theme-panel-shadow: none;
+  --theme-doc-fill: var(--card);
+  --theme-session-fill: transparent;
+  /* Borders */
+  --theme-prompt-fill: transparent;
+  --theme-prompt-border: 2px solid var(--accent);
+  --theme-header-border: 1.25px solid var(--ink);
+  --theme-box-border: 1.5px solid var(--ink);
+  --theme-field-rule: 1px solid var(--rule);
+  /* Page atmosphere */
+  --theme-page-overlay:
+    radial-gradient(circle at 82% 0%, rgba(0,0,0,0.03), transparent 42%);
+  --theme-page-noise-opacity: 0.06;
 }
 
-[data-treatment="institutional"] .booklet-page::before {
+/* ── Base selectors — consume variables ─────────────────────── */
+
+/* Page background + atmosphere */
+#booklet-container[data-treatment] .booklet-page {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+#booklet-container[data-treatment] .booklet-page::before {
+  opacity: var(--theme-page-noise-opacity);
   background-image:
-    radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.06) 100%),
+    var(--theme-page-overlay),
     url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.88' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
-  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.04);
-  opacity: 1;
 }
 
-[data-treatment="institutional"] .cover-designation {
-  border-width: 2px;
-  border-style: double;
-  border-color: var(--accent);
+/* Right-page warmth */
+#booklet-container[data-treatment] .booklet-page[data-page-type="field-ops"],
+#booklet-container[data-treatment] .booklet-page[data-page-type="boss"],
+#booklet-container[data-treatment] .booklet-page[data-page-type="overflow-doc"],
+#booklet-container[data-treatment] .booklet-page[data-page-type="rules-right"] {
+  background: var(--paper-2);
+}
+
+/* Label typography (designations, doc-type badges, mechanism labels) */
+#booklet-container[data-treatment] .cover-designation,
+#booklet-container[data-treatment] .fragment-doc-type,
+#booklet-container[data-treatment] .found-doc-type,
+#booklet-container[data-treatment] .boss-mechanism-label,
+#booklet-container[data-treatment] .boss-decoding-label,
+#booklet-container[data-treatment] .boss-convergence-label,
+#booklet-container[data-treatment] .password-final-label {
+  font-family: var(--theme-label-family);
+  font-style: var(--theme-label-style);
+  font-weight: var(--theme-label-weight);
+  text-transform: var(--theme-label-case);
+  letter-spacing: var(--theme-label-spacing);
+}
+
+/* Title typography (cover, week, boss, endings titles) */
+#booklet-container[data-treatment] .cover-title,
+#booklet-container[data-treatment] .rules-title,
+#booklet-container[data-treatment] .week-title,
+#booklet-container[data-treatment] .boss-title,
+#booklet-container[data-treatment] .password-assembly-title,
+#booklet-container[data-treatment] .endings-title {
+  font-family: var(--theme-title-family);
+  font-style: var(--theme-title-style);
+  font-weight: var(--theme-title-weight);
+  text-transform: var(--theme-title-case);
+  letter-spacing: var(--theme-title-spacing);
+}
+
+/* Body typography (narrative, fragments, rules text) */
+#booklet-container[data-treatment] .rules-body p,
+#booklet-container[data-treatment] .story-prompt,
+#booklet-container[data-treatment] .fragment-doc-body,
+#booklet-container[data-treatment] .found-doc-body,
+#booklet-container[data-treatment] .boss-narrative,
+#booklet-container[data-treatment] .boss-mechanism,
+#booklet-container[data-treatment] .boss-decoding-instruction,
+#booklet-container[data-treatment] .boss-convergence-instruction,
+#booklet-container[data-treatment] .password-assembly-subtitle,
+#booklet-container[data-treatment] .endings-content {
+  font-family: var(--theme-body-family);
+  line-height: var(--theme-body-leading);
+}
+
+/* Page headers */
+#booklet-container[data-treatment] .rules-header,
+#booklet-container[data-treatment] .page-header {
+  border-bottom: var(--theme-header-border);
+}
+
+/* Session cards */
+#booklet-container[data-treatment] .session-card {
+  background: var(--theme-session-fill);
+  border-radius: var(--theme-panel-radius);
+  box-shadow: var(--theme-panel-shadow);
+}
+
+/* Document panels (fragments, found docs, boss mechanisms) */
+#booklet-container[data-treatment] .fragment-doc,
+#booklet-container[data-treatment] .found-doc,
+#booklet-container[data-treatment] .boss-mechanism,
+#booklet-container[data-treatment] .boss-decoding-key,
+#booklet-container[data-treatment] .boss-convergence,
+#booklet-container[data-treatment] .password-final-assembly {
+  background: var(--theme-doc-fill);
+  border: var(--theme-panel-border);
+  border-radius: var(--theme-panel-radius);
+  box-shadow: var(--theme-panel-shadow);
+}
+
+/* Story prompt accent */
+#booklet-container[data-treatment] .story-prompt {
+  background: var(--theme-prompt-fill);
+  border-left: var(--theme-prompt-border);
+}
+
+/* Field rules (lines the user writes on — weight underline, dot leaders) */
+#booklet-container[data-treatment] .weight-line {
+  border-bottom: var(--theme-field-rule);
+}
+
+#booklet-container[data-treatment] .exercise-dots {
+  border-bottom: var(--theme-field-rule);
+  border-bottom-style: dotted;
+}
+
+/* Discrete input cells (single-value boxes: reps, password letters, decoded values) */
+#booklet-container[data-treatment] .password-log-box,
+#booklet-container[data-treatment] .password-assembly-value-cell,
+#booklet-container[data-treatment] .password-assembly-letter-cell,
+#booklet-container[data-treatment] .password-final-cell,
+#booklet-container[data-treatment] .boss-password-box,
+#booklet-container[data-treatment] .boss-decoded-box,
+#booklet-container[data-treatment] .boss-component-box,
+#booklet-container[data-treatment] .rep-box {
+  border: var(--theme-box-border);
+}
+
+/* Fragment body paragraph spacing */
+#booklet-container[data-treatment] .fragment-doc-body p,
+#booklet-container[data-treatment] .found-doc-body p {
+  margin-bottom: 0.42em;
+}
+
+/* ── PASTORAL: Eastern Shore treatment (exact replica) ────── */
+#booklet-container[data-treatment="pastoral"] {
+  --ink: #181714;
+  --paper: #f1ebe0;
+  --accent: #8b2a2a;
+  --muted: #857d72;
+  --rule: #ccc5b6;
+  --fog: #ddd6c5;
+  --warm: #e8dfc8;
+  --card: #ece6d8;
+  --paper-2: #e8dfc8;
+  --line-soft: #ccc5b6;
+  --accent-soft: #b26a6a;
+  --theme-title-family: var(--legacy-display);
+  --theme-title-style: italic;
+  --theme-title-weight: 700;
+  --theme-title-case: none;
+  --theme-title-spacing: -0.015em;
+  --theme-body-family: var(--legacy-serif);
+  --theme-body-leading: 1.56;
+  --theme-label-family: var(--legacy-mono);
+  --theme-label-style: normal;
+  --theme-label-weight: 600;
+  --theme-label-case: uppercase;
+  --theme-label-spacing: 0.18em;
+  --theme-panel-fill: transparent;
+  --theme-panel-border: 1px solid rgba(204,197,182,0.9);
+  --theme-panel-radius: 3px;
+  --theme-panel-shadow: none;
+  --theme-doc-fill: rgba(236,230,216,0.62);
+  --theme-session-fill: transparent;
+  --theme-prompt-fill: transparent;
+  --theme-prompt-border: 1.5px solid var(--accent-soft);
+  --theme-header-border: 1.5px solid var(--ink);
+  --theme-box-border: 1.5px solid var(--ink);
+  --theme-field-rule: 1px solid var(--rule);
+  --theme-page-overlay:
+    radial-gradient(circle at 78% 0%, rgba(0,0,0,0.025), transparent 40%);
+  --theme-page-noise-opacity: 0.05;
+}
+
+#booklet-container[data-treatment="pastoral"] .cover-designation {
+  color: var(--accent);
+}
+
+#booklet-container[data-treatment="pastoral"] .cover-title,
+#booklet-container[data-treatment="pastoral"] .boss-title,
+#booklet-container[data-treatment="pastoral"] .password-assembly-title {
+  line-height: 1.02;
+}
+
+#booklet-container[data-treatment="pastoral"] .session-card,
+#booklet-container[data-treatment="pastoral"] .fragment-doc,
+#booklet-container[data-treatment="pastoral"] .found-doc {
+  box-shadow: none;
+}
+
+#booklet-container[data-treatment="pastoral"] .fragment-doc.correspondence,
+#booklet-container[data-treatment="pastoral"] .found-doc.correspondence,
+#booklet-container[data-treatment="pastoral"] .fragment-doc.field-note,
+#booklet-container[data-treatment="pastoral"] .fragment-doc.memo {
+  background: transparent;
+  border-color: rgba(204,197,182,0.65);
+}
+
+#booklet-container[data-treatment="pastoral"] .story-prompt,
+#booklet-container[data-treatment="pastoral"] .rules-body p {
+  color: var(--ink);
+}
+
+#booklet-container[data-treatment="pastoral"] .fragment-doc-type,
+#booklet-container[data-treatment="pastoral"] .found-doc-type {
+  color: var(--accent);
+}
+
+/* ── INSTITUTIONAL: Government forms, heavy stamps, vignette ── */
+#booklet-container[data-treatment="institutional"] {
+  --theme-title-family: var(--condensed);
+  --theme-title-style: normal;
+  --theme-title-weight: 600;
+  --theme-title-case: uppercase;
+  --theme-title-spacing: 0.03em;
+  --theme-body-family: var(--serif);
+  --theme-label-family: var(--condensed);
+  --theme-label-spacing: 0.24em;
+  --theme-panel-fill: var(--paper-2);
+  --theme-doc-fill: var(--paper-2);
+  --theme-session-fill: transparent;
+  --theme-panel-border: 1px solid var(--line-soft);
+  --theme-panel-radius: 0;
+  --theme-prompt-fill: rgba(255,255,255,0.20);
+  --theme-prompt-border: 2px solid var(--accent);
+  --theme-header-border: 2px solid var(--ink);
+  --theme-field-rule: 1px solid var(--rule);
+  --theme-page-overlay:
+    radial-gradient(ellipse at center, transparent 58%, rgba(0,0,0,0.07) 100%);
+  --theme-page-noise-opacity: 0.10;
+}
+
+/* Institutional refinements */
+#booklet-container[data-treatment="institutional"] .cover-designation {
+  border: 2px double var(--accent);
   padding: 2px 6px;
 }
 
-[data-treatment="institutional"] .cover-title {
+#booklet-container[data-treatment="institutional"] .cover-title {
   border-bottom: 3px solid var(--ink);
   padding-bottom: 8px;
 }
 
-[data-treatment="institutional"] .rules-header {
+#booklet-container[data-treatment="institutional"] .rules-header {
   border-bottom-width: 3px;
 }
 
-/* -- NOIR: Photocopied case files, grain, ink bleed, high contrast -- */
-[data-treatment="noir"] .booklet-page::before {
-  background-image:
-    radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.12) 100%),
-    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.88' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
-  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.08);
-  opacity: 1;
+/* ── NOIR: Photocopied case files, grain, ink bleed ─────────── */
+#booklet-container[data-treatment="noir"] {
+  --theme-title-family: var(--condensed);
+  --theme-title-style: normal;
+  --theme-title-weight: 700;
+  --theme-title-case: uppercase;
+  --theme-title-spacing: 0.015em;
+  --theme-body-family: var(--serif);
+  --theme-label-family: var(--condensed);
+  --theme-panel-fill: rgba(255,255,255,0.12);
+  --theme-doc-fill: rgba(255,255,255,0.10);
+  --theme-panel-border: 1px solid rgba(0,0,0,0.16);
+  --theme-panel-radius: 0;
+  --theme-prompt-fill: rgba(0,0,0,0.025);
+  --theme-prompt-border: 3px solid var(--ink);
+  --theme-header-border: 1.5px solid var(--ink);
+  --theme-field-rule: 1px solid var(--muted);
+  --theme-page-overlay:
+    radial-gradient(circle at 50% 45%, transparent 34%, rgba(0,0,0,0.15) 100%),
+    linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.05));
+  --theme-page-noise-opacity: 0.14;
 }
 
-[data-treatment="noir"] .booklet-page {
+/* Noir refinements */
+#booklet-container[data-treatment="noir"] .booklet-page {
   filter: contrast(1.03);
 }
 
-[data-treatment="noir"] .cover-designation {
+#booklet-container[data-treatment="noir"] .cover-designation {
   transform: rotate(-0.8deg);
   opacity: 0.7;
 }
 
-[data-treatment="noir"] .story-prompt {
+#booklet-container[data-treatment="noir"] .story-prompt {
   border-left-width: 3px;
   border-left-color: var(--ink);
 }
 
-[data-treatment="noir"] .fragment-doc-type {
+#booklet-container[data-treatment="noir"] .fragment-doc-type {
   opacity: 0.8;
   letter-spacing: 0.2em;
 }
 
-/* -- TERMINAL: Computer printout, scan lines, monospace -- */
-[data-treatment="terminal"] .booklet-page::before {
-  background-image: repeating-linear-gradient(transparent, transparent 3px,
-      rgba(0, 0, 0, 0.025) 3px, rgba(0, 0, 0, 0.025) 4px);
-  box-shadow: none;
-  opacity: 1;
+/* ── TERMINAL: Computer printout, scan lines, monospace ─────── */
+#booklet-container[data-treatment="terminal"] {
+  --theme-title-family: var(--mono);
+  --theme-title-style: normal;
+  --theme-title-weight: 600;
+  --theme-title-case: uppercase;
+  --theme-title-spacing: 0.04em;
+  --theme-body-family: var(--sans);
+  --theme-label-family: var(--mono);
+  --theme-label-spacing: 0.22em;
+  --theme-panel-fill: var(--paper-2);
+  --theme-doc-fill: var(--paper-2);
+  --theme-panel-border: 1px solid var(--line-soft);
+  --theme-panel-radius: 0;
+  --theme-prompt-fill: transparent;
+  --theme-prompt-border: 1px solid var(--accent);
+  --theme-header-border: 1px solid var(--ink);
+  --theme-field-rule: 1px solid var(--muted);
+  --theme-page-overlay:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,0,0,0.03) 3px 4px),
+    linear-gradient(180deg, rgba(90,125,160,0.06), transparent 20%);
+  --theme-page-noise-opacity: 0.11;
 }
 
-[data-treatment="terminal"] .cover-designation {
+/* Terminal refinements — monospace overrides on specific elements */
+#booklet-container[data-treatment="terminal"] .cover-designation {
   background: transparent;
   border: 1px solid var(--ink);
   padding: 2px 6px;
 }
 
-[data-treatment="terminal"] .cover-title {
-  font-family: var(--mono);
-  font-style: normal;
+#booklet-container[data-treatment="terminal"] .cover-title {
   font-size: 20pt;
   letter-spacing: .05em;
 }
 
-[data-treatment="terminal"] .cover-tagline {
+#booklet-container[data-treatment="terminal"] .cover-tagline {
   font-family: var(--mono);
   font-style: normal;
   font-size: 7pt;
 }
 
-[data-treatment="terminal"] .rules-title {
-  font-family: var(--mono);
-  font-style: normal;
-  border-bottom: 1px solid var(--ink);
-  padding-bottom: 4px;
-}
-
-[data-treatment="terminal"] .week-title {
-  font-family: var(--mono);
-  font-style: normal;
+#booklet-container[data-treatment="terminal"] .week-title {
   font-size: 13pt;
 }
 
-[data-treatment="terminal"] .story-prompt {
+#booklet-container[data-treatment="terminal"] .story-prompt {
   font-family: var(--mono);
-  font-style: normal;
   font-size: 6.5pt;
-  border-left: 1px solid var(--muted);
 }
 
-[data-treatment="terminal"] .boss-title {
-  font-family: var(--mono);
-  font-style: normal;
+#booklet-container[data-treatment="terminal"] .boss-title {
   font-size: 16pt;
 }
 
-[data-treatment="terminal"] .found-doc-title,
-[data-treatment="terminal"] .endings-title {
+#booklet-container[data-treatment="terminal"] .found-doc-title,
+#booklet-container[data-treatment="terminal"] .endings-title {
   font-family: var(--mono);
   font-style: normal;
 }
 
-/* -- LITERARY: Published book, clean refined, elegant spacing -- */
-[data-treatment="literary"] .booklet-page::before {
-  opacity: 0;
+/* ── LITERARY: Published book, clean refined, elegant spacing ── */
+#booklet-container[data-treatment="literary"] {
+  --theme-title-family: var(--display);
+  --theme-title-style: italic;
+  --theme-title-weight: 600;
+  --theme-title-spacing: -0.01em;
+  --theme-body-family: var(--serif);
+  --theme-body-leading: 1.55;
+  --theme-label-family: var(--condensed);
+  --theme-label-weight: 500;
+  --theme-panel-fill: transparent;
+  --theme-doc-fill: transparent;
+  --theme-session-fill: transparent;
+  --theme-panel-border: 0;
+  --theme-panel-radius: 0;
+  --theme-prompt-fill: transparent;
+  --theme-prompt-border: 1px solid var(--muted);
+  --theme-header-border: 1px solid var(--line-soft);
+  --theme-box-border: 1.25px solid var(--ink);
+  --theme-field-rule: 0.75px solid var(--rule);
+  --theme-page-overlay: none;
+  --theme-page-noise-opacity: 0;
 }
 
-[data-treatment="literary"] .cover-designation {
+/* Literary refinements — small-caps, no borders on docs */
+#booklet-container[data-treatment="literary"] .cover-designation {
   font-variant: small-caps;
   text-transform: none;
   letter-spacing: 0.1em;
@@ -2703,12 +3002,12 @@ body.demo-mode .demo-error {
   padding: 0 0 2px 0;
 }
 
-[data-treatment="literary"] .cover-title {
+#booklet-container[data-treatment="literary"] .cover-title {
   font-weight: normal;
   letter-spacing: 0.02em;
 }
 
-[data-treatment="literary"] .fragment-doc-type {
+#booklet-container[data-treatment="literary"] .fragment-doc-type {
   font-variant: small-caps;
   text-transform: none;
   font-size: 7pt;
@@ -2716,25 +3015,52 @@ body.demo-mode .demo-error {
   color: var(--muted);
 }
 
-[data-treatment="literary"] .rules-body p,
-[data-treatment="literary"] .story-prompt {
-  line-height: 1.55;
-}
-
-[data-treatment="literary"] h2,
-[data-treatment="literary"] .rules-title {
+#booklet-container[data-treatment="literary"] h2,
+#booklet-container[data-treatment="literary"] .rules-title {
   font-weight: normal;
   border-bottom: 1px solid var(--muted);
   padding-bottom: 4px;
   letter-spacing: 0.08em;
 }
 
-/* -- BRUTALIST: Punk zine, stark heavy borders, oversized type -- */
-[data-treatment="brutalist"] .booklet-page::before {
-  opacity: 0;
+#booklet-container[data-treatment="literary"] .session-card {
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
 }
 
-[data-treatment="brutalist"] .cover-designation {
+#booklet-container[data-treatment="literary"] .fragment-doc,
+#booklet-container[data-treatment="literary"] .found-doc {
+  border: 0;
+  box-shadow: none;
+}
+
+/* ── BRUTALIST: Punk zine, stark heavy borders, oversized type ── */
+#booklet-container[data-treatment="brutalist"] {
+  --theme-title-family: var(--expanded);
+  --theme-title-style: normal;
+  --theme-title-weight: 800;
+  --theme-title-case: uppercase;
+  --theme-title-spacing: -0.02em;
+  --theme-body-family: var(--sans);
+  --theme-label-family: var(--condensed);
+  --theme-label-weight: 700;
+  --theme-label-spacing: 0.20em;
+  --theme-panel-fill: transparent;
+  --theme-doc-fill: transparent;
+  --theme-panel-border: 2px solid var(--ink);
+  --theme-panel-radius: 0;
+  --theme-prompt-fill: transparent;
+  --theme-prompt-border: 4px solid var(--ink);
+  --theme-header-border: 3px solid var(--ink);
+  --theme-box-border: 2px solid var(--ink);
+  --theme-field-rule: 1.5px solid var(--ink);
+  --theme-page-overlay: none;
+  --theme-page-noise-opacity: 0;
+}
+
+/* Brutalist refinements — oversized type, thick rules */
+#booklet-container[data-treatment="brutalist"] .cover-designation {
   font-size: 9pt;
   font-weight: bold;
   letter-spacing: 0.25em;
@@ -2744,63 +3070,73 @@ body.demo-mode .demo-error {
   padding: 3px 8px;
 }
 
-[data-treatment="brutalist"] .cover-title {
+#booklet-container[data-treatment="brutalist"] .cover-title {
   font-size: 34pt;
-  font-style: normal;
   font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: -0.02em;
+  line-height: 0.92;
 }
 
-[data-treatment="brutalist"] .cover-rule {
+#booklet-container[data-treatment="brutalist"] .cover-rule {
   height: 4px;
   width: 100%;
+  background: var(--accent);
 }
 
-[data-treatment="brutalist"] .rules-header,
-[data-treatment="brutalist"] .page-header {
-  border-bottom-width: 3px;
-}
-
-[data-treatment="brutalist"] .week-title {
-  font-style: normal;
+#booklet-container[data-treatment="brutalist"] .week-title {
   font-weight: 900;
-  text-transform: uppercase;
   font-size: 18pt;
 }
 
-[data-treatment="brutalist"] .boss-title {
-  font-style: normal;
+#booklet-container[data-treatment="brutalist"] .boss-title {
   font-weight: 900;
-  text-transform: uppercase;
   font-size: 22pt;
   border-bottom: 4px solid var(--ink);
   padding-bottom: 6px;
+  line-height: 0.92;
 }
 
-[data-treatment="brutalist"] .story-prompt {
-  border-left: 4px solid var(--ink);
-}
-
-[data-treatment="brutalist"] .session-card {
+#booklet-container[data-treatment="brutalist"] .session-card {
   border-bottom: 2px solid var(--ink);
 }
 
-[data-treatment="brutalist"] .found-doc-title {
-  font-style: normal;
+#booklet-container[data-treatment="brutalist"] .notes-box {
+  border: var(--theme-box-border);
+}
+
+#booklet-container[data-treatment="brutalist"] .found-doc-title {
   font-weight: 900;
   text-transform: uppercase;
 }
 
-/* -- CLINICAL: Lab report, halftone dots, hairline precision -- */
-[data-treatment="clinical"] .booklet-page::before {
-  background-image: radial-gradient(circle, var(--fog) 0.5px, transparent 0.5px);
-  background-size: 5px 5px;
-  opacity: 0.4;
-  box-shadow: none;
+/* ── CLINICAL: Lab report, halftone dots, hairline precision ── */
+#booklet-container[data-treatment="clinical"] {
+  --theme-title-family: var(--sans);
+  --theme-title-style: normal;
+  --theme-title-weight: 600;
+  --theme-title-spacing: 0.01em;
+  --theme-body-family: var(--sans);
+  --theme-label-family: var(--mono);
+  --theme-label-spacing: 0.22em;
+  --theme-panel-fill: rgba(255,255,255,0.34);
+  --theme-doc-fill: rgba(255,255,255,0.34);
+  --theme-panel-border: 0.75px solid var(--line-soft);
+  --theme-panel-radius: 0;
+  --theme-prompt-fill: rgba(255,255,255,0.22);
+  --theme-prompt-border: 1px solid var(--accent);
+  --theme-header-border: 0.75px solid var(--ink);
+  --theme-box-border: 1px solid var(--ink);
+  --theme-field-rule: 0.75px solid var(--rule);
+  --theme-page-overlay:
+    radial-gradient(circle, rgba(0,0,0,0.045) 0.45px, transparent 0.6px);
+  --theme-page-noise-opacity: 0.30;
 }
 
-[data-treatment="clinical"] .cover-designation {
+/* Clinical refinements — hairline precision */
+#booklet-container[data-treatment="clinical"] .booklet-page::before {
+  background-size: 5px 5px, auto;
+}
+
+#booklet-container[data-treatment="clinical"] .cover-designation {
   border: none;
   border-bottom: 1px solid var(--muted);
   font-size: 6.5pt;
@@ -2809,40 +3145,51 @@ body.demo-mode .demo-error {
   padding: 0 0 2px 0;
 }
 
-[data-treatment="clinical"] .cover-title {
+#booklet-container[data-treatment="clinical"] .cover-title {
   font-weight: normal;
   border-bottom: 0.5px solid var(--ink);
   padding-bottom: 8px;
 }
 
-[data-treatment="clinical"] .rules-header,
-[data-treatment="clinical"] .page-header {
-  border-bottom-width: 0.5px;
-}
-
-[data-treatment="clinical"] .rules-title,
-[data-treatment="clinical"] .week-title {
+#booklet-container[data-treatment="clinical"] .rules-title,
+#booklet-container[data-treatment="clinical"] .week-title {
   font-weight: normal;
 }
 
-[data-treatment="clinical"] .session-card {
+#booklet-container[data-treatment="clinical"] .session-card {
   border-bottom: 0.5px solid var(--fog);
 }
 
-[data-treatment="clinical"] .fragment-doc {
+#booklet-container[data-treatment="clinical"] .fragment-doc {
   border-width: 0.5px;
+  border-radius: 0;
 }
 
-/* -- CONFESSIONAL: Found diary, aged paper, worn edges -- */
-[data-treatment="confessional"] .booklet-page::before {
-  background-image:
-    radial-gradient(ellipse at 30% 70%, rgba(139, 119, 82, 0.08), transparent 70%),
-    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.88' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
-  box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.06);
-  opacity: 1;
+/* ── CONFESSIONAL: Found diary, aged paper, worn edges ────── */
+#booklet-container[data-treatment="confessional"] {
+  --theme-title-family: var(--display);
+  --theme-title-style: normal;
+  --theme-title-weight: 600;
+  --theme-title-spacing: -0.01em;
+  --theme-body-family: var(--serif);
+  --theme-label-family: var(--condensed);
+  --theme-label-style: italic;
+  --theme-panel-fill: transparent;
+  --theme-doc-fill: rgba(255,255,255,0.16);
+  --theme-session-fill: transparent;
+  --theme-panel-border: 1px dashed var(--rule);
+  --theme-panel-radius: 0;
+  --theme-prompt-fill: transparent;
+  --theme-prompt-border: 1px dashed var(--muted);
+  --theme-header-border: 1px dashed var(--muted);
+  --theme-field-rule: 1px dashed var(--muted);
+  --theme-page-overlay:
+    radial-gradient(ellipse at 30% 70%, rgba(139,119,82,0.09), transparent 70%);
+  --theme-page-noise-opacity: 0.11;
 }
 
-[data-treatment="confessional"] .cover-designation {
+/* Confessional refinements */
+#booklet-container[data-treatment="confessional"] .cover-designation {
   transform: rotate(0.5deg);
   opacity: 0.6;
   border-style: dashed;
@@ -2851,58 +3198,103 @@ body.demo-mode .demo-error {
   padding: 2px 6px;
 }
 
-[data-treatment="confessional"] .cover-title {
+#booklet-container[data-treatment="confessional"] .cover-title {
   border-bottom-style: dashed;
   border-bottom-width: 1px;
   border-bottom-color: var(--muted);
   padding-bottom: 8px;
 }
 
-[data-treatment="confessional"] .fragment-doc-type {
+#booklet-container[data-treatment="confessional"] .fragment-doc-type {
   opacity: 0.7;
   font-style: italic;
 }
 
-[data-treatment="confessional"] .story-prompt {
+#booklet-container[data-treatment="confessional"] .story-prompt {
   border-left-style: dashed;
 }
 
-[data-treatment="confessional"] .session-card {
+#booklet-container[data-treatment="confessional"] .session-card {
+  border: 0;
+  border-bottom: 1px dashed var(--rule);
+  border-radius: 0;
+}
+
+#booklet-container[data-treatment="confessional"] .rules-header,
+#booklet-container[data-treatment="confessional"] .page-header {
   border-bottom-style: dashed;
 }
 
-[data-treatment="confessional"] .rules-header,
-[data-treatment="confessional"] .page-header {
-  border-bottom-style: dashed;
+#booklet-container[data-treatment="confessional"] .fragment-doc.correspondence,
+#booklet-container[data-treatment="confessional"] .found-doc.correspondence {
+  border: 0;
+  box-shadow: none;
 }
 
-/* -- CORPORATE: Classified briefing, grid underlay, indexed tabs -- */
-[data-treatment="corporate"] .booklet-page::before {
-  background-image:
-    repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(0, 0, 0, 0.025) 19px, rgba(0, 0, 0, 0.025) 20px),
-    repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(0, 0, 0, 0.025) 19px, rgba(0, 0, 0, 0.025) 20px);
-  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.03);
-  opacity: 1;
+/* ── CORPORATE: Classified briefing, grid underlay ──────────── */
+#booklet-container[data-treatment="corporate"] {
+  --theme-title-family: var(--sans);
+  --theme-title-style: normal;
+  --theme-title-weight: 700;
+  --theme-title-case: uppercase;
+  --theme-title-spacing: 0.02em;
+  --theme-body-family: var(--sans);
+  --theme-label-family: var(--condensed);
+  --theme-label-weight: 700;
+  --theme-label-spacing: 0.22em;
+  --theme-panel-fill: rgba(255,255,255,0.24);
+  --theme-doc-fill: rgba(255,255,255,0.24);
+  --theme-panel-border: 1px solid var(--line-soft);
+  --theme-panel-radius: 0;
+  --theme-prompt-fill: rgba(255,255,255,0.16);
+  --theme-prompt-border: 2px solid var(--accent);
+  --theme-header-border: 2px double var(--ink);
+  --theme-box-border: 1.5px solid var(--ink);
+  --theme-field-rule: 1px solid var(--rule);
+  --theme-page-overlay:
+    repeating-linear-gradient(0deg, transparent 0 18px, rgba(0,0,0,0.022) 18px 19px),
+    repeating-linear-gradient(90deg, transparent 0 18px, rgba(0,0,0,0.022) 18px 19px);
+  --theme-page-noise-opacity: 0.10;
 }
 
-[data-treatment="corporate"] .cover-designation {
+/* Corporate refinements */
+#booklet-container[data-treatment="corporate"] .cover-designation {
   border: 2px double var(--accent);
   padding: 2px 6px;
 }
 
-[data-treatment="corporate"] .cover-title {
+#booklet-container[data-treatment="corporate"] .cover-title {
   border-bottom: 2px double var(--ink);
   padding-bottom: 8px;
+  font-style: normal;
 }
 
-[data-treatment="corporate"] .rules-header,
-[data-treatment="corporate"] .page-header {
+#booklet-container[data-treatment="corporate"] .rules-header,
+#booklet-container[data-treatment="corporate"] .page-header {
   border-bottom: 2px double var(--ink);
 }
 
-[data-treatment="corporate"] .fragment-doc-type {
+#booklet-container[data-treatment="corporate"] .fragment-doc-type {
   border-bottom: 2px double var(--muted);
   padding-bottom: 2px;
+}
+
+#booklet-container[data-treatment="corporate"] .fragment-doc {
+  border-radius: 0;
+}
+
+/* ── Cross-treatment refinements ──────────────────────────── */
+#booklet-container[data-treatment="pastoral"] .rules-header,
+#booklet-container[data-treatment="pastoral"] .page-header,
+#booklet-container[data-treatment="literary"] .rules-header,
+#booklet-container[data-treatment="literary"] .page-header,
+#booklet-container[data-treatment="confessional"] .rules-header,
+#booklet-container[data-treatment="confessional"] .page-header {
+  background: transparent;
+}
+
+#booklet-container[data-treatment="terminal"] .fragment-doc {
+  border-radius: 0;
 }
 
 /* ══════════════════════════════════════════════════════════════
