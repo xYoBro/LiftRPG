@@ -119,8 +119,8 @@
   };
 
   var LAYOUT_BUDGETS = {
-    survey:  { maxOracleEntries: 14, maxCipherWorkspaceArea: 48 },
-    console: { maxPtpNodes: 6, maxGridCols: 8, maxOracleEntries: 10 },
+    survey:  { maxOracleEntries: 5, maxCipherWorkspaceArea: 48 },
+    console: { maxPtpNodes: 6, maxGridCols: 8, maxOracleEntries: 6 },
     dossier: { maxGridCols: 6, maxCipherWorkspaceArea: 36 }
   };
 
