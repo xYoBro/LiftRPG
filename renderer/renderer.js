@@ -110,6 +110,73 @@
     return { lines: displayText.split('\n').filter(function (l) { return l.trim(); }) };
   }
 
+  // ── Layout Family Selection ─────────────────────────────
+  var LAYOUT_FAMILY_DEFAULT = {
+    pastoral: 'survey', institutional: 'survey', clinical: 'survey',
+    terminal: 'console', corporate: 'console', noir: 'console',
+    confessional: 'dossier', literary: 'dossier', brutalist: 'survey'
+  };
+
+  var LAYOUT_FAMILY_OVERRIDE = {
+    'noir:grid':                   'dossier',
+    'noir:player-drawn':           'dossier',
+    'brutalist:point-to-point':    'console',
+    'brutalist:linear-track':      'console'
+  };
+
+  var LAYOUT_BUDGETS = {
+    survey:  { maxOracleEntries: 14, maxCipherWorkspaceArea: 48 },
+    console: { maxPtpNodes: 6, maxGridCols: 8, maxOracleEntries: 10 },
+    dossier: { maxGridCols: 6, maxCipherWorkspaceArea: 36 }
+  };
+
+  var LAYOUT_DOMINANT = {
+    survey: 'map', console: 'cipher', dossier: 'oracle'
+  };
+
+  var BOSS_LAYOUT = {
+    confessional: 'document', literary: 'document'
+  };
+
+  function getFieldOpsLayout(fieldOps) {
+    var container = document.getElementById('booklet-container');
+    var treatment = container ? container.getAttribute('data-treatment') || '' : '';
+    var mapType = (fieldOps.mapState && fieldOps.mapState.mapType) || 'grid';
+
+    var family = LAYOUT_FAMILY_OVERRIDE[treatment + ':' + mapType]
+      || LAYOUT_FAMILY_DEFAULT[treatment]
+      || 'default';
+
+    if (family === 'default') return family;
+
+    // Dominant zone must exist
+    var dominant = LAYOUT_DOMINANT[family];
+    if (dominant === 'map' && !fieldOps.mapState) return 'default';
+    if (dominant === 'cipher' && !fieldOps.cipher) return 'default';
+    if (dominant === 'oracle' && !fieldOps.oracleTable) return 'default';
+
+    // Content budget check
+    var budget = LAYOUT_BUDGETS[family];
+    if (budget) {
+      var oracleCount = fieldOps.oracleTable
+        ? (fieldOps.oracleTable.entries || []).length : 0;
+      var ws = fieldOps.cipher && fieldOps.cipher.body
+        ? fieldOps.cipher.body.workSpace : null;
+      var wsArea = ws ? (ws.rows || 0) * (ws.cols || 10) : 0;
+      var mapState = fieldOps.mapState || {};
+      var gridCols = mapState.gridDimensions
+        ? mapState.gridDimensions.columns : 0;
+      var ptpNodes = mapState.nodes ? mapState.nodes.length : 0;
+
+      if (budget.maxOracleEntries && oracleCount > budget.maxOracleEntries) return 'default';
+      if (budget.maxCipherWorkspaceArea && wsArea > budget.maxCipherWorkspaceArea) return 'default';
+      if (budget.maxGridCols && gridCols > budget.maxGridCols) return 'default';
+      if (budget.maxPtpNodes && ptpNodes > budget.maxPtpNodes) return 'default';
+    }
+
+    return family;
+  }
+
   // ── LABELS ──────────────────────────────────────────────────
   // Built once per render() from data.meta. Schema may override
   // defaults via data.meta.labels — if absent, neutral fallbacks
@@ -977,6 +1044,12 @@
       inner.appendChild(content);
       p.appendChild(inner);
       return p;
+    }
+
+    // Select layout family
+    var layout = getFieldOpsLayout(week.fieldOps);
+    if (layout !== 'default') {
+      inner.setAttribute('data-layout', layout);
     }
 
     content.appendChild(buildCipherZone(week.fieldOps));
