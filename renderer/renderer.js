@@ -826,34 +826,13 @@
     }
   }
 
-  // ═══ FIELD OPS RIGHT (Map + Cipher + Oracle) ═══
-  function renderFieldOpsRight(week, weekNum, labels) {
-    var p = page('field-ops');
-    var inner = el('div', 'field-ops-right');
-
-    // Header
-    var hdr = el('div', 'rp-header');
-    hdr.appendChild(txt('span', '', labels.fieldOpsHeader));
-    hdr.appendChild(txt('span', 'page-num', ''));
-    inner.appendChild(hdr);
-
-    // Content grid
-    var content = el('div', 'rp-content');
-
-    // Guard: gracefully handle missing fieldOps (e.g., malformed JSON)
-    if (!week.fieldOps) {
-      inner.appendChild(content);
-      p.appendChild(inner);
-      return p;
-    }
-
-    // ── Cipher Zone ──
+  // ═══ Zone Builders (field ops page composition) ═══
+  function buildCipherZone(fieldOps) {
     var cipherZone = el('div', 'cipher-zone');
-    var cipher = week.fieldOps.cipher;
+    var cipher = fieldOps.cipher;
     if (cipher) {
       cipherZone.appendChild(txt('div', 'puzzle-title', cipher.title));
 
-      // Parse and render display text
       if (cipher.body && cipher.body.displayText) {
         var lines = cipher.body.displayText.split('\n');
         var currentSection = null;
@@ -863,13 +842,11 @@
           if (!trimmed) return;
 
           if (trimmed.match(/^KEY/i)) {
-            // Start key section
             currentSection = 'key';
             var keyDiv = el('div', 'cipher-key');
             keyDiv.appendChild(txt('div', 'key-grid', trimmed));
             cipherZone.appendChild(keyDiv);
           } else if (currentSection === 'key' && trimmed.match(/^[A-Z?]=/)) {
-            // Key continuation lines
             var lastKey = cipherZone.querySelector('.cipher-key:last-child .key-grid');
             if (lastKey) lastKey.textContent += '\n' + trimmed;
           } else if (trimmed.match(/^Position/i)) {
@@ -878,19 +855,16 @@
             posDiv.appendChild(txt('div', 'pos-numbers', trimmed));
             cipherZone.appendChild(posDiv);
           } else {
-            // Cipher sequence / encoded text
             currentSection = 'seq';
             cipherZone.appendChild(txt('div', 'cipher-sequence', trimmed));
           }
         });
       }
 
-      // Cipher key instruction
       if (cipher.body && cipher.body.key) {
         cipherZone.appendChild(txt('div', 'cipher-instruction', cipher.body.key));
       }
 
-      // Workspace (plaintext grid)
       if (cipher.body && cipher.body.workSpace) {
         var grid = el('div', 'plaintext-grid');
         var cells = cipher.body.workSpace.rows * 10; // approximate
@@ -900,16 +874,16 @@
         cipherZone.appendChild(grid);
       }
 
-      // Extraction instruction
       if (cipher.extractionInstruction) {
         cipherZone.appendChild(txt('div', 'password-extract', cipher.extractionInstruction));
       }
     }
-    content.appendChild(cipherZone);
+    return cipherZone;
+  }
 
-    // ── Map Zone ──
+  function buildMapZone(fieldOps) {
     var mapZone = el('div', 'map-zone');
-    var mapState = week.fieldOps.mapState;
+    var mapState = fieldOps.mapState;
     if (mapState) {
       var mapType = mapState.mapType || 'grid';
       switch (mapType) {
@@ -920,11 +894,12 @@
         default:               renderGridMap(mapZone, mapState); break;
       }
     }
-    content.appendChild(mapZone);
+    return mapZone;
+  }
 
-    // ── Oracle Zone ──
+  function buildOracleZone(fieldOps) {
     var oracleZone = el('div', 'oracle-zone');
-    var oracle = week.fieldOps.oracleTable;
+    var oracle = fieldOps.oracleTable;
     if (oracle) {
       oracleZone.appendChild(txt('div', 'oracle-header', oracle.title));
       if (oracle.instruction) {
@@ -934,7 +909,6 @@
       var entries = el('div', 'oracle-entries');
       if (oracle.entries) {
         if (oracle.mode === 'simple') {
-          // 2d6 mode — show every entry individually (rolls 2-12)
           oracle.entries.forEach(function (entry) {
             var entryEl = el('div', 'oracle-entry oracle-case');
             entryEl.appendChild(txt('span', 'oracle-case-num', entry.roll));
@@ -945,7 +919,6 @@
             entries.appendChild(entryEl);
           });
         } else {
-          // d100/full mode — group by cluster into decade ranges
           var clusters = {};
           oracle.entries.forEach(function (entry, oracleIdx) {
             var c;
@@ -982,7 +955,33 @@
       }
       oracleZone.appendChild(entries);
     }
-    content.appendChild(oracleZone);
+    return oracleZone;
+  }
+
+  // ═══ FIELD OPS RIGHT (Map + Cipher + Oracle) ═══
+  function renderFieldOpsRight(week, weekNum, labels) {
+    var p = page('field-ops');
+    var inner = el('div', 'field-ops-right');
+
+    // Header
+    var hdr = el('div', 'rp-header');
+    hdr.appendChild(txt('span', '', labels.fieldOpsHeader));
+    hdr.appendChild(txt('span', 'page-num', ''));
+    inner.appendChild(hdr);
+
+    // Content grid
+    var content = el('div', 'rp-content');
+
+    // Guard: gracefully handle missing fieldOps (e.g., malformed JSON)
+    if (!week.fieldOps) {
+      inner.appendChild(content);
+      p.appendChild(inner);
+      return p;
+    }
+
+    content.appendChild(buildCipherZone(week.fieldOps));
+    content.appendChild(buildMapZone(week.fieldOps));
+    content.appendChild(buildOracleZone(week.fieldOps));
 
     inner.appendChild(content);
     p.appendChild(inner);
