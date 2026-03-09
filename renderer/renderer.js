@@ -1107,6 +1107,14 @@
     var inner = el('div', 'boss-right');
     var boss = week.bossEncounter;
 
+    // Boss layout selection
+    var container = document.getElementById('booklet-container');
+    var treatment = container ? container.getAttribute('data-treatment') || '' : '';
+    var bossLayout = BOSS_LAYOUT[treatment];
+    if (bossLayout) {
+      inner.setAttribute('data-boss-layout', bossLayout);
+    }
+
     // Header
     var hdr = el('div', 'boss-header rp-header');
     hdr.appendChild(txt('span', '', 'Week ' + (weekNum < 10 ? '0' + weekNum : weekNum) + ' \u00b7 ' + labels.finalSurveyHeader));
@@ -1114,12 +1122,20 @@
     inner.appendChild(hdr);
 
     if (boss) {
-      // Title
+      // Title (always on inner, before any document frame)
       inner.appendChild(txt('h2', 'boss-title', boss.title));
+
+      // Document frame wrapper (for document-first boss layout)
+      var contentTarget = inner;
+      if (bossLayout === 'document') {
+        var docFrame = el('div', 'boss-document-frame');
+        inner.appendChild(docFrame);
+        contentTarget = docFrame;
+      }
 
       // Narrative
       if (boss.narrative) {
-        inner.appendChild(txt('div', 'boss-narrative', boss.narrative));
+        contentTarget.appendChild(txt('div', 'boss-narrative', boss.narrative));
       }
 
       // Mechanism
@@ -1127,7 +1143,7 @@
         var mech = el('div', 'boss-mechanism');
         mech.appendChild(txt('span', 'boss-mechanism-label', 'Procedure'));
         mech.appendChild(txt('div', '', boss.mechanismDescription));
-        inner.appendChild(mech);
+        contentTarget.appendChild(mech);
       }
 
       // Component inputs (from prior weeks)
@@ -1150,11 +1166,18 @@
           compList.appendChild(item);
         });
         compSection.appendChild(compList);
-        inner.appendChild(compSection);
+        contentTarget.appendChild(compSection);
       }
 
       // Decoding key (delayed interpretation)
       if (boss.decodingKey) {
+        var dkTarget = inner;
+        if (bossLayout === 'document') {
+          var dkFrame = el('div', 'boss-document-frame boss-attachment-frame');
+          inner.appendChild(dkFrame);
+          dkTarget = dkFrame;
+        }
+
         var dkSection = el('div', 'boss-decoding-key');
         dkSection.appendChild(txt('div', 'boss-decoding-label', 'Decoding Protocol'));
         if (boss.decodingKey.instruction) {
@@ -1169,7 +1192,7 @@
           });
           dkSection.appendChild(tableDiv);
         }
-        inner.appendChild(dkSection);
+        dkTarget.appendChild(dkSection);
 
         // Decoded letter boxes
         var decodedSection = el('div', 'boss-decoded-letters');
@@ -1183,10 +1206,10 @@
           decodedGrid.appendChild(decodedItem);
         }
         decodedSection.appendChild(decodedGrid);
-        inner.appendChild(decodedSection);
+        dkTarget.appendChild(decodedSection);
       }
 
-      // Convergence (password assembly)
+      // Convergence (password assembly) — always on inner, outside frames
       var convergence = el('div', 'boss-convergence');
       convergence.appendChild(txt('div', 'boss-convergence-label', 'Convergence'));
       var convergenceText = boss.convergenceInstruction || boss.passwordRevealInstruction || '';
