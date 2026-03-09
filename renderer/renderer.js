@@ -104,6 +104,17 @@
       .toLowerCase();
   }
 
+  function getPasswordLength(data, fallback) {
+    var meta = (data && data.meta) || {};
+    if (typeof meta.passwordLength === 'number' && meta.passwordLength > 0) {
+      return meta.passwordLength;
+    }
+    if (meta.passwordPlaintext) {
+      return meta.passwordPlaintext.length;
+    }
+    return fallback || 10;
+  }
+
   // ── Layout Family Selection ─────────────────────────────
   var LAYOUT_FAMILY_DEFAULT = {
     pastoral: 'survey', institutional: 'survey', clinical: 'survey',
@@ -255,6 +266,16 @@
         if (para.trim()) body.appendChild(txt('p', '', para.trim()));
       });
     }
+    var reEntryRule = data.rulesSpread.leftPage.reEntryRule;
+    var reEntryText = typeof reEntryRule === 'string'
+      ? reEntryRule
+      : reEntryRule && reEntryRule.ruleText;
+    if (reEntryText) {
+      body.appendChild(txt('h3', '', 'Re-Entry Procedure'));
+      reEntryText.split('\n').forEach(function (para) {
+        if (para.trim()) body.appendChild(txt('p', 'rules-reentry', para.trim()));
+      });
+    }
     inner.appendChild(body);
 
     p.appendChild(inner);
@@ -299,7 +320,7 @@
     var final_ = el('div', 'password-final');
     final_.appendChild(txt('div', 'password-final-label', 'Complete Password'));
     var boxes = el('div', 'password-final-boxes');
-    var pwLen = data.meta.passwordPlaintext ? data.meta.passwordPlaintext.length : 10;
+    var pwLen = getPasswordLength(data, 10);
     for (var i = 0; i < pwLen; i++) {
       boxes.appendChild(el('div', 'password-final-box'));
     }
@@ -959,6 +980,16 @@
   }
 
   function buildOracleZone(fieldOps) {
+    function appendOracleEntry(entryEl, entry) {
+      entryEl.appendChild(txt('span', 'oracle-text', entry.text));
+      if (entry.paperAction) {
+        entryEl.appendChild(txt('span', 'oracle-paper-action', entry.paperAction));
+      }
+      if (entry.fragmentRef) {
+        entryEl.appendChild(txt('span', 'frag-ref', '\u2192 ' + entry.fragmentRef));
+      }
+    }
+
     var oracleZone = el('div', 'oracle-zone');
     var oracle = fieldOps.oracleTable;
     if (oracle) {
@@ -971,12 +1002,10 @@
       if (oracle.entries) {
         if (oracle.mode === 'simple') {
           oracle.entries.forEach(function (entry) {
-            var entryEl = el('div', 'oracle-entry oracle-case');
+            var typeClass = entry.type ? ' oracle-entry-' + normalizeThemeToken(entry.type) : '';
+            var entryEl = el('div', 'oracle-entry oracle-case' + typeClass);
             entryEl.appendChild(txt('span', 'oracle-case-num', entry.roll));
-            entryEl.appendChild(txt('span', 'oracle-text', entry.text));
-            if (entry.fragmentRef) {
-              entryEl.appendChild(txt('span', 'frag-ref', '\u2192 ' + entry.fragmentRef));
-            }
+            appendOracleEntry(entryEl, entry);
             entries.appendChild(entryEl);
           });
         } else {
@@ -998,17 +1027,14 @@
             var group = clusters[key];
             var first = group[0];
             var last = group[group.length - 1];
-            var entryEl = el('div', 'oracle-entry oracle-case');
+            var typeClass = first.type ? ' oracle-entry-' + normalizeThemeToken(first.type) : '';
+            var entryEl = el('div', 'oracle-entry oracle-case' + typeClass);
 
             var rangeStr = group.length > 1
               ? first.roll + '\u2013' + last.roll
               : first.roll;
             entryEl.appendChild(txt('span', 'oracle-case-num', rangeStr));
-            entryEl.appendChild(txt('span', 'oracle-text', first.text));
-
-            if (first.fragmentRef) {
-              entryEl.appendChild(txt('span', 'frag-ref', '\u2192 ' + first.fragmentRef));
-            }
+            appendOracleEntry(entryEl, first);
 
             entries.appendChild(entryEl);
           });
@@ -1213,8 +1239,7 @@
       }
       var pwBoxes = el('div', 'boss-password-boxes');
       // Derive password length from meta or componentInputs
-      var pwLen = (data.meta && data.meta.passwordPlaintext) ? data.meta.passwordPlaintext.length
-        : (boss.componentInputs ? boss.componentInputs.length : 6);
+      var pwLen = getPasswordLength(data, boss.componentInputs ? boss.componentInputs.length : 6);
       for (var i = 0; i < pwLen; i++) {
         pwBoxes.appendChild(el('div', 'boss-password-box'));
       }
@@ -1392,7 +1417,7 @@
     var final_ = el('div', 'password-final-assembly');
     final_.appendChild(txt('div', 'password-final-label', 'Complete Password'));
     var finalRow = el('div', 'password-final-row');
-    var pwLen = data.meta.passwordPlaintext ? data.meta.passwordPlaintext.length : 10;
+    var pwLen = getPasswordLength(data, 10);
     for (var i = 0; i < pwLen; i++) {
       finalRow.appendChild(el('div', 'password-final-cell'));
     }

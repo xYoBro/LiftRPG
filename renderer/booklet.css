@@ -1405,6 +1405,7 @@ body {
 .oracle-entry {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 6px;
   padding: var(--oracle-entry-padding);
   border-bottom: 1px dotted var(--rule);
@@ -1429,6 +1430,19 @@ body {
   line-height: var(--oracle-text-lh);
   color: var(--ink);
   flex: 1;
+}
+
+.oracle-paper-action {
+  width: 100%;
+  margin-left: calc(var(--oracle-num-size) + 12px);
+  font-family: var(--mono);
+  font-size: calc(var(--oracle-text-size) - 0.5pt);
+  line-height: var(--oracle-text-lh);
+  color: var(--accent);
+}
+
+.oracle-entry-consequence .oracle-case-num {
+  color: var(--accent);
 }
 
 .oracle-case .frag-ref {
