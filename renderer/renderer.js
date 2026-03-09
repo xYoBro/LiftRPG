@@ -104,12 +104,6 @@
       .toLowerCase();
   }
 
-  /** Parse multiline cipher text into structured sections */
-  function parseCipherDisplay(displayText) {
-    if (!displayText) return { lines: [] };
-    return { lines: displayText.split('\n').filter(function (l) { return l.trim(); }) };
-  }
-
   // ── Layout Family Selection ─────────────────────────────
   var LAYOUT_FAMILY_DEFAULT = {
     pastoral: 'survey', institutional: 'survey', clinical: 'survey',
@@ -1040,7 +1034,8 @@
     var content = el('div', 'rp-content');
 
     // Guard: gracefully handle missing fieldOps (e.g., malformed JSON)
-    if (!week.fieldOps) {
+    // All three zones missing → skip page content (design doc: defensive)
+    if (!week.fieldOps || (!week.fieldOps.cipher && !week.fieldOps.mapState && !week.fieldOps.oracleTable)) {
       inner.appendChild(content);
       p.appendChild(inner);
       return p;

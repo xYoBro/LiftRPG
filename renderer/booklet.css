@@ -859,7 +859,7 @@ body {
   grid-template-areas:
     "map map"
     "cipher oracle";
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
 }
 
@@ -900,7 +900,7 @@ body {
   grid-template-areas:
     "cipher map"
     "cipher oracle";
-  grid-template-columns: 3fr 2fr;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
 }
 
@@ -938,7 +938,7 @@ body {
   grid-template-areas:
     "oracle map"
     "cipher cipher";
-  grid-template-columns: 3fr 2fr;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   grid-template-rows: minmax(0, 3fr) minmax(0, 1fr);
 }
 
@@ -1021,8 +1021,8 @@ body {
   content: var(--boss-attachment-label, "ATTACHMENT");
 }
 
-/* Inside document frame: tighter spacing */
-.boss-right[data-boss-layout="document"] .boss-document-frame .boss-title {
+/* Inside document-first boss: tighter spacing */
+.boss-right[data-boss-layout="document"] > .boss-title {
   font-size: 16pt;
   margin-bottom: 6px;
 }
