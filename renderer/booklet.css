@@ -2782,6 +2782,7 @@ body.demo-mode .demo-error {
   --paper-2: var(--warm);
   --line-soft: var(--rule);
   --accent-soft: var(--accent);
+  --theme-page-filter: none;
   /* Title typography */
   --theme-title-family: var(--display);
   --theme-title-style: italic;
@@ -2797,6 +2798,13 @@ body.demo-mode .demo-error {
   --theme-label-weight: 600;
   --theme-label-case: uppercase;
   --theme-label-spacing: 0.18em;
+  --theme-designation-color: var(--accent);
+  --theme-designation-fill: transparent;
+  --theme-designation-border: none;
+  --theme-designation-padding: 0;
+  --theme-designation-opacity: 1;
+  --theme-designation-transform: none;
+  --theme-doc-badge-color: var(--accent);
   /* Surfaces */
   --theme-panel-fill: transparent;
   --theme-panel-border: 1px solid var(--rule);
@@ -2804,16 +2812,21 @@ body.demo-mode .demo-error {
   --theme-panel-shadow: none;
   --theme-doc-fill: var(--card);
   --theme-session-fill: transparent;
+  --theme-session-border: 1px solid var(--fog);
+  --theme-session-separator: var(--theme-session-border);
   /* Borders */
   --theme-prompt-fill: transparent;
   --theme-prompt-border: 2px solid var(--accent);
   --theme-header-border: 1.25px solid var(--ink);
   --theme-box-border: 1.5px solid var(--ink);
   --theme-field-rule: 1px solid var(--rule);
+  --theme-cover-rule: none;
+  --theme-cover-rule-gap: 0;
   /* Page atmosphere */
   --theme-page-overlay:
     radial-gradient(circle at 82% 0%, rgba(0,0,0,0.03), transparent 42%);
   --theme-page-noise-opacity: 0.06;
+  --theme-page-atmosphere-size: auto;
 }
 
 /* ── Base selectors — consume variables ─────────────────────── */
@@ -2822,10 +2835,12 @@ body.demo-mode .demo-error {
 #booklet-container[data-treatment] .booklet-page {
   background: var(--paper);
   color: var(--ink);
+  filter: var(--theme-page-filter);
 }
 
 #booklet-container[data-treatment] .booklet-page::before {
   opacity: var(--theme-page-noise-opacity);
+  background-size: var(--theme-page-atmosphere-size);
   background-image:
     var(--theme-page-overlay),
     url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.88' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
@@ -2854,6 +2869,20 @@ body.demo-mode .demo-error {
   letter-spacing: var(--theme-label-spacing);
 }
 
+#booklet-container[data-treatment] .cover-designation {
+  color: var(--theme-designation-color);
+  background: var(--theme-designation-fill);
+  border: var(--theme-designation-border);
+  padding: var(--theme-designation-padding);
+  opacity: var(--theme-designation-opacity);
+  transform: var(--theme-designation-transform);
+}
+
+#booklet-container[data-treatment] .fragment-doc-type,
+#booklet-container[data-treatment] .found-doc-type {
+  color: var(--theme-doc-badge-color);
+}
+
 /* Title typography (cover, week, boss, endings titles) */
 #booklet-container[data-treatment] .cover-title,
 #booklet-container[data-treatment] .rules-title,
@@ -2866,6 +2895,11 @@ body.demo-mode .demo-error {
   font-weight: var(--theme-title-weight);
   text-transform: var(--theme-title-case);
   letter-spacing: var(--theme-title-spacing);
+}
+
+#booklet-container[data-treatment] .cover-title {
+  border-bottom: var(--theme-cover-rule);
+  padding-bottom: var(--theme-cover-rule-gap);
 }
 
 /* Body typography (narrative, fragments, rules text) */
@@ -2892,6 +2926,8 @@ body.demo-mode .demo-error {
 /* Session cards */
 #booklet-container[data-treatment] .session-card {
   background: var(--theme-session-fill);
+  border: var(--theme-session-border);
+  border-bottom: var(--theme-session-separator);
   border-radius: var(--theme-panel-radius);
   box-shadow: var(--theme-panel-shadow);
 }
@@ -2984,20 +3020,10 @@ body.demo-mode .demo-error {
   --theme-page-noise-opacity: 0.05;
 }
 
-#booklet-container[data-treatment="pastoral"] .cover-designation {
-  color: var(--accent);
-}
-
 #booklet-container[data-treatment="pastoral"] .cover-title,
 #booklet-container[data-treatment="pastoral"] .boss-title,
 #booklet-container[data-treatment="pastoral"] .password-assembly-title {
   line-height: 1.02;
-}
-
-#booklet-container[data-treatment="pastoral"] .session-card,
-#booklet-container[data-treatment="pastoral"] .fragment-doc,
-#booklet-container[data-treatment="pastoral"] .found-doc {
-  box-shadow: none;
 }
 
 #booklet-container[data-treatment="pastoral"] .fragment-doc.correspondence,
@@ -3006,16 +3032,6 @@ body.demo-mode .demo-error {
 #booklet-container[data-treatment="pastoral"] .fragment-doc.memo {
   background: transparent;
   border-color: rgba(204,197,182,0.65);
-}
-
-#booklet-container[data-treatment="pastoral"] .story-prompt,
-#booklet-container[data-treatment="pastoral"] .rules-body p {
-  color: var(--ink);
-}
-
-#booklet-container[data-treatment="pastoral"] .fragment-doc-type,
-#booklet-container[data-treatment="pastoral"] .found-doc-type {
-  color: var(--accent);
 }
 
 /* ── INSTITUTIONAL: Government forms, heavy stamps, vignette ── */
@@ -3037,20 +3053,13 @@ body.demo-mode .demo-error {
   --theme-prompt-border: 2px solid var(--accent);
   --theme-header-border: 2px solid var(--ink);
   --theme-field-rule: 1px solid var(--rule);
+  --theme-designation-border: 2px double var(--accent);
+  --theme-designation-padding: 2px 6px;
+  --theme-cover-rule: 3px solid var(--ink);
+  --theme-cover-rule-gap: 8px;
   --theme-page-overlay:
     radial-gradient(ellipse at center, transparent 58%, rgba(0,0,0,0.07) 100%);
   --theme-page-noise-opacity: 0.10;
-}
-
-/* Institutional refinements */
-#booklet-container[data-treatment="institutional"] .cover-designation {
-  border: 2px double var(--accent);
-  padding: 2px 6px;
-}
-
-#booklet-container[data-treatment="institutional"] .cover-title {
-  border-bottom: 3px solid var(--ink);
-  padding-bottom: 8px;
 }
 
 #booklet-container[data-treatment="institutional"] .rules-header {
@@ -3074,26 +3083,14 @@ body.demo-mode .demo-error {
   --theme-prompt-border: 3px solid var(--ink);
   --theme-header-border: 1.5px solid var(--ink);
   --theme-field-rule: 1px solid var(--muted);
+  --theme-page-filter: contrast(1.03);
+  --theme-designation-opacity: 0.7;
+  --theme-designation-transform: rotate(-0.8deg);
   --theme-page-overlay:
     radial-gradient(circle at 50% 45%, transparent 34%, rgba(0,0,0,0.15) 100%),
     linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.05));
   --theme-page-noise-opacity: 0.14;
   --cipher-attachment-label: "EXHIBIT A";
-}
-
-/* Noir refinements */
-#booklet-container[data-treatment="noir"] .booklet-page {
-  filter: contrast(1.03);
-}
-
-#booklet-container[data-treatment="noir"] .cover-designation {
-  transform: rotate(-0.8deg);
-  opacity: 0.7;
-}
-
-#booklet-container[data-treatment="noir"] .story-prompt {
-  border-left-width: 3px;
-  border-left-color: var(--ink);
 }
 
 #booklet-container[data-treatment="noir"] .fragment-doc-type {
@@ -3119,17 +3116,12 @@ body.demo-mode .demo-error {
   --theme-prompt-border: 1px solid var(--accent);
   --theme-header-border: 1px solid var(--ink);
   --theme-field-rule: 1px solid var(--muted);
+  --theme-designation-border: 1px solid var(--ink);
+  --theme-designation-padding: 2px 6px;
   --theme-page-overlay:
     repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,0,0,0.03) 3px 4px),
     linear-gradient(180deg, rgba(90,125,160,0.06), transparent 20%);
   --theme-page-noise-opacity: 0.11;
-}
-
-/* Terminal refinements — monospace overrides on specific elements */
-#booklet-container[data-treatment="terminal"] .cover-designation {
-  background: transparent;
-  border: 1px solid var(--ink);
-  padding: 2px 6px;
 }
 
 #booklet-container[data-treatment="terminal"] .cover-title {
@@ -3182,6 +3174,11 @@ body.demo-mode .demo-error {
   --theme-header-border: 1px solid var(--line-soft);
   --theme-box-border: 1.25px solid var(--ink);
   --theme-field-rule: 0.75px solid var(--rule);
+  --theme-designation-color: var(--muted);
+  --theme-designation-padding: 0 0 2px 0;
+  --theme-doc-badge-color: var(--muted);
+  --theme-session-border: none;
+  --theme-session-separator: 1px solid var(--rule);
   --theme-page-overlay: none;
   --theme-page-noise-opacity: 0;
   --cipher-attachment-label: "APPENDIX";
@@ -3196,8 +3193,6 @@ body.demo-mode .demo-error {
   letter-spacing: 0.1em;
   border: none;
   border-bottom: 1px solid var(--muted);
-  color: var(--muted);
-  padding: 0 0 2px 0;
 }
 
 #booklet-container[data-treatment="literary"] .cover-title {
@@ -3210,7 +3205,6 @@ body.demo-mode .demo-error {
   text-transform: none;
   font-size: 7pt;
   letter-spacing: 0.1em;
-  color: var(--muted);
 }
 
 #booklet-container[data-treatment="literary"] h2,
@@ -3219,18 +3213,6 @@ body.demo-mode .demo-error {
   border-bottom: 1px solid var(--muted);
   padding-bottom: 4px;
   letter-spacing: 0.08em;
-}
-
-#booklet-container[data-treatment="literary"] .session-card {
-  border: 0;
-  border-bottom: 1px solid var(--rule);
-  border-radius: 0;
-}
-
-#booklet-container[data-treatment="literary"] .fragment-doc,
-#booklet-container[data-treatment="literary"] .found-doc {
-  border: 0;
-  box-shadow: none;
 }
 
 /* ── BRUTALIST: Punk zine, stark heavy borders, oversized type ── */
@@ -3253,6 +3235,10 @@ body.demo-mode .demo-error {
   --theme-header-border: 3px solid var(--ink);
   --theme-box-border: 2px solid var(--ink);
   --theme-field-rule: 1.5px solid var(--ink);
+  --theme-designation-color: var(--ink);
+  --theme-designation-border: 3px solid var(--ink);
+  --theme-designation-padding: 3px 8px;
+  --theme-session-separator: 2px solid var(--ink);
   --theme-page-overlay: none;
   --theme-page-noise-opacity: 0;
 }
@@ -3262,10 +3248,6 @@ body.demo-mode .demo-error {
   font-size: 9pt;
   font-weight: bold;
   letter-spacing: 0.25em;
-  border: 3px solid var(--ink);
-  color: var(--ink);
-  background: transparent;
-  padding: 3px 8px;
 }
 
 #booklet-container[data-treatment="brutalist"] .cover-title {
@@ -3291,10 +3273,6 @@ body.demo-mode .demo-error {
   border-bottom: 4px solid var(--ink);
   padding-bottom: 6px;
   line-height: 0.92;
-}
-
-#booklet-container[data-treatment="brutalist"] .session-card {
-  border-bottom: 2px solid var(--ink);
 }
 
 #booklet-container[data-treatment="brutalist"] .notes-box {
@@ -3324,38 +3302,32 @@ body.demo-mode .demo-error {
   --theme-header-border: 0.75px solid var(--ink);
   --theme-box-border: 1px solid var(--ink);
   --theme-field-rule: 0.75px solid var(--rule);
+  --theme-designation-color: var(--muted);
+  --theme-designation-padding: 0 0 2px 0;
+  --theme-session-separator: 0.5px solid var(--fog);
+  --theme-cover-rule: 0.5px solid var(--ink);
+  --theme-cover-rule-gap: 8px;
   --theme-page-overlay:
     radial-gradient(circle, rgba(0,0,0,0.045) 0.45px, transparent 0.6px);
   --theme-page-noise-opacity: 0.30;
+  --theme-page-atmosphere-size: 5px 5px, auto;
 }
 
 /* Clinical refinements — hairline precision */
-#booklet-container[data-treatment="clinical"] .booklet-page::before {
-  background-size: 5px 5px, auto;
-}
-
 #booklet-container[data-treatment="clinical"] .cover-designation {
   border: none;
   border-bottom: 1px solid var(--muted);
   font-size: 6.5pt;
   letter-spacing: 0.3em;
-  color: var(--muted);
-  padding: 0 0 2px 0;
 }
 
 #booklet-container[data-treatment="clinical"] .cover-title {
   font-weight: normal;
-  border-bottom: 0.5px solid var(--ink);
-  padding-bottom: 8px;
 }
 
 #booklet-container[data-treatment="clinical"] .rules-title,
 #booklet-container[data-treatment="clinical"] .week-title {
   font-weight: normal;
-}
-
-#booklet-container[data-treatment="clinical"] .session-card {
-  border-bottom: 0.5px solid var(--fog);
 }
 
 #booklet-container[data-treatment="clinical"] .fragment-doc {
@@ -3381,6 +3353,14 @@ body.demo-mode .demo-error {
   --theme-prompt-border: 1px dashed var(--muted);
   --theme-header-border: 1px dashed var(--muted);
   --theme-field-rule: 1px dashed var(--muted);
+  --theme-designation-border: 1px dashed var(--muted);
+  --theme-designation-padding: 2px 6px;
+  --theme-designation-opacity: 0.6;
+  --theme-designation-transform: rotate(0.5deg);
+  --theme-session-border: none;
+  --theme-session-separator: 1px dashed var(--rule);
+  --theme-cover-rule: 1px dashed var(--muted);
+  --theme-cover-rule-gap: 8px;
   --theme-page-overlay:
     radial-gradient(ellipse at 30% 70%, rgba(139,119,82,0.09), transparent 70%);
   --theme-page-noise-opacity: 0.11;
@@ -3389,41 +3369,9 @@ body.demo-mode .demo-error {
   --boss-attachment-label: "DECODING PROTOCOL";
 }
 
-/* Confessional refinements */
-#booklet-container[data-treatment="confessional"] .cover-designation {
-  transform: rotate(0.5deg);
-  opacity: 0.6;
-  border-style: dashed;
-  border-width: 1px;
-  border-color: var(--muted);
-  padding: 2px 6px;
-}
-
-#booklet-container[data-treatment="confessional"] .cover-title {
-  border-bottom-style: dashed;
-  border-bottom-width: 1px;
-  border-bottom-color: var(--muted);
-  padding-bottom: 8px;
-}
-
 #booklet-container[data-treatment="confessional"] .fragment-doc-type {
   opacity: 0.7;
   font-style: italic;
-}
-
-#booklet-container[data-treatment="confessional"] .story-prompt {
-  border-left-style: dashed;
-}
-
-#booklet-container[data-treatment="confessional"] .session-card {
-  border: 0;
-  border-bottom: 1px dashed var(--rule);
-  border-radius: 0;
-}
-
-#booklet-container[data-treatment="confessional"] .rules-header,
-#booklet-container[data-treatment="confessional"] .page-header {
-  border-bottom-style: dashed;
 }
 
 #booklet-container[data-treatment="confessional"] .fragment-doc.correspondence,
@@ -3452,50 +3400,23 @@ body.demo-mode .demo-error {
   --theme-header-border: 2px double var(--ink);
   --theme-box-border: 1.5px solid var(--ink);
   --theme-field-rule: 1px solid var(--rule);
+  --theme-designation-border: 2px double var(--accent);
+  --theme-designation-padding: 2px 6px;
+  --theme-cover-rule: 2px double var(--ink);
+  --theme-cover-rule-gap: 8px;
   --theme-page-overlay:
     repeating-linear-gradient(0deg, transparent 0 18px, rgba(0,0,0,0.022) 18px 19px),
     repeating-linear-gradient(90deg, transparent 0 18px, rgba(0,0,0,0.022) 18px 19px);
   --theme-page-noise-opacity: 0.10;
 }
 
-/* Corporate refinements */
-#booklet-container[data-treatment="corporate"] .cover-designation {
-  border: 2px double var(--accent);
-  padding: 2px 6px;
-}
-
 #booklet-container[data-treatment="corporate"] .cover-title {
-  border-bottom: 2px double var(--ink);
-  padding-bottom: 8px;
   font-style: normal;
-}
-
-#booklet-container[data-treatment="corporate"] .rules-header,
-#booklet-container[data-treatment="corporate"] .page-header {
-  border-bottom: 2px double var(--ink);
 }
 
 #booklet-container[data-treatment="corporate"] .fragment-doc-type {
   border-bottom: 2px double var(--muted);
   padding-bottom: 2px;
-}
-
-#booklet-container[data-treatment="corporate"] .fragment-doc {
-  border-radius: 0;
-}
-
-/* ── Cross-treatment refinements ──────────────────────────── */
-#booklet-container[data-treatment="pastoral"] .rules-header,
-#booklet-container[data-treatment="pastoral"] .page-header,
-#booklet-container[data-treatment="literary"] .rules-header,
-#booklet-container[data-treatment="literary"] .page-header,
-#booklet-container[data-treatment="confessional"] .rules-header,
-#booklet-container[data-treatment="confessional"] .page-header {
-  background: transparent;
-}
-
-#booklet-container[data-treatment="terminal"] .fragment-doc {
-  border-radius: 0;
 }
 
 /* ══════════════════════════════════════════════════════════════
