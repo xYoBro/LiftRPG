@@ -490,8 +490,18 @@
     var PLAYER_R = 4.5;         // SVG units — current node radius
     var PLAYER_STROKE = 2.5;    // SVG units — double-ring stroke width
     var EDGE_W = 0.8;           // SVG units — edge stroke width
-    var LABEL_GAP = 5;          // SVG units — node center to label baseline
+    var LABEL_GAP = 8;          // SVG units — node center to label baseline
+    var EDGE_LABEL_OFFSET = 8;  // SVG units — perpendicular offset for edge labels
     var VB_PAD = 12;            // SVG units — viewBox padding all sides
+    // Collision margins — measured from actual rendered text in SVG coords.
+    // SVG viewBox 124×124 renders at ~229px, so 1 SVG unit ≈ 0.54px→SVG ratio.
+    // Node labels (5.5pt): 3.92 SVG units/char, 8.1 SVG units tall.
+    // Edge labels (4.5pt): 3.22 SVG units/char, 6.5 SVG units tall.
+    var CHAR_W = 4.0;           // SVG units — node label char width (measured 3.92, +2% margin)
+    var CHAR_W_EDGE = 3.3;      // SVG units — edge label char width (measured 3.22, +2% margin)
+    var NODE_HIT_R = 6;         // SVG units — collision radius around node centers
+    var LABEL_HH = 4.5;         // SVG units — node label half-height (measured 8.1/2 + margin)
+    var EDGE_LABEL_HH = 3.8;    // SVG units — edge label half-height (measured 6.5/2 + margin)
     // ─────────────────────────────────────────────────────────
 
     container.appendChild(txt('div', 'map-title', mapState.title || 'Location Map'));
@@ -515,6 +525,17 @@
     svg.style.width = '100%';
     svg.style.maxHeight = '3.5in';
 
+    // Collision helper — checks a candidate rect against all placed rects
+    function hitTest(cx, cy, hw, hh) {
+      for (var i = 0; i < placedLabels.length; i++) {
+        var p = placedLabels[i];
+        if (Math.abs(cx - p.x) < (hw + p.hw) && Math.abs(cy - p.y) < (hh + p.hh)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     // Draw edge lines first (behind nodes) — labels deferred until after node labels
     edges.forEach(function (edge) {
       var from = nodeLookup[edge.from];
@@ -531,9 +552,15 @@
       svg.appendChild(line);
     });
 
-    // Track placed labels for collision detection (shared by node + edge labels)
+    // Track placed rects for collision detection: {x, y, hw (half-width), hh (half-height)}
     var placedLabels = [];
     var legendEntries = [];
+
+    // Register all node bodies as occupied space FIRST
+    nodes.forEach(function (node) {
+      var isCurrent = node.id === currentNode;
+      placedLabels.push({ x: node.x, y: node.y, hw: NODE_HIT_R, hh: NODE_HIT_R });
+    });
 
     // Draw nodes + node labels
     nodes.forEach(function (node) {
@@ -553,30 +580,19 @@
       if (isCurrent) circle.setAttribute('stroke-width', PLAYER_STROKE);
       svg.appendChild(circle);
 
-      // Also register node body as occupied space for edge label collision
-      placedLabels.push({ x: node.x, y: node.y, hw: isCurrent ? PLAYER_R : NODE_R });
-
-      // Label — always below node, centered
+      // Label — below node, centered
       var labelText = (node.label || node.id).substring(0, 14);
       var labelY = node.y + LABEL_GAP + NODE_R;
       var labelX = node.x;
 
       // Clamp inside viewBox
-      var estHalfWidth = labelText.length * FONT_SIZE * 0.35;
-      if (labelX - estHalfWidth < 0) labelX = estHalfWidth + 1;
-      if (labelX + estHalfWidth > 100) labelX = 100 - estHalfWidth - 1;
+      var estHW = labelText.length * CHAR_W * 0.5;
+      if (labelX - estHW < -VB_PAD + 1) labelX = -VB_PAD + 1 + estHW;
+      if (labelX + estHW > 100 + VB_PAD - 1) labelX = 100 + VB_PAD - 1 - estHW;
       if (labelY > 100 + VB_PAD - 2) labelY = node.y - LABEL_GAP;
 
-      // Collision check against placed labels
-      var collides = false;
-      for (var i = 0; i < placedLabels.length; i++) {
-        var prev = placedLabels[i];
-        if (Math.abs(labelX - prev.x) < (estHalfWidth + prev.hw) &&
-            Math.abs(labelY - prev.y) < FONT_SIZE * 1.2) {
-          collides = true;
-          break;
-        }
-      }
+      // Collision check
+      var collides = hitTest(labelX, labelY, estHW, LABEL_HH);
 
       var lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       lbl.setAttribute('x', labelX);
@@ -588,10 +604,10 @@
         var refNum = legendEntries.length + 1;
         lbl.textContent = '[' + refNum + ']';
         legendEntries.push(refNum + ': ' + labelText);
-        placedLabels.push({ x: labelX, y: labelY, hw: FONT_SIZE * 1.2 });
+        placedLabels.push({ x: labelX, y: labelY, hw: 3 * CHAR_W * 0.5, hh: LABEL_HH });
       } else {
         lbl.textContent = labelText;
-        placedLabels.push({ x: labelX, y: labelY, hw: estHalfWidth });
+        placedLabels.push({ x: labelX, y: labelY, hw: estHW, hh: LABEL_HH });
       }
       svg.appendChild(lbl);
     });
@@ -607,46 +623,28 @@
       var mx = (from.x + to.x) / 2;
       var my = (from.y + to.y) / 2;
 
-      // Perpendicular offset away from edge line
+      // Perpendicular offset — try both sides of the edge
       var dx = to.x - from.x;
       var dy = to.y - from.y;
       var len = Math.sqrt(dx * dx + dy * dy) || 1;
-      var perpX = -dy / len * LABEL_GAP;
-      var perpY = dx / len * LABEL_GAP;
-      var elX = mx + perpX;
-      var elY = my + perpY - 1;
+      var perpX = -dy / len * EDGE_LABEL_OFFSET;
+      var perpY = dx / len * EDGE_LABEL_OFFSET;
 
-      // Clamp inside viewBox
-      var elHalfWidth = edgeLabelText.length * EDGE_FONT_SIZE * 0.35;
-      if (elX - elHalfWidth < 0) elX = elHalfWidth + 1;
-      if (elX + elHalfWidth > 100) elX = 100 - elHalfWidth - 1;
+      var estHW = edgeLabelText.length * CHAR_W_EDGE * 0.5;
+
+      // Try side A (perpendicular offset)
+      var elX = mx + perpX;
+      var elY = my + perpY;
+
+      // Clamp
+      if (elX - estHW < -VB_PAD + 1) elX = -VB_PAD + 1 + estHW;
+      if (elX + estHW > 100 + VB_PAD - 1) elX = 100 + VB_PAD - 1 - estHW;
       if (elY < -VB_PAD + 2) elY = -VB_PAD + 2;
       if (elY > 100 + VB_PAD - 2) elY = 100 + VB_PAD - 2;
 
-      // Collision check against all placed labels (nodes + prior edge labels)
-      var collides = false;
-      for (var i = 0; i < placedLabels.length; i++) {
-        var prev = placedLabels[i];
-        if (Math.abs(elX - prev.x) < (elHalfWidth + prev.hw) &&
-            Math.abs(elY - prev.y) < EDGE_FONT_SIZE * 1.4) {
-          collides = true;
-          break;
-        }
-      }
-
-      if (collides) {
-        // Legend fallback — [N] in SVG + text below
-        var refNum = legendEntries.length + 1;
-        var elbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        elbl.setAttribute('x', mx);
-        elbl.setAttribute('y', my - 2);
-        elbl.setAttribute('text-anchor', 'middle');
-        elbl.setAttribute('class', 'ptp-edge-label');
-        elbl.textContent = '[' + refNum + ']';
-        svg.appendChild(elbl);
-        legendEntries.push(refNum + ': ' + edgeLabelText);
-        placedLabels.push({ x: mx, y: my - 2, hw: EDGE_FONT_SIZE * 1.2 });
-      } else {
+      var placed = false;
+      if (!hitTest(elX, elY, estHW, EDGE_LABEL_HH)) {
+        // Side A is clear
         var elbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         elbl.setAttribute('x', elX);
         elbl.setAttribute('y', elY);
@@ -654,7 +652,36 @@
         elbl.setAttribute('class', 'ptp-edge-label');
         elbl.textContent = edgeLabelText;
         svg.appendChild(elbl);
-        placedLabels.push({ x: elX, y: elY, hw: elHalfWidth });
+        placedLabels.push({ x: elX, y: elY, hw: estHW, hh: EDGE_LABEL_HH });
+        placed = true;
+      }
+
+      if (!placed) {
+        // Try side B (opposite perpendicular)
+        elX = mx - perpX;
+        elY = my - perpY;
+        if (elX - estHW < -VB_PAD + 1) elX = -VB_PAD + 1 + estHW;
+        if (elX + estHW > 100 + VB_PAD - 1) elX = 100 + VB_PAD - 1 - estHW;
+        if (elY < -VB_PAD + 2) elY = -VB_PAD + 2;
+        if (elY > 100 + VB_PAD - 2) elY = 100 + VB_PAD - 2;
+
+        if (!hitTest(elX, elY, estHW, EDGE_LABEL_HH)) {
+          var elbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          elbl.setAttribute('x', elX);
+          elbl.setAttribute('y', elY);
+          elbl.setAttribute('text-anchor', 'middle');
+          elbl.setAttribute('class', 'ptp-edge-label');
+          elbl.textContent = edgeLabelText;
+          svg.appendChild(elbl);
+          placedLabels.push({ x: elX, y: elY, hw: estHW, hh: EDGE_LABEL_HH });
+          placed = true;
+        }
+      }
+
+      if (!placed) {
+        // Both sides blocked — legend only (no SVG text to avoid overlap)
+        var refNum = legendEntries.length + 1;
+        legendEntries.push(refNum + ': ' + edgeLabelText);
       }
     });
 

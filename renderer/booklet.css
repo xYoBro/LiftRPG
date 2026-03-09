@@ -647,12 +647,6 @@ body {
   border: 1px solid var(--rule);
   border-radius: 3px;
   background: var(--paper);
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent, transparent 13px,
-    var(--rule) 13px, var(--rule) 14px
-  );
-  background-position: 0 18px; /* offset below NOTES label */
   padding: 3px 8px;
   position: relative;
   overflow: hidden;
