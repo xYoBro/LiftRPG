@@ -855,24 +855,24 @@ body {
 }
 
 /* ── Layout Family: Survey (map dominant) ─────────────── */
+/* Map dominant left + cipher compact right, oracle full-width bottom.
+   Oracle needs full page width to fit 10-11 entries (2d6/d100). */
 .field-ops-right[data-layout="survey"] .rp-content {
   grid-template-areas:
-    "map map"
-    "cipher oracle";
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
-}
-
-.field-ops-right[data-layout="survey"] .oracle-zone {
-  border-top: none;
-  padding-top: 0;
-  border-left: 1px solid var(--rule);
-  padding-left: 6px;
+    "map cipher"
+    "oracle oracle";
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  grid-template-rows: minmax(0, 2fr) minmax(0, 3fr);
 }
 
 .field-ops-right[data-layout="survey"] .map-zone {
   border-bottom: 1px solid var(--rule);
   padding-bottom: 6px;
+}
+
+.field-ops-right[data-layout="survey"] .cipher-zone {
+  border-left: 1px solid var(--rule);
+  padding-left: 6px;
 }
 
 .field-ops-right[data-layout="survey"] .cipher-zone .puzzle-title {
@@ -893,6 +893,26 @@ body {
 
 .field-ops-right[data-layout="survey"] .cipher-zone .password-extract {
   font-size: 5.5pt;
+}
+
+/* Survey oracle: compact for compressed bottom row */
+.field-ops-right[data-layout="survey"] .oracle-text {
+  font-size: 6pt;
+  line-height: 1.25;
+}
+
+.field-ops-right[data-layout="survey"] .oracle-case-num {
+  font-size: 5.5pt;
+}
+
+.field-ops-right[data-layout="survey"] .oracle-entry {
+  padding: 1px 0;
+}
+
+.field-ops-right[data-layout="survey"] .oracle-instruction {
+  font-size: 6pt;
+  line-height: 1.25;
+  margin-bottom: 2px;
 }
 
 /* ── Layout Family: Console (cipher dominant) ─────────── */
