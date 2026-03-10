@@ -398,12 +398,11 @@ select {
   color: var(--page-muted);
 }
 
-.doc-designation {
+.doc-designation,
+.page-kicker {
   display: block;
   width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
   font-size: calc(var(--label-size) * 0.85);
   letter-spacing: 0.10em;
   margin-bottom: 0.1in;
@@ -446,6 +445,13 @@ select {
   font-weight: var(--weight-body);
   line-height: var(--body-line-height);
   color: var(--page-ink);
+}
+
+.oracle-text,
+.oracle-action,
+.fragment-card .body-copy,
+.session-narrative .body-copy {
+  overflow-wrap: anywhere;
 }
 
 .body-copy {
@@ -834,6 +840,9 @@ select {
   font-weight: var(--weight-emphasis);
   color: var(--page-ink);
   line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .exercise-leader {
@@ -1525,6 +1534,28 @@ select {
   .exercise-load,
   .set-grid {
     justify-content: start;
+  }
+}
+
+@media (max-width: 600px) {
+  .app-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .app-encrypt,
+  .app-unlock {
+    width: 100%;
+    justify-content: center;
+    border-left: 0;
+    border-right: 0;
+  }
+  
+  .app-status,
+  .encrypt-status,
+  .unlock-status {
+    overflow-wrap: anywhere;
+    letter-spacing: normal;
   }
 }
 

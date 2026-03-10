@@ -1603,6 +1603,7 @@
     refs.booklet.appendChild(grid);
     
     // Phase 1 + 2: Enforce page fit dynamically after painting
+    var clippedCount = 0;
     pages.forEach(function (page) {
       var frame = page.querySelector('.page-frame');
       if (!frame) return;
@@ -1629,13 +1630,31 @@
 
       var scale = clientH / trueH;
       page.setAttribute('data-fit-level', '4');
+      
+      var MIN_SCALE = 0.82;
+      var isClipped = false;
+      if (scale < MIN_SCALE) {
+        if (debug) {
+          console.warn('SEVERE OVERFLOW: Scale clamped from ' + scale.toFixed(3) + ' to MIN_SCALE (' + MIN_SCALE + ') on ' + page.getAttribute('data-page-type'));
+          frame.style.outline = '2px dashed red';
+        }
+        scale = MIN_SCALE;
+        isClipped = true;
+        clippedCount++;
+        page.setAttribute('data-fit-failed', 'true');
+      }
+
       frame.style.transform = 'scale(' + scale.toFixed(3) + ')';
       frame.style.transformOrigin = 'top center';
-      if (debug) console.log('Fallback: applied global CSS transform scale of', scale.toFixed(3));
+      if (debug && !isClipped) console.log('Fallback: applied global CSS transform scale of', scale.toFixed(3));
     });
 
     refs.printBtn.disabled = false;
-    setStatus('Loaded ' + pages.length + ' pages. Review, then print.', 'success');
+    if (clippedCount > 0) {
+      setStatus('Loaded ' + pages.length + ' pages. Warning: ' + clippedCount + ' pages clipped (exceeded max density).', 'error');
+    } else {
+      setStatus('Loaded ' + pages.length + ' pages. Review, then print.', 'success');
+    }
   }
 
   function formatPrescription(exercise) {
