@@ -71,7 +71,7 @@
   --badge-style: normal;
   --callout-surface: rgba(228, 221, 209, 0.22);
   --highlight-surface: rgba(123, 96, 71, 0.12);
-  --page-margin: 0.36in;
+  --page-margin: 0.5in;
 }
 
 * {
@@ -642,7 +642,7 @@ select {
 
 .session-ledger-body {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.35fr);
+  grid-template-columns: 2.35in minmax(0, 1fr);
   gap: 0.12in;
   align-items: start;
 }

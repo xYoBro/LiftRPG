@@ -618,7 +618,7 @@
       if (session.binaryChoice) weight += 1.2;
 
       // Reduced chunk size for easier layout: max 2 sessions, tight weight limits
-      if (current.length >= 2 || (current.length >= 1 && load + weight > 2.4)) {
+      if (current.length >= 2 || (current.length >= 1 && load + weight > 2.05)) {
         chunks.push(current);
         current = [];
         load = 0;
@@ -635,11 +635,55 @@
     var current = [];
     var load = 0;
 
+    var processed = [];
     (fragments || []).forEach(function (fragment) {
+      var body = fragment.bodyText || fragment.body || fragment.content || '';
+      var len = readingLength(body);
+      if (len > 800) {
+        var paras = splitParagraphs(body);
+        var currentParas = [];
+        var currentLen = 0;
+        var part = 1;
+
+        paras.forEach(function (p) {
+          var pLen = readingLength(p);
+          if (currentLen + pLen > 750 && currentParas.length > 0) {
+            var fClone = Object.assign({}, fragment, {
+              content: currentParas.join('\n\n'),
+              title: fragment.title ? (part > 1 ? fragment.title + ' (cont.)' : fragment.title) : ''
+            });
+            if (part > 1) {
+              fClone.inWorldAuthor = ''; fClone.inWorldRecipient = ''; fClone.date = '';
+            }
+            processed.push(fClone);
+            currentParas = [p];
+            currentLen = pLen;
+            part++;
+          } else {
+            currentParas.push(p);
+            currentLen += pLen;
+          }
+        });
+        if (currentParas.length > 0) {
+          var fFinal = Object.assign({}, fragment, {
+            content: currentParas.join('\n\n'),
+            title: fragment.title && part > 1 ? fragment.title + ' (cont.)' : fragment.title || ''
+          });
+          if (part > 1) {
+            fFinal.inWorldAuthor = ''; fFinal.inWorldRecipient = ''; fFinal.date = '';
+          }
+          processed.push(fFinal);
+        }
+      } else {
+        processed.push(fragment);
+      }
+    });
+
+    processed.forEach(function (fragment) {
       var body = fragment.bodyText || fragment.body || fragment.content || '';
       // Reduced density: lower max chars per page weight
       var weight = Math.max(1, Math.min(readingLength(body) / 600, 2.5));
-      if (current.length >= 2 || (current.length >= 1 && load + weight > 1.8)) {
+      if (current.length >= 2 || (current.length >= 1 && load + weight > 1.35)) {
         pages.push(current);
         current = [];
         load = 0;
