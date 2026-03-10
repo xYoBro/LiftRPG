@@ -72,6 +72,33 @@
   --callout-surface: rgba(228, 221, 209, 0.22);
   --highlight-surface: rgba(123, 96, 71, 0.12);
   --page-margin: 0.5in;
+
+  /* FIT TOKENS (Phase 4) */
+  --fit-gap: 22px;
+  --fit-row-pad: 0.12in;
+  --fit-prompt-margin: 0.18in;
+  --fit-body-size: var(--body-size);
+  --fit-label-size: var(--label-size);
+}
+
+.booklet-page[data-fit-level="1"] {
+  --fit-gap: 12px;
+  --fit-row-pad: 0.08in;
+  --fit-prompt-margin: 0.12in;
+}
+.booklet-page[data-fit-level="2"] {
+  --fit-gap: 8px;
+  --fit-row-pad: 0.04in;
+  --fit-prompt-margin: 0.08in;
+  --fit-body-size: calc(var(--body-size) * 0.95);
+  --fit-label-size: calc(var(--label-size) * 0.95);
+}
+.booklet-page[data-fit-level="3"] {
+  --fit-gap: 4px;
+  --fit-row-pad: 0.02in;
+  --fit-prompt-margin: 0.04in;
+  --fit-body-size: calc(var(--body-size) * 0.88);
+  --fit-label-size: calc(var(--label-size) * 0.88);
 }
 
 * {
@@ -319,6 +346,8 @@ select {
   border-bottom: var(--line-width-rule) var(--line-style) var(--page-rule);
 }
 
+
+
 .page-kicker,
 .doc-label,
 .doc-designation,
@@ -336,7 +365,7 @@ select {
 .fragment-meta-line,
 .back-meta {
   font-family: var(--font-mono);
-  font-size: var(--label-size);
+  font-size: var(--fit-label-size);
   font-weight: var(--weight-label);
   letter-spacing: var(--label-spacing);
   text-transform: var(--label-transform);
@@ -413,6 +442,17 @@ select {
   font-weight: var(--weight-body);
   line-height: var(--body-line-height);
   color: var(--page-ink);
+}
+
+.body-copy {
+  margin-top: 0;
+  margin-bottom: var(--fit-prompt-margin);
+  font-family: var(--font-body);
+  font-size: var(--fit-body-size);
+  font-weight: var(--weight-body);
+  letter-spacing: var(--letter-spacing);
+  line-height: var(--line-height);
+  text-rendering: optimizeLegibility;
 }
 
 .body-copy-tight {
@@ -647,29 +687,30 @@ select {
 .session-ledger-body {
   display: grid;
   grid-template-columns: 2.35in minmax(0, 1fr);
-  gap: 0.12in;
+  gap: var(--fit-gap);
   align-items: start;
 }
 
 .session-marginalia {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding-left: 0.12in;
+  gap: var(--fit-gap);
+  padding: 2px 0 0 0.14in;
   border-left: var(--line-width-hair) var(--line-style) var(--page-rule);
+  color: var(--color-ink-muted);
 }
 
 .session-card {
   display: flex;
   flex-direction: column;
-  gap: 0.12in;
+  gap: var(--fit-gap);
   background: var(--card-surface);
   box-shadow: var(--card-shadow);
   border-top: calc(var(--card-border-width) * 2) var(--card-border-style) var(--card-border-color);
   border-bottom: var(--card-border-width) var(--card-border-style) var(--card-border-color);
   border-left: 0;
   border-right: 0;
-  padding: 0.08in 0.12in 0.12in 0.16in;
+  padding: 0.08in 0.12in var(--fit-row-pad) 0.16in;
   margin-inline: 0;
   position: relative;
   overflow: hidden;

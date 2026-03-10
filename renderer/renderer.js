@@ -1581,6 +1581,39 @@
     }
 
     refs.booklet.appendChild(grid);
+    
+    // Phase 1 + 2: Enforce page fit dynamically after painting
+    pages.forEach(function (page) {
+      var frame = page.querySelector('.page-frame');
+      if (!frame) return;
+
+      var clientH = frame.clientHeight;
+      if (clientH === 0) return; // not effectively painted
+
+      var trueH = frame.scrollHeight;
+      var debug = new URLSearchParams(window.location.search).get('debugLayout') === '1';
+
+      if (trueH <= clientH) return;
+
+      if (debug) console.log('Overflow detected on', page.getAttribute('data-page-type'), '(Safe:', clientH, '/ True:', trueH, 'px)');
+
+      var levels = ['1', '2', '3'];
+      for (var k = 0; k < levels.length; k++) {
+        page.setAttribute('data-fit-level', levels[k]);
+        trueH = frame.scrollHeight;
+        if (trueH <= clientH) {
+          if (debug) console.log('Resolved with compaction fit-' + levels[k]);
+          return;
+        }
+      }
+
+      var scale = clientH / trueH;
+      page.setAttribute('data-fit-level', '4');
+      frame.style.transform = 'scale(' + scale.toFixed(3) + ')';
+      frame.style.transformOrigin = 'top center';
+      if (debug) console.log('Fallback: applied global CSS transform scale of', scale.toFixed(3));
+    });
+
     refs.printBtn.disabled = false;
     setStatus('Loaded ' + pages.length + ' pages. Review, then print.', 'success');
   }
@@ -1766,6 +1799,7 @@
     refs.layoutMode.addEventListener('change', function () {
       state.layoutMode = refs.layoutMode.value;
       syncLayoutMode();
+      if (state.data) renderBooklet(state.data);
     });
     refs.unlockBtn.addEventListener('click', attemptUnlock);
     refs.unlockPassword.addEventListener('keydown', function (event) {

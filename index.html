@@ -247,7 +247,7 @@
       transition: all .2s cubic-bezier(.4, 0, .2, 1);
     }
 
-    .flip-trigger:hover {
+    .flip-trigger:hover, .flip-trigger:focus-visible {
       background: var(--accent);
       border-color: var(--accent);
       transform: translateY(-2px);
@@ -745,7 +745,11 @@
 
       function measure() {
         var face = flipped ? back : front;
-        flipper.style.height = face.scrollHeight + 'px';
+        var contentHeight = face.scrollHeight;
+        var minH = 600;
+        var maxH = window.innerHeight * 0.85;
+        var clamped = Math.max(minH, Math.min(contentHeight, maxH));
+        flipper.style.height = clamped + 'px';
       }
 
       flipper.querySelectorAll('.flip-btn').forEach(function (btn) {
