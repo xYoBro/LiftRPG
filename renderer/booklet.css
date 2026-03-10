@@ -258,22 +258,22 @@ select {
 }
 
 .booklet-grid {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 22px;
-  justify-content: center;
+  align-items: center;
 }
 
-#booklet-container[data-layout-mode="single"] .booklet-grid {
-  grid-template-columns: repeat(1, minmax(0, 5.5in));
+.spread-row {
+  display: flex;
+  width: 11in;
 }
 
-#booklet-container[data-layout-mode="spread"] .booklet-grid,
-#booklet-container[data-layout-mode="booklet"] .booklet-grid {
-  grid-template-columns: repeat(2, minmax(0, 5.5in));
-}
-
-#booklet-container[data-layout-mode="spread"] .booklet-page:first-child {
-  grid-column: 2;
+.spread-spacer {
+  width: 5.5in;
+  height: 8.5in;
+  flex-shrink: 0;
+  background: transparent;
 }
 
 .booklet-page {
@@ -1408,14 +1408,6 @@ select {
 
 @media (max-width: 1240px) {
 
-  #booklet-container[data-layout-mode="spread"] .booklet-grid,
-  #booklet-container[data-layout-mode="booklet"] .booklet-grid {
-    grid-template-columns: repeat(1, minmax(0, 5.5in));
-  }
-
-  #booklet-container[data-layout-mode="spread"] .booklet-page:first-child {
-    grid-column: auto;
-  }
 }
 
 @media (max-width: 760px) {
@@ -1428,8 +1420,17 @@ select {
   }
 
   .booklet-page {
-    width: min(100vw - 20px, 5.5in);
     min-height: auto;
+  }
+  
+  #booklet-container[data-layout-mode="single"] .booklet-page {
+    width: min(100vw - 20px, 5.5in);
+  }
+
+  .spread-row {
+    transform: scale(min(calc((100vw - 20px) / 1056), 0.95));
+    transform-origin: top center;
+    margin-bottom: -5%;
   }
 
   .page-frame {
@@ -1489,20 +1490,45 @@ select {
 
   .booklet-grid {
     display: block;
+    gap: 0;
   }
 
-  .booklet-page {
+  .spread-row {
+    margin: 0;
+    width: 11in;
+    height: 8.5in;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .spread-row:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  #booklet-container[data-layout-mode="single"] .booklet-page {
     width: 5.5in;
     height: 8.5in;
     max-height: 8.5in;
     overflow: hidden;
     box-shadow: none;
-    break-after: page;
     page-break-after: always;
+    break-after: page;
   }
 
-  .booklet-page:last-child {
-    break-after: auto;
+  #booklet-container[data-layout-mode="single"] .booklet-page:last-child {
     page-break-after: auto;
+    break-after: auto;
+  }
+
+  #booklet-container[data-layout-mode="booklet"] .booklet-page,
+  #booklet-container[data-layout-mode="spread"] .booklet-page {
+    box-shadow: none;
+    page-break-after: auto;
+    break-after: auto;
+  }
+  
+  @page {
+    margin: 0;
   }
 }

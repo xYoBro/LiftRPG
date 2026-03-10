@@ -1523,11 +1523,63 @@
     applyTheme(refs.booklet, resolveTheme(data));
 
     var pages = buildPages(data);
-    var grid = make('div', 'booklet-grid');
+    
     pages.forEach(function (page, index) {
       page.setAttribute('data-page-number', String(index + 1));
-      grid.appendChild(page);
+      page.classList.add((index + 1) % 2 === 0 ? 'page-left' : 'page-right');
     });
+
+    var grid = make('div', 'booklet-grid');
+
+    if (state.layoutMode === 'single') {
+      pages.forEach(function (page) {
+        grid.appendChild(page);
+      });
+    } else if (state.layoutMode === 'booklet') {
+      var n = pages.length;
+      if (n % 4 !== 0) {
+        while (n % 4 !== 0) {
+          var blank = make('section', 'booklet-page page-blank');
+          pages.push(blank);
+          n = pages.length;
+        }
+      }
+      for (var i = 0; i < n / 2; i += 2) {
+        var spreadOut = make('div', 'spread-row printer-sheet');
+        spreadOut.appendChild(pages[n - 1 - i]);
+        spreadOut.appendChild(pages[i]);
+        grid.appendChild(spreadOut);
+
+        if (i + 1 < n / 2) {
+          var spreadIn = make('div', 'spread-row printer-sheet');
+          spreadIn.appendChild(pages[i + 1]);
+          spreadIn.appendChild(pages[n - 2 - i]);
+          grid.appendChild(spreadIn);
+        }
+      }
+    } else {
+      var nReader = pages.length;
+      var coverSpread = make('div', 'spread-row reader-spread');
+      coverSpread.appendChild(make('div', 'spread-spacer'));
+      coverSpread.appendChild(pages[0]);
+      grid.appendChild(coverSpread);
+
+      for (var j = 1; j < nReader - 1; j += 2) {
+        var rSpread = make('div', 'spread-row reader-spread');
+        rSpread.appendChild(pages[j]);
+        if (j + 1 < nReader) rSpread.appendChild(pages[j + 1]);
+        else rSpread.appendChild(make('div', 'spread-spacer'));
+        grid.appendChild(rSpread);
+      }
+
+      if (nReader % 2 === 0) {
+        var backSpread = make('div', 'spread-row reader-spread');
+        backSpread.appendChild(pages[nReader - 1]);
+        backSpread.appendChild(make('div', 'spread-spacer'));
+        grid.appendChild(backSpread);
+      }
+    }
+
     refs.booklet.appendChild(grid);
     refs.printBtn.disabled = false;
     setStatus('Loaded ' + pages.length + ' pages. Review, then print.', 'success');
