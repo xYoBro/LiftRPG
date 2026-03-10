@@ -272,6 +272,10 @@ select {
   grid-template-columns: repeat(2, minmax(0, 5.5in));
 }
 
+#booklet-container[data-layout-mode="spread"] .booklet-page:first-child {
+  grid-column: 2;
+}
+
 .booklet-page {
   position: relative;
   width: 5.5in;
@@ -1407,6 +1411,10 @@ select {
   #booklet-container[data-layout-mode="spread"] .booklet-grid,
   #booklet-container[data-layout-mode="booklet"] .booklet-grid {
     grid-template-columns: repeat(1, minmax(0, 5.5in));
+  }
+
+  #booklet-container[data-layout-mode="spread"] .booklet-page:first-child {
+    grid-column: auto;
   }
 }
 
