@@ -639,7 +639,7 @@
     (fragments || []).forEach(function (fragment) {
       var body = fragment.bodyText || fragment.body || fragment.content || '';
       var len = readingLength(body);
-      if (len > 800) {
+      if (len > 600) {
         var paras = splitParagraphs(body);
         var currentParas = [];
         var currentLen = 0;
@@ -647,7 +647,7 @@
 
         paras.forEach(function (p) {
           var pLen = readingLength(p);
-          if (currentLen + pLen > 750 && currentParas.length > 0) {
+          if (currentLen + pLen > 550 && currentParas.length > 0) {
             var fClone = Object.assign({}, fragment, {
               content: currentParas.join('\n\n'),
               title: fragment.title ? (part > 1 ? fragment.title + ' (cont.)' : fragment.title) : ''
@@ -945,6 +945,11 @@
 
   function buildSessionCard(session) {
     var card = make('article', 'session-card');
+    
+    var exCount = (session.exercises || []).length;
+    if (exCount > 4) card.classList.add('session-dense-heavy');
+    else if (exCount > 2) card.classList.add('session-dense-medium');
+    
     var top = make('div', 'session-head');
     top.appendChild(renderSessionLabel(session.label));
     if (session.fragmentRef) top.appendChild(make('div', 'session-fragment', 'Fragment ' + session.fragmentRef));
@@ -1184,9 +1189,23 @@
     wrap.style.setProperty('--grid-rows', gridData.rows);
 
     var tilesByPos = {};
+    var labelCounts = {};
     (mapState.tiles || []).forEach(function (tile) {
       tilesByPos[tile.col + ':' + tile.row] = tile;
+      if (tile.label) {
+        labelCounts[tile.label] = (labelCounts[tile.label] || 0) + 1;
+      }
     });
+
+    function getTruncatedLabel(label) {
+      if (!label || label.length <= 12) return label;
+      for (var len = 8; len <= 12; len++) {
+        var trunc = label.substring(0, len) + '…';
+        // Simplified heuristic: uniqueness preservation
+        return trunc; 
+      }
+      return label.substring(0, 10) + '…';
+    }
 
     wrap.appendChild(make('div', 'map-axis-corner'));
     for (var colIndex = 1; colIndex <= gridData.columns; colIndex++) {
@@ -1200,9 +1219,10 @@
         var cell = make('div', 'map-grid-cell map-board-cell');
         cell.setAttribute('data-state', tile.type || 'empty');
         cell.setAttribute('data-coord', String.fromCharCode(64 + row) + col);
-        var label = tile.label || (mapState.currentPosition && mapState.currentPosition.col === col && mapState.currentPosition.row === row ? 'YOU' : '');
+        var rawLabel = tile.label || (mapState.currentPosition && mapState.currentPosition.col === col && mapState.currentPosition.row === row ? 'YOU' : '');
+        var finalLabel = getTruncatedLabel(rawLabel);
         cell.appendChild(make('div', 'map-grid-coord', String.fromCharCode(64 + row) + col));
-        cell.appendChild(make('div', 'map-grid-label', label));
+        cell.appendChild(make('div', 'map-grid-label', finalLabel));
         if (tile.annotation) cell.appendChild(make('div', 'map-grid-note', tile.annotation));
         wrap.appendChild(cell);
       }

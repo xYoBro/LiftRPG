@@ -74,6 +74,7 @@
   --page-margin: 0.5in;
 
   /* FIT TOKENS (Phase 4) */
+  --fit-page-gap: 0.18in;
   --fit-gap: 22px;
   --fit-row-pad: 0.12in;
   --fit-prompt-margin: 0.18in;
@@ -82,11 +83,13 @@
 }
 
 .booklet-page[data-fit-level="1"] {
+  --fit-page-gap: 0.10in;
   --fit-gap: 12px;
   --fit-row-pad: 0.08in;
   --fit-prompt-margin: 0.12in;
 }
 .booklet-page[data-fit-level="2"] {
+  --fit-page-gap: 0.06in;
   --fit-gap: 8px;
   --fit-row-pad: 0.04in;
   --fit-prompt-margin: 0.08in;
@@ -94,6 +97,7 @@
   --fit-label-size: calc(var(--label-size) * 0.95);
 }
 .booklet-page[data-fit-level="3"] {
+  --fit-page-gap: 0.02in;
   --fit-gap: 4px;
   --fit-row-pad: 0.02in;
   --fit-prompt-margin: 0.04in;
@@ -335,14 +339,14 @@ select {
   padding: var(--page-margin);
   display: flex;
   flex-direction: column;
-  gap: 0.18in;
+  gap: var(--fit-page-gap);
 }
 
 .page-header {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-bottom: 0.12in;
+  padding-bottom: var(--fit-row-pad);
   border-bottom: var(--line-width-rule) var(--line-style) var(--page-rule);
 }
 
@@ -714,6 +718,19 @@ select {
   margin-inline: 0;
   position: relative;
   overflow: hidden;
+}
+
+.session-dense-medium {
+  --fit-row-pad: 0.10in;
+  --fit-prompt-margin: 0.14in;
+  --fit-body-size: calc(var(--body-size) * 0.95);
+}
+
+.session-dense-heavy {
+  --fit-row-pad: 0.06in;
+  --fit-prompt-margin: 0.08in;
+  --fit-gap: 8px;
+  --fit-body-size: calc(var(--body-size) * 0.88);
 }
 
 .session-card::before {
