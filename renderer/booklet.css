@@ -642,7 +642,7 @@ select {
 
 .session-ledger-body {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.9fr);
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.35fr);
   gap: 0.12in;
   align-items: start;
 }
