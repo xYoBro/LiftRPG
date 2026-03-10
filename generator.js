@@ -1,4 +1,4 @@
-(function(){
+(function () {
   /* ─── Anti-Trope Defense ─────────────────────────────────────────
      Ban list + randomized genre pool. When the user leaves creative
      direction blank, we actively steer the LLM away from default
@@ -43,7 +43,12 @@
     'Deep Space Janitor\'s Maintenance Log — someone has to clean up after first contact',
     'Monastery Brewery Conspiracy — the recipe is a prayer is a weapon',
     'Professional Cheese Cave Inspector — aging reveals terrible truths',
-    'Retired Circus Performer\'s Memoir — the tent is still standing somewhere'
+    'Retired Circus Performer\'s Memoir — the tent is still standing somewhere',
+    'County Water Archive Mystery — missing ledgers, recurring names, one wrong map',
+    'Rural Telephone Switchboard Conspiracy — voices arrive from lines that were buried decades ago',
+    'University Physics Department Cover-Up — the lab notes explain too much and not enough',
+    'Probationary Museum Registrar Mystery — every mislabeled object points to the same erased donor',
+    'Community Astronomy Logbook — the sky repeats a pattern no one else records'
   ];
 
   function shufflePick(arr, n) {
@@ -182,7 +187,7 @@
     '    - Elimination: candidates-and-clues, process-of-elimination, constraint-satisfaction',
     '    - Map-Spatial: grid-coordinate-reading, path-tracing, adjacency-extraction, room-label-derivation',
     '  - `oracleTable` (object): { title, instruction, mode, entries[] }. mode "simple" = 11 entries (2d6, rolls 2-12). mode "full" = 10 entries (d10xd10, ranges 01-10 through 91-00). Entry types: "fragment" (with fragmentRef) or "consequence" (in-place action).',
-    '    Consequence entries MUST include `paperAction` (string): a concrete player instruction that changes visible paper state — e.g., "Advance [clock name] 1 tick", "Mark [node] as locked", "Unlock fragment F.N". Names specific targets by their in-world name.',
+    '    Consequence entries MUST include `paperAction` (string): a concrete player instruction that changes visible paper state — e.g., "Advance the \'Extraction Risk\' clock 1 tick", "Mark [Node 4] as locked", "Check off one \'Supply\' box". Names specific targets by their in-world name.',
     '- `bossEncounter` (object, required when isBossWeek is true):',
     '  - `title` (string): In-world title for the boss page. Not "Final Puzzle".',
     '  - `narrative` (string): 2-4 sentences. The climax story moment.',
@@ -197,7 +202,8 @@
     '- `overflow` (boolean): True when sessions.length > 3. Triggers Part 2 spread.',
     '- `isDeload` (boolean): True for deload weeks. Tonal flag — "deload" never appears in booklet.',
     '- `overflowDocument` (foundDocument, required when overflow is true): Found document for the Part 2 right page.',
-    '- `interlude` (object, optional): Typographic interlude page. Must have explicit reason referencing worldContract or literaryRegister.'
+    '- `interlude` (object, optional): Typographic interlude page. Must have explicit reason referencing worldContract or literaryRegister.',
+    '- `gameplayClocks` (array, optional): Setup for progress clocks (e.g. Forged in the Dark style) mapped to the story. Each { clockName, segments (4/6/8), consequenceOnFull }.'
   ];
 
   var SCHEMA_FRAGMENTS = [
@@ -223,23 +229,24 @@
     'Visual identity for the booklet. The renderer applies these as CSS custom properties and a treatment archetype.',
     '',
     'Required fields:',
-    '- `visualArchetype` (string): One of "pastoral" | "institutional" | "noir" | "terminal" | "literary" | "brutalist" | "clinical" | "confessional" | "corporate".',
-    '  - pastoral: Warm field journal, county forms, tide logs, agricultural notebooks, quiet literary pages. Soft warmth, restrained mono labels, elegant serif text, invisible chrome. Use for rural, coastal, natural, folkloric, memoir, local-history, land-memory, and field-survey stories. This is the default treatment.',
-    '  - institutional: Government forms, heavy stamps, vignette edges. Bureaucracies, military, academia.',
-    '  - noir: Photocopied case files, grain, ink bleed, high contrast. Crime, mystery, investigation.',
-    '  - terminal: Computer printout, scan lines, monospace. Sci-fi, hacking, data systems.',
-    '  - literary: Published book, clean and refined, elegant spacing. Literary fiction, journals, memoirs.',
-    '  - brutalist: Punk zine, stark heavy borders, oversized type. Rebellion, underground, activism.',
-    '  - clinical: Lab report, halftone dots, hairline precision. Medical, scientific, forensic.',
-    '  - confessional: Found diary, aged paper, worn edges. Personal, intimate, handwritten feel.',
-    '  - corporate: Classified briefing, grid underlay, indexed tabs. Business, espionage, corporate intrigue.',
+    '- `visualArchetype` (string): One of "government" | "cyberpunk" | "scifi" | "fantasy" | "noir" | "steampunk" | "minimalist" | "nautical" | "occult".',
+    '  - government: Bureaucratic forms, dark inks, stark red accents, vintage paper. Use for military, institutional, classified, legal, and operational stories. This is the default treatment for deep anomalies or surveys.',
+    '  - cyberpunk: Neon accents, dark slates, terminal monospaces. Use for hacking, corporate dystopian, AI, or grid-runner plots.',
+    '  - scifi: Clean whites, sharp blues, sleek modern sans-serifs. Lab reports, deep-space logs, futuristic forensic trails.',
+    '  - fantasy: Rich organic greens/golds, elegant old-style serifs. Use for magic, folklore, knightly ledgers, or pastoral journals.',
+    '  - noir: High-contrast black and white, hard typewriter fonts. Use for gritty crime, old detective case files, or hardboiled mysteries.',
+    '  - steampunk: Brass and copper palettes, mechanical serifs. Use for Victorian-era, clockwork, industrial-revolution era logs.',
+    '  - minimalist: Pure stark monochrome, extreme whitespace boundaries. Use for extremely clinical, surreal, or "empty" liminal horror.',
+    '  - nautical: Deep oceanic blues, rusted bronze, crisp formal serifs. Use for submarine logs, shipping manifests, lighthouse keeper journals.',
+    '  - occult: Deep purples, crimson accents, aged and occult styling. Use for cosmic horror, grimoires, forbidden texts, dark academia.',
     '- `palette` (object): 6 hex color values (#rrggbb). Must work in B&W (adequate contrast).',
     '  - `ink` (string): Primary text color. Dark.',
     '  - `paper` (string): Page background. Light.',
     '  - `accent` (string): Stamps, highlights, key elements.',
     '  - `muted` (string): Secondary text, annotations.',
     '  - `rule` (string): Borders, dividers.',
-    '  - `fog` (string): Subtle backgrounds, card fills.'
+    '  - `fog` (string): Subtle backgrounds, card fills.',
+    '- `tokens` (object, optional): Any additional renderer theme variables needed to make the archetype feel specific without touching base CSS. Use this when the default archetype treatment needs custom surfaces, typography behavior, or line treatment.'
   ];
 
   var SCHEMA_TAIL = [
@@ -290,22 +297,19 @@
     '- Write meta.worldContract BEFORE generating any other content.',
     '- Every design decision — naming, voice, cipher themes, document types, map labels — must trace back to the world contract.',
     '- If a decision cannot justify itself through the world contract, cut it.',
+    '- If the user provides no creative direction, default to a deep mystery with a strong human core, a hidden system, and revelations that arrive by accumulation instead of jump scares.',
     '',
     '## Diegetic Everything',
     '- Every label, title, and instruction must feel like it belongs inside the fiction.',
     '- No game terminology: not "puzzle", "level", "boss fight", "checkpoint".',
     '- The booklet is a found document. The workout log is a real institutional form.',
     '',
-    '## Session Loop',
-    '- Every session follows a fixed phase order. This is the board-game turn structure.',
-    '- The phases are: Workout \u2192 Field Ops \u2192 Oracle \u2192 Record \u2192 Carry Forward.',
-    '- Workout: complete exercises, mark weights and reps.',
-    '- Field Ops: read story prompt, interact with map and cipher.',
-    '- Oracle: roll on oracle table, apply the result (including any paperAction).',
-    '- Record: tick clocks/tracks based on session outcomes.',
-    '- Carry Forward: note unresolved threads for next session (Zeigarnik tension).',
-    '- Write one of the rulesSpread.leftPage.sections to explain this loop using DIEGETIC phase names derived from the world contract \u2014 not "Workout Phase" but whatever the world calls it.',
-    '- Story prompts should respect this phase order: they set up Field Ops, not summarize the whole session.',
+    '## Session Loop & Analog Gameplay',
+    '- Treat the booklet like a board game or analog video game. It is not just a story; it is a system of tracking variables on paper.',
+    '- Every session follows a strict phase order: Workout \u2192 Field Ops (Puzzles/Maps) \u2192 Oracle (Systems/Events) \u2192 Record (Clocks/Tracks) \u2192 Carry Forward.',
+    '- Tie the Oracle heavily into "Progress Clocks" (e.g., "Risk of Discovery", "Storm Proximity").',
+    '- Story prompts MUST set up the Field Ops phase and explicitly refer to in-world game states (e.g. "If \'Alertness\' is full, mark this exercise skipped...").',
+    '- Write one of the rulesSpread.leftPage.sections to explain this analog game loop using DIEGETIC phase names.',
     '',
     '## Found Document Quality',
     '- Every fragment must pass: hasIrrelevantDetail = true, couldExistInDifferentStory = false.',
@@ -407,12 +411,25 @@
     '- Oracle table: simple mode = 11 entries (2d6), full mode = 10 entries (d10xd10).',
     '- Maximum 3 consequence-type oracle entries per week.',
     '',
-    '## Oracle as Game System',
-    '- Every consequence oracle entry MUST include a `paperAction` that changes visible paper state.',
-    '- Valid paperActions: clock ticks, track advances, map state changes, fragment unlocks, gating changes.',
-    '- The `paperAction` must name the specific target by its in-world name (not "advance a clock" but "advance the [specific clock name] 1 tick").',
-    '- Oracle results that produce only flavor text are not consequences \u2014 use fragment type instead.',
-    '- The oracle table is a game system. Every roll should move the board state.',
+    '## Oracle as Analog Game Engine',
+    '- The oracle table is the main driver of the analog game state. Every consequence oracle entry MUST include a `paperAction` that changes visible paper state.',
+    '- Use Progress Clocks frequently (circles with 4, 6, or 8 slices to fill in).',
+    '- Valid paperActions: "Fill 1 segment of the [Clock Name] clock", "Advance the [Specific] track by 2", "Mark [Node 4] as compromised", "Reveal [Fragment ID]".',
+    '- The `paperAction` must be unambiguously actionable on the paper, naming specific targets by their in-world name.',
+    '- Oracle results that produce only flavor text are NOT consequences \u2014 they are useless for gameplay. The board state must change.',
+    '',
+    '## Puzzle Variety',
+    '- Across a standard six-week block, use at least 4 distinct puzzle families.',
+    '- Valid families include: classical cipher, positional extraction, constraint logic, spatial route/adjacency, oracle-driven state change, fragment cross-reference, pattern recognition, metapuzzle assembly, and observational anomaly hunting.',
+    '- Do not repeat the same puzzle family in consecutive non-boss weeks unless the world contract makes repetition feel diegetic and escalating.',
+    '- The puzzle sequence should feel like a campaign arc: teach a grammar early, complicate it mid-block, then recombine it at convergence.',
+    '- Oracle tables must do more than point at flavor text. They should pressure routes, unlock documents, alter map states, or advance visible tracks.',
+    '',
+    '## Educational / Non-Fiction Mode',
+    '- If the user asks for educational or non-fiction material, treat the booklet as a diegetic teaching artifact rather than forcing a fiction overlay.',
+    '- Session prompts should frame inquiry, observation, or reflection instead of invented plot.',
+    '- Puzzles and oracle outcomes should reinforce the target material by requiring categorization, comparison, recall, sequencing, or model-building.',
+    '- The final encrypted page should still feel earned: it reveals synthesis, mastery, or a culminating insight rather than a fictional twist.',
     '',
     '## Branch Consequences',
     '- The binaryChoice is a branch-and-merge checkpoint, not a single-session fork.',
@@ -470,14 +487,14 @@
     '- passwordPlaintext does not appear in any printed content (prompts, fragments, titles, labels)',
     '- Pre-boss components do not form recognizable plaintext in collection order',
     '- Oracle entry counts: simple mode = exactly 11, full mode = exactly 10; max 3 consequence entries per week',
-    '- Every consequence oracle entry has a non-empty paperAction naming a specific target',
+    '- Every consequence oracle entry has a non-empty paperAction naming a specific analog paper target (e.g. a clock or track)',
     '- Post-choice sessions (between binaryChoice week and boss week) reference the choice consequences in at least 2 of: prompts, fragments, oracle entries, map labels',
     '- For consecutive weeks sharing the same mapType: map data differs in at least one node/tile/position state, label, or structure',
-    '- rulesSpread.leftPage.sections includes a section explaining the session phase order'
+    '- rulesSpread.leftPage.sections includes a section explaining the analog gameplay phase order'
   ].join('\n');
 
   /* ─── Public API ───────────────────────────────────────────────── */
-  window.generatePrompt = function(workout, brief, dice){
+  window.generatePrompt = function (workout, brief, dice) {
     var parts = [
       SCHEMA_SPEC,
       '',
@@ -491,10 +508,12 @@
       '',
       '## Creative Direction',
       '',
-      brief || (function(){
+      brief || (function () {
         var picks = shufflePick(GENRE_POOL, 4);
         return [
           'No specific creative direction provided.',
+          'Default mode: build a deep, slow-burn mystery with a strong human center.',
+          'The mystery should feel discoverable through labor, routine, documents, and repeated physical return to the same world.',
           '',
           'DO NOT default to these overused genres: ' + BANNED_TROPES.join('; ') + '.',
           'These are the most common LLM defaults and produce identical-feeling booklets.',
@@ -506,7 +525,8 @@
           '- ' + picks[3],
           '',
           'The world contract should feel genuinely surprising. Use the workout programme\'s',
-          'structure (heavy weeks, deload weeks, exercise selection) to inspire the fiction\'s texture.'
+          'structure (heavy weeks, deload weeks, exercise selection) to inspire the fiction\'s texture.',
+          'Whichever direction you choose, the resulting booklet should still function as a mystery that rewards theory-building across the full block.'
         ].join('\n');
       })(),
       '',

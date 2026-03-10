@@ -1,2452 +1,1716 @@
-/* ══════════════════════════════════════════════════════════════
-   LIFTRPG BOOKLET RENDERER v1.0
-   Reads schema v1.3 JSON → produces printable DOM pages.
-   Browser-native JS. No build step.
-   ══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
 
-  // ── UTILITIES ──────────────────────────────────────────────
+  var PAGE_WIDTH_IN = 5.5;
+  var PAGE_HEIGHT_IN = 8.5;
+  var CRYPTO_ALGO = 'AES-GCM';
+  var CRYPTO_KEY_BITS = 256;
+  var CRYPTO_SALT_BYTES = 32;
+  var CRYPTO_IV_BYTES = 12;
+  var CRYPTO_ITERATIONS = 200000;
 
-  function esc(str) {
-    if (!str) return '';
-    var d = document.createElement('div');
-    d.textContent = String(str);
-    return d.innerHTML;
-  }
-
-  /**
-   * Create a DOM element with optional class and content.
-   * CAUTION: string `content` is set via innerHTML — only pass
-   * developer-controlled literal strings here. For LLM-generated text,
-   * use txt() which uses safe textContent.
-   */
-  function el(tag, className, content) {
-    var e = document.createElement(tag);
-    if (className) e.className = className;
-    if (typeof content === 'string') {
-      e.innerHTML = content;
-    } else if (content && content.nodeType) {
-      e.appendChild(content);
-    } else if (Array.isArray(content)) {
-      content.forEach(function (c) {
-        if (c && c.nodeType) e.appendChild(c);
-        else if (typeof c === 'string') e.innerHTML += c;
-      });
-    }
-    return e;
-  }
-
-  /** Shorthand: create element with text content (safe) */
-  function txt(tag, className, text) {
-    var e = document.createElement(tag);
-    if (className) e.className = className;
-    if (text != null) e.textContent = String(text);
-    return e;
-  }
-
-  /** Create a booklet page shell */
-  function page(type) {
-    var p = document.createElement('div');
-    p.className = 'booklet-page';
-    p.setAttribute('data-page-type', type);
-    return p;
-  }
-
-  /** Card density tier based on exercise count */
-  function cardDensity(exerciseCount) {
-    if (exerciseCount >= 8) return 'density-ultra';
-    if (exerciseCount >= 6) return 'density-dense';
-    if (exerciseCount >= 4) return 'density-compact';
-    return '';
-  }
-
-  /**
-   * Auto-fit text to a single line by scaling font-size up to maxPt.
-   * Element must have white-space: nowrap in CSS.
-   * Reusable for any single-line label (designation, badge, header).
-   */
-  function fitTextToLine(element, maxPt) {
-    if (!element || !element.parentNode) return;
-    maxPt = maxPt || 10;
-    var container = element.parentNode;
-    var available = container.clientWidth - (parseFloat(getComputedStyle(container).paddingLeft) || 0)
-                  - (parseFloat(getComputedStyle(container).paddingRight) || 0);
-    // Binary search for largest font size that fits
-    var lo = 4, hi = maxPt;
-    while (hi - lo > 0.25) {
-      var mid = (lo + hi) / 2;
-      element.style.fontSize = mid + 'pt';
-      if (element.scrollWidth > available) {
-        hi = mid;
-      } else {
-        lo = mid;
-      }
-    }
-    element.style.fontSize = lo + 'pt';
-  }
-
-  /** Mix two hex colors (a → b) by ratio t (0 = pure a, 1 = pure b) */
-  function mixHex(a, b, t) {
-    var pa = parseInt(a.replace('#', ''), 16);
-    var pb = parseInt(b.replace('#', ''), 16);
-    var r = Math.round(((pa >> 16) & 0xff) * (1 - t) + ((pb >> 16) & 0xff) * t);
-    var g = Math.round(((pa >> 8) & 0xff) * (1 - t) + ((pb >> 8) & 0xff) * t);
-    var bl = Math.round((pa & 0xff) * (1 - t) + (pb & 0xff) * t);
-    return '#' + ((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1);
-  }
-
-  /** Normalize a camelCase or mixed-case token to kebab-case CSS class */
-  function normalizeThemeToken(value) {
-    return String(value || '')
-      .replace(/([a-z])([A-Z])/g, '$1-$2')
-      .replace(/[^a-zA-Z0-9]+/g, '-')
-      .toLowerCase();
-  }
-
-  function getPasswordLength(data, fallback) {
-    var meta = (data && data.meta) || {};
-    if (typeof meta.passwordLength === 'number' && meta.passwordLength > 0) {
-      return meta.passwordLength;
-    }
-    if (meta.passwordPlaintext) {
-      return meta.passwordPlaintext.length;
-    }
-    return fallback || 10;
-  }
-
-  // ── Layout Family Selection ─────────────────────────────
-  var LAYOUT_FAMILY_DEFAULT = {
-    pastoral: 'survey', institutional: 'survey', clinical: 'survey',
-    terminal: 'console', corporate: 'console', noir: 'console',
-    confessional: 'dossier', literary: 'dossier', brutalist: 'survey'
+  var state = {
+    data: null,
+    unlockedEnding: null,
+    layoutMode: 'single'
   };
 
-  var LAYOUT_FAMILY_OVERRIDE = {
-    'noir:grid':                   'dossier',
-    'noir:player-drawn':           'dossier',
-    'brutalist:point-to-point':    'console',
-    'brutalist:linear-track':      'console'
-  };
+  var refs = {};
 
-  var LAYOUT_BUDGETS = {
-    survey:  { maxOracleEntries: 12, maxCipherWorkspaceArea: 48 },
-    console: { maxPtpNodes: 6, maxGridCols: 8, maxOracleEntries: 8 },
-    dossier: { maxGridCols: 6, maxCipherWorkspaceArea: 36 }
-  };
-
-  var LAYOUT_DOMINANT = {
-    survey: 'map', console: 'cipher', dossier: 'oracle'
-  };
-
-  var BOSS_LAYOUT = {
-    confessional: 'document', literary: 'document'
-  };
-
-  function getFieldOpsLayout(fieldOps) {
-    var container = document.getElementById('booklet-container');
-    var treatment = container ? container.getAttribute('data-treatment') || '' : '';
-    var mapType = (fieldOps.mapState && fieldOps.mapState.mapType) || 'grid';
-
-    var family = LAYOUT_FAMILY_OVERRIDE[treatment + ':' + mapType]
-      || LAYOUT_FAMILY_DEFAULT[treatment]
-      || 'default';
-
-    if (family === 'default') return family;
-
-    // Dominant zone must exist
-    var dominant = LAYOUT_DOMINANT[family];
-    if (dominant === 'map' && !fieldOps.mapState) return 'default';
-    if (dominant === 'cipher' && !fieldOps.cipher) return 'default';
-    if (dominant === 'oracle' && !fieldOps.oracleTable) return 'default';
-
-    // Content budget check
-    var budget = LAYOUT_BUDGETS[family];
-    if (budget) {
-      var oracleCount = fieldOps.oracleTable
-        ? (fieldOps.oracleTable.entries || []).length : 0;
-      var ws = fieldOps.cipher && fieldOps.cipher.body
-        ? fieldOps.cipher.body.workSpace : null;
-      var wsArea = ws ? (ws.rows || 0) * (ws.cols || 10) : 0;
-      var mapState = fieldOps.mapState || {};
-      var gridCols = mapState.gridDimensions
-        ? mapState.gridDimensions.columns : 0;
-      var ptpNodes = mapState.nodes ? mapState.nodes.length : 0;
-
-      if (budget.maxOracleEntries && oracleCount > budget.maxOracleEntries) return 'default';
-      if (budget.maxCipherWorkspaceArea && wsArea > budget.maxCipherWorkspaceArea) return 'default';
-      if (budget.maxGridCols && gridCols > budget.maxGridCols) return 'default';
-      if (budget.maxPtpNodes && ptpNodes > budget.maxPtpNodes) return 'default';
+  var THEME_PRESETS = {
+    government: {
+      '--font-display': '"Playfair Display", Georgia, serif',
+      '--font-body': '"IBM Plex Mono", "Courier New", Courier, monospace',
+      '--font-mono': '"IBM Plex Mono", "Courier New", Courier, monospace',
+      '--font-accent': '"Share Tech Mono", monospace',
+      '--weight-body': '400',
+      '--weight-heading': '700',
+      '--weight-label': '600',
+      '--weight-emphasis': '700',
+      '--page-ink': '#111111',
+      '--page-paper': '#e6dfd1',
+      '--page-accent': '#a33b3b',
+      '--page-muted': '#5e5a51',
+      '--page-rule': '#a33b3b',
+      '--page-fog': '#dacfbe',
+      '--page-surface': 'linear-gradient(180deg, #e6dfd1 0%, #dacfbe 100%)',
+      '--page-underlay': 'none',
+      '--panel-surface': 'linear-gradient(180deg, rgba(230, 223, 209, 0.98) 0%, rgba(218, 207, 190, 0.92) 100%)',
+      '--panel-secondary-surface': 'transparent',
+      '--card-surface': 'transparent',
+      '--line-style': 'solid',
+      '--line-width-hair': '1px',
+      '--line-width-rule': '1.5px',
+      '--line-width-frame': '2px',
+      '--surface-radius': '0px',
+      '--surface-shadow': '0 18px 34px rgba(0, 0, 0, 0.08)',
+      '--page-shadow': '0 24px 56px rgba(0, 0, 0, 0.20)',
+      '--noise-opacity': '0.12',
+      '--fog-opacity': '0.1',
+      '--rule-opacity': '0.8',
+      '--stamp-opacity': '0.9',
+      '--label-size': '6pt',
+      '--label-spacing': '0.28em',
+      '--label-transform': 'uppercase',
+      '--heading-style': 'italic',
+      '--heading-size-xl': '38pt',
+      '--heading-size-lg': '16pt',
+      '--heading-size-md': '12pt',
+      '--body-size': '9pt',
+      '--body-line-height': '1.5',
+      '--small-size': '6.2pt',
+      '--mono-size': '6.4pt',
+      '--grid-stroke-style': 'solid',
+      '--grid-dot-opacity': '0.5',
+      '--grid-fill': 'rgba(163, 59, 59, 0.08)',
+      '--track-fill': 'rgba(218, 207, 190, 0.4)',
+      '--badge-style': 'normal',
+      '--callout-surface': 'rgba(218, 207, 190, 0.22)',
+      '--highlight-surface': 'rgba(163, 59, 59, 0.12)',
+      '--page-margin': '0.4in'
+    },
+    cyberpunk: {
+      '--font-display': '"Share Tech Mono", monospace',
+      '--font-body': '"IBM Plex Mono", monospace',
+      '--font-mono': '"IBM Plex Mono", monospace',
+      '--font-accent': '"Share Tech Mono", monospace',
+      '--weight-body': '400',
+      '--weight-heading': '600',
+      '--weight-label': '600',
+      '--weight-emphasis': '700',
+      '--page-ink': '#00ffcc',
+      '--page-paper': '#0a0a0a',
+      '--page-accent': '#ff00ff',
+      '--page-muted': '#008866',
+      '--page-rule': '#00ffcc',
+      '--page-fog': '#111111',
+      '--page-surface': 'linear-gradient(180deg, #0a0a0a 0%, #111111 100%)',
+      '--page-underlay': 'repeating-linear-gradient(180deg, rgba(0,255,204,0.06) 0 2px, transparent 2px 4px)',
+      '--panel-surface': 'linear-gradient(180deg, rgba(10,10,10,0.95) 0%, rgba(17,17,17,0.92) 100%)',
+      '--panel-secondary-surface': 'linear-gradient(180deg, rgba(0,255,204,0.1) 0%, transparent 100%)',
+      '--card-surface': 'rgba(17,17,17,0.8)',
+      '--line-style': 'solid',
+      '--line-width-hair': '1px',
+      '--line-width-rule': '1px',
+      '--line-width-frame': '2px',
+      '--surface-radius': '0px',
+      '--surface-shadow': '0 0px 20px rgba(0, 255, 204, 0.2)',
+      '--page-shadow': '0 24px 50px rgba(0,0,0,0.6)',
+      '--noise-opacity': '0.2',
+      '--fog-opacity': '0.3',
+      '--rule-opacity': '1',
+      '--stamp-opacity': '1',
+      '--label-size': '7pt',
+      '--label-spacing': '0.2em',
+      '--label-transform': 'uppercase',
+      '--heading-style': 'normal',
+      '--heading-size-xl': '24pt',
+      '--heading-size-lg': '14pt',
+      '--heading-size-md': '10pt',
+      '--body-size': '8pt',
+      '--body-line-height': '1.4',
+      '--small-size': '6pt',
+      '--mono-size': '8pt',
+      '--grid-stroke-style': 'dotted',
+      '--grid-dot-opacity': '0.5',
+      '--grid-fill': 'rgba(0, 255, 204, 0.1)',
+      '--track-fill': 'rgba(0, 255, 204, 0.2)',
+      '--badge-style': 'normal',
+      '--callout-surface': 'rgba(255, 0, 255, 0.1)',
+      '--highlight-surface': 'rgba(0, 255, 204, 0.15)',
+      '--page-margin': '0.3in'
+    },
+    scifi: {
+      '--font-display': 'system-ui, -apple-system, sans-serif',
+      '--font-body': 'system-ui, -apple-system, sans-serif',
+      '--font-mono': '"IBM Plex Mono", monospace',
+      '--font-accent': 'system-ui, -apple-system, sans-serif',
+      '--weight-body': '400',
+      '--weight-heading': '600',
+      '--weight-label': '500',
+      '--weight-emphasis': '700',
+      '--page-ink': '#222222',
+      '--page-paper': '#ffffff',
+      '--page-accent': '#0066ff',
+      '--page-muted': '#888888',
+      '--page-rule': '#e0e0e0',
+      '--page-fog': '#f5f7fa',
+      '--page-surface': 'linear-gradient(180deg, #ffffff 0%, #f5f7fa 100%)',
+      '--page-underlay': 'none',
+      '--panel-surface': 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(245,247,250,0.92) 100%)',
+      '--panel-secondary-surface': 'rgba(245,247,250,0.8)',
+      '--card-surface': 'rgba(255,255,255,1)',
+      '--line-style': 'solid',
+      '--line-width-hair': '1px',
+      '--line-width-rule': '1px',
+      '--line-width-frame': '1.5px',
+      '--surface-radius': '4px',
+      '--surface-shadow': '0 8px 24px rgba(0, 102, 255, 0.08)',
+      '--page-shadow': '0 24px 40px rgba(0,0,0,0.1)',
+      '--noise-opacity': '0.02',
+      '--fog-opacity': '0.05',
+      '--rule-opacity': '1',
+      '--stamp-opacity': '0.9',
+      '--label-size': '6.5pt',
+      '--label-spacing': '0.15em',
+      '--label-transform': 'uppercase',
+      '--heading-style': 'normal',
+      '--heading-size-xl': '28pt',
+      '--heading-size-lg': '16pt',
+      '--heading-size-md': '11pt',
+      '--body-size': '8.5pt',
+      '--body-line-height': '1.6',
+      '--small-size': '6.5pt',
+      '--mono-size': '7.5pt',
+      '--grid-stroke-style': 'solid',
+      '--grid-dot-opacity': '0.2',
+      '--grid-fill': 'rgba(0, 102, 255, 0.04)',
+      '--track-fill': 'rgba(224, 224, 224, 0.4)',
+      '--badge-style': 'normal',
+      '--callout-surface': 'rgba(0, 102, 255, 0.06)',
+      '--highlight-surface': 'rgba(0, 102, 255, 0.1)',
+      '--page-margin': '0.45in'
+    },
+    fantasy: {
+      '--font-display': '"Playfair Display", serif',
+      '--font-body': '"Libre Baskerville", serif',
+      '--font-mono': '"Libre Baskerville", serif',
+      '--font-accent': '"Playfair Display", serif',
+      '--weight-body': '400',
+      '--weight-heading': '700',
+      '--weight-label': '600',
+      '--weight-emphasis': '700',
+      '--page-ink': '#1a3322',
+      '--page-paper': '#f4ecc2',
+      '--page-accent': '#c5a059',
+      '--page-muted': '#5c6b5d',
+      '--page-rule': '#c5a059',
+      '--page-fog': '#eaddad',
+      '--page-surface': 'linear-gradient(180deg, #f4ecc2 0%, #eaddad 100%)',
+      '--page-underlay': 'none',
+      '--panel-surface': 'linear-gradient(180deg, rgba(244,236,194,0.98) 0%, rgba(234,221,173,0.92) 100%)',
+      '--panel-secondary-surface': 'transparent',
+      '--card-surface': 'transparent',
+      '--line-style': 'solid',
+      '--line-width-hair': '1px',
+      '--line-width-rule': '1.5px',
+      '--line-width-frame': '2.5px',
+      '--surface-radius': '0px',
+      '--surface-shadow': '0 18px 34px rgba(26, 51, 34, 0.15)',
+      '--page-shadow': '0 24px 56px rgba(0, 0, 0, 0.25)',
+      '--noise-opacity': '0.15',
+      '--fog-opacity': '0.2',
+      '--rule-opacity': '0.8',
+      '--stamp-opacity': '0.7',
+      '--label-size': '7pt',
+      '--label-spacing': '0.15em',
+      '--label-transform': 'uppercase',
+      '--heading-style': 'italic',
+      '--heading-size-xl': '32pt',
+      '--heading-size-lg': '16pt',
+      '--heading-size-md': '12pt',
+      '--body-size': '9pt',
+      '--body-line-height': '1.55',
+      '--small-size': '6.5pt',
+      '--mono-size': '8pt',
+      '--grid-stroke-style': 'dotted',
+      '--grid-dot-opacity': '0.6',
+      '--grid-fill': 'rgba(197, 160, 89, 0.1)',
+      '--track-fill': 'rgba(234, 221, 173, 0.5)',
+      '--badge-style': 'italic',
+      '--callout-surface': 'rgba(197, 160, 89, 0.15)',
+      '--highlight-surface': 'rgba(26, 51, 34, 0.1)',
+      '--page-margin': '0.36in'
+    },
+    noir: {
+      '--font-display': '"Share Tech Mono", monospace',
+      '--font-body': '"IBM Plex Mono", monospace',
+      '--font-mono': '"IBM Plex Mono", monospace',
+      '--font-accent': '"Share Tech Mono", monospace',
+      '--weight-body': '600',
+      '--weight-heading': '700',
+      '--weight-label': '700',
+      '--weight-emphasis': '700',
+      '--page-ink': '#000000',
+      '--page-paper': '#e4e4e4',
+      '--page-accent': '#000000',
+      '--page-muted': '#555555',
+      '--page-rule': '#000000',
+      '--page-fog': '#c8c8c8',
+      '--page-surface': 'linear-gradient(180deg, #e4e4e4 0%, #d0d0d0 100%)',
+      '--page-underlay': 'none',
+      '--panel-surface': 'linear-gradient(180deg, rgba(228,228,228,0.98) 0%, rgba(200,200,200,0.92) 100%)',
+      '--panel-secondary-surface': 'rgba(0,0,0,0.05)',
+      '--card-surface': 'linear-gradient(180deg, rgba(228,228,228,0.98) 0%, rgba(200,200,200,0.92) 100%)',
+      '--line-style': 'solid',
+      '--line-width-hair': '1.5px',
+      '--line-width-rule': '2.5px',
+      '--line-width-frame': '4px',
+      '--surface-radius': '0px',
+      '--surface-shadow': '0 20px 40px rgba(0,0,0,0.4)',
+      '--page-shadow': '0 24px 60px rgba(0,0,0,0.5)',
+      '--noise-opacity': '0.25',
+      '--fog-opacity': '0.1',
+      '--rule-opacity': '1',
+      '--stamp-opacity': '0.9',
+      '--label-size': '7.5pt',
+      '--label-spacing': '0.2em',
+      '--label-transform': 'uppercase',
+      '--heading-style': 'normal',
+      '--heading-size-xl': '26pt',
+      '--heading-size-lg': '15pt',
+      '--heading-size-md': '11pt',
+      '--body-size': '8.5pt',
+      '--body-line-height': '1.5',
+      '--small-size': '7pt',
+      '--mono-size': '8.5pt',
+      '--grid-stroke-style': 'solid',
+      '--grid-dot-opacity': '0.8',
+      '--grid-fill': 'rgba(0,0,0,0.08)',
+      '--track-fill': 'rgba(0,0,0,0.15)',
+      '--badge-style': 'normal',
+      '--callout-surface': 'rgba(0,0,0,0.08)',
+      '--highlight-surface': 'rgba(0,0,0,0.15)',
+      '--page-margin': '0.35in'
+    },
+    steampunk: {
+      '--font-display': '"Playfair Display", serif',
+      '--font-body': '"Libre Baskerville", serif',
+      '--font-mono': '"IBM Plex Mono", monospace',
+      '--font-accent': '"Share Tech Mono", monospace',
+      '--weight-body': '400',
+      '--weight-heading': '700',
+      '--weight-label': '600',
+      '--weight-emphasis': '700',
+      '--page-ink': '#3e2f24',
+      '--page-paper': '#d9c8b4',
+      '--page-accent': '#b87333',
+      '--page-muted': '#7a6452',
+      '--page-rule': '#b5a642',
+      '--page-fog': '#c4b09c',
+      '--page-surface': 'linear-gradient(180deg, #d9c8b4 0%, #c4b09c 100%)',
+      '--page-underlay': 'none',
+      '--panel-surface': 'linear-gradient(180deg, rgba(217,200,180,0.98) 0%, rgba(196,176,156,0.92) 100%)',
+      '--panel-secondary-surface': 'rgba(184,115,51,0.08)',
+      '--card-surface': 'linear-gradient(180deg, rgba(217,200,180,0.98) 0%, rgba(196,176,156,0.92) 100%)',
+      '--line-style': 'double',
+      '--line-width-hair': '1px',
+      '--line-width-rule': '3px',
+      '--line-width-frame': '4px',
+      '--surface-radius': '0px',
+      '--surface-shadow': '0 18px 34px rgba(62, 47, 36, 0.25)',
+      '--page-shadow': '0 24px 50px rgba(0,0,0,0.3)',
+      '--noise-opacity': '0.18',
+      '--fog-opacity': '0.2',
+      '--rule-opacity': '0.9',
+      '--stamp-opacity': '0.8',
+      '--label-size': '6.5pt',
+      '--label-spacing': '0.22em',
+      '--label-transform': 'uppercase',
+      '--heading-style': 'normal',
+      '--heading-size-xl': '28pt',
+      '--heading-size-lg': '15pt',
+      '--heading-size-md': '11pt',
+      '--body-size': '8.5pt',
+      '--body-line-height': '1.5',
+      '--small-size': '6.2pt',
+      '--mono-size': '7.5pt',
+      '--grid-stroke-style': 'solid',
+      '--grid-dot-opacity': '0.5',
+      '--grid-fill': 'rgba(184, 115, 51, 0.1)',
+      '--track-fill': 'rgba(181, 166, 66, 0.2)',
+      '--badge-style': 'normal',
+      '--callout-surface': 'rgba(184, 115, 51, 0.15)',
+      '--highlight-surface': 'rgba(181, 166, 66, 0.15)',
+      '--page-margin': '0.38in'
+    },
+    minimalist: {
+      '--font-display': 'system-ui, -apple-system, sans-serif',
+      '--font-body': 'system-ui, -apple-system, sans-serif',
+      '--font-mono': '"IBM Plex Mono", monospace',
+      '--font-accent': 'system-ui, -apple-system, sans-serif',
+      '--weight-body': '400',
+      '--weight-heading': '600',
+      '--weight-label': '600',
+      '--weight-emphasis': '700',
+      '--page-ink': '#000000',
+      '--page-paper': '#ffffff',
+      '--page-accent': '#000000',
+      '--page-muted': '#888888',
+      '--page-rule': '#e0e0e0',
+      '--page-fog': '#fdfdfd',
+      '--page-surface': '#ffffff',
+      '--page-underlay': 'none',
+      '--panel-surface': '#ffffff',
+      '--panel-secondary-surface': '#fcfcfc',
+      '--card-surface': '#ffffff',
+      '--line-style': 'solid',
+      '--line-width-hair': '1px',
+      '--line-width-rule': '1px',
+      '--line-width-frame': '2px',
+      '--surface-radius': '0px',
+      '--surface-shadow': 'none',
+      '--page-shadow': '0 20px 40px rgba(0,0,0,0.05)',
+      '--noise-opacity': '0.01',
+      '--fog-opacity': '0',
+      '--rule-opacity': '1',
+      '--stamp-opacity': '1',
+      '--label-size': '6pt',
+      '--label-spacing': '0.25em',
+      '--label-transform': 'uppercase',
+      '--heading-style': 'normal',
+      '--heading-size-xl': '30pt',
+      '--heading-size-lg': '16pt',
+      '--heading-size-md': '11pt',
+      '--body-size': '8.5pt',
+      '--body-line-height': '1.65',
+      '--small-size': '6.5pt',
+      '--mono-size': '7.5pt',
+      '--grid-stroke-style': 'solid',
+      '--grid-dot-opacity': '0.1',
+      '--grid-fill': 'rgba(0,0,0,0.02)',
+      '--track-fill': 'rgba(0,0,0,0.05)',
+      '--badge-style': 'normal',
+      '--callout-surface': 'rgba(0,0,0,0.03)',
+      '--highlight-surface': 'rgba(0,0,0,0.06)',
+      '--page-margin': '0.5in'
+    },
+    nautical: {
+      '--font-display': '"Playfair Display", serif',
+      '--font-body': '"Libre Baskerville", serif',
+      '--font-mono': '"IBM Plex Mono", monospace',
+      '--font-accent': '"Libre Baskerville", serif',
+      '--weight-body': '400',
+      '--weight-heading': '700',
+      '--weight-label': '600',
+      '--weight-emphasis': '700',
+      '--page-ink': '#001a33',
+      '--page-paper': '#f5f5dc',
+      '--page-accent': '#8a3324',
+      '--page-muted': '#5c6b73',
+      '--page-rule': '#334c66',
+      '--page-fog': '#e6e6cc',
+      '--page-surface': 'linear-gradient(180deg, #f5f5dc 0%, #e6e6cc 100%)',
+      '--page-underlay': 'none',
+      '--panel-surface': 'linear-gradient(180deg, rgba(245,245,220,0.98) 0%, rgba(230,230,204,0.92) 100%)',
+      '--panel-secondary-surface': 'rgba(0,26,51,0.05)',
+      '--card-surface': 'transparent',
+      '--line-style': 'solid',
+      '--line-width-hair': '1px',
+      '--line-width-rule': '1.5px',
+      '--line-width-frame': '2px',
+      '--surface-radius': '0px',
+      '--surface-shadow': '0 16px 30px rgba(0, 26, 51, 0.15)',
+      '--page-shadow': '0 24px 50px rgba(0,0,0,0.2)',
+      '--noise-opacity': '0.1',
+      '--fog-opacity': '0.15',
+      '--rule-opacity': '0.85',
+      '--stamp-opacity': '0.85',
+      '--label-size': '6.8pt',
+      '--label-spacing': '0.22em',
+      '--label-transform': 'uppercase',
+      '--heading-style': 'normal',
+      '--heading-size-xl': '26pt',
+      '--heading-size-lg': '15pt',
+      '--heading-size-md': '11pt',
+      '--body-size': '8.5pt',
+      '--body-line-height': '1.58',
+      '--small-size': '6.4pt',
+      '--mono-size': '7.2pt',
+      '--grid-stroke-style': 'solid',
+      '--grid-dot-opacity': '0.4',
+      '--grid-fill': 'rgba(138, 51, 36, 0.08)',
+      '--track-fill': 'rgba(51, 76, 102, 0.2)',
+      '--badge-style': 'normal',
+      '--callout-surface': 'rgba(51, 76, 102, 0.1)',
+      '--highlight-surface': 'rgba(138, 51, 36, 0.15)',
+      '--page-margin': '0.36in'
+    },
+    occult: {
+      '--font-display': '"Playfair Display", serif',
+      '--font-body': '"Libre Baskerville", serif',
+      '--font-mono': '"Libre Baskerville", serif',
+      '--font-accent': '"Playfair Display", serif',
+      '--weight-body': '400',
+      '--weight-heading': '700',
+      '--weight-label': '600',
+      '--weight-emphasis': '700',
+      '--page-ink': '#2a1a2e',
+      '--page-paper': '#c2b28f',
+      '--page-accent': '#8c001a',
+      '--page-muted': '#5c4a63',
+      '--page-rule': '#5a3d4a',
+      '--page-fog': '#a69673',
+      '--page-surface': 'linear-gradient(180deg, #c2b28f 0%, #a69673 100%)',
+      '--page-underlay': 'none',
+      '--panel-surface': 'linear-gradient(180deg, rgba(194,178,143,0.98) 0%, rgba(166,150,115,0.92) 100%)',
+      '--panel-secondary-surface': 'rgba(140,0,26,0.06)',
+      '--card-surface': 'transparent',
+      '--line-style': 'solid',
+      '--line-width-hair': '1px',
+      '--line-width-rule': '1.5px',
+      '--line-width-frame': '2.5px',
+      '--surface-radius': '0px',
+      '--surface-shadow': '0 20px 38px rgba(42, 26, 46, 0.25)',
+      '--page-shadow': '0 24px 60px rgba(0,0,0,0.4)',
+      '--noise-opacity': '0.22',
+      '--fog-opacity': '0.25',
+      '--rule-opacity': '0.9',
+      '--stamp-opacity': '0.8',
+      '--label-size': '6.5pt',
+      '--label-spacing': '0.18em',
+      '--label-transform': 'uppercase',
+      '--heading-style': 'italic',
+      '--heading-size-xl': '30pt',
+      '--heading-size-lg': '16pt',
+      '--heading-size-md': '12pt',
+      '--body-size': '9pt',
+      '--body-line-height': '1.45',
+      '--small-size': '6.4pt',
+      '--mono-size': '8pt',
+      '--grid-stroke-style': 'dotted',
+      '--grid-dot-opacity': '0.7',
+      '--grid-fill': 'rgba(140, 0, 26, 0.08)',
+      '--track-fill': 'rgba(90, 61, 74, 0.3)',
+      '--badge-style': 'italic',
+      '--callout-surface': 'rgba(90, 61, 74, 0.15)',
+      '--highlight-surface': 'rgba(140, 0, 26, 0.15)',
+      '--page-margin': '0.36in'
     }
+  };
 
-    return family;
+  function qs(id) {
+    return document.getElementById(id);
   }
 
-  // ── LABELS ──────────────────────────────────────────────────
-  // Built once per render() from data.meta. Schema may override
-  // defaults via data.meta.labels — if absent, neutral fallbacks
-  // apply so any booklet renders correctly regardless of theme.
-  function buildLabels(data) {
-    var m = (data && data.meta) || {};
-    var l = m.labels || {};
+  function make(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = String(text);
+    return node;
+  }
+
+  function append(node, children) {
+    children.forEach(function (child) {
+      if (child) node.appendChild(child);
+    });
+    return node;
+  }
+
+  function setStatus(message, tone) {
+    refs.status.textContent = message || '';
+    refs.status.setAttribute('data-tone', tone || 'neutral');
+  }
+
+  function safeUpper(value) {
+    return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
+
+  function normalisePassword(raw) {
+    return safeUpper(raw);
+  }
+
+  function alpha(hex, value) {
+    if (!hex || hex.charAt(0) !== '#' || (hex.length !== 7 && hex.length !== 4)) {
+      return 'rgba(0,0,0,' + value + ')';
+    }
+    var full = hex.length === 4
+      ? '#' + hex.charAt(1) + hex.charAt(1) + hex.charAt(2) + hex.charAt(2) + hex.charAt(3) + hex.charAt(3)
+      : hex;
+    var r = parseInt(full.slice(1, 3), 16);
+    var g = parseInt(full.slice(3, 5), 16);
+    var b = parseInt(full.slice(5, 7), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + value + ')';
+  }
+
+  function clone(obj) {
+    return JSON.parse(JSON.stringify(obj));
+  }
+
+  function mergeObjects(base, overrides) {
+    var output = clone(base || {});
+    Object.keys(overrides || {}).forEach(function (key) {
+      output[key] = overrides[key];
+    });
+    return output;
+  }
+
+  function resolveTheme(data) {
+    var theme = (data && data.theme) || {};
+    var archetype = theme.visualArchetype || 'government';
+    var preset = THEME_PRESETS[archetype] || THEME_PRESETS.government;
+    var palette = theme.palette || {};
+    var tokens = mergeObjects(preset, theme.tokens || {});
+
+    if (palette.ink) tokens['--page-ink'] = palette.ink;
+    if (palette.paper) tokens['--page-paper'] = palette.paper;
+    if (palette.accent) tokens['--page-accent'] = palette.accent;
+    if (palette.muted) tokens['--page-muted'] = palette.muted;
+    if (palette.rule) tokens['--page-rule'] = palette.rule;
+    if (palette.fog) tokens['--page-fog'] = palette.fog;
+
+    if (palette.paper && !theme.tokens) {
+      tokens['--page-surface'] = 'linear-gradient(180deg, ' + palette.paper + ' 0%, ' + alpha(palette.paper, 0.92) + ' 100%)';
+      tokens['--panel-surface'] = 'linear-gradient(180deg, ' + alpha(palette.paper, 0.98) + ' 0%, ' + alpha(palette.paper, 0.9) + ' 100%)';
+      tokens['--card-surface'] = tokens['--panel-surface'];
+    }
+    tokens['--page-underlay'] = tokens['--page-underlay'] || 'none';
+    tokens['--panel-secondary-surface'] = tokens['--panel-secondary-surface'] || alpha(tokens['--page-fog'], 0.28);
+    tokens['--callout-surface'] = tokens['--callout-surface'] || alpha(tokens['--page-fog'], 0.2);
+    tokens['--highlight-surface'] = tokens['--highlight-surface'] || alpha(tokens['--page-accent'], 0.12);
+
     return {
-      blockTitle: m.blockTitle || 'Field Journal',
-      fieldOpsHeader: l.fieldOpsHeader || 'Field Operations',
-      finalSurveyHeader: l.finalSurveyHeader || 'Final Week',
-      bossFallbackNarrative: l.bossFallbackNarrative || 'The final challenge awaits.',
-      passwordAssemblyTitle: l.passwordAssemblyTitle || 'Password Record \u2014 Final Assembly',
-      endingsFallbackTitle: l.endingsFallbackTitle || 'The Journey Is Complete',
-      endingsFallbackBody: l.endingsFallbackBody ||
-        'You have completed the program. Assemble your password components ' +
-        'and return to liftrpg.co \u2192 Render to discover what awaits.',
+      archetype: archetype,
+      tokens: tokens
     };
   }
 
-  // ── PAGE RENDERERS ─────────────────────────────────────────
-
-  // ═══ COVER ═══
-  function renderCover(data) {
-    var p = page('cover');
-    var inner = el('div', 'cover-page');
-
-    if (data.cover.designation) {
-      var desig = txt('div', 'cover-designation', data.cover.designation);
-      inner.appendChild(desig);
-    }
-    inner.appendChild(txt('h1', 'cover-title', data.meta.blockTitle));
-    if (data.cover.tagline) {
-      inner.appendChild(txt('div', 'cover-tagline', data.cover.tagline));
-    }
-    inner.appendChild(el('div', 'cover-rule'));
-
-    var colophon = el('div', 'cover-colophon');
-    if (data.cover.colophonLines && data.cover.colophonLines.length) {
-      data.cover.colophonLines.forEach(function (line) {
-        colophon.appendChild(txt('div', '', line));
-      });
-    }
-    inner.appendChild(colophon);
-
-    p.appendChild(inner);
-    return p;
-  }
-
-  // ═══ RULES LEFT (Briefing Document) ═══
-  function renderRulesLeft(data) {
-    var p = page('rules-left');
-    var inner = el('div', 'rules-left');
-
-    // Header
-    var header = el('div', 'rules-header');
-    header.appendChild(txt('span', '', data.meta.blockTitle));
-    header.appendChild(txt('span', 'page-num', ''));
-    inner.appendChild(header);
-
-    // Title
-    if (data.rulesSpread.leftPage.title) {
-      inner.appendChild(txt('h2', 'rules-title', data.rulesSpread.leftPage.title));
-    }
-
-    // Body content
-    var body = el('div', 'rules-body');
-    if (data.rulesSpread.leftPage.sections) {
-      data.rulesSpread.leftPage.sections.forEach(function (section) {
-        if (section.heading) {
-          body.appendChild(txt('h3', '', section.heading));
-        }
-        var sectionBody = section.text || section.body || '';
-        if (sectionBody) {
-          sectionBody.split('\n').forEach(function (para) {
-            if (para.trim()) body.appendChild(txt('p', '', para.trim()));
-          });
-        }
-      });
-    } else if (data.rulesSpread.leftPage.body) {
-      data.rulesSpread.leftPage.body.split('\n').forEach(function (para) {
-        if (para.trim()) body.appendChild(txt('p', '', para.trim()));
-      });
-    }
-    var reEntryRule = data.rulesSpread.leftPage.reEntryRule;
-    var reEntryText = typeof reEntryRule === 'string'
-      ? reEntryRule
-      : reEntryRule && reEntryRule.ruleText;
-    if (reEntryText) {
-      body.appendChild(txt('h3', '', 'Re-Entry Procedure'));
-      reEntryText.split('\n').forEach(function (para) {
-        if (para.trim()) body.appendChild(txt('p', 'rules-reentry', para.trim()));
-      });
-    }
-    inner.appendChild(body);
-
-    p.appendChild(inner);
-    return p;
-  }
-
-  // ═══ RULES RIGHT (Password Record Log) ═══
-  function renderRulesRight(data) {
-    var p = page('rules-right');
-    var inner = el('div', 'rules-right');
-
-    var title = data.rulesSpread.rightPage && data.rulesSpread.rightPage.title
-      ? data.rulesSpread.rightPage.title
-      : 'Survey Record';
-    inner.appendChild(txt('div', 'password-log-title', title));
-
-    var subtitle = data.rulesSpread.rightPage && data.rulesSpread.rightPage.instruction
-      ? data.rulesSpread.rightPage.instruction
-      : 'Record each week\'s component below. When all positions are filled, return to liftrpg.co \u2192 Render to unlock the ending.';
-    inner.appendChild(txt('div', 'password-log-subtitle', subtitle));
-
-    // One row per week
-    var grid = el('div', 'password-log-grid');
-    var weekCount = data.meta.weekCount || 6;
-    for (var w = 1; w <= weekCount; w++) {
-      var row = el('div', 'password-log-row');
-      row.appendChild(txt('span', 'password-log-week', 'Week ' + (w < 10 ? '0' + w : w)));
-      row.appendChild(el('div', 'password-log-box'));
-
-      // Show extraction instruction if available
-      var week = data.weeks[w - 1];
-      if (week && week.weeklyComponent && week.weeklyComponent.extractionInstruction && !week.isBossWeek) {
-        row.appendChild(txt('span', 'password-log-instruction', week.weeklyComponent.extractionInstruction));
-      } else if (week && week.isBossWeek) {
-        row.appendChild(txt('span', 'password-log-instruction', 'Boss convergence \u2014 see field operations'));
-      }
-      grid.appendChild(row);
-    }
-    inner.appendChild(grid);
-
-    // Final password assembly
-    var final_ = el('div', 'password-final');
-    final_.appendChild(txt('div', 'password-final-label', 'Complete Password'));
-    var boxes = el('div', 'password-final-boxes');
-    var pwLen = getPasswordLength(data, 10);
-    for (var i = 0; i < pwLen; i++) {
-      boxes.appendChild(el('div', 'password-final-box'));
-    }
-    final_.appendChild(boxes);
-    inner.appendChild(final_);
-
-    p.appendChild(inner);
-    return p;
-  }
-
-  // ═══ WORKOUT LEFT (Session Cards) ═══
-  function renderWorkoutLeft(week, weekNum, sessions, totalWeeks, isOverflow, labels) {
-    var p = page('workout-left');
-    var inner = el('div', 'workout-left');
-
-    // Page header
-    var hdr = el('div', 'page-header');
-    hdr.appendChild(txt('span', '', labels.blockTitle));
-    hdr.appendChild(txt('span', 'page-num', ''));
-    inner.appendChild(hdr);
-
-    // Overflow continuation note
-    if (isOverflow) {
-      var contNote = txt('div', 'overflow-header-note',
-        'Week ' + (weekNum < 10 ? '0' + weekNum : weekNum) +
-        ' \u00b7 Part 2 of 2 \u00b7 Sessions ' +
-        (sessions[0].sessionNumber) + '\u2013' +
-        (sessions[sessions.length - 1].sessionNumber) +
-        ' \u00b7 continued');
-      inner.appendChild(contNote);
-    }
-
-    // Week ID block
-    var weekId = el('div', 'week-id');
-    weekId.appendChild(txt('span', 'week-kicker',
-      'Week ' + (weekNum < 10 ? '0' + weekNum : weekNum) + ' \u00b7'));
-    weekId.appendChild(txt('span', 'week-title', week.title));
-    if (week.epigraph && week.epigraph.text) {
-      weekId.appendChild(txt('span', 'week-subtitle', week.epigraph.text));
-    }
-    inner.appendChild(weekId);
-
-    // Week meta
-    if (week.epigraph && week.epigraph.attribution) {
-      inner.appendChild(txt('span', 'week-meta', week.epigraph.attribution));
-    }
-
-    // Session cards
-    var cardsContainer = el('div', 'session-cards');
-    sessions.forEach(function (session) {
-      var maxExercises = Math.max.apply(null, sessions.map(function (s) { return s.exercises.length; }));
-      var density = cardDensity(maxExercises);
-      var card = el('div', 'session-card' + (density ? ' ' + density : ''));
-
-      // Header
-      card.appendChild(txt('div', 'session-header', session.label));
-
-      // Story prompt
-      if (session.storyPrompt) {
-        card.appendChild(txt('div', 'story-prompt', session.storyPrompt));
-      }
-
-      // Fragment ref (after prompt)
-      if (session.fragmentRef) {
-        card.appendChild(txt('div', 'frag-ref', '\u2192 ' + session.fragmentRef));
-      }
-
-      // Binary choice (rare — one per block)
-      if (session.binaryChoice) {
-        var bc = el('div', 'binary-choice');
-        bc.appendChild(txt('div', 'binary-choice-label', session.binaryChoice.choiceLabel));
-
-        var optA = el('div', 'binary-choice-option');
-        optA.appendChild(el('div', 'binary-choice-marker'));
-        optA.appendChild(txt('span', 'binary-choice-text', session.binaryChoice.promptA));
-        bc.appendChild(optA);
-
-        var optB = el('div', 'binary-choice-option');
-        optB.appendChild(el('div', 'binary-choice-marker'));
-        optB.appendChild(txt('span', 'binary-choice-text', session.binaryChoice.promptB));
-        bc.appendChild(optB);
-
-        card.appendChild(bc);
-      }
-
-      // Exercise table
-      var table = document.createElement('table');
-      table.className = 'exercise-table';
-      session.exercises.forEach(function (ex) {
-        var tr = document.createElement('tr');
-
-        // Name
-        var tdName = document.createElement('td');
-        tdName.className = 'exercise-name';
-        tdName.textContent = ex.name;
-        tr.appendChild(tdName);
-
-        // Dots
-        var tdDots = document.createElement('td');
-        tdDots.innerHTML = '<div class="exercise-dots"></div>';
-        tdDots.style.width = '100%';
-        tdDots.style.paddingRight = '10px';
-        tr.appendChild(tdDots);
-
-        // Weight
-        if (ex.weightField) {
-          var tdWeightLine = document.createElement('td');
-          tdWeightLine.style.verticalAlign = 'bottom';
-
-          var faintText = typeof ex.weightField === 'string' ? ex.weightField : null;
-          if (!faintText && ex.notes) {
-            faintText = ex.notes;
-          }
-
-          var wLine = document.createElement('div');
-          wLine.className = 'weight-line';
-          if (faintText) wLine.textContent = faintText;
-          else wLine.innerHTML = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
-          tdWeightLine.appendChild(wLine);
-          tr.appendChild(tdWeightLine);
-
-          var tdWeightLabel = document.createElement('td');
-          tdWeightLabel.style.verticalAlign = 'bottom';
-          var wLabel = document.createElement('div');
-          wLabel.className = 'weight-label';
-          wLabel.innerHTML = 'lbs &times;';
-          tdWeightLabel.appendChild(wLabel);
-          tr.appendChild(tdWeightLabel);
-        }
-
-        // Rep boxes
-        var tdReps = document.createElement('td');
-        tdReps.style.verticalAlign = 'bottom';
-        var repsDiv = document.createElement('div');
-        repsDiv.className = 'rep-boxes';
-
-        var sets = ex.sets || 3;
-        var reps = ex.repsPerSet;
-        if (typeof reps === 'number') {
-          for (var s = 0; s < sets; s++) {
-            var rBox = document.createElement('div');
-            rBox.className = 'rep-box';
-            rBox.textContent = String(reps);
-            repsDiv.appendChild(rBox);
-          }
-        } else if (reps != null) {
-          var numSets = typeof sets === 'number' ? sets : 1;
-          for (var s2 = 0; s2 < numSets; s2++) {
-            var rBoxString = document.createElement('div');
-            rBoxString.className = 'rep-box';
-            rBoxString.textContent = String(reps);
-            if (String(reps).length > 2) {
-              rBoxString.style.fontSize = '4.5pt';
-            }
-            repsDiv.appendChild(rBoxString);
-          }
-        }
-        // else: repsPerSet is null/undefined — render no boxes (weight field still shows)
-        tdReps.appendChild(repsDiv);
-        tr.appendChild(tdReps);
-
-        table.appendChild(tr);
-      });
-      card.appendChild(table);
-
-      // Notes box (hidden in dense mode via CSS)
-      var notesBox = el('div', 'notes-box');
-      card.appendChild(notesBox);
-
-      cardsContainer.appendChild(card);
+  function applyTheme(container, theme) {
+    container.setAttribute('data-archetype', theme.archetype);
+    Object.keys(theme.tokens).forEach(function (key) {
+      container.style.setProperty(key, theme.tokens[key]);
     });
-    inner.appendChild(cardsContainer);
-
-    // Survey progress footer
-    if (!isOverflow) {
-      var footer = el('div', 'survey-footer');
-      var pips = el('div', 'survey-pips');
-      var tw = totalWeeks || 6;
-      for (var pip = 1; pip <= tw; pip++) {
-        var pipEl = el('div', 'survey-pip');
-        if (pip < weekNum) pipEl.classList.add('filled');
-        if (pip === weekNum) pipEl.classList.add('current');
-        pips.appendChild(pipEl);
-      }
-      footer.appendChild(pips);
-      footer.appendChild(txt('span', 'survey-footer-note',
-        'Week ' + weekNum + ' of ' + tw));
-      inner.appendChild(footer);
-    }
-
-    p.appendChild(inner);
-    return p;
   }
-
-  // ═══ MAP RENDERERS ═══════════════════════════════════════════════
-  // Each map type is self-contained. Fix one without touching the others.
-  // Guardrail constants at the top of each function.
-  // Schema constraints live in generator.js SCHEMA_SPATIAL.
-
-  function renderGridMap(container, mapState) {
-    container.appendChild(txt('div', 'map-title', mapState.title || mapState.floorLabel || 'Floor Map'));
-
-    if (!mapState.gridDimensions) return;
-
-    var mapGrid = el('div', 'map-grid');
-    var cols = mapState.gridDimensions.columns;
-    var rows = mapState.gridDimensions.rows;
-    mapGrid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
-
-    // Build tile lookup
-    var tileLookup = {};
-    if (mapState.tiles) {
-      mapState.tiles.forEach(function (tile) {
-        tileLookup[tile.col + ',' + tile.row] = tile;
-      });
-    }
-
-    for (var r = 1; r <= rows; r++) {
-      for (var col = 1; col <= cols; col++) {
-        var tile = tileLookup[col + ',' + r];
-        var cell = el('div', 'map-cell');
-        if (tile) {
-          cell.classList.add(tile.type || 'empty');
-          if (tile.label) cell.textContent = tile.label;
-        } else {
-          cell.classList.add('empty');
-        }
-        mapGrid.appendChild(cell);
-      }
-    }
-    container.appendChild(mapGrid);
-
-    // Annotations
-    if (mapState.tiles) {
-      mapState.tiles.forEach(function (tile) {
-        if (tile.annotation) {
-          container.appendChild(txt('div', 'map-annotation',
-            (tile.label || '') + ': ' + tile.annotation));
-        }
-      });
-    }
-
-    // Map note
-    if (mapState.mapNote) {
-      container.appendChild(txt('div', 'map-note', mapState.mapNote));
-    }
-  }
-
-  function renderPtpMap(container, mapState) {
-    // ── PTP Guardrail Constants ──────────────────────────────
-    // Adjust these to fix layout issues.
-    // Schema constraints live in generator.js SCHEMA_SPATIAL.
-    var MAX_NODES = 8;          // max visible — clamp, don't crash
-    var FONT_SIZE = 5.5;        // pt — floor, never shrink below this
-    var EDGE_FONT_SIZE = 4.5;   // pt — edge labels
-    var NODE_R = 3;             // SVG units — node circle radius
-    var PLAYER_R = 4.5;         // SVG units — current node radius
-    var PLAYER_STROKE = 2.5;    // SVG units — double-ring stroke width
-    var EDGE_W = 0.8;           // SVG units — edge stroke width
-    var LABEL_GAP = 8;          // SVG units — node center to label baseline
-    var EDGE_LABEL_OFFSET = 8;  // SVG units — perpendicular offset for edge labels
-    var VB_PAD = 12;            // SVG units — viewBox padding all sides
-    // Collision margins — measured from actual rendered text in SVG coords.
-    // SVG viewBox 124×124 renders at ~229px, so 1 SVG unit ≈ 0.54px→SVG ratio.
-    // Node labels (5.5pt): 3.92 SVG units/char, 8.1 SVG units tall.
-    // Edge labels (4.5pt): 3.22 SVG units/char, 6.5 SVG units tall.
-    var CHAR_W = 4.0;           // SVG units — node label char width (measured 3.92, +2% margin)
-    var CHAR_W_EDGE = 3.3;      // SVG units — edge label char width (measured 3.22, +2% margin)
-    var NODE_HIT_R = 6;         // SVG units — collision radius around node centers
-    var LABEL_HH = 4.5;         // SVG units — node label half-height (measured 8.1/2 + margin)
-    var EDGE_LABEL_HH = 3.8;    // SVG units — edge label half-height (measured 6.5/2 + margin)
-    // ─────────────────────────────────────────────────────────
-
-    container.appendChild(txt('div', 'map-title', mapState.title || 'Location Map'));
-
-    var nodes = (mapState.nodes || []).slice(0, MAX_NODES);
-    var edges = mapState.edges || [];
-    var currentNode = mapState.currentNode;
-
-    if (nodes.length === 0) return;
-
-    // Build node lookup
-    var nodeLookup = {};
-    nodes.forEach(function (n) { nodeLookup[n.id] = n; });
-
-    // SVG — fixed viewBox, nodes at 0-100 map directly
-    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox',
-      (0 - VB_PAD) + ' ' + (0 - VB_PAD) + ' ' +
-      (100 + VB_PAD * 2) + ' ' + (100 + VB_PAD * 2));
-    svg.setAttribute('class', 'ptp-map');
-    svg.style.width = '100%';
-    svg.style.maxHeight = '3.5in';
-
-    // Collision helper — checks a candidate rect against all placed rects
-    function hitTest(cx, cy, hw, hh) {
-      for (var i = 0; i < placedLabels.length; i++) {
-        var p = placedLabels[i];
-        if (Math.abs(cx - p.x) < (hw + p.hw) && Math.abs(cy - p.y) < (hh + p.hh)) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    // Draw edge lines first (behind nodes) — labels deferred until after node labels
-    edges.forEach(function (edge) {
-      var from = nodeLookup[edge.from];
-      var to = nodeLookup[edge.to];
-      if (!from || !to) return;
-
-      var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', from.x);
-      line.setAttribute('y1', from.y);
-      line.setAttribute('x2', to.x);
-      line.setAttribute('y2', to.y);
-      line.setAttribute('class', 'ptp-edge' +
-        (edge.state === 'locked' ? ' ptp-edge-locked' : ''));
-      svg.appendChild(line);
-    });
-
-    // Track placed rects for collision detection: {x, y, hw (half-width), hh (half-height)}
-    var placedLabels = [];
-    var legendEntries = [];
-
-    // Register all node bodies as occupied space FIRST
-    nodes.forEach(function (node) {
-      var isCurrent = node.id === currentNode;
-      placedLabels.push({ x: node.x, y: node.y, hw: NODE_HIT_R, hh: NODE_HIT_R });
-    });
-
-    // Draw nodes + node labels
-    nodes.forEach(function (node) {
-      var isCurrent = node.id === currentNode;
-      var isLocked = node.state === 'locked';
-      var isAnomaly = node.state === 'anomaly';
-
-      // Node circle
-      var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      circle.setAttribute('cx', node.x);
-      circle.setAttribute('cy', node.y);
-      circle.setAttribute('r', isCurrent ? PLAYER_R : NODE_R);
-      circle.setAttribute('class', 'ptp-node' +
-        (isCurrent ? ' ptp-node-current' : '') +
-        (isLocked ? ' ptp-node-locked' : '') +
-        (isAnomaly ? ' ptp-node-anomaly' : ''));
-      if (isCurrent) circle.setAttribute('stroke-width', PLAYER_STROKE);
-      svg.appendChild(circle);
-
-      // Label — below node, centered
-      var labelText = (node.label || node.id).substring(0, 14);
-      var labelY = node.y + LABEL_GAP + NODE_R;
-      var labelX = node.x;
-
-      // Clamp inside viewBox
-      var estHW = labelText.length * CHAR_W * 0.5;
-      if (labelX - estHW < -VB_PAD + 1) labelX = -VB_PAD + 1 + estHW;
-      if (labelX + estHW > 100 + VB_PAD - 1) labelX = 100 + VB_PAD - 1 - estHW;
-      if (labelY > 100 + VB_PAD - 2) labelY = node.y - LABEL_GAP;
-
-      // Collision check
-      var collides = hitTest(labelX, labelY, estHW, LABEL_HH);
-
-      var lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      lbl.setAttribute('x', labelX);
-      lbl.setAttribute('y', labelY);
-      lbl.setAttribute('text-anchor', 'middle');
-      lbl.setAttribute('class', 'ptp-label' + (isLocked ? ' ptp-label-locked' : ''));
-
-      if (collides) {
-        var refNum = legendEntries.length + 1;
-        lbl.textContent = '[' + refNum + ']';
-        legendEntries.push(refNum + ': ' + labelText);
-        placedLabels.push({ x: labelX, y: labelY, hw: 3 * CHAR_W * 0.5, hh: LABEL_HH });
-      } else {
-        lbl.textContent = labelText;
-        placedLabels.push({ x: labelX, y: labelY, hw: estHW, hh: LABEL_HH });
-      }
-      svg.appendChild(lbl);
-    });
-
-    // Draw edge labels AFTER node labels — checked against placedLabels[]
-    edges.forEach(function (edge) {
-      if (!edge.label) return;
-      var from = nodeLookup[edge.from];
-      var to = nodeLookup[edge.to];
-      if (!from || !to) return;
-
-      var edgeLabelText = (edge.label || '').substring(0, 8);
-      var mx = (from.x + to.x) / 2;
-      var my = (from.y + to.y) / 2;
-
-      // Perpendicular offset — try both sides of the edge
-      var dx = to.x - from.x;
-      var dy = to.y - from.y;
-      var len = Math.sqrt(dx * dx + dy * dy) || 1;
-      var perpX = -dy / len * EDGE_LABEL_OFFSET;
-      var perpY = dx / len * EDGE_LABEL_OFFSET;
-
-      var estHW = edgeLabelText.length * CHAR_W_EDGE * 0.5;
-
-      // Try side A (perpendicular offset)
-      var elX = mx + perpX;
-      var elY = my + perpY;
-
-      // Clamp
-      if (elX - estHW < -VB_PAD + 1) elX = -VB_PAD + 1 + estHW;
-      if (elX + estHW > 100 + VB_PAD - 1) elX = 100 + VB_PAD - 1 - estHW;
-      if (elY < -VB_PAD + 2) elY = -VB_PAD + 2;
-      if (elY > 100 + VB_PAD - 2) elY = 100 + VB_PAD - 2;
-
-      var placed = false;
-      if (!hitTest(elX, elY, estHW, EDGE_LABEL_HH)) {
-        // Side A is clear
-        var elbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        elbl.setAttribute('x', elX);
-        elbl.setAttribute('y', elY);
-        elbl.setAttribute('text-anchor', 'middle');
-        elbl.setAttribute('class', 'ptp-edge-label');
-        elbl.textContent = edgeLabelText;
-        svg.appendChild(elbl);
-        placedLabels.push({ x: elX, y: elY, hw: estHW, hh: EDGE_LABEL_HH });
-        placed = true;
-      }
-
-      if (!placed) {
-        // Try side B (opposite perpendicular)
-        elX = mx - perpX;
-        elY = my - perpY;
-        if (elX - estHW < -VB_PAD + 1) elX = -VB_PAD + 1 + estHW;
-        if (elX + estHW > 100 + VB_PAD - 1) elX = 100 + VB_PAD - 1 - estHW;
-        if (elY < -VB_PAD + 2) elY = -VB_PAD + 2;
-        if (elY > 100 + VB_PAD - 2) elY = 100 + VB_PAD - 2;
-
-        if (!hitTest(elX, elY, estHW, EDGE_LABEL_HH)) {
-          var elbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          elbl.setAttribute('x', elX);
-          elbl.setAttribute('y', elY);
-          elbl.setAttribute('text-anchor', 'middle');
-          elbl.setAttribute('class', 'ptp-edge-label');
-          elbl.textContent = edgeLabelText;
-          svg.appendChild(elbl);
-          placedLabels.push({ x: elX, y: elY, hw: estHW, hh: EDGE_LABEL_HH });
-          placed = true;
-        }
-      }
-
-      if (!placed) {
-        // Both sides blocked — legend only (no SVG text to avoid overlap)
-        var refNum = legendEntries.length + 1;
-        legendEntries.push(refNum + ': ' + edgeLabelText);
-      }
-    });
-
-    container.appendChild(svg);
-
-    // Render legend entries for collision-displaced labels
-    legendEntries.forEach(function (entry) {
-      container.appendChild(txt('div', 'map-annotation', entry));
-    });
-
-    // Map note
-    if (mapState.mapNote) {
-      container.appendChild(txt('div', 'map-note', mapState.mapNote));
-    }
-  }
-
-  function renderLinearTrack(container, mapState) {
-    // ── Linear Track Constants ───────────────────────────────
-    var MAX_POSITIONS = 12;
-    var MIN_POSITIONS = 3;
-    // ─────────────────────────────────────────────────────────
-
-    container.appendChild(txt('div', 'map-title', mapState.title || 'Progress Track'));
-
-    var positions = (mapState.positions || []).slice(0, MAX_POSITIONS);
-    if (positions.length < MIN_POSITIONS) return;
-
-    var isVertical = mapState.direction === 'vertical';
-    var track = el('div', 'linear-track' + (isVertical ? ' linear-track-vertical' : ''));
-    var currentPos = mapState.currentPosition;
-
-    positions.forEach(function (pos, idx) {
-      // Connector between positions (not before first)
-      if (idx > 0) {
-        track.appendChild(el('div', 'linear-connector'));
-      }
-
-      var posEl = el('div', 'linear-position');
-      var state = pos.state || 'empty';
-      if (pos.index === currentPos) state = 'current';
-      posEl.classList.add(state);
-      posEl.textContent = (pos.label || String(pos.index)).substring(0, 8);
-      track.appendChild(posEl);
-    });
-
-    container.appendChild(track);
-
-    // Annotations
-    positions.forEach(function (pos) {
-      if (pos.annotation) {
-        container.appendChild(txt('div', 'map-annotation',
-          (pos.label || String(pos.index)) + ': ' + pos.annotation));
-      }
-    });
-
-    // Map note
-    if (mapState.mapNote) {
-      container.appendChild(txt('div', 'map-note', mapState.mapNote));
-    }
-  }
-
-  function renderPlayerDrawn(container, mapState) {
-    // ── Player-Drawn Constants ───────────────────────────────
-    var MAX_PROMPTS = 4;
-    var MAX_SEEDS = 3;
-    // ─────────────────────────────────────────────────────────
-
-    container.appendChild(txt('div', 'map-title', mapState.title || 'Survey Canvas'));
-
-    var canvasType = mapState.canvasType || 'dot-grid';
-    var dims = mapState.dimensions || { columns: 10, rows: 8 };
-    var cols = Math.min(16, Math.max(8, dims.columns));
-    var rows = Math.min(12, Math.max(6, dims.rows));
-
-    // Seed marker annotations (listed above canvas for reference)
-    var seeds = (mapState.seedMarkers || []).slice(0, MAX_SEEDS);
-    if (seeds.length > 0) {
-      seeds.forEach(function (seed) {
-        container.appendChild(txt('div', 'map-annotation',
-          '\u25CF ' + (seed.label || '').substring(0, 8) +
-          ' \u2014 col ' + seed.col + ', row ' + seed.row));
-      });
-    }
-
-    var canvas = el('div', 'canvas-container');
-
-    if (canvasType === 'blank') {
-      canvas.classList.add('canvas-blank');
-      canvas.style.height = (rows * 14) + 'px';
-
-    } else if (canvasType === 'graph-paper') {
-      canvas.classList.add('canvas-graph');
-      canvas.style.display = 'grid';
-      canvas.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
-      for (var gi = 0; gi < cols * rows; gi++) {
-        canvas.appendChild(el('div', 'canvas-graph-cell'));
-      }
-
-    } else if (canvasType === 'hex-dot') {
-      // Hex dot pattern — offset every other row
-      canvas.classList.add('canvas-dot-grid canvas-hex');
-      canvas.style.display = 'grid';
-      canvas.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
-      for (var hr = 0; hr < rows; hr++) {
-        for (var hc = 0; hc < cols; hc++) {
-          var hexDot = el('div', 'canvas-dot');
-          if (hr % 2 === 1) hexDot.style.transform = 'translateX(50%)';
-          canvas.appendChild(hexDot);
-        }
-      }
-
-    } else {
-      // dot-grid (default)
-      canvas.classList.add('canvas-dot-grid');
-      canvas.style.display = 'grid';
-      canvas.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
-      for (var di = 0; di < cols * rows; di++) {
-        canvas.appendChild(el('div', 'canvas-dot'));
-      }
-    }
-
-    container.appendChild(canvas);
-
-    // Drawing prompts
-    var prompts = (mapState.prompts || []).slice(0, MAX_PROMPTS);
-    prompts.forEach(function (prompt) {
-      container.appendChild(txt('div', 'canvas-prompt',
-        '\u25B8 ' + prompt.substring(0, 60)));
-    });
-
-    // Map note
-    if (mapState.mapNote) {
-      container.appendChild(txt('div', 'map-note', mapState.mapNote));
-    }
-  }
-
-  // ═══ Zone Builders (field ops page composition) ═══
-  function buildCipherZone(fieldOps) {
-    var cipherZone = el('div', 'cipher-zone');
-    var cipher = fieldOps.cipher;
-    if (cipher) {
-      cipherZone.appendChild(txt('div', 'puzzle-title', cipher.title));
-
-      if (cipher.body && cipher.body.displayText) {
-        var lines = cipher.body.displayText.split('\n');
-        var currentSection = null;
-
-        lines.forEach(function (line) {
-          var trimmed = line.trim();
-          if (!trimmed) return;
-
-          if (trimmed.match(/^KEY/i)) {
-            currentSection = 'key';
-            var keyDiv = el('div', 'cipher-key');
-            keyDiv.appendChild(txt('div', 'key-grid', trimmed));
-            cipherZone.appendChild(keyDiv);
-          } else if (currentSection === 'key' && trimmed.match(/^[A-Z?]=/)) {
-            var lastKey = cipherZone.querySelector('.cipher-key:last-child .key-grid');
-            if (lastKey) lastKey.textContent += '\n' + trimmed;
-          } else if (trimmed.match(/^Position/i)) {
-            currentSection = 'pos';
-            var posDiv = el('div', 'position-sequence');
-            posDiv.appendChild(txt('div', 'pos-numbers', trimmed));
-            cipherZone.appendChild(posDiv);
-          } else {
-            currentSection = 'seq';
-            cipherZone.appendChild(txt('div', 'cipher-sequence', trimmed));
-          }
-        });
-      }
-
-      if (cipher.body && cipher.body.key) {
-        cipherZone.appendChild(txt('div', 'cipher-instruction', cipher.body.key));
-      }
-
-      if (cipher.body && cipher.body.workSpace) {
-        var grid = el('div', 'plaintext-grid');
-        var cells = cipher.body.workSpace.rows * 10; // approximate
-        for (var c = 0; c < cells; c++) {
-          grid.appendChild(el('div', 'plaintext-cell'));
-        }
-        cipherZone.appendChild(grid);
-      }
-
-      if (cipher.extractionInstruction) {
-        cipherZone.appendChild(txt('div', 'password-extract', cipher.extractionInstruction));
-      }
-    }
-    return cipherZone;
-  }
-
-  function buildMapZone(fieldOps) {
-    var mapZone = el('div', 'map-zone');
-    var mapState = fieldOps.mapState;
-    if (mapState) {
-      var mapType = mapState.mapType || 'grid';
-      switch (mapType) {
-        case 'grid':           renderGridMap(mapZone, mapState); break;
-        case 'point-to-point': renderPtpMap(mapZone, mapState); break;
-        case 'linear-track':   renderLinearTrack(mapZone, mapState); break;
-        case 'player-drawn':   renderPlayerDrawn(mapZone, mapState); break;
-        default:               renderGridMap(mapZone, mapState); break;
-      }
-    }
-    return mapZone;
-  }
-
-  function buildOracleZone(fieldOps) {
-    function appendOracleEntry(entryEl, entry) {
-      entryEl.appendChild(txt('span', 'oracle-text', entry.text));
-      if (entry.paperAction) {
-        entryEl.appendChild(txt('span', 'oracle-paper-action', entry.paperAction));
-      }
-      if (entry.fragmentRef) {
-        entryEl.appendChild(txt('span', 'frag-ref', '\u2192 ' + entry.fragmentRef));
-      }
-    }
-
-    var oracleZone = el('div', 'oracle-zone');
-    var oracle = fieldOps.oracleTable;
-    if (oracle) {
-      oracleZone.appendChild(txt('div', 'oracle-header', oracle.title));
-      if (oracle.instruction) {
-        oracleZone.appendChild(txt('div', 'oracle-instruction', oracle.instruction));
-      }
-
-      var entries = el('div', 'oracle-entries');
-      if (oracle.entries) {
-        if (oracle.mode === 'simple') {
-          oracle.entries.forEach(function (entry) {
-            var typeClass = entry.type ? ' oracle-entry-' + normalizeThemeToken(entry.type) : '';
-            var entryEl = el('div', 'oracle-entry oracle-case' + typeClass);
-            entryEl.appendChild(txt('span', 'oracle-case-num', entry.roll));
-            appendOracleEntry(entryEl, entry);
-            entries.appendChild(entryEl);
-          });
-        } else {
-          var clusters = {};
-          oracle.entries.forEach(function (entry, oracleIdx) {
-            var c;
-            if (entry.cluster != null) {
-              c = entry.cluster;
-            } else {
-              var parsed = parseInt(entry.roll, 10);
-              c = isNaN(parsed) ? oracleIdx : Math.floor(parsed / 10);
-            }
-            if (!clusters[c]) clusters[c] = [];
-            clusters[c].push(entry);
-          });
-
-          var clusterKeys = Object.keys(clusters).sort(function (a, b) { return a - b; });
-          clusterKeys.forEach(function (key) {
-            var group = clusters[key];
-            var first = group[0];
-            var last = group[group.length - 1];
-            var typeClass = first.type ? ' oracle-entry-' + normalizeThemeToken(first.type) : '';
-            var entryEl = el('div', 'oracle-entry oracle-case' + typeClass);
-
-            var rangeStr = group.length > 1
-              ? first.roll + '\u2013' + last.roll
-              : first.roll;
-            entryEl.appendChild(txt('span', 'oracle-case-num', rangeStr));
-            appendOracleEntry(entryEl, first);
-
-            entries.appendChild(entryEl);
-          });
-        }
-      }
-      oracleZone.appendChild(entries);
-    }
-    return oracleZone;
-  }
-
-  // ═══ FIELD OPS RIGHT (Map + Cipher + Oracle) ═══
-  function renderFieldOpsRight(week, weekNum, labels) {
-    var p = page('field-ops');
-    var inner = el('div', 'field-ops-right');
-
-    // Header
-    var hdr = el('div', 'rp-header');
-    hdr.appendChild(txt('span', '', labels.fieldOpsHeader));
-    hdr.appendChild(txt('span', 'page-num', ''));
-    inner.appendChild(hdr);
-
-    // Content grid
-    var content = el('div', 'rp-content');
-
-    // Guard: gracefully handle missing fieldOps (e.g., malformed JSON)
-    // All three zones missing → skip page content (design doc: defensive)
-    if (!week.fieldOps || (!week.fieldOps.cipher && !week.fieldOps.mapState && !week.fieldOps.oracleTable)) {
-      inner.appendChild(content);
-      p.appendChild(inner);
-      return p;
-    }
-
-    // Select layout family
-    var layout = getFieldOpsLayout(week.fieldOps);
-    if (layout !== 'default') {
-      inner.setAttribute('data-layout', layout);
-    }
-
-    content.appendChild(buildCipherZone(week.fieldOps));
-    content.appendChild(buildMapZone(week.fieldOps));
-    content.appendChild(buildOracleZone(week.fieldOps));
-
-    inner.appendChild(content);
-    p.appendChild(inner);
-    return p;
-  }
-
-  // ── Print-safe area enforcement (runs after pages are in DOM) ──
-  var SAFE_INSET = 24; // px — matches --safe-inset in CSS (0.25in)
-  var MIN_SCALE = 0.82; // floor — below this, content is fundamentally too large
-
-  function enforcePageFit(page) {
-    var inner = page.children[0];
-    if (!inner) return;
-
-    // Measure true content height:
-    // Inner wrappers use height:100% — temporarily unset to get natural content height
-    var origPageOverflow = page.style.overflow;
-    var origInnerOverflow = inner.style.overflow;
-    var origHeight = inner.style.height;
-    var computedHeight = window.getComputedStyle(inner).height;
-    page.style.overflow = 'visible';
-    inner.style.overflow = 'visible';
-    inner.style.height = 'auto';
-
-    var pageH = page.offsetHeight;
-    var safeH = pageH - (2 * SAFE_INSET);
-    var trueH = inner.scrollHeight;
-
-    inner.style.height = origHeight || '';
-    page.style.overflow = origPageOverflow;
-    inner.style.overflow = origInnerOverflow;
-
-    if (trueH <= safeH) return; // fits — no action needed
-
-    var scale = safeH / trueH;
-    if (scale < MIN_SCALE) {
-      console.warn('enforcePageFit: page would need scale ' + scale.toFixed(3) +
-        ' (below ' + MIN_SCALE + ' floor). Content may be clipped. Inner class: ' + inner.className);
-      scale = MIN_SCALE;
-    }
-
-    inner.style.transform = 'scale(' + scale + ')';
-    inner.style.transformOrigin = 'top left';
-    inner.style.width = (100 / scale) + '%';
-  }
-
-  // ═══ BOSS RIGHT (replaces field ops on final week) ═══
-  function renderBossRight(data, week, weekNum, totalWeeks, labels) {
-    var p = page('boss');
-    var inner = el('div', 'boss-right');
-    var boss = week.bossEncounter;
-
-    // Boss layout selection
-    var container = document.getElementById('booklet-container');
-    var treatment = container ? container.getAttribute('data-treatment') || '' : '';
-    var bossLayout = BOSS_LAYOUT[treatment];
-    if (bossLayout) {
-      inner.setAttribute('data-boss-layout', bossLayout);
-    }
-
-    // Header
-    var hdr = el('div', 'boss-header rp-header');
-    hdr.appendChild(txt('span', '', 'Week ' + (weekNum < 10 ? '0' + weekNum : weekNum) + ' \u00b7 ' + labels.finalSurveyHeader));
-    hdr.appendChild(txt('span', 'page-num', ''));
-    inner.appendChild(hdr);
-
-    if (boss) {
-      // Title (always on inner, before any document frame)
-      inner.appendChild(txt('h2', 'boss-title', boss.title));
-
-      // Document frame wrapper (for document-first boss layout)
-      var contentTarget = inner;
-      if (bossLayout === 'document') {
-        var docFrame = el('div', 'boss-document-frame');
-        inner.appendChild(docFrame);
-        contentTarget = docFrame;
-      }
-
-      // Narrative
-      if (boss.narrative) {
-        contentTarget.appendChild(txt('div', 'boss-narrative', boss.narrative));
-      }
-
-      // Mechanism
-      if (boss.mechanismDescription) {
-        var mech = el('div', 'boss-mechanism');
-        mech.appendChild(txt('span', 'boss-mechanism-label', 'Procedure'));
-        mech.appendChild(txt('div', '', boss.mechanismDescription));
-        contentTarget.appendChild(mech);
-      }
-
-      // Component inputs (from prior weeks)
-      if (boss.componentInputs && boss.componentInputs.length) {
-        var compSection = el('div', 'boss-components');
-        compSection.appendChild(txt('div', 'boss-components-label', 'Required Components'));
-        var compList = el('div', 'boss-component-list');
-        boss.componentInputs.forEach(function (comp, idx) {
-          var item = el('div', 'boss-component-item');
-          // Handle both object format {weekNumber, description} and string format "H"
-          if (typeof comp === 'object' && comp !== null) {
-            var wn = comp.weekNumber || (idx + 1);
-            item.appendChild(txt('span', 'boss-component-week', 'Week ' + (wn < 10 ? '0' + wn : wn)));
-            item.appendChild(el('div', 'boss-component-box'));
-            item.appendChild(txt('span', '', comp.description || ''));
-          } else {
-            item.appendChild(txt('span', 'boss-component-week', 'Week ' + ((idx + 1) < 10 ? '0' + (idx + 1) : (idx + 1))));
-            item.appendChild(el('div', 'boss-component-box'));
-          }
-          compList.appendChild(item);
-        });
-        compSection.appendChild(compList);
-        contentTarget.appendChild(compSection);
-      }
-
-      // Decoding key (delayed interpretation)
-      if (boss.decodingKey) {
-        var dkTarget = inner;
-        if (bossLayout === 'document') {
-          var dkFrame = el('div', 'boss-document-frame boss-attachment-frame');
-          inner.appendChild(dkFrame);
-          dkTarget = dkFrame;
-        }
-
-        var dkSection = el('div', 'boss-decoding-key');
-        dkSection.appendChild(txt('div', 'boss-decoding-label', 'Decoding Protocol'));
-        if (boss.decodingKey.instruction) {
-          dkSection.appendChild(txt('div', 'boss-decoding-instruction', boss.decodingKey.instruction));
-        }
-        if (boss.decodingKey.referenceTable) {
-          var tableDiv = el('div', 'boss-decoding-table');
-          boss.decodingKey.referenceTable.split('\n').forEach(function (line) {
-            if (line.trim()) {
-              tableDiv.appendChild(txt('div', 'boss-decoding-table-line', line.trim()));
-            }
-          });
-          dkSection.appendChild(tableDiv);
-        }
-        dkTarget.appendChild(dkSection);
-
-        // Decoded letter boxes
-        var decodedSection = el('div', 'boss-decoded-letters');
-        decodedSection.appendChild(txt('div', 'boss-decoded-label', 'Decoded Values'));
-        var decodedGrid = el('div', 'boss-decoded-grid');
-        var inputCount = boss.componentInputs ? boss.componentInputs.length : 5;
-        for (var d = 0; d < inputCount; d++) {
-          var decodedItem = el('div', 'boss-decoded-item');
-          decodedItem.appendChild(txt('span', 'boss-decoded-week', 'Wk ' + ((d + 1) < 10 ? '0' + (d + 1) : (d + 1))));
-          decodedItem.appendChild(el('div', 'boss-decoded-box'));
-          decodedGrid.appendChild(decodedItem);
-        }
-        decodedSection.appendChild(decodedGrid);
-        dkTarget.appendChild(decodedSection);
-      }
-
-      // Convergence (password assembly) — always on inner, outside frames
-      var convergence = el('div', 'boss-convergence');
-      convergence.appendChild(txt('div', 'boss-convergence-label', 'Convergence'));
-      var convergenceText = boss.convergenceInstruction || boss.passwordRevealInstruction || '';
-      if (convergenceText) {
-        convergence.appendChild(txt('div', 'boss-convergence-instruction', convergenceText));
-      }
-      var pwBoxes = el('div', 'boss-password-boxes');
-      // Derive password length from meta or componentInputs
-      var pwLen = getPasswordLength(data, boss.componentInputs ? boss.componentInputs.length : 6);
-      for (var i = 0; i < pwLen; i++) {
-        pwBoxes.appendChild(el('div', 'boss-password-box'));
-      }
-      convergence.appendChild(pwBoxes);
-      inner.appendChild(convergence);
-    } else {
-      // Fallback if no boss data
-      inner.appendChild(txt('div', 'boss-title', labels.finalSurveyHeader));
-      inner.appendChild(txt('div', 'boss-narrative', labels.bossFallbackNarrative));
-    }
-
-    p.appendChild(inner);
-    return p;
-  }
-
-  // ═══ OVERFLOW LEFT (sessions 4+) ═══
-  function renderOverflowLeft(week, weekNum, overflowSessions, totalWeeks, labels) {
-    return renderWorkoutLeft(week, weekNum, overflowSessions, totalWeeks, true, labels);
-  }
-
-  // ═══ OVERFLOW RIGHT (found document) ═══
-  function renderOverflowRight(week) {
-    var p = page('overflow-doc');
-    var inner = el('div', 'overflow-doc-right');
-
-    if (week.overflowDocument) {
-      inner.appendChild(renderFoundDocument(week.overflowDocument));
-    } else {
-      // Fallback
-      var fd = el('div', 'found-doc');
-      fd.appendChild(txt('div', 'found-doc-type', 'Document'));
-      fd.appendChild(txt('div', 'found-doc-title', 'Filed as Recorded'));
-      fd.appendChild(txt('div', 'found-doc-body', 'This page intentionally left for narrative.'));
-      inner.appendChild(fd);
-    }
-
-    p.appendChild(inner);
-    return p;
-  }
-
-  // ═══ FOUND DOCUMENT RENDERER (shared) ═══
-  function renderFoundDocument(doc) {
-    var fd = el('div', 'found-doc');
-
-    if (doc.documentType) {
-      var typeStr = doc.documentType.replace(/-/g, ' ');
-      fd.appendChild(txt('div', 'found-doc-type', typeStr));
-    }
-    if (doc.inWorldAuthor) {
-      fd.appendChild(txt('div', 'found-doc-from', 'From: ' + doc.inWorldAuthor));
-    }
-    if (doc.inWorldRecipient) {
-      fd.appendChild(txt('div', 'found-doc-to', 'To: ' + doc.inWorldRecipient));
-    }
-    if (doc.title) {
-      fd.appendChild(txt('div', 'found-doc-title', doc.title));
-    }
-
-    var body = el('div', 'found-doc-body');
-    var bodySource = doc.bodyText || doc.body || doc.content || '';
-    if (bodySource) {
-      var bodyContent = typeof bodySource === 'string' ? bodySource : JSON.stringify(bodySource);
-      bodyContent.split('\n').forEach(function (para) {
-        if (para.trim()) body.appendChild(txt('p', '', para.trim()));
-      });
-    }
-    fd.appendChild(body);
-
-    if (doc.inWorldAuthor) {
-      fd.appendChild(txt('div', 'found-doc-sig', '\u2014 ' + doc.inWorldAuthor));
-    }
-
-    return fd;
-  }
-
-  // ═══ FRAGMENT PAGES ═══
-  function renderFragmentPage(fragments, startIdx, pageIdx) {
-    var p = page('fragment');
-    var isRecto = (pageIdx % 2 === 0);
-    var inner = el('div', 'fragment-page');
-    inner.setAttribute('data-side', isRecto ? 'recto' : 'verso');
-
-    // Page header
-    var hdr = el('div', 'page-header');
-    hdr.appendChild(txt('span', '', 'Documents'));
-    hdr.appendChild(txt('span', 'page-num', ''));
-    inner.appendChild(hdr);
-
-    fragments.forEach(function (frag, idx) {
-      var block = el('div', 'fragment-block');
-
-      // Large fragment number
-      block.appendChild(txt('div', 'fragment-number', frag.id || ('F.' + (startIdx + idx + 1))));
-
-      // Document
-      var docType = frag.documentType || 'memo';
-      var docTypeClass = normalizeThemeToken(docType);
-      var doc = el('div', 'fragment-doc ' + docTypeClass);
-
-      doc.appendChild(txt('div', 'fragment-doc-type', (docTypeClass || '').replace(/-/g, ' ')));
-
-      // Header metadata
-      var headerLines = [];
-      if (frag.inWorldAuthor) headerLines.push('From: ' + frag.inWorldAuthor);
-      if (frag.inWorldRecipient) headerLines.push('To: ' + frag.inWorldRecipient);
-      if (frag.date) headerLines.push('Date: ' + frag.date);
-      if (headerLines.length) {
-        doc.appendChild(txt('div', 'fragment-doc-header', headerLines.join('\n')));
-      }
-
-      // Title
-      if (frag.title) {
-        var titleEl = txt('div', '', frag.title);
-        titleEl.style.fontWeight = '700';
-        titleEl.style.marginBottom = '6px';
-        doc.appendChild(titleEl);
-      }
-
-      // Body
-      var body = el('div', 'fragment-doc-body');
-      var bodyText = frag.bodyText || frag.body || frag.content || '';
-      if (typeof bodyText === 'string') {
-        bodyText.split('\n').forEach(function (para) {
-          if (para.trim()) body.appendChild(txt('p', '', para.trim()));
-        });
-      }
-      doc.appendChild(body);
-
-      // Signature
-      if (frag.inWorldAuthor) {
-        doc.appendChild(txt('div', 'fragment-doc-sig', '\u2014 ' + frag.inWorldAuthor));
-      }
-
-      block.appendChild(doc);
-      inner.appendChild(block);
-    });
-
-    p.appendChild(inner);
-    return p;
-  }
-
-  // ═══ PASSWORD ASSEMBLY PAGE ═══
-  function renderPasswordAssembly(data, labels) {
-    var p = page('password-assembly');
-    var inner = el('div', 'password-assembly-page');
-
-    inner.appendChild(txt('h2', 'password-assembly-title', labels.passwordAssemblyTitle));
-    inner.appendChild(txt('div', 'password-assembly-subtitle',
-      'Transfer each week\u2019s recorded value to the grid below. Use the boss page decoding key to convert each value to its letter.'));
-
-    // Per-week rows
-    var grid = el('div', 'password-assembly-grid');
-    var weekCount = data.meta.weekCount || 6;
-    for (var w = 1; w <= weekCount; w++) {
-      var row = el('div', 'password-assembly-row');
-      row.appendChild(txt('span', 'password-assembly-week-label',
-        'Week ' + (w < 10 ? '0' + w : w)));
-      row.appendChild(el('div', 'password-assembly-value-cell'));
-      row.appendChild(txt('span', 'password-assembly-arrow', '\u2192'));
-      row.appendChild(el('div', 'password-assembly-letter-cell'));
-
-      // Show brief component type hint
-      var week = data.weeks[w - 1];
-      if (week && week.weeklyComponent && !week.isBossWeek) {
-        row.appendChild(txt('span', 'password-assembly-hint',
-          week.weeklyComponent.type || ''));
-      } else if (week && week.isBossWeek) {
-        row.appendChild(txt('span', 'password-assembly-hint', 'see decoding key'));
-      }
-      grid.appendChild(row);
-    }
-    inner.appendChild(grid);
-
-    // Final assembly
-    var final_ = el('div', 'password-final-assembly');
-    final_.appendChild(txt('div', 'password-final-label', 'Complete Password'));
-    var finalRow = el('div', 'password-final-row');
-    var pwLen = getPasswordLength(data, 10);
-    for (var i = 0; i < pwLen; i++) {
-      finalRow.appendChild(el('div', 'password-final-cell'));
-    }
-    final_.appendChild(finalRow);
-
-    // Unlock instruction (must make sense on printed paper, not just on screen)
-    var instrDiv = el('div', 'password-unlock-instruction');
-    instrDiv.appendChild(txt('span', '', 'When all positions are filled, return to '));
-    instrDiv.appendChild(txt('strong', '', 'liftrpg.co \u2192 Render'));
-    instrDiv.appendChild(txt('span', '', '. Upload your JSON and enter this password to unlock the final page.'));
-    final_.appendChild(instrDiv);
-
-    inner.appendChild(final_);
-
-    p.appendChild(inner);
-    return p;
-  }
-
-  // ═══ ENDINGS PAGE ═══
-  function renderEndingsPage(data, labels) {
-    var p = page('endings');
-    p.setAttribute('id', 'endings-page');
-    var inner = el('div', 'endings-page');
-
-    // If there's an encrypted ending, show locked state
-    if (data.meta && data.meta.passwordEncryptedEnding &&
-        data.meta.passwordEncryptedEnding !== 'PLACEHOLDER_ENCRYPTED_BLOB_REPLACE_AT_GENERATION_TIME') {
-      inner.classList.add('endings-locked');
-      inner.appendChild(txt('div', 'endings-locked-icon', '\uD83D\uDD12'));
-      inner.appendChild(txt('h2', 'endings-title', 'This Document Is Sealed'));
-      var lockMsg = el('div', 'endings-locked-msg');
-      lockMsg.appendChild(txt('span', '', 'Assemble your password from the weekly gauge readings. Return to '));
-      lockMsg.appendChild(txt('strong', '', 'liftrpg.co \u2192 Render'));
-      lockMsg.appendChild(txt('span', '', ' and enter it to unlock this page.'));
-      inner.appendChild(lockMsg);
-    } else if (data.endings && data.endings.length && data.endings[0].content) {
-      // Plaintext fallback (development/debug)
-      var ending = data.endings[0].content;
-      if (ending.body) {
-        var bodyDiv = el('div', 'endings-body');
-        ending.body.split('\n').forEach(function (para) {
-          if (para.trim()) bodyDiv.appendChild(txt('p', '', para.trim()));
-        });
-        inner.appendChild(bodyDiv);
-      }
-      if (ending.finalLine) {
-        inner.appendChild(txt('div', 'endings-final-line', ending.finalLine));
-      }
-    } else {
-      inner.appendChild(txt('h2', 'endings-title', labels.endingsFallbackTitle));
-      inner.appendChild(txt('div', 'endings-body', labels.endingsFallbackBody));
-    }
-
-    p.appendChild(inner);
-    return p;
-  }
-
-  // ═══ NOTES PAGE ═══
-  function renderNotesPage() {
-    var p = page('notes');
-    p.classList.add('notes-page');
-
-    var header = txt('div', 'notes-page-header', 'Notes');
-    p.appendChild(header);
-
-    var ruled = el('div', 'notes-ruled-area');
-    p.appendChild(ruled);
-
-    return p;
-  }
-
-  // ═══ BACK COVER ═══
-  function renderBackCover(data) {
-    var p = page('back-cover');
-    var inner = el('div', 'back-cover');
-
-    var colophon = el('div', 'back-cover-colophon');
-    colophon.appendChild(txt('div', '', 'Generated by LiftRPG'));
-    colophon.appendChild(txt('div', '', data.meta.generatedAt || ''));
-    colophon.appendChild(txt('div', '', 'liftrpg.co'));
-    inner.appendChild(colophon);
-
-    inner.appendChild(txt('div', 'back-cover-mark', 'LiftRPG'));
-
-    p.appendChild(inner);
-    return p;
-  }
-
-  // ── BOOKLET VALIDATION ────────────────────────────────────
-  // Structural checks beyond crash-prevention. Errors block render;
-  // warnings log to console and show count in status bar.
 
   function validateBooklet(data) {
     var errors = [];
-    var warnings = [];
-    var weeks = data.weeks;
-    var meta = data.meta;
-
-    // ── Hard errors (block render) ──────────────────────────
-
-    // 1. weekCount must match weeks array length
-    if (meta.weekCount != null && meta.weekCount !== weeks.length) {
-      errors.push('meta.weekCount (' + meta.weekCount + ') does not match weeks array length (' + weeks.length + ')');
+    if (!data || typeof data !== 'object') {
+      errors.push('JSON root must be an object.');
+      return errors;
     }
-
-    // 2. Exactly one boss week, must be final
-    var bossIndices = [];
-    weeks.forEach(function (wk, i) { if (wk.isBossWeek) bossIndices.push(i); });
-    if (bossIndices.length === 0) {
-      errors.push('No boss week found (exactly one week must have isBossWeek: true)');
-    } else if (bossIndices.length > 1) {
-      errors.push('Multiple boss weeks found at indices ' + bossIndices.join(', ') + ' (exactly one allowed)');
-    } else if (bossIndices[0] !== weeks.length - 1) {
-      errors.push('Boss week is at index ' + bossIndices[0] + ' but must be the final week (index ' + (weeks.length - 1) + ')');
-    }
-
-    // 3. Non-boss weeks must have fieldOps
-    weeks.forEach(function (wk, i) {
-      if (!wk.isBossWeek && !wk.fieldOps) {
-        errors.push('Week ' + (i + 1) + ' is not a boss week but has no fieldOps');
-      }
+    ['meta', 'cover', 'rulesSpread', 'weeks', 'fragments', 'endings'].forEach(function (key) {
+      if (!data[key]) errors.push('Missing top-level key "' + key + '".');
     });
-
-    // 4. Boss week must have bossEncounter
-    weeks.forEach(function (wk, i) {
-      if (wk.isBossWeek && !wk.bossEncounter) {
-        errors.push('Week ' + (i + 1) + ' is a boss week but has no bossEncounter');
-      }
-    });
-
-    // ── Warnings (render continues) ─────────────────────────
-
-    // 5. totalSessions mismatch
-    if (meta.totalSessions != null) {
-      var actualTotal = 0;
-      weeks.forEach(function (wk) { actualTotal += (wk.sessions ? wk.sessions.length : 0); });
-      if (meta.totalSessions !== actualTotal) {
-        warnings.push('meta.totalSessions (' + meta.totalSessions + ') does not match actual session count (' + actualTotal + ')');
+    if (data.meta && Array.isArray(data.weeks) && data.meta.weekCount !== data.weeks.length) {
+      errors.push('meta.weekCount does not match weeks.length.');
+    }
+    if (Array.isArray(data.weeks)) {
+      var bossWeeks = data.weeks.filter(function (week) { return week && week.isBossWeek; });
+      if (bossWeeks.length !== 1) errors.push('Exactly one boss week is required.');
+      if (bossWeeks.length === 1 && data.weeks[data.weeks.length - 1] !== bossWeeks[0]) {
+        errors.push('Boss week must be final week.');
       }
     }
-
-    // 6. weeklyComponent.type consistency
-    if (meta.weeklyComponentType) {
-      weeks.forEach(function (wk, i) {
-        if (!wk.isBossWeek && wk.weeklyComponent && wk.weeklyComponent.type &&
-            wk.weeklyComponent.type !== meta.weeklyComponentType) {
-          warnings.push('Week ' + (i + 1) + ' weeklyComponent.type "' + wk.weeklyComponent.type + '" does not match meta.weeklyComponentType "' + meta.weeklyComponentType + '"');
-        }
-      });
-    }
-
-    // 7. Binary choice: exactly one, not on boss week
-    var choiceCount = 0;
-    var choiceOnBoss = false;
-    weeks.forEach(function (wk) {
-      (wk.sessions || []).forEach(function (s) {
-        if (s.binaryChoice) {
-          choiceCount++;
-          if (wk.isBossWeek) choiceOnBoss = true;
-        }
-      });
-    });
-    if (choiceCount === 0) {
-      warnings.push('No binaryChoice found in any session (exactly one expected)');
-    } else if (choiceCount > 1) {
-      warnings.push('Found ' + choiceCount + ' binaryChoice entries (exactly one expected)');
-    }
-    if (choiceOnBoss) {
-      warnings.push('binaryChoice found on boss week (should be at midpoint, never on boss)');
-    }
-
-    // 8-9. Fragment ID uniqueness + fragmentRef resolution
-    var fragments = data.fragments || [];
-    var fragIds = {};
-    fragments.forEach(function (f) {
-      if (f.id) {
-        if (fragIds[f.id]) {
-          warnings.push('Duplicate fragment ID: "' + f.id + '"');
-        }
-        fragIds[f.id] = true;
-      }
-    });
-    weeks.forEach(function (wk, wi) {
-      (wk.sessions || []).forEach(function (s, si) {
-        if (s.fragmentRef && !fragIds[s.fragmentRef]) {
-          warnings.push('Week ' + (wi + 1) + ' session ' + (si + 1) + ' fragmentRef "' + s.fragmentRef + '" does not resolve to any fragment');
-        }
-      });
-      // Also check oracle table entries for fragmentRef
-      var cipher = wk.fieldOps && wk.fieldOps.cipher;
-      var oracle = (wk.fieldOps && wk.fieldOps.oracleTable) || {};
-      (oracle.entries || []).forEach(function (e) {
-        if (e.fragmentRef && !fragIds[e.fragmentRef]) {
-          warnings.push('Week ' + (wi + 1) + ' oracle entry fragmentRef "' + e.fragmentRef + '" does not resolve to any fragment');
-        }
-      });
-    });
-
-    // 10-11. componentInputs validation
-    var bossWeek = bossIndices.length === 1 ? weeks[bossIndices[0]] : null;
-    if (bossWeek && bossWeek.bossEncounter) {
-      var boss = bossWeek.bossEncounter;
-      var inputs = boss.componentInputs;
-      if (inputs) {
-        var expectedLen = weeks.length - 1;
-        if (inputs.length !== expectedLen) {
-          warnings.push('bossEncounter.componentInputs has ' + inputs.length + ' entries, expected ' + expectedLen + ' (one per non-boss week)');
-        }
-        // Check values match prior weeklyComponent.values
-        var priorValues = [];
-        weeks.forEach(function (wk) {
-          if (!wk.isBossWeek && wk.weeklyComponent) {
-            priorValues.push(wk.weeklyComponent.value);
-          }
-        });
-        for (var ci = 0; ci < Math.min(inputs.length, priorValues.length); ci++) {
-          if (inputs[ci] !== priorValues[ci] && String(inputs[ci]) !== String(priorValues[ci])) {
-            warnings.push('componentInputs[' + ci + '] = "' + inputs[ci] + '" but weeklyComponent.value for week ' + (ci + 1) + ' = "' + priorValues[ci] + '"');
-          }
-        }
-      }
-    }
-
-    // 12. Password plaintext leak scan
-    if (meta.passwordPlaintext && meta.passwordPlaintext.length >= 3) {
-      var pw = meta.passwordPlaintext.toUpperCase();
-      var leakFound = false;
-      function scanForLeak(text, location) {
-        if (text && typeof text === 'string' && text.toUpperCase().indexOf(pw) !== -1) {
-          if (!leakFound) {
-            warnings.push('passwordPlaintext "' + pw + '" found in printed content: ' + location);
-            leakFound = true;
-          }
-        }
-      }
-      weeks.forEach(function (wk, wi) {
-        scanForLeak(wk.title, 'week ' + (wi + 1) + ' title');
-        (wk.sessions || []).forEach(function (s, si) {
-          scanForLeak(s.storyPrompt, 'week ' + (wi + 1) + ' session ' + (si + 1) + ' storyPrompt');
-        });
-        if (wk.bossEncounter) {
-          scanForLeak(wk.bossEncounter.narrative, 'boss narrative');
-          scanForLeak(wk.bossEncounter.mechanismDescription, 'boss mechanismDescription');
-        }
-        if (wk.fieldOps && wk.fieldOps.cipher) {
-          var cb = wk.fieldOps.cipher.body;
-          if (cb) scanForLeak(cb.displayText, 'week ' + (wi + 1) + ' cipher displayText');
-        }
-      });
-      fragments.forEach(function (f) {
-        scanForLeak(f.content, 'fragment ' + (f.id || '?'));
-      });
-    }
-
-    // 13. Oracle entry counts
-    weeks.forEach(function (wk, wi) {
-      var oracle = (wk.fieldOps && wk.fieldOps.oracleTable) || {};
-      var entries = oracle.entries || [];
-      if (oracle.mode === 'simple' && entries.length !== 11) {
-        warnings.push('Week ' + (wi + 1) + ' oracle mode "simple" has ' + entries.length + ' entries (expected 11)');
-      } else if (oracle.mode === 'full' && entries.length !== 10) {
-        warnings.push('Week ' + (wi + 1) + ' oracle mode "full" has ' + entries.length + ' entries (expected 10)');
-      }
-    });
-
-    // 14. Boss week value should be null
-    if (bossWeek && bossWeek.weeklyComponent && bossWeek.weeklyComponent.value != null) {
-      warnings.push('Boss week weeklyComponent.value should be null, got "' + bossWeek.weeklyComponent.value + '"');
-    }
-
-    return { errors: errors, warnings: warnings };
+    return errors;
   }
 
-  // ── MAIN ORCHESTRATOR ──────────────────────────────────────
+  function splitParagraphs(text) {
+    return String(text || '')
+      .split('\n')
+      .map(function (line) { return line.trim(); })
+      .filter(Boolean);
+  }
 
-  function render(data) {
-    // ── Defensive validation — fail fast with actionable messages ──
-    if (!data || typeof data !== 'object') {
-      throw new Error('Render failed: expected a JSON object, got ' + typeof data);
-    }
+  function readingLength(value) {
+    return splitParagraphs(value).join(' ').length;
+  }
 
-    // Top-level required fields
-    var _required = ['meta', 'cover', 'rulesSpread', 'weeks'];
-    _required.forEach(function (key) {
-      if (!data[key]) throw new Error('Render failed: missing required field "' + key + '"');
-    });
+  function chunkSessions(week) {
+    var sessions = week.sessions || [];
+    var chunks = [];
+    var current = [];
+    var load = 0;
 
-    // Structural checks — catch the things that cause cryptic crashes
-    if (!Array.isArray(data.weeks) || data.weeks.length === 0) {
-      throw new Error('Render failed: data.weeks must be a non-empty array');
-    }
-    if (!data.meta.blockTitle) {
-      throw new Error('Render failed: meta.blockTitle is required');
-    }
-    if (!data.rulesSpread.leftPage || !data.rulesSpread.rightPage) {
-      throw new Error('Render failed: rulesSpread must have leftPage and rightPage');
-    }
-    data.weeks.forEach(function (wk, i) {
-      if (!Array.isArray(wk.sessions)) {
-        throw new Error('Render failed: weeks[' + i + '].sessions must be an array');
+    sessions.forEach(function (session) {
+      var weight = 1;
+      weight += Math.min((session.exercises || []).length, 6) * 0.3;
+      weight += Math.min(readingLength(session.storyPrompt) / 300, 1.5);
+      if (session.binaryChoice) weight += 1.2;
+
+      // Reduced chunk size for easier layout: max 2 sessions, tight weight limits
+      if (current.length >= 2 || (current.length >= 1 && load + weight > 2.4)) {
+        chunks.push(current);
+        current = [];
+        load = 0;
       }
+      current.push(session);
+      load += weight;
     });
-    // ─────────────────────────────────────────────────────────────
+    if (current.length) chunks.push(current);
+    return chunks;
+  }
 
-    // ── Structural validation — catch schema violations ──────────
-    var validation = validateBooklet(data);
-    if (validation.errors.length > 0) {
-      throw new Error('Validation failed: ' + validation.errors[0]);
-    }
-    window._lastValidationWarnings = validation.warnings;
-    if (validation.warnings.length > 0) {
-      console.warn('⚠ Booklet validation warnings (' + validation.warnings.length + '):');
-      validation.warnings.forEach(function (w) { console.warn('  • ' + w); });
-    }
-    // ─────────────────────────────────────────────────────────────
-
-    // Apply visual theme — default to pastoral if missing
-    var themeContainer = document.getElementById('booklet-container');
-    if (themeContainer) {
-      var theme = data.theme || {};
-      var arch = theme.visualArchetype || 'pastoral';
-      themeContainer.setAttribute('data-treatment', arch);
-      var pal = theme.palette || {};
-      var ink    = pal.ink    || '#181714';
-      var paper  = pal.paper  || '#f1ebe0';
-      var accent = pal.accent || '#8b2a2a';
-      var muted  = pal.muted  || '#857d72';
-      var rule   = pal.rule   || '#ccc5b6';
-      var fog    = pal.fog    || '#ddd6c5';
-      themeContainer.style.setProperty('--ink', ink);
-      themeContainer.style.setProperty('--paper', paper);
-      themeContainer.style.setProperty('--accent', accent);
-      themeContainer.style.setProperty('--muted', muted);
-      themeContainer.style.setProperty('--rule', rule);
-      themeContainer.style.setProperty('--fog', fog);
-      themeContainer.style.setProperty('--warm', mixHex(paper, fog, 0.35));
-      themeContainer.style.setProperty('--card', mixHex(paper, fog, 0.25));
-      themeContainer.style.setProperty('--paper-2', mixHex(paper, fog, 0.52));
-      themeContainer.style.setProperty('--line-soft', mixHex(ink, paper, 0.82));
-      themeContainer.style.setProperty('--accent-soft', mixHex(accent, paper, 0.78));
-    }
-
+  function paginateFragments(fragments) {
     var pages = [];
-    var totalWeeks = data.weeks.length;
-    var labels = buildLabels(data);
+    var current = [];
+    var load = 0;
 
-    // 1. Cover
-    pages.push(renderCover(data));
-
-    // 2-3. Rules spread
-    pages.push(renderRulesLeft(data));
-    pages.push(renderRulesRight(data));
-
-    // 4+. Workout weeks
-    for (var i = 0; i < data.weeks.length; i++) {
-      var week = data.weeks[i];
-      var weekNum = week.weekNumber || (i + 1);
-      var sessions = week.sessions || [];
-      var visibleSessions = sessions.slice(0, 3);
-
-      // Left page: session cards (first 3)
-      pages.push(renderWorkoutLeft(week, weekNum, visibleSessions, totalWeeks, false, labels));
-
-      // Right page: field ops or boss
-      if (week.isBossWeek) {
-        pages.push(renderBossRight(data, week, weekNum, totalWeeks, labels));
-      } else {
-        pages.push(renderFieldOpsRight(week, weekNum, labels));
+    (fragments || []).forEach(function (fragment) {
+      var body = fragment.bodyText || fragment.body || fragment.content || '';
+      // Reduced density: lower max chars per page weight
+      var weight = Math.max(1, Math.min(readingLength(body) / 600, 2.5));
+      if (current.length >= 2 || (current.length >= 1 && load + weight > 1.8)) {
+        pages.push(current);
+        current = [];
+        load = 0;
       }
-
-      // Overflow: sessions 4+
-      if (week.overflow && sessions.length > 3) {
-        var overflowSessions = sessions.slice(3);
-        pages.push(renderOverflowLeft(week, weekNum, overflowSessions, totalWeeks, labels));
-        pages.push(renderOverflowRight(week));
-      }
-    }
-
-    // Fragment pages — pack 2 per page, but split to 1 if content is very long
-    // Weighted heuristic accounts for document type CSS differences (mono fonts, borders)
-    function fragWeight(frag) {
-      var text = frag.bodyText || frag.body || frag.content || '';
-      var len = text.length;
-      var type = normalizeThemeToken(frag.documentType || 'memo');
-      if (type === 'field-note' || type === 'inspection') len *= 1.3;  // larger mono font
-      if (type === 'transcript') len *= 1.2;   // dialogue spacing
-      if (type === 'anomaly') len *= 1.15;     // extra border/padding
-      if (frag.inWorldAuthor) len += 40;       // sender line
-      if (frag.inWorldRecipient) len += 40;    // recipient line
-      return len;
-    }
-
-    if (data.fragments && data.fragments.length) {
-      var frags = data.fragments;
-      var f = 0;
-      var fragPageIdx = 0;
-      while (f < frags.length) {
-        var frag1 = frags[f];
-        var weight1 = fragWeight(frag1);
-        var frag2 = frags[f + 1];
-        var weight2 = frag2 ? fragWeight(frag2) : 0;
-
-        // Lowered thresholds: 900 combined / 500 single (was 1200/600)
-        if (frag2 && (weight1 + weight2 > 900)) {
-          if (weight1 > 500) {
-            // frag1 alone is long — give it its own page; frag2 re-queues
-            pages.push(renderFragmentPage([frag1], f, fragPageIdx++));
-            f += 1;
-          } else if (weight2 > 500) {
-            // frag2 alone is long — each gets its own page
-            pages.push(renderFragmentPage([frag1], f, fragPageIdx++));
-            pages.push(renderFragmentPage([frag2], f + 1, fragPageIdx++));
-            f += 2;
-          } else {
-            // Neither alone exceeds threshold — pair them
-            pages.push(renderFragmentPage([frag1, frag2], f, fragPageIdx++));
-            f += 2;
-          }
-        } else if (frag2) {
-          pages.push(renderFragmentPage([frag1, frag2], f, fragPageIdx++));
-          f += 2;
-        } else {
-          pages.push(renderFragmentPage([frag1], f, fragPageIdx++));
-          f += 1;
-        }
-      }
-    }
-
-    // Password assembly
-    pages.push(renderPasswordAssembly(data, labels));
-
-    // Endings
-    pages.push(renderEndingsPage(data, labels));
-
-    // Pad with ruled notes pages, then back cover always last
-    // (pages.length + 1 accounts for the back cover we're about to add)
-    while ((pages.length + 1) % 4 !== 0) {
-      pages.push(renderNotesPage());
-    }
-
-    // Back cover — always the very last page (colophon on physical back cover)
-    pages.push(renderBackCover(data));
-
-    // Set dynamic page numbers directly mapped to the array index (page 1 is index 0)
-    pages.forEach(function (renderedPage, pgIdx) {
-      if (!renderedPage) return;
-      var numEl = renderedPage.querySelector('.page-num');
-      if (numEl) {
-        var naturalPageNum = pgIdx + 1;
-        numEl.textContent = 'p.' + (naturalPageNum < 10 ? '0' + naturalPageNum : naturalPageNum);
-      }
+      current.push(fragment);
+      load += weight;
     });
+
+    if (current.length) pages.push(current);
+    return pages;
+  }
+
+  function makePageShell(type, title, kicker) {
+    var page = make('section', 'booklet-page');
+    page.setAttribute('data-page-type', type);
+
+    var frame = make('div', 'page-frame');
+    var header = make('header', 'page-header');
+    var kickerEl = make('div', 'page-kicker', kicker || '');
+    var titleEl = make('h2', 'page-title', title || '');
+    header.appendChild(kickerEl);
+    header.appendChild(titleEl);
+    frame.appendChild(header);
+    page.appendChild(frame);
+
+    return {
+      page: page,
+      frame: frame
+    };
+  }
+
+  function buildCoverPage(data) {
+    var shell = makePageShell('cover', data.meta.blockTitle, data.cover.designation || '');
+    shell.page.classList.add('page-cover');
+
+    if (data.cover.designation) {
+      shell.frame.insertBefore(make('div', 'doc-designation', data.cover.designation), shell.frame.firstChild);
+    }
+
+    var hero = make('div', 'cover-hero');
+    hero.appendChild(make('h1', 'cover-headline', data.meta.blockTitle || 'LiftRPG'));
+    hero.appendChild(make('p', 'cover-tagline', data.cover.tagline || ''));
+
+    var colophon = make('div', 'cover-colophon');
+    (data.cover.colophonLines || []).forEach(function (line) {
+      colophon.appendChild(make('div', 'cover-colophon-line', line));
+    });
+
+    shell.frame.appendChild(hero);
+    shell.frame.appendChild(colophon);
+    return shell.page;
+  }
+
+  function buildRulesPage(data) {
+    var pages = [];
+    var left = makePageShell('rules', data.rulesSpread.leftPage.title, 'Orientation');
+    var body = make('div', 'rules-stack');
+    (data.rulesSpread.leftPage.sections || []).forEach(function (section) {
+      var block = make('section', 'doc-block');
+      block.appendChild(make('div', 'doc-label', section.heading || 'Procedure'));
+      splitParagraphs(section.body || section.text).forEach(function (para) {
+        block.appendChild(make('p', 'body-copy', para));
+      });
+      body.appendChild(block);
+    });
+
+    var reEntry = data.rulesSpread.leftPage.reEntryRule;
+    var reEntryText = typeof reEntry === 'string' ? reEntry : reEntry && reEntry.ruleText;
+    if (reEntryText) {
+      var reEntryBlock = make('section', 'doc-block doc-block-callout');
+      reEntryBlock.appendChild(make('div', 'doc-label', 'Re-entry Procedure'));
+      splitParagraphs(reEntryText).forEach(function (para) {
+        reEntryBlock.appendChild(make('p', 'body-copy', para));
+      });
+      body.appendChild(reEntryBlock);
+    }
+    left.frame.appendChild(body);
+    pages.push(left.page);
+
+    var right = makePageShell('log', data.rulesSpread.rightPage.title, 'Record');
+    var logGrid = make('div', 'record-grid');
+    var componentType = (data.meta.weeklyComponentType || 'component').replace(/-/g, ' ');
+    (data.weeks || []).forEach(function (week) {
+      var row = make('div', 'record-row');
+      row.appendChild(make('div', 'record-week', 'Week ' + pad2(week.weekNumber)));
+      row.appendChild(make('div', 'record-cells record-cells-value'));
+      if (!week.isBossWeek) {
+        row.appendChild(make('div', 'record-note', week.weeklyComponent && week.weeklyComponent.extractionInstruction || componentType));
+      } else {
+        row.appendChild(make('div', 'record-note', 'Hold until convergence protocol.'));
+      }
+      logGrid.appendChild(row);
+    });
+    right.frame.appendChild(make('p', 'body-copy lead-copy', data.rulesSpread.rightPage.instruction || ''));
+    right.frame.appendChild(logGrid);
+
+    var finalBlock = make('section', 'doc-block doc-block-callout');
+    finalBlock.appendChild(make('div', 'doc-label', 'Final Assembly'));
+    finalBlock.appendChild(makePasswordBoxes(getPasswordLength(data, (data.meta && data.meta.weekCount) || 6), 'password-box'));
+    finalBlock.appendChild(make('p', 'body-copy', 'Return to liftrpg.co → Render with the completed word to unlock the final document.'));
+    right.frame.appendChild(finalBlock);
+    pages.push(right.page);
 
     return pages;
   }
 
-  // ── APP INITIALIZATION ─────────────────────────────────────
+  function extractFragmentRefs(node) {
+    var refs = [];
+    if (!node || typeof node !== 'object') return refs;
+    if (Array.isArray(node)) {
+      node.forEach(function (child) {
+        refs = refs.concat(extractFragmentRefs(child));
+      });
+      return refs;
+    }
+    if (typeof node.fragmentRef === 'string') {
+      refs.push(node.fragmentRef);
+    }
+    Object.keys(node).forEach(function (key) {
+      if (typeof node[key] === 'string') {
+        var match = node[key].match(/\bF\.\d+\b/g);
+        if (match) refs = refs.concat(match);
+      } else if (typeof node[key] === 'object') {
+        refs = refs.concat(extractFragmentRefs(node[key]));
+      }
+    });
+    return refs;
+  }
 
-  var jsonData = null;
+  function buildWeekPages(data, renderedFragments) {
+    var pages = [];
+    renderedFragments = renderedFragments || {};
+    (data.weeks || []).forEach(function (week) {
+      chunkSessions(week).forEach(function (chunk, chunkIndex, chunkList) {
+        pages.push(buildWorkoutPage(data, week, chunk, chunkIndex, chunkList.length));
+      });
+      pages.push(week.isBossWeek ? buildBossPage(data, week) : buildFieldOpsPages(data, week));
 
-  // Crypto constants (must be before demo mode for decrypt access)
-  var CRYPTO_SALT_BYTES = 32;
-  var CRYPTO_IV_BYTES = 12;
-  var CRYPTO_ITER = 200000;
-
-  // ── DEMO MODE ──────────────────────────────────────────────
-  var demoParam = new URLSearchParams(window.location.search).get('demo');
-  if (demoParam) {
-    var chrome = document.querySelector('.app-chrome');
-    if (chrome) chrome.style.display = 'none';
-    document.body.classList.add('demo-mode');
-
-    fetch('../' + encodeURIComponent(demoParam) + '.json')
-      .then(function (res) {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(function (data) {
-        jsonData = data;
-        var pages = render(data);
-        var container = document.getElementById('booklet-container');
-        container.innerHTML = '';
-
-        for (var i = 0; i < pages.length; i++) {
-          container.appendChild(pages[i]);
-        }
-        container.querySelectorAll('.cover-designation').forEach(function (d) { fitTextToLine(d, 10); });
-        container.querySelectorAll('.booklet-page').forEach(enforcePageFit);
-
-        // Show demo unlock bar if this booklet has an encrypted ending
-        if (data.meta && data.meta.passwordEncryptedEnding &&
-            data.meta.passwordEncryptedEnding !== 'PLACEHOLDER_ENCRYPTED_BLOB_REPLACE_AT_GENERATION_TIME' &&
-            data.meta.passwordPlaintext) {
-          var bar = document.createElement('div');
-          bar.className = 'demo-unlock-bar';
-
-          var label = document.createElement('span');
-          label.className = 'demo-unlock-label';
-          label.textContent = '\uD83D\uDD12 Try decrypting the ending:';
-
-          var spoiler = document.createElement('button');
-          spoiler.className = 'demo-unlock-spoiler';
-          spoiler.setAttribute('aria-label', 'Reveal password');
-          spoiler.textContent = data.meta.passwordPlaintext;
-          spoiler.addEventListener('click', function () {
-            spoiler.classList.add('revealed');
-          });
-
-          var unlockBtn = document.createElement('button');
-          unlockBtn.className = 'demo-unlock-btn';
-          unlockBtn.textContent = 'Unlock';
-          unlockBtn.addEventListener('click', function () {
-            spoiler.classList.add('revealed');
-            unlockBtn.disabled = true;
-            unlockBtn.textContent = 'Working\u2026';
-            decryptBlob(data.meta.passwordEncryptedEnding, normalisePassword(data.meta.passwordPlaintext))
-              .then(function (plaintext) {
-                var payload;
-                try { payload = JSON.parse(plaintext); } catch (e) {
-                  payload = { content: plaintext };
-                }
-                var endingsPage = document.getElementById('endings-page');
-                if (endingsPage) {
-                  var inner = endingsPage.querySelector('.endings-page');
-                  if (inner) {
-                    inner.classList.remove('endings-locked');
-                    inner.innerHTML = '';
-                    var bodyDiv = document.createElement('div');
-                    bodyDiv.className = 'endings-body endings-unlocked';
-                    bodyDiv.innerHTML = payload.content;
-                    inner.appendChild(bodyDiv);
-                  }
-                  endingsPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-                bar.classList.add('demo-unlock-success');
-                unlockBtn.textContent = '\u2713 Unlocked';
-                label.textContent = '\uD83D\uDD13 Ending decrypted';
-              })
-              .catch(function () {
-                unlockBtn.disabled = false;
-                unlockBtn.textContent = 'Unlock';
-              });
-          });
-
-          bar.appendChild(label);
-          bar.appendChild(spoiler);
-          bar.appendChild(unlockBtn);
-          document.body.appendChild(bar);
-        }
-      })
-      .catch(function (err) {
-        var container = document.getElementById('booklet-container');
-        container.innerHTML = '';
-        var msg = document.createElement('div');
-        msg.className = 'demo-error';
-        msg.textContent = 'Preview unavailable';
-        container.appendChild(msg);
-        console.error('Demo load failed:', err);
+      var refs = extractFragmentRefs(week);
+      var uniqueRefs = refs.filter(function (r, idx) { return refs.indexOf(r) === idx; });
+      var fragmentsForWeek = (data.fragments || []).filter(function (f) {
+        return uniqueRefs.indexOf(f.id) !== -1 && !renderedFragments[f.id];
       });
 
-    return; // Skip normal app initialization
-  }
-  // ── END DEMO MODE ──────────────────────────────────────────
-
-  var fileInput = document.getElementById('json-input');
-  var printBtn = document.getElementById('print-btn');
-  var container = document.getElementById('booklet-container');
-  var status = document.getElementById('status');
-  var layoutSelect = document.getElementById('layout-mode');
-
-  fileInput.addEventListener('change', function (e) {
-    var file = e.target.files[0];
-    if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function (ev) {
-      try {
-        jsonData = JSON.parse(ev.target.result);
-        doRender(); // auto-render on load
-      } catch (err) {
-        status.textContent = 'JSON error: ' + err.message;
+      if (fragmentsForWeek.length > 0) {
+        fragmentsForWeek.forEach(function (f) { renderedFragments[f.id] = true; });
+        pages = pages.concat(paginateFragments(fragmentsForWeek).map(function (pageFragments, index) {
+          var shell = makePageShell('fragments', 'Recovered Documents', 'Week ' + pad2(week.weekNumber) + ' · Archive');
+          var stack = make('div', 'fragment-stack');
+          pageFragments.forEach(function (fragment) {
+            stack.appendChild(renderFragment(fragment));
+          });
+          shell.frame.appendChild(stack);
+          return shell.page;
+        }));
       }
-    };
-    reader.readAsText(file);
-  });
-
-  function doRender() {
-    if (!jsonData) return;
-    container.innerHTML = '';
-    container.className = ''; // reset container
-    container.removeAttribute('data-treatment');
-    container.removeAttribute('style');
-    try {
-      var pages = render(jsonData);
-      var mode = layoutSelect ? layoutSelect.value : 'single';
-
-      if (mode === 'booklet' || mode === 'spread') {
-        container.classList.add('spread-view');
-        var imposed = [];
-        if (mode === 'booklet') {
-          var half = Math.ceil(pages.length / 2);
-          for (var p = 0; p < half; p++) {
-            var leftIdx = (p % 2 === 0) ? pages.length - 1 - p : p;
-            var rightIdx = (p % 2 === 0) ? p : pages.length - 1 - p;
-
-            var wrap = document.createElement('div');
-            wrap.className = 'print-spread';
-            if (pages[leftIdx]) wrap.appendChild(pages[leftIdx]);
-            if (pages[rightIdx]) wrap.appendChild(pages[rightIdx]);
-            imposed.push(wrap);
-          }
-        } else {
-          for (var s = 0; s < pages.length; s += 2) {
-            var wrap2 = document.createElement('div');
-            wrap2.className = 'print-spread';
-            wrap2.appendChild(pages[s]);
-            if (pages[s + 1]) wrap2.appendChild(pages[s + 1]);
-            imposed.push(wrap2);
-          }
-        }
-        imposed.forEach(function (spr) { container.appendChild(spr); });
-      } else {
-        pages.forEach(function (p) { container.appendChild(p); });
-      }
-
-      // Auto-fit single-line labels
-      container.querySelectorAll('.cover-designation').forEach(function (d) { fitTextToLine(d, 10); });
-      // Fix oracle tables that overflow their page
-      container.querySelectorAll('.booklet-page').forEach(enforcePageFit);
-
-      printBtn.disabled = false;
-      var statusMsg = 'Rendered ' + pages.length + ' pages (' +
-        (jsonData.weeks ? jsonData.weeks.length : 0) + ' weeks, ' +
-        (jsonData.fragments ? jsonData.fragments.length : 0) + ' fragments) in ' + mode + ' mode';
-      var vw = window._lastValidationWarnings;
-      if (vw && vw.length > 0) {
-        statusMsg += ' \u26A0 ' + vw.length + ' validation warning' + (vw.length > 1 ? 's' : '') + ' (see console)';
-      }
-      status.textContent = statusMsg;
-
-      // Show encrypt row if endings need encryption, or unlock row if already encrypted
-      if (needsEncryption(jsonData)) {
-        hideUnlockRow();
-        showEncryptRow();
-      } else if (jsonData.meta && jsonData.meta.passwordEncryptedEnding &&
-          jsonData.meta.passwordEncryptedEnding !== 'PLACEHOLDER_ENCRYPTED_BLOB_REPLACE_AT_GENERATION_TIME') {
-        hideEncryptRow();
-        showUnlockRow();
-      }
-    } catch (err) {
-      status.textContent = 'Render error: ' + err.message;
-      console.error(err);
-    }
+    });
+    return pages.flat();
   }
 
-  // ── Safari detection (WebKit bug #15548: @page size ignored) ──
-  var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  function buildWorkoutPage(data, week, sessions, chunkIndex, chunkCount) {
+    var shell = makePageShell(
+      'week-sessions',
+      week.title,
+      'Week ' + pad2(week.weekNumber) + (chunkCount > 1 ? ' · Session Log ' + (chunkIndex + 1) + '/' + chunkCount : ' · Session Log')
+    );
+    shell.page.classList.add('page-workout-form');
 
-  // Chrome: native print (works perfectly with @page size)
-  function doPrint() {
-    if (layoutSelect) layoutSelect.value = 'booklet';
-    doRender();
-    setTimeout(function () { window.print(); }, 200);
+    var intro = make('section', 'week-form-intro');
+    if (chunkIndex === 0) {
+      intro.appendChild(make('div', 'doc-label', week.epigraph && week.epigraph.attribution || ''));
+      intro.appendChild(make('p', 'body-copy epigraph-copy', week.epigraph && week.epigraph.text || ''));
+      shell.frame.appendChild(intro);
+    }
+
+    var sheet = make('section', 'workout-sheet');
+    sheet.appendChild(buildWorkoutSheetMeta(week, chunkIndex, chunkCount));
+
+    var cards = make('div', 'session-ledger-stack');
+    sessions.forEach(function (session) {
+      cards.appendChild(buildSessionLedger(session));
+    });
+    sheet.appendChild(cards);
+
+    var footer = make('section', 'week-capture');
+    footer.appendChild(make('div', 'doc-label', week.isBossWeek ? 'Terminal Week' : 'Weekly Capture'));
+    footer.appendChild(make('p', 'body-copy body-copy-tight', week.isBossWeek
+      ? 'Record your final sessions as performed. Convergence happens on the facing operations page.'
+      : week.weeklyComponent && week.weeklyComponent.extractionInstruction || 'Log the derived weekly value after this week’s field operation.'));
+    sheet.appendChild(footer);
+    shell.frame.appendChild(sheet);
+    return shell.page;
   }
 
-  // Safari: generate PDF (bypasses Safari's broken print engine)
-  function doSavePDF() {
-    if (!jsonData) return;
-    if (typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
-      status.textContent = 'PDF libraries not loaded. Try refreshing the page.';
-      return;
-    }
+  function buildWorkoutSheetMeta(week, chunkIndex, chunkCount) {
+    var meta = make('div', 'workout-sheet-meta');
+    meta.appendChild(buildMetaField('Week', pad2(week.weekNumber)));
+    meta.appendChild(buildMetaField('Block', week.title || 'Training Record'));
+    meta.appendChild(buildMetaField('Section', chunkCount > 1 ? 'Log ' + (chunkIndex + 1) + '/' + chunkCount : 'Full Log'));
+    meta.appendChild(buildMetaField('Status', week.isBossWeek ? 'Terminal' : (week.isDeload ? 'Reduced Load' : 'Active')));
+    return meta;
+  }
 
-    // Switch to booklet spreads and render
-    if (layoutSelect) layoutSelect.value = 'booklet';
-    doRender();
+  function buildMetaField(label, value) {
+    var field = make('div', 'workout-meta-field');
+    field.appendChild(make('div', 'workout-meta-label', label));
+    field.appendChild(make('div', 'workout-meta-value', value || ''));
+    return field;
+  }
 
-    var spreads = container.querySelectorAll('.print-spread');
-    if (!spreads.length) {
-      status.textContent = 'No spreads to export.';
-      return;
-    }
+  function buildSessionLedger(session) {
+    var ledger = make('article', 'session-ledger');
+    var top = make('div', 'session-ledger-head');
+    top.appendChild(renderSessionLabel(session.label));
+    if (session.fragmentRef) top.appendChild(make('div', 'session-fragment', 'Fragment ' + session.fragmentRef));
+    ledger.appendChild(top);
 
-    var jsPDF = window.jspdf.jsPDF;
-    var pdf = new jsPDF({ orientation: 'landscape', unit: 'in', format: 'letter' });
-    var total = spreads.length;
-
-    printBtn.disabled = true;
-    status.textContent = 'Generating PDF: page 1 of ' + total + '...';
-
-    function renderSpread(index) {
-      if (index >= total) {
-        var title = (jsonData.meta && jsonData.meta.blockTitle)
-          ? jsonData.meta.blockTitle.replace(/[^a-zA-Z0-9\- ]/g, '').replace(/\s+/g, '-')
-          : 'booklet';
-        pdf.save(title + '.pdf');
-        printBtn.disabled = false;
-        status.textContent = 'PDF saved: ' + total + ' pages. Open in Preview and print.';
-        return;
+    var body = make('div', 'session-ledger-body');
+    var exercises = make('div', 'exercise-table');
+    (session.exercises || []).forEach(function (exercise) {
+      var block = make('section', 'exercise-block');
+      block.appendChild(renderExerciseLedger(exercise));
+      if (exercise.notes) {
+        var notes = make('div', 'exercise-note', exercise.notes);
+        block.appendChild(notes);
       }
+      exercises.appendChild(block);
+    });
+    body.appendChild(exercises);
 
-      status.textContent = 'Generating PDF: page ' + (index + 1) + ' of ' + total + '...';
+    if (session.storyPrompt || session.binaryChoice) {
+      var marginal = make('div', 'session-marginalia');
+      if (session.storyPrompt) {
+        splitParagraphs(session.storyPrompt).forEach(function (para) {
+          marginal.appendChild(make('p', 'body-copy body-copy-tight', para));
+        });
+      }
+      if (session.binaryChoice) {
+        var choice = make('div', 'binary-choice');
+        choice.appendChild(make('div', 'doc-label', session.binaryChoice.choiceLabel || 'Route Decision'));
+        var columns = make('div', 'binary-choice-options');
+        var a = make('div', 'binary-choice-option');
+        a.appendChild(make('div', 'binary-choice-letter', 'A'));
+        a.appendChild(make('p', 'body-copy', session.binaryChoice.promptA || ''));
+        var b = make('div', 'binary-choice-option');
+        b.appendChild(make('div', 'binary-choice-letter', 'B'));
+        b.appendChild(make('p', 'body-copy', session.binaryChoice.promptB || ''));
+        columns.appendChild(a);
+        columns.appendChild(b);
+        choice.appendChild(columns);
+        marginal.appendChild(choice);
+      }
+      body.appendChild(marginal);
+    }
 
-      html2canvas(spreads[index], {
-        scale: 2, // ~150dpi at 11in = good print quality
-        useCORS: true,
-        logging: false,
-        backgroundColor: null
-      }).then(function (canvas) {
-        var imgData = canvas.toDataURL('image/jpeg', 0.95);
-        if (index > 0) pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, 0, 11, 8.5);
-        renderSpread(index + 1);
-      }).catch(function (err) {
-        status.textContent = 'PDF error on page ' + (index + 1) + ': ' + err.message;
-        printBtn.disabled = false;
-        console.error(err);
+    ledger.appendChild(body);
+    return ledger;
+  }
+
+  function buildSessionCard(session) {
+    var card = make('article', 'session-card');
+    var top = make('div', 'session-head');
+    top.appendChild(renderSessionLabel(session.label));
+    if (session.fragmentRef) top.appendChild(make('div', 'session-fragment', 'Fragment ' + session.fragmentRef));
+    card.appendChild(top);
+
+    var exercises = make('div', 'exercise-table');
+    (session.exercises || []).forEach(function (exercise) {
+      var block = make('section', 'exercise-block');
+      block.appendChild(renderExerciseLedger(exercise));
+      if (exercise.notes) {
+        var notes = make('div', 'exercise-note', exercise.notes);
+        block.appendChild(notes);
+      }
+      exercises.appendChild(block);
+    });
+    card.appendChild(exercises);
+
+    if (session.storyPrompt) {
+      var narrative = make('div', 'session-narrative');
+      splitParagraphs(session.storyPrompt).forEach(function (para) {
+        narrative.appendChild(make('p', 'body-copy', para));
       });
+      card.appendChild(narrative);
     }
 
-    // Small delay to let doRender() finish
-    setTimeout(function () { renderSpread(0); }, 300);
+    if (session.binaryChoice) {
+      var choice = make('div', 'binary-choice');
+      choice.appendChild(make('div', 'doc-label', session.binaryChoice.choiceLabel || 'Route Decision'));
+      var columns = make('div', 'binary-choice-options');
+      var a = make('div', 'binary-choice-option');
+      a.appendChild(make('div', 'binary-choice-letter', 'A'));
+      a.appendChild(make('p', 'body-copy', session.binaryChoice.promptA || ''));
+      var b = make('div', 'binary-choice-option');
+      b.appendChild(make('div', 'binary-choice-letter', 'B'));
+      b.appendChild(make('p', 'body-copy', session.binaryChoice.promptB || ''));
+      columns.appendChild(a);
+      columns.appendChild(b);
+      choice.appendChild(columns);
+      card.appendChild(choice);
+    }
+
+    return card;
   }
 
-  printBtn.addEventListener('click', function () {
-    if (isSafari) {
-      doSavePDF();
+  function renderSessionLabel(label) {
+    var text = typeof label === 'string' && label.trim() ? label.trim() : 'Session';
+    var parts = text.split('·').map(function (part) {
+      return part.trim();
+    }).filter(Boolean);
+    if (parts.length < 2) return make('div', 'session-label', text);
+
+    var group = make('div', 'session-docket');
+    var dayField = make('div', 'session-docket-field');
+    dayField.appendChild(make('div', 'session-docket-label', 'Day'));
+    dayField.appendChild(make('div', 'session-label', parts[0]));
+    group.appendChild(dayField);
+
+    var typeField = make('div', 'session-docket-field');
+    typeField.appendChild(make('div', 'session-docket-label', 'Assignment'));
+    typeField.appendChild(make('div', 'session-subtype', parts.slice(1).join(' · ')));
+    group.appendChild(typeField);
+    return group;
+  }
+
+  function renderExerciseLedger(exercise) {
+    var row = make('div', 'exercise-row');
+    row.appendChild(make('div', 'exercise-name', exercise.name || 'Lift'));
+    row.appendChild(make('div', 'exercise-leader'));
+
+    var load = make('div', 'exercise-load');
+    var loadLine = make('div', 'exercise-load-line');
+    loadLine.appendChild(make('span', 'exercise-guide', getLoadGuide(exercise)));
+    load.appendChild(loadLine);
+    if (showLoadSuffix(exercise)) {
+      load.appendChild(make('span', 'exercise-load-suffix', 'x'));
+    }
+    row.appendChild(load);
+    row.appendChild(renderSetBoxes(exercise));
+    return row;
+  }
+
+  function renderSetBoxes(exercise) {
+    var grid = make('div', 'set-grid');
+    var reps = getExerciseRepGuides(exercise);
+    var count = reps.length;
+    for (var index = 0; index < count; index++) {
+      var cell = make('div', 'set-cell');
+      var box = make('div', 'set-box');
+      box.appendChild(make('span', 'set-guide', reps[index]));
+      cell.appendChild(box);
+      grid.appendChild(cell);
+    }
+    return grid;
+  }
+
+  function getExerciseSetCount(exercise) {
+    if (typeof exercise.sets === 'number' && exercise.sets > 0) return Math.min(exercise.sets, 10);
+    if (typeof exercise.repsPerSet === 'string' && exercise.repsPerSet.indexOf('/') !== -1) {
+      return Math.min(exercise.repsPerSet.split('/').length, 10);
+    }
+    return 3;
+  }
+
+  function getExerciseRepGuides(exercise) {
+    if (typeof exercise.repsPerSet === 'number') {
+      return repeatGuide(String(exercise.repsPerSet), getExerciseSetCount(exercise));
+    }
+    if (typeof exercise.repsPerSet === 'string') {
+      if (exercise.repsPerSet.indexOf('/') !== -1) {
+        return exercise.repsPerSet.split('/').map(function (part) {
+          return part.trim();
+        }).filter(Boolean).slice(0, 10);
+      }
+      return repeatGuide(exercise.repsPerSet.trim(), getExerciseSetCount(exercise));
+    }
+    return repeatGuide('', getExerciseSetCount(exercise));
+  }
+
+  function repeatGuide(value, count) {
+    var items = [];
+    for (var i = 0; i < count; i++) items.push(value);
+    return items;
+  }
+
+  function getLoadGuide(exercise) {
+    if (typeof exercise.weightField === 'string' && exercise.weightField.trim()) {
+      return exercise.weightField.trim();
+    }
+    if (exercise.weightField === false) return 'done';
+    return 'weight';
+  }
+
+  function showLoadSuffix(exercise) {
+    var guide = getLoadGuide(exercise).toLowerCase();
+    return guide !== 'done';
+  }
+
+  function buildFieldOpsPages(data, week) {
+    var fieldOps = week.fieldOps || {};
+    var pages = [];
+    var splitOracle = fieldOps.oracleTable && (fieldOps.oracleTable.entries || []).length > 8;
+
+    var first = makePageShell('field-ops', fieldOps.mapState && fieldOps.mapState.title || week.title, 'Week ' + pad2(week.weekNumber) + ' · Field Operations');
+    first.page.classList.add('page-field-board');
+    var board = make('div', 'field-board');
+    if (fieldOps.mapState) board.appendChild(renderMapSection(fieldOps.mapState));
+    var appendix = make('div', !splitOracle && fieldOps.oracleTable ? 'field-appendix field-appendix-dual' : 'field-appendix');
+    if (week.gameplayClocks && week.gameplayClocks.length > 0) {
+      appendix.appendChild(renderGameplayClocks(week.gameplayClocks));
+    }
+    if (fieldOps.cipher) appendix.appendChild(renderCipherSection(fieldOps.cipher, week.weeklyComponent));
+    if (!splitOracle && fieldOps.oracleTable) appendix.appendChild(renderOracleSection(fieldOps.oracleTable));
+    if (appendix.children.length) board.appendChild(appendix);
+    first.frame.appendChild(board);
+    pages.push(first.page);
+
+    if (splitOracle && fieldOps.oracleTable) {
+      var second = makePageShell('oracle', fieldOps.oracleTable.title || 'Oracle', 'Week ' + pad2(week.weekNumber) + ' · Consequence Table');
+      second.page.classList.add('page-field-board');
+      var oracleSheet = make('div', 'field-board');
+      oracleSheet.appendChild(renderOracleSection(fieldOps.oracleTable));
+      second.frame.appendChild(oracleSheet);
+      pages.push(second.page);
+    }
+
+    return pages;
+  }
+
+  function renderGameplayClocks(clocks) {
+    var section = make('section', 'ops-section ops-clocks');
+    section.appendChild(make('div', 'doc-label', 'Active Clocks'));
+    var grid = make('div', 'clock-grid');
+    (clocks || []).forEach(function (clock) {
+      var item = make('div', 'clock-item');
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 100 100');
+      svg.setAttribute('class', 'progress-clock-svg');
+      var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', '50');
+      circle.setAttribute('cy', '50');
+      circle.setAttribute('r', '48');
+      circle.setAttribute('fill', 'var(--track-fill)');
+      circle.setAttribute('stroke', 'var(--page-rule)');
+      circle.setAttribute('stroke-width', '2');
+      svg.appendChild(circle);
+      var segments = parseInt(clock.segments, 10) || 4;
+      for (var i = 0; i < segments; i++) {
+        var angle = (i * 360) / segments;
+        var rad = (angle - 90) * (Math.PI / 180);
+        var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', '50');
+        line.setAttribute('y1', '50');
+        line.setAttribute('x2', String(50 + 48 * Math.cos(rad)));
+        line.setAttribute('y2', String(50 + 48 * Math.sin(rad)));
+        line.setAttribute('stroke', 'var(--page-rule)');
+        line.setAttribute('stroke-width', '1.5');
+        svg.appendChild(line);
+      }
+      var visuals = make('div', 'clock-visuals');
+      visuals.appendChild(svg);
+      item.appendChild(visuals);
+      var info = make('div', 'clock-info');
+      info.appendChild(make('div', 'clock-name', clock.clockName || 'Clock'));
+      if (clock.consequenceOnFull) {
+        info.appendChild(make('div', 'clock-consequence', 'ON FULL: ' + clock.consequenceOnFull));
+      }
+      item.appendChild(info);
+      grid.appendChild(item);
+    });
+    section.appendChild(grid);
+    return section;
+  }
+
+  function renderMapSection(mapState) {
+    var section = make('section', 'ops-section ops-map survey-board');
+    section.appendChild(make('div', 'doc-label', mapState.title || 'Map'));
+    if (mapState.floorLabel) section.appendChild(make('div', 'survey-board-designation', mapState.floorLabel));
+    if (mapState.mapNote) section.appendChild(make('p', 'body-copy body-copy-tight', mapState.mapNote));
+
+    if (mapState.mapType === 'point-to-point') {
+      section.appendChild(renderPointMap(mapState));
+    } else if (mapState.mapType === 'linear-track') {
+      section.appendChild(renderLinearMap(mapState));
+    } else if (mapState.mapType === 'player-drawn') {
+      section.appendChild(renderPlayerMap(mapState));
     } else {
-      doPrint();
+      section.appendChild(renderGridMap(mapState));
     }
-  });
-
-  if (layoutSelect) {
-    layoutSelect.addEventListener('change', doRender);
+    section.appendChild(renderMapLegend(mapState));
+    return section;
   }
 
-  // ── CRYPTO (AES-256-GCM, matches unlock/index.html + liftrpg-encrypt.js) ──
-  // Constants declared at top of IIFE (before demo mode) for hoisting
+  function renderGridMap(mapState) {
+    var gridData = mapState.gridDimensions || { columns: 6, rows: 5 };
+    var wrap = make('div', 'map-board');
+    wrap.style.setProperty('--grid-columns', gridData.columns);
+    wrap.style.setProperty('--grid-rows', gridData.rows);
 
-  function normalisePassword(raw) {
-    return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    var tilesByPos = {};
+    (mapState.tiles || []).forEach(function (tile) {
+      tilesByPos[tile.col + ':' + tile.row] = tile;
+    });
+
+    wrap.appendChild(make('div', 'map-axis-corner'));
+    for (var colIndex = 1; colIndex <= gridData.columns; colIndex++) {
+      wrap.appendChild(make('div', 'map-axis-label map-axis-label-top', String(colIndex)));
+    }
+
+    for (var row = 1; row <= gridData.rows; row++) {
+      wrap.appendChild(make('div', 'map-axis-label map-axis-label-side', String.fromCharCode(64 + row)));
+      for (var col = 1; col <= gridData.columns; col++) {
+        var tile = tilesByPos[col + ':' + row] || {};
+        var cell = make('div', 'map-grid-cell map-board-cell');
+        cell.setAttribute('data-state', tile.type || 'empty');
+        cell.setAttribute('data-coord', String.fromCharCode(64 + row) + col);
+        var label = tile.label || (mapState.currentPosition && mapState.currentPosition.col === col && mapState.currentPosition.row === row ? 'YOU' : '');
+        cell.appendChild(make('div', 'map-grid-coord', String.fromCharCode(64 + row) + col));
+        cell.appendChild(make('div', 'map-grid-label', label));
+        if (tile.annotation) cell.appendChild(make('div', 'map-grid-note', tile.annotation));
+        wrap.appendChild(cell);
+      }
+    }
+    return wrap;
+  }
+
+  function renderMapLegend(mapState) {
+    var section = make('div', 'map-legend');
+    var seen = {};
+    (mapState.tiles || []).forEach(function (tile) {
+      var state = tile.type || 'empty';
+      if (seen[state]) return;
+      seen[state] = true;
+      var item = make('div', 'map-legend-item');
+      var swatch = make('div', 'map-legend-swatch');
+      swatch.setAttribute('data-state', state);
+      item.appendChild(swatch);
+      item.appendChild(make('div', 'map-legend-label', state.replace(/-/g, ' ')));
+      section.appendChild(item);
+    });
+    return section;
+  }
+
+  function renderPointMap(mapState) {
+    var wrap = make('div', 'map-network');
+    (mapState.nodes || []).forEach(function (node) {
+      var card = make('div', 'map-node');
+      card.setAttribute('data-state', node.state || 'empty');
+      card.appendChild(make('div', 'map-node-name', node.label || node.id));
+      card.appendChild(make('div', 'map-node-meta', node.id || ''));
+      wrap.appendChild(card);
+    });
+    return wrap;
+  }
+
+  function renderLinearMap(mapState) {
+    var wrap = make('div', 'map-track');
+    (mapState.positions || []).forEach(function (position) {
+      var step = make('div', 'map-track-step');
+      step.setAttribute('data-state', position.state || 'empty');
+      step.appendChild(make('div', 'map-track-index', String(position.index)));
+      step.appendChild(make('div', 'map-track-label', position.label || ''));
+      wrap.appendChild(step);
+    });
+    return wrap;
+  }
+
+  function renderPlayerMap(mapState) {
+    var gridData = mapState.dimensions || { columns: 12, rows: 8 };
+    var wrap = make('div', 'player-map');
+    wrap.style.setProperty('--grid-columns', gridData.columns);
+    wrap.style.setProperty('--grid-rows', gridData.rows);
+    wrap.setAttribute('data-canvas-type', mapState.canvasType || 'dot-grid');
+    (mapState.prompts || []).slice(0, 4).forEach(function (prompt) {
+      wrap.appendChild(make('div', 'player-map-prompt', prompt));
+    });
+    return wrap;
+  }
+
+  function renderCipherSection(cipher, weeklyComponent) {
+    var section = make('section', 'ops-section ops-cipher');
+    section.appendChild(make('div', 'doc-label', cipher.title || 'Cipher'));
+    if (cipher.body && cipher.body.displayText) {
+      splitParagraphs(cipher.body.displayText).forEach(function (para) {
+        section.appendChild(make('p', 'body-copy', para));
+      });
+    }
+
+    if (cipher.body && cipher.body.key) {
+      var key = make('div', 'cipher-key');
+      splitParagraphs(cipher.body.key).forEach(function (line) {
+        key.appendChild(make('div', 'cipher-key-line', line));
+      });
+      section.appendChild(key);
+    }
+
+    if (cipher.body && cipher.body.workSpace) {
+      section.appendChild(renderWorkspace(cipher.body.workSpace));
+    }
+
+    var extraction = make('div', 'cipher-outcome');
+    extraction.appendChild(make('div', 'doc-label', 'Extraction'));
+    extraction.appendChild(make('p', 'body-copy', cipher.extractionInstruction || (weeklyComponent && weeklyComponent.extractionInstruction) || 'Record the derived value.'));
+    section.appendChild(extraction);
+    return section;
+  }
+
+  function renderWorkspace(workSpace) {
+    var grid = make('div', 'cipher-workspace');
+    var rows = Math.max(2, Math.min(workSpace.rows || 4, 8));
+    var cols = Math.max(4, Math.min(workSpace.cols || 10, 14));
+    grid.style.setProperty('--workspace-columns', cols);
+    for (var i = 0; i < rows * cols; i++) {
+      grid.appendChild(make('div', 'cipher-cell'));
+    }
+    return grid;
+  }
+
+  function renderOracleSection(oracle) {
+    var section = make('section', 'ops-section ops-oracle');
+    section.appendChild(make('div', 'doc-label', oracle.title || 'Oracle'));
+    if (oracle.instruction) section.appendChild(make('p', 'body-copy body-copy-tight', oracle.instruction));
+
+    var list = make('div', 'oracle-list');
+    (oracle.entries || []).forEach(function (entry) {
+      var row = make('article', 'oracle-entry');
+      row.setAttribute('data-entry-type', entry.type || 'fragment');
+      row.appendChild(make('div', 'oracle-roll', entry.roll || ''));
+      var content = make('div', 'oracle-copy');
+      content.appendChild(make('div', 'oracle-text', entry.text || ''));
+      if (entry.paperAction) content.appendChild(make('div', 'oracle-action', entry.paperAction));
+      if (entry.fragmentRef) content.appendChild(make('div', 'oracle-fragment', 'Retrieve ' + entry.fragmentRef));
+      row.appendChild(content);
+      list.appendChild(row);
+    });
+    section.appendChild(list);
+    return section;
+  }
+
+  function buildBossPage(data, week) {
+    var boss = week.bossEncounter || {};
+    var shell = makePageShell('boss', boss.title || week.title, 'Week ' + pad2(week.weekNumber) + ' · Convergence');
+    var layout = make('div', 'boss-layout');
+
+    var story = make('section', 'ops-section boss-story');
+    story.appendChild(make('div', 'doc-label', 'Terminal Document'));
+    splitParagraphs(boss.narrative || '').forEach(function (para) {
+      story.appendChild(make('p', 'body-copy', para));
+    });
+    if (boss.mechanismDescription) {
+      story.appendChild(make('div', 'doc-label', 'Procedure'));
+      splitParagraphs(boss.mechanismDescription).forEach(function (para) {
+        story.appendChild(make('p', 'body-copy', para));
+      });
+    }
+    if (boss.binaryChoiceAcknowledgement) {
+      story.appendChild(make('div', 'doc-label', 'Route Memory'));
+      if (boss.binaryChoiceAcknowledgement.ifA) story.appendChild(make('p', 'body-copy', 'If you marked A: ' + boss.binaryChoiceAcknowledgement.ifA));
+      if (boss.binaryChoiceAcknowledgement.ifB) story.appendChild(make('p', 'body-copy', 'If you marked B: ' + boss.binaryChoiceAcknowledgement.ifB));
+    }
+
+    var decode = make('section', 'ops-section boss-decode');
+    decode.appendChild(make('div', 'doc-label', 'Decoding Key'));
+    if (boss.decodingKey && boss.decodingKey.instruction) decode.appendChild(make('p', 'body-copy', boss.decodingKey.instruction));
+    if (boss.decodingKey && boss.decodingKey.referenceTable) {
+      var table = make('div', 'reference-table');
+      splitParagraphs(boss.decodingKey.referenceTable).forEach(function (line) {
+        table.appendChild(make('div', 'reference-line', line));
+      });
+      decode.appendChild(table);
+    }
+
+    decode.appendChild(make('div', 'doc-label', 'Recorded Inputs'));
+    var inputChips = make('div', 'chip-row');
+    (boss.componentInputs || []).forEach(function (item) {
+      inputChips.appendChild(make('div', 'chip', item));
+    });
+    decode.appendChild(inputChips);
+
+    decode.appendChild(make('div', 'doc-label', 'Final Word'));
+    decode.appendChild(makePasswordBoxes(getPasswordLength(data, (boss.componentInputs || []).length || 6), 'password-box password-box-large'));
+    decode.appendChild(make('p', 'body-copy', boss.passwordRevealInstruction || 'When the final word is assembled, enter it at liftrpg.co.'));
+
+    layout.appendChild(story);
+    layout.appendChild(decode);
+    shell.frame.appendChild(layout);
+    return shell.page;
+  }
+
+  function buildFragmentPages(data, renderedFragments) {
+    renderedFragments = renderedFragments || {};
+    var remaining = (data.fragments || []).filter(function (f) {
+      return !renderedFragments[f.id];
+    });
+    return paginateFragments(remaining).map(function (pageFragments, index) {
+      var shell = makePageShell('fragments', 'Recovered Documents', 'Appendix ' + pad2(index + 1));
+      var stack = make('div', 'fragment-stack');
+      pageFragments.forEach(function (fragment) {
+        stack.appendChild(renderFragment(fragment));
+      });
+      shell.frame.appendChild(stack);
+      return shell.page;
+    });
+  }
+
+  function renderFragment(fragment) {
+    var doc = make('article', 'fragment-card');
+    doc.setAttribute('data-document-type', fragment.documentType || 'memo');
+    if (fragment.designSpec && fragment.designSpec.paperTone) doc.setAttribute('data-paper-tone', fragment.designSpec.paperTone);
+    if (fragment.designSpec && fragment.designSpec.headerStyle) doc.setAttribute('data-header-style', fragment.designSpec.headerStyle);
+    if (fragment.designSpec && typeof fragment.designSpec.hasRedactions !== 'undefined') doc.setAttribute('data-has-redactions', String(fragment.designSpec.hasRedactions));
+    if (fragment.designSpec && typeof fragment.designSpec.hasAnnotations !== 'undefined') doc.setAttribute('data-has-annotations', String(fragment.designSpec.hasAnnotations));
+    var fragmentTop = make('div', 'fragment-topline');
+    fragmentTop.appendChild(make('div', 'doc-label', fragment.id || fragment.documentType || 'Document'));
+    fragmentTop.appendChild(make('div', 'fragment-type-badge', (fragment.documentType || 'document').replace(/([A-Z])/g, ' $1').trim()));
+    doc.appendChild(fragmentTop);
+    if (fragment.title) doc.appendChild(make('h3', 'fragment-title', fragment.title));
+
+    var meta = [];
+    if (fragment.inWorldAuthor) meta.push('From: ' + fragment.inWorldAuthor);
+    if (fragment.inWorldRecipient) meta.push('To: ' + fragment.inWorldRecipient);
+    if (fragment.date) meta.push('Date: ' + fragment.date);
+    if (fragment.inWorldPurpose) meta.push('Purpose: ' + fragment.inWorldPurpose);
+    if (meta.length) {
+      var metaBox = make('div', 'fragment-meta');
+      meta.forEach(function (line) {
+        metaBox.appendChild(make('div', 'fragment-meta-line', line));
+      });
+      doc.appendChild(metaBox);
+    }
+
+    splitParagraphs(fragment.bodyText || fragment.body || fragment.content || '').forEach(function (para) {
+      doc.appendChild(make('p', 'body-copy', para));
+    });
+    return doc;
+  }
+
+  function buildAssemblyPage(data) {
+    var shell = makePageShell('assembly', 'Password Assembly', 'Convergence Log');
+    shell.frame.appendChild(make('p', 'body-copy lead-copy', 'Transfer each recorded weekly value into the final assembly ladder. Decode only when the boss page gives the rule.'));
+    var list = make('div', 'assembly-grid');
+    (data.weeks || []).forEach(function (week) {
+      var row = make('div', 'assembly-row');
+      row.appendChild(make('div', 'assembly-week', 'Week ' + pad2(week.weekNumber)));
+      row.appendChild(make('div', 'assembly-input'));
+      row.appendChild(make('div', 'assembly-arrow', '→'));
+      row.appendChild(make('div', 'assembly-output'));
+      list.appendChild(row);
+    });
+    shell.frame.appendChild(list);
+    shell.frame.appendChild(makePasswordBoxes(getPasswordLength(data, (data.meta && data.meta.weekCount) || 6), 'password-box password-box-large'));
+    return shell.page;
+  }
+
+  function buildLockedEndingPage(data) {
+    var shell = makePageShell('ending-locked', 'Final Document', 'Encrypted');
+    shell.frame.appendChild(make('p', 'body-copy lead-copy', 'This final page remains sealed until the completed password is entered above. The booklet should give you everything you need.'));
+    if (data.endings && data.endings.length) {
+      var variants = make('div', 'chip-row');
+      data.endings.forEach(function (ending) {
+        variants.appendChild(make('div', 'chip chip-muted', ending.variant || 'Variant'));
+      });
+      shell.frame.appendChild(variants);
+    }
+    return shell.page;
+  }
+
+  function buildUnlockedEndingPage(payload) {
+    var shell = makePageShell('ending-unlocked', payload.title || 'Unlocked Document', payload.kicker || 'Unlocked');
+    if (payload.documentType) shell.frame.appendChild(make('div', 'doc-label', payload.documentType));
+    splitParagraphs(payload.body || payload.content || '').forEach(function (para) {
+      shell.frame.appendChild(make('p', 'body-copy ending-copy', para));
+    });
+    if (payload.finalLine) {
+      shell.frame.appendChild(make('p', 'body-copy ending-final-line', payload.finalLine));
+    }
+    return shell.page;
+  }
+
+  function buildBackCover(data) {
+    var shell = makePageShell('back-cover', data.meta.blockTitle, 'LiftRPG');
+    shell.page.classList.add('page-back');
+    shell.frame.appendChild(make('p', 'body-copy lead-copy', 'Printed by hand, completed in pencil, resolved through repetition.'));
+    var facts = make('div', 'chip-row');
+    facts.appendChild(make('div', 'chip', (data.meta.weekCount || 0) + ' weeks'));
+    facts.appendChild(make('div', 'chip', (data.meta.totalSessions || 0) + ' sessions'));
+    facts.appendChild(make('div', 'chip', (data.meta.weeklyComponentType || 'component').replace(/-/g, ' ')));
+    shell.frame.appendChild(facts);
+    if (data.meta.generatedAt) shell.frame.appendChild(make('div', 'back-meta', 'Generated ' + data.meta.generatedAt));
+    return shell.page;
+  }
+
+  function buildNotesPage(index) {
+    var shell = makePageShell('notes', 'Field Notes', 'Pad ' + pad2(index + 1));
+    var notes = make('div', 'notes-grid');
+    for (var i = 0; i < 36; i++) {
+      notes.appendChild(make('div', 'notes-cell'));
+    }
+    shell.frame.appendChild(notes);
+    return shell.page;
+  }
+
+  function makePasswordBoxes(count, className) {
+    var row = make('div', 'password-box-row');
+    for (var i = 0; i < count; i++) {
+      row.appendChild(make('div', className));
+    }
+    return row;
+  }
+
+  function getPasswordLength(data, fallback) {
+    var meta = data.meta || {};
+    if (typeof meta.passwordLength === 'number' && meta.passwordLength > 0) return meta.passwordLength;
+    if (meta.passwordPlaintext) return meta.passwordPlaintext.length;
+    return fallback || 6;
+  }
+
+  function buildPages(data) {
+    var pages = [];
+    var renderedFragments = {};
+    pages.push(buildCoverPage(data));
+    pages = pages.concat(buildRulesPage(data));
+    pages = pages.concat(buildWeekPages(data, renderedFragments));
+    pages = pages.concat(buildFragmentPages(data, renderedFragments));
+    pages.push(buildAssemblyPage(data));
+    pages.push(state.unlockedEnding ? buildUnlockedEndingPage(state.unlockedEnding) : buildLockedEndingPage(data));
+    while ((pages.length + 1) % 4 !== 0) {
+      pages.push(buildNotesPage(pages.length));
+    }
+    pages.push(buildBackCover(data));
+    return pages;
+  }
+
+  function renderBooklet(data) {
+    refs.booklet.innerHTML = '';
+    refs.booklet.setAttribute('data-layout-mode', state.layoutMode);
+    applyTheme(refs.booklet, resolveTheme(data));
+
+    var pages = buildPages(data);
+    var grid = make('div', 'booklet-grid');
+    pages.forEach(function (page, index) {
+      page.setAttribute('data-page-number', String(index + 1));
+      grid.appendChild(page);
+    });
+    refs.booklet.appendChild(grid);
+    refs.printBtn.disabled = false;
+    setStatus('Loaded ' + pages.length + ' pages. Review, then print.', 'success');
+  }
+
+  function formatPrescription(exercise) {
+    var sets = exercise.sets != null ? exercise.sets : '?';
+    var reps = exercise.repsPerSet != null ? exercise.repsPerSet : '?';
+    return sets + ' × ' + reps;
+  }
+
+  function pad2(value) {
+    return value < 10 ? '0' + value : String(value);
   }
 
   function deriveKey(password, salt, usage) {
     var enc = new TextEncoder();
-    return crypto.subtle.importKey(
-      'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
-    ).then(function (keyMat) {
-      return crypto.subtle.deriveKey(
-        { name: 'PBKDF2', salt: salt, iterations: CRYPTO_ITER, hash: 'SHA-256' },
-        keyMat,
-        { name: 'AES-GCM', length: 256 },
-        false,
-        [usage || 'decrypt']
-      );
-    });
+    return crypto.subtle.importKey('raw', enc.encode(normalisePassword(password)), 'PBKDF2', false, ['deriveKey'])
+      .then(function (material) {
+        return crypto.subtle.deriveKey(
+          { name: 'PBKDF2', salt: salt, iterations: CRYPTO_ITERATIONS, hash: 'SHA-256' },
+          material,
+          { name: CRYPTO_ALGO, length: CRYPTO_KEY_BITS },
+          false,
+          usage
+        );
+      });
   }
 
-  function decryptBlob(blobBase64url, password) {
-    var b64 = blobBase64url.replace(/-/g, '+').replace(/_/g, '/');
-    var bin = atob(b64);
-    var buf = new Uint8Array(bin.length);
-    for (var i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  function base64urlToUint8(blob) {
+    var normalized = blob.replace(/-/g, '+').replace(/_/g, '/');
+    while (normalized.length % 4) normalized += '=';
+    var binary = atob(normalized);
+    var out = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+    return out;
+  }
 
-    var salt = buf.slice(0, CRYPTO_SALT_BYTES);
-    var iv = buf.slice(CRYPTO_SALT_BYTES, CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES);
-    var ciphertext = buf.slice(CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES);
+  function uint8ToBase64url(bytes) {
+    var binary = '';
+    for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
 
-    return deriveKey(password, salt, 'decrypt').then(function (key) {
-      return crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, ciphertext);
+  function decryptBlob(blob, password) {
+    var packed = base64urlToUint8(blob);
+    var salt = packed.slice(0, CRYPTO_SALT_BYTES);
+    var iv = packed.slice(CRYPTO_SALT_BYTES, CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES);
+    var ciphertext = packed.slice(CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES);
+    return deriveKey(password, salt, ['decrypt']).then(function (key) {
+      return crypto.subtle.decrypt({ name: CRYPTO_ALGO, iv: iv }, key, ciphertext);
     }).then(function (plainBuf) {
-      return new TextDecoder().decode(plainBuf);
+      return JSON.parse(new TextDecoder().decode(plainBuf));
     });
   }
 
-  // ── ENCRYPT (AES-256-GCM, mirrors liftrpg-encrypt.js) ─────────
   function encryptBlob(payload, password) {
-    var enc = new TextEncoder();
-    var plaintext = enc.encode(JSON.stringify(payload));
     var salt = crypto.getRandomValues(new Uint8Array(CRYPTO_SALT_BYTES));
     var iv = crypto.getRandomValues(new Uint8Array(CRYPTO_IV_BYTES));
-
-    return deriveKey(password, salt, 'encrypt').then(function (key) {
-      return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, plaintext);
-    }).then(function (cipherBuf) {
-      var cipherArr = new Uint8Array(cipherBuf);
-      var combined = new Uint8Array(CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES + cipherArr.length);
+    var plaintext = new TextEncoder().encode(JSON.stringify(payload));
+    return deriveKey(password, salt, ['encrypt']).then(function (key) {
+      return crypto.subtle.encrypt({ name: CRYPTO_ALGO, iv: iv }, key, plaintext);
+    }).then(function (ciphertext) {
+      var cipherBytes = new Uint8Array(ciphertext);
+      var combined = new Uint8Array(CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES + cipherBytes.length);
       combined.set(salt, 0);
       combined.set(iv, CRYPTO_SALT_BYTES);
-      combined.set(cipherArr, CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES);
-
-      // base64url encode
-      var bin = '';
-      for (var i = 0; i < combined.length; i++) bin += String.fromCharCode(combined[i]);
-      return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      combined.set(cipherBytes, CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES);
+      return uint8ToBase64url(combined);
     });
-  }
-
-  // ── UNLOCK TOOLBAR LOGIC ─────────────────────────────────────────
-  function showUnlockRow() {
-    var row = document.getElementById('unlock-row');
-    if (row) row.style.display = '';
-  }
-
-  function hideUnlockRow() {
-    var row = document.getElementById('unlock-row');
-    if (row) row.style.display = 'none';
   }
 
   function attemptUnlock() {
-    var passwordEl = document.getElementById('unlock-password');
-    var statusEl = document.getElementById('unlock-status');
-    var btn = document.getElementById('unlock-btn');
-    var raw = passwordEl.value;
-    var password = normalisePassword(raw);
-
+    if (!state.data || !state.data.meta || !state.data.meta.passwordEncryptedEnding) {
+      refs.unlockStatus.textContent = 'No encrypted ending found.';
+      return;
+    }
+    var password = normalisePassword(refs.unlockPassword.value || '');
     if (!password) {
-      statusEl.textContent = 'Enter your password';
-      passwordEl.classList.add('shake');
-      setTimeout(function () { passwordEl.classList.remove('shake'); }, 500);
+      refs.unlockStatus.textContent = 'Enter the completed password.';
       return;
     }
-
-    if (!jsonData || !jsonData.meta || !jsonData.meta.passwordEncryptedEnding) {
-      statusEl.textContent = 'No encrypted ending in this JSON';
-      return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'Working\u2026';
-    statusEl.textContent = '';
-
-    decryptBlob(jsonData.meta.passwordEncryptedEnding, password)
-      .then(function (plaintext) {
-        var payload;
-        try {
-          payload = JSON.parse(plaintext);
-        } catch (e) {
-          payload = { kicker: 'Final page', title: 'The ending', content: plaintext };
-        }
-
-        // Replace the endings page content
-        var endingsPage = document.getElementById('endings-page');
-        if (endingsPage) {
-          var inner = endingsPage.querySelector('.endings-page');
-          if (inner) {
-            inner.classList.remove('endings-locked');
-            inner.innerHTML = '';
-
-            // Render the decrypted ending as booklet content
-            var bodyDiv = document.createElement('div');
-            bodyDiv.className = 'endings-body endings-unlocked';
-            bodyDiv.innerHTML = payload.content;
-            inner.appendChild(bodyDiv);
-          }
-        }
-
-        // Update toolbar state
-        btn.textContent = '\u2713 Unlocked';
-        btn.disabled = true;
-        btn.classList.add('unlocked');
-        passwordEl.disabled = true;
-        passwordEl.value = password;
-        statusEl.textContent = '';
-        var icon = document.querySelector('.unlock-icon');
-        if (icon) icon.textContent = '\uD83D\uDD13';
-      })
-      .catch(function (err) {
-        btn.disabled = false;
-        btn.textContent = 'Unlock';
-        passwordEl.classList.add('shake');
-        setTimeout(function () { passwordEl.classList.remove('shake'); }, 500);
-        statusEl.textContent = 'Wrong password';
-        console.error('Decrypt failed:', err);
-      });
-  }
-
-  // Wire up unlock button and Enter key
-  var unlockBtn = document.getElementById('unlock-btn');
-  var unlockInput = document.getElementById('unlock-password');
-  if (unlockBtn) {
-    unlockBtn.addEventListener('click', attemptUnlock);
-  }
-  if (unlockInput) {
-    unlockInput.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') attemptUnlock();
+    refs.unlockStatus.textContent = 'Unlocking…';
+    decryptBlob(state.data.meta.passwordEncryptedEnding, password).then(function (payload) {
+      state.unlockedEnding = payload;
+      refs.unlockStatus.textContent = 'Unlocked.';
+      renderBooklet(state.data);
+    }).catch(function () {
+      refs.unlockStatus.textContent = 'Password rejected.';
     });
   }
 
-  // ── ENCRYPT TOOLBAR LOGIC ──────────────────────────────────────
-
-  function showEncryptRow() {
-    var row = document.getElementById('encrypt-row');
-    if (row) row.style.display = '';
-  }
-
-  function hideEncryptRow() {
-    var row = document.getElementById('encrypt-row');
-    if (row) row.style.display = 'none';
-  }
-
-  /**
-   * Returns true when the JSON has endings that need encryption:
-   * endings[] present, but passwordEncryptedEnding missing or placeholder.
-   */
-  function needsEncryption(data) {
-    if (!data || !data.endings || !data.endings.length) return false;
-    var blob = data.meta && data.meta.passwordEncryptedEnding;
-    return !blob || blob === 'PLACEHOLDER_ENCRYPTED_BLOB_REPLACE_AT_GENERATION_TIME';
-  }
-
   function attemptEncrypt() {
-    var passwordEl = document.getElementById('encrypt-password');
-    var statusEl = document.getElementById('encrypt-status');
-    var btn = document.getElementById('encrypt-btn');
-    var dlBtn = document.getElementById('encrypt-download');
-    var raw = passwordEl.value;
-    var password = normalisePassword(raw);
-
+    if (!state.data || !Array.isArray(state.data.endings) || !state.data.endings.length) {
+      refs.encryptStatus.textContent = 'No endings available.';
+      return;
+    }
+    var password = normalisePassword(refs.encryptPassword.value || '');
     if (!password) {
-      statusEl.textContent = 'Enter your password';
-      passwordEl.classList.add('shake');
-      setTimeout(function () { passwordEl.classList.remove('shake'); }, 500);
+      refs.encryptStatus.textContent = 'Enter a password.';
       return;
     }
-
-    if (!jsonData || !jsonData.endings || !jsonData.endings.length) {
-      statusEl.textContent = 'No endings to encrypt';
-      return;
-    }
-
-    // Build the ending payload — same format as liftrpg-encrypt.js
-    var ending = jsonData.endings[0];
-    var payload = ending.content || ending;
-
-    btn.disabled = true;
-    btn.textContent = 'Working\u2026';
-    statusEl.textContent = '';
-
-    encryptBlob(payload, password)
-      .then(function (blob) {
-        // Round-trip verify: decrypt with same password
-        return decryptBlob(blob, password).then(function (plain) {
-          var recovered = JSON.parse(plain);
-          if (JSON.stringify(recovered) !== JSON.stringify(payload)) {
-            throw new Error('Round-trip verification failed');
-          }
-          return blob;
-        });
-      })
-      .then(function (blob) {
-        // Store blob in the live data
-        jsonData.meta.passwordEncryptedEnding = blob;
-
-        // Update toolbar state
-        btn.textContent = '\u2713 Encrypted';
-        btn.disabled = true;
-        btn.classList.add('encrypted');
-        passwordEl.disabled = true;
-        passwordEl.value = password;
-        statusEl.textContent = 'Ending sealed \u2014 download to save';
-        var icon = document.querySelector('.encrypt-icon');
-        if (icon) icon.textContent = '\uD83D\uDD10';
-
-        // Show download button
-        if (dlBtn) dlBtn.style.display = '';
-
-        // Update endings page in-place to show sealed state
-        var endingsPage = document.getElementById('endings-page');
-        if (endingsPage) {
-          var inner = endingsPage.querySelector('.endings-page');
-          if (inner) {
-            inner.className = 'endings-page endings-locked';
-            inner.innerHTML = '';
-            inner.appendChild(document.createTextNode(''));
-            var lockIcon = document.createElement('div');
-            lockIcon.className = 'endings-locked-icon';
-            lockIcon.textContent = '\uD83D\uDD12';
-            inner.appendChild(lockIcon);
-            var h2 = document.createElement('h2');
-            h2.className = 'endings-title';
-            h2.textContent = 'This Document Is Sealed';
-            inner.appendChild(h2);
-            var lockMsg = document.createElement('div');
-            lockMsg.className = 'endings-locked-msg';
-            lockMsg.innerHTML = 'Assemble your password from the weekly gauge readings. Return to <strong>liftrpg.co \u2192 Render</strong> and enter it to unlock this page.';
-            inner.appendChild(lockMsg);
-          }
-        }
-      })
-      .catch(function (err) {
-        btn.disabled = false;
-        btn.textContent = 'Encrypt';
-        statusEl.textContent = 'Encrypt failed: ' + err.message;
-        console.error('Encrypt failed:', err);
-      });
+    refs.encryptStatus.textContent = 'Encrypting…';
+    encryptBlob(state.data.endings[0].content || state.data.endings[0], password).then(function (blob) {
+      state.data.meta.passwordEncryptedEnding = blob;
+      refs.encryptStatus.textContent = 'Encrypted.';
+      refs.encryptDownload.style.display = 'inline-flex';
+    }).catch(function () {
+      refs.encryptStatus.textContent = 'Encryption failed.';
+    });
   }
 
-  function downloadEncryptedJSON() {
-    if (!jsonData) return;
-    var jsonStr = JSON.stringify(jsonData, null, 2);
-    var blob = new Blob([jsonStr], { type: 'application/json' });
+  function downloadJson() {
+    if (!state.data) return;
+    var blob = new Blob([JSON.stringify(state.data, null, 2)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    var title = (jsonData.meta && jsonData.meta.blockTitle)
-      ? jsonData.meta.blockTitle.replace(/[^a-zA-Z0-9\- ]/g, '').replace(/\s+/g, '-')
-      : 'booklet';
     a.href = url;
-    a.download = title + '-encrypted.json';
+    a.download = 'liftrpg-booklet.json';
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  // Wire up encrypt button and Enter key
-  var encryptBtn = document.getElementById('encrypt-btn');
-  var encryptInput = document.getElementById('encrypt-password');
-  var encryptDl = document.getElementById('encrypt-download');
-  if (encryptBtn) {
-    encryptBtn.addEventListener('click', attemptEncrypt);
+  function loadBooklet(data, sourceLabel) {
+    var errors = validateBooklet(data);
+    if (errors.length) {
+      refs.booklet.innerHTML = '';
+      refs.printBtn.disabled = true;
+      refs.unlockRow.style.display = 'none';
+      refs.encryptRow.style.display = 'none';
+      setStatus(errors.join(' '), 'error');
+      return;
+    }
+
+    state.data = data;
+    state.unlockedEnding = null;
+    renderBooklet(data);
+    refs.unlockRow.style.display = data.meta && data.meta.passwordEncryptedEnding ? 'flex' : 'none';
+    refs.encryptRow.style.display = data.meta && (!data.meta.passwordEncryptedEnding || data.meta.passwordEncryptedEnding.indexOf('PLACEHOLDER_') === 0) ? 'flex' : 'none';
+    refs.encryptDownload.style.display = 'none';
+    refs.unlockPassword.value = '';
+    refs.unlockStatus.textContent = '';
+    refs.encryptStatus.textContent = '';
+    setStatus('Loaded ' + sourceLabel + '.', 'success');
   }
-  if (encryptInput) {
-    encryptInput.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') attemptEncrypt();
+
+  function loadJsonFile(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var data = JSON.parse(String(reader.result || '{}'));
+        loadBooklet(data, file.name);
+      } catch (error) {
+        setStatus('Invalid JSON: ' + error.message, 'error');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function fetchDemo(name) {
+    var url = name === 'liftrpg-eastern-shore' ? '../liftrpg-eastern-shore.json' : '../' + name + '.json';
+    return fetch(url).then(function (response) {
+      if (!response.ok) throw new Error('Demo JSON not found.');
+      return response.json();
+    }).then(function (data) {
+      loadBooklet(data, name + '.json');
+    }).catch(function (error) {
+      setStatus(error.message, 'error');
     });
   }
-  if (encryptDl) {
-    encryptDl.addEventListener('click', downloadEncryptedJSON);
+
+  function syncLayoutMode() {
+    refs.booklet.setAttribute('data-layout-mode', state.layoutMode);
   }
 
-  // Expose for debugging
-  window.LiftRPGRenderer = { render: render };
+  function wireUi() {
+    refs.jsonInput.addEventListener('change', function (event) {
+      loadJsonFile(event.target.files && event.target.files[0]);
+    });
+    refs.printBtn.addEventListener('click', function () {
+      window.print();
+    });
+    refs.layoutMode.addEventListener('change', function () {
+      state.layoutMode = refs.layoutMode.value;
+      syncLayoutMode();
+    });
+    refs.unlockBtn.addEventListener('click', attemptUnlock);
+    refs.unlockPassword.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') attemptUnlock();
+    });
+    refs.encryptBtn.addEventListener('click', attemptEncrypt);
+    refs.encryptDownload.addEventListener('click', downloadJson);
+  }
 
+  function captureRefs() {
+    refs = {
+      booklet: qs('booklet-container'),
+      jsonInput: qs('json-input'),
+      printBtn: qs('print-btn'),
+      layoutMode: qs('layout-mode'),
+      status: qs('status'),
+      unlockRow: qs('unlock-row'),
+      unlockPassword: qs('unlock-password'),
+      unlockBtn: qs('unlock-btn'),
+      unlockStatus: qs('unlock-status'),
+      encryptRow: qs('encrypt-row'),
+      encryptPassword: qs('encrypt-password'),
+      encryptBtn: qs('encrypt-btn'),
+      encryptDownload: qs('encrypt-download'),
+      encryptStatus: qs('encrypt-status')
+    };
+  }
+
+  function init() {
+    captureRefs();
+    wireUi();
+    syncLayoutMode();
+    refs.printBtn.disabled = true;
+
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('demo')) {
+      fetchDemo(params.get('demo'));
+    } else {
+      setStatus('Load a booklet JSON to preview and print.', 'neutral');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
 })();
