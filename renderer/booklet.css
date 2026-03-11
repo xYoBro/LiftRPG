@@ -16,6 +16,50 @@
   --rule:#ccc5b6;
   --warm:#e8dfc8;
   --card:#ece6d8;
+  --paper-2:#f6f1e7;
+  --line-soft:#d8cfbf;
+  --accent-soft:rgba(139,42,42,.14);
+  --theme-page-filter:none;
+  --theme-title-family:'Playfair Display',Georgia,serif;
+  --theme-title-style:italic;
+  --theme-title-weight:700;
+  --theme-title-case:none;
+  --theme-title-spacing:normal;
+  --theme-body-family:'Libre Baskerville',Georgia,serif;
+  --theme-body-leading:1.6;
+  --theme-label-family:'Share Tech Mono',monospace;
+  --theme-label-style:normal;
+  --theme-label-weight:400;
+  --theme-label-case:uppercase;
+  --theme-label-spacing:.18em;
+  --theme-designation-color:var(--accent);
+  --theme-designation-fill:transparent;
+  --theme-designation-border:var(--rule);
+  --theme-designation-padding:0;
+  --theme-designation-opacity:1;
+  --theme-designation-transform:none;
+  --theme-doc-badge-color:var(--accent);
+  --theme-panel-fill:rgba(241,235,224,.96);
+  --theme-panel-border:var(--rule);
+  --theme-panel-radius:3px;
+  --theme-panel-shadow:0 12px 24px rgba(0,0,0,.06);
+  --theme-doc-fill:rgba(232,223,200,.78);
+  --theme-session-fill:rgba(236,230,216,.92);
+  --theme-session-border:var(--rule);
+  --theme-session-separator:var(--line-soft);
+  --theme-prompt-fill:rgba(255,255,255,.36);
+  --theme-prompt-border:var(--rule);
+  --theme-header-border:var(--ink);
+  --theme-box-border:var(--rule);
+  --theme-field-rule:var(--line-soft);
+  --theme-cover-rule:var(--accent);
+  --theme-cover-rule-gap:16px;
+  --theme-page-overlay:linear-gradient(180deg, rgba(255,255,255,.06) 0%, rgba(0,0,0,.02) 100%);
+  --theme-page-noise-opacity:.35;
+  --theme-page-atmosphere-size:200px;
+  --cipher-attachment-label:"Cipher Attachment";
+  --boss-document-label:"Final Document";
+  --boss-attachment-label:"Convergence Attachment";
   --mono:'Share Tech Mono',monospace;
   --serif:'Libre Baskerville',Georgia,serif;
   --display:'Playfair Display',Georgia,serif;
@@ -128,7 +172,7 @@ body{
   gap: 20px;
 }
 [data-layout-mode="booklet"] .booklet-grid,
-[data-layout-mode="reader"] .booklet-grid {
+[data-layout-mode="spread"] .booklet-grid {
   gap: 40px;
 }
 
