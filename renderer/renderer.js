@@ -617,8 +617,8 @@
       weight += Math.min(readingLength(session.storyPrompt) / 300, 1.5);
       if (session.binaryChoice) weight += 1.2;
 
-      // Reduced chunk size for easier layout: max 2 sessions, tight weight limits
-      if (current.length >= 2 || (current.length >= 1 && load + weight > 2.05)) {
+      // Hard limit of 3 workouts per page
+      if (current.length >= 3 || (current.length >= 1 && load + weight > 3.8)) {
         chunks.push(current);
         current = [];
         load = 0;
@@ -696,96 +696,105 @@
     return pages;
   }
 
-  function makePageShell(type, title, kicker) {
-    var page = make('section', 'booklet-page');
-    page.setAttribute('data-page-type', type);
 
-    var frame = make('div', 'page-frame');
-    var header = make('header', 'page-header');
-    var kickerEl = make('div', 'page-kicker', kicker || '');
-    var titleEl = make('h2', 'page-title', title || '');
-    header.appendChild(kickerEl);
-    header.appendChild(titleEl);
-    frame.appendChild(header);
-    page.appendChild(frame);
-
-    return {
-      page: page,
-      frame: frame
-    };
-  }
 
   function buildCoverPage(data) {
-    var shell = makePageShell('cover', data.meta.blockTitle, data.cover.designation || '');
-    shell.page.classList.add('page-cover');
+    var page = make('section', 'booklet-page');
+    page.setAttribute('data-page-type', 'cover');
+    var frame = make('div', 'cover-page');
 
     if (data.cover.designation) {
-      shell.frame.insertBefore(make('div', 'doc-designation', data.cover.designation), shell.frame.firstChild);
+      frame.appendChild(make('div', 'cover-designation', data.cover.designation));
     }
 
     var hero = make('div', 'cover-hero');
-    hero.appendChild(make('h1', 'cover-headline', data.meta.blockTitle || 'LiftRPG'));
+    hero.appendChild(make('h1', 'cover-title', data.meta.blockTitle || 'LiftRPG'));
     hero.appendChild(make('p', 'cover-tagline', data.cover.tagline || ''));
+    hero.appendChild(make('div', 'cover-rule'));
+    frame.appendChild(hero);
 
     var colophon = make('div', 'cover-colophon');
     (data.cover.colophonLines || []).forEach(function (line) {
       colophon.appendChild(make('div', 'cover-colophon-line', line));
     });
+    frame.appendChild(colophon);
+    page.appendChild(frame);
 
-    shell.frame.appendChild(hero);
-    shell.frame.appendChild(colophon);
-    return shell.page;
+    return page;
   }
 
   function buildRulesPage(data) {
     var pages = [];
-    var left = makePageShell('rules', data.rulesSpread.leftPage.title, 'Orientation');
-    var body = make('div', 'rules-stack');
+    
+    // Left Page: Rules/Briefing
+    var leftPage = make('section', 'booklet-page');
+    leftPage.setAttribute('data-page-type', 'rules-left');
+    var leftFrame = make('div', 'rules-left');
+    
+    var leftHeader = make('header', 'rules-header');
+    leftHeader.appendChild(make('span', '', 'Orientation'));
+    leftHeader.appendChild(make('span', 'page-num', ''));
+    leftFrame.appendChild(leftHeader);
+    
+    leftFrame.appendChild(make('h2', 'rules-title', data.rulesSpread.leftPage.title || 'Briefing'));
+    
+    var leftBody = make('div', 'rules-body');
     (data.rulesSpread.leftPage.sections || []).forEach(function (section) {
-      var block = make('section', 'doc-block');
-      block.appendChild(make('div', 'doc-label', section.heading || 'Procedure'));
+      leftBody.appendChild(make('h3', '', section.heading || 'Procedure'));
       splitParagraphs(section.body || section.text).forEach(function (para) {
-        block.appendChild(make('p', 'body-copy', para));
+        leftBody.appendChild(make('p', '', para));
       });
-      body.appendChild(block);
     });
 
     var reEntry = data.rulesSpread.leftPage.reEntryRule;
     var reEntryText = typeof reEntry === 'string' ? reEntry : reEntry && reEntry.ruleText;
     if (reEntryText) {
-      var reEntryBlock = make('section', 'doc-block doc-block-callout');
-      reEntryBlock.appendChild(make('div', 'doc-label', 'Re-entry Procedure'));
+      leftBody.appendChild(make('h3', '', 'Re-entry Procedure'));
       splitParagraphs(reEntryText).forEach(function (para) {
-        reEntryBlock.appendChild(make('p', 'body-copy', para));
+        leftBody.appendChild(make('p', '', para));
       });
-      body.appendChild(reEntryBlock);
     }
-    left.frame.appendChild(body);
-    pages.push(left.page);
+    leftFrame.appendChild(leftBody);
+    leftPage.appendChild(leftFrame);
+    pages.push(leftPage);
 
-    var right = makePageShell('log', data.rulesSpread.rightPage.title, 'Record');
-    var logGrid = make('div', 'record-grid');
+    // Right Page: Password Log
+    var rightPage = make('section', 'booklet-page');
+    rightPage.setAttribute('data-page-type', 'rules-right');
+    var rightFrame = make('div', 'rules-right');
+    
+    var rightHeader = make('header', 'rules-header');
+    rightHeader.appendChild(make('span', '', 'Record'));
+    rightHeader.appendChild(make('span', 'page-num', ''));
+    rightFrame.appendChild(rightHeader);
+
+    rightFrame.appendChild(make('div', 'password-log-title', data.rulesSpread.rightPage.title || 'Password Log'));
+    if (data.rulesSpread.rightPage.instruction) {
+      rightFrame.appendChild(make('div', 'password-log-subtitle', data.rulesSpread.rightPage.instruction));
+    }
+
+    var logGrid = make('div', 'password-log-grid');
     var componentType = (data.meta.weeklyComponentType || 'component').replace(/-/g, ' ');
     (data.weeks || []).forEach(function (week) {
-      var row = make('div', 'record-row');
-      row.appendChild(make('div', 'record-week', 'Week ' + pad2(week.weekNumber)));
-      row.appendChild(make('div', 'record-cells record-cells-value'));
+      var row = make('div', 'password-log-row');
+      row.appendChild(make('div', 'password-log-week', 'W' + pad2(week.weekNumber)));
+      row.appendChild(make('div', 'password-log-box'));
       if (!week.isBossWeek) {
-        row.appendChild(make('div', 'record-note', week.weeklyComponent && week.weeklyComponent.extractionInstruction || componentType));
+        row.appendChild(make('div', 'password-log-instruction', week.weeklyComponent && week.weeklyComponent.extractionInstruction || componentType));
       } else {
-        row.appendChild(make('div', 'record-note', 'Hold until convergence protocol.'));
+        row.appendChild(make('div', 'password-log-instruction', 'Hold until convergence protocol.'));
       }
       logGrid.appendChild(row);
     });
-    right.frame.appendChild(make('p', 'body-copy lead-copy', data.rulesSpread.rightPage.instruction || ''));
-    right.frame.appendChild(logGrid);
+    rightFrame.appendChild(logGrid);
 
-    var finalBlock = make('section', 'doc-block doc-block-callout');
-    finalBlock.appendChild(make('div', 'doc-label', 'Final Assembly'));
-    finalBlock.appendChild(makePasswordBoxes(getPasswordLength(data, (data.meta && data.meta.weekCount) || 6), 'password-box'));
-    finalBlock.appendChild(make('p', 'body-copy', 'Return to liftrpg.co → Render with the completed word to unlock the final document.'));
-    right.frame.appendChild(finalBlock);
-    pages.push(right.page);
+    var finalBlock = make('div', 'password-final');
+    finalBlock.appendChild(make('div', 'password-final-label', 'Final Assembly'));
+    finalBlock.appendChild(makePasswordBoxes(getPasswordLength(data, (data.meta && data.meta.weekCount) || 6), 'password-final-box'));
+    rightFrame.appendChild(finalBlock);
+
+    rightPage.appendChild(rightFrame);
+    pages.push(rightPage);
 
     return pages;
   }
@@ -818,6 +827,14 @@
     renderedFragments = renderedFragments || {};
     (data.weeks || []).forEach(function (week) {
       chunkSessions(week).forEach(function (chunk, chunkIndex, chunkList) {
+        if (chunkIndex > 0) {
+           // Subsequent workout chunks must also land on left pages.
+           // Since the previous page was a left page, we must insert a blank right page first.
+           var blank = make('section', 'booklet-page');
+           blank.setAttribute('data-page-type', 'blank-filler');
+           blank.classList.add('blank-page');
+           pages.push(blank);
+        }
         pages.push(buildWorkoutPage(data, week, chunk, chunkIndex, chunkList.length));
       });
       pages.push(week.isBossWeek ? buildBossPage(data, week) : buildFieldOpsPages(data, week));
@@ -831,13 +848,21 @@
       if (fragmentsForWeek.length > 0) {
         fragmentsForWeek.forEach(function (f) { renderedFragments[f.id] = true; });
         pages = pages.concat(paginateFragments(fragmentsForWeek).map(function (pageFragments, index) {
-          var shell = makePageShell('fragments', 'Recovered Documents', 'Week ' + pad2(week.weekNumber) + ' · Archive');
+          var page = make('section', 'booklet-page');
+          page.setAttribute('data-page-type', 'fragment');
+          var frame = make('div', 'fragment-page');
+          var header = make('header', 'page-header');
+          header.appendChild(make('span', '', 'Archive'));
+          header.appendChild(make('span', 'page-num', ''));
+          frame.appendChild(header);
+
           var stack = make('div', 'fragment-stack');
           pageFragments.forEach(function (fragment) {
             stack.appendChild(renderFragment(fragment));
           });
-          shell.frame.appendChild(stack);
-          return shell.page;
+          frame.appendChild(stack);
+          page.appendChild(frame);
+          return page;
         }));
       }
     });
@@ -845,204 +870,115 @@
   }
 
   function buildWorkoutPage(data, week, sessions, chunkIndex, chunkCount) {
-    var shell = makePageShell(
-      'week-sessions',
-      week.title,
-      'Week ' + pad2(week.weekNumber) + (chunkCount > 1 ? ' · Session Log ' + (chunkIndex + 1) + '/' + chunkCount : ' · Session Log')
-    );
-    shell.page.classList.add('page-workout-form');
+    var page = make('section', 'booklet-page');
+    page.setAttribute('data-page-type', 'workout-left');
+    var frame = make('div', 'workout-left');
 
-    var intro = make('section', 'week-form-intro');
-    if (chunkIndex === 0) {
-      intro.appendChild(make('div', 'doc-label', week.epigraph && week.epigraph.attribution || ''));
-      intro.appendChild(make('p', 'body-copy epigraph-copy', week.epigraph && week.epigraph.text || ''));
-      shell.frame.appendChild(intro);
+    var header = make('header', 'page-header');
+    header.appendChild(make('span', 'week-id', 'Week ' + pad2(week.weekNumber)));
+    header.appendChild(make('span', 'page-num', ''));
+    frame.appendChild(header);
+
+    var kickerText = chunkCount > 1 ? 'Session Log ' + (chunkIndex + 1) + '/' + chunkCount : 'Session Log';
+    frame.appendChild(make('div', 'week-kicker', kickerText));
+    frame.appendChild(make('h2', 'week-title', week.title || 'Training Record'));
+    
+    if (week.epigraph && chunkIndex === 0) {
+      frame.appendChild(make('div', 'week-subtitle', week.epigraph.attribution || ''));
+      frame.appendChild(make('div', 'week-meta', week.epigraph.text || ''));
     }
 
-    var sheet = make('section', 'workout-sheet');
-    sheet.appendChild(buildWorkoutSheetMeta(week, chunkIndex, chunkCount));
-
-    var cards = make('div', 'session-ledger-stack');
+    var cards = make('div', 'session-cards');
     sessions.forEach(function (session) {
-      cards.appendChild(buildSessionLedger(session));
+      cards.appendChild(buildSessionCard(session));
     });
-    sheet.appendChild(cards);
+    frame.appendChild(cards);
 
-    var footer = make('section', 'week-capture');
-    footer.appendChild(make('div', 'doc-label', week.isBossWeek ? 'Terminal Week' : 'Weekly Capture'));
-    footer.appendChild(make('p', 'body-copy body-copy-tight', week.isBossWeek
-      ? 'Record your final sessions as performed. Convergence happens on the facing operations page.'
-      : week.weeklyComponent && week.weeklyComponent.extractionInstruction || 'Log the derived weekly value after this week’s field operation.'));
-    sheet.appendChild(footer);
-    shell.frame.appendChild(sheet);
-    return shell.page;
-  }
-
-  function buildWorkoutSheetMeta(week, chunkIndex, chunkCount) {
-    var meta = make('div', 'workout-sheet-meta');
-    meta.appendChild(buildMetaField('Week', pad2(week.weekNumber)));
-    meta.appendChild(buildMetaField('Block', week.title || 'Training Record'));
-    meta.appendChild(buildMetaField('Section', chunkCount > 1 ? 'Log ' + (chunkIndex + 1) + '/' + chunkCount : 'Full Log'));
-    meta.appendChild(buildMetaField('Status', week.isBossWeek ? 'Terminal' : (week.isDeload ? 'Reduced Load' : 'Active')));
-    return meta;
-  }
-
-  function buildMetaField(label, value) {
-    var field = make('div', 'workout-meta-field');
-    field.appendChild(make('div', 'workout-meta-label', label));
-    field.appendChild(make('div', 'workout-meta-value', value || ''));
-    return field;
-  }
-
-  function buildSessionLedger(session) {
-    var ledger = make('article', 'session-ledger');
-    var top = make('div', 'session-ledger-head');
-    top.appendChild(renderSessionLabel(session.label));
-    if (session.fragmentRef) top.appendChild(make('div', 'session-fragment', 'Fragment ' + session.fragmentRef));
-    ledger.appendChild(top);
-
-    var body = make('div', 'session-ledger-body');
-    var exercises = make('div', 'exercise-table');
-    (session.exercises || []).forEach(function (exercise) {
-      var block = make('section', 'exercise-block');
-      block.appendChild(renderExerciseLedger(exercise));
-      if (exercise.notes) {
-        var notes = make('div', 'exercise-note', exercise.notes);
-        block.appendChild(notes);
-      }
-      exercises.appendChild(block);
-    });
-    body.appendChild(exercises);
-
-    if (session.storyPrompt || session.binaryChoice) {
-      var marginal = make('div', 'session-marginalia');
-      if (session.storyPrompt) {
-        splitParagraphs(session.storyPrompt).forEach(function (para) {
-          marginal.appendChild(make('p', 'body-copy body-copy-tight', para));
-        });
-      }
-      if (session.binaryChoice) {
-        var choice = make('div', 'binary-choice');
-        choice.appendChild(make('div', 'doc-label', session.binaryChoice.choiceLabel || 'Route Decision'));
-        var columns = make('div', 'binary-choice-options');
-        var a = make('div', 'binary-choice-option');
-        a.appendChild(make('div', 'binary-choice-letter', 'A'));
-        a.appendChild(make('p', 'body-copy', session.binaryChoice.promptA || ''));
-        var b = make('div', 'binary-choice-option');
-        b.appendChild(make('div', 'binary-choice-letter', 'B'));
-        b.appendChild(make('p', 'body-copy', session.binaryChoice.promptB || ''));
-        columns.appendChild(a);
-        columns.appendChild(b);
-        choice.appendChild(columns);
-        marginal.appendChild(choice);
-      }
-      body.appendChild(marginal);
-    }
-
-    ledger.appendChild(body);
-    return ledger;
+    page.appendChild(frame);
+    return page;
   }
 
   function buildSessionCard(session) {
     var card = make('article', 'session-card');
     
     var exCount = (session.exercises || []).length;
-    if (exCount > 4) card.classList.add('session-dense-heavy');
-    else if (exCount > 2) card.classList.add('session-dense-medium');
+    if (exCount > 4) card.classList.add('density-dense');
+    else if (exCount > 2) card.classList.add('density-compact');
     
-    var top = make('div', 'session-head');
-    top.appendChild(renderSessionLabel(session.label));
-    if (session.fragmentRef) top.appendChild(make('div', 'session-fragment', 'Fragment ' + session.fragmentRef));
-    card.appendChild(top);
+    card.appendChild(make('div', 'session-header', typeof session.label === 'string' ? session.label : 'Session'));
+    
+    if (session.storyPrompt) {
+      var prompt = make('div', 'story-prompt', session.storyPrompt);
+      card.appendChild(prompt);
+    }
+    
+    if (session.fragmentRef) {
+      card.appendChild(make('div', 'frag-ref', 'Fragment ' + session.fragmentRef));
+    }
 
-    var exercises = make('div', 'exercise-table');
+    var exercises = make('table', 'exercise-table');
     (session.exercises || []).forEach(function (exercise) {
-      var block = make('section', 'exercise-block');
-      block.appendChild(renderExerciseLedger(exercise));
-      if (exercise.notes) {
-        var notes = make('div', 'exercise-note', exercise.notes);
-        block.appendChild(notes);
-      }
-      exercises.appendChild(block);
+      exercises.appendChild(renderExerciseRow(exercise));
     });
     card.appendChild(exercises);
 
-    if (session.storyPrompt) {
-      var narrative = make('div', 'session-narrative');
-      splitParagraphs(session.storyPrompt).forEach(function (para) {
-        narrative.appendChild(make('p', 'body-copy', para));
-      });
-      card.appendChild(narrative);
-    }
+    var notesBox = make('div', 'notes-box');
+    var notesLines = make('div', 'notes-lines');
+    notesLines.appendChild(make('div', 'notes-line'));
+    notesLines.appendChild(make('div', 'notes-line'));
+    notesBox.appendChild(notesLines);
+    card.appendChild(notesBox);
 
     if (session.binaryChoice) {
       var choice = make('div', 'binary-choice');
-      choice.appendChild(make('div', 'doc-label', session.binaryChoice.choiceLabel || 'Route Decision'));
-      var columns = make('div', 'binary-choice-options');
+      choice.appendChild(make('div', 'binary-choice-label', session.binaryChoice.choiceLabel || 'Route Decision'));
+      
       var a = make('div', 'binary-choice-option');
-      a.appendChild(make('div', 'binary-choice-letter', 'A'));
-      a.appendChild(make('p', 'body-copy', session.binaryChoice.promptA || ''));
+      a.appendChild(make('div', 'binary-choice-marker'));
+      a.appendChild(make('div', 'binary-choice-text', session.binaryChoice.promptA || ''));
+      choice.appendChild(a);
+
       var b = make('div', 'binary-choice-option');
-      b.appendChild(make('div', 'binary-choice-letter', 'B'));
-      b.appendChild(make('p', 'body-copy', session.binaryChoice.promptB || ''));
-      columns.appendChild(a);
-      columns.appendChild(b);
-      choice.appendChild(columns);
+      b.appendChild(make('div', 'binary-choice-marker'));
+      b.appendChild(make('div', 'binary-choice-text', session.binaryChoice.promptB || ''));
+      choice.appendChild(b);
+      
       card.appendChild(choice);
     }
 
     return card;
   }
 
-  function renderSessionLabel(label) {
-    var text = typeof label === 'string' && label.trim() ? label.trim() : 'Session';
-    var parts = text.split('·').map(function (part) {
-      return part.trim();
-    }).filter(Boolean);
-    if (parts.length < 2) return make('div', 'session-label', text);
-
-    var group = make('div', 'session-docket');
-    var dayField = make('div', 'session-docket-field');
-    dayField.appendChild(make('div', 'session-docket-label', 'Day'));
-    dayField.appendChild(make('div', 'session-label', parts[0]));
-    group.appendChild(dayField);
-
-    var typeField = make('div', 'session-docket-field');
-    typeField.appendChild(make('div', 'session-docket-label', 'Assignment'));
-    typeField.appendChild(make('div', 'session-subtype', parts.slice(1).join(' · ')));
-    group.appendChild(typeField);
-    return group;
-  }
-
-  function renderExerciseLedger(exercise) {
-    var row = make('div', 'exercise-row');
-    row.appendChild(make('div', 'exercise-name', exercise.name || 'Lift'));
-    row.appendChild(make('div', 'exercise-leader'));
-
-    var load = make('div', 'exercise-load');
-    var loadLine = make('div', 'exercise-load-line');
-    loadLine.appendChild(make('span', 'exercise-guide', getLoadGuide(exercise)));
-    load.appendChild(loadLine);
-    if (showLoadSuffix(exercise)) {
-      load.appendChild(make('span', 'exercise-load-suffix', 'x'));
+  function renderExerciseRow(exercise) {
+    var tr = make('tr');
+    
+    var tdName = make('td');
+    var nameWrapper = make('div', 'exercise-name');
+    nameWrapper.textContent = exercise.name || 'Lift';
+    tdName.appendChild(nameWrapper);
+    tr.appendChild(tdName);
+    
+    if (showLoadSuffix(exercise) || exercise.loadGuide || exercise.loadInstruction) {
+        var tdWeight = make('td', 'exercise-weight');
+        tdWeight.textContent = getLoadGuide(exercise) + (showLoadSuffix(exercise) ? ' x' : '');
+        tr.appendChild(tdWeight);
     }
-    row.appendChild(load);
-    row.appendChild(renderSetBoxes(exercise));
-    return row;
-  }
-
-  function renderSetBoxes(exercise) {
-    var grid = make('div', 'set-grid');
-    var reps = getExerciseRepGuides(exercise);
-    var count = reps.length;
-    for (var index = 0; index < count; index++) {
-      var cell = make('div', 'set-cell');
-      var box = make('div', 'set-box');
-      box.appendChild(make('span', 'set-guide', reps[index]));
-      cell.appendChild(box);
-      grid.appendChild(cell);
+    
+    var tdDots = make('td');
+    tdDots.style.width = '100%';
+    tdDots.appendChild(make('div', 'exercise-dots'));
+    tr.appendChild(tdDots);
+    
+    var tdReps = make('td');
+    var repGroup = make('div', 'rep-boxes');
+    var count = getExerciseSetCount(exercise);
+    for (var i = 0; i < count; i++) {
+        repGroup.appendChild(make('div', 'rep-box'));
     }
-    return grid;
+    tdReps.appendChild(repGroup);
+    tr.appendChild(tdReps);
+    
+    return tr;
   }
 
   function getExerciseSetCount(exercise) {
@@ -1051,27 +987,6 @@
       return Math.min(exercise.repsPerSet.split('/').length, 10);
     }
     return 3;
-  }
-
-  function getExerciseRepGuides(exercise) {
-    if (typeof exercise.repsPerSet === 'number') {
-      return repeatGuide(String(exercise.repsPerSet), getExerciseSetCount(exercise));
-    }
-    if (typeof exercise.repsPerSet === 'string') {
-      if (exercise.repsPerSet.indexOf('/') !== -1) {
-        return exercise.repsPerSet.split('/').map(function (part) {
-          return part.trim();
-        }).filter(Boolean).slice(0, 10);
-      }
-      return repeatGuide(exercise.repsPerSet.trim(), getExerciseSetCount(exercise));
-    }
-    return repeatGuide('', getExerciseSetCount(exercise));
-  }
-
-  function repeatGuide(value, count) {
-    var items = [];
-    for (var i = 0; i < count; i++) items.push(value);
-    return items;
   }
 
   function getLoadGuide(exercise) {
@@ -1092,27 +1007,51 @@
     var pages = [];
     var splitOracle = fieldOps.oracleTable && (fieldOps.oracleTable.entries || []).length > 8;
 
-    var first = makePageShell('field-ops', fieldOps.mapState && fieldOps.mapState.title || week.title, 'Week ' + pad2(week.weekNumber) + ' · Field Operations');
-    first.page.classList.add('page-field-board');
-    var board = make('div', 'field-board');
-    if (fieldOps.mapState) board.appendChild(renderMapSection(fieldOps.mapState));
-    var appendix = make('div', !splitOracle && fieldOps.oracleTable ? 'field-appendix field-appendix-dual' : 'field-appendix');
+    var page = make('section', 'booklet-page');
+    page.setAttribute('data-page-type', 'field-ops');
+    var frame = make('div', 'field-ops-right');
+
+    var header = make('header', 'rp-header');
+    header.appendChild(make('span', '', fieldOps.mapState && fieldOps.mapState.title || week.title || 'Field Operations'));
+    header.appendChild(make('span', 'page-num', ''));
+    frame.appendChild(header);
+
+    var rpContent = make('div', 'rp-content');
+
+    if (fieldOps.cipher) rpContent.appendChild(renderCipherSection(fieldOps.cipher, week.weeklyComponent));
+    
+    // Map Zone
+    var mapZone = make('section', 'map-zone');
+    if (fieldOps.mapState) mapZone.appendChild(renderMapSection(fieldOps.mapState));
     if (week.gameplayClocks && week.gameplayClocks.length > 0) {
-      appendix.appendChild(renderGameplayClocks(week.gameplayClocks));
+      mapZone.appendChild(renderGameplayClocks(week.gameplayClocks));
     }
-    if (fieldOps.cipher) appendix.appendChild(renderCipherSection(fieldOps.cipher, week.weeklyComponent));
-    if (!splitOracle && fieldOps.oracleTable) appendix.appendChild(renderOracleSection(fieldOps.oracleTable));
-    if (appendix.children.length) board.appendChild(appendix);
-    first.frame.appendChild(board);
-    pages.push(first.page);
+    rpContent.appendChild(mapZone);
+
+    if (!splitOracle && fieldOps.oracleTable) {
+        rpContent.appendChild(renderOracleSection(fieldOps.oracleTable));
+    }
+
+    frame.appendChild(rpContent);
+    page.appendChild(frame);
+    pages.push(page);
 
     if (splitOracle && fieldOps.oracleTable) {
-      var second = makePageShell('oracle', fieldOps.oracleTable.title || 'Oracle', 'Week ' + pad2(week.weekNumber) + ' · Consequence Table');
-      second.page.classList.add('page-field-board');
-      var oracleSheet = make('div', 'field-board');
-      oracleSheet.appendChild(renderOracleSection(fieldOps.oracleTable));
-      second.frame.appendChild(oracleSheet);
-      pages.push(second.page);
+      var secondPage = make('section', 'booklet-page');
+      secondPage.setAttribute('data-page-type', 'oracle-overflow');
+      var secondFrame = make('div', 'field-ops-right');
+      
+      var secondHeader = make('header', 'rp-header');
+      secondHeader.appendChild(make('span', '', fieldOps.oracleTable.title || 'Oracle'));
+      secondHeader.appendChild(make('span', 'page-num', ''));
+      secondFrame.appendChild(secondHeader);
+      
+      var secondContent = make('div', 'rp-content');
+      secondContent.style.gridTemplateAreas = '"oracle oracle"';
+      secondContent.appendChild(renderOracleSection(fieldOps.oracleTable));
+      secondFrame.appendChild(secondContent);
+      secondPage.appendChild(secondFrame);
+      pages.push(secondPage);
     }
 
     return pages;
@@ -1164,10 +1103,8 @@
   }
 
   function renderMapSection(mapState) {
-    var section = make('section', 'ops-section ops-map survey-board');
-    section.appendChild(make('div', 'doc-label', mapState.title || 'Map'));
-    if (mapState.floorLabel) section.appendChild(make('div', 'survey-board-designation', mapState.floorLabel));
-    if (mapState.mapNote) section.appendChild(make('p', 'body-copy body-copy-tight', mapState.mapNote));
+    var section = make('div', 'map-content');
+    section.appendChild(make('div', 'map-title', mapState.title || 'Map'));
 
     if (mapState.mapType === 'point-to-point') {
       section.appendChild(renderPointMap(mapState));
@@ -1178,52 +1115,31 @@
     } else {
       section.appendChild(renderGridMap(mapState));
     }
-    section.appendChild(renderMapLegend(mapState));
+    if (mapState.floorLabel) section.appendChild(make('div', 'map-annotation', mapState.floorLabel));
+    if (mapState.mapNote) section.appendChild(make('div', 'map-note', mapState.mapNote));
     return section;
   }
 
   function renderGridMap(mapState) {
     var gridData = mapState.gridDimensions || { columns: 6, rows: 5 };
-    var wrap = make('div', 'map-board');
-    wrap.style.setProperty('--grid-columns', gridData.columns);
-    wrap.style.setProperty('--grid-rows', gridData.rows);
+    var wrap = make('div', 'map-grid');
+    wrap.style.gridTemplateColumns = 'repeat(' + gridData.columns + ', 1fr)';
 
     var tilesByPos = {};
-    var labelCounts = {};
     (mapState.tiles || []).forEach(function (tile) {
       tilesByPos[tile.col + ':' + tile.row] = tile;
-      if (tile.label) {
-        labelCounts[tile.label] = (labelCounts[tile.label] || 0) + 1;
-      }
     });
 
-    function getTruncatedLabel(label) {
-      if (!label || label.length <= 12) return label;
-      for (var len = 8; len <= 12; len++) {
-        var trunc = label.substring(0, len) + '…';
-        // Simplified heuristic: uniqueness preservation
-        return trunc; 
-      }
-      return label.substring(0, 10) + '…';
-    }
-
-    wrap.appendChild(make('div', 'map-axis-corner'));
-    for (var colIndex = 1; colIndex <= gridData.columns; colIndex++) {
-      wrap.appendChild(make('div', 'map-axis-label map-axis-label-top', String(colIndex)));
-    }
-
     for (var row = 1; row <= gridData.rows; row++) {
-      wrap.appendChild(make('div', 'map-axis-label map-axis-label-side', String.fromCharCode(64 + row)));
       for (var col = 1; col <= gridData.columns; col++) {
         var tile = tilesByPos[col + ':' + row] || {};
-        var cell = make('div', 'map-grid-cell map-board-cell');
-        cell.setAttribute('data-state', tile.type || 'empty');
-        cell.setAttribute('data-coord', String.fromCharCode(64 + row) + col);
+        var cellClass = 'map-cell ' + (tile.type || 'empty');
+        if (mapState.currentPosition && mapState.currentPosition.col === col && mapState.currentPosition.row === row) cellClass += ' current';
+        var cell = make('div', cellClass);
+        
         var rawLabel = tile.label || (mapState.currentPosition && mapState.currentPosition.col === col && mapState.currentPosition.row === row ? 'YOU' : '');
-        var finalLabel = getTruncatedLabel(rawLabel);
-        cell.appendChild(make('div', 'map-grid-coord', String.fromCharCode(64 + row) + col));
-        cell.appendChild(make('div', 'map-grid-label', finalLabel));
-        if (tile.annotation) cell.appendChild(make('div', 'map-grid-note', tile.annotation));
+        cell.textContent = rawLabel.substring(0, 5); // Tighter truncation for grid
+        
         wrap.appendChild(cell);
       }
     }
@@ -1284,19 +1200,17 @@
   }
 
   function renderCipherSection(cipher, weeklyComponent) {
-    var section = make('section', 'ops-section ops-cipher');
-    section.appendChild(make('div', 'doc-label', cipher.title || 'Cipher'));
+    var section = make('div', 'cipher-zone');
+    section.appendChild(make('div', 'puzzle-title', cipher.title || 'Cipher'));
     if (cipher.body && cipher.body.displayText) {
-      splitParagraphs(cipher.body.displayText).forEach(function (para) {
-        section.appendChild(make('p', 'body-copy', para));
-      });
+      section.appendChild(make('div', 'cipher-sequence', cipher.body.displayText));
     }
 
     if (cipher.body && cipher.body.key) {
       var key = make('div', 'cipher-key');
-      splitParagraphs(cipher.body.key).forEach(function (line) {
-        key.appendChild(make('div', 'cipher-key-line', line));
-      });
+      var grid = make('div', 'key-grid');
+      grid.textContent = cipher.body.key;
+      key.appendChild(grid);
       section.appendChild(key);
     }
 
@@ -1304,39 +1218,33 @@
       section.appendChild(renderWorkspace(cipher.body.workSpace));
     }
 
-    var extraction = make('div', 'cipher-outcome');
-    extraction.appendChild(make('div', 'doc-label', 'Extraction'));
-    extraction.appendChild(make('p', 'body-copy', cipher.extractionInstruction || (weeklyComponent && weeklyComponent.extractionInstruction) || 'Record the derived value.'));
-    section.appendChild(extraction);
+    var instruction = cipher.extractionInstruction || (weeklyComponent && weeklyComponent.extractionInstruction) || 'Record the derived value.';
+    section.appendChild(make('div', 'password-extract', instruction));
+    
     return section;
   }
 
   function renderWorkspace(workSpace) {
-    var grid = make('div', 'cipher-workspace');
-    var rows = Math.max(2, Math.min(workSpace.rows || 4, 8));
-    var cols = Math.max(4, Math.min(workSpace.cols || 10, 14));
-    grid.style.setProperty('--workspace-columns', cols);
-    for (var i = 0; i < rows * cols; i++) {
-      grid.appendChild(make('div', 'cipher-cell'));
+    var grid = make('div', 'plaintext-grid');
+    var size = Math.min((workSpace.rows || 1) * (workSpace.cols || 10), 40);
+    for (var i = 0; i < size; i++) {
+        grid.appendChild(make('div', 'plaintext-cell'));
     }
     return grid;
   }
 
   function renderOracleSection(oracle) {
-    var section = make('section', 'ops-section ops-oracle');
-    section.appendChild(make('div', 'doc-label', oracle.title || 'Oracle'));
-    if (oracle.instruction) section.appendChild(make('p', 'body-copy body-copy-tight', oracle.instruction));
+    var section = make('div', 'oracle-zone');
+    section.appendChild(make('header', 'oracle-header', oracle.title || 'Oracle'));
+    if (oracle.instruction) section.appendChild(make('div', 'oracle-instruction', oracle.instruction));
 
-    var list = make('div', 'oracle-list');
+    var list = make('div', 'oracle-entries');
     (oracle.entries || []).forEach(function (entry) {
-      var row = make('article', 'oracle-entry');
-      row.setAttribute('data-entry-type', entry.type || 'fragment');
-      row.appendChild(make('div', 'oracle-roll', entry.roll || ''));
-      var content = make('div', 'oracle-copy');
-      content.appendChild(make('div', 'oracle-text', entry.text || ''));
-      if (entry.paperAction) content.appendChild(make('div', 'oracle-action', entry.paperAction));
-      if (entry.fragmentRef) content.appendChild(make('div', 'oracle-fragment', 'Retrieve ' + entry.fragmentRef));
-      row.appendChild(content);
+      var row = make('div', 'oracle-entry');
+      row.appendChild(make('div', 'oracle-case-num', entry.roll || ''));
+      row.appendChild(make('div', 'oracle-text', entry.text || ''));
+      if (entry.paperAction) row.appendChild(make('div', 'oracle-text', '(' + entry.paperAction + ')'));
+      if (entry.fragmentRef) row.appendChild(make('div', 'frag-ref', entry.fragmentRef));
       list.appendChild(row);
     });
     section.appendChild(list);
@@ -1345,52 +1253,61 @@
 
   function buildBossPage(data, week) {
     var boss = week.bossEncounter || {};
-    var shell = makePageShell('boss', boss.title || week.title, 'Week ' + pad2(week.weekNumber) + ' · Convergence');
-    var layout = make('div', 'boss-layout');
+    var page = make('section', 'booklet-page');
+    page.setAttribute('data-page-type', 'boss');
+    var frame = make('div', 'boss-right');
+    
+    var header = make('header', 'boss-header');
+    header.appendChild(make('span', '', 'Convergence'));
+    header.appendChild(make('span', 'page-num', ''));
+    frame.appendChild(header);
 
-    var story = make('section', 'ops-section boss-story');
-    story.appendChild(make('div', 'doc-label', 'Terminal Document'));
-    splitParagraphs(boss.narrative || '').forEach(function (para) {
-      story.appendChild(make('p', 'body-copy', para));
-    });
+    frame.appendChild(make('h2', 'boss-title', boss.title || week.title));
+
+    if (boss.narrative) {
+      var narrative = make('div', 'boss-narrative');
+      splitParagraphs(boss.narrative).forEach(function (para) {
+        narrative.appendChild(make('p', '', para));
+      });
+      frame.appendChild(narrative);
+    }
+    
     if (boss.mechanismDescription) {
-      story.appendChild(make('div', 'doc-label', 'Procedure'));
+      var mechanism = make('div', 'boss-mechanism');
+      mechanism.appendChild(make('strong', 'boss-mechanism-label', 'Procedure'));
       splitParagraphs(boss.mechanismDescription).forEach(function (para) {
-        story.appendChild(make('p', 'body-copy', para));
+        mechanism.appendChild(make('p', '', para));
       });
-    }
-    if (boss.binaryChoiceAcknowledgement) {
-      story.appendChild(make('div', 'doc-label', 'Route Memory'));
-      if (boss.binaryChoiceAcknowledgement.ifA) story.appendChild(make('p', 'body-copy', 'If you marked A: ' + boss.binaryChoiceAcknowledgement.ifA));
-      if (boss.binaryChoiceAcknowledgement.ifB) story.appendChild(make('p', 'body-copy', 'If you marked B: ' + boss.binaryChoiceAcknowledgement.ifB));
+      frame.appendChild(mechanism);
     }
 
-    var decode = make('section', 'ops-section boss-decode');
-    decode.appendChild(make('div', 'doc-label', 'Decoding Key'));
-    if (boss.decodingKey && boss.decodingKey.instruction) decode.appendChild(make('p', 'body-copy', boss.decodingKey.instruction));
-    if (boss.decodingKey && boss.decodingKey.referenceTable) {
-      var table = make('div', 'reference-table');
-      splitParagraphs(boss.decodingKey.referenceTable).forEach(function (line) {
-        table.appendChild(make('div', 'reference-line', line));
-      });
-      decode.appendChild(table);
-    }
-
-    decode.appendChild(make('div', 'doc-label', 'Recorded Inputs'));
-    var inputChips = make('div', 'chip-row');
-    (boss.componentInputs || []).forEach(function (item) {
-      inputChips.appendChild(make('div', 'chip', item));
+    var components = make('div', 'boss-components');
+    components.appendChild(make('div', 'boss-components-label', 'Recorded Inputs'));
+    var list = make('div', 'boss-component-list');
+    (boss.componentInputs || []).forEach(function (item, idx) {
+      var row = make('div', 'boss-component-item');
+      row.appendChild(make('div', 'boss-component-week', 'W' + pad2(idx + 1)));
+      row.appendChild(make('div', 'boss-component-box'));
+      row.appendChild(make('div', '', item));
+      list.appendChild(row);
     });
-    decode.appendChild(inputChips);
+    components.appendChild(list);
+    frame.appendChild(components);
 
-    decode.appendChild(make('div', 'doc-label', 'Final Word'));
-    decode.appendChild(makePasswordBoxes(getPasswordLength(data, (boss.componentInputs || []).length || 6), 'password-box password-box-large'));
-    decode.appendChild(make('p', 'body-copy', boss.passwordRevealInstruction || 'When the final word is assembled, enter it at liftrpg.co.'));
-
-    layout.appendChild(story);
-    layout.appendChild(decode);
-    shell.frame.appendChild(layout);
-    return shell.page;
+    var convergence = make('div', 'boss-convergence');
+    convergence.appendChild(make('div', 'boss-convergence-label', 'Final Word'));
+    convergence.appendChild(make('p', 'boss-convergence-instruction', boss.passwordRevealInstruction || 'When the final word is assembled, enter it at liftrpg.co to unlock the ending.'));
+    
+    var wordLen = getPasswordLength(data, (boss.componentInputs || []).length || 6);
+    var pboxes = make('div', 'boss-password-boxes');
+    for (var i = 0; i < wordLen; i++) {
+        pboxes.appendChild(make('div', 'boss-password-box'));
+    }
+    convergence.appendChild(pboxes);
+    
+    frame.appendChild(convergence);
+    page.appendChild(frame);
+    return page;
   }
 
   function buildFragmentPages(data, renderedFragments) {
@@ -1399,111 +1316,181 @@
       return !renderedFragments[f.id];
     });
     return paginateFragments(remaining).map(function (pageFragments, index) {
-      var shell = makePageShell('fragments', 'Recovered Documents', 'Appendix ' + pad2(index + 1));
+      var page = make('section', 'booklet-page');
+      page.setAttribute('data-page-type', 'fragment');
+      var frame = make('div', 'fragment-page');
+      var header = make('header', 'page-header');
+      header.appendChild(make('span', '', 'Archive'));
+      header.appendChild(make('span', 'page-num', ''));
+      frame.appendChild(header);
+
       var stack = make('div', 'fragment-stack');
       pageFragments.forEach(function (fragment) {
         stack.appendChild(renderFragment(fragment));
       });
-      shell.frame.appendChild(stack);
-      return shell.page;
+      frame.appendChild(stack);
+      page.appendChild(frame);
+      return page;
     });
   }
 
   function renderFragment(fragment) {
-    var doc = make('article', 'fragment-card');
-    doc.setAttribute('data-document-type', fragment.documentType || 'memo');
-    if (fragment.designSpec && fragment.designSpec.paperTone) doc.setAttribute('data-paper-tone', fragment.designSpec.paperTone);
-    if (fragment.designSpec && fragment.designSpec.headerStyle) doc.setAttribute('data-header-style', fragment.designSpec.headerStyle);
-    if (fragment.designSpec && typeof fragment.designSpec.hasRedactions !== 'undefined') doc.setAttribute('data-has-redactions', String(fragment.designSpec.hasRedactions));
-    if (fragment.designSpec && typeof fragment.designSpec.hasAnnotations !== 'undefined') doc.setAttribute('data-has-annotations', String(fragment.designSpec.hasAnnotations));
-    var fragmentTop = make('div', 'fragment-topline');
-    fragmentTop.appendChild(make('div', 'doc-label', fragment.id || fragment.documentType || 'Document'));
-    fragmentTop.appendChild(make('div', 'fragment-type-badge', (fragment.documentType || 'document').replace(/([A-Z])/g, ' $1').trim()));
-    doc.appendChild(fragmentTop);
-    if (fragment.title) doc.appendChild(make('h3', 'fragment-title', fragment.title));
+    var page = make('section', 'booklet-page');
+    // alternate fragment-page styling if needed
+    page.setAttribute('data-page-type', 'fragment');
+    
+    var frame = make('div', 'fragment-page');
+    var header = make('header', 'page-header');
+    header.appendChild(make('span', '', 'Archive'));
+    header.appendChild(make('span', 'page-num', ''));
+    frame.appendChild(header);
 
+    var block = make('div', 'fragment-block');
+    if (fragment.id) {
+        block.appendChild(make('div', 'fragment-number', fragment.id.replace('F.', '')));
+    }
+
+    var dtype = (fragment.documentType || 'memo').toLowerCase().replace(' ', '-');
+    var doc = make('div', 'fragment-doc ' + dtype);
+    doc.appendChild(make('div', 'fragment-doc-type', (fragment.documentType || 'Document')));
+    
     var meta = [];
-    if (fragment.inWorldAuthor) meta.push('From: ' + fragment.inWorldAuthor);
-    if (fragment.inWorldRecipient) meta.push('To: ' + fragment.inWorldRecipient);
-    if (fragment.date) meta.push('Date: ' + fragment.date);
-    if (fragment.inWorldPurpose) meta.push('Purpose: ' + fragment.inWorldPurpose);
+    if (fragment.inWorldAuthor) meta.push('FROM: ' + fragment.inWorldAuthor);
+    if (fragment.inWorldRecipient) meta.push('TO: ' + fragment.inWorldRecipient);
+    if (fragment.date) meta.push('DATE: ' + fragment.date);
     if (meta.length) {
-      var metaBox = make('div', 'fragment-meta');
+      var metaBox = make('div', 'fragment-doc-header');
       meta.forEach(function (line) {
-        metaBox.appendChild(make('div', 'fragment-meta-line', line));
+        metaBox.appendChild(make('div', '', line));
       });
       doc.appendChild(metaBox);
     }
 
+    var body = make('div', 'fragment-doc-body');
     splitParagraphs(fragment.bodyText || fragment.body || fragment.content || '').forEach(function (para) {
-      doc.appendChild(make('p', 'body-copy', para));
+      body.appendChild(make('p', '', para));
     });
-    return doc;
+    doc.appendChild(body);
+
+    if (fragment.inWorldPurpose) {
+        doc.appendChild(make('div', 'fragment-doc-sig', fragment.inWorldPurpose));
+    } else {
+        doc.appendChild(make('div', 'fragment-doc-sig', 'END FILE'));
+    }
+
+    block.appendChild(doc);
+    frame.appendChild(block);
+    page.appendChild(frame);
+    
+    return page;
   }
 
   function buildAssemblyPage(data) {
-    var shell = makePageShell('assembly', 'Password Assembly', 'Convergence Log');
-    shell.frame.appendChild(make('p', 'body-copy lead-copy', 'Transfer each recorded weekly value into the final assembly ladder. Decode only when the boss page gives the rule.'));
-    var list = make('div', 'assembly-grid');
+    var page = make('section', 'booklet-page');
+    page.setAttribute('data-page-type', 'assembly');
+    
+    var frame = make('div', 'password-assembly-page');
+    frame.appendChild(make('h2', 'password-assembly-title', 'Password Assembly'));
+    frame.appendChild(make('p', 'password-assembly-subtitle', 'Transfer each recorded weekly value into the final assembly ladder. Decode only when the boss page gives the rule.'));
+    
+    var list = make('div', 'password-assembly-grid');
     (data.weeks || []).forEach(function (week) {
-      var row = make('div', 'assembly-row');
-      row.appendChild(make('div', 'assembly-week', 'Week ' + pad2(week.weekNumber)));
-      row.appendChild(make('div', 'assembly-input'));
-      row.appendChild(make('div', 'assembly-arrow', '→'));
-      row.appendChild(make('div', 'assembly-output'));
+      if (week.isBossWeek) return; // Boss weeks don't get an explicit row normally
+      var row = make('div', 'password-assembly-row');
+      row.appendChild(make('div', 'password-assembly-week-label', 'Week ' + pad2(week.weekNumber)));
+      row.appendChild(make('div', 'password-assembly-cell'));
+      row.appendChild(make('div', 'password-assembly-arrow', '→'));
+      row.appendChild(make('div', 'password-assembly-cell'));
       list.appendChild(row);
     });
-    shell.frame.appendChild(list);
-    shell.frame.appendChild(makePasswordBoxes(getPasswordLength(data, (data.meta && data.meta.weekCount) || 6), 'password-box password-box-large'));
-    return shell.page;
+    frame.appendChild(list);
+
+    var finalBlock = make('div', 'password-final-assembly');
+    finalBlock.appendChild(make('div', 'password-final-label', 'Final Word'));
+    
+    var wordLen = getPasswordLength(data, (data.meta && data.meta.weekCount) || 6);
+    var pboxes = make('div', 'password-final-row');
+    for (var i = 0; i < wordLen; i++) {
+        pboxes.appendChild(make('div', 'password-final-cell'));
+    }
+    finalBlock.appendChild(pboxes);
+
+    frame.appendChild(finalBlock);
+    page.appendChild(frame);
+    
+    return page;
   }
 
   function buildLockedEndingPage(data) {
-    var shell = makePageShell('ending-locked', 'Final Document', 'Encrypted');
-    shell.frame.appendChild(make('p', 'body-copy lead-copy', 'This final page remains sealed until the completed password is entered above. The booklet should give you everything you need.'));
+    var page = make('section', 'booklet-page');
+    page.setAttribute('data-page-type', 'ending-locked');
+    var frame = make('div', 'endings-page');
+    frame.appendChild(make('h2', 'endings-title', 'Final Document'));
+    
+    var body = make('div', 'endings-body');
+    body.appendChild(make('p', '', 'This final page remains sealed until the completed password is entered above. The booklet should give you everything you need.'));
+    frame.appendChild(body);
+    
     if (data.endings && data.endings.length) {
       var variants = make('div', 'chip-row');
       data.endings.forEach(function (ending) {
         variants.appendChild(make('div', 'chip chip-muted', ending.variant || 'Variant'));
       });
-      shell.frame.appendChild(variants);
+      frame.appendChild(variants);
     }
-    return shell.page;
+    page.appendChild(frame);
+    return page;
   }
 
   function buildUnlockedEndingPage(payload) {
-    var shell = makePageShell('ending-unlocked', payload.title || 'Unlocked Document', payload.kicker || 'Unlocked');
-    if (payload.documentType) shell.frame.appendChild(make('div', 'doc-label', payload.documentType));
+    var page = make('section', 'booklet-page');
+    page.setAttribute('data-page-type', 'ending-unlocked');
+    var frame = make('div', 'endings-page');
+
+    frame.appendChild(make('h2', 'endings-title', payload.title || 'Unlocked Document'));
+    if (payload.documentType) frame.appendChild(make('div', 'doc-label', payload.documentType));
+    
+    var body = make('div', 'endings-body');
     splitParagraphs(payload.body || payload.content || '').forEach(function (para) {
-      shell.frame.appendChild(make('p', 'body-copy ending-copy', para));
+      body.appendChild(make('p', '', para));
     });
+    frame.appendChild(body);
+    
     if (payload.finalLine) {
-      shell.frame.appendChild(make('p', 'body-copy ending-final-line', payload.finalLine));
+      frame.appendChild(make('div', 'endings-final-line', payload.finalLine));
     }
-    return shell.page;
+    page.appendChild(frame);
+    return page;
   }
 
   function buildBackCover(data) {
-    var shell = makePageShell('back-cover', data.meta.blockTitle, 'LiftRPG');
-    shell.page.classList.add('page-back');
-    shell.frame.appendChild(make('p', 'body-copy lead-copy', 'Printed by hand, completed in pencil, resolved through repetition.'));
-    var facts = make('div', 'chip-row');
-    facts.appendChild(make('div', 'chip', (data.meta.weekCount || 0) + ' weeks'));
-    facts.appendChild(make('div', 'chip', (data.meta.totalSessions || 0) + ' sessions'));
-    facts.appendChild(make('div', 'chip', (data.meta.weeklyComponentType || 'component').replace(/-/g, ' ')));
-    shell.frame.appendChild(facts);
-    if (data.meta.generatedAt) shell.frame.appendChild(make('div', 'back-meta', 'Generated ' + data.meta.generatedAt));
-    return shell.page;
+    var page = make('section', 'booklet-page');
+    page.classList.add('page-back');
+    page.setAttribute('data-page-type', 'back-cover');
+    var colophon = make('div', 'back-cover');
+    colophon.appendChild(make('p', 'back-cover-colophon', 'Printed by hand, completed in pencil, resolved through repetition.'));
+    colophon.appendChild(make('div', 'back-cover-mark', 'LiftRPG'));
+    page.appendChild(colophon);
+    return page;
   }
 
   function buildNotesPage(index) {
-    var shell = makePageShell('notes', 'Field Notes', 'Pad ' + pad2(index + 1));
+    var page = make('section', 'booklet-page');
+    page.setAttribute('data-page-type', 'notes');
+    
+    var frame = make('div', 'notes-page');
+    var header = make('header', 'page-header');
+    header.appendChild(make('span', '', 'Field Notes'));
+    header.appendChild(make('span', 'page-num', ''));
+    frame.appendChild(header);
+
     var notes = make('div', 'notes-grid');
     for (var i = 0; i < 36; i++) {
       notes.appendChild(make('div', 'notes-cell'));
     }
-    shell.frame.appendChild(notes);
-    return shell.page;
+    frame.appendChild(notes);
+    page.appendChild(frame);
+    return page;
   }
 
   function makePasswordBoxes(count, className) {
@@ -1605,10 +1592,10 @@
     // Phase 1 + 2: Enforce page fit dynamically after painting
     var clippedCount = 0;
     pages.forEach(function (page) {
-      var frame = page.querySelector('.page-frame');
-      if (!frame) return;
+      var frame = page.firstElementChild;
+      if (!frame || frame.tagName !== 'DIV') return;
 
-      var clientH = frame.clientHeight;
+      var clientH = page.clientHeight;
       if (clientH === 0) return; // not effectively painted
 
       var trueH = frame.scrollHeight;
