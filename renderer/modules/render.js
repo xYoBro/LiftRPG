@@ -5,8 +5,12 @@ import { applyTheme, resolveTheme } from './theme.js';
 
 function setPageNumbers(pages) {
   pages.forEach((page, index) => {
-    page.setAttribute('data-page-number', String(index + 1));
-    page.classList.add((index + 1) % 2 === 0 ? 'page-left' : 'page-right');
+    const pageNumber = index + 1;
+    page.setAttribute('data-page-number', String(pageNumber));
+    page.classList.add(pageNumber % 2 === 0 ? 'page-left' : 'page-right');
+    page.querySelectorAll('.page-num').forEach((node) => {
+      node.textContent = 'P.' + String(pageNumber).padStart(2, '0');
+    });
   });
 }
 

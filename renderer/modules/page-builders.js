@@ -1,7 +1,6 @@
 import { make } from './dom.js';
-import { chunkSessions, paginateFragments } from './layout-governor.js';
+import { chunkSessions } from './layout-governor.js';
 import {
-  extractFragmentRefs,
   getExerciseSetCount,
   getLoadGuide,
   getPasswordLength,
@@ -76,16 +75,32 @@ function buildRulesPage(data) {
   leftPage.appendChild(leftFrame);
   pages.push(leftPage);
 
+  const sealedPage = make('section', 'booklet-page');
+  sealedPage.setAttribute('data-page-type', 'rules-right');
+  const sealedFrame = make('div', 'rules-right sealed-page');
+  const sealedLock = make('div', 'sealed-lock', '🔒');
+  const sealedTitle = make('div', 'sealed-title', 'This Document Is Sealed');
+  const sealedBody = make('div', 'sealed-body');
+  sealedBody.appendChild(make('p', '', 'Assemble your password from the weekly gauge readings. Return to liftrpg.co → Render and enter it to unlock this page.'));
+  sealedFrame.appendChild(sealedLock);
+  sealedFrame.appendChild(sealedTitle);
+  sealedFrame.appendChild(sealedBody);
+  sealedPage.appendChild(sealedFrame);
+  pages.push(sealedPage);
+
+  return pages;
+}
+
+function buildGaugeLogPage(data) {
   const rightPage = make('section', 'booklet-page');
-  rightPage.setAttribute('data-page-type', 'rules-right');
-  const rightFrame = make('div', 'rules-right');
+  rightPage.setAttribute('data-page-type', 'gauge-log');
+  const rightFrame = make('div', 'rules-right gauge-log-page');
 
   const rightHeader = make('header', 'rules-header');
-  rightHeader.appendChild(make('span', '', 'Record'));
+  rightHeader.appendChild(make('span', '', data.rulesSpread.rightPage.title || 'Gauge Reading Log'));
   rightHeader.appendChild(make('span', 'page-num', ''));
   rightFrame.appendChild(rightHeader);
 
-  rightFrame.appendChild(make('div', 'password-log-title', data.rulesSpread.rightPage.title || 'Password Log'));
   if (data.rulesSpread.rightPage.instruction) {
     rightFrame.appendChild(make('div', 'password-log-subtitle', data.rulesSpread.rightPage.instruction));
   }
@@ -94,26 +109,24 @@ function buildRulesPage(data) {
   const componentType = (data.meta.weeklyComponentType || 'component').replace(/-/g, ' ');
   (data.weeks || []).forEach((week) => {
     const row = make('div', 'password-log-row');
-    row.appendChild(make('div', 'password-log-week', 'W' + pad2(week.weekNumber)));
+    row.appendChild(make('div', 'password-log-week', 'Week ' + pad2(week.weekNumber)));
     row.appendChild(make('div', 'password-log-box'));
     if (!week.isBossWeek) {
       row.appendChild(make('div', 'password-log-instruction', week.weeklyComponent && week.weeklyComponent.extractionInstruction || componentType));
     } else {
-      row.appendChild(make('div', 'password-log-instruction', 'Hold until convergence protocol.'));
+      row.appendChild(make('div', 'password-log-instruction', 'Boss convergence — see field operations'));
     }
     logGrid.appendChild(row);
   });
   rightFrame.appendChild(logGrid);
 
   const finalBlock = make('div', 'password-final');
-  finalBlock.appendChild(make('div', 'password-final-label', 'Final Assembly'));
+  finalBlock.appendChild(make('div', 'password-final-label', 'Complete Password'));
   finalBlock.appendChild(makePasswordBoxes(getPasswordLength(data, (data.meta && data.meta.weekCount) || 6), 'password-final-box'));
   rightFrame.appendChild(finalBlock);
 
   rightPage.appendChild(rightFrame);
-  pages.push(rightPage);
-
-  return pages;
+  return rightPage;
 }
 
 function buildWorkoutPage(data, week, sessions, chunkIndex, chunkCount) {
@@ -520,16 +533,7 @@ function buildBossPage(data, week) {
   return page;
 }
 
-function renderFragment(fragment) {
-  const page = make('section', 'booklet-page');
-  page.setAttribute('data-page-type', 'fragment');
-
-  const frame = make('div', 'fragment-page');
-  const header = make('header', 'page-header');
-  header.appendChild(make('span', '', 'Archive'));
-  header.appendChild(make('span', 'page-num', ''));
-  frame.appendChild(header);
-
+function buildFragmentBlock(fragment) {
   const block = make('div', 'fragment-block');
   if (fragment.id) {
     block.appendChild(make('div', 'fragment-number', fragment.id.replace('F.', '')));
@@ -559,36 +563,44 @@ function renderFragment(fragment) {
 
   doc.appendChild(make('div', 'fragment-doc-sig', fragment.inWorldPurpose || 'END FILE'));
   block.appendChild(doc);
-  frame.appendChild(block);
+  return block;
+}
+
+function buildDocumentPage(fragment) {
+  const page = make('section', 'booklet-page');
+  page.setAttribute('data-page-type', 'fragment');
+
+  const frame = make('div', 'fragment-page');
+  const header = make('header', 'page-header');
+  header.appendChild(make('span', '', 'Documents'));
+  header.appendChild(make('span', 'page-num', ''));
+  frame.appendChild(header);
+  frame.appendChild(buildFragmentBlock(fragment));
   page.appendChild(frame);
   return page;
 }
 
 function buildFragmentPages(data, renderedFragments) {
   const remaining = (data.fragments || []).filter((fragment) => !renderedFragments[fragment.id]);
-  return paginateFragments(remaining).map((pageFragments) => {
-    const page = make('section', 'booklet-page');
-    page.setAttribute('data-page-type', 'fragment');
-    const frame = make('div', 'fragment-page');
-    const header = make('header', 'page-header');
-    header.appendChild(make('span', '', 'Archive'));
-    header.appendChild(make('span', 'page-num', ''));
-    frame.appendChild(header);
+  return remaining.map((fragment) => buildDocumentPage(fragment));
+}
 
-    const stack = make('div', 'fragment-stack');
-    pageFragments.forEach((fragment) => {
-      stack.appendChild(renderFragment(fragment));
-    });
-    frame.appendChild(stack);
-    page.appendChild(frame);
-    return page;
-  });
+function buildOverflowDocumentPage(week) {
+  const page = make('section', 'booklet-page');
+  page.setAttribute('data-page-type', 'overflow-doc');
+  const frame = make('div', 'fragment-page');
+  const header = make('header', 'page-header');
+  header.appendChild(make('span', '', 'Documents'));
+  header.appendChild(make('span', 'page-num', ''));
+  frame.appendChild(header);
+  frame.appendChild(buildFragmentBlock(week.overflowDocument || {}));
+  page.appendChild(frame);
+  return page;
 }
 
 function buildAssemblyPage(data) {
-  const page = make('section', 'booklet-page');
-  page.setAttribute('data-page-type', 'assembly');
-
+  const leftPage = make('section', 'booklet-page');
+  leftPage.setAttribute('data-page-type', 'assembly');
   const frame = make('div', 'password-assembly-page');
   frame.appendChild(make('h2', 'password-assembly-title', 'Password Assembly'));
   frame.appendChild(make('p', 'password-assembly-subtitle', 'Transfer each recorded weekly value into the final assembly ladder. Decode only when the boss page gives the rule.'));
@@ -615,8 +627,8 @@ function buildAssemblyPage(data) {
   finalBlock.appendChild(passwordBoxes);
   frame.appendChild(finalBlock);
 
-  page.appendChild(frame);
-  return page;
+  leftPage.appendChild(frame);
+  return [leftPage, buildGaugeLogPage(data)];
 }
 
 function buildLockedEndingPage(data) {
@@ -696,44 +708,28 @@ function buildNotesPage() {
 function buildWeekPages(data, renderedFragments) {
   let pages = [];
   (data.weeks || []).forEach((week) => {
-    chunkSessions(week).forEach((chunk, chunkIndex, chunkList) => {
-      if (chunkIndex > 0) {
+    const chunks = chunkSessions(week);
+    if (chunks.length > 0) {
+      pages.push(buildWorkoutPage(data, week, chunks[0], 0, chunks.length));
+    }
+
+    if (week.isBossWeek) {
+      pages.push(buildBossPage(data, week));
+    } else {
+      pages = pages.concat(buildFieldOpsPages(data, week));
+    }
+
+    for (let index = 1; index < chunks.length; index += 1) {
+      pages.push(buildWorkoutPage(data, week, chunks[index], index, chunks.length));
+      if (week.overflowDocument) {
+        pages.push(buildOverflowDocumentPage(week));
+      } else {
         const blank = make('section', 'booklet-page blank-page');
         blank.setAttribute('data-page-type', 'blank-filler');
         pages.push(blank);
       }
-      pages.push(buildWorkoutPage(data, week, chunk, chunkIndex, chunkList.length));
-    });
-
-    pages = pages.concat(week.isBossWeek ? buildBossPage(data, week) : buildFieldOpsPages(data, week));
-
-    const refs = extractFragmentRefs(week);
-    const uniqueRefs = refs.filter((ref, index) => refs.indexOf(ref) === index);
-    const fragmentsForWeek = (data.fragments || []).filter((fragment) => uniqueRefs.indexOf(fragment.id) !== -1 && !renderedFragments[fragment.id]);
-
-    if (fragmentsForWeek.length > 0) {
-      fragmentsForWeek.forEach((fragment) => {
-        renderedFragments[fragment.id] = true;
-      });
-
-      pages = pages.concat(paginateFragments(fragmentsForWeek).map((pageFragments) => {
-        const page = make('section', 'booklet-page');
-        page.setAttribute('data-page-type', 'fragment');
-        const frame = make('div', 'fragment-page');
-        const header = make('header', 'page-header');
-        header.appendChild(make('span', '', 'Archive'));
-        header.appendChild(make('span', 'page-num', ''));
-        frame.appendChild(header);
-
-        const stack = make('div', 'fragment-stack');
-        pageFragments.forEach((fragment) => {
-          stack.appendChild(renderFragment(fragment));
-        });
-        frame.appendChild(stack);
-        page.appendChild(frame);
-        return page;
-      }));
     }
+
   });
 
   return pages.flat();
@@ -747,7 +743,7 @@ export function buildPages(data, unlockedEnding) {
   pages.push(...buildRulesPage(data));
   pages.push(...buildWeekPages(data, renderedFragments));
   pages.push(...buildFragmentPages(data, renderedFragments));
-  pages.push(buildAssemblyPage(data));
+  pages.push(...buildAssemblyPage(data));
   pages.push(unlockedEnding ? buildUnlockedEndingPage(unlockedEnding) : buildLockedEndingPage(data));
 
   while ((pages.length + 1) % 4 !== 0) {

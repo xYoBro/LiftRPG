@@ -12,7 +12,10 @@ export function chunkSessions(week) {
     weight += Math.min(readingLength(session.storyPrompt) / 300, 1.5);
     if (session.binaryChoice) weight += 1.2;
 
-    if (current.length >= 3 || (current.length >= 1 && load + weight > 3.8)) {
+    // Keep the governor, but bias toward 2-3 sessions per page.
+    // The previous threshold fragmented medium-density weeks into
+    // single-session pages, which doubled booklet length.
+    if (current.length >= 3 || (current.length >= 2 && load + weight > 7.2)) {
       chunks.push(current);
       current = [];
       load = 0;

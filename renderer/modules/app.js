@@ -1,12 +1,14 @@
 import { decryptBlob, encryptBlob } from './crypto.js';
 import { qs } from './dom.js';
+import { exportBookletPdf } from './pdf-export.js';
 import { renderBooklet, syncLayoutMode } from './render.js';
 import { normalisePassword, validateBooklet } from './utils.js';
 
 const state = {
   data: null,
   unlockedEnding: null,
-  layoutMode: 'single'
+  layoutMode: 'single',
+  restoreLayoutMode: null
 };
 
 let refs = {};
@@ -14,6 +16,57 @@ let refs = {};
 function setStatus(message, tone) {
   refs.status.textContent = message || '';
   refs.status.setAttribute('data-tone', tone || 'neutral');
+}
+
+function isSafariBrowser() {
+  return /^((?!chrome|android).)*safari/i.test(window.navigator.userAgent);
+}
+
+function waitForPaint() {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(resolve);
+    });
+  });
+}
+
+function renderCurrentBooklet() {
+  if (!state.data) return;
+  renderBooklet(refs, state.layoutMode, state.data, state.unlockedEnding, setStatus);
+}
+
+async function renderWithMode(layoutMode) {
+  state.layoutMode = layoutMode;
+  refs.layoutMode.value = layoutMode;
+  syncLayoutMode(refs, state.layoutMode);
+  renderCurrentBooklet();
+}
+
+async function printBooklet() {
+  if (!state.data) return;
+
+  state.restoreLayoutMode = state.layoutMode;
+  await renderWithMode('booklet');
+  await waitForPaint();
+
+  window.setTimeout(() => {
+    window.print();
+  }, 150);
+}
+
+async function handlePrint() {
+  if (!state.data) return;
+
+  if (isSafariBrowser()) {
+    try {
+      await exportBookletPdf(refs, state.data, renderWithMode, setStatus);
+      return;
+    } catch (error) {
+      setStatus('PDF export failed. Opening print dialog instead.', 'error');
+    }
+  }
+
+  await printBooklet();
 }
 
 function loadBooklet(data, sourceLabel) {
@@ -29,7 +82,7 @@ function loadBooklet(data, sourceLabel) {
 
   state.data = data;
   state.unlockedEnding = null;
-  renderBooklet(refs, state.layoutMode, data, state.unlockedEnding, setStatus);
+  renderCurrentBooklet();
 
   refs.unlockRow.style.display = data.meta && data.meta.passwordEncryptedEnding ? 'flex' : 'none';
   refs.encryptRow.style.display = data.meta && (!data.meta.passwordEncryptedEnding || data.meta.passwordEncryptedEnding.indexOf('PLACEHOLDER_') === 0) ? 'flex' : 'none';
@@ -150,18 +203,20 @@ function downloadJson() {
 }
 
 function wireUi() {
+  window.addEventListener('afterprint', () => {
+    if (!state.restoreLayoutMode) return;
+    const restoreLayoutMode = state.restoreLayoutMode;
+    state.restoreLayoutMode = null;
+    renderWithMode(restoreLayoutMode);
+  });
   refs.jsonInput.addEventListener('change', (event) => {
     loadJsonFile(event.target.files && event.target.files[0]);
   });
   refs.printBtn.addEventListener('click', () => {
-    window.print();
+    handlePrint();
   });
   refs.layoutMode.addEventListener('change', () => {
-    state.layoutMode = refs.layoutMode.value;
-    syncLayoutMode(refs, state.layoutMode);
-    if (state.data) {
-      renderBooklet(refs, state.layoutMode, state.data, state.unlockedEnding, setStatus);
-    }
+    renderWithMode(refs.layoutMode.value);
   });
   refs.unlockBtn.addEventListener('click', attemptUnlock);
   refs.unlockPassword.addEventListener('keydown', (event) => {

@@ -1,6 +1,57 @@
 import { alpha, mergeObjects } from './utils.js';
 
 const THEME_PRESETS = {
+  pastoral: {
+    '--font-display': '"Playfair Display", Georgia, serif',
+    '--font-body': '"Libre Baskerville", Georgia, serif',
+    '--font-mono': '"Share Tech Mono", monospace',
+    '--font-accent': '"Share Tech Mono", monospace',
+    '--weight-body': '400',
+    '--weight-heading': '700',
+    '--weight-label': '400',
+    '--weight-emphasis': '700',
+    '--page-ink': '#181714',
+    '--page-paper': '#f1ebe0',
+    '--page-accent': '#8b2a2a',
+    '--page-muted': '#857d72',
+    '--page-rule': '#ccc5b6',
+    '--page-fog': '#ddd6c5',
+    '--page-surface': 'linear-gradient(180deg, #f4efe4 0%, #efe8dc 100%)',
+    '--page-underlay': 'none',
+    '--panel-surface': 'rgba(255,255,255,0.18)',
+    '--panel-secondary-surface': 'rgba(232,223,200,0.45)',
+    '--card-surface': 'rgba(236,230,216,0.9)',
+    '--line-style': 'solid',
+    '--line-width-hair': '1px',
+    '--line-width-rule': '1.2px',
+    '--line-width-frame': '1.5px',
+    '--surface-radius': '3px',
+    '--surface-shadow': '0 10px 24px rgba(0,0,0,0.04)',
+    '--page-shadow': '0 20px 38px rgba(0,0,0,0.14)',
+    '--noise-opacity': '0.08',
+    '--fog-opacity': '0.1',
+    '--rule-opacity': '0.75',
+    '--stamp-opacity': '0.85',
+    '--label-size': '6.3pt',
+    '--label-spacing': '0.28em',
+    '--label-transform': 'uppercase',
+    '--heading-style': 'italic',
+    '--heading-size-xl': '32pt',
+    '--heading-size-lg': '16pt',
+    '--heading-size-md': '11pt',
+    '--body-size': '8.4pt',
+    '--body-line-height': '1.58',
+    '--small-size': '6.2pt',
+    '--mono-size': '6.4pt',
+    '--grid-stroke-style': 'solid',
+    '--grid-dot-opacity': '0.24',
+    '--grid-fill': 'rgba(204,197,182,0.28)',
+    '--track-fill': 'rgba(221,214,197,0.38)',
+    '--badge-style': 'normal',
+    '--callout-surface': 'rgba(232,223,200,0.42)',
+    '--highlight-surface': 'rgba(139,42,42,0.08)',
+    '--page-margin': '0.34in'
+  },
   government: {
     '--font-display': '"Playfair Display", Georgia, serif',
     '--font-body': '"IBM Plex Mono", "Courier New", Courier, monospace',
@@ -464,8 +515,8 @@ const THEME_PRESETS = {
 
 export function resolveTheme(data) {
   const theme = (data && data.theme) || {};
-  const archetype = theme.visualArchetype || 'government';
-  const preset = THEME_PRESETS[archetype] || THEME_PRESETS.government;
+  const archetype = theme.visualArchetype || 'pastoral';
+  const preset = THEME_PRESETS[archetype] || THEME_PRESETS.pastoral;
   const palette = theme.palette || {};
   const tokens = mergeObjects(preset, theme.tokens || {});
 

@@ -182,6 +182,19 @@ body{
   justify-content: center;
 }
 
+.reader-spread,
+.printer-sheet {
+  width: 11in;
+  height: 8.5in;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.reader-spread .booklet-page,
+.printer-sheet .booklet-page {
+  margin: 0 !important;
+}
+
 .spread-spacer {
   width: 5.5in;
   height: 8.5in;
@@ -220,7 +233,7 @@ body{
 /* Warm background variant for right-hand pages */
 .booklet-page[data-page-type="field-ops"],
 .booklet-page[data-page-type="boss"],
-.booklet-page[data-page-type="overflow-doc"],
+.booklet-page[data-page-type="gauge-log"],
 .booklet-page[data-page-type="rules-right"]{
   background:var(--warm);
 }
@@ -328,6 +341,37 @@ body{
   padding:32px 36px 28px 40px;
   display:flex;
   flex-direction:column;
+}
+.sealed-page{
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+  gap:18px;
+}
+.sealed-lock{
+  font-size:28pt;
+  line-height:1;
+  opacity:.55;
+}
+.sealed-title{
+  font-family:var(--mono);
+  font-size:11pt;
+  letter-spacing:.28em;
+  text-transform:uppercase;
+  color:var(--ink);
+}
+.sealed-body{
+  max-width:72%;
+}
+.sealed-body p{
+  font-family:var(--serif);
+  font-style:italic;
+  font-size:10pt;
+  line-height:1.6;
+  color:var(--muted);
+}
+.gauge-log-page .rules-header{
+  letter-spacing:.22em;
 }
 .password-log-title{
   font-family:var(--mono);
@@ -1097,6 +1141,7 @@ body{
   display:flex;
   flex-direction:column;
   position:relative;
+  min-height:0;
 }
 
 /* Large fragment number in margin */
@@ -1555,44 +1600,80 @@ body{
 }
 
 @page{
-  size:5.5in 8.5in;
+  size:letter landscape;
   margin:0;
 }
 @media print{
   @page{
-    size:5.5in 8.5in;
+    size:letter landscape;
     margin:0;
   }
   html,body{
     background:white;
     padding:0;
     margin:0;
-    width:5.5in;
-    height:8.5in;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
   }
   .no-print,
   .app-chrome{
     display:none !important;
   }
   #booklet-container{
+    display:block;
     padding:0;
-    gap:0;
+    margin:0;
   }
   .booklet-page{
     box-shadow:none;
-    margin:0;
     border-radius:0;
+    overflow:hidden;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+
+  [data-layout-mode="single"] .booklet-page{
     width:5.5in;
     height:8.5in;
+    margin:0;
     page-break-after:always;
     page-break-inside:avoid;
     break-after:page;
     break-inside:avoid;
-    overflow:hidden;
   }
-  .booklet-page:last-child{
+  [data-layout-mode="single"] .booklet-page:last-child{
     page-break-after:auto;
     break-after:auto;
+  }
+
+  [data-layout-mode="spread"] .reader-spread,
+  [data-layout-mode="booklet"] .printer-sheet{
+    display:flex;
+    flex-direction:row;
+    width:11in;
+    height:8.5in;
+    margin:0;
+    page-break-after:always;
+    page-break-inside:avoid;
+    break-after:page;
+    break-inside:avoid;
+    box-shadow:none;
+  }
+  [data-layout-mode="spread"] .reader-spread:last-child,
+  [data-layout-mode="booklet"] .printer-sheet:last-child{
+    page-break-after:auto;
+    break-after:auto;
+  }
+  [data-layout-mode="spread"] .booklet-page,
+  [data-layout-mode="booklet"] .booklet-page{
+    width:5.5in;
+    height:8.5in;
+    flex-shrink:0;
+    margin:0;
+    page-break-after:auto;
+    page-break-inside:avoid;
+    break-after:auto;
+    break-inside:avoid;
   }
   .blank-page{
     background:white;
