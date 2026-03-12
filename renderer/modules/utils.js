@@ -64,8 +64,12 @@ export function splitParagraphs(text) {
     .filter(Boolean);
 }
 
+export function stripHtml(text) {
+  return String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export function readingLength(value) {
-  return splitParagraphs(value).join(' ').length;
+  return stripHtml(splitParagraphs(value).join(' ')).length;
 }
 
 export function pad2(value) {
@@ -87,6 +91,22 @@ export function getExerciseSetCount(exercise) {
   return 3;
 }
 
+export function getExerciseTargetLoad(exercise) {
+  if (typeof exercise.notes === 'string' && exercise.notes.trim()) {
+    return exercise.notes.trim();
+  }
+  if (typeof exercise.loadInstruction === 'string' && exercise.loadInstruction.trim()) {
+    return exercise.loadInstruction.trim();
+  }
+  if (typeof exercise.loadGuide === 'string' && exercise.loadGuide.trim()) {
+    return exercise.loadGuide.trim();
+  }
+  if (typeof exercise.weightField === 'string' && exercise.weightField.trim()) {
+    return exercise.weightField.trim();
+  }
+  return '';
+}
+
 export function getLoadGuide(exercise) {
   if (typeof exercise.weightField === 'string' && exercise.weightField.trim()) {
     return exercise.weightField.trim();
@@ -97,6 +117,18 @@ export function getLoadGuide(exercise) {
 
 export function showLoadSuffix(exercise) {
   return getLoadGuide(exercise).toLowerCase() !== 'done';
+}
+
+export function getRepTargets(exercise) {
+  const count = getExerciseSetCount(exercise);
+  if (typeof exercise.repsPerSet === 'string' && exercise.repsPerSet.indexOf('/') !== -1) {
+    const targets = exercise.repsPerSet.split('/').map((part) => String(part || '').trim()).filter(Boolean);
+    if (!targets.length) return Array.from({ length: count }, () => '');
+    return Array.from({ length: count }, (_, index) => targets[Math.min(index, targets.length - 1)]);
+  }
+
+  const target = exercise.repsPerSet == null ? '' : String(exercise.repsPerSet).trim();
+  return Array.from({ length: count }, () => target);
 }
 
 export function extractFragmentRefs(node) {

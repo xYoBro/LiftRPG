@@ -1,4 +1,4 @@
-import { readingLength, splitParagraphs } from './utils.js';
+import { readingLength } from './utils.js';
 
 export function chunkSessions(week) {
   const sessions = week.sessions || [];
@@ -82,69 +82,11 @@ export function paginateFragments(fragments) {
   const pages = [];
   let current = [];
   let load = 0;
-  const processed = [];
-
   (fragments || []).forEach((fragment) => {
     const body = fragment.bodyText || fragment.body || fragment.content || '';
-    const len = readingLength(body);
+    const weight = Math.max(0.72, Math.min(readingLength(body) / 1800, 1.2));
 
-    if (len > 600) {
-      const paras = splitParagraphs(body);
-      let currentParas = [];
-      let currentLen = 0;
-      let part = 1;
-
-      paras.forEach((paragraph) => {
-        const paragraphLen = readingLength(paragraph);
-        if (currentLen + paragraphLen > 550 && currentParas.length > 0) {
-          const clone = Object.assign({}, fragment, {
-            content: currentParas.join('\n\n'),
-            title: fragment.title ? (part > 1 ? fragment.title + ' (cont.)' : fragment.title) : ''
-          });
-
-          if (part > 1) {
-            clone.inWorldAuthor = '';
-            clone.inWorldRecipient = '';
-            clone.date = '';
-          }
-
-          processed.push(clone);
-          currentParas = [paragraph];
-          currentLen = paragraphLen;
-          part += 1;
-          return;
-        }
-
-        currentParas.push(paragraph);
-        currentLen += paragraphLen;
-      });
-
-      if (currentParas.length > 0) {
-        const finalPart = Object.assign({}, fragment, {
-          content: currentParas.join('\n\n'),
-          title: fragment.title && part > 1 ? fragment.title + ' (cont.)' : fragment.title || ''
-        });
-
-        if (part > 1) {
-          finalPart.inWorldAuthor = '';
-          finalPart.inWorldRecipient = '';
-          finalPart.date = '';
-        }
-
-        processed.push(finalPart);
-      }
-
-      return;
-    }
-
-    processed.push(fragment);
-  });
-
-  processed.forEach((fragment) => {
-    const body = fragment.bodyText || fragment.body || fragment.content || '';
-    const weight = Math.max(1, Math.min(readingLength(body) / 600, 2.5));
-
-    if (current.length >= 2 || (current.length >= 1 && load + weight > 1.35)) {
+    if (current.length >= 2 || (current.length >= 1 && load + weight > 1.55)) {
       pages.push(current);
       current = [];
       load = 0;

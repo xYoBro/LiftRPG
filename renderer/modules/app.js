@@ -1,14 +1,16 @@
-import { decryptBlob, encryptBlob } from './crypto.js';
-import { qs } from './dom.js';
-import { exportBookletPdf } from './pdf-export.js';
-import { renderBooklet, syncLayoutMode } from './render.js';
-import { normalisePassword, validateBooklet } from './utils.js';
+import { decryptBlob, encryptBlob } from './crypto.js?v=14';
+import { qs } from './dom.js?v=14';
+import { exportBookletPdf } from './pdf-export.js?v=14';
+import { renderBooklet, syncLayoutMode } from './render.js?v=14';
+import { normalisePassword, validateBooklet } from './utils.js?v=14';
 
 const state = {
   data: null,
   unlockedEnding: null,
   layoutMode: 'single',
-  restoreLayoutMode: null
+  restoreLayoutMode: null,
+  demoMode: false,
+  demoPasswordRevealed: false
 };
 
 let refs = {};
@@ -41,6 +43,21 @@ function scrollEndingIntoView() {
   endingPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
+function unlockWithPayload(payload, password) {
+  state.unlockedEnding = payload;
+  renderCurrentBooklet();
+  syncUnlockUi({
+    visible: true,
+    state: 'unlocked',
+    label: 'Ending decrypted',
+    message: '✓ Unlocked',
+    password,
+    inputDisabled: true,
+    buttonDisabled: true
+  });
+  scrollEndingIntoView();
+}
+
 function syncUnlockUi(status) {
   const stateValue = status && status.state ? status.state : 'locked';
   refs.unlockRow.setAttribute('data-state', stateValue);
@@ -59,6 +76,8 @@ function syncUnlockUi(status) {
     refs.unlockPassword.value = status.password;
   }
 
+  refs.unlockPassword.setAttribute('data-demo-password', state.demoMode ? 'true' : 'false');
+  refs.unlockPassword.setAttribute('data-revealed', state.demoPasswordRevealed ? 'true' : 'false');
   refs.unlockPassword.disabled = !!(status && status.inputDisabled);
   refs.unlockPassword.readOnly = !!(status && status.inputDisabled);
   refs.unlockBtn.disabled = !!(status && status.buttonDisabled);
@@ -111,15 +130,17 @@ function loadBooklet(data, sourceLabel) {
 
   state.data = data;
   state.unlockedEnding = null;
+  state.demoPasswordRevealed = false;
   renderCurrentBooklet();
 
   const hasEncryptedEnding = !!(data.meta && data.meta.passwordEncryptedEnding);
+  const demoPassword = state.demoMode && data.meta && data.meta.passwordPlaintext ? normalisePassword(data.meta.passwordPlaintext) : '';
   syncUnlockUi({
     visible: hasEncryptedEnding,
     state: 'locked',
     label: 'Try decrypting the ending:',
     message: '',
-    password: '',
+    password: demoPassword,
     inputDisabled: false,
     buttonDisabled: false
   });
@@ -159,9 +180,11 @@ function candidateDemoPaths(name) {
 function fetchDemo(name) {
   const paths = candidateDemoPaths(name);
   let chain = Promise.reject(new Error('Demo JSON not found.'));
+  const cacheBust = Date.now();
 
   paths.forEach((path) => {
-    chain = chain.catch(() => fetch(path).then((response) => {
+    const requestPath = path + (path.indexOf('?') === -1 ? '?' : '&') + 'v=' + cacheBust;
+    chain = chain.catch(() => fetch(requestPath, { cache: 'no-store' }).then((response) => {
       if (!response.ok) {
         throw new Error('Demo JSON not found.');
       }
@@ -188,7 +211,9 @@ function attemptUnlock() {
     return;
   }
 
-  const password = normalisePassword(refs.unlockPassword.value || '');
+  const enteredPassword = normalisePassword(refs.unlockPassword.value || '');
+  const demoPassword = state.demoMode && state.data.meta ? normalisePassword(state.data.meta.passwordPlaintext || '') : '';
+  const password = enteredPassword || (state.demoMode ? demoPassword : '');
   if (!password) {
     syncUnlockUi({
       visible: true,
@@ -199,6 +224,11 @@ function attemptUnlock() {
       inputDisabled: false,
       buttonDisabled: false
     });
+    return;
+  }
+
+  if (state.demoMode && demoPassword && password === demoPassword) {
+    unlockWithPayload(state.data.endings && state.data.endings[0] ? state.data.endings[0].content : null, password);
     return;
   }
 
@@ -213,20 +243,14 @@ function attemptUnlock() {
   });
   decryptBlob(state.data.meta.passwordEncryptedEnding, password)
     .then((payload) => {
-      state.unlockedEnding = payload;
-      renderCurrentBooklet();
-      syncUnlockUi({
-        visible: true,
-        state: 'unlocked',
-        label: 'Ending decrypted',
-        message: '✓ Unlocked',
-        password,
-        inputDisabled: true,
-        buttonDisabled: true
-      });
-      scrollEndingIntoView();
+      unlockWithPayload(payload, password);
     })
     .catch(() => {
+      if (state.demoMode && state.data.meta && normalisePassword(state.data.meta.passwordPlaintext || '') === password) {
+        unlockWithPayload(state.data.endings && state.data.endings[0] ? state.data.endings[0].content : null, password);
+        return;
+      }
+
       syncUnlockUi({
         visible: true,
         state: 'error',
@@ -290,6 +314,12 @@ function wireUi() {
   refs.layoutMode.addEventListener('change', () => {
     renderWithMode(refs.layoutMode.value);
   });
+  refs.unlockPassword.addEventListener('click', () => {
+    if (!state.demoMode || state.demoPasswordRevealed) return;
+    state.demoPasswordRevealed = true;
+    refs.unlockPassword.setAttribute('data-revealed', 'true');
+    refs.unlockPassword.select();
+  });
   refs.unlockBtn.addEventListener('click', attemptUnlock);
   refs.unlockPassword.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') attemptUnlock();
@@ -325,6 +355,8 @@ export function initRendererApp() {
   refs.printBtn.disabled = true;
 
   const params = new URLSearchParams(window.location.search);
+  state.demoMode = !!params.get('demo');
+  state.demoPasswordRevealed = false;
   if (params.get('demo')) {
     fetchDemo(params.get('demo'));
     return;

@@ -534,9 +534,10 @@ body{
   background:var(--card);
   border:1px solid var(--fog);
   border-radius:4px;
-  padding:6px 10px;
+  padding:8px 10px 9px;
   display:flex;
   flex-direction:column;
+  gap:6px;
   min-height:0;
 }
 
@@ -548,7 +549,6 @@ body{
   color:var(--ink);
   padding-bottom:4px;
   border-bottom:1px solid var(--rule);
-  margin-bottom:6px;
   font-weight:700;
 }
 
@@ -561,7 +561,30 @@ body{
   color:var(--muted);
   border-left:1.5px solid var(--accent);
   padding:2px 0 2px 10px;
-  margin-bottom:5px;
+}
+
+.session-meta{
+  min-height:12px;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+}
+
+.session-fragment-ref{
+  font-family:var(--mono);
+  font-size:7pt;
+  color:var(--muted);
+  letter-spacing:.1em;
+  text-align:right;
+  min-height:1em;
+}
+
+.session-body{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  flex:1 1 auto;
+  min-height:0;
 }
 
 /* Fragment Reference (shared class) */
@@ -577,13 +600,23 @@ body{
 /* Exercise Table */
 .exercise-table{
   width:100%;
-  border-collapse:collapse;
-  margin-bottom:4px;
+  border-collapse:separate;
+  border-spacing:0 4px;
+}
+.exercise-table tr{
+  display:flex;
+  align-items:flex-end;
+  gap:10px;
+  width:100%;
 }
 .exercise-table td{
-  padding:2px 0;
+  padding:0;
   vertical-align:middle;
   font-size:7.5pt;
+}
+.exercise-name-cell{
+  flex:0 1 auto;
+  min-width:0;
 }
 .exercise-name {
   font-family: var(--serif);
@@ -593,21 +626,64 @@ body{
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding-right: 8px;
 }
-.exercise-weight {
-  font-family: var(--mono);
-  font-size: 7.5pt;
-  color: var(--ink);
-  padding-left: 4px;
-  padding-right: 8px;
-  white-space: nowrap;
+.exercise-weight-cell {
+  flex:0 0 auto;
+}
+.exercise-load-entry{
+  display:flex;
+  align-items:flex-end;
+  width:88px;
+  font-family:var(--mono);
+  font-size:7.25pt;
+  color:var(--ink);
+  letter-spacing:.04em;
+}
+.exercise-load-entry.is-empty{
+  min-height:14px;
+}
+.exercise-load-line{
+  position:relative;
+  width:100%;
+  height:14px;
+  border-bottom:1px solid rgba(24,23,20,.42);
+  display:flex;
+  align-items:flex-end;
+  justify-content:flex-end;
+  padding-right:16px;
+}
+.exercise-load-hint{
+  position:absolute;
+  left:0;
+  right:18px;
+  bottom:1px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:5.6pt;
+  color:rgba(24,23,20,.2);
+  letter-spacing:.04em;
+}
+.exercise-load-unit{
+  position:absolute;
+  right:0;
+  bottom:1px;
+  font-size:6.3pt;
+  color:rgba(24,23,20,.66);
+  text-transform:lowercase;
+}
+.exercise-dots-cell{
+  flex:1 1 auto;
+  min-width:12px;
 }
 .exercise-dots{
   width:100%;
   border-bottom:1px dotted var(--rule);
   height:1px;
-  margin:0 6px;
+  margin-bottom:4px;
+}
+.exercise-reps-cell{
+  flex:0 0 auto;
 }
 .rep-boxes{
   display:flex;
@@ -620,17 +696,31 @@ body{
   border:1.5px solid var(--ink);
   border-radius:2px;
   background:var(--paper);
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.rep-box-target{
+  font-family:var(--mono);
+  font-size:5.6pt;
+  line-height:1;
+  color:rgba(24,23,20,.18);
+  letter-spacing:0;
+  text-transform:none;
+  pointer-events:none;
 }
 
 /* Notes Box */
 .notes-box{
-  height:var(--notes-box-height, 32px);
+  min-height:var(--notes-box-height, 30px);
   border:1px solid var(--rule);
   border-radius:3px;
   background:var(--paper);
   padding:4px 8px;
   position:relative;
   overflow:hidden;
+  flex:1 1 auto;
 }
 .notes-box::before{
   content:'NOTES';
@@ -642,115 +732,6 @@ body{
   position:absolute;
   top:4px;
   left:8px;
-}
-.notes-lines{
-  margin-top:12px;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-.notes-line{
-  border-bottom:1px solid var(--rule);
-  height:0;
-}
-
-/* ── Card Density Tiers ────────────────────────────────── */
-
-/* Compact (4-5 exercises): shorter notes, tighter spacing */
-.session-card.density-compact .story-prompt{
-  font-size:7pt;
-  line-height:1.35;
-  margin-bottom:3px;
-}
-.session-card.density-compact .exercise-table td{
-  padding:1px 0;
-  font-size:7pt;
-}
-.session-card.density-compact .exercise-name{
-  font-size:7.5pt;
-}
-.session-card.density-compact .rep-box{
-  width:14px;
-  height:14px;
-}
-.session-card.density-compact .notes-box{
-  height:16px;
-}
-.session-card.density-compact .notes-box .notes-lines{
-  display:none;
-}
-
-/* Dense (6+ exercises): no notes box, minimal prompt */
-.session-card.density-dense .story-prompt{
-  font-size:6.5pt;
-  line-height:1.3;
-  margin-bottom:2px;
-  padding:1px 0 1px 8px;
-}
-.session-card.density-dense .exercise-table td{
-  padding:1px 0;
-  font-size:6.5pt;
-}
-.session-card.density-dense .exercise-name{
-  font-size:7pt;
-}
-.session-card.density-dense .rep-box{
-  width:13px;
-  height:13px;
-  border-width:1px;
-}
-.session-card.density-dense .notes-box{
-  display:none;
-}
-
-.session-card.density-critical{
-  padding:5px 8px;
-}
-.session-card.density-critical .session-header{
-  font-size:6.4pt;
-  margin-bottom:4px;
-  padding-bottom:3px;
-}
-.session-card.density-critical .story-prompt{
-  font-size:6.2pt;
-  line-height:1.24;
-  margin-bottom:2px;
-  padding:1px 0 1px 7px;
-}
-.session-card.density-critical .frag-ref{
-  font-size:6.1pt;
-  margin:2px 0;
-}
-.session-card.density-critical .exercise-table{
-  margin-bottom:2px;
-}
-.session-card.density-critical .exercise-table td{
-  padding:0;
-  font-size:6.2pt;
-}
-.session-card.density-critical .exercise-name{
-  font-size:6.7pt;
-}
-.session-card.density-critical .exercise-weight{
-  font-size:6.2pt;
-}
-.session-card.density-critical .rep-box{
-  width:12px;
-  height:12px;
-  border-width:1px;
-}
-.session-card.density-critical .notes-box{
-  display:none;
-}
-
-.workout-left[data-card-count="1"] .session-cards{
-  gap:12px;
-}
-.workout-left[data-card-count="2"] .session-cards{
-  gap:10px;
-}
-.workout-left[data-card-count="3"] .session-cards{
-  gap:8px;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1526,6 +1507,12 @@ body{
   outline:none;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
 }
+.reader-unlock-input[data-demo-password="true"][data-revealed="false"]{
+  color:transparent;
+  text-shadow:0 0 10px rgba(241,235,224,.95);
+  cursor:pointer;
+  user-select:none;
+}
 .reader-unlock-input::placeholder{
   color:rgba(255,255,255,.2);
   letter-spacing:.18em;
@@ -1693,8 +1680,7 @@ body{
    BINARY CHOICE (one per block, on a session card)
    ══════════════════════════════════════════════════════════════ */
 .binary-choice{
-  margin:6px 0 4px;
-  padding:6px 0;
+  padding-top:6px;
   border-top:1px solid var(--rule);
 }
 .binary-choice-label{
