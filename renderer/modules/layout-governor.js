@@ -3,30 +3,79 @@ import { readingLength, splitParagraphs } from './utils.js';
 export function chunkSessions(week) {
   const sessions = week.sessions || [];
   const chunks = [];
-  let current = [];
-  let load = 0;
-
-  sessions.forEach((session) => {
-    let weight = 1;
-    weight += Math.min((session.exercises || []).length, 6) * 0.3;
-    weight += Math.min(readingLength(session.storyPrompt) / 300, 1.5);
-    if (session.binaryChoice) weight += 1.2;
-
-    // Keep the governor, but bias toward 2-3 sessions per page.
-    // The previous threshold fragmented medium-density weeks into
-    // single-session pages, which doubled booklet length.
-    if (current.length >= 3 || (current.length >= 2 && load + weight > 7.2)) {
-      chunks.push(current);
-      current = [];
-      load = 0;
-    }
-
-    current.push(session);
-    load += weight;
-  });
-
-  if (current.length) chunks.push(current);
+  for (let index = 0; index < sessions.length; index += 3) {
+    chunks.push(sessions.slice(index, index + 3));
+  }
   return chunks;
+}
+
+function sessionComplexity(session, cardCount) {
+  const promptLength = readingLength(session.storyPrompt);
+  const exerciseCount = Math.min((session.exercises || []).length, 6);
+  let score = 1.35;
+  score += Math.min(promptLength / 180, 2.6);
+  score += exerciseCount * 0.62;
+  if (session.binaryChoice) score += 1.15;
+  if (session.fragmentRef) score += 0.2;
+
+  if (cardCount === 3) score += 0.6;
+  if (cardCount === 1) score -= 0.45;
+
+  return score;
+}
+
+function resolveDensity(score) {
+  if (score >= 6.2) return 'critical';
+  if (score >= 5.1) return 'dense';
+  if (score >= 4) return 'compact';
+  return 'standard';
+}
+
+function resolveNotesLines(score, cardCount) {
+  if (cardCount === 1) {
+    if (score >= 6.2) return 2;
+    return 3;
+  }
+
+  if (cardCount === 2) {
+    if (score >= 5.8) return 0;
+    if (score >= 4.8) return 1;
+    return 2;
+  }
+
+  if (score >= 6.2) return 0;
+  if (score >= 5.1) return 1;
+  return 2;
+}
+
+function resolveNotesHeight(notesLines) {
+  if (notesLines <= 0) return 0;
+  if (notesLines === 1) return 20;
+  if (notesLines === 2) return 30;
+  return 40;
+}
+
+export function planWorkoutPageLayout(sessions) {
+  const cardCount = Math.max(1, sessions.length);
+  const complexityScores = sessions.map((session) => sessionComplexity(session, cardCount));
+  const totalComplexity = complexityScores.reduce((sum, value) => sum + value, 0) || cardCount;
+
+  return sessions.map((session, index) => {
+    const score = complexityScores[index];
+    const density = resolveDensity(score);
+    const notesLines = resolveNotesLines(score, cardCount);
+    const notesHeight = resolveNotesHeight(notesLines);
+    const flexWeight = Math.max(1, Math.round((score / totalComplexity) * 100));
+
+    return {
+      density,
+      notesLines,
+      notesHeight,
+      flexWeight,
+      promptChars: readingLength(session.storyPrompt),
+      exerciseCount: (session.exercises || []).length
+    };
+  });
 }
 
 export function paginateFragments(fragments) {

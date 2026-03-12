@@ -1,5 +1,5 @@
 import { make } from './dom.js';
-import { chunkSessions } from './layout-governor.js';
+import { chunkSessions, paginateFragments, planWorkoutPageLayout } from './layout-governor.js';
 import {
   getExerciseSetCount,
   getLoadGuide,
@@ -133,6 +133,7 @@ function buildWorkoutPage(data, week, sessions, chunkIndex, chunkCount) {
   const page = make('section', 'booklet-page');
   page.setAttribute('data-page-type', 'workout-left');
   const frame = make('div', 'workout-left');
+  frame.setAttribute('data-card-count', String(sessions.length));
 
   const header = make('header', 'page-header');
   header.appendChild(make('span', 'week-id', 'Week ' + pad2(week.weekNumber)));
@@ -149,19 +150,21 @@ function buildWorkoutPage(data, week, sessions, chunkIndex, chunkCount) {
   }
 
   const cards = make('div', 'session-cards');
-  sessions.forEach((session) => {
-    cards.appendChild(buildSessionCard(session));
+  const layoutPlan = planWorkoutPageLayout(sessions);
+  sessions.forEach((session, index) => {
+    cards.appendChild(buildSessionCard(session, layoutPlan[index]));
   });
   frame.appendChild(cards);
   page.appendChild(frame);
   return page;
 }
 
-function buildSessionCard(session) {
+function buildSessionCard(session, layoutPlan) {
   const card = make('article', 'session-card');
-  const exerciseCount = (session.exercises || []).length;
-  if (exerciseCount > 4) card.classList.add('density-dense');
-  else if (exerciseCount > 2) card.classList.add('density-compact');
+  card.classList.add('density-' + (layoutPlan && layoutPlan.density || 'standard'));
+  if (layoutPlan && layoutPlan.flexWeight) {
+    card.style.flex = String(layoutPlan.flexWeight) + ' 1 0';
+  }
 
   card.appendChild(make('div', 'session-header', typeof session.label === 'string' ? session.label : 'Session'));
 
@@ -180,11 +183,18 @@ function buildSessionCard(session) {
   card.appendChild(exercises);
 
   const notesBox = make('div', 'notes-box');
-  const notesLines = make('div', 'notes-lines');
-  notesLines.appendChild(make('div', 'notes-line'));
-  notesLines.appendChild(make('div', 'notes-line'));
-  notesBox.appendChild(notesLines);
-  card.appendChild(notesBox);
+  const noteLineCount = layoutPlan && typeof layoutPlan.notesLines === 'number' ? layoutPlan.notesLines : 2;
+  if (noteLineCount > 0) {
+    if (layoutPlan && layoutPlan.notesHeight) {
+      notesBox.style.setProperty('--notes-box-height', layoutPlan.notesHeight + 'px');
+    }
+    const notesLines = make('div', 'notes-lines');
+    for (let index = 0; index < noteLineCount; index += 1) {
+      notesLines.appendChild(make('div', 'notes-line'));
+    }
+    notesBox.appendChild(notesLines);
+    card.appendChild(notesBox);
+  }
 
   if (session.binaryChoice) {
     const choice = make('div', 'binary-choice');
@@ -566,7 +576,7 @@ function buildFragmentBlock(fragment) {
   return block;
 }
 
-function buildDocumentPage(fragment) {
+function buildDocumentPage(fragments) {
   const page = make('section', 'booklet-page');
   page.setAttribute('data-page-type', 'fragment');
 
@@ -575,14 +585,16 @@ function buildDocumentPage(fragment) {
   header.appendChild(make('span', '', 'Documents'));
   header.appendChild(make('span', 'page-num', ''));
   frame.appendChild(header);
-  frame.appendChild(buildFragmentBlock(fragment));
+  fragments.forEach((fragment) => {
+    frame.appendChild(buildFragmentBlock(fragment));
+  });
   page.appendChild(frame);
   return page;
 }
 
 function buildFragmentPages(data, renderedFragments) {
   const remaining = (data.fragments || []).filter((fragment) => !renderedFragments[fragment.id]);
-  return remaining.map((fragment) => buildDocumentPage(fragment));
+  return paginateFragments(remaining).map((fragments) => buildDocumentPage(fragments));
 }
 
 function buildOverflowDocumentPage(week) {
@@ -653,6 +665,20 @@ function buildLockedEndingPage(data) {
   return page;
 }
 
+function appendFormattedBody(container, rawContent) {
+  const content = String(rawContent || '').trim();
+  if (!content) return;
+
+  if (/<[a-z][\s\S]*>/i.test(content)) {
+    container.innerHTML = content;
+    return;
+  }
+
+  splitParagraphs(content).forEach((para) => {
+    container.appendChild(make('p', '', para));
+  });
+}
+
 function buildUnlockedEndingPage(payload) {
   const page = make('section', 'booklet-page');
   page.setAttribute('data-page-type', 'ending-unlocked');
@@ -662,9 +688,7 @@ function buildUnlockedEndingPage(payload) {
   if (payload.documentType) frame.appendChild(make('div', 'doc-label', payload.documentType));
 
   const body = make('div', 'endings-body');
-  splitParagraphs(payload.body || payload.content || '').forEach((para) => {
-    body.appendChild(make('p', '', para));
-  });
+  appendFormattedBody(body, payload.body || payload.content || '');
   frame.appendChild(body);
 
   if (payload.finalLine) {

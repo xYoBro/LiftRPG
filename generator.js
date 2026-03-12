@@ -60,6 +60,85 @@
     return copy.slice(0, n);
   }
 
+  var MECHANIC_PROFILES = [
+    {
+      id: 'bureaucratic-mystery',
+      keywords: ['archive', 'bureau', 'county', 'survey', 'water', 'inspection', 'record', 'ledger', 'agency', 'protocol'],
+      mechanicFamily: 'investigation through paperwork and visible procedural drift',
+      dominantMap: 'grid',
+      oracleMode: 'simple',
+      puzzleFamilies: ['fragment cross-reference', 'grid-coordinate reading', 'observational anomaly hunting', 'oracle-driven state change'],
+      clocks: ['Escalation Risk', 'Evidence Chain', 'Site Integrity'],
+      artifacts: ['field notes', 'inspection forms', 'annotated maps']
+    },
+    {
+      id: 'journey-expedition',
+      keywords: ['road', 'route', 'rail', 'expedition', 'shore', 'coast', 'mountain', 'voyage', 'signal', 'station'],
+      mechanicFamily: 'movement pressure, route planning, and discovery under attrition',
+      dominantMap: 'linear-track',
+      oracleMode: 'simple',
+      puzzleFamilies: ['path tracing', 'route adjacency', 'environmental pattern recognition', 'resource clock pressure'],
+      clocks: ['Exposure', 'Supplies', 'Distance Remaining'],
+      artifacts: ['travel logs', 'route diagrams', 'supply manifests']
+    },
+    {
+      id: 'social-intrigue',
+      keywords: ['union', 'meeting', 'romance', 'family', 'town', 'parish', 'committee', 'choir', 'household', 'election'],
+      mechanicFamily: 'relationship pressure, trust tracking, and branching testimony',
+      dominantMap: 'point-to-point',
+      oracleMode: 'full',
+      puzzleFamilies: ['logic deduction', 'witness contradiction', 'fragment cross-reference', 'branch consequence tracking'],
+      clocks: ['Suspicion', 'Trust', 'Public Attention'],
+      artifacts: ['letters', 'minutes', 'transcripts']
+    },
+    {
+      id: 'occult-revelation',
+      keywords: ['ritual', 'saint', 'church', 'grave', 'occult', 'forbidden', 'prayer', 'grimoire', 'ghost', 'curse'],
+      mechanicFamily: 'forbidden knowledge accumulation with staged ritual revelation',
+      dominantMap: 'player-drawn',
+      oracleMode: 'full',
+      puzzleFamilies: ['symbol decoding', 'layered metapuzzle assembly', 'observational anomaly hunting', 'oracle-triggered rule mutation'],
+      clocks: ['Contamination', 'Witness', 'Seal Integrity'],
+      artifacts: ['marginalia', 'liturgical notes', 'redacted confessions']
+    }
+  ];
+
+  function deriveMechanicProfile(brief, workout) {
+    var haystack = String(brief || '') + '\n' + String(workout || '');
+    var text = haystack.toLowerCase();
+    var best = MECHANIC_PROFILES[0];
+    var bestScore = -1;
+
+    MECHANIC_PROFILES.forEach(function (profile) {
+      var score = 0;
+      profile.keywords.forEach(function (keyword) {
+        if (text.indexOf(keyword) !== -1) score += 1;
+      });
+      if (score > bestScore) {
+        bestScore = score;
+        best = profile;
+      }
+    });
+
+    return best;
+  }
+
+  function formatMechanicProfile(profile) {
+    return [
+      '## Algorithmic Story-to-Game Mapping',
+      '',
+      'Use this mechanic profile as the default ludonarrative package unless the worldContract strongly justifies a better fit.',
+      '- Dominant mechanic family: ' + profile.mechanicFamily,
+      '- Preferred recurring mapType: ' + profile.dominantMap,
+      '- Preferred oracle mode: ' + profile.oracleMode,
+      '- Puzzle families to emphasize: ' + profile.puzzleFamilies.join('; '),
+      '- Named progress clocks to prefer: ' + profile.clocks.join('; '),
+      '- Artifact surfaces to emphasize: ' + profile.artifacts.join('; '),
+      '',
+      'Write the weeks so the analog game structures feel inevitable for this story, not pasted on afterward.'
+    ].join('\n');
+  }
+
   /* ─── Schema Sections ───────────────────────────────────────────
      Each section is independently editable. To fix a map issue,
      find SCHEMA_SPATIAL. To fix a cipher issue, stay in SCHEMA_WEEKS
@@ -495,6 +574,7 @@
 
   /* ─── Public API ───────────────────────────────────────────────── */
   window.generatePrompt = function (workout, brief, dice) {
+    var mechanicProfile = deriveMechanicProfile(brief, workout);
     var parts = [
       SCHEMA_SPEC,
       '',
@@ -529,6 +609,8 @@
           'Whichever direction you choose, the resulting booklet should still function as a mystery that rewards theory-building across the full block.'
         ].join('\n');
       })(),
+      '',
+      formatMechanicProfile(mechanicProfile),
       '',
       '## Dice Selection',
       '',

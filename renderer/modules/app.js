@@ -35,6 +35,35 @@ function renderCurrentBooklet() {
   renderBooklet(refs, state.layoutMode, state.data, state.unlockedEnding, setStatus);
 }
 
+function scrollEndingIntoView() {
+  const endingPage = refs.booklet.querySelector('[data-page-type="ending-unlocked"]');
+  if (!endingPage) return;
+  endingPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function syncUnlockUi(status) {
+  const stateValue = status && status.state ? status.state : 'locked';
+  refs.unlockRow.setAttribute('data-state', stateValue);
+
+  if (status && status.visible === false) {
+    refs.unlockRow.style.display = 'none';
+    return;
+  }
+
+  refs.unlockRow.style.display = status && status.visible ? 'block' : 'none';
+  refs.unlockLabel.textContent = status && status.label ? status.label : 'Try decrypting the ending:';
+  refs.unlockStatus.textContent = status && status.message ? status.message : '';
+  refs.unlockStatus.style.display = status && status.message ? 'inline-flex' : 'none';
+
+  if (status && status.password !== undefined) {
+    refs.unlockPassword.value = status.password;
+  }
+
+  refs.unlockPassword.disabled = !!(status && status.inputDisabled);
+  refs.unlockPassword.readOnly = !!(status && status.inputDisabled);
+  refs.unlockBtn.disabled = !!(status && status.buttonDisabled);
+}
+
 async function renderWithMode(layoutMode) {
   state.layoutMode = layoutMode;
   refs.layoutMode.value = layoutMode;
@@ -84,11 +113,18 @@ function loadBooklet(data, sourceLabel) {
   state.unlockedEnding = null;
   renderCurrentBooklet();
 
-  refs.unlockRow.style.display = data.meta && data.meta.passwordEncryptedEnding ? 'flex' : 'none';
+  const hasEncryptedEnding = !!(data.meta && data.meta.passwordEncryptedEnding);
+  syncUnlockUi({
+    visible: hasEncryptedEnding,
+    state: 'locked',
+    label: 'Try decrypting the ending:',
+    message: '',
+    password: '',
+    inputDisabled: false,
+    buttonDisabled: false
+  });
   refs.encryptRow.style.display = data.meta && (!data.meta.passwordEncryptedEnding || data.meta.passwordEncryptedEnding.indexOf('PLACEHOLDER_') === 0) ? 'flex' : 'none';
   refs.encryptDownload.style.display = 'none';
-  refs.unlockPassword.value = '';
-  refs.unlockStatus.textContent = '';
   refs.encryptStatus.textContent = '';
   setStatus('Loaded ' + sourceLabel + '.', 'success');
 }
@@ -145,25 +181,61 @@ function fetchDemo(name) {
 
 function attemptUnlock() {
   if (!state.data || !state.data.meta || !state.data.meta.passwordEncryptedEnding) {
-    refs.unlockStatus.textContent = 'No encrypted ending found.';
+    syncUnlockUi({
+      visible: false,
+      state: 'locked'
+    });
     return;
   }
 
   const password = normalisePassword(refs.unlockPassword.value || '');
   if (!password) {
-    refs.unlockStatus.textContent = 'Enter the completed password.';
+    syncUnlockUi({
+      visible: true,
+      state: 'error',
+      label: 'Try decrypting the ending:',
+      message: 'Enter password',
+      password: '',
+      inputDisabled: false,
+      buttonDisabled: false
+    });
     return;
   }
 
-  refs.unlockStatus.textContent = 'Unlocking…';
+  syncUnlockUi({
+    visible: true,
+    state: 'pending',
+    label: 'Try decrypting the ending:',
+    message: 'Unlocking…',
+    password,
+    inputDisabled: false,
+    buttonDisabled: true
+  });
   decryptBlob(state.data.meta.passwordEncryptedEnding, password)
     .then((payload) => {
       state.unlockedEnding = payload;
-      refs.unlockStatus.textContent = 'Unlocked.';
-      renderBooklet(refs, state.layoutMode, state.data, state.unlockedEnding, setStatus);
+      renderCurrentBooklet();
+      syncUnlockUi({
+        visible: true,
+        state: 'unlocked',
+        label: 'Ending decrypted',
+        message: '✓ Unlocked',
+        password,
+        inputDisabled: true,
+        buttonDisabled: true
+      });
+      scrollEndingIntoView();
     })
     .catch(() => {
-      refs.unlockStatus.textContent = 'Password rejected.';
+      syncUnlockUi({
+        visible: true,
+        state: 'error',
+        label: 'Try decrypting the ending:',
+        message: 'Password rejected',
+        password,
+        inputDisabled: false,
+        buttonDisabled: false
+      });
     });
 }
 
@@ -234,6 +306,7 @@ function captureRefs() {
     layoutMode: qs('layout-mode'),
     status: qs('status'),
     unlockRow: qs('unlock-row'),
+    unlockLabel: qs('unlock-label'),
     unlockPassword: qs('unlock-password'),
     unlockBtn: qs('unlock-btn'),
     unlockStatus: qs('unlock-status'),
