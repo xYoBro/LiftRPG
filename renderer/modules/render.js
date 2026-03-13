@@ -1,7 +1,8 @@
-import { PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from './constants.js?v=16';
-import { make } from './dom.js?v=16';
-import { buildPages } from './page-builders.js?v=16';
-import { applyTheme, resolveTheme } from './theme.js?v=16';
+import { PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from './constants.js?v=17';
+import { make } from './dom.js?v=17';
+import { buildBookletMetaModel } from './booklet-models.js?v=17';
+import { buildPages } from './page-builders.js?v=17';
+import { applyTheme, resolveTheme } from './theme.js?v=17';
 
 function setPageNumbers(pages) {
   pages.forEach((page, index) => {
@@ -129,6 +130,20 @@ function applyFit(pages) {
   return clippedCount;
 }
 
+function applyBookletMetadata(booklet, data) {
+  const meta = buildBookletMetaModel(data);
+  const theme = data.theme || {};
+  const shape = meta.structuralShape || {};
+  const voice = meta.narrativeVoice || {};
+
+  booklet.setAttribute('data-visual-archetype', theme.visualArchetype || 'pastoral');
+  booklet.setAttribute('data-weekly-component-type', meta.weeklyComponentType || '');
+  booklet.setAttribute('data-structural-resolution', shape.resolution || '');
+  booklet.setAttribute('data-temporal-order', shape.temporalOrder || '');
+  booklet.setAttribute('data-narrative-person', voice.person || '');
+  booklet.setAttribute('data-narrative-tense', voice.tense || '');
+}
+
 export function syncLayoutMode(refs, layoutMode) {
   refs.booklet.setAttribute('data-layout-mode', layoutMode);
 }
@@ -137,6 +152,7 @@ export function renderBooklet(refs, layoutMode, data, unlockedEnding, setStatus)
   refs.booklet.innerHTML = '';
   syncLayoutMode(refs, layoutMode);
   applyTheme(refs.booklet, resolveTheme(data));
+  applyBookletMetadata(refs.booklet, data);
 
   const pages = buildPages(data, unlockedEnding);
   setPageNumbers(pages);

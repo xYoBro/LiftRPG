@@ -1,4 +1,4 @@
-import { make } from './dom.js?v=16';
+import { make } from './dom.js?v=17';
 
 function renderExerciseRow(rowModel) {
   const row = make('tr', 'exercise-row');

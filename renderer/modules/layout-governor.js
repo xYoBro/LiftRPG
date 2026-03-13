@@ -1,4 +1,4 @@
-import { readingLength } from './utils.js';
+import { readingLength } from './utils.js?v=17';
 
 export function chunkSessions(week) {
   const sessions = week.sessions || [];
@@ -104,4 +104,88 @@ export function paginateFragments(fragments) {
 
   if (current.length) pages.push(current);
   return pages;
+}
+
+function planWeekEntries(week, weekIndex) {
+  const entries = [];
+  const chunks = chunkSessions(week);
+
+  if (chunks.length > 0) {
+    entries.push({
+      type: 'workout-left',
+      weekIndex,
+      chunkIndex: 0,
+      chunkCount: chunks.length,
+      sessions: chunks[0]
+    });
+  }
+
+  if (week.isBossWeek) {
+    entries.push({
+      type: 'boss',
+      weekIndex
+    });
+  } else {
+    const oracleEntryCount = ((((week || {}).fieldOps || {}).oracleTable || {}).entries || []).length;
+    entries.push({
+      type: 'field-ops',
+      weekIndex,
+      layout: oracleEntryCount > 12 ? 'split-oracle' : 'standard'
+    });
+    if (oracleEntryCount > 12) {
+      entries.push({
+        type: 'oracle-overflow',
+        weekIndex,
+        layout: 'oracle-only'
+      });
+    }
+  }
+
+  for (let index = 1; index < chunks.length; index += 1) {
+    entries.push({
+      type: 'workout-left',
+      weekIndex,
+      chunkIndex: index,
+      chunkCount: chunks.length,
+      sessions: chunks[index]
+    });
+    entries.push(week.overflowDocument
+      ? { type: 'overflow-doc', weekIndex }
+      : { type: 'blank-filler', weekIndex }
+    );
+  }
+
+  return entries;
+}
+
+export function planBookletLayout(data, unlockedEnding) {
+  const entries = [
+    { type: 'cover' },
+    { type: 'rules-left' },
+    { type: 'rules-right' }
+  ];
+
+  (data.weeks || []).forEach((week, weekIndex) => {
+    entries.push(...planWeekEntries(week, weekIndex));
+  });
+
+  paginateFragments(data.fragments || []).forEach((fragments) => {
+    entries.push({
+      type: 'fragment-page',
+      fragments
+    });
+  });
+
+  entries.push(
+    { type: 'assembly' },
+    { type: 'gauge-log' },
+    { type: unlockedEnding ? 'ending-unlocked' : 'ending-locked' }
+  );
+
+  while ((entries.length + 1) % 4 !== 0) {
+    entries.push({ type: 'notes' });
+  }
+
+  entries.push({ type: 'back-cover' });
+  return entries;
 }

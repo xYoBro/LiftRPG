@@ -3,7 +3,7 @@ import {
   getExerciseTargetLoad,
   getRepTargets,
   showLoadSuffix
-} from './utils.js?v=16';
+} from './utils.js?v=17';
 
 function resolveExerciseNameWidthCh(exercises) {
   const longestExerciseName = Math.max(

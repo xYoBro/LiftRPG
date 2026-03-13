@@ -8,8 +8,7 @@ A generative Print & Play workout journal fused with a branching narrative TTRPG
 
 | App | Path | Purpose |
 |-----|------|---------|
-| Renderer | `/renderer/` | Upload schema v1.3 JSON → printable saddle-stitch booklet |
-| Unlock | `/unlock/` | Enter assembled password → client-side decrypt + reveal ending |
+| Renderer | `/renderer/` | Upload schema v1.3 JSON, preview booklet layouts, print/export, and unlock the encrypted ending inline |
 
 ## Development
 

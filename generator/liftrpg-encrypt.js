@@ -21,7 +21,7 @@
  * Encrypted blob = base64url( salt(32) | iv(12) | ciphertext )
  * Key derivation: PBKDF2-SHA256, 200,000 iterations, 256-bit AES-GCM key
  * Password normalisation: trim → uppercase → strip non-alphanumeric
- * This normalisation is mirrored in unlock/index.html
+ * This normalisation is mirrored in renderer/modules/app.js
  *
  * ── PAYLOAD FORMAT ──────────────────────────────────────────────────────────
  * The plaintext that gets encrypted is JSON:
@@ -42,7 +42,7 @@ const IV_BYTES   = 12;
 const ITER       = 200_000;
 
 // ── NORMALISE ──────────────────────────────────────────────────────────────
-// Must match the normalisation in unlock/index.html exactly.
+// Must match the normalisation in renderer/modules/app.js exactly.
 export function normalisePassword(raw) {
   return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
@@ -101,7 +101,7 @@ export async function encryptEnding(payload, password) {
 // ── DECRYPT (for testing) ──────────────────────────────────────────────────
 /**
  * Decrypts a blob produced by encryptEnding.
- * Mirrors the decryption in unlock/index.html.
+ * Mirrors the decryption in renderer/modules/app.js.
  *
  * @param {string} blobBase64url
  * @param {string} password
