@@ -1,4 +1,5 @@
-import { make } from './dom.js?v=21';
+import { make } from './dom.js?v=22';
+import { createBoundedPage } from './page-shell.js?v=22';
 
 function buildMetaLines(fragmentModel) {
   const lines = [];
@@ -47,10 +48,13 @@ export function renderFoundDocument(fragmentModel) {
 }
 
 export function renderDocumentPage(model) {
-  const page = make('section', 'booklet-page');
-  page.setAttribute('data-page-type', model.pageType || 'fragment');
-  const frame = make('div', 'fragment-page');
-  frame.setAttribute('data-layout-variant', model.layoutVariant || 'stacked');
+  const pageType = model.pageType || 'fragment';
+  const scaffold = createBoundedPage(pageType, 'fragment-page', {
+    boundaryRole: 'archive',
+    layoutVariant: model.layoutVariant || 'stacked'
+  });
+  const page = scaffold.page;
+  const frame = scaffold.frame;
 
   const header = make('header', 'page-header');
   header.appendChild(make('span', '', model.title || 'Documents'));
@@ -61,6 +65,5 @@ export function renderDocumentPage(model) {
     frame.appendChild(renderFoundDocument(fragmentModel));
   });
 
-  page.appendChild(frame);
   return page;
 }

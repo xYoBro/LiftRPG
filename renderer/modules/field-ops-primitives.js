@@ -1,4 +1,5 @@
-import { make } from './dom.js?v=21';
+import { make } from './dom.js?v=22';
+import { createBoundedPage } from './page-shell.js?v=22';
 
 function renderGameplayClocks(clocks) {
   const section = make('section', 'ops-section ops-clocks');
@@ -224,10 +225,12 @@ function renderCompanionComponent(component) {
 }
 
 export function renderFieldOpsPage(model) {
-  const page = make('section', 'booklet-page');
-  page.setAttribute('data-page-type', model.pageType);
-  const frame = make('div', 'field-ops-right');
-  frame.setAttribute('data-layout-variant', model.layoutVariant || 'balanced');
+  const scaffold = createBoundedPage(model.pageType, 'field-ops-right', {
+    boundaryRole: 'field-ops',
+    layoutVariant: model.layoutVariant || 'balanced'
+  });
+  const page = scaffold.page;
+  const frame = scaffold.frame;
   frame.setAttribute('data-map-family', (model.mechanicProfile || {}).mapFamily || 'none');
   frame.setAttribute('data-cipher-family', (model.mechanicProfile || {}).cipherFamily || 'none');
   frame.setAttribute('data-oracle-family', (model.mechanicProfile || {}).oracleFamily || 'none');
@@ -268,15 +271,16 @@ export function renderFieldOpsPage(model) {
   }
 
   frame.appendChild(content);
-  page.appendChild(frame);
   return page;
 }
 
 export function renderBossPage(model) {
-  const page = make('section', 'booklet-page');
-  page.setAttribute('data-page-type', 'boss');
-  const frame = make('div', 'boss-right');
-  frame.setAttribute('data-layout-variant', model.layoutVariant || 'standard');
+  const scaffold = createBoundedPage('boss', 'boss-right', {
+    boundaryRole: 'boss',
+    layoutVariant: model.layoutVariant || 'standard'
+  });
+  const page = scaffold.page;
+  const frame = scaffold.frame;
 
   if (model.convergenceProof) {
     frame.setAttribute('data-has-convergence-proof', 'true');
@@ -362,6 +366,5 @@ export function renderBossPage(model) {
   convergence.appendChild(passwordBoxes);
   frame.appendChild(convergence);
 
-  page.appendChild(frame);
   return page;
 }

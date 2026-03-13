@@ -1,10 +1,11 @@
-import { make } from './dom.js?v=21';
-import { splitRichText } from './booklet-models.js?v=21';
+import { make } from './dom.js?v=22';
+import { splitRichText } from './booklet-models.js?v=22';
+import { createBoundedPage } from './page-shell.js?v=22';
 
 export function renderCoverPage(model) {
-  const page = make('section', 'booklet-page');
-  page.setAttribute('data-page-type', 'cover');
-  const frame = make('div', 'cover-page');
+  const scaffold = createBoundedPage('cover', 'cover-page', { boundaryRole: 'cover' });
+  const page = scaffold.page;
+  const frame = scaffold.frame;
   frame.setAttribute('data-structural-resolution', model.meta.structuralShape && model.meta.structuralShape.resolution || '');
 
   if (model.designation) {
@@ -26,15 +27,16 @@ export function renderCoverPage(model) {
     colophon.appendChild(make('div', 'cover-colophon-line', line));
   });
   frame.appendChild(colophon);
-  page.appendChild(frame);
   return page;
 }
 
 export function renderRulesLeftPage(model) {
-  const page = make('section', 'booklet-page');
-  page.setAttribute('data-page-type', 'rules-left');
-  const frame = make('div', 'rules-left');
-  frame.setAttribute('data-layout-variant', model.layoutVariant || 'standard');
+  const scaffold = createBoundedPage('rules-left', 'rules-left', {
+    boundaryRole: 'briefing',
+    layoutVariant: model.layoutVariant || 'standard'
+  });
+  const page = scaffold.page;
+  const frame = scaffold.frame;
 
   const header = make('header', 'rules-header');
   header.appendChild(make('span', '', 'Orientation'));
@@ -59,15 +61,16 @@ export function renderRulesLeftPage(model) {
   }
 
   frame.appendChild(body);
-  page.appendChild(frame);
   return page;
 }
 
 export function renderSealedPage(model) {
-  const page = make('section', 'booklet-page');
-  page.setAttribute('data-page-type', 'rules-right');
-  const frame = make('div', 'rules-right sealed-page');
-  frame.setAttribute('data-layout-variant', model.layoutVariant || 'standard');
+  const scaffold = createBoundedPage('rules-right', 'rules-right sealed-page', {
+    boundaryRole: 'sealed',
+    layoutVariant: model.layoutVariant || 'standard'
+  });
+  const page = scaffold.page;
+  const frame = scaffold.frame;
 
   frame.appendChild(make('div', 'sealed-lock', '🔒'));
   frame.appendChild(make('div', 'sealed-title', model.title));
@@ -75,7 +78,6 @@ export function renderSealedPage(model) {
   body.appendChild(make('p', '', model.body));
   frame.appendChild(body);
 
-  page.appendChild(frame);
   return page;
 }
 
@@ -88,10 +90,12 @@ function makePasswordBoxes(count, className) {
 }
 
 export function renderGaugeLogPage(model) {
-  const page = make('section', 'booklet-page');
-  page.setAttribute('data-page-type', 'gauge-log');
-  const frame = make('div', 'rules-right gauge-log-page');
-  frame.setAttribute('data-layout-variant', model.layoutVariant || 'standard');
+  const scaffold = createBoundedPage('gauge-log', 'rules-right gauge-log-page', {
+    boundaryRole: 'unlock',
+    layoutVariant: model.layoutVariant || 'standard'
+  });
+  const page = scaffold.page;
+  const frame = scaffold.frame;
 
   const header = make('header', 'rules-header');
   header.appendChild(make('span', '', model.title));
@@ -117,15 +121,16 @@ export function renderGaugeLogPage(model) {
   finalBlock.appendChild(makePasswordBoxes(model.passwordLength, 'password-final-box'));
   frame.appendChild(finalBlock);
 
-  page.appendChild(frame);
   return page;
 }
 
 export function renderAssemblyPage(model) {
-  const page = make('section', 'booklet-page');
-  page.setAttribute('data-page-type', 'assembly');
-  const frame = make('div', 'password-assembly-page');
-  frame.setAttribute('data-layout-variant', model.layoutVariant || 'standard');
+  const scaffold = createBoundedPage('assembly', 'password-assembly-page', {
+    boundaryRole: 'unlock',
+    layoutVariant: model.layoutVariant || 'standard'
+  });
+  const page = scaffold.page;
+  const frame = scaffold.frame;
 
   frame.appendChild(make('h2', 'password-assembly-title', model.title));
   frame.appendChild(make('p', 'password-assembly-subtitle', model.subtitle));
@@ -150,15 +155,16 @@ export function renderAssemblyPage(model) {
   finalBlock.appendChild(passwordBoxes);
   frame.appendChild(finalBlock);
 
-  page.appendChild(frame);
   return page;
 }
 
 export function renderLockedEndingPage(model) {
-  const page = make('section', 'booklet-page');
-  page.setAttribute('data-page-type', 'ending-locked');
-  const frame = make('div', 'endings-page');
-  frame.setAttribute('data-layout-variant', model.layoutVariant || 'standard');
+  const scaffold = createBoundedPage('ending-locked', 'endings-page', {
+    boundaryRole: 'ending',
+    layoutVariant: model.layoutVariant || 'standard'
+  });
+  const page = scaffold.page;
+  const frame = scaffold.frame;
   frame.appendChild(make('h2', 'endings-title', model.title));
 
   const body = make('div', 'endings-body');
@@ -173,7 +179,6 @@ export function renderLockedEndingPage(model) {
     frame.appendChild(variants);
   }
 
-  page.appendChild(frame);
   return page;
 }
 
@@ -192,11 +197,13 @@ function appendFormattedBody(container, rawContent) {
 }
 
 export function renderUnlockedEndingPage(model) {
-  const page = make('section', 'booklet-page');
-  page.setAttribute('data-page-type', 'ending-unlocked');
-  const frame = make('div', 'endings-page');
+  const scaffold = createBoundedPage('ending-unlocked', 'endings-page', {
+    boundaryRole: 'ending',
+    layoutVariant: model.layoutVariant || 'document'
+  });
+  const page = scaffold.page;
+  const frame = scaffold.frame;
   frame.setAttribute('data-ending-treatment', model.treatment || 'default');
-  frame.setAttribute('data-layout-variant', model.layoutVariant || 'document');
 
   if (model.kicker) frame.appendChild(make('div', 'doc-label', model.kicker));
   frame.appendChild(make('h2', 'endings-title', model.title));
@@ -210,14 +217,16 @@ export function renderUnlockedEndingPage(model) {
     frame.appendChild(make('div', 'endings-final-line', model.finalLine));
   }
 
-  page.appendChild(frame);
   return page;
 }
 
 export function renderBackCover(model) {
-  const page = make('section', 'booklet-page page-back');
-  page.setAttribute('data-page-type', 'back-cover');
-  const frame = make('div', 'back-cover');
+  const scaffold = createBoundedPage('back-cover', 'back-cover', {
+    boundaryRole: 'back-cover',
+    pageClass: 'page-back'
+  });
+  const page = scaffold.page;
+  const frame = scaffold.frame;
   frame.appendChild(make('p', 'back-cover-colophon', model.colophon));
   if (model.generatedAt || model.weekCount || model.totalSessions) {
     const meta = make('div', 'back-cover-meta');
@@ -228,14 +237,13 @@ export function renderBackCover(model) {
     frame.appendChild(meta);
   }
   frame.appendChild(make('div', 'back-cover-mark', model.mark));
-  page.appendChild(frame);
   return page;
 }
 
 export function renderNotesPage(model) {
-  const page = make('section', 'booklet-page');
-  page.setAttribute('data-page-type', 'notes');
-  const frame = make('div', 'notes-page');
+  const scaffold = createBoundedPage('notes', 'notes-page', { boundaryRole: 'notes' });
+  const page = scaffold.page;
+  const frame = scaffold.frame;
 
   const header = make('header', 'page-header');
   header.appendChild(make('span', '', 'Field Notes'));
@@ -247,15 +255,16 @@ export function renderNotesPage(model) {
     notes.appendChild(make('div', 'notes-cell'));
   }
   frame.appendChild(notes);
-  page.appendChild(frame);
   return page;
 }
 
 export function renderInterludePage(model) {
-  const page = make('section', 'booklet-page');
-  page.setAttribute('data-page-type', 'interlude');
-  const frame = make('div', 'interlude-page');
-  frame.setAttribute('data-layout-variant', model.layoutVariant || 'quiet');
+  const scaffold = createBoundedPage('interlude', 'interlude-page', {
+    boundaryRole: 'interlude',
+    layoutVariant: model.layoutVariant || 'quiet'
+  });
+  const page = scaffold.page;
+  const frame = scaffold.frame;
   frame.setAttribute('data-spread-aware', model.spreadAware ? 'true' : 'false');
   if (model.payloadType) {
     frame.setAttribute('data-payload-type', model.payloadType);
@@ -276,6 +285,5 @@ export function renderInterludePage(model) {
     body.appendChild(make('p', '', paragraph));
   });
   frame.appendChild(body);
-  page.appendChild(frame);
   return page;
 }

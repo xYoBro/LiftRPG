@@ -1,4 +1,4 @@
-import { readingLength } from './utils.js?v=21';
+import { readingLength } from './utils.js?v=22';
 
 export const TEMPLATE_VARIANTS = {
   'rules-left': ['standard', 'compact', 'dense'],
@@ -13,6 +13,62 @@ export const TEMPLATE_VARIANTS = {
   'overflow-doc': ['standard', 'compact'],
   'fragment-page': ['stacked', 'tight'],
   interlude: ['quiet', 'artifact']
+};
+
+export const TEMPLATE_VARIANT_DETAILS = {
+  'rules-left': {
+    standard: 'Generous leading and spacing for the opening orientation page.',
+    compact: 'Tighter rules page with reduced leading and margin use.',
+    dense: 'Most compressed orientation layout for unusually long setup text.'
+  },
+  'rules-right': {
+    standard: 'Centered sealed-page treatment with broad negative space.',
+    compact: 'Tighter sealed-page treatment for longer supporting copy.'
+  },
+  'gauge-log': {
+    standard: 'Normal weekly gauge log spacing.',
+    compact: 'Condensed gauge log spacing for longer cycles.'
+  },
+  assembly: {
+    standard: 'Standard password-assembly ladder and final word block.',
+    compact: 'Reduced spacing for longer cycles or denser final instructions.'
+  },
+  boss: {
+    standard: 'Full convergence page treatment.',
+    compact: 'Reduced boss spacing while preserving all sections.',
+    dense: 'Most compressed boss layout before overflow is considered unresolved.'
+  },
+  'ending-locked': {
+    standard: 'Default locked ending notice.',
+    compact: 'Reduced spacing for multi-variant ending summaries.'
+  },
+  'ending-unlocked': {
+    letter: 'Warm, personal letter treatment.',
+    document: 'Formal recovered-document treatment.',
+    compact: 'Reduced spacing for unusually long unlocked endings.'
+  },
+  'field-ops': {
+    balanced: 'Evenly balanced map, cipher, and oracle surface.',
+    'map-dominant': 'Map or spatial companion takes visual precedence.',
+    'cipher-dominant': 'Cipher or extraction surface dominates the right page.',
+    'oracle-dominant': 'Oracle table dominates the right page.'
+  },
+  'oracle-overflow': {
+    standard: 'Default continuation oracle page.',
+    compact: 'Tighter continuation oracle page.'
+  },
+  'overflow-doc': {
+    standard: 'Recovered-document continuation page with regular spacing.',
+    compact: 'Reduced document spacing for longer overflow documents.'
+  },
+  'fragment-page': {
+    stacked: 'Normal archive page with one or two document blocks.',
+    tight: 'Compressed archive page for dense single-document content.'
+  },
+  interlude: {
+    quiet: 'Minimal interlude treatment with restrained chrome.',
+    artifact: 'Artifact-forward interlude treatment with more document character.'
+  }
 };
 
 function totalRulesBodyLength(data) {

@@ -1,10 +1,11 @@
-import { PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from './constants.js?v=21';
-import { make } from './dom.js?v=21';
-import { buildBookletMetaModel } from './booklet-models.js?v=21';
-import { optimizeBookletPlan } from './layout-preflight.js?v=21';
-import { buildPages } from './page-builders.js?v=21';
-import { setPageNumbers } from './pagination.js?v=21';
-import { applyTheme, resolveTheme } from './theme.js?v=21';
+import { PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from './constants.js?v=22';
+import { make } from './dom.js?v=22';
+import { buildBookletMetaModel } from './booklet-models.js?v=22';
+import { optimizeBookletPlan } from './layout-preflight.js?v=22';
+import { buildPages } from './page-builders.js?v=22';
+import { setPageNumbers } from './pagination.js?v=22';
+import { createBoundedPage } from './page-shell.js?v=22';
+import { applyTheme, resolveTheme } from './theme.js?v=22';
 
 function buildGrid(pages, layoutMode) {
   const grid = make('div', 'booklet-grid');
@@ -19,7 +20,10 @@ function buildGrid(pages, layoutMode) {
   if (layoutMode === 'booklet') {
     let count = pages.length;
     while (count % 4 !== 0) {
-      const blank = make('section', 'booklet-page page-blank');
+      const blank = createBoundedPage('blank-filler', 'page-blank', {
+        boundaryRole: 'utility',
+        pageClass: 'page-blank'
+      }).page;
       blank.style.width = PAGE_WIDTH_IN + 'in';
       blank.style.height = PAGE_HEIGHT_IN + 'in';
       pages.push(blank);
@@ -93,8 +97,12 @@ function annotatePagesWithDiagnostics(pages, diagnostics) {
     page.removeAttribute('data-layout-overflow');
     page.removeAttribute('data-layout-overflow-height');
     page.removeAttribute('data-layout-overflow-width');
+    page.removeAttribute('data-layout-missing-boundary');
 
     if (!detail) return;
+    if (detail.missingBoundary) {
+      page.setAttribute('data-layout-missing-boundary', 'true');
+    }
     if (detail.overflowHeight <= 0 && detail.overflowWidth <= 0) return;
 
     page.setAttribute('data-layout-overflow', 'true');
@@ -123,6 +131,15 @@ export function renderBooklet(refs, layoutMode, data, unlockedEnding, setStatus)
   window.__layoutPlan = layoutResult.plan;
   window.__layoutDiagnostics = layoutResult.diagnostics;
   window.__layoutSummary = layoutResult.diagnostics.summary;
+
+  if (layoutResult.diagnostics.missingBoundaryPageCount > 0) {
+    const boundaryTypes = Object.keys((layoutResult.diagnostics.summary || {}).missingBoundaryTypes || {}).join(', ');
+    setStatus(
+      'Loaded ' + pages.length + ' pages. ' + layoutResult.diagnostics.missingBoundaryPageCount + ' page(s) are missing a live-area boundary box' + (boundaryTypes ? ' (' + boundaryTypes + ')' : '') + '.',
+      'error'
+    );
+    return;
+  }
 
   if (layoutResult.diagnostics.overflowPageCount > 0) {
     const overflowTypes = Object.keys((layoutResult.diagnostics.summary || {}).overflowTypes || {}).join(', ');

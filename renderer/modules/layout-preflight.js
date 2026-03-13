@@ -1,10 +1,11 @@
-import { make } from './dom.js?v=21';
+import { make } from './dom.js?v=22';
 import {
   planBookletLayout,
   revisePlanForMeasurement
-} from './layout-governor.js?v=21';
-import { buildPages } from './page-builders.js?v=21';
-import { setPageNumbers } from './pagination.js?v=21';
+} from './layout-governor.js?v=22';
+import { buildPages } from './page-builders.js?v=22';
+import { getPageBoundary, getPageFrame } from './page-shell.js?v=22';
+import { setPageNumbers } from './pagination.js?v=22';
 
 const MAX_LAYOUT_PASSES = 10;
 
@@ -134,15 +135,26 @@ function measureSlotMetrics(page, pageType) {
 
 function measurePage(page) {
   const pageType = page.getAttribute('data-page-type') || '';
-  const frame = page.firstElementChild;
-  const safeHeight = page.clientHeight || Math.ceil(page.getBoundingClientRect().height);
-  const safeWidth = page.clientWidth || Math.ceil(page.getBoundingClientRect().width);
-  const trueHeight = frame
-    ? Math.max(frame.scrollHeight, Math.ceil(frame.getBoundingClientRect().height))
-    : Math.max(page.scrollHeight, safeHeight);
-  const trueWidth = frame
-    ? Math.max(frame.scrollWidth, Math.ceil(frame.getBoundingClientRect().width))
-    : Math.max(page.scrollWidth, safeWidth);
+  const boundary = getPageBoundary(page);
+  const frame = getPageFrame(page);
+  const safeHeight = boundary
+    ? boundary.clientHeight || Math.ceil(boundary.getBoundingClientRect().height)
+    : page.clientHeight || Math.ceil(page.getBoundingClientRect().height);
+  const safeWidth = boundary
+    ? boundary.clientWidth || Math.ceil(boundary.getBoundingClientRect().width)
+    : page.clientWidth || Math.ceil(page.getBoundingClientRect().width);
+  const trueHeight = Math.max(
+    frame ? frame.scrollHeight : 0,
+    frame ? Math.ceil(frame.getBoundingClientRect().height) : 0,
+    boundary ? boundary.scrollHeight : 0,
+    safeHeight
+  );
+  const trueWidth = Math.max(
+    frame ? frame.scrollWidth : 0,
+    frame ? Math.ceil(frame.getBoundingClientRect().width) : 0,
+    boundary ? boundary.scrollWidth : 0,
+    safeWidth
+  );
   const overflowHeight = Math.max(0, trueHeight - safeHeight);
   const overflowWidth = Math.max(0, trueWidth - safeWidth);
 
@@ -150,6 +162,9 @@ function measurePage(page) {
     planIndex: parseInt(page.getAttribute('data-plan-index'), 10) || 0,
     pageType,
     layoutVariant: page.getAttribute('data-layout-variant') || (frame && frame.getAttribute('data-layout-variant')) || '',
+    missingBoundary: !boundary,
+    liveAreaHeight: safeHeight,
+    liveAreaWidth: safeWidth,
     overflowHeight,
     overflowWidth,
     overflowArea: (overflowHeight * Math.max(1, safeWidth)) + (overflowWidth * Math.max(1, safeHeight)),
@@ -159,12 +174,14 @@ function measurePage(page) {
 
 function summarizeMeasurements(pageMeasurements) {
   const overflowPages = pageMeasurements.filter((page) => page.overflowHeight > 0 || page.overflowWidth > 0);
+  const missingBoundaryPages = pageMeasurements.filter((page) => page.missingBoundary);
   return {
     pageTypeCounts: countBy(pageMeasurements, (page) => page.pageType || 'unknown'),
     layoutVariantCounts: countBy(pageMeasurements.filter((page) => page.layoutVariant), (page) => {
       return page.pageType + ':' + page.layoutVariant;
     }),
-    overflowTypes: countBy(overflowPages, (page) => page.pageType || 'unknown')
+    overflowTypes: countBy(overflowPages, (page) => page.pageType || 'unknown'),
+    missingBoundaryTypes: countBy(missingBoundaryPages, (page) => page.pageType || 'unknown')
   };
 }
 
@@ -181,15 +198,17 @@ function evaluatePlan(container, data, unlockedEnding, plan) {
   const pageMeasurements = pages.map((page) => measurePage(page));
   surface.root.remove();
 
+  const missingBoundaryPageCount = pageMeasurements.filter((page) => page.missingBoundary).length;
   const overflowPageCount = pageMeasurements.filter((page) => page.overflowHeight > 0 || page.overflowWidth > 0).length;
   const totalOverflowHeight = pageMeasurements.reduce((sum, page) => sum + page.overflowHeight, 0);
   const totalOverflowWidth = pageMeasurements.reduce((sum, page) => sum + page.overflowWidth, 0);
   const totalOverflowArea = pageMeasurements.reduce((sum, page) => sum + page.overflowArea, 0);
-  const score = (overflowPageCount * 100000) + (totalOverflowArea * 100) + (pages.length * 10);
+  const score = (missingBoundaryPageCount * 10000000) + (overflowPageCount * 100000) + (totalOverflowArea * 100) + (pages.length * 10);
 
   return {
     plan,
     pageCount: pages.length,
+    missingBoundaryPageCount,
     overflowPageCount,
     totalOverflowHeight,
     totalOverflowWidth,

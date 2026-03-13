@@ -2,7 +2,7 @@ import {
   getPasswordLength,
   pad2,
   splitParagraphs
-} from './utils.js?v=21';
+} from './utils.js?v=22';
 
 function humanizeComponentType(value) {
   return String(value || 'component').replace(/-/g, ' ');

@@ -1,6 +1,7 @@
-import { make } from './dom.js?v=21';
-import { getPageAtom } from './atom-registry.js?v=21';
-import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=21';
+import { make } from './dom.js?v=22';
+import { getPageAtom } from './atom-registry.js?v=22';
+import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=22';
+import { createBoundedPage } from './page-shell.js?v=22';
 import {
   buildAssemblyPageModelWithVariant,
   buildBackCoverModel,
@@ -12,7 +13,7 @@ import {
   buildRulesLeftPageModelWithVariant,
   buildSealedPageModel,
   buildUnlockedEndingPageModel
-} from './booklet-models.js?v=21';
+} from './booklet-models.js?v=22';
 import {
   renderAssemblyPage,
   renderBackCover,
@@ -24,21 +25,21 @@ import {
   renderRulesLeftPage,
   renderSealedPage,
   renderUnlockedEndingPage
-} from './booklet-primitives.js?v=21';
-import { buildDocumentPageModel } from './document-models.js?v=21';
-import { renderDocumentPage } from './document-primitives.js?v=21';
-import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=21';
-import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=21';
-import { buildWorkoutPageModel } from './workout-models.js?v=21';
-import { renderWorkoutCard } from './workout-primitives.js?v=21';
-import { pad2 } from './utils.js?v=21';
+} from './booklet-primitives.js?v=22';
+import { buildDocumentPageModel } from './document-models.js?v=22';
+import { renderDocumentPage } from './document-primitives.js?v=22';
+import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=22';
+import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=22';
+import { buildWorkoutPageModel } from './workout-models.js?v=22';
+import { renderWorkoutCard } from './workout-primitives.js?v=22';
+import { pad2 } from './utils.js?v=22';
 
 function buildWorkoutPage(week, entry) {
   const sessions = entry.sessions || [];
   const mechanicProfile = entry.mechanicProfile || {};
-  const page = make('section', 'booklet-page');
-  page.setAttribute('data-page-type', 'workout-left');
-  const frame = make('div', 'workout-left');
+  const scaffold = createBoundedPage('workout-left', 'workout-left', { boundaryRole: 'session-log' });
+  const page = scaffold.page;
+  const frame = scaffold.frame;
   frame.setAttribute('data-card-count', String(sessions.length));
   frame.setAttribute('data-page-compaction', String(entry.compactionLevel || 0));
   frame.setAttribute('data-route-family', mechanicProfile.routeFamily || 'none');
@@ -67,14 +68,14 @@ function buildWorkoutPage(week, entry) {
     cards.appendChild(renderWorkoutCard(cardModel));
   });
   frame.appendChild(cards);
-  page.appendChild(frame);
   return page;
 }
 
 function buildBlankPage() {
-  const blank = make('section', 'booklet-page blank-page');
-  blank.setAttribute('data-page-type', 'blank-filler');
-  return blank;
+  return createBoundedPage('blank-filler', 'blank-page', {
+    boundaryRole: 'utility',
+    pageClass: 'blank-page'
+  }).page;
 }
 
 function tagPlanMetadata(page, entry, index) {
