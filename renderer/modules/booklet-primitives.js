@@ -1,6 +1,6 @@
-import { make } from './dom.js?v=22';
-import { splitRichText } from './booklet-models.js?v=22';
-import { createBoundedPage } from './page-shell.js?v=22';
+import { make } from './dom.js?v=23';
+import { splitRichText } from './booklet-models.js?v=23';
+import { createBoundedPage } from './page-shell.js?v=23';
 
 export function renderCoverPage(model) {
   const scaffold = createBoundedPage('cover', 'cover-page', { boundaryRole: 'cover' });
@@ -206,6 +206,7 @@ export function renderUnlockedEndingPage(model) {
   frame.setAttribute('data-ending-treatment', model.treatment || 'default');
 
   if (model.kicker) frame.appendChild(make('div', 'doc-label', model.kicker));
+  if (model.continuationLabel) frame.appendChild(make('div', 'doc-label continuation-label', model.continuationLabel));
   frame.appendChild(make('h2', 'endings-title', model.title));
   if (model.documentType) frame.appendChild(make('div', 'doc-label', model.documentType));
 
@@ -275,6 +276,9 @@ export function renderInterludePage(model) {
   header.appendChild(make('span', 'page-num', ''));
   frame.appendChild(header);
 
+  if (model.continuationLabel) {
+    frame.appendChild(make('div', 'doc-label continuation-label', model.continuationLabel));
+  }
   frame.appendChild(make('h2', 'interlude-title', model.title || 'Interlude'));
   if (model.reason) {
     frame.appendChild(make('div', 'interlude-reason', model.reason));

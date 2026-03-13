@@ -440,6 +440,10 @@ body{
   margin-bottom:5px;
 }
 
+.continuation-label{
+  color:var(--muted);
+}
+
 .chip-row{
   display:flex;
   flex-wrap:wrap;
@@ -1744,6 +1748,14 @@ body{
   color:var(--muted);
   margin-bottom:4px;
   line-height:1.4;
+}
+.fragment-doc-continuation{
+  font-family:var(--mono);
+  font-size:5.5pt;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:4px;
 }
 .fragment-doc-body{
   font-family:var(--serif);

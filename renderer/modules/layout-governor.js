@@ -1,6 +1,6 @@
-import { clone, readingLength } from './utils.js?v=22';
-import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=22';
-import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=22';
+import { clone, readingLength, splitParagraphs, splitRichContentBlocks } from './utils.js?v=23';
+import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=23';
+import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=23';
 
 const MAX_WORKOUT_COMPACTION = 3;
 
@@ -338,6 +338,169 @@ export function splitFragmentEntry(plan, index, measurement) {
   return normalizeBookletPlan(revised);
 }
 
+function splitMeasuredBlocks(blocks, heights, overflowHeight) {
+  if (!Array.isArray(blocks) || blocks.length <= 1) return null;
+
+  const normalizedHeights = Array.isArray(heights) && heights.length === blocks.length
+    ? heights
+    : blocks.map((block) => Math.max(1, Math.ceil(readingLength(block) / 120)));
+  const targetReduction = Math.max(1, (Math.ceil(overflowHeight || 0) + 8));
+
+  let splitIndex = blocks.length - 1;
+  let recovered = normalizedHeights[splitIndex] || 0;
+  while (splitIndex > 1 && recovered < targetReduction) {
+    splitIndex -= 1;
+    recovered += normalizedHeights[splitIndex] || 0;
+  }
+
+  let leading = blocks.slice(0, splitIndex);
+  let trailing = blocks.slice(splitIndex);
+
+  if (!leading.length || !trailing.length) {
+    const midpoint = Math.ceil(blocks.length / 2);
+    leading = blocks.slice(0, midpoint);
+    trailing = blocks.slice(midpoint);
+  }
+
+  if (!leading.length || !trailing.length) return null;
+  return { leading, trailing };
+}
+
+function splitSingleDocument(document, measurement) {
+  const paragraphs = Array.isArray(document && document.bodyParagraphs) && document.bodyParagraphs.length
+    ? document.bodyParagraphs
+    : splitParagraphs(document && (document.bodyText || document.body || document.content || ''));
+  const split = splitMeasuredBlocks(paragraphs, (measurement && measurement.slotMetrics && measurement.slotMetrics.documentParagraphHeights) || [], measurement && measurement.overflowHeight);
+  if (!split) return null;
+
+  const leading = clone(document);
+  leading.bodyParagraphs = split.leading;
+  leading.bodyText = split.leading.join('\n\n');
+  if (Object.prototype.hasOwnProperty.call(leading, 'body')) leading.body = split.leading.join('\n\n');
+  if (Object.prototype.hasOwnProperty.call(leading, 'content')) leading.content = split.leading.join('\n\n');
+  leading.continuationLabel = '';
+
+  const trailing = clone(document);
+  trailing.bodyParagraphs = split.trailing;
+  trailing.bodyText = split.trailing.join('\n\n');
+  if (Object.prototype.hasOwnProperty.call(trailing, 'body')) trailing.body = split.trailing.join('\n\n');
+  if (Object.prototype.hasOwnProperty.call(trailing, 'content')) trailing.content = split.trailing.join('\n\n');
+  trailing.continuationLabel = 'Continued';
+
+  return { leading, trailing };
+}
+
+function splitDocumentEntry(plan, index, measurement, data) {
+  const entry = (plan || [])[index];
+  if (!entry) return null;
+
+  if (entry.type === 'fragment-page') {
+    const fragments = entry.fragments || [];
+    if (fragments.length > 1) {
+      return splitFragmentEntry(plan, index, measurement);
+    }
+    if (fragments.length === 1) {
+      const split = splitSingleDocument(fragments[0], measurement);
+      if (!split) return null;
+      const revised = normalizeBookletPlan(plan);
+      revised.splice(index, 1,
+        {
+          ...revised[index],
+          fragments: [split.leading],
+          layoutVariant: 'tight'
+        },
+        {
+          ...revised[index],
+          fragments: [split.trailing],
+          layoutVariant: 'tight'
+        }
+      );
+      return normalizeBookletPlan(revised);
+    }
+  }
+
+  if (entry.type === 'overflow-doc') {
+    const week = ((data || {}).weeks || [])[entry.weekIndex] || {};
+    const source = (entry.fragments || [week.overflowDocument || {}])[0];
+    const split = splitSingleDocument(source, measurement);
+    if (!split) return null;
+
+    const revised = normalizeBookletPlan(plan);
+    revised.splice(index, 1,
+      {
+        ...revised[index],
+        fragments: [split.leading],
+        layoutVariant: 'compact'
+      },
+      {
+        ...revised[index],
+        fragments: [split.trailing],
+        layoutVariant: 'compact'
+      }
+    );
+    return normalizeBookletPlan(revised);
+  }
+
+  return null;
+}
+
+function splitInterludeEntry(plan, index, measurement) {
+  const entry = (plan || [])[index];
+  if (!entry || entry.type !== 'interlude') return null;
+
+  const blocks = Array.isArray(entry.bodyBlocks) && entry.bodyBlocks.length
+    ? entry.bodyBlocks
+    : splitRichContentBlocks(((entry.interlude || {}).body) || '');
+  const split = splitMeasuredBlocks(blocks, (measurement && measurement.slotMetrics && measurement.slotMetrics.paragraphHeights) || [], measurement && measurement.overflowHeight);
+  if (!split) return null;
+
+  const revised = normalizeBookletPlan(plan);
+  revised.splice(index, 1,
+    {
+      ...revised[index],
+      bodyBlocks: split.leading,
+      continuationLabel: ''
+    },
+    {
+      ...revised[index],
+      bodyBlocks: split.trailing,
+      continuationLabel: 'Continued',
+      layoutVariant: 'artifact'
+    }
+  );
+  return normalizeBookletPlan(revised);
+}
+
+function splitUnlockedEndingEntry(plan, index) {
+  const entry = (plan || [])[index];
+  if (!entry || entry.type !== 'ending-unlocked') return null;
+
+  const payload = entry.endingPayload || {};
+  const sourceBlocks = Array.isArray(entry.bodyBlocks) && entry.bodyBlocks.length
+    ? entry.bodyBlocks
+    : splitRichContentBlocks(payload.body || payload.content || '');
+  const split = splitMeasuredBlocks(sourceBlocks, [], 1);
+  if (!split) return null;
+
+  const revised = normalizeBookletPlan(plan);
+  revised.splice(index, 1,
+    {
+      ...revised[index],
+      bodyBlocks: split.leading,
+      finalLineOverride: '',
+      continuationLabel: ''
+    },
+    {
+      ...revised[index],
+      bodyBlocks: split.trailing,
+      finalLineOverride: payload.finalLine || '',
+      continuationLabel: 'Continued',
+      layoutVariant: 'compact'
+    }
+  );
+  return normalizeBookletPlan(revised);
+}
+
 export function revisePlanForMeasurement(plan, measurement, data) {
   if (!measurement) return null;
 
@@ -349,11 +512,22 @@ export function revisePlanForMeasurement(plan, measurement, data) {
     return splitFieldOpsEntry(plan, measurement.planIndex, measurement, data);
   }
 
-  if (measurement.pageType === 'fragment-page' || measurement.pageType === 'fragment') {
-    return splitFragmentEntry(plan, measurement.planIndex, measurement);
+  if (measurement.pageType === 'fragment-page' || measurement.pageType === 'fragment' || measurement.pageType === 'overflow-doc') {
+    return splitDocumentEntry(plan, measurement.planIndex, measurement, data);
   }
 
-  return reviseEntryVariant(plan, measurement.planIndex);
+  const variantRevision = reviseEntryVariant(plan, measurement.planIndex);
+  if (variantRevision) return variantRevision;
+
+  if (measurement.pageType === 'interlude') {
+    return splitInterludeEntry(plan, measurement.planIndex, measurement);
+  }
+
+  if (measurement.pageType === 'ending-unlocked') {
+    return splitUnlockedEndingEntry(plan, measurement.planIndex);
+  }
+
+  return null;
 }
 
 export function planBookletLayout(data, unlockedEnding) {
@@ -383,7 +557,8 @@ export function planBookletLayout(data, unlockedEnding) {
       layoutVariant: pickDefaultTemplateVariant(unlockedEnding ? 'ending-unlocked' : 'ending-locked', {
         data,
         entry: unlockedEnding || {}
-      })
+      }),
+      endingPayload: unlockedEnding ? clone(unlockedEnding) : null
     }
   );
 

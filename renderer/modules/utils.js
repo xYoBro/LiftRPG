@@ -64,6 +64,31 @@ export function splitParagraphs(text) {
     .filter(Boolean);
 }
 
+export function splitRichContentBlocks(content) {
+  const value = String(content || '').trim();
+  if (!value) return [];
+
+  if (/<p\b/i.test(value)) {
+    const blocks = value.match(/<p\b[^>]*>[\s\S]*?<\/p>/gi);
+    if (blocks && blocks.length) {
+      return blocks.map((block) => block.trim()).filter(Boolean);
+    }
+  }
+
+  if (/<[a-z][\s\S]*>/i.test(value)) {
+    return [value];
+  }
+
+  return splitParagraphs(value);
+}
+
+export function joinRichContentBlocks(blocks) {
+  const normalized = (blocks || []).map((block) => String(block || '').trim()).filter(Boolean);
+  if (!normalized.length) return '';
+  const hasHtml = normalized.some((block) => /<[a-z][\s\S]*>/i.test(block));
+  return hasHtml ? normalized.join('') : normalized.join('\n\n');
+}
+
 export function stripHtml(text) {
   return String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }

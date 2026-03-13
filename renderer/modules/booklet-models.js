@@ -1,8 +1,10 @@
 import {
   getPasswordLength,
+  joinRichContentBlocks,
   pad2,
+  splitRichContentBlocks,
   splitParagraphs
-} from './utils.js?v=22';
+} from './utils.js?v=23';
 
 function humanizeComponentType(value) {
   return String(value || 'component').replace(/-/g, ' ');
@@ -133,12 +135,18 @@ export function buildLockedEndingPageModel(data, layoutVariant = 'standard') {
   };
 }
 
-export function buildUnlockedEndingPageModel(data, payload, layoutVariant = 'document') {
+export function buildUnlockedEndingPageModel(data, payload, layoutVariant = 'document', entry = null) {
   const ending = (data.endings || []).find((item) => {
     if (!payload || !payload.variant || !item) return false;
     return item.variant === payload.variant;
   }) || (data.endings || [])[0] || {};
   const content = payload || ending.content || {};
+  const bodyBlocks = Array.isArray(entry && entry.bodyBlocks) && entry.bodyBlocks.length
+    ? entry.bodyBlocks
+    : splitRichContentBlocks(content.body || content.content || '');
+  const finalLine = entry && Object.prototype.hasOwnProperty.call(entry, 'finalLineOverride')
+    ? entry.finalLineOverride
+    : (content.finalLine || '');
 
   return {
     meta: buildBookletMetaModel(data),
@@ -146,10 +154,12 @@ export function buildUnlockedEndingPageModel(data, payload, layoutVariant = 'doc
     title: content.title || 'Unlocked Document',
     documentType: content.documentType || '',
     kicker: content.kicker || '',
-    body: content.body || content.content || '',
-    finalLine: content.finalLine || '',
+    body: joinRichContentBlocks(bodyBlocks),
+    bodyBlocks,
+    finalLine,
     designSpec: ending.designSpec || '',
-    treatment: inferEndingTreatment(ending.designSpec)
+    treatment: inferEndingTreatment(ending.designSpec),
+    continuationLabel: entry && entry.continuationLabel || ''
   };
 }
 
@@ -159,18 +169,23 @@ export function buildNotesPageModel() {
   };
 }
 
-export function buildInterludePageModel(week, layoutVariant, interludeOverride = null) {
+export function buildInterludePageModel(week, layoutVariant, interludeOverride = null, entry = null) {
   const interlude = interludeOverride || (week && week.interlude) || {};
+  const bodyBlocks = Array.isArray(entry && entry.bodyBlocks) && entry.bodyBlocks.length
+    ? entry.bodyBlocks
+    : splitRichContentBlocks(interlude.body || '');
 
   return {
     weekNumber: week && week.weekNumber || 0,
     layoutVariant: layoutVariant || 'quiet',
     title: interlude.title || 'Interlude',
     reason: interlude.reason || '',
-    body: interlude.body || '',
+    body: joinRichContentBlocks(bodyBlocks),
+    bodyBlocks,
     spreadAware: !!(interlude && (interlude.spreadAware || interlude['spread-aware'])),
     payload: interlude.payload || null,
-    payloadType: interlude.payloadType || ''
+    payloadType: interlude.payloadType || '',
+    continuationLabel: entry && entry.continuationLabel || ''
   };
 }
 

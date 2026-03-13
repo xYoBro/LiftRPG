@@ -1,5 +1,5 @@
-import { make } from './dom.js?v=22';
-import { createBoundedPage } from './page-shell.js?v=22';
+import { make } from './dom.js?v=23';
+import { createBoundedPage } from './page-shell.js?v=23';
 
 function renderGameplayClocks(clocks) {
   const section = make('section', 'ops-section ops-clocks');

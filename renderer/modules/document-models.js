@@ -1,5 +1,5 @@
-import { getDocumentAtom } from './atom-registry.js?v=22';
-import { splitParagraphs } from './utils.js?v=22';
+import { getDocumentAtom } from './atom-registry.js?v=23';
+import { splitParagraphs } from './utils.js?v=23';
 
 function normalizeDesignSpec(fragment) {
   const designSpec = fragment.designSpec || {};
@@ -31,6 +31,9 @@ export function buildFragmentModel(fragment) {
     .replace(/([a-z])([A-Z])/g, '$1-$2')
     .replace(/\s+/g, '-')
     .toLowerCase();
+  const bodyParagraphs = Array.isArray(fragment.bodyParagraphs) && fragment.bodyParagraphs.length
+    ? fragment.bodyParagraphs
+    : splitBody(fragment);
 
   return {
     id: fragment.id || '',
@@ -43,9 +46,12 @@ export function buildFragmentModel(fragment) {
     recipient: fragment.inWorldRecipient || '',
     date: fragment.date || '',
     purpose: fragment.inWorldPurpose || 'END FILE',
-    bodyParagraphs: splitBody(fragment),
+    bodyParagraphs,
     designSpec: normalizeDesignSpec(fragment),
-    authenticityChecks: normalizeAuthenticityChecks(fragment)
+    authenticityChecks: normalizeAuthenticityChecks(fragment),
+    continuationLabel: fragment.continuationLabel || '',
+    partIndex: fragment.partIndex || 0,
+    partCount: fragment.partCount || 0
   };
 }
 

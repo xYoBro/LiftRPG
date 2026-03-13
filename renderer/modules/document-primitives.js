@@ -1,5 +1,5 @@
-import { make } from './dom.js?v=22';
-import { createBoundedPage } from './page-shell.js?v=22';
+import { make } from './dom.js?v=23';
+import { createBoundedPage } from './page-shell.js?v=23';
 
 function buildMetaLines(fragmentModel) {
   const lines = [];
@@ -27,6 +27,9 @@ export function renderFoundDocument(fragmentModel) {
 
   const doc = make('div', 'fragment-doc ' + fragmentModel.documentClass);
   doc.appendChild(make('div', 'fragment-doc-type', fragmentModel.documentType));
+  if (fragmentModel.continuationLabel) {
+    doc.appendChild(make('div', 'fragment-doc-continuation', fragmentModel.continuationLabel));
+  }
 
   const metaLines = buildMetaLines(fragmentModel);
   if (metaLines.length) {

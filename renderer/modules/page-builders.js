@@ -1,7 +1,7 @@
-import { make } from './dom.js?v=22';
-import { getPageAtom } from './atom-registry.js?v=22';
-import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=22';
-import { createBoundedPage } from './page-shell.js?v=22';
+import { make } from './dom.js?v=23';
+import { getPageAtom } from './atom-registry.js?v=23';
+import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=23';
+import { createBoundedPage } from './page-shell.js?v=23';
 import {
   buildAssemblyPageModelWithVariant,
   buildBackCoverModel,
@@ -13,7 +13,7 @@ import {
   buildRulesLeftPageModelWithVariant,
   buildSealedPageModel,
   buildUnlockedEndingPageModel
-} from './booklet-models.js?v=22';
+} from './booklet-models.js?v=23';
 import {
   renderAssemblyPage,
   renderBackCover,
@@ -25,14 +25,14 @@ import {
   renderRulesLeftPage,
   renderSealedPage,
   renderUnlockedEndingPage
-} from './booklet-primitives.js?v=22';
-import { buildDocumentPageModel } from './document-models.js?v=22';
-import { renderDocumentPage } from './document-primitives.js?v=22';
-import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=22';
-import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=22';
-import { buildWorkoutPageModel } from './workout-models.js?v=22';
-import { renderWorkoutCard } from './workout-primitives.js?v=22';
-import { pad2 } from './utils.js?v=22';
+} from './booklet-primitives.js?v=23';
+import { buildDocumentPageModel } from './document-models.js?v=23';
+import { renderDocumentPage } from './document-primitives.js?v=23';
+import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=23';
+import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=23';
+import { buildWorkoutPageModel } from './workout-models.js?v=23';
+import { renderWorkoutCard } from './workout-primitives.js?v=23';
+import { pad2 } from './utils.js?v=23';
 
 function buildWorkoutPage(week, entry) {
   const sessions = entry.sessions || [];
@@ -156,12 +156,12 @@ export function buildPages(data, unlockedEnding, options = {}) {
         break;
       case 'overflow-doc': {
         const week = (data.weeks || [])[entry.weekIndex] || {};
-        page = renderDocumentPage(buildDocumentPageModel([week.overflowDocument || {}], 'overflow-doc', entry.layoutVariant));
+        page = renderDocumentPage(buildDocumentPageModel(entry.fragments || [week.overflowDocument || {}], 'overflow-doc', entry.layoutVariant));
         break;
       }
       case 'interlude': {
         const week = (data.weeks || [])[entry.weekIndex] || {};
-        page = renderInterludePage(buildInterludePageModel(week, entry.layoutVariant, entry.interlude));
+        page = renderInterludePage(buildInterludePageModel(week, entry.layoutVariant, entry.interlude, entry));
         break;
       }
       case 'blank-filler':
@@ -177,7 +177,7 @@ export function buildPages(data, unlockedEnding, options = {}) {
         page = renderLockedEndingPage(buildLockedEndingPageModel(data, entry.layoutVariant));
         break;
       case 'ending-unlocked':
-        page = renderUnlockedEndingPage(buildUnlockedEndingPageModel(data, unlockedEnding, entry.layoutVariant));
+        page = renderUnlockedEndingPage(buildUnlockedEndingPageModel(data, entry.endingPayload || unlockedEnding, entry.layoutVariant, entry));
         break;
       case 'notes':
         page = renderNotesPage(buildNotesPageModel());

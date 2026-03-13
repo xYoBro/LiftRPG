@@ -1,11 +1,11 @@
-import { make } from './dom.js?v=22';
+import { make } from './dom.js?v=23';
 import {
   planBookletLayout,
   revisePlanForMeasurement
-} from './layout-governor.js?v=22';
-import { buildPages } from './page-builders.js?v=22';
-import { getPageBoundary, getPageFrame } from './page-shell.js?v=22';
-import { setPageNumbers } from './pagination.js?v=22';
+} from './layout-governor.js?v=23';
+import { buildPages } from './page-builders.js?v=23';
+import { getPageBoundary, getPageFrame } from './page-shell.js?v=23';
+import { setPageNumbers } from './pagination.js?v=23';
 
 const MAX_LAYOUT_PASSES = 10;
 
@@ -74,9 +74,11 @@ function measureSlotMetrics(page, pageType) {
 
   if (pageType === 'fragment' || pageType === 'fragment-page' || pageType === 'overflow-doc') {
     const fragmentBlocks = Array.from(page.querySelectorAll('.fragment-block'));
+    const documentParagraphHeights = Array.from(page.querySelectorAll('.fragment-doc-body > p')).map((paragraph) => Math.ceil(paragraph.getBoundingClientRect().height));
     return {
       fragmentCount: fragmentBlocks.length,
-      fragmentHeights: fragmentBlocks.map((block) => Math.ceil(block.getBoundingClientRect().height))
+      fragmentHeights: fragmentBlocks.map((block) => Math.ceil(block.getBoundingClientRect().height)),
+      documentParagraphHeights
     };
   }
 
@@ -92,8 +94,10 @@ function measureSlotMetrics(page, pageType) {
   }
 
   if (pageType === 'ending-locked' || pageType === 'ending-unlocked') {
+    const paragraphs = Array.from(page.querySelectorAll('.endings-body > p'));
     return {
-      paragraphCount: page.querySelectorAll('.endings-body p').length,
+      paragraphCount: paragraphs.length,
+      paragraphHeights: paragraphs.map((paragraph) => Math.ceil(paragraph.getBoundingClientRect().height)),
       bodyHeight: heightOf(page.querySelector('.endings-body')),
       finalLineHeight: heightOf(page.querySelector('.endings-final-line'))
     };
@@ -116,8 +120,10 @@ function measureSlotMetrics(page, pageType) {
   }
 
   if (pageType === 'interlude') {
+    const paragraphs = Array.from(page.querySelectorAll('.interlude-body > p'));
     return {
-      paragraphCount: page.querySelectorAll('.interlude-body p').length,
+      paragraphCount: paragraphs.length,
+      paragraphHeights: paragraphs.map((paragraph) => Math.ceil(paragraph.getBoundingClientRect().height)),
       bodyHeight: heightOf(page.querySelector('.interlude-body')),
       reasonHeight: heightOf(page.querySelector('.interlude-reason'))
     };
