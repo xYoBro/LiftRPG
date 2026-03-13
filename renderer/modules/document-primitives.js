@@ -1,4 +1,4 @@
-import { make } from './dom.js?v=20';
+import { make } from './dom.js?v=21';
 
 function buildMetaLines(fragmentModel) {
   const lines = [];

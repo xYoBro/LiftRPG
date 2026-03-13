@@ -1,6 +1,6 @@
-import { make } from './dom.js?v=20';
-import { getPageAtom } from './atom-registry.js?v=20';
-import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=20';
+import { make } from './dom.js?v=21';
+import { getPageAtom } from './atom-registry.js?v=21';
+import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=21';
 import {
   buildAssemblyPageModelWithVariant,
   buildBackCoverModel,
@@ -12,7 +12,7 @@ import {
   buildRulesLeftPageModelWithVariant,
   buildSealedPageModel,
   buildUnlockedEndingPageModel
-} from './booklet-models.js?v=20';
+} from './booklet-models.js?v=21';
 import {
   renderAssemblyPage,
   renderBackCover,
@@ -24,14 +24,14 @@ import {
   renderRulesLeftPage,
   renderSealedPage,
   renderUnlockedEndingPage
-} from './booklet-primitives.js?v=20';
-import { buildDocumentPageModel } from './document-models.js?v=20';
-import { renderDocumentPage } from './document-primitives.js?v=20';
-import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=20';
-import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=20';
-import { buildWorkoutPageModel } from './workout-models.js?v=20';
-import { renderWorkoutCard } from './workout-primitives.js?v=20';
-import { pad2 } from './utils.js?v=20';
+} from './booklet-primitives.js?v=21';
+import { buildDocumentPageModel } from './document-models.js?v=21';
+import { renderDocumentPage } from './document-primitives.js?v=21';
+import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=21';
+import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=21';
+import { buildWorkoutPageModel } from './workout-models.js?v=21';
+import { renderWorkoutCard } from './workout-primitives.js?v=21';
+import { pad2 } from './utils.js?v=21';
 
 function buildWorkoutPage(week, entry) {
   const sessions = entry.sessions || [];

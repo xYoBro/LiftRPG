@@ -1,10 +1,10 @@
-import { make } from './dom.js?v=20';
+import { make } from './dom.js?v=21';
 import {
   planBookletLayout,
   revisePlanForMeasurement
-} from './layout-governor.js?v=20';
-import { buildPages } from './page-builders.js?v=20';
-import { setPageNumbers } from './pagination.js?v=20';
+} from './layout-governor.js?v=21';
+import { buildPages } from './page-builders.js?v=21';
+import { setPageNumbers } from './pagination.js?v=21';
 
 const MAX_LAYOUT_PASSES = 10;
 
@@ -37,6 +37,19 @@ function average(values) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+function heightOf(node) {
+  if (!node) return 0;
+  return Math.ceil(node.getBoundingClientRect().height);
+}
+
+function countBy(items, pickKey) {
+  return (items || []).reduce((counts, item) => {
+    const key = pickKey(item);
+    counts[key] = (counts[key] || 0) + 1;
+    return counts;
+  }, {});
+}
+
 function measureSlotMetrics(page, pageType) {
   if (pageType === 'workout-left') {
     const cards = Array.from(page.querySelectorAll('.session-card'));
@@ -66,6 +79,56 @@ function measureSlotMetrics(page, pageType) {
     };
   }
 
+  if (pageType === 'boss') {
+    return {
+      narrativeHeight: heightOf(page.querySelector('.boss-narrative')),
+      mechanismHeight: heightOf(page.querySelector('.boss-mechanism')),
+      proofHeight: heightOf(page.querySelector('.boss-proof')),
+      componentsHeight: heightOf(page.querySelector('.boss-components')),
+      convergenceHeight: heightOf(page.querySelector('.boss-convergence')),
+      componentCount: page.querySelectorAll('.boss-component-item').length
+    };
+  }
+
+  if (pageType === 'ending-locked' || pageType === 'ending-unlocked') {
+    return {
+      paragraphCount: page.querySelectorAll('.endings-body p').length,
+      bodyHeight: heightOf(page.querySelector('.endings-body')),
+      finalLineHeight: heightOf(page.querySelector('.endings-final-line'))
+    };
+  }
+
+  if (pageType === 'gauge-log') {
+    return {
+      rowCount: page.querySelectorAll('.password-log-row').length,
+      instructionHeight: heightOf(page.querySelector('.password-log-subtitle')),
+      finalBlockHeight: heightOf(page.querySelector('.password-final'))
+    };
+  }
+
+  if (pageType === 'assembly') {
+    return {
+      rowCount: page.querySelectorAll('.password-assembly-row').length,
+      subtitleHeight: heightOf(page.querySelector('.password-assembly-subtitle')),
+      finalBlockHeight: heightOf(page.querySelector('.password-final-assembly'))
+    };
+  }
+
+  if (pageType === 'interlude') {
+    return {
+      paragraphCount: page.querySelectorAll('.interlude-body p').length,
+      bodyHeight: heightOf(page.querySelector('.interlude-body')),
+      reasonHeight: heightOf(page.querySelector('.interlude-reason'))
+    };
+  }
+
+  if (pageType === 'rules-left' || pageType === 'rules-right') {
+    return {
+      headingCount: page.querySelectorAll('h3').length,
+      paragraphCount: page.querySelectorAll('p').length
+    };
+  }
+
   return {};
 }
 
@@ -86,10 +149,22 @@ function measurePage(page) {
   return {
     planIndex: parseInt(page.getAttribute('data-plan-index'), 10) || 0,
     pageType,
+    layoutVariant: page.getAttribute('data-layout-variant') || (frame && frame.getAttribute('data-layout-variant')) || '',
     overflowHeight,
     overflowWidth,
     overflowArea: (overflowHeight * Math.max(1, safeWidth)) + (overflowWidth * Math.max(1, safeHeight)),
     slotMetrics: measureSlotMetrics(page, pageType)
+  };
+}
+
+function summarizeMeasurements(pageMeasurements) {
+  const overflowPages = pageMeasurements.filter((page) => page.overflowHeight > 0 || page.overflowWidth > 0);
+  return {
+    pageTypeCounts: countBy(pageMeasurements, (page) => page.pageType || 'unknown'),
+    layoutVariantCounts: countBy(pageMeasurements.filter((page) => page.layoutVariant), (page) => {
+      return page.pageType + ':' + page.layoutVariant;
+    }),
+    overflowTypes: countBy(overflowPages, (page) => page.pageType || 'unknown')
   };
 }
 
@@ -120,7 +195,8 @@ function evaluatePlan(container, data, unlockedEnding, plan) {
     totalOverflowWidth,
     totalOverflowArea,
     score,
-    pages: pageMeasurements
+    pages: pageMeasurements,
+    summary: summarizeMeasurements(pageMeasurements)
   };
 }
 

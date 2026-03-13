@@ -1,6 +1,6 @@
-import { clone, readingLength } from './utils.js?v=20';
-import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=20';
-import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=20';
+import { clone, readingLength } from './utils.js?v=21';
+import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=21';
+import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=21';
 
 const MAX_WORKOUT_COMPACTION = 3;
 

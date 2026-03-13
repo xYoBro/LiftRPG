@@ -1,5 +1,5 @@
-import { make } from './dom.js?v=20';
-import { splitRichText } from './booklet-models.js?v=20';
+import { make } from './dom.js?v=21';
+import { splitRichText } from './booklet-models.js?v=21';
 
 export function renderCoverPage(model) {
   const page = make('section', 'booklet-page');

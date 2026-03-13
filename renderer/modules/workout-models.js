@@ -7,7 +7,7 @@ import {
 
 function resolveExerciseNameWidthCh(exercises) {
   const longestExerciseName = Math.max(
-    8,
+    4,
     ...(exercises || []).map((exercise) => String(exercise && exercise.name || 'Lift').trim().length || 4)
   );
   return Math.min(longestExerciseName, 20);
