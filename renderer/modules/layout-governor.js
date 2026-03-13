@@ -1,4 +1,8 @@
-import { readingLength } from './utils.js?v=17';
+import { clone, readingLength } from './utils.js?v=20';
+import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=20';
+import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=20';
+
+const MAX_WORKOUT_COMPACTION = 3;
 
 export function chunkSessions(week) {
   const sessions = week.sessions || [];
@@ -31,7 +35,7 @@ function resolveDensity(score) {
   return 'standard';
 }
 
-function resolveNotesLines(score, cardCount) {
+function baseNotesLines(score, cardCount) {
   if (cardCount === 1) {
     if (score >= 6.2) return 2;
     return 3;
@@ -48,22 +52,32 @@ function resolveNotesLines(score, cardCount) {
   return 2;
 }
 
-function resolveNotesHeight(notesLines) {
-  if (notesLines <= 0) return 0;
-  if (notesLines === 1) return 20;
-  if (notesLines === 2) return 30;
-  return 40;
+function resolveNotesLines(score, cardCount, compactionLevel) {
+  const minimumNotesLines = cardCount === 1 ? 1 : 0;
+  const lines = baseNotesLines(score, cardCount) - (compactionLevel || 0);
+  return Math.max(minimumNotesLines, lines);
 }
 
-export function planWorkoutPageLayout(sessions) {
+function resolveNotesHeight(notesLines, compactionLevel) {
+  if (notesLines <= 0) return 0;
+
+  let height = 40;
+  if (notesLines === 1) height = 20;
+  if (notesLines === 2) height = 30;
+
+  return Math.max(notesLines === 1 ? 12 : 0, height - ((compactionLevel || 0) * 4));
+}
+
+export function planWorkoutPageLayout(sessions, options = {}) {
   const cardCount = Math.max(1, sessions.length);
+  const compactionLevel = Math.max(0, Math.min(MAX_WORKOUT_COMPACTION, parseInt(options.compactionLevel, 10) || 0));
   const complexityScores = sessions.map((session) => sessionComplexity(session, cardCount));
   const totalComplexity = complexityScores.reduce((sum, value) => sum + value, 0) || cardCount;
   const cards = sessions.map((session, index) => {
     const score = complexityScores[index];
     const density = resolveDensity(score);
-    const notesLines = resolveNotesLines(score, cardCount);
-    const notesHeight = resolveNotesHeight(notesLines);
+    const notesLines = resolveNotesLines(score, cardCount, compactionLevel);
+    const notesHeight = resolveNotesHeight(notesLines, compactionLevel);
     const flexWeight = Math.max(1, Math.round((score / totalComplexity) * 100));
 
     return {
@@ -71,6 +85,7 @@ export function planWorkoutPageLayout(sessions) {
       notesLines,
       notesHeight,
       flexWeight,
+      compactionLevel,
       promptChars: readingLength(session.storyPrompt),
       exerciseCount: (session.exercises || []).length
     };
@@ -78,7 +93,8 @@ export function planWorkoutPageLayout(sessions) {
 
   return {
     cardCount,
-    pageDensity: resolveDensity(totalComplexity / cardCount),
+    compactionLevel,
+    pageDensity: resolveDensity((totalComplexity / cardCount) + (compactionLevel * 0.15)),
     totalComplexity,
     cards
   };
@@ -109,6 +125,8 @@ export function paginateFragments(fragments) {
 function planWeekEntries(week, weekIndex) {
   const entries = [];
   const chunks = chunkSessions(week);
+  const oracleEntryCount = ((((week || {}).fieldOps || {}).oracleTable || {}).entries || []).length;
+  const mechanicProfile = resolveWeekMechanicProfile(week);
 
   if (chunks.length > 0) {
     entries.push({
@@ -116,6 +134,8 @@ function planWeekEntries(week, weekIndex) {
       weekIndex,
       chunkIndex: 0,
       chunkCount: chunks.length,
+      compactionLevel: 0,
+      mechanicProfile,
       sessions: chunks[0]
     });
   }
@@ -123,22 +143,18 @@ function planWeekEntries(week, weekIndex) {
   if (week.isBossWeek) {
     entries.push({
       type: 'boss',
-      weekIndex
+      weekIndex,
+      layoutVariant: pickDefaultTemplateVariant('boss', { week })
     });
   } else {
-    const oracleEntryCount = ((((week || {}).fieldOps || {}).oracleTable || {}).entries || []).length;
     entries.push({
       type: 'field-ops',
       weekIndex,
-      layout: oracleEntryCount > 12 ? 'split-oracle' : 'standard'
+      layout: 'standard',
+      layoutVariant: pickDefaultTemplateVariant('field-ops', { week, mechanicProfile }),
+      mechanicProfile,
+      primaryOracleCount: oracleEntryCount
     });
-    if (oracleEntryCount > 12) {
-      entries.push({
-        type: 'oracle-overflow',
-        weekIndex,
-        layout: 'oracle-only'
-      });
-    }
   }
 
   for (let index = 1; index < chunks.length; index += 1) {
@@ -147,22 +163,204 @@ function planWeekEntries(week, weekIndex) {
       weekIndex,
       chunkIndex: index,
       chunkCount: chunks.length,
+      compactionLevel: 0,
+      mechanicProfile,
       sessions: chunks[index]
     });
     entries.push(week.overflowDocument
-      ? { type: 'overflow-doc', weekIndex }
+      ? {
+        type: 'overflow-doc',
+        weekIndex,
+        layoutVariant: pickDefaultTemplateVariant('overflow-doc', { week })
+      }
       : { type: 'blank-filler', weekIndex }
     );
+  }
+
+  if (week.interlude) {
+    entries.push({
+      type: 'interlude',
+      weekIndex,
+      interlude: clone(week.interlude),
+      layoutVariant: pickDefaultTemplateVariant('interlude', { week })
+    });
   }
 
   return entries;
 }
 
+export function normalizeBookletPlan(entries) {
+  const normalized = (entries || [])
+    .filter((entry) => entry && entry.type !== 'notes' && entry.type !== 'back-cover')
+    .map((entry) => clone(entry));
+
+  while ((normalized.length + 1) % 4 !== 0) {
+    normalized.push({ type: 'notes' });
+  }
+
+  normalized.push({ type: 'back-cover' });
+  return normalized;
+}
+
+export function compactWorkoutEntry(plan, index) {
+  const entry = (plan || [])[index];
+  if (!entry || entry.type !== 'workout-left') return null;
+
+  const currentLevel = Math.max(0, parseInt(entry.compactionLevel, 10) || 0);
+  if (currentLevel >= MAX_WORKOUT_COMPACTION) return null;
+
+  const revised = normalizeBookletPlan(plan);
+  revised[index] = {
+    ...revised[index],
+    compactionLevel: currentLevel + 1
+  };
+
+  return revised;
+}
+
+function reviseEntryVariant(plan, index) {
+  const entry = (plan || [])[index];
+  if (!entry) return null;
+
+  const supportedTypes = new Set([
+    'rules-left',
+    'rules-right',
+    'gauge-log',
+    'assembly',
+    'field-ops',
+    'boss',
+    'ending-locked',
+    'ending-unlocked',
+    'overflow-doc',
+    'fragment-page',
+    'oracle-overflow',
+    'interlude'
+  ]);
+
+  if (!supportedTypes.has(entry.type)) return null;
+
+  const nextVariant = nextTemplateVariant(entry.type, entry.layoutVariant || 'standard');
+  if (nextVariant === (entry.layoutVariant || 'standard')) return null;
+
+  const revised = normalizeBookletPlan(plan);
+  revised[index] = {
+    ...revised[index],
+    layoutVariant: nextVariant
+  };
+  return revised;
+}
+
+export function splitFieldOpsEntry(plan, index, measurement, data) {
+  const entry = (plan || [])[index];
+  if (!entry || entry.type !== 'field-ops') return null;
+
+  const week = ((data || {}).weeks || [])[entry.weekIndex] || {};
+  const oracleEntries = ((((week || {}).fieldOps || {}).oracleTable || {}).entries || []);
+  if (!oracleEntries.length) return null;
+
+  const slotMetrics = measurement && measurement.slotMetrics || {};
+  const currentPrimaryCount = entry.layout === 'split-oracle'
+    ? Math.max(0, Math.min(parseInt(entry.primaryOracleCount, 10) || 0, oracleEntries.length))
+    : oracleEntries.length;
+  const averageOracleEntryHeight = slotMetrics.averageOracleEntryHeight || 14;
+  const overflowHeight = Math.max(0, Math.ceil((measurement && measurement.overflowHeight) || 0));
+  const desiredReduction = overflowHeight + 12;
+  const moveCount = Math.max(1, Math.ceil(desiredReduction / averageOracleEntryHeight));
+  const nextPrimaryCount = Math.max(0, currentPrimaryCount - moveCount);
+
+  if (nextPrimaryCount === currentPrimaryCount) return null;
+
+  const revised = normalizeBookletPlan(plan);
+  revised[index] = {
+    ...revised[index],
+    layout: 'split-oracle',
+    primaryOracleCount: nextPrimaryCount
+  };
+
+  const overflowEntry = {
+    type: 'oracle-overflow',
+    weekIndex: entry.weekIndex,
+    layout: 'oracle-only',
+    primaryOracleCount: nextPrimaryCount,
+    layoutVariant: pickDefaultTemplateVariant('oracle-overflow', { week })
+  };
+
+  if (revised[index + 1] && revised[index + 1].type === 'oracle-overflow' && revised[index + 1].weekIndex === entry.weekIndex) {
+    revised[index + 1] = overflowEntry;
+  } else {
+    revised.splice(index + 1, 0, overflowEntry);
+  }
+
+  return normalizeBookletPlan(revised);
+}
+
+export function splitFragmentEntry(plan, index, measurement) {
+  const entry = (plan || [])[index];
+  const fragments = entry && entry.fragments || [];
+  if (!entry || entry.type !== 'fragment-page' || fragments.length <= 1) return null;
+
+  const slotMetrics = measurement && measurement.slotMetrics || {};
+  const fragmentHeights = slotMetrics.fragmentHeights || [];
+  const targetReduction = Math.max(0, ((measurement && measurement.overflowHeight) || 0) + 8);
+
+  let splitIndex = fragments.length - 1;
+  let recoveredHeight = fragmentHeights[splitIndex] || 0;
+  while (splitIndex > 1 && recoveredHeight < targetReduction) {
+    splitIndex -= 1;
+    recoveredHeight += fragmentHeights[splitIndex] || 0;
+  }
+
+  let leading = fragments.slice(0, splitIndex);
+  let trailing = fragments.slice(splitIndex);
+
+  if (!leading.length || !trailing.length) {
+    const midpoint = Math.ceil(fragments.length / 2);
+    leading = fragments.slice(0, midpoint);
+    trailing = fragments.slice(midpoint);
+  }
+
+  if (!leading.length || !trailing.length) return null;
+
+  const revised = normalizeBookletPlan(plan);
+  revised.splice(index, 1,
+    {
+      ...revised[index],
+      fragments: leading,
+      layoutVariant: pickDefaultTemplateVariant('fragment-page', { entry: { fragments: leading } })
+    },
+    {
+      ...revised[index],
+      fragments: trailing,
+      layoutVariant: pickDefaultTemplateVariant('fragment-page', { entry: { fragments: trailing } })
+    }
+  );
+
+  return normalizeBookletPlan(revised);
+}
+
+export function revisePlanForMeasurement(plan, measurement, data) {
+  if (!measurement) return null;
+
+  if (measurement.pageType === 'workout-left') {
+    return compactWorkoutEntry(plan, measurement.planIndex);
+  }
+
+  if (measurement.pageType === 'field-ops') {
+    return splitFieldOpsEntry(plan, measurement.planIndex, measurement, data);
+  }
+
+  if (measurement.pageType === 'fragment-page' || measurement.pageType === 'fragment') {
+    return splitFragmentEntry(plan, measurement.planIndex, measurement);
+  }
+
+  return reviseEntryVariant(plan, measurement.planIndex);
+}
+
 export function planBookletLayout(data, unlockedEnding) {
   const entries = [
     { type: 'cover' },
-    { type: 'rules-left' },
-    { type: 'rules-right' }
+    { type: 'rules-left', layoutVariant: pickDefaultTemplateVariant('rules-left', { data }) },
+    { type: 'rules-right', layoutVariant: pickDefaultTemplateVariant('rules-right', { data }) }
   ];
 
   (data.weeks || []).forEach((week, weekIndex) => {
@@ -172,20 +370,22 @@ export function planBookletLayout(data, unlockedEnding) {
   paginateFragments(data.fragments || []).forEach((fragments) => {
     entries.push({
       type: 'fragment-page',
-      fragments
+      fragments,
+      layoutVariant: pickDefaultTemplateVariant('fragment-page', { entry: { fragments } })
     });
   });
 
   entries.push(
-    { type: 'assembly' },
-    { type: 'gauge-log' },
-    { type: unlockedEnding ? 'ending-unlocked' : 'ending-locked' }
+    { type: 'assembly', layoutVariant: pickDefaultTemplateVariant('assembly', { data }) },
+    { type: 'gauge-log', layoutVariant: pickDefaultTemplateVariant('gauge-log', { data }) },
+    {
+      type: unlockedEnding ? 'ending-unlocked' : 'ending-locked',
+      layoutVariant: pickDefaultTemplateVariant(unlockedEnding ? 'ending-unlocked' : 'ending-locked', {
+        data,
+        entry: unlockedEnding || {}
+      })
+    }
   );
 
-  while ((entries.length + 1) % 4 !== 0) {
-    entries.push({ type: 'notes' });
-  }
-
-  entries.push({ type: 'back-cover' });
-  return entries;
+  return normalizeBookletPlan(entries);
 }

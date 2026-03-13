@@ -1,57 +1,67 @@
-import { make } from './dom.js?v=17';
-import { planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=17';
+import { make } from './dom.js?v=20';
+import { getPageAtom } from './atom-registry.js?v=20';
+import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=20';
 import {
-  buildAssemblyPageModel,
+  buildAssemblyPageModelWithVariant,
   buildBackCoverModel,
   buildCoverPageModel,
-  buildGaugeLogPageModel,
+  buildGaugeLogPageModelWithVariant,
+  buildInterludePageModel,
   buildLockedEndingPageModel,
   buildNotesPageModel,
-  buildRulesLeftPageModel,
+  buildRulesLeftPageModelWithVariant,
   buildSealedPageModel,
   buildUnlockedEndingPageModel
-} from './booklet-models.js?v=17';
+} from './booklet-models.js?v=20';
 import {
   renderAssemblyPage,
   renderBackCover,
   renderCoverPage,
   renderGaugeLogPage,
+  renderInterludePage,
   renderLockedEndingPage,
   renderNotesPage,
   renderRulesLeftPage,
   renderSealedPage,
   renderUnlockedEndingPage
-} from './booklet-primitives.js?v=17';
-import { buildDocumentPageModel } from './document-models.js?v=17';
-import { renderDocumentPage } from './document-primitives.js?v=17';
-import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=17';
-import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=17';
-import { buildWorkoutPageModel } from './workout-models.js?v=17';
-import { renderWorkoutCard } from './workout-primitives.js?v=17';
-import { pad2 } from './utils.js?v=17';
+} from './booklet-primitives.js?v=20';
+import { buildDocumentPageModel } from './document-models.js?v=20';
+import { renderDocumentPage } from './document-primitives.js?v=20';
+import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=20';
+import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=20';
+import { buildWorkoutPageModel } from './workout-models.js?v=20';
+import { renderWorkoutCard } from './workout-primitives.js?v=20';
+import { pad2 } from './utils.js?v=20';
 
-function buildWorkoutPage(week, sessions, chunkIndex, chunkCount) {
+function buildWorkoutPage(week, entry) {
+  const sessions = entry.sessions || [];
+  const mechanicProfile = entry.mechanicProfile || {};
   const page = make('section', 'booklet-page');
   page.setAttribute('data-page-type', 'workout-left');
   const frame = make('div', 'workout-left');
   frame.setAttribute('data-card-count', String(sessions.length));
+  frame.setAttribute('data-page-compaction', String(entry.compactionLevel || 0));
+  frame.setAttribute('data-route-family', mechanicProfile.routeFamily || 'none');
+  frame.setAttribute('data-clock-family', mechanicProfile.clockFamily || 'none');
 
   const header = make('header', 'page-header');
   header.appendChild(make('span', 'week-id', 'Week ' + pad2(week.weekNumber)));
   header.appendChild(make('span', 'page-num', ''));
   frame.appendChild(header);
 
-  const kickerText = chunkCount > 1 ? 'Session Log ' + (chunkIndex + 1) + '/' + chunkCount : 'Session Log';
+  const kickerText = entry.chunkCount > 1 ? 'Session Log ' + ((entry.chunkIndex || 0) + 1) + '/' + entry.chunkCount : 'Session Log';
   frame.appendChild(make('div', 'week-kicker', kickerText));
   frame.appendChild(make('h2', 'week-title', week.title || 'Training Record'));
 
-  if (week.epigraph && chunkIndex === 0) {
+  if (week.epigraph && (entry.chunkIndex || 0) === 0) {
     frame.appendChild(make('div', 'week-subtitle', week.epigraph.attribution || ''));
     frame.appendChild(make('div', 'week-meta', week.epigraph.text || ''));
   }
 
   const cards = make('div', 'session-cards');
-  const workoutPageModel = buildWorkoutPageModel(sessions, planWorkoutPageLayout(sessions));
+  const workoutPageModel = buildWorkoutPageModel(sessions, planWorkoutPageLayout(sessions, {
+    compactionLevel: entry.compactionLevel || 0
+  }));
   frame.setAttribute('data-page-density', workoutPageModel.pageDensity);
   workoutPageModel.cards.forEach((cardModel) => {
     cards.appendChild(renderWorkoutCard(cardModel));
@@ -67,77 +77,120 @@ function buildBlankPage() {
   return blank;
 }
 
-export function buildPages(data, unlockedEnding) {
+function tagPlanMetadata(page, entry, index) {
+  const atom = getPageAtom(entry.type || '');
+  page.setAttribute('data-plan-index', String(index));
+  page.setAttribute('data-plan-entry-type', entry.type || '');
+  page.setAttribute('data-atom-family', atom.family || 'custom');
+  page.setAttribute('data-atom-measurable', atom.measurable ? 'true' : 'false');
+  if (entry.weekIndex != null) {
+    page.setAttribute('data-plan-week', String(entry.weekIndex));
+  }
+  if (entry.compactionLevel != null) {
+    page.setAttribute('data-plan-compaction', String(entry.compactionLevel));
+  }
+  if (entry.layout) {
+    page.setAttribute('data-plan-layout', String(entry.layout));
+  }
+  if (entry.layoutVariant) {
+    page.setAttribute('data-layout-variant', String(entry.layoutVariant));
+  }
+}
+
+export function buildPages(data, unlockedEnding, options = {}) {
   const pages = [];
-  const plan = planBookletLayout(data, unlockedEnding);
+  const plan = normalizeBookletPlan(options.plan || planBookletLayout(data, unlockedEnding));
   const fieldOpsByWeek = new Map();
 
-  plan.forEach((entry) => {
+  plan.forEach((entry, index) => {
+    let page = null;
+
     switch (entry.type) {
       case 'cover':
-        pages.push(renderCoverPage(buildCoverPageModel(data)));
-        return;
+        page = renderCoverPage(buildCoverPageModel(data));
+        break;
       case 'rules-left':
-        pages.push(renderRulesLeftPage(buildRulesLeftPageModel(data)));
-        return;
+        page = renderRulesLeftPage(buildRulesLeftPageModelWithVariant(data, entry.layoutVariant));
+        break;
       case 'rules-right':
-        pages.push(renderSealedPage(buildSealedPageModel(data)));
-        return;
+        page = renderSealedPage(buildSealedPageModel(data, entry.layoutVariant));
+        break;
       case 'workout-left': {
         const week = (data.weeks || [])[entry.weekIndex] || {};
-        pages.push(buildWorkoutPage(week, entry.sessions || [], entry.chunkIndex || 0, entry.chunkCount || 1));
-        return;
+        page = buildWorkoutPage(week, entry);
+        break;
       }
       case 'field-ops':
       case 'oracle-overflow': {
         const week = (data.weeks || [])[entry.weekIndex] || {};
-        if (!fieldOpsByWeek.has(entry.weekIndex)) {
-          fieldOpsByWeek.set(entry.weekIndex, buildFieldOpsPageModels(data, week));
+        const fieldOpsLayout = entry.type === 'oracle-overflow'
+          ? {
+            ...entry,
+            layout: 'split-oracle'
+          }
+          : entry;
+        const cacheKey = [
+          entry.weekIndex,
+          fieldOpsLayout.layout || 'standard',
+          entry.layoutVariant || 'balanced',
+          entry.primaryOracleCount == null ? 'all' : entry.primaryOracleCount
+        ].join(':');
+        if (!fieldOpsByWeek.has(cacheKey)) {
+          fieldOpsByWeek.set(cacheKey, buildFieldOpsPageModels(data, week, fieldOpsLayout));
         }
-        const models = fieldOpsByWeek.get(entry.weekIndex) || [];
+        const models = fieldOpsByWeek.get(cacheKey) || [];
         const modelIndex = entry.type === 'oracle-overflow' ? 1 : 0;
         if (models[modelIndex]) {
-          pages.push(renderFieldOpsPage(models[modelIndex]));
+          page = renderFieldOpsPage(models[modelIndex]);
         }
-        return;
+        break;
       }
       case 'boss': {
         const week = (data.weeks || [])[entry.weekIndex] || {};
-        pages.push(renderBossPage(buildBossPageModel(data, week)));
-        return;
+        page = renderBossPage(buildBossPageModel(data, week, entry.layoutVariant));
+        break;
       }
       case 'fragment-page':
-        pages.push(renderDocumentPage(buildDocumentPageModel(entry.fragments || [], 'fragment')));
-        return;
+        page = renderDocumentPage(buildDocumentPageModel(entry.fragments || [], 'fragment', entry.layoutVariant));
+        break;
       case 'overflow-doc': {
         const week = (data.weeks || [])[entry.weekIndex] || {};
-        pages.push(renderDocumentPage(buildDocumentPageModel([week.overflowDocument || {}], 'overflow-doc')));
-        return;
+        page = renderDocumentPage(buildDocumentPageModel([week.overflowDocument || {}], 'overflow-doc', entry.layoutVariant));
+        break;
+      }
+      case 'interlude': {
+        const week = (data.weeks || [])[entry.weekIndex] || {};
+        page = renderInterludePage(buildInterludePageModel(week, entry.layoutVariant, entry.interlude));
+        break;
       }
       case 'blank-filler':
-        pages.push(buildBlankPage());
-        return;
+        page = buildBlankPage();
+        break;
       case 'assembly':
-        pages.push(renderAssemblyPage(buildAssemblyPageModel(data)));
-        return;
+        page = renderAssemblyPage(buildAssemblyPageModelWithVariant(data, entry.layoutVariant));
+        break;
       case 'gauge-log':
-        pages.push(renderGaugeLogPage(buildGaugeLogPageModel(data)));
-        return;
+        page = renderGaugeLogPage(buildGaugeLogPageModelWithVariant(data, entry.layoutVariant));
+        break;
       case 'ending-locked':
-        pages.push(renderLockedEndingPage(buildLockedEndingPageModel(data)));
-        return;
+        page = renderLockedEndingPage(buildLockedEndingPageModel(data, entry.layoutVariant));
+        break;
       case 'ending-unlocked':
-        pages.push(renderUnlockedEndingPage(buildUnlockedEndingPageModel(data, unlockedEnding)));
-        return;
+        page = renderUnlockedEndingPage(buildUnlockedEndingPageModel(data, unlockedEnding, entry.layoutVariant));
+        break;
       case 'notes':
-        pages.push(renderNotesPage(buildNotesPageModel()));
-        return;
+        page = renderNotesPage(buildNotesPageModel());
+        break;
       case 'back-cover':
-        pages.push(renderBackCover(buildBackCoverModel(data)));
-        return;
+        page = renderBackCover(buildBackCoverModel(data));
+        break;
       default:
-        return;
+        break;
     }
+
+    if (!page) return;
+    tagPlanMetadata(page, entry, index);
+    pages.push(page);
   });
 
   return pages;

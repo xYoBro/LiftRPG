@@ -2,7 +2,7 @@ import {
   getPasswordLength,
   pad2,
   splitParagraphs
-} from './utils.js?v=17';
+} from './utils.js?v=20';
 
 function humanizeComponentType(value) {
   return String(value || 'component').replace(/-/g, ' ');
@@ -34,7 +34,7 @@ export function buildCoverPageModel(data) {
   return {
     meta,
     designation: cover.designation || '',
-    title: meta.blockTitle,
+    title: cover.title || meta.blockTitle,
     subtitle: meta.blockSubtitle,
     tagline: cover.tagline || '',
     colophonLines: cover.colophonLines || []
@@ -42,6 +42,10 @@ export function buildCoverPageModel(data) {
 }
 
 export function buildRulesLeftPageModel(data) {
+  return buildRulesLeftPageModelWithVariant(data, 'standard');
+}
+
+export function buildRulesLeftPageModelWithVariant(data, layoutVariant) {
   const meta = buildBookletMetaModel(data);
   const leftPage = (data.rulesSpread || {}).leftPage || {};
   const reEntry = leftPage.reEntryRule;
@@ -49,26 +53,33 @@ export function buildRulesLeftPageModel(data) {
 
   return {
     meta,
+    layoutVariant: layoutVariant || 'standard',
     title: leftPage.title || 'Briefing',
     sections: leftPage.sections || [],
     reEntryText: reEntryText || ''
   };
 }
 
-export function buildSealedPageModel(data) {
+export function buildSealedPageModel(data, layoutVariant = 'standard') {
   return {
     meta: buildBookletMetaModel(data),
+    layoutVariant,
     title: 'This Document Is Sealed',
     body: 'Assemble your password from the weekly gauge readings. Return to liftrpg.co → Render and enter it to unlock this page.'
   };
 }
 
 export function buildGaugeLogPageModel(data) {
+  return buildGaugeLogPageModelWithVariant(data, 'standard');
+}
+
+export function buildGaugeLogPageModelWithVariant(data, layoutVariant) {
   const meta = buildBookletMetaModel(data);
   const rightPage = (data.rulesSpread || {}).rightPage || {};
 
   return {
     meta,
+    layoutVariant: layoutVariant || 'standard',
     title: rightPage.title || 'Gauge Reading Log',
     instruction: rightPage.instruction || '',
     rows: (data.weeks || []).map((week) => ({
@@ -82,10 +93,15 @@ export function buildGaugeLogPageModel(data) {
 }
 
 export function buildAssemblyPageModel(data) {
+  return buildAssemblyPageModelWithVariant(data, 'standard');
+}
+
+export function buildAssemblyPageModelWithVariant(data, layoutVariant) {
   const meta = buildBookletMetaModel(data);
 
   return {
     meta,
+    layoutVariant: layoutVariant || 'standard',
     title: 'Password Assembly',
     subtitle: 'Transfer each recorded weekly value into the final assembly ladder. Decode only when the boss page gives the rule.',
     rows: (data.weeks || [])
@@ -105,18 +121,19 @@ function inferEndingTreatment(designSpec) {
   return 'default';
 }
 
-export function buildLockedEndingPageModel(data) {
+export function buildLockedEndingPageModel(data, layoutVariant = 'standard') {
   const meta = buildBookletMetaModel(data);
 
   return {
     meta,
+    layoutVariant,
     title: 'Final Document',
     body: 'This final page remains sealed until the completed password is entered above. The booklet should give you everything you need.',
     variants: (data.endings || []).map((ending) => ending.variant || 'Variant')
   };
 }
 
-export function buildUnlockedEndingPageModel(data, payload) {
+export function buildUnlockedEndingPageModel(data, payload, layoutVariant = 'document') {
   const ending = (data.endings || []).find((item) => {
     if (!payload || !payload.variant || !item) return false;
     return item.variant === payload.variant;
@@ -125,8 +142,10 @@ export function buildUnlockedEndingPageModel(data, payload) {
 
   return {
     meta: buildBookletMetaModel(data),
+    layoutVariant,
     title: content.title || 'Unlocked Document',
     documentType: content.documentType || '',
+    kicker: content.kicker || '',
     body: content.body || content.content || '',
     finalLine: content.finalLine || '',
     designSpec: ending.designSpec || '',
@@ -140,13 +159,31 @@ export function buildNotesPageModel() {
   };
 }
 
+export function buildInterludePageModel(week, layoutVariant, interludeOverride = null) {
+  const interlude = interludeOverride || (week && week.interlude) || {};
+
+  return {
+    weekNumber: week && week.weekNumber || 0,
+    layoutVariant: layoutVariant || 'quiet',
+    title: interlude.title || 'Interlude',
+    reason: interlude.reason || '',
+    body: interlude.body || '',
+    spreadAware: !!(interlude && (interlude.spreadAware || interlude['spread-aware'])),
+    payload: interlude.payload || null,
+    payloadType: interlude.payloadType || ''
+  };
+}
+
 export function buildBackCoverModel(data) {
   const meta = buildBookletMetaModel(data);
 
   return {
     meta,
     colophon: 'Printed by hand, completed in pencil, resolved through repetition.',
-    mark: 'LiftRPG'
+    mark: 'LiftRPG',
+    generatedAt: meta.generatedAt || '',
+    weekCount: meta.weekCount || 0,
+    totalSessions: meta.totalSessions || 0
   };
 }
 

@@ -1,4 +1,5 @@
-import { splitParagraphs } from './utils.js?v=17';
+import { getDocumentAtom } from './atom-registry.js?v=20';
+import { splitParagraphs } from './utils.js?v=20';
 
 function normalizeDesignSpec(fragment) {
   const designSpec = fragment.designSpec || {};
@@ -36,6 +37,7 @@ export function buildFragmentModel(fragment) {
     numberText: fragment.id ? fragment.id.replace('F.', '') : '',
     documentType,
     documentClass,
+    atomFamily: getDocumentAtom(documentClass).family,
     title: fragment.title || '',
     author: fragment.inWorldAuthor || '',
     recipient: fragment.inWorldRecipient || '',
@@ -47,10 +49,12 @@ export function buildFragmentModel(fragment) {
   };
 }
 
-export function buildDocumentPageModel(fragments, pageType) {
+export function buildDocumentPageModel(fragments, pageType, layoutVariant = 'stacked') {
+  const normalizedPageType = pageType || 'fragment';
   return {
-    pageType: pageType || 'fragment',
-    title: 'Documents',
+    pageType: normalizedPageType,
+    layoutVariant,
+    title: normalizedPageType === 'overflow-doc' ? 'Supplement' : 'Documents',
     fragments: (fragments || []).map((fragment) => buildFragmentModel(fragment))
   };
 }

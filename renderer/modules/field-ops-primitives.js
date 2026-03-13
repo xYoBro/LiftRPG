@@ -1,4 +1,4 @@
-import { make } from './dom.js?v=17';
+import { make } from './dom.js?v=20';
 
 function renderGameplayClocks(clocks) {
   const section = make('section', 'ops-section ops-clocks');
@@ -189,10 +189,48 @@ function renderOracleSection(oracle) {
   return section;
 }
 
+function renderCompanionComponent(component) {
+  const card = make('section', 'companion-component');
+  card.setAttribute('data-component-family', component.family || 'custom-companion');
+  card.setAttribute('data-component-footprint', component.footprint || 'half-page');
+  card.appendChild(make('div', 'companion-title', component.title || 'Companion Component'));
+
+  if (component.body) {
+    card.appendChild(make('div', 'companion-body', component.body));
+  }
+
+  if ((component.slots || []).length) {
+    const slots = make('div', 'companion-slot-grid');
+    component.slots.forEach((slot) => {
+      const item = make('div', 'companion-slot');
+      item.appendChild(make('span', 'companion-slot-label', slot.label || ''));
+      item.appendChild(make('span', 'companion-slot-box'));
+      slots.appendChild(item);
+    });
+    card.appendChild(slots);
+  } else if ((component.rows || 0) > 0 && (component.cols || 0) > 0) {
+    const cells = make('div', 'companion-cell-grid');
+    cells.style.setProperty('--companion-cols', String(component.cols));
+    const total = component.rows * component.cols;
+    for (let i = 0; i < total; i += 1) {
+      cells.appendChild(make('div', 'companion-cell'));
+    }
+    card.appendChild(cells);
+  } else {
+    card.appendChild(make('div', 'companion-dash-line'));
+  }
+
+  return card;
+}
+
 export function renderFieldOpsPage(model) {
   const page = make('section', 'booklet-page');
   page.setAttribute('data-page-type', model.pageType);
   const frame = make('div', 'field-ops-right');
+  frame.setAttribute('data-layout-variant', model.layoutVariant || 'balanced');
+  frame.setAttribute('data-map-family', (model.mechanicProfile || {}).mapFamily || 'none');
+  frame.setAttribute('data-cipher-family', (model.mechanicProfile || {}).cipherFamily || 'none');
+  frame.setAttribute('data-oracle-family', (model.mechanicProfile || {}).oracleFamily || 'none');
 
   const header = make('header', 'rp-header');
   header.appendChild(make('span', '', model.headerTitle || 'Field Operations'));
@@ -219,6 +257,16 @@ export function renderFieldOpsPage(model) {
     content.appendChild(renderOracleSection(model.oracle));
   }
 
+  if ((model.companionComponents || []).length > 0) {
+    content.setAttribute('data-has-companion', 'true');
+    const companionZone = make('section', 'companion-zone');
+    companionZone.appendChild(make('div', 'doc-label', 'Companion Surface'));
+    model.companionComponents.forEach((component) => {
+      companionZone.appendChild(renderCompanionComponent(component));
+    });
+    content.appendChild(companionZone);
+  }
+
   frame.appendChild(content);
   page.appendChild(frame);
   return page;
@@ -228,6 +276,7 @@ export function renderBossPage(model) {
   const page = make('section', 'booklet-page');
   page.setAttribute('data-page-type', 'boss');
   const frame = make('div', 'boss-right');
+  frame.setAttribute('data-layout-variant', model.layoutVariant || 'standard');
 
   if (model.convergenceProof) {
     frame.setAttribute('data-has-convergence-proof', 'true');
@@ -291,6 +340,15 @@ export function renderBossPage(model) {
       branch.appendChild(make('p', '', 'If B: ' + model.binaryChoiceAcknowledgement.ifB));
     }
     frame.appendChild(branch);
+  }
+
+  if ((model.convergenceProofParagraphs || []).length) {
+    const proof = make('div', 'boss-proof');
+    proof.appendChild(make('div', 'boss-proof-label', 'Convergence Notes'));
+    model.convergenceProofParagraphs.slice(0, 2).forEach((paragraph) => {
+      proof.appendChild(make('p', '', paragraph));
+    });
+    frame.appendChild(proof);
   }
 
   const convergence = make('div', 'boss-convergence');

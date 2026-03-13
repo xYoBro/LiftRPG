@@ -1,3 +1,3 @@
-import { initRendererApp } from './modules/app.js?v=17';
+import { initRendererApp } from './modules/app.js?v=20';
 
 document.addEventListener('DOMContentLoaded', initRendererApp);

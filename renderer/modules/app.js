@@ -1,8 +1,8 @@
-import { decryptBlob, encryptBlob } from './crypto.js?v=17';
-import { qs } from './dom.js?v=17';
-import { exportBookletPdf } from './pdf-export.js?v=17';
-import { renderBooklet, syncLayoutMode } from './render.js?v=17';
-import { normalisePassword, validateBooklet } from './utils.js?v=17';
+import { decryptBlob, encryptBlob } from './crypto.js?v=20';
+import { qs } from './dom.js?v=20';
+import { exportBookletPdf } from './pdf-export.js?v=20';
+import { renderBooklet, syncLayoutMode } from './render.js?v=20';
+import { normalisePassword, validateBooklet } from './utils.js?v=20';
 
 const state = {
   data: null,

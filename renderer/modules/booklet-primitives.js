@@ -1,5 +1,5 @@
-import { make } from './dom.js?v=17';
-import { splitRichText } from './booklet-models.js?v=17';
+import { make } from './dom.js?v=20';
+import { splitRichText } from './booklet-models.js?v=20';
 
 export function renderCoverPage(model) {
   const page = make('section', 'booklet-page');
@@ -34,6 +34,7 @@ export function renderRulesLeftPage(model) {
   const page = make('section', 'booklet-page');
   page.setAttribute('data-page-type', 'rules-left');
   const frame = make('div', 'rules-left');
+  frame.setAttribute('data-layout-variant', model.layoutVariant || 'standard');
 
   const header = make('header', 'rules-header');
   header.appendChild(make('span', '', 'Orientation'));
@@ -66,6 +67,7 @@ export function renderSealedPage(model) {
   const page = make('section', 'booklet-page');
   page.setAttribute('data-page-type', 'rules-right');
   const frame = make('div', 'rules-right sealed-page');
+  frame.setAttribute('data-layout-variant', model.layoutVariant || 'standard');
 
   frame.appendChild(make('div', 'sealed-lock', '🔒'));
   frame.appendChild(make('div', 'sealed-title', model.title));
@@ -89,6 +91,7 @@ export function renderGaugeLogPage(model) {
   const page = make('section', 'booklet-page');
   page.setAttribute('data-page-type', 'gauge-log');
   const frame = make('div', 'rules-right gauge-log-page');
+  frame.setAttribute('data-layout-variant', model.layoutVariant || 'standard');
 
   const header = make('header', 'rules-header');
   header.appendChild(make('span', '', model.title));
@@ -122,6 +125,7 @@ export function renderAssemblyPage(model) {
   const page = make('section', 'booklet-page');
   page.setAttribute('data-page-type', 'assembly');
   const frame = make('div', 'password-assembly-page');
+  frame.setAttribute('data-layout-variant', model.layoutVariant || 'standard');
 
   frame.appendChild(make('h2', 'password-assembly-title', model.title));
   frame.appendChild(make('p', 'password-assembly-subtitle', model.subtitle));
@@ -154,6 +158,7 @@ export function renderLockedEndingPage(model) {
   const page = make('section', 'booklet-page');
   page.setAttribute('data-page-type', 'ending-locked');
   const frame = make('div', 'endings-page');
+  frame.setAttribute('data-layout-variant', model.layoutVariant || 'standard');
   frame.appendChild(make('h2', 'endings-title', model.title));
 
   const body = make('div', 'endings-body');
@@ -191,7 +196,9 @@ export function renderUnlockedEndingPage(model) {
   page.setAttribute('data-page-type', 'ending-unlocked');
   const frame = make('div', 'endings-page');
   frame.setAttribute('data-ending-treatment', model.treatment || 'default');
+  frame.setAttribute('data-layout-variant', model.layoutVariant || 'document');
 
+  if (model.kicker) frame.appendChild(make('div', 'doc-label', model.kicker));
   frame.appendChild(make('h2', 'endings-title', model.title));
   if (model.documentType) frame.appendChild(make('div', 'doc-label', model.documentType));
 
@@ -212,6 +219,14 @@ export function renderBackCover(model) {
   page.setAttribute('data-page-type', 'back-cover');
   const frame = make('div', 'back-cover');
   frame.appendChild(make('p', 'back-cover-colophon', model.colophon));
+  if (model.generatedAt || model.weekCount || model.totalSessions) {
+    const meta = make('div', 'back-cover-meta');
+    if (model.generatedAt) meta.appendChild(make('div', '', model.generatedAt));
+    if (model.weekCount || model.totalSessions) {
+      meta.appendChild(make('div', '', 'Weeks ' + model.weekCount + ' · Sessions ' + model.totalSessions));
+    }
+    frame.appendChild(meta);
+  }
   frame.appendChild(make('div', 'back-cover-mark', model.mark));
   page.appendChild(frame);
   return page;
@@ -232,6 +247,35 @@ export function renderNotesPage(model) {
     notes.appendChild(make('div', 'notes-cell'));
   }
   frame.appendChild(notes);
+  page.appendChild(frame);
+  return page;
+}
+
+export function renderInterludePage(model) {
+  const page = make('section', 'booklet-page');
+  page.setAttribute('data-page-type', 'interlude');
+  const frame = make('div', 'interlude-page');
+  frame.setAttribute('data-layout-variant', model.layoutVariant || 'quiet');
+  frame.setAttribute('data-spread-aware', model.spreadAware ? 'true' : 'false');
+  if (model.payloadType) {
+    frame.setAttribute('data-payload-type', model.payloadType);
+  }
+
+  const header = make('header', 'page-header');
+  header.appendChild(make('span', '', 'Interlude'));
+  header.appendChild(make('span', 'page-num', ''));
+  frame.appendChild(header);
+
+  frame.appendChild(make('h2', 'interlude-title', model.title || 'Interlude'));
+  if (model.reason) {
+    frame.appendChild(make('div', 'interlude-reason', model.reason));
+  }
+
+  const body = make('div', 'interlude-body');
+  splitRichText(model.body).forEach((paragraph) => {
+    body.appendChild(make('p', '', paragraph));
+  });
+  frame.appendChild(body);
   page.appendChild(frame);
   return page;
 }

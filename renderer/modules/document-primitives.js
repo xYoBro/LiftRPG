@@ -1,4 +1,4 @@
-import { make } from './dom.js?v=17';
+import { make } from './dom.js?v=20';
 
 function buildMetaLines(fragmentModel) {
   const lines = [];
@@ -18,6 +18,7 @@ export function renderFoundDocument(fragmentModel) {
   block.setAttribute('data-has-annotations', fragmentModel.designSpec.hasAnnotations ? 'true' : 'false');
   block.setAttribute('data-has-irrelevant-detail', String(fragmentModel.authenticityChecks.hasIrrelevantDetail));
   block.setAttribute('data-could-exist-elsewhere', String(fragmentModel.authenticityChecks.couldExistInDifferentStory));
+  block.setAttribute('data-document-family', fragmentModel.atomFamily || 'custom-document');
 
   if (fragmentModel.id) {
     block.appendChild(make('div', 'fragment-number', fragmentModel.numberText));
@@ -49,6 +50,7 @@ export function renderDocumentPage(model) {
   const page = make('section', 'booklet-page');
   page.setAttribute('data-page-type', model.pageType || 'fragment');
   const frame = make('div', 'fragment-page');
+  frame.setAttribute('data-layout-variant', model.layoutVariant || 'stacked');
 
   const header = make('header', 'page-header');
   header.appendChild(make('span', '', model.title || 'Documents'));

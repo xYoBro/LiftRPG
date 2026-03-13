@@ -2,7 +2,8 @@ import {
   getPasswordLength,
   pad2,
   splitParagraphs
-} from './utils.js?v=17';
+} from './utils.js?v=20';
+import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=20';
 
 function normalizeEntries(entries) {
   return (entries || []).map((entry) => ({
@@ -14,42 +15,64 @@ function normalizeEntries(entries) {
   }));
 }
 
-export function buildFieldOpsPageModels(data, week) {
+export function buildFieldOpsPageModels(data, week, layoutPlan = {}) {
   const fieldOps = week.fieldOps || {};
-  const oracleEntries = (((fieldOps || {}).oracleTable || {}).entries || []).length;
-  const splitOracle = oracleEntries > 12;
+  const oracleTable = fieldOps.oracleTable || null;
+  const oracleEntries = normalizeEntries((oracleTable || {}).entries || []);
+  const mechanicProfile = layoutPlan.mechanicProfile || resolveWeekMechanicProfile(week);
+  const splitOracle = layoutPlan.layout === 'split-oracle' || layoutPlan.layout === 'oracle-only';
+  const primaryOracleCount = splitOracle
+    ? Math.max(0, Math.min(parseInt(layoutPlan.primaryOracleCount, 10) || 0, oracleEntries.length))
+    : oracleEntries.length;
+  const primaryOracleEntries = splitOracle ? oracleEntries.slice(0, primaryOracleCount) : oracleEntries;
+  const overflowOracleEntries = splitOracle ? oracleEntries.slice(primaryOracleCount) : [];
 
   const firstPage = {
     pageType: 'field-ops',
+    layoutVariant: layoutPlan.layoutVariant || 'balanced',
     headerTitle: fieldOps.mapState && fieldOps.mapState.title || week.title || 'Field Operations',
     cipher: fieldOps.cipher ? buildCipherModel(fieldOps.cipher, week.weeklyComponent) : null,
     mapState: fieldOps.mapState ? buildMapModel(fieldOps.mapState) : null,
     gameplayClocks: buildClockModels(week.gameplayClocks),
-    oracle: splitOracle ? null : buildOracleModel(fieldOps.oracleTable),
+    companionComponents: buildCompanionModels(mechanicProfile.companionComponents),
+    mechanicProfile,
+    oracle: primaryOracleEntries.length
+      ? buildOracleModel({
+        ...(oracleTable || {}),
+        entries: primaryOracleEntries
+      })
+      : null,
     layout: splitOracle ? 'split-oracle' : 'standard'
   };
 
-  if (!splitOracle || !fieldOps.oracleTable) return [firstPage];
+  if (!splitOracle || !oracleTable || !overflowOracleEntries.length) return [firstPage];
 
   return [
     firstPage,
     {
       pageType: 'oracle-overflow',
-      headerTitle: fieldOps.oracleTable.title || 'Oracle',
+      layoutVariant: layoutPlan.layoutVariant || 'standard',
+      headerTitle: oracleTable.title || 'Oracle',
       cipher: null,
       mapState: null,
       gameplayClocks: [],
-      oracle: buildOracleModel(fieldOps.oracleTable),
+      companionComponents: [],
+      mechanicProfile,
+      oracle: buildOracleModel({
+        ...oracleTable,
+        entries: overflowOracleEntries
+      }),
       layout: 'oracle-only'
     }
   ];
 }
 
-export function buildBossPageModel(data, week) {
+export function buildBossPageModel(data, week, layoutVariant = 'standard') {
   const boss = week.bossEncounter || {};
   const decodingKey = boss.decodingKey || {};
 
   return {
+    layoutVariant,
     weekLabel: 'Week ' + pad2(week.weekNumber),
     title: boss.title || week.title || 'Convergence',
     narrativeParagraphs: splitParagraphs(boss.narrative || ''),
@@ -66,6 +89,20 @@ export function buildBossPageModel(data, week) {
     convergenceProofParagraphs: splitParagraphs(boss.convergenceProof || ''),
     binaryChoiceAcknowledgement: boss.binaryChoiceAcknowledgement || null
   };
+}
+
+function buildCompanionModels(components) {
+  return (components || []).map((component, index) => ({
+    id: component.id || 'companion-' + index,
+    type: component.type || 'custom',
+    family: component.family || 'custom-companion',
+    title: component.title || 'Companion Component',
+    body: component.body || component.instruction || component.prompt || '',
+    rows: component.rows || 0,
+    cols: component.cols || 0,
+    slots: Array.isArray(component.slots) ? component.slots : [],
+    footprint: component.footprint || 'half-page'
+  }));
 }
 
 export function buildCipherModel(cipher, weeklyComponent) {

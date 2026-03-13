@@ -1,19 +1,10 @@
-import { PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from './constants.js?v=17';
-import { make } from './dom.js?v=17';
-import { buildBookletMetaModel } from './booklet-models.js?v=17';
-import { buildPages } from './page-builders.js?v=17';
-import { applyTheme, resolveTheme } from './theme.js?v=17';
-
-function setPageNumbers(pages) {
-  pages.forEach((page, index) => {
-    const pageNumber = index + 1;
-    page.setAttribute('data-page-number', String(pageNumber));
-    page.classList.add(pageNumber % 2 === 0 ? 'page-left' : 'page-right');
-    page.querySelectorAll('.page-num').forEach((node) => {
-      node.textContent = 'P.' + String(pageNumber).padStart(2, '0');
-    });
-  });
-}
+import { PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from './constants.js?v=20';
+import { make } from './dom.js?v=20';
+import { buildBookletMetaModel } from './booklet-models.js?v=20';
+import { optimizeBookletPlan } from './layout-preflight.js?v=20';
+import { buildPages } from './page-builders.js?v=20';
+import { setPageNumbers } from './pagination.js?v=20';
+import { applyTheme, resolveTheme } from './theme.js?v=20';
 
 function buildGrid(pages, layoutMode) {
   const grid = make('div', 'booklet-grid');
@@ -78,58 +69,6 @@ function buildGrid(pages, layoutMode) {
   return grid;
 }
 
-function applyFit(pages) {
-  const debug = new URLSearchParams(window.location.search).get('debugLayout') === '1';
-  let clippedCount = 0;
-
-  pages.forEach((page) => {
-    const frame = page.firstElementChild;
-    if (!frame || frame.tagName !== 'DIV') return;
-
-    const clientHeight = page.clientHeight;
-    if (clientHeight === 0) return;
-
-    let trueHeight = frame.scrollHeight;
-    if (trueHeight <= clientHeight) return;
-
-    if (debug) {
-      console.log('Overflow detected on', page.getAttribute('data-page-type'), '(Safe:', clientHeight, '/ True:', trueHeight, 'px)');
-    }
-
-    for (const level of ['1', '2', '3']) {
-      if (frame.scrollHeight <= clientHeight) break;
-      page.setAttribute('data-fit-level', level);
-    }
-
-    trueHeight = frame.scrollHeight;
-    if (trueHeight <= clientHeight) return;
-
-    let scale = clientHeight / trueHeight;
-    page.setAttribute('data-fit-level', '4');
-
-    const minimumScale = 0.82;
-    let clipped = false;
-    if (scale < minimumScale) {
-      if (debug) {
-        console.warn('SEVERE OVERFLOW: Scale clamped from ' + scale.toFixed(3) + ' to ' + minimumScale + ' on ' + page.getAttribute('data-page-type'));
-        frame.style.outline = '2px dashed red';
-      }
-      scale = minimumScale;
-      clipped = true;
-      clippedCount += 1;
-      page.setAttribute('data-fit-failed', 'true');
-    }
-
-    frame.style.transform = 'scale(' + scale.toFixed(3) + ')';
-    frame.style.transformOrigin = 'top center';
-    if (debug && !clipped) {
-      console.log('Fallback: applied global CSS transform scale of', scale.toFixed(3));
-    }
-  });
-
-  return clippedCount;
-}
-
 function applyBookletMetadata(booklet, data) {
   const meta = buildBookletMetaModel(data);
   const theme = data.theme || {};
@@ -144,6 +83,26 @@ function applyBookletMetadata(booklet, data) {
   booklet.setAttribute('data-narrative-tense', voice.tense || '');
 }
 
+function annotatePagesWithDiagnostics(pages, diagnostics) {
+  const diagnosticsByIndex = new Map((diagnostics || []).map((item) => [item.planIndex, item]));
+
+  pages.forEach((page) => {
+    const planIndex = parseInt(page.getAttribute('data-plan-index'), 10) || 0;
+    const detail = diagnosticsByIndex.get(planIndex);
+
+    page.removeAttribute('data-layout-overflow');
+    page.removeAttribute('data-layout-overflow-height');
+    page.removeAttribute('data-layout-overflow-width');
+
+    if (!detail) return;
+    if (detail.overflowHeight <= 0 && detail.overflowWidth <= 0) return;
+
+    page.setAttribute('data-layout-overflow', 'true');
+    page.setAttribute('data-layout-overflow-height', String(detail.overflowHeight));
+    page.setAttribute('data-layout-overflow-width', String(detail.overflowWidth));
+  });
+}
+
 export function syncLayoutMode(refs, layoutMode) {
   refs.booklet.setAttribute('data-layout-mode', layoutMode);
 }
@@ -154,15 +113,29 @@ export function renderBooklet(refs, layoutMode, data, unlockedEnding, setStatus)
   applyTheme(refs.booklet, resolveTheme(data));
   applyBookletMetadata(refs.booklet, data);
 
-  const pages = buildPages(data, unlockedEnding);
+  const layoutResult = optimizeBookletPlan(refs.booklet, data, unlockedEnding);
+  const pages = buildPages(data, unlockedEnding, { plan: layoutResult.plan });
   setPageNumbers(pages);
+  annotatePagesWithDiagnostics(pages, layoutResult.diagnostics.pages);
   refs.booklet.appendChild(buildGrid(pages, layoutMode));
-
-  const clippedCount = applyFit(pages);
   refs.printBtn.disabled = false;
 
-  if (clippedCount > 0) {
-    setStatus('Loaded ' + pages.length + ' pages. Warning: ' + clippedCount + ' pages clipped (exceeded max density).', 'error');
+  window.__layoutPlan = layoutResult.plan;
+  window.__layoutDiagnostics = layoutResult.diagnostics;
+
+  if (layoutResult.diagnostics.overflowPageCount > 0) {
+    setStatus(
+      'Loaded ' + pages.length + ' pages. Layout governor left ' + layoutResult.diagnostics.overflowPageCount + ' unresolved overflow page(s).',
+      'error'
+    );
+    return;
+  }
+
+  if (layoutResult.passesApplied > 0) {
+    setStatus(
+      'Loaded ' + pages.length + ' pages. Layout governor resolved ' + layoutResult.passesApplied + ' plan adjustment(s). Review, then print.',
+      'success'
+    );
     return;
   }
 
