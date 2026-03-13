@@ -4,7 +4,7 @@ import {
   pad2,
   splitRichContentBlocks,
   splitParagraphs
-} from './utils.js?v=24';
+} from './utils.js?v=28';
 
 function humanizeComponentType(value) {
   return String(value || 'component').replace(/-/g, ' ');
@@ -29,15 +29,45 @@ export function buildBookletMetaModel(data) {
   };
 }
 
+function normalizeCoverMarking(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\bblock\s+\d+\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function resolveCoverSubtitle(designation, subtitle) {
+  if (!subtitle) return '';
+  if (!designation) return subtitle;
+
+  const normalizedDesignation = normalizeCoverMarking(designation);
+  const normalizedSubtitle = normalizeCoverMarking(subtitle);
+  if (!normalizedSubtitle) return '';
+  if (!normalizedDesignation) return subtitle;
+
+  if (
+    normalizedDesignation === normalizedSubtitle ||
+    normalizedDesignation.includes(normalizedSubtitle) ||
+    normalizedSubtitle.includes(normalizedDesignation)
+  ) {
+    return '';
+  }
+
+  return subtitle;
+}
+
 export function buildCoverPageModel(data) {
   const meta = buildBookletMetaModel(data);
   const cover = data.cover || {};
+  const designation = cover.designation || '';
 
   return {
     meta,
-    designation: cover.designation || '',
+    designation,
     title: cover.title || meta.blockTitle,
-    subtitle: meta.blockSubtitle,
+    subtitle: resolveCoverSubtitle(designation, cover.subtitle || meta.blockSubtitle),
     tagline: cover.tagline || '',
     colophonLines: cover.colophonLines || []
   };

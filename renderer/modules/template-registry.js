@@ -1,4 +1,4 @@
-import { readingLength } from './utils.js?v=24';
+import { readingLength } from './utils.js?v=28';
 
 export const TEMPLATE_VARIANTS = {
   'rules-left': ['standard', 'compact', 'dense'],
@@ -10,8 +10,8 @@ export const TEMPLATE_VARIANTS = {
   'ending-unlocked': ['letter', 'document', 'compact'],
   'field-ops': ['balanced', 'map-dominant', 'cipher-dominant', 'oracle-dominant'],
   'oracle-overflow': ['standard', 'compact'],
-  'overflow-doc': ['standard', 'compact'],
-  'fragment-page': ['stacked', 'tight'],
+  'overflow-doc': ['standard', 'compact', 'dense'],
+  'fragment-page': ['stacked', 'tight', 'dense'],
   interlude: ['quiet', 'artifact']
 };
 
@@ -59,11 +59,13 @@ export const TEMPLATE_VARIANT_DETAILS = {
   },
   'overflow-doc': {
     standard: 'Recovered-document continuation page with regular spacing.',
-    compact: 'Reduced document spacing for longer overflow documents.'
+    compact: 'Reduced document spacing for longer overflow documents.',
+    dense: 'Most compressed recovered-document page before overflow is considered unresolved.'
   },
   'fragment-page': {
     stacked: 'Normal archive page with one or two document blocks.',
-    tight: 'Compressed archive page for dense single-document content.'
+    tight: 'Compressed archive page for dense single-document content.',
+    dense: 'Most compressed archive page for long single-document artifacts.'
   },
   interlude: {
     quiet: 'Minimal interlude treatment with restrained chrome.',
@@ -117,10 +119,15 @@ export function pickDefaultTemplateVariant(type, context = {}) {
       return 'balanced';
     case 'overflow-doc': {
       const overflowLength = readingLength((((week || {}).overflowDocument || {}).body || ((week || {}).overflowDocument || {}).content || ''));
+      if (overflowLength > 1800) return 'dense';
       return overflowLength > 1100 ? 'compact' : 'standard';
     }
-    case 'fragment-page':
-      return ((entry.fragments || []).length || 0) > 1 ? 'stacked' : 'tight';
+    case 'fragment-page': {
+      if (((entry.fragments || []).length || 0) > 1) return 'stacked';
+      const fragment = (entry.fragments || [])[0] || {};
+      const fragmentLength = readingLength(fragment.body || fragment.content || '');
+      return fragmentLength > 1800 ? 'dense' : 'tight';
+    }
     case 'interlude': {
       const interludeBody = ((week || {}).interlude || {}).body || ((entry || {}).interlude || {}).body || '';
       if ((((week || {}).interlude || {}).spreadAware) || (((entry || {}).interlude || {}).spreadAware)) return 'artifact';

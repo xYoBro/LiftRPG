@@ -1,8 +1,8 @@
-import { decryptBlob, encryptBlob } from './crypto.js?v=24';
-import { qs } from './dom.js?v=24';
-import { exportBookletPdf } from './pdf-export.js?v=24';
-import { renderBooklet, syncLayoutMode } from './render.js?v=24';
-import { normalisePassword, validateBooklet } from './utils.js?v=24';
+import { decryptBlob, encryptBlob } from './crypto.js?v=28';
+import { qs } from './dom.js?v=28';
+import { exportBookletPdf } from './pdf-export.js?v=28';
+import { renderBooklet, syncLayoutMode } from './render.js?v=28';
+import { getDemoPassword, normalisePassword, validateBooklet } from './utils.js?v=28';
 
 const state = {
   data: null,
@@ -10,7 +10,9 @@ const state = {
   layoutMode: 'single',
   restoreLayoutMode: null,
   demoMode: false,
-  demoPasswordRevealed: false
+  demoPasswordRevealed: false,
+  previewTarget: '',
+  reviewMode: false
 };
 
 let refs = {};
@@ -35,12 +37,25 @@ function waitForPaint() {
 function renderCurrentBooklet() {
   if (!state.data) return;
   renderBooklet(refs, state.layoutMode, state.data, state.unlockedEnding, setStatus);
+  scrollPreviewTargetIntoView();
 }
 
 function scrollEndingIntoView() {
   const endingPage = refs.booklet.querySelector('[data-page-type="ending-unlocked"]');
   if (!endingPage) return;
   endingPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function scrollPreviewTargetIntoView() {
+  const target = String(state.previewTarget || '').trim();
+  if (!target || target === '1') return;
+
+  const selector = /^\d+$/.test(target)
+    ? '[data-page-index="' + target + '"]'
+    : '[data-page-type="' + target + '"]';
+  const page = refs.booklet.querySelector(selector);
+  if (!page) return;
+  page.scrollIntoView({ behavior: 'auto', block: 'start' });
 }
 
 function unlockWithPayload(payload, password) {
@@ -134,7 +149,7 @@ function loadBooklet(data, sourceLabel) {
   renderCurrentBooklet();
 
   const hasEncryptedEnding = !!(data.meta && data.meta.passwordEncryptedEnding);
-  const demoPassword = state.demoMode && data.meta && data.meta.passwordPlaintext ? normalisePassword(data.meta.passwordPlaintext) : '';
+  const demoPassword = state.demoMode && data.meta ? normalisePassword(getDemoPassword(data.meta)) : '';
   syncUnlockUi({
     visible: hasEncryptedEnding,
     state: 'locked',
@@ -212,7 +227,7 @@ function attemptUnlock() {
   }
 
   const enteredPassword = normalisePassword(refs.unlockPassword.value || '');
-  const demoPassword = state.demoMode && state.data.meta ? normalisePassword(state.data.meta.passwordPlaintext || '') : '';
+  const demoPassword = state.demoMode && state.data.meta ? normalisePassword(getDemoPassword(state.data.meta)) : '';
   const password = enteredPassword || (state.demoMode ? demoPassword : '');
   if (!password) {
     syncUnlockUi({
@@ -246,7 +261,7 @@ function attemptUnlock() {
       unlockWithPayload(payload, password);
     })
     .catch(() => {
-      if (state.demoMode && state.data.meta && normalisePassword(state.data.meta.passwordPlaintext || '') === password) {
+      if (state.demoMode && state.data.meta && normalisePassword(getDemoPassword(state.data.meta)) === password) {
         unlockWithPayload(state.data.endings && state.data.endings[0] ? state.data.endings[0].content : null, password);
         return;
       }
@@ -351,10 +366,17 @@ function captureRefs() {
 export function initRendererApp() {
   captureRefs();
   wireUi();
+  const params = new URLSearchParams(window.location.search);
+  const requestedMode = params.get('mode');
+  if (requestedMode === 'single' || requestedMode === 'spread' || requestedMode === 'booklet') {
+    state.layoutMode = requestedMode;
+  }
+  state.previewTarget = params.get('page') || '';
+  state.reviewMode = params.get('review') === '1';
+  document.body.setAttribute('data-review-mode', state.reviewMode ? 'true' : 'false');
   syncLayoutMode(refs, state.layoutMode);
   refs.printBtn.disabled = true;
 
-  const params = new URLSearchParams(window.location.search);
   state.demoMode = !!params.get('demo');
   state.demoPasswordRevealed = false;
   if (params.get('demo')) {

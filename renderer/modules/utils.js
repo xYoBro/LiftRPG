@@ -104,8 +104,15 @@ export function pad2(value) {
 export function getPasswordLength(data, fallback) {
   const meta = data.meta || {};
   if (typeof meta.passwordLength === 'number' && meta.passwordLength > 0) return meta.passwordLength;
+  if (typeof meta.demoPassword === 'string' && meta.demoPassword.trim()) return meta.demoPassword.trim().length;
   if (meta.passwordPlaintext) return meta.passwordPlaintext.length;
   return fallback || 6;
+}
+
+export function getDemoPassword(meta) {
+  if (meta && typeof meta.demoPassword === 'string' && meta.demoPassword.trim()) return meta.demoPassword;
+  if (meta && typeof meta.passwordPlaintext === 'string' && meta.passwordPlaintext.trim()) return meta.passwordPlaintext;
+  return '';
 }
 
 export function getExerciseSetCount(exercise) {

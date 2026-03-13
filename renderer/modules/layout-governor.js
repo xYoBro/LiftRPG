@@ -1,6 +1,6 @@
-import { clone, readingLength, splitParagraphs, splitRichContentBlocks } from './utils.js?v=24';
-import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=24';
-import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=24';
+import { clone, readingLength, splitRichContentBlocks } from './utils.js?v=28';
+import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=28';
+import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=28';
 
 const MAX_WORKOUT_COMPACTION = 3;
 
@@ -100,15 +100,39 @@ export function planWorkoutPageLayout(sessions, options = {}) {
   };
 }
 
+function fragmentWeight(fragment) {
+  const body = fragment.bodyText || fragment.body || fragment.content || '';
+  const documentType = String(fragment.documentType || '').toLowerCase();
+  let weight = Math.max(0.62, Math.min(readingLength(body) / 1600, 1.4));
+
+  if (['memo', 'report', 'inspection', 'correspondence', 'transcript', 'anomaly'].includes(documentType)) {
+    weight += 0.16;
+  }
+
+  if (((fragment.designSpec || {}).hasAnnotations)) weight += 0.04;
+  if (((fragment.designSpec || {}).hasRedactions)) weight += 0.04;
+
+  return Math.min(weight, 1.55);
+}
+
+function fragmentMustStandAlone(fragment, weight) {
+  const body = fragment.bodyText || fragment.body || fragment.content || '';
+  const documentType = String(fragment.documentType || '').toLowerCase();
+  const length = readingLength(body);
+  return weight >= 0.9
+    || length >= 950
+    || ['memo', 'report', 'inspection', 'correspondence', 'transcript', 'anomaly'].includes(documentType);
+}
+
 export function paginateFragments(fragments) {
   const pages = [];
   let current = [];
   let load = 0;
   (fragments || []).forEach((fragment) => {
-    const body = fragment.bodyText || fragment.body || fragment.content || '';
-    const weight = Math.max(0.72, Math.min(readingLength(body) / 1800, 1.2));
+    const weight = fragmentWeight(fragment);
+    const standalone = fragmentMustStandAlone(fragment, weight);
 
-    if (current.length >= 2 || (current.length >= 1 && load + weight > 1.55)) {
+    if (standalone && current.length) {
       pages.push(current);
       current = [];
       load = 0;
@@ -116,6 +140,19 @@ export function paginateFragments(fragments) {
 
     current.push(fragment);
     load += weight;
+
+    if (standalone) {
+      pages.push(current);
+      current = [];
+      load = 0;
+      return;
+    }
+
+    if (current.length >= 2 || load > 1.18) {
+      pages.push(current);
+      current = [];
+      load = 0;
+    }
   });
 
   if (current.length) pages.push(current);
@@ -366,30 +403,6 @@ function splitMeasuredBlocks(blocks, heights, overflowHeight) {
   return { leading, trailing };
 }
 
-function splitSingleDocument(document, measurement) {
-  const paragraphs = Array.isArray(document && document.bodyParagraphs) && document.bodyParagraphs.length
-    ? document.bodyParagraphs
-    : splitParagraphs(document && (document.bodyText || document.body || document.content || ''));
-  const split = splitMeasuredBlocks(paragraphs, (measurement && measurement.slotMetrics && measurement.slotMetrics.documentParagraphHeights) || [], measurement && measurement.overflowHeight);
-  if (!split) return null;
-
-  const leading = clone(document);
-  leading.bodyParagraphs = split.leading;
-  leading.bodyText = split.leading.join('\n\n');
-  if (Object.prototype.hasOwnProperty.call(leading, 'body')) leading.body = split.leading.join('\n\n');
-  if (Object.prototype.hasOwnProperty.call(leading, 'content')) leading.content = split.leading.join('\n\n');
-  leading.continuationLabel = '';
-
-  const trailing = clone(document);
-  trailing.bodyParagraphs = split.trailing;
-  trailing.bodyText = split.trailing.join('\n\n');
-  if (Object.prototype.hasOwnProperty.call(trailing, 'body')) trailing.body = split.trailing.join('\n\n');
-  if (Object.prototype.hasOwnProperty.call(trailing, 'content')) trailing.content = split.trailing.join('\n\n');
-  trailing.continuationLabel = 'Continued';
-
-  return { leading, trailing };
-}
-
 function splitDocumentEntry(plan, index, measurement, data) {
   const entry = (plan || [])[index];
   if (!entry) return null;
@@ -399,46 +412,11 @@ function splitDocumentEntry(plan, index, measurement, data) {
     if (fragments.length > 1) {
       return splitFragmentEntry(plan, index, measurement);
     }
-    if (fragments.length === 1) {
-      const split = splitSingleDocument(fragments[0], measurement);
-      if (!split) return null;
-      const revised = normalizeBookletPlan(plan);
-      revised.splice(index, 1,
-        {
-          ...revised[index],
-          fragments: [split.leading],
-          layoutVariant: 'tight'
-        },
-        {
-          ...revised[index],
-          fragments: [split.trailing],
-          layoutVariant: 'tight'
-        }
-      );
-      return normalizeBookletPlan(revised);
-    }
+    return null;
   }
 
   if (entry.type === 'overflow-doc') {
-    const week = ((data || {}).weeks || [])[entry.weekIndex] || {};
-    const source = (entry.fragments || [week.overflowDocument || {}])[0];
-    const split = splitSingleDocument(source, measurement);
-    if (!split) return null;
-
-    const revised = normalizeBookletPlan(plan);
-    revised.splice(index, 1,
-      {
-        ...revised[index],
-        fragments: [split.leading],
-        layoutVariant: 'compact'
-      },
-      {
-        ...revised[index],
-        fragments: [split.trailing],
-        layoutVariant: 'compact'
-      }
-    );
-    return normalizeBookletPlan(revised);
+    return null;
   }
 
   return null;
@@ -513,7 +491,12 @@ export function revisePlanForMeasurement(plan, measurement, data) {
   }
 
   if (measurement.pageType === 'fragment-page' || measurement.pageType === 'fragment' || measurement.pageType === 'overflow-doc') {
-    return splitDocumentEntry(plan, measurement.planIndex, measurement, data);
+    const documentRevision = splitDocumentEntry(plan, measurement.planIndex, measurement, data);
+    if (documentRevision) return documentRevision;
+
+    const documentVariantRevision = reviseEntryVariant(plan, measurement.planIndex);
+    if (documentVariantRevision) return documentVariantRevision;
+    return null;
   }
 
   const variantRevision = reviseEntryVariant(plan, measurement.planIndex);

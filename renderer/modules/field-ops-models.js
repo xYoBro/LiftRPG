@@ -2,8 +2,8 @@ import {
   getPasswordLength,
   pad2,
   splitParagraphs
-} from './utils.js?v=24';
-import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=24';
+} from './utils.js?v=28';
+import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=28';
 
 function normalizeEntries(entries) {
   return (entries || []).map((entry) => ({

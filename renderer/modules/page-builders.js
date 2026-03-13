@@ -1,7 +1,7 @@
-import { make } from './dom.js?v=24';
-import { getPageAtom } from './atom-registry.js?v=24';
-import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=24';
-import { createBoundedPage } from './page-shell.js?v=24';
+import { make } from './dom.js?v=28';
+import { getPageAtom } from './atom-registry.js?v=28';
+import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=28';
+import { createBoundedPage } from './page-shell.js?v=28';
 import {
   buildAssemblyPageModelWithVariant,
   buildBackCoverModel,
@@ -13,7 +13,7 @@ import {
   buildRulesLeftPageModelWithVariant,
   buildSealedPageModel,
   buildUnlockedEndingPageModel
-} from './booklet-models.js?v=24';
+} from './booklet-models.js?v=28';
 import {
   renderAssemblyPage,
   renderBackCover,
@@ -25,14 +25,14 @@ import {
   renderRulesLeftPage,
   renderSealedPage,
   renderUnlockedEndingPage
-} from './booklet-primitives.js?v=24';
-import { buildDocumentPageModel } from './document-models.js?v=24';
-import { renderDocumentPage } from './document-primitives.js?v=24';
-import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=24';
-import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=24';
-import { buildWorkoutPageModel } from './workout-models.js?v=24';
-import { renderWorkoutCard } from './workout-primitives.js?v=24';
-import { pad2 } from './utils.js?v=24';
+} from './booklet-primitives.js?v=28';
+import { buildDocumentPageModel } from './document-models.js?v=28';
+import { renderDocumentPage } from './document-primitives.js?v=28';
+import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=28';
+import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=28';
+import { buildWorkoutPageModel } from './workout-models.js?v=28';
+import { renderWorkoutCard } from './workout-primitives.js?v=28';
+import { pad2 } from './utils.js?v=28';
 
 function buildWorkoutPage(data, week, entry) {
   const sessions = entry.sessions || [];
@@ -101,6 +101,7 @@ function buildBlankPage() {
 function tagPlanMetadata(page, entry, index) {
   const atom = getPageAtom(entry.type || '');
   page.setAttribute('data-plan-index', String(index));
+  page.setAttribute('data-page-index', String(index + 1));
   page.setAttribute('data-plan-entry-type', entry.type || '');
   page.setAttribute('data-atom-family', atom.family || 'custom');
   page.setAttribute('data-atom-measurable', atom.measurable ? 'true' : 'false');
