@@ -1,6 +1,6 @@
-import { clone, readingLength, splitParagraphs, splitRichContentBlocks } from './utils.js?v=23';
-import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=23';
-import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=23';
+import { clone, readingLength, splitParagraphs, splitRichContentBlocks } from './utils.js?v=24';
+import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=24';
+import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=24';
 
 const MAX_WORKOUT_COMPACTION = 3;
 

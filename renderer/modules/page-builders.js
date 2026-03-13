@@ -1,7 +1,7 @@
-import { make } from './dom.js?v=23';
-import { getPageAtom } from './atom-registry.js?v=23';
-import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=23';
-import { createBoundedPage } from './page-shell.js?v=23';
+import { make } from './dom.js?v=24';
+import { getPageAtom } from './atom-registry.js?v=24';
+import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=24';
+import { createBoundedPage } from './page-shell.js?v=24';
 import {
   buildAssemblyPageModelWithVariant,
   buildBackCoverModel,
@@ -13,7 +13,7 @@ import {
   buildRulesLeftPageModelWithVariant,
   buildSealedPageModel,
   buildUnlockedEndingPageModel
-} from './booklet-models.js?v=23';
+} from './booklet-models.js?v=24';
 import {
   renderAssemblyPage,
   renderBackCover,
@@ -25,18 +25,20 @@ import {
   renderRulesLeftPage,
   renderSealedPage,
   renderUnlockedEndingPage
-} from './booklet-primitives.js?v=23';
-import { buildDocumentPageModel } from './document-models.js?v=23';
-import { renderDocumentPage } from './document-primitives.js?v=23';
-import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=23';
-import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=23';
-import { buildWorkoutPageModel } from './workout-models.js?v=23';
-import { renderWorkoutCard } from './workout-primitives.js?v=23';
-import { pad2 } from './utils.js?v=23';
+} from './booklet-primitives.js?v=24';
+import { buildDocumentPageModel } from './document-models.js?v=24';
+import { renderDocumentPage } from './document-primitives.js?v=24';
+import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=24';
+import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=24';
+import { buildWorkoutPageModel } from './workout-models.js?v=24';
+import { renderWorkoutCard } from './workout-primitives.js?v=24';
+import { pad2 } from './utils.js?v=24';
 
-function buildWorkoutPage(week, entry) {
+function buildWorkoutPage(data, week, entry) {
   const sessions = entry.sessions || [];
   const mechanicProfile = entry.mechanicProfile || {};
+  const totalWeeks = (data.weeks || []).length || 0;
+  const runningTitle = (data.cover || {}).title || ((data.meta || {}).blockTitle) || 'LiftRPG';
   const scaffold = createBoundedPage('workout-left', 'workout-left', { boundaryRole: 'session-log' });
   const page = scaffold.page;
   const frame = scaffold.frame;
@@ -46,11 +48,15 @@ function buildWorkoutPage(week, entry) {
   frame.setAttribute('data-clock-family', mechanicProfile.clockFamily || 'none');
 
   const header = make('header', 'page-header');
-  header.appendChild(make('span', 'week-id', 'Week ' + pad2(week.weekNumber)));
+  header.appendChild(make('span', 'running-title', runningTitle));
   header.appendChild(make('span', 'page-num', ''));
   frame.appendChild(header);
 
-  const kickerText = entry.chunkCount > 1 ? 'Session Log ' + ((entry.chunkIndex || 0) + 1) + '/' + entry.chunkCount : 'Session Log';
+  const chunkStart = ((entry.chunkIndex || 0) * 3) + 1;
+  const chunkEnd = chunkStart + sessions.length - 1;
+  const kickerText = entry.chunkCount > 1
+    ? 'Week ' + pad2(week.weekNumber) + ' · Part ' + ((entry.chunkIndex || 0) + 1) + ' of ' + entry.chunkCount + ' · Sessions ' + chunkStart + '-' + chunkEnd + ' · continued'
+    : 'Week ' + pad2(week.weekNumber) + ' ·';
   frame.appendChild(make('div', 'week-kicker', kickerText));
   frame.appendChild(make('h2', 'week-title', week.title || 'Training Record'));
 
@@ -68,6 +74,20 @@ function buildWorkoutPage(week, entry) {
     cards.appendChild(renderWorkoutCard(cardModel));
   });
   frame.appendChild(cards);
+
+  if (totalWeeks > 0) {
+    const footer = make('footer', 'week-progress');
+    const dots = make('div', 'week-progress-dots');
+    for (let index = 0; index < totalWeeks; index += 1) {
+      const dot = make('span', 'week-progress-dot');
+      if ((index + 1) === week.weekNumber) dot.setAttribute('data-state', 'active');
+      dots.appendChild(dot);
+    }
+    footer.appendChild(dots);
+    footer.appendChild(make('div', 'week-progress-label', 'Week ' + week.weekNumber + ' of ' + totalWeeks));
+    frame.appendChild(footer);
+  }
+
   return page;
 }
 
@@ -118,7 +138,7 @@ export function buildPages(data, unlockedEnding, options = {}) {
         break;
       case 'workout-left': {
         const week = (data.weeks || [])[entry.weekIndex] || {};
-        page = buildWorkoutPage(week, entry);
+        page = buildWorkoutPage(data, week, entry);
         break;
       }
       case 'field-ops':

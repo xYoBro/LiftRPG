@@ -1,5 +1,5 @@
-import { make } from './dom.js?v=23';
-import { createBoundedPage } from './page-shell.js?v=23';
+import { make } from './dom.js?v=24';
+import { createBoundedPage } from './page-shell.js?v=24';
 
 function buildMetaLines(fragmentModel) {
   const lines = [];

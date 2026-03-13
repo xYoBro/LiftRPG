@@ -689,6 +689,9 @@ body{
   font-size:7.5pt;
   color:var(--ink);
 }
+.running-title{
+  overflow-wrap:anywhere;
+}
 
 /* Week ID */
 .week-id{
@@ -696,12 +699,12 @@ body{
 }
 .week-kicker{
   font-family:var(--mono);
-  font-size:7pt;
-  letter-spacing:.22em;
+  font-size:6pt;
+  letter-spacing:.26em;
   text-transform:uppercase;
   color:var(--accent);
   display:block;
-  margin-bottom:2px;
+  margin-bottom:4px;
   overflow-wrap: anywhere;
 }
 .week-title{
@@ -1006,6 +1009,40 @@ body{
   position:absolute;
   top:4px;
   left:8px;
+}
+
+.week-progress{
+  margin-top:8px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.week-progress-dots{
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+
+.week-progress-dot{
+  width:7px;
+  height:7px;
+  border-radius:999px;
+  border:1px solid rgba(24,23,20,.4);
+  background:transparent;
+}
+
+.week-progress-dot[data-state="active"]{
+  background:var(--accent);
+  border-color:var(--accent);
+}
+
+.week-progress-label{
+  font-family:var(--mono);
+  font-size:5.4pt;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:var(--muted);
 }
 
 /* ══════════════════════════════════════════════════════════════

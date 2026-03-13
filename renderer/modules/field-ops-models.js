@@ -2,8 +2,8 @@ import {
   getPasswordLength,
   pad2,
   splitParagraphs
-} from './utils.js?v=23';
-import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=23';
+} from './utils.js?v=24';
+import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=24';
 
 function normalizeEntries(entries) {
   return (entries || []).map((entry) => ({
@@ -30,7 +30,7 @@ export function buildFieldOpsPageModels(data, week, layoutPlan = {}) {
   const firstPage = {
     pageType: 'field-ops',
     layoutVariant: layoutPlan.layoutVariant || 'balanced',
-    headerTitle: fieldOps.mapState && fieldOps.mapState.title || week.title || 'Field Operations',
+    headerTitle: 'Field Operations',
     cipher: fieldOps.cipher ? buildCipherModel(fieldOps.cipher, week.weeklyComponent) : null,
     mapState: fieldOps.mapState ? buildMapModel(fieldOps.mapState) : null,
     gameplayClocks: buildClockModels(week.gameplayClocks),
@@ -52,7 +52,7 @@ export function buildFieldOpsPageModels(data, week, layoutPlan = {}) {
     {
       pageType: 'oracle-overflow',
       layoutVariant: layoutPlan.layoutVariant || 'standard',
-      headerTitle: oracleTable.title || 'Oracle',
+      headerTitle: 'Field Operations',
       cipher: null,
       mapState: null,
       gameplayClocks: [],

@@ -1,6 +1,6 @@
-import { make } from './dom.js?v=23';
-import { splitRichText } from './booklet-models.js?v=23';
-import { createBoundedPage } from './page-shell.js?v=23';
+import { make } from './dom.js?v=24';
+import { splitRichText } from './booklet-models.js?v=24';
+import { createBoundedPage } from './page-shell.js?v=24';
 
 export function renderCoverPage(model) {
   const scaffold = createBoundedPage('cover', 'cover-page', { boundaryRole: 'cover' });
