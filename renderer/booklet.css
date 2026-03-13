@@ -537,7 +537,7 @@ body{
   padding:8px 10px 9px;
   display:flex;
   flex-direction:column;
-  gap:6px;
+  gap:3px;
   min-height:0;
 }
 
@@ -564,7 +564,7 @@ body{
 }
 
 .session-meta{
-  min-height:12px;
+  min-height:7px;
   display:flex;
   align-items:center;
   justify-content:flex-end;
@@ -582,7 +582,7 @@ body{
 .session-body{
   display:flex;
   flex-direction:column;
-  gap:6px;
+  gap:3px;
   flex:1 1 auto;
   min-height:0;
 }
@@ -599,15 +599,25 @@ body{
 
 /* Exercise Table */
 .exercise-table{
+  --exercise-row-gap-block:5px;
+  --exercise-row-padding-y:2px;
+  --exercise-name-gap:2ch;
+  --exercise-track-gap:8px;
+  --rep-box-size:calc(16px * 1.07);
   width:100%;
   border-collapse:separate;
-  border-spacing:0 4px;
+  border-spacing:0 var(--exercise-row-gap-block);
 }
-.exercise-table tr{
-  display:flex;
-  align-items:flex-end;
-  gap:10px;
+.exercise-row{
+  display:grid;
+  grid-template-columns:var(--exercise-name-width, 12ch) auto minmax(12px, 1fr) auto;
+  align-items:end;
   width:100%;
+  min-height:calc(var(--rep-box-size) + (var(--exercise-row-padding-y) * 2));
+  padding-block:var(--exercise-row-padding-y);
+}
+.exercise-row[data-has-load="false"]{
+  grid-template-columns:var(--exercise-name-width, 12ch) 0 minmax(12px, 1fr) auto;
 }
 .exercise-table td{
   padding:0;
@@ -615,8 +625,9 @@ body{
   font-size:7.5pt;
 }
 .exercise-name-cell{
-  flex:0 1 auto;
+  flex:0 0 var(--exercise-name-width, 12ch);
   min-width:0;
+  align-self:end;
 }
 .exercise-name {
   font-family: var(--serif);
@@ -629,6 +640,13 @@ body{
 }
 .exercise-weight-cell {
   flex:0 0 auto;
+  margin-left:var(--exercise-name-gap);
+  align-self:end;
+}
+.exercise-row[data-has-load="false"] .exercise-weight-cell{
+  width:0;
+  margin-left:0;
+  overflow:hidden;
 }
 .exercise-load-entry{
   display:flex;
@@ -641,6 +659,10 @@ body{
 }
 .exercise-load-entry.is-empty{
   min-height:14px;
+}
+.exercise-row[data-has-load="false"] .exercise-load-entry{
+  width:0;
+  min-height:0;
 }
 .exercise-load-line{
   position:relative;
@@ -673,26 +695,32 @@ body{
   text-transform:lowercase;
 }
 .exercise-dots-cell{
-  flex:1 1 auto;
   min-width:12px;
+  margin-left:var(--exercise-track-gap);
+  align-self:end;
+}
+.exercise-row[data-has-load="false"] .exercise-dots-cell{
+  margin-left:var(--exercise-name-gap);
 }
 .exercise-dots{
   width:100%;
   border-bottom:1px dotted var(--rule);
   height:1px;
-  margin-bottom:4px;
+  margin-bottom:1px;
 }
 .exercise-reps-cell{
-  flex:0 0 auto;
+  margin-left:var(--exercise-track-gap);
+  align-self:end;
 }
 .rep-boxes{
   display:flex;
-  gap:3px;
+  gap:4px;
+  align-items:flex-end;
   justify-content:flex-end;
 }
 .rep-box{
-  width:16px;
-  height:16px;
+  width:var(--rep-box-size);
+  height:var(--rep-box-size);
   border:1.5px solid var(--ink);
   border-radius:2px;
   background:var(--paper);

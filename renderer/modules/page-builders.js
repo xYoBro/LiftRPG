@@ -1,14 +1,12 @@
-import { make } from './dom.js';
-import { chunkSessions, paginateFragments, planWorkoutPageLayout } from './layout-governor.js';
+import { make } from './dom.js?v=16';
+import { chunkSessions, paginateFragments, planWorkoutPageLayout } from './layout-governor.js?v=16';
+import { buildWorkoutPageModel } from './workout-models.js?v=16';
+import { renderWorkoutCard } from './workout-primitives.js?v=16';
 import {
-  getExerciseSetCount,
-  getExerciseTargetLoad,
   getPasswordLength,
-  getRepTargets,
   pad2,
-  showLoadSuffix,
   splitParagraphs
-} from './utils.js';
+} from './utils.js?v=16';
 
 function buildCoverPage(data) {
   const page = make('section', 'booklet-page');
@@ -151,114 +149,14 @@ function buildWorkoutPage(data, week, sessions, chunkIndex, chunkCount) {
   }
 
   const cards = make('div', 'session-cards');
-  const layoutPlan = planWorkoutPageLayout(sessions);
-  sessions.forEach((session, index) => {
-    cards.appendChild(buildSessionCard(session, layoutPlan[index]));
+  const workoutPageModel = buildWorkoutPageModel(sessions, planWorkoutPageLayout(sessions));
+  frame.setAttribute('data-page-density', workoutPageModel.pageDensity);
+  workoutPageModel.cards.forEach((cardModel) => {
+    cards.appendChild(renderWorkoutCard(cardModel));
   });
   frame.appendChild(cards);
   page.appendChild(frame);
   return page;
-}
-
-function buildSessionCard(session, layoutPlan) {
-  const card = make('article', 'session-card');
-  if (layoutPlan && layoutPlan.flexWeight) {
-    card.style.flex = String(layoutPlan.flexWeight) + ' 1 0';
-  }
-
-  card.appendChild(make('div', 'session-header', typeof session.label === 'string' ? session.label : 'Session'));
-
-  if (session.storyPrompt) {
-    card.appendChild(make('div', 'story-prompt', session.storyPrompt));
-  }
-
-  const metaRow = make('div', 'session-meta');
-  const fragmentRef = make('div', 'session-fragment-ref', session.fragmentRef ? 'Fragment ' + session.fragmentRef : '');
-  if (!session.fragmentRef) {
-    fragmentRef.setAttribute('aria-hidden', 'true');
-  }
-  metaRow.appendChild(fragmentRef);
-  card.appendChild(metaRow);
-
-  const body = make('div', 'session-body');
-
-  const exercises = make('table', 'exercise-table');
-  (session.exercises || []).forEach((exercise) => {
-    exercises.appendChild(renderExerciseRow(exercise));
-  });
-  body.appendChild(exercises);
-
-  if (session.binaryChoice) {
-    const choice = make('div', 'binary-choice');
-    choice.appendChild(make('div', 'binary-choice-label', session.binaryChoice.choiceLabel || 'Route Decision'));
-
-    const optionA = make('div', 'binary-choice-option');
-    optionA.appendChild(make('div', 'binary-choice-marker'));
-    optionA.appendChild(make('div', 'binary-choice-text', session.binaryChoice.promptA || ''));
-    choice.appendChild(optionA);
-
-    const optionB = make('div', 'binary-choice-option');
-    optionB.appendChild(make('div', 'binary-choice-marker'));
-    optionB.appendChild(make('div', 'binary-choice-text', session.binaryChoice.promptB || ''));
-    choice.appendChild(optionB);
-
-    body.appendChild(choice);
-  }
-
-  const notesBox = make('div', 'notes-box');
-  if (layoutPlan && layoutPlan.notesHeight) {
-    notesBox.style.setProperty('--notes-box-height', layoutPlan.notesHeight + 'px');
-  }
-  body.appendChild(notesBox);
-
-  card.appendChild(body);
-
-  return card;
-}
-
-function renderExerciseRow(exercise) {
-  const row = make('tr');
-
-  const nameCell = make('td', 'exercise-name-cell');
-  const nameWrapper = make('div', 'exercise-name');
-  nameWrapper.textContent = exercise.name || 'Lift';
-  nameCell.appendChild(nameWrapper);
-  row.appendChild(nameCell);
-
-  const weightCell = make('td', 'exercise-weight-cell');
-  const loadEntry = make('div', 'exercise-load-entry');
-
-  if (showLoadSuffix(exercise)) {
-    loadEntry.classList.add('is-weighted');
-
-    const loadLine = make('span', 'exercise-load-line');
-    loadLine.appendChild(make('span', 'exercise-load-hint', getExerciseTargetLoad(exercise)));
-    loadLine.appendChild(make('span', 'exercise-load-unit', 'lbs'));
-    loadEntry.appendChild(loadLine);
-  } else {
-    loadEntry.classList.add('is-empty');
-  }
-
-  weightCell.appendChild(loadEntry);
-  row.appendChild(weightCell);
-
-  const dotsCell = make('td', 'exercise-dots-cell');
-  dotsCell.appendChild(make('div', 'exercise-dots'));
-  row.appendChild(dotsCell);
-
-  const repsCell = make('td', 'exercise-reps-cell');
-  const repGroup = make('div', 'rep-boxes');
-  const repTargets = getRepTargets(exercise);
-  const count = getExerciseSetCount(exercise);
-  for (let i = 0; i < count; i += 1) {
-    const repBox = make('div', 'rep-box');
-    repBox.appendChild(make('span', 'rep-box-target', repTargets[i] || ''));
-    repGroup.appendChild(repBox);
-  }
-  repsCell.appendChild(repGroup);
-  row.appendChild(repsCell);
-
-  return row;
 }
 
 function renderGameplayClocks(clocks) {

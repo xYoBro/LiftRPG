@@ -59,8 +59,7 @@ export function planWorkoutPageLayout(sessions) {
   const cardCount = Math.max(1, sessions.length);
   const complexityScores = sessions.map((session) => sessionComplexity(session, cardCount));
   const totalComplexity = complexityScores.reduce((sum, value) => sum + value, 0) || cardCount;
-
-  return sessions.map((session, index) => {
+  const cards = sessions.map((session, index) => {
     const score = complexityScores[index];
     const density = resolveDensity(score);
     const notesLines = resolveNotesLines(score, cardCount);
@@ -76,6 +75,13 @@ export function planWorkoutPageLayout(sessions) {
       exerciseCount: (session.exercises || []).length
     };
   });
+
+  return {
+    cardCount,
+    pageDensity: resolveDensity(totalComplexity / cardCount),
+    totalComplexity,
+    cards
+  };
 }
 
 export function paginateFragments(fragments) {

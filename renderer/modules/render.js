@@ -1,7 +1,7 @@
-import { PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from './constants.js?v=14';
-import { make } from './dom.js?v=14';
-import { buildPages } from './page-builders.js?v=14';
-import { applyTheme, resolveTheme } from './theme.js?v=14';
+import { PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from './constants.js?v=16';
+import { make } from './dom.js?v=16';
+import { buildPages } from './page-builders.js?v=16';
+import { applyTheme, resolveTheme } from './theme.js?v=16';
 
 function setPageNumbers(pages) {
   pages.forEach((page, index) => {
