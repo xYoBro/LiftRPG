@@ -1,7 +1,7 @@
-import { make } from './dom.js?v=43';
-import { getPageAtom } from './atom-registry.js?v=43';
-import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=43';
-import { createBoundedPage } from './page-shell.js?v=43';
+import { make } from './dom.js?v=44';
+import { getPageAtom } from './atom-registry.js?v=44';
+import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=44';
+import { createBoundedPage } from './page-shell.js?v=44';
 import {
   buildAssemblyPageModelWithVariant,
   buildBackCoverModel,
@@ -13,7 +13,7 @@ import {
   buildRulesLeftPageModelWithVariant,
   buildSealedPageModel,
   buildUnlockedEndingPageModel
-} from './booklet-models.js?v=43';
+} from './booklet-models.js?v=44';
 import {
   renderAssemblyPage,
   renderBackCover,
@@ -25,14 +25,16 @@ import {
   renderRulesLeftPage,
   renderSealedPage,
   renderUnlockedEndingPage
-} from './booklet-primitives.js?v=43';
-import { buildDocumentPageModel } from './document-models.js?v=43';
-import { renderDocumentPage } from './document-primitives.js?v=43';
-import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=43';
-import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=43';
-import { buildWorkoutPageModel } from './workout-models.js?v=43';
-import { renderWorkoutCard } from './workout-primitives.js?v=43';
-import { pad2 } from './utils.js?v=43';
+} from './booklet-primitives.js?v=44';
+import { buildDocumentPageModel } from './document-models.js?v=44';
+import { renderDocumentPage } from './document-primitives.js?v=44';
+import { buildCompanionSpreadPageModels } from './companion-models.js?v=44';
+import { renderCompanionSpreadPage } from './companion-primitives.js?v=44';
+import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=44';
+import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=44';
+import { buildWorkoutPageModel } from './workout-models.js?v=44';
+import { renderWorkoutCard } from './workout-primitives.js?v=44';
+import { pad2 } from './utils.js?v=44';
 
 function buildWorkoutPage(data, week, entry) {
   const sessions = entry.sessions || [];
@@ -123,6 +125,7 @@ export function buildPages(data, unlockedEnding, options = {}) {
   const pages = [];
   const plan = normalizeBookletPlan(options.plan || planBookletLayout(data, unlockedEnding));
   const fieldOpsByWeek = new Map();
+  const companionSpreadByWeek = new Map();
 
   plan.forEach((entry, index) => {
     let page = null;
@@ -155,7 +158,8 @@ export function buildPages(data, unlockedEnding, options = {}) {
           entry.weekIndex,
           fieldOpsLayout.layout || 'standard',
           entry.layoutVariant || 'balanced',
-          entry.primaryOracleCount == null ? 'all' : entry.primaryOracleCount
+          entry.primaryOracleCount == null ? 'all' : entry.primaryOracleCount,
+          fieldOpsLayout.companionPlacement || 'inline'
         ].join(':');
         if (!fieldOpsByWeek.has(cacheKey)) {
           fieldOpsByWeek.set(cacheKey, buildFieldOpsPageModels(data, week, fieldOpsLayout));
@@ -164,6 +168,23 @@ export function buildPages(data, unlockedEnding, options = {}) {
         const modelIndex = entry.type === 'oracle-overflow' ? 1 : 0;
         if (models[modelIndex]) {
           page = renderFieldOpsPage(models[modelIndex]);
+        }
+        break;
+      }
+      case 'companion-spread-left':
+      case 'companion-spread-right': {
+        const week = (data.weeks || [])[entry.weekIndex] || {};
+        const cacheKey = [
+          entry.weekIndex,
+          entry.layoutVariant || 'balanced'
+        ].join(':');
+        if (!companionSpreadByWeek.has(cacheKey)) {
+          companionSpreadByWeek.set(cacheKey, buildCompanionSpreadPageModels(week, entry));
+        }
+        const models = companionSpreadByWeek.get(cacheKey) || [];
+        const modelIndex = entry.type === 'companion-spread-right' ? 1 : 0;
+        if (models[modelIndex]) {
+          page = renderCompanionSpreadPage(models[modelIndex]);
         }
         break;
       }

@@ -1,6 +1,6 @@
-import { clone, readingLength, splitParagraphs, splitRichContentBlocks } from './utils.js?v=43';
-import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=43';
-import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=43';
+import { clone, readingLength, splitParagraphs, splitRichContentBlocks } from './utils.js?v=44';
+import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=44';
+import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=44';
 
 const MAX_WORKOUT_COMPACTION = 5;
 
@@ -165,6 +165,7 @@ function planWeekEntries(week, weekIndex) {
   const chunks = chunkSessions(week);
   const oracleEntryCount = ((((week || {}).fieldOps || {}).oracleTable || {}).entries || []).length;
   const mechanicProfile = resolveWeekMechanicProfile(week);
+  const needsCompanionSpread = !!mechanicProfile.needsCompanionSpread;
 
   if (chunks.length > 0) {
     entries.push({
@@ -191,8 +192,27 @@ function planWeekEntries(week, weekIndex) {
       layout: 'standard',
       layoutVariant: pickDefaultTemplateVariant('field-ops', { week, mechanicProfile }),
       mechanicProfile,
+      companionPlacement: needsCompanionSpread ? 'spread' : 'inline',
       primaryOracleCount: oracleEntryCount
     });
+  }
+
+  if (needsCompanionSpread && !week.isBossWeek) {
+    const companionVariant = pickDefaultTemplateVariant('companion-spread-left', { week, mechanicProfile });
+    entries.push(
+      {
+        type: 'companion-spread-left',
+        weekIndex,
+        layoutVariant: companionVariant,
+        mechanicProfile
+      },
+      {
+        type: 'companion-spread-right',
+        weekIndex,
+        layoutVariant: companionVariant,
+        mechanicProfile
+      }
+    );
   }
 
   for (let index = 1; index < chunks.length; index += 1) {
@@ -349,7 +369,9 @@ function reviseEntryVariant(plan, index) {
     'overflow-doc',
     'fragment-page',
     'oracle-overflow',
-    'interlude'
+    'interlude',
+    'companion-spread-left',
+    'companion-spread-right'
   ]);
 
   if (!supportedTypes.has(entry.type)) return null;
@@ -362,6 +384,37 @@ function reviseEntryVariant(plan, index) {
     ...revised[index],
     layoutVariant: nextVariant
   };
+  return revised;
+}
+
+function reviseCompanionSpreadVariant(plan, index) {
+  const entry = (plan || [])[index];
+  if (!entry || (entry.type !== 'companion-spread-left' && entry.type !== 'companion-spread-right')) return null;
+
+  const nextVariant = nextTemplateVariant(entry.type, entry.layoutVariant || 'balanced');
+  if (nextVariant === (entry.layoutVariant || 'balanced')) return null;
+
+  const revised = normalizeBookletPlan(plan);
+  revised[index] = {
+    ...revised[index],
+    layoutVariant: nextVariant
+  };
+
+  const siblingType = entry.type === 'companion-spread-left' ? 'companion-spread-right' : 'companion-spread-left';
+  const siblingIndex = revised.findIndex((candidate, candidateIndex) => {
+    return candidateIndex !== index
+      && candidate
+      && candidate.type === siblingType
+      && candidate.weekIndex === entry.weekIndex;
+  });
+
+  if (siblingIndex !== -1) {
+    revised[siblingIndex] = {
+      ...revised[siblingIndex],
+      layoutVariant: nextVariant
+    };
+  }
+
   return revised;
 }
 
@@ -780,6 +833,10 @@ export function revisePlanForMeasurement(plan, measurement, data) {
     const splitPlan = splitFieldOpsEntry(plan, measurement.planIndex, measurement, data);
     if (splitPlan) return splitPlan;
     return reviseEntryVariant(plan, measurement.planIndex);
+  }
+
+  if (measurement.pageType === 'companion-spread-left' || measurement.pageType === 'companion-spread-right') {
+    return reviseCompanionSpreadVariant(plan, measurement.planIndex);
   }
 
   if (measurement.pageType === 'boss') {

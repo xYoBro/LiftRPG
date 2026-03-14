@@ -20,6 +20,20 @@ export const PAGE_ATOM_REGISTRY = {
     liveAreaRole: 'sealed',
     description: 'Sealed right-hand page in the opening spread.'
   },
+  'companion-spread-left': {
+    family: 'companion-spread',
+    measurable: true,
+    label: 'Companion Spread Left',
+    liveAreaRole: 'play-grid',
+    description: 'Dedicated left-hand companion page carrying clocks and large analog support surfaces.'
+  },
+  'companion-spread-right': {
+    family: 'companion-spread',
+    measurable: true,
+    label: 'Companion Spread Right',
+    liveAreaRole: 'play-grid',
+    description: 'Dedicated right-hand companion page paired with the left companion spread surface.'
+  },
   'workout-left': {
     family: 'workout',
     measurable: true,

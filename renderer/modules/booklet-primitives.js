@@ -1,14 +1,15 @@
-import { make } from './dom.js?v=43';
-import { splitRichText } from './booklet-models.js?v=43';
-import { createBoundedPage } from './page-shell.js?v=43';
-import { sanitizeHtml, sanitizeSvg } from './utils.js?v=43';
+import { make } from './dom.js?v=44';
+import { splitRichText } from './booklet-models.js?v=44';
+import { buildClockModels, buildCompanionModels } from './field-ops-models.js?v=44';
+import { createBoundedPage } from './page-shell.js?v=44';
+import { sanitizeHtml, sanitizeSvg } from './utils.js?v=44';
 import {
   renderCipherSection,
   renderCompanionComponent,
   renderGameplayClocks,
   renderMapSection
-} from './field-ops-primitives.js?v=43';
-import { inferCipherFamily, inferMapFamily } from './mechanic-registry.js?v=43';
+} from './field-ops-primitives.js?v=44';
+import { inferCipherFamily, inferMapFamily } from './mechanic-registry.js?v=44';
 
 function renderCoverArt(model) {
   const source = String(model.coverArt || '').trim();
@@ -101,6 +102,26 @@ function renderInterludePayload(model) {
   if (type === 'narrative') {
     return renderNarrativePayload(payload);
   }
+  if (type === 'map' && payload.mapState) {
+    const wrap = make('div', 'interlude-payload interlude-map-payload');
+    wrap.appendChild(renderMapSection({
+      ...payload.mapState,
+      family: payload.mapState.family || inferMapFamily(payload.mapState.mapType || '')
+    }));
+    return wrap;
+  }
+  if (type === 'clock' && Array.isArray(payload.gameplayClocks) && payload.gameplayClocks.length) {
+    const wrap = make('div', 'interlude-payload interlude-clock-payload');
+    wrap.appendChild(renderGameplayClocks(buildClockModels(payload.gameplayClocks)));
+    return wrap;
+  }
+  if (type === 'companion' && Array.isArray(payload.companionComponents) && payload.companionComponents.length) {
+    const wrap = make('div', 'interlude-payload interlude-companion-payload');
+    buildCompanionModels(payload.companionComponents).forEach((component) => {
+      wrap.appendChild(renderCompanionComponent(component));
+    });
+    return wrap;
+  }
   if (type === 'cipher' || payload.body || payload.workSpace || payload.referenceTargets) {
     const wrap = make('div', 'interlude-payload interlude-cipher-payload');
     wrap.appendChild(renderCipherSection({
@@ -129,12 +150,12 @@ function renderInterludePayload(model) {
   }
   if (Array.isArray(payload.gameplayClocks) && payload.gameplayClocks.length) {
     const wrap = make('div', 'interlude-payload interlude-clock-payload');
-    wrap.appendChild(renderGameplayClocks(payload.gameplayClocks));
+    wrap.appendChild(renderGameplayClocks(buildClockModels(payload.gameplayClocks)));
     return wrap;
   }
   if (Array.isArray(payload.companionComponents) && payload.companionComponents.length) {
     const wrap = make('div', 'interlude-payload interlude-companion-payload');
-    payload.companionComponents.forEach((component) => {
+    buildCompanionModels(payload.companionComponents).forEach((component) => {
       wrap.appendChild(renderCompanionComponent(component));
     });
     return wrap;

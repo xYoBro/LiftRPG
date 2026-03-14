@@ -1,11 +1,11 @@
-import { make } from './dom.js?v=43';
+import { make } from './dom.js?v=44';
 import {
   planBookletLayout,
   revisePlanForMeasurement
-} from './layout-governor.js?v=43';
-import { buildPages } from './page-builders.js?v=43';
-import { getPageBoundary, getPageFrame } from './page-shell.js?v=43';
-import { setPageNumbers } from './pagination.js?v=43';
+} from './layout-governor.js?v=44';
+import { buildPages } from './page-builders.js?v=44';
+import { getPageBoundary, getPageFrame } from './page-shell.js?v=44';
+import { setPageNumbers } from './pagination.js?v=44';
 
 const MAX_LAYOUT_PASSES = 48;
 const OVERFLOW_TOLERANCE_PX = 2;
@@ -81,6 +81,17 @@ function measureSlotMetrics(page, pageType) {
       oracleEntryCount: oracleEntries.length,
       averageOracleEntryHeight: average(oracleEntryHeights),
       oracleEntryHeights
+    };
+  }
+
+  if (pageType === 'companion-spread-left' || pageType === 'companion-spread-right') {
+    const components = Array.from(page.querySelectorAll('.companion-component'));
+    const tracks = Array.from(page.querySelectorAll('.clock-item'));
+    return {
+      companionCount: components.length,
+      companionHeights: components.map((component) => Math.ceil(component.getBoundingClientRect().height)),
+      clockCount: tracks.length,
+      clockZoneHeight: heightOf(page.querySelector('.companion-clock-zone'))
     };
   }
 

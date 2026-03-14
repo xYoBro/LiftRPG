@@ -2,12 +2,12 @@ import {
   getPasswordLength,
   pad2,
   splitParagraphs
-} from './utils.js?v=43';
+} from './utils.js?v=44';
 import {
   inferCipherFamily,
   inferMapFamily,
   resolveWeekMechanicProfile
-} from './mechanic-registry.js?v=43';
+} from './mechanic-registry.js?v=44';
 
 function splitKeyRows(text) {
   return String(text || '')
@@ -42,6 +42,7 @@ export function buildFieldOpsPageModels(data, week, layoutPlan = {}) {
   const oracleTable = fieldOps.oracleTable || null;
   const oracleEntries = normalizeEntries((oracleTable || {}).entries || []);
   const mechanicProfile = layoutPlan.mechanicProfile || resolveWeekMechanicProfile(week);
+  const useCompanionSpread = layoutPlan.companionPlacement === 'spread';
   const splitOracle = layoutPlan.layout === 'split-oracle' || layoutPlan.layout === 'oracle-only';
   const primaryOracleCount = splitOracle
     ? Math.max(0, Math.min(parseInt(layoutPlan.primaryOracleCount, 10) || 0, oracleEntries.length))
@@ -55,8 +56,8 @@ export function buildFieldOpsPageModels(data, week, layoutPlan = {}) {
     headerTitle: 'Field Operations',
     cipher: fieldOps.cipher ? buildCipherModel(fieldOps.cipher, week.weeklyComponent, mechanicProfile) : null,
     mapState: fieldOps.mapState ? buildMapModel(fieldOps.mapState, mechanicProfile) : null,
-    gameplayClocks: buildClockModels(week.gameplayClocks),
-    companionComponents: buildCompanionModels(mechanicProfile.companionComponents),
+    gameplayClocks: useCompanionSpread ? [] : buildClockModels(week.gameplayClocks),
+    companionComponents: useCompanionSpread ? [] : buildCompanionModels(mechanicProfile.companionComponents),
     mechanicProfile,
     oracle: primaryOracleEntries.length
       ? buildOracleModel({

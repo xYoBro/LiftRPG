@@ -1,8 +1,10 @@
-import { readingLength } from './utils.js?v=43';
+import { readingLength } from './utils.js?v=44';
 
 export const TEMPLATE_VARIANTS = {
   'rules-left': ['standard', 'compact', 'dense'],
   'rules-right': ['standard', 'compact'],
+  'companion-spread-left': ['balanced', 'clock-dominant', 'companion-dominant', 'dense'],
+  'companion-spread-right': ['balanced', 'clock-dominant', 'companion-dominant', 'dense'],
   'gauge-log': ['standard', 'compact'],
   assembly: ['standard', 'compact'],
   boss: ['standard', 'compact', 'dense', 'tight'],
@@ -24,6 +26,18 @@ export const TEMPLATE_VARIANT_DETAILS = {
   'rules-right': {
     standard: 'Centered sealed-page treatment with broad negative space.',
     compact: 'Tighter sealed-page treatment for longer supporting copy.'
+  },
+  'companion-spread-left': {
+    balanced: 'Balanced companion-spread left page with clocks and at least one companion surface.',
+    'clock-dominant': 'Clock-heavy left page that gives more area to active tension tracks.',
+    'companion-dominant': 'Companion-heavy left page with clocks reduced to a supporting role.',
+    dense: 'Most compressed companion-spread left page before overflow is considered unresolved.'
+  },
+  'companion-spread-right': {
+    balanced: 'Balanced companion-spread right page for companion surfaces and play instructions.',
+    'clock-dominant': 'Supporting right page when the spread emphasizes clocks on the left.',
+    'companion-dominant': 'Companion-heavy right page for larger analog play surfaces.',
+    dense: 'Most compressed companion-spread right page before overflow is considered unresolved.'
   },
   'gauge-log': {
     standard: 'Normal weekly gauge log spacing.',
@@ -118,6 +132,20 @@ export function pickDefaultTemplateVariant(type, context = {}) {
       if (!cipherFamily.includes('none') && oracleFamily === 'none') return 'cipher-dominant';
       if (oracleFamily !== 'none') return 'oracle-dominant';
       return 'balanced';
+    case 'companion-spread-left':
+    case 'companion-spread-right': {
+      const totalClockCount = Array.isArray((week || {}).gameplayClocks) ? week.gameplayClocks.length : 0;
+      const totalCompanionWeight = companionComponents.reduce((sum, component) => {
+        if (component.footprint === 'full-page') return sum + 1.3;
+        if (component.footprint === 'quarter-page') return sum + 0.4;
+        return sum + 0.8;
+      }, 0);
+      if (companionComponents.some((component) => component.footprint === 'full-page')) return 'companion-dominant';
+      if (totalClockCount >= 2 && totalCompanionWeight <= 1.3) return 'clock-dominant';
+      if (totalCompanionWeight >= 1.8) return 'companion-dominant';
+      if (totalCompanionWeight >= 1.4 && totalClockCount >= 2) return 'dense';
+      return 'balanced';
+    }
     case 'overflow-doc': {
       const overflowLength = readingLength((((week || {}).overflowDocument || {}).body || ((week || {}).overflowDocument || {}).content || ''));
       if (overflowLength > 1800) return 'dense';

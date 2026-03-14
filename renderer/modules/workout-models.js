@@ -3,7 +3,7 @@ import {
   getExerciseSetCount,
   getRepTargets,
   showLoadSuffix
-} from './utils.js?v=43';
+} from './utils.js?v=44';
 
 let textMeasureContext = null;
 

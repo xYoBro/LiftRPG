@@ -159,6 +159,12 @@ export const COMPANION_COMPONENT_REGISTRY = {
   }
 };
 
+const COMPANION_FOOTPRINT_WEIGHT = {
+  'quarter-page': 0.42,
+  'half-page': 0.82,
+  'full-page': 1.32
+};
+
 export function inferMapFamily(mapType) {
   const value = String(mapType || '').trim();
   return MAP_FAMILY_BY_TYPE[value] || (value ? 'custom-map' : 'none');
@@ -228,9 +234,51 @@ function normalizeCompanionComponents(fieldOps) {
     });
 }
 
+export function getCompanionComponentWeight(component) {
+  const footprint = String((component && component.footprint) || 'half-page').trim().toLowerCase();
+  const family = String((component && component.family) || '').trim().toLowerCase();
+  let weight = COMPANION_FOOTPRINT_WEIGHT[footprint] || COMPANION_FOOTPRINT_WEIGHT['half-page'];
+
+  if (family === 'stress-track' || family === 'memory-slots' || family === 'dashboard') {
+    weight += 0.16;
+  }
+  if (family === 'overlay-window' || family === 'token-sheet') {
+    weight += 0.2;
+  }
+  if (family === 'usage-die' || family === 'return-box') {
+    weight -= 0.06;
+  }
+
+  return Math.max(0.28, weight);
+}
+
+export function getCompanionSurfaceWeight(components) {
+  return (components || []).reduce((sum, component) => {
+    return sum + getCompanionComponentWeight(component);
+  }, 0);
+}
+
+export function shouldUseCompanionSpread(week, mechanicProfile = null) {
+  const fieldOps = (week || {}).fieldOps || {};
+  const profile = mechanicProfile || resolveWeekMechanicProfile(week);
+  const components = profile.companionComponents || [];
+  const gameplayClocks = Array.isArray((week || {}).gameplayClocks) ? week.gameplayClocks : [];
+  const totalWeight = profile.companionSurfaceWeight || getCompanionSurfaceWeight(components);
+
+  if (!components.length) return false;
+  if (!(fieldOps.mapState || fieldOps.cipher || fieldOps.oracleTable)) return false;
+  if (components.some((component) => component.footprint === 'full-page')) return true;
+  if (components.length >= 3) return true;
+  if (gameplayClocks.length >= 2 && totalWeight >= 1.2) return true;
+  if (totalWeight >= 1.7) return true;
+  if ((profile.clockFamily || 'none') !== 'none' && totalWeight >= 1.35) return true;
+  return false;
+}
+
 export function resolveWeekMechanicProfile(week) {
   const fieldOps = week.fieldOps || {};
   const companionComponents = normalizeCompanionComponents(fieldOps);
+  const companionSurfaceWeight = getCompanionSurfaceWeight(companionComponents);
 
   return {
     mapFamily: normalizeMapFamily(fieldOps),
@@ -239,6 +287,12 @@ export function resolveWeekMechanicProfile(week) {
     clockFamily: normalizeClockFamily(week),
     routeFamily: normalizeBinaryRouteFamily(week),
     companionComponents,
-    companionFamilies: companionComponents.map((component) => component.family)
+    companionFamilies: companionComponents.map((component) => component.family),
+    companionSurfaceWeight,
+    needsCompanionSpread: shouldUseCompanionSpread(week, {
+      companionComponents,
+      companionSurfaceWeight,
+      clockFamily: normalizeClockFamily(week)
+    })
   };
 }
