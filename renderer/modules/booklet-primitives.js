@@ -374,7 +374,7 @@ export function renderUnlockedEndingPage(model) {
 
   if (model.kicker) frame.appendChild(make('div', 'doc-label', model.kicker));
   if (model.continuationLabel) frame.appendChild(make('div', 'doc-label continuation-label', model.continuationLabel));
-  frame.appendChild(make('h2', 'endings-title', model.title));
+  if (model.title) frame.appendChild(make('h2', 'endings-title', model.title));
   if (model.documentType) frame.appendChild(make('div', 'doc-label', model.documentType));
 
   const body = make('div', 'endings-body');

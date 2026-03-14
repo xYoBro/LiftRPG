@@ -7,6 +7,34 @@ import { setPageNumbers } from './pagination.js?v=44';
 import { createBoundedPage } from './page-shell.js?v=44';
 import { applyTheme, resolveTheme } from './theme.js?v=44';
 
+// ── V2 Engine imports ───────────────────────────────────────────────
+import { getAtomDefinition } from './engine/atom-registry.js';
+import { planAndMeasure } from './engine/page-planner.js';
+import { liftrpgAdapter } from './adapters/liftrpg-adapter.js';
+
+// Atom self-registration — import for side effects only
+import './atoms/cover.js';
+import './atoms/rules-block.js';
+import './atoms/gauge-log.js';
+import './atoms/session-card.js';
+import './atoms/cipher-panel.js';
+import './atoms/oracle-table.js';
+import './atoms/map-panel.js';
+import './atoms/boss-encounter.js';
+import './atoms/fragment-doc.js';
+import './atoms/assembly-page.js';
+import './atoms/ending.js';
+import './atoms/back-cover.js';
+import './atoms/notes-grid.js';
+import './atoms/text-block.js';
+import './atoms/image.js';
+import './atoms/tracker.js';
+import './atoms/callout-box.js';
+import './atoms/checklist.js';
+import './atoms/table.js';
+import './atoms/timeline.js';
+import './atoms/divider.js';
+
 function buildGrid(pages, layoutMode) {
   const grid = make('div', 'booklet-grid');
 
@@ -171,4 +199,164 @@ export function renderBooklet(refs, layoutMode, data, unlockedEnding, setStatus)
   }
 
   setStatus('Loaded ' + pages.length + ' pages. Review, then print.', 'success');
+}
+
+// =====================================================================
+// V2 Engine Pipeline
+// =====================================================================
+
+/**
+ * Render a single page from a spread side's placements.
+ *
+ * Creates a bounded page, renders each atom at its solved density,
+ * and appends the rendered content to the page frame.
+ *
+ * @param {Array} placements — array of placement objects from the spread plan
+ * @param {string} spreadType — section type (e.g. 'body', 'cover')
+ * @param {number} planIndex — sequential page index for diagnostics
+ * @returns {HTMLElement} the assembled page element
+ */
+function renderPageFromPlacements(placements, spreadType, planIndex) {
+  if (placements.length === 0) return null;
+
+  // Single full-page atom whose renderer returns a complete booklet-page:
+  // use it directly instead of double-wrapping.
+  if (placements.length === 1) {
+    const def = getAtomDefinition(placements[0].type);
+    if (def) {
+      const rendered = def.render(placements[0].atom, placements[0].density);
+      if (rendered.classList && rendered.classList.contains('booklet-page')) {
+        rendered.setAttribute('data-plan-index', String(planIndex));
+        rendered.setAttribute('data-engine', 'v2');
+        return rendered;
+      }
+      // Content fragment — wrap it below
+    }
+  }
+
+  const primaryType = placements[0].type;
+  const { page, frame } = createBoundedPage(
+    primaryType,
+    'page-' + primaryType,
+    { boundaryRole: spreadType, pageClass: 'page-' + primaryType },
+  );
+
+  page.setAttribute('data-plan-index', String(planIndex));
+  page.setAttribute('data-engine', 'v2');
+
+  for (const placement of placements) {
+    const def = getAtomDefinition(placement.type);
+    if (!def) {
+      console.warn('[render-v2] No atom definition for type:', placement.type);
+      continue;
+    }
+    const rendered = def.render(placement.atom, placement.density);
+    // If a renderer returned a full page, extract its frame content
+    if (rendered.classList && rendered.classList.contains('booklet-page')) {
+      const innerFrame = rendered.querySelector('.page-frame');
+      if (innerFrame) {
+        while (innerFrame.firstChild) {
+          frame.appendChild(innerFrame.firstChild);
+        }
+      }
+    } else {
+      frame.appendChild(rendered);
+    }
+  }
+
+  return page;
+}
+
+/**
+ * Convert a spread plan into an array of page DOM elements.
+ *
+ * @param {object[]} spreadPlan — from planAndMeasure()
+ * @returns {HTMLElement[]}
+ */
+function buildPagesFromSpreadPlan(spreadPlan) {
+  const pages = [];
+  let planIndex = 0;
+
+  for (const spread of spreadPlan) {
+    if (spread.left.length > 0) {
+      const page = renderPageFromPlacements(spread.left, spread.spreadType, planIndex);
+      if (page) {
+        pages.push(page);
+        planIndex++;
+      }
+    }
+    if (spread.right.length > 0) {
+      const page = renderPageFromPlacements(spread.right, spread.spreadType, planIndex);
+      if (page) {
+        pages.push(page);
+        planIndex++;
+      }
+    }
+  }
+
+  return pages;
+}
+
+/**
+ * V2 render pipeline: adapter → planner → atom renderers → grid.
+ *
+ * Replaces the V1 pipeline (layout-governor + page-builders) with the
+ * universal atom-based engine. Same signature as renderBooklet() for
+ * drop-in switching.
+ */
+export function renderBookletV2(refs, layoutMode, data, unlockedEnding, setStatus) {
+  refs.booklet.innerHTML = '';
+  syncLayoutMode(refs, layoutMode);
+  applyTheme(refs.booklet, resolveTheme(data));
+  applyBookletMetadata(refs.booklet, data);
+
+  // Step 1: Extract atoms from data via adapter
+  const atoms = liftrpgAdapter.extractAtoms(data, unlockedEnding);
+
+  // Step 2: Plan and measure — full pipeline with overflow resolution
+  const { spreadPlan, diagnostics } = planAndMeasure(atoms, refs.booklet, {
+    sectionOrder: liftrpgAdapter.sectionOrder,
+    planningUnit: 'spread',
+    padToMultipleOf: 4,
+  });
+
+  // Step 3: Render atoms into pages
+  const pages = buildPagesFromSpreadPlan(spreadPlan);
+  setPageNumbers(pages);
+
+  // Step 4: Build grid and attach
+  refs.booklet.appendChild(buildGrid(pages, layoutMode));
+  refs.printBtn.disabled = false;
+
+  // Step 5: Expose diagnostics for debugging
+  window.__v2SpreadPlan = spreadPlan;
+  window.__v2Diagnostics = diagnostics;
+  window.__v2AtomCount = atoms.length;
+  window.__v2PageCount = pages.length;
+
+  // Step 6: Report status
+  const unresolvedCount = (diagnostics.unresolvedOverflow || []).length;
+  if (unresolvedCount > 0) {
+    setStatus(
+      '[V2] Loaded ' + pages.length + ' pages (' + atoms.length + ' atoms). ' +
+      unresolvedCount + ' unresolved overflow(s). ' +
+      diagnostics.revisionPasses + ' revision pass(es).',
+      'error',
+    );
+    return;
+  }
+
+  if (diagnostics.revisionPasses > 0) {
+    setStatus(
+      '[V2] Loaded ' + pages.length + ' pages (' + atoms.length + ' atoms). ' +
+      diagnostics.revisionPasses + ' revision pass(es) applied. Review, then print.',
+      'success',
+    );
+    return;
+  }
+
+  setStatus(
+    '[V2] Loaded ' + pages.length + ' pages (' + atoms.length + ' atoms). Review, then print.',
+    'success',
+  );
 }

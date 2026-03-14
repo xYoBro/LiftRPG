@@ -82,6 +82,9 @@ body[data-review-mode="true"] .reader-unlock{
   display:none !important;
 }
 
+body[data-demo-mode="true"] .app-toolbar{
+  display:none !important;
+}
 body[data-demo-view="true"] .app-chrome{
   display:none !important;
 }
@@ -3329,7 +3332,7 @@ body[data-demo-view="true"] .reader-unlock-hint{
 
 #booklet-container[data-archetype="pastoral"] .story-prompt{
   background:transparent;
-  border-left-width:3px;
+  border-left-width:1px;
   border-left-color:var(--accent);
   padding-left:8px;
   color:#8b8174;
@@ -3350,7 +3353,7 @@ body[data-demo-view="true"] .reader-unlock-hint{
 
 #booklet-container[data-archetype="pastoral"] .fragment-doc.report,
 #booklet-container[data-archetype="pastoral"] .fragment-doc.memo{
-  border-left-width:3.5px;
+  border-left-width:2px;
 }
 
 #booklet-container[data-archetype="pastoral"] .found-doc{
@@ -3444,6 +3447,76 @@ body[data-demo-view="true"] .reader-unlock-hint{
   font-size:5.5pt;
   color:var(--muted);
   letter-spacing:.06em;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   NOTES GRID (padding pages — dot / lined / graph / blank)
+   ══════════════════════════════════════════════════════════════ */
+.notes-grid-atom{
+  display:flex;
+  flex-direction:column;
+  height:100%;
+  padding:16px 20px 20px;
+  box-sizing:border-box;
+}
+.notes-grid-heading{
+  font-family:var(--mono);
+  font-size:6.5pt;
+  font-weight:600;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:var(--theme-label-color,var(--muted));
+  margin:0 0 12px;
+  padding-bottom:6px;
+  border-bottom:1px solid var(--theme-box-border,var(--rule));
+}
+
+/* Dot grid — Japanese stationery aesthetic */
+.notes-grid-dots{
+  flex:1;
+  display:grid;
+  grid-template-columns:repeat(var(--notes-grid-cols, 20), 1fr);
+  grid-template-rows:repeat(var(--notes-grid-rows, 28), 1fr);
+  align-items:center;
+  justify-items:center;
+}
+.notes-grid-dot{
+  display:block;
+  width:1.5px;
+  height:1.5px;
+  border-radius:50%;
+  background:var(--theme-line-color,var(--rule));
+  opacity:0.38;
+}
+
+/* Lined variant */
+.notes-grid-lined{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  padding:8px 0;
+}
+.notes-grid-line{
+  border-bottom:1px solid var(--theme-line-color,var(--rule));
+  opacity:0.3;
+}
+
+/* Graph variant */
+.notes-grid-graph{
+  flex:1;
+  display:grid;
+  grid-template-columns:repeat(var(--notes-grid-cols, 20), 1fr);
+  grid-template-rows:repeat(var(--notes-grid-rows, 28), 1fr);
+}
+.notes-grid-cell{
+  border:0.5px solid var(--theme-line-color,var(--rule));
+  opacity:0.25;
+}
+
+/* Blank variant */
+.notes-grid-blank{
+  flex:1;
 }
 
 /* ══════════════════════════════════════════════════════════════
