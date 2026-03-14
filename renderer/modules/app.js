@@ -403,7 +403,7 @@ export function initRendererApp() {
   }
   state.previewTarget = params.get('page') || '';
   state.reviewMode = params.get('review') === '1';
-  state.engineV2 = params.get('engine') === 'v2';
+  state.engineV2 = params.get('engine') !== 'v1';
   state.demoView = params.get('demoView') === '1';
   document.body.setAttribute('data-review-mode', state.reviewMode ? 'true' : 'false');
   document.body.setAttribute('data-demo-view', state.demoView ? 'true' : 'false');
