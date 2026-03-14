@@ -768,6 +768,7 @@ body[data-review-mode="true"] .reader-unlock{
   flex-direction:column;
   gap:3px;
   min-height:0;
+  overflow:hidden;
 }
 .workout-left[data-page-compaction="1"] .session-cards{
   gap:7px;
@@ -798,15 +799,56 @@ body[data-review-mode="true"] .reader-unlock{
   gap:5px;
 }
 .workout-left[data-page-compaction="3"] .session-card{
-  padding:5px 9px 6px;
+  padding:4px 8px 5px;
   gap:1px;
 }
 .workout-left[data-page-compaction="3"] .session-header{
   padding-bottom:2px;
 }
 .workout-left[data-page-compaction="3"] .story-prompt{
-  font-size:6.8pt;
-  line-height:1.32;
+  font-size:6.6pt;
+  line-height:1.28;
+}
+.workout-left[data-page-compaction="3"] .session-meta{
+  min-height:6px;
+}
+.workout-left[data-page-compaction="3"] .session-body{
+  gap:2px;
+}
+.workout-left[data-page-compaction="3"] .notes-box{
+  padding:3px 6px;
+}
+.workout-left[data-page-compaction="4"] .session-cards,
+.workout-left[data-page-compaction="5"] .session-cards{
+  gap:4px;
+}
+.workout-left[data-page-compaction="4"] .session-card,
+.workout-left[data-page-compaction="5"] .session-card{
+  padding:4px 7px 4px;
+  gap:1px;
+}
+.workout-left[data-page-compaction="4"] .session-header,
+.workout-left[data-page-compaction="5"] .session-header{
+  font-size:6.6pt;
+  padding-bottom:2px;
+}
+.workout-left[data-page-compaction="4"] .story-prompt,
+.workout-left[data-page-compaction="5"] .story-prompt{
+  font-size:6.35pt;
+  line-height:1.24;
+  padding:1px 0 1px 8px;
+}
+.workout-left[data-page-compaction="4"] .session-meta,
+.workout-left[data-page-compaction="5"] .session-meta{
+  min-height:5px;
+}
+.workout-left[data-page-compaction="4"] .session-fragment-ref,
+.workout-left[data-page-compaction="5"] .session-fragment-ref{
+  font-size:6.2pt;
+}
+.workout-left[data-page-compaction="4"] .session-body,
+.workout-left[data-page-compaction="5"] .session-body{
+  gap:2px;
 }
 
 .session-header{
@@ -866,9 +908,9 @@ body[data-review-mode="true"] .reader-unlock{
 .exercise-table{
   --exercise-row-gap-block:5px;
   --exercise-row-padding-y:2px;
-  --exercise-name-gap:3ch;
-  --exercise-track-gap:6px;
-  --exercise-load-width:54px;
+  --exercise-name-gap:2.25ch;
+  --exercise-track-gap:4px;
+  --exercise-load-width:48px;
   --rep-box-size:calc(16px * 1.07);
   width:100%;
   display:flex;
@@ -1008,6 +1050,24 @@ body[data-review-mode="true"] .reader-unlock{
   overflow:hidden;
   flex:1 1 auto;
 }
+.workout-left[data-page-compaction="4"] .exercise-table,
+.workout-left[data-page-compaction="5"] .exercise-table{
+  --exercise-row-gap-block:4px;
+  --exercise-row-padding-y:1px;
+  --exercise-track-gap:3px;
+}
+.workout-left[data-page-compaction="4"] .exercise-name,
+.workout-left[data-page-compaction="5"] .exercise-name{
+  font-size:7.6pt;
+}
+.workout-left[data-page-compaction="4"] .rep-box-target,
+.workout-left[data-page-compaction="5"] .rep-box-target{
+  font-size:5.1pt;
+}
+.workout-left[data-page-compaction="4"] .notes-box,
+.workout-left[data-page-compaction="5"] .notes-box{
+  padding:2px 6px;
+}
 .notes-box::before{
   content:'NOTES';
   font-family:var(--mono);
@@ -1025,6 +1085,13 @@ body[data-review-mode="true"] .reader-unlock{
   display:flex;
   align-items:center;
   gap:8px;
+}
+.workout-left[data-card-count="3"] .week-progress{
+  margin-top:6px;
+}
+.workout-left[data-card-count="3"][data-page-compaction="4"] .week-progress,
+.workout-left[data-card-count="3"][data-page-compaction="5"] .week-progress{
+  margin-top:4px;
 }
 
 .week-progress-dots{

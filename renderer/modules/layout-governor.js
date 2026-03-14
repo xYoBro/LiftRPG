@@ -1,8 +1,8 @@
-import { clone, readingLength, splitRichContentBlocks } from './utils.js?v=30';
-import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=30';
-import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=30';
+import { clone, readingLength, splitRichContentBlocks } from './utils.js?v=31';
+import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=31';
+import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=31';
 
-const MAX_WORKOUT_COMPACTION = 3;
+const MAX_WORKOUT_COMPACTION = 5;
 
 export function chunkSessions(week) {
   const sessions = week.sessions || [];
@@ -59,12 +59,12 @@ function resolveNotesLines(score, cardCount, compactionLevel) {
 }
 
 function resolveNotesHeight(notesLines, compactionLevel, cardCount) {
-  const minimumHeight = cardCount === 1 ? 20 : 12;
+  const minimumHeight = cardCount === 1 ? 20 : (cardCount === 3 ? 8 : 12);
 
   let height = minimumHeight;
   if (notesLines >= 3) height = 40;
   else if (notesLines === 2) height = 30;
-  else if (notesLines === 1) height = cardCount === 1 ? 22 : 18;
+  else if (notesLines === 1) height = cardCount === 1 ? 22 : (cardCount === 3 ? 14 : 18);
 
   return Math.max(minimumHeight, height - ((compactionLevel || 0) * 4));
 }

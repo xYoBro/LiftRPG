@@ -1,7 +1,7 @@
-import { make } from './dom.js?v=30';
-import { getPageAtom } from './atom-registry.js?v=30';
-import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=30';
-import { createBoundedPage } from './page-shell.js?v=30';
+import { make } from './dom.js?v=31';
+import { getPageAtom } from './atom-registry.js?v=31';
+import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=31';
+import { createBoundedPage } from './page-shell.js?v=31';
 import {
   buildAssemblyPageModelWithVariant,
   buildBackCoverModel,
@@ -13,7 +13,7 @@ import {
   buildRulesLeftPageModelWithVariant,
   buildSealedPageModel,
   buildUnlockedEndingPageModel
-} from './booklet-models.js?v=30';
+} from './booklet-models.js?v=31';
 import {
   renderAssemblyPage,
   renderBackCover,
@@ -25,14 +25,14 @@ import {
   renderRulesLeftPage,
   renderSealedPage,
   renderUnlockedEndingPage
-} from './booklet-primitives.js?v=30';
-import { buildDocumentPageModel } from './document-models.js?v=30';
-import { renderDocumentPage } from './document-primitives.js?v=30';
-import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=30';
-import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=30';
-import { buildWorkoutPageModel } from './workout-models.js?v=30';
-import { renderWorkoutCard } from './workout-primitives.js?v=30';
-import { pad2 } from './utils.js?v=30';
+} from './booklet-primitives.js?v=31';
+import { buildDocumentPageModel } from './document-models.js?v=31';
+import { renderDocumentPage } from './document-primitives.js?v=31';
+import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=31';
+import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=31';
+import { buildWorkoutPageModel } from './workout-models.js?v=31';
+import { renderWorkoutCard } from './workout-primitives.js?v=31';
+import { pad2 } from './utils.js?v=31';
 
 function buildWorkoutPage(data, week, entry) {
   const sessions = entry.sessions || [];

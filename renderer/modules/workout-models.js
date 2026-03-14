@@ -3,7 +3,7 @@ import {
   getExerciseSetCount,
   getRepTargets,
   showLoadSuffix
-} from './utils.js?v=30';
+} from './utils.js?v=31';
 
 let textMeasureContext = null;
 
@@ -21,7 +21,7 @@ function measureExerciseNameWidthPx(name) {
   const label = String(name || 'Lift').trim() || 'Lift';
   if (!context) return Math.max(54, Math.min(142, label.length * 8));
 
-  context.font = '700 15px \"Libre Baskerville\", Georgia, serif';
+  context.font = '700 10.67px \"Libre Baskerville\", Georgia, serif';
   return Math.ceil(context.measureText(label).width);
 }
 
@@ -30,7 +30,7 @@ function resolveExerciseNameWidthPx(exercises) {
     54,
     ...(exercises || []).map((exercise) => measureExerciseNameWidthPx(exercise && exercise.name))
   );
-  return Math.min(longestWidth + 4, 150);
+  return Math.min(longestWidth + 2, 132);
 }
 
 function buildExerciseRowModel(exercise) {

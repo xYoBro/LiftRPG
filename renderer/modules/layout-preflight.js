@@ -1,11 +1,11 @@
-import { make } from './dom.js?v=30';
+import { make } from './dom.js?v=31';
 import {
   planBookletLayout,
   revisePlanForMeasurement
-} from './layout-governor.js?v=30';
-import { buildPages } from './page-builders.js?v=30';
-import { getPageBoundary, getPageFrame } from './page-shell.js?v=30';
-import { setPageNumbers } from './pagination.js?v=30';
+} from './layout-governor.js?v=31';
+import { buildPages } from './page-builders.js?v=31';
+import { getPageBoundary, getPageFrame } from './page-shell.js?v=31';
+import { setPageNumbers } from './pagination.js?v=31';
 
 const MAX_LAYOUT_PASSES = 10;
 const OVERFLOW_TOLERANCE_PX = 2;
@@ -56,10 +56,16 @@ function measureSlotMetrics(page, pageType) {
   if (pageType === 'workout-left') {
     const cards = Array.from(page.querySelectorAll('.session-card'));
     const noteBoxes = Array.from(page.querySelectorAll('.notes-box'));
+    const cardOverflowHeights = cards.map((card) => {
+      const overflow = Math.ceil(card.scrollHeight - card.clientHeight);
+      return Math.max(0, overflow);
+    });
     return {
       cardCount: cards.length,
       cardHeights: cards.map((card) => Math.ceil(card.getBoundingClientRect().height)),
-      noteBoxHeights: noteBoxes.map((noteBox) => Math.ceil(noteBox.getBoundingClientRect().height))
+      noteBoxHeights: noteBoxes.map((noteBox) => Math.ceil(noteBox.getBoundingClientRect().height)),
+      cardOverflowHeights,
+      totalCardOverflowHeight: cardOverflowHeights.reduce((sum, value) => sum + value, 0)
     };
   }
 
@@ -164,8 +170,11 @@ function measurePage(page) {
     frame ? Math.ceil(frame.getBoundingClientRect().width) : 0,
     safeWidth
   );
+  const slotMetrics = measureSlotMetrics(page, pageType);
+  const internalOverflowHeight = Math.max(0, slotMetrics.totalCardOverflowHeight || 0);
   const overflowHeight = Math.max(0, contentHeight - safeHeight - OVERFLOW_TOLERANCE_PX);
   const overflowWidth = Math.max(0, contentWidth - safeWidth - OVERFLOW_TOLERANCE_PX);
+  const effectiveOverflowHeight = Math.max(overflowHeight, internalOverflowHeight);
 
   return {
     planIndex: parseInt(page.getAttribute('data-plan-index'), 10) || 0,
@@ -174,10 +183,10 @@ function measurePage(page) {
     missingBoundary: !boundary,
     liveAreaHeight: safeHeight,
     liveAreaWidth: safeWidth,
-    overflowHeight,
+    overflowHeight: effectiveOverflowHeight,
     overflowWidth,
-    overflowArea: (overflowHeight * Math.max(1, safeWidth)) + (overflowWidth * Math.max(1, safeHeight)),
-    slotMetrics: measureSlotMetrics(page, pageType)
+    overflowArea: (effectiveOverflowHeight * Math.max(1, safeWidth)) + (overflowWidth * Math.max(1, safeHeight)),
+    slotMetrics
   };
 }
 

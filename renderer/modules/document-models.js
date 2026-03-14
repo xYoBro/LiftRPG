@@ -1,5 +1,5 @@
-import { getDocumentAtom } from './atom-registry.js?v=30';
-import { splitParagraphs } from './utils.js?v=30';
+import { getDocumentAtom } from './atom-registry.js?v=31';
+import { splitParagraphs } from './utils.js?v=31';
 
 function normalizeDesignSpec(fragment) {
   const designSpec = fragment.designSpec || {};
