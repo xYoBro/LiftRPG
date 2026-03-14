@@ -37,12 +37,15 @@ registerAtom('rules-block', {
     const data = atom.data || {};
     const side = data.side || 'left';
 
+    // adapter wraps as { side, data: <bookletData> }
+    const bookletData = data.data || data;
+
     if (side === 'right') {
-      const sealedModel = buildSealedPageModel(data);
+      const sealedModel = buildSealedPageModel(bookletData);
       return renderSealedPage(sealedModel);
     }
 
-    const rulesModel = buildRulesLeftPageModel(data);
+    const rulesModel = buildRulesLeftPageModel(bookletData);
     return renderRulesLeftPage(rulesModel);
   },
 });
