@@ -10,6 +10,7 @@ const state = {
   layoutMode: 'single',
   restoreLayoutMode: null,
   demoMode: false,
+  demoView: false,
   demoPasswordRevealed: false,
   previewTarget: '',
   reviewMode: false,
@@ -400,7 +401,9 @@ export function initRendererApp() {
   }
   state.previewTarget = params.get('page') || '';
   state.reviewMode = params.get('review') === '1';
+  state.demoView = params.get('demoView') === '1';
   document.body.setAttribute('data-review-mode', state.reviewMode ? 'true' : 'false');
+  document.body.setAttribute('data-demo-view', state.demoView ? 'true' : 'false');
   refs.layoutMode.value = state.layoutMode;
   syncLayoutMode(refs, state.layoutMode);
   refs.printBtn.disabled = true;
