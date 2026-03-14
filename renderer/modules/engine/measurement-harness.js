@@ -84,10 +84,34 @@ export function measureAtom(stack, atom, density) {
     return { measuredHeight: 0, measuredWidth: 0, overflowHeight: 0 };
   }
 
-  // Create a bounded page context for accurate measurement
+  // Create a bounded page context for accurate measurement.
+  // Override frame to use block layout with auto height so we measure
+  // the atom's intrinsic content height, not its flexed height.
   const { page, boundary, frame } = createBoundedPage(atom.type, `measure-${atom.type}`);
+  Object.assign(frame.style, {
+    display:       'block',
+    height:        'auto',
+  });
   const rendered = def.render(atom, density);
-  frame.appendChild(rendered);
+  // If the atom renderer returned a full page element (has .booklet-page class),
+  // extract its frame content instead of nesting a page inside a page.
+  if (rendered.classList && rendered.classList.contains('booklet-page')) {
+    const innerFrame = rendered.querySelector('.page-frame');
+    if (innerFrame) {
+      // Switch inner frame to block layout too for intrinsic measurement
+      Object.assign(innerFrame.style, { display: 'block', height: 'auto' });
+      while (innerFrame.firstChild) {
+        frame.appendChild(innerFrame.firstChild);
+      }
+    }
+  } else {
+    // Strip flex self-sizing from the rendered element so it
+    // flows at its natural content height inside the block frame.
+    if (rendered.style && rendered.style.flex) {
+      rendered.style.flex = '';
+    }
+    frame.appendChild(rendered);
+  }
   stack.appendChild(page);
 
   // Measure

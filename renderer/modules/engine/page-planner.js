@@ -432,6 +432,71 @@ export function planAndMeasure(atoms, container, options = {}) {
 
     diagnostics.revisionPasses = revisionsApplied;
 
+    // Step 4: Compact — merge underfilled sharable pages
+    // After measurement, estimates may have over-allocated. Walk spreads and
+    // merge consecutive same-side single-atom pages when their measured
+    // heights fit together within the page budget.
+    let compactions = 0;
+    for (let i = 0; i < spreadPlan.length; i++) {
+      for (const side of ['left', 'right']) {
+        const placements = spreadPlan[i][side];
+        if (placements.length === 0) continue;
+
+        // Only compact sharable atoms
+        const allShareable = placements.every(p => {
+          const def = getAtomDefinition(p.type);
+          return def && def.canShare;
+        });
+        if (!allShareable) continue;
+
+        let runningHeight = placements.reduce(
+          (s, p) => s + (p.measuredHeight || p.estimatedHeight), 0,
+        );
+        if (PAGE_BUDGET.heightPx - runningHeight < 20) continue;
+
+        // Look ahead for the next spread with same-side sharable atoms
+        for (let j = i + 1; j < spreadPlan.length; j++) {
+          const candidatePlacements = spreadPlan[j][side];
+          if (candidatePlacements.length === 0) continue;
+
+          // Must be same section/group type to merge
+          if (spreadPlan[j].spreadType !== spreadPlan[i].spreadType) break;
+
+          const candidateShareable = candidatePlacements.every(p => {
+            const def = getAtomDefinition(p.type);
+            return def && def.canShare;
+          });
+          if (!candidateShareable) continue;
+
+          const candidateHeight = candidatePlacements.reduce(
+            (s, p) => s + (p.measuredHeight || p.estimatedHeight), 0,
+          );
+
+          if (runningHeight + candidateHeight <= PAGE_BUDGET.heightPx) {
+            // Merge: move all candidate placements into current page
+            placements.push(...candidatePlacements);
+            candidatePlacements.length = 0;
+            compactions++;
+            runningHeight += candidateHeight;
+            // Keep looking if there's still room
+            if (PAGE_BUDGET.heightPx - runningHeight < 20) break;
+          } else {
+            break;  // Won't fit, stop looking
+          }
+        }
+      }
+    }
+
+    // Remove empty spreads left by compaction
+    if (compactions > 0) {
+      for (let i = spreadPlan.length - 1; i >= 0; i--) {
+        if (spreadPlan[i].left.length === 0 && spreadPlan[i].right.length === 0) {
+          spreadPlan.splice(i, 1);
+        }
+      }
+    }
+    diagnostics.compactions = compactions;
+
     // Re-index spreads and recount pages
     let pageCount = 0;
     for (let i = 0; i < spreadPlan.length; i++) {

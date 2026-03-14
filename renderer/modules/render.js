@@ -219,6 +219,21 @@ export function renderBooklet(refs, layoutMode, data, unlockedEnding, setStatus)
 function renderPageFromPlacements(placements, spreadType, planIndex) {
   if (placements.length === 0) return null;
 
+  // Single full-page atom whose renderer returns a complete booklet-page:
+  // use it directly instead of double-wrapping.
+  if (placements.length === 1) {
+    const def = getAtomDefinition(placements[0].type);
+    if (def) {
+      const rendered = def.render(placements[0].atom, placements[0].density);
+      if (rendered.classList && rendered.classList.contains('booklet-page')) {
+        rendered.setAttribute('data-plan-index', String(planIndex));
+        rendered.setAttribute('data-engine', 'v2');
+        return rendered;
+      }
+      // Content fragment — wrap it below
+    }
+  }
+
   const primaryType = placements[0].type;
   const { page, frame } = createBoundedPage(
     primaryType,
@@ -236,7 +251,17 @@ function renderPageFromPlacements(placements, spreadType, planIndex) {
       continue;
     }
     const rendered = def.render(placement.atom, placement.density);
-    frame.appendChild(rendered);
+    // If a renderer returned a full page, extract its frame content
+    if (rendered.classList && rendered.classList.contains('booklet-page')) {
+      const innerFrame = rendered.querySelector('.page-frame');
+      if (innerFrame) {
+        while (innerFrame.firstChild) {
+          frame.appendChild(innerFrame.firstChild);
+        }
+      }
+    } else {
+      frame.appendChild(rendered);
+    }
   }
 
   return page;
