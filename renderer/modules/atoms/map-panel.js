@@ -10,12 +10,21 @@
 import { registerAtom } from '../engine/atom-registry.js';
 import { buildMapModel } from '../field-ops-models.js';
 import { renderMapSection } from '../field-ops-primitives.js';
+import { densityVariant } from '../engine/density-util.js';
 
 const MAP_HEIGHTS = {
-  'grid': 200,
+  'grid':           200,
   'point-to-point': 220,
-  'linear-track': 160,
-  'player-drawn': 350,
+  'linear-track':   160,
+  'player-drawn':   350,
+};
+
+/** ~15% reduction at max density */
+const MAP_HEIGHTS_MIN = {
+  'grid':           170,
+  'point-to-point': 188,
+  'linear-track':   136,
+  'player-drawn':   300,
 };
 
 registerAtom('map-panel', {
@@ -26,9 +35,10 @@ registerAtom('map-panel', {
   estimate(data, density) {
     const map = data.map || {};
     const mapType = map.mapType || 'grid';
-    const height = MAP_HEIGHTS[mapType] || MAP_HEIGHTS['grid'];
+    const preferred = MAP_HEIGHTS[mapType]     || MAP_HEIGHTS['grid'];
+    const min       = MAP_HEIGHTS_MIN[mapType] || MAP_HEIGHTS_MIN['grid'];
 
-    return { minHeight: height, preferredHeight: height };
+    return { minHeight: min, preferredHeight: preferred };
   },
 
   render(atom, density) {
@@ -36,7 +46,12 @@ registerAtom('map-panel', {
     const map = data.map || {};
 
     const mapModel = buildMapModel(map, null);
-    return renderMapSection(mapModel);
+    const el = renderMapSection(mapModel);
+
+    const variant = densityVariant(density);
+    if (variant) el.setAttribute('data-density-variant', variant);
+
+    return el;
   },
 });
 

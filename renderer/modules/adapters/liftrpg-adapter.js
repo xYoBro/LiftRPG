@@ -70,10 +70,25 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
 
   // ── Weeks ───────────────────────────────────────────────────
   const weeks = data.weeks || [];
+  const totalWeeks = weeks.length;
+  const bookletTitle = (data.cover || {}).title || ((data.meta || {}).blockTitle) || 'LiftRPG';
+
   for (let wi = 0; wi < weeks.length; wi++) {
     const week = weeks[wi];
     const isBoss = !!week.isBossWeek;
     const profile = resolveWeekMechanicProfile(week);
+
+    // Week header (kicker, title, epigraph) — before session cards
+    atoms.push(createAtom({
+      type: 'week-header',
+      id: `w${wi}-header`,
+      group: `week-${wi}`,
+      section: 'body',
+      sequence: wi * 1000 - 1,
+      sizeHint: 'minimal',
+      pageAffinity: 'left',
+      data: { weekIndex: wi, weekMeta: week, totalWeeks, bookletTitle, isFirstChunk: true },
+    }));
 
     // Session cards (left page)
     const sessions = week.sessions || [];
@@ -89,6 +104,18 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         data: { session: sessions[si], weekIndex: wi, weekMeta: week, profile },
       }));
     }
+
+    // Week footer (progress dots) — after session cards
+    atoms.push(createAtom({
+      type: 'week-footer',
+      id: `w${wi}-footer`,
+      group: `week-${wi}`,
+      section: 'body',
+      sequence: wi * 1000 + 50,
+      sizeHint: 'minimal',
+      pageAffinity: 'left',
+      data: { weekIndex: wi, totalWeeks },
+    }));
 
     if (isBoss) {
       // Boss encounter (right page)

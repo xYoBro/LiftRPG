@@ -95,31 +95,33 @@ export function measureAtom(stack, atom, density) {
   }
 
   // Create a bounded page context for accurate measurement.
-  // Override frame to use block layout with auto height so we measure
-  // the atom's intrinsic content height, not its flexed height.
+  // Use flex column layout (matching the real page frame) with auto
+  // height so the frame grows to fit content. This ensures margins
+  // behave identically to the rendered page — in flex layout, margins
+  // don't collapse through elements or with the container, unlike
+  // block layout where collapsed-through margins are invisible to
+  // both getBoundingClientRect() and getComputedStyle().
   const { page, boundary, frame } = createBoundedPage(atom.type, `measure-${atom.type}`);
   Object.assign(frame.style, {
-    display:       'block',
     height:        'auto',
+    // Keep display:flex and flex-direction:column from CSS —
+    // only override height to auto so frame grows to fit content.
   });
   const rendered = def.render(atom, density);
   // If the atom renderer returned a full page element (has .booklet-page class),
   // extract its frame content instead of nesting a page inside a page.
-  let measureTarget = rendered;
   if (rendered.classList && rendered.classList.contains('booklet-page')) {
     const innerFrame = rendered.querySelector('.page-frame');
     if (innerFrame) {
-      // Switch inner frame to block layout too for intrinsic measurement
-      Object.assign(innerFrame.style, { display: 'block', height: 'auto' });
+      Object.assign(innerFrame.style, { height: 'auto' });
       while (innerFrame.firstChild) {
         frame.appendChild(innerFrame.firstChild);
       }
     }
-    // Content was moved into frame — measure frame, not the detached shell
-    measureTarget = frame;
   } else {
-    // Strip flex self-sizing from the rendered element so it
-    // flows at its natural content height inside the block frame.
+    // Strip V1 flex self-sizing (e.g. session cards set flex: N 1 0)
+    // so the atom uses its intrinsic height. The CSS rule
+    // .page-frame > * { flex-shrink: 0 } prevents compression.
     if (rendered.style && rendered.style.flex) {
       rendered.style.flex = '';
     }
@@ -127,13 +129,15 @@ export function measureAtom(stack, atom, density) {
   }
   stack.appendChild(page);
 
-  // Measure
+  // Measure the frame's auto height — this captures the atom's
+  // intrinsic content height PLUS its margins (which don't collapse
+  // in the flex column context, matching the rendered page).
   const boundaryRect = boundary.getBoundingClientRect();
-  const contentRect  = measureTarget.getBoundingClientRect();
+  const frameRect    = frame.getBoundingClientRect();
 
-  const measuredHeight = contentRect.height;
-  const measuredWidth  = contentRect.width;
-  const overflowHeight = Math.max(0, contentRect.bottom - boundaryRect.bottom);
+  const measuredHeight = frameRect.height;
+  const measuredWidth  = frameRect.width;
+  const overflowHeight = Math.max(0, frameRect.bottom - boundaryRect.bottom);
 
   // Clean up
   page.remove();

@@ -17,6 +17,8 @@ import './atoms/cover.js';
 import './atoms/rules-block.js';
 import './atoms/gauge-log.js';
 import './atoms/session-card.js';
+import './atoms/week-header.js';
+import './atoms/week-footer.js';
 import './atoms/cipher-panel.js';
 import './atoms/oracle-table.js';
 import './atoms/map-panel.js';
@@ -256,10 +258,18 @@ function renderPageFromPlacements(placements, spreadType, planIndex) {
       const innerFrame = rendered.querySelector('.page-frame');
       if (innerFrame) {
         while (innerFrame.firstChild) {
-          frame.appendChild(innerFrame.firstChild);
+          const child = innerFrame.firstChild;
+          // Strip V1 flex self-sizing so atoms use intrinsic height
+          // in the page frame's flex column layout.
+          if (child.style && child.style.flex) child.style.flex = '';
+          frame.appendChild(child);
         }
       }
     } else {
+      // Strip V1 flex self-sizing (e.g. session cards set flex: N 1 0)
+      // so atoms use their intrinsic height, matching the measurement
+      // harness's block-layout measurement.
+      if (rendered.style && rendered.style.flex) rendered.style.flex = '';
       frame.appendChild(rendered);
     }
   }

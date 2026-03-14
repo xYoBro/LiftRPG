@@ -10,10 +10,13 @@
 import { registerAtom } from '../engine/atom-registry.js';
 import { buildCipherModel } from '../field-ops-models.js';
 import { renderCipherSection } from '../field-ops-primitives.js';
+import { densityVariant } from '../engine/density-util.js';
 
 const BASE_HEIGHT = 180;
 const WORKSPACE_HEIGHT = 40;
 const KEY_ROWS_HEIGHT = 30;
+/** Max compressible margin savings at tight density */
+const DENSITY_SAVINGS = 30;
 
 registerAtom('cipher-panel', {
   defaultSizeHint: 'quarter-page',
@@ -37,7 +40,10 @@ registerAtom('cipher-panel', {
       }
     }
 
-    return { minHeight: height, preferredHeight: height };
+    return {
+      minHeight:       height - DENSITY_SAVINGS,
+      preferredHeight: height,
+    };
   },
 
   render(atom, density) {
@@ -47,7 +53,12 @@ registerAtom('cipher-panel', {
     // buildCipherModel expects (cipher, weeklyComponent, mechanicProfile)
     // We pass cipher as weeklyComponent fallback for extractionInstruction
     const cipherModel = buildCipherModel(cipher, cipher, null);
-    return renderCipherSection(cipherModel);
+    const el = renderCipherSection(cipherModel);
+
+    const variant = densityVariant(density);
+    if (variant) el.setAttribute('data-density-variant', variant);
+
+    return el;
   },
 });
 

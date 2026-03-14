@@ -418,6 +418,13 @@ body[data-demo-view="true"] #booklet-container{
   flex-direction:column;
   overflow:hidden;
 }
+/* V2 atom pages: each atom should take its intrinsic height.
+   The page planner ensures atoms fit within the budget.
+   flex-shrink:0 prevents silent compression when totals are
+   near the boundary (which causes content clipping). */
+.page-frame > *{
+  flex-shrink:0;
+}
 
 .booklet-page[data-layout-overflow="true"] > .page-boundary{
   outline:1px solid rgba(139,42,42,.32);
@@ -2146,6 +2153,83 @@ body[data-demo-view="true"] #booklet-container{
 .companion-reminder{
   margin-top:5px;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   FIELD-OPS DENSITY VARIANTS (data-density-variant on element)
+   ══════════════════════════════════════════════════════════════ */
+
+/* — Cipher: compact ——————————————————————————————————————————— */
+.cipher-zone[data-density-variant="compact"] .cipher-key{margin-bottom:4px}
+.cipher-zone[data-density-variant="compact"] .cipher-workspace{margin-top:6px}
+.cipher-zone[data-density-variant="compact"] .puzzle-title{margin-bottom:2px}
+.cipher-zone[data-density-variant="compact"] .password-extract{margin-top:4px}
+/* — Cipher: dense ————————————————————————————————————————————— */
+.cipher-zone[data-density-variant="dense"] .cipher-key{margin-bottom:2px}
+.cipher-zone[data-density-variant="dense"] .cipher-workspace{margin-top:4px}
+.cipher-zone[data-density-variant="dense"] .puzzle-title{margin-bottom:1px;font-size:8pt}
+.cipher-zone[data-density-variant="dense"] .password-extract{margin-top:3px;font-size:5.2pt}
+.cipher-zone[data-density-variant="dense"] .cipher-sequence{margin-bottom:2px;font-size:6.2pt}
+/* — Cipher: tight —————————————————————————————————————————————— */
+.cipher-zone[data-density-variant="tight"] .cipher-key{margin-bottom:0}
+.cipher-zone[data-density-variant="tight"] .cipher-workspace{margin-top:2px}
+.cipher-zone[data-density-variant="tight"] .puzzle-title{margin-bottom:0;font-size:7.5pt}
+.cipher-zone[data-density-variant="tight"] .password-extract{margin-top:2px;font-size:5pt}
+.cipher-zone[data-density-variant="tight"] .cipher-sequence{margin-bottom:1px;font-size:6pt}
+.cipher-zone[data-density-variant="tight"] .cipher-key-table{gap:1px;font-size:5.6pt}
+.cipher-zone[data-density-variant="tight"] .cipher-key-cell{padding:1px 3px}
+
+/* — Oracle: compact ——————————————————————————————————————————— */
+.oracle-zone[data-density-variant="compact"] .oracle-entry{padding:1px 0}
+.oracle-zone[data-density-variant="compact"] .oracle-entries{gap:1px 6px}
+.oracle-zone[data-density-variant="compact"] .oracle-header{font-size:8pt;margin-bottom:2px}
+/* — Oracle: dense ————————————————————————————————————————————— */
+.oracle-zone[data-density-variant="dense"] .oracle-entry{padding:0}
+.oracle-zone[data-density-variant="dense"] .oracle-entries{gap:0 5px}
+.oracle-zone[data-density-variant="dense"] .oracle-header{font-size:7.5pt;margin-bottom:1px}
+.oracle-zone[data-density-variant="dense"] .oracle-text{font-size:4.8pt}
+.oracle-zone[data-density-variant="dense"] .oracle-instruction{font-size:5.4pt;margin-bottom:2px}
+/* — Oracle: tight —————————————————————————————————————————————— */
+.oracle-zone[data-density-variant="tight"] .oracle-entry{padding:0;border-bottom-width:0}
+.oracle-zone[data-density-variant="tight"] .oracle-entries{gap:0 4px}
+.oracle-zone[data-density-variant="tight"] .oracle-header{font-size:7pt;margin-bottom:0}
+.oracle-zone[data-density-variant="tight"] .oracle-text{font-size:4.6pt;line-height:1.15}
+.oracle-zone[data-density-variant="tight"] .oracle-case-num{font-size:4.6pt}
+
+/* — Map: compact —————————————————————————————————————————————— */
+.map-content[data-density-variant="compact"] .map-network{min-height:150px;margin-bottom:3px}
+.map-content[data-density-variant="compact"] .map-grid{margin-bottom:3px;gap:1px}
+.map-content[data-density-variant="compact"] .map-title{margin-bottom:2px}
+/* — Map: dense ———————————————————————————————————————————————— */
+.map-content[data-density-variant="dense"] .map-network{min-height:140px;margin-bottom:2px}
+.map-content[data-density-variant="dense"] .map-grid{margin-bottom:2px;gap:1px}
+.map-content[data-density-variant="dense"] .map-title{margin-bottom:1px;font-size:6.4pt}
+.map-content[data-density-variant="dense"] .map-annotation{font-size:5pt;margin-bottom:1px}
+.map-content[data-density-variant="dense"] .map-note{font-size:5pt}
+/* — Map: tight ——————————————————————————————————————————————— */
+.map-content[data-density-variant="tight"] .map-network{min-height:130px;margin-bottom:1px}
+.map-content[data-density-variant="tight"] .map-grid{margin-bottom:1px;gap:0}
+.map-content[data-density-variant="tight"] .map-title{margin-bottom:0;font-size:6pt}
+.map-content[data-density-variant="tight"] .map-annotation{font-size:4.8pt;margin-bottom:0}
+.map-content[data-density-variant="tight"] .map-note{font-size:4.8pt}
+
+/* — Fragment: compact ————————————————————————————————————————— */
+.fragment-doc[data-density-variant="compact"]{padding:7px 12px}
+.fragment-doc[data-density-variant="compact"] .fragment-doc-body{font-size:6.2pt;line-height:1.28}
+.fragment-doc[data-density-variant="compact"] .fragment-doc-body p{margin-bottom:3px}
+/* — Fragment: dense ——————————————————————————————————————————— */
+.fragment-doc[data-density-variant="dense"]{padding:5px 9px 6px}
+.fragment-doc[data-density-variant="dense"] .fragment-doc-type{margin-bottom:2px}
+.fragment-doc[data-density-variant="dense"] .fragment-doc-header{font-size:5.4pt;line-height:1.2;margin-bottom:2px}
+.fragment-doc[data-density-variant="dense"] .fragment-doc-body{font-size:5.85pt;line-height:1.22}
+.fragment-doc[data-density-variant="dense"] .fragment-doc-body p{margin-bottom:1px}
+.fragment-doc[data-density-variant="dense"] .fragment-doc-sig{font-size:5.2pt;padding-top:4px}
+/* — Fragment: tight ——————————————————————————————————————————— */
+.fragment-doc[data-density-variant="tight"]{padding:4px 8px 5px}
+.fragment-doc[data-density-variant="tight"] .fragment-doc-type{margin-bottom:1px;font-size:4.8pt}
+.fragment-doc[data-density-variant="tight"] .fragment-doc-header{font-size:5pt;line-height:1.15;margin-bottom:1px}
+.fragment-doc[data-density-variant="tight"] .fragment-doc-body{font-size:5.5pt;line-height:1.18}
+.fragment-doc[data-density-variant="tight"] .fragment-doc-body p{margin-bottom:0}
+.fragment-doc[data-density-variant="tight"] .fragment-doc-sig{font-size:4.8pt;padding-top:2px}
 
 /* ══════════════════════════════════════════════════════════════
    BOSS ENCOUNTER PAGE (replaces field ops on boss week)
