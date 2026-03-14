@@ -1,6 +1,7 @@
-import { make } from './dom.js?v=31';
-import { splitRichText } from './booklet-models.js?v=31';
-import { createBoundedPage } from './page-shell.js?v=31';
+import { make } from './dom.js?v=32';
+import { splitRichText } from './booklet-models.js?v=32';
+import { createBoundedPage } from './page-shell.js?v=32';
+import { sanitizeHtml } from './utils.js?v=32';
 
 export function renderCoverPage(model) {
   const scaffold = createBoundedPage('cover', 'cover-page', { boundaryRole: 'cover' });
@@ -187,7 +188,7 @@ function appendFormattedBody(container, rawContent) {
   if (!content) return;
 
   if (/<[a-z][\s\S]*>/i.test(content)) {
-    container.innerHTML = content;
+    container.innerHTML = sanitizeHtml(content);
     return;
   }
 

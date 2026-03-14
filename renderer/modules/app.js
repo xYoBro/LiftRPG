@@ -1,8 +1,8 @@
-import { decryptBlob, encryptBlob } from './crypto.js?v=31';
-import { qs } from './dom.js?v=31';
-import { exportBookletPdf } from './pdf-export.js?v=31';
-import { renderBooklet, syncLayoutMode } from './render.js?v=31';
-import { getDemoPassword, normalisePassword, validateBooklet } from './utils.js?v=31';
+import { decryptBlob, encryptBlob } from './crypto.js?v=32';
+import { qs } from './dom.js?v=32';
+import { exportBookletPdf } from './pdf-export.js?v=32';
+import { renderBooklet, syncLayoutMode } from './render.js?v=32';
+import { getDemoPassword, normalisePassword, validateBooklet } from './utils.js?v=32';
 
 const state = {
   data: null,
@@ -170,10 +170,12 @@ function loadBooklet(data, sourceLabel) {
   state.data = data;
   state.unlockedEnding = null;
   state.demoPasswordRevealed = false;
+  refs.layoutMode.value = state.layoutMode;
   renderCurrentBooklet();
   scheduleFontAwareRerender();
 
   const hasEncryptedEnding = !!(data.meta && data.meta.passwordEncryptedEnding);
+  const hasEndings = Array.isArray(data.endings) && data.endings.length > 0;
   const demoPassword = state.demoMode && data.meta ? normalisePassword(getDemoPassword(data.meta)) : '';
   syncUnlockUi({
     visible: hasEncryptedEnding,
@@ -184,7 +186,7 @@ function loadBooklet(data, sourceLabel) {
     inputDisabled: false,
     buttonDisabled: false
   });
-  refs.encryptRow.style.display = data.meta && (!data.meta.passwordEncryptedEnding || data.meta.passwordEncryptedEnding.indexOf('PLACEHOLDER_') === 0) ? 'flex' : 'none';
+  refs.encryptRow.style.display = data.meta && hasEndings && (!data.meta.passwordEncryptedEnding || data.meta.passwordEncryptedEnding.indexOf('PLACEHOLDER_') === 0) ? 'flex' : 'none';
   refs.encryptDownload.style.display = 'none';
   refs.encryptStatus.textContent = '';
   setStatus('Loaded ' + sourceLabel + '.', 'success');
@@ -399,6 +401,7 @@ export function initRendererApp() {
   state.previewTarget = params.get('page') || '';
   state.reviewMode = params.get('review') === '1';
   document.body.setAttribute('data-review-mode', state.reviewMode ? 'true' : 'false');
+  refs.layoutMode.value = state.layoutMode;
   syncLayoutMode(refs, state.layoutMode);
   refs.printBtn.disabled = true;
 

@@ -1,4 +1,4 @@
-import { readingLength } from './utils.js?v=31';
+import { readingLength } from './utils.js?v=32';
 
 export const TEMPLATE_VARIANTS = {
   'rules-left': ['standard', 'compact', 'dense'],

@@ -93,6 +93,118 @@ export function stripHtml(text) {
   return String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function unwrapElement(element) {
+  const parent = element && element.parentNode;
+  if (!parent) return;
+
+  while (element.firstChild) {
+    parent.insertBefore(element.firstChild, element);
+  }
+  parent.removeChild(element);
+}
+
+function isSafeUrl(url) {
+  const value = String(url || '').trim();
+  if (!value) return false;
+  if (value.startsWith('#') || value.startsWith('/')) return true;
+  if (/^(https?:|mailto:|tel:)/i.test(value)) return true;
+  return false;
+}
+
+export function sanitizeHtml(rawHtml) {
+  const content = String(rawHtml || '').trim();
+  if (!content) return '';
+
+  if (typeof DOMParser === 'undefined') {
+    return stripHtml(content);
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString('<body>' + content + '</body>', 'text/html');
+  const root = doc.body;
+  const allowedTags = new Set([
+    'A',
+    'B',
+    'BLOCKQUOTE',
+    'BR',
+    'EM',
+    'HR',
+    'I',
+    'LI',
+    'OL',
+    'P',
+    'SPAN',
+    'STRONG',
+    'U',
+    'UL'
+  ]);
+  const blockedTags = new Set([
+    'BASE',
+    'BUTTON',
+    'EMBED',
+    'FORM',
+    'IFRAME',
+    'INPUT',
+    'LINK',
+    'META',
+    'OBJECT',
+    'SCRIPT',
+    'SELECT',
+    'STYLE',
+    'SVG',
+    'MATH',
+    'TEMPLATE',
+    'TEXTAREA'
+  ]);
+
+  Array.from(root.querySelectorAll('*')).forEach((element) => {
+    const tagName = String(element.tagName || '').toUpperCase();
+
+    if (blockedTags.has(tagName)) {
+      element.remove();
+      return;
+    }
+
+    if (!allowedTags.has(tagName)) {
+      unwrapElement(element);
+      return;
+    }
+
+    Array.from(element.attributes).forEach((attribute) => {
+      const name = String(attribute.name || '').toLowerCase();
+      const value = String(attribute.value || '');
+
+      if (
+        name.startsWith('on')
+        || name === 'style'
+        || name === 'src'
+        || name === 'srcdoc'
+        || name === 'xlink:href'
+      ) {
+        element.removeAttribute(attribute.name);
+        return;
+      }
+
+      if (name === 'href') {
+        if (!isSafeUrl(value)) {
+          element.removeAttribute(attribute.name);
+          element.removeAttribute('target');
+          element.removeAttribute('rel');
+          return;
+        }
+        element.setAttribute('rel', 'noopener noreferrer');
+        return;
+      }
+
+      if (!['href', 'rel', 'title'].includes(name)) {
+        element.removeAttribute(attribute.name);
+      }
+    });
+  });
+
+  return root.innerHTML.trim();
+}
+
 export function readingLength(value) {
   return stripHtml(splitParagraphs(value).join(' ')).length;
 }

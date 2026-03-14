@@ -21,6 +21,20 @@ function sanitizeTitle(data) {
     || 'LiftRPG-Render';
 }
 
+function resolveCanvasBackground(refs) {
+  const element = refs && refs.booklet;
+  if (!element || typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') {
+    return '#f1ebe0';
+  }
+
+  const styles = window.getComputedStyle(element);
+  const pagePaper = styles.getPropertyValue('--page-paper').trim();
+  if (pagePaper) return pagePaper;
+
+  const backgroundColor = styles.backgroundColor || '';
+  return backgroundColor.trim() || '#f1ebe0';
+}
+
 export async function exportBookletPdf(refs, data, renderWithMode, setStatus) {
   if (!data) return;
 
@@ -50,6 +64,7 @@ export async function exportBookletPdf(refs, data, renderWithMode, setStatus) {
     }
 
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'in', format: 'letter' });
+    const backgroundColor = resolveCanvasBackground(refs);
 
     for (let index = 0; index < spreads.length; index += 1) {
       setStatus('Generating PDF: page ' + (index + 1) + ' of ' + spreads.length + '…', 'neutral');
@@ -57,7 +72,7 @@ export async function exportBookletPdf(refs, data, renderWithMode, setStatus) {
         scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: '#f1ebe0'
+        backgroundColor
       });
       const image = canvas.toDataURL('image/jpeg', 0.95);
       if (index > 0) {

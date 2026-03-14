@@ -1,11 +1,11 @@
-import { PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from './constants.js?v=31';
-import { make } from './dom.js?v=31';
-import { buildBookletMetaModel } from './booklet-models.js?v=31';
-import { optimizeBookletPlan } from './layout-preflight.js?v=31';
-import { buildPages } from './page-builders.js?v=31';
-import { setPageNumbers } from './pagination.js?v=31';
-import { createBoundedPage } from './page-shell.js?v=31';
-import { applyTheme, resolveTheme } from './theme.js?v=31';
+import { PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from './constants.js?v=32';
+import { make } from './dom.js?v=32';
+import { buildBookletMetaModel } from './booklet-models.js?v=32';
+import { optimizeBookletPlan } from './layout-preflight.js?v=32';
+import { buildPages } from './page-builders.js?v=32';
+import { setPageNumbers } from './pagination.js?v=32';
+import { createBoundedPage } from './page-shell.js?v=32';
+import { applyTheme, resolveTheme } from './theme.js?v=32';
 
 function buildGrid(pages, layoutMode) {
   const grid = make('div', 'booklet-grid');
