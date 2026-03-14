@@ -3233,6 +3233,10 @@ body[data-demo-view="true"] .reader-unlock-hint{
   line-height:1.15;
 }
 
+#booklet-container[data-archetype="pastoral"]{
+  --accent:#8b2a2a;
+}
+
 #booklet-container[data-archetype="pastoral"] .page-boundary{
   inset:var(--page-live-top,0.3in) var(--page-live-right,0.3in) var(--page-live-bottom,0.28in) var(--page-live-left,0.3in);
 }
@@ -3325,7 +3329,7 @@ body[data-demo-view="true"] .reader-unlock-hint{
 
 #booklet-container[data-archetype="pastoral"] .story-prompt{
   background:transparent;
-  border-left-width:1px;
+  border-left-width:3px;
   border-left-color:var(--accent);
   padding-left:8px;
   color:#8b8174;
@@ -3346,7 +3350,7 @@ body[data-demo-view="true"] .reader-unlock-hint{
 
 #booklet-container[data-archetype="pastoral"] .fragment-doc.report,
 #booklet-container[data-archetype="pastoral"] .fragment-doc.memo{
-  border-left-width:2px;
+  border-left-width:3.5px;
 }
 
 #booklet-container[data-archetype="pastoral"] .found-doc{
