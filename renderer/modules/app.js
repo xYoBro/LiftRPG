@@ -412,6 +412,7 @@ export function initRendererApp() {
   refs.printBtn.disabled = true;
 
   state.demoMode = !!params.get('demo');
+  document.body.setAttribute('data-demo-mode', state.demoMode ? 'true' : 'false');
   state.demoPasswordRevealed = false;
   if (params.get('demo')) {
     fetchDemo(params.get('demo'));

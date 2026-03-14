@@ -82,6 +82,9 @@ body[data-review-mode="true"] .reader-unlock{
   display:none !important;
 }
 
+body[data-demo-mode="true"] .app-toolbar{
+  display:none !important;
+}
 body[data-demo-view="true"] .app-chrome{
   display:none !important;
 }
@@ -3231,6 +3234,10 @@ body[data-demo-view="true"] .reader-unlock-hint{
   color:var(--ink);
   margin-bottom:10px;
   line-height:1.15;
+}
+
+#booklet-container[data-archetype="pastoral"]{
+  --accent:#8b2a2a;
 }
 
 #booklet-container[data-archetype="pastoral"] .page-boundary{
