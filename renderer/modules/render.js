@@ -335,7 +335,7 @@ export function renderBookletV2(refs, layoutMode, data, unlockedEnding, setStatu
   window.__v2PageCount = pages.length;
 
   // Step 6: Report status
-  const unresolvedCount = (diagnostics.unresolvedOverflows || []).length;
+  const unresolvedCount = (diagnostics.unresolvedOverflow || []).length;
   if (unresolvedCount > 0) {
     setStatus(
       '[V2] Loaded ' + pages.length + ' pages (' + atoms.length + ' atoms). ' +

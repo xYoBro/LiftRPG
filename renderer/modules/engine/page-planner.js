@@ -459,8 +459,9 @@ export function planAndMeasure(atoms, container, options = {}) {
           const candidatePlacements = spreadPlan[j][side];
           if (candidatePlacements.length === 0) continue;
 
-          // Must be same section/group type to merge
+          // Must be same section and week to merge (never cross week boundaries)
           if (spreadPlan[j].spreadType !== spreadPlan[i].spreadType) break;
+          if (spreadPlan[j].weekIndex !== spreadPlan[i].weekIndex) break;
 
           const candidateShareable = candidatePlacements.every(p => {
             const def = getAtomDefinition(p.type);

@@ -95,6 +95,7 @@ export function measureAtom(stack, atom, density) {
   const rendered = def.render(atom, density);
   // If the atom renderer returned a full page element (has .booklet-page class),
   // extract its frame content instead of nesting a page inside a page.
+  let measureTarget = rendered;
   if (rendered.classList && rendered.classList.contains('booklet-page')) {
     const innerFrame = rendered.querySelector('.page-frame');
     if (innerFrame) {
@@ -104,6 +105,8 @@ export function measureAtom(stack, atom, density) {
         frame.appendChild(innerFrame.firstChild);
       }
     }
+    // Content was moved into frame — measure frame, not the detached shell
+    measureTarget = frame;
   } else {
     // Strip flex self-sizing from the rendered element so it
     // flows at its natural content height inside the block frame.
@@ -116,7 +119,7 @@ export function measureAtom(stack, atom, density) {
 
   // Measure
   const boundaryRect = boundary.getBoundingClientRect();
-  const contentRect  = rendered.getBoundingClientRect();
+  const contentRect  = measureTarget.getBoundingClientRect();
 
   const measuredHeight = contentRect.height;
   const measuredWidth  = contentRect.width;
