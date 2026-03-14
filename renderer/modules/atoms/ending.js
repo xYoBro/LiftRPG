@@ -41,7 +41,12 @@ registerAtom('ending', {
 
     if (type === 'unlocked') {
       const payload = data.content || null;
-      const unlockedModel = buildUnlockedEndingPageModel(bookletData, payload);
+      // Pass continuationLabel via the entry param (4th arg) so the
+      // model builder picks it up for multi-page endings.
+      const entry = payload && payload.continuationLabel
+        ? { continuationLabel: payload.continuationLabel }
+        : null;
+      const unlockedModel = buildUnlockedEndingPageModel(bookletData, payload, 'document', entry);
       return renderUnlockedEndingPage(unlockedModel);
     }
 

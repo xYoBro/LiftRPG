@@ -504,8 +504,30 @@ export function planAndMeasure(atoms, container, options = {}) {
       if (spreadPlan[i].left.length > 0)  pageCount++;
       if (spreadPlan[i].right.length > 0) pageCount++;
     }
+    // Step 5: Re-pad after compaction (page count may have changed)
+    const padTo = options.padToMultipleOf ?? DEFAULT_PAGE_SPEC.padToMultipleOf;
+    const postRemainder = pageCount % padTo;
+    const postPadding   = postRemainder === 0 ? 0 : padTo - postRemainder;
+
+    for (let pi = 0; pi < postPadding; pi++) {
+      const padSpread = createSpread(spreadPlan.length, 'padding');
+      padSpread.left.push(createPlacement({
+        type:         'notes-grid',
+        id:           `post-padding-${pi}`,
+        group:        'padding',
+        section:      'padding',
+        sequence:     pi,
+        sizeHint:     'full-page',
+        pageAffinity: 'either',
+        data:         { variant: 'dot' },
+      }));
+      spreadPlan.push(padSpread);
+      pageCount++;
+    }
+
     diagnostics.totalPages   = pageCount;
     diagnostics.totalSpreads = spreadPlan.length;
+    diagnostics.paddingPages = postPadding;
 
     // Record per-spread usage
     for (const spread of spreadPlan) {

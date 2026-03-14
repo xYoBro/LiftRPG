@@ -19,8 +19,8 @@ import { make } from '../dom.js';
 /** Full page height in px (5.5" × 8.5" at 96dpi minus margins). */
 const FULL_PAGE_HEIGHT = 741;
 
-/** Default cell count for dot and graph variants. */
-const DEFAULT_CELL_COUNT = 36;
+/** Default cell count for dot and graph variants (20 cols × 28 rows = 560). */
+const DEFAULT_CELL_COUNT = 560;
 
 /** Default line count for the lined variant. */
 const DEFAULT_LINE_COUNT = 28;
@@ -36,7 +36,7 @@ const DEFAULT_LINE_COUNT = 28;
  */
 function buildDotGrid(cellCount) {
   const container = make('div', 'notes-grid-dots');
-  const cols = 6;
+  const cols = 20;
   const rows = Math.ceil(cellCount / cols);
   container.style.setProperty('--notes-grid-cols', cols);
   container.style.setProperty('--notes-grid-rows', rows);
@@ -67,7 +67,7 @@ function buildLinedGrid(lineCount) {
  */
 function buildGraphGrid(cellCount) {
   const container = make('div', 'notes-grid-graph');
-  const cols = 6;
+  const cols = 20;
   const rows = Math.ceil(cellCount / cols);
   container.style.setProperty('--notes-grid-cols', cols);
   container.style.setProperty('--notes-grid-rows', rows);

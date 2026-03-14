@@ -206,12 +206,34 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
   }));
 
   if (unlockedEnding) {
-    atoms.push(createAtom({
-      type: 'ending', id: 'ending-unlocked', group: 'endings',
-      section: 'endings', sequence: 1,
-      sizeHint: 'full-page', pageAffinity: 'either',
-      data: { type: 'unlocked', data, content: unlockedEnding },
-    }));
+    const endingBody = unlockedEnding.body || unlockedEnding.content || '';
+    const endingChunks = splitEndingBody(endingBody);
+
+    for (let ei = 0; ei < endingChunks.length; ei++) {
+      const isFirst = ei === 0;
+      const isLast = ei === endingChunks.length - 1;
+      atoms.push(createAtom({
+        type: 'ending', id: `ending-unlocked-${ei}`, group: 'endings',
+        section: 'endings', sequence: 1 + ei,
+        sizeHint: 'full-page', pageAffinity: 'either',
+        data: {
+          type: 'unlocked',
+          data,
+          content: {
+            ...unlockedEnding,
+            body: endingChunks[ei],
+            // Title and kicker only on first page
+            title: isFirst ? (unlockedEnding.title || 'Unlocked Document') : '',
+            kicker: isFirst ? (unlockedEnding.kicker || '') : '',
+            documentType: isFirst ? (unlockedEnding.documentType || '') : '',
+            // Final line only on last page
+            finalLine: isLast ? (unlockedEnding.finalLine || '') : '',
+            // Continuation label on subsequent pages
+            continuationLabel: isFirst ? '' : 'Continued',
+          },
+        },
+      }));
+    }
   }
 
   // ── Back cover ──────────────────────────────────────────────
@@ -228,6 +250,45 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Split a long ending body into page-sized chunks.
+ * Splits on paragraph boundaries (double newline). If the body fits on
+ * one page (~1800 chars or fewer), returns a single chunk.
+ *
+ * @param {string} body — the ending body text
+ * @returns {string[]} array of body chunks (1 or 2)
+ */
+function splitEndingBody(body) {
+  const PAGE_CHAR_BUDGET = 1800;
+  if (!body || body.length <= PAGE_CHAR_BUDGET) return [body || ''];
+
+  const paragraphs = body.split(/\n\n+/);
+  if (paragraphs.length <= 1) return [body];
+
+  // Find the split point closest to the middle by character count
+  let charCount = 0;
+  const midpoint = body.length / 2;
+  let splitIndex = 0;
+  let bestDist = Infinity;
+
+  for (let i = 0; i < paragraphs.length; i++) {
+    charCount += paragraphs[i].length + 2; // +2 for the \n\n
+    const dist = Math.abs(charCount - midpoint);
+    if (dist < bestDist) {
+      bestDist = dist;
+      splitIndex = i + 1;
+    }
+  }
+
+  // Ensure at least 1 paragraph on each side
+  splitIndex = Math.max(1, Math.min(paragraphs.length - 1, splitIndex));
+
+  return [
+    paragraphs.slice(0, splitIndex).join('\n\n'),
+    paragraphs.slice(splitIndex).join('\n\n'),
+  ];
+}
 
 /**
  * Estimate fragment weight for size hint selection.
