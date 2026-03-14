@@ -1,14 +1,14 @@
-import { make } from './dom.js?v=17';
+import { make } from './dom.js?v=30';
 
 function renderExerciseRow(rowModel) {
-  const row = make('tr', 'exercise-row');
+  const row = make('div', 'exercise-row');
   row.setAttribute('data-has-load', rowModel.hasLoad ? 'true' : 'false');
 
-  const nameCell = make('td', 'exercise-name-cell');
+  const nameCell = make('div', 'exercise-name-cell');
   nameCell.appendChild(make('div', 'exercise-name', rowModel.name));
   row.appendChild(nameCell);
 
-  const weightCell = make('td', 'exercise-weight-cell');
+  const weightCell = make('div', 'exercise-weight-cell');
   const loadEntry = make('div', 'exercise-load-entry');
 
   if (rowModel.hasLoad) {
@@ -24,11 +24,11 @@ function renderExerciseRow(rowModel) {
   weightCell.appendChild(loadEntry);
   row.appendChild(weightCell);
 
-  const dotsCell = make('td', 'exercise-dots-cell');
+  const dotsCell = make('div', 'exercise-dots-cell');
   dotsCell.appendChild(make('div', 'exercise-dots'));
   row.appendChild(dotsCell);
 
-  const repsCell = make('td', 'exercise-reps-cell');
+  const repsCell = make('div', 'exercise-reps-cell');
   const repGroup = make('div', 'rep-boxes');
   rowModel.repTargets.forEach((target) => {
     const repBox = make('div', 'rep-box');
@@ -42,8 +42,8 @@ function renderExerciseRow(rowModel) {
 }
 
 function renderExerciseTable(cardModel) {
-  const exercises = make('table', 'exercise-table');
-  exercises.style.setProperty('--exercise-name-width', cardModel.exerciseNameWidthCh + 'ch');
+  const exercises = make('div', 'exercise-table');
+  exercises.style.setProperty('--exercise-name-width', cardModel.exerciseNameWidthPx + 'px');
   cardModel.exerciseRows.forEach((rowModel) => {
     exercises.appendChild(renderExerciseRow(rowModel));
   });
@@ -96,9 +96,7 @@ export function renderWorkoutCard(cardModel) {
   }
 
   const notesBox = make('div', 'notes-box');
-  if (cardModel.notesHeight) {
-    notesBox.style.setProperty('--notes-box-height', cardModel.notesHeight + 'px');
-  }
+  notesBox.style.setProperty('--notes-box-height', Math.max(12, cardModel.notesHeight || 0) + 'px');
   body.appendChild(notesBox);
 
   card.appendChild(body);

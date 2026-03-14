@@ -141,15 +141,30 @@ export const DOCUMENT_ATOM_REGISTRY = {
     label: 'Field Note',
     description: 'Field notebook or observational note artifact.'
   },
+  'field-note': {
+    family: 'hand-authored',
+    label: 'Field Note',
+    description: 'Field notebook or observational note artifact.'
+  },
   correspondence: {
     family: 'personal',
     label: 'Correspondence',
     description: 'Letter, message, or direct personal correspondence.'
   },
+  letter: {
+    family: 'personal',
+    label: 'Letter',
+    description: 'Personal or diegetic letter artifact.'
+  },
   transcript: {
     family: 'recorded',
     label: 'Transcript',
     description: 'Recorded conversation, statement, or hearing transcript.'
+  },
+  form: {
+    family: 'bureaucratic',
+    label: 'Form',
+    description: 'Structured form or worksheet artifact.'
   },
   anomaly: {
     family: 'anomalous',
@@ -163,5 +178,9 @@ export function getPageAtom(type) {
 }
 
 export function getDocumentAtom(type) {
-  return DOCUMENT_ATOM_REGISTRY[type] || { family: 'custom-document' };
+  const normalized = String(type || '')
+    .replace(/([a-z])([A-Z])/g, '$1-$2')
+    .replace(/\s+/g, '-')
+    .trim();
+  return DOCUMENT_ATOM_REGISTRY[type] || DOCUMENT_ATOM_REGISTRY[normalized] || { family: 'custom-document' };
 }

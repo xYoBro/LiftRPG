@@ -1,6 +1,6 @@
-import { clone, readingLength, splitRichContentBlocks } from './utils.js?v=28';
-import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=28';
-import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=28';
+import { clone, readingLength, splitRichContentBlocks } from './utils.js?v=30';
+import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=30';
+import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=30';
 
 const MAX_WORKOUT_COMPACTION = 3;
 
@@ -58,14 +58,15 @@ function resolveNotesLines(score, cardCount, compactionLevel) {
   return Math.max(minimumNotesLines, lines);
 }
 
-function resolveNotesHeight(notesLines, compactionLevel) {
-  if (notesLines <= 0) return 0;
+function resolveNotesHeight(notesLines, compactionLevel, cardCount) {
+  const minimumHeight = cardCount === 1 ? 20 : 12;
 
-  let height = 40;
-  if (notesLines === 1) height = 20;
-  if (notesLines === 2) height = 30;
+  let height = minimumHeight;
+  if (notesLines >= 3) height = 40;
+  else if (notesLines === 2) height = 30;
+  else if (notesLines === 1) height = cardCount === 1 ? 22 : 18;
 
-  return Math.max(notesLines === 1 ? 12 : 0, height - ((compactionLevel || 0) * 4));
+  return Math.max(minimumHeight, height - ((compactionLevel || 0) * 4));
 }
 
 export function planWorkoutPageLayout(sessions, options = {}) {
@@ -77,7 +78,7 @@ export function planWorkoutPageLayout(sessions, options = {}) {
     const score = complexityScores[index];
     const density = resolveDensity(score);
     const notesLines = resolveNotesLines(score, cardCount, compactionLevel);
-    const notesHeight = resolveNotesHeight(notesLines, compactionLevel);
+    const notesHeight = resolveNotesHeight(notesLines, compactionLevel, cardCount);
     const flexWeight = Math.max(1, Math.round((score / totalComplexity) * 100));
 
     return {

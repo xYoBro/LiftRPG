@@ -1,16 +1,36 @@
 import {
+  formatExerciseTargetLoad,
   getExerciseSetCount,
-  getExerciseTargetLoad,
   getRepTargets,
   showLoadSuffix
-} from './utils.js?v=17';
+} from './utils.js?v=30';
 
-function resolveExerciseNameWidthCh(exercises) {
-  const longestExerciseName = Math.max(
-    4,
-    ...(exercises || []).map((exercise) => String(exercise && exercise.name || 'Lift').trim().length || 4)
+let textMeasureContext = null;
+
+function getTextMeasureContext() {
+  if (typeof document === 'undefined') return null;
+  if (textMeasureContext) return textMeasureContext;
+
+  const canvas = document.createElement('canvas');
+  textMeasureContext = canvas.getContext('2d');
+  return textMeasureContext;
+}
+
+function measureExerciseNameWidthPx(name) {
+  const context = getTextMeasureContext();
+  const label = String(name || 'Lift').trim() || 'Lift';
+  if (!context) return Math.max(54, Math.min(142, label.length * 8));
+
+  context.font = '700 15px \"Libre Baskerville\", Georgia, serif';
+  return Math.ceil(context.measureText(label).width);
+}
+
+function resolveExerciseNameWidthPx(exercises) {
+  const longestWidth = Math.max(
+    54,
+    ...(exercises || []).map((exercise) => measureExerciseNameWidthPx(exercise && exercise.name))
   );
-  return Math.min(longestExerciseName, 20);
+  return Math.min(longestWidth + 4, 150);
 }
 
 function buildExerciseRowModel(exercise) {
@@ -21,7 +41,7 @@ function buildExerciseRowModel(exercise) {
   return {
     hasLoad,
     name: exercise && exercise.name || 'Lift',
-    loadHint: hasLoad ? getExerciseTargetLoad(exercise) : '',
+    loadHint: hasLoad ? formatExerciseTargetLoad(exercise) : '',
     repTargets: repTargets.slice(0, repCount)
   };
 }
@@ -40,11 +60,11 @@ export function buildWorkoutCardModel(session, layoutPlan) {
 
   return {
     flexWeight: layoutPlan && layoutPlan.flexWeight ? layoutPlan.flexWeight : 1,
-    notesHeight: layoutPlan && layoutPlan.notesHeight ? layoutPlan.notesHeight : 0,
+    notesHeight: layoutPlan && typeof layoutPlan.notesHeight === 'number' ? layoutPlan.notesHeight : 12,
     sessionLabel: typeof session.label === 'string' ? session.label : 'Session',
     storyPrompt: session.storyPrompt || '',
     fragmentRefText: session.fragmentRef ? 'Fragment ' + session.fragmentRef : '',
-    exerciseNameWidthCh: resolveExerciseNameWidthCh(exercises),
+    exerciseNameWidthPx: resolveExerciseNameWidthPx(exercises),
     exerciseRows: exercises.map((exercise) => buildExerciseRowModel(exercise)),
     binaryChoice: buildBinaryChoiceModel(session.binaryChoice)
   };

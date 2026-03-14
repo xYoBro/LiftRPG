@@ -1,13 +1,14 @@
-import { make } from './dom.js?v=28';
+import { make } from './dom.js?v=30';
 import {
   planBookletLayout,
   revisePlanForMeasurement
-} from './layout-governor.js?v=28';
-import { buildPages } from './page-builders.js?v=28';
-import { getPageBoundary, getPageFrame } from './page-shell.js?v=28';
-import { setPageNumbers } from './pagination.js?v=28';
+} from './layout-governor.js?v=30';
+import { buildPages } from './page-builders.js?v=30';
+import { getPageBoundary, getPageFrame } from './page-shell.js?v=30';
+import { setPageNumbers } from './pagination.js?v=30';
 
 const MAX_LAYOUT_PASSES = 10;
+const OVERFLOW_TOLERANCE_PX = 2;
 
 function createMeasurementRoot(container) {
   const root = make('div', 'layout-preflight-root');
@@ -143,26 +144,28 @@ function measurePage(page) {
   const pageType = page.getAttribute('data-page-type') || '';
   const boundary = getPageBoundary(page);
   const frame = getPageFrame(page);
-  const safeHeight = boundary
-    ? boundary.clientHeight || Math.ceil(boundary.getBoundingClientRect().height)
-    : page.clientHeight || Math.ceil(page.getBoundingClientRect().height);
-  const safeWidth = boundary
-    ? boundary.clientWidth || Math.ceil(boundary.getBoundingClientRect().width)
-    : page.clientWidth || Math.ceil(page.getBoundingClientRect().width);
-  const trueHeight = Math.max(
+  const safeHeight = frame
+    ? frame.clientHeight || Math.ceil(frame.getBoundingClientRect().height)
+    : boundary
+      ? boundary.clientHeight || Math.ceil(boundary.getBoundingClientRect().height)
+      : page.clientHeight || Math.ceil(page.getBoundingClientRect().height);
+  const safeWidth = frame
+    ? frame.clientWidth || Math.ceil(frame.getBoundingClientRect().width)
+    : boundary
+      ? boundary.clientWidth || Math.ceil(boundary.getBoundingClientRect().width)
+      : page.clientWidth || Math.ceil(page.getBoundingClientRect().width);
+  const contentHeight = Math.max(
     frame ? frame.scrollHeight : 0,
     frame ? Math.ceil(frame.getBoundingClientRect().height) : 0,
-    boundary ? boundary.scrollHeight : 0,
     safeHeight
   );
-  const trueWidth = Math.max(
+  const contentWidth = Math.max(
     frame ? frame.scrollWidth : 0,
     frame ? Math.ceil(frame.getBoundingClientRect().width) : 0,
-    boundary ? boundary.scrollWidth : 0,
     safeWidth
   );
-  const overflowHeight = Math.max(0, trueHeight - safeHeight);
-  const overflowWidth = Math.max(0, trueWidth - safeWidth);
+  const overflowHeight = Math.max(0, contentHeight - safeHeight - OVERFLOW_TOLERANCE_PX);
+  const overflowWidth = Math.max(0, contentWidth - safeWidth - OVERFLOW_TOLERANCE_PX);
 
   return {
     planIndex: parseInt(page.getAttribute('data-plan-index'), 10) || 0,

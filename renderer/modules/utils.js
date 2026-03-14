@@ -139,6 +139,25 @@ export function getExerciseTargetLoad(exercise) {
   return '';
 }
 
+export function formatExerciseTargetLoad(exercise) {
+  const raw = getExerciseTargetLoad(exercise);
+  if (!raw) return '';
+
+  const normalized = raw.replace(/\s+/g, ' ').trim();
+  const rmMatch = normalized.match(/(\d+\s*%)\s*(?:of\s*)?(1RM)/i);
+  if (rmMatch) {
+    return (rmMatch[1] + ' ' + rmMatch[2].toUpperCase()).replace(/\s+/g, ' ').trim();
+  }
+
+  const percentMatch = normalized.match(/\d+\s*%/);
+  if (percentMatch) return percentMatch[0].replace(/\s+/g, ' ');
+
+  const poundsMatch = normalized.match(/\d+\s*(?:lb|lbs)/i);
+  if (poundsMatch) return poundsMatch[0].toLowerCase();
+
+  return normalized.split(/[.;,(]/)[0].trim().slice(0, 12);
+}
+
 export function getLoadGuide(exercise) {
   if (typeof exercise.weightField === 'string' && exercise.weightField.trim()) {
     return exercise.weightField.trim();

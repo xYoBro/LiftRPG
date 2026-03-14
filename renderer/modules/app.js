@@ -1,8 +1,8 @@
-import { decryptBlob, encryptBlob } from './crypto.js?v=28';
-import { qs } from './dom.js?v=28';
-import { exportBookletPdf } from './pdf-export.js?v=28';
-import { renderBooklet, syncLayoutMode } from './render.js?v=28';
-import { getDemoPassword, normalisePassword, validateBooklet } from './utils.js?v=28';
+import { decryptBlob, encryptBlob } from './crypto.js?v=30';
+import { qs } from './dom.js?v=30';
+import { exportBookletPdf } from './pdf-export.js?v=30';
+import { renderBooklet, syncLayoutMode } from './render.js?v=30';
+import { getDemoPassword, normalisePassword, validateBooklet } from './utils.js?v=30';
 
 const state = {
   data: null,
@@ -12,7 +12,8 @@ const state = {
   demoMode: false,
   demoPasswordRevealed: false,
   previewTarget: '',
-  reviewMode: false
+  reviewMode: false,
+  pendingFontRenderToken: null
 };
 
 let refs = {};
@@ -38,6 +39,29 @@ function renderCurrentBooklet() {
   if (!state.data) return;
   renderBooklet(refs, state.layoutMode, state.data, state.unlockedEnding, setStatus);
   scrollPreviewTargetIntoView();
+}
+
+function waitForFontsReady() {
+  if (!document.fonts || document.fonts.status === 'loaded') {
+    return Promise.resolve();
+  }
+  return document.fonts.ready.catch(() => {});
+}
+
+function scheduleFontAwareRerender() {
+  if (!state.data || !document.fonts || document.fonts.status === 'loaded') {
+    return;
+  }
+
+  const token = Symbol('font-render');
+  state.pendingFontRenderToken = token;
+  setStatus('Loading booklet typography…', 'neutral');
+
+  waitForFontsReady().then(() => {
+    if (state.pendingFontRenderToken !== token || !state.data) return;
+    state.pendingFontRenderToken = null;
+    renderCurrentBooklet();
+  });
 }
 
 function scrollEndingIntoView() {
@@ -147,6 +171,7 @@ function loadBooklet(data, sourceLabel) {
   state.unlockedEnding = null;
   state.demoPasswordRevealed = false;
   renderCurrentBooklet();
+  scheduleFontAwareRerender();
 
   const hasEncryptedEnding = !!(data.meta && data.meta.passwordEncryptedEnding);
   const demoPassword = state.demoMode && data.meta ? normalisePassword(getDemoPassword(data.meta)) : '';
