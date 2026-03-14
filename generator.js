@@ -69,6 +69,9 @@
       oracleMode: 'simple',
       puzzleFamilies: ['fragment cross-reference', 'grid-coordinate reading', 'observational anomaly hunting', 'oracle-driven state change'],
       clocks: ['Escalation Risk', 'Evidence Chain', 'Site Integrity'],
+      clockTypes: ['danger-clock', 'project-clock', 'linked-clock'],
+      companionModules: ['dashboard', 'stress-track', 'return-box'],
+      interludePayloads: ['fragment-ref', 'password-element'],
       artifacts: ['field notes', 'inspection forms', 'annotated maps']
     },
     {
@@ -79,6 +82,9 @@
       oracleMode: 'simple',
       puzzleFamilies: ['path tracing', 'route adjacency', 'environmental pattern recognition', 'resource clock pressure'],
       clocks: ['Exposure', 'Supplies', 'Distance Remaining'],
+      clockTypes: ['racing-clock', 'danger-clock', 'project-clock'],
+      companionModules: ['usage-die', 'inventory-grid', 'dashboard'],
+      interludePayloads: ['narrative', 'cipher'],
       artifacts: ['travel logs', 'route diagrams', 'supply manifests']
     },
     {
@@ -89,6 +95,9 @@
       oracleMode: 'full',
       puzzleFamilies: ['logic deduction', 'witness contradiction', 'fragment cross-reference', 'branch consequence tracking'],
       clocks: ['Suspicion', 'Trust', 'Public Attention'],
+      clockTypes: ['linked-clock', 'racing-clock', 'danger-clock'],
+      companionModules: ['memory-slots', 'dashboard', 'return-box'],
+      interludePayloads: ['fragment-ref', 'narrative'],
       artifacts: ['letters', 'minutes', 'transcripts']
     },
     {
@@ -99,6 +108,9 @@
       oracleMode: 'full',
       puzzleFamilies: ['symbol decoding', 'layered metapuzzle assembly', 'observational anomaly hunting', 'oracle-triggered rule mutation'],
       clocks: ['Contamination', 'Witness', 'Seal Integrity'],
+      clockTypes: ['danger-clock', 'linked-clock', 'tug-of-war-clock'],
+      companionModules: ['stress-track', 'memory-slots', 'overlay-window'],
+      interludePayloads: ['cipher', 'password-element'],
       artifacts: ['marginalia', 'liturgical notes', 'redacted confessions']
     }
   ];
@@ -133,6 +145,9 @@
       '- Preferred oracle mode: ' + profile.oracleMode,
       '- Puzzle families to emphasize: ' + profile.puzzleFamilies.join('; '),
       '- Named progress clocks to prefer: ' + profile.clocks.join('; '),
+      '- Clock families to prefer: ' + profile.clockTypes.join('; '),
+      '- Companion surfaces to prefer: ' + profile.companionModules.join('; '),
+      '- Interlude payloads to prefer: ' + profile.interludePayloads.join('; '),
       '- Artifact surfaces to emphasize: ' + profile.artifacts.join('; '),
       '',
       'Write the weeks so the analog game structures feel inevitable for this story, not pasted on afterward.'
@@ -267,6 +282,15 @@
     '    - Map-Spatial: grid-coordinate-reading, path-tracing, adjacency-extraction, room-label-derivation',
     '  - `oracleTable` (object): { title, instruction, mode, entries[] }. mode "simple" = 11 entries (2d6, rolls 2-12). mode "full" = 10 entries (d10xd10, ranges 01-10 through 91-00). Entry types: "fragment" (with fragmentRef) or "consequence" (in-place action).',
     '    Consequence entries MUST include `paperAction` (string): a concrete player instruction that changes visible paper state — e.g., "Advance the \'Extraction Risk\' clock 1 tick", "Mark [Node 4] as locked", "Check off one \'Supply\' box". Names specific targets by their in-world name.',
+    '  - `companionComponents` (array, optional): Additional analog game surfaces for this week. Use 0-2 only when the story materially benefits.',
+    '    Supported component types: "dashboard" | "return-box" | "inventory-grid" | "token-sheet" | "overlay-window" | "stress-track" | "usage-die" | "memory-slots".',
+    '    - dashboard / stress-track: { type, title, subtitle?, body?, tracks: [{label, segments, startValue?}], reminder? }',
+    '    - inventory-grid: { type, title, body?, slots: [{label}], conditions?: [{label}], footprint? }',
+    '    - token-sheet: { type, title, body?, tokens?: [{label}], rows?, cols?, footprint? }',
+    '    - overlay-window: { type, title, body?, windows?: [{label}], footprint: "full-page" }',
+    '    - return-box: { type, title, body?, reminder? }',
+    '    - usage-die: { type, title, body?, usageDie: "d20"|"d12"|"d10"|"d8"|"d6"|"d4", reminder? }',
+    '    - memory-slots: { type, title, body?, slots?: [{label}], reminder? }',
     '- `bossEncounter` (object, required when isBossWeek is true):',
     '  - `title` (string): In-world title for the boss page. Not "Final Puzzle".',
     '  - `narrative` (string): 2-4 sentences. The climax story moment.',
@@ -282,7 +306,14 @@
     '- `isDeload` (boolean): True for deload weeks. Tonal flag — "deload" never appears in booklet.',
     '- `overflowDocument` (foundDocument, required when overflow is true): Found document for the Part 2 right page.',
     '- `interlude` (object, optional): Typographic interlude page. Must have explicit reason referencing worldContract or literaryRegister.',
-    '- `gameplayClocks` (array, optional): Setup for progress clocks (e.g. Forged in the Dark style) mapped to the story. Each { clockName, segments (4/6/8), consequenceOnFull }.'
+    '  - `payloadType` (string, optional): "none" | "narrative" | "cipher" | "fragment-ref" | "password-element".',
+    '  - `payload` (object, optional): Structured add-on surface for the interlude. Keep it small and page-worthy.',
+    '    - narrative payload: { title?, text }',
+    '    - cipher payload: same shape as a compact `cipher` object',
+    '    - fragment-ref payload: { title?, fragmentRefs: ["F.2","F.7"] }',
+    '    - password-element payload: { title?, instruction?, count?, valueHint? }',
+    '- `gameplayClocks` (array, optional): Setup for progress clocks mapped to the story. Each { clockName, segments (4/6/8), clockType, startValue?, direction?, linkedClockName?, opposedClockName?, thresholds?, consequenceOnFull }.',
+    '  Supported clockType values: "progress-clock" | "danger-clock" | "racing-clock" | "tug-of-war-clock" | "linked-clock" | "project-clock".'
   ];
 
   var SCHEMA_FRAGMENTS = [
@@ -335,6 +366,8 @@
     '- `designation` (string): Official-sounding designation. Example: "MSA Survey Log · Block 01 · Restricted Distribution"',
     '- `tagline` (string): One line. Official warning or procedural note — not marketing.',
     '- `colophonLines` (string[], 3-6): Small print: date, schema version, URL. Plus one LLM-written world line.',
+    '- `svgArt` (string, optional): Minimal inline SVG line art for the cover. Use only if the world clearly benefits; otherwise omit.',
+    '- `coverArtCaption` (string, optional): Small mono caption for the cover art.',
     '',
     '## rulesSpread (object)',
     '',
@@ -389,6 +422,7 @@
     '- Tie the Oracle heavily into "Progress Clocks" (e.g., "Risk of Discovery", "Storm Proximity").',
     '- Story prompts MUST set up the Field Ops phase and explicitly refer to in-world game states (e.g. "If \'Alertness\' is full, mark this exercise skipped...").',
     '- Write one of the rulesSpread.leftPage.sections to explain this analog game loop using DIEGETIC phase names.',
+    '- Prefer low-friction mechanics: marks, boxes, route choices, short lookups, and visible clocks over arithmetic-heavy subsystems.',
     '',
     '## Found Document Quality',
     '- Every fragment must pass: hasIrrelevantDetail = true, couldExistInDifferentStory = false.',
@@ -496,6 +530,7 @@
     '- Valid paperActions: "Fill 1 segment of the [Clock Name] clock", "Advance the [Specific] track by 2", "Mark [Node 4] as compromised", "Reveal [Fragment ID]".',
     '- The `paperAction` must be unambiguously actionable on the paper, naming specific targets by their in-world name.',
     '- Oracle results that produce only flavor text are NOT consequences \u2014 they are useless for gameplay. The board state must change.',
+    '- If you author gameplayClocks, prefer at least one partially filled or endowed clock (`startValue`) early in the block unless the fiction strongly argues against it.',
     '',
     '## Puzzle Variety',
     '- Across a standard six-week block, use at least 4 distinct puzzle families.',
@@ -503,6 +538,8 @@
     '- Do not repeat the same puzzle family in consecutive non-boss weeks unless the world contract makes repetition feel diegetic and escalating.',
     '- The puzzle sequence should feel like a campaign arc: teach a grammar early, complicate it mid-block, then recombine it at convergence.',
     '- Oracle tables must do more than point at flavor text. They should pressure routes, unlock documents, alter map states, or advance visible tracks.',
+    '- If you use companion components, they must create tension, scarcity, or branching state, not just fill space.',
+    '- High-value companion patterns: stress accumulation, usage die depletion, inventory crowding, linked clocks, route denial, and memory-slot overwrite pressure.',
     '',
     '## Educational / Non-Fiction Mode',
     '- If the user asks for educational or non-fiction material, treat the booklet as a diegetic teaching artifact rather than forcing a fiction overlay.',
@@ -545,6 +582,7 @@
     '- The palette must have sufficient contrast for B&W printing (ink on paper ≥ 4.5:1 ratio).',
     '- palette.paper should be a light warm/neutral tone (not pure white). palette.ink should be near-black.',
     '- palette.accent is the signature color — stamps, borders, key headings.',
+    '- If you include cover svgArt, keep it sparse, print-safe, and line-based. It should feel like an artifact stamp or schematic, not poster illustration.',
     '',
     '## Exercise Data',
     '- Copy exercise data EXACTLY from the workout programme provided below.',
@@ -567,6 +605,7 @@
     '- Pre-boss components do not form recognizable plaintext in collection order',
     '- Oracle entry counts: simple mode = exactly 11, full mode = exactly 10; max 3 consequence entries per week',
     '- Every consequence oracle entry has a non-empty paperAction naming a specific analog paper target (e.g. a clock or track)',
+    '- Companion component types, interlude payload types, and clockType values all come from the supported renderer vocabulary above; do not invent unsupported labels',
     '- Post-choice sessions (between binaryChoice week and boss week) reference the choice consequences in at least 2 of: prompts, fragments, oracle entries, map labels',
     '- For consecutive weeks sharing the same mapType: map data differs in at least one node/tile/position state, label, or structure',
     '- rulesSpread.leftPage.sections includes a section explaining the analog gameplay phase order'

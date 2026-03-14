@@ -111,6 +111,54 @@ function isSafeUrl(url) {
   return false;
 }
 
+function sanitizeDomTree(root, allowedTags, blockedTags, allowedAttributes, options = {}) {
+  Array.from(root.querySelectorAll('*')).forEach((element) => {
+    const tagName = String(element.tagName || '').toUpperCase();
+
+    if (blockedTags.has(tagName)) {
+      element.remove();
+      return;
+    }
+
+    if (!allowedTags.has(tagName)) {
+      unwrapElement(element);
+      return;
+    }
+
+    Array.from(element.attributes).forEach((attribute) => {
+      const name = String(attribute.name || '');
+      const lowerName = name.toLowerCase();
+      const value = String(attribute.value || '');
+
+      if (
+        lowerName.startsWith('on')
+        || lowerName === 'style'
+        || lowerName === 'src'
+        || lowerName === 'srcdoc'
+        || lowerName === 'xlink:href'
+      ) {
+        element.removeAttribute(name);
+        return;
+      }
+
+      if (lowerName === 'href') {
+        if (!options.allowHref || !isSafeUrl(value)) {
+          element.removeAttribute(name);
+          element.removeAttribute('target');
+          element.removeAttribute('rel');
+          return;
+        }
+        element.setAttribute('rel', 'noopener noreferrer');
+        return;
+      }
+
+      if (!allowedAttributes.has(name) && !allowedAttributes.has(lowerName)) {
+        element.removeAttribute(name);
+      }
+    });
+  });
+}
+
 export function sanitizeHtml(rawHtml) {
   const content = String(rawHtml || '').trim();
   if (!content) return '';
@@ -157,52 +205,73 @@ export function sanitizeHtml(rawHtml) {
     'TEXTAREA'
   ]);
 
-  Array.from(root.querySelectorAll('*')).forEach((element) => {
-    const tagName = String(element.tagName || '').toUpperCase();
-
-    if (blockedTags.has(tagName)) {
-      element.remove();
-      return;
-    }
-
-    if (!allowedTags.has(tagName)) {
-      unwrapElement(element);
-      return;
-    }
-
-    Array.from(element.attributes).forEach((attribute) => {
-      const name = String(attribute.name || '').toLowerCase();
-      const value = String(attribute.value || '');
-
-      if (
-        name.startsWith('on')
-        || name === 'style'
-        || name === 'src'
-        || name === 'srcdoc'
-        || name === 'xlink:href'
-      ) {
-        element.removeAttribute(attribute.name);
-        return;
-      }
-
-      if (name === 'href') {
-        if (!isSafeUrl(value)) {
-          element.removeAttribute(attribute.name);
-          element.removeAttribute('target');
-          element.removeAttribute('rel');
-          return;
-        }
-        element.setAttribute('rel', 'noopener noreferrer');
-        return;
-      }
-
-      if (!['href', 'rel', 'title'].includes(name)) {
-        element.removeAttribute(attribute.name);
-      }
-    });
-  });
+  sanitizeDomTree(root, allowedTags, blockedTags, new Set(['href', 'rel', 'title']), { allowHref: true });
 
   return root.innerHTML.trim();
+}
+
+export function sanitizeSvg(rawSvg) {
+  const content = String(rawSvg || '').trim();
+  if (!content || typeof DOMParser === 'undefined') return '';
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(content, 'image/svg+xml');
+  const root = doc.documentElement;
+  const rootTag = String(root && root.tagName || '').toLowerCase();
+  if (rootTag !== 'svg') return '';
+
+  const blockedTags = new Set(['SCRIPT', 'FOREIGNOBJECT', 'IFRAME', 'AUDIO', 'VIDEO', 'IMAGE', 'USE', 'STYLE']);
+  const allowedTags = new Set([
+    'SVG',
+    'G',
+    'PATH',
+    'LINE',
+    'RECT',
+    'CIRCLE',
+    'ELLIPSE',
+    'POLYGON',
+    'POLYLINE',
+    'TEXT',
+    'TSPAN',
+    'DEFS',
+    'CLIPPATH'
+  ]);
+  const allowedAttributes = new Set([
+    'class',
+    'clip-path',
+    'cx',
+    'cy',
+    'd',
+    'fill',
+    'height',
+    'opacity',
+    'points',
+    'preserveAspectRatio',
+    'r',
+    'rx',
+    'ry',
+    'stroke',
+    'stroke-linecap',
+    'stroke-linejoin',
+    'stroke-width',
+    'text-anchor',
+    'transform',
+    'viewBox',
+    'width',
+    'x',
+    'x1',
+    'x2',
+    'y',
+    'y1',
+    'y2',
+    'xmlns'
+  ]);
+
+  sanitizeDomTree(root, allowedTags, blockedTags, allowedAttributes);
+
+  root.removeAttribute('style');
+  root.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  return root.outerHTML.trim();
 }
 
 export function readingLength(value) {

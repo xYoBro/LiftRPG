@@ -78,6 +78,26 @@ export const CLOCK_FAMILY_REGISTRY = {
   'progress-clock': {
     label: 'Progress Clock',
     description: 'Circular progress or threat clock surface.'
+  },
+  'danger-clock': {
+    label: 'Danger Clock',
+    description: 'Escalating threat clock that fills toward a complication.'
+  },
+  'racing-clock': {
+    label: 'Racing Clock',
+    description: 'One of two opposed clocks that compete toward resolution.'
+  },
+  'tug-of-war-clock': {
+    label: 'Tug Of War Clock',
+    description: 'Clock whose filled state can rise or fall as control shifts.'
+  },
+  'linked-clock': {
+    label: 'Linked Clock',
+    description: 'Clock that unlocks or advances another clock when filled.'
+  },
+  'project-clock': {
+    label: 'Project Clock',
+    description: 'Long-term project or investigation clock that accumulates progress across weeks.'
   }
 };
 
@@ -118,22 +138,55 @@ export const COMPANION_COMPONENT_REGISTRY = {
     title: 'Overlay Window',
     footprint: 'full-page',
     description: 'Overlay or alignment surface intended to interact with another page.'
+  },
+  'stress-track': {
+    family: 'stress-track',
+    title: 'Stress Track',
+    footprint: 'half-page',
+    description: 'Escalating psychological or environmental pressure track with threshold consequences.'
+  },
+  'usage-die': {
+    family: 'usage-die',
+    title: 'Usage Die',
+    footprint: 'quarter-page',
+    description: 'Resource depletion tracker that steps down through die sizes.'
+  },
+  'memory-slots': {
+    family: 'memory-slots',
+    title: 'Memory Slots',
+    footprint: 'half-page',
+    description: 'Slot-limited memory or evidence surface where new entries crowd out older ones.'
   }
 };
 
+export function inferMapFamily(mapType) {
+  const value = String(mapType || '').trim();
+  return MAP_FAMILY_BY_TYPE[value] || (value ? 'custom-map' : 'none');
+}
+
+export function inferCipherFamily(cipherType) {
+  const value = String(cipherType || '').trim();
+  return CIPHER_FAMILY_BY_TYPE[value] || (value ? 'custom-cipher' : 'none');
+}
+
 function normalizeMapFamily(fieldOps) {
   const mapType = ((fieldOps || {}).mapState || {}).mapType || '';
-  return MAP_FAMILY_BY_TYPE[mapType] || (mapType ? 'custom-map' : 'none');
+  return inferMapFamily(mapType);
 }
 
 function normalizeCipherFamily(fieldOps) {
   const cipherType = ((fieldOps || {}).cipher || {}).type || '';
-  return CIPHER_FAMILY_BY_TYPE[cipherType] || (cipherType ? 'custom-cipher' : 'none');
+  return inferCipherFamily(cipherType);
 }
 
 function normalizeOracleFamily(fieldOps) {
+  const declaredMode = String((((fieldOps || {}).oracleTable || {}).mode) || '').trim().toLowerCase();
   const oracleEntries = ((((fieldOps || {}).oracleTable || {}).entries) || []);
   if (!oracleEntries.length) return 'none';
+
+  if (declaredMode === 'fragment' || declaredMode === 'fragment-oracle') return 'fragment-oracle';
+  if (declaredMode === 'consequence' || declaredMode === 'consequence-oracle') return 'consequence-oracle';
+  if (declaredMode === 'mixed' || declaredMode === 'mixed-oracle') return 'mixed-oracle';
 
   const hasConsequences = oracleEntries.some((entry) => entry && entry.type === 'consequence');
   const hasFragments = oracleEntries.some((entry) => entry && entry.fragmentRef);
@@ -144,7 +197,15 @@ function normalizeOracleFamily(fieldOps) {
 
 function normalizeClockFamily(week) {
   const clocks = week && Array.isArray(week.gameplayClocks) ? week.gameplayClocks : [];
-  return clocks.length ? 'progress-clock' : 'none';
+  if (!clocks.length) return 'none';
+
+  const types = clocks.map((clock) => String(clock && clock.clockType || '').trim().toLowerCase()).filter(Boolean);
+  if (types.includes('linked') || types.includes('linked-clock')) return 'linked-clock';
+  if (types.includes('race') || types.includes('racing') || types.includes('racing-clock')) return 'racing-clock';
+  if (types.includes('tug-of-war') || types.includes('tug') || types.includes('tug-of-war-clock')) return 'tug-of-war-clock';
+  if (types.includes('danger') || types.includes('threat') || types.includes('danger-clock')) return 'danger-clock';
+  if (types.includes('project') || types.includes('project-clock')) return 'project-clock';
+  return 'progress-clock';
 }
 
 function normalizeBinaryRouteFamily(week) {

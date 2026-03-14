@@ -4,8 +4,8 @@ import {
   CRYPTO_IV_BYTES,
   CRYPTO_KEY_BITS,
   CRYPTO_SALT_BYTES
-} from './constants.js?v=42';
-import { normalisePassword } from './utils.js?v=42';
+} from './constants.js?v=43';
+import { normalisePassword } from './utils.js?v=43';
 
 function deriveKey(password, salt, usage) {
   const encoder = new TextEncoder();

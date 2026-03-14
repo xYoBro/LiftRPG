@@ -2,8 +2,30 @@ import {
   getPasswordLength,
   pad2,
   splitParagraphs
-} from './utils.js?v=42';
-import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=42';
+} from './utils.js?v=43';
+import {
+  inferCipherFamily,
+  inferMapFamily,
+  resolveWeekMechanicProfile
+} from './mechanic-registry.js?v=43';
+
+function splitKeyRows(text) {
+  return String(text || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.split(/\s{2,}|\s*\|\s*/).map((cell) => cell.trim()).filter(Boolean));
+}
+
+function parseClockType(clockType) {
+  const normalized = String(clockType || '').trim().toLowerCase();
+  if (normalized === 'danger' || normalized === 'danger-clock' || normalized === 'threat') return 'danger-clock';
+  if (normalized === 'race' || normalized === 'racing' || normalized === 'racing-clock') return 'racing-clock';
+  if (normalized === 'tug' || normalized === 'tug-of-war' || normalized === 'tug-of-war-clock') return 'tug-of-war-clock';
+  if (normalized === 'linked' || normalized === 'linked-clock') return 'linked-clock';
+  if (normalized === 'project' || normalized === 'project-clock') return 'project-clock';
+  return 'progress-clock';
+}
 
 function normalizeEntries(entries) {
   return (entries || []).map((entry) => ({
@@ -31,8 +53,8 @@ export function buildFieldOpsPageModels(data, week, layoutPlan = {}) {
     pageType: 'field-ops',
     layoutVariant: layoutPlan.layoutVariant || 'balanced',
     headerTitle: 'Field Operations',
-    cipher: fieldOps.cipher ? buildCipherModel(fieldOps.cipher, week.weeklyComponent) : null,
-    mapState: fieldOps.mapState ? buildMapModel(fieldOps.mapState) : null,
+    cipher: fieldOps.cipher ? buildCipherModel(fieldOps.cipher, week.weeklyComponent, mechanicProfile) : null,
+    mapState: fieldOps.mapState ? buildMapModel(fieldOps.mapState, mechanicProfile) : null,
     gameplayClocks: buildClockModels(week.gameplayClocks),
     companionComponents: buildCompanionModels(mechanicProfile.companionComponents),
     mechanicProfile,
@@ -103,29 +125,43 @@ export function buildBossPageModel(data, week, options = 'standard') {
   };
 }
 
-function buildCompanionModels(components) {
+export function buildCompanionModels(components) {
   return (components || []).map((component, index) => ({
     id: component.id || 'companion-' + index,
     type: component.type || 'custom',
     family: component.family || 'custom-companion',
     title: component.title || 'Companion Component',
     body: component.body || component.instruction || component.prompt || '',
+    subtitle: component.subtitle || '',
     rows: component.rows || 0,
     cols: component.cols || 0,
     slots: Array.isArray(component.slots) ? component.slots : [],
+    tracks: Array.isArray(component.tracks) ? component.tracks : [],
+    tokens: Array.isArray(component.tokens) ? component.tokens : [],
+    conditions: Array.isArray(component.conditions) ? component.conditions : [],
+    windows: Array.isArray(component.windows) ? component.windows : [],
+    usageDie: component.usageDie || component.usage || '',
+    playWindow: component.playWindow || 'rest',
+    reminder: component.reminder || '',
     footprint: component.footprint || 'half-page'
   }));
 }
 
-export function buildCipherModel(cipher, weeklyComponent) {
+export function buildCipherModel(cipher, weeklyComponent, mechanicProfile = null) {
   const body = cipher.body || {};
+  const keyRows = splitKeyRows(body.key || '');
+  const family = inferCipherFamily(cipher.type || '') || (mechanicProfile && mechanicProfile.cipherFamily) || 'none';
 
   return {
     type: cipher.type || '',
+    family,
     title: cipher.title || 'Cipher',
     sequenceText: body.displayText || '',
     keyText: body.key || '',
+    keyRows,
     workSpace: body.workSpace || null,
+    workspaceStyle: body.workSpace && body.workSpace.style || '',
+    referenceTargets: Array.isArray(body.referenceTargets) ? body.referenceTargets : [],
     extractionInstruction: cipher.extractionInstruction || (weeklyComponent && weeklyComponent.extractionInstruction) || 'Record the derived value.',
     noticeabilityDesign: cipher.noticeabilityDesign || '',
     characterDerivationProof: cipher.characterDerivationProof || ''
@@ -146,14 +182,22 @@ export function buildClockModels(clocks) {
   return (clocks || []).map((clock) => ({
     clockName: clock.clockName || 'Clock',
     segments: parseInt(clock.segments, 10) || 4,
+    clockType: parseClockType(clock.clockType),
+    startValue: Math.max(0, Math.min(parseInt(clock.startValue, 10) || 0, parseInt(clock.segments, 10) || 4)),
+    direction: String(clock.direction || '').trim().toLowerCase() || 'fill',
+    linkedClockName: clock.linkedClockName || clock.linkedTo || '',
+    opposedClockName: clock.opposedClockName || clock.racingAgainst || '',
+    thresholds: Array.isArray(clock.thresholds) ? clock.thresholds : [],
     consequenceOnFull: clock.consequenceOnFull || ''
   }));
 }
 
-export function buildMapModel(mapState) {
+export function buildMapModel(mapState, mechanicProfile = null) {
   if (!mapState) return null;
+  const family = inferMapFamily(mapState.mapType || '') || (mechanicProfile && mechanicProfile.mapFamily) || 'none';
 
   return {
+    family,
     mapType: mapState.mapType || 'grid',
     title: mapState.title || 'Map',
     mapNote: mapState.mapNote || '',

@@ -1,7 +1,147 @@
-import { make } from './dom.js?v=42';
-import { splitRichText } from './booklet-models.js?v=42';
-import { createBoundedPage } from './page-shell.js?v=42';
-import { sanitizeHtml } from './utils.js?v=42';
+import { make } from './dom.js?v=43';
+import { splitRichText } from './booklet-models.js?v=43';
+import { createBoundedPage } from './page-shell.js?v=43';
+import { sanitizeHtml, sanitizeSvg } from './utils.js?v=43';
+import {
+  renderCipherSection,
+  renderCompanionComponent,
+  renderGameplayClocks,
+  renderMapSection
+} from './field-ops-primitives.js?v=43';
+import { inferCipherFamily, inferMapFamily } from './mechanic-registry.js?v=43';
+
+function renderCoverArt(model) {
+  const source = String(model.coverArt || '').trim();
+  if (!source) return null;
+
+  const wrap = make('div', 'cover-art');
+  if (/^\s*<svg[\s\S]*<\/svg>\s*$/i.test(source)) {
+    const safeSvg = sanitizeSvg(source);
+    if (safeSvg) {
+      wrap.innerHTML = safeSvg;
+    }
+  } else {
+    const pre = make('pre', 'cover-art-text', source);
+    wrap.appendChild(pre);
+  }
+
+  if (!wrap.childNodes.length) return null;
+  if (model.coverArtCaption) {
+    wrap.appendChild(make('div', 'cover-art-caption', model.coverArtCaption));
+  }
+  return wrap;
+}
+
+function renderFragmentRefPayload(payload) {
+  const refs = Array.isArray(payload.fragmentRefs)
+    ? payload.fragmentRefs
+    : Array.isArray(payload.refs)
+      ? payload.refs
+      : payload.fragmentRef
+        ? [payload.fragmentRef]
+        : [];
+  if (!refs.length) return null;
+
+  const wrap = make('div', 'interlude-payload interlude-fragment-refs');
+  wrap.appendChild(make('div', 'doc-label', payload.title || 'Archive References'));
+  const row = make('div', 'interlude-fragment-row');
+  refs.forEach((ref) => {
+    row.appendChild(make('div', 'cipher-reference-item', ref));
+  });
+  wrap.appendChild(row);
+  return wrap;
+}
+
+function renderPasswordElementPayload(payload) {
+  const wrap = make('div', 'interlude-payload interlude-password-element');
+  wrap.appendChild(make('div', 'doc-label', payload.title || 'Password Element'));
+  if (payload.instruction) {
+    wrap.appendChild(make('div', 'interlude-payload-note', payload.instruction));
+  }
+  const row = make('div', 'password-box-row');
+  const count = Math.max(1, parseInt(payload.count, 10) || String(payload.value || '').length || 5);
+  for (let index = 0; index < count; index += 1) {
+    const box = make('div', 'password-final-box');
+    const value = String(payload.value || '');
+    if (value && value[index]) {
+      box.appendChild(make('span', 'password-box-hint', value[index]));
+    }
+    row.appendChild(box);
+  }
+  wrap.appendChild(row);
+  return wrap;
+}
+
+function renderNarrativePayload(payload) {
+  const text = payload.text || payload.body || payload.content || '';
+  if (!text) return null;
+  const wrap = make('div', 'interlude-payload interlude-narrative-payload');
+  if (payload.title) {
+    wrap.appendChild(make('div', 'doc-label', payload.title));
+  }
+  const body = make('div', 'interlude-payload-body');
+  splitRichText(text).forEach((paragraph) => {
+    body.appendChild(make('p', '', paragraph));
+  });
+  wrap.appendChild(body);
+  return wrap;
+}
+
+function renderInterludePayload(model) {
+  const payload = model.payload;
+  if (!payload) return null;
+
+  const type = String(model.payloadType || payload.type || '').trim().toLowerCase();
+  if (type === 'fragment-ref' || type === 'fragment-reference') {
+    return renderFragmentRefPayload(payload);
+  }
+  if (type === 'password-element') {
+    return renderPasswordElementPayload(payload);
+  }
+  if (type === 'narrative') {
+    return renderNarrativePayload(payload);
+  }
+  if (type === 'cipher' || payload.body || payload.workSpace || payload.referenceTargets) {
+    const wrap = make('div', 'interlude-payload interlude-cipher-payload');
+    wrap.appendChild(renderCipherSection({
+      type: payload.type || 'interlude-cipher',
+      family: payload.family || inferCipherFamily(payload.type || '') || 'text-extraction',
+      title: payload.title || 'Embedded Cipher',
+      sequenceText: payload.displayText || payload.sequenceText || '',
+      keyText: payload.key || payload.keyText || '',
+      keyRows: payload.keyRows || [],
+      workSpace: payload.workSpace || null,
+      workspaceStyle: payload.workspaceStyle || (payload.workSpace && payload.workSpace.style) || '',
+      referenceTargets: payload.referenceTargets || [],
+      extractionInstruction: payload.extractionInstruction || '',
+      noticeabilityDesign: payload.noticeabilityDesign || '',
+      characterDerivationProof: payload.characterDerivationProof || ''
+    }));
+    return wrap;
+  }
+  if (payload.mapState) {
+    const wrap = make('div', 'interlude-payload interlude-map-payload');
+    wrap.appendChild(renderMapSection({
+      ...payload.mapState,
+      family: payload.mapState.family || inferMapFamily(payload.mapState.mapType || '')
+    }));
+    return wrap;
+  }
+  if (Array.isArray(payload.gameplayClocks) && payload.gameplayClocks.length) {
+    const wrap = make('div', 'interlude-payload interlude-clock-payload');
+    wrap.appendChild(renderGameplayClocks(payload.gameplayClocks));
+    return wrap;
+  }
+  if (Array.isArray(payload.companionComponents) && payload.companionComponents.length) {
+    const wrap = make('div', 'interlude-payload interlude-companion-payload');
+    payload.companionComponents.forEach((component) => {
+      wrap.appendChild(renderCompanionComponent(component));
+    });
+    return wrap;
+  }
+
+  return renderNarrativePayload(payload);
+}
 
 export function renderCoverPage(model) {
   const scaffold = createBoundedPage('cover', 'cover-page', { boundaryRole: 'cover' });
@@ -15,6 +155,11 @@ export function renderCoverPage(model) {
 
   if (model.subtitle) {
     frame.appendChild(make('div', 'cover-subtitle', model.subtitle));
+  }
+
+  const coverArt = renderCoverArt(model);
+  if (coverArt) {
+    frame.appendChild(coverArt);
   }
 
   const hero = make('div', 'cover-hero');
@@ -290,5 +435,10 @@ export function renderInterludePage(model) {
     body.appendChild(make('p', '', paragraph));
   });
   frame.appendChild(body);
+
+  const payload = renderInterludePayload(model);
+  if (payload) {
+    frame.appendChild(payload);
+  }
   return page;
 }

@@ -4,7 +4,7 @@ import {
   pad2,
   splitRichContentBlocks,
   splitParagraphs
-} from './utils.js?v=42';
+} from './utils.js?v=43';
 
 function humanizeComponentType(value) {
   return String(value || 'component').replace(/-/g, ' ');
@@ -69,7 +69,9 @@ export function buildCoverPageModel(data) {
     title: cover.title || meta.blockTitle,
     subtitle: resolveCoverSubtitle(designation, cover.subtitle || meta.blockSubtitle),
     tagline: cover.tagline || '',
-    colophonLines: cover.colophonLines || []
+    colophonLines: cover.colophonLines || [],
+    coverArt: cover.svgArt || cover.coverArt || '',
+    coverArtCaption: cover.coverArtCaption || cover.artCaption || ''
   };
 }
 
