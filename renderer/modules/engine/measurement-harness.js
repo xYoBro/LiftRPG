@@ -52,9 +52,19 @@ export function createMeasurementRoot(container) {
   root.appendChild(stack);
   container.appendChild(root);
 
+  // Measure the real CSS boundary height once from a throwaway page.
+  // This replaces the static PAGE_BUDGET.heightPx for overflow checks,
+  // ensuring the planner uses the archetype's actual print-safe area.
+  const probe = createBoundedPage('_probe', '_probe');
+  stack.appendChild(probe.page);
+  const probeBoundaryHeight = probe.boundary.getBoundingClientRect().height;
+  probe.page.remove();
+
   return {
     root,
     stack,
+    /** Actual CSS boundary height for the active theme (px). */
+    boundaryHeightPx: probeBoundaryHeight,
     destroy() {
       root.remove();
     },

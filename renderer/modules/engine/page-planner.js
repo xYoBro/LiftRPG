@@ -80,11 +80,18 @@ export function orderAtoms(atoms, sectionOrder = DEFAULT_SECTION_ORDER) {
  * Estimate an atom's height using its registry estimate() function,
  * falling back to the size hint approximation table.
  */
-function estimateAtomHeight(atom, density = 0.0) {
+/** Default estimation density — moderate compression avoids inflated
+ *  notes/padding that would cause the planner to over-allocate pages.
+ *  The measurement harness refines actual sizing post-plan. */
+const ESTIMATE_DENSITY = 0.6;
+
+function estimateAtomHeight(atom, density = ESTIMATE_DENSITY) {
   const def = getAtomDefinition(atom.type);
   if (def) {
     const est = def.estimate(atom.data, density);
-    return est.preferredHeight;
+    // Use minHeight for packing — lets more atoms fit per page.
+    // The measurement harness refines actual height post-plan.
+    return est.minHeight;
   }
   return SIZE_HINT_PX[atom.sizeHint] || SIZE_HINT_PX['flex'];
 }
@@ -130,7 +137,7 @@ function createSpread(spreadIndex, spreadType, weekIndex = null) {
 /**
  * Create an atom placement entry for a spread's left or right page.
  */
-function createPlacement(atom, density = 0.0) {
+function createPlacement(atom, density = ESTIMATE_DENSITY) {
   return {
     atomId:          atom.id,
     type:            atom.type,
@@ -165,61 +172,107 @@ function pageEstimatedHeight(placements) {
  */
 function binGroupIntoSpreads(groupAtoms, startSpreadIndex, spreadType, weekIndex, planningUnit) {
   const budget  = PAGE_BUDGET.heightPx;
-  const spreads = [];
-  let current   = createSpread(startSpreadIndex + spreads.length, spreadType, weekIndex);
+
+  // ── Separate atoms by affinity ──────────────────────────────
+  const fullPage = [];
+  const leftAtoms  = [];
+  const rightAtoms = [];
+  const eitherAtoms = [];
 
   for (const atom of groupAtoms) {
-    const placement = createPlacement(atom);
-
-    // Full-page atoms get their own page/spread
     if (atom.sizeHint === 'full-page' || !getAtomDefinition(atom.type)?.canShare) {
-      // Flush current spread if it has content
-      if (current.left.length > 0 || current.right.length > 0) {
-        spreads.push(current);
-        current = createSpread(startSpreadIndex + spreads.length, spreadType, weekIndex);
-      }
-      current.left.push(placement);
-      spreads.push(current);
-      current = createSpread(startSpreadIndex + spreads.length, spreadType, weekIndex);
+      fullPage.push(atom);
       continue;
     }
+    const affinity = (planningUnit === 'page') ? 'left' : (atom.pageAffinity || 'either');
+    if (affinity === 'left')       leftAtoms.push(atom);
+    else if (affinity === 'right') rightAtoms.push(atom);
+    else                           eitherAtoms.push(atom);
+  }
 
-    // Determine target side
-    const affinity = atom.pageAffinity || 'either';
-    let targetSide;
-    if (planningUnit === 'page') {
-      targetSide = 'left';    // page mode: everything on the single page
-    } else if (affinity === 'left') {
-      targetSide = 'left';
-    } else if (affinity === 'right') {
-      targetSide = 'right';
-    } else {
-      // 'either' — pick the side with more room
-      const leftHeight  = pageEstimatedHeight(current.left);
-      const rightHeight = pageEstimatedHeight(current.right);
-      targetSide = leftHeight <= rightHeight ? 'left' : 'right';
+  // ── Bin left atoms into left pages ──────────────────────────
+  const leftPages = [];  // each entry is an array of placements
+  let currentPage = [];
+  for (const atom of leftAtoms) {
+    const placement = createPlacement(atom);
+    const currentHeight = pageEstimatedHeight(currentPage);
+    if (currentPage.length > 0 && currentHeight + placement.estimatedHeight > budget) {
+      leftPages.push(currentPage);
+      currentPage = [];
     }
+    currentPage.push(placement);
+  }
+  if (currentPage.length > 0) leftPages.push(currentPage);
 
-    const targetPage   = current[targetSide];
-    const currentHeight = pageEstimatedHeight(targetPage);
+  // ── Bin right atoms into right pages ────────────────────────
+  const rightPages = [];
+  currentPage = [];
+  for (const atom of rightAtoms) {
+    const placement = createPlacement(atom);
+    const currentHeight = pageEstimatedHeight(currentPage);
+    if (currentPage.length > 0 && currentHeight + placement.estimatedHeight > budget) {
+      rightPages.push(currentPage);
+      currentPage = [];
+    }
+    currentPage.push(placement);
+  }
+  if (currentPage.length > 0) rightPages.push(currentPage);
 
-    // Does it fit?
-    if (currentHeight + placement.estimatedHeight <= budget) {
-      targetPage.push(placement);
-    } else {
-      // Start a new spread
-      spreads.push(current);
-      current = createSpread(startSpreadIndex + spreads.length, spreadType, weekIndex);
-      current[targetSide].push(placement);
+  // ── Distribute 'either' atoms into pages with room ─────────
+  for (const atom of eitherAtoms) {
+    const placement = createPlacement(atom);
+    let placed = false;
+
+    // Try right pages first (they tend to have more room)
+    for (const page of rightPages) {
+      if (pageEstimatedHeight(page) + placement.estimatedHeight <= budget) {
+        page.push(placement);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      // Try left pages
+      for (const page of leftPages) {
+        if (pageEstimatedHeight(page) + placement.estimatedHeight <= budget) {
+          page.push(placement);
+          placed = true;
+          break;
+        }
+      }
+    }
+    if (!placed) {
+      // New right page for overflow
+      rightPages.push([placement]);
     }
   }
 
-  // Push last spread if it has content
-  if (current.left.length > 0 || current.right.length > 0) {
-    spreads.push(current);
+  // ── Combine into spreads: pair left[i] with right[i] ───────
+  const spreads = [];
+  const maxSpreads = Math.max(leftPages.length, rightPages.length);
+
+  for (let i = 0; i < maxSpreads; i++) {
+    const spread = createSpread(startSpreadIndex + spreads.length, spreadType, weekIndex);
+    if (i < leftPages.length)  spread.left  = leftPages[i];
+    if (i < rightPages.length) spread.right = rightPages[i];
+    spreads.push(spread);
   }
 
-  return spreads;
+  // ── Insert full-page atoms as their own spreads at the front
+  const fullSpreads = [];
+  for (const atom of fullPage) {
+    const spread = createSpread(startSpreadIndex + fullSpreads.length, spreadType, weekIndex);
+    spread.left.push(createPlacement(atom));
+    fullSpreads.push(spread);
+  }
+
+  // Full-page atoms go first (cover, rules), then paired content
+  const allSpreads = [...fullSpreads, ...spreads];
+
+  // Re-index spread positions
+  allSpreads.forEach((s, i) => { s.spreadIndex = startSpreadIndex + i; });
+
+  return allSpreads;
 }
 
 // ---------------------------------------------------------------------------
@@ -326,7 +379,12 @@ export function planAndMeasure(atoms, container, options = {}) {
   const { spreadPlan, diagnostics } = planSpreads(atoms, options);
 
   // Step 2: Measure each atom in the offscreen DOM
-  const { stack, destroy } = createMeasurementRoot(container);
+  const { stack, destroy, boundaryHeightPx } = createMeasurementRoot(container);
+
+  // Use the real CSS boundary height for overflow checks.
+  // This adapts to the active archetype's print-safe area instead of
+  // relying on the static PAGE_BUDGET.heightPx (which may differ).
+  const effectiveBudget = boundaryHeightPx || PAGE_BUDGET.heightPx;
 
   try {
     // Measure all atoms
@@ -347,23 +405,25 @@ export function planAndMeasure(atoms, container, options = {}) {
 
     // Step 3: Revise overflows
     let revisionsApplied = 0;
+    const unresolvedAtomIds = new Set();  // Track atoms already flagged
 
     for (let pass = 0; pass < MAX_REVISIONS; pass++) {
-      let anyOverflow = false;
+      let anyResolvableOverflow = false;
 
       for (const spread of spreadPlan) {
         for (const side of ['left', 'right']) {
           const placements = spread[side];
           if (placements.length === 0) continue;
 
+          // Skip pages where every atom is already flagged unresolvable
+          if (placements.every(p => unresolvedAtomIds.has(p.atomId))) continue;
+
           const totalHeight = placements.reduce(
             (s, p) => s + (p.measuredHeight || p.estimatedHeight), 0,
           );
-          const overflowPx = totalHeight - PAGE_BUDGET.heightPx;
+          const overflowPx = totalHeight - effectiveBudget;
 
           if (overflowPx > 2) {
-            anyOverflow = true;
-
             const result = resolvePageOverflow(
               placements.map(p => ({
                 atomId:  p.atomId,
@@ -372,10 +432,14 @@ export function planAndMeasure(atoms, container, options = {}) {
                 data:    p.atom?.data,
               })),
               overflowPx,
-              PAGE_BUDGET.heightPx,
+              effectiveBudget,
             );
 
             // Apply density adjustments
+            if (result.adjustments.length > 0 || result.splitAtomId) {
+              anyResolvableOverflow = true;
+            }
+
             for (const adj of result.adjustments) {
               const placement = placements.find(p => p.atomId === adj.atomId);
               if (placement) {
@@ -411,13 +475,15 @@ export function planAndMeasure(atoms, container, options = {}) {
               }
             }
 
-            // Flag unresolved overflow
+            // Flag unresolved overflow (only once per atom)
             if (!result.resolved && !result.splitAtomId) {
               for (const p of placements) {
+                if (unresolvedAtomIds.has(p.atomId)) continue;
                 const h = p.measuredHeight || p.estimatedHeight;
-                if (h > PAGE_BUDGET.heightPx) {
+                if (h > effectiveBudget) {
+                  unresolvedAtomIds.add(p.atomId);
                   recordUnresolvedOverflow(
-                    diagnostics, p.atomId, h - PAGE_BUDGET.heightPx, side,
+                    diagnostics, p.atomId, h - effectiveBudget, side,
                   );
                 }
               }
@@ -426,7 +492,7 @@ export function planAndMeasure(atoms, container, options = {}) {
         }
       }
 
-      if (anyOverflow) revisionsApplied++;
+      if (anyResolvableOverflow) revisionsApplied++;
       else break;
     }
 
@@ -452,7 +518,7 @@ export function planAndMeasure(atoms, container, options = {}) {
         let runningHeight = placements.reduce(
           (s, p) => s + (p.measuredHeight || p.estimatedHeight), 0,
         );
-        if (PAGE_BUDGET.heightPx - runningHeight < 20) continue;
+        if (effectiveBudget - runningHeight < 20) continue;
 
         // Look ahead for the next spread with same-side sharable atoms
         for (let j = i + 1; j < spreadPlan.length; j++) {
@@ -473,14 +539,14 @@ export function planAndMeasure(atoms, container, options = {}) {
             (s, p) => s + (p.measuredHeight || p.estimatedHeight), 0,
           );
 
-          if (runningHeight + candidateHeight <= PAGE_BUDGET.heightPx) {
+          if (runningHeight + candidateHeight <= effectiveBudget) {
             // Merge: move all candidate placements into current page
             placements.push(...candidatePlacements);
             candidatePlacements.length = 0;
             compactions++;
             runningHeight += candidateHeight;
             // Keep looking if there's still room
-            if (PAGE_BUDGET.heightPx - runningHeight < 20) break;
+            if (effectiveBudget - runningHeight < 20) break;
           } else {
             break;  // Won't fit, stop looking
           }
@@ -540,8 +606,8 @@ export function planAndMeasure(atoms, container, options = {}) {
       );
       recordSpreadUsage(
         diagnostics, spread.spreadIndex,
-        `${Math.round(leftHeight / PAGE_BUDGET.heightPx * 100)}%`,
-        `${Math.round(rightHeight / PAGE_BUDGET.heightPx * 100)}%`,
+        `${Math.round(leftHeight / effectiveBudget * 100)}%`,
+        `${Math.round(rightHeight / effectiveBudget * 100)}%`,
         spread.left.length,
         spread.right.length,
       );
