@@ -225,12 +225,16 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
   }));
 
   // ── Endings ─────────────────────────────────────────────────
-  atoms.push(createAtom({
-    type: 'ending', id: 'ending-locked', group: 'endings',
-    section: 'endings', sequence: 0,
-    sizeHint: 'full-page', pageAffinity: 'either',
-    data: { type: 'locked', data },
-  }));
+  // Show either the locked (sealed) page OR the unlocked ending —
+  // never both. The locked page is the default; unlocking replaces it.
+  if (!unlockedEnding) {
+    atoms.push(createAtom({
+      type: 'ending', id: 'ending-locked', group: 'endings',
+      section: 'endings', sequence: 0,
+      sizeHint: 'full-page', pageAffinity: 'either',
+      data: { type: 'locked', data },
+    }));
+  }
 
   if (unlockedEnding) {
     const endingBody = unlockedEnding.body || unlockedEnding.content || '';
@@ -280,41 +284,38 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
 
 /**
  * Split a long ending body into page-sized chunks.
- * Splits on paragraph boundaries (double newline). If the body fits on
- * one page (~1800 chars or fewer), returns a single chunk.
+ * Splits on paragraph boundaries (double newline). Returns as many
+ * chunks as needed — no artificial cap.
  *
- * @param {string} body — the ending body text
- * @returns {string[]} array of body chunks (1 or 2)
+ * @param {string} body — the ending body text (string or HTML)
+ * @returns {string[]} array of body chunks
  */
 function splitEndingBody(body) {
   const PAGE_CHAR_BUDGET = 1800;
-  if (!body || body.length <= PAGE_CHAR_BUDGET) return [body || ''];
+  const text = typeof body === 'string' ? body : '';
+  if (!text || text.length <= PAGE_CHAR_BUDGET) return [text || ''];
 
-  const paragraphs = body.split(/\n\n+/);
-  if (paragraphs.length <= 1) return [body];
+  const paragraphs = text.split(/\n\n+/);
+  if (paragraphs.length <= 1) return [text];
 
-  // Find the split point closest to the middle by character count
-  let charCount = 0;
-  const midpoint = body.length / 2;
-  let splitIndex = 0;
-  let bestDist = Infinity;
+  // Greedily fill pages up to the character budget
+  const chunks = [];
+  let current = [];
+  let currentLen = 0;
 
-  for (let i = 0; i < paragraphs.length; i++) {
-    charCount += paragraphs[i].length + 2; // +2 for the \n\n
-    const dist = Math.abs(charCount - midpoint);
-    if (dist < bestDist) {
-      bestDist = dist;
-      splitIndex = i + 1;
+  for (const para of paragraphs) {
+    const paraLen = para.length + 2; // +2 for the \n\n separator
+    if (current.length > 0 && currentLen + paraLen > PAGE_CHAR_BUDGET) {
+      chunks.push(current.join('\n\n'));
+      current = [];
+      currentLen = 0;
     }
+    current.push(para);
+    currentLen += paraLen;
   }
+  if (current.length > 0) chunks.push(current.join('\n\n'));
 
-  // Ensure at least 1 paragraph on each side
-  splitIndex = Math.max(1, Math.min(paragraphs.length - 1, splitIndex));
-
-  return [
-    paragraphs.slice(0, splitIndex).join('\n\n'),
-    paragraphs.slice(splitIndex).join('\n\n'),
-  ];
+  return chunks;
 }
 
 /**

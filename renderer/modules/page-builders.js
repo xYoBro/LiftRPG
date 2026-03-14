@@ -57,7 +57,7 @@ function buildWorkoutPage(data, week, entry) {
   const chunkStart = ((entry.chunkIndex || 0) * 3) + 1;
   const chunkEnd = chunkStart + sessions.length - 1;
   const kickerText = entry.chunkCount > 1
-    ? 'Week ' + pad2(week.weekNumber) + ' · Part ' + ((entry.chunkIndex || 0) + 1) + ' of ' + entry.chunkCount + ' · Sessions ' + chunkStart + '-' + chunkEnd + ((entry.chunkIndex || 0) > 0 ? ' · continued' : '')
+    ? 'Week ' + pad2(week.weekNumber) + ' · Part ' + ((entry.chunkIndex || 0) + 1) + ' of ' + entry.chunkCount + ' · Sessions ' + chunkStart + '-' + chunkEnd + ' · continued'
     : 'Week ' + pad2(week.weekNumber) + ' ·';
   frame.appendChild(make('div', 'week-kicker', kickerText));
   frame.appendChild(make('h2', 'week-title', week.title || 'Training Record'));

@@ -1,7 +1,7 @@
 import { decryptBlob, encryptBlob } from './crypto.js?v=44';
 import { qs } from './dom.js?v=44';
 import { exportBookletPdf } from './pdf-export.js?v=44';
-import { renderBooklet, renderBookletV2, syncLayoutMode } from './render.js?v=44';
+import { renderBooklet, syncLayoutMode } from './render.js?v=44';
 import { getDemoPassword, normalisePassword, validateBooklet } from './utils.js?v=44';
 
 const state = {
@@ -14,7 +14,6 @@ const state = {
   demoPasswordRevealed: false,
   previewTarget: '',
   reviewMode: false,
-  engineV2: false,
   pendingFontRenderToken: null
 };
 
@@ -39,8 +38,7 @@ function waitForPaint() {
 
 function renderCurrentBooklet() {
   if (!state.data) return;
-  const renderFn = state.engineV2 ? renderBookletV2 : renderBooklet;
-  renderFn(refs, state.layoutMode, state.data, state.unlockedEnding, setStatus);
+  renderBooklet(refs, state.layoutMode, state.data, state.unlockedEnding, setStatus);
   scrollPreviewTargetIntoView();
 }
 
@@ -403,7 +401,6 @@ export function initRendererApp() {
   }
   state.previewTarget = params.get('page') || '';
   state.reviewMode = params.get('review') === '1';
-  state.engineV2 = params.get('engine') !== 'v1';
   state.demoView = params.get('demoView') === '1';
   document.body.setAttribute('data-review-mode', state.reviewMode ? 'true' : 'false');
   document.body.setAttribute('data-demo-view', state.demoView ? 'true' : 'false');
@@ -412,7 +409,6 @@ export function initRendererApp() {
   refs.printBtn.disabled = true;
 
   state.demoMode = !!params.get('demo');
-  document.body.setAttribute('data-demo-mode', state.demoMode ? 'true' : 'false');
   state.demoPasswordRevealed = false;
   if (params.get('demo')) {
     fetchDemo(params.get('demo'));

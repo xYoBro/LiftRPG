@@ -25,6 +25,24 @@ import {
 
 const FULL_PAGE_HEIGHT = 741;
 
+/**
+ * Infer the layout variant from the ending's designSpec.
+ * Matches the treatment inference in booklet-models.js but maps
+ * to layout variant names used by CSS [data-layout-variant] selectors:
+ *   warm-letter → 'letter', official-document → 'document', default → 'document'
+ */
+function inferLayoutVariant(endings, payload) {
+  // Find the matching ending entry to read designSpec
+  const ending = (endings || []).find(e =>
+    payload && payload.variant && e && e.variant === payload.variant,
+  ) || (endings || [])[0] || {};
+  const spec = String(ending.designSpec || '').toLowerCase();
+  if (spec.includes('letter') || spec.includes('warm') || spec.includes('personal')) {
+    return 'letter';
+  }
+  return 'document';
+}
+
 registerAtom('ending', {
   defaultSizeHint: 'full-page',
   canShare: false,
@@ -46,7 +64,8 @@ registerAtom('ending', {
       const entry = payload && payload.continuationLabel
         ? { continuationLabel: payload.continuationLabel }
         : null;
-      const unlockedModel = buildUnlockedEndingPageModel(bookletData, payload, 'document', entry);
+      const layoutVariant = inferLayoutVariant(bookletData.endings, payload);
+      const unlockedModel = buildUnlockedEndingPageModel(bookletData, payload, layoutVariant, entry);
       return renderUnlockedEndingPage(unlockedModel);
     }
 

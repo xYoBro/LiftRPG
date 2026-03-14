@@ -183,7 +183,7 @@ export function buildUnlockedEndingPageModel(data, payload, layoutVariant = 'doc
   return {
     meta: buildBookletMetaModel(data),
     layoutVariant,
-    title: content.title ?? 'Unlocked Document',
+    title: content.title || 'Unlocked Document',
     documentType: content.documentType || '',
     kicker: content.kicker || '',
     body: joinRichContentBlocks(bodyBlocks),

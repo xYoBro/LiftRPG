@@ -158,6 +158,21 @@ function pageEstimatedHeight(placements) {
 }
 
 /**
+ * Find the index where padding spreads should be inserted.
+ * Inserts before back-matter so the back cover stays last
+ * (required for correct saddle-stitch imposition).
+ */
+function findPaddingInsertIndex(spreadPlan) {
+  // Walk backward to find the first back-matter spread
+  for (let i = spreadPlan.length - 1; i >= 0; i--) {
+    if (spreadPlan[i].spreadType === 'back-matter') {
+      return i; // Insert before this spread
+    }
+  }
+  return spreadPlan.length; // No back-matter — append at end
+}
+
+/**
  * Bin a group of atoms into one or more spreads.
  *
  * For spread mode: assigns atoms to left/right based on pageAffinity.
@@ -174,75 +189,78 @@ function binGroupIntoSpreads(groupAtoms, startSpreadIndex, spreadType, weekIndex
   const budget  = PAGE_BUDGET.heightPx;
 
   // ── Separate atoms by affinity ──────────────────────────────
-  const fullPage = [];
+  // Full-page and non-shareable atoms are routed by their affinity
+  // (not pulled to the front), so boss encounters stay paired with
+  // their week's session cards and respect pageAffinity: 'right'.
   const leftAtoms  = [];
   const rightAtoms = [];
   const eitherAtoms = [];
 
   for (const atom of groupAtoms) {
-    if (atom.sizeHint === 'full-page' || !getAtomDefinition(atom.type)?.canShare) {
-      fullPage.push(atom);
-      continue;
-    }
     const affinity = (planningUnit === 'page') ? 'left' : (atom.pageAffinity || 'either');
     if (affinity === 'left')       leftAtoms.push(atom);
     else if (affinity === 'right') rightAtoms.push(atom);
     else                           eitherAtoms.push(atom);
   }
 
-  // ── Bin left atoms into left pages ──────────────────────────
-  const leftPages = [];  // each entry is an array of placements
-  let currentPage = [];
-  for (const atom of leftAtoms) {
-    const placement = createPlacement(atom);
-    const currentHeight = pageEstimatedHeight(currentPage);
-    if (currentPage.length > 0 && currentHeight + placement.estimatedHeight > budget) {
-      leftPages.push(currentPage);
-      currentPage = [];
-    }
-    currentPage.push(placement);
-  }
-  if (currentPage.length > 0) leftPages.push(currentPage);
+  // ── Bin atoms into pages (shared helper) ────────────────────
+  // Non-shareable atoms (full-page, canShare:false) get their own
+  // page via forced breaks before and after.
+  function binToPages(atoms) {
+    const pages = [];
+    let current = [];
+    for (const atom of atoms) {
+      const placement = createPlacement(atom);
+      const ownPage = atom.sizeHint === 'full-page' || !getAtomDefinition(atom.type)?.canShare;
 
-  // ── Bin right atoms into right pages ────────────────────────
-  const rightPages = [];
-  currentPage = [];
-  for (const atom of rightAtoms) {
-    const placement = createPlacement(atom);
-    const currentHeight = pageEstimatedHeight(currentPage);
-    if (currentPage.length > 0 && currentHeight + placement.estimatedHeight > budget) {
-      rightPages.push(currentPage);
-      currentPage = [];
+      if (ownPage) {
+        // Flush any accumulated shareable atoms
+        if (current.length > 0) { pages.push(current); current = []; }
+        // Full-page atom gets its own page
+        pages.push([placement]);
+      } else {
+        const currentHeight = pageEstimatedHeight(current);
+        if (current.length > 0 && currentHeight + placement.estimatedHeight > budget) {
+          pages.push(current);
+          current = [];
+        }
+        current.push(placement);
+      }
     }
-    currentPage.push(placement);
+    if (current.length > 0) pages.push(current);
+    return pages;
   }
-  if (currentPage.length > 0) rightPages.push(currentPage);
+
+  const leftPages  = binToPages(leftAtoms);
+  const rightPages = binToPages(rightAtoms);
 
   // ── Distribute 'either' atoms into pages with room ─────────
   for (const atom of eitherAtoms) {
     const placement = createPlacement(atom);
+    const ownPage = atom.sizeHint === 'full-page' || !getAtomDefinition(atom.type)?.canShare;
     let placed = false;
 
-    // Try right pages first (they tend to have more room)
-    for (const page of rightPages) {
-      if (pageEstimatedHeight(page) + placement.estimatedHeight <= budget) {
-        page.push(placement);
-        placed = true;
-        break;
-      }
-    }
-    if (!placed) {
-      // Try left pages
-      for (const page of leftPages) {
+    if (!ownPage) {
+      // Try right pages first (they tend to have more room)
+      for (const page of rightPages) {
         if (pageEstimatedHeight(page) + placement.estimatedHeight <= budget) {
           page.push(placement);
           placed = true;
           break;
         }
       }
+      if (!placed) {
+        for (const page of leftPages) {
+          if (pageEstimatedHeight(page) + placement.estimatedHeight <= budget) {
+            page.push(placement);
+            placed = true;
+            break;
+          }
+        }
+      }
     }
     if (!placed) {
-      // New right page for overflow
+      // New page (right side for either-affinity overflow)
       rightPages.push([placement]);
     }
   }
@@ -258,21 +276,10 @@ function binGroupIntoSpreads(groupAtoms, startSpreadIndex, spreadType, weekIndex
     spreads.push(spread);
   }
 
-  // ── Insert full-page atoms as their own spreads at the front
-  const fullSpreads = [];
-  for (const atom of fullPage) {
-    const spread = createSpread(startSpreadIndex + fullSpreads.length, spreadType, weekIndex);
-    spread.left.push(createPlacement(atom));
-    fullSpreads.push(spread);
-  }
-
-  // Full-page atoms go first (cover, rules), then paired content
-  const allSpreads = [...fullSpreads, ...spreads];
-
   // Re-index spread positions
-  allSpreads.forEach((s, i) => { s.spreadIndex = startSpreadIndex + i; });
+  spreads.forEach((s, i) => { s.spreadIndex = startSpreadIndex + i; });
 
-  return allSpreads;
+  return spreads;
 }
 
 // ---------------------------------------------------------------------------
@@ -334,24 +341,29 @@ export function planSpreads(atoms, options = {}) {
     if (spread.right.length > 0) totalPages++;
   }
 
-  // Pad to multiple of padToMultipleOf
+  // Pad to multiple of padToMultipleOf.
+  // Insert padding BEFORE back-matter so the back cover stays last
+  // (critical for saddle-stitch imposition).
   const remainder     = totalPages % padToMultipleOf;
   const paddingNeeded = remainder === 0 ? 0 : padToMultipleOf - remainder;
 
-  for (let i = 0; i < paddingNeeded; i++) {
-    const paddingSpread = createSpread(spreadPlan.length, 'padding');
-    paddingSpread.left.push(createPlacement({
-      type:         'notes-grid',
-      id:           `padding-${i}`,
-      group:        'padding',
-      section:      'padding',
-      sequence:     i,
-      sizeHint:     'full-page',
-      pageAffinity: 'either',
-      data:         { variant: 'dot' },
-    }));
-    spreadPlan.push(paddingSpread);
-    totalPages++;
+  if (paddingNeeded > 0) {
+    const insertIdx = findPaddingInsertIndex(spreadPlan);
+    for (let i = 0; i < paddingNeeded; i++) {
+      const paddingSpread = createSpread(spreadPlan.length, 'padding');
+      paddingSpread.left.push(createPlacement({
+        type:         'notes-grid',
+        id:           `padding-${i}`,
+        group:        'padding',
+        section:      'padding',
+        sequence:     i,
+        sizeHint:     'full-page',
+        pageAffinity: 'either',
+        data:         { variant: 'dot' },
+      }));
+      spreadPlan.splice(insertIdx + i, 0, paddingSpread);
+      totalPages++;
+    }
   }
 
   // Phase 4: Record diagnostics
@@ -576,20 +588,23 @@ export function planAndMeasure(atoms, container, options = {}) {
     const postRemainder = pageCount % padTo;
     const postPadding   = postRemainder === 0 ? 0 : padTo - postRemainder;
 
-    for (let pi = 0; pi < postPadding; pi++) {
-      const padSpread = createSpread(spreadPlan.length, 'padding');
-      padSpread.left.push(createPlacement({
-        type:         'notes-grid',
-        id:           `post-padding-${pi}`,
-        group:        'padding',
-        section:      'padding',
-        sequence:     pi,
-        sizeHint:     'full-page',
-        pageAffinity: 'either',
-        data:         { variant: 'dot' },
-      }));
-      spreadPlan.push(padSpread);
-      pageCount++;
+    if (postPadding > 0) {
+      const postInsertIdx = findPaddingInsertIndex(spreadPlan);
+      for (let pi = 0; pi < postPadding; pi++) {
+        const padSpread = createSpread(spreadPlan.length, 'padding');
+        padSpread.left.push(createPlacement({
+          type:         'notes-grid',
+          id:           `post-padding-${pi}`,
+          group:        'padding',
+          section:      'padding',
+          sequence:     pi,
+          sizeHint:     'full-page',
+          pageAffinity: 'either',
+          data:         { variant: 'dot' },
+        }));
+        spreadPlan.splice(postInsertIdx + pi, 0, padSpread);
+        pageCount++;
+      }
     }
 
     diagnostics.totalPages   = pageCount;
