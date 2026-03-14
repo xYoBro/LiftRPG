@@ -10,11 +10,13 @@
 :root{
   --ink:#181714;
   --paper:#f1ebe0;
+  --page-secondary-paper:#efe5d7;
+  --secondary-paper:var(--page-secondary-paper,#efe5d7);
   --fog:#ddd6c5;
   --accent:#8b2a2a;
   --muted:#857d72;
   --rule:#ccc5b6;
-  --warm:#e8dfc8;
+  --warm:#efe5d7;
   --card:#ece6d8;
   --paper-2:#f6f1e7;
   --line-soft:#d8cfbf;
@@ -161,17 +163,18 @@ body[data-review-mode="true"] .reader-unlock{
 
 /* ── BOOKLET CONTAINER ───────────────────────────────────── */
 #booklet-container{
-  padding:30px 20px;
+  padding:30px 20px 132px;
   display:flex;
   flex-direction:column;
   align-items:center;
   --ink:var(--page-ink,#181714);
   --paper:var(--page-paper,#f1ebe0);
+  --secondary-paper:var(--page-secondary-paper,var(--paper));
   --fog:var(--page-fog,#ddd6c5);
   --accent:var(--page-accent,#8b2a2a);
   --muted:var(--page-muted,#857d72);
   --rule:var(--page-rule,#ccc5b6);
-  --warm:var(--panel-secondary-surface,#e8dfc8);
+  --warm:var(--secondary-paper,var(--paper));
   --card:var(--card-surface,#ece6d8);
   --paper-2:var(--panel-surface,#f6f1e7);
   --line-soft:var(--page-rule,#d8cfbf);
@@ -908,9 +911,9 @@ body[data-review-mode="true"] .reader-unlock{
 .exercise-table{
   --exercise-row-gap-block:5px;
   --exercise-row-padding-y:2px;
-  --exercise-name-gap:2.25ch;
+  --exercise-name-gap:2ch;
   --exercise-track-gap:4px;
-  --exercise-load-width:48px;
+  --exercise-load-width:44px;
   --rep-box-size:calc(16px * 1.07);
   width:100%;
   display:flex;
@@ -972,12 +975,12 @@ body[data-review-mode="true"] .reader-unlock{
   display:flex;
   align-items:flex-end;
   justify-content:flex-end;
-  padding-right:14px;
+  padding-right:13px;
 }
 .exercise-load-hint{
   position:absolute;
   left:0;
-  right:15px;
+  right:14px;
   bottom:1px;
   overflow:hidden;
   text-overflow:ellipsis;
@@ -1046,6 +1049,7 @@ body[data-review-mode="true"] .reader-unlock{
   border-radius:3px;
   background:var(--paper-2);
   padding:4px 8px;
+  margin-top:2px;
   position:relative;
   overflow:hidden;
   flex:1 1 auto;
@@ -1150,8 +1154,11 @@ body[data-review-mode="true"] .reader-unlock{
   display:flex;
   justify-content:space-between;
   align-items:baseline;
-  font-size:5.2pt;
-  color:var(--muted);
+  font-family:var(--mono);
+  font-size:5.7pt;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:var(--accent);
   padding-bottom:2px;
   border-bottom:1px solid var(--theme-header-border,var(--rule));
   margin-bottom:3px;
@@ -1229,15 +1236,15 @@ body[data-review-mode="true"] .reader-unlock{
 .puzzle-title{
   font-family:var(--display);
   font-style:italic;
-  font-size:8.2pt;
+  font-size:8.6pt;
   color:var(--ink);
   margin-bottom:2px;
   line-height:1.15;
 }
 .cipher-sequence{
   font-family:var(--mono);
-  font-size:6.4pt;
-  line-height:1.38;
+  font-size:6.7pt;
+  line-height:1.42;
   color:var(--ink);
   margin-bottom:3px;
   word-break:break-all;
@@ -1289,9 +1296,9 @@ body[data-review-mode="true"] .reader-unlock{
 /* Password extract instruction */
 .password-extract{
   font-family:var(--mono);
-  font-size:5.9pt;
+  font-size:6pt;
   line-height:1.32;
-  color:var(--ink);
+  color:color-mix(in srgb, var(--ink) 82%, var(--muted) 18%);
   border-left:2px solid var(--accent);
   padding-left:6px;
   margin:4px 0 0;
@@ -1361,24 +1368,27 @@ body[data-review-mode="true"] .reader-unlock{
 }
 .map-annotation{
   font-family:var(--mono);
-  font-size:5.7pt;
+  font-size:5.9pt;
   line-height:1.3;
-  color:var(--muted);
+  color:color-mix(in srgb, var(--ink) 68%, var(--muted) 32%);
   font-style:italic;
   margin-top:3px;
 }
 .map-note{
   font-family:var(--serif);
-  font-size:5.8pt;
+  font-size:6.1pt;
   font-style:italic;
-  line-height:1.22;
-  color:var(--muted);
+  line-height:1.28;
+  color:color-mix(in srgb, var(--ink) 74%, var(--muted) 26%);
   margin-top:3px;
 }
 
 /* ── Oracle ──────────────────────────────────────────── */
 .oracle-header{
-  font-size:5.8pt;
+  font-family:var(--mono);
+  font-size:5.9pt;
+  letter-spacing:.14em;
+  text-transform:uppercase;
   color:var(--ink);
   font-weight:700;
   padding-bottom:2px;
@@ -1386,34 +1396,34 @@ body[data-review-mode="true"] .reader-unlock{
   margin-bottom:3px;
 }
 .oracle-instruction{
-  font-size:5.7pt;
+  font-size:5.9pt;
   font-style:italic;
-  color:var(--muted);
-  margin-bottom:2px;
+  color:color-mix(in srgb, var(--ink) 72%, var(--muted) 28%);
+  margin-bottom:3px;
 }
 .oracle-entries{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:1px 7px;
+  gap:2px 8px;
 }
 .oracle-entry{
   display:flex;
   align-items:baseline;
   gap:3px;
-  padding:1px 0;
+  padding:2px 0;
   border-bottom:1px dotted var(--theme-field-rule,var(--rule));
 }
 .oracle-case-num{
   font-family:var(--mono);
-  font-size:4.7pt;
-  color:var(--muted);
+  font-size:5pt;
+  color:color-mix(in srgb, var(--ink) 58%, var(--muted) 42%);
   white-space:nowrap;
   letter-spacing:.04em;
 }
 .oracle-text{
   font-family:var(--serif);
-  font-size:4.8pt;
-  line-height:1.16;
+  font-size:5.2pt;
+  line-height:1.22;
   color:var(--ink);
   flex:1;
   overflow-wrap: anywhere;
@@ -1443,7 +1453,7 @@ body[data-review-mode="true"] .reader-unlock{
   font-family:var(--serif);
   font-size:6.8pt;
   line-height:1.4;
-  color:var(--muted);
+  color:color-mix(in srgb, var(--ink) 74%, var(--muted) 26%);
   margin-bottom:6px;
 }
 .companion-slot-grid{
@@ -1511,6 +1521,9 @@ body[data-review-mode="true"] .reader-unlock{
 }
 .boss-right[data-layout-variant="dense"]{
   padding:4px 4px 0 4px;
+}
+.boss-right[data-layout-variant="tight"]{
+  padding:3px 3px 0 3px;
 }
 .boss-header{
   font-size:6pt;
@@ -1609,6 +1622,11 @@ body[data-review-mode="true"] .reader-unlock{
   padding-top:12px;
   border-top:2px solid var(--ink);
 }
+.boss-right[data-layout-variant="dense"] .boss-convergence,
+.boss-right[data-layout-variant="tight"] .boss-convergence{
+  margin-top:8px;
+  padding-top:8px;
+}
 .boss-convergence-label{
   font-family:var(--mono);
   font-size:7pt;
@@ -1697,6 +1715,98 @@ body[data-review-mode="true"] .reader-unlock{
   border:2px solid var(--theme-box-border,var(--ink));
   border-radius:2px;
   background:white;
+}
+.boss-right[data-layout-variant="tight"] .boss-header{
+  font-size:5.4pt;
+  padding-bottom:3px;
+  margin-bottom:8px;
+}
+.boss-right[data-layout-variant="tight"] .boss-title{
+  font-size:15.5pt;
+  margin-bottom:6px;
+}
+.boss-right[data-layout-variant="tight"] .boss-narrative{
+  font-size:7.2pt;
+  line-height:1.4;
+  margin-bottom:10px;
+  padding-left:10px;
+}
+.boss-right[data-layout-variant="tight"] .boss-mechanism{
+  font-size:6.4pt;
+  line-height:1.4;
+  margin-bottom:10px;
+  padding:8px 9px;
+}
+.boss-right[data-layout-variant="tight"] .boss-decoding-instruction{
+  font-size:5.9pt;
+  line-height:1.35;
+  margin-top:6px;
+}
+.boss-right[data-layout-variant="tight"] .boss-decoding-table{
+  margin-top:6px;
+  padding:6px 8px;
+  font-size:5.7pt;
+  line-height:1.35;
+}
+.boss-right[data-layout-variant="tight"] .boss-components{
+  margin-bottom:10px;
+}
+.boss-right[data-layout-variant="tight"] .boss-components-label{
+  font-size:6.2pt;
+  margin-bottom:4px;
+}
+.boss-right[data-layout-variant="tight"] .boss-component-list{
+  display:grid;
+  grid-template-columns:repeat(5, minmax(0, 1fr));
+  gap:6px 4px;
+}
+.boss-right[data-layout-variant="tight"] .boss-component-item{
+  flex-direction:column;
+  align-items:flex-start;
+  gap:3px;
+  font-size:5.7pt;
+}
+.boss-right[data-layout-variant="tight"] .boss-component-week{
+  min-width:0;
+}
+.boss-right[data-layout-variant="tight"] .boss-component-box{
+  width:18px;
+  height:18px;
+}
+.boss-right[data-layout-variant="tight"] .boss-convergence{
+  padding-top:8px;
+}
+.boss-right[data-layout-variant="tight"] .boss-convergence-label{
+  font-size:6.2pt;
+  margin-bottom:6px;
+}
+.boss-right[data-layout-variant="tight"] .boss-convergence-instruction{
+  font-size:6.9pt;
+  line-height:1.4;
+  margin-bottom:6px;
+}
+.boss-right[data-layout-variant="tight"] .boss-branch-note{
+  margin-bottom:10px;
+  padding:6px 8px;
+}
+.boss-right[data-layout-variant="tight"] .boss-branch-note p{
+  font-size:6.4pt;
+  line-height:1.34;
+}
+.boss-right[data-layout-variant="tight"] .boss-proof{
+  margin-bottom:10px;
+  padding:6px 8px;
+}
+.boss-right[data-layout-variant="tight"] .boss-proof p{
+  font-size:6.2pt;
+  line-height:1.3;
+}
+.boss-right[data-layout-variant="tight"] .boss-password-boxes{
+  gap:3px;
+}
+.boss-right[data-layout-variant="tight"] .boss-password-box{
+  width:20px;
+  height:20px;
 }
 
 /* ══════════════════════════════════════════════════════════════

@@ -1,11 +1,11 @@
-import { PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from './constants.js?v=32';
-import { make } from './dom.js?v=32';
-import { buildBookletMetaModel } from './booklet-models.js?v=32';
-import { optimizeBookletPlan } from './layout-preflight.js?v=32';
-import { buildPages } from './page-builders.js?v=32';
-import { setPageNumbers } from './pagination.js?v=32';
-import { createBoundedPage } from './page-shell.js?v=32';
-import { applyTheme, resolveTheme } from './theme.js?v=32';
+import { PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from './constants.js?v=42';
+import { make } from './dom.js?v=42';
+import { buildBookletMetaModel } from './booklet-models.js?v=42';
+import { optimizeBookletPlan } from './layout-preflight.js?v=42';
+import { buildPages } from './page-builders.js?v=42';
+import { setPageNumbers } from './pagination.js?v=42';
+import { createBoundedPage } from './page-shell.js?v=42';
+import { applyTheme, resolveTheme } from './theme.js?v=42';
 
 function buildGrid(pages, layoutMode) {
   const grid = make('div', 'booklet-grid');
@@ -116,6 +116,7 @@ export function syncLayoutMode(refs, layoutMode) {
 }
 
 export function renderBooklet(refs, layoutMode, data, unlockedEnding, setStatus) {
+  const debugLayout = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debugLayout') === '1';
   refs.booklet.innerHTML = '';
   syncLayoutMode(refs, layoutMode);
   applyTheme(refs.booklet, resolveTheme(data));
@@ -143,11 +144,22 @@ export function renderBooklet(refs, layoutMode, data, unlockedEnding, setStatus)
 
   if (layoutResult.diagnostics.overflowPageCount > 0) {
     const overflowTypes = Object.keys((layoutResult.diagnostics.summary || {}).overflowTypes || {}).join(', ');
+    const overflowIndexes = (layoutResult.diagnostics.pages || [])
+      .filter((page) => page.overflowHeight > 0 || page.overflowWidth > 0)
+      .map((page) => String((page.planIndex || 0) + 1))
+      .join(', ');
+    if (debugLayout) {
+      window.location.hash = 'layout-overflow=' + encodeURIComponent(overflowIndexes || overflowTypes || 'true');
+    }
     setStatus(
-      'Loaded ' + pages.length + ' pages. Layout governor left ' + layoutResult.diagnostics.overflowPageCount + ' unresolved overflow page(s)' + (overflowTypes ? ' (' + overflowTypes + ')' : '') + '.',
+      'Loaded ' + pages.length + ' pages. Layout governor left ' + layoutResult.diagnostics.overflowPageCount + ' unresolved overflow page(s)' + (overflowTypes ? ' (' + overflowTypes + ')' : '') + (overflowIndexes ? ' at pages ' + overflowIndexes : '') + '.',
       'error'
     );
     return;
+  }
+
+  if (debugLayout) {
+    window.location.hash = 'layout-ok';
   }
 
   if (layoutResult.passesApplied > 0) {

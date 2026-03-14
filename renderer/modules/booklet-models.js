@@ -4,7 +4,7 @@ import {
   pad2,
   splitRichContentBlocks,
   splitParagraphs
-} from './utils.js?v=32';
+} from './utils.js?v=42';
 
 function humanizeComponentType(value) {
   return String(value || 'component').replace(/-/g, ' ');

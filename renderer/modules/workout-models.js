@@ -3,7 +3,7 @@ import {
   getExerciseSetCount,
   getRepTargets,
   showLoadSuffix
-} from './utils.js?v=32';
+} from './utils.js?v=42';
 
 let textMeasureContext = null;
 
@@ -57,16 +57,20 @@ function buildBinaryChoiceModel(binaryChoice) {
 
 export function buildWorkoutCardModel(session, layoutPlan) {
   const exercises = session.exercises || [];
+  const showNotes = typeof session.showNotes === 'boolean' ? session.showNotes : exercises.length > 0;
+  const continuationLabel = String(session.continuationLabel || '').trim();
 
   return {
     flexWeight: layoutPlan && layoutPlan.flexWeight ? layoutPlan.flexWeight : 1,
     notesHeight: layoutPlan && typeof layoutPlan.notesHeight === 'number' ? layoutPlan.notesHeight : 12,
     sessionLabel: typeof session.label === 'string' ? session.label : 'Session',
+    continuationLabel,
     storyPrompt: session.storyPrompt || '',
     fragmentRefText: session.fragmentRef ? 'Fragment ' + session.fragmentRef : '',
     exerciseNameWidthPx: resolveExerciseNameWidthPx(exercises),
     exerciseRows: exercises.map((exercise) => buildExerciseRowModel(exercise)),
-    binaryChoice: buildBinaryChoiceModel(session.binaryChoice)
+    binaryChoice: buildBinaryChoiceModel(session.binaryChoice),
+    showNotes
   };
 }
 

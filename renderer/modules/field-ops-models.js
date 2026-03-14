@@ -2,8 +2,8 @@ import {
   getPasswordLength,
   pad2,
   splitParagraphs
-} from './utils.js?v=32';
-import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=32';
+} from './utils.js?v=42';
+import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=42';
 
 function normalizeEntries(entries) {
   return (entries || []).map((entry) => ({
@@ -67,27 +67,39 @@ export function buildFieldOpsPageModels(data, week, layoutPlan = {}) {
   ];
 }
 
-export function buildBossPageModel(data, week, layoutVariant = 'standard') {
+export function buildBossPageModel(data, week, options = 'standard') {
   const boss = week.bossEncounter || {};
   const decodingKey = boss.decodingKey || {};
+  const entry = options && typeof options === 'object' ? options : {};
+  const layoutVariant = typeof options === 'string' ? options : (entry.layoutVariant || 'standard');
+  const continuationSegment = entry.continuationSegment || 'full';
+  const isContinuation = continuationSegment === 'followup';
+  const hasConvergenceAppendix = !!(
+    boss.convergenceProof
+    || (boss.binaryChoiceAcknowledgement && (boss.binaryChoiceAcknowledgement.ifA || boss.binaryChoiceAcknowledgement.ifB))
+  );
 
   return {
     layoutVariant,
+    continuationSegment,
+    continuationLabel: entry.continuationLabel || '',
     weekLabel: 'Week ' + pad2(week.weekNumber),
-    title: boss.title || week.title || 'Convergence',
-    narrativeParagraphs: splitParagraphs(boss.narrative || ''),
-    mechanismParagraphs: splitParagraphs(boss.mechanismDescription || ''),
-    decodingInstruction: decodingKey.instruction || '',
-    decodingTable: decodingKey.referenceTable || '',
-    componentInputs: (boss.componentInputs || []).map((item, index) => ({
+    title: isContinuation
+      ? ((boss.title || week.title || 'Convergence') + ' — Continued')
+      : (boss.title || week.title || 'Convergence'),
+    narrativeParagraphs: isContinuation ? [] : splitParagraphs(boss.narrative || ''),
+    mechanismParagraphs: isContinuation ? [] : splitParagraphs(boss.mechanismDescription || ''),
+    decodingInstruction: isContinuation ? '' : (decodingKey.instruction || ''),
+    decodingTable: isContinuation ? '' : (decodingKey.referenceTable || ''),
+    componentInputs: isContinuation ? [] : (boss.componentInputs || []).map((item, index) => ({
       weekLabel: 'W' + pad2(index + 1),
       value: item
     })),
     passwordRevealInstruction: boss.passwordRevealInstruction || 'When the final word is assembled, enter it at liftrpg.co to unlock the ending.',
     passwordLength: getPasswordLength(data, (boss.componentInputs || []).length || 6),
-    convergenceProof: boss.convergenceProof || '',
-    convergenceProofParagraphs: splitParagraphs(boss.convergenceProof || ''),
-    binaryChoiceAcknowledgement: boss.binaryChoiceAcknowledgement || null
+    convergenceProof: (!isContinuation && hasConvergenceAppendix) ? '' : (boss.convergenceProof || ''),
+    convergenceProofParagraphs: isContinuation ? splitParagraphs(boss.convergenceProof || '') : [],
+    binaryChoiceAcknowledgement: isContinuation ? (boss.binaryChoiceAcknowledgement || null) : null
   };
 }
 

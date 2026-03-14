@@ -1,11 +1,11 @@
-import { readingLength } from './utils.js?v=32';
+import { readingLength } from './utils.js?v=42';
 
 export const TEMPLATE_VARIANTS = {
   'rules-left': ['standard', 'compact', 'dense'],
   'rules-right': ['standard', 'compact'],
   'gauge-log': ['standard', 'compact'],
   assembly: ['standard', 'compact'],
-  boss: ['standard', 'compact', 'dense'],
+  boss: ['standard', 'compact', 'dense', 'tight'],
   'ending-locked': ['standard', 'compact'],
   'ending-unlocked': ['letter', 'document', 'compact'],
   'field-ops': ['balanced', 'map-dominant', 'cipher-dominant', 'oracle-dominant'],
@@ -36,7 +36,8 @@ export const TEMPLATE_VARIANT_DETAILS = {
   boss: {
     standard: 'Full convergence page treatment.',
     compact: 'Reduced boss spacing while preserving all sections.',
-    dense: 'Most compressed boss layout before overflow is considered unresolved.'
+    dense: 'Most compressed boss layout before overflow is considered unresolved.',
+    tight: 'Emergency convergence layout with aggressive spacing reduction.'
   },
   'ending-locked': {
     standard: 'Default locked ending notice.',

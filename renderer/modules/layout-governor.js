@@ -1,6 +1,6 @@
-import { clone, readingLength, splitRichContentBlocks } from './utils.js?v=32';
-import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=32';
-import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=32';
+import { clone, readingLength, splitParagraphs, splitRichContentBlocks } from './utils.js?v=42';
+import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=42';
+import { nextTemplateVariant, pickDefaultTemplateVariant } from './template-registry.js?v=42';
 
 const MAX_WORKOUT_COMPACTION = 5;
 
@@ -256,6 +256,83 @@ export function compactWorkoutEntry(plan, index) {
   return revised;
 }
 
+function buildWorkoutContinuationPartner(week, weekIndex) {
+  if (week && week.overflowDocument) {
+    return {
+      type: 'overflow-doc',
+      weekIndex,
+      layoutVariant: pickDefaultTemplateVariant('overflow-doc', { week })
+    };
+  }
+
+  return { type: 'blank-filler', weekIndex };
+}
+
+function reindexWeekWorkoutEntries(plan, weekIndex) {
+  const revised = normalizeBookletPlan(plan);
+  const workoutIndexes = [];
+
+  revised.forEach((entry, index) => {
+    if (entry && entry.type === 'workout-left' && entry.weekIndex === weekIndex) {
+      workoutIndexes.push(index);
+    }
+  });
+
+  const chunkCount = workoutIndexes.length;
+  workoutIndexes.forEach((planIndex, chunkIndex) => {
+    revised[planIndex] = {
+      ...revised[planIndex],
+      chunkIndex,
+      chunkCount
+    };
+  });
+
+  return revised;
+}
+
+function splitWorkoutEntry(plan, index, measurement, data) {
+  const entry = (plan || [])[index];
+  if (!entry || entry.type !== 'workout-left') return null;
+
+  const sessions = Array.isArray(entry.sessions) ? entry.sessions : [];
+  if (sessions.length <= 1) return null;
+
+  const week = ((data || {}).weeks || [])[entry.weekIndex] || {};
+  const overflowHeights = (((measurement || {}).slotMetrics || {}).cardOverflowHeights) || [];
+  let splitIndex = Math.ceil(sessions.length / 2);
+
+  if (sessions.length === 3 && overflowHeights.length === sessions.length) {
+    const worstCardIndex = overflowHeights.reduce((bestIndex, value, candidateIndex, values) => {
+      return value > values[bestIndex] ? candidateIndex : bestIndex;
+    }, 0);
+    splitIndex = worstCardIndex <= 0 ? 1 : 2;
+  } else if (sessions.length === 2) {
+    splitIndex = 1;
+  }
+
+  const leadingSessions = sessions.slice(0, splitIndex);
+  const trailingSessions = sessions.slice(splitIndex);
+  if (!leadingSessions.length || !trailingSessions.length) return null;
+
+  const revised = normalizeBookletPlan(plan);
+  revised[index] = {
+    ...revised[index],
+    sessions: leadingSessions,
+    compactionLevel: 0
+  };
+
+  revised.splice(index + 2, 0,
+    {
+      ...entry,
+      sessions: trailingSessions,
+      compactionLevel: 0
+    },
+    buildWorkoutContinuationPartner(week, entry.weekIndex)
+  );
+
+  return reindexWeekWorkoutEntries(revised, entry.weekIndex);
+}
+
 function reviseEntryVariant(plan, index) {
   const entry = (plan || [])[index];
   if (!entry) return null;
@@ -404,6 +481,173 @@ function splitMeasuredBlocks(blocks, heights, overflowHeight) {
   return { leading, trailing };
 }
 
+function splitPlainTextBlocks(text) {
+  const paragraphs = splitParagraphs(text || '');
+  if (paragraphs.length > 1) return paragraphs;
+
+  const normalized = String(text || '').trim();
+  if (!normalized) return [];
+
+  const sentences = normalized
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9"'“‘(])/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (sentences.length > 1) return sentences;
+  return [normalized];
+}
+
+function joinPlainTextBlocks(blocks) {
+  return (blocks || []).map((block) => String(block || '').trim()).filter(Boolean).join('\n\n');
+}
+
+function cloneFragmentWithBody(fragment, bodyParagraphs, continuationLabel, partIndex, partCount) {
+  return {
+    ...clone(fragment || {}),
+    bodyParagraphs,
+    continuationLabel: continuationLabel || '',
+    partIndex,
+    partCount
+  };
+}
+
+function splitSingleFragmentDocument(plan, index, measurement, entry, fragment) {
+  const bodyParagraphs = Array.isArray(fragment && fragment.bodyParagraphs) && fragment.bodyParagraphs.length
+    ? fragment.bodyParagraphs
+    : splitPlainTextBlocks((fragment && (fragment.bodyText || fragment.body || fragment.content)) || '');
+  const split = splitMeasuredBlocks(
+    bodyParagraphs,
+    (measurement && measurement.slotMetrics && measurement.slotMetrics.documentParagraphHeights) || [],
+    measurement && measurement.overflowHeight
+  );
+  if (!split) return null;
+
+  const leadingFragment = cloneFragmentWithBody(fragment, split.leading, '', 1, 2);
+  const trailingFragment = cloneFragmentWithBody(fragment, split.trailing, 'Continued', 2, 2);
+  const variantType = entry.type === 'overflow-doc' ? 'overflow-doc' : 'fragment-page';
+  const revised = normalizeBookletPlan(plan);
+
+  revised.splice(index, 1,
+    {
+      ...entry,
+      fragments: [leadingFragment],
+      layoutVariant: pickDefaultTemplateVariant(variantType, { entry: { fragments: [leadingFragment] } })
+    },
+    {
+      ...entry,
+      fragments: [trailingFragment],
+      layoutVariant: pickDefaultTemplateVariant(variantType, { entry: { fragments: [trailingFragment] } })
+    }
+  );
+
+  return normalizeBookletPlan(revised);
+}
+
+function buildWorkoutSessionFromSegments(session, segments, continuationLabel) {
+  const storyBlocks = [];
+  const exercises = [];
+  let binaryChoice = null;
+
+  (segments || []).forEach((segment) => {
+    if (!segment) return;
+    if (segment.kind === 'story') {
+      storyBlocks.push(segment.value);
+      return;
+    }
+    if (segment.kind === 'exercise') {
+      exercises.push(clone(segment.value));
+      return;
+    }
+    if (segment.kind === 'binaryChoice') {
+      binaryChoice = clone(segment.value);
+    }
+  });
+
+  return {
+    ...clone(session || {}),
+    storyPrompt: joinPlainTextBlocks(storyBlocks),
+    exercises,
+    binaryChoice,
+    continuationLabel: continuationLabel || '',
+    showNotes: exercises.length > 0
+  };
+}
+
+function splitSingleSessionWorkoutEntry(plan, index, measurement, data) {
+  const entry = (plan || [])[index];
+  if (!entry || entry.type !== 'workout-left') return null;
+
+  const sessions = Array.isArray(entry.sessions) ? entry.sessions : [];
+  if (sessions.length !== 1) return null;
+
+  const session = sessions[0] || {};
+  const storyBlocks = splitPlainTextBlocks(session.storyPrompt || '');
+  const slotMetrics = (measurement && measurement.slotMetrics) || {};
+  const storyHeight = ((slotMetrics.storyPromptHeights || [])[0]) || 0;
+  const exerciseRowHeights = ((slotMetrics.exerciseRowHeightsByCard || [])[0]) || [];
+  const binaryChoiceHeight = ((slotMetrics.binaryChoiceHeights || [])[0]) || 0;
+  const storyBlockHeights = storyBlocks.length
+    ? storyBlocks.map(() => Math.max(1, Math.ceil(storyHeight / storyBlocks.length)))
+    : [];
+
+  const segments = [];
+  storyBlocks.forEach((block, blockIndex) => {
+    segments.push({
+      kind: 'story',
+      value: block,
+      height: storyBlockHeights[blockIndex] || Math.max(1, Math.ceil(readingLength(block) / 120))
+    });
+  });
+  (session.exercises || []).forEach((exercise, exerciseIndex) => {
+    segments.push({
+      kind: 'exercise',
+      value: exercise,
+      height: exerciseRowHeights[exerciseIndex] || 20
+    });
+  });
+  if (session.binaryChoice) {
+    segments.push({
+      kind: 'binaryChoice',
+      value: session.binaryChoice,
+      height: binaryChoiceHeight || 24
+    });
+  }
+
+  if (segments.length <= 1) return null;
+
+  const split = splitMeasuredBlocks(
+    segments,
+    segments.map((segment) => segment.height),
+    measurement && measurement.overflowHeight
+  );
+  if (!split) return null;
+
+  const leadingSession = buildWorkoutSessionFromSegments(session, split.leading, '');
+  const trailingSession = buildWorkoutSessionFromSegments(session, split.trailing, 'Continued');
+  const leadingContentCount = leadingSession.exercises.length + (leadingSession.storyPrompt ? 1 : 0) + (leadingSession.binaryChoice ? 1 : 0);
+  const trailingContentCount = trailingSession.exercises.length + (trailingSession.storyPrompt ? 1 : 0) + (trailingSession.binaryChoice ? 1 : 0);
+  if (!leadingContentCount || !trailingContentCount) return null;
+
+  const week = ((data || {}).weeks || [])[entry.weekIndex] || {};
+  const revised = normalizeBookletPlan(plan);
+  revised[index] = {
+    ...revised[index],
+    sessions: [leadingSession],
+    compactionLevel: 0
+  };
+
+  revised.splice(index + 2, 0,
+    {
+      ...entry,
+      sessions: [trailingSession],
+      compactionLevel: 0
+    },
+    buildWorkoutContinuationPartner(week, entry.weekIndex)
+  );
+
+  return reindexWeekWorkoutEntries(revised, entry.weekIndex);
+}
+
 function splitDocumentEntry(plan, index, measurement, data) {
   const entry = (plan || [])[index];
   if (!entry) return null;
@@ -413,14 +657,51 @@ function splitDocumentEntry(plan, index, measurement, data) {
     if (fragments.length > 1) {
       return splitFragmentEntry(plan, index, measurement);
     }
+    if (fragments.length === 1) {
+      return splitSingleFragmentDocument(plan, index, measurement, entry, fragments[0]);
+    }
     return null;
   }
 
   if (entry.type === 'overflow-doc') {
-    return null;
+    const week = ((data || {}).weeks || [])[entry.weekIndex] || {};
+    const sourceFragment = ((entry.fragments || [])[0]) || week.overflowDocument;
+    if (!sourceFragment) return null;
+    return splitSingleFragmentDocument(plan, index, measurement, entry, sourceFragment);
   }
 
   return null;
+}
+
+function splitBossEntry(plan, index, data) {
+  const entry = (plan || [])[index];
+  if (!entry || entry.type !== 'boss' || entry.continuationSegment) return null;
+
+  const week = ((data || {}).weeks || [])[entry.weekIndex] || {};
+  const boss = week.bossEncounter || {};
+  const hasConvergenceAppendix = !!(
+    boss.convergenceProof
+    || (boss.binaryChoiceAcknowledgement && (boss.binaryChoiceAcknowledgement.ifA || boss.binaryChoiceAcknowledgement.ifB))
+  );
+  if (!hasConvergenceAppendix) return null;
+
+  const revised = normalizeBookletPlan(plan);
+  revised.splice(index, 1,
+    {
+      ...entry,
+      layoutVariant: 'tight',
+      continuationSegment: 'main',
+      continuationLabel: ''
+    },
+    {
+      ...entry,
+      layoutVariant: 'tight',
+      continuationSegment: 'followup',
+      continuationLabel: 'Convergence continuation'
+    }
+  );
+
+  return normalizeBookletPlan(revised);
 }
 
 function splitInterludeEntry(plan, index, measurement) {
@@ -450,7 +731,7 @@ function splitInterludeEntry(plan, index, measurement) {
   return normalizeBookletPlan(revised);
 }
 
-function splitUnlockedEndingEntry(plan, index) {
+function splitUnlockedEndingEntry(plan, index, measurement) {
   const entry = (plan || [])[index];
   if (!entry || entry.type !== 'ending-unlocked') return null;
 
@@ -458,7 +739,11 @@ function splitUnlockedEndingEntry(plan, index) {
   const sourceBlocks = Array.isArray(entry.bodyBlocks) && entry.bodyBlocks.length
     ? entry.bodyBlocks
     : splitRichContentBlocks(payload.body || payload.content || '');
-  const split = splitMeasuredBlocks(sourceBlocks, [], 1);
+  const split = splitMeasuredBlocks(
+    sourceBlocks,
+    (measurement && measurement.slotMetrics && measurement.slotMetrics.paragraphHeights) || [],
+    measurement && measurement.overflowHeight
+  );
   if (!split) return null;
 
   const revised = normalizeBookletPlan(plan);
@@ -484,11 +769,23 @@ export function revisePlanForMeasurement(plan, measurement, data) {
   if (!measurement) return null;
 
   if (measurement.pageType === 'workout-left') {
-    return compactWorkoutEntry(plan, measurement.planIndex);
+    const compactedPlan = compactWorkoutEntry(plan, measurement.planIndex);
+    if (compactedPlan) return compactedPlan;
+    const splitPlan = splitWorkoutEntry(plan, measurement.planIndex, measurement, data);
+    if (splitPlan) return splitPlan;
+    return splitSingleSessionWorkoutEntry(plan, measurement.planIndex, measurement, data);
   }
 
   if (measurement.pageType === 'field-ops') {
-    return splitFieldOpsEntry(plan, measurement.planIndex, measurement, data);
+    const splitPlan = splitFieldOpsEntry(plan, measurement.planIndex, measurement, data);
+    if (splitPlan) return splitPlan;
+    return reviseEntryVariant(plan, measurement.planIndex);
+  }
+
+  if (measurement.pageType === 'boss') {
+    const bossVariantRevision = reviseEntryVariant(plan, measurement.planIndex);
+    if (bossVariantRevision) return bossVariantRevision;
+    return splitBossEntry(plan, measurement.planIndex, data);
   }
 
   if (measurement.pageType === 'fragment-page' || measurement.pageType === 'fragment' || measurement.pageType === 'overflow-doc') {
@@ -500,15 +797,20 @@ export function revisePlanForMeasurement(plan, measurement, data) {
     return null;
   }
 
+  if (measurement.pageType === 'interlude') {
+    const interludeSplit = splitInterludeEntry(plan, measurement.planIndex, measurement);
+    if (interludeSplit) return interludeSplit;
+  }
+
   const variantRevision = reviseEntryVariant(plan, measurement.planIndex);
   if (variantRevision) return variantRevision;
 
   if (measurement.pageType === 'interlude') {
-    return splitInterludeEntry(plan, measurement.planIndex, measurement);
+    return null;
   }
 
   if (measurement.pageType === 'ending-unlocked') {
-    return splitUnlockedEndingEntry(plan, measurement.planIndex);
+    return splitUnlockedEndingEntry(plan, measurement.planIndex, measurement);
   }
 
   return null;

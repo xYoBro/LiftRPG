@@ -1,5 +1,5 @@
-import { make } from './dom.js?v=32';
-import { createBoundedPage } from './page-shell.js?v=32';
+import { make } from './dom.js?v=42';
+import { createBoundedPage } from './page-shell.js?v=42';
 
 function renderGameplayClocks(clocks) {
   const section = make('section', 'ops-section ops-clocks');
@@ -288,12 +288,18 @@ export function renderBossPage(model) {
   if (model.binaryChoiceAcknowledgement) {
     frame.setAttribute('data-has-binary-choice-ack', 'true');
   }
+  if (model.continuationSegment) {
+    frame.setAttribute('data-continuation-segment', model.continuationSegment);
+  }
 
   const header = make('header', 'boss-header');
   header.appendChild(make('span', '', 'Convergence'));
   header.appendChild(make('span', 'page-num', ''));
   frame.appendChild(header);
 
+  if (model.continuationLabel) {
+    frame.appendChild(make('div', 'doc-label continuation-label', model.continuationLabel));
+  }
   frame.appendChild(make('h2', 'boss-title', model.title));
 
   if ((model.narrativeParagraphs || []).length) {
@@ -321,18 +327,20 @@ export function renderBossPage(model) {
     frame.appendChild(mechanism);
   }
 
-  const components = make('div', 'boss-components');
-  components.appendChild(make('div', 'boss-components-label', 'Recorded Inputs'));
-  const list = make('div', 'boss-component-list');
-  (model.componentInputs || []).forEach((item) => {
-    const row = make('div', 'boss-component-item');
-    row.appendChild(make('div', 'boss-component-week', item.weekLabel));
-    row.appendChild(make('div', 'boss-component-box'));
-    row.appendChild(make('div', '', item.value));
-    list.appendChild(row);
-  });
-  components.appendChild(list);
-  frame.appendChild(components);
+  if ((model.componentInputs || []).length) {
+    const components = make('div', 'boss-components');
+    components.appendChild(make('div', 'boss-components-label', 'Recorded Inputs'));
+    const list = make('div', 'boss-component-list');
+    (model.componentInputs || []).forEach((item) => {
+      const row = make('div', 'boss-component-item');
+      row.appendChild(make('div', 'boss-component-week', item.weekLabel));
+      row.appendChild(make('div', 'boss-component-box'));
+      row.appendChild(make('div', '', item.value));
+      list.appendChild(row);
+    });
+    components.appendChild(list);
+    frame.appendChild(components);
+  }
 
   if (model.binaryChoiceAcknowledgement) {
     const branch = make('div', 'boss-branch-note');

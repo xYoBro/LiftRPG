@@ -1,4 +1,4 @@
-import { make } from './dom.js?v=32';
+import { make } from './dom.js?v=42';
 
 function renderExerciseRow(rowModel) {
   const row = make('div', 'exercise-row');
@@ -73,7 +73,10 @@ export function renderWorkoutCard(cardModel) {
   const card = make('article', 'session-card');
   card.style.flex = String(cardModel.flexWeight) + ' 1 0';
 
-  card.appendChild(make('div', 'session-header', cardModel.sessionLabel));
+  const headerText = cardModel.continuationLabel
+    ? (cardModel.sessionLabel + ' · ' + cardModel.continuationLabel)
+    : cardModel.sessionLabel;
+  card.appendChild(make('div', 'session-header', headerText));
 
   if (cardModel.storyPrompt) {
     card.appendChild(make('div', 'story-prompt', cardModel.storyPrompt));
@@ -88,16 +91,20 @@ export function renderWorkoutCard(cardModel) {
   card.appendChild(metaRow);
 
   const body = make('div', 'session-body');
-  body.appendChild(renderExerciseTable(cardModel));
+  if (cardModel.exerciseRows.length) {
+    body.appendChild(renderExerciseTable(cardModel));
+  }
 
   const binaryChoice = renderBinaryChoice(cardModel.binaryChoice);
   if (binaryChoice) {
     body.appendChild(binaryChoice);
   }
 
-  const notesBox = make('div', 'notes-box');
-  notesBox.style.setProperty('--notes-box-height', Math.max(12, cardModel.notesHeight || 0) + 'px');
-  body.appendChild(notesBox);
+  if (cardModel.showNotes) {
+    const notesBox = make('div', 'notes-box');
+    notesBox.style.setProperty('--notes-box-height', Math.max(12, cardModel.notesHeight || 0) + 'px');
+    body.appendChild(notesBox);
+  }
 
   card.appendChild(body);
   return card;

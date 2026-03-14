@@ -1,13 +1,13 @@
-import { make } from './dom.js?v=32';
+import { make } from './dom.js?v=42';
 import {
   planBookletLayout,
   revisePlanForMeasurement
-} from './layout-governor.js?v=32';
-import { buildPages } from './page-builders.js?v=32';
-import { getPageBoundary, getPageFrame } from './page-shell.js?v=32';
-import { setPageNumbers } from './pagination.js?v=32';
+} from './layout-governor.js?v=42';
+import { buildPages } from './page-builders.js?v=42';
+import { getPageBoundary, getPageFrame } from './page-shell.js?v=42';
+import { setPageNumbers } from './pagination.js?v=42';
 
-const MAX_LAYOUT_PASSES = 10;
+const MAX_LAYOUT_PASSES = 48;
 const OVERFLOW_TOLERANCE_PX = 2;
 
 function createMeasurementRoot(container) {
@@ -63,6 +63,11 @@ function measureSlotMetrics(page, pageType) {
     return {
       cardCount: cards.length,
       cardHeights: cards.map((card) => Math.ceil(card.getBoundingClientRect().height)),
+      storyPromptHeights: cards.map((card) => heightOf(card.querySelector('.story-prompt'))),
+      binaryChoiceHeights: cards.map((card) => heightOf(card.querySelector('.binary-choice'))),
+      exerciseRowHeightsByCard: cards.map((card) => {
+        return Array.from(card.querySelectorAll('.exercise-row')).map((row) => Math.ceil(row.getBoundingClientRect().height));
+      }),
       noteBoxHeights: noteBoxes.map((noteBox) => Math.ceil(noteBox.getBoundingClientRect().height)),
       cardOverflowHeights,
       totalCardOverflowHeight: cardOverflowHeights.reduce((sum, value) => sum + value, 0)
@@ -237,13 +242,13 @@ function evaluatePlan(container, data, unlockedEnding, plan) {
   };
 }
 
-function findWorstOverflow(measurements) {
+function findOverflowPages(measurements) {
   return (measurements || [])
     .filter((page) => page.overflowHeight > 0 || page.overflowWidth > 0)
     .sort((a, b) => {
       if (b.overflowArea !== a.overflowArea) return b.overflowArea - a.overflowArea;
       return b.overflowHeight - a.overflowHeight;
-    })[0] || null;
+    });
 }
 
 export function optimizeBookletPlan(container, data, unlockedEnding) {
@@ -252,19 +257,41 @@ export function optimizeBookletPlan(container, data, unlockedEnding) {
   let passesApplied = 0;
 
   for (let pass = 0; pass < MAX_LAYOUT_PASSES; pass += 1) {
-    const worstOverflow = findWorstOverflow(current.pages);
-    if (!worstOverflow) break;
+    const overflowPages = findOverflowPages(current.pages);
+    if (!overflowPages.length) break;
 
-    const revisedPlan = revisePlanForMeasurement(currentPlan, worstOverflow, data);
-    if (!revisedPlan) break;
+    let bestRevision = null;
+    for (const overflowPage of overflowPages) {
+      const revisedPlan = revisePlanForMeasurement(currentPlan, overflowPage, data);
+      if (!revisedPlan) continue;
 
-    const revised = evaluatePlan(container, data, unlockedEnding, revisedPlan);
-    if (revised.score >= current.score && revised.totalOverflowArea >= current.totalOverflowArea) {
-      break;
+      const revised = evaluatePlan(container, data, unlockedEnding, revisedPlan);
+      const improved = revised.score < current.score || revised.totalOverflowArea < current.totalOverflowArea;
+      if (!improved) continue;
+
+      if (
+        !bestRevision
+        || revised.score < bestRevision.diagnostics.score
+        || (
+          revised.score === bestRevision.diagnostics.score
+          && revised.totalOverflowArea < bestRevision.diagnostics.totalOverflowArea
+        )
+      ) {
+        bestRevision = {
+          plan: revisedPlan,
+          diagnostics: revised
+        };
+      }
+
+      if (revised.totalOverflowArea === 0 && revised.overflowPageCount === 0 && revised.missingBoundaryPageCount === 0) {
+        break;
+      }
     }
 
-    currentPlan = revisedPlan;
-    current = revised;
+    if (!bestRevision) break;
+
+    currentPlan = bestRevision.plan;
+    current = bestRevision.diagnostics;
     passesApplied += 1;
   }
 

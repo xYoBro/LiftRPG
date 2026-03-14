@@ -1,4 +1,4 @@
-import { alpha, mergeObjects } from './utils.js?v=32';
+import { alpha, mergeObjects } from './utils.js?v=42';
 
 const THEME_PRESETS = {
   pastoral: {
@@ -12,6 +12,7 @@ const THEME_PRESETS = {
     '--weight-emphasis': '700',
     '--page-ink': '#181714',
     '--page-paper': '#f1ebe0',
+    '--page-secondary-paper': '#efe5d7',
     '--page-accent': '#8b2a2a',
     '--page-muted': '#857d72',
     '--page-rule': '#ccc5b6',
@@ -67,6 +68,7 @@ const THEME_PRESETS = {
     '--weight-emphasis': '700',
     '--page-ink': '#111111',
     '--page-paper': '#e6dfd1',
+    '--page-secondary-paper': '#ded2be',
     '--page-accent': '#a33b3b',
     '--page-muted': '#5e5a51',
     '--page-rule': '#a33b3b',
@@ -526,6 +528,7 @@ export function resolveTheme(data) {
 
   if (palette.ink) tokens['--page-ink'] = palette.ink;
   if (palette.paper) tokens['--page-paper'] = palette.paper;
+  if (palette.paper && !theme.tokens) tokens['--page-secondary-paper'] = palette.paper;
   if (palette.accent) tokens['--page-accent'] = palette.accent;
   if (palette.muted) tokens['--page-muted'] = palette.muted;
   if (palette.rule) tokens['--page-rule'] = palette.rule;
@@ -538,6 +541,7 @@ export function resolveTheme(data) {
   }
 
   tokens['--page-underlay'] = tokens['--page-underlay'] || 'none';
+  tokens['--page-secondary-paper'] = tokens['--page-secondary-paper'] || tokens['--page-paper'];
   tokens['--panel-secondary-surface'] = tokens['--panel-secondary-surface'] || alpha(tokens['--page-fog'], 0.28);
   tokens['--callout-surface'] = tokens['--callout-surface'] || alpha(tokens['--page-fog'], 0.2);
   tokens['--highlight-surface'] = tokens['--highlight-surface'] || alpha(tokens['--page-accent'], 0.12);

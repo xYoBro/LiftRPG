@@ -1,7 +1,7 @@
-import { make } from './dom.js?v=32';
-import { getPageAtom } from './atom-registry.js?v=32';
-import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=32';
-import { createBoundedPage } from './page-shell.js?v=32';
+import { make } from './dom.js?v=42';
+import { getPageAtom } from './atom-registry.js?v=42';
+import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=42';
+import { createBoundedPage } from './page-shell.js?v=42';
 import {
   buildAssemblyPageModelWithVariant,
   buildBackCoverModel,
@@ -13,7 +13,7 @@ import {
   buildRulesLeftPageModelWithVariant,
   buildSealedPageModel,
   buildUnlockedEndingPageModel
-} from './booklet-models.js?v=32';
+} from './booklet-models.js?v=42';
 import {
   renderAssemblyPage,
   renderBackCover,
@@ -25,14 +25,14 @@ import {
   renderRulesLeftPage,
   renderSealedPage,
   renderUnlockedEndingPage
-} from './booklet-primitives.js?v=32';
-import { buildDocumentPageModel } from './document-models.js?v=32';
-import { renderDocumentPage } from './document-primitives.js?v=32';
-import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=32';
-import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=32';
-import { buildWorkoutPageModel } from './workout-models.js?v=32';
-import { renderWorkoutCard } from './workout-primitives.js?v=32';
-import { pad2 } from './utils.js?v=32';
+} from './booklet-primitives.js?v=42';
+import { buildDocumentPageModel } from './document-models.js?v=42';
+import { renderDocumentPage } from './document-primitives.js?v=42';
+import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=42';
+import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=42';
+import { buildWorkoutPageModel } from './workout-models.js?v=42';
+import { renderWorkoutCard } from './workout-primitives.js?v=42';
+import { pad2 } from './utils.js?v=42';
 
 function buildWorkoutPage(data, week, entry) {
   const sessions = entry.sessions || [];
@@ -169,7 +169,7 @@ export function buildPages(data, unlockedEnding, options = {}) {
       }
       case 'boss': {
         const week = (data.weeks || [])[entry.weekIndex] || {};
-        page = renderBossPage(buildBossPageModel(data, week, entry.layoutVariant));
+        page = renderBossPage(buildBossPageModel(data, week, entry));
         break;
       }
       case 'fragment-page':
