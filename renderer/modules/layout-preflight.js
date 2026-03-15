@@ -117,12 +117,19 @@ function measureSlotMetrics(page, pageType) {
   }
 
   if (pageType === 'ending-locked' || pageType === 'ending-unlocked') {
+    const bodyEl = page.querySelector('.endings-body');
     const paragraphs = Array.from(page.querySelectorAll('.endings-body > p'));
+    const bodyClientH = bodyEl ? bodyEl.clientHeight : 0;
+    const bodyScrollH = bodyEl ? bodyEl.scrollHeight : 0;
+    // Detect internal clipping: .endings-body uses flex:1 + overflow:hidden,
+    // which hides overflow from the frame's getBoundingClientRect.
+    const internalClip = Math.max(0, bodyScrollH - bodyClientH);
     return {
       paragraphCount: paragraphs.length,
       paragraphHeights: paragraphs.map((paragraph) => Math.ceil(paragraph.getBoundingClientRect().height)),
-      bodyHeight: heightOf(page.querySelector('.endings-body')),
-      finalLineHeight: heightOf(page.querySelector('.endings-final-line'))
+      bodyHeight: heightOf(bodyEl),
+      finalLineHeight: heightOf(page.querySelector('.endings-final-line')),
+      totalCardOverflowHeight: internalClip
     };
   }
 

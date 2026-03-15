@@ -14,6 +14,15 @@
 </head>
 
 <body>
+  <script>
+    // FOUC prevention: hide toolbar before first paint in demo/iframe mode
+    (function () {
+      var sp = new URLSearchParams(window.location.search);
+      if (sp.has('demo') || window.self !== window.top) {
+        document.body.setAttribute('data-demo-view', 'true');
+      }
+    })();
+  </script>
 
   <!-- ── APP CONTROLS (hidden in print) ─────────────── -->
   <div class="app-chrome no-print">
