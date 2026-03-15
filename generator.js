@@ -921,4 +921,256 @@
 
     return parts.join('\n');
   };
+
+  // ── Multi-stage prompt generators ───────────────────────────────────────────
+  //
+  // Additive to window.generatePrompt (single-pass, Chat + API Standard mode).
+  // API "Deep" mode chains:
+  //   generateStage1Prompt → generateStage2Prompt → generateStage3Prompt
+  //
+  // Stage 1: Layer Bible  — compact 3-layer architecture planning JSON
+  // Stage 2: Campaign Plan — per-week structure using the approved layer bible
+  // Stage 3: Final Compile — full booklet JSON compiled from SCHEMA_SPEC +
+  //                          approved layer bible + approved campaign plan
+
+  var STAGE1_OUTPUT_SCHEMA = JSON.stringify({
+    storyLayer: {
+      premise: '',
+      protagonist: { role: '', want: '', flaw: '' },
+      antagonistPressure: '',
+      relationshipWeb: [],
+      midpointReversal: '',
+      bossTruth: '',
+      recurringMotifs: { object: '', place: '', phrase: '', sensory: '' }
+    },
+    gameLayer: {
+      coreLoop: '',
+      persistentTopology: '',
+      majorZones: [],
+      gatesAndKeys: [],
+      persistentPressures: [],
+      companionSurfaces: [],
+      revisitLogic: '',
+      bossConvergence: ''
+    },
+    governingLayer: {
+      institutionName: '',
+      departments: [],
+      proceduresThatAffectPlay: [],
+      recordsAndForms: [],
+      documentVoiceRules: []
+    },
+    designPrinciples: []
+  }, null, 2);
+
+  var STAGE2_OUTPUT_SCHEMA = JSON.stringify({
+    topology: {
+      mainMap: '',
+      zones: [],
+      persistentLocks: [],
+      shortcuts: [],
+      pressureCircuits: []
+    },
+    weeks: [
+      {
+        weekNumber: 1,
+        zoneFocus: '',
+        mapReuse: 'full',
+        stateChange: '',
+        newGateOrUnlock: '',
+        weeklyComponentMeaning: '',
+        oraclePressure: '',
+        fragmentFunction: '',
+        governingProcedure: '',
+        companionChange: '',
+        isBossWeek: false,
+        isBinaryChoiceWeek: false,
+        sessionBeatTypes: []
+      }
+    ],
+    bossPlan: {
+      decodeLogic: '',
+      whyItFeelsEarned: '',
+      requiredPriorKnowledge: []
+    }
+  }, null, 2);
+
+  window.generateStage1Prompt = function (workout, brief, dice) {
+    var blend = deriveDesignBlend(brief, workout);
+    var parts = [
+      '# Stage 1 — Layer Bible',
+      '',
+      'You are architecting a LiftRPG print-and-play zine. This is planning only.',
+      'Do not output the final booklet JSON. Return the compact layer bible JSON only.',
+      '',
+      '## Your Goal',
+      'Build a three-layer structural foundation that will govern all later compile decisions.',
+      '',
+      '### Story Layer',
+      'Define: core premise, protagonist (role, want, flaw), antagonist pressure,',
+      'relationship web (intimate / institutional / unstable / ghostly),',
+      'midpoint reversal, boss truth, recurring motifs (object, place, phrase, sensory).',
+      '',
+      '### Game Layer',
+      'Define: the core game loop, one persistent topology reused across most non-boss weeks,',
+      'major zones with distinct mechanical identity, all gates and the keys that open them,',
+      'persistent pressures (clocks, heat, patrols, scarcity), companion surfaces managed',
+      'across the campaign, revisitation logic (how prior spaces become meaningful again),',
+      'and exactly what boss convergence requires from prior weeks.',
+      '',
+      '### Governing Layer',
+      'Define: institution name, departments, procedures that materially affect play',
+      '(what paperwork grants access, what inspection triggers alert, what records change board state),',
+      'recurring document types and their voice rules.',
+      '',
+      '## Hard Targets',
+      '- One persistent facility topology reused across most non-boss weeks.',
+      '- Player must reopen routes, learn pressure habits, gain access, revisit prior spaces, and combine clues.',
+      '- Boss decode pays off spatial mastery and institutional knowledge — not arbitrary substitution.',
+      '',
+      '## Anti-Patterns to Eliminate',
+      '- One-off maps that never recur.',
+      '- Story prompts that are mostly metaphorical lifting prose.',
+      '- Oracle entries that are only vibes instead of playable consequences.',
+      '- Governing material that is flavor instead of play-governing.',
+      '- Password logic that feels retrofitted.',
+      '',
+      '## Output Rules',
+      '- Return compact JSON only, matching the schema below exactly.',
+      '- No markdown fences, no explanation, no commentary.',
+      '- Stop after Stage 1.',
+      '',
+      '---',
+      '',
+      '# Your Inputs',
+      '',
+      '## Workout Programme',
+      '',
+      workout,
+      '',
+      '## Creative Direction',
+      '',
+      brief || buildDefaultBrief(workout, blend),
+      '',
+      formatDesignBias(blend),
+      '',
+      '## Dice Selection',
+      '',
+      dice,
+      '',
+      '---',
+      '',
+      '## Output Schema',
+      '',
+      STAGE1_OUTPUT_SCHEMA
+    ];
+    return parts.join('\n');
+  };
+
+  window.generateStage2Prompt = function (workout, brief, dice, layerBible) {
+    var weekCount = 6;
+    var match = workout.match(/(\d+)\s*weeks?\b/i);
+    if (match) { weekCount = Math.max(4, Math.min(12, parseInt(match[1], 10) || 6)); }
+    var midpoint = Math.ceil(weekCount / 2);
+    var minReuse = Math.max(weekCount - 2, 3);
+    var parts = [
+      '# Stage 2 — Campaign Plan',
+      '',
+      'Using the approved layer bible, generate the per-week campaign plan.',
+      'Do not output the final booklet JSON yet.',
+      '',
+      '## Approved Layer Bible',
+      '',
+      JSON.stringify(layerBible, null, 2),
+      '',
+      '## Campaign Plan Rules',
+      '- Use ' + weekCount + ' weeks to match the workout programme.',
+      '- At least ' + minReuse + ' non-boss weeks must reuse the same main topology.',
+      '  Set mapReuse to "full", "zoom", or "overlay" for those weeks.',
+      '- Week ' + midpoint + ' is the binary choice week (isBinaryChoiceWeek: true).',
+      '- Week ' + weekCount + ' is the boss week (isBossWeek: true).',
+      '- Each week must specify: zone focus, map state change, new gate or unlock,',
+      '  weekly component meaning, oracle pressure, fragment function,',
+      '  governing procedure, companion change, session beat types.',
+      '- The boss plan must explain exactly why the decode feels earned',
+      '  from prior spatial and institutional knowledge — not retrofitted.',
+      '',
+      '## Output Rules',
+      '- Return compact JSON only, matching the schema below exactly.',
+      '- No markdown fences, no explanation.',
+      '- Stop after Stage 2.',
+      '',
+      '---',
+      '',
+      '## Output Schema',
+      '',
+      STAGE2_OUTPUT_SCHEMA
+    ];
+    return parts.join('\n');
+  };
+
+  window.generateStage3Prompt = function (workout, brief, dice, layerBible, campaignPlan) {
+    var blend = deriveDesignBlend(brief, workout);
+    var STAGE3_POSTCHECKS = [
+      '',
+      '## Stage 3 Postchecks — enforce before outputting',
+      '- Oracle entries must use `text`, never `description`.',
+      '- Fragment oracle entries (type: "fragment") must include `fragmentRef`.',
+      '- Simple oracle tables need exactly 11 entries with roll values "2" through "12".',
+      '- `fieldOps.cipher.body` must be an object, not a string.',
+      '- `interlude.payloadType` must be one of: "none" | "narrative" | "cipher" | "map" | "clock" | "companion" | "fragment-ref" | "password-element".',
+      '- Verify every check before outputting. If any fails, fix it first.'
+    ].join('\n');
+
+    var parts = [
+      '# Stage 3 — Final Compile',
+      '',
+      'You have completed the layer bible and campaign plan.',
+      'Now compile the final LiftRPG booklet JSON.',
+      '',
+      '## Approved Layer Bible',
+      '',
+      JSON.stringify(layerBible, null, 2),
+      '',
+      '## Approved Campaign Plan',
+      '',
+      JSON.stringify(campaignPlan, null, 2),
+      '',
+      '## Structural Constraints',
+      '- The approved topology, zone definitions, gates, and governing procedures are the structural skeleton.',
+      '- The governing layer must appear in actual procedures, forms, inspections, and permissions — not flavor text.',
+      '- Each week\'s oracle, cipher, and fragment must align with its campaign plan entry.',
+      '- The boss decode must require exactly the prior spatial and institutional knowledge the plan specifies.',
+      '',
+      '---',
+      '',
+      SCHEMA_SPEC,
+      '',
+      '---',
+      '',
+      '# Your Inputs',
+      '',
+      '## Workout Programme',
+      '',
+      workout,
+      '',
+      '## Creative Direction',
+      '',
+      brief || buildDefaultBrief(workout, blend),
+      '',
+      formatDesignBias(blend),
+      '',
+      '## Dice Selection',
+      '',
+      dice,
+      'Tip: use only the selected dice and keep microplay pencil-fast.',
+      '',
+      '---',
+      '',
+      INSTRUCTIONS,
+      STAGE3_POSTCHECKS
+    ];
+    return parts.join('\n');
+  };
+
 })();

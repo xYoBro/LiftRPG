@@ -370,6 +370,118 @@ window.LiftRPGAPI = (function () {
     }
   }
 
+  // ── Provider dispatcher ────────────────────────────────────────────────────
+  // Unified dispatch used by both single-stage generate() and generateMultiStage().
+
+  async function callProvider(settings, prompt) {
+    if (settings.format === 'anthropic') {
+      return callAnthropic(settings.apiKey, settings.model, prompt);
+    }
+    return callOpenAICompat(settings.apiKey, settings.baseUrl, settings.model, prompt);
+  }
+
+  // ── Booklet schema postchecks ─────────────────────────────────────────────
+  // Returns array of human-readable error strings.
+
+  var VALID_PAYLOAD_TYPES = {
+    none:1, narrative:1, cipher:1, map:1, clock:1,
+    companion:1, 'fragment-ref':1, 'password-element':1
+  };
+
+  function validateBookletSchema(booklet) {
+    var errors = [];
+    (booklet.weeks || []).forEach(function (week, wi) {
+      var wn = 'Week ' + (wi + 1);
+      var fo = week.fieldOps || {};
+
+      // Oracle checks
+      var oracle = fo.oracleTable || fo.oracle || {};
+      var entries = oracle.entries || [];
+      entries.forEach(function (entry, ei) {
+        if (Object.prototype.hasOwnProperty.call(entry, 'description')) {
+          errors.push(wn + ' oracle[' + ei + ']: uses "description" — must be "text"');
+        }
+        if (entry.type === 'fragment' && !entry.fragmentRef) {
+          errors.push(wn + ' oracle[' + ei + ']: type "fragment" missing fragmentRef');
+        }
+      });
+      var mode = oracle.mode || (entries.length === 11 ? 'simple' : null);
+      if (mode === 'simple' && entries.length !== 11) {
+        errors.push(wn + ' simple oracle: has ' + entries.length + ' entries, needs 11 (rolls "2"–"12")');
+      }
+
+      // Cipher body must be an object
+      var cipher = fo.cipher || {};
+      if (cipher.body !== undefined && typeof cipher.body !== 'object') {
+        errors.push(wn + ' cipher.body: must be an object, got ' + (typeof cipher.body));
+      }
+
+      // Interlude payloadType
+      var interlude = week.interlude || {};
+      if (interlude.payloadType && !VALID_PAYLOAD_TYPES[interlude.payloadType]) {
+        errors.push(wn + ' interlude.payloadType: "' + interlude.payloadType + '" not supported');
+      }
+    });
+    return errors;
+  }
+
+  // ── Targeted patch prompt ─────────────────────────────────────────────────
+
+  function generatePatchPrompt(rawJson, errors) {
+    return [
+      '# Schema Patch',
+      '',
+      'The LiftRPG booklet JSON below has validation errors.',
+      'Return the corrected JSON only. Fix only the listed errors.',
+      'Do not rewrite or restructure anything else.',
+      '',
+      '## Errors',
+      errors.map(function (e) { return '- ' + e; }).join('\n'),
+      '',
+      '## JSON to Patch',
+      '',
+      rawJson
+    ].join('\n');
+  }
+
+  // ── Multi-stage generator ─────────────────────────────────────────────────
+
+  async function generateMultiStage(settings, workout, brief, dice, onProgress) {
+    if (typeof window.generateStage1Prompt !== 'function' ||
+        typeof window.generateStage2Prompt !== 'function' ||
+        typeof window.generateStage3Prompt !== 'function') {
+      throw new Error('Multi-stage generators not loaded. Please reload the page.');
+    }
+
+    onProgress('stage1', 'Building layer bible\u2026');
+    var raw1 = await callProvider(settings, window.generateStage1Prompt(workout, brief, dice));
+    var layerBible = extractJson(raw1);
+
+    onProgress('stage2', 'Planning your campaign\u2026');
+    var raw2 = await callProvider(settings, window.generateStage2Prompt(workout, brief, dice, layerBible));
+    var campaignPlan = extractJson(raw2);
+
+    onProgress('stage3', 'Compiling booklet\u2026');
+    var raw3 = await callProvider(settings, window.generateStage3Prompt(workout, brief, dice, layerBible, campaignPlan));
+    var booklet = extractJson(raw3);
+
+    onProgress('validating', 'Validating schema\u2026');
+    var errors = validateBookletSchema(booklet);
+    if (errors.length > 0) {
+      console.warn('[LiftRPG] Schema errors, requesting patch:', errors);
+      var label = errors.length === 1 ? '1 error' : errors.length + ' errors';
+      onProgress('patching', 'Patching ' + label + '\u2026');
+      var rawPatched = await callProvider(settings, generatePatchPrompt(JSON.stringify(booklet, null, 2), errors));
+      booklet = extractJson(rawPatched);
+      var remaining = validateBookletSchema(booklet);
+      if (remaining.length > 0) {
+        console.warn('[LiftRPG] Patch did not fully resolve errors:', remaining);
+      }
+    }
+
+    return booklet;
+  }
+
   // ── Public API ──────────────────────────────────────────────────────────────
 
   /**
@@ -399,5 +511,5 @@ window.LiftRPGAPI = (function () {
     return extractJson(raw);
   }
 
-  return { PROVIDERS: PROVIDERS, generate: generate, _extractJson: extractJson };
+  return { PROVIDERS: PROVIDERS, generate: generate, generateMultiStage: generateMultiStage, _extractJson: extractJson, _validateSchema: validateBookletSchema };
 })();

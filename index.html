@@ -770,6 +770,80 @@
       display: none;
     }
 
+    /* ── Generation depth toggle ── */
+    .gen-depth-toggle {
+      display: none;
+      margin-top: 14px;
+    }
+
+    .gen-depth-toggle.is-visible {
+      display: block;
+    }
+
+    .depth-btns {
+      display: flex;
+    }
+
+    .depth-btn {
+      flex: 1;
+      font-family: var(--mono);
+      font-size: 7pt;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--rule);
+      padding: 5px 10px;
+      cursor: pointer;
+      transition: background .12s, color .12s, border-color .12s;
+    }
+
+    .depth-btn:first-child {
+      border-right: none;
+    }
+
+    .depth-btn.active {
+      color: var(--paper);
+      background: var(--ink);
+      border-color: var(--ink);
+    }
+
+    .depth-btn:not(.active):hover {
+      color: var(--ink);
+      border-color: var(--ink);
+    }
+
+    .depth-note {
+      font-size: 6pt;
+      letter-spacing: .04em;
+      color: var(--muted);
+      margin: 5px 0 0;
+    }
+
+    /* ── Stage progress pips ─── */
+    .stage-steps {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .stage-steps.is-hidden {
+      display: none;
+    }
+
+    .stage-pip {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--rule);
+      flex-shrink: 0;
+      transition: background .25s;
+    }
+
+    .stage-pip.done   { background: var(--ink); }
+    .stage-pip.active { background: var(--accent); }
+
     /* ── Responsive ────────────────── */
     @media (max-width:520px) {
       .card {
@@ -910,6 +984,16 @@
         <input type="password" id="api-key" class="api-input" placeholder="API Key" autocomplete="off">
         <label class="field-label" for="api-model">Model</label>
         <input type="text" id="api-model" class="api-input" placeholder="Model name">
+
+        <!-- Generation depth toggle -->
+        <div class="gen-depth-toggle" id="gen-depth-toggle">
+          <label class="field-label" style="margin-top:14px">Generation</label>
+          <div class="depth-btns">
+            <button class="depth-btn active" type="button" data-depth="standard">Standard</button>
+            <button class="depth-btn" type="button" data-depth="deep">Deep</button>
+          </div>
+          <p class="depth-note">Deep: 3-stage pipeline &mdash; more coherent output, 3&times; API calls</p>
+        </div>
       </div>
 
       <button class="gen-submit" id="gen-submit" type="button">Generate Prompt</button>
@@ -924,9 +1008,15 @@
 
       <!-- API output section -->
       <div class="api-output-section" id="api-output-section">
+        <div class="stage-steps is-hidden" id="stage-steps">
+          <div class="stage-pip" id="pip-1"></div>
+          <div class="stage-pip" id="pip-2"></div>
+          <div class="stage-pip" id="pip-3"></div>
+          <div class="stage-pip" id="pip-4"></div>
+        </div>
         <div class="api-progress" id="api-progress">
           <div class="spinner"></div>
-          <span class="api-status-text">Generating your booklet&hellip;</span>
+          <span class="api-status-text" id="api-status-text">Generating your booklet&hellip;</span>
         </div>
         <span class="api-error-text is-hidden" id="api-error-text"></span>
         <button class="gen-copy" id="api-open-btn" type="button" style="display:none">Open Booklet &rarr;</button>
@@ -1006,6 +1096,19 @@
       var apiProgress = document.getElementById('api-progress');
       var apiErrorText = document.getElementById('api-error-text');
       var apiOpenBtn = document.getElementById('api-open-btn');
+      var apiStatusText = document.getElementById('api-status-text');
+      var stageSteps = document.getElementById('stage-steps');
+      var stagePips = [
+        document.getElementById('pip-1'),
+        document.getElementById('pip-2'),
+        document.getElementById('pip-3'),
+        document.getElementById('pip-4')
+      ];
+
+      // Depth toggle
+      var genDepthToggle = document.getElementById('gen-depth-toggle');
+      var depthBtns = document.querySelectorAll('.depth-btn');
+      var currentDepth = 'standard';
 
       // API settings fields
       var apiProviderEl = document.getElementById('api-provider');
@@ -1025,10 +1128,12 @@
         });
         if (mode === 'api') {
           apiSettings.classList.add('is-visible');
+          genDepthToggle.classList.add('is-visible');
           submitBtn.textContent = 'Generate Booklet';
           outputSection.classList.remove('is-visible');
         } else {
           apiSettings.classList.remove('is-visible');
+          genDepthToggle.classList.remove('is-visible');
           submitBtn.textContent = 'Generate Prompt';
           apiOutputSection.classList.remove('is-visible');
         }
@@ -1036,6 +1141,13 @@
 
       modeBtns.forEach(function (btn) {
         btn.addEventListener('click', function () { switchMode(btn.dataset.mode); });
+      });
+
+      depthBtns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          currentDepth = btn.dataset.depth;
+          depthBtns.forEach(function (b) { b.classList.toggle('active', b.dataset.depth === currentDepth); });
+        });
       });
 
       // ── API settings: load / save / provider change ───────────────────────
@@ -1198,22 +1310,53 @@
 
         saveAPISettings();
 
-        // Show progress state
+        var isDeep = (currentDepth === 'deep');
+
+        // Show progress
         apiOutputSection.classList.add('is-visible');
         apiProgress.classList.remove('is-hidden');
         apiErrorText.classList.add('is-hidden');
         apiOpenBtn.style.display = 'none';
         submitBtn.disabled = true;
 
-        window.LiftRPGAPI.generate(settings, workout, brief, dice)
+        // Stage pips (deep mode only)
+        stageSteps.classList.toggle('is-hidden', !isDeep);
+        if (isDeep) {
+          stagePips.forEach(function (p) { p.className = 'stage-pip'; });
+          stagePips[0].classList.add('active');
+          apiStatusText.textContent = 'Building layer bible…';
+        } else {
+          apiStatusText.textContent = 'Generating your booklet…';
+        }
+
+        function onProgress(stage, message) {
+          apiStatusText.textContent = message;
+          if (!isDeep) return;
+          var order = { stage1: 0, stage2: 1, stage3: 2, validating: 3, patching: 3 };
+          var idx = (stage in order) ? order[stage] : -1;
+          if (idx >= 0) {
+            stagePips.forEach(function (p, i) {
+              p.className = 'stage-pip' + (i < idx ? ' done' : i === idx ? ' active' : '');
+            });
+          }
+        }
+
+        var generateFn = isDeep
+          ? function () { return window.LiftRPGAPI.generateMultiStage(settings, workout, brief, dice, onProgress); }
+          : function () { return window.LiftRPGAPI.generate(settings, workout, brief, dice); };
+
+        generateFn()
           .then(function (data) {
             sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(data));
+            if (isDeep) { stagePips.forEach(function (p) { p.className = 'stage-pip done'; }); }
             apiProgress.classList.add('is-hidden');
+            stageSteps.classList.add('is-hidden');
             apiOpenBtn.style.display = '';
           })
           .catch(function (err) {
             console.error('[LiftRPG API]', err);
             apiProgress.classList.add('is-hidden');
+            stageSteps.classList.add('is-hidden');
             showAPIError(err.message || 'Generation failed. Check the console for details.');
           })
           .finally(function () {
