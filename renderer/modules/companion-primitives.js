@@ -1,9 +1,9 @@
-import { make } from './dom.js?v=44';
-import { createBoundedPage } from './page-shell.js?v=44';
+import { make } from './dom.js?v=46';
+import { createBoundedPage } from './page-shell.js?v=46';
 import {
   renderCompanionComponent,
   renderGameplayClocks
-} from './field-ops-primitives.js?v=44';
+} from './field-ops-primitives.js?v=46';
 
 export function renderCompanionSpreadPage(model) {
   const scaffold = createBoundedPage(model.pageType, 'companion-page', {

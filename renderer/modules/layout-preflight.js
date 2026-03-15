@@ -1,11 +1,11 @@
-import { make } from './dom.js?v=44';
+import { make } from './dom.js?v=46';
 import {
   planBookletLayout,
   revisePlanForMeasurement
-} from './layout-governor.js?v=44';
-import { buildPages } from './page-builders.js?v=44';
-import { getPageBoundary, getPageFrame } from './page-shell.js?v=44';
-import { setPageNumbers } from './pagination.js?v=44';
+} from './layout-governor.js?v=46';
+import { buildPages } from './page-builders.js?v=46';
+import { getPageBoundary, getPageFrame } from './page-shell.js?v=46';
+import { setPageNumbers } from './pagination.js?v=46';
 
 const MAX_LAYOUT_PASSES = 48;
 const OVERFLOW_TOLERANCE_PX = 2;

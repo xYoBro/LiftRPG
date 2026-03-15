@@ -1,4 +1,4 @@
-import { make } from './dom.js?v=44';
+import { make } from './dom.js?v=46';
 
 export function createBoundedPage(pageType, frameClass, options = {}) {
   const pageClasses = ['booklet-page'];

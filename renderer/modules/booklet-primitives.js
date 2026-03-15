@@ -1,15 +1,15 @@
-import { make } from './dom.js?v=44';
-import { splitRichText } from './booklet-models.js?v=44';
-import { buildClockModels, buildCompanionModels } from './field-ops-models.js?v=44';
-import { createBoundedPage } from './page-shell.js?v=44';
-import { sanitizeHtml, sanitizeSvg } from './utils.js?v=44';
+import { make } from './dom.js?v=46';
+import { splitRichText } from './booklet-models.js?v=46';
+import { buildClockModels, buildCompanionModels } from './field-ops-models.js?v=46';
+import { createBoundedPage } from './page-shell.js?v=46';
+import { sanitizeHtml, sanitizeSvg } from './utils.js?v=46';
 import {
   renderCipherSection,
   renderCompanionComponent,
   renderGameplayClocks,
   renderMapSection
-} from './field-ops-primitives.js?v=44';
-import { inferCipherFamily, inferMapFamily } from './mechanic-registry.js?v=44';
+} from './field-ops-primitives.js?v=46';
+import { inferCipherFamily, inferMapFamily } from './mechanic-registry.js?v=46';
 
 function renderCoverArt(model) {
   const source = String(model.coverArt || '').trim();

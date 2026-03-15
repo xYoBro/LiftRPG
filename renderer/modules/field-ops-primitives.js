@@ -1,5 +1,5 @@
-import { make } from './dom.js?v=44';
-import { createBoundedPage } from './page-shell.js?v=44';
+import { make } from './dom.js?v=46';
+import { createBoundedPage } from './page-shell.js?v=46';
 
 function polarPoint(cx, cy, radius, angleDegrees) {
   const radians = (angleDegrees - 90) * (Math.PI / 180);

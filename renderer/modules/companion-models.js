@@ -1,6 +1,6 @@
-import { pad2 } from './utils.js?v=44';
-import { buildClockModels, buildCompanionModels } from './field-ops-models.js?v=44';
-import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=44';
+import { pad2 } from './utils.js?v=46';
+import { buildClockModels, buildCompanionModels } from './field-ops-models.js?v=46';
+import { resolveWeekMechanicProfile } from './mechanic-registry.js?v=46';
 
 function componentWeight(component) {
   const footprint = String((component && component.footprint) || 'half-page').trim().toLowerCase();

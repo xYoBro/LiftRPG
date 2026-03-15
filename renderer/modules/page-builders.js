@@ -1,7 +1,7 @@
-import { make } from './dom.js?v=44';
-import { getPageAtom } from './atom-registry.js?v=44';
-import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=44';
-import { createBoundedPage } from './page-shell.js?v=44';
+import { make } from './dom.js?v=46';
+import { getPageAtom } from './atom-registry.js?v=46';
+import { normalizeBookletPlan, planBookletLayout, planWorkoutPageLayout } from './layout-governor.js?v=46';
+import { createBoundedPage } from './page-shell.js?v=46';
 import {
   buildAssemblyPageModelWithVariant,
   buildBackCoverModel,
@@ -13,7 +13,7 @@ import {
   buildRulesLeftPageModelWithVariant,
   buildSealedPageModel,
   buildUnlockedEndingPageModel
-} from './booklet-models.js?v=44';
+} from './booklet-models.js?v=46';
 import {
   renderAssemblyPage,
   renderBackCover,
@@ -25,16 +25,16 @@ import {
   renderRulesLeftPage,
   renderSealedPage,
   renderUnlockedEndingPage
-} from './booklet-primitives.js?v=44';
-import { buildDocumentPageModel } from './document-models.js?v=44';
-import { renderDocumentPage } from './document-primitives.js?v=44';
-import { buildCompanionSpreadPageModels } from './companion-models.js?v=44';
-import { renderCompanionSpreadPage } from './companion-primitives.js?v=44';
-import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=44';
-import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=44';
-import { buildWorkoutPageModel } from './workout-models.js?v=44';
-import { renderWorkoutCard } from './workout-primitives.js?v=44';
-import { pad2 } from './utils.js?v=44';
+} from './booklet-primitives.js?v=46';
+import { buildDocumentPageModel } from './document-models.js?v=46';
+import { renderDocumentPage } from './document-primitives.js?v=46';
+import { buildCompanionSpreadPageModels } from './companion-models.js?v=46';
+import { renderCompanionSpreadPage } from './companion-primitives.js?v=46';
+import { buildBossPageModel, buildFieldOpsPageModels } from './field-ops-models.js?v=46';
+import { renderBossPage, renderFieldOpsPage } from './field-ops-primitives.js?v=46';
+import { buildWorkoutPageModel } from './workout-models.js?v=46';
+import { renderWorkoutCard } from './workout-primitives.js?v=46';
+import { pad2 } from './utils.js?v=46';
 
 function buildWorkoutPage(data, week, entry) {
   const sessions = entry.sessions || [];
