@@ -1145,7 +1145,7 @@
           <span class="api-status-text" id="api-status-text">Generating your booklet&hellip;</span>
         </div>
         <span class="api-error-text is-hidden" id="api-error-text"></span>
-        <button class="gen-copy" id="api-open-btn" type="button" style="display:none">Open Booklet &rarr;</button>
+        <button class="gen-copy" id="api-open-btn" type="button" style="display:none">Download JSON</button>
       </div>
     </div>
   </div>
@@ -1662,7 +1662,15 @@
       }
 
       apiOpenBtn.addEventListener('click', function () {
-        window.open('renderer/?source=session', '_blank');
+        var raw = sessionStorage.getItem('liftrpg_pending_json');
+        if (!raw) return;
+        var blob = new Blob([raw], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'liftrpg-booklet.json';
+        a.click();
+        URL.revokeObjectURL(url);
       });
 
       // ── Copy to clipboard (chat mode) ─────────────────────────────────────
