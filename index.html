@@ -772,12 +772,8 @@
 
     /* ── Generation depth toggle ── */
     .gen-depth-toggle {
-      display: none;
-      margin-top: 14px;
-    }
-
-    .gen-depth-toggle.is-visible {
       display: block;
+      margin-top: 14px;
     }
 
     .depth-btns {
@@ -843,6 +839,88 @@
 
     .stage-pip.done   { background: var(--ink); }
     .stage-pip.active { background: var(--accent); }
+
+    /* ── Chat deep wizard ─── */
+    .chat-wizard {
+      display: none;
+      margin-top: 18px;
+      border-top: 1px solid var(--rule);
+      padding-top: 14px;
+    }
+
+    .chat-wizard.is-visible {
+      display: block;
+    }
+
+    .wizard-step-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .wizard-num {
+      font-family: var(--mono);
+      font-size: 6pt;
+      letter-spacing: .2em;
+      color: var(--paper);
+      background: var(--muted);
+      width: 18px;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background .2s;
+    }
+
+    .wizard-num.active { background: var(--accent); }
+    .wizard-num.done   { background: var(--ink); }
+
+    .wizard-step-label {
+      font-family: var(--mono);
+      font-size: 6pt;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .wizard-step-label.active { color: var(--accent); }
+    .wizard-step-label.done   { color: var(--ink); }
+
+    .wizard-divider {
+      flex: 1;
+      height: 1px;
+      background: var(--rule);
+    }
+
+    .wizard-pane {
+      display: none;
+    }
+
+    .wizard-pane.is-visible {
+      display: block;
+    }
+
+    .wizard-hint {
+      font-family: var(--mono);
+      font-size: 6pt;
+      letter-spacing: .04em;
+      color: var(--muted);
+      margin: 0 0 8px;
+      line-height: 1.6;
+    }
+
+    .wizard-error {
+      display: none;
+      font-family: var(--mono);
+      font-size: 6pt;
+      letter-spacing: .04em;
+      color: var(--accent);
+      margin-top: 4px;
+    }
+
+    .wizard-error.is-visible { display: block; }
 
     /* ── Responsive ────────────────── */
     @media (max-width:520px) {
@@ -984,16 +1062,16 @@
         <input type="password" id="api-key" class="api-input" placeholder="API Key" autocomplete="off">
         <label class="field-label" for="api-model">Model</label>
         <input type="text" id="api-model" class="api-input" placeholder="Model name">
+      </div>
 
-        <!-- Generation depth toggle -->
-        <div class="gen-depth-toggle" id="gen-depth-toggle">
-          <label class="field-label" style="margin-top:14px">Generation</label>
-          <div class="depth-btns">
-            <button class="depth-btn active" type="button" data-depth="standard">Standard</button>
-            <button class="depth-btn" type="button" data-depth="deep">Deep</button>
-          </div>
-          <p class="depth-note">Deep: 3-stage pipeline &mdash; more coherent output, 3&times; API calls</p>
+      <!-- Generation depth (shown in both Chat and API modes) -->
+      <div class="gen-depth-toggle" id="gen-depth-toggle">
+        <label class="field-label">Generation</label>
+        <div class="depth-btns">
+          <button class="depth-btn active" type="button" data-depth="standard">Standard</button>
+          <button class="depth-btn" type="button" data-depth="deep">Deep</button>
         </div>
+        <p class="depth-note">Deep: 3-stage pipeline &mdash; more coherent, larger token budget</p>
       </div>
 
       <button class="gen-submit" id="gen-submit" type="button">Generate Prompt</button>
@@ -1004,6 +1082,54 @@
         <textarea id="gen-output" class="gen-input gen-output" rows="10" readonly></textarea>
         <button class="gen-copy" id="gen-copy" type="button">Copy to Clipboard</button>
         <p class="gen-hint">Paste into Claude, ChatGPT, or Gemini. Upload the JSON result to Render.</p>
+      </div>
+
+      <!-- Chat deep wizard (3-step) -->
+      <div class="chat-wizard" id="chat-wizard">
+
+        <!-- Step indicator -->
+        <div class="wizard-step-row">
+          <div class="wizard-num active" id="wiz-num-1">1</div>
+          <span class="wizard-step-label active" id="wiz-label-1">Layer Bible</span>
+          <div class="wizard-divider"></div>
+          <div class="wizard-num" id="wiz-num-2">2</div>
+          <span class="wizard-step-label" id="wiz-label-2">Campaign</span>
+          <div class="wizard-divider"></div>
+          <div class="wizard-num" id="wiz-num-3">3</div>
+          <span class="wizard-step-label" id="wiz-label-3">Compile</span>
+        </div>
+
+        <!-- Pane 1: Layer Bible -->
+        <div class="wizard-pane is-visible" id="wiz-pane-1">
+          <p class="wizard-hint">Copy &rarr; paste into your LLM &rarr; copy the JSON result back below</p>
+          <textarea id="wiz-prompt-1" class="gen-input gen-output" rows="8" readonly></textarea>
+          <button class="gen-copy" id="wiz-copy-1" type="button">Copy Prompt</button>
+          <label class="field-label" for="wiz-result-1" style="margin-top:14px">Paste Layer Bible Result</label>
+          <textarea id="wiz-result-1" class="gen-input" rows="5"
+            placeholder='{"storyLayer":{...},"gameLayer":{...},"governingLayer":{...}}'></textarea>
+          <div class="wizard-error" id="wiz-error-1">Invalid JSON &mdash; paste the raw JSON the LLM returned</div>
+          <button class="gen-submit" id="wiz-next-1" type="button" style="margin-top:12px">Next: Plan Campaign &rarr;</button>
+        </div>
+
+        <!-- Pane 2: Campaign Plan -->
+        <div class="wizard-pane" id="wiz-pane-2">
+          <p class="wizard-hint">Copy &rarr; paste into your LLM &rarr; copy the JSON result back below</p>
+          <textarea id="wiz-prompt-2" class="gen-input gen-output" rows="8" readonly></textarea>
+          <button class="gen-copy" id="wiz-copy-2" type="button">Copy Prompt</button>
+          <label class="field-label" for="wiz-result-2" style="margin-top:14px">Paste Campaign Plan Result</label>
+          <textarea id="wiz-result-2" class="gen-input" rows="5"
+            placeholder='{"topology":{...},"weeks":[...],"bossPlan":{...}}'></textarea>
+          <div class="wizard-error" id="wiz-error-2">Invalid JSON &mdash; paste the raw JSON the LLM returned</div>
+          <button class="gen-submit" id="wiz-next-2" type="button" style="margin-top:12px">Next: Compile Booklet &rarr;</button>
+        </div>
+
+        <!-- Pane 3: Final Compile -->
+        <div class="wizard-pane" id="wiz-pane-3">
+          <p class="wizard-hint">Copy &rarr; paste into your LLM &rarr; upload the JSON result in the Render tab</p>
+          <textarea id="wiz-prompt-3" class="gen-input gen-output" rows="10" readonly></textarea>
+          <button class="gen-copy" id="wiz-copy-3" type="button">Copy Final Prompt</button>
+        </div>
+
       </div>
 
       <!-- API output section -->
@@ -1110,6 +1236,39 @@
       var depthBtns = document.querySelectorAll('.depth-btn');
       var currentDepth = 'standard';
 
+      // Chat deep wizard
+      var chatWizard = document.getElementById('chat-wizard');
+      var wizPanes = [
+        document.getElementById('wiz-pane-1'),
+        document.getElementById('wiz-pane-2'),
+        document.getElementById('wiz-pane-3')
+      ];
+      var wizNums   = [
+        document.getElementById('wiz-num-1'),
+        document.getElementById('wiz-num-2'),
+        document.getElementById('wiz-num-3')
+      ];
+      var wizLabels = [
+        document.getElementById('wiz-label-1'),
+        document.getElementById('wiz-label-2'),
+        document.getElementById('wiz-label-3')
+      ];
+      var wizPrompts = [
+        document.getElementById('wiz-prompt-1'),
+        document.getElementById('wiz-prompt-2'),
+        document.getElementById('wiz-prompt-3')
+      ];
+      var wizResults = [
+        document.getElementById('wiz-result-1'),
+        document.getElementById('wiz-result-2')
+      ];
+      var wizErrors = [
+        document.getElementById('wiz-error-1'),
+        document.getElementById('wiz-error-2')
+      ];
+      var wizStep = 0; // 0-indexed current wizard step
+      var wizData = [null, null]; // parsed stage1 + stage2 results
+
       // API settings fields
       var apiProviderEl = document.getElementById('api-provider');
       var apiKeyEl = document.getElementById('api-key');
@@ -1128,15 +1287,13 @@
         });
         if (mode === 'api') {
           apiSettings.classList.add('is-visible');
-          genDepthToggle.classList.add('is-visible');
-          submitBtn.textContent = 'Generate Booklet';
           outputSection.classList.remove('is-visible');
+          chatWizard.classList.remove('is-visible');
         } else {
           apiSettings.classList.remove('is-visible');
-          genDepthToggle.classList.remove('is-visible');
-          submitBtn.textContent = 'Generate Prompt';
           apiOutputSection.classList.remove('is-visible');
         }
+        updateSubmitLabel();
       }
 
       modeBtns.forEach(function (btn) {
@@ -1147,6 +1304,7 @@
         btn.addEventListener('click', function () {
           currentDepth = btn.dataset.depth;
           depthBtns.forEach(function (b) { b.classList.toggle('active', b.dataset.depth === currentDepth); });
+          updateSubmitLabel();
         });
       });
 
@@ -1248,10 +1406,140 @@
       submitBtn.addEventListener('click', function () {
         if (currentMode === 'api') {
           handleAPIGenerate();
+        } else if (currentDepth === 'deep') {
+          handleChatDeepGenerate();
         } else {
           handleChatGenerate();
         }
       });
+
+      // ── Submit label ─────────────────────────────────────────────────────
+      function updateSubmitLabel() {
+        if (currentMode === 'api') {
+          submitBtn.textContent = 'Generate Booklet';
+        } else if (currentDepth === 'deep') {
+          submitBtn.textContent = 'Build Layer Bible →';
+        } else {
+          submitBtn.textContent = 'Generate Prompt';
+        }
+      }
+
+      // ── Wizard helpers ────────────────────────────────────────────────────
+      function wizSetStep(idx) {
+        wizStep = idx;
+        wizPanes.forEach(function (p, i) {
+          p.classList.toggle('is-visible', i === idx);
+        });
+        wizNums.forEach(function (n, i) {
+          n.className = 'wizard-num' + (i < idx ? ' done' : i === idx ? ' active' : '');
+        });
+        wizLabels.forEach(function (l, i) {
+          l.className = 'wizard-step-label' + (i < idx ? ' done' : i === idx ? ' active' : '');
+        });
+        wizPrompts[idx].scrollTop = 0;
+      }
+
+      function makeCopyHandler(textarea, btn, defaultLabel) {
+        return function () {
+          var text = textarea.value;
+          if (!text) return;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () {
+              btn.textContent = 'Copied';
+              setTimeout(function () { btn.textContent = defaultLabel; }, 2000);
+            });
+          } else {
+            textarea.select();
+            textarea.setSelectionRange(0, 99999);
+            try { document.execCommand('copy'); } catch (e) {}
+            btn.textContent = 'Copied';
+            setTimeout(function () { btn.textContent = defaultLabel; }, 2000);
+          }
+        };
+      }
+
+      document.getElementById('wiz-copy-1').addEventListener('click',
+        makeCopyHandler(wizPrompts[0], document.getElementById('wiz-copy-1'), 'Copy Prompt'));
+      document.getElementById('wiz-copy-2').addEventListener('click',
+        makeCopyHandler(wizPrompts[1], document.getElementById('wiz-copy-2'), 'Copy Prompt'));
+      document.getElementById('wiz-copy-3').addEventListener('click',
+        makeCopyHandler(wizPrompts[2], document.getElementById('wiz-copy-3'), 'Copy Final Prompt'));
+
+      document.getElementById('wiz-next-1').addEventListener('click', function () {
+        var raw = wizResults[0].value.trim();
+        wizErrors[0].classList.remove('is-visible');
+        if (!raw) { wizErrors[0].textContent = 'Paste the JSON the LLM returned'; wizErrors[0].classList.add('is-visible'); return; }
+        try {
+          wizData[0] = JSON.parse(raw);
+        } catch (e) {
+          // try extractJson if available
+          if (window.LiftRPGAPI && window.LiftRPGAPI._extractJson) {
+            try { wizData[0] = window.LiftRPGAPI._extractJson(raw); }
+            catch (e2) { wizErrors[0].textContent = 'Invalid JSON — paste the raw JSON the LLM returned'; wizErrors[0].classList.add('is-visible'); return; }
+          } else {
+            wizErrors[0].textContent = 'Invalid JSON — paste the raw JSON the LLM returned';
+            wizErrors[0].classList.add('is-visible'); return;
+          }
+        }
+        var workout = workoutEl.value.trim();
+        var brief = briefEl.value.trim();
+        var diceRadio = document.querySelector('input[name="gen-dice"]:checked');
+        var dice = diceRadio ? diceRadio.value : '2d6';
+        wizPrompts[1].value = window.generateStage2Prompt(workout, brief, dice, wizData[0]);
+        wizSetStep(1);
+      });
+
+      document.getElementById('wiz-next-2').addEventListener('click', function () {
+        var raw = wizResults[1].value.trim();
+        wizErrors[1].classList.remove('is-visible');
+        if (!raw) { wizErrors[1].textContent = 'Paste the JSON the LLM returned'; wizErrors[1].classList.add('is-visible'); return; }
+        try {
+          wizData[1] = JSON.parse(raw);
+        } catch (e) {
+          if (window.LiftRPGAPI && window.LiftRPGAPI._extractJson) {
+            try { wizData[1] = window.LiftRPGAPI._extractJson(raw); }
+            catch (e2) { wizErrors[1].textContent = 'Invalid JSON — paste the raw JSON the LLM returned'; wizErrors[1].classList.add('is-visible'); return; }
+          } else {
+            wizErrors[1].textContent = 'Invalid JSON — paste the raw JSON the LLM returned';
+            wizErrors[1].classList.add('is-visible'); return;
+          }
+        }
+        var workout = workoutEl.value.trim();
+        var brief = briefEl.value.trim();
+        var diceRadio = document.querySelector('input[name="gen-dice"]:checked');
+        var dice = diceRadio ? diceRadio.value : '2d6';
+        wizPrompts[2].value = window.generateStage3Prompt(workout, brief, dice, wizData[0], wizData[1]);
+        wizSetStep(2);
+      });
+
+      // ── Chat deep mode: start wizard ──────────────────────────────────────
+      function handleChatDeepGenerate() {
+        var workout = validateWorkout();
+        if (!workout) return;
+
+        if (typeof window.generateStage1Prompt !== 'function') {
+          outputEl.value = 'Generator unavailable. Please reload the page.';
+          outputSection.classList.add('is-visible');
+          return;
+        }
+
+        var brief = briefEl.value.trim();
+        var diceRadio = document.querySelector('input[name="gen-dice"]:checked');
+        var dice = diceRadio ? diceRadio.value : '2d6';
+
+        // Reset wizard state
+        wizData = [null, null];
+        wizResults[0].value = '';
+        wizResults[1].value = '';
+        wizErrors[0].classList.remove('is-visible');
+        wizErrors[1].classList.remove('is-visible');
+
+        wizPrompts[0].value = window.generateStage1Prompt(workout, brief, dice);
+        wizSetStep(0);
+
+        outputSection.classList.remove('is-visible');
+        chatWizard.classList.add('is-visible');
+      }
 
       // ── Chat mode: generate prompt ────────────────────────────────────────
       function handleChatGenerate() {
@@ -1268,6 +1556,7 @@
           return;
         }
 
+        chatWizard.classList.remove('is-visible');
         var prompt = window.generatePrompt(workout, brief, dice);
         outputEl.value = prompt;
         outputSection.classList.add('is-visible');
