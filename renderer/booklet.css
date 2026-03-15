@@ -3233,6 +3233,10 @@ body[data-demo-view="true"] .reader-unlock-hint{
   line-height:1.15;
 }
 
+#booklet-container[data-archetype="pastoral"]{
+  --accent:#8b2a2a;
+}
+
 #booklet-container[data-archetype="pastoral"] .page-boundary{
   inset:var(--page-live-top,0.3in) var(--page-live-right,0.3in) var(--page-live-bottom,0.28in) var(--page-live-left,0.3in);
 }

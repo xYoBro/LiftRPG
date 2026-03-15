@@ -2,12 +2,12 @@ import {
   getPasswordLength,
   pad2,
   splitParagraphs
-} from './utils.js?v=46';
+} from './utils.js?v=47';
 import {
   inferCipherFamily,
   inferMapFamily,
   resolveWeekMechanicProfile
-} from './mechanic-registry.js?v=46';
+} from './mechanic-registry.js?v=47';
 
 function splitKeyRows(text) {
   return String(text || '')

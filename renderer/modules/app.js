@@ -1,8 +1,8 @@
-import { decryptBlob, encryptBlob } from './crypto.js?v=46';
-import { qs } from './dom.js?v=46';
-import { exportBookletPdf } from './pdf-export.js?v=46';
-import { renderBooklet, syncLayoutMode } from './render.js?v=46';
-import { getDemoPassword, normalisePassword, validateBooklet } from './utils.js?v=46';
+import { decryptBlob, encryptBlob } from './crypto.js?v=47';
+import { qs } from './dom.js?v=47';
+import { exportBookletPdf } from './pdf-export.js?v=47';
+import { renderBooklet, syncLayoutMode } from './render.js?v=47';
+import { getDemoPassword, normalisePassword, validateBooklet } from './utils.js?v=47';
 
 const state = {
   data: null,
@@ -209,14 +209,14 @@ function loadJsonFile(file) {
 function candidateDemoPaths(name) {
   if (name === 'liftrpg-eastern-shore') {
     return [
-      '../content/liftrpg-eastern-shore.json',
-      '../liftrpg-eastern-shore.json'
+      '../liftrpg-eastern-shore.json',
+      '../content/liftrpg-eastern-shore.json'
     ];
   }
 
   return [
-    '../content/' + name + '.json',
-    '../' + name + '.json'
+    '../' + name + '.json',
+    '../content/' + name + '.json'
   ];
 }
 
