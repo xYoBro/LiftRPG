@@ -543,7 +543,7 @@
     '- Oracle tables must do more than point at flavor text. They should pressure routes, unlock documents, alter map states, or advance visible tracks.',
     '- If you use companion components, they must create tension, scarcity, or branching state, not just fill space.',
     '- High-value companion patterns: stress accumulation, usage die depletion, inventory crowding, linked clocks, route denial, and memory-slot overwrite pressure.',
-    '- If a week carries multiple heavy companion components or a full-page companion footprint, assume the renderer may allocate a dedicated companion spread rather than squeezing them under field ops.',
+    '- If a week carries multiple heavy companion components or a full-page companion footprint, assume the renderer will allocate extra tracker and companion state within the weekly right-hand surface rather than collapsing them into a token gesture.',
     '',
     '## Educational / Non-Fiction Mode',
     '- If the user asks for educational or non-fiction material, treat the booklet as a diegetic teaching artifact rather than forcing a fiction overlay.',
