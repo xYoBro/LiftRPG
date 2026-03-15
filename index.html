@@ -610,6 +610,166 @@
       margin-bottom: 0;
     }
 
+    /* ── Mode toggle (Chat / API) ─── */
+    .mode-toggle {
+      display: flex;
+      margin-top: 4px;
+      margin-bottom: 16px;
+    }
+
+    .mode-btn {
+      flex: 1;
+      font-family: var(--mono);
+      font-size: 7pt;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--rule);
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: background .12s, color .12s, border-color .12s;
+    }
+
+    .mode-btn:first-child {
+      border-right: none;
+    }
+
+    .mode-btn.active {
+      color: var(--paper);
+      background: var(--ink);
+      border-color: var(--ink);
+    }
+
+    .mode-btn:not(.active):hover {
+      color: var(--ink);
+      border-color: var(--ink);
+    }
+
+    /* ── API settings panel ──────── */
+    .api-settings {
+      display: none;
+      border-top: 1px solid var(--rule);
+      margin-top: 16px;
+      padding-top: 4px;
+    }
+
+    .api-settings.is-visible {
+      display: block;
+    }
+
+    .api-settings-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-top: 12px;
+    }
+
+    .api-settings-header .field-label {
+      margin-top: 0;
+      margin-bottom: 0;
+    }
+
+    .api-key-note {
+      font-size: 6pt;
+      letter-spacing: .04em;
+      color: var(--muted);
+    }
+
+    .api-select,
+    .api-input {
+      display: block;
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 8pt;
+      color: var(--ink);
+      background: transparent;
+      border: 1.5px solid var(--rule);
+      padding: 7px 10px;
+      transition: border-color .15s;
+      -webkit-appearance: none;
+      appearance: none;
+      box-sizing: border-box;
+    }
+
+    .api-select:focus,
+    .api-input:focus {
+      outline: none;
+      border-color: var(--ink);
+    }
+
+    .api-input::placeholder {
+      color: var(--muted);
+      opacity: .7;
+    }
+
+    .api-base-url-row {
+      display: none;
+    }
+
+    .api-base-url-row.is-visible {
+      display: block;
+    }
+
+    /* ── API output section ────────── */
+    .api-output-section {
+      display: none;
+      margin-top: 18px;
+      border-top: 1px solid var(--rule);
+      padding-top: 12px;
+    }
+
+    .api-output-section.is-visible {
+      display: block;
+    }
+
+    .api-progress {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+    }
+
+    .api-progress.is-hidden {
+      display: none;
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--rule);
+      border-top-color: var(--ink);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .api-status-text {
+      font-family: var(--mono);
+      font-size: 7pt;
+      letter-spacing: .06em;
+      color: var(--muted);
+    }
+
+    .api-error-text {
+      display: block;
+      font-family: var(--mono);
+      font-size: 7pt;
+      letter-spacing: .04em;
+      color: var(--accent);
+      padding: 6px 0;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .api-error-text.is-hidden {
+      display: none;
+    }
+
     /* ── Responsive ────────────────── */
     @media (max-width:520px) {
       .card {
@@ -700,6 +860,11 @@
       <div class="kicker">Prompt Generator</div>
       <div class="rule"></div>
 
+      <div class="mode-toggle">
+        <button class="mode-btn active" type="button" data-mode="chat">Chat</button>
+        <button class="mode-btn" type="button" data-mode="api">API</button>
+      </div>
+
       <label class="field-label" for="gen-workout">Workout Program</label>
       <textarea id="gen-workout" class="gen-input" rows="6"
         placeholder="Paste your Liftosaur Liftoscript export, or describe your program in plain text"></textarea>
@@ -722,18 +887,55 @@
         <div class="dice-tip">Tip: Google &ldquo;roll 2d6&rdquo; &mdash; works as dice if you have none</div>
       </fieldset>
 
-      <button class="gen-submit" id="gen-submit" type="button">Generate</button>
+      <!-- API settings (hidden in Chat mode) -->
+      <div class="api-settings" id="api-settings">
+        <div class="api-settings-header">
+          <span class="field-label">API Settings</span>
+          <span class="api-key-note">Key stored in your browser only</span>
+        </div>
+        <label class="field-label" for="api-provider">Provider</label>
+        <select id="api-provider" class="api-select">
+          <option value="anthropic">Claude (Anthropic)</option>
+          <option value="openai">OpenAI</option>
+          <option value="groq">Groq</option>
+          <option value="gemini">Google Gemini</option>
+          <option value="ollama">Ollama (local)</option>
+          <option value="custom">Custom (OpenAI-compatible)</option>
+        </select>
+        <div id="api-base-url-row" class="api-base-url-row">
+          <label class="field-label" for="api-base-url">Base URL</label>
+          <input type="url" id="api-base-url" class="api-input" placeholder="https://api.example.com/v1">
+        </div>
+        <label class="field-label" for="api-key">API Key</label>
+        <input type="password" id="api-key" class="api-input" placeholder="API Key" autocomplete="off">
+        <label class="field-label" for="api-model">Model</label>
+        <input type="text" id="api-model" class="api-input" placeholder="Model name">
+      </div>
 
+      <button class="gen-submit" id="gen-submit" type="button">Generate Prompt</button>
+
+      <!-- Chat output section -->
       <div class="gen-output-section" id="gen-output-section">
         <label class="field-label" for="gen-output">Your Prompt</label>
         <textarea id="gen-output" class="gen-input gen-output" rows="10" readonly></textarea>
         <button class="gen-copy" id="gen-copy" type="button">Copy to Clipboard</button>
         <p class="gen-hint">Paste into Claude, ChatGPT, or Gemini. Upload the JSON result to Render.</p>
       </div>
+
+      <!-- API output section -->
+      <div class="api-output-section" id="api-output-section">
+        <div class="api-progress" id="api-progress">
+          <div class="spinner"></div>
+          <span class="api-status-text">Generating your booklet&hellip;</span>
+        </div>
+        <span class="api-error-text is-hidden" id="api-error-text"></span>
+        <button class="gen-copy" id="api-open-btn" type="button" style="display:none">Open Booklet &rarr;</button>
+      </div>
     </div>
   </div>
 
   <script src="generator.js"></script>
+  <script src="generator/api-generator.js"></script>
   <script>
     (function () {
       var flipper = document.getElementById('card-flip');
@@ -785,6 +987,7 @@
   </script>
   <script>
     (function () {
+      // ── DOM refs ────────────────────────────────────────────────────────────
       var modal = document.getElementById('generator-modal');
       var openBtn = document.getElementById('open-generator');
       var closeBtn = document.getElementById('modal-close');
@@ -796,9 +999,100 @@
       var outputSection = document.getElementById('gen-output-section');
       var workoutError = document.getElementById('workout-error');
 
+      // Mode toggle
+      var modeBtns = document.querySelectorAll('.mode-btn');
+      var apiSettings = document.getElementById('api-settings');
+      var apiOutputSection = document.getElementById('api-output-section');
+      var apiProgress = document.getElementById('api-progress');
+      var apiErrorText = document.getElementById('api-error-text');
+      var apiOpenBtn = document.getElementById('api-open-btn');
+
+      // API settings fields
+      var apiProviderEl = document.getElementById('api-provider');
+      var apiKeyEl = document.getElementById('api-key');
+      var apiModelEl = document.getElementById('api-model');
+      var apiBaseUrlRow = document.getElementById('api-base-url-row');
+      var apiBaseUrlEl = document.getElementById('api-base-url');
+
+      var currentMode = 'chat';
+      var LS = 'liftrpg_api_';
+
+      // ── Mode switching ────────────────────────────────────────────────────
+      function switchMode(mode) {
+        currentMode = mode;
+        modeBtns.forEach(function (btn) {
+          btn.classList.toggle('active', btn.dataset.mode === mode);
+        });
+        if (mode === 'api') {
+          apiSettings.classList.add('is-visible');
+          submitBtn.textContent = 'Generate Booklet';
+          outputSection.classList.remove('is-visible');
+        } else {
+          apiSettings.classList.remove('is-visible');
+          submitBtn.textContent = 'Generate Prompt';
+          apiOutputSection.classList.remove('is-visible');
+        }
+      }
+
+      modeBtns.forEach(function (btn) {
+        btn.addEventListener('click', function () { switchMode(btn.dataset.mode); });
+      });
+
+      // ── API settings: load / save / provider change ───────────────────────
+      function updateProviderUI(provider) {
+        var isCustom = provider === 'custom';
+        var isOllama = provider === 'ollama';
+        apiBaseUrlRow.classList.toggle('is-visible', isCustom);
+        apiKeyEl.disabled = isOllama;
+        apiKeyEl.placeholder = isOllama ? 'No key needed for local models' : 'API Key';
+
+        // Update model to provider default when switching, unless user has typed something
+        var providerConfig = window.LiftRPGAPI && window.LiftRPGAPI.PROVIDERS[provider];
+        if (providerConfig) {
+          var otherDefaults = window.LiftRPGAPI
+            ? Object.values(window.LiftRPGAPI.PROVIDERS)
+                .filter(function (p) { return p !== providerConfig; })
+                .map(function (p) { return p.defaultModel; })
+            : [];
+          var currentModel = apiModelEl.value;
+          if (!currentModel || otherDefaults.indexOf(currentModel) !== -1) {
+            apiModelEl.value = providerConfig.defaultModel;
+          }
+        }
+      }
+
+      function loadAPISettings() {
+        var provider = localStorage.getItem(LS + 'provider') || 'anthropic';
+        apiProviderEl.value = provider;
+        apiKeyEl.value = localStorage.getItem(LS + 'key') || '';
+        apiBaseUrlEl.value = localStorage.getItem(LS + 'base_url') || '';
+        var savedModel = localStorage.getItem(LS + 'model') || '';
+        var providerConfig = window.LiftRPGAPI && window.LiftRPGAPI.PROVIDERS[provider];
+        apiModelEl.value = savedModel || (providerConfig ? providerConfig.defaultModel : '');
+        updateProviderUI(provider);
+      }
+
+      function saveAPISettings() {
+        localStorage.setItem(LS + 'provider', apiProviderEl.value);
+        localStorage.setItem(LS + 'key', apiKeyEl.value);
+        localStorage.setItem(LS + 'model', apiModelEl.value);
+        localStorage.setItem(LS + 'base_url', apiBaseUrlEl.value);
+      }
+
+      apiProviderEl.addEventListener('change', function () {
+        updateProviderUI(apiProviderEl.value);
+        saveAPISettings();
+      });
+
+      [apiKeyEl, apiModelEl, apiBaseUrlEl].forEach(function (el) {
+        el.addEventListener('change', saveAPISettings);
+      });
+
+      // ── Open / close ──────────────────────────────────────────────────────
       function openModal() {
         modal.classList.add('is-open');
         document.body.style.overflow = 'hidden';
+        if (window.LiftRPGAPI) loadAPISettings();
         workoutEl.focus();
       }
 
@@ -807,54 +1101,30 @@
         document.body.style.overflow = '';
       }
 
-      // Open
       openBtn.addEventListener('click', openModal);
       var howGenerate = document.getElementById('how-generate');
       if (howGenerate) howGenerate.addEventListener('click', function (e) { e.preventDefault(); openModal(); });
 
-      // Close: button, overlay click, escape
       closeBtn.addEventListener('click', closeModal);
-      modal.addEventListener('click', function (e) {
-        if (e.target === modal) closeModal();
-      });
+      modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
       document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && modal.classList.contains('is-open')) {
-          closeModal();
-        }
+        if (e.key === 'Escape' && modal.classList.contains('is-open')) closeModal();
       });
 
-      // Generate
-      submitBtn.addEventListener('click', function () {
+      // ── Validation ────────────────────────────────────────────────────────
+      function validateWorkout() {
         var workout = workoutEl.value.trim();
-        var brief = briefEl.value.trim();
-        var diceRadio = document.querySelector('input[name="gen-dice"]:checked');
-        var dice = diceRadio ? diceRadio.value : '2d6';
-
-        // Validate workout
         if (!workout) {
           workoutError.classList.add('is-visible');
           workoutEl.style.borderColor = 'var(--accent)';
           workoutEl.focus();
-          return;
+          return null;
         }
         workoutError.classList.remove('is-visible');
         workoutEl.style.borderColor = '';
+        return workout;
+      }
 
-        // Check generator loaded
-        if (typeof window.generatePrompt !== 'function') {
-          outputEl.value = 'Generator unavailable. Please reload the page.';
-          outputSection.classList.add('is-visible');
-          return;
-        }
-
-        // Assemble prompt
-        var prompt = window.generatePrompt(workout, brief, dice);
-        outputEl.value = prompt;
-        outputSection.classList.add('is-visible');
-        outputEl.scrollTop = 0;
-      });
-
-      // Clear error on input
       workoutEl.addEventListener('input', function () {
         if (workoutEl.value.trim()) {
           workoutError.classList.remove('is-visible');
@@ -862,15 +1132,114 @@
         }
       });
 
-      // Copy to clipboard
+      // ── Submit dispatch ───────────────────────────────────────────────────
+      submitBtn.addEventListener('click', function () {
+        if (currentMode === 'api') {
+          handleAPIGenerate();
+        } else {
+          handleChatGenerate();
+        }
+      });
+
+      // ── Chat mode: generate prompt ────────────────────────────────────────
+      function handleChatGenerate() {
+        var workout = validateWorkout();
+        if (!workout) return;
+
+        var brief = briefEl.value.trim();
+        var diceRadio = document.querySelector('input[name="gen-dice"]:checked');
+        var dice = diceRadio ? diceRadio.value : '2d6';
+
+        if (typeof window.generatePrompt !== 'function') {
+          outputEl.value = 'Generator unavailable. Please reload the page.';
+          outputSection.classList.add('is-visible');
+          return;
+        }
+
+        var prompt = window.generatePrompt(workout, brief, dice);
+        outputEl.value = prompt;
+        outputSection.classList.add('is-visible');
+        outputEl.scrollTop = 0;
+      }
+
+      // ── API mode: call provider, auto-load renderer ───────────────────────
+      function handleAPIGenerate() {
+        var workout = validateWorkout();
+        if (!workout) return;
+
+        if (!window.LiftRPGAPI) {
+          showAPIError('API generator unavailable. Please reload the page.');
+          return;
+        }
+
+        var brief = briefEl.value.trim();
+        var diceRadio = document.querySelector('input[name="gen-dice"]:checked');
+        var dice = diceRadio ? diceRadio.value : '2d6';
+
+        var provider = apiProviderEl.value;
+        var providerConfig = window.LiftRPGAPI.PROVIDERS[provider];
+        var settings = {
+          format: providerConfig ? providerConfig.format : 'openai',
+          apiKey: apiKeyEl.value.trim(),
+          model: apiModelEl.value.trim(),
+          baseUrl: provider === 'custom'
+            ? apiBaseUrlEl.value.trim()
+            : (providerConfig ? providerConfig.baseUrl : '')
+        };
+
+        if (!settings.model) {
+          showAPIError('Enter a model name to continue.');
+          return;
+        }
+        if (!settings.apiKey && !(providerConfig && providerConfig.noKey)) {
+          showAPIError('Enter an API key to continue.');
+          return;
+        }
+
+        saveAPISettings();
+
+        // Show progress state
+        apiOutputSection.classList.add('is-visible');
+        apiProgress.classList.remove('is-hidden');
+        apiErrorText.classList.add('is-hidden');
+        apiOpenBtn.style.display = 'none';
+        submitBtn.disabled = true;
+
+        window.LiftRPGAPI.generate(settings, workout, brief, dice)
+          .then(function (data) {
+            sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(data));
+            apiProgress.classList.add('is-hidden');
+            apiOpenBtn.style.display = '';
+          })
+          .catch(function (err) {
+            console.error('[LiftRPG API]', err);
+            apiProgress.classList.add('is-hidden');
+            showAPIError(err.message || 'Generation failed. Check the console for details.');
+          })
+          .finally(function () {
+            submitBtn.disabled = false;
+          });
+      }
+
+      function showAPIError(msg) {
+        apiOutputSection.classList.add('is-visible');
+        apiProgress.classList.add('is-hidden');
+        apiErrorText.textContent = msg;
+        apiErrorText.classList.remove('is-hidden');
+        apiOpenBtn.style.display = 'none';
+      }
+
+      apiOpenBtn.addEventListener('click', function () {
+        window.open('renderer/?source=session', '_blank');
+      });
+
+      // ── Copy to clipboard (chat mode) ─────────────────────────────────────
       copyBtn.addEventListener('click', function () {
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(outputEl.value).then(function () {
             copyBtn.textContent = 'Copied';
             setTimeout(function () { copyBtn.textContent = 'Copy to Clipboard'; }, 2000);
-          }, function () {
-            fallbackCopy();
-          });
+          }, fallbackCopy);
         } else {
           fallbackCopy();
         }
@@ -891,5 +1260,3 @@
     })();
   </script>
 </body>
-
-</html>

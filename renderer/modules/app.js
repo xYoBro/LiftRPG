@@ -579,6 +579,22 @@ export function initRendererApp() {
   syncLayoutMode(refs, state.layoutMode);
   refs.printBtn.disabled = true;
 
+  if (params.get('source') === 'session') {
+    const pending = sessionStorage.getItem('liftrpg_pending_json');
+    sessionStorage.removeItem('liftrpg_pending_json');
+    if (pending) {
+      let parsed;
+      try { parsed = JSON.parse(pending); } catch (e) {
+        setStatus('Generated JSON was invalid — could not load.', 'error');
+        return;
+      }
+      loadBooklet(parsed, 'Generated Booklet');
+    } else {
+      setStatus('No generated booklet found in session — it may have already been loaded.', 'error');
+    }
+    return;
+  }
+
   state.demoMode = !!params.get('demo');
   document.body.setAttribute('data-demo-mode', state.demoMode ? 'true' : 'false');
   state.demoPasswordRevealed = false;
