@@ -458,6 +458,33 @@ function attemptUnlock() {
     });
 }
 
+function autoEncryptAndLoad(data) {
+  const hasEndings = Array.isArray(data.endings) && data.endings.length > 0;
+  const plaintext = data.meta && data.meta.passwordPlaintext;
+  const alreadyEncrypted = data.meta && data.meta.passwordEncryptedEnding &&
+    data.meta.passwordEncryptedEnding.indexOf('PLACEHOLDER_') !== 0;
+
+  if (!hasEndings || !plaintext || alreadyEncrypted) {
+    loadBooklet(data, 'Generated Booklet');
+    return;
+  }
+
+  setStatus('Sealing ending…', 'neutral');
+  const password = normalisePassword(plaintext);
+  const payload = data.endings[0].content || data.endings[0];
+
+  encryptBlob(payload, password)
+    .then((blob) => {
+      data.meta.passwordEncryptedEnding = blob;
+      delete data.meta.passwordPlaintext;
+      data.endings = [];
+      loadBooklet(data, 'Generated Booklet');
+    })
+    .catch(() => {
+      loadBooklet(data, 'Generated Booklet');
+    });
+}
+
 function attemptEncrypt() {
   if (!state.data || !Array.isArray(state.data.endings) || !state.data.endings.length) {
     refs.encryptStatus.textContent = 'No endings available.';
@@ -588,7 +615,7 @@ export function initRendererApp() {
         setStatus('Generated JSON was invalid — could not load.', 'error');
         return;
       }
-      loadBooklet(parsed, 'Generated Booklet');
+      autoEncryptAndLoad(parsed);
     } else {
       setStatus('No generated booklet found in session — it may have already been loaded.', 'error');
     }
