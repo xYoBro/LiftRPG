@@ -14,6 +14,7 @@ const state = {
   demoPasswordRevealed: false,
   previewTarget: '',
   reviewMode: false,
+  auditConfig: null,
   pendingFontRenderToken: null
 };
 
@@ -36,9 +37,160 @@ function waitForPaint() {
   });
 }
 
+function parseAuditNumber(value, fallbackValue) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallbackValue;
+}
+
+function roundAuditPx(value) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return null;
+  return Math.round(value * 100) / 100;
+}
+
+function summarizeWeeklyAudit(config) {
+  const pages = [...refs.booklet.querySelectorAll('.booklet-page[data-page-number]')];
+  if (!pages.length || !window.__v2PageCount || pages.length !== window.__v2PageCount) {
+    return { status: 'pending' };
+  }
+  if (document.fonts && document.fonts.status !== 'loaded') {
+    return { status: 'pending' };
+  }
+
+  const failures = [];
+  const pageTypeCounts = {};
+  const weeklyPageTypes = new Set(['workout-left', 'field-ops', 'boss']);
+  const requiredPageTypes = Array.isArray(config.requiredPageTypes) ? config.requiredPageTypes : [];
+  const inspectPages = new Set(Array.isArray(config.inspectPages) ? config.inspectPages : []);
+  const inspectedPages = [];
+  let auditedPages = 0;
+
+  function fail(message) {
+    if (failures.length < 12) failures.push(message);
+  }
+
+  pages.forEach((page) => {
+    const pageNumber = Number(page.dataset.pageNumber || 0);
+    const pageType = page.getAttribute('data-page-type') || '';
+    pageTypeCounts[pageType] = (pageTypeCounts[pageType] || 0) + 1;
+
+    const frame = page.querySelector('.page-frame');
+    const footer = page.querySelector('.week-progress');
+    const footerDots = footer ? [...footer.querySelectorAll('.week-progress-dot')] : [];
+    const activeDots = footerDots.filter((dot) => dot.dataset.state === 'active');
+    const frameRect = frame ? frame.getBoundingClientRect() : null;
+    const footerRect = footer ? footer.getBoundingClientRect() : null;
+    const frameChildren = frame ? [...frame.children] : [];
+    const lastChild = frameChildren.length ? frameChildren[frameChildren.length - 1] : null;
+    const lastChildRect = lastChild ? lastChild.getBoundingClientRect() : null;
+
+    if (inspectPages.has(pageNumber)) {
+      const sessionCards = page.querySelector('.session-cards');
+      const sessionRect = sessionCards ? sessionCards.getBoundingClientRect() : null;
+      const mechanicContent = page.querySelector('.rp-content');
+      const mechanicRect = mechanicContent ? mechanicContent.getBoundingClientRect() : null;
+      inspectedPages.push({
+        pageNumber,
+        pageType,
+        footerBottomGapPx: (frameRect && footerRect) ? roundAuditPx(frameRect.bottom - footerRect.bottom) : null,
+        contentBottomGapPx: (frameRect && lastChildRect) ? roundAuditPx(frameRect.bottom - lastChildRect.bottom) : null,
+        workoutSlackPx: (sessionRect && footerRect) ? roundAuditPx(footerRect.top - sessionRect.bottom) : null,
+        mechanicSlackPx: (mechanicRect && footerRect) ? roundAuditPx(footerRect.top - mechanicRect.bottom) : null,
+        frameOverflowPx: frame ? Math.max(0, frame.scrollHeight - frame.clientHeight) : null,
+        sessionCardCount: page.querySelectorAll('.session-card').length,
+        cardCountAttr: frame ? Number(frame.getAttribute('data-card-count') || 0) : 0,
+        compaction: frame ? (frame.getAttribute('data-page-compaction') || '') : '',
+        dotCount: footerDots.length,
+        activeDotCount: activeDots.length,
+        textSample: String((frame ? frame.textContent : page.textContent) || '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 120)
+      });
+    }
+
+    if (!weeklyPageTypes.has(pageType)) return;
+
+    auditedPages += 1;
+
+    if (!footer) {
+      fail('page ' + page.dataset.pageNumber + ' (' + pageType + ') missing week footer');
+      return;
+    }
+
+    if (footerDots.length !== config.totalWeeks) {
+      fail('page ' + page.dataset.pageNumber + ' (' + pageType + ') has ' + footerDots.length + ' dots');
+    }
+    if (activeDots.length !== 1) {
+      fail('page ' + page.dataset.pageNumber + ' (' + pageType + ') has ' + activeDots.length + ' active dots');
+    }
+
+    if (frameRect && footerRect) {
+      const footerGap = frameRect.bottom - footerRect.bottom;
+      if (footerGap > config.maxFooterBottomGapPx) {
+        fail('page ' + page.dataset.pageNumber + ' (' + pageType + ') footer drifted ' + Math.round(footerGap * 100) / 100 + 'px');
+      }
+    }
+
+    if (pageType === 'workout-left') {
+      const sessionCards = page.querySelector('.session-cards');
+      const sessionRect = sessionCards ? sessionCards.getBoundingClientRect() : null;
+      const cardCountAttr = frame ? Number(frame.getAttribute('data-card-count') || 0) : 0;
+      const sessionCardCount = page.querySelectorAll('.session-card').length;
+      if (sessionCardCount !== cardCountAttr) {
+        fail('page ' + page.dataset.pageNumber + ' (workout-left) lost card-count metadata');
+      }
+      if (sessionRect && footerRect) {
+        const slack = footerRect.top - sessionRect.bottom;
+        if (slack > config.maxWorkoutSlackPx) {
+          fail('page ' + page.dataset.pageNumber + ' (workout-left) has ' + Math.round(slack * 100) / 100 + 'px of slack');
+        }
+      }
+    }
+
+    if (pageType === 'field-ops') {
+      const mechanicContent = page.querySelector('.rp-content');
+      const mechanicRect = mechanicContent ? mechanicContent.getBoundingClientRect() : null;
+      if (mechanicRect && footerRect) {
+        const slack = footerRect.top - mechanicRect.bottom;
+        if (slack > config.maxMechanicSlackPx) {
+          fail('page ' + page.dataset.pageNumber + ' (field-ops) has ' + Math.round(slack * 100) / 100 + 'px of slack');
+        }
+      }
+    }
+  });
+
+  requiredPageTypes.forEach((pageType) => {
+    if (!pageTypeCounts[pageType]) {
+      fail('missing page type ' + pageType);
+    }
+  });
+
+  return {
+    status: failures.length ? 'fail' : 'ok',
+    pageCount: pages.length,
+    auditedPages,
+    pageTypeCounts,
+    failures,
+    inspectedPages
+  };
+}
+
+function publishAuditStatus() {
+  if (!state.auditConfig) return;
+
+  const summary = summarizeWeeklyAudit(state.auditConfig);
+  if (summary.status === 'pending') {
+    document.title = 'LIFTRPG_AUDIT_PENDING';
+    return;
+  }
+
+  document.title = 'LIFTRPG_AUDIT:' + encodeURIComponent(JSON.stringify(summary));
+}
+
 function renderCurrentBooklet() {
   if (!state.data) return;
   renderBooklet(refs, state.layoutMode, state.data, state.unlockedEnding, setStatus);
+  publishAuditStatus();
   scrollPreviewTargetIntoView();
 }
 
@@ -76,7 +228,7 @@ function scrollPreviewTargetIntoView() {
   if (!target || target === '1') return;
 
   const selector = /^\d+$/.test(target)
-    ? '[data-page-index="' + target + '"]'
+    ? '[data-page-number="' + target + '"]'
     : '[data-page-type="' + target + '"]';
   const page = refs.booklet.querySelector(selector);
   if (!page) return;
@@ -402,8 +554,27 @@ export function initRendererApp() {
   state.previewTarget = params.get('page') || '';
   state.reviewMode = params.get('review') === '1';
   state.demoView = params.get('demoView') === '1';
+  state.auditConfig = params.get('audit') === 'weekly'
+    ? {
+      totalWeeks: Math.max(1, parseAuditNumber(params.get('auditTotalWeeks'), 1)),
+      maxFooterBottomGapPx: parseAuditNumber(params.get('auditMaxFooterGap'), 16),
+      maxWorkoutSlackPx: parseAuditNumber(params.get('auditMaxWorkoutSlack'), 24),
+      maxMechanicSlackPx: parseAuditNumber(params.get('auditMaxMechanicSlack'), 36),
+      inspectPages: String(params.get('auditInspectPages') || '')
+        .split(',')
+        .map((value) => parseInt(value.trim(), 10))
+        .filter((value) => Number.isInteger(value) && value > 0),
+      requiredPageTypes: String(params.get('auditRequirePageTypes') || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+    }
+    : null;
   document.body.setAttribute('data-review-mode', state.reviewMode ? 'true' : 'false');
   document.body.setAttribute('data-demo-view', state.demoView ? 'true' : 'false');
+  if (state.auditConfig) {
+    document.title = 'LIFTRPG_AUDIT_PENDING';
+  }
   refs.layoutMode.value = state.layoutMode;
   syncLayoutMode(refs, state.layoutMode);
   refs.printBtn.disabled = true;

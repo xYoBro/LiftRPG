@@ -101,7 +101,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         sequence: wi * 1000 + si,
         sizeHint: 'quarter-page',
         pageAffinity: 'left',
-        data: { session: sessions[si], weekIndex: wi, weekMeta: week, profile },
+        data: { session: sessions[si], weekIndex: wi, weekMeta: week, profile, totalWeeks },
       }));
     }
 
@@ -127,7 +127,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         sequence: wi * 1000 + 100,
         sizeHint: 'full-page',
         pageAffinity: 'right',
-        data: { week, data },
+        data: { week, data, weekIndex: wi, totalWeeks },
       }));
     } else {
       // Cipher panel
@@ -140,7 +140,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
           sequence: wi * 1000 + 100,
           sizeHint: 'quarter-page',
           pageAffinity: 'right',
-          data: { cipher: (week.fieldOps || {}).cipher || week.weeklyComponent, weekIndex: wi },
+          data: { cipher: (week.fieldOps || {}).cipher || week.weeklyComponent, weekIndex: wi, totalWeeks },
         }));
       }
 
@@ -154,7 +154,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
           sequence: wi * 1000 + 101,
           sizeHint: 'quarter-page',
           pageAffinity: 'right',
-          data: { oracle: week.fieldOps.oracleTable, weekIndex: wi },
+          data: { oracle: week.fieldOps.oracleTable, weekIndex: wi, totalWeeks },
         }));
       }
 
@@ -170,7 +170,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
           sequence: wi * 1000 + 102,
           sizeHint: mapHint,
           pageAffinity: 'right',
-          data: { map: week.fieldOps.mapState, weekIndex: wi },
+          data: { map: week.fieldOps.mapState, weekIndex: wi, totalWeeks },
         }));
       }
 
@@ -191,6 +191,8 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
               label: comp.title || 'Component',
               segments: (comp.tracks && comp.tracks[0] && comp.tracks[0].segments) || 6,
               startValue: (comp.tracks && comp.tracks[0] && comp.tracks[0].startValue) || 0,
+              weekIndex: wi,
+              totalWeeks,
             },
           }));
         }

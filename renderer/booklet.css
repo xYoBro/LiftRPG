@@ -1212,17 +1212,22 @@ body[data-demo-view="true"] #booklet-container{
 }
 
 .week-progress{
-  margin-top:8px;
+  margin-top:auto;
+  padding-top:8px;
   display:flex;
   align-items:center;
   gap:8px;
 }
 .workout-left[data-card-count="3"] .week-progress{
-  margin-top:6px;
+  padding-top:6px;
 }
 .workout-left[data-card-count="3"][data-page-compaction="4"] .week-progress,
 .workout-left[data-card-count="3"][data-page-compaction="5"] .week-progress{
-  margin-top:4px;
+  padding-top:4px;
+}
+.boss-right > .week-progress{
+  margin-top:8px;
+  padding-top:0;
 }
 
 .week-progress-dots{
