@@ -70,7 +70,7 @@ window.LiftRPGAPI = (function () {
       },
       body: JSON.stringify({
         model: model,
-        max_tokens: 16000,
+        max_tokens: 32000,
         messages: [{ role: 'user', content: prompt }]
       })
     });
@@ -86,6 +86,7 @@ window.LiftRPGAPI = (function () {
       throw new Error('Unexpected Anthropic response shape. Check the console.');
     }
 
+    window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = body.content[0].text);
     return body.content[0].text;
   }
 
@@ -99,7 +100,7 @@ window.LiftRPGAPI = (function () {
       headers: headers,
       body: JSON.stringify({
         model: model,
-        max_tokens: 16384,
+        max_tokens: 32768,
         messages: [{ role: 'user', content: prompt }]
       })
     });
@@ -115,6 +116,7 @@ window.LiftRPGAPI = (function () {
       throw new Error('Unexpected API response shape. Check the console.');
     }
 
+    window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = body.choices[0].message.content);
     return body.choices[0].message.content;
   }
 
@@ -282,9 +284,15 @@ window.LiftRPGAPI = (function () {
     } catch (e2) {
       console.error('[LiftRPG] Repair failed:', e2.message);
       console.log('[LiftRPG] Repaired JSON (first 500):', repaired.slice(0, 500));
+      console.log('[LiftRPG] Full raw length:', repaired.length, '— access window.LiftRPGAPI.lastRaw for full text');
       var msg = e2.message || '';
-      var isTruncated = msg.toLowerCase().indexOf('unterminated') !== -1
-        || msg.toLowerCase().indexOf('unexpected end') !== -1;
+      var msgL = msg.toLowerCase();
+      var isTruncated = msgL.indexOf('unterminated') !== -1
+        || msgL.indexOf('unexpected end') !== -1
+        || msgL.indexOf('unexpected eof') !== -1
+        || msgL.indexOf('end of file') !== -1
+        || msgL.indexOf("expected ']'") !== -1
+        || msgL.indexOf("expected '}'" ) !== -1;
       throw new Error(
         'Malformed JSON: ' + msg + '\n\n' +
         (isTruncated
@@ -323,5 +331,5 @@ window.LiftRPGAPI = (function () {
     return extractJson(raw);
   }
 
-  return { PROVIDERS: PROVIDERS, generate: generate };
+  return { PROVIDERS: PROVIDERS, generate: generate, _extractJson: extractJson };
 })();

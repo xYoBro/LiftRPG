@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LiftRPG JSON Repair Tester</title>
+<style>
+  body { font-family: monospace; background: #111; color: #ccc; margin: 0; padding: 20px; }
+  h1   { color: #fff; font-size: 1rem; margin: 0 0 12px; }
+  p    { color: #888; font-size: 0.8rem; margin: 0 0 12px; }
+  textarea { width: 100%; height: 260px; background: #1a1a1a; color: #aef; border: 1px solid #333;
+             padding: 10px; font-size: 0.8rem; box-sizing: border-box; resize: vertical; }
+  .row { display: flex; gap: 8px; margin: 8px 0; }
+  button { background: #2a6; color: #fff; border: none; padding: 8px 18px; cursor: pointer;
+           font-size: 0.85rem; border-radius: 4px; }
+  button:hover { background: #3b7; }
+  button.sec { background: #444; }
+  button.sec:hover { background: #555; }
+  #out { background: #1a1a1a; border: 1px solid #333; padding: 12px; margin-top: 12px;
+         min-height: 80px; white-space: pre-wrap; font-size: 0.78rem; word-break: break-all; }
+  .ok   { color: #4e4; }
+  .err  { color: #e44; }
+  .warn { color: #fa4; }
+  .dim  { color: #666; }
+  #stats { font-size: 0.75rem; color: #666; margin-top: 6px; }
+</style>
+</head>
+<body>
+<h1>LiftRPG — JSON Repair Tester</h1>
+<p>Paste raw LLM output (or broken JSON) below. No API calls — tests the repair logic from api-generator.js offline.</p>
+
+<textarea id="raw" placeholder="Paste raw LLM response here (markdown fences ok, prose ok)…"></textarea>
+
+<div class="row">
+  <button onclick="runRepair()">Run Repair</button>
+  <button class="sec" onclick="loadLast()">Load window.LiftRPGAPI.lastRaw</button>
+  <button class="sec" onclick="clearAll()">Clear</button>
+</div>
+
+<div id="stats"></div>
+<div id="out" class="dim">Output will appear here.</div>
+
+<script src="api-generator.js"></script>
+<script>
+function qs(id) { return document.getElementById(id); }
+
+function runRepair() {
+  var raw = qs('raw').value.trim();
+  if (!raw) { setOut('warn', 'Paste something first.'); return; }
+
+  var t0 = performance.now();
+  try {
+    var result = window.LiftRPGAPI._extractJson(raw);
+    var elapsed = (performance.now() - t0).toFixed(1);
+    qs('stats').textContent =
+      'Parsed in ' + elapsed + 'ms  |  ' +
+      'Keys at root: ' + Object.keys(result).join(', ');
+    setOut('ok', JSON.stringify(result, null, 2));
+  } catch (e) {
+    var elapsed = (performance.now() - t0).toFixed(1);
+    qs('stats').textContent = 'Failed in ' + elapsed + 'ms';
+    setOut('err', e.message);
+  }
+}
+
+function loadLast() {
+  var last = window.LiftRPGAPI && window.LiftRPGAPI.lastRaw;
+  if (!last) {
+    setOut('warn', 'window.LiftRPGAPI.lastRaw is empty.\n\nMake an API call from the generator first, then come back here.');
+    return;
+  }
+  qs('raw').value = last;
+  qs('stats').textContent = 'Loaded lastRaw (' + last.length + ' chars)';
+  setOut('dim', 'Raw response loaded — click Run Repair.');
+}
+
+function clearAll() {
+  qs('raw').value = '';
+  qs('stats').textContent = '';
+  setOut('dim', 'Output will appear here.');
+}
+
+function setOut(cls, text) {
+  var el = qs('out');
+  el.className = cls;
+  el.textContent = text;
+}
+
+// If opened from the generator tab in same session, auto-load
+if (window.LiftRPGAPI && window.LiftRPGAPI.lastRaw) {
+  loadLast();
+}
+</script>
+</body>
+</html>
