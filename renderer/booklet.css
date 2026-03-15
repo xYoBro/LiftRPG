@@ -1202,6 +1202,121 @@ body[data-demo-view="true"] #booklet-container{
 .workout-left[data-page-compaction="5"] .notes-box{
   padding:2px 6px;
 }
+.session-card[data-density-variant="compact"]{
+  padding:7px 9px 7px;
+  gap:2px;
+}
+.session-card[data-density-variant="compact"] .session-header{
+  font-size:6.8pt;
+  padding-bottom:3px;
+}
+.session-card[data-density-variant="compact"] .story-prompt{
+  font-size:7pt;
+  line-height:1.28;
+  padding:2px 0 2px 8px;
+}
+.session-card[data-density-variant="compact"] .exercise-table{
+  --exercise-row-gap-block:4px;
+  --exercise-row-padding-y:1px;
+  --exercise-track-gap:3px;
+}
+.session-card[data-density-variant="compact"] .exercise-name{
+  font-size:7.6pt;
+}
+.session-card[data-density-variant="compact"] .rep-box-target{
+  font-size:5.1pt;
+}
+.session-card[data-density-variant="compact"] .notes-box{
+  padding:2px 6px;
+}
+.session-card[data-density-variant="dense"]{
+  padding:5px 8px 5px;
+  gap:1px;
+}
+.session-card[data-density-variant="dense"] .session-header{
+  font-size:6.45pt;
+  padding-bottom:2px;
+}
+.session-card[data-density-variant="dense"] .story-prompt{
+  font-size:6.35pt;
+  line-height:1.2;
+  padding:1px 0 1px 7px;
+}
+.session-card[data-density-variant="dense"] .session-meta{
+  min-height:6px;
+}
+.session-card[data-density-variant="dense"] .session-fragment-ref{
+  font-size:6.3pt;
+}
+.session-card[data-density-variant="dense"] .session-body{
+  gap:2px;
+}
+.session-card[data-density-variant="dense"] .exercise-table{
+  --exercise-row-gap-block:3px;
+  --exercise-row-padding-y:1px;
+  --exercise-track-gap:2px;
+  --exercise-load-width:40px;
+  --rep-box-size:15px;
+}
+.session-card[data-density-variant="dense"] .exercise-name{
+  font-size:7.2pt;
+}
+.session-card[data-density-variant="dense"] .exercise-load-entry{
+  font-size:6.6pt;
+}
+.session-card[data-density-variant="dense"] .rep-boxes{
+  gap:3px;
+}
+.session-card[data-density-variant="dense"] .rep-box-target{
+  font-size:4.8pt;
+}
+.session-card[data-density-variant="dense"] .notes-box{
+  padding:1px 5px;
+}
+.session-card[data-density-variant="tight"]{
+  padding:4px 7px 4px;
+  gap:1px;
+}
+.session-card[data-density-variant="tight"] .session-header{
+  font-size:6.1pt;
+  padding-bottom:1px;
+}
+.session-card[data-density-variant="tight"] .story-prompt{
+  font-size:5.9pt;
+  line-height:1.14;
+  padding:1px 0 1px 6px;
+}
+.session-card[data-density-variant="tight"] .session-meta{
+  min-height:5px;
+}
+.session-card[data-density-variant="tight"] .session-fragment-ref{
+  font-size:6pt;
+}
+.session-card[data-density-variant="tight"] .session-body{
+  gap:1px;
+}
+.session-card[data-density-variant="tight"] .exercise-table{
+  --exercise-row-gap-block:2px;
+  --exercise-row-padding-y:0px;
+  --exercise-track-gap:2px;
+  --exercise-load-width:38px;
+  --rep-box-size:14px;
+}
+.session-card[data-density-variant="tight"] .exercise-name{
+  font-size:6.9pt;
+}
+.session-card[data-density-variant="tight"] .exercise-load-entry{
+  font-size:6.2pt;
+}
+.session-card[data-density-variant="tight"] .rep-boxes{
+  gap:2px;
+}
+.session-card[data-density-variant="tight"] .rep-box-target{
+  font-size:4.5pt;
+}
+.session-card[data-density-variant="tight"] .notes-box{
+  padding:1px 4px;
+}
 .workout-left[data-card-count="1"] .session-cards{
   flex:0 0 auto;
 }
@@ -3549,6 +3664,46 @@ body[data-demo-view="true"] .reader-unlock-hint{
   font-size:7pt;
   line-height:1.4;
   color:var(--ink);
+}
+.session-card[data-density-variant="dense"] .binary-choice{
+  padding-top:4px;
+}
+.session-card[data-density-variant="tight"] .binary-choice{
+  padding-top:3px;
+}
+.session-card[data-density-variant="dense"] .binary-choice-label{
+  font-size:6.2pt;
+  margin-bottom:3px;
+  line-height:1.2;
+}
+.session-card[data-density-variant="tight"] .binary-choice-label{
+  font-size:5.9pt;
+  margin-bottom:2px;
+  line-height:1.14;
+}
+.session-card[data-density-variant="dense"] .binary-choice-option{
+  gap:4px;
+  margin-bottom:2px;
+}
+.session-card[data-density-variant="tight"] .binary-choice-option{
+  gap:3px;
+  margin-bottom:2px;
+}
+.session-card[data-density-variant="dense"] .binary-choice-marker{
+  width:8px;
+  height:8px;
+}
+.session-card[data-density-variant="tight"] .binary-choice-marker{
+  width:7px;
+  height:7px;
+}
+.session-card[data-density-variant="dense"] .binary-choice-text{
+  font-size:6.1pt;
+  line-height:1.18;
+}
+.session-card[data-density-variant="tight"] .binary-choice-text{
+  font-size:5.8pt;
+  line-height:1.1;
 }
 .workout-left[data-card-count="2"] .binary-choice-text{
   font-size:6.4pt;

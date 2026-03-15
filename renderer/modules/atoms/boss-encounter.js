@@ -16,6 +16,43 @@ import { buildBossPageModel } from '../field-ops-models.js';
 import { renderBossPage } from '../field-ops-primitives.js';
 
 const FULL_PAGE_HEIGHT = 741;
+const BOSS_BASE_OVERFLOW = 38;
+const BOSS_MAX_SHRINK = 64;
+
+function bossContentWeight(week, bookletData) {
+  const model = buildBossPageModel(bookletData, week, 'standard');
+  const narrativeLen = (model.narrativeParagraphs || []).join(' ').length;
+  const mechanismLen = (model.mechanismParagraphs || []).join(' ').length;
+  const proofLen = (model.convergenceProofParagraphs || []).join(' ').length;
+  const branchLen = [
+    ((model.binaryChoiceAcknowledgement || {}).ifA || ''),
+    ((model.binaryChoiceAcknowledgement || {}).ifB || ''),
+  ].join(' ').length;
+  const tableLines = String(model.decodingTable || '').split('\n').filter(Boolean).length;
+  const componentCount = (model.componentInputs || []).length;
+
+  return Math.min(
+    1,
+    (narrativeLen + mechanismLen + proofLen + branchLen) / 1400
+      + tableLines * 0.04
+      + componentCount * 0.03,
+  );
+}
+
+function estimateBossHeight(data, density) {
+  const normalizedDensity = Number.isFinite(density) ? density : 0.6;
+  const week = (data || {}).week || {};
+  const bookletData = (data || {}).data || {};
+  const overflowAllowance = BOSS_BASE_OVERFLOW + bossContentWeight(week, bookletData) * 22;
+
+  return FULL_PAGE_HEIGHT + overflowAllowance - normalizedDensity * BOSS_MAX_SHRINK;
+}
+
+function bossLayoutVariant(density) {
+  if (density >= 0.75) return 'tight';
+  if (density >= 0.45) return 'dense';
+  return 'standard';
+}
 
 registerAtom('boss-encounter', {
   defaultSizeHint: 'full-page',
@@ -23,16 +60,20 @@ registerAtom('boss-encounter', {
   pageAffinity: 'right',
 
   estimate(data, density) {
-    return { minHeight: FULL_PAGE_HEIGHT, preferredHeight: FULL_PAGE_HEIGHT };
+    return {
+      minHeight: estimateBossHeight(data, 1.0),
+      preferredHeight: estimateBossHeight(data, density),
+    };
   },
 
   render(atom, density) {
     const data = atom.data || {};
     const week = data.week || {};
     const bookletData = data.data || {};
+    const layoutVariant = bossLayoutVariant(density);
 
     // buildBossPageModel(data, week, options)
-    const bossModel = buildBossPageModel(bookletData, week);
+    const bossModel = buildBossPageModel(bookletData, week, layoutVariant);
     return renderBossPage(bossModel);
   },
 });

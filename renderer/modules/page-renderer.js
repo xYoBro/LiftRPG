@@ -183,12 +183,13 @@ export function renderPageFromPlacements(placements, spreadType, planIndex) {
   }
 
   const primaryType = placements[0].type;
+  const pageType = primaryType === 'fragment-doc' ? 'fragment-page' : primaryType;
   const frameClass = primaryType === 'fragment-doc'
     ? 'fragment-page page-fragment-doc'
     : 'page-' + primaryType;
-  const pageClass = primaryType ? 'page-shell-' + primaryType : null;
+  const pageClass = pageType ? 'page-shell-' + pageType : null;
   const { page, frame } = createBoundedPage(
-    primaryType,
+    pageType,
     frameClass,
     { boundaryRole: spreadType, pageClass },
   );

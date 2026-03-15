@@ -15,6 +15,7 @@ const FOOTER_HEIGHT = 25;
 registerAtom('week-footer', {
   defaultSizeHint: 'minimal',
   canShare: true,
+  canSplitAway: false,
   pageAffinity: 'left',
 
   estimate() {

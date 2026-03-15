@@ -202,6 +202,8 @@ export function createAtom(partial) {
     type:         partial.type,
     id:           partial.id ?? null,
     group:        partial.group ?? null,
+    groupPolicy:  partial.groupPolicy ?? null,
+    mustOwnPage:  !!partial.mustOwnPage,
     section:      partial.section ?? null,
     sequence:     partial.sequence ?? 0,
     sizeHint:     partial.sizeHint ?? definition.defaultSizeHint,

@@ -134,12 +134,17 @@ export function resolvePageOverflow(pageAtoms, overflowPx, pageBudgetPx) {
 
   // ── Strategy 3: Split — move the last atom to a new spread ──────────
   if (pageAtoms.length > 1) {
-    const lastAtom = pageAtoms[pageAtoms.length - 1];
-    return {
-      resolved: false,
-      adjustments: [],
-      splitAtomId: lastAtom.atomId,
-    };
+    for (let index = pageAtoms.length - 1; index >= 0; index -= 1) {
+      const candidate = pageAtoms[index];
+      const definition = getAtomDefinition(candidate.type);
+      if (definition && definition.canSplitAway === false) continue;
+
+      return {
+        resolved: false,
+        adjustments: [],
+        splitAtomId: candidate.atomId,
+      };
+    }
   }
 
   // ── Strategy 4: Single atom exceeds page — flag unresolved ──────────

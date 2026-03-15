@@ -150,11 +150,116 @@ function createPlacement(atom, density = ESTIMATE_DENSITY) {
   };
 }
 
+function placementMustOwnPage(placement) {
+  const atom = placement && placement.atom ? placement.atom : null;
+  return !!(atom && atom.mustOwnPage);
+}
+
+function placementLocksPage(placement) {
+  if (!placement) return false;
+
+  const atom = placement.atom || {};
+  const definition = getAtomDefinition(placement.type);
+  return placementMustOwnPage(placement)
+    || atom.sizeHint === 'full-page'
+    || !(definition && definition.canShare);
+}
+
 /**
  * Sum estimated heights of placements on a page side.
  */
 function pageEstimatedHeight(placements) {
   return placements.reduce((sum, p) => sum + p.estimatedHeight, 0);
+}
+
+function isPaddingPlacement(placement) {
+  const atom = placement && placement.atom ? placement.atom : {};
+  return atom.section === 'padding' || atom.group === 'padding';
+}
+
+function isSinglePagePreferredPlacement(placement) {
+  const policy = placement && placement.atom ? placement.atom.groupPolicy : null;
+  return !!policy && policy.mode === 'single-page-preferred';
+}
+
+function sameGroupPlacements(placements, group) {
+  return placements.length > 0
+    && placements.every((placement) => placement.atom && placement.atom.group === group);
+}
+
+function prunePaddingPlacements(spreadPlan) {
+  for (const spread of spreadPlan) {
+    spread.left = spread.left.filter((placement) => !isPaddingPlacement(placement));
+    spread.right = spread.right.filter((placement) => !isPaddingPlacement(placement));
+  }
+
+  for (let i = spreadPlan.length - 1; i >= 0; i--) {
+    if (spreadPlan[i].left.length === 0 && spreadPlan[i].right.length === 0) {
+      spreadPlan.splice(i, 1);
+    }
+  }
+}
+
+function countPages(spreadPlan) {
+  let pageCount = 0;
+  for (const spread of spreadPlan) {
+    if (spread.left.length > 0) pageCount++;
+    if (spread.right.length > 0) pageCount++;
+  }
+  return pageCount;
+}
+
+function countPaddingPages(spreadPlan) {
+  let pageCount = 0;
+  for (const spread of spreadPlan) {
+    if (spread.left.some(isPaddingPlacement)) pageCount++;
+    if (spread.right.some(isPaddingPlacement)) pageCount++;
+  }
+  return pageCount;
+}
+
+function removeEmptySpreads(spreadPlan) {
+  for (let i = spreadPlan.length - 1; i >= 0; i--) {
+    if (spreadPlan[i].left.length === 0 && spreadPlan[i].right.length === 0) {
+      spreadPlan.splice(i, 1);
+    }
+  }
+}
+
+function reindexSpreads(spreadPlan) {
+  for (let i = 0; i < spreadPlan.length; i++) {
+    spreadPlan[i].spreadIndex = i;
+  }
+}
+
+function collapseSinglePagePreferredGroups(spreadPlan) {
+  const collapsedKeys = new Set();
+
+  for (let i = 0; i < spreadPlan.length; i++) {
+    for (const side of ['left', 'right']) {
+      const placements = spreadPlan[i][side];
+      if (placements.length === 0 || !isSinglePagePreferredPlacement(placements[0])) continue;
+
+      const group = placements[0].atom && placements[0].atom.group;
+      if (!group || !sameGroupPlacements(placements, group)) continue;
+
+      const collapseKey = `${group}:${side}`;
+      if (collapsedKeys.has(collapseKey)) continue;
+      collapsedKeys.add(collapseKey);
+
+      for (let j = i + 1; j < spreadPlan.length; j++) {
+        const nextPlacements = spreadPlan[j][side];
+        if (nextPlacements.length === 0) continue;
+        if (!sameGroupPlacements(nextPlacements, group)) break;
+
+        placements.push(...nextPlacements);
+        nextPlacements.length = 0;
+      }
+    }
+  }
+
+  removeEmptySpreads(spreadPlan);
+  reindexSpreads(spreadPlan);
 }
 
 /**
@@ -211,7 +316,7 @@ function binGroupIntoSpreads(groupAtoms, startSpreadIndex, spreadType, weekIndex
     let current = [];
     for (const atom of atoms) {
       const placement = createPlacement(atom);
-      const ownPage = atom.sizeHint === 'full-page' || !getAtomDefinition(atom.type)?.canShare;
+      const ownPage = atom.mustOwnPage || atom.sizeHint === 'full-page' || !getAtomDefinition(atom.type)?.canShare;
 
       if (ownPage) {
         // Flush any accumulated shareable atoms
@@ -237,12 +342,13 @@ function binGroupIntoSpreads(groupAtoms, startSpreadIndex, spreadType, weekIndex
   // ── Distribute 'either' atoms into pages with room ─────────
   for (const atom of eitherAtoms) {
     const placement = createPlacement(atom);
-    const ownPage = atom.sizeHint === 'full-page' || !getAtomDefinition(atom.type)?.canShare;
+    const ownPage = atom.mustOwnPage || atom.sizeHint === 'full-page' || !getAtomDefinition(atom.type)?.canShare;
     let placed = false;
 
     if (!ownPage) {
       // Try right pages first (they tend to have more room)
       for (const page of rightPages) {
+        if (page.some(placementLocksPage)) continue;
         if (pageEstimatedHeight(page) + placement.estimatedHeight <= budget) {
           page.push(placement);
           placed = true;
@@ -251,6 +357,7 @@ function binGroupIntoSpreads(groupAtoms, startSpreadIndex, spreadType, weekIndex
       }
       if (!placed) {
         for (const page of leftPages) {
+          if (page.some(placementLocksPage)) continue;
           if (pageEstimatedHeight(page) + placement.estimatedHeight <= budget) {
             page.push(placement);
             placed = true;
@@ -390,6 +497,10 @@ export function planAndMeasure(atoms, container, options = {}) {
   // Step 1: Plan with estimates
   const { spreadPlan, diagnostics } = planSpreads(atoms, options);
 
+  // Restore adapter-declared single-page groups before measurement so the
+  // density solver gets a chance to fit the intended page unit.
+  collapseSinglePagePreferredGroups(spreadPlan);
+
   // Step 2: Measure each atom in the offscreen DOM
   const { stack, destroy, boundaryHeightPx } = createMeasurementRoot(container);
 
@@ -491,15 +602,18 @@ export function planAndMeasure(atoms, container, options = {}) {
 
             // Flag unresolved overflow (only once per atom)
             if (!result.resolved && !result.splitAtomId) {
-              for (const p of placements) {
-                if (unresolvedAtomIds.has(p.atomId)) continue;
-                const h = p.measuredHeight || p.estimatedHeight;
-                if (h > effectiveBudget) {
-                  unresolvedAtomIds.add(p.atomId);
-                  recordUnresolvedOverflow(
-                    diagnostics, p.atomId, h - effectiveBudget, side,
-                  );
-                }
+              const culprit = placements.reduce((largest, placement) => {
+                if (!largest) return placement;
+                const largestHeight = largest.measuredHeight || largest.estimatedHeight || 0;
+                const placementHeight = placement.measuredHeight || placement.estimatedHeight || 0;
+                return placementHeight > largestHeight ? placement : largest;
+              }, null);
+
+              if (culprit && !unresolvedAtomIds.has(culprit.atomId)) {
+                unresolvedAtomIds.add(culprit.atomId);
+                recordUnresolvedOverflow(
+                  diagnostics, culprit.atomId, overflowPx, side,
+                );
               }
             }
           }
@@ -524,8 +638,7 @@ export function planAndMeasure(atoms, container, options = {}) {
 
         // Only compact sharable atoms
         const allShareable = placements.every(p => {
-          const def = getAtomDefinition(p.type);
-          return def && def.canShare;
+          return !placementLocksPage(p);
         });
         if (!allShareable) continue;
 
@@ -539,8 +652,7 @@ export function planAndMeasure(atoms, container, options = {}) {
           if (spreadPlan[j].weekIndex !== spreadPlan[i].weekIndex) break;
 
           const candidateShareable = candidatePlacements.every(p => {
-            const def = getAtomDefinition(p.type);
-            return def && def.canShare;
+            return !placementLocksPage(p);
           });
           if (!candidateShareable) continue;
 
@@ -564,21 +676,18 @@ export function planAndMeasure(atoms, container, options = {}) {
 
     // Remove empty spreads left by compaction
     if (compactions > 0) {
-      for (let i = spreadPlan.length - 1; i >= 0; i--) {
-        if (spreadPlan[i].left.length === 0 && spreadPlan[i].right.length === 0) {
-          spreadPlan.splice(i, 1);
-        }
-      }
+      removeEmptySpreads(spreadPlan);
     }
     diagnostics.compactions = compactions;
 
+    // Any padding inserted during estimate-only planning is provisional.
+    // Remove it before the final recount so imposition is based on the
+    // measured post-compaction layout, not stale pre-compaction pages.
+    prunePaddingPlacements(spreadPlan);
+
     // Re-index spreads and recount pages
-    let pageCount = 0;
-    for (let i = 0; i < spreadPlan.length; i++) {
-      spreadPlan[i].spreadIndex = i;
-      if (spreadPlan[i].left.length > 0)  pageCount++;
-      if (spreadPlan[i].right.length > 0) pageCount++;
-    }
+    reindexSpreads(spreadPlan);
+    let pageCount = countPages(spreadPlan);
     // Step 5: Re-pad after compaction (page count may have changed)
     const padTo = options.padToMultipleOf ?? DEFAULT_PAGE_SPEC.padToMultipleOf;
     const postRemainder = pageCount % padTo;
@@ -603,9 +712,41 @@ export function planAndMeasure(atoms, container, options = {}) {
       }
     }
 
+    // Final overflow truth pass: report the pages we are actually about
+    // to print, including clipped full-page atoms whose internal content
+    // overflows without exceeding the outer frame height.
+    for (const spread of spreadPlan) {
+      for (const side of ['left', 'right']) {
+        const placements = spread[side];
+        if (placements.length === 0) continue;
+
+        const finalMeasurement = measurePlacementsPage(
+          stack,
+          placements,
+          spread.spreadType,
+        );
+
+        if (finalMeasurement.overflowHeight > 2) {
+          const culprit = placements.reduce((largest, placement) => {
+            if (!largest) return placement;
+            const largestHeight = largest.measuredHeight || largest.estimatedHeight || 0;
+            const placementHeight = placement.measuredHeight || placement.estimatedHeight || 0;
+            return placementHeight > largestHeight ? placement : largest;
+          }, null);
+
+          if (culprit && !unresolvedAtomIds.has(culprit.atomId)) {
+            unresolvedAtomIds.add(culprit.atomId);
+            recordUnresolvedOverflow(
+              diagnostics, culprit.atomId, finalMeasurement.overflowHeight, side,
+            );
+          }
+        }
+      }
+    }
+
     diagnostics.totalPages   = pageCount;
     diagnostics.totalSpreads = spreadPlan.length;
-    diagnostics.paddingPages = postPadding;
+    diagnostics.paddingPages = countPaddingPages(spreadPlan);
 
     // Record per-spread usage
     for (const spread of spreadPlan) {

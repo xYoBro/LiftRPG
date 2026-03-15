@@ -13,7 +13,9 @@
  */
 
 import { createAtom } from '../engine/atom-registry.js';
+import { PAGE_BUDGET } from '../engine/page-spec.js';
 import { resolveWeekMechanicProfile } from '../mechanic-registry.js';
+import { estimateSessionCardHeight } from '../session-card-metrics.js';
 import {
   buildUnlockedEndingPageModel,
 } from '../booklet-models.js';
@@ -31,6 +33,14 @@ export const LIFTRPG_SECTIONS = [
   'cover', 'front-matter', 'body', 'supplements',
   'end-matter', 'endings', 'back-matter', 'padding',
 ];
+
+const SESSION_CHUNK_DENSITY = 1.0;
+const CHUNK_HEADER_HEIGHT = 92;
+const CHUNK_FOOTER_HEIGHT = 24;
+
+function singlePageGroupPolicy() {
+  return { mode: 'single-page-preferred' };
+}
 
 // ---------------------------------------------------------------------------
 // Main extraction
@@ -85,12 +95,15 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
     const week = weeks[wi];
     const isBoss = !!week.isBossWeek;
     const profile = resolveWeekMechanicProfile(week);
+    const sessionChunks = chunkWeekSessions(week.sessions || []);
+    const primaryGroup = `week-${wi}-chunk-0`;
 
     // Week header (kicker, title, epigraph) — before session cards
     atoms.push(createAtom({
       type: 'week-header',
       id: `w${wi}-header`,
-      group: `week-${wi}`,
+      group: primaryGroup,
+      groupPolicy: singlePageGroupPolicy(),
       section: 'body',
       sequence: wi * 1000 - 1,
       sizeHint: 'minimal',
@@ -99,27 +112,39 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
     }));
 
     // Session cards (left page)
-    const sessions = week.sessions || [];
-    for (let si = 0; si < sessions.length; si++) {
-      atoms.push(createAtom({
-        type: 'session-card',
-        id: `w${wi}-s${si}`,
-        group: `week-${wi}`,
-        section: 'body',
-        sequence: wi * 1000 + si,
-        sizeHint: 'quarter-page',
-        pageAffinity: 'left',
-        data: { session: sessions[si], weekIndex: wi, weekMeta: week, profile, totalWeeks },
-      }));
+    for (let chunkIndex = 0; chunkIndex < sessionChunks.length; chunkIndex++) {
+      const chunk = sessionChunks[chunkIndex];
+      const chunkGroup = `week-${wi}-chunk-${chunkIndex}`;
+      for (let si = 0; si < chunk.sessions.length; si++) {
+        const sessionIndex = chunk.startIndex + si;
+        atoms.push(createAtom({
+          type: 'session-card',
+          id: `w${wi}-s${sessionIndex}`,
+          group: chunkGroup,
+          groupPolicy: singlePageGroupPolicy(),
+          section: 'body',
+          sequence: wi * 1000 + chunkIndex * 100 + si,
+          sizeHint: 'quarter-page',
+          pageAffinity: 'left',
+          data: {
+            session: chunk.sessions[si],
+            weekIndex: wi,
+            weekMeta: week,
+            profile,
+            totalWeeks,
+          },
+        }));
+      }
     }
 
     // Week footer (progress dots) — after session cards
     atoms.push(createAtom({
       type: 'week-footer',
       id: `w${wi}-footer`,
-      group: `week-${wi}`,
+      group: `week-${wi}-chunk-${Math.max(0, sessionChunks.length - 1)}`,
+      groupPolicy: singlePageGroupPolicy(),
       section: 'body',
-      sequence: wi * 1000 + 50,
+      sequence: wi * 1000 + Math.max(0, sessionChunks.length - 1) * 100 + 50,
       sizeHint: 'minimal',
       pageAffinity: 'left',
       data: { weekIndex: wi, totalWeeks },
@@ -130,7 +155,8 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
       atoms.push(createAtom({
         type: 'boss-encounter',
         id: `w${wi}-boss`,
-        group: `week-${wi}`,
+        group: primaryGroup,
+        groupPolicy: singlePageGroupPolicy(),
         section: 'body',
         sequence: wi * 1000 + 100,
         sizeHint: 'full-page',
@@ -143,7 +169,8 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         atoms.push(createAtom({
           type: 'cipher-panel',
           id: `w${wi}-cipher`,
-          group: `week-${wi}`,
+          group: primaryGroup,
+          groupPolicy: singlePageGroupPolicy(),
           section: 'body',
           sequence: wi * 1000 + 100,
           sizeHint: 'quarter-page',
@@ -157,7 +184,8 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         atoms.push(createAtom({
           type: 'oracle-table',
           id: `w${wi}-oracle`,
-          group: `week-${wi}`,
+          group: primaryGroup,
+          groupPolicy: singlePageGroupPolicy(),
           section: 'body',
           sequence: wi * 1000 + 101,
           sizeHint: 'quarter-page',
@@ -173,7 +201,8 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         atoms.push(createAtom({
           type: 'map-panel',
           id: `w${wi}-map`,
-          group: `week-${wi}`,
+          group: primaryGroup,
+          groupPolicy: singlePageGroupPolicy(),
           section: 'body',
           sequence: wi * 1000 + 102,
           sizeHint: mapHint,
@@ -189,7 +218,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
           atoms.push(createAtom({
             type: 'tracker',
             id: `w${wi}-companion-${ci}`,
-            group: `week-${wi}-companions`,
+            group: `${primaryGroup}-companions`,
             section: 'body',
             sequence: wi * 1000 + 200 + ci,
             sizeHint: comp.footprint || 'half-page',
@@ -206,6 +235,50 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         }
       }
     }
+
+    if (week.overflowDocument) {
+      const overflowPageCount = Math.max(1, sessionChunks.length - 1);
+      for (let overflowIndex = 0; overflowIndex < overflowPageCount; overflowIndex++) {
+        const chunkGroup = `week-${wi}-chunk-${Math.min(sessionChunks.length - 1, overflowIndex + 1)}`;
+        atoms.push(createAtom({
+          type: 'overflow-doc',
+          id: `w${wi}-overflow-doc-${overflowIndex}`,
+          group: chunkGroup,
+          groupPolicy: singlePageGroupPolicy(),
+          section: 'body',
+          sequence: wi * 1000 + (overflowIndex + 1) * 100 + 90,
+          sizeHint: 'full-page',
+          pageAffinity: 'right',
+          data: {
+            document: {
+              ...week.overflowDocument,
+              continuationLabel: overflowIndex > 0 ? 'Continued' : '',
+            },
+            week,
+            weekIndex: wi,
+            totalWeeks,
+          },
+        }));
+      }
+    }
+
+    if (week.interlude) {
+      atoms.push(createAtom({
+        type: 'interlude',
+        id: `w${wi}-interlude`,
+        group: `interlude-${wi}`,
+        section: 'body',
+        sequence: wi * 1000 + 900,
+        sizeHint: 'full-page',
+        pageAffinity: 'either',
+        data: {
+          week,
+          weekIndex: wi,
+          totalWeeks,
+          interlude: week.interlude,
+        },
+      }));
+    }
   }
 
   // ── Fragments ───────────────────────────────────────────────
@@ -213,11 +286,13 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
   for (let fi = 0; fi < fragments.length; fi++) {
     const frag = fragments[fi];
     const weight = fragmentWeight(frag);
-    const hint = weight >= 0.9 ? 'full-page' : weight >= 0.5 ? 'half-page' : 'flex';
+    const standalone = fragmentMustStandAlone(frag, weight);
+    const hint = standalone ? 'full-page' : weight >= 0.5 ? 'half-page' : 'flex';
     atoms.push(createAtom({
       type: 'fragment-doc',
       id: `frag-${fi}`,
       group: 'fragments',
+      mustOwnPage: standalone,
       section: 'supplements',
       sequence: fi,
       sizeHint: hint,
@@ -416,17 +491,114 @@ function splitEndingBody(unlockedEnding, bookletData) {
   }
 }
 
+function chunkWeekSessions(sessions, maxSessionsPerPage = 3) {
+  const list = Array.isArray(sessions) ? sessions : [];
+  if (!list.length) return [{ startIndex: 0, sessions: [] }];
+  if (list.length <= maxSessionsPerPage) {
+    return [{ startIndex: 0, sessions: list.slice() }];
+  }
+
+  const partitions = [];
+  const targetChunkCount = Math.ceil(list.length / maxSessionsPerPage);
+
+  function walk(startIndex, sizes) {
+    if (startIndex >= list.length) {
+      partitions.push(sizes.slice());
+      return;
+    }
+
+    for (let size = 1; size <= maxSessionsPerPage; size += 1) {
+      if (startIndex + size > list.length) break;
+      sizes.push(size);
+      walk(startIndex + size, sizes);
+      sizes.pop();
+    }
+  }
+
+  function scorePartition(sizes) {
+    let startIndex = 0;
+    let totalOverflow = 0;
+    let maxLoad = 0;
+
+    sizes.forEach((size, index) => {
+      const chunk = list.slice(startIndex, startIndex + size);
+      const sessionLoad = chunk.reduce(
+        (sum, session) => sum + estimateSessionCardHeight(session, SESSION_CHUNK_DENSITY),
+        0,
+      );
+      const pageLoad = sessionLoad
+        + (index === 0 ? CHUNK_HEADER_HEIGHT : 0)
+        + (index === sizes.length - 1 ? CHUNK_FOOTER_HEIGHT : 0);
+
+      totalOverflow += Math.max(0, pageLoad - PAGE_BUDGET.heightPx);
+      maxLoad = Math.max(maxLoad, pageLoad);
+      startIndex += size;
+    });
+
+    return {
+      sizes,
+      totalOverflow,
+      chunkCount: sizes.length,
+      maxLoad,
+    };
+  }
+
+  walk(0, []);
+
+  const best = partitions
+    .filter((sizes) => sizes.length === targetChunkCount)
+    .map(scorePartition)
+    .sort((a, b) =>
+      a.totalOverflow - b.totalOverflow
+      || a.chunkCount - b.chunkCount
+      || a.maxLoad - b.maxLoad
+    )[0];
+
+  const chunks = [];
+  let startIndex = 0;
+  (best ? best.sizes : [list.length]).forEach((size) => {
+    chunks.push({
+      startIndex,
+      sessions: list.slice(startIndex, startIndex + size),
+    });
+    startIndex += size;
+  });
+
+  return chunks;
+}
+
 /**
  * Estimate fragment weight for size hint selection.
- * Ported from layout-governor.js logic.
+ * Mirrors the regression-contract fragment governor so authored archive
+ * pacing matches the page plan used in layout checks.
  */
 function fragmentWeight(fragment) {
-  const bodyLen = (fragment.bodyText || fragment.body || fragment.content || '').length;
-  const type = fragment.documentType || '';
-  let weight = 0.62;
-  if (bodyLen > 600) weight += (bodyLen - 600) / 1000;
-  if (['transcript', 'form'].includes(type)) weight += 0.15;
-  return Math.min(1.55, weight);
+  const body = (fragment.bodyText || fragment.body || fragment.content || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const documentType = String(fragment.documentType || '').toLowerCase();
+  let weight = Math.max(0.62, Math.min(body.length / 1600, 1.4));
+
+  if (['memo', 'report', 'inspection', 'correspondence', 'transcript', 'anomaly'].includes(documentType)) {
+    weight += 0.16;
+  }
+  if ((((fragment || {}).designSpec || {}).hasAnnotations)) weight += 0.04;
+  if ((((fragment || {}).designSpec || {}).hasRedactions)) weight += 0.04;
+
+  return Math.min(weight, 1.55);
+}
+
+function fragmentMustStandAlone(fragment, weight = fragmentWeight(fragment)) {
+  const body = (fragment.bodyText || fragment.body || fragment.content || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const documentType = String(fragment.documentType || '').toLowerCase();
+
+  return weight >= 0.9
+    || body.length >= 950
+    || ['memo', 'report', 'inspection', 'correspondence', 'transcript', 'anomaly'].includes(documentType);
 }
 
 // ---------------------------------------------------------------------------
