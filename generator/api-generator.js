@@ -163,7 +163,7 @@ window.LiftRPGAPI = (function () {
 
   var VALID_ESC    = { '"':1, '\\':1, '/':1, b:1, f:1, n:1, r:1, t:1, u:1 };
   // After a string closes, valid JSON structural separators follow
-  var AFTER_STRING = { ',':1, '}':1, ']':1, ':':1 };
+  var AFTER_STRING = { ',':1, '}':1, ']':1, ':':1, '/':1 };  // / starts a comment
 
   function peekStructural(text, from) {
     for (var k = from; k < text.length; k++) {
@@ -181,6 +181,20 @@ window.LiftRPGAPI = (function () {
 
       // Pass-through: character following a valid escape sequence
       if (esc) { out.push(c); esc = false; continue; }
+
+      // JS-style comments: skip when not inside a string
+      if (!inStr && c === '/') {
+        var nx2 = text[i + 1] || '';
+        if (nx2 === '/') {                      // line comment
+          while (i < text.length && text[i] !== '\n') i++;
+          continue;
+        } else if (nx2 === '*') {               // block comment
+          i += 2;
+          while (i < text.length - 1 && !(text[i] === '*' && text[i+1] === '/')) i++;
+          i++;  // skip closing '/'
+          continue;
+        }
+      }
 
       // Backslash inside string: validate or double-escape
       if (c === '\\' && inStr) {
@@ -244,10 +258,25 @@ window.LiftRPGAPI = (function () {
     return text;
   }
 
+  // ── Python / JS literal normalisation ───────────────────────────────────────
+  // Some models (especially smaller/fine-tuned) emit Python or JS literals.
+  // Word-boundary replacement: may fire inside string values, but these tokens
+  // (True, None, NaN, Infinity) are vanishingly rare in narrative prose.
+
+  function fixLiterals(text) {
+    return text
+      .replace(/\bTrue\b/g,     'true')
+      .replace(/\bFalse\b/g,    'false')
+      .replace(/\bNone\b/g,     'null')
+      .replace(/\bNaN\b/g,      'null')
+      .replace(/\bInfinity\b/g, 'null')
+      .replace(/\bundefined\b/g,'null');
+  }
+
   // ── public repair entry point ────────────────────────────────────────────────
 
   function repairJson(text) {
-    return fixStructural(walkAndRepair(text));
+    return fixStructural(walkAndRepair(fixLiterals(text)));
   }
 
   // ── JSON extraction ──────────────────────────────────────────────────────────
@@ -255,9 +284,20 @@ window.LiftRPGAPI = (function () {
   function extractJson(text) {
     // 1. Strip markdown code fences
     var stripped = text
+      .replace(/^\uFEFF/, '')           // strip BOM
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```\s*$/, '')
       .trim();
+
+    // 1.5: Doubled JSON — model serialised the JSON twice
+    if (stripped.charAt(0) === '"' && stripped.charAt(stripped.length - 1) === '"') {
+      try {
+        var maybeInner = JSON.parse(stripped);
+        if (typeof maybeInner === 'string' && maybeInner.trim().charAt(0) === '{') {
+          try { return JSON.parse(maybeInner); } catch (e) { /* fall through */ }
+        }
+      } catch (e) { /* not a valid JSON string, continue */ }
+    }
 
     // 2. Locate root {…} with depth counting (not fragile lastIndexOf)
     var bounds = findJsonBounds(stripped);
