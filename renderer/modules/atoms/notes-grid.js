@@ -19,11 +19,11 @@ import { make } from '../dom.js';
 /** Full page height in px (5.5" × 8.5" at 96dpi minus margins). */
 const FULL_PAGE_HEIGHT = 741;
 
-/** Default cell count for dot and graph variants (20 cols × 28 rows = 560). */
-const DEFAULT_CELL_COUNT = 560;
+/** Full-page stationery spacing (24 cols × 36 rows = 864). */
+const DEFAULT_CELL_COUNT = 864;
 
 /** Default line count for the lined variant. */
-const DEFAULT_LINE_COUNT = 28;
+const DEFAULT_LINE_COUNT = 32;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -36,7 +36,7 @@ const DEFAULT_LINE_COUNT = 28;
  */
 function buildDotGrid(cellCount) {
   const container = make('div', 'notes-grid-dots');
-  const cols = 20;
+  const cols = 24;
   const rows = Math.ceil(cellCount / cols);
   container.style.setProperty('--notes-grid-cols', cols);
   container.style.setProperty('--notes-grid-rows', rows);
@@ -67,7 +67,7 @@ function buildLinedGrid(lineCount) {
  */
 function buildGraphGrid(cellCount) {
   const container = make('div', 'notes-grid-graph');
-  const cols = 20;
+  const cols = 24;
   const rows = Math.ceil(cellCount / cols);
   container.style.setProperty('--notes-grid-cols', cols);
   container.style.setProperty('--notes-grid-rows', rows);
@@ -101,14 +101,14 @@ registerAtom('notes-grid', {
 
   render(atom, _density) {
     const data = atom.data ?? {};
-    const variant = data.variant || 'lined';
+    const variant = data.variant || 'dot';
     const cellCount = data.cellCount || DEFAULT_CELL_COUNT;
 
     const el = make('div', 'notes-grid-atom');
     el.dataset.variant = variant;
 
     // Header
-    const heading = make('h3', 'notes-grid-heading', data.label || 'Field Notes');
+    const heading = make('h3', 'notes-grid-heading', data.label || 'Notes');
     el.appendChild(heading);
 
     // Grid body
@@ -129,7 +129,10 @@ registerAtom('notes-grid', {
         break;
     }
 
-    el.appendChild(grid);
+    const sheet = make('div', 'notes-grid-sheet');
+    sheet.dataset.variant = variant;
+    sheet.appendChild(grid);
+    el.appendChild(sheet);
     return el;
   },
 });

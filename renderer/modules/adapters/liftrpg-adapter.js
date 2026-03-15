@@ -14,6 +14,14 @@
 
 import { createAtom } from '../engine/atom-registry.js';
 import { resolveWeekMechanicProfile } from '../mechanic-registry.js';
+import {
+  buildUnlockedEndingPageModel,
+} from '../booklet-models.js';
+import { renderUnlockedEndingPage } from '../booklet-primitives.js';
+import {
+  joinRichContentBlocks,
+  splitRichContentBlocks,
+} from '../utils.js';
 
 // ---------------------------------------------------------------------------
 // Section ordering
@@ -239,8 +247,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
   }
 
   if (unlockedEnding) {
-    const endingBody = unlockedEnding.body || unlockedEnding.content || '';
-    const endingChunks = splitEndingBody(endingBody);
+    const endingChunks = splitEndingBody(unlockedEnding, data);
 
     for (let ei = 0; ei < endingChunks.length; ei++) {
       const isFirst = ei === 0;
@@ -292,32 +299,121 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
  * @param {string} body — the ending body text (string or HTML)
  * @returns {string[]} array of body chunks
  */
-function splitEndingBody(body) {
-  const PAGE_CHAR_BUDGET = 1800;
-  const text = typeof body === 'string' ? body : '';
-  if (!text || text.length <= PAGE_CHAR_BUDGET) return [text || ''];
+function inferEndingLayoutVariant(endings, payload) {
+  const ending = (endings || []).find((entry) =>
+    payload && payload.variant && entry && entry.variant === payload.variant,
+  ) || (endings || [])[0] || {};
+  const spec = String(ending.designSpec || '').toLowerCase();
+  if (spec.includes('letter') || spec.includes('warm') || spec.includes('personal')) {
+    return 'letter';
+  }
+  return 'document';
+}
 
-  const paragraphs = text.split(/\n\n+/);
-  if (paragraphs.length <= 1) return [text];
+function fallbackSplitEndingBody(body) {
+  const PAGE_CHAR_BUDGET = 2400;
+  const blocks = splitRichContentBlocks(body);
+  if (!blocks.length) return [''];
+  if (blocks.length === 1) return [joinRichContentBlocks(blocks)];
 
-  // Greedily fill pages up to the character budget
   const chunks = [];
   let current = [];
   let currentLen = 0;
 
-  for (const para of paragraphs) {
-    const paraLen = para.length + 2; // +2 for the \n\n separator
-    if (current.length > 0 && currentLen + paraLen > PAGE_CHAR_BUDGET) {
-      chunks.push(current.join('\n\n'));
+  blocks.forEach((block) => {
+    const blockLen = String(block || '').length + 2;
+    if (current.length > 0 && currentLen + blockLen > PAGE_CHAR_BUDGET) {
+      chunks.push(joinRichContentBlocks(current));
       current = [];
       currentLen = 0;
     }
-    current.push(para);
-    currentLen += paraLen;
+    current.push(block);
+    currentLen += blockLen;
+  });
+
+  if (current.length > 0) {
+    chunks.push(joinRichContentBlocks(current));
   }
-  if (current.length > 0) chunks.push(current.join('\n\n'));
 
   return chunks;
+}
+
+function splitEndingBody(unlockedEnding, bookletData) {
+  const body = unlockedEnding && (unlockedEnding.body || unlockedEnding.content) || '';
+  const blocks = splitRichContentBlocks(body);
+  if (!blocks.length) return [''];
+  if (blocks.length === 1) return [joinRichContentBlocks(blocks)];
+
+  if (typeof document === 'undefined' || !document.body) {
+    return fallbackSplitEndingBody(body);
+  }
+
+  const layoutVariant = inferEndingLayoutVariant(bookletData.endings, unlockedEnding);
+  const measurementRoot = document.createElement('div');
+  Object.assign(measurementRoot.style, {
+    position: 'fixed',
+    left: '-200vw',
+    top: '0',
+    width: '5.5in',
+    visibility: 'hidden',
+    pointerEvents: 'none',
+    zIndex: '-1',
+  });
+  document.body.appendChild(measurementRoot);
+
+  function fitsEndingChunk(chunkBlocks, options = {}) {
+    const payload = {
+      ...unlockedEnding,
+      body: joinRichContentBlocks(chunkBlocks),
+      title: options.isContinuation ? '' : (unlockedEnding.title || 'Unlocked Document'),
+      kicker: options.isContinuation ? '' : (unlockedEnding.kicker || ''),
+      documentType: options.isContinuation ? '' : (unlockedEnding.documentType || ''),
+      finalLine: options.isLast ? (unlockedEnding.finalLine || '') : '',
+      continuationLabel: options.isContinuation ? 'Continued' : '',
+    };
+    const entry = options.isContinuation ? { continuationLabel: 'Continued' } : null;
+    const model = buildUnlockedEndingPageModel(bookletData, payload, layoutVariant, entry);
+    const page = renderUnlockedEndingPage(model);
+    measurementRoot.appendChild(page);
+
+    const frame = page.querySelector('.page-frame');
+    const bodyEl = page.querySelector('.endings-body');
+    const fits = !!frame && !!bodyEl
+      && frame.scrollHeight <= frame.clientHeight + 1
+      && bodyEl.scrollHeight <= bodyEl.clientHeight + 1;
+
+    page.remove();
+    return fits;
+  }
+
+  try {
+    const chunks = [];
+    let start = 0;
+
+    while (start < blocks.length) {
+      let bestEnd = start + 1;
+
+      for (let end = start + 1; end <= blocks.length; end++) {
+        const fits = fitsEndingChunk(blocks.slice(start, end), {
+          isContinuation: start > 0,
+          isLast: end === blocks.length,
+        });
+        if (!fits) break;
+        bestEnd = end;
+      }
+
+      if (bestEnd <= start) {
+        bestEnd = Math.min(blocks.length, start + 1);
+      }
+
+      chunks.push(joinRichContentBlocks(blocks.slice(start, bestEnd)));
+      start = bestEnd;
+    }
+
+    return chunks;
+  } finally {
+    measurementRoot.remove();
+  }
 }
 
 /**

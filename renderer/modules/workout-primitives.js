@@ -71,7 +71,6 @@ function renderBinaryChoice(binaryChoiceModel) {
 
 export function renderWorkoutCard(cardModel) {
   const card = make('article', 'session-card');
-  card.style.flex = String(cardModel.flexWeight) + ' 1 0';
 
   const headerText = cardModel.continuationLabel
     ? (cardModel.sessionLabel + ' · ' + cardModel.continuationLabel)

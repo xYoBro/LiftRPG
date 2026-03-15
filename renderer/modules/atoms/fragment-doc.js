@@ -24,10 +24,8 @@ registerAtom('fragment-doc', {
   pageAffinity: 'either',
 
   estimate(data, density) {
-    const bodyText = data.bodyText || data.body || data.content || '';
-    const paragraphCount = Array.isArray(data.bodyParagraphs) && data.bodyParagraphs.length
-      ? data.bodyParagraphs.length
-      : bodyText.split(/\n\n+/).filter(Boolean).length || 1;
+    const fragmentModel = buildFragmentModel(data || {});
+    const paragraphCount = fragmentModel.bodyParagraphs.length || 1;
 
     const preferred = CHROME_HEIGHT     + paragraphCount * PARAGRAPH_HEIGHT;
     const min       = CHROME_HEIGHT_MIN + paragraphCount * PARAGRAPH_HEIGHT_MIN;

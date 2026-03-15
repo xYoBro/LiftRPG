@@ -14,8 +14,36 @@
 
 import { make } from '../dom.js';
 import { createBoundedPage } from '../page-shell.js';
+import { renderPageFromPlacements } from '../page-renderer.js';
 import { getAtomDefinition } from './atom-registry.js';
 import { PAGE_BUDGET } from './page-spec.js';
+
+function clipsVerticalOverflow(style) {
+  const overflowY = style.overflowY || '';
+  const overflow = style.overflow || '';
+  return ['hidden', 'clip', 'auto', 'scroll'].includes(overflowY)
+    || ['hidden', 'clip', 'auto', 'scroll'].includes(overflow);
+}
+
+function measureInternalOverflowPx(root) {
+  if (!root || typeof window === 'undefined' || typeof root.querySelectorAll !== 'function') {
+    return 0;
+  }
+
+  let maxOverflow = 0;
+  const nodes = [root, ...root.querySelectorAll('*')];
+  nodes.forEach((node) => {
+    if (!(node instanceof HTMLElement) || node.clientHeight <= 0) return;
+
+    const style = window.getComputedStyle(node);
+    if (!clipsVerticalOverflow(style)) return;
+
+    const overflow = node.scrollHeight - node.clientHeight;
+    if (overflow > maxOverflow) maxOverflow = overflow;
+  });
+
+  return maxOverflow;
+}
 
 // ---------------------------------------------------------------------------
 // Measurement root
@@ -134,10 +162,15 @@ export function measureAtom(stack, atom, density) {
   // in the flex column context, matching the rendered page).
   const boundaryRect = boundary.getBoundingClientRect();
   const frameRect    = frame.getBoundingClientRect();
+  const internalOverflowPx = measureInternalOverflowPx(frame);
 
-  const measuredHeight = frameRect.height;
+  const measuredHeight = frameRect.height + internalOverflowPx;
   const measuredWidth  = frameRect.width;
-  const overflowHeight = Math.max(0, frameRect.bottom - boundaryRect.bottom);
+  const overflowHeight = Math.max(
+    0,
+    frameRect.bottom - boundaryRect.bottom,
+    internalOverflowPx,
+  );
 
   // Clean up
   page.remove();
@@ -165,6 +198,57 @@ export function measurePageAtoms(stack, pageAtoms) {
       overflowHeight: result.overflowHeight,
     };
   });
+}
+
+export function measurePlacementsPage(stack, placements, spreadType = 'body') {
+  if (!Array.isArray(placements) || placements.length === 0) {
+    return {
+      overflowHeight: 0,
+      boundaryHeight: 0,
+      frameHeight: 0,
+    };
+  }
+
+  const page = renderPageFromPlacements(placements, spreadType, -1);
+  if (!page) {
+    return {
+      overflowHeight: 0,
+      boundaryHeight: 0,
+      frameHeight: 0,
+    };
+  }
+
+  stack.appendChild(page);
+
+  const boundary = page.querySelector(':scope > .page-boundary');
+  const frame = page.querySelector(':scope > .page-boundary > .page-frame');
+
+  if (!boundary || !frame) {
+    page.remove();
+    return {
+      overflowHeight: 0,
+      boundaryHeight: 0,
+      frameHeight: 0,
+    };
+  }
+
+  const boundaryRect = boundary.getBoundingClientRect();
+  const frameRect = frame.getBoundingClientRect();
+  const internalOverflowPx = measureInternalOverflowPx(frame);
+  const overflowHeight = Math.max(
+    0,
+    frame.scrollHeight - frame.clientHeight,
+    frameRect.bottom - boundaryRect.bottom,
+    internalOverflowPx,
+  );
+
+  page.remove();
+
+  return {
+    overflowHeight,
+    boundaryHeight: boundaryRect.height,
+    frameHeight: frameRect.height,
+  };
 }
 
 // ---------------------------------------------------------------------------

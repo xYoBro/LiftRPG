@@ -15,7 +15,7 @@ import { getAtomDefinition } from './atom-registry.js';
 import { PAGE_BUDGET, DEFAULT_PAGE_SPEC } from './page-spec.js';
 import { resolvePageOverflow, MAX_REVISIONS } from './density-solver.js';
 import {
-  createMeasurementRoot, measureAtom, checkPageFit,
+  createMeasurementRoot, measureAtom, measurePlacementsPage,
 } from './measurement-harness.js';
 import {
   createDiagnostics, recordAdjustment, recordSplit,
@@ -430,10 +430,12 @@ export function planAndMeasure(atoms, container, options = {}) {
           // Skip pages where every atom is already flagged unresolvable
           if (placements.every(p => unresolvedAtomIds.has(p.atomId))) continue;
 
-          const totalHeight = placements.reduce(
-            (s, p) => s + (p.measuredHeight || p.estimatedHeight), 0,
+          const pageMeasurement = measurePlacementsPage(
+            stack,
+            placements,
+            spread.spreadType,
           );
-          const overflowPx = totalHeight - effectiveBudget;
+          const overflowPx = pageMeasurement.overflowHeight;
 
           if (overflowPx > 2) {
             const result = resolvePageOverflow(
@@ -527,11 +529,6 @@ export function planAndMeasure(atoms, container, options = {}) {
         });
         if (!allShareable) continue;
 
-        let runningHeight = placements.reduce(
-          (s, p) => s + (p.measuredHeight || p.estimatedHeight), 0,
-        );
-        if (effectiveBudget - runningHeight < 20) continue;
-
         // Look ahead for the next spread with same-side sharable atoms
         for (let j = i + 1; j < spreadPlan.length; j++) {
           const candidatePlacements = spreadPlan[j][side];
@@ -547,18 +544,17 @@ export function planAndMeasure(atoms, container, options = {}) {
           });
           if (!candidateShareable) continue;
 
-          const candidateHeight = candidatePlacements.reduce(
-            (s, p) => s + (p.measuredHeight || p.estimatedHeight), 0,
+          const mergedMeasurement = measurePlacementsPage(
+            stack,
+            [...placements, ...candidatePlacements],
+            spreadPlan[i].spreadType,
           );
 
-          if (runningHeight + candidateHeight <= effectiveBudget) {
+          if (mergedMeasurement.overflowHeight <= 2) {
             // Merge: move all candidate placements into current page
             placements.push(...candidatePlacements);
             candidatePlacements.length = 0;
             compactions++;
-            runningHeight += candidateHeight;
-            // Keep looking if there's still room
-            if (effectiveBudget - runningHeight < 20) break;
           } else {
             break;  // Won't fit, stop looking
           }

@@ -414,7 +414,7 @@ export function renderNotesPage(model) {
   const frame = scaffold.frame;
 
   const header = make('header', 'page-header');
-  header.appendChild(make('span', '', 'Field Notes'));
+  header.appendChild(make('span', '', 'Notes'));
   header.appendChild(make('span', 'page-num', ''));
   frame.appendChild(header);
 
