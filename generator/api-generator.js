@@ -86,8 +86,22 @@ window.LiftRPGAPI = (function () {
       throw new Error('Unexpected Anthropic response shape. Check the console.');
     }
 
-    window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = body.content[0].text);
-    return body.content[0].text;
+    var rawText = body.content[0].text;
+    window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
+    window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = {
+      stop_reason: body.stop_reason,
+      model:       body.model,
+      usage:       body.usage
+    });
+    if (body.stop_reason === 'max_tokens') {
+      throw new Error(
+        'Response truncated: the model hit the output token limit before completing the JSON.\n\n' +
+        'The booklet JSON requires more output tokens than this model provided. ' +
+        'Switch to a model with a larger output window, or use Chat mode.\n' +
+        'Tip: open generator/test-repair.html and click \'Load lastRaw\' to inspect the partial output.'
+      );
+    }
+    return rawText;
   }
 
   async function callOpenAICompat(apiKey, baseUrl, model, prompt) {
@@ -116,8 +130,22 @@ window.LiftRPGAPI = (function () {
       throw new Error('Unexpected API response shape. Check the console.');
     }
 
-    window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = body.choices[0].message.content);
-    return body.choices[0].message.content;
+    var rawText = body.choices[0].message.content;
+    window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
+    window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = {
+      finish_reason: body.choices[0].finish_reason,
+      model:         body.model,
+      usage:         body.usage
+    });
+    if (body.choices[0].finish_reason === 'length') {
+      throw new Error(
+        'Response truncated: the model hit the output token limit before completing the JSON.\n\n' +
+        'The booklet JSON requires more output tokens than this model provided. ' +
+        'Switch to a model with a larger output window, or use Chat mode.\n' +
+        'Tip: open generator/test-repair.html and click \'Load lastRaw\' to inspect the partial output.'
+      );
+    }
+    return rawText;
   }
 
   // ── JSON repair ─────────────────────────────────────────────────────────────
