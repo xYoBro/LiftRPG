@@ -59,7 +59,7 @@ window.LiftRPGAPI = (function () {
 
   // ── Request handlers ────────────────────────────────────────────────────────
 
-  async function callAnthropic(apiKey, model, prompt) {
+  async function callAnthropic(apiKey, model, prompt, maxTokens) {
     var resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -70,7 +70,7 @@ window.LiftRPGAPI = (function () {
       },
       body: JSON.stringify({
         model: model,
-        max_tokens: 32000,
+        max_tokens: maxTokens || 32000,
         messages: [{ role: 'user', content: prompt }]
       })
     });
@@ -104,7 +104,7 @@ window.LiftRPGAPI = (function () {
     return rawText;
   }
 
-  async function callOpenAICompat(apiKey, baseUrl, model, prompt) {
+  async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens) {
     var url = baseUrl.replace(/\/+$/, '') + '/chat/completions';
     var headers = { 'content-type': 'application/json' };
     if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
@@ -114,7 +114,7 @@ window.LiftRPGAPI = (function () {
       headers: headers,
       body: JSON.stringify({
         model: model,
-        max_tokens: 32768,
+        max_tokens: maxTokens || 32768,
         messages: [{ role: 'user', content: prompt }]
       })
     });
@@ -373,11 +373,11 @@ window.LiftRPGAPI = (function () {
   // ── Provider dispatcher ────────────────────────────────────────────────────
   // Unified dispatch used by both single-stage generate() and generateMultiStage().
 
-  async function callProvider(settings, prompt) {
+  async function callProvider(settings, prompt, maxTokens) {
     if (settings.format === 'anthropic') {
-      return callAnthropic(settings.apiKey, settings.model, prompt);
+      return callAnthropic(settings.apiKey, settings.model, prompt, maxTokens);
     }
-    return callOpenAICompat(settings.apiKey, settings.baseUrl, settings.model, prompt);
+    return callOpenAICompat(settings.apiKey, settings.baseUrl, settings.model, prompt, maxTokens);
   }
 
   // ── Booklet schema postchecks ─────────────────────────────────────────────
@@ -454,12 +454,26 @@ window.LiftRPGAPI = (function () {
     }
 
     onProgress('stage1', 'Building layer bible\u2026');
-    var raw1 = await callProvider(settings, window.generateStage1Prompt(workout, brief, dice));
+    var raw1 = await callProvider(settings, window.generateStage1Prompt(workout, brief, dice), 4096);
     var layerBible = extractJson(raw1);
 
+    if (!layerBible.storyLayer || !layerBible.gameLayer || !layerBible.governingLayer) {
+      throw new Error(
+        'Stage 1 failed: layer bible is missing required sections (storyLayer, gameLayer, governingLayer).\n' +
+        'The model may not have followed the output schema. Try again.'
+      );
+    }
+
     onProgress('stage2', 'Planning your campaign\u2026');
-    var raw2 = await callProvider(settings, window.generateStage2Prompt(workout, brief, dice, layerBible));
+    var raw2 = await callProvider(settings, window.generateStage2Prompt(workout, brief, dice, layerBible), 8192);
     var campaignPlan = extractJson(raw2);
+
+    if (!campaignPlan.weeks || !Array.isArray(campaignPlan.weeks) || !campaignPlan.bossPlan) {
+      throw new Error(
+        'Stage 2 failed: campaign plan is missing required sections (weeks[], bossPlan).\n' +
+        'The model may not have followed the output schema. Try again.'
+      );
+    }
 
     onProgress('stage3', 'Compiling booklet\u2026');
     var raw3 = await callProvider(settings, window.generateStage3Prompt(workout, brief, dice, layerBible, campaignPlan));
