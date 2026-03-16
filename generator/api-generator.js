@@ -631,6 +631,7 @@ window.LiftRPGAPI = (function () {
     var usedFragmentRefs = [];
     var cipherProgression = [];
     var componentValues = [];
+    var overflowDocs = [];
     var binaryChoiceState = null;
 
     // Map progression from the LAST week that has a mapState
@@ -684,6 +685,16 @@ window.LiftRPGAPI = (function () {
           };
         }
       });
+
+      // Overflow document tracking
+      if (week.overflowDocument && week.overflowDocument.id) {
+        overflowDocs.push({
+          week: wn,
+          id: week.overflowDocument.id,
+          documentType: week.overflowDocument.documentType || '',
+          author: week.overflowDocument.inWorldAuthor || ''
+        });
+      }
 
       // Map state tracking
       if (fo.mapState) {
@@ -745,6 +756,7 @@ window.LiftRPGAPI = (function () {
       componentValues: componentValues,
       cipherProgression: cipherProgression,
       usedFragmentRefs: usedFragmentRefs,
+      overflowDocs: overflowDocs,
       recentOracles: recentOracles.slice(-2),
       mapProgression: mapSummary,
       binaryChoice: binaryChoiceState,
@@ -850,19 +862,130 @@ window.LiftRPGAPI = (function () {
     var summaries = [];
     weekChunkOutputs.forEach(function (chunk) {
       (chunk.weeks || []).forEach(function (w) {
+        var sessions = w.sessions || [];
+        var fo = w.fieldOps || {};
+
         var entry = {
           weekNumber: w.weekNumber,
-          title: w.title,
-          storyPrompts: (w.sessions || []).map(function (s) { return s.storyPrompt || ''; }).filter(Boolean),
-          fragmentRefs: (w.sessions || []).map(function (s) { return s.fragmentRef || ''; }).filter(Boolean),
-          binaryChoice: null,
-          overflowDocument: w.overflowDocument
-            ? { id: w.overflowDocument.id, title: w.overflowDocument.title || '' }
-            : null
+          title: w.title
         };
-        (w.sessions || []).forEach(function (s) {
-          if (s.binaryChoice) entry.binaryChoice = s.binaryChoice;
+
+        // Epigraph (truncated — may be string or {text, attribution})
+        if (w.epigraph) {
+          entry.epigraph = typeof w.epigraph === 'string'
+            ? w.epigraph.slice(0, 80)
+            : (w.epigraph.text || '').slice(0, 80);
+        }
+
+        // Session data (compact — truncated prompts, key refs only)
+        entry.sessions = sessions.map(function (s, si) {
+          var sd = { index: si + 1 };
+          if (s.label) sd.label = s.label;
+          if (s.storyPrompt) sd.storyPrompt = s.storyPrompt.slice(0, 50);
+          if (s.fragmentRef) sd.fragmentRef = s.fragmentRef;
+          return sd;
         });
+
+        // Fragment refs (flat list for quick lookup)
+        var refs = sessions.map(function (s) { return s.fragmentRef || ''; }).filter(Boolean);
+        if (refs.length > 0) entry.fragmentRefs = refs;
+
+        // Weekly component
+        var wc = w.weeklyComponent || {};
+        if (wc.value !== undefined && wc.value !== null) {
+          entry.weeklyComponent = { value: wc.value };
+          if (wc.type) entry.weeklyComponent.type = wc.type;
+          if (wc.extractionInstruction) entry.weeklyComponent.extractionInstruction = wc.extractionInstruction;
+        }
+
+        // Cipher summary
+        var cipher = fo.cipher || {};
+        if (cipher.type) {
+          entry.cipher = {
+            type: cipher.type,
+            title: (cipher.title || '').slice(0, 100)
+          };
+          if (cipher.extractionInstruction) {
+            entry.cipher.extractionInstruction = cipher.extractionInstruction.slice(0, 150);
+          }
+          if (cipher.characterDerivationProof) {
+            entry.cipher.hasProof = true;
+          }
+        }
+
+        // Oracle summary (compact — counts + fragment refs only)
+        var oracle = fo.oracleTable || fo.oracle || {};
+        var oEntries = oracle.entries || [];
+        if (oEntries.length > 0) {
+          var fragLinked = [];
+          oEntries.forEach(function (e) {
+            if (e.fragmentRef) fragLinked.push(e.fragmentRef);
+          });
+          entry.oracle = { entryCount: oEntries.length };
+          if (oracle.mode) entry.oracle.mode = oracle.mode;
+          if (fragLinked.length > 0) entry.oracle.fragmentLinked = fragLinked;
+        }
+
+        // Map state summary
+        var ms = fo.mapState;
+        if (ms) {
+          entry.mapState = {};
+          if (ms.gridDimensions) {
+            entry.mapState.gridSize = ms.gridDimensions.columns + '\u00d7' + ms.gridDimensions.rows;
+          }
+          if (ms.currentPosition) entry.mapState.currentPosition = ms.currentPosition;
+          if (ms.mapNote) entry.mapState.mapNote = ms.mapNote.slice(0, 120);
+          // Tile counts (compact)
+          var tiles = ms.tiles || [];
+          if (tiles.length > 0) {
+            var anomalyCount = 0, inaccessibleCount = 0;
+            tiles.forEach(function (t) {
+              if (t.type === 'anomaly') anomalyCount++;
+              if (t.type === 'inaccessible') inaccessibleCount++;
+            });
+            if (anomalyCount) entry.mapState.anomalyCount = anomalyCount;
+            if (inaccessibleCount) entry.mapState.inaccessibleCount = inaccessibleCount;
+          }
+        }
+
+        // Overflow document
+        if (w.overflowDocument) {
+          entry.overflowDocument = {
+            id: w.overflowDocument.id,
+            documentType: w.overflowDocument.documentType || '',
+            title: (w.overflowDocument.title || '').slice(0, 80)
+          };
+          if (w.overflowDocument.inWorldPurpose) {
+            entry.overflowDocument.inWorldPurpose = w.overflowDocument.inWorldPurpose.slice(0, 100);
+          }
+        }
+
+        // Binary choice
+        sessions.forEach(function (s) {
+          if (s.binaryChoice) {
+            entry.binaryChoice = {
+              choiceLabel: (s.binaryChoice.choiceLabel || '').slice(0, 120),
+              promptA: (s.binaryChoice.promptA || '').slice(0, 80),
+              promptB: (s.binaryChoice.promptB || '').slice(0, 80)
+            };
+          }
+        });
+
+        // Boss encounter summary
+        if (w.isBossWeek && w.bossEncounter) {
+          var boss = w.bossEncounter;
+          entry.bossEncounter = {
+            title: boss.title || '',
+            componentInputs: boss.componentInputs || []
+          };
+          if (boss.convergenceProof) {
+            entry.bossEncounter.convergenceExcerpt = boss.convergenceProof.slice(0, 200);
+          }
+          if (boss.binaryChoiceAcknowledgement) {
+            entry.bossEncounter.acknowledgesBinaryChoice = true;
+          }
+        }
+
         summaries.push(entry);
       });
     });
@@ -1017,6 +1140,127 @@ window.LiftRPGAPI = (function () {
     return { warnings: warnings };
   }
 
+  // ── Fragment batching ──────────────────────────────────────────────────
+  // Groups fragmentRegistry entries into batches by weekRef for sequential generation.
+
+  /**
+   * buildFragmentBatches(fragmentRegistry, weekSummaries) → Array<{ weekNumbers, registry, weekSummaries }>
+   *
+   * Groups registry entries into batches using weekRef associations.
+   * Strategy: one batch per week-chunk pair (weeks 1-2, 3-4, 5-6 for a 6-week booklet),
+   * with entries that lack weekRef distributed into the last batch.
+   * Overflow documents (associated by week) are included in the same batch as their week.
+   *
+   * Each batch contains:
+   *   weekNumbers: number[]         — which weeks this batch covers
+   *   registry: object[]            — registry entries for this batch
+   *   weekSummaries: object[]       — week summaries scoped to this batch
+   */
+  function buildFragmentBatches(fragmentRegistry, weekSummaries) {
+    if (!fragmentRegistry || fragmentRegistry.length === 0) return [];
+
+    // Determine week numbers from summaries
+    var allWeekNums = (weekSummaries || []).map(function (ws) { return ws.weekNumber; });
+    if (allWeekNums.length === 0) allWeekNums = [1, 2, 3, 4, 5, 6];
+
+    // Build pairs: [1,2], [3,4], [5,6] for 6-week; [1,2], [3] for 3-week, etc.
+    var pairs = [];
+    for (var i = 0; i < allWeekNums.length; i += 2) {
+      var pair = [allWeekNums[i]];
+      if (i + 1 < allWeekNums.length) pair.push(allWeekNums[i + 1]);
+      pairs.push(pair);
+    }
+
+    // Build a weekNumber → summaries lookup
+    var summaryByWeek = {};
+    (weekSummaries || []).forEach(function (ws) {
+      summaryByWeek[ws.weekNumber] = ws;
+    });
+
+    // Assign each registry entry to a pair based on weekRef
+    var pairBuckets = pairs.map(function () { return []; });
+    var unassigned = [];
+
+    fragmentRegistry.forEach(function (entry) {
+      if (entry.weekRef && typeof entry.weekRef === 'number') {
+        // Find which pair this weekRef belongs to
+        var placed = false;
+        for (var pi = 0; pi < pairs.length; pi++) {
+          if (pairs[pi].indexOf(entry.weekRef) !== -1) {
+            pairBuckets[pi].push(entry);
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) unassigned.push(entry);
+      } else {
+        unassigned.push(entry);
+      }
+    });
+
+    // Distribute unassigned entries evenly across batches (not all into last)
+    if (unassigned.length > 0) {
+      for (var ui = 0; ui < unassigned.length; ui++) {
+        var targetBucket = ui % pairBuckets.length;
+        pairBuckets[targetBucket].push(unassigned[ui]);
+      }
+    }
+
+    // Build batch objects (skip empty batches)
+    var batches = [];
+    for (var bi = 0; bi < pairs.length; bi++) {
+      if (pairBuckets[bi].length === 0) continue;
+      var batchSummaries = pairs[bi].map(function (wn) {
+        return summaryByWeek[wn];
+      }).filter(Boolean);
+      batches.push({
+        weekNumbers: pairs[bi],
+        registry: pairBuckets[bi],
+        weekSummaries: batchSummaries
+      });
+    }
+
+    return batches;
+  }
+
+  /**
+   * mergeFragmentBatches(batchOutputs, expectedRegistry) → { fragments, errors }
+   *
+   * Merges batch outputs into a single fragments array.
+   * Validates:
+   *   - no duplicate IDs across batches
+   *   - all registry IDs present in output
+   *   - final array ordered by batch sequence (deterministic)
+   */
+  function mergeFragmentBatches(batchOutputs, expectedRegistry) {
+    var merged = [];
+    var seenIds = {};
+    var errors = [];
+
+    batchOutputs.forEach(function (batchOutput, bi) {
+      var frags = (batchOutput || {}).fragments || [];
+      frags.forEach(function (f) {
+        var nid = normalizeId(f.id);
+        if (seenIds[nid]) {
+          errors.push('Duplicate fragment ID across batches: ' + f.id + ' (batch ' + (bi + 1) + ')');
+        } else {
+          seenIds[nid] = true;
+          merged.push(f);
+        }
+      });
+    });
+
+    // Check completeness against registry
+    (expectedRegistry || []).forEach(function (entry) {
+      var nid = normalizeId(entry.id);
+      if (!seenIds[nid]) {
+        errors.push('Missing fragment from batches: ' + entry.id);
+      }
+    });
+
+    return { fragments: merged, errors: errors };
+  }
+
   // ── Expanded booklet validation ─────────────────────────────────────────
   // Validates the assembled booklet. Returns array of human-readable errors.
   // Fragment ID matching is soft: "F.01" matches "F-01", "f_01", etc.
@@ -1075,15 +1319,37 @@ window.LiftRPGAPI = (function () {
       }
     });
 
-    // Collect overflow document IDs and check for collisions
+    // Collect overflow document IDs and check for collisions + required fields
     weeks.forEach(function (week, wi) {
+      var wn = 'Week ' + (wi + 1);
+      var hasOverflow = (week.sessions || []).length > 3;
       var od = week.overflowDocument;
-      if (od && od.id) {
-        var nid = normalizeId(od.id);
-        if (allDocIds[nid]) {
-          errors.push('Week ' + (wi + 1) + ' overflowDocument ID "' + od.id + '" collides with ' + (allDocIds[nid] === 'fragment' ? 'a fragment' : 'another overflow document'));
+
+      // Week alignment: overflow weeks must have overflow docs
+      if (hasOverflow && !od) {
+        errors.push(wn + ' has > 3 sessions but no overflowDocument');
+      }
+
+      if (od) {
+        // Required fields
+        if (!od.id) {
+          errors.push(wn + ' overflowDocument missing id');
         }
-        allDocIds[nid] = 'overflow';
+        if (!od.documentType) {
+          errors.push(wn + ' overflowDocument missing documentType');
+        }
+        if (!od.content && !od.body) {
+          errors.push(wn + ' overflowDocument missing content');
+        }
+
+        // ID collision check
+        if (od.id) {
+          var nid = normalizeId(od.id);
+          if (allDocIds[nid]) {
+            errors.push(wn + ' overflowDocument ID "' + od.id + '" collides with ' + (allDocIds[nid] === 'fragment' ? 'a fragment' : 'another overflow document'));
+          }
+          allDocIds[nid] = 'overflow';
+        }
       }
     });
 
@@ -1278,6 +1544,7 @@ window.LiftRPGAPI = (function () {
         typeof window.generateShellPrompt  !== 'function' ||
         typeof window.generateWeekChunkPrompt !== 'function' ||
         typeof window.generateFragmentsPrompt !== 'function' ||
+        typeof window.generateFragmentBatchPrompt !== 'function' ||
         typeof window.generateEndingsPrompt   !== 'function') {
       throw new Error('Pipeline generators not loaded. Please reload the page.');
     }
@@ -1285,7 +1552,8 @@ window.LiftRPGAPI = (function () {
     // 0. Plan the pipeline
     var weekCount = window.parseWeekCount(workout);
     var chunks = window.planWeekChunks(weekCount);
-    var totalStages = 3 + chunks.length + 2; // planning(2) + shell(1) + weeks(N) + fragments(1) + endings(1)
+    // totalStages updated after campaign plan (once we know batch count)
+    var totalStages = 3 + chunks.length + 2; // initial estimate: planning(2) + shell(1) + weeks(N) + fragments(1) + endings(1)
     var stageNum = 0;
 
     function progress(message) {
@@ -1330,6 +1598,15 @@ window.LiftRPGAPI = (function () {
       console.warn('[LiftRPG] Stage 2 missing fragmentRegistry — fragments will have no pre-assigned IDs');
       campaignPlan.fragmentRegistry = [];
     }
+    if (!campaignPlan.overflowRegistry || !Array.isArray(campaignPlan.overflowRegistry)) {
+      console.warn('[LiftRPG] Stage 2 missing overflowRegistry — overflow docs will be unplanned');
+      campaignPlan.overflowRegistry = [];
+    }
+
+    // Recalculate totalStages now that we know fragment batch count
+    var plannedFragBatches = buildFragmentBatches(campaignPlan.fragmentRegistry, null);
+    var fragBatchCount = Math.max(plannedFragBatches.length, 1); // at least 1 for monolithic fallback
+    totalStages = 3 + chunks.length + fragBatchCount + 1; // planning(2) + shell(1) + weeks(N) + fragBatches(B) + endings(1)
 
     // 3. Booklet Shell
     progress('Building booklet shell\u2026');
@@ -1380,15 +1657,60 @@ window.LiftRPGAPI = (function () {
       });
     }
 
-    // N-2. Fragments
-    progress('Generating fragments\u2026');
+    // N-2. Fragments (batched by week association)
     var weekSummaries = extractWeekSummaries(weekChunkOutputs);
-    var rawFrags = await callStage(
-      window.generateFragmentsPrompt(layerBible, campaignPlan, weekSummaries),
-      32000,
-      'Fragments'
-    );
-    var fragmentsOutput = extractJson(rawFrags);
+    var fragBatches = buildFragmentBatches(campaignPlan.fragmentRegistry, weekSummaries);
+    var fragmentsOutput;
+
+    if (fragBatches.length <= 1) {
+      // Small registry or no weekRef data — single call (monolithic fallback)
+      progress('Generating fragments\u2026');
+      var rawFrags = await callStage(
+        window.generateFragmentsPrompt(layerBible, campaignPlan, weekSummaries),
+        32000,
+        'Fragments'
+      );
+      fragmentsOutput = extractJson(rawFrags);
+    } else {
+      // Batched generation
+      var batchOutputs = [];
+      var priorFragments = [];
+
+      for (var fi = 0; fi < fragBatches.length; fi++) {
+        var batch = fragBatches[fi];
+        var batchLabel = 'Fragments ' + (fi + 1) + '/' + fragBatches.length +
+          ' (weeks ' + batch.weekNumbers.join(',') + ')';
+        progress('Generating ' + batchLabel.toLowerCase() + '\u2026');
+
+        var rawBatch = await callStage(
+          window.generateFragmentBatchPrompt(
+            layerBible,
+            batch.registry,
+            batch.weekSummaries,
+            weekSummaries,
+            priorFragments,
+            fi,
+            fragBatches.length
+          ),
+          32000,
+          batchLabel
+        );
+        var batchOutput = extractJson(rawBatch);
+        batchOutputs.push(batchOutput);
+
+        // Accumulate for continuity into next batch
+        (batchOutput.fragments || []).forEach(function (f) {
+          priorFragments.push(f);
+        });
+      }
+
+      // Merge + validate
+      var mergeResult = mergeFragmentBatches(batchOutputs, campaignPlan.fragmentRegistry);
+      if (mergeResult.errors.length > 0) {
+        console.warn('[LiftRPG] Fragment batch merge issues:', mergeResult.errors);
+      }
+      fragmentsOutput = { fragments: mergeResult.fragments };
+    }
 
     // N-1. Endings
     progress('Generating endings\u2026');
@@ -1396,7 +1718,7 @@ window.LiftRPGAPI = (function () {
     var bossWeek = lastChunkWeeks[lastChunkWeeks.length - 1] || {};
     var binaryChoiceWeek = findBinaryChoiceWeek(weekChunkOutputs);
     var rawEndings = await callStage(
-      window.generateEndingsPrompt(layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext),
+      window.generateEndingsPrompt(layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext, weekSummaries),
       8192,
       'Endings'
     );
@@ -1593,6 +1915,22 @@ window.LiftRPGAPI = (function () {
             weekRef: { type: 'integer' }
           },
           required: ['id', 'title', 'documentType', 'revealPurpose']
+        }
+      },
+      overflowRegistry: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            weekNumber: { type: 'integer' },
+            documentType: { type: 'string' },
+            author: { type: 'string' },
+            narrativeFunction: { type: 'string' },
+            tonalIntent: { type: 'string' },
+            arcRelationship: { type: 'string' }
+          },
+          required: ['id', 'weekNumber', 'documentType', 'narrativeFunction']
         }
       }
     },
@@ -1927,6 +2265,7 @@ window.LiftRPGAPI = (function () {
         typeof window.generateShellPrompt  !== 'function' ||
         typeof window.generateWeekChunkPrompt !== 'function' ||
         typeof window.generateFragmentsPrompt !== 'function' ||
+        typeof window.generateFragmentBatchPrompt !== 'function' ||
         typeof window.generateEndingsPrompt   !== 'function') {
       throw new Error('Pipeline generators not loaded. Please reload the page.');
     }
@@ -1946,7 +2285,7 @@ window.LiftRPGAPI = (function () {
 
     // Plan pipeline
     var chunks = typeof window.planWeekChunks === 'function' ? window.planWeekChunks(weekCount) : [[1, 2, 3], [4, 5, 6]];
-    var totalStages = 5;
+    var totalStages = 5; // initial estimate; updated after campaign plan
     var stageNum = 0;
 
     function progress(message) {
@@ -1993,6 +2332,15 @@ window.LiftRPGAPI = (function () {
       console.warn('[LiftRPG] Stage 2 missing fragmentRegistry \u2014 fragments will have no pre-assigned IDs');
       campaignPlan.fragmentRegistry = [];
     }
+    if (!campaignPlan.overflowRegistry || !Array.isArray(campaignPlan.overflowRegistry)) {
+      console.warn('[LiftRPG] Stage 2 missing overflowRegistry \u2014 overflow docs will be unplanned');
+      campaignPlan.overflowRegistry = [];
+    }
+
+    // Recalculate totalStages now that we know fragment batch count
+    var plannedFragBatches = buildFragmentBatches(campaignPlan.fragmentRegistry, null);
+    var fragBatchCount = Math.max(plannedFragBatches.length, 1);
+    totalStages = 3 + fragBatchCount + 1; // world+campaign(1) + shell(1) + weeks(1) + fragBatches(B) + endings(1)
 
     // Stage 2 — Booklet Shell
     progress('Building booklet shell\u2026');
@@ -2039,13 +2387,56 @@ window.LiftRPGAPI = (function () {
       });
     }
 
-    // Stage 4 — Fragments
-    progress('Generating fragments\u2026');
+    // Stage 4 — Fragments (batched by week association)
     var weekSummaries = extractWeekSummaries(weekChunkOutputs);
-    var fragmentsOutput = await callStage(
-      window.generateFragmentsPrompt(layerBible, campaignPlan, weekSummaries),
-      STRUCTURED_SCHEMA_FRAGMENTS, 32000, 'Fragments'
-    );
+    var fragBatches = buildFragmentBatches(campaignPlan.fragmentRegistry, weekSummaries);
+    var fragmentsOutput;
+
+    if (fragBatches.length <= 1) {
+      // Small registry or no weekRef data — single call (monolithic fallback)
+      progress('Generating fragments\u2026');
+      fragmentsOutput = await callStage(
+        window.generateFragmentsPrompt(layerBible, campaignPlan, weekSummaries),
+        STRUCTURED_SCHEMA_FRAGMENTS, 32000, 'Fragments'
+      );
+    } else {
+      // Batched generation
+      var batchOutputs = [];
+      var priorFragments = [];
+
+      for (var fi = 0; fi < fragBatches.length; fi++) {
+        var batch = fragBatches[fi];
+        var batchLabel = 'Fragments ' + (fi + 1) + '/' + fragBatches.length +
+          ' (weeks ' + batch.weekNumbers.join(',') + ')';
+        progress('Generating ' + batchLabel.toLowerCase() + '\u2026');
+
+        var batchOutput = await callStage(
+          window.generateFragmentBatchPrompt(
+            layerBible,
+            batch.registry,
+            batch.weekSummaries,
+            weekSummaries,
+            priorFragments,
+            fi,
+            fragBatches.length
+          ),
+          STRUCTURED_SCHEMA_FRAGMENTS, 32000, batchLabel
+        );
+        batchOutputs.push(batchOutput);
+
+        // Accumulate for continuity into next batch
+        (batchOutput.fragments || []).forEach(function (f) {
+          priorFragments.push(f);
+        });
+      }
+
+      // Merge + validate
+      var mergeResult = mergeFragmentBatches(batchOutputs, campaignPlan.fragmentRegistry);
+      if (mergeResult.errors.length > 0) {
+        console.warn('[LiftRPG] Fragment batch merge issues:', mergeResult.errors);
+      }
+      fragmentsOutput = { fragments: mergeResult.fragments };
+    }
 
     // Stage 5 — Endings
     progress('Generating endings\u2026');
@@ -2053,7 +2444,7 @@ window.LiftRPGAPI = (function () {
     var bossWeek = lastChunkWeeks[lastChunkWeeks.length - 1] || {};
     var binaryChoiceWeek = findBinaryChoiceWeek(weekChunkOutputs);
     var endingsOutput = await callStage(
-      window.generateEndingsPrompt(layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext),
+      window.generateEndingsPrompt(layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext, weekSummaries),
       STRUCTURED_SCHEMA_ENDINGS, 8192, 'Endings'
     );
 

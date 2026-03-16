@@ -1147,6 +1147,17 @@
         weekRef: 1,
         sessionRef: null
       }
+    ],
+    overflowRegistry: [
+      {
+        id: 'F.30',
+        weekNumber: 1,
+        documentType: '',
+        author: '',
+        narrativeFunction: '',
+        tonalIntent: '',
+        arcRelationship: ''
+      }
     ]
   }, null, 2);
 
@@ -1281,6 +1292,19 @@
       '- Fragment purposes should escalate: early fragments establish setting, midpoint fragments',
       '  recontextualize, late fragments reveal hidden truths or betray expectations.',
       '- Aim for 15-22 fragments total, distributed across all non-boss weeks.',
+      '',
+      '## Overflow Document Registry',
+      '- Overflow documents appear on weeks where sessions > 3 (the right-side page becomes a found document).',
+      '- Plan one overflow document per overflow week. Use IDs starting at F.30 (F.30, F.31, F.32, ...).',
+      '- Overflow IDs must NOT collide with fragment IDs.',
+      '- Each entry: { id, weekNumber, documentType (memo/fieldNote/inspection/report/',
+      '  transcript/correspondence/anomaly/form), author (named character from relationship web),',
+      '  narrativeFunction (what this document does for the story), tonalIntent (how it should feel),',
+      '  arcRelationship (how it connects to this week&apos;s arc beat or the mystery&apos;s progression) }.',
+      '- Overflow documents form a secondary narrative spine: early overflow documents establish institutional',
+      '  voice and procedural norms. Midpoint overflow documents introduce contradictions or cover-ups.',
+      '  Late overflow documents deliver revelations that reframe earlier documents.',
+      '- At least one overflow document should directly contradict or complicate a fragment from a different week.',
       '',
       '## Output Rules',
       '- Return compact JSON only, matching the schema below exactly.',
@@ -1546,6 +1570,19 @@
       ''
     ];
 
+    // Overflow document plan — inject planned overflow docs for these weeks
+    var overflowRegistry = campaignPlan.overflowRegistry || [];
+    var relevantOverflows = overflowRegistry.filter(function (entry) {
+      return weekNumbers.indexOf(entry.weekNumber) !== -1;
+    });
+    if (relevantOverflows.length > 0) {
+      parts.push('### Planned Overflow Documents (generate these exactly when overflow is true)');
+      parts.push('When a week has > 3 sessions, it gets overflow: true and needs an overflowDocument.');
+      parts.push('Use the planned document below instead of inventing one:');
+      parts.push(JSON.stringify(relevantOverflows, null, 2));
+      parts.push('');
+    }
+
     // Shell-level narrative constraints (voice, register, world contract)
     if (shellContext) {
       parts.push('### Narrative Constraints (from booklet shell — follow these exactly)');
@@ -1599,6 +1636,15 @@
       // Fragment refs already used (avoid re-assigning)
       if (continuity.usedFragmentRefs && continuity.usedFragmentRefs.length > 0) {
         parts.push('**Fragment IDs already assigned** (do not reuse): ' + continuity.usedFragmentRefs.join(', '));
+        parts.push('');
+      }
+
+      // Overflow documents generated so far
+      if (continuity.overflowDocs && continuity.overflowDocs.length > 0) {
+        parts.push('**Overflow documents generated:**');
+        continuity.overflowDocs.forEach(function (od) {
+          parts.push('- Week ' + od.week + ': ' + od.id + ' (' + od.documentType + (od.author ? ' by ' + od.author : '') + ')');
+        });
         parts.push('');
       }
 
@@ -1674,6 +1720,13 @@
       if (pw.isBossWeek) {
         parts.push('  This is the BOSS week — use bossEncounter instead of fieldOps.');
       }
+      // Flag planned overflow doc for this week
+      var plannedOF = relevantOverflows.filter(function (o) { return o.weekNumber === pw.weekNumber; })[0];
+      if (plannedOF) {
+        parts.push('  This week has a planned overflow document: ' + plannedOF.id +
+          ' (' + plannedOF.documentType + ' by ' + (plannedOF.author || 'unknown') +
+          '). Use this plan for the overflowDocument field.');
+      }
     });
     parts.push('');
     parts.push('---');
@@ -1714,29 +1767,183 @@
       JSON.stringify(layerBible),
       '',
       '### Campaign Narrative (what happened in the weeks — use for cross-references)',
-      JSON.stringify(weekSummaries, null, 2),
-      '',
-      '---',
-      '',
-      '## Fragment Quality Requirements',
-      '- Generate exactly one fragment per registry entry, using the assigned IDs.',
-      '- Each fragment is a found document that could exist inside the fiction.',
-      '- Authors from the relationship web should reveal their blind spots, not just their knowledge.',
-      '- Different characters noticing different things about the same event is more powerful',
-      '  than different characters knowing different facts.',
-      '- Early fragments establish setting. Midpoint fragments recontextualize. Late fragments',
-      '  reveal hidden truths or betray expectations.',
-      '- At least one incident, place, procedure, or relationship should recur across',
-      '  multiple document perspectives.',
-      '- Fragments may arrive as threaded packets, route updates, contradictory records,',
-      '  or personal aftershocks — not just isolated lore drops.',
-      '- Include at least three linked functions: one action-changing artifact, one',
-      '  interpretation-changing artifact, and one character-deepening artifact.',
-      '',
-      '---',
-      '',
-      INSTRUCTIONS
+      ''
     ];
+
+    renderWeekSummaryLines(parts, weekSummaries);
+
+    parts.push('---');
+    parts.push('');
+    parts.push('## Fragment Quality Requirements');
+    parts.push('- Generate exactly one fragment per registry entry, using the assigned IDs.');
+    parts.push('- Each fragment is a found document that could exist inside the fiction.');
+    parts.push('- Authors from the relationship web should reveal their blind spots, not just their knowledge.');
+    parts.push('- Different characters noticing different things about the same event is more powerful');
+    parts.push('  than different characters knowing different facts.');
+    parts.push('- Early fragments establish setting. Midpoint fragments recontextualize. Late fragments');
+    parts.push('  reveal hidden truths or betray expectations.');
+    parts.push('- At least one incident, place, procedure, or relationship should recur across');
+    parts.push('  multiple document perspectives.');
+    parts.push('- Fragments may arrive as threaded packets, route updates, contradictory records,');
+    parts.push('  or personal aftershocks \u2014 not just isolated lore drops.');
+    parts.push('- Include at least three linked functions: one action-changing artifact, one');
+    parts.push('  interpretation-changing artifact, and one character-deepening artifact.');
+    parts.push('');
+    parts.push('---');
+    parts.push('');
+    parts.push(INSTRUCTIONS);
+
+    return parts.join('\n');
+  };
+
+  /**
+   * Internal: render week summary lines into a parts array.
+   * Shared between monolithic and batch fragment prompts.
+   */
+  function renderWeekSummaryLines(parts, weekSummaries) {
+    (weekSummaries || []).forEach(function (ws) {
+      parts.push('**Week ' + ws.weekNumber + ': ' + ws.title + '**');
+      if (ws.sessions) {
+        ws.sessions.forEach(function (s) {
+          if (s.storyPrompt) {
+            parts.push('- Session ' + s.index + ': ' + s.storyPrompt.slice(0, 120));
+          }
+        });
+      }
+      if (ws.fragmentRefs && ws.fragmentRefs.length > 0) {
+        parts.push('- Session fragmentRefs: ' + ws.fragmentRefs.join(', '));
+      }
+      if (ws.cipher) {
+        var cipherLine = '- Cipher (' + ws.cipher.type + '): ' + ws.cipher.title;
+        if (ws.cipher.extractionInstruction) {
+          cipherLine += ' \u2014 ' + ws.cipher.extractionInstruction;
+        }
+        parts.push(cipherLine);
+      }
+      if (ws.oracle && ws.oracle.fragmentLinked && ws.oracle.fragmentLinked.length > 0) {
+        parts.push('- Oracle fragment refs: ' + ws.oracle.fragmentLinked.join(', '));
+      }
+      if (ws.overflowDocument) {
+        parts.push('- Overflow doc: ' + ws.overflowDocument.id + ' (' + ws.overflowDocument.documentType + ')');
+      }
+      if (ws.mapState && ws.mapState.mapNote) {
+        parts.push('- Map note: ' + ws.mapState.mapNote);
+      }
+      if (ws.weeklyComponent) {
+        parts.push('- Component value: ' + ws.weeklyComponent.value);
+      }
+      if (ws.binaryChoice) {
+        parts.push('- BINARY CHOICE: ' + ws.binaryChoice.choiceLabel);
+      }
+      if (ws.bossEncounter) {
+        parts.push('- BOSS: ' + ws.bossEncounter.title + ' \u2014 inputs: [' + (ws.bossEncounter.componentInputs || []).join(', ') + ']');
+      }
+      parts.push('');
+    });
+  }
+
+  /**
+   * Stage N-2 (API pipeline): Fragment Batch — subset of fragments for specific weeks.
+   *
+   * @param {object} layerBible - Stage 1 output
+   * @param {object[]} batchRegistry - Subset of fragmentRegistry entries for this batch
+   * @param {object[]} batchWeekSummaries - Week summaries relevant to this batch
+   * @param {object[]} allWeekSummaries - Full week summaries (for cross-reference context)
+   * @param {object[]} priorFragments - Fragments from earlier batches (for continuity)
+   * @param {number} batchIndex - 0-based batch index
+   * @param {number} totalBatches - Total number of batches
+   */
+  window.generateFragmentBatchPrompt = function (layerBible, batchRegistry, batchWeekSummaries, allWeekSummaries, priorFragments, batchIndex, totalBatches) {
+    var parts = [
+      '# Generate Fragment Batch ' + (batchIndex + 1) + ' of ' + totalBatches,
+      '',
+      'Generate a partial JSON object with a single `fragments` array.',
+      'This batch contains ' + batchRegistry.length + ' fragments.',
+      'Output ONLY the fragments array. Do not output weeks, meta, or endings.',
+      '',
+      '---',
+      '',
+      SCHEMA_FRAGS,
+      '',
+      '---',
+      '',
+      '## Fragment Registry (your contract — generate exactly these fragments)',
+      '',
+      JSON.stringify(batchRegistry, null, 2),
+      '',
+      '## Reference Context',
+      '',
+      '### Approved Layer Bible',
+      JSON.stringify(layerBible),
+      ''
+    ];
+
+    // Prior fragments from earlier batches — establishes voice, variety, continuity
+    if (priorFragments && priorFragments.length > 0) {
+      parts.push('### Already-Generated Fragments (earlier batches — maintain voice continuity, avoid repetition)');
+      parts.push('');
+      priorFragments.forEach(function (f) {
+        var line = '- **' + f.id + '** (' + f.documentType + ')';
+        if (f.inWorldAuthor) line += ' by ' + f.inWorldAuthor;
+        if (f.inWorldPurpose) line += ' \u2014 ' + f.inWorldPurpose;
+        parts.push(line);
+      });
+      parts.push('');
+    }
+
+    // Primary context: weeks this batch is associated with
+    parts.push('### Campaign Narrative \u2014 Focus Weeks');
+    parts.push('');
+    renderWeekSummaryLines(parts, batchWeekSummaries);
+
+    // Broader context: other weeks (compact, for cross-reference only)
+    var focusWeekNums = {};
+    batchWeekSummaries.forEach(function (ws) { focusWeekNums[ws.weekNumber] = true; });
+    var otherWeeks = (allWeekSummaries || []).filter(function (ws) {
+      return !focusWeekNums[ws.weekNumber];
+    });
+    if (otherWeeks.length > 0) {
+      parts.push('### Other Weeks (for cross-reference only)');
+      parts.push('');
+      otherWeeks.forEach(function (ws) {
+        var line = '**Week ' + ws.weekNumber + ': ' + ws.title + '**';
+        if (ws.fragmentRefs && ws.fragmentRefs.length > 0) {
+          line += ' \u2014 refs: ' + ws.fragmentRefs.join(', ');
+        }
+        parts.push(line);
+      });
+      parts.push('');
+    }
+
+    parts.push('---');
+    parts.push('');
+    parts.push('## Fragment Quality Requirements');
+    parts.push('- Generate exactly one fragment per registry entry, using the assigned IDs.');
+    parts.push('- Each fragment is a found document that could exist inside the fiction.');
+    parts.push('- Authors from the relationship web should reveal their blind spots, not just their knowledge.');
+    parts.push('- Different characters noticing different things about the same event is more powerful');
+    parts.push('  than different characters knowing different facts.');
+
+    if (batchIndex === 0) {
+      parts.push('- This is the first batch: establish the documentary voice, setting texture, and recurring');
+      parts.push('  incidents that later fragments will recontextualize.');
+    } else if (batchIndex === totalBatches - 1) {
+      parts.push('- This is the final batch: these fragments should recontextualize earlier material,');
+      parts.push('  reveal hidden truths, or betray expectations set by earlier documents.');
+    } else {
+      parts.push('- This is a middle batch: deepen the web of contradictions and perspectives.');
+      parts.push('  Refer to specific details from earlier fragments. Recontextualize, do not just add.');
+    }
+
+    parts.push('- Include at least one linked function per batch: action-changing, interpretation-changing,');
+    parts.push('  or character-deepening artifact.');
+    parts.push('- Fragments may arrive as threaded packets, route updates, contradictory records,');
+    parts.push('  or personal aftershocks \u2014 not just isolated lore drops.');
+    parts.push('');
+    parts.push('---');
+    parts.push('');
+    parts.push(INSTRUCTIONS);
+
     return parts.join('\n');
   };
 
@@ -1748,8 +1955,9 @@
    * @param {object} bossWeek - The generated boss week object
    * @param {object|null} binaryChoiceWeek - The generated binary choice week, if found
    * @param {object|null} shellContext - Shell-level narrative constraints { worldContract, narrativeVoice, literaryRegister, structuralShape }
+   * @param {object[]|null} weekSummaries - Enriched week summaries for narrative arc context
    */
-  window.generateEndingsPrompt = function (layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext) {
+  window.generateEndingsPrompt = function (layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext, weekSummaries) {
     var parts = [
       '# Generate Endings',
       '',
@@ -1819,6 +2027,43 @@
       structuralShape: (layerBible.storyLayer || {}).resolutionMode
     }, null, 2));
     parts.push('');
+
+    // Narrative arc from week summaries — ending must pay off these threads
+    if (weekSummaries && weekSummaries.length > 0) {
+      parts.push('### Narrative Arc (what happened across all weeks)');
+      parts.push('');
+      weekSummaries.forEach(function (ws) {
+        var line = '**Week ' + ws.weekNumber + ': ' + ws.title + '**';
+        parts.push(line);
+
+        // Key story beats
+        if (ws.sessions) {
+          ws.sessions.forEach(function (s) {
+            if (s.storyPrompt) {
+              parts.push('- ' + s.storyPrompt.slice(0, 100));
+            }
+          });
+        }
+
+        // Component value — convergence chain
+        if (ws.weeklyComponent) {
+          parts.push('- Component: ' + ws.weeklyComponent.value);
+        }
+
+        // Binary choice
+        if (ws.binaryChoice) {
+          parts.push('- BINARY CHOICE: ' + ws.binaryChoice.choiceLabel);
+        }
+
+        // Boss
+        if (ws.bossEncounter) {
+          parts.push('- BOSS: ' + ws.bossEncounter.title);
+        }
+
+        parts.push('');
+      });
+    }
+
     parts.push('---');
     parts.push('');
     parts.push('## Ending Requirements');
