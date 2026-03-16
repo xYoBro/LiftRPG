@@ -1640,9 +1640,14 @@
           updatePips(current, total);
         }
 
+        var useStructured = isDeep && provider === 'gemini'
+          && typeof window.LiftRPGAPI.generateStructured === 'function';
         var generateFn = isDeep
-          ? function () { return window.LiftRPGAPI.generateMultiStage(settings, workout, brief, dice, onProgress); }
+          ? (useStructured
+            ? function () { return window.LiftRPGAPI.generateStructured(settings, workout, brief, dice, onProgress); }
+            : function () { return window.LiftRPGAPI.generateMultiStage(settings, workout, brief, dice, onProgress); })
           : function () { return window.LiftRPGAPI.generate(settings, workout, brief, dice); };
+        if (useStructured) console.log('[LiftRPG] Using structured generation (Gemini native)');
 
         generateFn()
           .then(function (data) {
