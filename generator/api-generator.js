@@ -1830,11 +1830,12 @@ window.LiftRPGAPI = (function () {
           companionSurfaces: { type: 'array', items: { type: 'string' } },
           revisitLogic: { type: 'string' },
           boardStateArc: { type: 'string' },
-          bossConvergence: { type: 'string' }
+          bossConvergence: { type: 'string' },
+          informationLayers: { type: 'string' }
         },
         required: ['coreLoop', 'persistentTopology', 'majorZones', 'gatesAndKeys',
           'progressionGates', 'persistentPressures', 'companionSurfaces',
-          'revisitLogic', 'boardStateArc', 'bossConvergence']
+          'revisitLogic', 'boardStateArc', 'bossConvergence', 'informationLayers']
       },
       governingLayer: {
         type: 'object',
@@ -1848,9 +1849,77 @@ window.LiftRPGAPI = (function () {
         required: ['institutionName', 'departments', 'proceduresThatAffectPlay',
           'recordsAndForms', 'documentVoiceRules']
       },
-      designPrinciples: { type: 'array', items: { type: 'string' } }
+      designPrinciples: { type: 'array', items: { type: 'string' } },
+      designLedger: {
+        type: 'object',
+        properties: {
+          mysteryQuestions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                question: { type: 'string' },
+                answerableFrom: { type: 'string' },
+                revealTiming: { type: 'string' }
+              },
+              required: ['question', 'answerableFrom', 'revealTiming']
+            }
+          },
+          falseAssumptions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                assumption: { type: 'string' },
+                plantedBy: { type: 'string' },
+                correctedBy: { type: 'string' }
+              },
+              required: ['assumption', 'plantedBy', 'correctedBy']
+            }
+          },
+          motifPayoffs: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                motif: { type: 'string' },
+                firstAppearance: { type: 'string' },
+                transformation: { type: 'string' },
+                payoff: { type: 'string' }
+              },
+              required: ['motif', 'firstAppearance', 'transformation', 'payoff']
+            }
+          },
+          weekTransformations: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                week: { type: 'integer' },
+                understandingShift: { type: 'string' },
+                stateChange: { type: 'string' },
+                framingChange: { type: 'string' }
+              },
+              required: ['week', 'understandingShift', 'stateChange', 'framingChange']
+            }
+          },
+          clueEconomy: {
+            type: 'object',
+            properties: {
+              hardClues: { type: 'array', items: { type: 'string' } },
+              softClues: { type: 'array', items: { type: 'string' } },
+              misdirections: { type: 'array', items: { type: 'string' } },
+              confirmations: { type: 'array', items: { type: 'string' } }
+            },
+            required: ['hardClues', 'softClues', 'misdirections', 'confirmations']
+          },
+          finalRevealRecontextualizes: { type: 'string' }
+        },
+        required: ['mysteryQuestions', 'falseAssumptions', 'motifPayoffs',
+          'weekTransformations', 'clueEconomy', 'finalRevealRecontextualizes']
+      }
     },
-    required: ['storyLayer', 'gameLayer', 'governingLayer', 'designPrinciples']
+    required: ['storyLayer', 'gameLayer', 'governingLayer', 'designPrinciples', 'designLedger']
   };
 
   var STRUCTURED_SCHEMA_CAMPAIGN = {
@@ -1912,9 +1981,10 @@ window.LiftRPGAPI = (function () {
             documentType: { type: 'string' },
             author: { type: 'string' },
             revealPurpose: { type: 'string' },
+            clueFunction: { type: 'string', enum: ['establishes', 'complicates', 'reveals'] },
             weekRef: { type: 'integer' }
           },
-          required: ['id', 'title', 'documentType', 'revealPurpose']
+          required: ['id', 'title', 'documentType', 'revealPurpose', 'clueFunction']
         }
       },
       overflowRegistry: {
@@ -1937,6 +2007,38 @@ window.LiftRPGAPI = (function () {
     required: ['topology', 'weeks', 'bossPlan', 'fragmentRegistry']
   };
 
+  // ── Shared sub-schemas for reuse across structured schemas ──────────────
+
+  var DOCUMENT_TYPE_ENUM = ['memo', 'report', 'inspection', 'fieldNote',
+    'correspondence', 'letter', 'transcript', 'form', 'anomaly'];
+
+  var DESIGN_SPEC_SCHEMA = {
+    type: 'object',
+    properties: {
+      paperTone: { type: 'string', enum: ['cold', 'warm', 'aged', 'clinical', 'weathered', 'official', 'faded'] },
+      primaryTypeface: { type: 'string', enum: ['mono', 'serif', 'sans', 'mixed', 'handwritten'] },
+      headerStyle: { type: 'string', enum: ['form', 'letterhead', 'stamp', 'handwritten', 'typewriter', 'none'] },
+      hasRedactions: { type: 'boolean' },
+      hasAnnotations: { type: 'boolean' }
+    }
+  };
+
+  var AUTHENTICITY_CHECKS_SCHEMA = {
+    type: 'object',
+    properties: {
+      hasIrrelevantDetail: { type: 'boolean' },
+      couldExistInDifferentStory: { type: 'boolean' },
+      redactionDoesNarrativeWork: { type: 'boolean' }
+    }
+  };
+
+  var TILE_TYPE_ENUM = ['empty', 'cleared', 'locked', 'anomaly', 'current', 'inaccessible'];
+  var MAP_TYPE_ENUM = ['grid', 'point-to-point', 'linear-track', 'player-drawn'];
+  var VISUAL_ARCHETYPE_ENUM = ['government', 'cyberpunk', 'scifi', 'fantasy', 'noir',
+    'steampunk', 'minimalist', 'nautical', 'occult', 'pastoral'];
+
+  // ── STRUCTURED_SCHEMA_SHELL ───────────────────────────────────────────────
+
   var STRUCTURED_SCHEMA_SHELL = {
     type: 'object',
     properties: {
@@ -1948,9 +2050,35 @@ window.LiftRPGAPI = (function () {
           blockTitle: { type: 'string' },
           blockSubtitle: { type: 'string' },
           worldContract: { type: 'string' },
-          narrativeVoice: { type: 'object' },
-          literaryRegister: { type: 'object' },
-          structuralShape: { type: 'object' },
+          narrativeVoice: {
+            type: 'object',
+            properties: {
+              person: { type: 'string', enum: ['first', 'second', 'third'] },
+              tense: { type: 'string', enum: ['past', 'present'] },
+              narratorStance: { type: 'string' },
+              voiceRationale: { type: 'string' }
+            },
+            required: ['person', 'tense', 'narratorStance']
+          },
+          literaryRegister: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              behaviorDescription: { type: 'string' },
+              forbiddenMoves: { type: 'array', items: { type: 'string' } }
+            },
+            required: ['name', 'behaviorDescription', 'forbiddenMoves']
+          },
+          structuralShape: {
+            type: 'object',
+            properties: {
+              resolution: { type: 'string', enum: ['full', 'partial', 'ambiguous', 'open'] },
+              temporalOrder: { type: 'string', enum: ['linear', 'fragmented', 'reverse', 'parallel'] },
+              narratorReliability: { type: 'string', enum: ['reliable', 'unreliable', 'multiple', 'shifting'] },
+              promptFragmentRelationship: { type: 'string', enum: ['fragments-deepen', 'fragments-contradict', 'fragments-parallel', 'fragments-precede'] }
+            },
+            required: ['resolution', 'temporalOrder', 'narratorReliability', 'promptFragmentRelationship']
+          },
           weeklyComponentType: { type: 'string' },
           passwordLength: { type: 'integer' },
           passwordEncryptedEnding: { type: 'string' },
@@ -2000,7 +2128,7 @@ window.LiftRPGAPI = (function () {
       theme: {
         type: 'object',
         properties: {
-          visualArchetype: { type: 'string' },
+          visualArchetype: { type: 'string', enum: VISUAL_ARCHETYPE_ENUM },
           palette: {
             type: 'object',
             properties: {
@@ -2033,7 +2161,8 @@ window.LiftRPGAPI = (function () {
               properties: {
                 text: { type: 'string' },
                 attribution: { type: 'string' }
-              }
+              },
+              required: ['text', 'attribution']
             },
             isBossWeek: { type: 'boolean' },
             isDeload: { type: 'boolean' },
@@ -2085,9 +2214,93 @@ window.LiftRPGAPI = (function () {
             fieldOps: {
               type: 'object',
               properties: {
-                mapState: { type: 'object' },
-                cipher: { type: 'object' },
-                oracleTable: { type: 'object' },
+                mapState: {
+                  type: 'object',
+                  properties: {
+                    mapType: { type: 'string', enum: MAP_TYPE_ENUM },
+                    gridDimensions: {
+                      type: 'object',
+                      properties: {
+                        columns: { type: 'integer' },
+                        rows: { type: 'integer' }
+                      },
+                      required: ['columns', 'rows']
+                    },
+                    floorLabel: { type: 'string' },
+                    currentPosition: {
+                      type: 'object',
+                      properties: {
+                        col: { type: 'integer' },
+                        row: { type: 'integer' }
+                      },
+                      required: ['col', 'row']
+                    },
+                    mapNote: { type: 'string' },
+                    tiles: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          col: { type: 'integer' },
+                          row: { type: 'integer' },
+                          type: { type: 'string', enum: TILE_TYPE_ENUM },
+                          label: { type: 'string' },
+                          annotation: { type: 'string' }
+                        },
+                        required: ['col', 'row', 'type', 'label']
+                      }
+                    }
+                  },
+                  required: ['gridDimensions', 'currentPosition', 'tiles']
+                },
+                cipher: {
+                  type: 'object',
+                  properties: {
+                    type: { type: 'string' },
+                    title: { type: 'string' },
+                    body: {
+                      type: 'object',
+                      properties: {
+                        displayText: { type: 'string' },
+                        key: { type: 'string' },
+                        workSpace: {
+                          type: 'object',
+                          properties: {
+                            rows: { type: 'integer' },
+                            style: { type: 'string' }
+                          }
+                        }
+                      },
+                      required: ['displayText', 'key']
+                    },
+                    extractionInstruction: { type: 'string' },
+                    characterDerivationProof: { type: 'string' }
+                  },
+                  required: ['type', 'title', 'body', 'extractionInstruction', 'characterDerivationProof']
+                },
+                oracleTable: {
+                  type: 'object',
+                  properties: {
+                    title: { type: 'string' },
+                    instruction: { type: 'string' },
+                    mode: { type: 'string', enum: ['simple', 'full'] },
+                    entries: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          roll: { type: 'string' },
+                          text: { type: 'string' },
+                          type: { type: 'string', enum: ['fragment', 'consequence'] },
+                          fragmentRef: { type: 'string' },
+                          paperAction: { type: 'string' }
+                        },
+                        required: ['roll', 'text', 'type']
+                      }
+                    }
+                  },
+                  required: ['title', 'instruction', 'mode', 'entries']
+                },
                 companionComponents: { type: 'array', items: { type: 'object' } }
               }
             },
@@ -2098,14 +2311,67 @@ window.LiftRPGAPI = (function () {
                 narrative: { type: 'string' },
                 mechanismDescription: { type: 'string' },
                 componentInputs: { type: 'array', items: { type: 'string' } },
-                decodingKey: { type: 'object' },
+                decodingKey: {
+                  type: 'object',
+                  properties: {
+                    instruction: { type: 'string' },
+                    referenceTable: { type: 'string' }
+                  },
+                  required: ['instruction', 'referenceTable']
+                },
                 convergenceProof: { type: 'string' },
-                passwordRevealInstruction: { type: 'string' }
-              }
+                passwordRevealInstruction: { type: 'string' },
+                binaryChoiceAcknowledgement: {
+                  type: 'object',
+                  properties: {
+                    ifA: { type: 'string' },
+                    ifB: { type: 'string' }
+                  },
+                  required: ['ifA', 'ifB']
+                }
+              },
+              required: ['title', 'narrative', 'mechanismDescription', 'componentInputs',
+                'decodingKey', 'passwordRevealInstruction']
             },
-            overflowDocument: { type: 'object' },
-            interlude: { type: 'object' },
-            gameplayClocks: { type: 'array', items: { type: 'object' } }
+            overflowDocument: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                documentType: { type: 'string', enum: DOCUMENT_TYPE_ENUM },
+                inWorldAuthor: { type: 'string' },
+                inWorldRecipient: { type: 'string' },
+                inWorldPurpose: { type: 'string' },
+                content: { type: 'string' },
+                designSpec: DESIGN_SPEC_SCHEMA,
+                authenticityChecks: AUTHENTICITY_CHECKS_SCHEMA
+              },
+              required: ['id', 'documentType', 'content']
+            },
+            interlude: {
+              type: 'object',
+              properties: {
+                title: { type: 'string' },
+                reason: { type: 'string' },
+                body: { type: 'string' },
+                payloadType: { type: 'string' },
+                payload: { type: 'object' },
+                spreadAware: { type: 'boolean' }
+              },
+              required: ['title', 'reason', 'body']
+            },
+            gameplayClocks: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  segments: { type: 'integer' },
+                  startValue: { type: 'integer' },
+                  direction: { type: 'string', enum: ['fill', 'drain'] }
+                },
+                required: ['name', 'segments']
+              }
+            }
           },
           required: ['weekNumber', 'title', 'isBossWeek', 'sessions', 'weeklyComponent']
         }
@@ -2123,29 +2389,13 @@ window.LiftRPGAPI = (function () {
           type: 'object',
           properties: {
             id: { type: 'string' },
-            documentType: { type: 'string' },
+            documentType: { type: 'string', enum: DOCUMENT_TYPE_ENUM },
             inWorldAuthor: { type: 'string' },
             inWorldRecipient: { type: 'string' },
             inWorldPurpose: { type: 'string' },
             content: { type: 'string' },
-            designSpec: {
-              type: 'object',
-              properties: {
-                paperTone: { type: 'string' },
-                primaryTypeface: { type: 'string' },
-                headerStyle: { type: 'string' },
-                hasRedactions: { type: 'boolean' },
-                hasAnnotations: { type: 'boolean' }
-              }
-            },
-            authenticityChecks: {
-              type: 'object',
-              properties: {
-                hasIrrelevantDetail: { type: 'boolean' },
-                couldExistInDifferentStory: { type: 'boolean' },
-                redactionDoesNarrativeWork: { type: 'boolean' }
-              }
-            }
+            designSpec: DESIGN_SPEC_SCHEMA,
+            authenticityChecks: AUTHENTICITY_CHECKS_SCHEMA
           },
           required: ['id', 'documentType', 'content']
         }
@@ -2162,11 +2412,11 @@ window.LiftRPGAPI = (function () {
         items: {
           type: 'object',
           properties: {
-            variant: { type: 'string' },
+            variant: { type: 'string', enum: ['canonical', 'bittersweet', 'dark', 'ambiguous'] },
             content: {
               type: 'object',
               properties: {
-                documentType: { type: 'string' },
+                documentType: { type: 'string', enum: DOCUMENT_TYPE_ENUM },
                 body: { type: 'string' },
                 finalLine: { type: 'string' }
               },

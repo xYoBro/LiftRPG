@@ -894,6 +894,19 @@
     '- Choose at least one mechanic family, document family, or expected beat to exclude on purpose. Identity comes from selected absence as much as inclusion.',
     '- Avoid cookie-cutter arcs where each week is just clue -> stranger clue -> boss reveal.',
     '',
+    '## Anti-Generic Doctrine',
+    '- Every content field must earn its space by revealing, recontextualizing,',
+    '  altering state, or exposing character through omission. No atmospheric filler.',
+    '- No fragment should be transplantable unchanged into a different booklet.',
+    '  If you removed the proper nouns, would it still feel specific? If yes, rewrite.',
+    '- Later weeks must recontextualize earlier elements. Do not merely intensify',
+    '  atmosphere or add more weirdness. The player&apos;s understanding must change.',
+    '- Documents are authored for in-world purpose, not to impress the reader.',
+    '  The author of each document does not know they are in a game.',
+    '- Final reveals must resolve prior evidence, not introduce new core facts.',
+    '- Endings pay off named earlier specifics (places, objects, phrases, relationships),',
+    '  not summarize the plot.',
+    '',
     '## Anti-Patterns (hard reject)',
     '- NEVER write story prompts that are gym metaphors ("your muscles burn like the reactor core", "each rep forges the blade"). The workout is real. The story is fiction. They fuse through timing and tension, not literal mapping.',
     '- NEVER create one-off maps that share no topology between weeks. The player must learn and master a persistent space.',
@@ -1091,7 +1104,8 @@
       companionSurfaces: [],
       revisitLogic: '',
       boardStateArc: '',
-      bossConvergence: ''
+      bossConvergence: '',
+      informationLayers: ''
     },
     governingLayer: {
       institutionName: '',
@@ -1100,7 +1114,28 @@
       recordsAndForms: [],
       documentVoiceRules: []
     },
-    designPrinciples: []
+    designPrinciples: [],
+    designLedger: {
+      mysteryQuestions: [
+        { question: '', answerableFrom: '', revealTiming: '' }
+      ],
+      falseAssumptions: [
+        { assumption: '', plantedBy: '', correctedBy: '' }
+      ],
+      motifPayoffs: [
+        { motif: '', firstAppearance: '', transformation: '', payoff: '' }
+      ],
+      weekTransformations: [
+        { week: 1, understandingShift: '', stateChange: '', framingChange: '' }
+      ],
+      clueEconomy: {
+        hardClues: [],
+        softClues: [],
+        misdirections: [],
+        confirmations: []
+      },
+      finalRevealRecontextualizes: ''
+    }
   }, null, 2);
 
   var STAGE2_OUTPUT_SCHEMA = JSON.stringify({
@@ -1144,6 +1179,7 @@
         documentType: '',
         author: '',
         revealPurpose: '',
+        clueFunction: '',
         weekRef: 1,
         sessionRef: null
       }
@@ -1166,11 +1202,19 @@
     var parts = [
       '# Stage 1 — Layer Bible',
       '',
-      'You are architecting a LiftRPG print-and-play zine. This is planning only.',
-      'Do not output the final booklet JSON. Return the compact layer bible JSON only.',
+      'You are architecting a print-and-play solo workout journal with the structural',
+      'depth of a stateful paper game. This is planning only — return the layer bible JSON.',
       '',
-      '## Your Goal',
-      'Build a three-layer structural foundation that will govern all later compile decisions.',
+      '## Structural DNA (genre-neutral, non-negotiable)',
+      '- **Persistent topology.** One map reused across weeks. Player revisits spaces with new understanding.',
+      '- **Meaningful gating.** Locked areas have specific keys earned through play, not by week number.',
+      '- **Environmental clueing.** Answers are in the map, documents, and oracle — not exposition.',
+      '- **Information asymmetry.** Player knows less than the institution. Documents imply unseen systems.',
+      '- **Accumulated consequence.** Choices and discoveries persist. Nothing resets between weeks.',
+      '- **Clue economy.** Every fragment and oracle result advances an answerable question. No lore dumps.',
+      '- **Earned convergence.** Boss decode pays off spatial mastery and institutional knowledge.',
+      '',
+      '## Three-Layer Foundation',
       '',
       '### Story Layer',
       'Define: core premise, protagonist (role, want, need, flaw, wound, arc),',
@@ -1178,37 +1222,87 @@
       'initial stance, secret, and arc function: introduces tension / reveals truth /',
       'changes loyalty / provides key / blocks path), midpoint reversal, darkest moment',
       '(what it costs the protagonist — relational, ethical, or institutional),',
-      'resolution mode (how the block ends emotionally), boss truth,',
-      'recurring motifs (object, place, phrase, sensory).',
+      'resolution mode, boss truth, recurring motifs (object, place, phrase, sensory).',
+      '',
+      'Mystery pacing: plan the central answerable question, the revelation sequence',
+      '(which facts establish early, which fragment complicates at midpoint, which',
+      'recontextualizes near the end), and partial resolution with durable ambiguity.',
       '',
       '### Game Layer',
-      'Define: the core game loop, one persistent topology reused across most non-boss weeks,',
-      'major zones with distinct mechanical identity, all gates and the keys that open them,',
-      'progression gates (what the player gains each week and what it unlocks on the map),',
-      'persistent pressures (clocks, heat, patrols, scarcity), companion surfaces managed',
-      'across the campaign, revisitation logic (how prior spaces become meaningful again),',
-      'board state arc (how the playable space evolves from Week 1 constrained to Week N-1 mastered),',
-      'and exactly what boss convergence requires from prior weeks.',
+      'Define: core game loop, one persistent topology reused across most non-boss weeks,',
+      'major zones with distinct mechanical identity (each zone has a dominant activity:',
+      'patrol, search, decode, observe, extract, survey), all gates and the specific keys',
+      'that open them (a gate is a locked zone, document, or knowledge; a key is a cipher',
+      'value, cleared node, companion action, or oracle result), progression gates per week',
+      '(what the player gains and what it unlocks), persistent pressures (clocks, patrols,',
+      'surveillance, scarcity — at least one escalates regardless of player action),',
+      'companion surfaces (each has trackable state: trust, information shared, loyalty),',
+      'revisitation logic (how prior spaces become mechanically different — a cleared node',
+      'reveals a shortcut, a decoded document unlocks an adjacent zone), board state arc',
+      '(Week 1 constrained → penultimate week mastered), information layers (what the player',
+      'can verify vs. what the institution claims vs. what the documents actually show),',
+      'and exactly what boss convergence requires (list specific outputs: cipher values,',
+      'cleared zones, companion states, oracle discoveries).',
       '',
       '### Governing Layer',
       'Define: institution name, departments, procedures that materially affect play',
-      '(what paperwork grants access, what inspection triggers alert, what records change board state),',
-      'recurring document types and their voice rules.',
+      '(what paperwork grants access, what inspection triggers alert, what records change',
+      'board state), recurring document types and their voice rules, and information',
+      'classification hierarchy (what the player is cleared to see, what is redacted,',
+      'what contradicts official records). The institution is the system the player',
+      'navigates — its documents imply structures larger than the booklet contains.',
       '',
       '## Hard Targets',
-      '- One persistent facility topology reused across most non-boss weeks.',
-      '- Player must reopen routes, learn pressure habits, gain access, revisit prior spaces, and combine clues.',
-      '- Each non-boss week must give the player something they did not have before: a cleared route, a new key, a decoded access code, a revealed map area, an unlocked companion function.',
-      '- Boss decode pays off spatial mastery and institutional knowledge — not arbitrary substitution.',
+      '- Topology: 1 persistent map, 3+ zones, 2+ locked in Week 1, opened through play.',
+      '- Gating: every gate names its key. At least one gate requires outputs from 2 different weeks.',
+      '- Oracle: 40%+ entries per week produce playable consequences (board state, clock, gate, companion).',
+      '- Fragments: clue economy — early establish, midpoint complicate, late recontextualize. 3+ verifiable.',
+      '- Overflow docs: institutional artifacts implying larger systems. 1+ contradicts an earlier fragment.',
+      '- Boss: decode requires specific outputs from 3+ prior weeks referencing map, institution, or relationships.',
+      '- Companions: 2+ with persistent trackable state. Binary choice costs something relational/institutional.',
+      '- Mystery: central question answerable from evidence. Revelations via documents only, not exposition.',
+      '',
+      '## Design Ledger (prewriting commitments — fill before all other fields)',
+      '',
+      '### Mystery Questions (exactly 3)',
+      'Each must be answerable from evidence in the booklet. Name the question,',
+      'what evidence answers it (fragments, cipher outputs, map state, oracle results),',
+      'and when the answer becomes available (early, midpoint, or late).',
+      '',
+      '### False Assumptions (exactly 3)',
+      'What the player will likely believe early that turns out to be wrong or incomplete.',
+      'Name the assumption, what plants it (which document, prompt, or map state),',
+      'and what later evidence corrects it (which fragment, oracle result, or reveal).',
+      '',
+      '### Motif Payoffs (4-6)',
+      'Each recurring element (object, phrase, place, sensation, procedure) must have:',
+      'first appearance (week + context), how it transforms across the block, and what',
+      'its final appearance pays off. A motif that merely recurs is decoration. A motif',
+      'that means something different the last time it appears is architecture.',
+      '',
+      '### Week-by-Week Transformations (one per week)',
+      'For each week, commit to what changes in:',
+      '- understanding: what the player now knows or suspects that they did not before.',
+      '- state: what changed on the board (map, clocks, companion stance, gate).',
+      '- framing: how the institutional or relationship context shifted.',
+      '',
+      '### Clue Economy',
+      'Tag every planned clue as: hard (directly answers a mystery question),',
+      'soft (suggestive, needs combination with another clue), misdirection (plausible',
+      'wrong answer), or confirmation (validates a soft clue in hindsight).',
+      'Distribute so no non-boss week is clue-free.',
+      '',
+      '### Final Reveal',
+      'Name exactly what the boss decode or final document recontextualizes.',
+      'It must reframe at least 2 earlier elements (motifs, documents, map state)',
+      'rather than introducing new core facts.',
       '',
       '## Anti-Patterns to Eliminate',
-      '- One-off maps that never recur.',
-      '- Story prompts that are mostly metaphorical lifting prose.',
-      '- Oracle entries that are only vibes instead of playable consequences.',
-      '- Governing material that is flavor instead of play-governing.',
-      '- Password logic that feels retrofitted.',
-      '- Boss decode that does not reference map locations or institutional knowledge.',
-      '- Game systems that operate in isolation (oracle has no effect on map, clocks have no effect on routes).',
+      '- One-off maps. Atmospheric-only story prompts. Vibes-only oracle entries.',
+      '- Lore-dump fragments. Flavor-only overflow documents. Stateless companions.',
+      '- Retrofitted password. Arbitrary boss decode without referencing prior play.',
+      '- Gates opening by week number. Exposition instead of diegetic documents.',
+      '- Game systems in isolation (oracle has no effect on map, clocks have no effect on routes).',
       '',
       '## Output Rules',
       '- Return compact JSON only, matching the schema below exactly.',
@@ -1263,48 +1357,95 @@
       '- Week ' + midpoint + ' is the binary choice week (isBinaryChoiceWeek: true).',
       '- Week ' + weekCount + ' is the boss week (isBossWeek: true).',
       '',
+      '## Design Ledger Enforcement',
+      'The layer bible includes a designLedger with prewriting commitments.',
+      'The campaign plan must honor all of them:',
+      '- Map each mystery question to the weeks where evidence appears.',
+      '- Map each false assumption to the week that plants it and the week that corrects it.',
+      '- Each motif must appear in at least 2 non-adjacent weeks.',
+      '- clueEconomy tags (hard/soft/misdirection/confirmation) must be distributed so no',
+      '  non-boss week is clue-free. fragmentFunction must name the clue type it delivers.',
+      '- weekTransformations must match stateChange, playerGains, and companionChange per week.',
+      '- finalRevealRecontextualizes must connect to the bossPlan.',
+      '',
+      '## Topology Doctrine',
+      '- The persistent topology from the layer bible must have 3+ distinct zones.',
+      '- Each zone has a dominant activity (patrol, search, decode, observe, extract, survey).',
+      '- At least 2 zones are locked in Week 1 and opened through play by the penultimate week.',
+      '- Gate state changes are explicit per week: "Week X clears node Y, unlocks zone Z."',
+      '- By Week ' + (weekCount - 1) + ', all zones must be accessible.',
+      '- mapReuse values: "full" (same map, different state), "zoom" (subset of main map),',
+      '  "overlay" (same map with new layer of information).',
+      '',
+      '## Oracle Doctrine',
+      '- At least 40% of oracle entries per week produce a playable consequence:',
+      '  board state change, clock tick, gate effect, or companion reaction.',
+      '- Oracle entries that reference fragments must name the fragment ID.',
+      '- No oracle table is purely atmospheric — every table advances the mystery or changes the board.',
+      '- Oracle consequences should connect to the week&apos;s zone focus and active pressures.',
+      '',
+      '## Companion & Choice Doctrine',
+      '- Each non-boss week must specify which named companion appears and how their stance changes.',
+      '- companionChange must be specific: "X&apos;s trust increases because Y" — not "relationship develops."',
+      '- The binary choice week must name: what the player gains from each option, what they lose,',
+      '  and how at least one companion reacts differently based on the choice.',
+      '- At least one companion&apos;s behavior in the final weeks depends on earlier player actions.',
+      '',
       '## Arc Beat Assignment',
-      '- Week 1: Setup + hook (establish setting, protagonist role, core tension, constrained map)',
-      '- Week 2: Complication (new pressure source, first gate opened, relationship tension)',
-      '- Week ' + midpoint + ': Reversal (binary choice that recontextualizes evidence and costs a relationship)',
-      '- Week ' + Math.max(weekCount - 2, midpoint + 1) + ': Deepening (darkest moment — relational or ethical cost, a system turns against the player)',
-      '- Week ' + (weekCount - 1) + ': Escalation (multiple pressures converge, full map access, final preparation)',
-      '- Week ' + weekCount + ': Boss (culmination of spatial + institutional + relational mastery)',
+      '- Week 1: Setup (establish setting, protagonist role, core tension, constrained map — most zones locked)',
+      '- Week 2: Complication (new pressure, first gate opened, companion introduces tension)',
+      '- Week ' + midpoint + ': Reversal (binary choice recontextualizes evidence, costs a relationship,',
+      '  reveals that an earlier clue meant something different than assumed)',
+      '- Week ' + Math.max(weekCount - 2, midpoint + 1) + ': Deepening (darkest moment — relational or ethical cost,',
+      '  an institutional system turns against the player, a trusted document is revealed as unreliable)',
+      '- Week ' + (weekCount - 1) + ': Escalation (pressures converge, full map access, final preparation,',
+      '  the player can now see the pattern connecting earlier fragments)',
+      '- Week ' + weekCount + ': Boss (culmination — decode requires spatial mastery + institutional',
+      '  knowledge + relationship state from prior weeks)',
       '',
       '## Per-Week Requirements',
-      '- Each week must specify: zone focus, map state change, new gate or unlock,',
-      '  weekly component meaning, oracle pressure, fragment function,',
-      '  governing procedure, companion change, session beat types.',
-      '- `arcBeat`: the narrative function of this week (setup, complication, reversal, darkest moment, escalation, culmination).',
-      '- `npcBeat`: which named character from the relationship web appears, what they reveal or conceal, and how it changes the player\'s understanding.',
-      '- `stateSnapshot`: one-line board state entering this week (which nodes open, clock levels, companion state).',
-      '- `playerGains`: what new capability, access, or knowledge the player acquires this week.',
-      '- The boss plan must explain exactly why the decode feels earned',
-      '  from prior spatial and institutional knowledge — not retrofitted.',
+      '- Each week must specify all of the following:',
+      '  `zoneFocus` — which zone of the topology is active this week.',
+      '  `stateChange` — what changes on the map (node cleared, gate opened, shortcut revealed).',
+      '  `newGateOrUnlock` — what new capability, access, or knowledge the player gains.',
+      '  `oraclePressure` — what the oracle table does and how it affects board state.',
+      '  `fragmentFunction` — which fragments appear and their role (establishes / complicates / reveals).',
+      '  `companionChange` — which companion, what they do, how their trackable state changes.',
+      '  `governingProcedure` — what institutional procedure is active and how it affects access.',
+      '  `weeklyComponentMeaning` — what the cipher value represents in-fiction and how it connects to the decode.',
+      '- `arcBeat`: narrative function (setup, complication, reversal, darkest moment, escalation, culmination).',
+      '- `npcBeat`: which named character appears, what they reveal or conceal, and why it matters.',
+      '- `stateSnapshot`: one-line board state entering this week (open nodes, clock levels, companion states).',
+      '- `playerGains`: what the player acquires that they did not have before.',
       '',
-      '## Fragment Registry',
+      '## Fragment Registry — Clue Economy',
       '- Assign fragment IDs (F.01, F.02, ...) for every found document the booklet needs.',
-      '- Each entry: { id, title (working title), documentType (memo/fieldNote/inspection/report/',
-      '  transcript/correspondence/anomaly/form), author (named character from relationship web),',
-      '  revealPurpose (what this document reveals to the player), weekRef (which week references it),',
-      '  sessionRef (which session number, or null if oracle-referenced) }.',
+      '- Each entry: { id, title, documentType, author, revealPurpose, clueFunction, weekRef, sessionRef }.',
+      '- `clueFunction` is one of: "establishes" (baseline fact), "complicates" (contradicts or adds nuance),',
+      '  "reveals" (answers a question or recontextualizes earlier evidence).',
       '- At least 3 fragments must be authored by named characters from the relationship web.',
-      '- Fragment purposes should escalate: early fragments establish setting, midpoint fragments',
-      '  recontextualize, late fragments reveal hidden truths or betray expectations.',
+      '- At least 3 fragments must be verifiable — their claims can be checked against map state,',
+      '  cipher outputs, or other fragments.',
+      '- No fragment dumps lore. If it contains world-building, it must also contain a clue.',
       '- Aim for 15-22 fragments total, distributed across all non-boss weeks.',
       '',
-      '## Overflow Document Registry',
+      '## Overflow Document Registry — Institutional Ecology',
       '- Overflow documents appear on weeks where sessions > 3 (the right-side page becomes a found document).',
       '- Plan one overflow document per overflow week. Use IDs starting at F.30 (F.30, F.31, F.32, ...).',
       '- Overflow IDs must NOT collide with fragment IDs.',
-      '- Each entry: { id, weekNumber, documentType (memo/fieldNote/inspection/report/',
-      '  transcript/correspondence/anomaly/form), author (named character from relationship web),',
-      '  narrativeFunction (what this document does for the story), tonalIntent (how it should feel),',
-      '  arcRelationship (how it connects to this week&apos;s arc beat or the mystery&apos;s progression) }.',
-      '- Overflow documents form a secondary narrative spine: early overflow documents establish institutional',
-      '  voice and procedural norms. Midpoint overflow documents introduce contradictions or cover-ups.',
-      '  Late overflow documents deliver revelations that reframe earlier documents.',
-      '- At least one overflow document should directly contradict or complicate a fragment from a different week.',
+      '- Each entry: { id, weekNumber, documentType, author, narrativeFunction, tonalIntent, arcRelationship }.',
+      '- Overflow documents represent the institution talking to itself — memos, inspections, internal',
+      '  correspondence, procedural forms. They imply systems larger than the player sees.',
+      '- Escalation: early overflow documents establish institutional voice and procedural norms.',
+      '  Midpoint documents show strain or cover-ups. Late documents deliver revelations.',
+      '- At least one overflow document must contradict or complicate a fragment from a different week.',
+      '',
+      '## Boss Convergence Proof',
+      '- `requiredPriorKnowledge` must list at least 3 specific outputs from prior weeks:',
+      '  cipher values, cleared zones, companion revelations, or oracle discoveries.',
+      '- `whyItFeelsEarned` must explain how spatial mastery, institutional knowledge,',
+      '  and relationship navigation all contribute to the decode.',
+      '- The decode must not be solvable without prior-week play.',
       '',
       '## Output Rules',
       '- Return compact JSON only, matching the schema below exactly.',
@@ -1499,14 +1640,56 @@
       '',
       formatDesignBias(blend),
       '',
-      '## Key Requirements',
+      '## Shell Requirements',
+      '',
+      '### Structural',
       '- meta.weekCount must equal ' + weekCount,
       '- meta.weeklyComponentType should match the layer bible&apos;s game layer',
-      '- meta.passwordLength should match the number of non-boss weeks',
+      '- meta.passwordLength should match the number of non-boss weeks (' + (weekCount - 1) + ')',
       '- meta.passwordEncryptedEnding: set to "PLACEHOLDER_ENCRYPT_WITH_RENDERER"',
-      '- Rules sections must explain the play cadence in-world, using the layer bible&apos;s governing procedures',
-      '- Cover title and designation should feel diegetic to the world',
-      '- Choose the visual archetype that best serves the fiction',
+      '',
+      '### World Contract',
+      'meta.worldContract is the single most important string in the booklet.',
+      'It is NOT a plot summary. It is the governing question or tension the reader carries',
+      'through every session. Write it as a premise the reader tests against the evidence.',
+      'Pattern: "[Setting] where [ordinary situation] is complicated by [destabilizing force],',
+      'raising the question of [what the reader will try to determine]."',
+      'Max 2 sentences. The entire booklet must justify itself through this contract.',
+      '',
+      '### Narrative Voice (meta.narrativeVoice)',
+      '- person/tense: choose what creates the right distance for this fiction.',
+      '- narratorStance: not "third person limited" — describe how the narrator relates to',
+      '  the protagonist&apos;s perception, vocabulary, and blind spots. Specific enough that',
+      '  a later stage could write a paragraph matching this stance without other guidance.',
+      '- voiceRationale: why this voice serves the world contract (not just "it felt right").',
+      '',
+      '### Literary Register (meta.literaryRegister)',
+      '- name: a 2-3 word label for the prose style (e.g. "Pastoral Waterlog", "Clinical Redline").',
+      '- behaviorDescription: describe the register as if briefing a ghostwriter. What does this',
+      '  prose DO? How does it earn its nouns? What does it refuse? Include diction, pacing,',
+      '  sentence rhythm, and what the prose uses instead of adjectives that editorialize.',
+      '- forbiddenMoves: 3-5 specific writing moves that violate this register.',
+      '  These are prose-level bans, not theme bans. Examples: "metaphors referencing anything',
+      '  outside the setting", "interior monologue explaining feelings", "sentences that could',
+      '  appear in a Lovecraft story."',
+      '',
+      '### Structural Shape (meta.structuralShape)',
+      '- resolution, temporalOrder, narratorReliability, promptFragmentRelationship:',
+      '  choose values that create genuine structural variation. Not every booklet should be',
+      '  "partial / fragmented / multiple / fragments-deepen." Choose what this fiction needs.',
+      '',
+      '### Cover & Rules Spread',
+      '- Cover title and designation must feel like a real artifact: a dossier, journal,',
+      '  field report, operations manual, maintenance log, or similar in-world object.',
+      '- Rules sections must explain the play cadence diegetically, using the layer bible&apos;s',
+      '  governing procedures. A player who reads only the rules spread should understand',
+      '  what the institution expects them to do and why the weekly routine matters.',
+      '',
+      '### Visual Archetype & Theme',
+      '- Choose the archetype that serves the fiction — not always "government."',
+      '- Palette: 6 hex colors (ink, paper, accent, muted, rule, fog) that feel',
+      '  like the world&apos;s stationery. A government archive, a coastal field office,',
+      '  a corporate clinic, and a maritime station all have different paper.',
       '',
       '---',
       '',
@@ -1712,22 +1895,73 @@
     // Week-specific requirements
     parts.push('## Requirements for ' + weekLabel);
     relevantPlanWeeks.forEach(function (pw) {
-      parts.push('- Week ' + pw.weekNumber + ': arcBeat = ' + (pw.arcBeat || 'unspecified') +
-        ', playerGains = ' + (pw.playerGains || 'unspecified'));
+      parts.push('');
+      parts.push('### Week ' + pw.weekNumber);
+      parts.push('- arcBeat: ' + (pw.arcBeat || 'unspecified'));
+      parts.push('- playerGains: ' + (pw.playerGains || 'unspecified'));
+      if (pw.zoneFocus) parts.push('- zoneFocus: ' + pw.zoneFocus);
+      if (pw.stateChange) parts.push('- stateChange: ' + pw.stateChange);
+      if (pw.newGateOrUnlock) parts.push('- newGateOrUnlock: ' + pw.newGateOrUnlock);
+      if (pw.oraclePressure) parts.push('- oraclePressure: ' + pw.oraclePressure);
+      if (pw.fragmentFunction) parts.push('- fragmentFunction: ' + pw.fragmentFunction);
+      if (pw.companionChange) parts.push('- companionChange: ' + pw.companionChange);
+      if (pw.weeklyComponentMeaning) parts.push('- weeklyComponentMeaning: ' + pw.weeklyComponentMeaning);
       if (pw.isBinaryChoiceWeek) {
-        parts.push('  This is the BINARY CHOICE week — include binaryChoice in one session.');
+        parts.push('- **BINARY CHOICE week** — include binaryChoice in one session.');
       }
       if (pw.isBossWeek) {
-        parts.push('  This is the BOSS week — use bossEncounter instead of fieldOps.');
+        parts.push('- **BOSS week** — use bossEncounter instead of fieldOps.');
       }
-      // Flag planned overflow doc for this week
       var plannedOF = relevantOverflows.filter(function (o) { return o.weekNumber === pw.weekNumber; })[0];
       if (plannedOF) {
-        parts.push('  This week has a planned overflow document: ' + plannedOF.id +
-          ' (' + plannedOF.documentType + ' by ' + (plannedOF.author || 'unknown') +
-          '). Use this plan for the overflowDocument field.');
+        parts.push('- Planned overflow: ' + plannedOF.id + ' (' + plannedOF.documentType +
+          ' by ' + (plannedOF.author || 'unknown') + ').');
+        if (plannedOF.narrativeFunction) parts.push('  Function: ' + plannedOF.narrativeFunction);
       }
     });
+    parts.push('');
+
+    // Artifact-grade week construction doctrine
+    parts.push('## Week Construction Doctrine');
+    parts.push('');
+    parts.push('### Story Prompts');
+    parts.push('- Each storyPrompt is 2-4 sentences containing one physical action, one sensory');
+    parts.push('  detail, and one named object or place from the layer bible.');
+    parts.push('- Prompts must advance the mystery or alter a relationship — not just describe atmosphere.');
+    parts.push('- At least one prompt per week must reference a specific map node, fragment, or clock by name.');
+    parts.push('- End on unresolved pressure. Never resolve a story beat at session end.');
+    parts.push('');
+    parts.push('### Map State');
+    parts.push('- The map must reflect this week&apos;s stateChange from the campaign plan.');
+    parts.push('- Tiles changed from prior weeks: update type (locked→cleared, empty→anomaly, etc.).');
+    parts.push('- New tiles must have labels drawn from the layer bible&apos;s governing layer or topology.');
+    parts.push('- currentPosition must make spatial sense given the zone focus.');
+    parts.push('- mapNote must describe what is observably different this week, not repeat prior notes.');
+    parts.push('');
+    parts.push('### Cipher');
+    parts.push('- The cipher must produce the planned weeklyComponent.value through a solvable mechanic.');
+    parts.push('- cipher.body.displayText presents the puzzle in-world. cipher.body.key is the answer.');
+    parts.push('- extractionInstruction tells the player exactly which number/code to extract.');
+    parts.push('- characterDerivationProof explains how the value derives from the puzzle (for validation).');
+    parts.push('- Do not explain the cipher method in displayText. Present the puzzle, not the pedagogy.');
+    parts.push('- Each week must use a different cipher family than the prior week.');
+    parts.push('');
+    parts.push('### Oracle Table');
+    parts.push('- Simple mode: exactly 11 entries (roll "2" through "12"). Full mode: exactly 10 entries.');
+    parts.push('- At least 4 entries must produce a playable consequence: a paperAction that names');
+    parts.push('  a specific clock, map node, or companion by label. No vague "something changes."');
+    parts.push('- Fragment-type entries must include fragmentRef pointing to a real fragment ID.');
+    parts.push('- Consequence-type entries must have paperAction naming a specific target.');
+    parts.push('- Oracle entries should connect to this week&apos;s zone focus and active pressures.');
+    parts.push('');
+    parts.push('### Overflow Document');
+    parts.push('- If overflow is true, the overflowDocument is an institutional artifact — a memo,');
+    parts.push('  inspection report, internal letter, or procedural form.');
+    parts.push('- It must feel authored by someone with an in-world job, not by a storyteller.');
+    parts.push('- Include at least one irrelevant operational detail (a date, a reference number,');
+    parts.push('  a routing instruction) that makes the document feel real.');
+    parts.push('- The document must do narrative work: establish a procedure, reveal a contradiction,');
+    parts.push('  or provide evidence the player can cross-reference against other material.');
     parts.push('');
     parts.push('---');
     parts.push('');
@@ -1774,20 +2008,44 @@
 
     parts.push('---');
     parts.push('');
-    parts.push('## Fragment Quality Requirements');
+    parts.push('## Fragment Construction Doctrine');
+    parts.push('');
+    parts.push('### Contract');
     parts.push('- Generate exactly one fragment per registry entry, using the assigned IDs.');
-    parts.push('- Each fragment is a found document that could exist inside the fiction.');
-    parts.push('- Authors from the relationship web should reveal their blind spots, not just their knowledge.');
-    parts.push('- Different characters noticing different things about the same event is more powerful');
+    parts.push('- Honour the registry&apos;s clueFunction tag: "establishes" fragments plant baseline');
+    parts.push('  facts, "complicates" fragments contradict or add nuance, "reveals" fragments');
+    parts.push('  answer a question or recontextualize earlier evidence.');
+    parts.push('');
+    parts.push('### Document Authenticity');
+    parts.push('- Each fragment is a real document that someone wrote for an in-world reason.');
+    parts.push('  The author does not know they are in a game.');
+    parts.push('- Include at least one irrelevant operational detail per fragment: a routing number,');
+    parts.push('  a date stamp, a cc: line, a weather note, a reference to an unrelated procedure.');
+    parts.push('  This detail makes the document feel found, not composed.');
+    parts.push('- designSpec must match the document type: a memo from maintenance has different paper,');
+    parts.push('  typeface, and header style than a personal letter or an inspection form.');
+    parts.push('- If the document has redactions, every redaction must do narrative work — it conceals');
+    parts.push('  something the player can partially reconstruct from other evidence.');
+    parts.push('');
+    parts.push('### Narrative Function');
+    parts.push('- Authors from the relationship web reveal their blind spots, not just their knowledge.');
+    parts.push('  Different characters noticing different things about the same event is more powerful');
     parts.push('  than different characters knowing different facts.');
-    parts.push('- Early fragments establish setting. Midpoint fragments recontextualize. Late fragments');
-    parts.push('  reveal hidden truths or betray expectations.');
-    parts.push('- At least one incident, place, procedure, or relationship should recur across');
-    parts.push('  multiple document perspectives.');
-    parts.push('- Fragments may arrive as threaded packets, route updates, contradictory records,');
-    parts.push('  or personal aftershocks \u2014 not just isolated lore drops.');
-    parts.push('- Include at least three linked functions: one action-changing artifact, one');
-    parts.push('  interpretation-changing artifact, and one character-deepening artifact.');
+    parts.push('- At least one incident, place, or procedure must recur across multiple fragments,');
+    parts.push('  described differently by different authors.');
+    parts.push('- Include at least three linked functions across the set: one artifact that changes');
+    parts.push('  what the player does (action), one that changes what the player believes');
+    parts.push('  (interpretation), and one that deepens a named character&apos;s stakes.');
+    parts.push('- Every fragment must support at least one cross-reference: a place named on the map,');
+    parts.push('  a date that aligns with a week&apos;s events, a person mentioned in a storyPrompt,');
+    parts.push('  or a value that connects to a cipher output.');
+    parts.push('');
+    parts.push('### Anti-Generic Test');
+    parts.push('- If you removed the proper nouns from a fragment, would it still feel specific');
+    parts.push('  to THIS booklet? If no, the voice and detail are too generic. Rewrite.');
+    parts.push('- Fragments that merely summarize lore fail. Every fragment must contain either');
+    parts.push('  a clue, a contradiction, evidence of omission, or a procedural detail that');
+    parts.push('  the player can cross-reference against other material.');
     parts.push('');
     parts.push('---');
     parts.push('');
@@ -1917,28 +2175,53 @@
 
     parts.push('---');
     parts.push('');
-    parts.push('## Fragment Quality Requirements');
+    parts.push('## Fragment Construction Doctrine');
+    parts.push('');
+    parts.push('### Contract');
     parts.push('- Generate exactly one fragment per registry entry, using the assigned IDs.');
-    parts.push('- Each fragment is a found document that could exist inside the fiction.');
-    parts.push('- Authors from the relationship web should reveal their blind spots, not just their knowledge.');
-    parts.push('- Different characters noticing different things about the same event is more powerful');
-    parts.push('  than different characters knowing different facts.');
+    parts.push('- Honour the registry&apos;s clueFunction tag: "establishes" fragments plant baseline');
+    parts.push('  facts, "complicates" fragments contradict or add nuance, "reveals" fragments');
+    parts.push('  answer a question or recontextualize earlier evidence.');
+    parts.push('');
+    parts.push('### Document Authenticity');
+    parts.push('- Each fragment is a real document written for an in-world reason.');
+    parts.push('  The author does not know they are in a game.');
+    parts.push('- Include at least one irrelevant operational detail per fragment: a routing number,');
+    parts.push('  a date stamp, a cc: line, a weather note, a reference to an unrelated procedure.');
+    parts.push('- designSpec must match the document type and its in-world origin.');
+    parts.push('- Redactions must do narrative work — concealing something partially reconstructable.');
+    parts.push('');
+    parts.push('### Narrative Function');
+    parts.push('- Authors reveal blind spots, not just knowledge. Different characters noticing');
+    parts.push('  different things about the same event beats different characters knowing different facts.');
+    parts.push('- Every fragment must support at least one cross-reference: a map place, a date,');
+    parts.push('  a person from a storyPrompt, or a value connected to a cipher output.');
 
     if (batchIndex === 0) {
-      parts.push('- This is the first batch: establish the documentary voice, setting texture, and recurring');
-      parts.push('  incidents that later fragments will recontextualize.');
+      parts.push('');
+      parts.push('### Batch Position: First');
+      parts.push('- Establish the documentary voice, setting texture, and recurring incidents.');
+      parts.push('- Plant baseline facts that later batches will complicate or recontextualize.');
+      parts.push('- At least one fragment must name a place or procedure that appears on the map.');
     } else if (batchIndex === totalBatches - 1) {
-      parts.push('- This is the final batch: these fragments should recontextualize earlier material,');
-      parts.push('  reveal hidden truths, or betray expectations set by earlier documents.');
+      parts.push('');
+      parts.push('### Batch Position: Final');
+      parts.push('- These fragments recontextualize earlier material, reveal hidden truths,');
+      parts.push('  or betray expectations set by earlier documents.');
+      parts.push('- Reference specific details from earlier fragments by name or implication.');
+      parts.push('- At least one fragment must make the player re-read an earlier document differently.');
     } else {
-      parts.push('- This is a middle batch: deepen the web of contradictions and perspectives.');
-      parts.push('  Refer to specific details from earlier fragments. Recontextualize, do not just add.');
+      parts.push('');
+      parts.push('### Batch Position: Middle');
+      parts.push('- Deepen contradictions and perspectives. Refer to specific earlier details.');
+      parts.push('- Recontextualize, do not just add. What earlier fragment does this one complicate?');
     }
 
-    parts.push('- Include at least one linked function per batch: action-changing, interpretation-changing,');
-    parts.push('  or character-deepening artifact.');
-    parts.push('- Fragments may arrive as threaded packets, route updates, contradictory records,');
-    parts.push('  or personal aftershocks \u2014 not just isolated lore drops.');
+    parts.push('');
+    parts.push('### Anti-Generic Test');
+    parts.push('- If you removed the proper nouns, would it still feel specific to THIS booklet?');
+    parts.push('- Every fragment must contain a clue, contradiction, evidence of omission, or');
+    parts.push('  procedural detail cross-referenceable against other booklet material.');
     parts.push('');
     parts.push('---');
     parts.push('');
@@ -2066,14 +2349,40 @@
 
     parts.push('---');
     parts.push('');
-    parts.push('## Ending Requirements');
-    parts.push('- The ending is a found document first, not a summary.');
-    parts.push('- Pay off at least three recurring details: object, place, relationship phrase, procedure, motif.');
-    parts.push('- The ending must reflect: (a) the binary choice, (b) the boss outcome,');
-    parts.push('  and (c) at least one relationship consequence.');
-    parts.push('- If there are multiple ending variants, they should differ in emotional register');
-    parts.push('  and relationship resolution, not just plot outcome.');
-    parts.push('- The final line should feel discrete and earned.');
+    parts.push('## Ending Construction Doctrine');
+    parts.push('');
+    parts.push('### Document Identity');
+    parts.push('- The ending is a found document that exists in-world — not a narrator&apos;s summary.');
+    parts.push('- Choose a document type that the story has earned: final report, personal letter,');
+    parts.push('  decommission order, recovered journal entry, institutional memo.');
+    parts.push('- The document&apos;s author writes for their own purpose. They do not address the player.');
+    parts.push('');
+    parts.push('### Payoff Density');
+    parts.push('- Name at least three specific earlier elements by their exact in-world identifiers:');
+    parts.push('  a place, an object, a relationship, a phrase, a procedure, or a motif.');
+    parts.push('- The decoded password truth must land — reference the revelation without');
+    parts.push('  restating it mechanically. Show its consequence, not its content.');
+    parts.push('- The binary choice and boss outcome must both visibly shape the document&apos;s');
+    parts.push('  content, tone, or what the author knows. Not just which ending fires.');
+    parts.push('');
+    parts.push('### Variant Differentiation');
+    parts.push('- Multiple endings must differ in emotional register, relationship resolution,');
+    parts.push('  and what the author believes happened — not just plot outcome.');
+    parts.push('- Each variant should feel like a different person wrote it, or the same person');
+    parts.push('  in a fundamentally different emotional state.');
+    parts.push('');
+    parts.push('### Voice & Register');
+    parts.push('- Preserve the booklet&apos;s established literary register while allowing deliberate');
+    parts.push('  tonal contrast when the story demands it (grief in a clinical voice, hope in');
+    parts.push('  bureaucratic language, rage in measured institutional prose).');
+    parts.push('- The final line must feel discrete and earned — a sentence that works as a');
+    parts.push('  closing image, not a thesis statement.');
+    parts.push('');
+    parts.push('### Anti-Generic Test');
+    parts.push('- If the ending could belong to a different booklet with proper nouns swapped, rewrite.');
+    parts.push('- If it summarizes the plot instead of revealing a final piece of the world, rewrite.');
+    parts.push('- If the emotional weight comes from telling the reader how to feel rather than');
+    parts.push('  showing specific concrete detail, rewrite.');
     parts.push('');
     parts.push('---');
     parts.push('');
