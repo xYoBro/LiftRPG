@@ -15,6 +15,10 @@
 window.LiftRPGAPI = (function () {
   'use strict';
 
+  // ── Constants ─────────────────────────────────────────────────────────────
+
+  var DEFAULT_TIMEOUT_MS = 300000; // 5 minutes — generous for long LLM generations
+
   // ── Provider presets ────────────────────────────────────────────────────────
 
   var PROVIDERS = {
@@ -57,10 +61,47 @@ window.LiftRPGAPI = (function () {
     }
   };
 
+  // ── Fetch with timeout ────────────────────────────────────────────────────
+  // Wraps fetch() with an AbortController so long-running requests don't hang
+  // silently. Default 5 minutes; override via settings.requestTimeoutMs.
+
+  function fetchWithTimeout(url, options, timeoutMs) {
+    var ms = timeoutMs || DEFAULT_TIMEOUT_MS;
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, ms);
+    var merged = Object.assign({}, options, { signal: controller.signal });
+    return fetch(url, merged)
+      .catch(function (err) {
+        if (err.name === 'AbortError') {
+          throw new Error(
+            'Request timed out after ' + Math.round(ms / 1000) + 's. ' +
+            'The model may need more time, or the request may have stalled. Try again.'
+          );
+        }
+        throw err;
+      })
+      .finally(function () { clearTimeout(timer); });
+  }
+
+  // ── Content extraction helpers ────────────────────────────────────────────
+  // OpenAI-compatible responses may return content as a string or an array of
+  // typed parts (e.g. [{ type: "text", text: "..." }]).
+
+  function extractTextContent(content) {
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+      return content
+        .filter(function (p) { return p && (p.type === 'text' || p.text); })
+        .map(function (p) { return p.text || ''; })
+        .join('');
+    }
+    return String(content || '');
+  }
+
   // ── Request handlers ────────────────────────────────────────────────────────
 
-  async function callAnthropic(apiKey, model, prompt, maxTokens) {
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+  async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs) {
+    var resp = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'x-api-key': apiKey,
@@ -73,7 +114,7 @@ window.LiftRPGAPI = (function () {
         max_tokens: maxTokens || 32000,
         messages: [{ role: 'user', content: prompt }]
       })
-    });
+    }, timeoutMs);
 
     var body = await resp.json();
 
@@ -104,12 +145,19 @@ window.LiftRPGAPI = (function () {
     return rawText;
   }
 
-  async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens) {
+  async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens, timeoutMs) {
     var url = baseUrl.replace(/\/+$/, '') + '/chat/completions';
     var headers = { 'content-type': 'application/json' };
-    if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
+    if (apiKey) {
+      // Google Generative Language API uses x-goog-api-key instead of Bearer token
+      if (baseUrl && baseUrl.indexOf('googleapis.com') !== -1) {
+        headers['x-goog-api-key'] = apiKey;
+      } else {
+        headers['Authorization'] = 'Bearer ' + apiKey;
+      }
+    }
 
-    var resp = await fetch(url, {
+    var resp = await fetchWithTimeout(url, {
       method: 'POST',
       headers: headers,
       body: JSON.stringify({
@@ -117,7 +165,7 @@ window.LiftRPGAPI = (function () {
         max_tokens: maxTokens || 32768,
         messages: [{ role: 'user', content: prompt }]
       })
-    });
+    }, timeoutMs);
 
     var body = await resp.json();
 
@@ -130,7 +178,7 @@ window.LiftRPGAPI = (function () {
       throw new Error('Unexpected API response shape. Check the console.');
     }
 
-    var rawText = body.choices[0].message.content;
+    var rawText = extractTextContent(body.choices[0].message.content);
     window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
     window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = {
       finish_reason: body.choices[0].finish_reason,
@@ -158,6 +206,7 @@ window.LiftRPGAPI = (function () {
   //  3. Unescaped double-quotes in strings (HTML attrs: class="x", "scare quotes")
   //  4. Trailing commas                    (before } or ])
   //  5. Missing commas between items       (adjacent } { or ] [)
+  //  6. Python/JS literals                 (True, False, None, NaN, etc.)
   //
   // Strategy:
   //  - findJsonBounds: depth-counting walk to find the exact root {…} block,
@@ -165,6 +214,8 @@ window.LiftRPGAPI = (function () {
   //  - walkAndRepair: single character pass fixing issues 1–3. For unescaped
   //    quotes, heuristic: if the char after " (ignoring whitespace) is NOT a
   //    JSON structural char (,:}]) then we're inside a string, escape it.
+  //  - fixLiterals: string-aware replacement of Python/JS literals (issue 6).
+  //    Only replaces outside JSON string values to avoid corrupting prose.
   //  - fixStructural: regex pass for issues 4–5.
   //  - extractJson runs direct parse first (fast path), then repair, so clean
   //    JSON pays no cost.
@@ -287,37 +338,77 @@ window.LiftRPGAPI = (function () {
   }
 
   // ── Python / JS literal normalisation ───────────────────────────────────────
-  // Some models (especially smaller/fine-tuned) emit Python or JS literals.
-  // Word-boundary replacement: may fire inside string values, but these tokens
-  // (True, None, NaN, Infinity) are vanishingly rare in narrative prose.
+  // String-aware: only replaces literals outside JSON string values to avoid
+  // corrupting prose like "None of the above" → "null of the above".
+  // Runs AFTER walkAndRepair so string escaping is normalised first.
+
+  var LITERAL_KEYWORDS = {
+    'True': 'true', 'False': 'false', 'None': 'null',
+    'NaN': 'null', 'Infinity': 'null', 'undefined': 'null'
+  };
 
   function fixLiterals(text) {
-    return text
-      .replace(/\bTrue\b/g,     'true')
-      .replace(/\bFalse\b/g,    'false')
-      .replace(/\bNone\b/g,     'null')
-      .replace(/\bNaN\b/g,      'null')
-      .replace(/\bInfinity\b/g, 'null')
-      .replace(/\bundefined\b/g,'null');
+    var out = '';
+    var inStr = false;
+    var esc = false;
+    var i = 0;
+
+    while (i < text.length) {
+      var c = text[i];
+
+      if (esc)               { out += c; esc = false; i++; continue; }
+      if (c === '\\' && inStr) { out += c; esc = true;  i++; continue; }
+      if (c === '"')         { inStr = !inStr; out += c; i++; continue; }
+      if (inStr)             { out += c; i++; continue; }
+
+      // Outside string: check for keyword at word boundary
+      var matched = false;
+      if (/[A-Z_a-z]/.test(c)) {
+        var before = i > 0 ? text[i - 1] : '';
+        if (!before || !/\w/.test(before)) {
+          for (var kw in LITERAL_KEYWORDS) {
+            if (text.substring(i, i + kw.length) === kw) {
+              var after = text[i + kw.length];
+              if (!after || !/\w/.test(after)) {
+                out += LITERAL_KEYWORDS[kw];
+                i += kw.length;
+                matched = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      if (!matched) { out += c; i++; }
+    }
+
+    return out;
   }
 
   // ── public repair entry point ────────────────────────────────────────────────
 
   function repairJson(text) {
-    return fixStructural(walkAndRepair(fixLiterals(text)));
+    // walkAndRepair first (normalises escapes), then fixLiterals (string-aware),
+    // then fixStructural (trailing commas, missing commas)
+    return fixStructural(fixLiterals(walkAndRepair(text)));
   }
 
   // ── JSON extraction ──────────────────────────────────────────────────────────
 
   function extractJson(text) {
-    // 1. Strip markdown code fences
-    var stripped = text
-      .replace(/^\uFEFF/, '')           // strip BOM
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```\s*$/, '')
-      .trim();
+    // 1. Strip BOM
+    var cleaned = text.replace(/^\uFEFF/, '');
 
-    // 1.5: Doubled JSON — model serialised the JSON twice
+    // 2. Extract from ```json ... ``` fenced block anywhere in the text
+    var fenceMatch = cleaned.match(/```json\s*([\s\S]*?)```/i);
+    if (!fenceMatch) {
+      // Also try plain ``` fences (some models omit "json" label)
+      fenceMatch = cleaned.match(/```\s*([\s\S]*?)```/);
+    }
+    var stripped = fenceMatch ? fenceMatch[1].trim() : cleaned.trim();
+
+    // 3. Doubled JSON — model serialised the JSON twice
     if (stripped.charAt(0) === '"' && stripped.charAt(stripped.length - 1) === '"') {
       try {
         var maybeInner = JSON.parse(stripped);
@@ -327,7 +418,7 @@ window.LiftRPGAPI = (function () {
       } catch (e) { /* not a valid JSON string, continue */ }
     }
 
-    // 2. Locate root {…} with depth counting (not fragile lastIndexOf)
+    // 4. Locate root {…} with depth counting (not fragile lastIndexOf)
     var bounds = findJsonBounds(stripped);
     if (!bounds) {
       throw new Error(
@@ -337,7 +428,7 @@ window.LiftRPGAPI = (function () {
     }
     var jsonStr = stripped.slice(bounds[0], bounds[1] + 1);
 
-    // 3. Fast path: direct parse
+    // 5. Fast path: direct parse
     try {
       return JSON.parse(jsonStr);
     } catch (e1) {
@@ -345,7 +436,7 @@ window.LiftRPGAPI = (function () {
       console.log('[LiftRPG] Raw JSON (first 500):', jsonStr.slice(0, 500));
     }
 
-    // 4. Repair path
+    // 6. Repair path
     var repaired = repairJson(jsonStr);
     try {
       return JSON.parse(repaired);
@@ -374,10 +465,19 @@ window.LiftRPGAPI = (function () {
   // Unified dispatch used by both single-stage generate() and generateMultiStage().
 
   async function callProvider(settings, prompt, maxTokens) {
+    var timeoutMs = settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS;
     if (settings.format === 'anthropic') {
-      return callAnthropic(settings.apiKey, settings.model, prompt, maxTokens);
+      return callAnthropic(settings.apiKey, settings.model, prompt, maxTokens, timeoutMs);
     }
-    return callOpenAICompat(settings.apiKey, settings.baseUrl, settings.model, prompt, maxTokens);
+    return callOpenAICompat(settings.apiKey, settings.baseUrl, settings.model, prompt, maxTokens, timeoutMs);
+  }
+
+  // ── ID normalisation ────────────────────────────────────────────────────────
+  // Soft matching for fragment IDs: "F.01" vs "F-01" vs "f_01" all match.
+  // Used in validation only — never rewrites IDs in the booklet.
+
+  function normalizeId(id) {
+    return String(id || '').toLowerCase().replace(/[-_.\s]/g, '');
   }
 
   // ── Booklet schema postchecks ─────────────────────────────────────────────
@@ -429,16 +529,19 @@ window.LiftRPGAPI = (function () {
 
   function generatePatchPrompt(rawJson, errors) {
     return [
-      '# Schema Patch',
+      'You are a JSON repair specialist.',
       '',
-      'The LiftRPG booklet JSON below has validation errors.',
-      'Return the corrected JSON only. Fix only the listed errors.',
-      'Do not rewrite or restructure anything else.',
+      'The JSON below has validation errors. Fix ONLY the listed errors.',
       '',
-      '## Errors',
+      'RULES:',
+      '- Output ONLY the corrected JSON. No markdown fences, no commentary, no explanation.',
+      '- Preserve all unaffected content exactly as-is.',
+      '- The output must be valid, parseable JSON.',
+      '',
+      '## Errors to Fix',
       errors.map(function (e) { return '- ' + e; }).join('\n'),
       '',
-      '## JSON to Patch',
+      '## JSON',
       '',
       rawJson
     ].join('\n');
@@ -517,6 +620,7 @@ window.LiftRPGAPI = (function () {
 
   // ── Expanded booklet validation ─────────────────────────────────────────
   // Validates the assembled booklet. Returns array of human-readable errors.
+  // Fragment ID matching is soft: "F.01" matches "F-01", "f_01", etc.
 
   function validateAssembledBooklet(booklet) {
     var errors = [];
@@ -545,9 +649,19 @@ window.LiftRPGAPI = (function () {
       errors.push('Boss week must be the final week in the array');
     }
 
-    // Fragment ID cross-reference
+    // Fragment ID cross-reference (exact first, then normalised)
     var fragmentIds = {};
-    fragments.forEach(function (f) { if (f.id) fragmentIds[f.id] = true; });
+    var fragmentIdsNorm = {};
+    fragments.forEach(function (f) {
+      if (f.id) {
+        fragmentIds[f.id] = true;
+        fragmentIdsNorm[normalizeId(f.id)] = true;
+      }
+    });
+
+    function fragmentExists(ref) {
+      return fragmentIds[ref] || fragmentIdsNorm[normalizeId(ref)];
+    }
 
     weeks.forEach(function (week, wi) {
       var wn = 'Week ' + (wi + 1);
@@ -555,7 +669,7 @@ window.LiftRPGAPI = (function () {
 
       // Session fragmentRef checks
       (week.sessions || []).forEach(function (s, si) {
-        if (s.fragmentRef && !fragmentIds[s.fragmentRef]) {
+        if (s.fragmentRef && !fragmentExists(s.fragmentRef)) {
           errors.push(wn + ' session ' + (si + 1) + ': fragmentRef "' + s.fragmentRef + '" not found in fragments[]');
         }
       });
@@ -570,7 +684,7 @@ window.LiftRPGAPI = (function () {
         if (entry.type === 'fragment' && !entry.fragmentRef) {
           errors.push(wn + ' oracle[' + ei + ']: type "fragment" missing fragmentRef');
         }
-        if (entry.fragmentRef && !fragmentIds[entry.fragmentRef]) {
+        if (entry.fragmentRef && !fragmentExists(entry.fragmentRef)) {
           errors.push(wn + ' oracle[' + ei + ']: fragmentRef "' + entry.fragmentRef + '" not found in fragments[]');
         }
       });
@@ -752,22 +866,27 @@ window.LiftRPGAPI = (function () {
       ((endingsOutput || {}).endings || []).length, 'endings');
     var booklet = assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput);
 
-    // Validate
+    // Validate + single patch attempt (no retry loop)
     var errors = validateAssembledBooklet(booklet);
     if (errors.length > 0) {
       console.warn('[LiftRPG] Assembled booklet has', errors.length, 'validation errors:', errors);
       var errLabel = errors.length === 1 ? '1 error' : errors.length + ' errors';
       progress('Patching ' + errLabel + '\u2026');
-      // Patch stage: send the full assembled booklet + errors
-      var rawPatched = await callStage(
-        generatePatchPrompt(JSON.stringify(booklet, null, 2), errors),
-        32000,
-        'Patch'
-      );
-      booklet = extractJson(rawPatched);
-      var remaining = validateAssembledBooklet(booklet);
-      if (remaining.length > 0) {
-        console.warn('[LiftRPG] Patch did not fully resolve errors:', remaining);
+      try {
+        var rawPatched = await callStage(
+          generatePatchPrompt(JSON.stringify(booklet, null, 2), errors),
+          32000,
+          'Patch'
+        );
+        booklet = extractJson(rawPatched);
+        var remaining = validateAssembledBooklet(booklet);
+        if (remaining.length > 0) {
+          console.warn('[LiftRPG] Patch did not fully resolve errors (' + remaining.length + ' remaining):', remaining);
+          // Keep the partially repaired booklet — better than the unpatched version
+        }
+      } catch (patchErr) {
+        // Patch failed — keep the unpatched booklet and warn
+        console.warn('[LiftRPG] Patch stage failed, returning unpatched booklet:', patchErr.message);
       }
     }
 
@@ -786,6 +905,7 @@ window.LiftRPGAPI = (function () {
    *   apiKey:  string
    *   baseUrl: string       (openai format only)
    *   model:   string
+   *   requestTimeoutMs: number (optional, default 300000)
    * }
    */
   async function generate(settings, workout, brief, dice) {
@@ -794,14 +914,7 @@ window.LiftRPGAPI = (function () {
     }
 
     var prompt = window.generatePrompt(workout, brief, dice);
-    var raw;
-
-    if (settings.format === 'anthropic') {
-      raw = await callAnthropic(settings.apiKey, settings.model, prompt);
-    } else {
-      raw = await callOpenAICompat(settings.apiKey, settings.baseUrl, settings.model, prompt);
-    }
-
+    var raw = await callProvider(settings, prompt);
     return extractJson(raw);
   }
 
