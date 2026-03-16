@@ -1499,10 +1499,11 @@
    * @param {object} layerBible - Stage 1 output
    * @param {object} campaignPlan - Stage 2 output
    * @param {number[]} weekNumbers - Which weeks to generate (e.g. [1,2] or [3])
-   * @param {object[]|null} previousChunkWeeks - Previous chunk&apos;s weeks array for continuity
+   * @param {object|null} continuity - Enriched continuity packet from buildChunkContinuity(), or null for first chunk
    * @param {Array} allComponentValues - Accumulated weeklyComponent.value from prior chunks
+   * @param {object|null} shellContext - Shell-level narrative constraints { worldContract, narrativeVoice, literaryRegister, structuralShape }
    */
-  window.generateWeekChunkPrompt = function (workout, brief, layerBible, campaignPlan, weekNumbers, previousChunkWeeks, allComponentValues) {
+  window.generateWeekChunkPrompt = function (workout, brief, layerBible, campaignPlan, weekNumbers, continuity, allComponentValues, shellContext) {
     var blend = deriveDesignBlend(brief, workout);
     var weekCount = (campaignPlan.weeks || []).length || 6;
     var isBossChunk = weekNumbers.indexOf(weekCount) !== -1;
@@ -1545,18 +1546,99 @@
       ''
     ];
 
-    // Continuity from previous chunk
-    if (previousChunkWeeks && previousChunkWeeks.length > 0) {
-      var lastWeek = previousChunkWeeks[previousChunkWeeks.length - 1];
-      var continuity = {
-        lastWeekNumber: lastWeek.weekNumber,
-        lastMapState: (lastWeek.fieldOps || {}).mapState || null,
-        lastClocks: lastWeek.gameplayClocks || [],
-        lastTitle: lastWeek.title
-      };
-      parts.push('### Previous Week State (for map/clock/companion continuity)');
-      parts.push(JSON.stringify(continuity, null, 2));
+    // Shell-level narrative constraints (voice, register, world contract)
+    if (shellContext) {
+      parts.push('### Narrative Constraints (from booklet shell — follow these exactly)');
+      if (shellContext.worldContract) {
+        parts.push('**World Contract:** ' + shellContext.worldContract);
+      }
+      if (shellContext.narrativeVoice) {
+        parts.push('**Narrative Voice:** ' + JSON.stringify(shellContext.narrativeVoice));
+      }
+      if (shellContext.literaryRegister) {
+        parts.push('**Literary Register:** ' + JSON.stringify(shellContext.literaryRegister));
+      }
+      if (shellContext.structuralShape) {
+        parts.push('**Structural Shape:** ' + JSON.stringify(shellContext.structuralShape));
+      }
       parts.push('');
+    }
+
+    // Continuity from prior weeks (enriched packet from api-generator)
+    if (continuity && continuity.weekCount > 0) {
+      parts.push('### Story So Far (continuity from weeks 1\u2013' + continuity.weekCount + ')');
+      parts.push('');
+
+      // Week titles for narrative thread awareness
+      if (continuity.weekSummaries && continuity.weekSummaries.length > 0) {
+        parts.push('**Week titles:**');
+        continuity.weekSummaries.forEach(function (ws) {
+          parts.push('- Week ' + ws.week + ': ' + ws.title);
+        });
+        parts.push('');
+      }
+
+      // Cipher progression (type escalation awareness)
+      if (continuity.cipherProgression && continuity.cipherProgression.length > 0) {
+        parts.push('**Cipher types used so far** (do not repeat the same type):');
+        continuity.cipherProgression.forEach(function (cp) {
+          parts.push('- Week ' + cp.week + ': ' + cp.type + (cp.title ? ' \u2014 ' + cp.title : ''));
+        });
+        parts.push('');
+      }
+
+      // Component values collected
+      if (continuity.componentValues && continuity.componentValues.length > 0) {
+        parts.push('**Weekly component values collected:**');
+        continuity.componentValues.forEach(function (cv) {
+          parts.push('- Week ' + cv.week + ': ' + cv.value);
+        });
+        parts.push('');
+      }
+
+      // Fragment refs already used (avoid re-assigning)
+      if (continuity.usedFragmentRefs && continuity.usedFragmentRefs.length > 0) {
+        parts.push('**Fragment IDs already assigned** (do not reuse): ' + continuity.usedFragmentRefs.join(', '));
+        parts.push('');
+      }
+
+      // Recent oracle context
+      if (continuity.recentOracles && continuity.recentOracles.length > 0) {
+        parts.push('**Recent oracle tables:**');
+        continuity.recentOracles.forEach(function (o) {
+          var detail = 'Week ' + o.week + ': ' + o.entryCount + ' entries';
+          if (o.fragmentRefs) detail += ', refs: ' + o.fragmentRefs.join(', ');
+          if (o.paperActions) detail += ', actions: ' + o.paperActions.join('; ');
+          parts.push('- ' + detail);
+        });
+        parts.push('');
+      }
+
+      // Map progression
+      if (continuity.mapProgression) {
+        var mp = continuity.mapProgression;
+        parts.push('**Map state** (' + mp.gridDimensions.columns + '\u00d7' + mp.gridDimensions.rows + ' grid):');
+        parts.push('- Current position: row ' + mp.currentPosition.row + ', col ' + mp.currentPosition.col);
+        parts.push('- Tiles: ' + mp.tileCount + ' total, ' + mp.anomalyCount + ' anomaly, ' + mp.inaccessibleCount + ' inaccessible');
+        if (mp.notableAnnotations && mp.notableAnnotations.length > 0) {
+          parts.push('- Notable: ' + mp.notableAnnotations.join('; '));
+        }
+        if (mp.floorLabel) parts.push('- Last label: ' + mp.floorLabel);
+        parts.push('');
+      }
+
+      // Gameplay clocks
+      if (continuity.clocks && continuity.clocks.length > 0) {
+        parts.push('**Active clocks:** ' + JSON.stringify(continuity.clocks));
+        parts.push('');
+      }
+
+      // Binary choice state
+      if (continuity.binaryChoice) {
+        parts.push('**Binary choice already occurred** in Week ' + continuity.binaryChoice.week + ': ' + continuity.binaryChoice.choiceLabel);
+        parts.push('Do NOT add another binaryChoice in this chunk.');
+        parts.push('');
+      }
     }
 
     // Boss needs all prior component values
@@ -1665,8 +1747,9 @@
    * @param {object} campaignPlan - Stage 2 output
    * @param {object} bossWeek - The generated boss week object
    * @param {object|null} binaryChoiceWeek - The generated binary choice week, if found
+   * @param {object|null} shellContext - Shell-level narrative constraints { worldContract, narrativeVoice, literaryRegister, structuralShape }
    */
-  window.generateEndingsPrompt = function (layerBible, campaignPlan, bossWeek, binaryChoiceWeek) {
+  window.generateEndingsPrompt = function (layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext) {
     var parts = [
       '# Generate Endings',
       '',
@@ -1680,24 +1763,43 @@
       '---',
       '',
       '## Reference Context',
-      '',
-      '### Protagonist Arc',
-      JSON.stringify({
-        protagonist: layerBible.storyLayer.protagonist,
-        relationshipWeb: layerBible.storyLayer.relationshipWeb,
-        darkestMoment: layerBible.storyLayer.darkestMoment,
-        resolutionMode: layerBible.storyLayer.resolutionMode,
-        recurringMotifs: layerBible.storyLayer.recurringMotifs
-      }, null, 2),
-      '',
-      '### Boss Encounter',
-      JSON.stringify({
-        title: (bossWeek.bossEncounter || {}).title,
-        narrative: (bossWeek.bossEncounter || {}).narrative,
-        convergenceProof: (bossWeek.bossEncounter || {}).convergenceProof
-      }, null, 2),
       ''
     ];
+
+    // Shell-level narrative constraints (voice, register, world contract)
+    if (shellContext) {
+      parts.push('### Narrative Constraints (from booklet shell — the ending must honour these)');
+      if (shellContext.worldContract) {
+        parts.push('**World Contract:** ' + shellContext.worldContract);
+      }
+      if (shellContext.narrativeVoice) {
+        parts.push('**Narrative Voice:** ' + JSON.stringify(shellContext.narrativeVoice));
+      }
+      if (shellContext.literaryRegister) {
+        parts.push('**Literary Register:** ' + JSON.stringify(shellContext.literaryRegister));
+      }
+      if (shellContext.structuralShape) {
+        parts.push('**Structural Shape:** ' + JSON.stringify(shellContext.structuralShape));
+      }
+      parts.push('');
+    }
+
+    parts.push('### Protagonist Arc');
+    parts.push(JSON.stringify({
+      protagonist: layerBible.storyLayer.protagonist,
+      relationshipWeb: layerBible.storyLayer.relationshipWeb,
+      darkestMoment: layerBible.storyLayer.darkestMoment,
+      resolutionMode: layerBible.storyLayer.resolutionMode,
+      recurringMotifs: layerBible.storyLayer.recurringMotifs
+    }, null, 2));
+    parts.push('');
+    parts.push('### Boss Encounter');
+    parts.push(JSON.stringify({
+      title: (bossWeek.bossEncounter || {}).title,
+      narrative: (bossWeek.bossEncounter || {}).narrative,
+      convergenceProof: (bossWeek.bossEncounter || {}).convergenceProof
+    }, null, 2));
+    parts.push('');
 
     if (binaryChoiceWeek) {
       var binaryChoice = null;

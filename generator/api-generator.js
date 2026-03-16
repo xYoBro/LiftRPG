@@ -603,6 +603,155 @@ window.LiftRPGAPI = (function () {
     ].join('\n');
   }
 
+  // ── Shell context extractor ─────────────────────────────────────────────
+  // Extracts compact narrative constraints from shell output for downstream stages.
+  // Returns null if shell has no relevant fields (safe to pass as-is).
+
+  function extractShellContext(shell) {
+    var meta = shell.meta || {};
+    var ctx = {};
+    var hasContent = false;
+    if (meta.worldContract)    { ctx.worldContract    = meta.worldContract;    hasContent = true; }
+    if (meta.narrativeVoice)   { ctx.narrativeVoice   = meta.narrativeVoice;   hasContent = true; }
+    if (meta.literaryRegister) { ctx.literaryRegister  = meta.literaryRegister; hasContent = true; }
+    if (meta.structuralShape)  { ctx.structuralShape   = meta.structuralShape;  hasContent = true; }
+    return hasContent ? ctx : null;
+  }
+
+  // ── Inter-chunk continuity builder ──────────────────────────────────────
+  // Builds a compact continuity packet from ALL prior generated weeks.
+  // Replaces the thin {lastWeekNumber, lastMapState, lastClocks, lastTitle}
+  // with a richer summary that lets downstream chunks maintain puzzle, map,
+  // fragment, and narrative coherence without seeing full prior JSON.
+
+  function buildChunkContinuity(allPriorWeeks) {
+    if (!allPriorWeeks || allPriorWeeks.length === 0) return null;
+
+    var weekSummaries = [];
+    var usedFragmentRefs = [];
+    var cipherProgression = [];
+    var componentValues = [];
+    var binaryChoiceState = null;
+
+    // Map progression from the LAST week that has a mapState
+    var lastMapState = null;
+
+    // Recent oracle context (last 2 weeks only)
+    var recentOracles = [];
+
+    allPriorWeeks.forEach(function (week, wi) {
+      var wn = week.weekNumber || (wi + 1);
+      var fo = week.fieldOps || {};
+      var sessions = week.sessions || [];
+
+      // Week title summary
+      weekSummaries.push({ week: wn, title: week.title || '' });
+
+      // Component values
+      var wc = week.weeklyComponent || {};
+      if (wc.value !== undefined && wc.value !== null && wc.value !== '') {
+        componentValues.push({ week: wn, value: wc.value });
+      }
+
+      // Cipher progression (type + short summary)
+      var cipher = fo.cipher || {};
+      if (cipher.type) {
+        cipherProgression.push({
+          week: wn,
+          type: cipher.type,
+          title: (cipher.title || '').slice(0, 80)
+        });
+      }
+
+      // Fragment refs used in sessions
+      sessions.forEach(function (s) {
+        if (s.fragmentRef) usedFragmentRefs.push(s.fragmentRef);
+      });
+
+      // Oracle fragment refs
+      var oracle = fo.oracleTable || fo.oracle || {};
+      var entries = oracle.entries || [];
+      entries.forEach(function (e) {
+        if (e.fragmentRef) usedFragmentRefs.push(e.fragmentRef);
+      });
+
+      // Binary choice detection
+      sessions.forEach(function (s) {
+        if (s.binaryChoice) {
+          binaryChoiceState = {
+            week: wn,
+            choiceLabel: (s.binaryChoice.choiceLabel || '').slice(0, 120)
+          };
+        }
+      });
+
+      // Map state tracking
+      if (fo.mapState) {
+        lastMapState = fo.mapState;
+      }
+
+      // Recent oracle summaries (keep last 2)
+      if (entries.length > 0) {
+        var oracleSummary = { week: wn, entryCount: entries.length };
+        // Extract fragment refs and paper actions from oracle
+        var oracleFrags = [];
+        var oracleActions = [];
+        entries.forEach(function (e) {
+          if (e.fragmentRef) oracleFrags.push(e.fragmentRef);
+          if (e.paperAction) oracleActions.push(e.paperAction.slice(0, 60));
+        });
+        if (oracleFrags.length > 0) oracleSummary.fragmentRefs = oracleFrags;
+        if (oracleActions.length > 0) oracleSummary.paperActions = oracleActions.slice(0, 3);
+        recentOracles.push(oracleSummary);
+      }
+    });
+
+    // Build map summary from last known mapState
+    var mapSummary = null;
+    if (lastMapState) {
+      var tiles = lastMapState.tiles || [];
+      var anomalyCount = 0;
+      var inaccessibleCount = 0;
+      var notableAnnotations = [];
+      tiles.forEach(function (t) {
+        if (t.type === 'anomaly') anomalyCount++;
+        if (t.type === 'inaccessible') inaccessibleCount++;
+        if (t.annotation) notableAnnotations.push(t.label + ': ' + t.annotation.slice(0, 50));
+      });
+      mapSummary = {
+        currentPosition: lastMapState.currentPosition,
+        gridDimensions: lastMapState.gridDimensions,
+        floorLabel: lastMapState.floorLabel,
+        tileCount: tiles.length,
+        anomalyCount: anomalyCount,
+        inaccessibleCount: inaccessibleCount
+      };
+      if (notableAnnotations.length > 0) {
+        mapSummary.notableAnnotations = notableAnnotations.slice(0, 5);
+      }
+    }
+
+    // Deduplicate fragment refs
+    var seen = {};
+    usedFragmentRefs = usedFragmentRefs.filter(function (ref) {
+      if (seen[ref]) return false;
+      seen[ref] = true;
+      return true;
+    });
+
+    return {
+      weekCount: allPriorWeeks.length,
+      weekSummaries: weekSummaries,
+      componentValues: componentValues,
+      cipherProgression: cipherProgression,
+      usedFragmentRefs: usedFragmentRefs,
+      recentOracles: recentOracles.slice(-2),
+      mapProgression: mapSummary,
+      binaryChoice: binaryChoiceState,
+      clocks: allPriorWeeks[allPriorWeeks.length - 1].gameplayClocks || []
+    };
+  }
+
   // ── Booklet assembler ────────────────────────────────────────────────────
   // Merges partial JSON chunks from the 10-stage pipeline into a complete booklet.
 
@@ -622,13 +771,11 @@ window.LiftRPGAPI = (function () {
       booklet.weeks = booklet.weeks.concat(chunk.weeks || []);
     });
 
-    // Ensure meta.weekCount matches
-    booklet.meta.weekCount = booklet.weeks.length;
-
-    // Sum total sessions
-    booklet.meta.totalSessions = booklet.weeks.reduce(function (sum, w) {
-      return sum + (w.sessions ? w.sessions.length : 0);
-    }, 0);
+    // Enforce deterministic derived fields (meta counts, componentInputs, password)
+    var result = enforceBookletDerivedFields(booklet);
+    if (result.warnings.length > 0) {
+      console.warn('[LiftRPG] Assembly derivation warnings:', result.warnings);
+    }
 
     return booklet;
   }
@@ -687,11 +834,11 @@ window.LiftRPGAPI = (function () {
       }
     });
 
-    // Ensure meta counts match actual data
-    booklet.meta.weekCount = booklet.weeks.length;
-    booklet.meta.totalSessions = booklet.weeks.reduce(function (sum, w) {
-      return sum + (w.sessions ? w.sessions.length : 0);
-    }, 0);
+    // Enforce deterministic derived fields (meta counts, componentInputs, password)
+    var result = enforceBookletDerivedFields(booklet);
+    if (result.warnings.length > 0) {
+      console.warn('[LiftRPG] Structured assembly derivation warnings:', result.warnings);
+    }
 
     return booklet;
   }
@@ -737,6 +884,139 @@ window.LiftRPGAPI = (function () {
     return null;
   }
 
+  // ── Deterministic derivation helpers ──────────────────────────────────────
+  // Compute bookkeeping facts from assembled data instead of trusting model prose.
+
+  /**
+   * decodeA1Z26(values) → string | null
+   * Converts an array of numeric values to uppercase letters via A=1 … Z=26.
+   * Returns null if any value is out of range or non-numeric.
+   */
+  function decodeA1Z26(values) {
+    if (!Array.isArray(values) || values.length === 0) return null;
+    var letters = '';
+    for (var i = 0; i < values.length; i++) {
+      var n = Number(values[i]);
+      if (isNaN(n) || n < 1 || n > 26 || n !== Math.floor(n)) return null;
+      letters += String.fromCharCode(64 + n); // 65='A', so 64+1='A'
+    }
+    return letters;
+  }
+
+  /**
+   * isStandardAlphaTable(referenceTable) → boolean
+   * Detects whether a decodingKey.referenceTable is a standard A=1 … Z=26 table.
+   * Matches tables formatted as "1=A  2=B  3=C …" with any whitespace/newlines.
+   * Returns false for any non-standard mapping (reverse alphabet, custom codes, etc.).
+   */
+  function isStandardAlphaTable(referenceTable) {
+    if (!referenceTable || typeof referenceTable !== 'string') return false;
+    // Extract all N=L pairs from the table text
+    var pairs = referenceTable.match(/\d+=\s*[A-Za-z]/g);
+    if (!pairs || pairs.length < 26) return false;
+    // Verify each pair matches standard A1Z26
+    for (var i = 0; i < 26; i++) {
+      var expected = (i + 1) + '=' + String.fromCharCode(65 + i);
+      // Find this pair (allow whitespace around =)
+      var found = false;
+      for (var j = 0; j < pairs.length; j++) {
+        var cleaned = pairs[j].replace(/\s/g, '').toUpperCase();
+        if (cleaned === expected) { found = true; break; }
+      }
+      if (!found) return false;
+    }
+    return true;
+  }
+
+  /**
+   * enforceBookletDerivedFields(booklet) → { warnings: string[] }
+   *
+   * Post-assembly enforcement of deterministic fields. Mutates booklet in place.
+   * Called by both assembleBooklet() and assembleStructuredBooklet().
+   *
+   * Enforces:
+   *   meta.weekCount, meta.totalSessions
+   *   bossEncounter.componentInputs (from collected non-boss weeklyComponent values)
+   *   meta.demoPassword + meta.passwordLength (when A1Z26 decode succeeds)
+   *
+   * Returns warnings array for non-critical issues (e.g. non-standard decode table).
+   */
+  function enforceBookletDerivedFields(booklet) {
+    var warnings = [];
+    var weeks = booklet.weeks || [];
+    var meta = booklet.meta || {};
+    booklet.meta = meta;
+
+    // ── Meta counts (always override) ──────────────────────────────────────
+    meta.weekCount = weeks.length;
+    meta.totalSessions = weeks.reduce(function (sum, w) {
+      return sum + (w.sessions ? w.sessions.length : 0);
+    }, 0);
+
+    // ── Collect non-boss weeklyComponent values ────────────────────────────
+    var nonBossValues = [];
+    weeks.forEach(function (w) {
+      if (!w.isBossWeek) {
+        var wc = w.weeklyComponent || {};
+        if (wc.value !== undefined && wc.value !== null && wc.value !== '') {
+          nonBossValues.push(wc.value);
+        }
+      }
+    });
+
+    // ── Boss encounter: enforce componentInputs ────────────────────────────
+    var bossWeek = null;
+    for (var i = weeks.length - 1; i >= 0; i--) {
+      if (weeks[i].isBossWeek) { bossWeek = weeks[i]; break; }
+    }
+
+    if (bossWeek && bossWeek.bossEncounter && nonBossValues.length > 0) {
+      var boss = bossWeek.bossEncounter;
+      var existingInputs = boss.componentInputs || [];
+
+      // Only override when we have values for every non-boss week
+      var nonBossCount = weeks.filter(function (w) { return !w.isBossWeek; }).length;
+      if (nonBossValues.length === nonBossCount) {
+        // Convert to strings for consistency
+        var computed = nonBossValues.map(function (v) { return String(v); });
+
+        // Check if model's values match — if not, override with computed truth
+        var mismatch = existingInputs.length !== computed.length;
+        if (!mismatch) {
+          for (var ci = 0; ci < computed.length; ci++) {
+            if (String(existingInputs[ci]) !== computed[ci]) { mismatch = true; break; }
+          }
+        }
+
+        if (mismatch) {
+          if (existingInputs.length > 0) {
+            warnings.push('componentInputs overridden: model had [' + existingInputs.join(', ') + '], computed [' + computed.join(', ') + ']');
+          }
+          boss.componentInputs = computed;
+        }
+      }
+
+      // ── Password derivation (A1Z26 only) ──────────────────────────────────
+      var dk = boss.decodingKey;
+      if (dk && dk.referenceTable) {
+        if (isStandardAlphaTable(dk.referenceTable)) {
+          var numericValues = (boss.componentInputs || []).map(function (v) { return Number(v); });
+          var password = decodeA1Z26(numericValues);
+          if (password) {
+            meta.demoPassword = password;
+            meta.passwordLength = password.length;
+          } else {
+            warnings.push('A1Z26 decode failed — componentInputs contain non-integer or out-of-range values');
+          }
+        } else {
+          warnings.push('Boss decodingKey.referenceTable is not standard A1Z26 — password not derived deterministically');
+        }
+      }
+    }
+
+    return { warnings: warnings };
+  }
+
   // ── Expanded booklet validation ─────────────────────────────────────────
   // Validates the assembled booklet. Returns array of human-readable errors.
   // Fragment ID matching is soft: "F.01" matches "F-01", "f_01", etc.
@@ -744,20 +1024,28 @@ window.LiftRPGAPI = (function () {
   function validateAssembledBooklet(booklet) {
     var errors = [];
 
-    // Top-level key checks
+    // ── Top-level structure ──────────────────────────────────────────────────
     ['meta', 'cover', 'rulesSpread', 'weeks', 'fragments', 'endings'].forEach(function (key) {
       if (!booklet[key]) errors.push('Missing top-level key: ' + key);
     });
 
+    var meta = booklet.meta || {};
     var weeks = booklet.weeks || [];
     var fragments = booklet.fragments || [];
 
-    // Week count consistency
-    if (booklet.meta && booklet.meta.weekCount !== weeks.length) {
-      errors.push('meta.weekCount (' + booklet.meta.weekCount + ') does not match weeks.length (' + weeks.length + ')');
+    // ── Meta consistency ─────────────────────────────────────────────────────
+    if (meta.weekCount !== undefined && meta.weekCount !== weeks.length) {
+      errors.push('meta.weekCount (' + meta.weekCount + ') does not match weeks.length (' + weeks.length + ')');
+    }
+    if (meta.totalSessions !== undefined) {
+      var actualSessions = 0;
+      weeks.forEach(function (w) { actualSessions += (w.sessions || []).length; });
+      if (meta.totalSessions !== actualSessions) {
+        errors.push('meta.totalSessions (' + meta.totalSessions + ') does not match actual session count (' + actualSessions + ')');
+      }
     }
 
-    // Boss week checks
+    // ── Boss week: exactly one, must be final ────────────────────────────────
     var bossWeeks = weeks.filter(function (w) { return w.isBossWeek; });
     if (bossWeeks.length === 0) {
       errors.push('No boss week found (isBossWeek: true)');
@@ -768,13 +1056,34 @@ window.LiftRPGAPI = (function () {
       errors.push('Boss week must be the final week in the array');
     }
 
-    // Fragment ID cross-reference (exact first, then normalised)
+    // ── Fragment + overflow document ID uniqueness ───────────────────────────
     var fragmentIds = {};
     var fragmentIdsNorm = {};
+    var allDocIds = {};  // fragments + overflow docs combined
     fragments.forEach(function (f) {
       if (f.id) {
+        var nid = normalizeId(f.id);
+        if (fragmentIds[f.id]) {
+          errors.push('Duplicate fragment ID: "' + f.id + '"');
+        }
         fragmentIds[f.id] = true;
-        fragmentIdsNorm[normalizeId(f.id)] = true;
+        fragmentIdsNorm[nid] = true;
+        if (allDocIds[nid]) {
+          errors.push('Fragment ID "' + f.id + '" collides with another document ID');
+        }
+        allDocIds[nid] = 'fragment';
+      }
+    });
+
+    // Collect overflow document IDs and check for collisions
+    weeks.forEach(function (week, wi) {
+      var od = week.overflowDocument;
+      if (od && od.id) {
+        var nid = normalizeId(od.id);
+        if (allDocIds[nid]) {
+          errors.push('Week ' + (wi + 1) + ' overflowDocument ID "' + od.id + '" collides with ' + (allDocIds[nid] === 'fragment' ? 'a fragment' : 'another overflow document'));
+        }
+        allDocIds[nid] = 'overflow';
       }
     });
 
@@ -782,18 +1091,28 @@ window.LiftRPGAPI = (function () {
       return fragmentIds[ref] || fragmentIdsNorm[normalizeId(ref)];
     }
 
+    // ── Collect non-boss weeklyComponent values for boss verification ────────
+    var nonBossValues = [];
+    var hasBinaryChoice = false;
+    var binaryChoiceWeek = null;
+
+    // ── Per-week validation ──────────────────────────────────────────────────
     weeks.forEach(function (week, wi) {
       var wn = 'Week ' + (wi + 1);
       var fo = week.fieldOps || {};
 
-      // Session fragmentRef checks
+      // -- Sessions --
       (week.sessions || []).forEach(function (s, si) {
         if (s.fragmentRef && !fragmentExists(s.fragmentRef)) {
           errors.push(wn + ' session ' + (si + 1) + ': fragmentRef "' + s.fragmentRef + '" not found in fragments[]');
         }
+        if (s.binaryChoice) {
+          hasBinaryChoice = true;
+          binaryChoiceWeek = wn;
+        }
       });
 
-      // Oracle checks (existing + fragmentRef cross-ref)
+      // -- Oracle validation --
       var oracle = fo.oracleTable || fo.oracle || {};
       var entries = oracle.entries || [];
       entries.forEach(function (entry, ei) {
@@ -807,39 +1126,139 @@ window.LiftRPGAPI = (function () {
           errors.push(wn + ' oracle[' + ei + ']: fragmentRef "' + entry.fragmentRef + '" not found in fragments[]');
         }
       });
+
+      // Simple oracle: must have exactly rolls "2" through "12"
       var mode = oracle.mode || (entries.length === 11 ? 'simple' : null);
-      if (mode === 'simple' && entries.length !== 11) {
-        errors.push(wn + ' simple oracle: has ' + entries.length + ' entries, needs 11 (rolls "2"\u2013"12")');
+      if (mode === 'simple') {
+        if (entries.length !== 11) {
+          errors.push(wn + ' simple oracle: has ' + entries.length + ' entries, needs 11 (rolls "2"\u2013"12")');
+        } else {
+          var expectedRolls = {};
+          for (var r = 2; r <= 12; r++) expectedRolls[String(r)] = false;
+          entries.forEach(function (entry) {
+            var roll = String(entry.roll);
+            if (!(roll in expectedRolls)) {
+              errors.push(wn + ' simple oracle: unexpected roll "' + roll + '" (must be "2"\u2013"12")');
+            } else if (expectedRolls[roll]) {
+              errors.push(wn + ' simple oracle: duplicate roll "' + roll + '"');
+            }
+            expectedRolls[roll] = true;
+          });
+          for (var mr in expectedRolls) {
+            if (!expectedRolls[mr]) {
+              errors.push(wn + ' simple oracle: missing roll "' + mr + '"');
+            }
+          }
+        }
       }
 
-      // Cipher body must be an object
+      // -- Cipher validation (non-boss weeks) --
       var cipher = fo.cipher || {};
-      if (cipher.body !== undefined && typeof cipher.body !== 'object') {
-        errors.push(wn + ' cipher.body: must be an object, got ' + (typeof cipher.body));
+      if (!week.isBossWeek) {
+        // Required cipher fields
+        var REQUIRED_CIPHER_FIELDS = ['type', 'body', 'extractionInstruction', 'characterDerivationProof', 'noticeabilityDesign'];
+        REQUIRED_CIPHER_FIELDS.forEach(function (field) {
+          if (cipher[field] === undefined || cipher[field] === null || cipher[field] === '') {
+            errors.push(wn + ' cipher: missing required field "' + field + '"');
+          }
+        });
+        if (cipher.body !== undefined && typeof cipher.body !== 'object') {
+          errors.push(wn + ' cipher.body: must be an object, got ' + (typeof cipher.body));
+        }
       }
 
-      // Interlude payloadType
+      // -- Map grid integrity --
+      var mapState = fo.mapState;
+      if (mapState && mapState.gridDimensions) {
+        var dims = mapState.gridDimensions;
+        var tiles = mapState.tiles || [];
+        var expectedTileCount = (dims.rows || 0) * (dims.columns || 0);
+
+        if (tiles.length > 0 && tiles.length !== expectedTileCount) {
+          errors.push(wn + ' mapState: rows(' + dims.rows + ') * columns(' + dims.columns + ') = ' + expectedTileCount + ' but got ' + tiles.length + ' tiles');
+        }
+
+        // Duplicate coordinate check + bounds check
+        if (tiles.length > 0) {
+          var coordsSeen = {};
+          tiles.forEach(function (tile, ti) {
+            if (tile.row !== undefined && tile.col !== undefined) {
+              var coord = tile.row + ',' + tile.col;
+              if (coordsSeen[coord]) {
+                errors.push(wn + ' mapState tile[' + ti + ']: duplicate coord (' + coord + ')');
+              }
+              coordsSeen[coord] = true;
+              if (tile.row < 1 || tile.row > dims.rows) {
+                errors.push(wn + ' mapState tile[' + ti + ']: row ' + tile.row + ' out of bounds (1\u2013' + dims.rows + ')');
+              }
+              if (tile.col < 1 || tile.col > dims.columns) {
+                errors.push(wn + ' mapState tile[' + ti + ']: col ' + tile.col + ' out of bounds (1\u2013' + dims.columns + ')');
+              }
+            }
+          });
+        }
+
+        // currentPosition validity
+        var cp = mapState.currentPosition;
+        if (cp) {
+          if (cp.row !== undefined && (cp.row < 1 || cp.row > dims.rows)) {
+            errors.push(wn + ' mapState.currentPosition: row ' + cp.row + ' out of bounds (1\u2013' + dims.rows + ')');
+          }
+          if (cp.col !== undefined && (cp.col < 1 || cp.col > dims.columns)) {
+            errors.push(wn + ' mapState.currentPosition: col ' + cp.col + ' out of bounds (1\u2013' + dims.columns + ')');
+          }
+        }
+      }
+
+      // -- Interlude payloadType --
       var interlude = week.interlude || {};
       if (interlude.payloadType && !VALID_PAYLOAD_TYPES[interlude.payloadType]) {
         errors.push(wn + ' interlude.payloadType: "' + interlude.payloadType + '" not supported');
       }
 
-      // weeklyComponent.value on non-boss weeks
+      // -- weeklyComponent.value on non-boss weeks --
       if (!week.isBossWeek) {
         var wc = week.weeklyComponent || {};
         if (wc.value === undefined || wc.value === null || wc.value === '') {
           errors.push(wn + ': weeklyComponent.value is missing or empty');
         }
+        nonBossValues.push(wc.value);
       }
     });
 
-    // Boss componentInputs length
+    // ── Boss encounter validation ────────────────────────────────────────────
     if (bossWeeks.length === 1) {
       var boss = bossWeeks[0].bossEncounter || {};
       var inputs = boss.componentInputs || [];
       var nonBossCount = weeks.filter(function (w) { return !w.isBossWeek; }).length;
+
+      // componentInputs count must match non-boss weeks
       if (inputs.length > 0 && inputs.length !== nonBossCount) {
         errors.push('Boss componentInputs has ' + inputs.length + ' values but there are ' + nonBossCount + ' non-boss weeks');
+      }
+
+      // componentInputs values must exactly match collected weeklyComponent values in order
+      if (inputs.length === nonBossValues.length && inputs.length > 0) {
+        for (var ci = 0; ci < inputs.length; ci++) {
+          if (String(inputs[ci]) !== String(nonBossValues[ci])) {
+            errors.push('Boss componentInputs[' + ci + '] = "' + inputs[ci] + '" does not match Week ' + (ci + 1) + ' weeklyComponent.value = "' + nonBossValues[ci] + '"');
+          }
+        }
+      }
+
+      // binaryChoice → binaryChoiceAcknowledgement cross-check
+      if (hasBinaryChoice) {
+        var bca = boss.binaryChoiceAcknowledgement;
+        if (!bca) {
+          errors.push('A session has binaryChoice (' + binaryChoiceWeek + ') but boss encounter has no binaryChoiceAcknowledgement');
+        } else {
+          if (!bca.ifA) {
+            errors.push('Boss binaryChoiceAcknowledgement missing ifA');
+          }
+          if (!bca.ifB) {
+            errors.push('Boss binaryChoiceAcknowledgement missing ifB');
+          }
+        }
       }
     }
 
@@ -924,10 +1343,13 @@ window.LiftRPGAPI = (function () {
       );
     }
 
+    // Extract narrative constraints for downstream stages
+    var shellContext = extractShellContext(shell);
+
     // 4..N-3. Week Chunks
     var weekChunkOutputs = [];
     var allComponentValues = [];
-    var previousChunkWeeks = null;
+    var allPriorWeeks = [];
 
     for (var ci = 0; ci < chunks.length; ci++) {
       var weekNums = chunks[ci];
@@ -940,17 +1362,18 @@ window.LiftRPGAPI = (function () {
 
       progress(label);
       var chunkLabel = isBoss ? 'Boss Week' : 'Weeks ' + weekNums.join(',');
+      var continuity = buildChunkContinuity(allPriorWeeks);
       var rawChunk = await callStage(
-        window.generateWeekChunkPrompt(workout, brief, layerBible, campaignPlan, weekNums, previousChunkWeeks, allComponentValues),
+        window.generateWeekChunkPrompt(workout, brief, layerBible, campaignPlan, weekNums, continuity, allComponentValues, shellContext),
         32000,
         chunkLabel
       );
       var chunkOutput = extractJson(rawChunk);
       weekChunkOutputs.push(chunkOutput);
-      previousChunkWeeks = chunkOutput.weeks || [];
 
-      // Accumulate component values for boss decode
+      // Accumulate all prior weeks for continuity + component values for boss
       (chunkOutput.weeks || []).forEach(function (w) {
+        allPriorWeeks.push(w);
         if (w.weeklyComponent && w.weeklyComponent.value !== undefined && w.weeklyComponent.value !== null) {
           allComponentValues.push(w.weeklyComponent.value);
         }
@@ -973,7 +1396,7 @@ window.LiftRPGAPI = (function () {
     var bossWeek = lastChunkWeeks[lastChunkWeeks.length - 1] || {};
     var binaryChoiceWeek = findBinaryChoiceWeek(weekChunkOutputs);
     var rawEndings = await callStage(
-      window.generateEndingsPrompt(layerBible, campaignPlan, bossWeek, binaryChoiceWeek),
+      window.generateEndingsPrompt(layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext),
       8192,
       'Endings'
     );
@@ -1585,11 +2008,14 @@ window.LiftRPGAPI = (function () {
       );
     }
 
+    // Extract narrative constraints for downstream stages
+    var shellContext = extractShellContext(shell);
+
     // Stage 3 — Weeks (N internal API calls, 1 progress step)
     progress('Generating weeks\u2026');
     var weekChunkOutputs = [];
     var allComponentValues = [];
-    var previousChunkWeeks = null;
+    var allPriorWeeks = [];
 
     for (var ci = 0; ci < chunks.length; ci++) {
       var weekNums = chunks[ci];
@@ -1597,15 +2023,16 @@ window.LiftRPGAPI = (function () {
         ? 'Week ' + weekNums[0]
         : 'Weeks ' + weekNums.join(',');
 
+      var continuity = buildChunkContinuity(allPriorWeeks);
       var chunkOutput = await callStage(
-        window.generateWeekChunkPrompt(workoutText, brief, layerBible, campaignPlan, weekNums, previousChunkWeeks, allComponentValues),
+        window.generateWeekChunkPrompt(workoutText, brief, layerBible, campaignPlan, weekNums, continuity, allComponentValues, shellContext),
         STRUCTURED_SCHEMA_WEEKS, 32000, chunkLabel
       );
       weekChunkOutputs.push(chunkOutput);
-      previousChunkWeeks = chunkOutput.weeks || [];
 
-      // Accumulate component values for boss decode
+      // Accumulate all prior weeks for continuity + component values for boss
       (chunkOutput.weeks || []).forEach(function (w) {
+        allPriorWeeks.push(w);
         if (w.weeklyComponent && w.weeklyComponent.value !== undefined && w.weeklyComponent.value !== null) {
           allComponentValues.push(w.weeklyComponent.value);
         }
@@ -1626,7 +2053,7 @@ window.LiftRPGAPI = (function () {
     var bossWeek = lastChunkWeeks[lastChunkWeeks.length - 1] || {};
     var binaryChoiceWeek = findBinaryChoiceWeek(weekChunkOutputs);
     var endingsOutput = await callStage(
-      window.generateEndingsPrompt(layerBible, campaignPlan, bossWeek, binaryChoiceWeek),
+      window.generateEndingsPrompt(layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext),
       STRUCTURED_SCHEMA_ENDINGS, 8192, 'Endings'
     );
 
