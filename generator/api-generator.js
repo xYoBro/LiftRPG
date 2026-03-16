@@ -641,9 +641,18 @@ window.LiftRPGAPI = (function () {
       onProgress(stageNum, totalStages, message);
     }
 
+    // Helper: wrap callProvider to tag errors with stage name
+    async function callStage(prompt, maxTokens, stageName) {
+      try {
+        return await callProvider(settings, prompt, maxTokens);
+      } catch (err) {
+        throw new Error('[' + stageName + '] ' + err.message);
+      }
+    }
+
     // 1. Layer Bible
     progress('Building layer bible\u2026');
-    var raw1 = await callProvider(settings, window.generateStage1Prompt(workout, brief, dice), 4096);
+    var raw1 = await callStage(window.generateStage1Prompt(workout, brief, dice), 8192, 'Layer Bible');
     var layerBible = extractJson(raw1);
 
     if (!layerBible.storyLayer || !layerBible.gameLayer || !layerBible.governingLayer) {
@@ -655,7 +664,7 @@ window.LiftRPGAPI = (function () {
 
     // 2. Campaign Plan + Fragment Registry
     progress('Planning campaign\u2026');
-    var raw2 = await callProvider(settings, window.generateStage2Prompt(workout, brief, dice, layerBible), 8192);
+    var raw2 = await callStage(window.generateStage2Prompt(workout, brief, dice, layerBible), 16384, 'Campaign Plan');
     var campaignPlan = extractJson(raw2);
 
     if (!campaignPlan.weeks || !Array.isArray(campaignPlan.weeks) || !campaignPlan.bossPlan) {
@@ -672,7 +681,7 @@ window.LiftRPGAPI = (function () {
 
     // 3. Booklet Shell
     progress('Building booklet shell\u2026');
-    var raw3 = await callProvider(settings, window.generateShellPrompt(brief, layerBible, campaignPlan), 8192);
+    var raw3 = await callStage(window.generateShellPrompt(brief, layerBible, campaignPlan), 16384, 'Booklet Shell');
     var shell = extractJson(raw3);
 
     if (!shell.meta || !shell.cover || !shell.rulesSpread) {
@@ -697,10 +706,11 @@ window.LiftRPGAPI = (function () {
           : 'Generating weeks ' + weekNums[0] + '\u2013' + weekNums[weekNums.length - 1] + '\u2026';
 
       progress(label);
-      var rawChunk = await callProvider(
-        settings,
+      var chunkLabel = isBoss ? 'Boss Week' : 'Weeks ' + weekNums.join(',');
+      var rawChunk = await callStage(
         window.generateWeekChunkPrompt(workout, brief, layerBible, campaignPlan, weekNums, previousChunkWeeks, allComponentValues),
-        16384
+        32000,
+        chunkLabel
       );
       var chunkOutput = extractJson(rawChunk);
       weekChunkOutputs.push(chunkOutput);
@@ -717,10 +727,10 @@ window.LiftRPGAPI = (function () {
     // N-2. Fragments
     progress('Generating fragments\u2026');
     var weekSummaries = extractWeekSummaries(weekChunkOutputs);
-    var rawFrags = await callProvider(
-      settings,
+    var rawFrags = await callStage(
       window.generateFragmentsPrompt(layerBible, campaignPlan, weekSummaries),
-      16384
+      32000,
+      'Fragments'
     );
     var fragmentsOutput = extractJson(rawFrags);
 
@@ -729,10 +739,10 @@ window.LiftRPGAPI = (function () {
     var lastChunkWeeks = weekChunkOutputs[weekChunkOutputs.length - 1].weeks || [];
     var bossWeek = lastChunkWeeks[lastChunkWeeks.length - 1] || {};
     var binaryChoiceWeek = findBinaryChoiceWeek(weekChunkOutputs);
-    var rawEndings = await callProvider(
-      settings,
+    var rawEndings = await callStage(
       window.generateEndingsPrompt(layerBible, campaignPlan, bossWeek, binaryChoiceWeek),
-      4096
+      8192,
+      'Endings'
     );
     var endingsOutput = extractJson(rawEndings);
 
@@ -749,9 +759,10 @@ window.LiftRPGAPI = (function () {
       var errLabel = errors.length === 1 ? '1 error' : errors.length + ' errors';
       progress('Patching ' + errLabel + '\u2026');
       // Patch stage: send the full assembled booklet + errors
-      var rawPatched = await callProvider(
-        settings,
-        generatePatchPrompt(JSON.stringify(booklet, null, 2), errors)
+      var rawPatched = await callStage(
+        generatePatchPrompt(JSON.stringify(booklet, null, 2), errors),
+        32000,
+        'Patch'
       );
       booklet = extractJson(rawPatched);
       var remaining = validateAssembledBooklet(booklet);

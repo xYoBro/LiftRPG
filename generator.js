@@ -1001,18 +1001,18 @@
     var midpoint = Math.ceil(weekCount / 2);
     var chunks = [];
 
-    // Early weeks: 1 to midpoint-1, in groups of max 3
+    // Early weeks: 1 to midpoint-1, in groups of max 2
     var early = [];
     for (var i = 1; i < midpoint; i++) early.push(i);
-    while (early.length > 0) chunks.push(early.splice(0, 3));
+    while (early.length > 0) chunks.push(early.splice(0, 2));
 
     // Midpoint: always isolated
     chunks.push([midpoint]);
 
-    // Late weeks: midpoint+1 to weekCount-1, in groups of max 3
+    // Late weeks: midpoint+1 to weekCount-1, in groups of max 2
     var late = [];
     for (var i = midpoint + 1; i < weekCount; i++) late.push(i);
-    while (late.length > 0) chunks.push(late.splice(0, 3));
+    while (late.length > 0) chunks.push(late.splice(0, 2));
 
     // Boss: always isolated
     chunks.push([weekCount]);
