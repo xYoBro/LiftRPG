@@ -196,6 +196,62 @@ window.LiftRPGAPI = (function () {
     return rawText;
   }
 
+  // ── Native Gemini structured output ─────────────────────────────────────────
+  // Calls Gemini's generateContent endpoint with responseJsonSchema for typed
+  // JSON output. No extractJson/repairJson needed — structured output guarantees
+  // valid JSON conforming to the schema. Used only by generateStructured().
+
+  async function callGeminiNative(apiKey, model, prompt, responseSchema, maxTokens, timeoutMs) {
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+      encodeURIComponent(model) + ':generateContent';
+
+    var resp = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: {
+        'x-goog-api-key': apiKey,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseJsonSchema: responseSchema,
+          maxOutputTokens: maxTokens || 32768
+        }
+      })
+    }, timeoutMs);
+
+    var body = await resp.json();
+
+    if (!resp.ok) {
+      var errMsg = (body.error && body.error.message) || ('HTTP ' + resp.status);
+      throw new Error('Gemini API error: ' + errMsg);
+    }
+
+    if (!body.candidates || !body.candidates[0] || !body.candidates[0].content ||
+        !body.candidates[0].content.parts || !body.candidates[0].content.parts[0]) {
+      throw new Error('Unexpected Gemini response shape. Check the console.');
+    }
+
+    var rawText = body.candidates[0].content.parts[0].text;
+    window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
+    window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = {
+      finishReason: body.candidates[0].finishReason,
+      model: model,
+      usage: body.usageMetadata || null
+    });
+
+    // Structured output guarantees valid JSON — parse directly
+    try {
+      return JSON.parse(rawText);
+    } catch (parseErr) {
+      throw new Error(
+        'Gemini structured output returned invalid JSON: ' + parseErr.message + '\n\n' +
+        'This should not happen with responseJsonSchema. Check the console for raw output.'
+      );
+    }
+  }
+
   // ── JSON repair ─────────────────────────────────────────────────────────────
   //
   // LLMs regularly produce JSON that is structurally correct but fails to parse.
@@ -577,6 +633,69 @@ window.LiftRPGAPI = (function () {
     return booklet;
   }
 
+  // ── Structured booklet assembler ────────────────────────────────────────
+  // Same as assembleBooklet but with exercise override: when normalizedWorkout
+  // has populated weeks[].sessions[].exercises, those replace LLM-generated
+  // exercise data deterministically. Used only by generateStructured().
+
+  function assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, normalizedWorkout) {
+    var booklet = {
+      meta:        shell.meta        || {},
+      cover:       shell.cover       || {},
+      rulesSpread: shell.rulesSpread || {},
+      theme:       shell.theme       || {},
+      weeks:       [],
+      fragments:   (fragmentsOutput || {}).fragments || [],
+      endings:     (endingsOutput   || {}).endings   || []
+    };
+
+    // Concatenate weeks from all chunks in order
+    weekChunkOutputs.forEach(function (chunk) {
+      booklet.weeks = booklet.weeks.concat(chunk.weeks || []);
+    });
+
+    // Override exercises with normalized data when available
+    var nw = normalizedWorkout || {};
+    if (nw.weeks && nw.weeks.length > 0) {
+      booklet.weeks.forEach(function (week, wi) {
+        var nwWeek = nw.weeks[wi];
+        if (!nwWeek || !nwWeek.sessions) return;
+        (week.sessions || []).forEach(function (session, si) {
+          var nwSession = nwWeek.sessions[si];
+          if (!nwSession || !nwSession.exercises || nwSession.exercises.length === 0) return;
+          // Map normalized exercises to renderer shape
+          session.exercises = nwSession.exercises.map(function (ex) {
+            return {
+              name: ex.name || 'Lift',
+              sets: ex.sets || 3,
+              repsPerSet: ex.repsPerSet || '5',
+              weightField: ex.weightField !== undefined ? ex.weightField : true,
+              notes: ex.notes || ''
+            };
+          });
+          if (nwSession.dayLabel) {
+            session.label = 'Session ' + (si + 1) + ' \u00b7 ' + nwSession.dayLabel;
+          }
+        });
+      });
+    }
+
+    // Set overflow deterministically
+    booklet.weeks.forEach(function (week) {
+      if ((week.sessions || []).length > 3) {
+        week.overflow = true;
+      }
+    });
+
+    // Ensure meta counts match actual data
+    booklet.meta.weekCount = booklet.weeks.length;
+    booklet.meta.totalSessions = booklet.weeks.reduce(function (sum, w) {
+      return sum + (w.sessions ? w.sessions.length : 0);
+    }, 0);
+
+    return booklet;
+  }
+
   // ── Week summary extractor ──────────────────────────────────────────────
   // Compact context from generated weeks for the fragments stage.
 
@@ -893,6 +1012,640 @@ window.LiftRPGAPI = (function () {
     return booklet;
   }
 
+  // ── Structured Output JSON Schemas ──────────────────────────────────────────
+  // JSON Schema objects for Gemini native structured output (responseJsonSchema).
+  // Derived from STAGE1/STAGE2_OUTPUT_SCHEMA shapes + SCHEMA_SPEC field definitions
+  // in generator.js. Required fields match what the pipeline and
+  // validateAssembledBooklet() check. Deeply variable inner structures (fieldOps,
+  // bossEncounter) typed as generic objects — prompt text provides guidance.
+
+  var STRUCTURED_SCHEMA_BIBLE = {
+    type: 'object',
+    properties: {
+      storyLayer: {
+        type: 'object',
+        properties: {
+          premise: { type: 'string' },
+          protagonist: {
+            type: 'object',
+            properties: {
+              role: { type: 'string' }, want: { type: 'string' }, need: { type: 'string' },
+              flaw: { type: 'string' }, wound: { type: 'string' }, arc: { type: 'string' }
+            },
+            required: ['role', 'want', 'need', 'flaw', 'wound', 'arc']
+          },
+          antagonistPressure: { type: 'string' },
+          relationshipWeb: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' }, role: { type: 'string' },
+                initialStance: { type: 'string' }, secret: { type: 'string' },
+                arcFunction: { type: 'string' }
+              },
+              required: ['name', 'role', 'initialStance', 'secret', 'arcFunction']
+            }
+          },
+          midpointReversal: { type: 'string' },
+          darkestMoment: { type: 'string' },
+          resolutionMode: { type: 'string' },
+          bossTruth: { type: 'string' },
+          recurringMotifs: {
+            type: 'object',
+            properties: {
+              object: { type: 'string' }, place: { type: 'string' },
+              phrase: { type: 'string' }, sensory: { type: 'string' }
+            },
+            required: ['object', 'place', 'phrase', 'sensory']
+          }
+        },
+        required: ['premise', 'protagonist', 'antagonistPressure', 'relationshipWeb',
+          'midpointReversal', 'darkestMoment', 'resolutionMode', 'bossTruth', 'recurringMotifs']
+      },
+      gameLayer: {
+        type: 'object',
+        properties: {
+          coreLoop: { type: 'string' },
+          persistentTopology: { type: 'string' },
+          majorZones: { type: 'array', items: { type: 'string' } },
+          gatesAndKeys: { type: 'array', items: { type: 'string' } },
+          progressionGates: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                week: { type: 'integer' }, playerGains: { type: 'string' },
+                unlocks: { type: 'string' }, requires: { type: 'string' }
+              },
+              required: ['week', 'playerGains', 'unlocks', 'requires']
+            }
+          },
+          persistentPressures: { type: 'array', items: { type: 'string' } },
+          companionSurfaces: { type: 'array', items: { type: 'string' } },
+          revisitLogic: { type: 'string' },
+          boardStateArc: { type: 'string' },
+          bossConvergence: { type: 'string' }
+        },
+        required: ['coreLoop', 'persistentTopology', 'majorZones', 'gatesAndKeys',
+          'progressionGates', 'persistentPressures', 'companionSurfaces',
+          'revisitLogic', 'boardStateArc', 'bossConvergence']
+      },
+      governingLayer: {
+        type: 'object',
+        properties: {
+          institutionName: { type: 'string' },
+          departments: { type: 'array', items: { type: 'string' } },
+          proceduresThatAffectPlay: { type: 'array', items: { type: 'string' } },
+          recordsAndForms: { type: 'array', items: { type: 'string' } },
+          documentVoiceRules: { type: 'array', items: { type: 'string' } }
+        },
+        required: ['institutionName', 'departments', 'proceduresThatAffectPlay',
+          'recordsAndForms', 'documentVoiceRules']
+      },
+      designPrinciples: { type: 'array', items: { type: 'string' } }
+    },
+    required: ['storyLayer', 'gameLayer', 'governingLayer', 'designPrinciples']
+  };
+
+  var STRUCTURED_SCHEMA_CAMPAIGN = {
+    type: 'object',
+    properties: {
+      topology: {
+        type: 'object',
+        properties: {
+          mainMap: { type: 'string' },
+          zones: { type: 'array', items: { type: 'string' } },
+          persistentLocks: { type: 'array', items: { type: 'string' } },
+          shortcuts: { type: 'array', items: { type: 'string' } },
+          pressureCircuits: { type: 'array', items: { type: 'string' } }
+        },
+        required: ['mainMap', 'zones']
+      },
+      weeks: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            weekNumber: { type: 'integer' },
+            arcBeat: { type: 'string' },
+            npcBeat: { type: 'string' },
+            stateSnapshot: { type: 'string' },
+            playerGains: { type: 'string' },
+            zoneFocus: { type: 'string' },
+            mapReuse: { type: 'string' },
+            stateChange: { type: 'string' },
+            newGateOrUnlock: { type: 'string' },
+            weeklyComponentMeaning: { type: 'string' },
+            oraclePressure: { type: 'string' },
+            fragmentFunction: { type: 'string' },
+            governingProcedure: { type: 'string' },
+            companionChange: { type: 'string' },
+            isBossWeek: { type: 'boolean' },
+            isBinaryChoiceWeek: { type: 'boolean' },
+            sessionBeatTypes: { type: 'array', items: { type: 'string' } }
+          },
+          required: ['weekNumber', 'arcBeat', 'isBossWeek', 'isBinaryChoiceWeek', 'sessionBeatTypes']
+        }
+      },
+      bossPlan: {
+        type: 'object',
+        properties: {
+          decodeLogic: { type: 'string' },
+          whyItFeelsEarned: { type: 'string' },
+          requiredPriorKnowledge: { type: 'array', items: { type: 'string' } }
+        },
+        required: ['decodeLogic', 'whyItFeelsEarned', 'requiredPriorKnowledge']
+      },
+      fragmentRegistry: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            title: { type: 'string' },
+            documentType: { type: 'string' },
+            author: { type: 'string' },
+            revealPurpose: { type: 'string' },
+            weekRef: { type: 'integer' }
+          },
+          required: ['id', 'title', 'documentType', 'revealPurpose']
+        }
+      }
+    },
+    required: ['topology', 'weeks', 'bossPlan', 'fragmentRegistry']
+  };
+
+  var STRUCTURED_SCHEMA_SHELL = {
+    type: 'object',
+    properties: {
+      meta: {
+        type: 'object',
+        properties: {
+          schemaVersion: { type: 'string' },
+          generatedAt: { type: 'string' },
+          blockTitle: { type: 'string' },
+          blockSubtitle: { type: 'string' },
+          worldContract: { type: 'string' },
+          narrativeVoice: { type: 'object' },
+          literaryRegister: { type: 'object' },
+          structuralShape: { type: 'object' },
+          weeklyComponentType: { type: 'string' },
+          passwordLength: { type: 'integer' },
+          passwordEncryptedEnding: { type: 'string' },
+          liftoScript: { type: 'string' },
+          weekCount: { type: 'integer' },
+          totalSessions: { type: 'integer' }
+        },
+        required: ['schemaVersion', 'blockTitle', 'worldContract', 'weeklyComponentType',
+          'passwordLength', 'weekCount', 'totalSessions']
+      },
+      cover: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          designation: { type: 'string' },
+          subtitle: { type: 'string' },
+          tagline: { type: 'string' },
+          colophonLines: { type: 'array', items: { type: 'string' } },
+          svgArt: { type: 'string' },
+          coverArtCaption: { type: 'string' }
+        },
+        required: ['title', 'designation', 'tagline', 'colophonLines']
+      },
+      rulesSpread: {
+        type: 'object',
+        properties: {
+          leftPage: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+              reEntryRule: { type: 'string' },
+              sections: { type: 'array', items: { type: 'object' } }
+            },
+            required: ['title', 'sections']
+          },
+          rightPage: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+              instruction: { type: 'string' }
+            },
+            required: ['title', 'instruction']
+          }
+        },
+        required: ['leftPage', 'rightPage']
+      },
+      theme: {
+        type: 'object',
+        properties: {
+          visualArchetype: { type: 'string' },
+          palette: {
+            type: 'object',
+            properties: {
+              ink: { type: 'string' }, paper: { type: 'string' },
+              accent: { type: 'string' }, muted: { type: 'string' },
+              rule: { type: 'string' }, fog: { type: 'string' }
+            },
+            required: ['ink', 'paper', 'accent', 'muted', 'rule', 'fog']
+          },
+          tokens: { type: 'object' }
+        },
+        required: ['visualArchetype', 'palette']
+      }
+    },
+    required: ['meta', 'cover', 'rulesSpread', 'theme']
+  };
+
+  var STRUCTURED_SCHEMA_WEEKS = {
+    type: 'object',
+    properties: {
+      weeks: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            weekNumber: { type: 'integer' },
+            title: { type: 'string' },
+            epigraph: {
+              type: 'object',
+              properties: {
+                text: { type: 'string' },
+                attribution: { type: 'string' }
+              }
+            },
+            isBossWeek: { type: 'boolean' },
+            isDeload: { type: 'boolean' },
+            overflow: { type: 'boolean' },
+            weeklyComponent: {
+              type: 'object',
+              properties: {
+                type: { type: 'string' },
+                value: { type: 'string' },
+                extractionInstruction: { type: 'string' }
+              },
+              required: ['type', 'extractionInstruction']
+            },
+            sessions: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  sessionNumber: { type: 'integer' },
+                  label: { type: 'string' },
+                  storyPrompt: { type: 'string' },
+                  fragmentRef: { type: 'string' },
+                  exercises: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        name: { type: 'string' },
+                        sets: { type: 'integer' },
+                        repsPerSet: { type: 'string' },
+                        weightField: { type: 'boolean' },
+                        notes: { type: 'string' }
+                      },
+                      required: ['name']
+                    }
+                  },
+                  binaryChoice: {
+                    type: 'object',
+                    properties: {
+                      choiceLabel: { type: 'string' },
+                      promptA: { type: 'string' },
+                      promptB: { type: 'string' }
+                    }
+                  }
+                },
+                required: ['sessionNumber', 'label', 'storyPrompt', 'exercises']
+              }
+            },
+            fieldOps: {
+              type: 'object',
+              properties: {
+                mapState: { type: 'object' },
+                cipher: { type: 'object' },
+                oracleTable: { type: 'object' },
+                companionComponents: { type: 'array', items: { type: 'object' } }
+              }
+            },
+            bossEncounter: {
+              type: 'object',
+              properties: {
+                title: { type: 'string' },
+                narrative: { type: 'string' },
+                mechanismDescription: { type: 'string' },
+                componentInputs: { type: 'array', items: { type: 'string' } },
+                decodingKey: { type: 'object' },
+                convergenceProof: { type: 'string' },
+                passwordRevealInstruction: { type: 'string' }
+              }
+            },
+            overflowDocument: { type: 'object' },
+            interlude: { type: 'object' },
+            gameplayClocks: { type: 'array', items: { type: 'object' } }
+          },
+          required: ['weekNumber', 'title', 'isBossWeek', 'sessions', 'weeklyComponent']
+        }
+      }
+    },
+    required: ['weeks']
+  };
+
+  var STRUCTURED_SCHEMA_FRAGMENTS = {
+    type: 'object',
+    properties: {
+      fragments: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            documentType: { type: 'string' },
+            inWorldAuthor: { type: 'string' },
+            inWorldRecipient: { type: 'string' },
+            inWorldPurpose: { type: 'string' },
+            content: { type: 'string' },
+            designSpec: {
+              type: 'object',
+              properties: {
+                paperTone: { type: 'string' },
+                primaryTypeface: { type: 'string' },
+                headerStyle: { type: 'string' },
+                hasRedactions: { type: 'boolean' },
+                hasAnnotations: { type: 'boolean' }
+              }
+            },
+            authenticityChecks: {
+              type: 'object',
+              properties: {
+                hasIrrelevantDetail: { type: 'boolean' },
+                couldExistInDifferentStory: { type: 'boolean' },
+                redactionDoesNarrativeWork: { type: 'boolean' }
+              }
+            }
+          },
+          required: ['id', 'documentType', 'content']
+        }
+      }
+    },
+    required: ['fragments']
+  };
+
+  var STRUCTURED_SCHEMA_ENDINGS = {
+    type: 'object',
+    properties: {
+      endings: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            variant: { type: 'string' },
+            content: {
+              type: 'object',
+              properties: {
+                documentType: { type: 'string' },
+                body: { type: 'string' },
+                finalLine: { type: 'string' }
+              },
+              required: ['body', 'finalLine']
+            },
+            designSpec: { type: 'string' }
+          },
+          required: ['variant', 'content']
+        }
+      }
+    },
+    required: ['endings']
+  };
+
+  // ── Workout input normalisation ─────────────────────────────────────────────
+  // Bridge between string workout input and NormalizedWorkout objects.
+  // String input: wraps in a minimal shell with source: "raw" and empty weeks[].
+  // Object input: passes through unchanged.
+
+  function normalizeWorkoutParam(workout) {
+    // Already a NormalizedWorkout object
+    if (workout && typeof workout === 'object' && workout.source) {
+      return workout;
+    }
+
+    // String input — wrap in minimal NormalizedWorkout shell
+    var rawText = String(workout || '');
+    var weekCount = typeof window.parseWeekCount === 'function'
+      ? window.parseWeekCount(rawText)
+      : 6;
+
+    return {
+      source: 'raw',
+      rawText: rawText,
+      weekCount: weekCount,
+      weeks: [],
+      summary: {
+        sessionsPerWeek: 0,
+        totalExercises: 0,
+        progression: ''
+      }
+    };
+  }
+
+  // ── Normalized workout → prompt text ────────────────────────────────────────
+  // Converts a NormalizedWorkout with populated weeks[] into compact structured
+  // text for prompt injection. Falls back to rawText when weeks[] is empty.
+
+  function formatNormalizedForPrompt(nw) {
+    if (!nw || !nw.weeks || nw.weeks.length === 0) {
+      return nw ? nw.rawText || '' : '';
+    }
+
+    var lines = [];
+    var sessionsPerWeek = 0;
+    nw.weeks.forEach(function (week) {
+      if (week.sessions) sessionsPerWeek = Math.max(sessionsPerWeek, week.sessions.length);
+    });
+
+    lines.push(nw.weekCount + ' weeks, ' + sessionsPerWeek + ' sessions/week.' +
+      (nw.summary && nw.summary.progression ? ' Progression: ' + nw.summary.progression + '.' : ''));
+    lines.push('');
+
+    nw.weeks.forEach(function (week, wi) {
+      lines.push('Week ' + (wi + 1) + ':');
+      (week.sessions || []).forEach(function (session, si) {
+        var label = session.dayLabel || ('Session ' + (si + 1));
+        var exList = (session.exercises || []).map(function (ex) {
+          var sets = ex.sets || 3;
+          var reps = ex.repsPerSet || '5';
+          var desc = ex.name + ' ' + sets + 'x' + reps;
+          if (ex.notes) desc += ' ' + ex.notes;
+          return desc;
+        }).join(', ');
+        lines.push('  ' + label + ': ' + (exList || 'no exercises listed'));
+      });
+    });
+
+    return lines.join('\n');
+  }
+
+  // ── 5-Stage Structured Generator ──────────────────────────────────────────
+  //
+  // Pipeline: World+Campaign → Shell → Weeks → Fragments → Endings
+  //
+  // Uses native Gemini API with responseJsonSchema for typed JSON output.
+  // No extractJson/repairJson step. Reuses existing prompt generators from
+  // generator.js unchanged. Exercise override happens during assembly.
+  //
+  // onProgress(stageIndex, totalStages, message) — UI callback
+
+  async function generateStructured(settings, workout, brief, dice, onProgress) {
+    // Validate required prompt generators
+    if (typeof window.generateStage1Prompt !== 'function' ||
+        typeof window.generateStage2Prompt !== 'function' ||
+        typeof window.generateShellPrompt  !== 'function' ||
+        typeof window.generateWeekChunkPrompt !== 'function' ||
+        typeof window.generateFragmentsPrompt !== 'function' ||
+        typeof window.generateEndingsPrompt   !== 'function') {
+      throw new Error('Pipeline generators not loaded. Please reload the page.');
+    }
+
+    // Resolve Gemini settings
+    var apiKey = settings.geminiApiKey || settings.apiKey;
+    var model = settings.geminiModel || settings.model || 'gemini-2.5-flash';
+    if (!apiKey) {
+      throw new Error('Gemini API key required for structured generation.');
+    }
+    var timeoutMs = settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS;
+
+    // Normalize workout input
+    var nw = normalizeWorkoutParam(workout);
+    var workoutText = nw.weeks.length > 0 ? formatNormalizedForPrompt(nw) : nw.rawText;
+    var weekCount = nw.weekCount || (typeof window.parseWeekCount === 'function' ? window.parseWeekCount(workoutText) : 6);
+
+    // Plan pipeline
+    var chunks = typeof window.planWeekChunks === 'function' ? window.planWeekChunks(weekCount) : [[1, 2, 3], [4, 5, 6]];
+    var totalStages = 5;
+    var stageNum = 0;
+
+    function progress(message) {
+      stageNum++;
+      if (onProgress) onProgress(stageNum, totalStages, message);
+    }
+
+    // Helper: call Gemini native with error tagging
+    async function callStage(prompt, schema, maxTokens, stageName) {
+      try {
+        return await callGeminiNative(apiKey, model, prompt, schema, maxTokens, timeoutMs);
+      } catch (err) {
+        throw new Error('[' + stageName + '] ' + err.message);
+      }
+    }
+
+    // Stage 1 — World + Campaign (2 internal API calls, 1 progress step)
+    progress('Building world + campaign\u2026');
+    var layerBible = await callStage(
+      window.generateStage1Prompt(workoutText, brief, dice),
+      STRUCTURED_SCHEMA_BIBLE, 8192, 'Layer Bible'
+    );
+
+    if (!layerBible.storyLayer || !layerBible.gameLayer || !layerBible.governingLayer) {
+      throw new Error(
+        'Stage 1 failed: layer bible missing required sections (storyLayer, gameLayer, governingLayer).\n' +
+        'The model may not have followed the output schema. Try again.'
+      );
+    }
+
+    var campaignPlan = await callStage(
+      window.generateStage2Prompt(workoutText, brief, dice, layerBible),
+      STRUCTURED_SCHEMA_CAMPAIGN, 16384, 'Campaign Plan'
+    );
+
+    if (!campaignPlan.weeks || !Array.isArray(campaignPlan.weeks) || !campaignPlan.bossPlan) {
+      throw new Error(
+        'Stage 2 failed: campaign plan missing required sections (weeks[], bossPlan).\n' +
+        'The model may not have followed the output schema. Try again.'
+      );
+    }
+
+    if (!campaignPlan.fragmentRegistry || !Array.isArray(campaignPlan.fragmentRegistry)) {
+      console.warn('[LiftRPG] Stage 2 missing fragmentRegistry \u2014 fragments will have no pre-assigned IDs');
+      campaignPlan.fragmentRegistry = [];
+    }
+
+    // Stage 2 — Booklet Shell
+    progress('Building booklet shell\u2026');
+    var shell = await callStage(
+      window.generateShellPrompt(brief, layerBible, campaignPlan),
+      STRUCTURED_SCHEMA_SHELL, 16384, 'Booklet Shell'
+    );
+
+    if (!shell.meta || !shell.cover || !shell.rulesSpread) {
+      throw new Error(
+        'Stage 3 failed: booklet shell missing required keys (meta, cover, rulesSpread).\n' +
+        'The model may not have followed the output schema. Try again.'
+      );
+    }
+
+    // Stage 3 — Weeks (N internal API calls, 1 progress step)
+    progress('Generating weeks\u2026');
+    var weekChunkOutputs = [];
+    var allComponentValues = [];
+    var previousChunkWeeks = null;
+
+    for (var ci = 0; ci < chunks.length; ci++) {
+      var weekNums = chunks[ci];
+      var chunkLabel = weekNums.length === 1
+        ? 'Week ' + weekNums[0]
+        : 'Weeks ' + weekNums.join(',');
+
+      var chunkOutput = await callStage(
+        window.generateWeekChunkPrompt(workoutText, brief, layerBible, campaignPlan, weekNums, previousChunkWeeks, allComponentValues),
+        STRUCTURED_SCHEMA_WEEKS, 32000, chunkLabel
+      );
+      weekChunkOutputs.push(chunkOutput);
+      previousChunkWeeks = chunkOutput.weeks || [];
+
+      // Accumulate component values for boss decode
+      (chunkOutput.weeks || []).forEach(function (w) {
+        if (w.weeklyComponent && w.weeklyComponent.value !== undefined && w.weeklyComponent.value !== null) {
+          allComponentValues.push(w.weeklyComponent.value);
+        }
+      });
+    }
+
+    // Stage 4 — Fragments
+    progress('Generating fragments\u2026');
+    var weekSummaries = extractWeekSummaries(weekChunkOutputs);
+    var fragmentsOutput = await callStage(
+      window.generateFragmentsPrompt(layerBible, campaignPlan, weekSummaries),
+      STRUCTURED_SCHEMA_FRAGMENTS, 32000, 'Fragments'
+    );
+
+    // Stage 5 — Endings
+    progress('Generating endings\u2026');
+    var lastChunkWeeks = weekChunkOutputs[weekChunkOutputs.length - 1].weeks || [];
+    var bossWeek = lastChunkWeeks[lastChunkWeeks.length - 1] || {};
+    var binaryChoiceWeek = findBinaryChoiceWeek(weekChunkOutputs);
+    var endingsOutput = await callStage(
+      window.generateEndingsPrompt(layerBible, campaignPlan, bossWeek, binaryChoiceWeek),
+      STRUCTURED_SCHEMA_ENDINGS, 8192, 'Endings'
+    );
+
+    // Assemble with exercise override
+    console.log('[LiftRPG] Assembling structured booklet from', weekChunkOutputs.length, 'week chunks,',
+      ((fragmentsOutput || {}).fragments || []).length, 'fragments,',
+      ((endingsOutput || {}).endings || []).length, 'endings');
+    var booklet = assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, nw);
+
+    // Validate — log warnings but no LLM patch step
+    // (structured output should prevent malformed JSON; semantic errors are reported)
+    var errors = validateAssembledBooklet(booklet);
+    if (errors.length > 0) {
+      console.warn('[LiftRPG] Assembled structured booklet has', errors.length, 'validation warnings:', errors);
+    }
+
+    return booklet;
+  }
+
   // ── Public API ──────────────────────────────────────────────────────────────
 
   /**
@@ -922,8 +1675,10 @@ window.LiftRPGAPI = (function () {
     PROVIDERS: PROVIDERS,
     generate: generate,
     generateMultiStage: generateMultiStage,
+    generateStructured: generateStructured,
     _extractJson: extractJson,
     _validateSchema: validateBookletSchema,
-    _validateAssembled: validateAssembledBooklet
+    _validateAssembled: validateAssembledBooklet,
+    _normalizeWorkout: normalizeWorkoutParam
   };
 })();
