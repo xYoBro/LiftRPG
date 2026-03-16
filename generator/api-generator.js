@@ -1299,6 +1299,17 @@ window.LiftRPGAPI = (function () {
     if (weeks.length > 0 && !weeks[weeks.length - 1].isBossWeek) {
       errors.push('Boss week must be the final week in the array');
     }
+    if (bossWeeks.length === 1 && !bossWeeks[0].bossEncounter) {
+      errors.push('Boss week (isBossWeek: true) has no bossEncounter object');
+    }
+
+    // ── Fragment documentType validation ────────────────────────────────────
+    var VALID_DOC_TYPES = { memo: 1, fieldNote: 1, transcript: 1, inspection: 1, correspondence: 1, anomaly: 1, form: 1, report: 1 };
+    fragments.forEach(function (f) {
+      if (f.documentType && !VALID_DOC_TYPES[f.documentType]) {
+        errors.push('Fragment "' + (f.id || '?') + '": documentType "' + f.documentType + '" not in supported list');
+      }
+    });
 
     // ── Fragment + overflow document ID uniqueness ───────────────────────────
     var fragmentIds = {};
@@ -1666,7 +1677,7 @@ window.LiftRPGAPI = (function () {
       // Small registry or no weekRef data — single call (monolithic fallback)
       progress('Generating fragments\u2026');
       var rawFrags = await callStage(
-        window.generateFragmentsPrompt(layerBible, campaignPlan, weekSummaries),
+        window.generateFragmentsPrompt(layerBible, campaignPlan, weekSummaries, shellContext),
         32000,
         'Fragments'
       );
@@ -1690,7 +1701,8 @@ window.LiftRPGAPI = (function () {
             weekSummaries,
             priorFragments,
             fi,
-            fragBatches.length
+            fragBatches.length,
+            shellContext
           ),
           32000,
           batchLabel
@@ -2065,17 +2077,19 @@ window.LiftRPGAPI = (function () {
             properties: {
               name: { type: 'string' },
               behaviorDescription: { type: 'string' },
-              forbiddenMoves: { type: 'array', items: { type: 'string' } }
+              forbiddenMoves: { type: 'array', items: { type: 'string' } },
+              typographicBehavior: { type: 'string' }
             },
             required: ['name', 'behaviorDescription', 'forbiddenMoves']
           },
           structuralShape: {
             type: 'object',
             properties: {
-              resolution: { type: 'string', enum: ['full', 'partial', 'ambiguous', 'open'] },
+              resolution: { type: 'string', enum: ['full', 'partial', 'ambiguous', 'open', 'closed', 'shifted', 'costly'] },
               temporalOrder: { type: 'string', enum: ['linear', 'fragmented', 'reverse', 'parallel'] },
-              narratorReliability: { type: 'string', enum: ['reliable', 'unreliable', 'multiple', 'shifting'] },
-              promptFragmentRelationship: { type: 'string', enum: ['fragments-deepen', 'fragments-contradict', 'fragments-parallel', 'fragments-precede'] }
+              narratorReliability: { type: 'string', enum: ['reliable', 'unreliable', 'multiple', 'shifting', 'compromised', 'institutional'] },
+              promptFragmentRelationship: { type: 'string', enum: ['fragments-deepen', 'fragments-contradict', 'fragments-parallel', 'fragments-precede'] },
+              shapeRationale: { type: 'string' }
             },
             required: ['resolution', 'temporalOrder', 'narratorReliability', 'promptFragmentRelationship']
           },
@@ -2086,7 +2100,8 @@ window.LiftRPGAPI = (function () {
           weekCount: { type: 'integer' },
           totalSessions: { type: 'integer' }
         },
-        required: ['schemaVersion', 'blockTitle', 'worldContract', 'weeklyComponentType',
+        required: ['schemaVersion', 'blockTitle', 'worldContract', 'narrativeVoice',
+          'literaryRegister', 'structuralShape', 'weeklyComponentType',
           'passwordLength', 'weekCount', 'totalSessions']
       },
       cover: {
@@ -2171,10 +2186,10 @@ window.LiftRPGAPI = (function () {
               type: 'object',
               properties: {
                 type: { type: 'string' },
-                value: { type: 'string' },
+                value: { type: 'string', nullable: true },
                 extractionInstruction: { type: 'string' }
               },
-              required: ['type', 'extractionInstruction']
+              required: ['type', 'value', 'extractionInstruction']
             },
             sessions: {
               type: 'array',
@@ -2217,6 +2232,7 @@ window.LiftRPGAPI = (function () {
                 mapState: {
                   type: 'object',
                   properties: {
+                    title: { type: 'string' },
                     mapType: { type: 'string', enum: MAP_TYPE_ENUM },
                     gridDimensions: {
                       type: 'object',
@@ -2267,16 +2283,20 @@ window.LiftRPGAPI = (function () {
                           type: 'object',
                           properties: {
                             rows: { type: 'integer' },
+                            cellCount: { type: 'integer' },
                             style: { type: 'string' }
                           }
-                        }
+                        },
+                        referenceTargets: { type: 'array', items: { type: 'string' } }
                       },
                       required: ['displayText', 'key']
                     },
                     extractionInstruction: { type: 'string' },
-                    characterDerivationProof: { type: 'string' }
+                    characterDerivationProof: { type: 'string' },
+                    noticeabilityDesign: { type: 'string' }
                   },
-                  required: ['type', 'title', 'body', 'extractionInstruction', 'characterDerivationProof']
+                  required: ['type', 'title', 'body', 'extractionInstruction',
+                    'characterDerivationProof', 'noticeabilityDesign']
                 },
                 oracleTable: {
                   type: 'object',
@@ -2365,9 +2385,14 @@ window.LiftRPGAPI = (function () {
                 type: 'object',
                 properties: {
                   name: { type: 'string' },
+                  clockType: { type: 'string' },
                   segments: { type: 'integer' },
                   startValue: { type: 'integer' },
-                  direction: { type: 'string', enum: ['fill', 'drain'] }
+                  direction: { type: 'string', enum: ['fill', 'drain'] },
+                  linkedClockName: { type: 'string' },
+                  opposedClockName: { type: 'string' },
+                  thresholds: { type: 'array', items: { type: 'object' } },
+                  consequenceOnFull: { type: 'string' }
                 },
                 required: ['name', 'segments']
               }
@@ -2397,7 +2422,7 @@ window.LiftRPGAPI = (function () {
             designSpec: DESIGN_SPEC_SCHEMA,
             authenticityChecks: AUTHENTICITY_CHECKS_SCHEMA
           },
-          required: ['id', 'documentType', 'content']
+          required: ['id', 'documentType', 'inWorldAuthor', 'inWorldPurpose', 'content']
         }
       }
     },
@@ -2646,7 +2671,7 @@ window.LiftRPGAPI = (function () {
       // Small registry or no weekRef data — single call (monolithic fallback)
       progress('Generating fragments\u2026');
       fragmentsOutput = await callStage(
-        window.generateFragmentsPrompt(layerBible, campaignPlan, weekSummaries),
+        window.generateFragmentsPrompt(layerBible, campaignPlan, weekSummaries, shellContext),
         STRUCTURED_SCHEMA_FRAGMENTS, 32000, 'Fragments'
       );
     } else {
@@ -2668,7 +2693,8 @@ window.LiftRPGAPI = (function () {
             weekSummaries,
             priorFragments,
             fi,
-            fragBatches.length
+            fragBatches.length,
+            shellContext
           ),
           STRUCTURED_SCHEMA_FRAGMENTS, 32000, batchLabel
         );
@@ -2739,6 +2765,601 @@ window.LiftRPGAPI = (function () {
     return extractJson(raw);
   }
 
+  // ── Quality Report ────────────────────────────────────────────────────────
+  //
+  // Deterministic post-generation analysis. Returns a structured report
+  // object with scores, warnings, and weak-spot flags. Does NOT modify the
+  // booklet. Stored on window.LiftRPGAPI.lastQualityReport after each call.
+
+  function generateQualityReport(booklet) {
+    var report = {
+      timestamp: new Date().toISOString(),
+      schemaErrors: [],
+      scores: {},
+      warnings: [],
+      weakSpots: []
+    };
+
+    if (!booklet || typeof booklet !== 'object') {
+      report.schemaErrors.push('Booklet is not a valid object');
+      return report;
+    }
+
+    // ── Schema completeness (delegate to existing validator) ───────────────
+    report.schemaErrors = validateAssembledBooklet(booklet);
+    report.scores.schemaCompleteness = report.schemaErrors.length === 0
+      ? { score: 1, label: 'clean' }
+      : { score: Math.max(0, 1 - report.schemaErrors.length * 0.1), label: report.schemaErrors.length + ' errors' };
+
+    var meta = booklet.meta || {};
+    var weeks = booklet.weeks || [];
+    var fragments = booklet.fragments || [];
+    var endings = booklet.endings || [];
+    var nonBossWeeks = weeks.filter(function (w) { return !w.isBossWeek; });
+    var bossWeek = weeks.filter(function (w) { return w.isBossWeek; })[0];
+
+    // ── Helper: collect all fragment IDs ────────────────────────────────────
+    var fragmentIdSet = {};
+    fragments.forEach(function (f) { if (f.id) fragmentIdSet[f.id] = f; });
+
+    // ── Continuity coherence ───────────────────────────────────────────────
+    var continuityIssues = [];
+
+    // Check fragmentRefs in sessions resolve
+    var referencedFragmentIds = {};
+    weeks.forEach(function (week, wi) {
+      (week.sessions || []).forEach(function (s) {
+        if (s.fragmentRef) {
+          referencedFragmentIds[s.fragmentRef] = true;
+          if (!fragmentIdSet[s.fragmentRef]) {
+            continuityIssues.push('Week ' + (wi + 1) + ' fragmentRef "' + s.fragmentRef + '" unresolved');
+          }
+        }
+      });
+      // Oracle fragment refs
+      var oracle = (week.fieldOps || {}).oracleTable || (week.fieldOps || {}).oracle || {};
+      (oracle.entries || []).forEach(function (e) {
+        if (e.fragmentRef) {
+          referencedFragmentIds[e.fragmentRef] = true;
+          if (!fragmentIdSet[e.fragmentRef]) {
+            continuityIssues.push('Week ' + (wi + 1) + ' oracle fragmentRef "' + e.fragmentRef + '" unresolved');
+          }
+        }
+      });
+    });
+
+    // Unreferenced fragments (never pointed to by any session or oracle)
+    var unreferencedFragments = fragments.filter(function (f) {
+      return f.id && !referencedFragmentIds[f.id];
+    });
+    if (unreferencedFragments.length > 0) {
+      continuityIssues.push(unreferencedFragments.length + ' fragment(s) never referenced: ' +
+        unreferencedFragments.map(function (f) { return f.id; }).join(', '));
+    }
+
+    report.scores.continuityCoherence = continuityIssues.length === 0
+      ? { score: 1, label: 'clean' }
+      : { score: Math.max(0, 1 - continuityIssues.length * 0.15), label: continuityIssues.length + ' issues' };
+    if (continuityIssues.length) report.warnings = report.warnings.concat(continuityIssues);
+
+    // ── Boss convergence integrity ─────────────────────────────────────────
+    var bossIssues = [];
+    if (bossWeek) {
+      if (!bossWeek.bossEncounter) {
+        bossIssues.push('Boss week (isBossWeek: true) has no bossEncounter object');
+      } else {
+        var boss = bossWeek.bossEncounter;
+        var inputs = boss.componentInputs || [];
+        var collectedValues = nonBossWeeks.map(function (w) {
+          return (w.weeklyComponent || {}).value;
+        });
+
+        if (inputs.length !== collectedValues.length) {
+          bossIssues.push('componentInputs count (' + inputs.length + ') != non-boss weeks (' + collectedValues.length + ')');
+        } else {
+          for (var bi = 0; bi < inputs.length; bi++) {
+            if (String(inputs[bi]) !== String(collectedValues[bi])) {
+              bossIssues.push('componentInputs[' + bi + '] mismatch: "' + inputs[bi] + '" vs "' + collectedValues[bi] + '"');
+            }
+          }
+        }
+
+        if (!boss.decodingKey) {
+          bossIssues.push('Boss missing decodingKey');
+        }
+        if (!boss.binaryChoiceAcknowledgement) {
+          var hasBinary = weeks.some(function (w) {
+            return (w.sessions || []).some(function (s) { return s.binaryChoice; });
+          });
+          if (hasBinary) bossIssues.push('Binary choice exists but boss has no binaryChoiceAcknowledgement');
+        }
+      }
+    } else {
+      bossIssues.push('No boss week found');
+    }
+
+    report.scores.bossConvergence = bossIssues.length === 0
+      ? { score: 1, label: 'clean' }
+      : { score: Math.max(0, 1 - bossIssues.length * 0.25), label: bossIssues.length + ' issues' };
+    if (bossIssues.length) report.warnings = report.warnings.concat(bossIssues.map(function (i) { return 'Boss: ' + i; }));
+
+    // ── Fragment reference integrity ───────────────────────────────────────
+    var fragIssues = [];
+    var docTypes = {};
+    fragments.forEach(function (f) {
+      if (!f.id) fragIssues.push('Fragment missing id');
+      if (!f.documentType) fragIssues.push('Fragment "' + (f.id || '?') + '" missing documentType');
+      var dt = f.documentType || 'unknown';
+      docTypes[dt] = (docTypes[dt] || 0) + 1;
+      if (!f.content && !f.body) fragIssues.push('Fragment "' + (f.id || '?') + '" missing content');
+    });
+
+    // Document type diversity
+    var typeCount = Object.keys(docTypes).length;
+    if (typeCount < 3 && fragments.length >= 6) {
+      report.weakSpots.push({
+        area: 'fragment-diversity',
+        detail: 'Only ' + typeCount + ' document type(s) across ' + fragments.length + ' fragments',
+        severity: 'medium'
+      });
+    }
+
+    report.scores.fragmentIntegrity = fragIssues.length === 0
+      ? { score: 1, label: 'clean' }
+      : { score: Math.max(0, 1 - fragIssues.length * 0.1), label: fragIssues.length + ' issues' };
+
+    // ── Map integrity ──────────────────────────────────────────────────────
+    var mapIssues = [];
+    var prevMapLabels = null;
+    nonBossWeeks.forEach(function (week, wi) {
+      var ms = (week.fieldOps || {}).mapState;
+      if (!ms) {
+        mapIssues.push('Week ' + (wi + 1) + ' missing mapState');
+        return;
+      }
+      var tiles = ms.tiles || [];
+      // Fingerprint includes label + type so persistent topology with evolving state is not flagged
+      var labels = tiles.map(function (t) { return (t.label || '') + ':' + (t.type || ''); }).sort().join('|');
+
+      // Check for state evolution (tile labels AND types should differ between weeks)
+      if (prevMapLabels !== null && labels === prevMapLabels) {
+        report.weakSpots.push({
+          area: 'map-stagnation',
+          detail: 'Week ' + (wi + 1) + ' map tiles identical to previous week — no visible evolution',
+          severity: 'high'
+        });
+      }
+      prevMapLabels = labels;
+
+      if (!ms.currentPosition) {
+        mapIssues.push('Week ' + (wi + 1) + ' mapState missing currentPosition');
+      }
+    });
+
+    report.scores.mapIntegrity = mapIssues.length === 0
+      ? { score: 1, label: 'clean' }
+      : { score: Math.max(0, 1 - mapIssues.length * 0.15), label: mapIssues.length + ' issues' };
+
+    // ── Oracle completeness ────────────────────────────────────────────────
+    var oracleIssues = [];
+    var allOracleTexts = [];
+    weeks.forEach(function (week, wi) {
+      if (week.isBossWeek) return;
+      var oracle = (week.fieldOps || {}).oracleTable || (week.fieldOps || {}).oracle || {};
+      var entries = oracle.entries || [];
+      if (entries.length === 0) {
+        oracleIssues.push('Week ' + (wi + 1) + ' has no oracle entries');
+        return;
+      }
+
+      entries.forEach(function (e) {
+        var txt = e.text || '';
+        allOracleTexts.push(txt);
+        // Check for vague paperAction
+        if (e.paperAction) {
+          var pa = e.paperAction.toLowerCase();
+          if (pa.indexOf('something') !== -1 || pa.indexOf('update the board') !== -1 || pa === '') {
+            report.weakSpots.push({
+              area: 'oracle-vagueness',
+              detail: 'Week ' + (wi + 1) + ' oracle paperAction is vague: "' + e.paperAction + '"',
+              severity: 'high'
+            });
+          }
+        }
+      });
+    });
+
+    // Thin oracle variety: check for near-duplicate texts across weeks
+    var oracleDupes = 0;
+    for (var oi = 0; oi < allOracleTexts.length; oi++) {
+      for (var oj = oi + 1; oj < allOracleTexts.length; oj++) {
+        if (allOracleTexts[oi] && allOracleTexts[oi] === allOracleTexts[oj]) {
+          oracleDupes++;
+        }
+      }
+    }
+    if (oracleDupes > 0) {
+      report.weakSpots.push({
+        area: 'oracle-variety',
+        detail: oracleDupes + ' duplicate oracle text(s) across weeks',
+        severity: 'medium'
+      });
+    }
+
+    report.scores.oracleCompleteness = oracleIssues.length === 0
+      ? { score: 1, label: 'clean' }
+      : { score: Math.max(0, 1 - oracleIssues.length * 0.2), label: oracleIssues.length + ' issues' };
+
+    // ── Overflow document planning integrity ───────────────────────────────
+    var overflowIssues = [];
+    weeks.forEach(function (week, wi) {
+      if ((week.sessions || []).length > 3) {
+        var od = week.overflowDocument;
+        if (!od) {
+          overflowIssues.push('Week ' + (wi + 1) + ' overflow but no overflowDocument');
+        } else {
+          if (!od.documentType) overflowIssues.push('Week ' + (wi + 1) + ' overflowDocument missing documentType');
+          if (!od.content && !od.body) overflowIssues.push('Week ' + (wi + 1) + ' overflowDocument missing content');
+        }
+      }
+    });
+
+    report.scores.overflowIntegrity = overflowIssues.length === 0
+      ? { score: 1, label: 'clean' }
+      : { score: Math.max(0, 1 - overflowIssues.length * 0.25), label: overflowIssues.length + ' issues' };
+
+    // ── Workout/session consistency ────────────────────────────────────────
+    var sessionIssues = [];
+    var totalSessions = 0;
+    weeks.forEach(function (week, wi) {
+      var sessions = week.sessions || [];
+      totalSessions += sessions.length;
+      if (sessions.length === 0) {
+        sessionIssues.push('Week ' + (wi + 1) + ' has zero sessions');
+      }
+      sessions.forEach(function (s, si) {
+        if (!s.storyPrompt && !s.prompt) {
+          sessionIssues.push('Week ' + (wi + 1) + ' session ' + (si + 1) + ' missing storyPrompt');
+        }
+        if (!s.exercises || s.exercises.length === 0) {
+          sessionIssues.push('Week ' + (wi + 1) + ' session ' + (si + 1) + ' has no exercises');
+        }
+      });
+    });
+    if (meta.totalSessions && meta.totalSessions !== totalSessions) {
+      sessionIssues.push('meta.totalSessions (' + meta.totalSessions + ') != actual (' + totalSessions + ')');
+    }
+
+    report.scores.sessionConsistency = sessionIssues.length === 0
+      ? { score: 1, label: 'clean' }
+      : { score: Math.max(0, 1 - sessionIssues.length * 0.1), label: sessionIssues.length + ' issues' };
+
+    // ── Weak spot detection (heuristics) ───────────────────────────────────
+
+    // Repeated cipher types
+    var cipherTypes = [];
+    nonBossWeeks.forEach(function (w) {
+      var ct = ((w.fieldOps || {}).cipher || {}).type || '';
+      cipherTypes.push(ct);
+    });
+    for (var ci = 1; ci < cipherTypes.length; ci++) {
+      if (cipherTypes[ci] && cipherTypes[ci] === cipherTypes[ci - 1]) {
+        report.weakSpots.push({
+          area: 'cipher-repetition',
+          detail: 'Weeks ' + ci + ' and ' + (ci + 1) + ' both use cipher type "' + cipherTypes[ci] + '"',
+          severity: 'high'
+        });
+      }
+    }
+    var uniqueCipherTypes = {};
+    cipherTypes.forEach(function (t) { if (t) uniqueCipherTypes[t] = true; });
+    if (Object.keys(uniqueCipherTypes).length < Math.min(4, nonBossWeeks.length) && nonBossWeeks.length >= 4) {
+      report.weakSpots.push({
+        area: 'cipher-diversity',
+        detail: 'Only ' + Object.keys(uniqueCipherTypes).length + ' distinct cipher types across ' + nonBossWeeks.length + ' non-boss weeks (target: 4+)',
+        severity: 'medium'
+      });
+    }
+
+    // Underused fragments (exist but never referenced)
+    if (unreferencedFragments.length > fragments.length * 0.3 && fragments.length > 3) {
+      report.weakSpots.push({
+        area: 'underused-fragments',
+        detail: unreferencedFragments.length + ' of ' + fragments.length + ' fragments never referenced by sessions or oracles',
+        severity: 'medium'
+      });
+    }
+
+    // Voice/register drift risk: check if meta has narrativeVoice
+    if (!meta.narrativeVoice && !meta.literaryRegister) {
+      report.weakSpots.push({
+        area: 'voice-drift-risk',
+        detail: 'meta missing narrativeVoice and literaryRegister — high risk of register drift across stages',
+        severity: 'low'
+      });
+    }
+
+    // Endings quality: check endings reference specifics
+    endings.forEach(function (ending, ei) {
+      var body = '';
+      if (ending.content && typeof ending.content === 'object') {
+        body = ending.content.body || ending.content.html || '';
+      } else if (typeof ending.content === 'string') {
+        body = ending.content;
+      } else if (ending.body) {
+        body = ending.body;
+      }
+      if (body.length < 100) {
+        report.weakSpots.push({
+          area: 'thin-ending',
+          detail: 'Ending ' + (ei + 1) + ' body is only ' + body.length + ' chars — likely too thin for payoff',
+          severity: 'high'
+        });
+      }
+    });
+
+    // Unsupported reveal pattern: boss without decodingKey referenceTable
+    if (bossWeek) {
+      var dk = (bossWeek.bossEncounter || {}).decodingKey;
+      if (dk && !dk.referenceTable && !dk.instruction) {
+        report.weakSpots.push({
+          area: 'unsupported-reveal',
+          detail: 'Boss decodingKey present but missing both referenceTable and instruction',
+          severity: 'high'
+        });
+      }
+    }
+
+    // ── Aggregate score ────────────────────────────────────────────────────
+    var scoreKeys = Object.keys(report.scores);
+    var totalScore = 0;
+    scoreKeys.forEach(function (k) { totalScore += report.scores[k].score; });
+    report.scores.aggregate = {
+      score: Math.round((totalScore / scoreKeys.length) * 100) / 100,
+      label: scoreKeys.length + ' dimensions'
+    };
+
+    report.weakSpotCount = report.weakSpots.length;
+    report.warningCount = report.warnings.length;
+
+    // Side-effect: store on public API for console inspection
+    if (typeof window !== 'undefined' && window.LiftRPGAPI) {
+      window.LiftRPGAPI.lastQualityReport = report;
+    }
+
+    return report;
+  }
+
+  // ── Golden Comparator ──────────────────────────────────────────────────────
+  //
+  // Compare an assembled booklet against a target artifact and report
+  // structural, continuity, and quality differences.
+
+  function compareToTarget(booklet, target) {
+    var diffs = {
+      timestamp: new Date().toISOString(),
+      missingFields: [],
+      looserStructures: [],
+      continuityMismatches: [],
+      genericityRisks: [],
+      crossRefWeaknesses: []
+    };
+
+    if (!booklet || !target) {
+      diffs.missingFields.push('booklet or target is null/undefined');
+      return diffs;
+    }
+
+    // ── Missing fields: walk target top-level and per-week ─────────────────
+    var TOP_KEYS = ['meta', 'theme', 'cover', 'rulesSpread', 'weeks', 'fragments', 'endings'];
+    TOP_KEYS.forEach(function (key) {
+      if (target[key] !== undefined && booklet[key] === undefined) {
+        diffs.missingFields.push('Missing top-level: ' + key);
+      }
+    });
+
+    // Compare meta keys
+    if (target.meta && booklet.meta) {
+      Object.keys(target.meta).forEach(function (mk) {
+        if (booklet.meta[mk] === undefined) {
+          diffs.missingFields.push('Missing meta.' + mk);
+        }
+      });
+    }
+
+    // Compare theme keys
+    if (target.theme && booklet.theme) {
+      Object.keys(target.theme).forEach(function (tk) {
+        if (booklet.theme[tk] === undefined) {
+          diffs.missingFields.push('Missing theme.' + tk);
+        }
+      });
+    }
+
+    // ── Per-week structural comparison ─────────────────────────────────────
+    var tWeeks = target.weeks || [];
+    var bWeeks = booklet.weeks || [];
+    var minWeeks = Math.min(tWeeks.length, bWeeks.length);
+
+    for (var wi = 0; wi < minWeeks; wi++) {
+      var tw = tWeeks[wi];
+      var bw = bWeeks[wi];
+      var wn = 'Week ' + (wi + 1);
+
+      // fieldOps sub-keys
+      var tfo = tw.fieldOps || {};
+      var bfo = bw.fieldOps || {};
+      ['mapState', 'cipher', 'oracleTable'].forEach(function (fk) {
+        if (tfo[fk] && !bfo[fk]) {
+          diffs.missingFields.push(wn + ' fieldOps.' + fk + ' missing');
+        }
+      });
+
+      // Session count comparison
+      var tSessions = (tw.sessions || []).length;
+      var bSessions = (bw.sessions || []).length;
+      if (bSessions < tSessions) {
+        diffs.looserStructures.push(wn + ': ' + bSessions + ' sessions vs target ' + tSessions);
+      }
+
+      // Oracle entry count
+      var tOracle = (tfo.oracleTable || tfo.oracle || {}).entries || [];
+      var bOracle = (bfo.oracleTable || bfo.oracle || {}).entries || [];
+      if (bOracle.length < tOracle.length) {
+        diffs.looserStructures.push(wn + ': ' + bOracle.length + ' oracle entries vs target ' + tOracle.length);
+      }
+
+      // Map tile count
+      var tTiles = ((tfo.mapState || {}).tiles || []).length;
+      var bTiles = ((bfo.mapState || {}).tiles || []).length;
+      if (bTiles < tTiles && tTiles > 0) {
+        diffs.looserStructures.push(wn + ': ' + bTiles + ' map tiles vs target ' + tTiles);
+      }
+
+      // Cipher fields present in target but missing in booklet
+      var tCipher = tfo.cipher || {};
+      var bCipher = bfo.cipher || {};
+      ['type', 'body', 'extractionInstruction', 'characterDerivationProof', 'noticeabilityDesign'].forEach(function (cf) {
+        if (tCipher[cf] !== undefined && (bCipher[cf] === undefined || bCipher[cf] === null || bCipher[cf] === '')) {
+          diffs.missingFields.push(wn + ' cipher.' + cf);
+        }
+      });
+
+      // Overflow document comparison
+      if (tw.overflowDocument && !bw.overflowDocument) {
+        diffs.missingFields.push(wn + ' overflowDocument missing (target has one)');
+      }
+    }
+
+    if (bWeeks.length < tWeeks.length) {
+      diffs.looserStructures.push('Fewer weeks: ' + bWeeks.length + ' vs target ' + tWeeks.length);
+    }
+
+    // ── Fragment comparison ────────────────────────────────────────────────
+    var tFrags = target.fragments || [];
+    var bFrags = booklet.fragments || [];
+    if (bFrags.length < tFrags.length) {
+      diffs.looserStructures.push('Fewer fragments: ' + bFrags.length + ' vs target ' + tFrags.length);
+    }
+
+    // Fragment field depth
+    var targetFragKeys = {};
+    tFrags.forEach(function (f) {
+      Object.keys(f).forEach(function (k) { targetFragKeys[k] = true; });
+    });
+    var bookletFragKeys = {};
+    bFrags.forEach(function (f) {
+      Object.keys(f).forEach(function (k) { bookletFragKeys[k] = true; });
+    });
+    Object.keys(targetFragKeys).forEach(function (k) {
+      if (!bookletFragKeys[k]) {
+        diffs.missingFields.push('Fragment field "' + k + '" present in target but absent in booklet');
+      }
+    });
+
+    // ── Continuity mismatches ──────────────────────────────────────────────
+
+    // Cipher type diversity comparison
+    var tCipherTypes = {};
+    var bCipherTypes = {};
+    (target.weeks || []).forEach(function (w) {
+      if (!w.isBossWeek) {
+        var t = ((w.fieldOps || {}).cipher || {}).type;
+        if (t) tCipherTypes[t] = true;
+      }
+    });
+    (booklet.weeks || []).forEach(function (w) {
+      if (!w.isBossWeek) {
+        var t = ((w.fieldOps || {}).cipher || {}).type;
+        if (t) bCipherTypes[t] = true;
+      }
+    });
+    var tCipherCount = Object.keys(tCipherTypes).length;
+    var bCipherCount = Object.keys(bCipherTypes).length;
+    if (bCipherCount < tCipherCount) {
+      diffs.continuityMismatches.push('Cipher diversity: ' + bCipherCount + ' types vs target ' + tCipherCount);
+    }
+
+    // Document type diversity comparison
+    var tDocTypes = {};
+    var bDocTypes = {};
+    tFrags.forEach(function (f) { if (f.documentType) tDocTypes[f.documentType] = true; });
+    bFrags.forEach(function (f) { if (f.documentType) bDocTypes[f.documentType] = true; });
+    var tDocCount = Object.keys(tDocTypes).length;
+    var bDocCount = Object.keys(bDocTypes).length;
+    if (bDocCount < tDocCount) {
+      diffs.continuityMismatches.push('Document type diversity: ' + bDocCount + ' types vs target ' + tDocCount);
+    }
+
+    // ── Genericity risks ───────────────────────────────────────────────────
+
+    // Fragment content length comparison (thinner = riskier)
+    var tAvgLen = 0;
+    var bAvgLen = 0;
+    tFrags.forEach(function (f) {
+      var c = f.content;
+      if (typeof c === 'object' && c) c = c.body || c.html || '';
+      tAvgLen += (c || '').length;
+    });
+    bFrags.forEach(function (f) {
+      var c = f.content;
+      if (typeof c === 'object' && c) c = c.body || c.html || '';
+      bAvgLen += (c || '').length;
+    });
+    tAvgLen = tFrags.length ? Math.round(tAvgLen / tFrags.length) : 0;
+    bAvgLen = bFrags.length ? Math.round(bAvgLen / bFrags.length) : 0;
+    if (bAvgLen < tAvgLen * 0.6 && tAvgLen > 0) {
+      diffs.genericityRisks.push('Fragment avg content length ' + bAvgLen + ' chars vs target ' + tAvgLen + ' — likely thinner');
+    }
+
+    // Ending count comparison
+    var tEndings = (target.endings || []).length;
+    var bEndings = (booklet.endings || []).length;
+    if (bEndings < tEndings) {
+      diffs.genericityRisks.push('Fewer endings: ' + bEndings + ' vs target ' + tEndings);
+    }
+
+    // Check for authenticityChecks presence (target has it, booklet might not)
+    var targetHasAuthChecks = tFrags.some(function (f) { return f.authenticityChecks; });
+    var bookletHasAuthChecks = bFrags.some(function (f) { return f.authenticityChecks; });
+    if (targetHasAuthChecks && !bookletHasAuthChecks) {
+      diffs.genericityRisks.push('Target fragments have authenticityChecks — booklet fragments lack them');
+    }
+
+    // ── Cross-reference weaknesses ─────────────────────────────────────────
+    var bFragRefCount = 0;
+    (booklet.weeks || []).forEach(function (w) {
+      (w.sessions || []).forEach(function (s) { if (s.fragmentRef) bFragRefCount++; });
+      var o = ((w.fieldOps || {}).oracleTable || (w.fieldOps || {}).oracle || {}).entries || [];
+      o.forEach(function (e) { if (e.fragmentRef) bFragRefCount++; });
+    });
+    var tFragRefCount = 0;
+    (target.weeks || []).forEach(function (w) {
+      (w.sessions || []).forEach(function (s) { if (s.fragmentRef) tFragRefCount++; });
+      var o = ((w.fieldOps || {}).oracleTable || (w.fieldOps || {}).oracle || {}).entries || [];
+      o.forEach(function (e) { if (e.fragmentRef) tFragRefCount++; });
+    });
+    if (bFragRefCount < tFragRefCount) {
+      diffs.crossRefWeaknesses.push('Fewer fragment cross-references: ' + bFragRefCount + ' vs target ' + tFragRefCount);
+    }
+
+    // Characters as fragment authors
+    var bAuthors = {};
+    bFrags.forEach(function (f) { if (f.inWorldAuthor) bAuthors[f.inWorldAuthor] = true; });
+    var tAuthors = {};
+    tFrags.forEach(function (f) { if (f.inWorldAuthor) tAuthors[f.inWorldAuthor] = true; });
+    if (Object.keys(bAuthors).length < Object.keys(tAuthors).length) {
+      diffs.crossRefWeaknesses.push('Fewer distinct fragment authors: ' + Object.keys(bAuthors).length + ' vs target ' + Object.keys(tAuthors).length);
+    }
+
+    // Summary counts
+    diffs.totalIssues = diffs.missingFields.length + diffs.looserStructures.length +
+      diffs.continuityMismatches.length + diffs.genericityRisks.length +
+      diffs.crossRefWeaknesses.length;
+
+    return diffs;
+  }
+
   return {
     PROVIDERS: PROVIDERS,
     generate: generate,
@@ -2747,6 +3368,9 @@ window.LiftRPGAPI = (function () {
     _extractJson: extractJson,
     _validateSchema: validateBookletSchema,
     _validateAssembled: validateAssembledBooklet,
-    _normalizeWorkout: normalizeWorkoutParam
+    _normalizeWorkout: normalizeWorkoutParam,
+    qualityReport: generateQualityReport,
+    compareToTarget: compareToTarget,
+    lastQualityReport: null
   };
 })();

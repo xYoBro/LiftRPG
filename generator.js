@@ -963,7 +963,79 @@
     '- each non-boss week gives the player a new capability, access, or knowledge they did not have before',
     '- the board state evolves week over week: maps show consequences of prior weeks, clocks carry forward, companions change state',
     '- boss decodingKey references map locations, spatial relationships, or institutional knowledge — not just arithmetic',
-    '- the ending reflects the binary choice, boss outcome, and at least one relationship consequence'
+    '- the ending reflects the binary choice, boss outcome, and at least one relationship consequence',
+    '',
+    '## Quality Standard — Artifact vs Generic',
+    '',
+    '**Artifact-grade** output reads like a real indie TTRPG product:',
+    '- Every document has an in-world author with a visible agenda, blind spot, or emotional state.',
+    '- Fragments cross-reference each other through shared proper nouns, contradictory claims, or sequential document numbers.',
+    '- Oracle consequences name specific map nodes, clock names, or companion slots — never vague.',
+    '- Cipher families differ week to week. No two consecutive non-boss weeks use the same puzzle shape.',
+    '- Map state evolves: nodes unlock, routes close, annotations accumulate. The player can see where they have been.',
+    '- The boss decode rewards spatial mastery and institutional memory, not arithmetic.',
+    '- Endings name specific earlier objects, places, phrases, and relationships — not plot summaries.',
+    '',
+    '**Competent but generic** output looks professional but transplantable:',
+    '- Documents have atmospheric prose but no visible author agenda or blind spot.',
+    '- Fragments are self-contained lore drops — removing any one changes nothing.',
+    '- Oracle entries say "something shifts" or "you feel uneasy" instead of naming targets.',
+    '- The same cipher family repeats across weeks with only surface reskinning.',
+    '- Maps reset each week or share topology but show no state evolution.',
+    '- The boss decode is arithmetic on weekly values.',
+    '- Endings summarize the arc ("and so the mystery was solved") instead of paying off specifics.',
+    '',
+    'If any section of your output matches the generic column, silently rewrite it',
+    'before returning JSON. Do not mention this check in your output.',
+    '',
+    '## Postwriting Quality Gate',
+    '',
+    'After drafting your complete JSON response but before returning it, silently',
+    'audit every content field against this checklist. Rewrite any field that fails.',
+    'Do not mention this audit or output any reasoning — just fix and return clean JSON.',
+    '',
+    '**Fragments:** For each fragment, ask: if I removed the proper nouns, would this',
+    'document still feel specific to THIS booklet? If yes → rewrite with concrete',
+    'references to named places, people, procedures, or prior events.',
+    '',
+    '**Oracle tables:** Scan all oracle entries across all weeks. Flag any entry whose',
+    'consequence is atmospheric rather than mechanical (no named target for paperAction).',
+    'Flag any pair of entries across weeks that are functionally identical. Rewrite flagged entries.',
+    '',
+    '**Cipher families:** List the cipher family used each non-boss week. If any two',
+    'consecutive weeks share the same family, redesign one. If any cipher body explains',
+    'its own method, strip the pedagogy and present only the puzzle.',
+    '',
+    '**Story prompts:** Read all storyPrompts in sequence. Flag any prompt that:',
+    '(a) contains gym/exercise metaphor, (b) ends on tidy closure instead of unresolved',
+    'pressure, (c) lacks a physical action or sensory detail, or (d) is interchangeable',
+    'with a prompt from a different week. Rewrite flagged prompts.',
+    '',
+    '**Map progression:** Compare map state across weeks. If the topology shows no',
+    'evolution (no new unlocks, closed routes, or annotation changes), add visible',
+    'state changes that reflect the campaign plan&apos;s stateChange for each week.',
+    '',
+    '**Clue economy:** Verify every fragment tagged "establishes" is referenced or',
+    'contradicted by a later fragment. Verify every "reveals" fragment resolves',
+    'something planted earlier. Orphaned clues must be connected or cut.',
+    '',
+    '**Boss reveal:** Confirm the decodingKey requires knowledge the player earned',
+    'through play (map locations, institutional facts, spatial relationships), not',
+    'just arithmetic on weekly component values. If arithmetic-only, redesign.',
+    '',
+    '**Endings:** Confirm each ending names at least three specific earlier elements',
+    'by their exact in-world identifiers. If an ending summarizes plot instead of',
+    'paying off specifics, rewrite it as a found document with concrete references.',
+    '',
+    '**Overflow documents:** Confirm each overflow document adds institutional depth',
+    '(new operational detail, contradictory account, procedural artifact) rather than',
+    'restating information the player already has. If it restates, replace with new material.',
+    '',
+    '**Repeated reveal shapes:** Scan endings and boss content. If the emotional shape',
+    'of the reveal (dramatic unmasking, quiet realization, institutional cover-up exposed)',
+    'is identical across variants, redesign one variant&apos;s emotional register.',
+    '',
+    'This gate is mandatory. Every content-producing response must pass it silently.'
   ].join('\n');
 
   window.generatePrompt = function (workout, brief, dice) {
@@ -1977,7 +2049,7 @@
    * @param {object} campaignPlan - Stage 2 output (with fragmentRegistry)
    * @param {object[]} weekSummaries - Compact summaries extracted from generated weeks
    */
-  window.generateFragmentsPrompt = function (layerBible, campaignPlan, weekSummaries) {
+  window.generateFragmentsPrompt = function (layerBible, campaignPlan, weekSummaries, shellContext) {
     var parts = [
       '# Generate All Fragments',
       '',
@@ -1999,10 +2071,20 @@
       '',
       '### Approved Layer Bible',
       JSON.stringify(layerBible),
-      '',
-      '### Campaign Narrative (what happened in the weeks — use for cross-references)',
       ''
     ];
+
+    // Voice/register constraints from the shell
+    if (shellContext) {
+      parts.push('### Narrative Constraints (from booklet shell — fragments must honour these)');
+      if (shellContext.worldContract) parts.push('**World Contract:** ' + shellContext.worldContract);
+      if (shellContext.narrativeVoice) parts.push('**Narrative Voice:** ' + JSON.stringify(shellContext.narrativeVoice));
+      if (shellContext.literaryRegister) parts.push('**Literary Register:** ' + JSON.stringify(shellContext.literaryRegister));
+      parts.push('');
+    }
+
+    parts.push('### Campaign Narrative (what happened in the weeks — use for cross-references)');
+    parts.push('');
 
     renderWeekSummaryLines(parts, weekSummaries);
 
@@ -2111,7 +2193,7 @@
    * @param {number} batchIndex - 0-based batch index
    * @param {number} totalBatches - Total number of batches
    */
-  window.generateFragmentBatchPrompt = function (layerBible, batchRegistry, batchWeekSummaries, allWeekSummaries, priorFragments, batchIndex, totalBatches) {
+  window.generateFragmentBatchPrompt = function (layerBible, batchRegistry, batchWeekSummaries, allWeekSummaries, priorFragments, batchIndex, totalBatches, shellContext) {
     var parts = [
       '# Generate Fragment Batch ' + (batchIndex + 1) + ' of ' + totalBatches,
       '',
@@ -2135,6 +2217,15 @@
       JSON.stringify(layerBible),
       ''
     ];
+
+    // Voice/register constraints from the shell
+    if (shellContext) {
+      parts.push('### Narrative Constraints (from booklet shell — fragments must honour these)');
+      if (shellContext.worldContract) parts.push('**World Contract:** ' + shellContext.worldContract);
+      if (shellContext.narrativeVoice) parts.push('**Narrative Voice:** ' + JSON.stringify(shellContext.narrativeVoice));
+      if (shellContext.literaryRegister) parts.push('**Literary Register:** ' + JSON.stringify(shellContext.literaryRegister));
+      parts.push('');
+    }
 
     // Prior fragments from earlier batches — establishes voice, variety, continuity
     if (priorFragments && priorFragments.length > 0) {
