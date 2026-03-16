@@ -444,50 +444,317 @@ window.LiftRPGAPI = (function () {
     ].join('\n');
   }
 
-  // ── Multi-stage generator ─────────────────────────────────────────────────
+  // ── Booklet assembler ────────────────────────────────────────────────────
+  // Merges partial JSON chunks from the 10-stage pipeline into a complete booklet.
 
-  async function generateMultiStage(settings, workout, brief, dice, onProgress) {
-    if (typeof window.generateStage1Prompt !== 'function' ||
-        typeof window.generateStage2Prompt !== 'function' ||
-        typeof window.generateStage3Prompt !== 'function') {
-      throw new Error('Multi-stage generators not loaded. Please reload the page.');
+  function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput) {
+    var booklet = {
+      meta:       shell.meta       || {},
+      cover:      shell.cover      || {},
+      rulesSpread:shell.rulesSpread|| {},
+      theme:      shell.theme      || {},
+      weeks:      [],
+      fragments:  (fragmentsOutput || {}).fragments || [],
+      endings:    (endingsOutput   || {}).endings   || []
+    };
+
+    // Concatenate weeks from all chunks in order
+    weekChunkOutputs.forEach(function (chunk) {
+      booklet.weeks = booklet.weeks.concat(chunk.weeks || []);
+    });
+
+    // Ensure meta.weekCount matches
+    booklet.meta.weekCount = booklet.weeks.length;
+
+    // Sum total sessions
+    booklet.meta.totalSessions = booklet.weeks.reduce(function (sum, w) {
+      return sum + (w.sessions ? w.sessions.length : 0);
+    }, 0);
+
+    return booklet;
+  }
+
+  // ── Week summary extractor ──────────────────────────────────────────────
+  // Compact context from generated weeks for the fragments stage.
+
+  function extractWeekSummaries(weekChunkOutputs) {
+    var summaries = [];
+    weekChunkOutputs.forEach(function (chunk) {
+      (chunk.weeks || []).forEach(function (w) {
+        var entry = {
+          weekNumber: w.weekNumber,
+          title: w.title,
+          storyPrompts: (w.sessions || []).map(function (s) { return s.storyPrompt || ''; }).filter(Boolean),
+          fragmentRefs: (w.sessions || []).map(function (s) { return s.fragmentRef || ''; }).filter(Boolean),
+          binaryChoice: null,
+          overflowDocument: w.overflowDocument
+            ? { id: w.overflowDocument.id, title: w.overflowDocument.title || '' }
+            : null
+        };
+        (w.sessions || []).forEach(function (s) {
+          if (s.binaryChoice) entry.binaryChoice = s.binaryChoice;
+        });
+        summaries.push(entry);
+      });
+    });
+    return summaries;
+  }
+
+  // ── Binary choice week finder ───────────────────────────────────────────
+
+  function findBinaryChoiceWeek(weekChunkOutputs) {
+    for (var ci = 0; ci < weekChunkOutputs.length; ci++) {
+      var weeks = weekChunkOutputs[ci].weeks || [];
+      for (var wi = 0; wi < weeks.length; wi++) {
+        var sessions = weeks[wi].sessions || [];
+        for (var si = 0; si < sessions.length; si++) {
+          if (sessions[si].binaryChoice) return weeks[wi];
+        }
+      }
+    }
+    return null;
+  }
+
+  // ── Expanded booklet validation ─────────────────────────────────────────
+  // Validates the assembled booklet. Returns array of human-readable errors.
+
+  function validateAssembledBooklet(booklet) {
+    var errors = [];
+
+    // Top-level key checks
+    ['meta', 'cover', 'rulesSpread', 'weeks', 'fragments', 'endings'].forEach(function (key) {
+      if (!booklet[key]) errors.push('Missing top-level key: ' + key);
+    });
+
+    var weeks = booklet.weeks || [];
+    var fragments = booklet.fragments || [];
+
+    // Week count consistency
+    if (booklet.meta && booklet.meta.weekCount !== weeks.length) {
+      errors.push('meta.weekCount (' + booklet.meta.weekCount + ') does not match weeks.length (' + weeks.length + ')');
     }
 
-    onProgress('stage1', 'Building layer bible\u2026');
+    // Boss week checks
+    var bossWeeks = weeks.filter(function (w) { return w.isBossWeek; });
+    if (bossWeeks.length === 0) {
+      errors.push('No boss week found (isBossWeek: true)');
+    } else if (bossWeeks.length > 1) {
+      errors.push('Multiple boss weeks found — must be exactly one');
+    }
+    if (weeks.length > 0 && !weeks[weeks.length - 1].isBossWeek) {
+      errors.push('Boss week must be the final week in the array');
+    }
+
+    // Fragment ID cross-reference
+    var fragmentIds = {};
+    fragments.forEach(function (f) { if (f.id) fragmentIds[f.id] = true; });
+
+    weeks.forEach(function (week, wi) {
+      var wn = 'Week ' + (wi + 1);
+      var fo = week.fieldOps || {};
+
+      // Session fragmentRef checks
+      (week.sessions || []).forEach(function (s, si) {
+        if (s.fragmentRef && !fragmentIds[s.fragmentRef]) {
+          errors.push(wn + ' session ' + (si + 1) + ': fragmentRef "' + s.fragmentRef + '" not found in fragments[]');
+        }
+      });
+
+      // Oracle checks (existing + fragmentRef cross-ref)
+      var oracle = fo.oracleTable || fo.oracle || {};
+      var entries = oracle.entries || [];
+      entries.forEach(function (entry, ei) {
+        if (Object.prototype.hasOwnProperty.call(entry, 'description')) {
+          errors.push(wn + ' oracle[' + ei + ']: uses "description" — must be "text"');
+        }
+        if (entry.type === 'fragment' && !entry.fragmentRef) {
+          errors.push(wn + ' oracle[' + ei + ']: type "fragment" missing fragmentRef');
+        }
+        if (entry.fragmentRef && !fragmentIds[entry.fragmentRef]) {
+          errors.push(wn + ' oracle[' + ei + ']: fragmentRef "' + entry.fragmentRef + '" not found in fragments[]');
+        }
+      });
+      var mode = oracle.mode || (entries.length === 11 ? 'simple' : null);
+      if (mode === 'simple' && entries.length !== 11) {
+        errors.push(wn + ' simple oracle: has ' + entries.length + ' entries, needs 11 (rolls "2"\u2013"12")');
+      }
+
+      // Cipher body must be an object
+      var cipher = fo.cipher || {};
+      if (cipher.body !== undefined && typeof cipher.body !== 'object') {
+        errors.push(wn + ' cipher.body: must be an object, got ' + (typeof cipher.body));
+      }
+
+      // Interlude payloadType
+      var interlude = week.interlude || {};
+      if (interlude.payloadType && !VALID_PAYLOAD_TYPES[interlude.payloadType]) {
+        errors.push(wn + ' interlude.payloadType: "' + interlude.payloadType + '" not supported');
+      }
+
+      // weeklyComponent.value on non-boss weeks
+      if (!week.isBossWeek) {
+        var wc = week.weeklyComponent || {};
+        if (wc.value === undefined || wc.value === null || wc.value === '') {
+          errors.push(wn + ': weeklyComponent.value is missing or empty');
+        }
+      }
+    });
+
+    // Boss componentInputs length
+    if (bossWeeks.length === 1) {
+      var boss = bossWeeks[0].bossEncounter || {};
+      var inputs = boss.componentInputs || [];
+      var nonBossCount = weeks.filter(function (w) { return !w.isBossWeek; }).length;
+      if (inputs.length > 0 && inputs.length !== nonBossCount) {
+        errors.push('Boss componentInputs has ' + inputs.length + ' values but there are ' + nonBossCount + ' non-boss weeks');
+      }
+    }
+
+    return errors;
+  }
+
+  // ── 10-Stage Multi-Stage Generator ──────────────────────────────────────
+  //
+  // Pipeline: Layer Bible → Campaign Plan → Shell → Week Chunks → Fragments → Endings → Validate → Patch
+  //
+  // onProgress(stageIndex, totalStages, message) — UI callback
+
+  async function generateMultiStage(settings, workout, brief, dice, onProgress) {
+    // Check required generators
+    if (typeof window.generateStage1Prompt !== 'function' ||
+        typeof window.generateStage2Prompt !== 'function' ||
+        typeof window.generateShellPrompt  !== 'function' ||
+        typeof window.generateWeekChunkPrompt !== 'function' ||
+        typeof window.generateFragmentsPrompt !== 'function' ||
+        typeof window.generateEndingsPrompt   !== 'function') {
+      throw new Error('Pipeline generators not loaded. Please reload the page.');
+    }
+
+    // 0. Plan the pipeline
+    var weekCount = window.parseWeekCount(workout);
+    var chunks = window.planWeekChunks(weekCount);
+    var totalStages = 3 + chunks.length + 2; // planning(2) + shell(1) + weeks(N) + fragments(1) + endings(1)
+    var stageNum = 0;
+
+    function progress(message) {
+      stageNum++;
+      onProgress(stageNum, totalStages, message);
+    }
+
+    // 1. Layer Bible
+    progress('Building layer bible\u2026');
     var raw1 = await callProvider(settings, window.generateStage1Prompt(workout, brief, dice), 4096);
     var layerBible = extractJson(raw1);
 
     if (!layerBible.storyLayer || !layerBible.gameLayer || !layerBible.governingLayer) {
       throw new Error(
-        'Stage 1 failed: layer bible is missing required sections (storyLayer, gameLayer, governingLayer).\n' +
+        'Stage 1 failed: layer bible missing required sections (storyLayer, gameLayer, governingLayer).\n' +
         'The model may not have followed the output schema. Try again.'
       );
     }
 
-    onProgress('stage2', 'Planning your campaign\u2026');
+    // 2. Campaign Plan + Fragment Registry
+    progress('Planning campaign\u2026');
     var raw2 = await callProvider(settings, window.generateStage2Prompt(workout, brief, dice, layerBible), 8192);
     var campaignPlan = extractJson(raw2);
 
     if (!campaignPlan.weeks || !Array.isArray(campaignPlan.weeks) || !campaignPlan.bossPlan) {
       throw new Error(
-        'Stage 2 failed: campaign plan is missing required sections (weeks[], bossPlan).\n' +
+        'Stage 2 failed: campaign plan missing required sections (weeks[], bossPlan).\n' +
         'The model may not have followed the output schema. Try again.'
       );
     }
 
-    onProgress('stage3', 'Compiling booklet\u2026');
-    var raw3 = await callProvider(settings, window.generateStage3Prompt(workout, brief, dice, layerBible, campaignPlan));
-    var booklet = extractJson(raw3);
+    if (!campaignPlan.fragmentRegistry || !Array.isArray(campaignPlan.fragmentRegistry)) {
+      console.warn('[LiftRPG] Stage 2 missing fragmentRegistry — fragments will have no pre-assigned IDs');
+      campaignPlan.fragmentRegistry = [];
+    }
 
-    onProgress('validating', 'Validating schema\u2026');
-    var errors = validateBookletSchema(booklet);
+    // 3. Booklet Shell
+    progress('Building booklet shell\u2026');
+    var raw3 = await callProvider(settings, window.generateShellPrompt(brief, layerBible, campaignPlan), 8192);
+    var shell = extractJson(raw3);
+
+    if (!shell.meta || !shell.cover || !shell.rulesSpread) {
+      throw new Error(
+        'Stage 3 failed: booklet shell missing required keys (meta, cover, rulesSpread).\n' +
+        'The model may not have followed the output schema. Try again.'
+      );
+    }
+
+    // 4..N-3. Week Chunks
+    var weekChunkOutputs = [];
+    var allComponentValues = [];
+    var previousChunkWeeks = null;
+
+    for (var ci = 0; ci < chunks.length; ci++) {
+      var weekNums = chunks[ci];
+      var isBoss = weekNums.indexOf(weekCount) !== -1;
+      var label = isBoss
+        ? 'Generating boss week\u2026'
+        : weekNums.length === 1
+          ? 'Generating week ' + weekNums[0] + '\u2026'
+          : 'Generating weeks ' + weekNums[0] + '\u2013' + weekNums[weekNums.length - 1] + '\u2026';
+
+      progress(label);
+      var rawChunk = await callProvider(
+        settings,
+        window.generateWeekChunkPrompt(workout, brief, layerBible, campaignPlan, weekNums, previousChunkWeeks, allComponentValues),
+        16384
+      );
+      var chunkOutput = extractJson(rawChunk);
+      weekChunkOutputs.push(chunkOutput);
+      previousChunkWeeks = chunkOutput.weeks || [];
+
+      // Accumulate component values for boss decode
+      (chunkOutput.weeks || []).forEach(function (w) {
+        if (w.weeklyComponent && w.weeklyComponent.value !== undefined && w.weeklyComponent.value !== null) {
+          allComponentValues.push(w.weeklyComponent.value);
+        }
+      });
+    }
+
+    // N-2. Fragments
+    progress('Generating fragments\u2026');
+    var weekSummaries = extractWeekSummaries(weekChunkOutputs);
+    var rawFrags = await callProvider(
+      settings,
+      window.generateFragmentsPrompt(layerBible, campaignPlan, weekSummaries),
+      16384
+    );
+    var fragmentsOutput = extractJson(rawFrags);
+
+    // N-1. Endings
+    progress('Generating endings\u2026');
+    var lastChunkWeeks = weekChunkOutputs[weekChunkOutputs.length - 1].weeks || [];
+    var bossWeek = lastChunkWeeks[lastChunkWeeks.length - 1] || {};
+    var binaryChoiceWeek = findBinaryChoiceWeek(weekChunkOutputs);
+    var rawEndings = await callProvider(
+      settings,
+      window.generateEndingsPrompt(layerBible, campaignPlan, bossWeek, binaryChoiceWeek),
+      4096
+    );
+    var endingsOutput = extractJson(rawEndings);
+
+    // Assemble
+    console.log('[LiftRPG] Assembling booklet from', weekChunkOutputs.length, 'week chunks,',
+      ((fragmentsOutput || {}).fragments || []).length, 'fragments,',
+      ((endingsOutput || {}).endings || []).length, 'endings');
+    var booklet = assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput);
+
+    // Validate
+    var errors = validateAssembledBooklet(booklet);
     if (errors.length > 0) {
-      console.warn('[LiftRPG] Schema errors, requesting patch:', errors);
-      var label = errors.length === 1 ? '1 error' : errors.length + ' errors';
-      onProgress('patching', 'Patching ' + label + '\u2026');
-      var rawPatched = await callProvider(settings, generatePatchPrompt(JSON.stringify(booklet, null, 2), errors));
+      console.warn('[LiftRPG] Assembled booklet has', errors.length, 'validation errors:', errors);
+      var errLabel = errors.length === 1 ? '1 error' : errors.length + ' errors';
+      progress('Patching ' + errLabel + '\u2026');
+      // Patch stage: send the full assembled booklet + errors
+      var rawPatched = await callProvider(
+        settings,
+        generatePatchPrompt(JSON.stringify(booklet, null, 2), errors)
+      );
       booklet = extractJson(rawPatched);
-      var remaining = validateBookletSchema(booklet);
+      var remaining = validateAssembledBooklet(booklet);
       if (remaining.length > 0) {
         console.warn('[LiftRPG] Patch did not fully resolve errors:', remaining);
       }
@@ -500,6 +767,8 @@ window.LiftRPGAPI = (function () {
 
   /**
    * generate(settings, workout, brief, dice) → Promise<Object>
+   *
+   * Single-pass generation (Standard mode).
    *
    * settings: {
    *   format:  'anthropic' | 'openai'
@@ -525,5 +794,12 @@ window.LiftRPGAPI = (function () {
     return extractJson(raw);
   }
 
-  return { PROVIDERS: PROVIDERS, generate: generate, generateMultiStage: generateMultiStage, _extractJson: extractJson, _validateSchema: validateBookletSchema };
+  return {
+    PROVIDERS: PROVIDERS,
+    generate: generate,
+    generateMultiStage: generateMultiStage,
+    _extractJson: extractJson,
+    _validateSchema: validateBookletSchema,
+    _validateAssembled: validateAssembledBooklet
+  };
 })();

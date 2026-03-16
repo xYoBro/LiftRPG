@@ -1071,7 +1071,7 @@
           <button class="depth-btn active" type="button" data-depth="standard">Standard</button>
           <button class="depth-btn" type="button" data-depth="deep">Deep</button>
         </div>
-        <p class="depth-note">Deep: 3-stage pipeline &mdash; more coherent, larger token budget</p>
+        <p class="depth-note">Deep: multi-stage pipeline &mdash; more coherent, larger token budget</p>
       </div>
 
       <button class="gen-submit" id="gen-submit" type="button">Generate Prompt</button>
@@ -1135,10 +1135,7 @@
       <!-- API output section -->
       <div class="api-output-section" id="api-output-section">
         <div class="stage-steps is-hidden" id="stage-steps">
-          <div class="stage-pip" id="pip-1"></div>
-          <div class="stage-pip" id="pip-2"></div>
-          <div class="stage-pip" id="pip-3"></div>
-          <div class="stage-pip" id="pip-4"></div>
+          <!-- pips generated dynamically by onProgress -->
         </div>
         <div class="api-progress" id="api-progress">
           <div class="spinner"></div>
@@ -1224,12 +1221,7 @@
       var apiOpenBtn = document.getElementById('api-open-btn');
       var apiStatusText = document.getElementById('api-status-text');
       var stageSteps = document.getElementById('stage-steps');
-      var stagePips = [
-        document.getElementById('pip-1'),
-        document.getElementById('pip-2'),
-        document.getElementById('pip-3'),
-        document.getElementById('pip-4')
-      ];
+      var pipCount = 0;
 
       // Depth toggle
       var genDepthToggle = document.getElementById('gen-depth-toggle');
@@ -1608,26 +1600,44 @@
         apiOpenBtn.style.display = 'none';
         submitBtn.disabled = true;
 
-        // Stage pips (deep mode only)
+        // Stage pips (deep mode only — created dynamically)
         stageSteps.classList.toggle('is-hidden', !isDeep);
         if (isDeep) {
-          stagePips.forEach(function (p) { p.className = 'stage-pip'; });
-          stagePips[0].classList.add('active');
-          apiStatusText.textContent = 'Building layer bible…';
+          stageSteps.innerHTML = '';
+          pipCount = 0;
+          apiStatusText.textContent = 'Building layer bible\u2026';
         } else {
-          apiStatusText.textContent = 'Generating your booklet…';
+          apiStatusText.textContent = 'Generating your booklet\u2026';
         }
 
-        function onProgress(stage, message) {
+        function ensurePips(total) {
+          if (pipCount === total) return;
+          stageSteps.innerHTML = '';
+          for (var k = 0; k < total; k++) {
+            var pip = document.createElement('div');
+            pip.className = 'stage-pip';
+            stageSteps.appendChild(pip);
+          }
+          pipCount = total;
+        }
+
+        function updatePips(current, total) {
+          ensurePips(total);
+          var pips = stageSteps.children;
+          for (var k = 0; k < pips.length; k++) {
+            pips[k].className = 'stage-pip' + (k < current - 1 ? ' done' : k === current - 1 ? ' active' : '');
+          }
+        }
+
+        function markAllDone() {
+          var pips = stageSteps.children;
+          for (var k = 0; k < pips.length; k++) pips[k].className = 'stage-pip done';
+        }
+
+        function onProgress(current, total, message) {
           apiStatusText.textContent = message;
           if (!isDeep) return;
-          var order = { stage1: 0, stage2: 1, stage3: 2, validating: 3, patching: 3 };
-          var idx = (stage in order) ? order[stage] : -1;
-          if (idx >= 0) {
-            stagePips.forEach(function (p, i) {
-              p.className = 'stage-pip' + (i < idx ? ' done' : i === idx ? ' active' : '');
-            });
-          }
+          updatePips(current, total);
         }
 
         var generateFn = isDeep
@@ -1637,7 +1647,7 @@
         generateFn()
           .then(function (data) {
             sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(data));
-            if (isDeep) { stagePips.forEach(function (p) { p.className = 'stage-pip done'; }); }
+            if (isDeep) markAllDone();
             apiProgress.classList.add('is-hidden');
             stageSteps.classList.add('is-hidden');
             apiOpenBtn.style.display = '';

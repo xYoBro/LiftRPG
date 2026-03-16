@@ -985,16 +985,85 @@
     return parts.join('\n');
   };
 
+  // ── Week count + chunking utilities ────────────────────────────────────────
+
+  window.parseWeekCount = function (workout) {
+    var match = String(workout || '').match(/(\d+)\s*weeks?\b/i);
+    var n = match ? parseInt(match[1], 10) : 6;
+    return Math.max(4, Math.min(12, n || 6));
+  };
+
+  /**
+   * planWeekChunks(weekCount) → [[weekNums], ...]
+   * Dynamic chunker: isolates midpoint + boss, groups the rest in ≤ 3.
+   */
+  window.planWeekChunks = function (weekCount) {
+    var midpoint = Math.ceil(weekCount / 2);
+    var chunks = [];
+
+    // Early weeks: 1 to midpoint-1, in groups of max 3
+    var early = [];
+    for (var i = 1; i < midpoint; i++) early.push(i);
+    while (early.length > 0) chunks.push(early.splice(0, 3));
+
+    // Midpoint: always isolated
+    chunks.push([midpoint]);
+
+    // Late weeks: midpoint+1 to weekCount-1, in groups of max 3
+    var late = [];
+    for (var i = midpoint + 1; i < weekCount; i++) late.push(i);
+    while (late.length > 0) chunks.push(late.splice(0, 3));
+
+    // Boss: always isolated
+    chunks.push([weekCount]);
+
+    return chunks;
+  };
+
+  /**
+   * extractWeekWorkout(workout, weekNumbers) → string
+   * Extracts workout sections for specific weeks. Falls back to full text.
+   */
+  window.extractWeekWorkout = function (workout, weekNumbers) {
+    var text = String(workout || '');
+    var weekPattern = /(?:^|\n)\s*(?:week\s*)(\d+)\s*[:\-\u2013\u2014]/gi;
+    var matches = [];
+    var m;
+    while ((m = weekPattern.exec(text)) !== null) {
+      matches.push({ weekNum: parseInt(m[1], 10), start: m.index });
+    }
+    if (matches.length === 0) return text;
+    var sections = {};
+    for (var i = 0; i < matches.length; i++) {
+      var end = (i + 1 < matches.length) ? matches[i + 1].start : text.length;
+      sections[matches[i].weekNum] = text.slice(matches[i].start, end).trim();
+    }
+    var result = [];
+    weekNumbers.forEach(function (wn) {
+      if (sections[wn]) result.push(sections[wn]);
+    });
+    return result.length > 0 ? result.join('\n\n') : text;
+  };
+
   // ── Multi-stage prompt generators ───────────────────────────────────────────
   //
   // Additive to window.generatePrompt (single-pass, Chat + API Standard mode).
-  // API "Deep" mode chains:
+  //
+  // Chat "Deep" wizard (3-stage, kept for backward compat):
   //   generateStage1Prompt → generateStage2Prompt → generateStage3Prompt
+  //
+  // API "Deep" mode (10-stage partial-JSON pipeline):
+  //   Stage 1: Layer Bible
+  //   Stage 2: Campaign Plan + Fragment Registry
+  //   Stage 3: Booklet Shell (meta, cover, rules, theme)
+  //   Stages 4..N-3: Week Chunks (dynamic, 2-3 weeks each)
+  //   Stage N-2: Fragments (all found documents)
+  //   Stage N-1: Endings
+  //   Stage N: Patch (conditional, only if validation fails)
   //
   // Stage 1: Layer Bible  — compact 3-layer architecture planning JSON
   // Stage 2: Campaign Plan — per-week structure using the approved layer bible
-  // Stage 3: Final Compile — full booklet JSON compiled from SCHEMA_SPEC +
-  //                          approved layer bible + approved campaign plan
+  // Stage 3 (Chat): Final Compile — full booklet JSON (kept for Chat wizard)
 
   var STAGE1_OUTPUT_SCHEMA = JSON.stringify({
     storyLayer: {
@@ -1067,7 +1136,18 @@
       decodeLogic: '',
       whyItFeelsEarned: '',
       requiredPriorKnowledge: []
-    }
+    },
+    fragmentRegistry: [
+      {
+        id: 'F.01',
+        title: '',
+        documentType: '',
+        author: '',
+        revealPurpose: '',
+        weekRef: 1,
+        sessionRef: null
+      }
+    ]
   }, null, 2);
 
   window.generateStage1Prompt = function (workout, brief, dice) {
@@ -1152,9 +1232,7 @@
   };
 
   window.generateStage2Prompt = function (workout, brief, dice, layerBible) {
-    var weekCount = 6;
-    var match = workout.match(/(\d+)\s*weeks?\b/i);
-    if (match) { weekCount = Math.max(4, Math.min(12, parseInt(match[1], 10) || 6)); }
+    var weekCount = window.parseWeekCount(workout);
     var midpoint = Math.ceil(weekCount / 2);
     var minReuse = Math.max(weekCount - 2, 3);
     var parts = [
@@ -1192,6 +1270,17 @@
       '- `playerGains`: what new capability, access, or knowledge the player acquires this week.',
       '- The boss plan must explain exactly why the decode feels earned',
       '  from prior spatial and institutional knowledge — not retrofitted.',
+      '',
+      '## Fragment Registry',
+      '- Assign fragment IDs (F.01, F.02, ...) for every found document the booklet needs.',
+      '- Each entry: { id, title (working title), documentType (memo/fieldNote/inspection/report/',
+      '  transcript/correspondence/anomaly/form), author (named character from relationship web),',
+      '  revealPurpose (what this document reveals to the player), weekRef (which week references it),',
+      '  sessionRef (which session number, or null if oracle-referenced) }.',
+      '- At least 3 fragments must be authored by named characters from the relationship web.',
+      '- Fragment purposes should escalate: early fragments establish setting, midpoint fragments',
+      '  recontextualize, late fragments reveal hidden truths or betray expectations.',
+      '- Aim for 15-22 fragments total, distributed across all non-boss weeks.',
       '',
       '## Output Rules',
       '- Return compact JSON only, matching the schema below exactly.',
@@ -1305,6 +1394,344 @@
       INSTRUCTIONS,
       STAGE3_POSTCHECKS
     ];
+    return parts.join('\n');
+  };
+
+  // ── 10-Stage Partial-JSON Pipeline Generators ─────────────────────────────
+  //
+  // These produce prompts for the API-only 10-stage pipeline.
+  // Each stage outputs partial JSON that the JS assembler merges.
+
+  // Schema subsets for partial-JSON stages
+  var SCHEMA_SHELL = [].concat(
+    SCHEMA_HEADER, [''],
+    SCHEMA_META, [''],
+    SCHEMA_THEME, [''],
+    SCHEMA_TAIL
+  ).join('\n');
+
+  var SCHEMA_WEEKS = [].concat(
+    ['# LiftRPG Week Schema — Partial Output'],
+    [''],
+    ['Output a JSON object with a single `weeks` array containing only the requested weeks.'],
+    [''],
+    SCHEMA_WEEKS_PRE, [''],
+    SCHEMA_SPATIAL, [''],
+    SCHEMA_WEEKS_POST
+  ).join('\n');
+
+  var SCHEMA_FRAGS = [].concat(
+    ['# LiftRPG Fragment Schema — Partial Output'],
+    [''],
+    ['Output a JSON object with a single `fragments` array containing all found documents.'],
+    [''],
+    SCHEMA_FRAGMENTS
+  ).join('\n');
+
+  var SCHEMA_ENDINGS = [].concat(
+    ['# LiftRPG Endings Schema — Partial Output'],
+    [''],
+    ['Output a JSON object with a single `endings` array.'],
+    [''],
+    SCHEMA_TAIL
+  ).join('\n');
+
+  /**
+   * Stage 3 (API pipeline): Booklet Shell — meta, cover, rulesSpread, theme
+   */
+  window.generateShellPrompt = function (brief, layerBible, campaignPlan) {
+    var blend = deriveDesignBlend(brief, '');
+    var weekCount = (campaignPlan.weeks || []).length || 6;
+    var parts = [
+      '# Booklet Shell — meta, cover, rulesSpread, theme',
+      '',
+      'Generate the booklet infrastructure as a partial JSON object.',
+      'Output a JSON object with exactly these top-level keys: meta, cover, rulesSpread, theme.',
+      'Do NOT output weeks, fragments, or endings — those come in later stages.',
+      '',
+      '---',
+      '',
+      SCHEMA_SHELL,
+      '',
+      '---',
+      '',
+      '## Reference Context (do not output these formats)',
+      '',
+      '### Approved Layer Bible',
+      JSON.stringify(layerBible),
+      '',
+      '### Approved Campaign Plan (summary)',
+      JSON.stringify({
+        weekCount: weekCount,
+        bossPlan: campaignPlan.bossPlan,
+        fragmentCount: (campaignPlan.fragmentRegistry || []).length
+      }),
+      '',
+      '---',
+      '',
+      '## Creative Direction',
+      '',
+      brief || buildDefaultBrief('', blend),
+      '',
+      formatDesignBias(blend),
+      '',
+      '## Key Requirements',
+      '- meta.weekCount must equal ' + weekCount,
+      '- meta.weeklyComponentType should match the layer bible&apos;s game layer',
+      '- meta.passwordLength should match the number of non-boss weeks',
+      '- meta.passwordEncryptedEnding: set to "PLACEHOLDER_ENCRYPT_WITH_RENDERER"',
+      '- Rules sections must explain the play cadence in-world, using the layer bible&apos;s governing procedures',
+      '- Cover title and designation should feel diegetic to the world',
+      '- Choose the visual archetype that best serves the fiction',
+      '',
+      '---',
+      '',
+      INSTRUCTIONS
+    ];
+    return parts.join('\n');
+  };
+
+  /**
+   * Stage 4..N-3 (API pipeline): Week Chunk — partial weeks[] array
+   *
+   * @param {string} workout - Full workout text
+   * @param {string} brief - Creative direction
+   * @param {object} layerBible - Stage 1 output
+   * @param {object} campaignPlan - Stage 2 output
+   * @param {number[]} weekNumbers - Which weeks to generate (e.g. [1,2] or [3])
+   * @param {object[]|null} previousChunkWeeks - Previous chunk&apos;s weeks array for continuity
+   * @param {Array} allComponentValues - Accumulated weeklyComponent.value from prior chunks
+   */
+  window.generateWeekChunkPrompt = function (workout, brief, layerBible, campaignPlan, weekNumbers, previousChunkWeeks, allComponentValues) {
+    var blend = deriveDesignBlend(brief, workout);
+    var weekCount = (campaignPlan.weeks || []).length || 6;
+    var isBossChunk = weekNumbers.indexOf(weekCount) !== -1;
+
+    // Filter campaign plan to just the relevant weeks
+    var relevantPlanWeeks = (campaignPlan.weeks || []).filter(function (pw) {
+      return weekNumbers.indexOf(pw.weekNumber) !== -1;
+    });
+
+    // Extract workout data for these specific weeks
+    var weekWorkout = window.extractWeekWorkout(workout, weekNumbers);
+
+    var weekLabel = weekNumbers.length === 1
+      ? 'Week ' + weekNumbers[0]
+      : 'Weeks ' + weekNumbers[0] + '-' + weekNumbers[weekNumbers.length - 1];
+
+    var parts = [
+      '# Generate ' + weekLabel + (isBossChunk ? ' (Boss Week)' : ''),
+      '',
+      'Generate a partial JSON object with a single `weeks` array containing',
+      weekNumbers.length === 1 ? '1 week object.' : weekNumbers.length + ' week objects.',
+      'Output ONLY the weeks requested. Do not output meta, cover, fragments, or endings.',
+      '',
+      '---',
+      '',
+      SCHEMA_WEEKS,
+      '',
+      '---',
+      '',
+      '## Reference Context',
+      '',
+      '### Approved Layer Bible',
+      JSON.stringify(layerBible),
+      '',
+      '### Campaign Plan for ' + weekLabel,
+      JSON.stringify(relevantPlanWeeks, null, 2),
+      '',
+      '### Fragment Registry (use these IDs for fragmentRef in sessions and oracle entries)',
+      JSON.stringify(campaignPlan.fragmentRegistry || []),
+      ''
+    ];
+
+    // Continuity from previous chunk
+    if (previousChunkWeeks && previousChunkWeeks.length > 0) {
+      var lastWeek = previousChunkWeeks[previousChunkWeeks.length - 1];
+      var continuity = {
+        lastWeekNumber: lastWeek.weekNumber,
+        lastMapState: (lastWeek.fieldOps || {}).mapState || null,
+        lastClocks: lastWeek.gameplayClocks || [],
+        lastTitle: lastWeek.title
+      };
+      parts.push('### Previous Week State (for map/clock/companion continuity)');
+      parts.push(JSON.stringify(continuity, null, 2));
+      parts.push('');
+    }
+
+    // Boss needs all prior component values
+    if (isBossChunk && allComponentValues.length > 0) {
+      parts.push('### Prior Weekly Component Values (for bossEncounter.componentInputs)');
+      parts.push('These values were collected from weeks 1-' + (weekCount - 1) + ' in order:');
+      parts.push(JSON.stringify(allComponentValues));
+      parts.push('The boss decodingKey must convert these values to letters.');
+      parts.push('');
+    }
+
+    parts.push('---');
+    parts.push('');
+    parts.push('## Workout Programme for ' + weekLabel);
+    parts.push('');
+    parts.push(weekWorkout);
+    parts.push('');
+    parts.push('## Creative Direction');
+    parts.push('');
+    parts.push(brief || buildDefaultBrief(workout, blend));
+    parts.push('');
+    parts.push(formatDesignBias(blend));
+    parts.push('');
+
+    // Week-specific requirements
+    parts.push('## Requirements for ' + weekLabel);
+    relevantPlanWeeks.forEach(function (pw) {
+      parts.push('- Week ' + pw.weekNumber + ': arcBeat = ' + (pw.arcBeat || 'unspecified') +
+        ', playerGains = ' + (pw.playerGains || 'unspecified'));
+      if (pw.isBinaryChoiceWeek) {
+        parts.push('  This is the BINARY CHOICE week — include binaryChoice in one session.');
+      }
+      if (pw.isBossWeek) {
+        parts.push('  This is the BOSS week — use bossEncounter instead of fieldOps.');
+      }
+    });
+    parts.push('');
+    parts.push('---');
+    parts.push('');
+    parts.push(INSTRUCTIONS);
+
+    return parts.join('\n');
+  };
+
+  /**
+   * Stage N-2 (API pipeline): Fragments — all found documents
+   *
+   * @param {object} layerBible - Stage 1 output
+   * @param {object} campaignPlan - Stage 2 output (with fragmentRegistry)
+   * @param {object[]} weekSummaries - Compact summaries extracted from generated weeks
+   */
+  window.generateFragmentsPrompt = function (layerBible, campaignPlan, weekSummaries) {
+    var parts = [
+      '# Generate All Fragments',
+      '',
+      'Generate a partial JSON object with a single `fragments` array.',
+      'This array contains ALL found documents for the entire booklet.',
+      'Output ONLY the fragments array. Do not output weeks, meta, or endings.',
+      '',
+      '---',
+      '',
+      SCHEMA_FRAGS,
+      '',
+      '---',
+      '',
+      '## Fragment Registry (your contract — generate one fragment per entry)',
+      '',
+      JSON.stringify(campaignPlan.fragmentRegistry || [], null, 2),
+      '',
+      '## Reference Context',
+      '',
+      '### Approved Layer Bible',
+      JSON.stringify(layerBible),
+      '',
+      '### Campaign Narrative (what happened in the weeks — use for cross-references)',
+      JSON.stringify(weekSummaries, null, 2),
+      '',
+      '---',
+      '',
+      '## Fragment Quality Requirements',
+      '- Generate exactly one fragment per registry entry, using the assigned IDs.',
+      '- Each fragment is a found document that could exist inside the fiction.',
+      '- Authors from the relationship web should reveal their blind spots, not just their knowledge.',
+      '- Different characters noticing different things about the same event is more powerful',
+      '  than different characters knowing different facts.',
+      '- Early fragments establish setting. Midpoint fragments recontextualize. Late fragments',
+      '  reveal hidden truths or betray expectations.',
+      '- At least one incident, place, procedure, or relationship should recur across',
+      '  multiple document perspectives.',
+      '- Fragments may arrive as threaded packets, route updates, contradictory records,',
+      '  or personal aftershocks — not just isolated lore drops.',
+      '- Include at least three linked functions: one action-changing artifact, one',
+      '  interpretation-changing artifact, and one character-deepening artifact.',
+      '',
+      '---',
+      '',
+      INSTRUCTIONS
+    ];
+    return parts.join('\n');
+  };
+
+  /**
+   * Stage N-1 (API pipeline): Endings — all ending variants
+   *
+   * @param {object} layerBible - Stage 1 output
+   * @param {object} campaignPlan - Stage 2 output
+   * @param {object} bossWeek - The generated boss week object
+   * @param {object|null} binaryChoiceWeek - The generated binary choice week, if found
+   */
+  window.generateEndingsPrompt = function (layerBible, campaignPlan, bossWeek, binaryChoiceWeek) {
+    var parts = [
+      '# Generate Endings',
+      '',
+      'Generate a partial JSON object with a single `endings` array.',
+      'Output ONLY the endings array. Do not output weeks, meta, or fragments.',
+      '',
+      '---',
+      '',
+      SCHEMA_ENDINGS,
+      '',
+      '---',
+      '',
+      '## Reference Context',
+      '',
+      '### Protagonist Arc',
+      JSON.stringify({
+        protagonist: layerBible.storyLayer.protagonist,
+        relationshipWeb: layerBible.storyLayer.relationshipWeb,
+        darkestMoment: layerBible.storyLayer.darkestMoment,
+        resolutionMode: layerBible.storyLayer.resolutionMode,
+        recurringMotifs: layerBible.storyLayer.recurringMotifs
+      }, null, 2),
+      '',
+      '### Boss Encounter',
+      JSON.stringify({
+        title: (bossWeek.bossEncounter || {}).title,
+        narrative: (bossWeek.bossEncounter || {}).narrative,
+        convergenceProof: (bossWeek.bossEncounter || {}).convergenceProof
+      }, null, 2),
+      ''
+    ];
+
+    if (binaryChoiceWeek) {
+      var binaryChoice = null;
+      (binaryChoiceWeek.sessions || []).forEach(function (s) {
+        if (s.binaryChoice) binaryChoice = s.binaryChoice;
+      });
+      if (binaryChoice) {
+        parts.push('### Binary Choice (the player chose one of these)');
+        parts.push(JSON.stringify(binaryChoice, null, 2));
+        parts.push('');
+      }
+    }
+
+    parts.push('### Campaign Plan Resolution');
+    parts.push(JSON.stringify({
+      bossPlan: campaignPlan.bossPlan,
+      structuralShape: (layerBible.storyLayer || {}).resolutionMode
+    }, null, 2));
+    parts.push('');
+    parts.push('---');
+    parts.push('');
+    parts.push('## Ending Requirements');
+    parts.push('- The ending is a found document first, not a summary.');
+    parts.push('- Pay off at least three recurring details: object, place, relationship phrase, procedure, motif.');
+    parts.push('- The ending must reflect: (a) the binary choice, (b) the boss outcome,');
+    parts.push('  and (c) at least one relationship consequence.');
+    parts.push('- If there are multiple ending variants, they should differ in emotional register');
+    parts.push('  and relationship resolution, not just plot outcome.');
+    parts.push('- The final line should feel discrete and earned.');
+    parts.push('');
+    parts.push('---');
+    parts.push('');
+    parts.push(INSTRUCTIONS);
+
     return parts.join('\n');
   };
 
