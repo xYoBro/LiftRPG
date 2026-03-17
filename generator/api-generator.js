@@ -174,7 +174,10 @@ window.LiftRPGAPI = (function () {
     var body = await resp.json();
 
     if (!resp.ok) {
-      var errMsg = (body.error && body.error.message) || ('HTTP ' + resp.status);
+      var errMsg = (body.error && body.error.message)
+        || (body.error && body.error.status && (body.error.status + ': ' + JSON.stringify(body.error)))
+        || (body.message)
+        || ('HTTP ' + resp.status + ' — ' + JSON.stringify(body).slice(0, 500));
       throw new Error('API error: ' + errMsg);
     }
 
