@@ -251,23 +251,23 @@ window.LiftRPGAPI = (function () {
       console.warn('[LiftRPG] Gemini structured output truncated (MAX_TOKENS). Attempting repair.');
     }
 
-    // Try direct parse first, fall back to repair pipeline
+    // Try direct parse first, fall back to full extractJson pipeline
+    // (bounds extraction + repair + structural fixes)
     try {
       return JSON.parse(rawText);
     } catch (parseErr) {
-      console.warn('[LiftRPG] Gemini structured output parse failed (' + parseErr.message + ') — attempting repair');
+      console.warn('[LiftRPG] Gemini structured output parse failed (' + parseErr.message + ') — attempting extractJson');
       try {
-        var repaired = repairJson(rawText);
-        return JSON.parse(repaired);
-      } catch (repairErr) {
+        return extractJson(rawText);
+      } catch (extractErr) {
         var isTruncated = finishReason === 'MAX_TOKENS'
           || parseErr.message.toLowerCase().indexOf('unterminated') !== -1
           || parseErr.message.toLowerCase().indexOf('unexpected end') !== -1;
         throw new Error(
-          'Gemini structured output returned invalid JSON: ' + parseErr.message + '\n\n' +
+          'Gemini structured output parse failed: ' + parseErr.message + '\n\n' +
           (isTruncated
-            ? 'The response was truncated (output token limit). The layer bible schema may be too large for the current maxOutputTokens setting.'
-            : 'Repair failed: ' + repairErr.message + '. Check the console for raw output (window.LiftRPGAPI.lastRaw).')
+            ? 'The response was truncated (output token limit). Try a model with a larger output window.'
+            : 'Repair also failed: ' + extractErr.message + '\nRaw output saved to window.LiftRPGAPI.lastRaw')
         );
       }
     }
