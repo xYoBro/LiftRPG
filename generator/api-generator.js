@@ -153,12 +153,7 @@ window.LiftRPGAPI = (function () {
     var url = baseUrl.replace(/\/+$/, '') + '/chat/completions';
     var headers = { 'content-type': 'application/json' };
     if (apiKey) {
-      // Google Generative Language API uses x-goog-api-key instead of Bearer token
-      if (baseUrl && baseUrl.indexOf('googleapis.com') !== -1) {
-        headers['x-goog-api-key'] = apiKey;
-      } else {
-        headers['Authorization'] = 'Bearer ' + apiKey;
-      }
+      headers['Authorization'] = 'Bearer ' + apiKey;
     }
 
     var resp = await fetchWithTimeout(url, {
@@ -172,11 +167,13 @@ window.LiftRPGAPI = (function () {
     }, timeoutMs);
 
     var body = await resp.json();
+    // Gemini may return array-format error responses
+    var errObj = Array.isArray(body) ? body[0] : body;
 
     if (!resp.ok) {
-      var errMsg = (body.error && body.error.message)
-        || (body.error && body.error.status && (body.error.status + ': ' + JSON.stringify(body.error)))
-        || (body.message)
+      var errMsg = (errObj.error && errObj.error.message)
+        || (errObj.error && errObj.error.status && (errObj.error.status + ': ' + JSON.stringify(errObj.error)))
+        || (errObj.message)
         || ('HTTP ' + resp.status + ' — ' + JSON.stringify(body).slice(0, 500));
       throw new Error('API error: ' + errMsg);
     }
