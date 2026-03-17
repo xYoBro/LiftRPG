@@ -922,6 +922,136 @@
 
     .wizard-error.is-visible { display: block; }
 
+    /* ── JSON Assembly ─────────────── */
+    .json-assembly {
+      display: none;
+      margin-top: 18px;
+      border-top: 1px solid var(--rule);
+      padding-top: 12px;
+    }
+    .json-assembly.is-visible { display: block; }
+
+    .assembly-hint {
+      font-family: var(--mono);
+      font-size: 6pt;
+      letter-spacing: .04em;
+      color: var(--muted);
+      margin: 0 0 10px;
+      line-height: 1.6;
+    }
+
+    .assembly-chunk-wrap {
+      position: relative;
+      margin-bottom: 8px;
+    }
+
+    .chunk-label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 6pt;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+
+    .chunk-remove {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background: none;
+      border: none;
+      font-family: var(--mono);
+      font-size: 9pt;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 2px 6px;
+      line-height: 1;
+    }
+    .chunk-remove:hover { color: var(--accent); }
+
+    .assembly-add {
+      display: block;
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 7pt;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: none;
+      border: 1.5px dashed var(--rule);
+      padding: 7px 14px;
+      cursor: pointer;
+      margin-bottom: 10px;
+      transition: border-color .15s, color .15s;
+    }
+    .assembly-add:hover {
+      border-color: var(--ink);
+      color: var(--ink);
+    }
+
+    #assembly-result {
+      margin-top: 10px;
+      font-family: var(--mono);
+      font-size: 7pt;
+      line-height: 1.6;
+    }
+
+    .assembly-success {
+      color: var(--ink);
+      padding: 10px 12px;
+      border: 1.5px solid var(--ink);
+    }
+    .assembly-success .result-title {
+      font-size: 8pt;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .assembly-success .result-meta {
+      color: var(--muted);
+      font-size: 6pt;
+      letter-spacing: .04em;
+      margin-bottom: 10px;
+    }
+    .assembly-success .result-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .assembly-success .result-actions button {
+      flex: 1;
+      font-family: var(--mono);
+      font-size: 7pt;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 8px 14px;
+      cursor: pointer;
+      border: 1.5px solid var(--ink);
+      transition: background .15s, color .15s;
+    }
+    .assembly-success .result-btn-primary {
+      background: var(--ink);
+      color: var(--paper);
+    }
+    .assembly-success .result-btn-primary:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .assembly-success .result-btn-secondary {
+      background: none;
+      color: var(--ink);
+    }
+    .assembly-success .result-btn-secondary:hover {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    .assembly-error {
+      color: var(--accent);
+      font-size: 6pt;
+      letter-spacing: .04em;
+      line-height: 1.6;
+    }
+
     /* ── Responsive ────────────────── */
     @media (max-width:520px) {
       .card {
@@ -1078,10 +1208,25 @@
 
       <!-- Chat output section -->
       <div class="gen-output-section" id="gen-output-section">
-        <label class="field-label" for="gen-output">Your Prompt</label>
+        <label class="field-label">Step 1 &mdash; Your Prompt</label>
         <textarea id="gen-output" class="gen-input gen-output" rows="10" readonly></textarea>
         <button class="gen-copy" id="gen-copy" type="button">Copy to Clipboard</button>
-        <p class="gen-hint">Paste into Claude, ChatGPT, or Gemini. Upload the JSON result to Render.</p>
+        <p class="gen-hint">Paste into Claude, ChatGPT, or Gemini.</p>
+      </div>
+
+      <!-- JSON assembly (Chat Standard step 2) -->
+      <div class="json-assembly" id="json-assembly">
+        <label class="field-label">Step 2 &mdash; Paste the Response</label>
+        <p class="assembly-hint">Paste the JSON from your LLM. If the response was cut off, click &ldquo;continue&rdquo; in the chat, then add each continuation below.</p>
+        <div id="assembly-chunks">
+          <div class="assembly-chunk-wrap">
+            <span class="chunk-label">Response</span>
+            <textarea class="gen-input assembly-chunk" rows="8" placeholder="Paste the LLM&apos;s JSON response here&hellip;"></textarea>
+          </div>
+        </div>
+        <button class="assembly-add" id="assembly-add" type="button">+ Add Continuation</button>
+        <button class="gen-submit" id="assembly-submit" type="button">Assemble &amp; Validate</button>
+        <div id="assembly-result"></div>
       </div>
 
       <!-- Chat deep wizard (3-step) -->
@@ -1210,6 +1355,7 @@
       var briefEl = document.getElementById('gen-brief');
       var outputEl = document.getElementById('gen-output');
       var outputSection = document.getElementById('gen-output-section');
+      var jsonAssembly = document.getElementById('json-assembly');
       var workoutError = document.getElementById('workout-error');
 
       // Mode toggle
@@ -1281,6 +1427,7 @@
           apiSettings.classList.add('is-visible');
           outputSection.classList.remove('is-visible');
           chatWizard.classList.remove('is-visible');
+          jsonAssembly.classList.remove('is-visible');
         } else {
           apiSettings.classList.remove('is-visible');
           apiOutputSection.classList.remove('is-visible');
@@ -1530,6 +1677,7 @@
         wizSetStep(0);
 
         outputSection.classList.remove('is-visible');
+        jsonAssembly.classList.remove('is-visible');
         chatWizard.classList.add('is-visible');
       }
 
@@ -1552,7 +1700,168 @@
         var prompt = window.generatePrompt(workout, brief, dice);
         outputEl.value = prompt;
         outputSection.classList.add('is-visible');
+        jsonAssembly.classList.add('is-visible');
+        resetAssembly();
         outputEl.scrollTop = 0;
+      }
+
+      // ── JSON Assembly (Chat Standard step 2) ────────────────────────────────
+      var assemblyChunks = document.getElementById('assembly-chunks');
+      var assemblyResult = document.getElementById('assembly-result');
+      var assemblyAddBtn = document.getElementById('assembly-add');
+      var assemblySubmitBtn = document.getElementById('assembly-submit');
+      var MAX_CHUNKS = 5;
+
+      function resetAssembly() {
+        assemblyChunks.innerHTML =
+          '<div class="assembly-chunk-wrap">' +
+            '<span class="chunk-label">Response</span>' +
+            '<textarea class="gen-input assembly-chunk" rows="8" placeholder="Paste the LLM\u2019s JSON response here\u2026"></textarea>' +
+          '</div>';
+        assemblyResult.innerHTML = '';
+      }
+
+      function renumberChunks() {
+        var wraps = assemblyChunks.querySelectorAll('.assembly-chunk-wrap');
+        for (var i = 0; i < wraps.length; i++) {
+          var label = wraps[i].querySelector('.chunk-label');
+          if (i === 0) {
+            label.textContent = 'Response';
+            // Remove the remove button from first chunk if it exists
+            var btn = wraps[i].querySelector('.chunk-remove');
+            if (btn) btn.remove();
+          } else {
+            label.textContent = 'Continuation ' + (i + 1);
+          }
+        }
+      }
+
+      assemblyAddBtn.addEventListener('click', function () {
+        var count = assemblyChunks.querySelectorAll('.assembly-chunk-wrap').length;
+        if (count >= MAX_CHUNKS) return;
+        var wrap = document.createElement('div');
+        wrap.className = 'assembly-chunk-wrap';
+        wrap.innerHTML =
+          '<span class="chunk-label">Continuation ' + (count + 1) + '</span>' +
+          '<button type="button" class="chunk-remove" title="Remove">&times;</button>' +
+          '<textarea class="gen-input assembly-chunk" rows="6" placeholder="Paste the next part\u2026"></textarea>';
+        wrap.querySelector('.chunk-remove').addEventListener('click', function () {
+          wrap.remove();
+          renumberChunks();
+        });
+        assemblyChunks.appendChild(wrap);
+        wrap.querySelector('textarea').focus();
+      });
+
+      // ── Fallback helpers (when api-generator.js not loaded) ─────────────────
+      function fallbackFindJsonBounds(text) {
+        var depth = 0, inStr = false, esc = false, start = -1;
+        for (var i = 0; i < text.length; i++) {
+          var c = text[i];
+          if (esc) { esc = false; continue; }
+          if (c === '\\' && inStr) { esc = true; continue; }
+          if (c === '"') { inStr = !inStr; continue; }
+          if (inStr) continue;
+          if (c === '{') { if (depth++ === 0) start = i; }
+          else if (c === '}') { if (--depth === 0 && start !== -1) return [start, i]; }
+        }
+        var a = text.indexOf('{'), b = text.lastIndexOf('}');
+        return (a !== -1 && b > a) ? [a, b] : null;
+      }
+
+      function fallbackExtractJson(text) {
+        var cleaned = text.replace(/^\uFEFF/, '');
+        var fence = cleaned.match(/```json\s*([\s\S]*?)```/i);
+        if (!fence) fence = cleaned.match(/```\s*([\s\S]*?)```/);
+        var stripped = fence ? fence[1].trim() : cleaned.trim();
+        var bounds = fallbackFindJsonBounds(stripped);
+        if (!bounds) throw new Error('No JSON object found in the pasted text.');
+        return JSON.parse(stripped.slice(bounds[0], bounds[1] + 1));
+      }
+
+      function basicValidateBooklet(data) {
+        var errors = [];
+        if (!data || typeof data !== 'object') { errors.push('Root must be a JSON object.'); return errors; }
+        ['meta', 'cover', 'rulesSpread', 'weeks', 'fragments', 'endings'].forEach(function (k) {
+          if (!data[k]) errors.push('Missing required key: "' + k + '"');
+        });
+        if (Array.isArray(data.weeks)) {
+          var boss = data.weeks.filter(function (w) { return w && w.isBossWeek; });
+          if (boss.length !== 1) errors.push('Exactly one boss week is required.');
+        }
+        return errors;
+      }
+
+      assemblySubmitBtn.addEventListener('click', function () {
+        assemblyResult.innerHTML = '';
+        var chunks = assemblyChunks.querySelectorAll('.assembly-chunk');
+        var combined = '';
+        for (var i = 0; i < chunks.length; i++) {
+          var val = chunks[i].value.trim();
+          if (val) combined += (i > 0 ? '\n' : '') + val;
+        }
+        if (!combined) {
+          assemblyResult.innerHTML = '<p class="assembly-error">Paste the JSON response from your LLM above.</p>';
+          return;
+        }
+
+        var data;
+        try {
+          if (window.LiftRPGAPI && window.LiftRPGAPI._extractJson) {
+            data = window.LiftRPGAPI._extractJson(combined);
+          } else {
+            data = fallbackExtractJson(combined);
+          }
+        } catch (e) {
+          assemblyResult.innerHTML = '<p class="assembly-error">' + escapeForHtml(e.message) + '</p>';
+          return;
+        }
+
+        var errors = basicValidateBooklet(data);
+        if (errors.length > 0) {
+          assemblyResult.innerHTML = '<p class="assembly-error">Validation issues:<br>' + errors.map(escapeForHtml).join('<br>') + '</p>';
+          return;
+        }
+
+        var title = (data.cover && data.cover.title) || (data.meta && data.meta.title) || 'Untitled';
+        var weekCount = Array.isArray(data.weeks) ? data.weeks.length : '?';
+        var slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+        // Store for download / renderer handoff
+        jsonAssembly._assembledData = data;
+        jsonAssembly._filename = 'liftrpg-' + slug + '.json';
+
+        assemblyResult.innerHTML =
+          '<div class="assembly-success">' +
+            '<div class="result-title">' + escapeForHtml(title) + '</div>' +
+            '<div class="result-meta">' + weekCount + ' weeks &middot; validated</div>' +
+            '<div class="result-actions">' +
+              '<button type="button" class="result-btn-primary" id="assembly-open">Open in Renderer</button>' +
+              '<button type="button" class="result-btn-secondary" id="assembly-download">Download JSON</button>' +
+            '</div>' +
+          '</div>';
+
+        document.getElementById('assembly-open').addEventListener('click', function () {
+          sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(jsonAssembly._assembledData));
+          window.open('renderer/?source=session', '_blank');
+        });
+
+        document.getElementById('assembly-download').addEventListener('click', function () {
+          var blob = new Blob([JSON.stringify(jsonAssembly._assembledData, null, 2)], { type: 'application/json' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = jsonAssembly._filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        });
+      });
+
+      // Minimal HTML escaping for display
+      function escapeForHtml(str) {
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
       }
 
       // ── API mode: call provider, auto-load renderer ───────────────────────
