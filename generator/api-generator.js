@@ -1150,10 +1150,9 @@ window.LiftRPGAPI = (function () {
   /**
    * buildFragmentBatches(fragmentRegistry, weekSummaries) → Array<{ weekNumbers, registry, weekSummaries }>
    *
-   * Groups registry entries into batches using weekRef associations.
-   * Strategy: one batch per week-chunk pair (weeks 1-2, 3-4, 5-6 for a 6-week booklet),
-   * with entries that lack weekRef distributed into the last batch.
-   * Overflow documents (associated by week) are included in the same batch as their week.
+   * Groups fragmentRegistry entries into batches using weekRef associations.
+   * Strategy: one batch per week-chunk pair (weeks 1-2, 3-4, 5-6 for a 6-week booklet).
+   * Entries that lack weekRef are distributed evenly across batches (round-robin).
    *
    * Each batch contains:
    *   weekNumbers: number[]         — which weeks this batch covers
@@ -1363,6 +1362,8 @@ window.LiftRPGAPI = (function () {
         }
         if (!od.documentType) {
           errors.push(wn + ' overflowDocument missing documentType');
+        } else if (!validDocLookup[od.documentType]) {
+          errors.push(wn + ' overflowDocument: documentType "' + od.documentType + '" not in supported list');
         }
         if (!od.content && !od.body) {
           errors.push(wn + ' overflowDocument missing content');
@@ -2926,20 +2927,30 @@ window.LiftRPGAPI = (function () {
     var nonBossWeeks = weeks.filter(function (w) { return !w.isBossWeek; });
     var bossWeek = weeks.filter(function (w) { return w.isBossWeek; })[0];
 
-    // ── Helper: collect all fragment IDs ────────────────────────────────────
-    var fragmentIdSet = {};
-    fragments.forEach(function (f) { if (f.id) fragmentIdSet[f.id] = f; });
+    // ── Helper: collect all fragment IDs (soft-matching via normalizeId) ────
+    var fragmentIdSet = {};     // exact ID → fragment
+    var fragmentIdSetNorm = {}; // normalizeId(ID) → fragment
+    fragments.forEach(function (f) {
+      if (f.id) {
+        fragmentIdSet[f.id] = f;
+        fragmentIdSetNorm[normalizeId(f.id)] = f;
+      }
+    });
+
+    function fragmentExistsQR(ref) {
+      return fragmentIdSet[ref] || fragmentIdSetNorm[normalizeId(ref)];
+    }
 
     // ── Continuity coherence ───────────────────────────────────────────────
     var continuityIssues = [];
 
-    // Check fragmentRefs in sessions resolve
-    var referencedFragmentIds = {};
+    // Check fragmentRefs in sessions resolve (soft-matching via normalizeId)
+    var referencedFragmentIdsNorm = {}; // normalizeId(ref) → true
     weeks.forEach(function (week, wi) {
       (week.sessions || []).forEach(function (s) {
         if (s.fragmentRef) {
-          referencedFragmentIds[s.fragmentRef] = true;
-          if (!fragmentIdSet[s.fragmentRef]) {
+          referencedFragmentIdsNorm[normalizeId(s.fragmentRef)] = true;
+          if (!fragmentExistsQR(s.fragmentRef)) {
             continuityIssues.push('Week ' + (wi + 1) + ' fragmentRef "' + s.fragmentRef + '" unresolved');
           }
         }
@@ -2948,17 +2959,17 @@ window.LiftRPGAPI = (function () {
       var oracle = (week.fieldOps || {}).oracleTable || (week.fieldOps || {}).oracle || {};
       (oracle.entries || []).forEach(function (e) {
         if (e.fragmentRef) {
-          referencedFragmentIds[e.fragmentRef] = true;
-          if (!fragmentIdSet[e.fragmentRef]) {
+          referencedFragmentIdsNorm[normalizeId(e.fragmentRef)] = true;
+          if (!fragmentExistsQR(e.fragmentRef)) {
             continuityIssues.push('Week ' + (wi + 1) + ' oracle fragmentRef "' + e.fragmentRef + '" unresolved');
           }
         }
       });
     });
 
-    // Unreferenced fragments (never pointed to by any session or oracle)
+    // Unreferenced fragments (never pointed to by any session or oracle, soft-matched)
     var unreferencedFragments = fragments.filter(function (f) {
-      return f.id && !referencedFragmentIds[f.id];
+      return f.id && !referencedFragmentIdsNorm[normalizeId(f.id)];
     });
     if (unreferencedFragments.length > 0) {
       continuityIssues.push(unreferencedFragments.length + ' fragment(s) never referenced: ' +
@@ -3372,7 +3383,8 @@ window.LiftRPGAPI = (function () {
       diffs.looserStructures.push('Fewer fragments: ' + bFrags.length + ' vs target ' + tFrags.length);
     }
 
-    // Fragment field depth
+    // Fragment field depth — richness comparison, not schema validation.
+    // Target-only optional fields are genericityRisks (thinner output), not missingFields.
     var targetFragKeys = {};
     tFrags.forEach(function (f) {
       Object.keys(f).forEach(function (k) { targetFragKeys[k] = true; });
@@ -3383,7 +3395,7 @@ window.LiftRPGAPI = (function () {
     });
     Object.keys(targetFragKeys).forEach(function (k) {
       if (!bookletFragKeys[k]) {
-        diffs.missingFields.push('Fragment field "' + k + '" present in target but absent in booklet');
+        diffs.genericityRisks.push('Fragment field "' + k + '" present in target but absent in booklet');
       }
     });
 
