@@ -25,6 +25,16 @@ function clipsVerticalOverflow(style) {
     || ['hidden', 'clip', 'auto', 'scroll'].includes(overflow);
 }
 
+/**
+ * Returns true if the element uses intentional CSS content truncation.
+ * Elements with -webkit-line-clamp clip content by design and should not
+ * be counted as overflow — the clipping is the intended behaviour.
+ */
+function hasIntentionalClamp(style) {
+  const lc = style.getPropertyValue('-webkit-line-clamp');
+  return Boolean(lc && lc !== 'none' && lc !== '0');
+}
+
 function measureInternalOverflowPx(root) {
   if (!root || typeof window === 'undefined' || typeof root.querySelectorAll !== 'function') {
     return 0;
@@ -37,6 +47,9 @@ function measureInternalOverflowPx(root) {
 
     const style = window.getComputedStyle(node);
     if (!clipsVerticalOverflow(style)) return;
+    // Skip elements with intentional CSS truncation (line-clamp).
+    // Their clientHeight < scrollHeight by design, not by overflow.
+    if (hasIntentionalClamp(style)) return;
 
     const overflow = node.scrollHeight - node.clientHeight;
     if (overflow > maxOverflow) maxOverflow = overflow;
@@ -137,14 +150,15 @@ export function measureAtom(stack, atom, density) {
   });
   const rendered = def.render(atom, density);
   // If the atom renderer returned a full page element (has .booklet-page class),
-  // extract its frame content instead of nesting a page inside a page.
+  // move its inner frame into the measurement context rather than just its children.
+  // Moving the frame itself preserves the frame's class list and data-layout-variant
+  // attribute, so density-variant CSS rules (e.g. .boss-right[data-layout-variant="tight"])
+  // apply correctly during offscreen measurement.
   if (rendered.classList && rendered.classList.contains('booklet-page')) {
     const innerFrame = rendered.querySelector('.page-frame');
     if (innerFrame) {
       Object.assign(innerFrame.style, { height: 'auto' });
-      while (innerFrame.firstChild) {
-        frame.appendChild(innerFrame.firstChild);
-      }
+      frame.appendChild(innerFrame);
     }
   } else {
     // Strip V1 flex self-sizing (e.g. session cards set flex: N 1 0)

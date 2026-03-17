@@ -1,10 +1,14 @@
 /**
  * tracker.js — Gameplay tracker/gauge atom
  *
- * Renders a single tracker for the RPG mechanical layer. Four types:
- * gauge (horizontal bar), clock (SVG pie segments), track (linear
- * box row), tally (simple tally area). Start values pre-fill segments
- * per the Endowed Progress principle. Thresholds mark trigger points.
+ * Renders companion components and game trackers for the RPG mechanical layer.
+ *
+ * Companion types (memory-slots, dashboard, stress-track, inventory-grid,
+ * return-box, usage-die) render using .companion-component markup that
+ * matches the booklet.css companion section.
+ *
+ * Generic types (gauge, clock, track, tally) render as simple .tracker-atom
+ * elements for when a tracker is not a companion component.
  *
  * @module atoms/tracker
  */
@@ -18,7 +22,12 @@ import { make } from '../dom.js';
 
 const DEFAULT_SEGMENTS = 8;
 
-/** Base heights per track type in px. */
+const COMPANION_TYPES = new Set([
+  'memory-slots', 'dashboard', 'stress-track',
+  'inventory-grid', 'return-box', 'usage-die', 'token-sheet', 'overlay-window',
+]);
+
+/** Base heights per generic track type in px. */
 const TYPE_HEIGHTS = {
   gauge: 80,
   clock: 120,
@@ -26,56 +35,59 @@ const TYPE_HEIGHTS = {
   tally: 50,
 };
 
+/**
+ * Height estimators for companion types. Each fn receives (slots) → px.
+ */
+const COMPANION_HEIGHTS = {
+  'memory-slots':   (slots) => 30 + Math.max(1, slots) * 36,
+  'dashboard':      (slots) => 28 + Math.max(1, slots) * 26,
+  'stress-track':   ()      => 60,
+  'inventory-grid': (slots) => 28 + Math.ceil(Math.max(1, slots) / 2) * 30,
+  'return-box':     ()      => 80,
+  'usage-die':      ()      => 60,
+  'token-sheet':    ()      => 120,
+  'overlay-window': ()      => 160,
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function lerp(spacious, compressed, density) {
-  return spacious + (compressed - spacious) * density;
-}
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
-/**
- * Build a horizontal segmented gauge bar.
- */
+// ---------------------------------------------------------------------------
+// Generic visual builders (gauge, clock, track, tally)
+// ---------------------------------------------------------------------------
+
 function buildGauge(segments, startValue, thresholds) {
   const container = make('div', 'tracker-gauge');
   const bar = make('div', 'tracker-gauge-bar');
-
   for (let i = 0; i < segments; i++) {
     const seg = make('div', 'tracker-gauge-segment');
     if (i < startValue) seg.classList.add('tracker-filled');
-    if (thresholds && thresholds.includes(i + 1)) {
-      seg.classList.add('tracker-threshold');
-    }
+    if (thresholds && thresholds.includes(i + 1)) seg.classList.add('tracker-threshold');
     bar.appendChild(seg);
   }
-
   container.appendChild(bar);
   return container;
 }
 
-/**
- * Build a circular SVG clock with pie segments.
- */
 function buildClock(segments, startValue, thresholds) {
   const container = make('div', 'tracker-clock');
   const size = 80;
   const cx = size / 2;
   const cy = size / 2;
   const r = (size / 2) - 4;
-
   const ns = 'http://www.w3.org/2000/svg';
+
   const svg = document.createElementNS(ns, 'svg');
   svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
   svg.setAttribute('class', 'tracker-clock-svg');
   svg.setAttribute('width', String(size));
   svg.setAttribute('height', String(size));
 
-  // Outer circle
   const circle = document.createElementNS(ns, 'circle');
   circle.setAttribute('cx', String(cx));
   circle.setAttribute('cy', String(cy));
@@ -83,12 +95,10 @@ function buildClock(segments, startValue, thresholds) {
   circle.setAttribute('class', 'tracker-clock-ring');
   svg.appendChild(circle);
 
-  // Pie segments
   const angleStep = (2 * Math.PI) / segments;
   for (let i = 0; i < segments; i++) {
     const startAngle = i * angleStep - Math.PI / 2;
     const endAngle = startAngle + angleStep;
-
     const x1 = cx + r * Math.cos(startAngle);
     const y1 = cy + r * Math.sin(startAngle);
     const x2 = cx + r * Math.cos(endAngle);
@@ -103,7 +113,6 @@ function buildClock(segments, startValue, thresholds) {
       'Z',
     ].join(' ');
     path.setAttribute('d', d);
-
     let cls = 'tracker-clock-segment';
     if (i < startValue) cls += ' tracker-filled';
     if (thresholds && thresholds.includes(i + 1)) cls += ' tracker-threshold';
@@ -124,39 +133,149 @@ function buildClock(segments, startValue, thresholds) {
   return container;
 }
 
-/**
- * Build a linear box track (row of boxes).
- */
 function buildTrack(segments, startValue, thresholds, direction) {
   const isReverse = direction === 'drain' || direction === 'down';
   const container = make('div', 'tracker-track');
   if (isReverse) container.classList.add('tracker-track-drain');
-
   for (let i = 0; i < segments; i++) {
     const box = make('div', 'tracker-track-box');
     if (i < startValue) box.classList.add('tracker-filled');
-    if (thresholds && thresholds.includes(i + 1)) {
-      box.classList.add('tracker-threshold');
-    }
-    // Index label inside box for reference
+    if (thresholds && thresholds.includes(i + 1)) box.classList.add('tracker-threshold');
     box.dataset.index = String(i + 1);
     container.appendChild(box);
   }
-
   return container;
 }
 
-/**
- * Build a simple tally area.
- */
 function buildTally(segments, startValue) {
   const container = make('div', 'tracker-tally');
-  const label = make('span', 'tracker-tally-label',
-    `${startValue || 0} / ${segments}`);
+  const label = make('span', 'tracker-tally-label', `${startValue || 0} / ${segments}`);
   const area = make('div', 'tracker-tally-area');
   container.appendChild(label);
   container.appendChild(area);
   return container;
+}
+
+// ---------------------------------------------------------------------------
+// Companion-specific visual builders
+// ---------------------------------------------------------------------------
+
+/**
+ * memory-slots: labeled writing slots with ruled lines.
+ */
+function buildMemorySlots(data) {
+  const slots = clamp(data.slots || 5, 1, 10);
+  const container = make('div', 'companion-memory-slots');
+  for (let i = 0; i < slots; i++) {
+    const slot = make('div', 'companion-memory-slot');
+    const lbl = make('div', 'companion-slot-label', String(i + 1).padStart(2, '0'));
+    const lines = make('div', 'companion-memory-lines');
+    lines.appendChild(make('div', 'companion-memory-line'));
+    lines.appendChild(make('div', 'companion-memory-line'));
+    slot.appendChild(lbl);
+    slot.appendChild(lines);
+    container.appendChild(slot);
+  }
+  return container;
+}
+
+/**
+ * dashboard: ruled dash-lines for free-form player writing.
+ */
+function buildDashboard(data) {
+  const lineCount = clamp(data.slots || 5, 1, 10);
+  const container = make('div', 'companion-dashboard');
+  for (let i = 0; i < lineCount; i++) {
+    container.appendChild(make('div', 'companion-dash-line'));
+  }
+  return container;
+}
+
+/**
+ * stress-track: row of fillable boxes (escalating pressure track).
+ */
+function buildStressTrack(data) {
+  const segments = clamp(data.segments || data.slots || 8, 1, 16);
+  const startValue = clamp(data.startValue || 0, 0, segments);
+  const track = make('div', 'companion-track');
+  const boxes = make('div', 'companion-track-boxes');
+  for (let i = 0; i < segments; i++) {
+    const box = make('div', 'companion-track-box');
+    if (i < startValue) box.dataset.filled = 'true';
+    boxes.appendChild(box);
+  }
+  track.appendChild(boxes);
+  return track;
+}
+
+/**
+ * inventory-grid: 2-column grid of labeled slots.
+ */
+function buildInventoryGrid(data) {
+  const slots = clamp(data.slots || 4, 1, 12);
+  const grid = make('div', 'companion-inventory-grid');
+  for (let i = 0; i < slots; i++) {
+    const slot = make('div', 'companion-inventory-slot');
+    const box = make('div', 'companion-slot-box');
+    const lbl = make('div', 'companion-slot-label', String(i + 1).padStart(2, '0'));
+    slot.appendChild(box);
+    slot.appendChild(lbl);
+    grid.appendChild(slot);
+  }
+  return grid;
+}
+
+/**
+ * return-box: small deposit box for a clue or card value.
+ */
+function buildReturnBox() {
+  const box = make('div', 'companion-return-box');
+  box.appendChild(make('div', 'companion-return-slot'));
+  return box;
+}
+
+/**
+ * usage-die: die-step depletion tracker (d12 → d10 → ... → d2).
+ */
+function buildUsageDie() {
+  const steps = ['d12', 'd10', 'd8', 'd6', 'd4', 'd2'];
+  const container = make('div', 'companion-usage-die');
+  steps.forEach((step, i) => {
+    const el = make('div', 'companion-usage-step', step);
+    if (i === 0) el.dataset.active = 'true';
+    container.appendChild(el);
+  });
+  return container;
+}
+
+// ---------------------------------------------------------------------------
+// Companion component wrapper
+// ---------------------------------------------------------------------------
+
+function renderCompanionComponent(data) {
+  const type = data.trackType || 'dashboard';
+  const el = make('div', 'companion-component');
+
+  if (data.label) {
+    el.appendChild(make('div', 'companion-title', data.label));
+  }
+  if (data.instruction) {
+    el.appendChild(make('div', 'companion-reminder', data.instruction));
+  }
+
+  let visual;
+  switch (type) {
+    case 'memory-slots':   visual = buildMemorySlots(data);   break;
+    case 'dashboard':      visual = buildDashboard(data);     break;
+    case 'stress-track':   visual = buildStressTrack(data);   break;
+    case 'inventory-grid': visual = buildInventoryGrid(data); break;
+    case 'return-box':     visual = buildReturnBox();          break;
+    case 'usage-die':      visual = buildUsageDie();           break;
+    default:               visual = buildDashboard(data);      break;
+  }
+
+  el.appendChild(visual);
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -168,13 +287,25 @@ registerAtom('tracker', {
   canShare: true,
   pageAffinity: 'either',
 
-  estimate(data, density) {
+  estimate(data, _density) {
     const type = data?.trackType || 'track';
+
+    if (COMPANION_TYPES.has(type)) {
+      const slots = data?.slots || 5;
+      const heightFn = COMPANION_HEIGHTS[type];
+      const baseHeight = heightFn ? heightFn(slots) : 100;
+      const instructionHeight = data?.instruction ? 20 : 0;
+      const total = baseHeight + instructionHeight;
+      return {
+        minHeight: Math.round(total * 0.78),
+        preferredHeight: total,
+      };
+    }
+
     const baseHeight = TYPE_HEIGHTS[type] || TYPE_HEIGHTS.track;
     const labelHeight = data?.label ? 24 : 0;
     const consequenceHeight = data?.consequence ? 20 : 0;
     const total = baseHeight + labelHeight + consequenceHeight;
-
     return {
       minHeight: Math.round(total * 0.75),
       preferredHeight: total,
@@ -185,6 +316,13 @@ registerAtom('tracker', {
     const data = atom.data ?? {};
     const d = density ?? 0;
     const trackType = data.trackType || 'track';
+
+    // Companion-specific rendering using .companion-* CSS classes
+    if (COMPANION_TYPES.has(trackType)) {
+      return renderCompanionComponent(data);
+    }
+
+    // Generic rendering (gauge, clock, track, tally)
     const segments = clamp(data.segments || DEFAULT_SEGMENTS, 1, 24);
     const startValue = clamp(data.startValue || 0, 0, segments);
     const thresholds = Array.isArray(data.thresholds) ? data.thresholds : [];
@@ -192,37 +330,24 @@ registerAtom('tracker', {
     const el = make('div', 'tracker-atom');
     el.dataset.trackType = trackType;
 
-    // Label
     if (data.label) {
       el.appendChild(make('div', 'tracker-label', data.label));
     }
 
-    // Visual representation
     let visual;
     switch (trackType) {
-      case 'gauge':
-        visual = buildGauge(segments, startValue, thresholds);
-        break;
-      case 'clock':
-        visual = buildClock(segments, startValue, thresholds);
-        break;
-      case 'tally':
-        visual = buildTally(segments, startValue);
-        break;
+      case 'gauge': visual = buildGauge(segments, startValue, thresholds); break;
+      case 'clock': visual = buildClock(segments, startValue, thresholds); break;
+      case 'tally': visual = buildTally(segments, startValue); break;
       case 'track':
-      default:
-        visual = buildTrack(segments, startValue, thresholds, data.direction);
-        break;
+      default:      visual = buildTrack(segments, startValue, thresholds, data.direction); break;
     }
 
     el.appendChild(visual);
 
-    // Consequence text
     if (data.consequence) {
       const note = make('div', 'tracker-consequence', data.consequence);
-      if (d > 0.6) {
-        note.style.fontSize = '9px';
-      }
+      if (d > 0.6) note.style.fontSize = '9px';
       el.appendChild(note);
     }
 

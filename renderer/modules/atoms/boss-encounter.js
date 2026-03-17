@@ -17,7 +17,9 @@ import { renderBossPage } from '../field-ops-primitives.js';
 
 const FULL_PAGE_HEIGHT = 741;
 const BOSS_BASE_OVERFLOW = 38;
-const BOSS_MAX_SHRINK = 64;
+// Reflects actual shrink potential when componentInputs have long text:
+// tight variant + boss-component-value line-clamp saves ~280px on dense booklets.
+const BOSS_MAX_SHRINK = 300;
 
 function bossContentWeight(week, bookletData) {
   const model = buildBossPageModel(bookletData, week, 'standard');

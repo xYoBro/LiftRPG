@@ -127,25 +127,45 @@ export function buildBossPageModel(data, week, options = 'standard') {
 }
 
 export function buildCompanionModels(components) {
-  return (components || []).map((component, index) => ({
-    id: component.id || 'companion-' + index,
-    type: component.type || 'custom',
-    family: component.family || 'custom-companion',
-    title: component.title || 'Companion Component',
-    body: component.body || component.instruction || component.prompt || '',
-    subtitle: component.subtitle || '',
-    rows: component.rows || 0,
-    cols: component.cols || 0,
-    slots: Array.isArray(component.slots) ? component.slots : [],
-    tracks: Array.isArray(component.tracks) ? component.tracks : [],
-    tokens: Array.isArray(component.tokens) ? component.tokens : [],
-    conditions: Array.isArray(component.conditions) ? component.conditions : [],
-    windows: Array.isArray(component.windows) ? component.windows : [],
-    usageDie: component.usageDie || component.usage || '',
-    playWindow: component.playWindow || 'rest',
-    reminder: component.reminder || '',
-    footprint: component.footprint || 'half-page'
-  }));
+  return (components || []).map((component, index) => {
+    const family = component.family || 'custom-companion';
+    const slotCount = typeof component.slots === 'number' ? component.slots : 0;
+    const rawSlots = Array.isArray(component.slots) ? component.slots : [];
+    const rawTracks = Array.isArray(component.tracks) ? component.tracks : [];
+
+    // memory-slots: generate labeled slot objects from numeric slot count
+    const slots = rawSlots.length ? rawSlots
+      : (family === 'memory-slots' && slotCount > 0
+        ? new Array(slotCount).fill(null).map((_, i) => ({ label: 'M' + (i + 1) }))
+        : rawSlots);
+
+    // stress-track: generate a single track from numeric slot count
+    const tracks = rawTracks.length ? rawTracks
+      : (family === 'stress-track' && slotCount > 0
+        ? [{ label: '', segments: slotCount, startValue: 0 }]
+        : rawTracks);
+
+    return {
+      id: component.id || 'companion-' + index,
+      type: component.type || 'custom',
+      family,
+      title: component.label || component.title || 'Companion Component',
+      body: component.body || component.instruction || component.prompt || '',
+      subtitle: component.subtitle || '',
+      rows: component.rows || 0,
+      cols: component.cols || 0,
+      slots,
+      tracks,
+      slotCount,
+      tokens: Array.isArray(component.tokens) ? component.tokens : [],
+      conditions: Array.isArray(component.conditions) ? component.conditions : [],
+      windows: Array.isArray(component.windows) ? component.windows : [],
+      usageDie: component.usageDie || component.usage || '',
+      playWindow: component.playWindow || 'rest',
+      reminder: component.reminder || '',
+      footprint: component.footprint || 'half-page',
+    };
+  });
 }
 
 export function buildCipherModel(cipher, weeklyComponent, mechanicProfile = null) {

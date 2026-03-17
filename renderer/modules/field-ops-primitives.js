@@ -477,6 +477,14 @@ export function renderCompanionComponent(component) {
       tracks.appendChild(renderTrackRail(track));
     });
     card.appendChild(tracks);
+  } else if (component.family === 'dashboard') {
+    // No tracks array: render ruled dash-lines
+    const lineCount = component.slotCount || 5;
+    const dash = make('div', 'companion-dashboard');
+    for (let i = 0; i < lineCount; i++) {
+      dash.appendChild(make('div', 'companion-dash-line'));
+    }
+    card.appendChild(dash);
   } else if (component.family === 'usage-die') {
     card.appendChild(renderUsageDie(component));
   } else if (component.family === 'memory-slots') {
@@ -631,7 +639,7 @@ export function renderBossPage(model) {
       const row = make('div', 'boss-component-item');
       row.appendChild(make('div', 'boss-component-week', item.weekLabel));
       row.appendChild(make('div', 'boss-component-box'));
-      row.appendChild(make('div', '', item.value));
+      row.appendChild(make('div', 'boss-component-value', item.value));
       list.appendChild(row);
     });
     components.appendChild(list);

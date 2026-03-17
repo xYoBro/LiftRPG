@@ -14,7 +14,7 @@
 
 import { registerAtom } from '../engine/atom-registry.js';
 import {
-  buildRulesLeftPageModel,
+  buildRulesLeftPageModelWithVariant,
   buildSealedPageModel,
 } from '../booklet-models.js';
 import {
@@ -36,16 +36,20 @@ registerAtom('rules-block', {
   render(atom, density) {
     const data = atom.data || {};
     const side = data.side || 'left';
+    const d = density ?? 0;
 
     // adapter wraps as { side, data: <bookletData> }
     const bookletData = data.data || data;
 
+    // Map density to layout variant so CSS compact/dense selectors activate
+    const layoutVariant = d >= 0.6 ? 'dense' : d >= 0.3 ? 'compact' : 'standard';
+
     if (side === 'right') {
-      const sealedModel = buildSealedPageModel(bookletData);
+      const sealedModel = buildSealedPageModel(bookletData, layoutVariant);
       return renderSealedPage(sealedModel);
     }
 
-    const rulesModel = buildRulesLeftPageModel(bookletData);
+    const rulesModel = buildRulesLeftPageModelWithVariant(bookletData, layoutVariant);
     return renderRulesLeftPage(rulesModel);
   },
 });
