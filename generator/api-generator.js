@@ -238,21 +238,38 @@ window.LiftRPGAPI = (function () {
     }
 
     var rawText = body.candidates[0].content.parts[0].text;
+    var finishReason = body.candidates[0].finishReason;
     window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
     window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = {
-      finishReason: body.candidates[0].finishReason,
+      finishReason: finishReason,
       model: model,
       usage: body.usageMetadata || null
     });
 
-    // Structured output guarantees valid JSON — parse directly
+    // Check for truncation before parsing
+    if (finishReason === 'MAX_TOKENS') {
+      console.warn('[LiftRPG] Gemini structured output truncated (MAX_TOKENS). Attempting repair.');
+    }
+
+    // Try direct parse first, fall back to repair pipeline
     try {
       return JSON.parse(rawText);
     } catch (parseErr) {
-      throw new Error(
-        'Gemini structured output returned invalid JSON: ' + parseErr.message + '\n\n' +
-        'This should not happen with responseJsonSchema. Check the console for raw output.'
-      );
+      console.warn('[LiftRPG] Gemini structured output parse failed (' + parseErr.message + ') — attempting repair');
+      try {
+        var repaired = repairJson(rawText);
+        return JSON.parse(repaired);
+      } catch (repairErr) {
+        var isTruncated = finishReason === 'MAX_TOKENS'
+          || parseErr.message.toLowerCase().indexOf('unterminated') !== -1
+          || parseErr.message.toLowerCase().indexOf('unexpected end') !== -1;
+        throw new Error(
+          'Gemini structured output returned invalid JSON: ' + parseErr.message + '\n\n' +
+          (isTruncated
+            ? 'The response was truncated (output token limit). The layer bible schema may be too large for the current maxOutputTokens setting.'
+            : 'Repair failed: ' + repairErr.message + '. Check the console for raw output (window.LiftRPGAPI.lastRaw).')
+        );
+      }
     }
   }
 
@@ -2699,7 +2716,7 @@ window.LiftRPGAPI = (function () {
     progress('Building world + campaign\u2026');
     var layerBible = await callStage(
       window.generateStage1Prompt(workoutText, brief, dice),
-      STRUCTURED_SCHEMA_BIBLE, 8192, 'Layer Bible'
+      STRUCTURED_SCHEMA_BIBLE, 16384, 'Layer Bible'
     );
 
     if (!layerBible.storyLayer || !layerBible.gameLayer || !layerBible.governingLayer) {
