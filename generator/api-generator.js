@@ -19,6 +19,10 @@ window.LiftRPGAPI = (function () {
 
   var DEFAULT_TIMEOUT_MS = 300000; // 5 minutes — generous for long LLM generations
 
+  // Canonical document type list — single source of truth for schema enums + validator
+  var DOCUMENT_TYPE_ENUM = ['memo', 'report', 'inspection', 'fieldNote',
+    'correspondence', 'letter', 'transcript', 'form', 'anomaly'];
+
   // ── Provider presets ────────────────────────────────────────────────────────
 
   var PROVIDERS = {
@@ -131,8 +135,8 @@ window.LiftRPGAPI = (function () {
     window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
     window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = {
       stop_reason: body.stop_reason,
-      model:       body.model,
-      usage:       body.usage
+      model: body.model,
+      usage: body.usage
     });
     if (body.stop_reason === 'max_tokens') {
       throw new Error(
@@ -182,8 +186,8 @@ window.LiftRPGAPI = (function () {
     window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
     window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = {
       finish_reason: body.choices[0].finish_reason,
-      model:         body.model,
-      usage:         body.usage
+      model: body.model,
+      usage: body.usage
     });
     if (body.choices[0].finish_reason === 'length') {
       throw new Error(
@@ -229,7 +233,7 @@ window.LiftRPGAPI = (function () {
     }
 
     if (!body.candidates || !body.candidates[0] || !body.candidates[0].content ||
-        !body.candidates[0].content.parts || !body.candidates[0].content.parts[0]) {
+      !body.candidates[0].content.parts || !body.candidates[0].content.parts[0]) {
       throw new Error('Unexpected Gemini response shape. Check the console.');
     }
 
@@ -282,10 +286,10 @@ window.LiftRPGAPI = (function () {
     var depth = 0, inStr = false, esc = false, start = -1;
     for (var i = 0; i < text.length; i++) {
       var c = text[i];
-      if (esc)             { esc = false; continue; }
+      if (esc) { esc = false; continue; }
       if (c === '\\' && inStr) { esc = true; continue; }
-      if (c === '"')       { inStr = !inStr; continue; }
-      if (inStr)           continue;
+      if (c === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
       if (c === '{') { if (depth++ === 0) start = i; }
       else if (c === '}') { if (--depth === 0 && start !== -1) return [start, i]; }
     }
@@ -296,9 +300,9 @@ window.LiftRPGAPI = (function () {
 
   // ── character walk ───────────────────────────────────────────────────────────
 
-  var VALID_ESC    = { '"':1, '\\':1, '/':1, b:1, f:1, n:1, r:1, t:1, u:1 };
+  var VALID_ESC = { '"': 1, '\\': 1, '/': 1, b: 1, f: 1, n: 1, r: 1, t: 1, u: 1 };
   // After a string closes, valid JSON structural separators follow
-  var AFTER_STRING = { ',':1, '}':1, ']':1, ':':1, '/':1 };  // / starts a comment
+  var AFTER_STRING = { ',': 1, '}': 1, ']': 1, ':': 1, '/': 1 };  // / starts a comment
 
   function peekStructural(text, from) {
     for (var k = from; k < text.length; k++) {
@@ -325,7 +329,7 @@ window.LiftRPGAPI = (function () {
           continue;
         } else if (nx2 === '*') {               // block comment
           i += 2;
-          while (i < text.length - 1 && !(text[i] === '*' && text[i+1] === '/')) i++;
+          while (i < text.length - 1 && !(text[i] === '*' && text[i + 1] === '/')) i++;
           i++;  // skip closing '/'
           continue;
         }
@@ -335,7 +339,7 @@ window.LiftRPGAPI = (function () {
       if (c === '\\' && inStr) {
         var nx = text[i + 1] || '';
         if (VALID_ESC[nx]) { out.push(c); esc = true; }
-        else               { out.push('\\\\'); }  // stray backslash
+        else { out.push('\\\\'); }  // stray backslash
         continue;
       }
 
@@ -361,9 +365,9 @@ window.LiftRPGAPI = (function () {
       // Inside a string: escape raw control characters
       if (inStr) {
         var code = c.charCodeAt(0);
-        if      (c === '\n') { out.push('\\n');  continue; }
-        else if (c === '\r') { out.push('\\r');  continue; }
-        else if (c === '\t') { out.push('\\t');  continue; }
+        if (c === '\n') { out.push('\\n'); continue; }
+        else if (c === '\r') { out.push('\\r'); continue; }
+        else if (c === '\t') { out.push('\\t'); continue; }
         else if (code < 0x20) {
           out.push('\\u' + ('0000' + code.toString(16)).slice(-4));
           continue;
@@ -386,7 +390,7 @@ window.LiftRPGAPI = (function () {
     //    }{  ][  ]["  }[  ]{  ]"  }"  — only when separated by whitespace
     //    (whitespace guard avoids firing on root-level double-objects, which
     //    are unfixable anyway and need Chat mode)
-    text = text.replace(/([}\]])(\s+)([{[\"])/g, function(_, close, ws, open) {
+    text = text.replace(/([}\]])(\s+)([{[\"])/g, function (_, close, ws, open) {
       return close + ',' + ws + open;
     });
 
@@ -412,10 +416,10 @@ window.LiftRPGAPI = (function () {
     while (i < text.length) {
       var c = text[i];
 
-      if (esc)               { out += c; esc = false; i++; continue; }
-      if (c === '\\' && inStr) { out += c; esc = true;  i++; continue; }
-      if (c === '"')         { inStr = !inStr; out += c; i++; continue; }
-      if (inStr)             { out += c; i++; continue; }
+      if (esc) { out += c; esc = false; i++; continue; }
+      if (c === '\\' && inStr) { out += c; esc = true; i++; continue; }
+      if (c === '"') { inStr = !inStr; out += c; i++; continue; }
+      if (inStr) { out += c; i++; continue; }
 
       // Outside string: check for keyword at word boundary
       var matched = false;
@@ -507,7 +511,7 @@ window.LiftRPGAPI = (function () {
         || msgL.indexOf('unexpected eof') !== -1
         || msgL.indexOf('end of file') !== -1
         || msgL.indexOf("expected ']'") !== -1
-        || msgL.indexOf("expected '}'" ) !== -1;
+        || msgL.indexOf("expected '}'") !== -1;
       throw new Error(
         'Malformed JSON: ' + msg + '\n\n' +
         (isTruncated
@@ -540,8 +544,8 @@ window.LiftRPGAPI = (function () {
   // Returns array of human-readable error strings.
 
   var VALID_PAYLOAD_TYPES = {
-    none:1, narrative:1, cipher:1, map:1, clock:1,
-    companion:1, 'fragment-ref':1, 'password-element':1
+    none: 1, narrative: 1, cipher: 1, map: 1, clock: 1,
+    companion: 1, 'fragment-ref': 1, 'password-element': 1
   };
 
   function validateBookletSchema(booklet) {
@@ -611,10 +615,10 @@ window.LiftRPGAPI = (function () {
     var meta = shell.meta || {};
     var ctx = {};
     var hasContent = false;
-    if (meta.worldContract)    { ctx.worldContract    = meta.worldContract;    hasContent = true; }
-    if (meta.narrativeVoice)   { ctx.narrativeVoice   = meta.narrativeVoice;   hasContent = true; }
-    if (meta.literaryRegister) { ctx.literaryRegister  = meta.literaryRegister; hasContent = true; }
-    if (meta.structuralShape)  { ctx.structuralShape   = meta.structuralShape;  hasContent = true; }
+    if (meta.worldContract) { ctx.worldContract = meta.worldContract; hasContent = true; }
+    if (meta.narrativeVoice) { ctx.narrativeVoice = meta.narrativeVoice; hasContent = true; }
+    if (meta.literaryRegister) { ctx.literaryRegister = meta.literaryRegister; hasContent = true; }
+    if (meta.structuralShape) { ctx.structuralShape = meta.structuralShape; hasContent = true; }
     return hasContent ? ctx : null;
   }
 
@@ -769,13 +773,13 @@ window.LiftRPGAPI = (function () {
 
   function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput) {
     var booklet = {
-      meta:       shell.meta       || {},
-      cover:      shell.cover      || {},
-      rulesSpread:shell.rulesSpread|| {},
-      theme:      shell.theme      || {},
-      weeks:      [],
-      fragments:  (fragmentsOutput || {}).fragments || [],
-      endings:    (endingsOutput   || {}).endings   || []
+      meta: shell.meta || {},
+      cover: shell.cover || {},
+      rulesSpread: shell.rulesSpread || {},
+      theme: shell.theme || {},
+      weeks: [],
+      fragments: (fragmentsOutput || {}).fragments || [],
+      endings: (endingsOutput || {}).endings || []
     };
 
     // Concatenate weeks from all chunks in order
@@ -799,13 +803,13 @@ window.LiftRPGAPI = (function () {
 
   function assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, normalizedWorkout) {
     var booklet = {
-      meta:        shell.meta        || {},
-      cover:       shell.cover       || {},
+      meta: shell.meta || {},
+      cover: shell.cover || {},
       rulesSpread: shell.rulesSpread || {},
-      theme:       shell.theme       || {},
-      weeks:       [],
-      fragments:   (fragmentsOutput || {}).fragments || [],
-      endings:     (endingsOutput   || {}).endings   || []
+      theme: shell.theme || {},
+      weeks: [],
+      fragments: (fragmentsOutput || {}).fragments || [],
+      endings: (endingsOutput || {}).endings || []
     };
 
     // Concatenate weeks from all chunks in order
@@ -1159,9 +1163,17 @@ window.LiftRPGAPI = (function () {
   function buildFragmentBatches(fragmentRegistry, weekSummaries) {
     if (!fragmentRegistry || fragmentRegistry.length === 0) return [];
 
-    // Determine week numbers from summaries
+    // Determine week numbers from summaries; fall back to weekRefs in registry
     var allWeekNums = (weekSummaries || []).map(function (ws) { return ws.weekNumber; });
-    if (allWeekNums.length === 0) allWeekNums = [1, 2, 3, 4, 5, 6];
+    if (allWeekNums.length === 0) {
+      // Pre-planning call (no summaries yet) — derive from registry weekRefs
+      var weekSet = {};
+      fragmentRegistry.forEach(function (entry) {
+        if (entry.weekRef && typeof entry.weekRef === 'number') weekSet[entry.weekRef] = true;
+      });
+      allWeekNums = Object.keys(weekSet).map(Number).sort(function (a, b) { return a - b; });
+    }
+    if (allWeekNums.length === 0) allWeekNums = [1]; // absolute fallback — at least one batch
 
     // Build pairs: [1,2], [3,4], [5,6] for 6-week; [1,2], [3] for 3-week, etc.
     var pairs = [];
@@ -1267,6 +1279,7 @@ window.LiftRPGAPI = (function () {
 
   function validateAssembledBooklet(booklet) {
     var errors = [];
+    var warnings = []; // soft issues (stylistic, non-fatal) — attached to return value
 
     // ── Top-level structure ──────────────────────────────────────────────────
     ['meta', 'cover', 'rulesSpread', 'weeks', 'fragments', 'endings'].forEach(function (key) {
@@ -1304,9 +1317,11 @@ window.LiftRPGAPI = (function () {
     }
 
     // ── Fragment documentType validation ────────────────────────────────────
-    var VALID_DOC_TYPES = { memo: 1, fieldNote: 1, transcript: 1, inspection: 1, correspondence: 1, anomaly: 1, form: 1, report: 1 };
+    // Derive from DOCUMENT_TYPE_ENUM (single source of truth for schema + validator)
+    var validDocLookup = {};
+    DOCUMENT_TYPE_ENUM.forEach(function (t) { validDocLookup[t] = true; });
     fragments.forEach(function (f) {
-      if (f.documentType && !VALID_DOC_TYPES[f.documentType]) {
+      if (f.documentType && !validDocLookup[f.documentType]) {
         errors.push('Fragment "' + (f.id || '?') + '": documentType "' + f.documentType + '" not in supported list');
       }
     });
@@ -1372,6 +1387,7 @@ window.LiftRPGAPI = (function () {
     var nonBossValues = [];
     var hasBinaryChoice = false;
     var binaryChoiceWeek = null;
+    var weekMapSnapshots = []; // collected for cross-week map progression check
 
     // ── Per-week validation ──────────────────────────────────────────────────
     weeks.forEach(function (week, wi) {
@@ -1484,7 +1500,29 @@ window.LiftRPGAPI = (function () {
           if (cp.col !== undefined && (cp.col < 1 || cp.col > dims.columns)) {
             errors.push(wn + ' mapState.currentPosition: col ' + cp.col + ' out of bounds (1\u2013' + dims.columns + ')');
           }
+          // Verify currentPosition corresponds to an actual tile
+          if (cp.row !== undefined && cp.col !== undefined && tiles.length > 0) {
+            var cpCoord = cp.row + ',' + cp.col;
+            if (!coordsSeen[cpCoord]) {
+              errors.push(wn + ' mapState.currentPosition (' + cpCoord + ') does not match any tile');
+            }
+          }
         }
+      }
+
+      // Collect map snapshot for cross-week progression check (non-boss only)
+      if (!week.isBossWeek && mapState && mapState.tiles && mapState.tiles.length > 0) {
+        var tileByCoord = {};
+        (mapState.tiles || []).forEach(function (t) {
+          if (t.row !== undefined && t.col !== undefined) {
+            tileByCoord[t.row + ',' + t.col] = t.type || 'unknown';
+          }
+        });
+        weekMapSnapshots.push({
+          weekIndex: wi,
+          dims: mapState.gridDimensions || {},
+          tileByCoord: tileByCoord
+        });
       }
 
       // -- Interlude payloadType --
@@ -1503,13 +1541,43 @@ window.LiftRPGAPI = (function () {
       }
     });
 
+    // ── Cross-week map progression validation ─────────────────────────────────
+    if (weekMapSnapshots.length >= 2) {
+      // Impossible tile regressions: cleared→locked, anomaly→locked
+      var REGRESSION_PAIRS = { 'cleared→locked': true, 'anomaly→locked': true };
+      var firstDims = weekMapSnapshots[0].dims;
+
+      for (var mi = 1; mi < weekMapSnapshots.length; mi++) {
+        var prev = weekMapSnapshots[mi - 1];
+        var curr = weekMapSnapshots[mi];
+        var prevWn = 'Week ' + (prev.weekIndex + 1);
+        var currWn = 'Week ' + (curr.weekIndex + 1);
+
+        // Grid dimension consistency (warning — dimensions could change for narrative reasons)
+        if (curr.dims.rows !== firstDims.rows || curr.dims.columns !== firstDims.columns) {
+          warnings.push(currWn + ' mapState gridDimensions (' + curr.dims.rows + 'x' + curr.dims.columns +
+            ') differ from Week 1 (' + firstDims.rows + 'x' + firstDims.columns + ')');
+        }
+
+        // Tile state regressions (error — logically impossible)
+        for (var coord in prev.tileByCoord) {
+          if (curr.tileByCoord[coord]) {
+            var transition = prev.tileByCoord[coord] + '\u2192' + curr.tileByCoord[coord];
+            if (REGRESSION_PAIRS[transition]) {
+              errors.push(prevWn + '\u2192' + currWn + ' tile (' + coord + '): impossible regression ' + transition);
+            }
+          }
+        }
+      }
+    }
+
     // ── Boss encounter validation ────────────────────────────────────────────
     if (bossWeeks.length === 1) {
       var boss = bossWeeks[0].bossEncounter || {};
       var inputs = boss.componentInputs || [];
       var nonBossCount = weeks.filter(function (w) { return !w.isBossWeek; }).length;
 
-      // componentInputs count must match non-boss weeks
+      // componentInputs count must match non-boss weeks (error — deterministic invariant)
       if (inputs.length > 0 && inputs.length !== nonBossCount) {
         errors.push('Boss componentInputs has ' + inputs.length + ' values but there are ' + nonBossCount + ' non-boss weeks');
       }
@@ -1519,6 +1587,47 @@ window.LiftRPGAPI = (function () {
         for (var ci = 0; ci < inputs.length; ci++) {
           if (String(inputs[ci]) !== String(nonBossValues[ci])) {
             errors.push('Boss componentInputs[' + ci + '] = "' + inputs[ci] + '" does not match Week ' + (ci + 1) + ' weeklyComponent.value = "' + nonBossValues[ci] + '"');
+          }
+        }
+      }
+
+      // ── A1Z26 numeric validity (when boss decode is standard alphabetic) ────
+      var dk = boss.decodingKey;
+      var isA1Z26Boss = dk && dk.referenceTable && isStandardAlphaTable(dk.referenceTable);
+
+      if (isA1Z26Boss) {
+        // Each non-boss weeklyComponent.value must be an integer 1–26
+        nonBossValues.forEach(function (val, vi) {
+          if (val === undefined || val === null || val === '') return; // already flagged above
+          var n = Number(val);
+          if (isNaN(n) || n !== Math.floor(n)) {
+            errors.push('Week ' + (vi + 1) + ' weeklyComponent.value "' + val + '" is not an integer (required for A1Z26 decode)');
+          } else if (n < 1 || n > 26) {
+            errors.push('Week ' + (vi + 1) + ' weeklyComponent.value ' + n + ' out of A1Z26 range (1\u201326)');
+          }
+        });
+
+        // Verify demoPassword matches deterministic derivation
+        var derivedPassword = decodeA1Z26(
+          (boss.componentInputs || []).map(function (v) { return Number(v); })
+        );
+        if (derivedPassword && meta.demoPassword) {
+          if (meta.demoPassword !== derivedPassword) {
+            errors.push('meta.demoPassword "' + meta.demoPassword + '" does not match derived A1Z26 password "' + derivedPassword + '"');
+          }
+        }
+
+        // Repeated decoded letters (warning — stylistic, not impossible)
+        if (derivedPassword) {
+          var letterCounts = {};
+          for (var li = 0; li < derivedPassword.length; li++) {
+            var ch = derivedPassword[li];
+            letterCounts[ch] = (letterCounts[ch] || 0) + 1;
+          }
+          for (var letter in letterCounts) {
+            if (letterCounts[letter] > 1) {
+              warnings.push('A1Z26 decoded password "' + derivedPassword + '" has repeated letter "' + letter + '" (\u00d7' + letterCounts[letter] + ')');
+            }
           }
         }
       }
@@ -1539,6 +1648,8 @@ window.LiftRPGAPI = (function () {
       }
     }
 
+    // Attach warnings as a property on the errors array (preserves API contract)
+    errors.warnings = warnings;
     return errors;
   }
 
@@ -1551,12 +1662,12 @@ window.LiftRPGAPI = (function () {
   async function generateMultiStage(settings, workout, brief, dice, onProgress) {
     // Check required generators
     if (typeof window.generateStage1Prompt !== 'function' ||
-        typeof window.generateStage2Prompt !== 'function' ||
-        typeof window.generateShellPrompt  !== 'function' ||
-        typeof window.generateWeekChunkPrompt !== 'function' ||
-        typeof window.generateFragmentsPrompt !== 'function' ||
-        typeof window.generateFragmentBatchPrompt !== 'function' ||
-        typeof window.generateEndingsPrompt   !== 'function') {
+      typeof window.generateStage2Prompt !== 'function' ||
+      typeof window.generateShellPrompt !== 'function' ||
+      typeof window.generateWeekChunkPrompt !== 'function' ||
+      typeof window.generateFragmentsPrompt !== 'function' ||
+      typeof window.generateFragmentBatchPrompt !== 'function' ||
+      typeof window.generateEndingsPrompt !== 'function') {
       throw new Error('Pipeline generators not loaded. Please reload the page.');
     }
 
@@ -1744,8 +1855,12 @@ window.LiftRPGAPI = (function () {
 
     // Validate + single patch attempt (no retry loop)
     var errors = validateAssembledBooklet(booklet);
+    if (errors.warnings && errors.warnings.length > 0) {
+      console.warn('[LiftRPG] Validation warnings:', errors.warnings);
+    }
     if (errors.length > 0) {
       console.warn('[LiftRPG] Assembled booklet has', errors.length, 'validation errors:', errors);
+      totalStages++; // account for patch stage in progress reporting
       var errLabel = errors.length === 1 ? '1 error' : errors.length + ' errors';
       progress('Patching ' + errLabel + '\u2026');
       try {
@@ -1755,6 +1870,8 @@ window.LiftRPGAPI = (function () {
           'Patch'
         );
         booklet = extractJson(rawPatched);
+        // Re-enforce derived fields — patch LLM may have clobbered them
+        enforceBookletDerivedFields(booklet);
         var remaining = validateAssembledBooklet(booklet);
         if (remaining.length > 0) {
           console.warn('[LiftRPG] Patch did not fully resolve errors (' + remaining.length + ' remaining):', remaining);
@@ -1765,6 +1882,9 @@ window.LiftRPGAPI = (function () {
         console.warn('[LiftRPG] Patch stage failed, returning unpatched booklet:', patchErr.message);
       }
     }
+
+    // Auto-populate quality report for console inspection
+    generateQualityReport(booklet);
 
     return booklet;
   }
@@ -2020,9 +2140,6 @@ window.LiftRPGAPI = (function () {
   };
 
   // ── Shared sub-schemas for reuse across structured schemas ──────────────
-
-  var DOCUMENT_TYPE_ENUM = ['memo', 'report', 'inspection', 'fieldNote',
-    'correspondence', 'letter', 'transcript', 'form', 'anomaly'];
 
   var DESIGN_SPEC_SCHEMA = {
     type: 'object',
@@ -2536,12 +2653,12 @@ window.LiftRPGAPI = (function () {
   async function generateStructured(settings, workout, brief, dice, onProgress) {
     // Validate required prompt generators
     if (typeof window.generateStage1Prompt !== 'function' ||
-        typeof window.generateStage2Prompt !== 'function' ||
-        typeof window.generateShellPrompt  !== 'function' ||
-        typeof window.generateWeekChunkPrompt !== 'function' ||
-        typeof window.generateFragmentsPrompt !== 'function' ||
-        typeof window.generateFragmentBatchPrompt !== 'function' ||
-        typeof window.generateEndingsPrompt   !== 'function') {
+      typeof window.generateStage2Prompt !== 'function' ||
+      typeof window.generateShellPrompt !== 'function' ||
+      typeof window.generateWeekChunkPrompt !== 'function' ||
+      typeof window.generateFragmentsPrompt !== 'function' ||
+      typeof window.generateFragmentBatchPrompt !== 'function' ||
+      typeof window.generateEndingsPrompt !== 'function') {
       throw new Error('Pipeline generators not loaded. Please reload the page.');
     }
 
@@ -2733,9 +2850,15 @@ window.LiftRPGAPI = (function () {
     // Validate — log warnings but no LLM patch step
     // (structured output should prevent malformed JSON; semantic errors are reported)
     var errors = validateAssembledBooklet(booklet);
-    if (errors.length > 0) {
-      console.warn('[LiftRPG] Assembled structured booklet has', errors.length, 'validation warnings:', errors);
+    if (errors.warnings && errors.warnings.length > 0) {
+      console.warn('[LiftRPG] Validation warnings:', errors.warnings);
     }
+    if (errors.length > 0) {
+      console.warn('[LiftRPG] Assembled structured booklet has', errors.length, 'validation errors:', errors);
+    }
+
+    // Auto-populate quality report for console inspection
+    generateQualityReport(booklet);
 
     return booklet;
   }
@@ -2787,8 +2910,13 @@ window.LiftRPGAPI = (function () {
 
     // ── Schema completeness (delegate to existing validator) ───────────────
     report.schemaErrors = validateAssembledBooklet(booklet);
+    // Surface validator warnings (soft issues) alongside hard errors
+    var validatorWarnings = report.schemaErrors.warnings || [];
+    if (validatorWarnings.length > 0) {
+      report.warnings = report.warnings.concat(validatorWarnings);
+    }
     report.scores.schemaCompleteness = report.schemaErrors.length === 0
-      ? { score: 1, label: 'clean' }
+      ? { score: 1, label: validatorWarnings.length > 0 ? validatorWarnings.length + ' warnings' : 'clean' }
       : { score: Math.max(0, 1 - report.schemaErrors.length * 0.1), label: report.schemaErrors.length + ' errors' };
 
     var meta = booklet.meta || {};
@@ -2843,45 +2971,36 @@ window.LiftRPGAPI = (function () {
     if (continuityIssues.length) report.warnings = report.warnings.concat(continuityIssues);
 
     // ── Boss convergence integrity ─────────────────────────────────────────
+    // Count boss-related validator errors for scoring (they already live in
+    // schemaErrors — do NOT re-add them to warnings to avoid duplication).
+    // Add quality-only checks that the validator doesn't cover.
     var bossIssues = [];
-    if (bossWeek) {
-      if (!bossWeek.bossEncounter) {
-        bossIssues.push('Boss week (isBossWeek: true) has no bossEncounter object');
-      } else {
-        var boss = bossWeek.bossEncounter;
-        var inputs = boss.componentInputs || [];
-        var collectedValues = nonBossWeeks.map(function (w) {
-          return (w.weeklyComponent || {}).value;
-        });
-
-        if (inputs.length !== collectedValues.length) {
-          bossIssues.push('componentInputs count (' + inputs.length + ') != non-boss weeks (' + collectedValues.length + ')');
-        } else {
-          for (var bi = 0; bi < inputs.length; bi++) {
-            if (String(inputs[bi]) !== String(collectedValues[bi])) {
-              bossIssues.push('componentInputs[' + bi + '] mismatch: "' + inputs[bi] + '" vs "' + collectedValues[bi] + '"');
-            }
-          }
-        }
-
-        if (!boss.decodingKey) {
-          bossIssues.push('Boss missing decodingKey');
-        }
-        if (!boss.binaryChoiceAcknowledgement) {
-          var hasBinary = weeks.some(function (w) {
-            return (w.sessions || []).some(function (s) { return s.binaryChoice; });
-          });
-          if (hasBinary) bossIssues.push('Binary choice exists but boss has no binaryChoiceAcknowledgement');
-        }
-      }
-    } else {
+    var bossQualityWarnings = []; // quality-only (not in schemaErrors)
+    if (!bossWeek) {
+      // Already an error in schemaErrors; just count for scoring
       bossIssues.push('No boss week found');
+    } else if (!bossWeek.bossEncounter) {
+      bossIssues.push('Boss week has no bossEncounter object');
+    } else {
+      var bossObj = bossWeek.bossEncounter;
+      if (!bossObj.decodingKey) {
+        bossQualityWarnings.push('Boss missing decodingKey — no reveal mechanic');
+      }
+      // Count boss-related hard errors from validator for scoring only
+      var bossErrorCount = report.schemaErrors.filter(function (e) {
+        return e.indexOf('Boss ') === 0 || e.indexOf('componentInputs') !== -1 ||
+          e.indexOf('A1Z26') !== -1 || e.indexOf('demoPassword') !== -1;
+      }).length;
+      // Pad bossIssues length to reflect validator errors without duplicating strings
+      for (var bei = 0; bei < bossErrorCount; bei++) bossIssues.push('(validator)');
     }
 
-    report.scores.bossConvergence = bossIssues.length === 0
+    var bossTotalIssues = bossIssues.length + bossQualityWarnings.length;
+    report.scores.bossConvergence = bossTotalIssues === 0
       ? { score: 1, label: 'clean' }
-      : { score: Math.max(0, 1 - bossIssues.length * 0.25), label: bossIssues.length + ' issues' };
-    if (bossIssues.length) report.warnings = report.warnings.concat(bossIssues.map(function (i) { return 'Boss: ' + i; }));
+      : { score: Math.max(0, 1 - bossTotalIssues * 0.25), label: bossTotalIssues + ' issues' };
+    // Only add quality-only warnings (validator errors are already in schemaErrors)
+    if (bossQualityWarnings.length) report.warnings = report.warnings.concat(bossQualityWarnings);
 
     // ── Fragment reference integrity ───────────────────────────────────────
     var fragIssues = [];
@@ -2911,10 +3030,11 @@ window.LiftRPGAPI = (function () {
     // ── Map integrity ──────────────────────────────────────────────────────
     var mapIssues = [];
     var prevMapLabels = null;
-    nonBossWeeks.forEach(function (week, wi) {
+    nonBossWeeks.forEach(function (week) {
+      var actualWeekNum = weeks.indexOf(week) + 1; // true week number, not filtered index
       var ms = (week.fieldOps || {}).mapState;
       if (!ms) {
-        mapIssues.push('Week ' + (wi + 1) + ' missing mapState');
+        mapIssues.push('Week ' + actualWeekNum + ' missing mapState');
         return;
       }
       var tiles = ms.tiles || [];
@@ -2925,20 +3045,26 @@ window.LiftRPGAPI = (function () {
       if (prevMapLabels !== null && labels === prevMapLabels) {
         report.weakSpots.push({
           area: 'map-stagnation',
-          detail: 'Week ' + (wi + 1) + ' map tiles identical to previous week — no visible evolution',
+          detail: 'Week ' + actualWeekNum + ' map tiles identical to previous week — no visible evolution',
           severity: 'high'
         });
       }
       prevMapLabels = labels;
 
       if (!ms.currentPosition) {
-        mapIssues.push('Week ' + (wi + 1) + ' mapState missing currentPosition');
+        mapIssues.push('Week ' + actualWeekNum + ' mapState missing currentPosition');
       }
     });
 
-    report.scores.mapIntegrity = mapIssues.length === 0
+    // Count map regression errors from validator for scoring (already in schemaErrors)
+    var mapRegressionCount = report.schemaErrors.filter(function (e) {
+      return e.indexOf('impossible regression') !== -1;
+    }).length;
+
+    var mapTotalIssues = mapIssues.length + mapRegressionCount;
+    report.scores.mapIntegrity = mapTotalIssues === 0
       ? { score: 1, label: 'clean' }
-      : { score: Math.max(0, 1 - mapIssues.length * 0.15), label: mapIssues.length + ' issues' };
+      : { score: Math.max(0, 1 - mapTotalIssues * 0.15), label: mapTotalIssues + ' issues' };
 
     // ── Oracle completeness ────────────────────────────────────────────────
     var oracleIssues = [];
@@ -3189,11 +3315,15 @@ window.LiftRPGAPI = (function () {
       // fieldOps sub-keys
       var tfo = tw.fieldOps || {};
       var bfo = bw.fieldOps || {};
-      ['mapState', 'cipher', 'oracleTable'].forEach(function (fk) {
+      ['mapState', 'cipher'].forEach(function (fk) {
         if (tfo[fk] && !bfo[fk]) {
           diffs.missingFields.push(wn + ' fieldOps.' + fk + ' missing');
         }
       });
+      // Oracle uses either key — check both
+      if ((tfo.oracleTable || tfo.oracle) && !(bfo.oracleTable || bfo.oracle)) {
+        diffs.missingFields.push(wn + ' fieldOps oracle missing');
+      }
 
       // Session count comparison
       var tSessions = (tw.sessions || []).length;
