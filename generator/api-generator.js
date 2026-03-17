@@ -200,79 +200,6 @@ window.LiftRPGAPI = (function () {
     return rawText;
   }
 
-  // ── Native Gemini structured output ─────────────────────────────────────────
-  // Calls Gemini's generateContent endpoint with responseJsonSchema for typed
-  // JSON output. No extractJson/repairJson needed — structured output guarantees
-  // valid JSON conforming to the schema. Used only by generateStructured().
-
-  async function callGeminiNative(apiKey, model, prompt, responseSchema, maxTokens, timeoutMs) {
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
-      encodeURIComponent(model) + ':generateContent';
-
-    var resp = await fetchWithTimeout(url, {
-      method: 'POST',
-      headers: {
-        'x-goog-api-key': apiKey,
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseJsonSchema: responseSchema,
-          maxOutputTokens: maxTokens || 32768
-        }
-      })
-    }, timeoutMs);
-
-    var body = await resp.json();
-
-    if (!resp.ok) {
-      var errMsg = (body.error && body.error.message) || ('HTTP ' + resp.status);
-      throw new Error('Gemini API error: ' + errMsg);
-    }
-
-    if (!body.candidates || !body.candidates[0] || !body.candidates[0].content ||
-      !body.candidates[0].content.parts || !body.candidates[0].content.parts[0]) {
-      throw new Error('Unexpected Gemini response shape. Check the console.');
-    }
-
-    var rawText = body.candidates[0].content.parts[0].text;
-    var finishReason = body.candidates[0].finishReason;
-    window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
-    window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = {
-      finishReason: finishReason,
-      model: model,
-      usage: body.usageMetadata || null
-    });
-
-    // Check for truncation before parsing
-    if (finishReason === 'MAX_TOKENS') {
-      console.warn('[LiftRPG] Gemini structured output truncated (MAX_TOKENS). Attempting repair.');
-    }
-
-    // Try direct parse first, fall back to full extractJson pipeline
-    // (bounds extraction + repair + structural fixes)
-    try {
-      return JSON.parse(rawText);
-    } catch (parseErr) {
-      console.warn('[LiftRPG] Gemini structured output parse failed (' + parseErr.message + ') — attempting extractJson');
-      try {
-        return extractJson(rawText);
-      } catch (extractErr) {
-        var isTruncated = finishReason === 'MAX_TOKENS'
-          || parseErr.message.toLowerCase().indexOf('unterminated') !== -1
-          || parseErr.message.toLowerCase().indexOf('unexpected end') !== -1;
-        throw new Error(
-          'Gemini structured output parse failed: ' + parseErr.message + '\n\n' +
-          (isTruncated
-            ? 'The response was truncated (output token limit). Try a model with a larger output window.'
-            : 'Repair also failed: ' + extractErr.message + '\nRaw output saved to window.LiftRPGAPI.lastRaw')
-        );
-      }
-    }
-  }
-
   // ── JSON repair ─────────────────────────────────────────────────────────────
   //
   // LLMs regularly produce JSON that is structurally correct but fails to parse.
@@ -2703,10 +2630,15 @@ window.LiftRPGAPI = (function () {
       if (onProgress) onProgress(stageNum, totalStages, message);
     }
 
-    // Helper: call Gemini native with error tagging
-    async function callStage(prompt, schema, maxTokens, stageName) {
+    // Helper: call Gemini via OpenAI-compatible endpoint + extractJson
+    // Native structured output (responseJsonSchema) proved unreliable —
+    // Gemini regularly returns malformed JSON despite schema constraints.
+    // The OpenAI-compatible path + extractJson repair pipeline is robust.
+    var geminiOpenAIBase = 'https://generativelanguage.googleapis.com/v1beta/openai';
+    async function callStage(prompt, _schema, maxTokens, stageName) {
       try {
-        return await callGeminiNative(apiKey, model, prompt, schema, maxTokens, timeoutMs);
+        var raw = await callOpenAICompat(apiKey, geminiOpenAIBase, model, prompt, maxTokens, timeoutMs);
+        return extractJson(raw);
       } catch (err) {
         throw new Error('[' + stageName + '] ' + err.message);
       }
