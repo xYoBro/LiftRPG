@@ -544,7 +544,7 @@
     '- `epigraph` (object): { text, attribution }',
     '- `isBossWeek` (boolean): True for the final week only',
     '- `weeklyComponent` (object): { type, value, extractionInstruction }. Type must match meta.weeklyComponentType on non-boss weeks. Value is non-semantic raw data, not a letter, and should feel like a collectable operational clue rather than arbitrary filler. Boss week value is null.',
-    '- `sessions` (array, 3-6 items): Each session has { sessionNumber, label, exercises, storyPrompt, fragmentRef?, binaryChoice? }',
+    '- `sessions` (array, 3-6 items): Each session has { sessionNumber, label, exercises: [{ name, sets, repsPerSet, weightField?, notes? }], storyPrompt, fragmentRef?, binaryChoice?: { choiceLabel, promptA, promptB } }',
     '- `fieldOps` (object, required on non-boss weeks): contains mapState, cipher, oracleTable, and optional companionComponents',
     '- `bossEncounter` (object, required on boss week): replaces fieldOps',
     '- `overflow` (boolean): True when sessions.length > 3',
@@ -641,7 +641,7 @@
     '  "progress-clock" | "danger-clock" | "racing-clock" | "tug-of-war-clock" | "linked-clock" | "project-clock"',
     '',
     '### bossEncounter',
-    '- Shape: { title, narrative, mechanismDescription, componentInputs, decodingKey, convergenceProof, passwordRevealInstruction, binaryChoiceAcknowledgement? }',
+    '- Shape: { title, narrative, mechanismDescription, componentInputs, decodingKey, convergenceProof, passwordRevealInstruction, binaryChoiceAcknowledgement?: { ifA, ifB } }',
     '- `decodingKey`: { instruction, referenceTable }',
     '- `componentInputs` must match the prior weeklyComponent values in order',
     '- The boss page reveals how raw values become letters for the first time'
