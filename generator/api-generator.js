@@ -161,7 +161,8 @@ window.LiftRPGAPI = (function () {
       headers: headers,
       body: JSON.stringify({
         model: model,
-        max_tokens: maxTokens || 32768,
+        max_tokens: maxTokens || 65536,
+        max_completion_tokens: maxTokens || 65536,
         messages: [{ role: 'user', content: prompt }]
       })
     }, timeoutMs);
