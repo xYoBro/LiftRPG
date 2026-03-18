@@ -1,6 +1,19 @@
 import { make } from './dom.js?v=47';
 import { createBoundedPage } from './page-shell.js?v=47';
 
+const WORD_NUMS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8 };
+const BOX_GRID_PATTERN = /(\w+)\s+rows?\s+(?:of\s+)?(\w+)\s+box(?:es)?/i;
+
+function parseDashboardBoxGrid(text) {
+  if (!text) return null;
+  const match = text.match(BOX_GRID_PATTERN);
+  if (!match) return null;
+  const rows = WORD_NUMS[match[1].toLowerCase()] || parseInt(match[1], 10);
+  const cols = WORD_NUMS[match[2].toLowerCase()] || parseInt(match[2], 10);
+  if (!rows || !cols || rows > 8 || cols > 8) return null;
+  return { rows, cols };
+}
+
 function polarPoint(cx, cy, radius, angleDegrees) {
   const radians = (angleDegrees - 90) * (Math.PI / 180);
   return {
@@ -493,13 +506,25 @@ export function renderCompanionComponent(component) {
     });
     card.appendChild(tracks);
   } else if (component.family === 'dashboard') {
-    // No tracks array: render ruled dash-lines
-    const lineCount = component.slotCount || 5;
-    const dash = make('div', 'companion-dashboard');
-    for (let i = 0; i < lineCount; i++) {
-      dash.appendChild(make('div', 'companion-dash-line'));
+    const boxGrid = parseDashboardBoxGrid(component.body);
+    if (boxGrid) {
+      const grid = make('div', 'companion-dashboard companion-dashboard-grid');
+      for (let r = 0; r < boxGrid.rows; r++) {
+        const row = make('div', 'companion-dashboard-row');
+        for (let c = 0; c < boxGrid.cols; c++) {
+          row.appendChild(make('div', 'companion-dashboard-box'));
+        }
+        grid.appendChild(row);
+      }
+      card.appendChild(grid);
+    } else {
+      const lineCount = component.slotCount || 5;
+      const dash = make('div', 'companion-dashboard');
+      for (let i = 0; i < lineCount; i++) {
+        dash.appendChild(make('div', 'companion-dash-line'));
+      }
+      card.appendChild(dash);
     }
-    card.appendChild(dash);
   } else if (component.family === 'usage-die') {
     card.appendChild(renderUsageDie(component));
   } else if (component.family === 'memory-slots') {
