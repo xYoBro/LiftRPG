@@ -562,17 +562,6 @@
     }
 
     /* ── Output section ───────────── */
-    .gen-output-section {
-      display: none;
-      margin-top: 18px;
-      border-top: 1px solid var(--rule);
-      padding-top: 12px;
-    }
-
-    .gen-output-section.is-visible {
-      display: block;
-    }
-
     .gen-output {
       background: rgba(24, 23, 20, .04);
       font-size: 7pt;
@@ -601,244 +590,6 @@
       background: var(--ink);
       color: var(--paper);
     }
-
-    .gen-hint {
-      font-size: 6pt;
-      letter-spacing: .04em;
-      color: var(--muted);
-      margin-top: 8px;
-      margin-bottom: 0;
-    }
-
-    /* ── Mode toggle (Chat / API) ─── */
-    .mode-toggle {
-      display: flex;
-      margin-top: 4px;
-      margin-bottom: 16px;
-    }
-
-    .mode-btn {
-      flex: 1;
-      font-family: var(--mono);
-      font-size: 7pt;
-      letter-spacing: .2em;
-      text-transform: uppercase;
-      color: var(--muted);
-      background: none;
-      border: 1px solid var(--rule);
-      padding: 6px 12px;
-      cursor: pointer;
-      transition: background .12s, color .12s, border-color .12s;
-    }
-
-    .mode-btn:first-child {
-      border-right: none;
-    }
-
-    .mode-btn.active {
-      color: var(--paper);
-      background: var(--ink);
-      border-color: var(--ink);
-    }
-
-    .mode-btn:not(.active):hover {
-      color: var(--ink);
-      border-color: var(--ink);
-    }
-
-    /* ── API settings panel ──────── */
-    .api-settings {
-      display: none;
-      border-top: 1px solid var(--rule);
-      margin-top: 16px;
-      padding-top: 4px;
-    }
-
-    .api-settings.is-visible {
-      display: block;
-    }
-
-    .api-settings-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-top: 12px;
-    }
-
-    .api-settings-header .field-label {
-      margin-top: 0;
-      margin-bottom: 0;
-    }
-
-    .api-key-note {
-      font-size: 6pt;
-      letter-spacing: .04em;
-      color: var(--muted);
-    }
-
-    .api-select,
-    .api-input {
-      display: block;
-      width: 100%;
-      font-family: var(--mono);
-      font-size: 8pt;
-      color: var(--ink);
-      background: transparent;
-      border: 1.5px solid var(--rule);
-      padding: 7px 10px;
-      transition: border-color .15s;
-      -webkit-appearance: none;
-      appearance: none;
-      box-sizing: border-box;
-    }
-
-    .api-select:focus,
-    .api-input:focus {
-      outline: none;
-      border-color: var(--ink);
-    }
-
-    .api-input::placeholder {
-      color: var(--muted);
-      opacity: .7;
-    }
-
-    .api-base-url-row {
-      display: none;
-    }
-
-    .api-base-url-row.is-visible {
-      display: block;
-    }
-
-    /* ── API output section ────────── */
-    .api-output-section {
-      display: none;
-      margin-top: 18px;
-      border-top: 1px solid var(--rule);
-      padding-top: 12px;
-    }
-
-    .api-output-section.is-visible {
-      display: block;
-    }
-
-    .api-progress {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 0;
-    }
-
-    .api-progress.is-hidden {
-      display: none;
-    }
-
-    .spinner {
-      width: 14px;
-      height: 14px;
-      border: 2px solid var(--rule);
-      border-top-color: var(--ink);
-      border-radius: 50%;
-      animation: spin .8s linear infinite;
-      flex-shrink: 0;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .api-status-text {
-      font-family: var(--mono);
-      font-size: 7pt;
-      letter-spacing: .06em;
-      color: var(--muted);
-    }
-
-    .api-error-text {
-      display: block;
-      font-family: var(--mono);
-      font-size: 7pt;
-      letter-spacing: .04em;
-      color: var(--accent);
-      padding: 6px 0;
-      line-height: 1.6;
-      white-space: pre-wrap;
-    }
-
-    .api-error-text.is-hidden {
-      display: none;
-    }
-
-    /* ── Generation depth toggle ── */
-    .gen-depth-toggle {
-      display: block;
-      margin-top: 14px;
-    }
-
-    .depth-btns {
-      display: flex;
-    }
-
-    .depth-btn {
-      flex: 1;
-      font-family: var(--mono);
-      font-size: 7pt;
-      letter-spacing: .15em;
-      text-transform: uppercase;
-      color: var(--muted);
-      background: none;
-      border: 1px solid var(--rule);
-      padding: 5px 10px;
-      cursor: pointer;
-      transition: background .12s, color .12s, border-color .12s;
-    }
-
-    .depth-btn:first-child {
-      border-right: none;
-    }
-
-    .depth-btn.active {
-      color: var(--paper);
-      background: var(--ink);
-      border-color: var(--ink);
-    }
-
-    .depth-btn:not(.active):hover {
-      color: var(--ink);
-      border-color: var(--ink);
-    }
-
-    .depth-note {
-      font-size: 6pt;
-      letter-spacing: .04em;
-      color: var(--muted);
-      margin: 5px 0 0;
-    }
-
-    /* ── Stage progress pips ─── */
-    .stage-steps {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 4px;
-    }
-
-    .stage-steps.is-hidden {
-      display: none;
-    }
-
-    .stage-pip {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: var(--rule);
-      flex-shrink: 0;
-      transition: background .25s;
-    }
-
-    .stage-pip.done   { background: var(--ink); }
-    .stage-pip.active { background: var(--accent); }
 
     /* ── Chat deep wizard ─── */
     .chat-wizard {
@@ -923,23 +674,6 @@
     .wizard-error.is-visible { display: block; }
 
     /* ── JSON Assembly ─────────────── */
-    .json-assembly {
-      display: none;
-      margin-top: 18px;
-      border-top: 1px solid var(--rule);
-      padding-top: 12px;
-    }
-    .json-assembly.is-visible { display: block; }
-
-    .assembly-hint {
-      font-family: var(--mono);
-      font-size: 6pt;
-      letter-spacing: .04em;
-      color: var(--muted);
-      margin: 0 0 10px;
-      line-height: 1.6;
-    }
-
     .assembly-chunk-wrap {
       position: relative;
       margin-bottom: 8px;
@@ -990,7 +724,7 @@
       color: var(--ink);
     }
 
-    #assembly-result {
+    #wiz-assembly-result {
       margin-top: 10px;
       font-family: var(--mono);
       font-size: 7pt;
@@ -1148,11 +882,6 @@
       <div class="kicker">Prompt Generator</div>
       <div class="rule"></div>
 
-      <div class="mode-toggle">
-        <button class="mode-btn active" type="button" data-mode="chat">Chat</button>
-        <button class="mode-btn" type="button" data-mode="api">API</button>
-      </div>
-
       <label class="field-label" for="gen-workout">Workout Program</label>
       <textarea id="gen-workout" class="gen-input" rows="6"
         placeholder="Paste your Liftosaur Liftoscript export, or describe your program in plain text"></textarea>
@@ -1175,65 +904,7 @@
         <div class="dice-tip">Tip: Google &ldquo;roll 2d6&rdquo; &mdash; works as dice if you have none</div>
       </fieldset>
 
-      <!-- API settings (hidden in Chat mode) -->
-      <div class="api-settings" id="api-settings">
-        <div class="api-settings-header">
-          <span class="field-label">API Settings</span>
-          <span class="api-key-note">Key stored in your browser only</span>
-        </div>
-        <label class="field-label" for="api-provider">Provider</label>
-        <select id="api-provider" class="api-select">
-          <option value="anthropic">Claude (Anthropic)</option>
-          <option value="openai">OpenAI</option>
-          <option value="groq">Groq</option>
-          <option value="gemini">Google Gemini</option>
-          <option value="ollama">Ollama (local)</option>
-          <option value="custom">Custom (OpenAI-compatible)</option>
-        </select>
-        <div id="api-base-url-row" class="api-base-url-row">
-          <label class="field-label" for="api-base-url">Base URL</label>
-          <input type="url" id="api-base-url" class="api-input" placeholder="https://api.example.com/v1">
-        </div>
-        <label class="field-label" for="api-key">API Key</label>
-        <input type="password" id="api-key" class="api-input" placeholder="API Key" autocomplete="off">
-        <label class="field-label" for="api-model">Model</label>
-        <input type="text" id="api-model" class="api-input" placeholder="Model name">
-      </div>
-
-      <!-- Generation depth (shown in both Chat and API modes) -->
-      <div class="gen-depth-toggle" id="gen-depth-toggle">
-        <label class="field-label">Generation</label>
-        <div class="depth-btns">
-          <button class="depth-btn active" type="button" data-depth="standard">Standard</button>
-          <button class="depth-btn" type="button" data-depth="deep">Deep</button>
-        </div>
-        <p class="depth-note">Deep: multi-stage pipeline &mdash; more coherent, larger token budget</p>
-      </div>
-
-      <button class="gen-submit" id="gen-submit" type="button">Generate Prompt</button>
-
-      <!-- Chat output section -->
-      <div class="gen-output-section" id="gen-output-section">
-        <label class="field-label">Step 1 &mdash; Your Prompt</label>
-        <textarea id="gen-output" class="gen-input gen-output" rows="10" readonly></textarea>
-        <button class="gen-copy" id="gen-copy" type="button">Copy to Clipboard</button>
-        <p class="gen-hint">Paste into Claude, ChatGPT, or Gemini.</p>
-      </div>
-
-      <!-- JSON assembly (Chat Standard step 2) -->
-      <div class="json-assembly" id="json-assembly">
-        <label class="field-label">Step 2 &mdash; Paste the Response</label>
-        <p class="assembly-hint">Paste the JSON from your LLM. If the response was cut off, click &ldquo;continue&rdquo; in the chat, then add each continuation below.</p>
-        <div id="assembly-chunks">
-          <div class="assembly-chunk-wrap">
-            <span class="chunk-label">Response</span>
-            <textarea class="gen-input assembly-chunk" rows="8" placeholder="Paste the LLM&apos;s JSON response here&hellip;"></textarea>
-          </div>
-        </div>
-        <button class="assembly-add" id="assembly-add" type="button">+ Add Continuation</button>
-        <button class="gen-submit" id="assembly-submit" type="button">Assemble &amp; Validate</button>
-        <div id="assembly-result"></div>
-      </div>
+      <button class="gen-submit" id="gen-submit" type="button">Build Layer Bible &rarr;</button>
 
       <!-- Chat deep wizard (3-step) -->
       <div class="chat-wizard" id="chat-wizard">
@@ -1296,23 +967,10 @@
 
       </div>
 
-      <!-- API output section -->
-      <div class="api-output-section" id="api-output-section">
-        <div class="stage-steps is-hidden" id="stage-steps">
-          <!-- pips generated dynamically by onProgress -->
-        </div>
-        <div class="api-progress" id="api-progress">
-          <div class="spinner"></div>
-          <span class="api-status-text" id="api-status-text">Generating your booklet&hellip;</span>
-        </div>
-        <span class="api-error-text is-hidden" id="api-error-text"></span>
-        <button class="gen-copy" id="api-open-btn" type="button" style="display:none">Download JSON</button>
-      </div>
     </div>
   </div>
 
   <script src="generator.js"></script>
-  <script src="generator/api-generator.js"></script>
   <script>
     (function () {
       var flipper = document.getElementById('card-flip');
@@ -1369,29 +1027,9 @@
       var openBtn = document.getElementById('open-generator');
       var closeBtn = document.getElementById('modal-close');
       var submitBtn = document.getElementById('gen-submit');
-      var copyBtn = document.getElementById('gen-copy');
       var workoutEl = document.getElementById('gen-workout');
       var briefEl = document.getElementById('gen-brief');
-      var outputEl = document.getElementById('gen-output');
-      var outputSection = document.getElementById('gen-output-section');
-      var jsonAssembly = document.getElementById('json-assembly');
       var workoutError = document.getElementById('workout-error');
-
-      // Mode toggle
-      var modeBtns = document.querySelectorAll('.mode-btn');
-      var apiSettings = document.getElementById('api-settings');
-      var apiOutputSection = document.getElementById('api-output-section');
-      var apiProgress = document.getElementById('api-progress');
-      var apiErrorText = document.getElementById('api-error-text');
-      var apiOpenBtn = document.getElementById('api-open-btn');
-      var apiStatusText = document.getElementById('api-status-text');
-      var stageSteps = document.getElementById('stage-steps');
-      var pipCount = 0;
-
-      // Depth toggle
-      var genDepthToggle = document.getElementById('gen-depth-toggle');
-      var depthBtns = document.querySelectorAll('.depth-btn');
-      var currentDepth = 'standard';
 
       // Chat deep wizard
       var chatWizard = document.getElementById('chat-wizard');
@@ -1426,101 +1064,10 @@
       var wizStep = 0; // 0-indexed current wizard step
       var wizData = [null, null]; // parsed stage1 + stage2 results
 
-      // API settings fields
-      var apiProviderEl = document.getElementById('api-provider');
-      var apiKeyEl = document.getElementById('api-key');
-      var apiModelEl = document.getElementById('api-model');
-      var apiBaseUrlRow = document.getElementById('api-base-url-row');
-      var apiBaseUrlEl = document.getElementById('api-base-url');
-
-      var currentMode = 'chat';
-      var LS = 'liftrpg_api_';
-
-      // ── Mode switching ────────────────────────────────────────────────────
-      function switchMode(mode) {
-        currentMode = mode;
-        modeBtns.forEach(function (btn) {
-          btn.classList.toggle('active', btn.dataset.mode === mode);
-        });
-        if (mode === 'api') {
-          apiSettings.classList.add('is-visible');
-          outputSection.classList.remove('is-visible');
-          chatWizard.classList.remove('is-visible');
-          jsonAssembly.classList.remove('is-visible');
-        } else {
-          apiSettings.classList.remove('is-visible');
-          apiOutputSection.classList.remove('is-visible');
-        }
-        updateSubmitLabel();
-      }
-
-      modeBtns.forEach(function (btn) {
-        btn.addEventListener('click', function () { switchMode(btn.dataset.mode); });
-      });
-
-      depthBtns.forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          currentDepth = btn.dataset.depth;
-          depthBtns.forEach(function (b) { b.classList.toggle('active', b.dataset.depth === currentDepth); });
-          updateSubmitLabel();
-        });
-      });
-
-      // ── API settings: load / save / provider change ───────────────────────
-      function updateProviderUI(provider) {
-        var isCustom = provider === 'custom';
-        var isOllama = provider === 'ollama';
-        apiBaseUrlRow.classList.toggle('is-visible', isCustom);
-        apiKeyEl.disabled = isOllama;
-        apiKeyEl.placeholder = isOllama ? 'No key needed for local models' : 'API Key';
-
-        // Update model to provider default when switching, unless user has typed something
-        var providerConfig = window.LiftRPGAPI && window.LiftRPGAPI.PROVIDERS[provider];
-        if (providerConfig) {
-          var otherDefaults = window.LiftRPGAPI
-            ? Object.values(window.LiftRPGAPI.PROVIDERS)
-                .filter(function (p) { return p !== providerConfig; })
-                .map(function (p) { return p.defaultModel; })
-            : [];
-          var currentModel = apiModelEl.value;
-          if (!currentModel || otherDefaults.indexOf(currentModel) !== -1) {
-            apiModelEl.value = providerConfig.defaultModel;
-          }
-        }
-      }
-
-      function loadAPISettings() {
-        var provider = localStorage.getItem(LS + 'provider') || 'anthropic';
-        apiProviderEl.value = provider;
-        apiKeyEl.value = localStorage.getItem(LS + 'key') || '';
-        apiBaseUrlEl.value = localStorage.getItem(LS + 'base_url') || '';
-        var savedModel = localStorage.getItem(LS + 'model') || '';
-        var providerConfig = window.LiftRPGAPI && window.LiftRPGAPI.PROVIDERS[provider];
-        apiModelEl.value = savedModel || (providerConfig ? providerConfig.defaultModel : '');
-        updateProviderUI(provider);
-      }
-
-      function saveAPISettings() {
-        localStorage.setItem(LS + 'provider', apiProviderEl.value);
-        localStorage.setItem(LS + 'key', apiKeyEl.value);
-        localStorage.setItem(LS + 'model', apiModelEl.value);
-        localStorage.setItem(LS + 'base_url', apiBaseUrlEl.value);
-      }
-
-      apiProviderEl.addEventListener('change', function () {
-        updateProviderUI(apiProviderEl.value);
-        saveAPISettings();
-      });
-
-      [apiKeyEl, apiModelEl, apiBaseUrlEl].forEach(function (el) {
-        el.addEventListener('change', saveAPISettings);
-      });
-
       // ── Open / close ──────────────────────────────────────────────────────
       function openModal() {
         modal.classList.add('is-open');
         document.body.style.overflow = 'hidden';
-        if (window.LiftRPGAPI) loadAPISettings();
         workoutEl.focus();
       }
 
@@ -1560,27 +1107,10 @@
         }
       });
 
-      // ── Submit dispatch ───────────────────────────────────────────────────
+      // ── Submit ───────────────────────────────────────────────────────────
       submitBtn.addEventListener('click', function () {
-        if (currentMode === 'api') {
-          handleAPIGenerate();
-        } else if (currentDepth === 'deep') {
-          handleChatDeepGenerate();
-        } else {
-          handleChatGenerate();
-        }
+        handleChatDeepGenerate();
       });
-
-      // ── Submit label ─────────────────────────────────────────────────────
-      function updateSubmitLabel() {
-        if (currentMode === 'api') {
-          submitBtn.textContent = 'Generate Booklet';
-        } else if (currentDepth === 'deep') {
-          submitBtn.textContent = 'Build Layer Bible →';
-        } else {
-          submitBtn.textContent = 'Generate Prompt';
-        }
-      }
 
       // ── Wizard helpers ────────────────────────────────────────────────────
       function wizSetStep(idx) {
@@ -1630,14 +1160,8 @@
         try {
           wizData[0] = JSON.parse(raw);
         } catch (e) {
-          // try extractJson if available
-          if (window.LiftRPGAPI && window.LiftRPGAPI._extractJson) {
-            try { wizData[0] = window.LiftRPGAPI._extractJson(raw); }
-            catch (e2) { wizErrors[0].textContent = 'Invalid JSON — paste the raw JSON the LLM returned'; wizErrors[0].classList.add('is-visible'); return; }
-          } else {
-            wizErrors[0].textContent = 'Invalid JSON — paste the raw JSON the LLM returned';
-            wizErrors[0].classList.add('is-visible'); return;
-          }
+          try { wizData[0] = fallbackExtractJson(raw); }
+          catch (e2) { wizErrors[0].textContent = 'Invalid JSON — paste the raw JSON the LLM returned'; wizErrors[0].classList.add('is-visible'); return; }
         }
         var workout = workoutEl.value.trim();
         var brief = briefEl.value.trim();
@@ -1654,13 +1178,8 @@
         try {
           wizData[1] = JSON.parse(raw);
         } catch (e) {
-          if (window.LiftRPGAPI && window.LiftRPGAPI._extractJson) {
-            try { wizData[1] = window.LiftRPGAPI._extractJson(raw); }
-            catch (e2) { wizErrors[1].textContent = 'Invalid JSON — paste the raw JSON the LLM returned'; wizErrors[1].classList.add('is-visible'); return; }
-          } else {
-            wizErrors[1].textContent = 'Invalid JSON — paste the raw JSON the LLM returned';
-            wizErrors[1].classList.add('is-visible'); return;
-          }
+          try { wizData[1] = fallbackExtractJson(raw); }
+          catch (e2) { wizErrors[1].textContent = 'Invalid JSON — paste the raw JSON the LLM returned'; wizErrors[1].classList.add('is-visible'); return; }
         }
         var workout = workoutEl.value.trim();
         var brief = briefEl.value.trim();
@@ -1676,8 +1195,7 @@
         if (!workout) return;
 
         if (typeof window.generateStage1Prompt !== 'function') {
-          outputEl.value = 'Generator unavailable. Please reload the page.';
-          outputSection.classList.add('is-visible');
+          alert('Generator unavailable. Please reload the page.');
           return;
         }
 
@@ -1694,51 +1212,13 @@
 
         wizPrompts[0].value = window.generateStage1Prompt(workout, brief, dice);
         wizSetStep(0);
-
-        outputSection.classList.remove('is-visible');
-        jsonAssembly.classList.remove('is-visible');
         chatWizard.classList.add('is-visible');
       }
 
-      // ── Chat mode: generate prompt ────────────────────────────────────────
-      function handleChatGenerate() {
-        var workout = validateWorkout();
-        if (!workout) return;
-
-        var brief = briefEl.value.trim();
-        var diceRadio = document.querySelector('input[name="gen-dice"]:checked');
-        var dice = diceRadio ? diceRadio.value : '2d6';
-
-        if (typeof window.generatePrompt !== 'function') {
-          outputEl.value = 'Generator unavailable. Please reload the page.';
-          outputSection.classList.add('is-visible');
-          return;
-        }
-
-        chatWizard.classList.remove('is-visible');
-        var prompt = window.generatePrompt(workout, brief, dice);
-        outputEl.value = prompt;
-        outputSection.classList.add('is-visible');
-        jsonAssembly.classList.add('is-visible');
-        resetAssembly();
-        outputEl.scrollTop = 0;
-      }
-
-      // ── JSON Assembly (shared by Chat Standard + Wizard Step 3) ─────────────
-      var assemblyChunks = document.getElementById('assembly-chunks');
-      var assemblyResult = document.getElementById('assembly-result');
+      // ── JSON Assembly helpers ────────────────────────────────────────────────
       var MAX_CHUNKS = 5;
 
-      function resetAssembly() {
-        assemblyChunks.innerHTML =
-          '<div class="assembly-chunk-wrap">' +
-            '<span class="chunk-label">Response</span>' +
-            '<textarea class="gen-input assembly-chunk" rows="8" placeholder="Paste the LLM\u2019s JSON response here\u2026"></textarea>' +
-          '</div>';
-        assemblyResult.innerHTML = '';
-      }
-
-      // ── Fallback helpers (when api-generator.js not loaded) ─────────────────
+      // ── JSON extraction helpers ─────────────────────────────────────────────
       function fallbackFindJsonBounds(text) {
         var depth = 0, inStr = false, esc = false, start = -1;
         for (var i = 0; i < text.length; i++) {
@@ -1820,11 +1300,7 @@
 
           var data;
           try {
-            if (window.LiftRPGAPI && window.LiftRPGAPI._extractJson) {
-              data = window.LiftRPGAPI._extractJson(combined);
-            } else {
-              data = fallbackExtractJson(combined);
-            }
+            data = fallbackExtractJson(combined);
           } catch (e) {
             resultContainer.innerHTML = '<p class="assembly-error">' + escapeForHtml(e.message) + '</p>';
             return;
@@ -1872,14 +1348,6 @@
         });
       }
 
-      // Wire Chat Standard assembly
-      wireAssemblySection(
-        assemblyChunks,
-        document.getElementById('assembly-add'),
-        document.getElementById('assembly-submit'),
-        assemblyResult
-      );
-
       // Wire Wizard Step 3 assembly
       wireAssemblySection(
         document.getElementById('wiz-assembly-chunks'),
@@ -1888,163 +1356,6 @@
         document.getElementById('wiz-assembly-result')
       );
 
-      // ── API mode: call provider, auto-load renderer ───────────────────────
-      function handleAPIGenerate() {
-        var workout = validateWorkout();
-        if (!workout) return;
-
-        if (!window.LiftRPGAPI) {
-          showAPIError('API generator unavailable. Please reload the page.');
-          return;
-        }
-
-        var brief = briefEl.value.trim();
-        var diceRadio = document.querySelector('input[name="gen-dice"]:checked');
-        var dice = diceRadio ? diceRadio.value : '2d6';
-
-        var provider = apiProviderEl.value;
-        var providerConfig = window.LiftRPGAPI.PROVIDERS[provider];
-        var settings = {
-          format: providerConfig ? providerConfig.format : 'openai',
-          apiKey: apiKeyEl.value.trim(),
-          model: apiModelEl.value.trim(),
-          baseUrl: provider === 'custom'
-            ? apiBaseUrlEl.value.trim()
-            : (providerConfig ? providerConfig.baseUrl : '')
-        };
-
-        if (!settings.model) {
-          showAPIError('Enter a model name to continue.');
-          return;
-        }
-        if (!settings.apiKey && !(providerConfig && providerConfig.noKey)) {
-          showAPIError('Enter an API key to continue.');
-          return;
-        }
-
-        saveAPISettings();
-
-        var isDeep = (currentDepth === 'deep');
-
-        // Show progress
-        apiOutputSection.classList.add('is-visible');
-        apiProgress.classList.remove('is-hidden');
-        apiErrorText.classList.add('is-hidden');
-        apiOpenBtn.style.display = 'none';
-        submitBtn.disabled = true;
-
-        // Stage pips (deep mode only — created dynamically)
-        stageSteps.classList.toggle('is-hidden', !isDeep);
-        if (isDeep) {
-          stageSteps.innerHTML = '';
-          pipCount = 0;
-          apiStatusText.textContent = 'Building layer bible\u2026';
-        } else {
-          apiStatusText.textContent = 'Generating your booklet\u2026';
-        }
-
-        function ensurePips(total) {
-          if (pipCount === total) return;
-          stageSteps.innerHTML = '';
-          for (var k = 0; k < total; k++) {
-            var pip = document.createElement('div');
-            pip.className = 'stage-pip';
-            stageSteps.appendChild(pip);
-          }
-          pipCount = total;
-        }
-
-        function updatePips(current, total) {
-          ensurePips(total);
-          var pips = stageSteps.children;
-          for (var k = 0; k < pips.length; k++) {
-            pips[k].className = 'stage-pip' + (k < current - 1 ? ' done' : k === current - 1 ? ' active' : '');
-          }
-        }
-
-        function markAllDone() {
-          var pips = stageSteps.children;
-          for (var k = 0; k < pips.length; k++) pips[k].className = 'stage-pip done';
-        }
-
-        function onProgress(current, total, message) {
-          apiStatusText.textContent = message;
-          if (!isDeep) return;
-          updatePips(current, total);
-        }
-
-        var useStructured = isDeep && provider === 'gemini'
-          && typeof window.LiftRPGAPI.generateStructured === 'function';
-        var generateFn = isDeep
-          ? (useStructured
-            ? function () { return window.LiftRPGAPI.generateStructured(settings, workout, brief, dice, onProgress); }
-            : function () { return window.LiftRPGAPI.generateMultiStage(settings, workout, brief, dice, onProgress); })
-          : function () { return window.LiftRPGAPI.generate(settings, workout, brief, dice); };
-        if (useStructured) console.log('[LiftRPG] Using structured generation (Gemini native)');
-
-        generateFn()
-          .then(function (data) {
-            sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(data));
-            if (isDeep) markAllDone();
-            apiProgress.classList.add('is-hidden');
-            stageSteps.classList.add('is-hidden');
-            apiOpenBtn.style.display = '';
-          })
-          .catch(function (err) {
-            console.error('[LiftRPG API]', err);
-            apiProgress.classList.add('is-hidden');
-            stageSteps.classList.add('is-hidden');
-            showAPIError(err.message || 'Generation failed. Check the console for details.');
-          })
-          .finally(function () {
-            submitBtn.disabled = false;
-          });
-      }
-
-      function showAPIError(msg) {
-        apiOutputSection.classList.add('is-visible');
-        apiProgress.classList.add('is-hidden');
-        apiErrorText.textContent = msg;
-        apiErrorText.classList.remove('is-hidden');
-        apiOpenBtn.style.display = 'none';
-      }
-
-      apiOpenBtn.addEventListener('click', function () {
-        var raw = sessionStorage.getItem('liftrpg_pending_json');
-        if (!raw) return;
-        var blob = new Blob([raw], { type: 'application/json' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = 'liftrpg-booklet.json';
-        a.click();
-        URL.revokeObjectURL(url);
-      });
-
-      // ── Copy to clipboard (chat mode) ─────────────────────────────────────
-      copyBtn.addEventListener('click', function () {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(outputEl.value).then(function () {
-            copyBtn.textContent = 'Copied';
-            setTimeout(function () { copyBtn.textContent = 'Copy to Clipboard'; }, 2000);
-          }, fallbackCopy);
-        } else {
-          fallbackCopy();
-        }
-      });
-
-      function fallbackCopy() {
-        outputEl.select();
-        outputEl.setSelectionRange(0, 99999);
-        try {
-          document.execCommand('copy');
-          copyBtn.textContent = 'Copied';
-          setTimeout(function () { copyBtn.textContent = 'Copy to Clipboard'; }, 2000);
-        } catch (e) {
-          copyBtn.textContent = 'Select all + Cmd/Ctrl+C';
-          setTimeout(function () { copyBtn.textContent = 'Copy to Clipboard'; }, 3000);
-        }
-      }
     })();
   </script>
 </body>
