@@ -40,7 +40,13 @@ const TYPE_HEIGHTS = {
  */
 const COMPANION_HEIGHTS = {
   'memory-slots':   (slots) => 30 + Math.max(1, slots) * 36,
-  'dashboard':      (slots) => 28 + Math.max(1, slots) * 26,
+  'dashboard':      (slots, data) => {
+    if (data && data.instruction) {
+      const grid = parseBoxGridFromInstruction(data.instruction);
+      if (grid) return 20 + grid.rows * 36;
+    }
+    return 28 + Math.max(1, slots) * 26;
+  },
   'stress-track':   ()      => 60,
   'inventory-grid': (slots) => 28 + Math.ceil(Math.max(1, slots) / 2) * 30,
   'return-box':     ()      => 80,
@@ -180,9 +186,40 @@ function buildMemorySlots(data) {
 }
 
 /**
- * dashboard: ruled dash-lines for free-form player writing.
+ * Parse instruction text for box grid patterns like
+ * "Two rows of four boxes each" or "3 rows of 5 boxes".
+ * Returns { rows, cols } or null if no pattern found.
+ */
+function parseBoxGridFromInstruction(instruction) {
+  if (!instruction) return null;
+  const WORD_NUMS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8 };
+  const pattern = /(\w+)\s+rows?\s+(?:of\s+)?(\w+)\s+box(?:es)?/i;
+  const match = instruction.match(pattern);
+  if (!match) return null;
+  const rows = WORD_NUMS[match[1].toLowerCase()] || parseInt(match[1], 10);
+  const cols = WORD_NUMS[match[2].toLowerCase()] || parseInt(match[2], 10);
+  if (!rows || !cols || rows > 8 || cols > 8) return null;
+  return { rows, cols };
+}
+
+/**
+ * dashboard: box grid if instruction describes one, otherwise ruled dash-lines.
  */
 function buildDashboard(data) {
+  const grid = parseBoxGridFromInstruction(data.instruction);
+
+  if (grid) {
+    const container = make('div', 'companion-dashboard companion-dashboard-grid');
+    for (let r = 0; r < grid.rows; r++) {
+      const row = make('div', 'companion-dashboard-row');
+      for (let c = 0; c < grid.cols; c++) {
+        row.appendChild(make('div', 'companion-dashboard-box'));
+      }
+      container.appendChild(row);
+    }
+    return container;
+  }
+
   const lineCount = clamp(data.slots || 5, 1, 10);
   const container = make('div', 'companion-dashboard');
   for (let i = 0; i < lineCount; i++) {
@@ -293,7 +330,7 @@ registerAtom('tracker', {
     if (COMPANION_TYPES.has(type)) {
       const slots = data?.slots || 5;
       const heightFn = COMPANION_HEIGHTS[type];
-      const baseHeight = heightFn ? heightFn(slots) : 100;
+      const baseHeight = heightFn ? heightFn(slots, data) : 100;
       const instructionHeight = data?.instruction ? 20 : 0;
       const total = baseHeight + instructionHeight;
       return {

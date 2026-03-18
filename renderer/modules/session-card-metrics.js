@@ -70,7 +70,7 @@ export function estimateSessionCardHeight(session, density) {
   const normalizedDensity = Number.isFinite(density) ? density : 0.6;
   const exercises = Array.isArray((session || {}).exercises) ? session.exercises : [];
   const exerciseCount = Math.max(exercises.length, MIN_EXERCISES);
-  const notesLines = Math.round(8 - normalizedDensity * 6);
+  const notesLines = Math.max(3, Math.round(8 - normalizedDensity * 6));
   const notesHeight = notesLines * NOTES_LINE_HEIGHT;
 
   return CARD_HEADER_HEIGHT

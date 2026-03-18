@@ -98,15 +98,30 @@ export function renderGameplayClocks(clocks) {
 
 function renderGridMap(mapState) {
   const wrap = make('div', 'map-grid');
-  wrap.style.gridTemplateColumns = 'repeat(' + mapState.gridDimensions.columns + ', 1fr)';
+  const cols = mapState.gridDimensions.columns;
+  wrap.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
 
   const tilesByPosition = {};
+  let minRow = mapState.gridDimensions.rows;
+  let maxRow = 1;
   (mapState.tiles || []).forEach((tile) => {
     tilesByPosition[tile.col + ':' + tile.row] = tile;
+    if (tile.row < minRow) minRow = tile.row;
+    if (tile.row > maxRow) maxRow = tile.row;
   });
 
-  for (let row = 1; row <= mapState.gridDimensions.rows; row += 1) {
-    for (let col = 1; col <= mapState.gridDimensions.columns; col += 1) {
+  // Include current position in bounding box
+  if (mapState.currentPosition) {
+    if (mapState.currentPosition.row < minRow) minRow = mapState.currentPosition.row;
+    if (mapState.currentPosition.row > maxRow) maxRow = mapState.currentPosition.row;
+  }
+
+  // Pad one row above and below for context, clamped to grid bounds
+  const startRow = Math.max(1, minRow - 1);
+  const endRow = Math.min(mapState.gridDimensions.rows, maxRow + 1);
+
+  for (let row = startRow; row <= endRow; row += 1) {
+    for (let col = 1; col <= cols; col += 1) {
       const tile = tilesByPosition[col + ':' + row] || {};
       let cellClass = 'map-cell ' + (tile.type || 'empty');
       if (mapState.currentPosition && mapState.currentPosition.col === col && mapState.currentPosition.row === row) {

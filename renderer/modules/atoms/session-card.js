@@ -40,7 +40,7 @@ registerAtom('session-card', {
     const normalizedDensity = Number.isFinite(density) ? density : 0.6;
 
     // Compute notes height from density
-    const notesLines = Math.round(8 - normalizedDensity * 6);
+    const notesLines = Math.max(3, Math.round(8 - normalizedDensity * 6));
     const notesHeight = notesLines * NOTES_LINE_HEIGHT;
 
     // Build a layoutPlan compatible with buildWorkoutCardModel
