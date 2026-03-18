@@ -1,5 +1,4 @@
-`renderer-source/` is the private working copy of the V2 renderer.
+`public/renderer/` is the source of truth for the V2 renderer in this workspace.
 
-- Edit files here while developing in `LiftRPG-dev`
-- Run `npm run build:gold-disk` to sync into `public/renderer/`
-- Treat `public/renderer/` as the shipped gold disk, not the place to keep unsynced private edits
+- Edit renderer files directly here while developing in `LiftRPG-dev`
+- `npm run build:gold-disk` now keeps demo fixtures in sync and removes stale renderer residue

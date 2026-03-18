@@ -519,9 +519,25 @@ const THEME_PRESETS = {
   }
 };
 
+const THEME_ALIASES = {
+  institutional: 'government',
+  terminal: 'scifi',
+  clinical: 'minimalist',
+  corporate: 'government',
+  confessional: 'pastoral',
+  literary: 'pastoral'
+};
+
+function normaliseThemeArchetype(value) {
+  const requested = String(value || '').trim().toLowerCase();
+  if (THEME_PRESETS[requested]) return requested;
+  if (THEME_ALIASES[requested]) return THEME_ALIASES[requested];
+  return 'pastoral';
+}
+
 export function resolveTheme(data) {
   const theme = (data && data.theme) || {};
-  const archetype = theme.visualArchetype || 'pastoral';
+  const archetype = normaliseThemeArchetype(theme.visualArchetype);
   const preset = THEME_PRESETS[archetype] || THEME_PRESETS.pastoral;
   const palette = theme.palette || {};
   const tokens = mergeObjects(preset, theme.tokens || {});

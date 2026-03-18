@@ -407,6 +407,31 @@
     };
   }
 
+  function buildBlendContextFromPlans(layerBible, campaignPlan) {
+    var storyLayer = (layerBible || {}).storyLayer || {};
+    var gameLayer = (layerBible || {}).gameLayer || {};
+    var governingLayer = (layerBible || {}).governingLayer || {};
+
+    return JSON.stringify({
+      premise: storyLayer.premise || '',
+      protagonistRole: ((storyLayer.protagonist || {}).role) || '',
+      antagonistPressure: storyLayer.antagonistPressure || '',
+      persistentTopology: gameLayer.persistentTopology || '',
+      majorZones: gameLayer.majorZones || [],
+      institutionName: governingLayer.institutionName || '',
+      departments: governingLayer.departments || [],
+      weekSignals: ((campaignPlan || {}).weeks || []).map(function (week) {
+        return {
+          arcBeat: week.arcBeat || '',
+          zoneFocus: week.zoneFocus || '',
+          stateChange: week.stateChange || '',
+          npcBeat: week.npcBeat || ''
+        };
+      }),
+      bossPlan: (campaignPlan || {}).bossPlan || {}
+    });
+  }
+
   function formatDesignBias(blend) {
     var primary = blend.primary;
     var secondary = blend.secondary;
@@ -1677,7 +1702,8 @@
    * Stage 3 (API pipeline): Booklet Shell — meta, cover, rulesSpread, theme
    */
   window.generateShellPrompt = function (brief, layerBible, campaignPlan) {
-    var blend = deriveDesignBlend(brief, '');
+    var blendContext = buildBlendContextFromPlans(layerBible, campaignPlan);
+    var blend = deriveDesignBlend(brief, blendContext);
     var weekCount = (campaignPlan.weeks || []).length || 6;
     var parts = [
       '# Booklet Shell — meta, cover, rulesSpread, theme',
@@ -1708,7 +1734,7 @@
       '',
       '## Creative Direction',
       '',
-      brief || buildDefaultBrief('', blend),
+      brief || buildDefaultBrief(blendContext, blend),
       '',
       formatDesignBias(blend),
       '',
@@ -1918,13 +1944,42 @@
       // Map progression
       if (continuity.mapProgression) {
         var mp = continuity.mapProgression;
-        parts.push('**Map state** (' + mp.gridDimensions.columns + '\u00d7' + mp.gridDimensions.rows + ' grid):');
-        parts.push('- Current position: row ' + mp.currentPosition.row + ', col ' + mp.currentPosition.col);
-        parts.push('- Tiles: ' + mp.tileCount + ' total, ' + mp.anomalyCount + ' anomaly, ' + mp.inaccessibleCount + ' inaccessible');
-        if (mp.notableAnnotations && mp.notableAnnotations.length > 0) {
-          parts.push('- Notable: ' + mp.notableAnnotations.join('; '));
+        parts.push('**Map state** (' + mp.mapType + (mp.title ? ', ' + mp.title : '') + '):');
+        if (mp.mapType === 'point-to-point') {
+          parts.push('- Nodes: ' + mp.nodeCount + ', edges: ' + mp.edgeCount);
+          if (mp.currentNode) parts.push('- Current node: ' + mp.currentNode);
+          if (mp.notableNodes && mp.notableNodes.length > 0) {
+            parts.push('- Notable nodes: ' + mp.notableNodes.join('; '));
+          }
+        } else if (mp.mapType === 'linear-track') {
+          parts.push('- Positions: ' + mp.positionCount + ', direction: ' + mp.direction);
+          if (mp.currentPosition !== undefined && mp.currentPosition !== null) {
+            parts.push('- Current position: ' + mp.currentPosition);
+          }
+          if (mp.notablePositions && mp.notablePositions.length > 0) {
+            parts.push('- Notable positions: ' + mp.notablePositions.join('; '));
+          }
+        } else if (mp.mapType === 'player-drawn') {
+          if (mp.dimensions) {
+            parts.push('- Canvas: ' + mp.canvasType + ' (' + mp.dimensions.columns + '\u00d7' + mp.dimensions.rows + ')');
+          } else {
+            parts.push('- Canvas: ' + mp.canvasType);
+          }
+          parts.push('- Seed markers: ' + mp.seedMarkerCount + ', prompts: ' + mp.promptCount);
+          if (mp.seedMarkers && mp.seedMarkers.length > 0) {
+            parts.push('- Seed markers: ' + mp.seedMarkers.join('; '));
+          }
+        } else {
+          parts.push('- Grid: ' + mp.gridDimensions.columns + '\u00d7' + mp.gridDimensions.rows);
+          parts.push('- Current position: row ' + mp.currentPosition.row + ', col ' + mp.currentPosition.col);
+          parts.push('- Tiles: ' + mp.tileCount + ' total, ' + mp.anomalyCount + ' anomaly, ' + mp.inaccessibleCount + ' inaccessible');
+          if (mp.notableAnnotations && mp.notableAnnotations.length > 0) {
+            parts.push('- Notable: ' + mp.notableAnnotations.join('; '));
+          }
         }
         if (mp.floorLabel) parts.push('- Last label: ' + mp.floorLabel);
+        if (mp.mapNote) parts.push('- Last note: ' + mp.mapNote);
+        parts.push('- Preserve this topology family unless the campaign plan explicitly calls for a zoom or overlay shift.');
         parts.push('');
       }
 
@@ -2005,6 +2060,8 @@
     parts.push('');
     parts.push('### Map State');
     parts.push('- The map must reflect this week&apos;s stateChange from the campaign plan.');
+    parts.push('- Preserve the established mapType unless the campaign plan explicitly justifies a zoom or overlay shift.');
+    parts.push('- Do not silently collapse point-to-point, linear-track, or player-drawn spaces into a grid.');
     parts.push('- Tiles changed from prior weeks: update type (locked→cleared, empty→anomaly, etc.).');
     parts.push('- New tiles must have labels drawn from the layer bible&apos;s governing layer or topology.');
     parts.push('- currentPosition must make spatial sense given the zone focus.');

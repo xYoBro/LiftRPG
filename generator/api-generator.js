@@ -667,29 +667,7 @@ window.LiftRPGAPI = (function () {
     });
 
     // Build map summary from last known mapState
-    var mapSummary = null;
-    if (lastMapState) {
-      var tiles = lastMapState.tiles || [];
-      var anomalyCount = 0;
-      var inaccessibleCount = 0;
-      var notableAnnotations = [];
-      tiles.forEach(function (t) {
-        if (t.type === 'anomaly') anomalyCount++;
-        if (t.type === 'inaccessible') inaccessibleCount++;
-        if (t.annotation) notableAnnotations.push(t.label + ': ' + t.annotation.slice(0, 50));
-      });
-      mapSummary = {
-        currentPosition: lastMapState.currentPosition,
-        gridDimensions: lastMapState.gridDimensions,
-        floorLabel: lastMapState.floorLabel,
-        tileCount: tiles.length,
-        anomalyCount: anomalyCount,
-        inaccessibleCount: inaccessibleCount
-      };
-      if (notableAnnotations.length > 0) {
-        mapSummary.notableAnnotations = notableAnnotations.slice(0, 5);
-      }
-    }
+    var mapSummary = summarizeMapStateForContinuity(lastMapState);
 
     // Deduplicate fragment refs
     var seen = {};
@@ -711,6 +689,79 @@ window.LiftRPGAPI = (function () {
       binaryChoice: binaryChoiceState,
       clocks: allPriorWeeks[allPriorWeeks.length - 1].gameplayClocks || []
     };
+  }
+
+  function summarizeMapStateForContinuity(mapState) {
+    if (!mapState) return null;
+
+    var mapType = String(mapState.mapType || 'grid');
+    var summary = { mapType: mapType };
+
+    if (mapState.title) summary.title = String(mapState.title).slice(0, 80);
+    if (mapState.floorLabel) summary.floorLabel = String(mapState.floorLabel).slice(0, 60);
+    if (mapState.mapNote) summary.mapNote = String(mapState.mapNote).slice(0, 120);
+
+    if (mapType === 'point-to-point') {
+      var nodes = mapState.nodes || [];
+      var edges = mapState.edges || [];
+      summary.nodeCount = nodes.length;
+      summary.edgeCount = edges.length;
+      summary.currentNode = mapState.currentNode || '';
+      summary.notableNodes = nodes
+        .filter(function (node) { return node && (node.state || node.label); })
+        .slice(0, 5)
+        .map(function (node) {
+          return (node.label || node.id || 'node') + (node.state ? ' [' + node.state + ']' : '');
+        });
+      return summary;
+    }
+
+    if (mapType === 'linear-track') {
+      var positions = mapState.positions || [];
+      summary.positionCount = positions.length;
+      summary.currentPosition = mapState.currentPosition;
+      summary.direction = mapState.direction || 'horizontal';
+      summary.notablePositions = positions
+        .filter(function (position) { return position && (position.annotation || position.label || position.state); })
+        .slice(0, 5)
+        .map(function (position) {
+          var parts = [position.label || ('Position ' + position.index)];
+          if (position.state) parts.push('[' + position.state + ']');
+          if (position.annotation) parts.push(position.annotation.slice(0, 40));
+          return parts.join(' ');
+        });
+      return summary;
+    }
+
+    if (mapType === 'player-drawn') {
+      summary.canvasType = mapState.canvasType || 'dot-grid';
+      summary.dimensions = mapState.dimensions || null;
+      summary.seedMarkerCount = (mapState.seedMarkers || []).length;
+      summary.promptCount = (mapState.prompts || []).length;
+      summary.seedMarkers = (mapState.seedMarkers || []).slice(0, 3).map(function (marker) {
+        return marker.label || ('(' + marker.col + ',' + marker.row + ')');
+      });
+      return summary;
+    }
+
+    var tiles = mapState.tiles || [];
+    var anomalyCount = 0;
+    var inaccessibleCount = 0;
+    var notableAnnotations = [];
+    tiles.forEach(function (tile) {
+      if (tile.type === 'anomaly') anomalyCount++;
+      if (tile.type === 'inaccessible') inaccessibleCount++;
+      if (tile.annotation) notableAnnotations.push((tile.label || 'tile') + ': ' + tile.annotation.slice(0, 50));
+    });
+    summary.currentPosition = mapState.currentPosition;
+    summary.gridDimensions = mapState.gridDimensions;
+    summary.tileCount = tiles.length;
+    summary.anomalyCount = anomalyCount;
+    summary.inaccessibleCount = inaccessibleCount;
+    if (notableAnnotations.length > 0) {
+      summary.notableAnnotations = notableAnnotations.slice(0, 5);
+    }
+    return summary;
   }
 
   // ── Booklet assembler ────────────────────────────────────────────────────
@@ -1000,6 +1051,35 @@ window.LiftRPGAPI = (function () {
     return true;
   }
 
+  var SUPPORTED_THEME_ARCHETYPES = {
+    pastoral: true,
+    government: true,
+    cyberpunk: true,
+    scifi: true,
+    fantasy: true,
+    noir: true,
+    steampunk: true,
+    minimalist: true,
+    nautical: true,
+    occult: true
+  };
+
+  var THEME_ARCHETYPE_ALIASES = {
+    institutional: 'government',
+    terminal: 'scifi',
+    clinical: 'minimalist',
+    corporate: 'government',
+    confessional: 'pastoral',
+    literary: 'pastoral'
+  };
+
+  function normalizeThemeArchetype(value) {
+    var requested = String(value || '').trim().toLowerCase();
+    if (SUPPORTED_THEME_ARCHETYPES[requested]) return requested;
+    if (THEME_ARCHETYPE_ALIASES[requested]) return THEME_ARCHETYPE_ALIASES[requested];
+    return 'pastoral';
+  }
+
   /**
    * enforceBookletDerivedFields(booklet) → { warnings: string[] }
    *
@@ -1018,6 +1098,14 @@ window.LiftRPGAPI = (function () {
     var weeks = booklet.weeks || [];
     var meta = booklet.meta || {};
     booklet.meta = meta;
+    booklet.theme = booklet.theme || {};
+
+    var requestedArchetype = String(booklet.theme.visualArchetype || '').trim().toLowerCase();
+    var normalizedArchetype = normalizeThemeArchetype(booklet.theme.visualArchetype);
+    if (requestedArchetype && requestedArchetype !== normalizedArchetype) {
+      warnings.push('theme.visualArchetype normalized from "' + requestedArchetype + '" to "' + normalizedArchetype + '"');
+    }
+    booklet.theme.visualArchetype = normalizedArchetype;
 
     // ── Meta counts (always override) ──────────────────────────────────────
     meta.weekCount = weeks.length;

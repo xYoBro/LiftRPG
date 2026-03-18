@@ -9,6 +9,7 @@ const state = {
   unlockedEnding: null,
   layoutMode: 'single',
   restoreLayoutMode: null,
+  authorMode: false,
   demoMode: false,
   demoView: false,
   demoPasswordRevealed: false,
@@ -235,6 +236,21 @@ function scrollPreviewTargetIntoView() {
   page.scrollIntoView({ behavior: 'auto', block: 'start' });
 }
 
+function hasRealEncryptedEnding(data) {
+  const blob = data && data.meta ? data.meta.passwordEncryptedEnding : '';
+  return !!blob && blob.indexOf('PLACEHOLDER_') !== 0;
+}
+
+function resolveAutoSealPassword(data) {
+  const meta = data && data.meta ? data.meta : null;
+  if (!meta) return '';
+
+  const explicitPassword = normalisePassword(meta.passwordPlaintext || '');
+  if (explicitPassword) return explicitPassword;
+
+  return normalisePassword(getDemoPassword(meta) || '');
+}
+
 function unlockWithPayload(payload, password) {
   state.unlockedEnding = payload;
   renderCurrentBooklet();
@@ -327,7 +343,8 @@ function loadBooklet(data, sourceLabel) {
   renderCurrentBooklet();
   scheduleFontAwareRerender();
 
-  const hasEncryptedEnding = !!(data.meta && data.meta.passwordEncryptedEnding);
+  const hasEncryptedEnding = hasRealEncryptedEnding(data);
+  const hasPlaceholderEnding = !!(data.meta && data.meta.passwordEncryptedEnding) && !hasEncryptedEnding;
   const hasEndings = Array.isArray(data.endings) && data.endings.length > 0;
   const demoPassword = state.demoMode && data.meta ? normalisePassword(getDemoPassword(data.meta)) : '';
   syncUnlockUi({
@@ -339,9 +356,17 @@ function loadBooklet(data, sourceLabel) {
     inputDisabled: false,
     buttonDisabled: false
   });
-  refs.encryptRow.style.display = data.meta && hasEndings && (!data.meta.passwordEncryptedEnding || data.meta.passwordEncryptedEnding.indexOf('PLACEHOLDER_') === 0) ? 'flex' : 'none';
+  refs.encryptRow.style.display = state.authorMode && data.meta && hasEndings && !hasEncryptedEnding ? 'flex' : 'none';
   refs.encryptDownload.style.display = 'none';
   refs.encryptStatus.textContent = '';
+  if (hasPlaceholderEnding && hasEndings && !state.authorMode) {
+    refs.encryptRow.style.display = 'none';
+    setStatus('Loaded ' + sourceLabel + '. Ending is still unsealed; this view is decrypt-only.', 'warning');
+    return;
+  }
+  if (!state.authorMode) {
+    refs.encryptRow.style.display = 'none';
+  }
   setStatus('Loaded ' + sourceLabel + '.', 'success');
 }
 
@@ -350,7 +375,7 @@ function loadJsonFile(file) {
   const reader = new FileReader();
   reader.onload = function onLoad() {
     try {
-      loadBooklet(JSON.parse(String(reader.result || '{}')), file.name);
+      autoEncryptAndLoad(JSON.parse(String(reader.result || '{}')), file.name);
     } catch (error) {
       setStatus('Invalid JSON: ' + error.message, 'error');
     }
@@ -390,7 +415,7 @@ function fetchDemo(name) {
   return chain
     .then((result) => {
       const label = result.path.split('/').pop() || name + '.json';
-      loadBooklet(result.data, label);
+      autoEncryptAndLoad(result.data, label);
     })
     .catch((error) => {
       setStatus(error.message, 'error');
@@ -398,7 +423,7 @@ function fetchDemo(name) {
 }
 
 function attemptUnlock() {
-  if (!state.data || !state.data.meta || !state.data.meta.passwordEncryptedEnding) {
+  if (!state.data || !hasRealEncryptedEnding(state.data)) {
     syncUnlockUi({
       visible: false,
       state: 'locked'
@@ -458,19 +483,17 @@ function attemptUnlock() {
     });
 }
 
-function autoEncryptAndLoad(data) {
+function autoEncryptAndLoad(data, sourceLabel = 'Generated Booklet') {
   const hasEndings = Array.isArray(data.endings) && data.endings.length > 0;
-  const plaintext = data.meta && data.meta.passwordPlaintext;
-  const alreadyEncrypted = data.meta && data.meta.passwordEncryptedEnding &&
-    data.meta.passwordEncryptedEnding.indexOf('PLACEHOLDER_') !== 0;
+  const password = resolveAutoSealPassword(data);
+  const alreadyEncrypted = hasRealEncryptedEnding(data);
 
-  if (!hasEndings || !plaintext || alreadyEncrypted) {
-    loadBooklet(data, 'Generated Booklet');
+  if (!hasEndings || !password || alreadyEncrypted) {
+    loadBooklet(data, sourceLabel);
     return;
   }
 
   setStatus('Sealing ending…', 'neutral');
-  const password = normalisePassword(plaintext);
   const payload = data.endings[0].content || data.endings[0];
 
   encryptBlob(payload, password)
@@ -478,10 +501,10 @@ function autoEncryptAndLoad(data) {
       data.meta.passwordEncryptedEnding = blob;
       delete data.meta.passwordPlaintext;
       data.endings = [];
-      loadBooklet(data, 'Generated Booklet');
+      loadBooklet(data, sourceLabel);
     })
     .catch(() => {
-      loadBooklet(data, 'Generated Booklet');
+      loadBooklet(data, sourceLabel);
     });
 }
 
@@ -580,6 +603,7 @@ export function initRendererApp() {
   }
   state.previewTarget = params.get('page') || '';
   state.reviewMode = params.get('review') === '1';
+  state.authorMode = state.reviewMode || params.get('author') === '1';
   state.demoView = params.get('demoView') === '1';
   state.auditConfig = params.get('audit') === 'weekly'
     ? {
