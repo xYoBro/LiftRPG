@@ -3948,6 +3948,13 @@ body[data-demo-view="true"] .reader-unlock-hint{
     padding:0;
     margin:0;
   }
+  .booklet-grid{
+    gap:0 !important;
+  }
+  .spread-row{
+    margin:0 !important;
+    padding:0 !important;
+  }
   .booklet-page{
     box-shadow:none;
     border-radius:0;
