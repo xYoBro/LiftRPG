@@ -347,6 +347,26 @@
     return hash >>> 0;
   }
 
+  function createPromptVariantSalt() {
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      return Array.from(crypto.getRandomValues(new Uint32Array(2))).join('-');
+    }
+    return String(Date.now()) + '-' + String(Math.random()).slice(2);
+  }
+
+  window.beginLiftRpgPromptRun = function () {
+    var salt = createPromptVariantSalt();
+    window.__liftRpgVariantSalt = salt;
+    return salt;
+  };
+
+  function getPromptVariantSalt() {
+    if (!window.__liftRpgVariantSalt) {
+      window.beginLiftRpgPromptRun();
+    }
+    return window.__liftRpgVariantSalt || '';
+  }
+
   function normalizeText(text) {
     return String(text || '').toLowerCase();
   }
@@ -376,7 +396,7 @@
   }
 
   function deriveDesignBlend(brief, workout) {
-    var haystack = normalizeText(String(brief || '') + '\n' + String(workout || ''));
+    var haystack = normalizeText(String(brief || '') + '\n' + String(workout || '') + '\n' + getPromptVariantSalt());
     var seed = hashString(haystack || String(workout || '') || 'liftrpg');
     var scored = DESIGN_PROFILES.map(function (profile) {
       var score = 0;
@@ -524,7 +544,7 @@
     '- `weeklyComponentType` (string): One fiction-native non-semantic measurement family used across all non-boss weeks. It should feel like an operational residue or in-world key: a number, code, reading, tag, case ID, route marker, calibration value, or designation, never a plaintext letter.',
     '- `structuralShape` (object): { resolution, temporalOrder, narratorReliability, promptFragmentRelationship, shapeRationale }. Resolution values: "closed" (mystery solved), "open" (ambiguity persists), "shifted" (question changed), "costly" (resolved at a price). NarratorReliability values: "reliable", "compromised" (knows but omits), "unreliable" (believes wrong things), "institutional" (voice of the system). Choose values that create real structural consequences, not decorative labels.',
     '- `passwordLength` (integer, 4-12): Length of the intended final password word',
-    '- `passwordEncryptedEnding` (string): If you are not running trusted encryption code, set this to "PLACEHOLDER_ENCRYPT_WITH_RENDERER". Do not invent fake ciphertext.',
+    '- `passwordEncryptedEnding` (string, optional): Trusted tooling writes this after sealing the ending. Do not invent fake ciphertext.',
     '- `demoPassword` (string, optional): Only include for explicit demo fixtures.',
     '- `liftoScript` (string): Raw workout program pasted by the user',
     '- `weekCount` (integer, 4-16): Derived from the workout program',
@@ -757,7 +777,7 @@
     '',
     '## Contract Guardrails',
     '- Always include a `theme` object.',
-    '- If you are not actually encrypting endings with trusted code, set `meta.passwordEncryptedEnding` to "PLACEHOLDER_ENCRYPT_WITH_RENDERER".',
+    '- Do not invent `meta.passwordEncryptedEnding`. Leave it empty or omit it; trusted tooling seals the ending later.',
     '- Do not include `meta.passwordPlaintext` unless this is an explicit demo fixture and the user asked for it.',
     '- Author the plaintext `endings` array now. Tooling will encrypt later.',
     '',
@@ -1744,7 +1764,7 @@
       '- meta.weekCount must equal ' + weekCount,
       '- meta.weeklyComponentType should match the layer bible&apos;s game layer',
       '- meta.passwordLength should match the number of non-boss weeks (' + (weekCount - 1) + ')',
-      '- meta.passwordEncryptedEnding: set to "PLACEHOLDER_ENCRYPT_WITH_RENDERER"',
+      '- meta.passwordEncryptedEnding: omit it or leave it empty; trusted tooling seals the ending later',
       '',
       '### World Contract',
       'meta.worldContract is the single most important string in the booklet.',
@@ -1844,7 +1864,7 @@
       JSON.stringify(layerBible),
       '',
       '### Campaign Plan for ' + weekLabel,
-      JSON.stringify(relevantPlanWeeks, null, 2),
+      JSON.stringify(relevantPlanWeeks),
       '',
       '### Fragment Registry (use these IDs for fragmentRef in sessions and oracle entries)',
       JSON.stringify(campaignPlan.fragmentRegistry || []),
@@ -2096,6 +2116,21 @@
     parts.push('');
     parts.push(INSTRUCTIONS);
 
+    var WEEK_CHUNK_POSTCHECKS = [
+      '',
+      '## Output Postchecks — verify before outputting',
+      '- Your output MUST be exactly `{ "weeks": [...] }` — do not wrap it in any other key.',
+      '- Do NOT output meta, cover, rulesSpread, theme, fragments, or endings.',
+      '- Non-boss weeks: include `fieldOps`, do NOT include `bossEncounter`.',
+      '- Boss week: `isBossWeek: true`, include `bossEncounter`, omit `fieldOps`.',
+      '- Oracle entries use `text` (string), not `description` or `label`.',
+      '- Oracle `type: \"fragment\"` entries must include `fragmentRef`.',
+      '- Simple oracle: exactly 11 entries with roll values "2" through "12".',
+      '- `cipher.body` is an object, not a string.',
+      '- Escape all double-quote characters inside string values as \\". Use em-dashes instead of quoted speech where possible.',
+    ].join('\n');
+    parts.push(WEEK_CHUNK_POSTCHECKS);
+
     return parts.join('\n');
   };
 
@@ -2189,6 +2224,14 @@
     parts.push('---');
     parts.push('');
     parts.push(INSTRUCTIONS);
+
+    parts.push('');
+    parts.push('## Output Postchecks — verify before outputting');
+    parts.push('- Your output MUST be exactly `{ "fragments": [...] }` — do not wrap it in any other key.');
+    parts.push('- Do NOT output weeks, meta, cover, endings, or any other top-level key.');
+    parts.push('- Generate exactly one fragment object per registry entry, using the assigned ID.');
+    parts.push('- `documentType` must be one of: memo, report, inspection, fieldNote, correspondence, letter, transcript, form, anomaly.');
+    parts.push('- Escape all double-quote characters inside string values as \\". Use em-dashes instead of quoted speech where possible.');
 
     return parts.join('\n');
   };
@@ -2535,6 +2578,14 @@
     parts.push('---');
     parts.push('');
     parts.push(INSTRUCTIONS);
+
+    parts.push('');
+    parts.push('## Output Postchecks — verify before outputting');
+    parts.push('- Your output MUST be exactly `{ "endings": [...] }` — do not wrap it in any other key.');
+    parts.push('- Do NOT output weeks, meta, cover, fragments, or any other top-level key.');
+    parts.push('- Each ending: { variant, content: { documentType, body, finalLine }, designSpec }.');
+    parts.push('- `variant` must be one of: canonical, bittersweet, dark, ambiguous.');
+    parts.push('- Escape all double-quote characters inside string values as \\". Use em-dashes instead of quoted speech where possible.');
 
     return parts.join('\n');
   };

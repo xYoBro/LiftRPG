@@ -2,7 +2,7 @@ import { decryptBlob, encryptBlob } from './crypto.js?v=47';
 import { qs } from './dom.js?v=47';
 import { exportBookletPdf } from './pdf-export.js?v=47';
 import { renderBooklet, syncLayoutMode } from './render.js?v=47';
-import { getDemoPassword, normalisePassword, validateBooklet } from './utils.js?v=47';
+import { deriveBookletPassword, normalisePassword, validateBooklet } from './utils.js?v=47';
 
 const state = {
   data: null,
@@ -242,13 +242,7 @@ function hasRealEncryptedEnding(data) {
 }
 
 function resolveAutoSealPassword(data) {
-  const meta = data && data.meta ? data.meta : null;
-  if (!meta) return '';
-
-  const explicitPassword = normalisePassword(meta.passwordPlaintext || '');
-  if (explicitPassword) return explicitPassword;
-
-  return normalisePassword(getDemoPassword(meta) || '');
+  return deriveBookletPassword(data);
 }
 
 function unlockWithPayload(payload, password) {
@@ -346,7 +340,7 @@ function loadBooklet(data, sourceLabel) {
   const hasEncryptedEnding = hasRealEncryptedEnding(data);
   const hasPlaceholderEnding = !!(data.meta && data.meta.passwordEncryptedEnding) && !hasEncryptedEnding;
   const hasEndings = Array.isArray(data.endings) && data.endings.length > 0;
-  const demoPassword = state.demoMode && data.meta ? normalisePassword(getDemoPassword(data.meta)) : '';
+  const demoPassword = state.demoMode ? deriveBookletPassword(data) : '';
   syncUnlockUi({
     visible: hasEncryptedEnding,
     state: 'locked',
@@ -432,7 +426,7 @@ function attemptUnlock() {
   }
 
   const enteredPassword = normalisePassword(refs.unlockPassword.value || '');
-  const demoPassword = state.demoMode && state.data.meta ? normalisePassword(getDemoPassword(state.data.meta)) : '';
+  const demoPassword = state.demoMode ? deriveBookletPassword(state.data) : '';
   const password = enteredPassword || (state.demoMode ? demoPassword : '');
   if (!password) {
     syncUnlockUi({
@@ -466,7 +460,7 @@ function attemptUnlock() {
       unlockWithPayload(payload, password);
     })
     .catch(() => {
-      if (state.demoMode && state.data.meta && normalisePassword(getDemoPassword(state.data.meta)) === password) {
+      if (state.demoMode && deriveBookletPassword(state.data) === password) {
         unlockWithPayload(state.data.endings && state.data.endings[0] ? state.data.endings[0].content : null, password);
         return;
       }

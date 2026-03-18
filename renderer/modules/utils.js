@@ -6,6 +6,29 @@ export function normalisePassword(raw) {
   return safeUpper(raw);
 }
 
+function decodeA1Z26(values) {
+  if (!Array.isArray(values) || values.length === 0) return '';
+  let letters = '';
+  for (let index = 0; index < values.length; index += 1) {
+    const value = Number(values[index]);
+    if (!Number.isInteger(value) || value < 1 || value > 26) return '';
+    letters += String.fromCharCode(64 + value);
+  }
+  return letters;
+}
+
+function isStandardAlphaTable(referenceTable) {
+  if (!referenceTable || typeof referenceTable !== 'string') return false;
+  const pairs = referenceTable.match(/\d+=\s*[A-Za-z]/g);
+  if (!pairs || pairs.length < 26) return false;
+  for (let index = 0; index < 26; index += 1) {
+    const expected = (index + 1) + '=' + String.fromCharCode(65 + index);
+    const found = pairs.some((pair) => pair.replace(/\s/g, '').toUpperCase() === expected);
+    if (!found) return false;
+  }
+  return true;
+}
+
 export function alpha(hex, value) {
   if (!hex || hex.charAt(0) !== '#' || (hex.length !== 7 && hex.length !== 4)) {
     return 'rgba(0,0,0,' + value + ')';
@@ -285,8 +308,8 @@ export function pad2(value) {
 export function getPasswordLength(data, fallback) {
   const meta = data.meta || {};
   if (typeof meta.passwordLength === 'number' && meta.passwordLength > 0) return meta.passwordLength;
-  if (typeof meta.demoPassword === 'string' && meta.demoPassword.trim()) return meta.demoPassword.trim().length;
-  if (meta.passwordPlaintext) return meta.passwordPlaintext.length;
+  const derived = deriveBookletPassword(data);
+  if (derived) return derived.length;
   return fallback || 6;
 }
 
@@ -294,6 +317,23 @@ export function getDemoPassword(meta) {
   if (meta && typeof meta.demoPassword === 'string' && meta.demoPassword.trim()) return meta.demoPassword;
   if (meta && typeof meta.passwordPlaintext === 'string' && meta.passwordPlaintext.trim()) return meta.passwordPlaintext;
   return '';
+}
+
+export function deriveBookletPassword(data) {
+  const meta = data && data.meta ? data.meta : {};
+  if (typeof meta.demoPassword === 'string' && meta.demoPassword.trim()) {
+    return normalisePassword(meta.demoPassword);
+  }
+  if (typeof meta.passwordPlaintext === 'string' && meta.passwordPlaintext.trim()) {
+    return normalisePassword(meta.passwordPlaintext);
+  }
+
+  const weeks = Array.isArray(data && data.weeks) ? data.weeks : [];
+  const bossWeek = weeks.find((week) => week && week.isBossWeek && week.bossEncounter);
+  const boss = bossWeek && bossWeek.bossEncounter ? bossWeek.bossEncounter : null;
+  if (!boss || !boss.decodingKey || !isStandardAlphaTable(boss.decodingKey.referenceTable)) return '';
+
+  return normalisePassword(decodeA1Z26(boss.componentInputs || []));
 }
 
 export function getExerciseSetCount(exercise) {

@@ -1203,6 +1203,7 @@
         var brief = briefEl.value.trim();
         var diceRadio = document.querySelector('input[name="gen-dice"]:checked');
         var dice = diceRadio ? diceRadio.value : '2d6';
+        if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
 
         // Reset wizard state
         wizData = [null, null];
@@ -1260,6 +1261,57 @@
 
       function escapeForHtml(str) {
         return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      function setActionBusy(button, busyText, callback) {
+        var original = button.textContent;
+        button.disabled = true;
+        button.textContent = busyText;
+        return Promise.resolve()
+          .then(callback)
+          .catch(function (error) {
+            console.error(error);
+            alert(error && error.message ? error.message : 'Could not prepare the booklet export.');
+          })
+          .finally(function () {
+            button.disabled = false;
+            button.textContent = original;
+          });
+      }
+
+      async function prepareAssemblyExport(data) {
+        var cloned = JSON.parse(JSON.stringify(data || {}));
+        if (!cloned || typeof cloned !== 'object') return cloned;
+
+        if (!cloned.meta) cloned.meta = {};
+        var hasCiphertext = typeof cloned.meta.passwordEncryptedEnding === 'string'
+          && cloned.meta.passwordEncryptedEnding
+          && cloned.meta.passwordEncryptedEnding.indexOf('PLACEHOLDER_') !== 0;
+
+        if (!hasCiphertext && Array.isArray(cloned.endings) && cloned.endings.length > 0) {
+          var modules = await Promise.all([
+            import('renderer/modules/utils.js?v=47'),
+            import('generator/liftrpg-encrypt.js')
+          ]);
+          var password = modules[0].deriveBookletPassword(cloned);
+          if (password) {
+            var payload = cloned.endings[0].content || cloned.endings[0];
+            cloned.meta.passwordEncryptedEnding = await modules[1].encryptEnding(payload, password);
+            cloned.endings = [];
+            hasCiphertext = true;
+          }
+        }
+
+        if (hasCiphertext) {
+          delete cloned.meta.passwordPlaintext;
+          delete cloned.meta.demoPassword;
+        }
+
+        if (!hasCiphertext && Array.isArray(cloned.endings) && cloned.endings.length > 0) {
+          throw new Error('Could not seal the ending automatically. Export requires a derivable password or pre-encrypted ending.');
+        }
+
+        return cloned;
       }
 
       // Wire an assembly section: chunks container, add button, submit button, result div
@@ -1330,21 +1382,29 @@
               '</div>' +
             '</div>';
 
-          resultContainer.querySelector('.assembly-open-btn').addEventListener('click', function () {
-            sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(resultContainer._assembledData));
-            window.open('renderer/?source=session', '_blank');
+          resultContainer.querySelector('.assembly-open-btn').addEventListener('click', function (event) {
+            var button = event.currentTarget;
+            setActionBusy(button, 'Preparing…', async function () {
+              resultContainer._assembledData = await prepareAssemblyExport(resultContainer._assembledData);
+              sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(resultContainer._assembledData));
+              window.open('renderer/?source=session', '_blank');
+            });
           });
 
-          resultContainer.querySelector('.assembly-dl-btn').addEventListener('click', function () {
-            var blob = new Blob([JSON.stringify(resultContainer._assembledData, null, 2)], { type: 'application/json' });
-            var url = URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = resultContainer._filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+          resultContainer.querySelector('.assembly-dl-btn').addEventListener('click', function (event) {
+            var button = event.currentTarget;
+            setActionBusy(button, 'Sealing…', async function () {
+              resultContainer._assembledData = await prepareAssemblyExport(resultContainer._assembledData);
+              var blob = new Blob([JSON.stringify(resultContainer._assembledData, null, 2)], { type: 'application/json' });
+              var url = URL.createObjectURL(blob);
+              var a = document.createElement('a');
+              a.href = url;
+              a.download = resultContainer._filename;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            });
           });
         });
       }

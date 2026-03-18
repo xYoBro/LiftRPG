@@ -1089,7 +1089,7 @@ window.LiftRPGAPI = (function () {
    * Enforces:
    *   meta.weekCount, meta.totalSessions
    *   bossEncounter.componentInputs (from collected non-boss weeklyComponent values)
-   *   meta.demoPassword + meta.passwordLength (when A1Z26 decode succeeds)
+   *   meta.passwordLength (when A1Z26 decode succeeds)
    *
    * Returns warnings array for non-critical issues (e.g. non-standard decode table).
    */
@@ -1163,7 +1163,6 @@ window.LiftRPGAPI = (function () {
           var numericValues = (boss.componentInputs || []).map(function (v) { return Number(v); });
           var password = decodeA1Z26(numericValues);
           if (password) {
-            meta.demoPassword = password;
             meta.passwordLength = password.length;
           } else {
             warnings.push('A1Z26 decode failed — componentInputs contain non-integer or out-of-range values');
@@ -1694,6 +1693,7 @@ window.LiftRPGAPI = (function () {
   // onProgress(stageIndex, totalStages, message) — UI callback
 
   async function generateMultiStage(settings, workout, brief, dice, onProgress) {
+    if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
     // Check required generators
     if (typeof window.generateStage1Prompt !== 'function' ||
       typeof window.generateStage2Prompt !== 'function' ||
@@ -1724,6 +1724,22 @@ window.LiftRPGAPI = (function () {
       } catch (err) {
         throw new Error('[' + stageName + '] ' + err.message);
       }
+    }
+
+    // Helper: unwrap partial-JSON output when model adds an extra wrapper key.
+    // e.g., { "weekOutput": { "weeks": [...] } } → { "weeks": [...] }
+    function unwrapIfNeeded(result, expectedKey) {
+      if (!result || typeof result !== 'object') return result;
+      if (result[expectedKey]) return result; // already correct shape
+      var keys = Object.keys(result);
+      if (keys.length === 1) {
+        var inner = result[keys[0]];
+        if (inner && typeof inner === 'object' && inner[expectedKey]) {
+          console.warn('[LiftRPG] Stage output wrapped in "' + keys[0] + '" key — unwrapping to get "' + expectedKey + '"');
+          return inner;
+        }
+      }
+      return result;
     }
 
     // 1. Layer Bible
@@ -1768,6 +1784,14 @@ window.LiftRPGAPI = (function () {
     progress('Building booklet shell\u2026');
     var raw3 = await callStage(window.generateShellPrompt(brief, layerBible, campaignPlan), 16384, 'Booklet Shell');
     var shell = extractJson(raw3);
+    shell = unwrapIfNeeded(shell, 'meta');
+    // If model output full booklet instead of shell, strip week/fragment/endings keys
+    if (shell.meta && Array.isArray(shell.weeks)) {
+      console.warn('[LiftRPG] Shell stage output included weeks/fragments/endings — stripping');
+      delete shell.weeks;
+      delete shell.fragments;
+      delete shell.endings;
+    }
 
     if (!shell.meta || !shell.cover || !shell.rulesSpread) {
       throw new Error(
@@ -1802,6 +1826,12 @@ window.LiftRPGAPI = (function () {
         chunkLabel
       );
       var chunkOutput = extractJson(rawChunk);
+      chunkOutput = unwrapIfNeeded(chunkOutput, 'weeks');
+      // If model output full booklet instead of just weeks, extract only weeks
+      if (chunkOutput.meta && Array.isArray(chunkOutput.weeks)) {
+        console.warn('[LiftRPG] Week chunk output a full booklet — extracting weeks only');
+        chunkOutput = { weeks: chunkOutput.weeks };
+      }
       weekChunkOutputs.push(chunkOutput);
 
       // Accumulate all prior weeks for continuity + component values for boss
@@ -1827,6 +1857,7 @@ window.LiftRPGAPI = (function () {
         'Fragments'
       );
       fragmentsOutput = extractJson(rawFrags);
+      fragmentsOutput = unwrapIfNeeded(fragmentsOutput, 'fragments');
     } else {
       // Batched generation
       var batchOutputs = [];
@@ -1853,6 +1884,7 @@ window.LiftRPGAPI = (function () {
           batchLabel
         );
         var batchOutput = extractJson(rawBatch);
+        batchOutput = unwrapIfNeeded(batchOutput, 'fragments');
         batchOutputs.push(batchOutput);
 
         // Accumulate for continuity into next batch
@@ -1880,6 +1912,7 @@ window.LiftRPGAPI = (function () {
       'Endings'
     );
     var endingsOutput = extractJson(rawEndings);
+    endingsOutput = unwrapIfNeeded(endingsOutput, 'endings');
 
     // Assemble
     console.log('[LiftRPG] Assembling booklet from', weekChunkOutputs.length, 'week chunks,',
@@ -2685,6 +2718,7 @@ window.LiftRPGAPI = (function () {
   // onProgress(stageIndex, totalStages, message) — UI callback
 
   async function generateStructured(settings, workout, brief, dice, onProgress) {
+    if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
     // Validate required prompt generators
     if (typeof window.generateStage1Prompt !== 'function' ||
       typeof window.generateStage2Prompt !== 'function' ||
@@ -2918,6 +2952,7 @@ window.LiftRPGAPI = (function () {
    * }
    */
   async function generate(settings, workout, brief, dice) {
+    if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
     if (typeof window.generatePrompt !== 'function') {
       throw new Error('Prompt generator not loaded. Please reload the page.');
     }
