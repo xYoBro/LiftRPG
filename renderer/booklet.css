@@ -832,8 +832,10 @@ body[data-demo-view="true"] #booklet-container{
   color:var(--ink);
   margin-bottom:8px;
 }
-.password-final-boxes{
+.password-final-boxes,
+.password-box-row{
   display:flex;
+  flex-wrap:wrap;
   gap:6px;
 }
 .password-final-box{
