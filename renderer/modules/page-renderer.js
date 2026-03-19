@@ -106,6 +106,74 @@ function resolveMechanicCopy(artifactIdentity) {
   return BOARD_STATE_COPY[artifactIdentity.boardStateMode] || BOARD_STATE_COPY['survey-grid'];
 }
 
+function extractPlacementLabel(placement) {
+  const data = placement.atom?.data || placement.data || {};
+  if (placement.type === 'cipher-panel') {
+    return ((data.cipher || {}).title || data.label || 'Cipher').trim();
+  }
+  if (placement.type === 'oracle-table') {
+    return ((data.oracle || {}).title || data.label || 'Oracle').trim();
+  }
+  if (placement.type === 'map-panel') {
+    return ((data.map || {}).title || (data.map || {}).floorLabel || data.label || 'Topology').trim();
+  }
+  if (placement.type === 'tracker') {
+    return (data.label || data.trackType || 'Companion').trim();
+  }
+  return '';
+}
+
+function buildMechanicBriefing(artifactIdentity, placements) {
+  if (artifactIdentity.shellFamily !== 'classified-packet') return null;
+
+  const labels = placements
+    .map((placement) => extractPlacementLabel(placement))
+    .filter(Boolean)
+    .slice(0, 4);
+  const weekContext = weekContextFromPlacements(placements);
+  const boardMode = String(artifactIdentity.boardStateMode || 'survey-grid').replace(/-/g, ' ');
+
+  const box = make('section', 'ops-directive-board');
+  box.appendChild(make('div', 'doc-label', 'Current Board'));
+  const meta = make('div', 'ops-directive-meta');
+  meta.appendChild(make('div', 'ops-directive-chip', weekContext ? ('Week ' + (weekContext.weekIndex + 1)) : 'Weekly Board'));
+  meta.appendChild(make('div', 'ops-directive-chip', boardMode));
+  meta.appendChild(make('div', 'ops-directive-chip', labels.length ? (labels.length + ' active surfaces') : 'Companion surface'));
+  box.appendChild(meta);
+
+  if (labels.length) {
+    const list = make('div', 'ops-directive-list');
+    labels.forEach((label) => {
+      list.appendChild(make('div', 'ops-directive-item', label));
+    });
+    box.appendChild(list);
+  }
+
+  return box;
+}
+
+function renderMechanicStrip(artifactIdentity, placements) {
+  if (artifactIdentity.shellFamily !== 'classified-packet') return null;
+
+  const strip = make('div', 'ops-incident-strip');
+  const placementTypes = new Set(placements.map((placement) => placement.type));
+  const surfaceLabels = [];
+  if (placementTypes.has('cipher-panel')) surfaceLabels.push('Cipher');
+  if (placementTypes.has('map-panel')) surfaceLabels.push('Topology');
+  if (placementTypes.has('oracle-table')) surfaceLabels.push('Oracle');
+  if (placementTypes.has('tracker')) surfaceLabels.push('Companion');
+
+  [
+    'Packet',
+    String(artifactIdentity.boardStateMode || 'survey-grid').replace(/-/g, ' '),
+    surfaceLabels.join(' / ') || 'Evidence Surface',
+  ].forEach((value) => {
+    strip.appendChild(make('div', 'ops-incident-chip', value));
+  });
+
+  return strip;
+}
+
 export function renderPlacementInto(target, placement) {
   const def = getAtomDefinition(placement.type);
   if (!def) {
@@ -187,6 +255,8 @@ function renderMechanicPage(placements, planIndex) {
   const artifactIdentity = resolveArtifactIdentity(placements);
   const copy = resolveMechanicCopy(artifactIdentity);
   const layoutVariant = resolveMechanicLayoutVariant(placements, artifactIdentity);
+  const surfacePlacements = placements.filter((placement) => placement.type !== 'tracker' && placement.type !== 'week-footer');
+  const surfaceTypes = new Set(surfacePlacements.map((placement) => placement.type));
   const { page, frame } = createBoundedPage(
     'field-ops',
     'field-ops-right',
@@ -208,15 +278,29 @@ function renderMechanicPage(placements, planIndex) {
   header.appendChild(make('span', 'page-num', ''));
   frame.appendChild(header);
 
+  const strip = renderMechanicStrip(artifactIdentity, placements);
+  if (strip) {
+    frame.appendChild(strip);
+  }
+
+  const companionPlacements = placements.filter((placement) => placement.type === 'tracker');
+  const briefing = buildMechanicBriefing(artifactIdentity, placements);
+  if (briefing && (surfacePlacements.length <= 1 || companionPlacements.length > 0)) {
+    frame.appendChild(briefing);
+  }
+
   const content = make('div', 'rp-content');
   content.setAttribute('data-shell-family', artifactIdentity.shellFamily || DEFAULT_ARTIFACT_IDENTITY.shellFamily);
   content.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || DEFAULT_ARTIFACT_IDENTITY.boardStateMode);
   content.setAttribute('data-attachment-strategy', artifactIdentity.attachmentStrategy || DEFAULT_ARTIFACT_IDENTITY.attachmentStrategy);
-  const companionPlacements = placements.filter((placement) => placement.type === 'tracker');
+  if (surfaceTypes.size === 1) {
+    const soloType = surfacePlacements[0] ? surfacePlacements[0].type : '';
+    content.setAttribute('data-solo-surface', soloType);
+  } else if (surfacePlacements.length === 0 && companionPlacements.length > 0) {
+    content.setAttribute('data-solo-surface', 'tracker');
+  }
 
-  placements
-    .filter((placement) => placement.type !== 'tracker' && placement.type !== 'week-footer')
-    .forEach((placement) => renderPlacementInto(content, placement));
+  surfacePlacements.forEach((placement) => renderPlacementInto(content, placement));
 
   if (companionPlacements.length > 0) {
     content.setAttribute('data-has-companion', 'true');

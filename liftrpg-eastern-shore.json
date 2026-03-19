@@ -455,7 +455,7 @@
         },
         "oracleTable": {
           "title": "Dorchester County Conditions Log · Daily Field Observation",
-          "instruction": "During any rest period, roll 2d6 and consult the log below. Record what you find.",
+          "instruction": "During any rest period, roll 1d100 and consult the log below. Record what you find.",
           "mode": "simple",
           "entries": [
             {
@@ -954,7 +954,7 @@
         },
         "oracleTable": {
           "title": "Dorchester County Conditions Log · Daily Field Observation",
-          "instruction": "During any rest period, roll 2d6 and consult the log below. Record what you find.",
+          "instruction": "During any rest period, roll 1d100 and consult the log below. Record what you find.",
           "mode": "simple",
           "entries": [
             {
@@ -1463,7 +1463,7 @@
         },
         "oracleTable": {
           "title": "Dorchester County Conditions Log · Daily Field Observation",
-          "instruction": "During any rest period, roll 2d6 and consult the log below. Record what you find.",
+          "instruction": "During any rest period, roll 1d100 and consult the log below. Record what you find.",
           "mode": "simple",
           "entries": [
             {
@@ -1964,7 +1964,7 @@
         },
         "oracleTable": {
           "title": "Dorchester County Conditions Log · Daily Field Observation",
-          "instruction": "During any rest period, roll 2d6 and consult the log below. Record what you find.",
+          "instruction": "During any rest period, roll 1d100 and consult the log below. Record what you find.",
           "mode": "simple",
           "entries": [
             {
@@ -2470,7 +2470,7 @@
         },
         "oracleTable": {
           "title": "Dorchester County Conditions Log · Daily Field Observation",
-          "instruction": "During any rest period, roll 2d6 and consult the log below. Record what you find.",
+          "instruction": "During any rest period, roll 1d100 and consult the log below. Record what you find.",
           "mode": "simple",
           "entries": [
             {
@@ -3554,7 +3554,7 @@
         },
         {
           "heading": "Daily Conditions Log",
-          "body": "During any rest period between sets, roll two six-sided dice and consult the conditions log on the right page. Follow the entry. Some entries direct you to a fragment. Some instruct you to mark your survey grid. If you choose not to roll, no observation is recorded. Both outcomes are within normal parameters."
+          "body": "During any rest period between sets, roll 1d100 and consult the conditions log on the right page. Follow the entry. Some entries direct you to a fragment. Some instruct you to mark your survey grid. If you choose not to roll, no observation is recorded. Both outcomes are within normal parameters."
         },
         {
           "heading": "The Gauge Reading Log",

@@ -8,6 +8,7 @@ import {
   inferMapFamily,
   resolveWeekMechanicProfile
 } from './mechanic-registry.js?v=47';
+import { normalizeD100Language, resolveArtifactIdentity } from './booklet-models.js?v=47';
 
 function splitKeyRows(text) {
   return String(text || '')
@@ -97,6 +98,8 @@ export function buildBossPageModel(data, week, options = 'standard') {
   const layoutVariant = typeof options === 'string' ? options : (entry.layoutVariant || 'standard');
   const continuationSegment = entry.continuationSegment || 'full';
   const isContinuation = continuationSegment === 'followup';
+  const artifactIdentity = resolveArtifactIdentity(data || {});
+  const shellFamily = artifactIdentity.shellFamily || 'field-survey';
   const hasConvergenceAppendix = !!(
     boss.convergenceProof
     || (boss.binaryChoiceAcknowledgement && (boss.binaryChoiceAcknowledgement.ifA || boss.binaryChoiceAcknowledgement.ifB))
@@ -104,6 +107,8 @@ export function buildBossPageModel(data, week, options = 'standard') {
 
   return {
     layoutVariant,
+    artifactIdentity,
+    shellFamily,
     continuationSegment,
     continuationLabel: entry.continuationLabel || '',
     weekLabel: 'Week ' + pad2(week.weekNumber),
@@ -118,6 +123,8 @@ export function buildBossPageModel(data, week, options = 'standard') {
       weekLabel: 'W' + pad2(index + 1),
       value: item
     })),
+    componentLabel: shellFamily === 'classified-packet' ? 'Recovered Inputs' : 'Recorded Inputs',
+    convergenceLabel: shellFamily === 'classified-packet' ? 'Incident Name' : 'Final Word',
     passwordRevealInstruction: boss.passwordRevealInstruction || 'When the final word is assembled, enter it at liftrpg.co to unlock the ending.',
     passwordLength: getPasswordLength(data, (boss.componentInputs || []).length || 6),
     convergenceProof: (!isContinuation && hasConvergenceAppendix) ? '' : (boss.convergenceProof || ''),
@@ -193,7 +200,7 @@ export function buildOracleModel(oracle) {
   if (!oracle) return null;
   return {
     title: oracle.title || 'Oracle',
-    instruction: oracle.instruction || '',
+    instruction: normalizeD100Language(oracle.instruction || ''),
     mode: oracle.mode || '',
     entries: normalizeEntries(oracle.entries)
   };

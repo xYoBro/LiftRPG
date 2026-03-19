@@ -272,10 +272,10 @@ function buildReturnBox() {
 }
 
 /**
- * usage-die: die-step depletion tracker (d12 → d10 → ... → d2).
+ * usage-die: legacy depletion tracker, rendered as d100 readiness bands.
  */
 function buildUsageDie() {
-  const steps = ['d12', 'd10', 'd8', 'd6', 'd4', 'd2'];
+  const steps = ['100', '80', '60', '40', '20', '00'];
   const container = make('div', 'companion-usage-die');
   steps.forEach((step, i) => {
     const el = make('div', 'companion-usage-step', step);
@@ -285,6 +285,28 @@ function buildUsageDie() {
   return container;
 }
 
+function buildTokenSheet(data) {
+  const total = Math.max(4, (data.rows || 2) * (data.cols || 4), data.slots || 0);
+  const grid = make('div', 'companion-token-sheet');
+  for (let i = 0; i < total; i += 1) {
+    const item = make('div', 'companion-token');
+    item.appendChild(make('div', 'companion-token-label', 'TOKEN ' + String(i + 1).padStart(2, '0')));
+    grid.appendChild(item);
+  }
+  return grid;
+}
+
+function buildOverlayWindow(data) {
+  const overlay = make('div', 'companion-overlay');
+  const windows = Math.max(3, data.slots || 0);
+  for (let i = 0; i < windows; i += 1) {
+    const pane = make('div', 'companion-overlay-window');
+    pane.appendChild(make('div', 'companion-overlay-label', 'WINDOW ' + String(i + 1).padStart(2, '0')));
+    overlay.appendChild(pane);
+  }
+  return overlay;
+}
+
 // ---------------------------------------------------------------------------
 // Companion component wrapper
 // ---------------------------------------------------------------------------
@@ -292,6 +314,11 @@ function buildUsageDie() {
 function renderCompanionComponent(data) {
   const type = data.trackType || 'dashboard';
   const el = make('div', 'companion-component');
+  const artifactIdentity = data.artifactIdentity || {};
+
+  el.setAttribute('data-shell-family', artifactIdentity.shellFamily || 'field-survey');
+  el.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || 'survey-grid');
+  el.setAttribute('data-component-type', type);
 
   if (data.label) {
     el.appendChild(make('div', 'companion-title', data.label));
@@ -308,6 +335,8 @@ function renderCompanionComponent(data) {
     case 'inventory-grid': visual = buildInventoryGrid(data); break;
     case 'return-box':     visual = buildReturnBox();          break;
     case 'usage-die':      visual = buildUsageDie();           break;
+    case 'token-sheet':    visual = buildTokenSheet(data);     break;
+    case 'overlay-window': visual = buildOverlayWindow(data);  break;
     default:               visual = buildDashboard(data);      break;
   }
 

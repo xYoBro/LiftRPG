@@ -8,7 +8,7 @@ import { applyTheme, resolveTheme } from './theme.js?v=47';
 
 // ── V2 Engine imports ───────────────────────────────────────────────
 import { planAndMeasure } from './engine/page-planner.js';
-import { liftrpgAdapter } from './adapters/liftrpg-adapter.js';
+import { liftrpgAdapter, MAX_BOOKLET_PAGES } from './adapters/liftrpg-adapter.js';
 
 // Atom self-registration — import for side effects only
 import './atoms/cover.js';
@@ -186,6 +186,16 @@ export function renderBooklet(refs, layoutMode, data, unlockedEnding, setStatus)
   window.__v2PageCount = pages.length;
 
   // Step 6: Report status
+  if (pages.length > MAX_BOOKLET_PAGES) {
+    refs.printBtn.disabled = true;
+    setStatus(
+      '[V2] Loaded ' + pages.length + ' pages (' + atoms.length + ' atoms). ' +
+      'Booklet exceeds the ' + MAX_BOOKLET_PAGES + '-page print budget.',
+      'error',
+    );
+    return;
+  }
+
   const unresolvedCount = (diagnostics.unresolvedOverflow || []).length;
   if (unresolvedCount > 0) {
     setStatus(

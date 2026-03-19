@@ -611,6 +611,94 @@ window.LiftRPGAPI = (function () {
     return normalized;
   }
 
+  function cloneSimple(value) {
+    if (value === undefined || value === null) return value;
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function buildIdentityContract(shell, campaignPlan) {
+    shell = shell || {};
+    ensureArtifactIdentity(shell, campaignPlan || null);
+    var meta = shell.meta || {};
+    return {
+      worldContract: meta.worldContract || '',
+      narrativeVoice: cloneSimple(meta.narrativeVoice) || null,
+      literaryRegister: cloneSimple(meta.literaryRegister) || null,
+      structuralShape: cloneSimple(meta.structuralShape) || null,
+      weeklyComponentType: meta.weeklyComponentType || '',
+      artifactIdentity: cloneSimple(meta.artifactIdentity) || null
+    };
+  }
+
+  function equalJsonLike(a, b) {
+    return JSON.stringify(a || null) === JSON.stringify(b || null);
+  }
+
+  function compareIdentityContract(booklet, contract) {
+    var errors = [];
+    if (!booklet || !contract) return errors;
+    var meta = booklet.meta || {};
+    var expectedIdentity = contract.artifactIdentity || {};
+    var actualIdentity = normalizeArtifactIdentity(meta.artifactIdentity, { meta: meta, theme: booklet.theme || {} }, null);
+
+    if (contract.worldContract && meta.worldContract !== contract.worldContract) {
+      errors.push('meta.worldContract drifted from the approved shell contract');
+    }
+    if (contract.weeklyComponentType && meta.weeklyComponentType !== contract.weeklyComponentType) {
+      errors.push('meta.weeklyComponentType drifted from "' + contract.weeklyComponentType + '"');
+    }
+    if (contract.narrativeVoice && !equalJsonLike(meta.narrativeVoice, contract.narrativeVoice)) {
+      errors.push('meta.narrativeVoice drifted from the approved shell contract');
+    }
+    if (contract.literaryRegister && !equalJsonLike(meta.literaryRegister, contract.literaryRegister)) {
+      errors.push('meta.literaryRegister drifted from the approved shell contract');
+    }
+    if (contract.structuralShape && !equalJsonLike(meta.structuralShape, contract.structuralShape)) {
+      errors.push('meta.structuralShape drifted from the approved shell contract');
+    }
+
+    Object.keys(expectedIdentity).forEach(function (key) {
+      if (!expectedIdentity[key]) return;
+      if (JSON.stringify(actualIdentity[key] || null) !== JSON.stringify(expectedIdentity[key] || null)) {
+        errors.push('meta.artifactIdentity.' + key + ' drifted from "' + expectedIdentity[key] + '"');
+      }
+    });
+
+    return errors;
+  }
+
+  function enforceIdentityContract(booklet, contract) {
+    if (!booklet || !contract) return;
+    booklet.meta = booklet.meta || {};
+    if (contract.worldContract) booklet.meta.worldContract = contract.worldContract;
+    if (contract.weeklyComponentType) booklet.meta.weeklyComponentType = contract.weeklyComponentType;
+    if (contract.narrativeVoice) booklet.meta.narrativeVoice = cloneSimple(contract.narrativeVoice);
+    if (contract.literaryRegister) booklet.meta.literaryRegister = cloneSimple(contract.literaryRegister);
+    if (contract.structuralShape) booklet.meta.structuralShape = cloneSimple(contract.structuralShape);
+    if (contract.artifactIdentity) booklet.meta.artifactIdentity = cloneSimple(contract.artifactIdentity);
+  }
+
+  function formatIdentityContractLines(contract) {
+    if (!contract) return [];
+    var lines = [
+      '- Preserve shell identity exactly. Do not normalize this booklet into generic field dossier grammar.'
+    ];
+    if (contract.worldContract) lines.push('- Keep meta.worldContract exactly: ' + contract.worldContract);
+    if (contract.weeklyComponentType) lines.push('- Keep meta.weeklyComponentType: ' + contract.weeklyComponentType);
+    if (contract.artifactIdentity) {
+      lines.push('- Keep meta.artifactIdentity exactly: ' + JSON.stringify(contract.artifactIdentity));
+      if (contract.artifactIdentity.shellFamily) lines.push('- Do not change shellFamily: ' + contract.artifactIdentity.shellFamily);
+      if (contract.artifactIdentity.boardStateMode) lines.push('- Do not change boardStateMode: ' + contract.artifactIdentity.boardStateMode);
+      if (contract.artifactIdentity.openingMode) lines.push('- Do not change openingMode: ' + contract.artifactIdentity.openingMode);
+      if (contract.artifactIdentity.rulesDeliveryMode) lines.push('- Do not change rulesDeliveryMode: ' + contract.artifactIdentity.rulesDeliveryMode);
+      if (contract.artifactIdentity.unlockLogic) lines.push('- Do not change unlockLogic: ' + contract.artifactIdentity.unlockLogic);
+    }
+    if (contract.narrativeVoice) lines.push('- Keep meta.narrativeVoice exactly as provided.');
+    if (contract.literaryRegister) lines.push('- Keep meta.literaryRegister exactly as provided.');
+    if (contract.structuralShape) lines.push('- Keep meta.structuralShape exactly as provided.');
+    return lines;
+  }
+
   function extractEndingBodyText(entry) {
     if (!entry || typeof entry !== 'object') return '';
     if (typeof entry.content === 'string') return entry.content;
@@ -972,6 +1060,39 @@ window.LiftRPGAPI = (function () {
     none: 1, narrative: 1, cipher: 1, map: 1, clock: 1,
     companion: 1, 'fragment-ref': 1, 'password-element': 1
   };
+  var ORACLE_ROLL_BANDS = ['00-09', '10-19', '20-29', '30-39', '40-49', '50-59', '60-69', '70-79', '80-89', '90-99'];
+
+  function normalizeOracleRollBand(value) {
+    return String(value || '')
+      .trim()
+      .replace(/[–—]/g, '-')
+      .replace(/\s+/g, '');
+  }
+
+  function collectOracleBandErrors(entries, label) {
+    var errors = [];
+    if (entries.length !== ORACLE_ROLL_BANDS.length) {
+      errors.push(label + ': has ' + entries.length + ' entries, needs 10 (bands "00-09"–"90-99")');
+      return errors;
+    }
+    var seen = {};
+    entries.forEach(function (entry) {
+      var roll = normalizeOracleRollBand(entry && entry.roll);
+      if (ORACLE_ROLL_BANDS.indexOf(roll) === -1) {
+        errors.push(label + ': unexpected roll "' + (entry && entry.roll) + '" (must use d100 bands "00-09"–"90-99")');
+        return;
+      }
+      if (seen[roll]) {
+        errors.push(label + ': duplicate roll "' + roll + '"');
+        return;
+      }
+      seen[roll] = true;
+    });
+    ORACLE_ROLL_BANDS.forEach(function (roll) {
+      if (!seen[roll]) errors.push(label + ': missing roll "' + roll + '"');
+    });
+    return errors;
+  }
 
   function validateBookletSchema(booklet) {
     var errors = [];
@@ -990,10 +1111,9 @@ window.LiftRPGAPI = (function () {
           errors.push(wn + ' oracle[' + ei + ']: type "fragment" missing fragmentRef');
         }
       });
-      var mode = oracle.mode || (entries.length === 11 ? 'simple' : null);
-      if (mode === 'simple' && entries.length !== 11) {
-        errors.push(wn + ' simple oracle: has ' + entries.length + ' entries, needs 11 (rolls "2"–"12")');
-      }
+      collectOracleBandErrors(entries, wn + ' oracle').forEach(function (message) {
+        errors.push(message);
+      });
 
       // Cipher body must be an object
       var cipher = fo.cipher || {};
@@ -1012,7 +1132,9 @@ window.LiftRPGAPI = (function () {
 
   // ── Targeted patch prompt ─────────────────────────────────────────────────
 
-  function generatePatchPrompt(rawJson, errors) {
+  function generatePatchPrompt(rawJson, errors, options) {
+    options = options || {};
+    var contractLines = formatIdentityContractLines(options.identityContract || null);
     return [
       'You are a JSON repair specialist.',
       '',
@@ -1021,7 +1143,11 @@ window.LiftRPGAPI = (function () {
       'RULES:',
       '- Output ONLY the corrected JSON. No markdown fences, no commentary, no explanation.',
       '- Preserve all unaffected content exactly as-is.',
+      '- Do not rewrite the booklet into a safer or more generic form.',
       '- The output must be valid, parseable JSON.',
+      contractLines.length ? '' : null,
+      contractLines.length ? '## Identity Contract' : null,
+      contractLines.length ? contractLines.join('\n') : null,
       '',
       '## Errors to Fix',
       errors.map(function (e) { return '- ' + e; }).join('\n'),
@@ -1029,7 +1155,7 @@ window.LiftRPGAPI = (function () {
       '## JSON',
       '',
       rawJson
-    ].join('\n');
+    ].filter(Boolean).join('\n');
   }
 
   // ── Shell context extractor ─────────────────────────────────────────────
@@ -1942,30 +2068,9 @@ window.LiftRPGAPI = (function () {
         }
       });
 
-      // Simple oracle: must have exactly rolls "2" through "12"
-      var mode = oracle.mode || (entries.length === 11 ? 'simple' : null);
-      if (mode === 'simple') {
-        if (entries.length !== 11) {
-          errors.push(wn + ' simple oracle: has ' + entries.length + ' entries, needs 11 (rolls "2"\u2013"12")');
-        } else {
-          var expectedRolls = {};
-          for (var r = 2; r <= 12; r++) expectedRolls[String(r)] = false;
-          entries.forEach(function (entry) {
-            var roll = String(entry.roll);
-            if (!(roll in expectedRolls)) {
-              errors.push(wn + ' simple oracle: unexpected roll "' + roll + '" (must be "2"\u2013"12")');
-            } else if (expectedRolls[roll]) {
-              errors.push(wn + ' simple oracle: duplicate roll "' + roll + '"');
-            }
-            expectedRolls[roll] = true;
-          });
-          for (var mr in expectedRolls) {
-            if (!expectedRolls[mr]) {
-              errors.push(wn + ' simple oracle: missing roll "' + mr + '"');
-            }
-          }
-        }
-      }
+      collectOracleBandErrors(entries, wn + ' oracle').forEach(function (message) {
+        errors.push(message);
+      });
 
       // -- Cipher validation (non-boss weeks) --
       var cipher = fo.cipher || {};
@@ -2290,6 +2395,7 @@ window.LiftRPGAPI = (function () {
     }
 
     // Extract narrative constraints for downstream stages
+    var identityContract = buildIdentityContract(shell, campaignPlan);
     var shellContext = extractShellContext(shell);
 
     // 4..N-3. Week Chunks
@@ -2408,6 +2514,7 @@ window.LiftRPGAPI = (function () {
       ((fragmentsOutput || {}).fragments || []).length, 'fragments,',
       ((endingsOutput || {}).endings || []).length, 'endings');
     var booklet = assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan);
+    enforceIdentityContract(booklet, identityContract);
 
     // Validate + single patch attempt (no retry loop)
     var errors = validateAssembledBooklet(booklet);
@@ -2421,13 +2528,21 @@ window.LiftRPGAPI = (function () {
       progress('Patching ' + errLabel + '\u2026');
       try {
         var rawPatched = await callStage(
-          generatePatchPrompt(JSON.stringify(booklet, null, 2), errors),
+          generatePatchPrompt(JSON.stringify(booklet, null, 2), errors, {
+            identityContract: identityContract
+          }),
           32000,
           'Patch'
         );
         booklet = extractJson(rawPatched);
+        enforceIdentityContract(booklet, identityContract);
         // Re-enforce derived fields — patch LLM may have clobbered them
         enforceBookletDerivedFields(booklet);
+        var identityDrift = compareIdentityContract(booklet, identityContract);
+        if (identityDrift.length > 0) {
+          console.warn('[LiftRPG] Patch drifted shell identity; restored approved shell contract:', identityDrift);
+          enforceIdentityContract(booklet, identityContract);
+        }
         var remaining = validateAssembledBooklet(booklet);
         if (remaining.length > 0) {
           console.warn('[LiftRPG] Patch did not fully resolve errors (' + remaining.length + ' remaining):', remaining);
@@ -2440,7 +2555,13 @@ window.LiftRPGAPI = (function () {
     }
 
     // Auto-populate quality report for console inspection
-    generateQualityReport(booklet);
+    var report = generateQualityReport(booklet);
+    var qualityGate = buildQualityGate(report);
+    if (!qualityGate.passed) {
+      throw new Error('Quality gate failed:\n' + qualityGate.blockers.map(function (entry) {
+        return '- ' + entry.message;
+      }).join('\n'));
+    }
 
     return booklet;
   }
@@ -2999,7 +3120,7 @@ window.LiftRPGAPI = (function () {
                   properties: {
                     title: { type: 'string' },
                     instruction: { type: 'string' },
-                    mode: { type: 'string', enum: ['simple', 'full'] },
+                    mode: { type: 'string' },
                     entries: {
                       type: 'array',
                       items: {
@@ -3334,6 +3455,7 @@ window.LiftRPGAPI = (function () {
     }
 
     // Extract narrative constraints for downstream stages
+    var identityContract = buildIdentityContract(shell, campaignPlan);
     var shellContext = extractShellContext(shell);
 
     // Stage 3 — Weeks (N internal API calls, 1 progress step)
@@ -3431,6 +3553,7 @@ window.LiftRPGAPI = (function () {
       ((fragmentsOutput || {}).fragments || []).length, 'fragments,',
       ((endingsOutput || {}).endings || []).length, 'endings');
     var booklet = assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, nw, campaignPlan);
+    enforceIdentityContract(booklet, identityContract);
 
     // Validate — log warnings but no LLM patch step
     // (structured output should prevent malformed JSON; semantic errors are reported)
@@ -3443,7 +3566,13 @@ window.LiftRPGAPI = (function () {
     }
 
     // Auto-populate quality report for console inspection
-    generateQualityReport(booklet);
+    var report = generateQualityReport(booklet);
+    var qualityGate = buildQualityGate(report);
+    if (!qualityGate.passed) {
+      throw new Error('Quality gate failed:\n' + qualityGate.blockers.map(function (entry) {
+        return '- ' + entry.message;
+      }).join('\n'));
+    }
 
     return booklet;
   }
@@ -3479,6 +3608,135 @@ window.LiftRPGAPI = (function () {
   // Deterministic post-generation analysis. Returns a structured report
   // object with scores, warnings, and weak-spot flags. Does NOT modify the
   // booklet. Stored on window.LiftRPGAPI.lastQualityReport after each call.
+
+  function extractWeekCompanionTypes(week) {
+    return ((((week || {}).fieldOps || {}).companionComponents) || [])
+      .map(function (component) { return String((component || {}).type || '').trim(); })
+      .filter(Boolean)
+      .sort();
+  }
+
+  function collectIdentityVariationFindings(booklet, nonBossWeeks, fragments, report) {
+    var findings = 0;
+    var meta = (booklet || {}).meta || {};
+    var artifactIdentity = meta.artifactIdentity || {};
+
+    var docTypeCounts = {};
+    fragments.forEach(function (fragment) {
+      var type = String((fragment || {}).documentType || '').trim().toLowerCase();
+      if (!type) return;
+      docTypeCounts[type] = (docTypeCounts[type] || 0) + 1;
+    });
+    var dominantDocType = '';
+    var dominantDocCount = 0;
+    Object.keys(docTypeCounts).forEach(function (type) {
+      if (docTypeCounts[type] > dominantDocCount) {
+        dominantDocType = type;
+        dominantDocCount = docTypeCounts[type];
+      }
+    });
+    if (dominantDocType && fragments.length >= 6 && dominantDocCount / fragments.length >= 0.5) {
+      report.weakSpots.push({
+        area: 'artifact-monoculture',
+        detail: '"' + dominantDocType + '" accounts for ' + dominantDocCount + ' of ' + fragments.length + ' fragments',
+        severity: 'high'
+      });
+      findings++;
+    }
+
+    var mapTypes = {};
+    nonBossWeeks.forEach(function (week) {
+      var mapType = String((((week || {}).fieldOps || {}).mapState || {}).mapType || 'grid');
+      mapTypes[mapType] = true;
+    });
+    if (nonBossWeeks.length >= 4 && Object.keys(mapTypes).length < 2) {
+      report.weakSpots.push({
+        area: 'board-monotony',
+        detail: 'All non-boss weeks use the same mapState.mapType "' + Object.keys(mapTypes)[0] + '"',
+        severity: 'high'
+      });
+      findings++;
+    }
+
+    var companionSignatures = {};
+    nonBossWeeks.forEach(function (week) {
+      var signature = extractWeekCompanionTypes(week).join('|') || 'none';
+      companionSignatures[signature] = true;
+    });
+    if (nonBossWeeks.length >= 4 && Object.keys(companionSignatures).length < 2) {
+      report.weakSpots.push({
+        area: 'companion-sameness',
+        detail: 'Companion component loadout repeats across every non-boss week',
+        severity: 'medium'
+      });
+      findings++;
+    }
+
+    if (!artifactIdentity.openingMode || !artifactIdentity.rulesDeliveryMode || !artifactIdentity.unlockLogic) {
+      report.weakSpots.push({
+        area: 'identity-undercommitment',
+        detail: 'artifactIdentity is missing one or more differentiation fields (openingMode, rulesDeliveryMode, unlockLogic)',
+        severity: 'medium'
+      });
+      findings++;
+    }
+
+    return findings;
+  }
+
+  var QUALITY_BLOCKING_AREAS = {
+    'artifact-monoculture': { target: 'fragments' },
+    'board-monotony': { target: 'weeks' },
+    'companion-sameness': { target: 'weeks' },
+    'identity-undercommitment': { target: 'shell', alwaysBlock: true },
+    'map-stagnation': { target: 'weeks' },
+    'cipher-repetition': { target: 'weeks' },
+    'oracle-vagueness': { target: 'weeks' },
+    'identity-drift-risk': { target: 'shell', alwaysBlock: true },
+    'thin-ending': { target: 'endings' },
+    'unsupported-reveal': { target: 'endings' }
+  };
+
+  function formatQualityGateMessage(target, detail) {
+    var prefix = target ? target.charAt(0).toUpperCase() + target.slice(1) : 'Booklet';
+    return prefix + ': ' + detail;
+  }
+
+  function buildQualityGate(report) {
+    report = report || {};
+    var blockers = [];
+    var seen = {};
+
+    function pushBlocker(target, detail) {
+      var message = formatQualityGateMessage(target, detail);
+      if (seen[message]) return;
+      seen[message] = true;
+      blockers.push({ target: target || '', message: message });
+    }
+
+    (report.weakSpots || []).forEach(function (spot) {
+      var policy = QUALITY_BLOCKING_AREAS[spot.area];
+      if (!policy) return;
+      if (policy.alwaysBlock || spot.severity === 'high') {
+        pushBlocker(policy.target, spot.detail);
+      }
+    });
+
+    var identityVariationScore = (((report.scores || {}).identityVariation) || {}).score;
+    if (typeof identityVariationScore === 'number' && identityVariationScore < 0.8) {
+      pushBlocker('shell', 'identity variation score is ' + identityVariationScore + ' — the booklet is still converging toward the default grammar');
+    }
+
+    var aggregateScore = (((report.scores || {}).aggregate) || {}).score;
+    if (typeof aggregateScore === 'number' && aggregateScore < 0.72) {
+      pushBlocker('shell', 'aggregate quality score is ' + aggregateScore + ' — the booklet needs another pass before export');
+    }
+
+    return {
+      passed: blockers.length === 0,
+      blockers: blockers
+    };
+  }
 
   function generateQualityReport(booklet) {
     var report = {
@@ -3760,6 +4018,11 @@ window.LiftRPGAPI = (function () {
     report.scores.sessionConsistency = sessionIssues.length === 0
       ? { score: 1, label: 'clean' }
       : { score: Math.max(0, 1 - sessionIssues.length * 0.1), label: sessionIssues.length + ' issues' };
+
+    var identityVariationIssues = collectIdentityVariationFindings(booklet, nonBossWeeks, fragments, report);
+    report.scores.identityVariation = identityVariationIssues === 0
+      ? { score: 1, label: 'clean' }
+      : { score: Math.max(0, 1 - identityVariationIssues * 0.2), label: identityVariationIssues + ' issues' };
 
     // ── Weak spot detection (heuristics) ───────────────────────────────────
 
@@ -4106,6 +4369,10 @@ window.LiftRPGAPI = (function () {
     generateStructured: generateStructured,
     manual: {
       ensureArtifactIdentity: ensureArtifactIdentity,
+      buildIdentityContract: buildIdentityContract,
+      compareIdentityContract: compareIdentityContract,
+      enforceIdentityContract: enforceIdentityContract,
+      formatIdentityContractLines: formatIdentityContractLines,
       buildContinuityLedger: buildContinuityLedger,
       validateWeekChunkContinuity: validateWeekChunkContinuity,
       validateFragmentBatchContinuity: validateFragmentBatchContinuity,
@@ -4122,7 +4389,10 @@ window.LiftRPGAPI = (function () {
     _validateSchema: validateBookletSchema,
     _validateAssembled: validateAssembledBooklet,
     _normalizeWorkout: normalizeWorkoutParam,
+    _buildIdentityContract: buildIdentityContract,
+    _compareIdentityContract: compareIdentityContract,
     qualityReport: generateQualityReport,
+    qualityGate: buildQualityGate,
     compareToTarget: compareToTarget,
     lastQualityReport: null
   };

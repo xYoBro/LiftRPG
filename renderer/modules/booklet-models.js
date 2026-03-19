@@ -220,6 +220,17 @@ function resolveCoverSubtitle(designation, subtitle) {
   return subtitle;
 }
 
+export function normalizeD100Language(value) {
+  var text = String(value || '');
+  if (!text) return '';
+
+  return text
+    .replace(/\broll\s+2d6\b/gi, 'roll 1d100')
+    .replace(/\broll\s+two\s+six-sided\s+dice\b/gi, 'roll 1d100')
+    .replace(/\bd10\s*\+\s*d%\s*\(percentile\)\b/gi, 'd100')
+    .replace(/\bd10\s*\+\s*d%\b/gi, 'd100');
+}
+
 export function buildCoverPageModel(data) {
   const meta = buildBookletMetaModel(data);
   const cover = data.cover || {};
@@ -255,8 +266,15 @@ export function buildRulesLeftPageModelWithVariant(data, layoutVariant) {
     artifactIdentity,
     layoutVariant: layoutVariant || 'standard',
     title: leftPage.title || artifactIdentity.copy.rulesTitle,
-    sections: leftPage.sections || [],
-    reEntryText: reEntryText || ''
+    sections: (leftPage.sections || []).map(function (section) {
+      return {
+        ...section,
+        body: normalizeD100Language(section.body || section.text || ''),
+        text: normalizeD100Language(section.text || section.body || '')
+      };
+    }),
+    reEntryText: normalizeD100Language(reEntryText || ''),
+    supportNote: 'No worries if you do not have dice. Ask Google to roll a d100.'
   };
 }
 
@@ -286,7 +304,7 @@ export function buildGaugeLogPageModelWithVariant(data, layoutVariant) {
     artifactIdentity,
     layoutVariant: layoutVariant || 'standard',
     title: rightPage.title || artifactIdentity.copy.gaugeTitle,
-    instruction: rightPage.instruction || '',
+    instruction: normalizeD100Language(rightPage.instruction || ''),
     rows: (data.weeks || []).map((week) => ({
       weekLabel: 'Week ' + pad2(week.weekNumber),
       instruction: week.isBossWeek

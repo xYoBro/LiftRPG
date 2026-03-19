@@ -11,6 +11,48 @@ import {
 } from './field-ops-primitives.js?v=47';
 import { inferCipherFamily, inferMapFamily } from './mechanic-registry.js?v=47';
 
+function renderClassifiedPacketCoverMeta(model) {
+  const wrap = make('div', 'cover-packet-meta');
+  const rows = [
+    ['Packet', (model.designation || model.meta.blockTitle || 'Incident Packet').slice(0, 56)],
+    ['Class', (model.artifactIdentity && model.artifactIdentity.artifactClass) || 'classified packet'],
+    ['Mode', (model.artifactIdentity && model.artifactIdentity.boardStateMode) || 'survey-grid'],
+  ];
+
+  rows.forEach(([label, value]) => {
+    const row = make('div', 'cover-packet-row');
+    row.appendChild(make('span', 'cover-packet-label', label));
+    row.appendChild(make('span', 'cover-packet-value', value));
+    wrap.appendChild(row);
+  });
+
+  return wrap;
+}
+
+function renderClassifiedRulesCallout(model) {
+  const wrap = make('aside', 'rules-sidecar');
+  wrap.appendChild(make('div', 'doc-label', 'Packet Handling'));
+  [
+    'Read the procedure text before opening any weekly record.',
+    'Treat empty logs and redacted forms as authored evidence, not filler.',
+    'Do not unseal the annex until the packet ledger fully reconciles.',
+  ].forEach((item) => {
+    wrap.appendChild(make('div', 'rules-sidecar-item', item));
+  });
+  if (model.meta && model.meta.weeklyComponentLabel) {
+    wrap.appendChild(make('div', 'rules-sidecar-chip', model.meta.weeklyComponentLabel));
+  }
+  return wrap;
+}
+
+function renderClassifiedSealCard(model) {
+  const card = make('div', 'sealed-card');
+  card.appendChild(make('div', 'sealed-card-marking', 'Sealed Material'));
+  card.appendChild(make('div', 'sealed-card-title', model.title));
+  card.appendChild(make('div', 'sealed-card-note', 'Open only after the packet ledger reconciles.'));
+  return card;
+}
+
 function renderCoverArt(model) {
   const source = String(model.coverArt || '').trim();
   if (!source) return null;
@@ -179,6 +221,10 @@ export function renderCoverPage(model) {
     frame.appendChild(make('div', 'cover-subtitle', model.subtitle));
   }
 
+  if (model.artifactIdentity && model.artifactIdentity.shellFamily === 'classified-packet') {
+    frame.appendChild(renderClassifiedPacketCoverMeta(model));
+  }
+
   const coverArt = renderCoverArt(model);
   if (coverArt) {
     frame.appendChild(coverArt);
@@ -214,6 +260,10 @@ export function renderRulesLeftPage(model) {
 
   frame.appendChild(make('h2', 'rules-title', model.title));
 
+  if (model.artifactIdentity && model.artifactIdentity.shellFamily === 'classified-packet') {
+    frame.appendChild(renderClassifiedRulesCallout(model));
+  }
+
   const body = make('div', 'rules-body');
   (model.sections || []).forEach((section) => {
     body.appendChild(make('h3', '', section.heading || 'Procedure'));
@@ -225,6 +275,13 @@ export function renderRulesLeftPage(model) {
   if (model.reEntryText) {
     body.appendChild(make('h3', '', 'Re-entry Procedure'));
     splitRichText(model.reEntryText).forEach((para) => {
+      body.appendChild(make('p', '', para));
+    });
+  }
+
+  if (model.supportNote) {
+    body.appendChild(make('h3', '', 'Roll Support'));
+    splitRichText(model.supportNote).forEach((para) => {
       body.appendChild(make('p', '', para));
     });
   }
@@ -243,6 +300,9 @@ export function renderSealedPage(model) {
   frame.setAttribute('data-shell-family', model.artifactIdentity && model.artifactIdentity.shellFamily || 'field-survey');
 
   frame.appendChild(make('div', 'sealed-lock', '🔒'));
+  if (model.artifactIdentity && model.artifactIdentity.shellFamily === 'classified-packet') {
+    frame.appendChild(renderClassifiedSealCard(model));
+  }
   frame.appendChild(make('div', 'sealed-title', model.title));
   const body = make('div', 'sealed-body');
   body.appendChild(make('p', '', model.body));

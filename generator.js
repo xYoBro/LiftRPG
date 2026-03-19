@@ -75,7 +75,7 @@
         'personal cost for knowing'
       ],
       mapType: 'grid',
-      oracleMode: 'simple',
+      oracleMode: 'banded-d100',
       puzzleFamilies: ['fragment cross-reference', 'grid-coordinate reading', 'observational anomaly hunting', 'process deduction'],
       pressureClocks: ['Exposure Risk', 'Evidence Chain', 'Site Integrity'],
       scarcitySurfaces: ['dashboard', 'stress-track', 'return-box'],
@@ -111,10 +111,10 @@
         'arrival that reveals a cost already paid'
       ],
       mapType: 'linear-track',
-      oracleMode: 'simple',
+      oracleMode: 'banded-d100',
       puzzleFamilies: ['path tracing', 'route adjacency', 'environmental pattern recognition', 'resource clock pressure'],
       pressureClocks: ['Exposure', 'Supplies', 'Distance Remaining'],
-      scarcitySurfaces: ['usage-die', 'inventory-grid', 'dashboard'],
+      scarcitySurfaces: ['stress-track', 'inventory-grid', 'dashboard'],
       interludePayloads: ['narrative', 'cipher', 'map'],
       documentTypes: ['fieldNote', 'report', 'letter', 'correspondence', 'memo'],
       themeHints: ['nautical', 'pastoral', 'scifi']
@@ -147,7 +147,7 @@
         'consequence that must be lived with publicly'
       ],
       mapType: 'point-to-point',
-      oracleMode: 'full',
+      oracleMode: 'banded-d100',
       puzzleFamilies: ['logic deduction', 'witness contradiction', 'fragment cross-reference', 'branch consequence tracking'],
       pressureClocks: ['Suspicion', 'Trust', 'Public Attention'],
       scarcitySurfaces: ['memory-slots', 'dashboard', 'return-box'],
@@ -183,7 +183,7 @@
         'irreversible interpretive act'
       ],
       mapType: 'player-drawn',
-      oracleMode: 'full',
+      oracleMode: 'banded-d100',
       puzzleFamilies: ['symbol decoding', 'layered metapuzzle assembly', 'observational anomaly hunting', 'oracle-triggered rule mutation'],
       pressureClocks: ['Contamination', 'Witness', 'Seal Integrity'],
       scarcitySurfaces: ['stress-track', 'memory-slots', 'overlay-window'],
@@ -219,7 +219,7 @@
         'triage under institutional pressure'
       ],
       mapType: 'grid',
-      oracleMode: 'simple',
+      oracleMode: 'banded-d100',
       puzzleFamilies: ['process deduction', 'index extraction', 'observational anomaly hunting', 'route denial'],
       pressureClocks: ['Containment Loss', 'Triage Load', 'Exposure Window'],
       scarcitySurfaces: ['dashboard', 'stress-track', 'inventory-grid'],
@@ -255,10 +255,10 @@
         'costly arrival or stand'
       ],
       mapType: 'point-to-point',
-      oracleMode: 'simple',
+      oracleMode: 'banded-d100',
       puzzleFamilies: ['path tracing', 'adjacency extraction', 'constraint logic', 'resource clock pressure'],
       pressureClocks: ['Weather', 'Supplies', 'Pursuit'],
-      scarcitySurfaces: ['inventory-grid', 'usage-die', 'return-box'],
+      scarcitySurfaces: ['inventory-grid', 'stress-track', 'return-box'],
       interludePayloads: ['map', 'narrative', 'fragment-ref'],
       documentTypes: ['fieldNote', 'letter', 'report', 'inspection', 'memo'],
       themeHints: ['pastoral', 'noir', 'nautical']
@@ -291,7 +291,7 @@
         'consequence that changes how the place can be lived in'
       ],
       mapType: 'grid',
-      oracleMode: 'simple',
+      oracleMode: 'banded-d100',
       puzzleFamilies: ['room-label derivation', 'fragment cross-reference', 'pattern recognition', 'logic deduction'],
       pressureClocks: ['Strain', 'Suspicion', 'Caretaking Load'],
       scarcitySurfaces: ['memory-slots', 'dashboard', 'inventory-grid'],
@@ -327,10 +327,10 @@
         'manual intervention with public consequence'
       ],
       mapType: 'point-to-point',
-      oracleMode: 'simple',
+      oracleMode: 'banded-d100',
       puzzleFamilies: ['route adjacency', 'tracker-value lookup', 'process deduction', 'visual pattern'],
       pressureClocks: ['Load', 'Outage Risk', 'Public Fallout'],
-      scarcitySurfaces: ['dashboard', 'usage-die', 'stress-track'],
+      scarcitySurfaces: ['dashboard', 'memory-slots', 'stress-track'],
       interludePayloads: ['clock', 'map', 'password-element'],
       documentTypes: ['inspection', 'report', 'memo', 'form', 'fieldNote', 'transcript'],
       themeHints: ['government', 'scifi', 'noir']
@@ -654,9 +654,8 @@
     '',
     '### fieldOps.oracleTable',
     '- Shape: { title, instruction, mode, entries[] }',
-    '- `mode`: "simple" or "full"',
-    '- `simple` uses exactly 11 entries with roll values "2" through "12"',
-    '- `full` uses exactly 10 entries with roll values in "01"-"00" bands',
+    '- `mode` is optional metadata; if present prefer "fragment", "consequence", or "mixed"',
+    '- Oracle tables use exactly 10 entries with roll bands "00-09", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90-99"',
     '- Each entry: { roll: string, type: "fragment"|"consequence", text: string, paperAction?: string, fragmentRef?: string }',
     '- CRITICAL: the text field is called `text`, never `description` or `label`.',
     '- Fragment entries (type: "fragment") must include `fragmentRef` pointing to a real fragment ID.',
@@ -671,7 +670,6 @@
     '- `token-sheet`',
     '- `overlay-window`',
     '- `stress-track`',
-    '- `usage-die`',
     '- `memory-slots`',
     '',
     '### week.interlude',
@@ -859,7 +857,7 @@
     '- The map, clocks, oracles, companions, and ciphers are ONE living board, not five parallel games. Every system must affect at least one other system.',
     '- Oracle consequences should reference specific map nodes ("shade the node you occupy on the map"), specific clocks ("advance [clock name] by 1"), or specific companion state ("cross off one slot on [companion]").',
     '- Clock consequenceOnFull should trigger a visible map change: a route closes, a node becomes inaccessible, a new zone opens under duress, or an NPC\'s position shifts.',
-    '- Companion depletion or exhaustion should gate a player decision: when a stress-track fills or usage-die is spent, the player loses access to a route, information source, or safe option.',
+    '- Companion depletion or exhaustion should gate a player decision: when a stress-track fills or a dashboard/inventory surface is exhausted, the player loses access to a route, information source, or safe option.',
     '- Cipher solutions should connect to the map: the fiction-native value derived from a cipher should correspond to a map location, node label, or route identifier the player can now access or reinterpret.',
     '- Weekly component values should be spatially derived: readings from instruments at specific map coordinates, tags from specific nodes, codes found in specific restricted areas.',
     '- The binary choice at midpoint should fork the board state: one option opens route A and closes route B; the other does the reverse. Both routes must remain viable but with different pressures and information access.',
@@ -988,7 +986,7 @@
     '- companion component, interlude payload, map, and clock vocab come only from the supported list',
     '- oracle entries use the field name `text`, never `description` or `label`',
     '- oracle fragment entries include `fragmentRef` pointing to a real fragment ID',
-    '- simple oracle tables have exactly 11 entries (roll "2" through "12"); full tables have exactly 10',
+    '- every oracle table has exactly 10 entries using the d100 roll bands "00-09" through "90-99"',
     '- `cipher.body` is an object with { displayText?, key?, workSpace?, referenceTargets? }, never a string',
     '- most non-boss weeks share a persistent main topology — maps are not unrelated one-offs',
     '- story prompts contain zero gym/exercise metaphors — the workout is real, the fiction is fiction',
@@ -1103,10 +1101,10 @@
       '',
       formatDesignBias(blend),
       '',
-      '## Dice Selection',
+      '## Randomizer',
       '',
-      dice,
-      'Tip: use only the selected dice and keep microplay pencil-fast.',
+      dice || 'd100',
+      'If the player has no dice, tell them to ask Google to roll a d100.',
       '',
       '---',
       '',
@@ -1442,9 +1440,9 @@
       '',
       formatDesignBias(blend),
       '',
-      '## Dice Selection',
+      '## Randomizer',
       '',
-      dice,
+      dice || 'd100',
       '',
       '---',
       '',
@@ -1587,7 +1585,7 @@
       '## Stage 3 Postchecks — enforce before outputting',
       '- Oracle entries must use `text`, never `description`.',
       '- Fragment oracle entries (type: "fragment") must include `fragmentRef`.',
-      '- Simple oracle tables need exactly 11 entries with roll values "2" through "12".',
+      '- Oracle tables need exactly 10 entries with roll bands "00-09" through "90-99".',
       '- `fieldOps.cipher.body` must be an object, not a string.',
       '- `interlude.payloadType` must be one of: "none" | "narrative" | "cipher" | "map" | "clock" | "companion" | "fragment-ref" | "password-element".',
       '- Verify every check before outputting. If any fails, fix it first.'
@@ -1668,10 +1666,10 @@
       '',
       formatDesignBias(blend),
       '',
-      '## Dice Selection',
+      '## Randomizer',
       '',
-      dice,
-      'Tip: use only the selected dice and keep microplay pencil-fast.',
+      dice || 'd100',
+      'If the player has no dice, tell them to ask Google to roll a d100.',
       '',
       '---',
       '',
@@ -1905,6 +1903,10 @@
       if (shellContext.structuralShape) {
         parts.push('**Structural Shape:** ' + JSON.stringify(shellContext.structuralShape));
       }
+      if (shellContext.artifactIdentity) {
+        parts.push('**Artifact Identity Contract:** ' + JSON.stringify(shellContext.artifactIdentity));
+        parts.push('Do not flatten this into a generic ops dossier. Preserve shellFamily, boardStateMode, openingMode, rulesDeliveryMode, and unlockLogic.');
+      }
       parts.push('');
     }
 
@@ -2102,7 +2104,7 @@
     parts.push('- Each week must use a different cipher family than the prior week.');
     parts.push('');
     parts.push('### Oracle Table');
-    parts.push('- Simple mode: exactly 11 entries (roll "2" through "12"). Full mode: exactly 10 entries.');
+    parts.push('- Use exactly 10 oracle entries with d100 roll bands "00-09" through "90-99".');
     parts.push('- At least 4 entries must produce a playable consequence: a paperAction that names');
     parts.push('  a specific clock, map node, or companion by label. No vague "something changes."');
     parts.push('- Fragment-type entries must include fragmentRef pointing to a real fragment ID.');
@@ -2131,7 +2133,7 @@
       '- Boss week: `isBossWeek: true`, include `bossEncounter`, omit `fieldOps`.',
       '- Oracle entries use `text` (string), not `description` or `label`.',
       '- Oracle `type: \"fragment\"` entries must include `fragmentRef`.',
-      '- Simple oracle: exactly 11 entries with roll values "2" through "12".',
+      '- Oracle tables: exactly 10 entries with roll bands "00-09" through "90-99".',
       '- `cipher.body` is an object, not a string.',
       '- Escape all double-quote characters inside string values as \\". Use em-dashes instead of quoted speech where possible.',
     ].join('\n');
@@ -2178,6 +2180,10 @@
       if (shellContext.worldContract) parts.push('**World Contract:** ' + shellContext.worldContract);
       if (shellContext.narrativeVoice) parts.push('**Narrative Voice:** ' + JSON.stringify(shellContext.narrativeVoice));
       if (shellContext.literaryRegister) parts.push('**Literary Register:** ' + JSON.stringify(shellContext.literaryRegister));
+      if (shellContext.artifactIdentity) {
+        parts.push('**Artifact Identity Contract:** ' + JSON.stringify(shellContext.artifactIdentity));
+        parts.push('Fragments must read like documents from this artifact family, not generic clue memos.');
+      }
       parts.push('');
     }
 
@@ -2330,6 +2336,10 @@
       if (shellContext.worldContract) parts.push('**World Contract:** ' + shellContext.worldContract);
       if (shellContext.narrativeVoice) parts.push('**Narrative Voice:** ' + JSON.stringify(shellContext.narrativeVoice));
       if (shellContext.literaryRegister) parts.push('**Literary Register:** ' + JSON.stringify(shellContext.literaryRegister));
+      if (shellContext.artifactIdentity) {
+        parts.push('**Artifact Identity Contract:** ' + JSON.stringify(shellContext.artifactIdentity));
+        parts.push('Do not normalize this batch into generic reports. Preserve the approved artifact family and document ecology.');
+      }
       parts.push('');
     }
 
@@ -2468,6 +2478,10 @@
       }
       if (shellContext.structuralShape) {
         parts.push('**Structural Shape:** ' + JSON.stringify(shellContext.structuralShape));
+      }
+      if (shellContext.artifactIdentity) {
+        parts.push('**Artifact Identity Contract:** ' + JSON.stringify(shellContext.artifactIdentity));
+        parts.push('The ending must feel like the same artifact family and reveal shape promised by the shell.');
       }
       parts.push('');
     }

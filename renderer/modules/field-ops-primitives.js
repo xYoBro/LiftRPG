@@ -113,27 +113,15 @@ function renderGridMap(mapState) {
   const wrap = make('div', 'map-grid');
   const cols = mapState.gridDimensions.columns;
   wrap.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+  wrap.style.setProperty('--grid-columns', String(cols));
+  wrap.style.setProperty('--grid-rows', String(mapState.gridDimensions.rows || 1));
 
   const tilesByPosition = {};
-  let minRow = mapState.gridDimensions.rows;
-  let maxRow = 1;
   (mapState.tiles || []).forEach((tile) => {
     tilesByPosition[tile.col + ':' + tile.row] = tile;
-    if (tile.row < minRow) minRow = tile.row;
-    if (tile.row > maxRow) maxRow = tile.row;
   });
 
-  // Include current position in bounding box
-  if (mapState.currentPosition) {
-    if (mapState.currentPosition.row < minRow) minRow = mapState.currentPosition.row;
-    if (mapState.currentPosition.row > maxRow) maxRow = mapState.currentPosition.row;
-  }
-
-  // Pad one row above and below for context, clamped to grid bounds
-  const startRow = Math.max(1, minRow - 1);
-  const endRow = Math.min(mapState.gridDimensions.rows, maxRow + 1);
-
-  for (let row = startRow; row <= endRow; row += 1) {
+  for (let row = 1; row <= mapState.gridDimensions.rows; row += 1) {
     for (let col = 1; col <= cols; col += 1) {
       const tile = tilesByPosition[col + ':' + row] || {};
       let cellClass = 'map-cell ' + (tile.type || 'empty');
@@ -156,10 +144,26 @@ function renderPointMap(mapState) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('class', 'map-network-svg');
   svg.setAttribute('viewBox', '0 0 100 100');
-  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  const nodes = (mapState.nodes || []).map((node) => ({ ...node }));
+  const maxX = nodes.reduce((max, node) => Math.max(max, Number(node.x) || 0), 0);
+  const maxY = nodes.reduce((max, node) => Math.max(max, Number(node.y) || 0), 0);
+  const usesGridCoords = maxX <= 12 && maxY <= 12;
+
+  function normalizeCoord(value, maxValue, insetStart, insetEnd) {
+    const numeric = Number(value) || 0;
+    if (usesGridCoords) {
+      const span = Math.max(1, maxValue - 1);
+      return insetStart + ((Math.max(1, numeric) - 1) / span) * (insetEnd - insetStart);
+    }
+    return Math.max(insetStart, Math.min(insetEnd, numeric));
+  }
 
   const nodesById = {};
-  (mapState.nodes || []).forEach((node) => {
+  nodes.forEach((node) => {
+    node._x = normalizeCoord(node.x, maxX, 16, 84);
+    node._y = normalizeCoord(node.y, maxY, 14, 82);
     nodesById[node.id] = node;
   });
 
@@ -169,18 +173,18 @@ function renderPointMap(mapState) {
     if (!from || !to) return;
 
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', String(from.x || 0));
-    line.setAttribute('y1', String(from.y || 0));
-    line.setAttribute('x2', String(to.x || 0));
-    line.setAttribute('y2', String(to.y || 0));
+    line.setAttribute('x1', String(from._x || 0));
+    line.setAttribute('y1', String(from._y || 0));
+    line.setAttribute('x2', String(to._x || 0));
+    line.setAttribute('y2', String(to._y || 0));
     line.setAttribute('class', 'map-edge');
     line.setAttribute('data-state', edge.state || 'open');
     svg.appendChild(line);
 
     if (edge.label) {
       const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      label.setAttribute('x', String(((from.x || 0) + (to.x || 0)) / 2));
-      label.setAttribute('y', String((((from.y || 0) + (to.y || 0)) / 2) - 2));
+      label.setAttribute('x', String(((from._x || 0) + (to._x || 0)) / 2));
+      label.setAttribute('y', String((((from._y || 0) + (to._y || 0)) / 2) - 2));
       label.setAttribute('text-anchor', 'middle');
       label.setAttribute('class', 'map-edge-label');
       label.textContent = edge.label;
@@ -190,19 +194,27 @@ function renderPointMap(mapState) {
   wrap.appendChild(svg);
 
   const nodeLayer = make('div', 'map-network-nodes');
-  (mapState.nodes || []).forEach((node) => {
+  nodes.forEach((node) => {
     const card = make('div', 'map-node');
     card.setAttribute('data-state', node.state || 'empty');
     if (mapState.currentNode && mapState.currentNode === node.id) {
       card.setAttribute('data-current', 'true');
     }
-    card.style.left = String(node.x || 0) + '%';
-    card.style.top = String(node.y || 0) + '%';
+    card.style.left = String(node._x || 0) + '%';
+    card.style.top = String(node._y || 0) + '%';
     card.appendChild(make('div', 'map-node-name', node.label || node.id));
     card.appendChild(make('div', 'map-node-meta', node.id || ''));
     nodeLayer.appendChild(card);
   });
   wrap.appendChild(nodeLayer);
+
+  const legend = make('div', 'map-network-legend');
+  legend.appendChild(make('div', 'map-network-chip', ((mapState.nodes || []).length || 0) + ' nodes'));
+  legend.appendChild(make('div', 'map-network-chip', ((mapState.edges || []).length || 0) + ' routes'));
+  if (mapState.currentNode) {
+    legend.appendChild(make('div', 'map-network-chip', 'Current ' + mapState.currentNode));
+  }
+  wrap.appendChild(legend);
   return wrap;
 }
 
@@ -454,11 +466,11 @@ function renderOverlay(component) {
 
 function renderUsageDie(component) {
   const wrap = make('div', 'companion-usage-die');
-  const ladder = ['d20', 'd12', 'd10', 'd8', 'd6', 'd4'];
-  const current = String(component.usageDie || 'd8').toLowerCase();
+  const ladder = ['100', '80', '60', '40', '20', '00'];
+  const current = String(component.usageDie || component.usage || '').toLowerCase();
   ladder.forEach((step) => {
-    const item = make('div', 'companion-usage-step', step.toUpperCase());
-    if (step === current) item.setAttribute('data-active', 'true');
+    const item = make('div', 'companion-usage-step', step);
+    if (step === '100' || current.indexOf(step) !== -1) item.setAttribute('data-active', 'true');
     wrap.appendChild(item);
   });
   return wrap;
@@ -625,6 +637,7 @@ export function renderBossPage(model) {
   });
   const page = scaffold.page;
   const frame = scaffold.frame;
+  frame.setAttribute('data-shell-family', model.shellFamily || (model.artifactIdentity && model.artifactIdentity.shellFamily) || 'field-survey');
 
   if (model.convergenceProof) {
     frame.setAttribute('data-has-convergence-proof', 'true');
@@ -640,6 +653,14 @@ export function renderBossPage(model) {
   header.appendChild(make('span', '', 'Convergence'));
   header.appendChild(make('span', 'page-num', ''));
   frame.appendChild(header);
+
+  if (model.shellFamily === 'classified-packet') {
+    const strip = make('div', 'boss-incident-strip');
+    strip.appendChild(make('div', 'boss-incident-chip', 'Final Document'));
+    strip.appendChild(make('div', 'boss-incident-chip', model.weekLabel || 'Week 00'));
+    strip.appendChild(make('div', 'boss-incident-chip', 'Recovered Inputs ' + ((model.componentInputs || []).length || 0)));
+    frame.appendChild(strip);
+  }
 
   if (model.continuationLabel) {
     frame.appendChild(make('div', 'doc-label continuation-label', model.continuationLabel));
@@ -673,7 +694,7 @@ export function renderBossPage(model) {
 
   if ((model.componentInputs || []).length) {
     const components = make('div', 'boss-components');
-    components.appendChild(make('div', 'boss-components-label', 'Recorded Inputs'));
+    components.appendChild(make('div', 'boss-components-label', model.componentLabel || 'Recorded Inputs'));
     const list = make('div', 'boss-component-list');
     (model.componentInputs || []).forEach((item) => {
       const row = make('div', 'boss-component-item');
@@ -708,7 +729,7 @@ export function renderBossPage(model) {
   }
 
   const convergence = make('div', 'boss-convergence');
-  convergence.appendChild(make('div', 'boss-convergence-label', 'Final Word'));
+  convergence.appendChild(make('div', 'boss-convergence-label', model.convergenceLabel || 'Final Word'));
   convergence.appendChild(make('p', 'boss-convergence-instruction', model.passwordRevealInstruction));
 
   const passwordBoxes = make('div', 'boss-password-boxes');

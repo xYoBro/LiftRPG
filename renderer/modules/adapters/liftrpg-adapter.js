@@ -38,9 +38,62 @@ export const LIFTRPG_SECTIONS = [
 const SESSION_CHUNK_DENSITY = 1.0;
 const CHUNK_HEADER_HEIGHT = 92;
 const CHUNK_FOOTER_HEIGHT = 24;
+export const MAX_BOOKLET_PAGES = 80;
 
 function singlePageGroupPolicy() {
   return { mode: 'single-page-preferred' };
+}
+
+function resolveMapSizeHint(artifactIdentity, mapState) {
+  const shellFamily = String((artifactIdentity && artifactIdentity.shellFamily) || '').trim().toLowerCase();
+  const boardStateMode = String((artifactIdentity && artifactIdentity.boardStateMode) || '').trim().toLowerCase();
+  const mapType = String((mapState && mapState.mapType) || 'grid').trim().toLowerCase();
+
+  if (mapType === 'player-drawn') return 'full-page';
+  if (shellFamily === 'classified-packet' && (
+    boardStateMode === 'node-graph'
+    || boardStateMode === 'timeline-reconstruction'
+    || boardStateMode === 'testimony-matrix'
+  )) {
+    return 'full-page';
+  }
+  if (mapType === 'point-to-point') return shellFamily === 'classified-packet' ? 'full-page' : 'half-page';
+  if (mapType === 'grid') return 'half-page';
+  return 'quarter-page';
+}
+
+function resolveTrackerSizeHint(artifactIdentity, component) {
+  const shellFamily = String((artifactIdentity && artifactIdentity.shellFamily) || '').trim().toLowerCase();
+  const family = String((component && (component.type || component.family)) || '').trim().toLowerCase();
+  const footprint = String((component && component.footprint) || '').trim().toLowerCase();
+
+  if (footprint === 'full-page' || footprint === 'half-page' || footprint === 'quarter-page') {
+    return footprint;
+  }
+  if (shellFamily === 'classified-packet') {
+    if (family === 'token-sheet' || family === 'overlay-window') return 'full-page';
+    if (family === 'memory-slots' || family === 'inventory-grid' || family === 'dashboard') return 'half-page';
+  }
+  return footprint || 'half-page';
+}
+
+function resolveTrackerGroup(primaryGroup, weekIndex, attachmentStrategy, artifactIdentity, component) {
+  const shellFamily = String((artifactIdentity && artifactIdentity.shellFamily) || '').trim().toLowerCase();
+  const boardStateMode = String((artifactIdentity && artifactIdentity.boardStateMode) || '').trim().toLowerCase();
+  const family = String((component && (component.type || component.family)) || '').trim().toLowerCase();
+
+  if (shellFamily === 'classified-packet') {
+    if (family === 'token-sheet' || family === 'overlay-window') {
+      return `week-${weekIndex}-tactical-board`;
+    }
+    if (family === 'memory-slots' || family === 'inventory-grid') {
+      return boardStateMode === 'testimony-matrix'
+        ? `week-${weekIndex}-case-surface`
+        : `week-${weekIndex}-support-surface`;
+    }
+  }
+
+  return resolveAttachmentGroup(primaryGroup, weekIndex, attachmentStrategy, 'companion', artifactIdentity);
 }
 
 // ---------------------------------------------------------------------------
@@ -213,8 +266,6 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
 
       // Map panel
       if (week.fieldOps && week.fieldOps.mapState) {
-        const mapType = week.fieldOps.mapState.mapType || 'grid';
-        const mapHint = (mapType === 'player-drawn') ? 'half-page' : 'quarter-page';
         atoms.push(createAtom({
           type: 'map-panel',
           id: `w${wi}-map`,
@@ -222,7 +273,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
           groupPolicy: singlePageGroupPolicy(),
           section: 'body',
           sequence: wi * 1000 + 102,
-          sizeHint: mapHint,
+          sizeHint: resolveMapSizeHint(artifactIdentity, week.fieldOps.mapState),
           pageAffinity: 'right',
           data: {
             map: week.fieldOps.mapState,
@@ -240,10 +291,10 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
           atoms.push(createAtom({
             type: 'tracker',
             id: `w${wi}-companion-${ci}`,
-            group: `${primaryGroup}-companions`,
+            group: resolveTrackerGroup(primaryGroup, wi, attachmentStrategy, artifactIdentity, comp),
             section: 'body',
             sequence: wi * 1000 + 200 + ci,
-            sizeHint: comp.footprint || 'half-page',
+            sizeHint: resolveTrackerSizeHint(artifactIdentity, comp),
             pageAffinity: 'either',
             data: {
               trackType: comp.type || comp.family || 'track',
@@ -603,6 +654,7 @@ function resolveWeekAttachmentStrategy(artifactIdentity, week, profile) {
 }
 
 function resolveAttachmentGroup(primaryGroup, weekIndex, attachmentStrategy, channel, artifactIdentity = null) {
+  const shellFamily = String((artifactIdentity && artifactIdentity.shellFamily) || '').trim().toLowerCase();
   const boardStateMode = String((artifactIdentity && artifactIdentity.boardStateMode) || '').trim().toLowerCase();
 
   if (attachmentStrategy === 'narrative-support') {
@@ -611,6 +663,16 @@ function resolveAttachmentGroup(primaryGroup, weekIndex, attachmentStrategy, cha
   }
 
   if (attachmentStrategy === 'split-technical' || attachmentStrategy === 'appendix-split') {
+    if (shellFamily === 'classified-packet') {
+      if (boardStateMode === 'node-graph' || boardStateMode === 'timeline-reconstruction') {
+        if (channel === 'map') return `week-${weekIndex}-topology-board`;
+        return `week-${weekIndex}-ops-ledger`;
+      }
+      if (boardStateMode === 'testimony-matrix') {
+        if (channel === 'map') return `week-${weekIndex}-case-map`;
+        return `week-${weekIndex}-case-ledger`;
+      }
+    }
     if (boardStateMode === 'timeline-reconstruction') {
       return channel === 'cipher' ? `week-${weekIndex}-tech-cipher` : `week-${weekIndex}-timeline-board`;
     }
@@ -644,6 +706,9 @@ function fragmentWeight(fragment) {
   if (['memo', 'report', 'inspection', 'correspondence', 'transcript', 'anomaly'].includes(documentType)) {
     weight += 0.16;
   }
+  if (['letter', 'form', 'fieldnote', 'field-note'].includes(documentType)) {
+    weight += 0.08;
+  }
   if ((((fragment || {}).designSpec || {}).hasAnnotations)) weight += 0.04;
   if ((((fragment || {}).designSpec || {}).hasRedactions)) weight += 0.04;
 
@@ -658,8 +723,8 @@ function fragmentMustStandAlone(fragment, weight = fragmentWeight(fragment)) {
   const documentType = String(fragment.documentType || '').toLowerCase();
 
   return weight >= 0.9
-    || body.length >= 950
-    || ['memo', 'report', 'inspection', 'correspondence', 'transcript', 'anomaly'].includes(documentType);
+    || body.length >= 900
+    || ['memo', 'report', 'inspection', 'correspondence', 'transcript', 'anomaly', 'letter'].includes(documentType);
 }
 
 // ---------------------------------------------------------------------------

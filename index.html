@@ -1062,18 +1062,13 @@
         placeholder="Artifact type, tone, authors/books to echo, mechanic feel, realism vs. genre, emotional stakes — or leave blank for a surprise"></textarea>
       <div class="dice-tip">Better results: mention the kind of artifact you want, the voice/style, the mechanic feel, and whether you want quiet realism or overt genre. A few words still works.</div>
 
-      <fieldset class="dice-fieldset">
-        <legend class="field-label">Dice</legend>
-        <label class="dice-option">
-          <input type="radio" name="gen-dice" value="2d6" checked />
-          <span>2d6 <span class="dice-note">(six-sided pair)</span></span>
-        </label>
-        <label class="dice-option">
-          <input type="radio" name="gen-dice" value="d10 + d% (percentile)" />
-          <span>d10 + d% <span class="dice-note">(percentile)</span></span>
-        </label>
-        <div class="dice-tip">Tip: Google &ldquo;roll 2d6&rdquo; &mdash; works as dice if you have none</div>
-      </fieldset>
+      <div class="dice-fieldset">
+        <div class="field-label">Randomizer</div>
+        <div class="dice-option">
+          <span>d100 <span class="dice-note">(00-99 percentile bands)</span></span>
+        </div>
+        <div class="dice-tip">No worries if you don&rsquo;t have dice. Ask Google to roll a d100.</div>
+      </div>
 
       <button class="gen-submit" id="gen-submit" type="button">Build Layer Bible &rarr;</button>
 
@@ -1336,7 +1331,7 @@
       var assemblyResultEl = document.getElementById('wiz-assembly-result');
       var WIZARD_DRAFT_KEY = 'liftrpg_manual_wizard_draft_v2';
       var LEGACY_WIZARD_DRAFT_KEY = 'liftrpg_manual_wizard_draft_v1';
-      var WIZARD_BUILD_VERSION = '2.1.0';
+      var WIZARD_BUILD_VERSION = '2.2.0';
       var WIZARD_DRAFT_SCHEMA_VERSION = 2;
       var WIZARD_STAGE_KEYS = ['layerBible', 'campaignPlan', 'shell', 'weeks', 'fragments', 'endings'];
 
@@ -1405,10 +1400,8 @@
         }
       }
 
-      function selectDiceValue(value) {
-        var target = value || '2d6';
-        var radio = document.querySelector('input[name="gen-dice"][value="' + target + '"]');
-        if (radio) radio.checked = true;
+      function selectDiceValue(_value) {
+        return 'd100';
       }
 
       function collectWizardDraft() {
@@ -1601,7 +1594,7 @@
         resetWizardState({ keepDraft: true });
         workoutEl.value = draft.workout || '';
         briefEl.value = draft.brief || '';
-        selectDiceValue(draft.dice || '2d6');
+        selectDiceValue(draft.dice || 'd100');
 
         wizData = draft.wizData;
         wizState = draft.wizState;
@@ -1775,8 +1768,7 @@
       }
 
       function getDiceValue() {
-        var diceRadio = document.querySelector('input[name="gen-dice"]:checked');
-        return diceRadio ? diceRadio.value : '2d6';
+        return 'd100';
       }
 
       function wizSetStep(idx) {
@@ -2126,6 +2118,16 @@
         var cloned = JSON.parse(JSON.stringify(data || {}));
         if (!cloned || typeof cloned !== 'object') return cloned;
 
+        if (api() && typeof api().qualityReport === 'function' && typeof api().qualityGate === 'function') {
+          var report = api().qualityReport(cloned);
+          var gate = api().qualityGate(report);
+          if (!gate.passed) {
+            throw new Error('Booklet is still blocked by the quality gate:\n' + gate.blockers.map(function (entry) {
+              return '- ' + entry.message;
+            }).join('\n'));
+          }
+        }
+
         if (!cloned.meta) cloned.meta = {};
         var hasCiphertext = typeof cloned.meta.passwordEncryptedEnding === 'string'
           && cloned.meta.passwordEncryptedEnding
@@ -2164,10 +2166,49 @@
           return;
         }
 
+        function getShellIdentityContract() {
+          if (!wizData.shell || !manualApi() || typeof manualApi().buildIdentityContract !== 'function') return null;
+          return manualApi().buildIdentityContract(wizData.shell, wizData.campaignPlan || null);
+        }
+
+        function buildRepairGuardrails(label) {
+          var lines = [
+            '- Preserve all validated content outside the repaired subtree.',
+            '- Do not rewrite the booklet into a safer or more generic format.'
+          ];
+          if (label === 'layer bible') {
+            lines.push('- Keep the approved design ledger logic intact. Repair shape, not concept.');
+          } else if (label === 'campaign plan') {
+            lines.push('- Do not renumber weeks, fragment IDs, or overflow IDs.');
+            lines.push('- Preserve the planned mystery progression, boss plan, and week transformations.');
+          } else if (label === 'booklet shell') {
+            lines.push('- Preserve the chosen voice, register, cover object, and shell identity.');
+            lines.push('- Do not collapse the shell into the default LiftRPG cover/rules grammar.');
+          } else if (label === 'week chunk') {
+            lines.push('- Do not rewrite other weeks. Repair only the requested week chunk.');
+            lines.push('- Do not change week numbers, collected component values, or approved fragment/overflow IDs.');
+          } else if (label === 'fragment batch') {
+            lines.push('- Do not change assigned fragment IDs or convert every document into the same memo/report voice.');
+            lines.push('- Preserve document ecology and in-world authorship unless an error explicitly requires a change.');
+          } else if (label === 'endings') {
+            lines.push('- Do not change the approved boss inputs, reveal path, or sealed-ending contract.');
+            lines.push('- Repair continuity and schema issues without inventing new provenance or unlock logic.');
+          }
+
+          var identityContract = getShellIdentityContract();
+          if (identityContract && manualApi() && typeof manualApi().formatIdentityContractLines === 'function') {
+            lines = lines.concat(manualApi().formatIdentityContractLines(identityContract));
+          }
+          return lines;
+        }
+
         var promptText = [
           'You are repairing a LiftRPG ' + stageLabel + ' JSON subtree.',
           'Return ONLY valid JSON. Preserve the existing creative decisions and wording where possible.',
           'Do not rewrite the whole booklet. Fix only syntax and contract violations.',
+          '',
+          'Repair guardrails:',
+          buildRepairGuardrails(stageLabel).join('\n'),
           '',
           'Required contract:',
           contract,
@@ -2657,17 +2698,21 @@
         wizSetStep(5);
       }
 
-      function renderAssemblySuccess(data) {
+      function renderAssemblySuccess(data, report) {
         var title = (data.cover && data.cover.title) || (data.meta && data.meta.title) || 'Untitled';
         var weekCount = Array.isArray(data.weeks) ? data.weeks.length : '?';
         var slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        var aggregateScore = report && report.scores && report.scores.aggregate && typeof report.scores.aggregate.score === 'number'
+          ? report.scores.aggregate.score
+          : null;
+        var qualityMeta = weekCount + ' weeks &middot; validated' + (aggregateScore !== null ? ' &middot; quality ' + aggregateScore : '');
 
         assemblyResultEl._assembledData = data;
         assemblyResultEl._filename = 'liftrpg-' + slug + '.json';
         assemblyResultEl.innerHTML =
           '<div class="assembly-success">' +
             '<div class="result-title">' + escapeForHtml(title) + '</div>' +
-            '<div class="result-meta">' + weekCount + ' weeks &middot; validated</div>' +
+            '<div class="result-meta">' + escapeForHtml(qualityMeta) + '</div>' +
             '<div class="result-actions">' +
               '<button type="button" class="result-btn-primary assembly-open-btn">Open in Renderer</button>' +
               '<button type="button" class="result-btn-secondary assembly-dl-btn">Download JSON</button>' +
@@ -2704,6 +2749,10 @@
         var targets = {};
         (errors || []).forEach(function (error) {
           var text = String(error || '').toLowerCase();
+          if (text.indexOf('shell:') === 0 || text.indexOf('shell ') === 0) targets.shell = true;
+          if (text.indexOf('weeks:') === 0 || text.indexOf('week ') === 0 || text.indexOf('weeks ') === 0) targets.weeks = true;
+          if (text.indexOf('fragments:') === 0 || text.indexOf('fragment ') === 0 || text.indexOf('fragments ') === 0) targets.fragments = true;
+          if (text.indexOf('endings:') === 0 || text.indexOf('ending ') === 0 || text.indexOf('endings ') === 0) targets.endings = true;
           if (text.indexOf('fragment') !== -1) targets.fragments = true;
           if (text.indexOf('boss') !== -1 || text.indexOf('componentinputs') !== -1 || text.indexOf('weeklycomponent') !== -1 ||
               text.indexOf('oracle') !== -1 || text.indexOf('mapstate') !== -1 || text.indexOf('session ') !== -1) {
@@ -2869,7 +2918,20 @@
           return;
         }
 
-        renderAssemblySuccess(booklet);
+        var qualityReport = api() && typeof api().qualityReport === 'function'
+          ? api().qualityReport(booklet)
+          : null;
+        var qualityGate = qualityReport && api() && typeof api().qualityGate === 'function'
+          ? api().qualityGate(qualityReport)
+          : { passed: true, blockers: [] };
+
+        if (!qualityGate.passed) {
+          renderAssemblyErrors(qualityGate.blockers.map(function (entry) { return entry.message; }));
+          saveWizardDraft();
+          return;
+        }
+
+        renderAssemblySuccess(booklet, qualityReport);
         saveWizardDraft();
       });
 

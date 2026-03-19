@@ -13,16 +13,16 @@ import { renderMapSection } from '../field-ops-primitives.js';
 import { densityVariant } from '../engine/density-util.js';
 
 const MAP_HEIGHTS = {
-  'grid':           200,
-  'point-to-point': 220,
+  'grid':           280,
+  'point-to-point': 360,
   'linear-track':   160,
   'player-drawn':   350,
 };
 
 /** ~15% reduction at max density */
 const MAP_HEIGHTS_MIN = {
-  'grid':           170,
-  'point-to-point': 188,
+  'grid':           240,
+  'point-to-point': 300,
   'linear-track':   136,
   'player-drawn':   300,
 };

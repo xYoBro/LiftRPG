@@ -60,6 +60,7 @@ function summarizeWeeklyAudit(config) {
   const failures = [];
   const pageTypeCounts = {};
   const weeklyPageTypes = new Set(['workout-left', 'field-ops', 'boss']);
+  const staticDensityPageTypes = new Set(Array.isArray(config.staticDensityPageTypes) ? config.staticDensityPageTypes : []);
   const requiredPageTypes = Array.isArray(config.requiredPageTypes) ? config.requiredPageTypes : [];
   const inspectPages = new Set(Array.isArray(config.inspectPages) ? config.inspectPages : []);
   const inspectedPages = [];
@@ -107,6 +108,17 @@ function summarizeWeeklyAudit(config) {
           .trim()
           .slice(0, 120)
       });
+    }
+
+    if (staticDensityPageTypes.has(pageType)) {
+      auditedPages += 1;
+      if (frameRect && lastChildRect) {
+        const contentGap = frameRect.bottom - lastChildRect.bottom;
+        if (contentGap > config.maxStaticContentGapPx) {
+          fail('page ' + page.dataset.pageNumber + ' (' + pageType + ') has ' + Math.round(contentGap * 100) / 100 + 'px of dead space');
+        }
+      }
+      return;
     }
 
     if (!weeklyPageTypes.has(pageType)) return;
@@ -605,10 +617,15 @@ export function initRendererApp() {
       maxFooterBottomGapPx: parseAuditNumber(params.get('auditMaxFooterGap'), 16),
       maxWorkoutSlackPx: parseAuditNumber(params.get('auditMaxWorkoutSlack'), 24),
       maxMechanicSlackPx: parseAuditNumber(params.get('auditMaxMechanicSlack'), 36),
+      maxStaticContentGapPx: parseAuditNumber(params.get('auditMaxStaticGap'), 96),
       inspectPages: String(params.get('auditInspectPages') || '')
         .split(',')
         .map((value) => parseInt(value.trim(), 10))
         .filter((value) => Number.isInteger(value) && value > 0),
+      staticDensityPageTypes: String(params.get('auditStaticPageTypes') || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean),
       requiredPageTypes: String(params.get('auditRequirePageTypes') || '')
         .split(',')
         .map((value) => value.trim())
