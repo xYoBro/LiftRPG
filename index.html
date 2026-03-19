@@ -1715,8 +1715,8 @@
 
         if (!hasCiphertext && Array.isArray(cloned.endings) && cloned.endings.length > 0) {
           var modules = await Promise.all([
-            import('renderer/modules/utils.js?v=47'),
-            import('generator/liftrpg-encrypt.js')
+            import('./renderer/modules/utils.js?v=47'),
+            import('./generator/liftrpg-encrypt.js')
           ]);
           var password = modules[0].deriveBookletPassword(cloned);
           if (password) {
