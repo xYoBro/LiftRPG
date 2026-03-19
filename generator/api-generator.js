@@ -3580,6 +3580,15 @@ window.LiftRPGAPI = (function () {
     generate: generate,
     generateMultiStage: generateMultiStage,
     generateStructured: generateStructured,
+    manual: {
+      extractShellContext: extractShellContext,
+      buildChunkContinuity: buildChunkContinuity,
+      assembleBooklet: assembleBooklet,
+      extractWeekSummaries: extractWeekSummaries,
+      findBinaryChoiceWeek: findBinaryChoiceWeek,
+      buildFragmentBatches: buildFragmentBatches,
+      mergeFragmentBatches: mergeFragmentBatches
+    },
     _extractJson: extractJson,
     _validateSchema: validateBookletSchema,
     _validateAssembled: validateAssembledBooklet,

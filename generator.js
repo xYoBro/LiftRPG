@@ -1179,8 +1179,9 @@
   //
   // Additive to window.generatePrompt (single-pass, Chat + API Standard mode).
   //
-  // Chat "Deep" wizard (3-stage, kept for backward compat):
+  // Legacy full-compile chat path:
   //   generateStage1Prompt → generateStage2Prompt → generateStage3Prompt
+  // The default manual flow now continues through shell / weeks / fragments / endings.
   //
   // API "Deep" mode (10-stage partial-JSON pipeline):
   //   Stage 1: Layer Bible
@@ -1193,7 +1194,7 @@
   //
   // Stage 1: Layer Bible  — compact 3-layer architecture planning JSON
   // Stage 2: Campaign Plan — per-week structure using the approved layer bible
-  // Stage 3 (Chat): Final Compile — full booklet JSON (kept for Chat wizard)
+  // Stage 3 (legacy chat): Final Compile — full booklet JSON retained only as fallback
 
   var STAGE1_OUTPUT_SCHEMA = JSON.stringify({
     storyLayer: {

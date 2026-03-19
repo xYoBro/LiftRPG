@@ -890,7 +890,8 @@
 
       <label class="field-label" for="gen-brief">Creative Direction</label>
       <textarea id="gen-brief" class="gen-input" rows="4"
-        placeholder="Genre, setting, tone, story hooks, mood — or leave blank for a surprise"></textarea>
+        placeholder="Artifact type, tone, authors/books to echo, mechanic feel, realism vs. genre, emotional stakes — or leave blank for a surprise"></textarea>
+      <div class="dice-tip">Better results: mention the kind of artifact you want, the voice/style, the mechanic feel, and whether you want quiet realism or overt genre. A few words still works.</div>
 
       <fieldset class="dice-fieldset">
         <legend class="field-label">Dice</legend>
@@ -907,10 +908,8 @@
 
       <button class="gen-submit" id="gen-submit" type="button">Build Layer Bible &rarr;</button>
 
-      <!-- Chat deep wizard (3-step) -->
       <div class="chat-wizard" id="chat-wizard">
 
-        <!-- Step indicator -->
         <div class="wizard-step-row">
           <div class="wizard-num active" id="wiz-num-1">1</div>
           <span class="wizard-step-label active" id="wiz-label-1">Layer Bible</span>
@@ -919,10 +918,18 @@
           <span class="wizard-step-label" id="wiz-label-2">Campaign</span>
           <div class="wizard-divider"></div>
           <div class="wizard-num" id="wiz-num-3">3</div>
-          <span class="wizard-step-label" id="wiz-label-3">Compile</span>
+          <span class="wizard-step-label" id="wiz-label-3">Shell</span>
+          <div class="wizard-divider"></div>
+          <div class="wizard-num" id="wiz-num-4">4</div>
+          <span class="wizard-step-label" id="wiz-label-4">Weeks</span>
+          <div class="wizard-divider"></div>
+          <div class="wizard-num" id="wiz-num-5">5</div>
+          <span class="wizard-step-label" id="wiz-label-5">Fragments</span>
+          <div class="wizard-divider"></div>
+          <div class="wizard-num" id="wiz-num-6">6</div>
+          <span class="wizard-step-label" id="wiz-label-6">Endings</span>
         </div>
 
-        <!-- Pane 1: Layer Bible -->
         <div class="wizard-pane is-visible" id="wiz-pane-1">
           <p class="wizard-hint">Copy &rarr; paste into your LLM &rarr; copy the JSON result back below</p>
           <textarea id="wiz-prompt-1" class="gen-input gen-output" rows="8" readonly></textarea>
@@ -931,10 +938,10 @@
           <textarea id="wiz-result-1" class="gen-input" rows="5"
             placeholder='{"storyLayer":{...},"gameLayer":{...},"governingLayer":{...}}'></textarea>
           <div class="wizard-error" id="wiz-error-1">Invalid JSON &mdash; paste the raw JSON the LLM returned</div>
+          <div id="wiz-repair-1"></div>
           <button class="gen-submit" id="wiz-next-1" type="button" style="margin-top:12px">Next: Plan Campaign &rarr;</button>
         </div>
 
-        <!-- Pane 2: Campaign Plan -->
         <div class="wizard-pane" id="wiz-pane-2">
           <p class="wizard-hint">Copy &rarr; paste into your LLM &rarr; copy the JSON result back below</p>
           <textarea id="wiz-prompt-2" class="gen-input gen-output" rows="8" readonly></textarea>
@@ -943,35 +950,51 @@
           <textarea id="wiz-result-2" class="gen-input" rows="5"
             placeholder='{"topology":{...},"weeks":[...],"bossPlan":{...}}'></textarea>
           <div class="wizard-error" id="wiz-error-2">Invalid JSON &mdash; paste the raw JSON the LLM returned</div>
-          <button class="gen-submit" id="wiz-next-2" type="button" style="margin-top:12px">Next: Compile Booklet &rarr;</button>
+          <div id="wiz-repair-2"></div>
+          <button class="gen-submit" id="wiz-next-2" type="button" style="margin-top:12px">Next: Build Shell &rarr;</button>
         </div>
 
-        <!-- Pane 3: Final Compile -->
         <div class="wizard-pane" id="wiz-pane-3">
-          <p class="wizard-hint">Copy &rarr; paste into your LLM &rarr; paste the JSON result below</p>
+          <p class="wizard-hint">Generate the booklet shell only: meta, cover, rules, and theme</p>
           <textarea id="wiz-prompt-3" class="gen-input gen-output" rows="10" readonly></textarea>
-          <button class="gen-copy" id="wiz-copy-3" type="button">Copy Final Prompt</button>
+          <button class="gen-copy" id="wiz-copy-3" type="button">Copy Prompt</button>
+          <label class="field-label" for="wiz-result-3" style="margin-top:14px">Paste Shell Result</label>
+          <textarea id="wiz-result-3" class="gen-input" rows="7"
+            placeholder='{"meta":{...},"cover":{...},"rulesSpread":{...},"theme":{...}}'></textarea>
+          <div class="wizard-error" id="wiz-error-3">Invalid JSON &mdash; paste the raw JSON the LLM returned</div>
+          <div id="wiz-repair-3"></div>
+          <button class="gen-submit" id="wiz-next-3" type="button" style="margin-top:12px">Next: Build Weeks &rarr;</button>
+        </div>
 
-          <div class="wiz-assembly" id="wiz-assembly">
-            <label class="field-label">Paste the Result</label>
-            <div id="wiz-assembly-chunks">
-              <div class="assembly-chunk-wrap">
-                <span class="chunk-label">Response</span>
-                <textarea class="gen-input assembly-chunk" rows="8" placeholder="Paste the LLM&apos;s JSON response here&hellip;"></textarea>
-              </div>
-            </div>
-            <button class="assembly-add" id="wiz-assembly-add" type="button">+ Add Continuation</button>
-            <button class="gen-submit" id="wiz-assembly-submit" type="button">Assemble &amp; Validate</button>
-            <div id="wiz-assembly-result"></div>
-          </div>
+        <div class="wizard-pane" id="wiz-pane-4">
+          <p class="wizard-hint">Generate only the requested week chunk. Each chunk is validated before you move on.</p>
+          <div id="wiz-weeks-stage"></div>
+        </div>
+
+        <div class="wizard-pane" id="wiz-pane-5">
+          <p class="wizard-hint">Generate fragments in smaller batches so repairs stay local.</p>
+          <div id="wiz-fragments-stage"></div>
+        </div>
+
+        <div class="wizard-pane" id="wiz-pane-6">
+          <p class="wizard-hint">Generate the endings subtree, then assemble and validate the full booklet locally.</p>
+          <textarea id="wiz-prompt-6" class="gen-input gen-output" rows="10" readonly></textarea>
+          <button class="gen-copy" id="wiz-copy-6" type="button">Copy Prompt</button>
+          <label class="field-label" for="wiz-result-6" style="margin-top:14px">Paste Endings Result</label>
+          <textarea id="wiz-result-6" class="gen-input" rows="7"
+            placeholder='{"endings":[...]}'></textarea>
+          <div class="wizard-error" id="wiz-error-6">Invalid JSON &mdash; paste the raw JSON the LLM returned</div>
+          <div id="wiz-repair-6"></div>
+          <button class="gen-submit" id="wiz-assemble-submit" type="button" style="margin-top:12px">Assemble &amp; Validate Booklet</button>
+          <div id="wiz-assembly-result"></div>
         </div>
 
       </div>
 
     </div>
   </div>
-
   <script src="generator.js"></script>
+  <script src="generator/api-generator.js"></script>
   <script>
     (function () {
       var flipper = document.getElementById('card-flip');
@@ -1023,7 +1046,6 @@
   </script>
   <script>
     (function () {
-      // ── DOM refs ────────────────────────────────────────────────────────────
       var modal = document.getElementById('generator-modal');
       var openBtn = document.getElementById('open-generator');
       var closeBtn = document.getElementById('modal-close');
@@ -1031,41 +1053,106 @@
       var workoutEl = document.getElementById('gen-workout');
       var briefEl = document.getElementById('gen-brief');
       var workoutError = document.getElementById('workout-error');
-
-      // Chat deep wizard
       var chatWizard = document.getElementById('chat-wizard');
+
       var wizPanes = [
         document.getElementById('wiz-pane-1'),
         document.getElementById('wiz-pane-2'),
-        document.getElementById('wiz-pane-3')
+        document.getElementById('wiz-pane-3'),
+        document.getElementById('wiz-pane-4'),
+        document.getElementById('wiz-pane-5'),
+        document.getElementById('wiz-pane-6')
       ];
-      var wizNums   = [
+      var wizNums = [
         document.getElementById('wiz-num-1'),
         document.getElementById('wiz-num-2'),
-        document.getElementById('wiz-num-3')
+        document.getElementById('wiz-num-3'),
+        document.getElementById('wiz-num-4'),
+        document.getElementById('wiz-num-5'),
+        document.getElementById('wiz-num-6')
       ];
       var wizLabels = [
         document.getElementById('wiz-label-1'),
         document.getElementById('wiz-label-2'),
-        document.getElementById('wiz-label-3')
+        document.getElementById('wiz-label-3'),
+        document.getElementById('wiz-label-4'),
+        document.getElementById('wiz-label-5'),
+        document.getElementById('wiz-label-6')
       ];
-      var wizPrompts = [
-        document.getElementById('wiz-prompt-1'),
-        document.getElementById('wiz-prompt-2'),
-        document.getElementById('wiz-prompt-3')
-      ];
-      var wizResults = [
-        document.getElementById('wiz-result-1'),
-        document.getElementById('wiz-result-2')
-      ];
-      var wizErrors = [
-        document.getElementById('wiz-error-1'),
-        document.getElementById('wiz-error-2')
-      ];
-      var wizStep = 0; // 0-indexed current wizard step
-      var wizData = [null, null]; // parsed stage1 + stage2 results
+      var wizPrompts = {
+        1: document.getElementById('wiz-prompt-1'),
+        2: document.getElementById('wiz-prompt-2'),
+        3: document.getElementById('wiz-prompt-3'),
+        6: document.getElementById('wiz-prompt-6')
+      };
+      var wizResults = {
+        1: document.getElementById('wiz-result-1'),
+        2: document.getElementById('wiz-result-2'),
+        3: document.getElementById('wiz-result-3'),
+        6: document.getElementById('wiz-result-6')
+      };
+      var wizErrors = {
+        1: document.getElementById('wiz-error-1'),
+        2: document.getElementById('wiz-error-2'),
+        3: document.getElementById('wiz-error-3'),
+        6: document.getElementById('wiz-error-6')
+      };
+      var wizRepair = {
+        1: document.getElementById('wiz-repair-1'),
+        2: document.getElementById('wiz-repair-2'),
+        3: document.getElementById('wiz-repair-3'),
+        6: document.getElementById('wiz-repair-6')
+      };
+      var weeksStageEl = document.getElementById('wiz-weeks-stage');
+      var fragmentsStageEl = document.getElementById('wiz-fragments-stage');
+      var assemblyResultEl = document.getElementById('wiz-assembly-result');
 
-      // ── Open / close ──────────────────────────────────────────────────────
+      var wizStep = 0;
+      var wizData = {};
+      var wizState = {};
+
+      function api() {
+        return window.LiftRPGAPI || null;
+      }
+
+      function manualApi() {
+        return api() && api().manual ? api().manual : null;
+      }
+
+      function resetWizardState() {
+        wizData = {
+          layerBible: null,
+          campaignPlan: null,
+          shell: null,
+          shellContext: null,
+          weekChunkOutputs: [],
+          weekSummaries: [],
+          fragmentsOutput: { fragments: [] },
+          endingsOutput: null
+        };
+        wizState = {
+          weekChunks: [],
+          weekChunkIndex: 0,
+          fragmentBatches: [],
+          fragmentBatchIndex: 0,
+          fragmentBatchOutputs: []
+        };
+
+        Object.keys(wizResults).forEach(function (key) {
+          wizResults[key].value = '';
+        });
+        Object.keys(wizErrors).forEach(function (key) {
+          wizErrors[key].classList.remove('is-visible');
+        });
+        Object.keys(wizRepair).forEach(function (key) {
+          wizRepair[key].innerHTML = '';
+        });
+
+        weeksStageEl.innerHTML = '';
+        fragmentsStageEl.innerHTML = '';
+        assemblyResultEl.innerHTML = '';
+      }
+
       function openModal() {
         modal.classList.add('is-open');
         document.body.style.overflow = 'hidden';
@@ -1079,15 +1166,21 @@
 
       openBtn.addEventListener('click', openModal);
       var howGenerate = document.getElementById('how-generate');
-      if (howGenerate) howGenerate.addEventListener('click', function (e) { e.preventDefault(); openModal(); });
+      if (howGenerate) {
+        howGenerate.addEventListener('click', function (e) {
+          e.preventDefault();
+          openModal();
+        });
+      }
 
       closeBtn.addEventListener('click', closeModal);
-      modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+      modal.addEventListener('click', function (e) {
+        if (e.target === modal) closeModal();
+      });
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && modal.classList.contains('is-open')) closeModal();
       });
 
-      // ── Validation ────────────────────────────────────────────────────────
       function validateWorkout() {
         var workout = workoutEl.value.trim();
         if (!workout) {
@@ -1108,131 +1201,91 @@
         }
       });
 
-      // ── Submit ───────────────────────────────────────────────────────────
-      submitBtn.addEventListener('click', function () {
-        handleChatDeepGenerate();
-      });
-
-      // ── Wizard helpers ────────────────────────────────────────────────────
-      function wizSetStep(idx) {
-        wizStep = idx;
-        wizPanes.forEach(function (p, i) {
-          p.classList.toggle('is-visible', i === idx);
-        });
-        wizNums.forEach(function (n, i) {
-          n.className = 'wizard-num' + (i < idx ? ' done' : i === idx ? ' active' : '');
-        });
-        wizLabels.forEach(function (l, i) {
-          l.className = 'wizard-step-label' + (i < idx ? ' done' : i === idx ? ' active' : '');
-        });
-        wizPrompts[idx].scrollTop = 0;
+      function getDiceValue() {
+        var diceRadio = document.querySelector('input[name="gen-dice"]:checked');
+        return diceRadio ? diceRadio.value : '2d6';
       }
 
-      function makeCopyHandler(textarea, btn, defaultLabel) {
-        return function () {
-          var text = textarea.value;
-          if (!text) return;
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(function () {
-              btn.textContent = 'Copied';
-              setTimeout(function () { btn.textContent = defaultLabel; }, 2000);
-            });
-          } else {
-            textarea.select();
-            textarea.setSelectionRange(0, 99999);
-            try { document.execCommand('copy'); } catch (e) {}
-            btn.textContent = 'Copied';
-            setTimeout(function () { btn.textContent = defaultLabel; }, 2000);
+      function wizSetStep(idx) {
+        wizStep = idx;
+        wizPanes.forEach(function (pane, i) {
+          pane.classList.toggle('is-visible', i === idx);
+        });
+        wizNums.forEach(function (num, i) {
+          num.className = 'wizard-num' + (i < idx ? ' done' : i === idx ? ' active' : '');
+        });
+        wizLabels.forEach(function (label, i) {
+          label.className = 'wizard-step-label' + (i < idx ? ' done' : i === idx ? ' active' : '');
+        });
+        var prompt = wizPrompts[idx + 1];
+        if (prompt) prompt.scrollTop = 0;
+      }
+
+      function copyText(text, button, defaultLabel) {
+        if (!text) return;
+        function updateCopied() {
+          if (button) {
+            button.textContent = 'Copied';
+            setTimeout(function () { button.textContent = defaultLabel; }, 2000);
           }
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(updateCopied);
+        } else {
+          var helper = document.createElement('textarea');
+          helper.value = text;
+          document.body.appendChild(helper);
+          helper.select();
+          try { document.execCommand('copy'); } catch (e) {}
+          document.body.removeChild(helper);
+          updateCopied();
+        }
+      }
+
+      function makeCopyHandler(textarea, button, defaultLabel) {
+        return function () {
+          copyText(textarea.value, button, defaultLabel);
         };
       }
 
       document.getElementById('wiz-copy-1').addEventListener('click',
-        makeCopyHandler(wizPrompts[0], document.getElementById('wiz-copy-1'), 'Copy Prompt'));
+        makeCopyHandler(wizPrompts[1], document.getElementById('wiz-copy-1'), 'Copy Prompt'));
       document.getElementById('wiz-copy-2').addEventListener('click',
-        makeCopyHandler(wizPrompts[1], document.getElementById('wiz-copy-2'), 'Copy Prompt'));
+        makeCopyHandler(wizPrompts[2], document.getElementById('wiz-copy-2'), 'Copy Prompt'));
       document.getElementById('wiz-copy-3').addEventListener('click',
-        makeCopyHandler(wizPrompts[2], document.getElementById('wiz-copy-3'), 'Copy Final Prompt'));
+        makeCopyHandler(wizPrompts[3], document.getElementById('wiz-copy-3'), 'Copy Prompt'));
+      document.getElementById('wiz-copy-6').addEventListener('click',
+        makeCopyHandler(wizPrompts[6], document.getElementById('wiz-copy-6'), 'Copy Prompt'));
 
-      document.getElementById('wiz-next-1').addEventListener('click', function () {
-        var raw = wizResults[0].value.trim();
-        wizErrors[0].classList.remove('is-visible');
-        if (!raw) { wizErrors[0].textContent = 'Paste the JSON the LLM returned'; wizErrors[0].classList.add('is-visible'); return; }
-        try {
-          wizData[0] = JSON.parse(raw);
-        } catch (e) {
-          try { wizData[0] = fallbackExtractJson(raw); }
-          catch (e2) { wizErrors[0].textContent = 'Invalid JSON — paste the raw JSON the LLM returned'; wizErrors[0].classList.add('is-visible'); return; }
-        }
-        var workout = workoutEl.value.trim();
-        var brief = briefEl.value.trim();
-        var diceRadio = document.querySelector('input[name="gen-dice"]:checked');
-        var dice = diceRadio ? diceRadio.value : '2d6';
-        wizPrompts[1].value = window.generateStage2Prompt(workout, brief, dice, wizData[0]);
-        wizSetStep(1);
-      });
-
-      document.getElementById('wiz-next-2').addEventListener('click', function () {
-        var raw = wizResults[1].value.trim();
-        wizErrors[1].classList.remove('is-visible');
-        if (!raw) { wizErrors[1].textContent = 'Paste the JSON the LLM returned'; wizErrors[1].classList.add('is-visible'); return; }
-        try {
-          wizData[1] = JSON.parse(raw);
-        } catch (e) {
-          try { wizData[1] = fallbackExtractJson(raw); }
-          catch (e2) { wizErrors[1].textContent = 'Invalid JSON — paste the raw JSON the LLM returned'; wizErrors[1].classList.add('is-visible'); return; }
-        }
-        var workout = workoutEl.value.trim();
-        var brief = briefEl.value.trim();
-        var diceRadio = document.querySelector('input[name="gen-dice"]:checked');
-        var dice = diceRadio ? diceRadio.value : '2d6';
-        wizPrompts[2].value = window.generateStage3Prompt(workout, brief, dice, wizData[0], wizData[1]);
-        wizSetStep(2);
-      });
-
-      // ── Chat deep mode: start wizard ──────────────────────────────────────
-      function handleChatDeepGenerate() {
-        var workout = validateWorkout();
-        if (!workout) return;
-
-        if (typeof window.generateStage1Prompt !== 'function') {
-          alert('Generator unavailable. Please reload the page.');
-          return;
-        }
-
-        var brief = briefEl.value.trim();
-        var diceRadio = document.querySelector('input[name="gen-dice"]:checked');
-        var dice = diceRadio ? diceRadio.value : '2d6';
-        if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
-
-        // Reset wizard state
-        wizData = [null, null];
-        wizResults[0].value = '';
-        wizResults[1].value = '';
-        wizErrors[0].classList.remove('is-visible');
-        wizErrors[1].classList.remove('is-visible');
-
-        wizPrompts[0].value = window.generateStage1Prompt(workout, brief, dice);
-        wizSetStep(0);
-        chatWizard.classList.add('is-visible');
-      }
-
-      // ── JSON Assembly helpers ────────────────────────────────────────────────
-      var MAX_CHUNKS = 5;
-
-      // ── JSON extraction helpers ─────────────────────────────────────────────
       function fallbackFindJsonBounds(text) {
-        var depth = 0, inStr = false, esc = false, start = -1;
+        var depth = 0;
+        var inStr = false;
+        var esc = false;
+        var start = -1;
         for (var i = 0; i < text.length; i++) {
           var c = text[i];
-          if (esc) { esc = false; continue; }
-          if (c === '\\' && inStr) { esc = true; continue; }
-          if (c === '"') { inStr = !inStr; continue; }
+          if (esc) {
+            esc = false;
+            continue;
+          }
+          if (c === '\\' && inStr) {
+            esc = true;
+            continue;
+          }
+          if (c === '"') {
+            inStr = !inStr;
+            continue;
+          }
           if (inStr) continue;
-          if (c === '{') { if (depth++ === 0) start = i; }
-          else if (c === '}') { if (--depth === 0 && start !== -1) return [start, i]; }
+          if (c === '{') {
+            if (depth++ === 0) start = i;
+          } else if (c === '}') {
+            if (--depth === 0 && start !== -1) return [start, i];
+          }
         }
-        var a = text.indexOf('{'), b = text.lastIndexOf('}');
+        var a = text.indexOf('{');
+        var b = text.lastIndexOf('}');
         return (a !== -1 && b > a) ? [a, b] : null;
       }
 
@@ -1246,21 +1299,19 @@
         return JSON.parse(stripped.slice(bounds[0], bounds[1] + 1));
       }
 
-      function basicValidateBooklet(data) {
-        var errors = [];
-        if (!data || typeof data !== 'object') { errors.push('Root must be a JSON object.'); return errors; }
-        ['meta', 'cover', 'rulesSpread', 'weeks', 'fragments', 'endings'].forEach(function (k) {
-          if (!data[k]) errors.push('Missing required key: "' + k + '"');
-        });
-        if (Array.isArray(data.weeks)) {
-          var boss = data.weeks.filter(function (w) { return w && w.isBossWeek; });
-          if (boss.length !== 1) errors.push('Exactly one boss week is required.');
+      function extractJson(text) {
+        if (api() && typeof api()._extractJson === 'function') {
+          return api()._extractJson(text);
         }
-        return errors;
+        return fallbackExtractJson(text);
       }
 
       function escapeForHtml(str) {
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
       }
 
       function setActionBusy(button, busyText, callback) {
@@ -1314,109 +1365,596 @@
         return cloned;
       }
 
-      // Wire an assembly section: chunks container, add button, submit button, result div
-      function wireAssemblySection(chunksContainer, addBtn, submitBtn, resultContainer) {
-        addBtn.addEventListener('click', function () {
-          var count = chunksContainer.querySelectorAll('.assembly-chunk-wrap').length;
-          if (count >= MAX_CHUNKS) return;
-          var wrap = document.createElement('div');
-          wrap.className = 'assembly-chunk-wrap';
-          wrap.innerHTML =
-            '<span class="chunk-label">Continuation ' + (count + 1) + '</span>' +
-            '<button type="button" class="chunk-remove" title="Remove">&times;</button>' +
-            '<textarea class="gen-input assembly-chunk" rows="6" placeholder="Paste the next part\u2026"></textarea>';
-          wrap.querySelector('.chunk-remove').addEventListener('click', function () {
-            wrap.remove();
-            var wraps = chunksContainer.querySelectorAll('.assembly-chunk-wrap');
-            for (var i = 0; i < wraps.length; i++) {
-              var label = wraps[i].querySelector('.chunk-label');
-              if (i === 0) { label.textContent = 'Response'; var btn = wraps[i].querySelector('.chunk-remove'); if (btn) btn.remove(); }
-              else { label.textContent = 'Continuation ' + (i + 1); }
-            }
+      function renderRepairPrompt(container, stageLabel, contract, rawText, errors) {
+        if (!container) return;
+        if (!errors || !errors.length) {
+          container.innerHTML = '';
+          return;
+        }
+
+        var promptText = [
+          'You are repairing a LiftRPG ' + stageLabel + ' JSON subtree.',
+          'Return ONLY valid JSON. Preserve the existing creative decisions and wording where possible.',
+          'Do not rewrite the whole booklet. Fix only syntax and contract violations.',
+          '',
+          'Required contract:',
+          contract,
+          '',
+          'Issues to fix:',
+          errors.map(function (msg) { return '- ' + msg; }).join('\n'),
+          '',
+          'Original text to repair:',
+          rawText
+        ].join('\n');
+
+        container.innerHTML =
+          '<label class="field-label" style="margin-top:14px">Targeted Repair Prompt</label>' +
+          '<textarea class="gen-input gen-output" rows="9" readonly></textarea>' +
+          '<button class="gen-copy" type="button">Copy Repair Prompt</button>';
+
+        var textarea = container.querySelector('textarea');
+        var button = container.querySelector('button');
+        textarea.value = promptText;
+        button.addEventListener('click', makeCopyHandler(textarea, button, 'Copy Repair Prompt'));
+      }
+
+      function setStageError(stageNumber, message) {
+        var el = wizErrors[stageNumber];
+        if (!el) return;
+        el.textContent = message;
+        el.classList.add('is-visible');
+      }
+
+      function clearStageError(stageNumber) {
+        var el = wizErrors[stageNumber];
+        if (!el) return;
+        el.classList.remove('is-visible');
+      }
+
+      function parseStageJson(rawText, validator, stageNumber, stageLabel, contract) {
+        if (!rawText.trim()) {
+          var emptyMsg = 'Paste the JSON the LLM returned.';
+          setStageError(stageNumber, emptyMsg);
+          renderRepairPrompt(wizRepair[stageNumber], stageLabel, contract, rawText, [emptyMsg]);
+          return null;
+        }
+
+        clearStageError(stageNumber);
+        try {
+          var data = extractJson(rawText);
+          var errors = validator(data);
+          if (errors.length > 0) {
+            setStageError(stageNumber, errors[0]);
+            renderRepairPrompt(wizRepair[stageNumber], stageLabel, contract, rawText, errors);
+            return null;
+          }
+          renderRepairPrompt(wizRepair[stageNumber], stageLabel, contract, rawText, []);
+          return data;
+        } catch (error) {
+          setStageError(stageNumber, error.message || 'Invalid JSON.');
+          renderRepairPrompt(wizRepair[stageNumber], stageLabel, contract, rawText, [error.message || 'Invalid JSON.']);
+          return null;
+        }
+      }
+
+      function validateLayerBible(data) {
+        var errors = [];
+        if (!data || typeof data !== 'object') return ['Root must be a JSON object.'];
+        ['storyLayer', 'gameLayer', 'governingLayer'].forEach(function (key) {
+          if (!data[key]) errors.push('Missing required key: ' + key);
+        });
+        if (!Array.isArray(data.designPrinciples)) errors.push('designPrinciples must be an array.');
+        if (!data.designLedger) errors.push('Missing required key: designLedger');
+        return errors;
+      }
+
+      function validateCampaignPlan(data) {
+        var errors = [];
+        if (!data || typeof data !== 'object') return ['Root must be a JSON object.'];
+        if (!Array.isArray(data.weeks) || data.weeks.length === 0) {
+          errors.push('weeks must be a non-empty array.');
+        }
+        if (!data.bossPlan || typeof data.bossPlan !== 'object') {
+          errors.push('bossPlan is required.');
+        }
+        if (!Array.isArray(data.fragmentRegistry)) data.fragmentRegistry = [];
+        if (!Array.isArray(data.overflowRegistry)) data.overflowRegistry = [];
+        return errors;
+      }
+
+      function validateShell(data) {
+        var errors = [];
+        if (!data || typeof data !== 'object') return ['Root must be a JSON object.'];
+        ['meta', 'cover', 'rulesSpread'].forEach(function (key) {
+          if (!data[key]) errors.push('Missing required key: ' + key);
+        });
+        if (!data.theme) data.theme = {};
+        return errors;
+      }
+
+      function validateWeekChunk(data, expectedWeeks) {
+        var errors = [];
+        if (!data || typeof data !== 'object') return ['Root must be a JSON object.'];
+        if (!Array.isArray(data.weeks)) {
+          errors.push('weeks must be an array.');
+          return errors;
+        }
+        if (data.weeks.length !== expectedWeeks.length) {
+          errors.push('Expected ' + expectedWeeks.length + ' week objects but received ' + data.weeks.length + '.');
+        }
+        var received = {};
+        data.weeks.forEach(function (week) {
+          if (typeof week.weekNumber === 'number') received[week.weekNumber] = true;
+        });
+        expectedWeeks.forEach(function (weekNumber) {
+          if (!received[weekNumber]) errors.push('Missing weekNumber ' + weekNumber + ' in this chunk.');
+        });
+        return errors;
+      }
+
+      function validateFragmentBatch(data, expectedRegistry) {
+        var errors = [];
+        if (!data || typeof data !== 'object') return ['Root must be a JSON object.'];
+        if (!Array.isArray(data.fragments)) {
+          errors.push('fragments must be an array.');
+          return errors;
+        }
+        var expected = {};
+        (expectedRegistry || []).forEach(function (entry) {
+          expected[String(entry.id || '').toLowerCase()] = true;
+        });
+        if (expectedRegistry && data.fragments.length !== expectedRegistry.length) {
+          errors.push('Expected ' + expectedRegistry.length + ' fragments in this batch but received ' + data.fragments.length + '.');
+        }
+        data.fragments.forEach(function (fragment) {
+          var id = String((fragment || {}).id || '').toLowerCase();
+          if (!id) errors.push('Each fragment needs an id.');
+          else if (!expected[id]) errors.push('Unexpected fragment id: ' + fragment.id);
+        });
+        Object.keys(expected).forEach(function (id) {
+          var found = data.fragments.some(function (fragment) {
+            return String((fragment || {}).id || '').toLowerCase() === id;
           });
-          chunksContainer.appendChild(wrap);
-          wrap.querySelector('textarea').focus();
+          if (!found) errors.push('Missing fragment id: ' + id.toUpperCase());
+        });
+        return errors;
+      }
+
+      function validateEndings(data) {
+        var errors = [];
+        if (!data || typeof data !== 'object') return ['Root must be a JSON object.'];
+        if (!Array.isArray(data.endings) || data.endings.length === 0) {
+          errors.push('endings must be a non-empty array.');
+        }
+        return errors;
+      }
+
+      function renderStepSummary(items, emptyLabel) {
+        if (!items || items.length === 0) return '<div class="result-meta">' + escapeForHtml(emptyLabel) + '</div>';
+        return '<div class="result-meta">' + items.map(escapeForHtml).join(' &middot; ') + '</div>';
+      }
+
+      function getCurrentPriorWeeks() {
+        var prior = [];
+        wizData.weekChunkOutputs.forEach(function (chunk) {
+          prior = prior.concat(chunk.weeks || []);
+        });
+        return prior;
+      }
+
+      function getCollectedComponentValues() {
+        var values = [];
+        getCurrentPriorWeeks().forEach(function (week) {
+          if (week && !week.isBossWeek) {
+            var component = week.weeklyComponent || {};
+            if (component.value !== undefined && component.value !== null && component.value !== '') {
+              values.push(component.value);
+            }
+          }
+        });
+        return values;
+      }
+
+      function renderWeekChunkStage() {
+        var chunkIndex = wizState.weekChunkIndex;
+        var weekNumbers = wizState.weekChunks[chunkIndex];
+        var continuity = manualApi() && typeof manualApi().buildChunkContinuity === 'function'
+          ? manualApi().buildChunkContinuity(getCurrentPriorWeeks())
+          : null;
+        var prompt = window.generateWeekChunkPrompt(
+          workoutEl.value.trim(),
+          briefEl.value.trim(),
+          wizData.layerBible,
+          wizData.campaignPlan,
+          weekNumbers,
+          continuity,
+          getCollectedComponentValues(),
+          wizData.shellContext
+        );
+        var label = weekNumbers.length === 1
+          ? 'Week ' + weekNumbers[0]
+          : 'Weeks ' + weekNumbers[0] + '-' + weekNumbers[weekNumbers.length - 1];
+        var completed = wizData.weekChunkOutputs.map(function (chunk) {
+          var nums = (chunk.weeks || []).map(function (week) { return week.weekNumber; });
+          return nums.length === 1 ? 'Week ' + nums[0] + ' validated' : 'Weeks ' + nums[0] + '-' + nums[nums.length - 1] + ' validated';
         });
 
-        submitBtn.addEventListener('click', function () {
-          resultContainer.innerHTML = '';
-          var chunks = chunksContainer.querySelectorAll('.assembly-chunk');
-          var combined = '';
-          for (var i = 0; i < chunks.length; i++) {
-            var val = chunks[i].value.trim();
-            if (val) combined += (i > 0 ? '\n' : '') + val;
-          }
-          if (!combined) {
-            resultContainer.innerHTML = '<p class="assembly-error">Paste the JSON response from your LLM above.</p>';
+        weeksStageEl.innerHTML =
+          renderStepSummary(completed, 'No validated week chunks yet.') +
+          '<label class="field-label" style="margin-top:14px">Current Chunk: ' + escapeForHtml(label) + ' (' + (chunkIndex + 1) + ' of ' + wizState.weekChunks.length + ')</label>' +
+          '<textarea id="wiz-weeks-prompt-current" class="gen-input gen-output" rows="12" readonly></textarea>' +
+          '<button class="gen-copy" id="wiz-weeks-copy-current" type="button">Copy Prompt</button>' +
+          '<label class="field-label" for="wiz-weeks-result-current" style="margin-top:14px">Paste Week Chunk Result</label>' +
+          '<textarea id="wiz-weeks-result-current" class="gen-input" rows="9" placeholder=\'{"weeks":[...]}\'></textarea>' +
+          '<div class="wizard-error" id="wiz-weeks-error-current">Invalid JSON.</div>' +
+          '<div id="wiz-weeks-repair-current"></div>' +
+          '<button class="gen-submit" id="wiz-weeks-next-current" type="button" style="margin-top:12px">' +
+            (chunkIndex + 1 === wizState.weekChunks.length ? 'Next: Build Fragments →' : 'Validate Chunk & Next →') +
+          '</button>';
+
+        var promptEl = document.getElementById('wiz-weeks-prompt-current');
+        var copyBtn = document.getElementById('wiz-weeks-copy-current');
+        var resultEl = document.getElementById('wiz-weeks-result-current');
+        var errorEl = document.getElementById('wiz-weeks-error-current');
+        var repairEl = document.getElementById('wiz-weeks-repair-current');
+        promptEl.value = prompt;
+        copyBtn.addEventListener('click', makeCopyHandler(promptEl, copyBtn, 'Copy Prompt'));
+        document.getElementById('wiz-weeks-next-current').addEventListener('click', function () {
+          errorEl.classList.remove('is-visible');
+          var raw = resultEl.value.trim();
+          if (!raw) {
+            errorEl.textContent = 'Paste the JSON the LLM returned.';
+            errorEl.classList.add('is-visible');
+            renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, ['Paste the JSON the LLM returned.']);
             return;
           }
-
-          var data;
           try {
-            data = fallbackExtractJson(combined);
-          } catch (e) {
-            resultContainer.innerHTML = '<p class="assembly-error">' + escapeForHtml(e.message) + '</p>';
+            var chunk = extractJson(raw);
+            var errors = validateWeekChunk(chunk, weekNumbers);
+            if (errors.length > 0) {
+              errorEl.textContent = errors[0];
+              errorEl.classList.add('is-visible');
+              renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, errors);
+              return;
+            }
+            renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, []);
+            wizData.weekChunkOutputs.push(chunk);
+            wizState.weekChunkIndex += 1;
+            if (wizState.weekChunkIndex < wizState.weekChunks.length) {
+              renderWeekChunkStage();
+              return;
+            }
+            prepareFragmentsStage();
+          } catch (error) {
+            errorEl.textContent = error.message || 'Invalid JSON.';
+            errorEl.classList.add('is-visible');
+            renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, [error.message || 'Invalid JSON.']);
+          }
+        });
+      }
+
+      function renderFragmentBatchStage() {
+        var batchIndex = wizState.fragmentBatchIndex;
+        var batch = wizState.fragmentBatches[batchIndex];
+        var priorFragments = [];
+        wizState.fragmentBatchOutputs.forEach(function (output) {
+          priorFragments = priorFragments.concat(output.fragments || []);
+        });
+        var prompt = window.generateFragmentBatchPrompt(
+          wizData.layerBible,
+          batch.registry,
+          batch.weekSummaries,
+          wizData.weekSummaries,
+          priorFragments,
+          batchIndex,
+          wizState.fragmentBatches.length,
+          wizData.shellContext
+        );
+        var batchLabel = batch.weekNumbers.length === 1
+          ? 'Week ' + batch.weekNumbers[0]
+          : 'Weeks ' + batch.weekNumbers[0] + '-' + batch.weekNumbers[batch.weekNumbers.length - 1];
+        var completed = wizState.fragmentBatchOutputs.map(function (output, idx) {
+          var doneBatch = wizState.fragmentBatches[idx];
+          var doneLabel = doneBatch.weekNumbers.length === 1
+            ? 'Week ' + doneBatch.weekNumbers[0]
+            : 'Weeks ' + doneBatch.weekNumbers[0] + '-' + doneBatch.weekNumbers[doneBatch.weekNumbers.length - 1];
+          return doneLabel + ' fragments validated';
+        });
+
+        fragmentsStageEl.innerHTML =
+          renderStepSummary(completed, 'No validated fragment batches yet.') +
+          '<label class="field-label" style="margin-top:14px">Current Batch: ' + escapeForHtml(batchLabel) + ' (' + (batchIndex + 1) + ' of ' + wizState.fragmentBatches.length + ')</label>' +
+          '<textarea id="wiz-fragments-prompt-current" class="gen-input gen-output" rows="12" readonly></textarea>' +
+          '<button class="gen-copy" id="wiz-fragments-copy-current" type="button">Copy Prompt</button>' +
+          '<label class="field-label" for="wiz-fragments-result-current" style="margin-top:14px">Paste Fragment Batch Result</label>' +
+          '<textarea id="wiz-fragments-result-current" class="gen-input" rows="9" placeholder=\'{"fragments":[...]}\'></textarea>' +
+          '<div class="wizard-error" id="wiz-fragments-error-current">Invalid JSON.</div>' +
+          '<div id="wiz-fragments-repair-current"></div>' +
+          '<button class="gen-submit" id="wiz-fragments-next-current" type="button" style="margin-top:12px">' +
+            (batchIndex + 1 === wizState.fragmentBatches.length ? 'Next: Build Endings →' : 'Validate Batch & Next →') +
+          '</button>';
+
+        var promptEl = document.getElementById('wiz-fragments-prompt-current');
+        var copyBtn = document.getElementById('wiz-fragments-copy-current');
+        var resultEl = document.getElementById('wiz-fragments-result-current');
+        var errorEl = document.getElementById('wiz-fragments-error-current');
+        var repairEl = document.getElementById('wiz-fragments-repair-current');
+        promptEl.value = prompt;
+        copyBtn.addEventListener('click', makeCopyHandler(promptEl, copyBtn, 'Copy Prompt'));
+        document.getElementById('wiz-fragments-next-current').addEventListener('click', function () {
+          errorEl.classList.remove('is-visible');
+          var raw = resultEl.value.trim();
+          if (!raw) {
+            errorEl.textContent = 'Paste the JSON the LLM returned.';
+            errorEl.classList.add('is-visible');
+            renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, ['Paste the JSON the LLM returned.']);
             return;
           }
+          try {
+            var batchOutput = extractJson(raw);
+            var errors = validateFragmentBatch(batchOutput, batch.registry);
+            if (errors.length > 0) {
+              errorEl.textContent = errors[0];
+              errorEl.classList.add('is-visible');
+              renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, errors);
+              return;
+            }
+            renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, []);
+            wizState.fragmentBatchOutputs.push(batchOutput);
+            wizState.fragmentBatchIndex += 1;
+            if (wizState.fragmentBatchIndex < wizState.fragmentBatches.length) {
+              renderFragmentBatchStage();
+              return;
+            }
 
-          var errors = basicValidateBooklet(data);
-          if (errors.length > 0) {
-            resultContainer.innerHTML = '<p class="assembly-error">Validation issues:<br>' + errors.map(escapeForHtml).join('<br>') + '</p>';
-            return;
+            var mergeResult = manualApi() && typeof manualApi().mergeFragmentBatches === 'function'
+              ? manualApi().mergeFragmentBatches(wizState.fragmentBatchOutputs, wizData.campaignPlan.fragmentRegistry || [])
+              : { fragments: [].concat.apply([], wizState.fragmentBatchOutputs.map(function (output) { return output.fragments || []; })), errors: [] };
+            if (mergeResult.errors && mergeResult.errors.length > 0) {
+              errorEl.textContent = mergeResult.errors[0];
+              errorEl.classList.add('is-visible');
+              renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, mergeResult.errors);
+              return;
+            }
+            wizData.fragmentsOutput = { fragments: mergeResult.fragments || [] };
+            prepareEndingsStage();
+          } catch (error) {
+            errorEl.textContent = error.message || 'Invalid JSON.';
+            errorEl.classList.add('is-visible');
+            renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, [error.message || 'Invalid JSON.']);
           }
+        });
+      }
 
-          var title = (data.cover && data.cover.title) || (data.meta && data.meta.title) || 'Untitled';
-          var weekCount = Array.isArray(data.weeks) ? data.weeks.length : '?';
-          var slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      function prepareFragmentsStage() {
+        if (manualApi() && typeof manualApi().extractWeekSummaries === 'function') {
+          wizData.weekSummaries = manualApi().extractWeekSummaries(wizData.weekChunkOutputs);
+        } else {
+          wizData.weekSummaries = [];
+        }
+        wizState.fragmentBatchOutputs = [];
+        wizState.fragmentBatchIndex = 0;
+        wizState.fragmentBatches = manualApi() && typeof manualApi().buildFragmentBatches === 'function'
+          ? manualApi().buildFragmentBatches(wizData.campaignPlan.fragmentRegistry || [], wizData.weekSummaries)
+          : [];
 
-          resultContainer._assembledData = data;
-          resultContainer._filename = 'liftrpg-' + slug + '.json';
+        if (!wizState.fragmentBatches.length) {
+          wizData.fragmentsOutput = { fragments: [] };
+          prepareEndingsStage();
+          return;
+        }
 
-          resultContainer.innerHTML =
-            '<div class="assembly-success">' +
-              '<div class="result-title">' + escapeForHtml(title) + '</div>' +
-              '<div class="result-meta">' + weekCount + ' weeks &middot; validated</div>' +
-              '<div class="result-actions">' +
-                '<button type="button" class="result-btn-primary assembly-open-btn">Open in Renderer</button>' +
-                '<button type="button" class="result-btn-secondary assembly-dl-btn">Download JSON</button>' +
-              '</div>' +
-            '</div>';
+        renderFragmentBatchStage();
+        wizSetStep(4);
+      }
 
-          resultContainer.querySelector('.assembly-open-btn').addEventListener('click', function (event) {
-            var button = event.currentTarget;
-            setActionBusy(button, 'Preparing…', async function () {
-              resultContainer._assembledData = await prepareAssemblyExport(resultContainer._assembledData);
-              sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(resultContainer._assembledData));
-              window.open('renderer/?source=session', '_blank');
-            });
+      function prepareEndingsStage() {
+        if (manualApi() && typeof manualApi().extractWeekSummaries === 'function') {
+          wizData.weekSummaries = manualApi().extractWeekSummaries(wizData.weekChunkOutputs);
+        }
+        var bossWeek = null;
+        wizData.weekChunkOutputs.forEach(function (chunk) {
+          (chunk.weeks || []).forEach(function (week) {
+            if (week && week.isBossWeek) bossWeek = week;
           });
+        });
+        var binaryChoiceWeek = manualApi() && typeof manualApi().findBinaryChoiceWeek === 'function'
+          ? manualApi().findBinaryChoiceWeek(wizData.weekChunkOutputs)
+          : null;
+        wizPrompts[6].value = window.generateEndingsPrompt(
+          wizData.layerBible,
+          wizData.campaignPlan,
+          bossWeek || {},
+          binaryChoiceWeek,
+          wizData.shellContext,
+          wizData.weekSummaries
+        );
+        wizResults[6].value = '';
+        clearStageError(6);
+        renderRepairPrompt(wizRepair[6], 'endings', 'Return only `{ "endings": [...] }`.', '', []);
+        wizSetStep(5);
+      }
 
-          resultContainer.querySelector('.assembly-dl-btn').addEventListener('click', function (event) {
-            var button = event.currentTarget;
-            setActionBusy(button, 'Sealing…', async function () {
-              resultContainer._assembledData = await prepareAssemblyExport(resultContainer._assembledData);
-              var blob = new Blob([JSON.stringify(resultContainer._assembledData, null, 2)], { type: 'application/json' });
-              var url = URL.createObjectURL(blob);
-              var a = document.createElement('a');
-              a.href = url;
-              a.download = resultContainer._filename;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              URL.revokeObjectURL(url);
-            });
+      function renderAssemblySuccess(data) {
+        var title = (data.cover && data.cover.title) || (data.meta && data.meta.title) || 'Untitled';
+        var weekCount = Array.isArray(data.weeks) ? data.weeks.length : '?';
+        var slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+        assemblyResultEl._assembledData = data;
+        assemblyResultEl._filename = 'liftrpg-' + slug + '.json';
+        assemblyResultEl.innerHTML =
+          '<div class="assembly-success">' +
+            '<div class="result-title">' + escapeForHtml(title) + '</div>' +
+            '<div class="result-meta">' + weekCount + ' weeks &middot; validated</div>' +
+            '<div class="result-actions">' +
+              '<button type="button" class="result-btn-primary assembly-open-btn">Open in Renderer</button>' +
+              '<button type="button" class="result-btn-secondary assembly-dl-btn">Download JSON</button>' +
+            '</div>' +
+          '</div>';
+
+        assemblyResultEl.querySelector('.assembly-open-btn').addEventListener('click', function (event) {
+          var button = event.currentTarget;
+          setActionBusy(button, 'Preparing…', async function () {
+            assemblyResultEl._assembledData = await prepareAssemblyExport(assemblyResultEl._assembledData);
+            sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(assemblyResultEl._assembledData));
+            window.open('renderer/?source=session', '_blank');
+          });
+        });
+
+        assemblyResultEl.querySelector('.assembly-dl-btn').addEventListener('click', function (event) {
+          var button = event.currentTarget;
+          setActionBusy(button, 'Sealing…', async function () {
+            assemblyResultEl._assembledData = await prepareAssemblyExport(assemblyResultEl._assembledData);
+            var blob = new Blob([JSON.stringify(assemblyResultEl._assembledData, null, 2)], { type: 'application/json' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = assemblyResultEl._filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
           });
         });
       }
 
-      // Wire Wizard Step 3 assembly
-      wireAssemblySection(
-        document.getElementById('wiz-assembly-chunks'),
-        document.getElementById('wiz-assembly-add'),
-        document.getElementById('wiz-assembly-submit'),
-        document.getElementById('wiz-assembly-result')
-      );
+      function likelyRepairTargets(errors) {
+        var targets = {};
+        (errors || []).forEach(function (error) {
+          var text = String(error || '').toLowerCase();
+          if (text.indexOf('fragment') !== -1) targets.fragments = true;
+          if (text.indexOf('boss') !== -1 || text.indexOf('componentinputs') !== -1 || text.indexOf('weeklycomponent') !== -1 ||
+              text.indexOf('oracle') !== -1 || text.indexOf('mapstate') !== -1 || text.indexOf('session ') !== -1) {
+            targets.weeks = true;
+          }
+          if (text.indexOf('meta.') !== -1 || text.indexOf('cover') !== -1 || text.indexOf('rulesspread') !== -1) {
+            targets.shell = true;
+          }
+          if (text.indexOf('ending') !== -1) targets.endings = true;
+        });
+        return Object.keys(targets);
+      }
 
+      function renderAssemblyErrors(errors) {
+        var targets = likelyRepairTargets(errors);
+        assemblyResultEl.innerHTML =
+          '<p class="assembly-error">Validation issues:<br>' + errors.map(escapeForHtml).join('<br>') + '</p>' +
+          (targets.length > 0
+            ? '<div class="result-actions">' +
+                targets.map(function (target) {
+                  return '<button type="button" class="result-btn-secondary assembly-back-btn" data-target="' + escapeForHtml(target) + '">Back to ' + escapeForHtml(target.charAt(0).toUpperCase() + target.slice(1)) + '</button>';
+                }).join('') +
+              '</div>'
+            : '');
+
+        Array.prototype.forEach.call(assemblyResultEl.querySelectorAll('.assembly-back-btn'), function (button) {
+          button.addEventListener('click', function () {
+            var target = button.getAttribute('data-target');
+            if (target === 'shell') wizSetStep(2);
+            if (target === 'weeks') wizSetStep(3);
+            if (target === 'fragments') wizSetStep(4);
+            if (target === 'endings') wizSetStep(5);
+          });
+        });
+      }
+
+      function handleManualGenerate() {
+        var workout = validateWorkout();
+        if (!workout) return;
+
+        if (typeof window.generateStage1Prompt !== 'function' || !api() || !manualApi()) {
+          alert('Generator unavailable. Please reload the page.');
+          return;
+        }
+
+        resetWizardState();
+        if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
+        chatWizard.classList.add('is-visible');
+        wizPrompts[1].value = window.generateStage1Prompt(workout, briefEl.value.trim(), getDiceValue());
+        wizSetStep(0);
+      }
+
+      submitBtn.addEventListener('click', handleManualGenerate);
+
+      document.getElementById('wiz-next-1').addEventListener('click', function () {
+        var layerBible = parseStageJson(
+          wizResults[1].value,
+          validateLayerBible,
+          1,
+          'layer bible',
+          'Return only the layer bible JSON with storyLayer, gameLayer, governingLayer, designPrinciples, and designLedger.'
+        );
+        if (!layerBible) return;
+        wizData.layerBible = layerBible;
+        wizPrompts[2].value = window.generateStage2Prompt(workoutEl.value.trim(), briefEl.value.trim(), getDiceValue(), layerBible);
+        wizSetStep(1);
+      });
+
+      document.getElementById('wiz-next-2').addEventListener('click', function () {
+        var campaignPlan = parseStageJson(
+          wizResults[2].value,
+          validateCampaignPlan,
+          2,
+          'campaign plan',
+          'Return only campaign plan JSON with topology, weeks, bossPlan, fragmentRegistry, and overflowRegistry.'
+        );
+        if (!campaignPlan) return;
+        wizData.campaignPlan = campaignPlan;
+        wizPrompts[3].value = window.generateShellPrompt(briefEl.value.trim(), wizData.layerBible, campaignPlan);
+        wizSetStep(2);
+      });
+
+      document.getElementById('wiz-next-3').addEventListener('click', function () {
+        var shell = parseStageJson(
+          wizResults[3].value,
+          validateShell,
+          3,
+          'booklet shell',
+          'Return only shell JSON with meta, cover, rulesSpread, and theme.'
+        );
+        if (!shell) return;
+        wizData.shell = shell;
+        wizData.shellContext = manualApi().extractShellContext ? manualApi().extractShellContext(shell) : null;
+        var plannedWeeks = Array.isArray(wizData.campaignPlan.weeks) ? wizData.campaignPlan.weeks.length : 0;
+        wizState.weekChunks = typeof window.planWeekChunks === 'function'
+          ? window.planWeekChunks(plannedWeeks)
+          : [Array.from({ length: plannedWeeks }, function (_, i) { return i + 1; })];
+        wizState.weekChunkIndex = 0;
+        wizData.weekChunkOutputs = [];
+        renderWeekChunkStage();
+        wizSetStep(3);
+      });
+
+      document.getElementById('wiz-assemble-submit').addEventListener('click', function () {
+        assemblyResultEl.innerHTML = '';
+        var endingsOutput = parseStageJson(
+          wizResults[6].value,
+          validateEndings,
+          6,
+          'endings',
+          'Return only `{ "endings": [...] }`. Do not invent encrypted ending ciphertext.'
+        );
+        if (!endingsOutput) return;
+
+        wizData.endingsOutput = endingsOutput;
+        var booklet = manualApi().assembleBooklet(
+          wizData.shell,
+          wizData.weekChunkOutputs,
+          wizData.fragmentsOutput || { fragments: [] },
+          endingsOutput
+        );
+
+        var errors = api() && typeof api()._validateAssembled === 'function'
+          ? api()._validateAssembled(booklet)
+          : [];
+
+        if (errors.length > 0) {
+          renderAssemblyErrors(errors);
+          return;
+        }
+
+        renderAssemblySuccess(booklet);
+      });
     })();
   </script>
 </body>
