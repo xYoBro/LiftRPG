@@ -609,6 +609,7 @@
       align-items: center;
       gap: 6px;
       margin-bottom: 12px;
+      flex-wrap: wrap;
     }
 
     .wizard-num {
@@ -642,8 +643,59 @@
 
     .wizard-divider {
       flex: 1;
+      min-width: 12px;
       height: 1px;
       background: var(--rule);
+    }
+
+    .wizard-overview {
+      border: 1px solid rgba(24, 23, 20, .09);
+      background: rgba(255, 255, 255, .42);
+      padding: 12px 14px;
+      margin-bottom: 14px;
+    }
+
+    .wizard-current-kicker {
+      font-size: 6pt;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+
+    .wizard-current-title {
+      font-family: var(--display);
+      font-style: italic;
+      font-size: 15pt;
+      line-height: 1.12;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+
+    .wizard-current-help {
+      font-size: 7pt;
+      line-height: 1.65;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .wizard-locked-in {
+      font-size: 6pt;
+      line-height: 1.6;
+      letter-spacing: .04em;
+      color: var(--muted);
+      padding-top: 8px;
+      border-top: 1px solid rgba(24, 23, 20, .08);
+    }
+
+    .wizard-recovery-note {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(24, 23, 20, .08);
+      font-size: 6pt;
+      line-height: 1.65;
+      letter-spacing: .04em;
+      color: var(--muted);
     }
 
     .wizard-pane {
@@ -673,6 +725,32 @@
     }
 
     .wizard-error.is-visible { display: block; }
+
+    .wizard-stage-card {
+      margin-top: 10px;
+      border: 1px solid rgba(24, 23, 20, .09);
+      background: rgba(255, 255, 255, .34);
+      padding: 10px 12px;
+    }
+
+    .wizard-stage-kicker {
+      font-size: 6pt;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .wizard-stage-copy {
+      font-size: 7pt;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    .wizard-stage-copy strong {
+      color: var(--ink);
+      font-weight: 600;
+    }
 
     /* ── JSON Assembly ─────────────── */
     .assembly-chunk-wrap {
@@ -930,8 +1008,20 @@
           <span class="wizard-step-label" id="wiz-label-6">Endings</span>
         </div>
 
+        <div class="wizard-overview">
+          <div class="wizard-current-kicker" id="wiz-current-kicker">Step 1 of 6</div>
+          <div class="wizard-current-title" id="wiz-current-title">Build the Layer Bible</div>
+          <div class="wizard-current-help" id="wiz-current-help">Copy the prompt into your LLM, paste back only the JSON, then continue to Campaign.</div>
+          <div class="wizard-locked-in" id="wiz-locked-in">Nothing locked in yet.</div>
+          <div class="wizard-recovery-note" id="wiz-recovery-note">If a step fails validation, use the repair prompt shown below that step and repaste only that stage.</div>
+        </div>
+
         <div class="wizard-pane is-visible" id="wiz-pane-1">
           <p class="wizard-hint">Copy &rarr; paste into your LLM &rarr; copy the JSON result back below</p>
+          <div class="wizard-stage-card">
+            <div class="wizard-stage-kicker">This Step Produces</div>
+            <div class="wizard-stage-copy"><strong>The Layer Bible</strong>: the world, game structure, institution, and design ledger that every later step must follow.</div>
+          </div>
           <textarea id="wiz-prompt-1" class="gen-input gen-output" rows="8" readonly></textarea>
           <button class="gen-copy" id="wiz-copy-1" type="button">Copy Prompt</button>
           <label class="field-label" for="wiz-result-1" style="margin-top:14px">Paste Layer Bible Result</label>
@@ -944,6 +1034,10 @@
 
         <div class="wizard-pane" id="wiz-pane-2">
           <p class="wizard-hint">Copy &rarr; paste into your LLM &rarr; copy the JSON result back below</p>
+          <div class="wizard-stage-card">
+            <div class="wizard-stage-kicker">This Step Produces</div>
+            <div class="wizard-stage-copy"><strong>The Campaign Plan</strong>: the week arc, fragment registry, and boss logic. If this is wrong, fix it here before moving on.</div>
+          </div>
           <textarea id="wiz-prompt-2" class="gen-input gen-output" rows="8" readonly></textarea>
           <button class="gen-copy" id="wiz-copy-2" type="button">Copy Prompt</button>
           <label class="field-label" for="wiz-result-2" style="margin-top:14px">Paste Campaign Plan Result</label>
@@ -956,6 +1050,10 @@
 
         <div class="wizard-pane" id="wiz-pane-3">
           <p class="wizard-hint">Generate the booklet shell only: meta, cover, rules, and theme</p>
+          <div class="wizard-stage-card">
+            <div class="wizard-stage-kicker">This Step Produces</div>
+            <div class="wizard-stage-copy"><strong>The Shell</strong>: title, cover, rules, and theme. No weeks, fragments, or endings yet.</div>
+          </div>
           <textarea id="wiz-prompt-3" class="gen-input gen-output" rows="10" readonly></textarea>
           <button class="gen-copy" id="wiz-copy-3" type="button">Copy Prompt</button>
           <label class="field-label" for="wiz-result-3" style="margin-top:14px">Paste Shell Result</label>
@@ -978,6 +1076,10 @@
 
         <div class="wizard-pane" id="wiz-pane-6">
           <p class="wizard-hint">Generate the endings subtree, then assemble and validate the full booklet locally.</p>
+          <div class="wizard-stage-card">
+            <div class="wizard-stage-kicker">This Step Produces</div>
+            <div class="wizard-stage-copy"><strong>The Endings</strong>: the final narrative payoff. After this, LiftRPG assembles and validates the whole booklet on-device.</div>
+          </div>
           <textarea id="wiz-prompt-6" class="gen-input gen-output" rows="10" readonly></textarea>
           <button class="gen-copy" id="wiz-copy-6" type="button">Copy Prompt</button>
           <label class="field-label" for="wiz-result-6" style="margin-top:14px">Paste Endings Result</label>
@@ -1103,6 +1205,11 @@
         3: document.getElementById('wiz-repair-3'),
         6: document.getElementById('wiz-repair-6')
       };
+      var wizCurrentKicker = document.getElementById('wiz-current-kicker');
+      var wizCurrentTitle = document.getElementById('wiz-current-title');
+      var wizCurrentHelp = document.getElementById('wiz-current-help');
+      var wizLockedIn = document.getElementById('wiz-locked-in');
+      var wizRecoveryNote = document.getElementById('wiz-recovery-note');
       var weeksStageEl = document.getElementById('wiz-weeks-stage');
       var fragmentsStageEl = document.getElementById('wiz-fragments-stage');
       var assemblyResultEl = document.getElementById('wiz-assembly-result');
@@ -1110,6 +1217,38 @@
       var wizStep = 0;
       var wizData = {};
       var wizState = {};
+      var stepText = [
+        {
+          title: 'Build the Layer Bible',
+          help: 'Copy the prompt into your LLM, then paste back only the layer-bible JSON before continuing.',
+          recovery: 'If the JSON is malformed or missing sections, use the repair prompt shown below and repaste only the Layer Bible.'
+        },
+        {
+          title: 'Plan the Campaign',
+          help: 'This defines the week-by-week structure, fragment registry, and boss logic that the rest of the booklet will inherit.',
+          recovery: 'If this fails, repair only the Campaign Plan here. Do not regenerate the whole booklet.'
+        },
+        {
+          title: 'Set the Shell',
+          help: 'Generate only the shell: meta, cover, rules, and theme. Weeks, fragments, and endings come later.',
+          recovery: 'If this step is off, repair only the Shell. The rest of the booklet can stay untouched.'
+        },
+        {
+          title: 'Generate the Weeks',
+          help: 'Work chunk by chunk. Validate each week group before moving to the next so errors stay local.',
+          recovery: 'If a chunk fails, repair only that week chunk and repaste it. Earlier validated chunks stay locked in.'
+        },
+        {
+          title: 'Generate the Fragments',
+          help: 'Fragments are batched so voice and document logic can stay rich without forcing a full-book rewrite.',
+          recovery: 'If a fragment batch fails, repair only that batch. Previously validated batches remain locked in.'
+        },
+        {
+          title: 'Finish the Endings',
+          help: 'Paste the endings JSON, then LiftRPG assembles and validates the full booklet locally before export.',
+          recovery: 'If final validation fails, return only to the flagged stage instead of redoing everything.'
+        }
+      ];
 
       function api() {
         return window.LiftRPGAPI || null;
@@ -1151,6 +1290,7 @@
         weeksStageEl.innerHTML = '';
         fragmentsStageEl.innerHTML = '';
         assemblyResultEl.innerHTML = '';
+        updateWizardOverview(0);
       }
 
       function openModal() {
@@ -1213,12 +1353,43 @@
         });
         wizNums.forEach(function (num, i) {
           num.className = 'wizard-num' + (i < idx ? ' done' : i === idx ? ' active' : '');
+          num.textContent = i < idx ? '✓' : String(i + 1);
         });
         wizLabels.forEach(function (label, i) {
           label.className = 'wizard-step-label' + (i < idx ? ' done' : i === idx ? ' active' : '');
         });
         var prompt = wizPrompts[idx + 1];
         if (prompt) prompt.scrollTop = 0;
+        updateWizardOverview(idx);
+      }
+
+      function collectLockedInItems() {
+        var items = [];
+        if (wizData.layerBible) items.push('Layer Bible saved');
+        if (wizData.campaignPlan) items.push('Campaign saved');
+        if (wizData.shell) items.push('Shell saved');
+        if (wizData.weekChunkOutputs && wizData.weekChunkOutputs.length > 0) {
+          items.push(wizData.weekChunkOutputs.length + ' week chunk' + (wizData.weekChunkOutputs.length === 1 ? '' : 's') + ' validated');
+        }
+        if (wizState.fragmentBatchOutputs && wizState.fragmentBatchOutputs.length > 0) {
+          items.push(wizState.fragmentBatchOutputs.length + ' fragment batch' + (wizState.fragmentBatchOutputs.length === 1 ? '' : 'es') + ' validated');
+        }
+        if (wizData.endingsOutput) items.push('Endings ready');
+        return items;
+      }
+
+      function updateWizardOverview(idx) {
+        var entry = stepText[idx] || stepText[0];
+        if (wizCurrentKicker) wizCurrentKicker.textContent = 'Step ' + (idx + 1) + ' of ' + wizPanes.length;
+        if (wizCurrentTitle) wizCurrentTitle.textContent = entry.title;
+        if (wizCurrentHelp) wizCurrentHelp.textContent = entry.help;
+        if (wizRecoveryNote) wizRecoveryNote.textContent = entry.recovery;
+        if (wizLockedIn) {
+          var items = collectLockedInItems();
+          wizLockedIn.textContent = items.length > 0
+            ? 'Locked in: ' + items.join(' • ')
+            : 'Nothing locked in yet.';
+        }
       }
 
       function copyText(text, button, defaultLabel) {
@@ -1581,6 +1752,10 @@
 
         weeksStageEl.innerHTML =
           renderStepSummary(completed, 'No validated week chunks yet.') +
+          '<div class="wizard-stage-card">' +
+            '<div class="wizard-stage-kicker">What To Do Now</div>' +
+            '<div class="wizard-stage-copy"><strong>Generate only ' + escapeForHtml(label) + '</strong>, then paste back just the `weeks` JSON. If this chunk fails, repair this chunk only.</div>' +
+          '</div>' +
           '<label class="field-label" style="margin-top:14px">Current Chunk: ' + escapeForHtml(label) + ' (' + (chunkIndex + 1) + ' of ' + wizState.weekChunks.length + ')</label>' +
           '<textarea id="wiz-weeks-prompt-current" class="gen-input gen-output" rows="12" readonly></textarea>' +
           '<button class="gen-copy" id="wiz-weeks-copy-current" type="button">Copy Prompt</button>' +
@@ -1620,6 +1795,7 @@
             renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, []);
             wizData.weekChunkOutputs.push(chunk);
             wizState.weekChunkIndex += 1;
+            updateWizardOverview(3);
             if (wizState.weekChunkIndex < wizState.weekChunks.length) {
               renderWeekChunkStage();
               return;
@@ -1663,6 +1839,10 @@
 
         fragmentsStageEl.innerHTML =
           renderStepSummary(completed, 'No validated fragment batches yet.') +
+          '<div class="wizard-stage-card">' +
+            '<div class="wizard-stage-kicker">What To Do Now</div>' +
+            '<div class="wizard-stage-copy"><strong>Generate only the current fragment batch</strong>, then paste back just the `fragments` JSON. If this batch fails, repair only this batch.</div>' +
+          '</div>' +
           '<label class="field-label" style="margin-top:14px">Current Batch: ' + escapeForHtml(batchLabel) + ' (' + (batchIndex + 1) + ' of ' + wizState.fragmentBatches.length + ')</label>' +
           '<textarea id="wiz-fragments-prompt-current" class="gen-input gen-output" rows="12" readonly></textarea>' +
           '<button class="gen-copy" id="wiz-fragments-copy-current" type="button">Copy Prompt</button>' +
@@ -1702,6 +1882,7 @@
             renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, []);
             wizState.fragmentBatchOutputs.push(batchOutput);
             wizState.fragmentBatchIndex += 1;
+            updateWizardOverview(4);
             if (wizState.fragmentBatchIndex < wizState.fragmentBatches.length) {
               renderFragmentBatchStage();
               return;
@@ -1937,6 +2118,7 @@
         if (!endingsOutput) return;
 
         wizData.endingsOutput = endingsOutput;
+        updateWizardOverview(5);
         var booklet = manualApi().assembleBooklet(
           wizData.shell,
           wizData.weekChunkOutputs,
