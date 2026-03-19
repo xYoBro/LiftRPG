@@ -191,6 +191,27 @@ function resolveWorksheetType(companionPlacements) {
   return 'notes';
 }
 
+function resolveSoloSurfaceWorksheet(surfacePlacements) {
+  const placement = surfacePlacements[0];
+  if (!placement) return null;
+
+  const data = placement.atom?.data || placement.data || {};
+  if (placement.type === 'cipher-panel') {
+    const cipher = data.cipher || {};
+    const family = String(cipher.family || '').trim().toLowerCase();
+    if (family === 'cross-reference' || family === 'route-tracing') {
+      return { label: 'Decode Ledger', type: 'alignment-ledger', rows: 4 };
+    }
+    return { label: 'Decode Surface', type: 'decode-grid', rows: 5 };
+  }
+
+  if (placement.type === 'oracle-table') {
+    return { label: 'Resolution Notes', type: 'notes', rows: 5 };
+  }
+
+  return null;
+}
+
 function buildBoardWorksheet(label, worksheetType = 'notes', rowCount = 4) {
   const wrap = make('section', 'board-worksheet');
   wrap.setAttribute('data-worksheet-type', worksheetType);
@@ -228,6 +249,21 @@ function buildBoardWorksheet(label, worksheetType = 'notes', rowCount = 4) {
       ledger.appendChild(row);
     }
     wrap.appendChild(ledger);
+    return wrap;
+  }
+
+  if (worksheetType === 'decode-grid') {
+    const grid = make('div', 'board-decode-grid');
+    for (let index = 0; index < 10; index += 1) {
+      grid.appendChild(make('div', 'board-decode-cell'));
+    }
+    wrap.appendChild(grid);
+
+    const lines = make('div', 'board-worksheet-lines');
+    for (let index = 0; index < Math.max(3, rowCount - 1); index += 1) {
+      lines.appendChild(make('div', 'board-worksheet-line'));
+    }
+    wrap.appendChild(lines);
     return wrap;
   }
 
@@ -393,7 +429,8 @@ function renderMechanicPage(placements, planIndex) {
   const briefing = buildMechanicBriefing(artifactIdentity, placements);
   const isSoloCompanionPage = surfacePlacements.length === 0 && companionPlacements.length === 1;
   const isSoloMapPage = surfacePlacements.length === 1 && surfacePlacements[0].type === 'map-panel' && companionPlacements.length === 0;
-  if (briefing && !isSoloCompanionPage && !isSoloMapPage && (surfacePlacements.length <= 1 || companionPlacements.length > 0)) {
+  const isSoloSurfacePage = surfacePlacements.length === 1 && companionPlacements.length === 0;
+  if (briefing && !isSoloCompanionPage && !isSoloSurfacePage && (surfacePlacements.length <= 1 || companionPlacements.length > 0)) {
     frame.appendChild(briefing);
   }
 
@@ -409,6 +446,13 @@ function renderMechanicPage(placements, planIndex) {
   }
 
   surfacePlacements.forEach((placement) => renderPlacementInto(content, placement));
+
+  if (artifactIdentity.shellFamily === 'classified-packet' && isSoloSurfacePage) {
+    const worksheet = resolveSoloSurfaceWorksheet(surfacePlacements);
+    if (worksheet) {
+      content.appendChild(buildBoardWorksheet(worksheet.label, worksheet.type, worksheet.rows));
+    }
+  }
 
   if (companionPlacements.length > 0) {
     content.setAttribute('data-has-companion', 'true');

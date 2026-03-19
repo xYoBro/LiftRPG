@@ -139,6 +139,57 @@ function renderGridMap(mapState) {
   return wrap;
 }
 
+const ROUTE_LABEL_ABBREVIATIONS = {
+  access: 'Acc.',
+  airlock: 'Airlock',
+  approach: 'Appr.',
+  archive: 'Arch.',
+  bridge: 'Bridge',
+  cargo: 'Cargo',
+  command: 'Cmd.',
+  corridor: 'Corr.',
+  crew: 'Crew',
+  direct: 'Dir.',
+  eva: 'EVA',
+  exterior: 'Ext.',
+  habitation: 'Hab.',
+  junction: 'Jct.',
+  ladder: 'Ldr.',
+  lab: 'Lab',
+  link: 'Link',
+  maintenance: 'Maint.',
+  medical: 'Med.',
+  node: 'Node',
+  passage: 'Pass.',
+  run: 'Run',
+  science: 'Sci.',
+  service: 'Svc.',
+  transit: 'Transit',
+};
+
+function compactRouteLabel(label, maxChars = 18) {
+  const raw = String(label || '').trim();
+  if (!raw) return '';
+  if (raw.length <= maxChars) return raw;
+
+  const compact = raw.replace(/[A-Za-z]+/g, (word) => {
+    const replacement = ROUTE_LABEL_ABBREVIATIONS[word.toLowerCase()];
+    return replacement || word;
+  });
+  if (compact.length <= maxChars) return compact;
+
+  return compact
+    .split(/\s+/)
+    .map((part) => part.replace(/[aeiou]/gi, ''))
+    .join(' ')
+    .slice(0, maxChars)
+    .trim();
+}
+
+function buildRouteCode(index) {
+  return 'R' + String(index + 1);
+}
+
 function renderPointMap(mapState) {
   const wrap = make('div', 'map-network');
   const shellFamily = ((mapState.artifactIdentity || {}).shellFamily || '').toLowerCase();
@@ -185,7 +236,7 @@ function renderPointMap(mapState) {
     nodesById[node.id] = node;
   });
 
-  (mapState.edges || []).forEach((edge) => {
+  (mapState.edges || []).forEach((edge, edgeIndex) => {
     const from = nodesById[edge.from];
     const to = nodesById[edge.to];
     if (!from || !to) return;
@@ -200,12 +251,34 @@ function renderPointMap(mapState) {
     svg.appendChild(line);
 
     if (edge.label) {
+      const dx = (to._x || 0) - (from._x || 0);
+      const dy = (to._y || 0) - (from._y || 0);
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      const normalX = -dy / distance;
+      const normalY = dx / distance;
+      const offsetSign = edgeIndex % 2 === 0 ? 1 : -1;
+      const isDeferredRoute = edge.state === 'locked' || edge.state === 'inaccessible';
+      const labelOffset = shellFamily === 'classified-packet'
+        ? (isDeferredRoute ? 6.4 : 4.8)
+        : 3.2;
+      const labelProgress = shellFamily === 'classified-packet'
+        ? (isDeferredRoute
+          ? (edgeIndex % 2 === 0 ? 0.24 : 0.78)
+          : (edgeIndex % 2 === 0 ? 0.36 : 0.6))
+        : 0.5;
+      const labelText = shellFamily === 'classified-packet'
+        ? buildRouteCode(edgeIndex)
+        : compactRouteLabel(edge.label, distance < 22 ? 12 : 16);
+      const textLength = Math.max(10, Math.min(distance * 0.9, labelText.length * 3.6));
       const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      label.setAttribute('x', String(((from._x || 0) + (to._x || 0)) / 2));
-      label.setAttribute('y', String((((from._y || 0) + (to._y || 0)) / 2) - 2));
+      label.setAttribute('x', String((from._x || 0) + (dx * labelProgress) + (normalX * labelOffset * offsetSign)));
+      label.setAttribute('y', String((from._y || 0) + (dy * labelProgress) + (normalY * labelOffset * offsetSign)));
       label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('dominant-baseline', 'middle');
       label.setAttribute('class', 'map-edge-label');
-      label.textContent = edge.label;
+      label.setAttribute('textLength', String(textLength));
+      label.setAttribute('lengthAdjust', 'spacingAndGlyphs');
+      label.textContent = labelText;
       svg.appendChild(label);
     }
   });
@@ -233,6 +306,26 @@ function renderPointMap(mapState) {
     legend.appendChild(make('div', 'map-network-chip', 'Current ' + mapState.currentNode));
   }
   wrap.appendChild(legend);
+  return wrap;
+}
+
+function renderRouteKey(mapState) {
+  const shellFamily = ((mapState.artifactIdentity || {}).shellFamily || '').toLowerCase();
+  if (shellFamily !== 'classified-packet' || mapState.mapType !== 'point-to-point' || !(mapState.edges || []).length) {
+    return null;
+  }
+
+  const wrap = make('div', 'map-route-key');
+  wrap.appendChild(make('div', 'doc-label', 'Route Key'));
+
+  const grid = make('div', 'map-route-key-grid');
+  (mapState.edges || []).forEach((edge, index) => {
+    const row = make('div', 'map-route-key-row');
+    row.appendChild(make('div', 'map-route-key-code', buildRouteCode(index)));
+    row.appendChild(make('div', 'map-route-key-label', edge.label || 'Route'));
+    grid.appendChild(row);
+  });
+  wrap.appendChild(grid);
   return wrap;
 }
 
@@ -278,6 +371,8 @@ export function renderMapSection(mapState) {
 
   if (mapState.mapType === 'point-to-point') {
     section.appendChild(renderPointMap(mapState));
+    const routeKey = renderRouteKey(mapState);
+    if (routeKey) section.appendChild(routeKey);
   } else if (mapState.mapType === 'linear-track') {
     section.appendChild(renderLinearMap(mapState));
   } else if (mapState.mapType === 'player-drawn') {
