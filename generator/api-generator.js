@@ -485,6 +485,486 @@ window.LiftRPGAPI = (function () {
     return String(id || '').toLowerCase().replace(/[-_.\s]/g, '');
   }
 
+  function firstNonEmpty() {
+    for (var i = 0; i < arguments.length; i++) {
+      var value = arguments[i];
+      if (value !== undefined && value !== null && String(value).trim()) {
+        return String(value).trim();
+      }
+    }
+    return '';
+  }
+
+  function toSlugWords(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  function inferArtifactClassFromShell(shell) {
+    var cover = shell.cover || {};
+    var meta = shell.meta || {};
+    var theme = shell.theme || {};
+    var source = toSlugWords([
+      cover.designation,
+      cover.title,
+      cover.subtitle,
+      meta.blockSubtitle,
+      meta.worldContract,
+      meta.weeklyComponentType
+    ].join(' '));
+
+    if (!source) {
+      switch (String(theme.visualArchetype || '').toLowerCase()) {
+        case 'government': return 'classified incident packet';
+        case 'nautical': return 'ship logbook';
+        case 'minimalist': return 'technical field manual';
+        case 'occult': return 'devotional manual';
+        default: return 'field survey folio';
+      }
+    }
+
+    if (/\b(ship|deck|captain|hull|compartment|navigation|voyage)\b/.test(source)) return 'ship logbook';
+    if (/\b(court|docket|testimony|deposition|verdict)\b/.test(source)) return 'court packet';
+    if (/\b(devotional|liturgy|prayer|rite|choir|chapel)\b/.test(source)) return 'devotional manual';
+    if (/\b(binder|witness|statement|interview|profile)\b/.test(source)) return 'witness binder';
+    if (/\b(archive|household|family|estate|ledger)\b/.test(source)) return 'household archive';
+    if (/\b(manual|protocol|maintenance|operations|procedure)\b/.test(source)) return 'technical field manual';
+    if (/\b(packet|dossier|classified|incident|agency|office)\b/.test(source)) return 'classified incident packet';
+    return 'field survey folio';
+  }
+
+  function inferShellFamily(artifactClass, themeArchetype) {
+    var artifact = toSlugWords(artifactClass);
+    if (artifact.indexOf('ship') !== -1) return 'ship-logbook';
+    if (artifact.indexOf('court') !== -1) return 'court-packet';
+    if (artifact.indexOf('devotional') !== -1) return 'devotional-manual';
+    if (artifact.indexOf('witness') !== -1) return 'witness-binder';
+    if (artifact.indexOf('archive') !== -1 || artifact.indexOf('household') !== -1) return 'household-archive';
+    if (artifact.indexOf('manual') !== -1) return 'technical-manual';
+    if (artifact.indexOf('packet') !== -1 || artifact.indexOf('dossier') !== -1 || themeArchetype === 'government') {
+      return 'classified-packet';
+    }
+    return 'field-survey';
+  }
+
+  function inferBoardStateMode(shell, campaignPlan) {
+    var metaIdentity = (((shell || {}).meta || {}).artifactIdentity || {});
+    if (metaIdentity.boardStateMode) return String(metaIdentity.boardStateMode);
+
+    var topology = (((campaignPlan || {}).topology || {}).type || '').toLowerCase();
+    if (topology) {
+      if (topology.indexOf('timeline') !== -1) return 'timeline-reconstruction';
+      if (topology.indexOf('route') !== -1) return 'route-tracker';
+      if (topology.indexOf('node') !== -1) return 'node-graph';
+    }
+
+    var componentType = String((((shell || {}).meta || {}).weeklyComponentType) || '').toLowerCase();
+    if (componentType.indexOf('station') !== -1 || componentType.indexOf('gauge') !== -1) return 'survey-grid';
+    if (componentType.indexOf('ledger') !== -1) return 'ledger-board';
+    return 'survey-grid';
+  }
+
+  function inferAttachmentStrategy(shellFamily, boardStateMode) {
+    if (boardStateMode === 'timeline-reconstruction' || boardStateMode === 'testimony-matrix') {
+      return 'narrative-support';
+    }
+    if (shellFamily === 'classified-packet' || shellFamily === 'technical-manual' || shellFamily === 'ship-logbook') {
+      return 'split-technical';
+    }
+    if (shellFamily === 'witness-binder' || shellFamily === 'household-archive') {
+      return 'single-dominant';
+    }
+    return 'split-technical';
+  }
+
+  function normalizeArtifactIdentity(rawIdentity, shell, campaignPlan) {
+    var identity = rawIdentity && typeof rawIdentity === 'object' ? rawIdentity : {};
+    var themeArchetype = String((((shell || {}).theme || {}).visualArchetype) || '').toLowerCase();
+    var artifactClass = firstNonEmpty(identity.artifactClass, inferArtifactClassFromShell(shell));
+    var shellFamily = firstNonEmpty(identity.shellFamily, inferShellFamily(artifactClass, themeArchetype));
+    var boardStateMode = firstNonEmpty(identity.boardStateMode, inferBoardStateMode(shell, campaignPlan));
+    var attachmentStrategy = firstNonEmpty(identity.attachmentStrategy, inferAttachmentStrategy(shellFamily, boardStateMode));
+
+    return {
+      artifactClass: artifactClass,
+      artifactBlend: Array.isArray(identity.artifactBlend) ? identity.artifactBlend.slice(0, 4) : (identity.artifactBlend || ''),
+      authorialMode: firstNonEmpty(identity.authorialMode, themeArchetype === 'government' ? 'procedural' : ''),
+      boardStateMode: boardStateMode,
+      documentEcology: identity.documentEcology || '',
+      materialCulture: identity.materialCulture || '',
+      openingMode: firstNonEmpty(identity.openingMode, shellFamily === 'classified-packet' ? 'briefing' : 'artifact-first'),
+      rulesDeliveryMode: firstNonEmpty(identity.rulesDeliveryMode, shellFamily === 'devotional-manual' ? 'diegetic-procedure' : 'mixed'),
+      revealShape: identity.revealShape || '',
+      unlockLogic: identity.unlockLogic || '',
+      shellFamily: shellFamily,
+      attachmentStrategy: attachmentStrategy
+    };
+  }
+
+  function ensureArtifactIdentity(shell, campaignPlan) {
+    if (!shell || typeof shell !== 'object') return null;
+    if (!shell.meta) shell.meta = {};
+    var normalized = normalizeArtifactIdentity(shell.meta.artifactIdentity, shell, campaignPlan);
+    shell.meta.artifactIdentity = normalized;
+    return normalized;
+  }
+
+  function extractEndingBodyText(entry) {
+    if (!entry || typeof entry !== 'object') return '';
+    if (typeof entry.content === 'string') return entry.content;
+    if (entry.content && typeof entry.content === 'object') {
+      return firstNonEmpty(entry.content.body, entry.content.content, entry.content.html);
+    }
+    return firstNonEmpty(entry.body, entry.text);
+  }
+
+  var SIGNAL_TOKEN_STOPWORDS = {
+    the: 1, and: 1, with: 1, from: 1, into: 1, this: 1, that: 1, then: 1,
+    were: 1, have: 1, your: 1, their: 1, there: 1, while: 1, after: 1,
+    before: 1, where: 1, which: 1, shall: 1, would: 1, could: 1, about: 1
+  };
+  var COUNT_WORDS = {
+    one: 1, two: 2, three: 3, four: 4, five: 5,
+    six: 6, seven: 7, eight: 8, nine: 9, ten: 10
+  };
+  var CONTINUITY_PHRASE_PATTERNS = [
+    /\b([a-z0-9-]+(?:\s+[a-z0-9-]+){0,2}\s+cipher)\b/gi,
+    /\b([a-z0-9-]+(?:\s+[a-z0-9-]+){0,2}\s+relay)\b/gi,
+    /\b([a-z0-9-]+(?:\s+[a-z0-9-]+){0,2}\s+clearance)\b/gi
+  ];
+
+  function extractYearsFromText(text) {
+    var matches = String(text || '').match(/\b(18|19|20)\d{2}\b/g) || [];
+    return matches.map(function (year) { return Number(year); });
+  }
+
+  function addSignalTokens(target, text) {
+    String(text || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .split(/\s+/)
+      .forEach(function (token) {
+        if (!token || token.length < 4 || SIGNAL_TOKEN_STOPWORDS[token]) return;
+        target[token] = true;
+      });
+  }
+
+  function collectAnchoredPhrases(text) {
+    var source = String(text || '').toLowerCase();
+    var phrases = {};
+
+    CONTINUITY_PHRASE_PATTERNS.forEach(function (pattern) {
+      pattern.lastIndex = 0;
+      var match;
+      while ((match = pattern.exec(source))) {
+        var phrase = String(match[1] || '').replace(/\s+/g, ' ').trim();
+        if (!phrase) continue;
+        phrases[phrase] = true;
+      }
+    });
+
+    return Object.keys(phrases);
+  }
+
+  function addAnchoredPhrases(target, text) {
+    collectAnchoredPhrases(text).forEach(function (phrase) {
+      target[phrase] = true;
+    });
+  }
+
+  function parseCountToken(token) {
+    if (token === undefined || token === null) return 0;
+    var normalized = String(token).trim().toLowerCase();
+    if (COUNT_WORDS[normalized]) return COUNT_WORDS[normalized];
+    return parseInt(normalized, 10) || 0;
+  }
+
+  function extractInputCountClaims(text) {
+    var claims = [];
+    var seen = {};
+    var pattern = /\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:true\s+|recorded\s+|convergence\s+|component\s+|weekly\s+|final\s+|real\s+)?inputs?\b/gi;
+    var match;
+
+    while ((match = pattern.exec(String(text || '')))) {
+      var phrase = String(match[0] || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (!phrase || seen[phrase]) continue;
+      seen[phrase] = true;
+      claims.push({
+        phrase: phrase,
+        value: parseCountToken(match[1])
+      });
+    }
+
+    return claims;
+  }
+
+  function buildContinuityLedger(context) {
+    context = context || {};
+    var shell = context.shell || {};
+    var campaignPlan = context.campaignPlan || {};
+    var weekChunkOutputs = context.weekChunkOutputs || [];
+    var fragmentsOutput = context.fragmentsOutput || {};
+    var endingsOutput = context.endingsOutput || {};
+    var identity = ensureArtifactIdentity(shell, campaignPlan) || {};
+    var weeks = [];
+    var fragmentIds = {};
+    var overflowIds = {};
+    var componentValues = [];
+    var cipherTypes = [];
+    var sessionFragmentRefs = {};
+    var oracleFragmentRefs = {};
+    var knownSignalTokens = {};
+    var knownAnchoredPhrases = {};
+    var priorYears = {};
+
+    addSignalTokens(knownSignalTokens, (shell.meta || {}).worldContract);
+    addSignalTokens(knownSignalTokens, (((shell.meta || {}).artifactIdentity || {}).artifactClass || ''));
+    addAnchoredPhrases(knownAnchoredPhrases, (shell.meta || {}).worldContract);
+
+    weekChunkOutputs.forEach(function (chunk) {
+      (chunk.weeks || []).forEach(function (week) {
+        weeks.push(week);
+        var wc = week.weeklyComponent || {};
+        if (!week.isBossWeek && wc.value !== undefined && wc.value !== null && wc.value !== '') {
+          componentValues.push(String(wc.value));
+        }
+        if (week.overflowDocument && week.overflowDocument.id) {
+          overflowIds[normalizeId(week.overflowDocument.id)] = true;
+        }
+        var cipherType = (((week.fieldOps || {}).cipher || {}).type || '').trim();
+        if (cipherType) cipherTypes.push(cipherType);
+        addSignalTokens(knownSignalTokens, week.title);
+        addSignalTokens(knownSignalTokens, ((week.fieldOps || {}).cipher || {}).title);
+        addAnchoredPhrases(knownAnchoredPhrases, week.title);
+        addAnchoredPhrases(knownAnchoredPhrases, ((week.fieldOps || {}).cipher || {}).title);
+        extractYearsFromText(week.title).forEach(function (year) { priorYears[year] = true; });
+        (week.sessions || []).forEach(function (session) {
+          if (session.fragmentRef) sessionFragmentRefs[normalizeId(session.fragmentRef)] = true;
+          addSignalTokens(knownSignalTokens, session.storyPrompt);
+          addAnchoredPhrases(knownAnchoredPhrases, session.storyPrompt);
+          extractYearsFromText(session.storyPrompt).forEach(function (year) { priorYears[year] = true; });
+        });
+        ((((week.fieldOps || {}).oracleTable || {}).entries) || []).forEach(function (entry) {
+          if (entry.fragmentRef) oracleFragmentRefs[normalizeId(entry.fragmentRef)] = true;
+          addSignalTokens(knownSignalTokens, entry.text);
+          addAnchoredPhrases(knownAnchoredPhrases, entry.text);
+          extractYearsFromText(entry.text).forEach(function (year) { priorYears[year] = true; });
+        });
+        ((((week.fieldOps || {}).oracle || {}).entries) || []).forEach(function (entry) {
+          if (entry.fragmentRef) oracleFragmentRefs[normalizeId(entry.fragmentRef)] = true;
+          addSignalTokens(knownSignalTokens, entry.text);
+          addAnchoredPhrases(knownAnchoredPhrases, entry.text);
+          extractYearsFromText(entry.text).forEach(function (year) { priorYears[year] = true; });
+        });
+        if (week.overflowDocument) {
+          addSignalTokens(knownSignalTokens, week.overflowDocument.title);
+          addSignalTokens(knownSignalTokens, week.overflowDocument.content || week.overflowDocument.body);
+          addAnchoredPhrases(knownAnchoredPhrases, week.overflowDocument.title);
+          addAnchoredPhrases(knownAnchoredPhrases, week.overflowDocument.content || week.overflowDocument.body);
+          extractYearsFromText(week.overflowDocument.content || week.overflowDocument.body).forEach(function (year) { priorYears[year] = true; });
+        }
+      });
+    });
+
+    (campaignPlan.fragmentRegistry || []).forEach(function (entry) {
+      if (entry && entry.id) fragmentIds[normalizeId(entry.id)] = true;
+    });
+    ((fragmentsOutput || {}).fragments || []).forEach(function (entry) {
+      if (entry && entry.id) fragmentIds[normalizeId(entry.id)] = true;
+      addSignalTokens(knownSignalTokens, entry.title);
+      addSignalTokens(knownSignalTokens, extractEndingBodyText(entry));
+      addAnchoredPhrases(knownAnchoredPhrases, entry.title);
+      addAnchoredPhrases(knownAnchoredPhrases, extractEndingBodyText(entry));
+      extractYearsFromText(extractEndingBodyText(entry)).forEach(function (year) { priorYears[year] = true; });
+    });
+    (campaignPlan.overflowRegistry || []).forEach(function (entry) {
+      if (entry && entry.id) overflowIds[normalizeId(entry.id)] = true;
+    });
+
+    var bossPlan = campaignPlan.bossPlan || {};
+    var expectedBossInputCount = weeks.filter(function (week) { return !week.isBossWeek; }).length;
+    if (!expectedBossInputCount && Array.isArray(campaignPlan.weeks)) {
+      expectedBossInputCount = Math.max(0, campaignPlan.weeks.length - 1);
+    }
+
+    return {
+      artifactIdentity: identity,
+      weekCount: Array.isArray(campaignPlan.weeks) ? campaignPlan.weeks.length : weeks.length,
+      weeklyComponentType: firstNonEmpty((shell.meta || {}).weeklyComponentType, bossPlan.weeklyComponentType),
+      expectedBossInputCount: expectedBossInputCount,
+      componentValues: componentValues,
+      fragmentIds: fragmentIds,
+      overflowIds: overflowIds,
+      cipherTypes: cipherTypes,
+      sessionFragmentRefs: sessionFragmentRefs,
+      oracleFragmentRefs: oracleFragmentRefs,
+      endings: (endingsOutput || {}).endings || [],
+      knownSignalTokens: knownSignalTokens,
+      knownAnchoredPhrases: knownAnchoredPhrases,
+      priorYears: priorYears
+    };
+  }
+
+  function continuityRefExists(ledger, ref) {
+    var normalized = normalizeId(ref);
+    return !!((ledger.fragmentIds && ledger.fragmentIds[normalized]) || (ledger.overflowIds && ledger.overflowIds[normalized]));
+  }
+
+  function validateWeekChunkContinuity(chunk, context) {
+    var errors = [];
+    context = context || {};
+    var ledger = buildContinuityLedger({
+      shell: context.shell,
+      campaignPlan: context.campaignPlan,
+      weekChunkOutputs: context.priorWeekChunkOutputs || []
+    });
+    var expectedWeeklyComponentType = ledger.weeklyComponentType;
+    var combinedComponentValues = ledger.componentValues.slice();
+
+    (chunk.weeks || []).forEach(function (week, index) {
+      var label = 'Week ' + (week.weekNumber || context.expectedWeeks && context.expectedWeeks[index] || '?');
+      var wc = week.weeklyComponent || {};
+      if (!week.isBossWeek && expectedWeeklyComponentType && wc.type && wc.type !== expectedWeeklyComponentType) {
+        errors.push(label + ' weeklyComponent.type "' + wc.type + '" does not match shell meta.weeklyComponentType "' + expectedWeeklyComponentType + '"');
+      }
+
+      (week.sessions || []).forEach(function (session, sessionIndex) {
+        if (session.fragmentRef && !continuityRefExists(ledger, session.fragmentRef)) {
+          errors.push(label + ' session ' + (sessionIndex + 1) + ': fragmentRef "' + session.fragmentRef + '" is not present in fragmentRegistry or overflowRegistry');
+        }
+      });
+
+      var oracle = (week.fieldOps || {}).oracleTable || (week.fieldOps || {}).oracle || {};
+      (oracle.entries || []).forEach(function (entry, entryIndex) {
+        if (entry.fragmentRef && !continuityRefExists(ledger, entry.fragmentRef)) {
+          errors.push(label + ' oracle[' + entryIndex + ']: fragmentRef "' + entry.fragmentRef + '" is not present in fragmentRegistry or overflowRegistry');
+        }
+      });
+
+      if (week.overflowDocument && week.overflowDocument.id) {
+        var overflowId = normalizeId(week.overflowDocument.id);
+        if (!ledger.overflowIds[overflowId] && Array.isArray((context.campaignPlan || {}).overflowRegistry) && (context.campaignPlan || {}).overflowRegistry.length) {
+          errors.push(label + ' overflowDocument.id "' + week.overflowDocument.id + '" is not present in overflowRegistry');
+        }
+        ledger.overflowIds[overflowId] = true;
+      }
+
+      if (!week.isBossWeek && wc.value !== undefined && wc.value !== null && wc.value !== '') {
+        combinedComponentValues.push(String(wc.value));
+      }
+    });
+
+    var bossWeek = (chunk.weeks || []).find(function (week) { return week && week.isBossWeek; });
+    if (bossWeek && bossWeek.bossEncounter) {
+      var inputs = (bossWeek.bossEncounter.componentInputs || []).map(function (value) { return String(value); });
+      if (inputs.length !== combinedComponentValues.length) {
+        errors.push('Boss componentInputs has ' + inputs.length + ' values but the validated non-boss week set has ' + combinedComponentValues.length);
+      } else {
+        for (var i = 0; i < inputs.length; i++) {
+          if (inputs[i] !== combinedComponentValues[i]) {
+            errors.push('Boss componentInputs[' + i + '] = "' + inputs[i] + '" does not match collected weeklyComponent value "' + combinedComponentValues[i] + '"');
+          }
+        }
+      }
+
+      var bossText = [
+        bossWeek.bossEncounter.narrative,
+        bossWeek.bossEncounter.mechanismDescription,
+        (bossWeek.bossEncounter.decodingKey || {}).instruction,
+        bossWeek.bossEncounter.convergenceProof,
+        bossWeek.bossEncounter.passwordRevealInstruction
+      ].join('\n');
+      extractInputCountClaims(bossText).forEach(function (claim) {
+        if (claim.value && claim.value !== inputs.length) {
+          errors.push('Boss prose says "' + claim.phrase + '" but componentInputs has ' + inputs.length + ' values.');
+        }
+      });
+    }
+
+    return errors;
+  }
+
+  function validateFragmentBatchContinuity(batchOutput, context) {
+    var errors = [];
+    context = context || {};
+    var ledger = buildContinuityLedger({
+      shell: context.shell,
+      campaignPlan: context.campaignPlan,
+      weekChunkOutputs: context.weekChunkOutputs || []
+    });
+
+    (batchOutput.fragments || []).forEach(function (fragment) {
+      var id = String((fragment || {}).id || '');
+      var normalized = normalizeId(id);
+      if (!normalized) return;
+      if (context.expectedRegistry && context.expectedRegistry.length && !ledger.fragmentIds[normalized]) {
+        errors.push('Fragment "' + id + '" is not present in the campaign fragmentRegistry');
+      }
+
+      var content = extractEndingBodyText(fragment);
+      var lowered = content.toLowerCase();
+      if (lowered.indexOf('liftrpg.co') !== -1 || lowered.indexOf('unlock the ending') !== -1) {
+        errors.push('Fragment "' + id + '" leaks final unlock language reserved for the boss/endings path');
+      }
+    });
+
+    return errors;
+  }
+
+  function validateEndingsContinuity(endingsOutput, context) {
+    var errors = [];
+    context = context || {};
+    var ledger = buildContinuityLedger({
+      shell: context.shell,
+      campaignPlan: context.campaignPlan,
+      weekChunkOutputs: context.weekChunkOutputs || [],
+      fragmentsOutput: context.fragmentsOutput || {}
+    });
+
+    (endingsOutput.endings || []).forEach(function (ending, index) {
+      if (ending.passwordEncryptedEnding || ending.passwordPlaintext) {
+        errors.push('Ending ' + (index + 1) + ' includes forbidden password fields; ending payloads must stay plaintext until local sealing.');
+      }
+
+      var body = extractEndingBodyText(ending);
+      var lowered = body.toLowerCase();
+      if (lowered.indexOf('passwordencryptedending') !== -1) {
+        errors.push('Ending ' + (index + 1) + ' appears to include ciphertext or sealing metadata.');
+      }
+
+      if (ledger.componentValues.length > 0 && lowered.indexOf('liftrpg.co') !== -1 && lowered.indexOf('enter it') === -1 && lowered.indexOf('enter the word') === -1) {
+        errors.push('Ending ' + (index + 1) + ' references the unlock path without a stable instruction phrase.');
+      }
+
+      extractYearsFromText(body).forEach(function (year) {
+        var knownYears = Object.keys(ledger.priorYears || {}).map(function (value) { return Number(value); });
+        if (!knownYears.length) return;
+        var known = !!ledger.priorYears[year];
+        var closeToKnown = knownYears.some(function (candidate) {
+          return Math.abs(candidate - year) <= 1;
+        });
+        if (!known && !closeToKnown) {
+          errors.push('Ending ' + (index + 1) + ' introduces year ' + year + ' without support from validated weeks or fragments.');
+        }
+      });
+
+      collectAnchoredPhrases(body).forEach(function (phrase) {
+        var supportedPhrase = ledger.knownAnchoredPhrases && ledger.knownAnchoredPhrases[phrase];
+        if (!supportedPhrase) {
+          errors.push('Ending ' + (index + 1) + ' references "' + phrase + '" but that anchored phrase does not appear in validated weeks or fragments.');
+        }
+      });
+
+      if (/\bearth relay\b/i.test(body) && !(ledger.knownSignalTokens && (ledger.knownSignalTokens.earth || ledger.knownSignalTokens.relay))) {
+        errors.push('Ending ' + (index + 1) + ' introduces "Earth relay" without upstream support.');
+      }
+    });
+
+    return errors;
+  }
+
   // ── Booklet schema postchecks ─────────────────────────────────────────────
   // Returns array of human-readable error strings.
 
@@ -560,10 +1040,12 @@ window.LiftRPGAPI = (function () {
     var meta = shell.meta || {};
     var ctx = {};
     var hasContent = false;
+    ensureArtifactIdentity(shell, null);
     if (meta.worldContract) { ctx.worldContract = meta.worldContract; hasContent = true; }
     if (meta.narrativeVoice) { ctx.narrativeVoice = meta.narrativeVoice; hasContent = true; }
     if (meta.literaryRegister) { ctx.literaryRegister = meta.literaryRegister; hasContent = true; }
     if (meta.structuralShape) { ctx.structuralShape = meta.structuralShape; hasContent = true; }
+    if (meta.artifactIdentity) { ctx.artifactIdentity = meta.artifactIdentity; hasContent = true; }
     return hasContent ? ctx : null;
   }
 
@@ -767,7 +1249,8 @@ window.LiftRPGAPI = (function () {
   // ── Booklet assembler ────────────────────────────────────────────────────
   // Merges partial JSON chunks from the 10-stage pipeline into a complete booklet.
 
-  function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput) {
+  function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan) {
+    ensureArtifactIdentity(shell, campaignPlan || null);
     var booklet = {
       meta: shell.meta || {},
       cover: shell.cover || {},
@@ -797,7 +1280,8 @@ window.LiftRPGAPI = (function () {
   // has populated weeks[].sessions[].exercises, those replace LLM-generated
   // exercise data deterministically. Used only by generateStructured().
 
-  function assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, normalizedWorkout) {
+  function assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, normalizedWorkout, campaignPlan) {
+    ensureArtifactIdentity(shell, campaignPlan || null);
     var booklet = {
       meta: shell.meta || {},
       cover: shell.cover || {},
@@ -1320,6 +1804,10 @@ window.LiftRPGAPI = (function () {
     var meta = booklet.meta || {};
     var weeks = booklet.weeks || [];
     var fragments = booklet.fragments || [];
+
+    if (!meta.artifactIdentity || typeof meta.artifactIdentity !== 'object') {
+      warnings.push('meta.artifactIdentity is missing; renderer will fall back to a derived shell family.');
+    }
 
     // ── Meta consistency ─────────────────────────────────────────────────────
     if (meta.weekCount !== undefined && meta.weekCount !== weeks.length) {
@@ -1919,7 +2407,7 @@ window.LiftRPGAPI = (function () {
     console.log('[LiftRPG] Assembling booklet from', weekChunkOutputs.length, 'week chunks,',
       ((fragmentsOutput || {}).fragments || []).length, 'fragments,',
       ((endingsOutput || {}).endings || []).length, 'endings');
-    var booklet = assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput);
+    var booklet = assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan);
 
     // Validate + single patch attempt (no retry loop)
     var errors = validateAssembledBooklet(booklet);
@@ -2278,6 +2766,29 @@ window.LiftRPGAPI = (function () {
             },
             required: ['resolution', 'temporalOrder', 'narratorReliability', 'promptFragmentRelationship']
           },
+          artifactIdentity: {
+            type: 'object',
+            properties: {
+              artifactClass: { type: 'string' },
+              artifactBlend: {
+                anyOf: [
+                  { type: 'string' },
+                  { type: 'array', items: { type: 'string' } }
+                ]
+              },
+              authorialMode: { type: 'string' },
+              boardStateMode: { type: 'string' },
+              documentEcology: { type: 'string' },
+              materialCulture: { type: 'string' },
+              openingMode: { type: 'string' },
+              rulesDeliveryMode: { type: 'string' },
+              revealShape: { type: 'string' },
+              unlockLogic: { type: 'string' },
+              shellFamily: { type: 'string' },
+              attachmentStrategy: { type: 'string' }
+            },
+            required: ['artifactClass', 'boardStateMode', 'shellFamily', 'attachmentStrategy']
+          },
           weeklyComponentType: { type: 'string' },
           passwordLength: { type: 'integer' },
           passwordEncryptedEnding: { type: 'string' },
@@ -2286,7 +2797,7 @@ window.LiftRPGAPI = (function () {
           totalSessions: { type: 'integer' }
         },
         required: ['schemaVersion', 'blockTitle', 'worldContract', 'narrativeVoice',
-          'literaryRegister', 'structuralShape', 'weeklyComponentType',
+          'literaryRegister', 'structuralShape', 'artifactIdentity', 'weeklyComponentType',
           'passwordLength', 'weekCount', 'totalSessions']
       },
       cover: {
@@ -2919,7 +3430,7 @@ window.LiftRPGAPI = (function () {
     console.log('[LiftRPG] Assembling structured booklet from', weekChunkOutputs.length, 'week chunks,',
       ((fragmentsOutput || {}).fragments || []).length, 'fragments,',
       ((endingsOutput || {}).endings || []).length, 'endings');
-    var booklet = assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, nw);
+    var booklet = assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, nw, campaignPlan);
 
     // Validate — log warnings but no LLM patch step
     // (structured output should prevent malformed JSON; semantic errors are reported)
@@ -3294,6 +3805,13 @@ window.LiftRPGAPI = (function () {
         severity: 'low'
       });
     }
+    if (!meta.artifactIdentity) {
+      report.weakSpots.push({
+        area: 'identity-drift-risk',
+        detail: 'meta.artifactIdentity missing — renderer will infer shell identity from weak signals only',
+        severity: 'high'
+      });
+    }
 
     // Endings quality: check endings reference specifics
     endings.forEach(function (ending, ei) {
@@ -3587,6 +4105,11 @@ window.LiftRPGAPI = (function () {
     generateMultiStage: generateMultiStage,
     generateStructured: generateStructured,
     manual: {
+      ensureArtifactIdentity: ensureArtifactIdentity,
+      buildContinuityLedger: buildContinuityLedger,
+      validateWeekChunkContinuity: validateWeekChunkContinuity,
+      validateFragmentBatchContinuity: validateFragmentBatchContinuity,
+      validateEndingsContinuity: validateEndingsContinuity,
       extractShellContext: extractShellContext,
       buildChunkContinuity: buildChunkContinuity,
       assembleBooklet: assembleBooklet,

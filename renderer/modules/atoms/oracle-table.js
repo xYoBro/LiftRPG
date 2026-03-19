@@ -35,9 +35,13 @@ registerAtom('oracle-table', {
   render(atom, density) {
     const data = atom.data || {};
     const oracle = data.oracle || {};
+    const artifactIdentity = data.artifactIdentity || {};
 
     const oracleModel = buildOracleModel(oracle);
     const el = renderOracleSection(oracleModel);
+    el.setAttribute('data-shell-family', artifactIdentity.shellFamily || 'field-survey');
+    el.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || 'survey-grid');
+    el.setAttribute('data-attachment-strategy', artifactIdentity.attachmentStrategy || 'split-technical');
 
     const variant = densityVariant(density);
     if (variant) el.setAttribute('data-density-variant', variant);

@@ -1,6 +1,6 @@
 import { PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from './constants.js?v=47';
 import { make } from './dom.js?v=47';
-import { buildBookletMetaModel } from './booklet-models.js?v=47';
+import { buildBookletMetaModel, resolveArtifactIdentity } from './booklet-models.js?v=47';
 import { setPageNumbers } from './pagination.js?v=47';
 import { createBoundedPage } from './page-shell.js?v=47';
 import { renderPageFromPlacements } from './page-renderer.js?v=47';
@@ -108,6 +108,7 @@ function applyBookletMetadata(booklet, data) {
   const theme = data.theme || {};
   const shape = meta.structuralShape || {};
   const voice = meta.narrativeVoice || {};
+  const artifactIdentity = resolveArtifactIdentity(data);
 
   booklet.setAttribute('data-visual-archetype', theme.visualArchetype || 'pastoral');
   booklet.setAttribute('data-weekly-component-type', meta.weeklyComponentType || '');
@@ -115,6 +116,9 @@ function applyBookletMetadata(booklet, data) {
   booklet.setAttribute('data-temporal-order', shape.temporalOrder || '');
   booklet.setAttribute('data-narrative-person', voice.person || '');
   booklet.setAttribute('data-narrative-tense', voice.tense || '');
+  booklet.setAttribute('data-shell-family', artifactIdentity.shellFamily || 'field-survey');
+  booklet.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || 'survey-grid');
+  booklet.setAttribute('data-attachment-strategy', artifactIdentity.attachmentStrategy || 'split-technical');
 }
 
 export function syncLayoutMode(refs, layoutMode) {

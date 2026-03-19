@@ -49,11 +49,15 @@ registerAtom('cipher-panel', {
   render(atom, density) {
     const data = atom.data || {};
     const cipher = data.cipher || {};
+    const artifactIdentity = data.artifactIdentity || {};
 
     // buildCipherModel expects (cipher, weeklyComponent, mechanicProfile)
     // We pass cipher as weeklyComponent fallback for extractionInstruction
     const cipherModel = buildCipherModel(cipher, cipher, null);
     const el = renderCipherSection(cipherModel);
+    el.setAttribute('data-shell-family', artifactIdentity.shellFamily || 'field-survey');
+    el.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || 'survey-grid');
+    el.setAttribute('data-attachment-strategy', artifactIdentity.attachmentStrategy || 'split-technical');
 
     const variant = densityVariant(density);
     if (variant) el.setAttribute('data-density-variant', variant);

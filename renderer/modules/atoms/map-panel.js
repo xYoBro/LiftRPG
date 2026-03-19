@@ -44,9 +44,13 @@ registerAtom('map-panel', {
   render(atom, density) {
     const data = atom.data || {};
     const map = data.map || {};
+    const artifactIdentity = data.artifactIdentity || {};
 
     const mapModel = buildMapModel(map, null);
     const el = renderMapSection(mapModel);
+    el.setAttribute('data-shell-family', artifactIdentity.shellFamily || 'field-survey');
+    el.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || 'survey-grid');
+    el.setAttribute('data-attachment-strategy', artifactIdentity.attachmentStrategy || 'split-technical');
 
     const variant = densityVariant(density);
     if (variant) el.setAttribute('data-density-variant', variant);

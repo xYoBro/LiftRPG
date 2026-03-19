@@ -18,6 +18,7 @@ import { resolveWeekMechanicProfile } from '../mechanic-registry.js';
 import { estimateSessionCardHeight } from '../session-card-metrics.js';
 import {
   buildUnlockedEndingPageModel,
+  resolveArtifactIdentity,
 } from '../booklet-models.js';
 import { renderUnlockedEndingPage } from '../booklet-primitives.js';
 import {
@@ -55,6 +56,8 @@ function singlePageGroupPolicy() {
  */
 export function extractLiftRPGAtoms(data, unlockedEnding = null) {
   const atoms = [];
+  const artifactIdentity = resolveArtifactIdentity(data);
+  const shellFamily = artifactIdentity.shellFamily || 'field-survey';
 
   // ── Cover ───────────────────────────────────────────────────
   atoms.push(createAtom({
@@ -79,9 +82,12 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
   }));
 
   // ── Gauge log ───────────────────────────────────────────────
+  const gaugeSequence = shellFamily === 'classified-packet' || shellFamily === 'court-packet' ? 3 : 2;
+  const assemblySequence = shellFamily === 'classified-packet' || shellFamily === 'court-packet' ? 2 : 0;
+
   atoms.push(createAtom({
     type: 'gauge-log', id: 'gauge-log', group: 'front-matter',
-    section: 'front-matter', sequence: 2,
+    section: 'front-matter', sequence: gaugeSequence,
     sizeHint: 'full-page', pageAffinity: 'either',
     data: data,
   }));
@@ -97,6 +103,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
     const profile = resolveWeekMechanicProfile(week);
     const sessionChunks = chunkWeekSessions(week.sessions || []);
     const primaryGroup = `week-${wi}-chunk-0`;
+    const attachmentStrategy = resolveWeekAttachmentStrategy(artifactIdentity, week, profile);
 
     // Week header (kicker, title, epigraph) — before session cards
     atoms.push(createAtom({
@@ -169,13 +176,18 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         atoms.push(createAtom({
           type: 'cipher-panel',
           id: `w${wi}-cipher`,
-          group: primaryGroup,
+          group: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'cipher', artifactIdentity),
           groupPolicy: singlePageGroupPolicy(),
           section: 'body',
           sequence: wi * 1000 + 100,
           sizeHint: 'quarter-page',
           pageAffinity: 'right',
-          data: { cipher: (week.fieldOps || {}).cipher || week.weeklyComponent, weekIndex: wi, totalWeeks },
+          data: {
+            cipher: (week.fieldOps || {}).cipher || week.weeklyComponent,
+            weekIndex: wi,
+            totalWeeks,
+            artifactIdentity,
+          },
         }));
       }
 
@@ -184,13 +196,18 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         atoms.push(createAtom({
           type: 'oracle-table',
           id: `w${wi}-oracle`,
-          group: primaryGroup,
+          group: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'oracle', artifactIdentity),
           groupPolicy: singlePageGroupPolicy(),
           section: 'body',
           sequence: wi * 1000 + 101,
           sizeHint: 'quarter-page',
           pageAffinity: 'right',
-          data: { oracle: week.fieldOps.oracleTable, weekIndex: wi, totalWeeks },
+          data: {
+            oracle: week.fieldOps.oracleTable,
+            weekIndex: wi,
+            totalWeeks,
+            artifactIdentity,
+          },
         }));
       }
 
@@ -201,13 +218,18 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         atoms.push(createAtom({
           type: 'map-panel',
           id: `w${wi}-map`,
-          group: primaryGroup,
+          group: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'map', artifactIdentity),
           groupPolicy: singlePageGroupPolicy(),
           section: 'body',
           sequence: wi * 1000 + 102,
           sizeHint: mapHint,
           pageAffinity: 'right',
-          data: { map: week.fieldOps.mapState, weekIndex: wi, totalWeeks },
+          data: {
+            map: week.fieldOps.mapState,
+            weekIndex: wi,
+            totalWeeks,
+            artifactIdentity,
+          },
         }));
       }
 
@@ -232,6 +254,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
               startValue: (comp.tracks && comp.tracks[0] && comp.tracks[0].startValue) || 0,
               weekIndex: wi,
               totalWeeks,
+              artifactIdentity,
             },
           }));
         }
@@ -306,7 +329,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
   // ── Assembly page ───────────────────────────────────────────
   atoms.push(createAtom({
     type: 'assembly-page', id: 'assembly', group: 'end-matter',
-    section: 'end-matter', sequence: 0,
+    section: 'end-matter', sequence: assemblySequence,
     sizeHint: 'full-page', pageAffinity: 'either',
     data: data,
   }));
@@ -567,6 +590,42 @@ function chunkWeekSessions(sessions, maxSessionsPerPage = 3) {
   });
 
   return chunks;
+}
+
+function resolveWeekAttachmentStrategy(artifactIdentity, week, profile) {
+  const explicit = String((artifactIdentity && artifactIdentity.attachmentStrategy) || '').trim().toLowerCase();
+  if (explicit) return explicit;
+
+  const fieldOps = (week && week.fieldOps) || {};
+  const attachmentCount = Number(!!fieldOps.cipher) + Number(!!fieldOps.oracleTable || !!fieldOps.oracle) + Number(!!fieldOps.mapState);
+  if (attachmentCount >= 3 || (profile && profile.needsCompanionSpread)) return 'split-technical';
+  return 'single-dominant';
+}
+
+function resolveAttachmentGroup(primaryGroup, weekIndex, attachmentStrategy, channel, artifactIdentity = null) {
+  const boardStateMode = String((artifactIdentity && artifactIdentity.boardStateMode) || '').trim().toLowerCase();
+
+  if (attachmentStrategy === 'narrative-support') {
+    if (channel === 'cipher') return `week-${weekIndex}-support-cipher`;
+    return primaryGroup;
+  }
+
+  if (attachmentStrategy === 'split-technical' || attachmentStrategy === 'appendix-split') {
+    if (boardStateMode === 'timeline-reconstruction') {
+      return channel === 'cipher' ? `week-${weekIndex}-tech-cipher` : `week-${weekIndex}-timeline-board`;
+    }
+    if (boardStateMode === 'testimony-matrix') {
+      return channel === 'map' ? `week-${weekIndex}-tech-map` : `week-${weekIndex}-matrix-board`;
+    }
+    if (boardStateMode === 'node-graph') {
+      return channel === 'cipher' ? `week-${weekIndex}-tech-cipher` : `week-${weekIndex}-network-board`;
+    }
+    if (boardStateMode === 'ledger-board') {
+      return channel === 'map' ? `week-${weekIndex}-tech-map` : `week-${weekIndex}-ledger-board`;
+    }
+    return `week-${weekIndex}-tech-${channel}`;
+  }
+  return primaryGroup;
 }
 
 /**

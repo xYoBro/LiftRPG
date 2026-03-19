@@ -496,6 +496,68 @@ body[data-demo-view="true"] #booklet-container{
   justify-content:flex-start;
   padding:8px 8px 0 8px;
 }
+.cover-page[data-shell-family="classified-packet"],
+.rules-left[data-shell-family="classified-packet"],
+.sealed-page[data-shell-family="classified-packet"],
+.gauge-log-page[data-shell-family="classified-packet"],
+.password-assembly-page[data-shell-family="classified-packet"],
+.endings-page[data-shell-family="classified-packet"]{
+  border-radius:0;
+  box-shadow:none;
+}
+.cover-page[data-shell-family="classified-packet"] .cover-title,
+.rules-left[data-shell-family="classified-packet"] .rules-title,
+.password-assembly-page[data-shell-family="classified-packet"] .password-assembly-title,
+.endings-page[data-shell-family="classified-packet"] .endings-title{
+  text-align:left;
+  font-family:var(--mono);
+  font-style:normal;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.cover-page[data-shell-family="classified-packet"] .cover-designation{
+  display:inline-flex;
+  padding:3px 8px;
+  border:1.5px solid var(--ink);
+  background:rgba(0,0,0,.03);
+}
+.cover-page[data-shell-family="ship-logbook"] .cover-hero,
+.endings-page[data-shell-family="ship-logbook"] .endings-title{
+  text-align:center;
+}
+.cover-page[data-shell-family="ship-logbook"] .cover-rule{
+  width:100%;
+  max-width:none;
+}
+.rules-left[data-shell-family="ship-logbook"] .rules-header,
+.gauge-log-page[data-shell-family="ship-logbook"] .rules-header{
+  justify-content:space-between;
+  border-bottom:1px dashed var(--rule);
+}
+.cover-page[data-shell-family="witness-binder"] .cover-designation,
+.rules-left[data-shell-family="witness-binder"] .doc-label,
+.endings-page[data-shell-family="witness-binder"] .doc-label{
+  transform:rotate(-1.5deg);
+}
+.cover-page[data-shell-family="devotional-manual"] .cover-title,
+.endings-page[data-shell-family="devotional-manual"] .endings-title{
+  text-align:center;
+  font-style:italic;
+}
+.sealed-page[data-shell-family="devotional-manual"],
+.endings-page[data-shell-family="devotional-manual"]{
+  background:linear-gradient(180deg, rgba(246,240,227,.98) 0%, rgba(235,226,208,.98) 100%);
+}
+.cover-page[data-shell-family="technical-manual"] .cover-title,
+.rules-left[data-shell-family="technical-manual"] .rules-title,
+.password-assembly-page[data-shell-family="technical-manual"] .password-assembly-title{
+  font-family:var(--mono);
+  font-style:normal;
+}
+.gauge-log-page[data-shell-family="technical-manual"] .password-log-grid,
+.password-assembly-page[data-shell-family="technical-manual"] .password-assembly-grid{
+  gap:6px;
+}
 .cover-hero{
   display:flex;
   flex-direction:column;
@@ -1614,6 +1676,34 @@ body[data-demo-view="true"] #booklet-container{
     "oracle oracle"
     "companion companion";
 }
+.field-ops-right[data-layout-variant="timeline-dominant"] .rp-content{
+  grid-template-columns:1fr 1fr;
+  grid-template-rows:minmax(0, 1.05fr) auto;
+  grid-template-areas:
+    "map map"
+    "oracle cipher";
+}
+.field-ops-right[data-layout-variant="timeline-dominant"] .rp-content[data-has-companion="true"]{
+  grid-template-rows:minmax(0, 1.05fr) auto 1fr;
+  grid-template-areas:
+    "map map"
+    "oracle cipher"
+    "companion companion";
+}
+.field-ops-right[data-layout-variant="matrix-dominant"] .rp-content{
+  grid-template-columns:.9fr 1.1fr;
+  grid-template-rows:auto minmax(0, 1fr);
+  grid-template-areas:
+    "oracle oracle"
+    "map cipher";
+}
+.field-ops-right[data-layout-variant="matrix-dominant"] .rp-content[data-has-companion="true"]{
+  grid-template-rows:auto minmax(0, 1fr) 1fr;
+  grid-template-areas:
+    "oracle oracle"
+    "map cipher"
+    "companion companion";
+}
 
 /* Zone containers */
 .cipher-zone{grid-area:cipher;}
@@ -1627,6 +1717,71 @@ body[data-demo-view="true"] #booklet-container{
   display:flex;
   flex-direction:column;
   gap:6px;
+}
+.field-ops-right[data-board-state-mode="node-graph"] .map-zone,
+.field-ops-right[data-board-state-mode="timeline-reconstruction"] .map-zone,
+.field-ops-right[data-board-state-mode="testimony-matrix"] .oracle-zone,
+.field-ops-right[data-board-state-mode="ledger-board"] .cipher-zone{
+  padding:5px 6px 6px;
+  border:1px solid color-mix(in srgb, var(--theme-panel-border,var(--rule)) 78%, transparent 22%);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--paper) 92%, white 8%), color-mix(in srgb, var(--paper-2) 94%, white 6%));
+}
+.field-ops-right[data-board-state-mode="timeline-reconstruction"] .map-zone{
+  position:relative;
+}
+.field-ops-right[data-board-state-mode="timeline-reconstruction"] .map-zone::after{
+  content:"";
+  position:absolute;
+  left:9px;
+  right:9px;
+  bottom:-3px;
+  border-bottom:1px dashed color-mix(in srgb, var(--accent) 55%, transparent 45%);
+}
+.field-ops-right[data-board-state-mode="testimony-matrix"] .oracle-zone{
+  border-top:none;
+  padding-top:5px;
+}
+.field-ops-right[data-board-state-mode="testimony-matrix"] .oracle-entries{
+  grid-template-columns:1fr;
+  gap:1px 0;
+}
+.field-ops-right[data-board-state-mode="testimony-matrix"] .oracle-entry{
+  padding:3px 0;
+}
+.field-ops-right[data-board-state-mode="testimony-matrix"] .cipher-zone{
+  border-left:2px solid color-mix(in srgb, var(--theme-field-rule,var(--rule)) 72%, transparent 28%);
+  padding-left:7px;
+}
+.field-ops-right[data-board-state-mode="node-graph"] .map-network{
+  min-height:184px;
+  background:
+    radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--accent) 10%, transparent 90%), transparent 24%),
+    color-mix(in srgb, var(--paper) 92%, white 8%);
+}
+.field-ops-right[data-board-state-mode="node-graph"] .map-node{
+  min-width:54px;
+  box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent 90%);
+}
+.field-ops-right[data-board-state-mode="ledger-board"] .cipher-zone{
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent 17px,
+      color-mix(in srgb, var(--theme-field-rule,var(--rule)) 24%, transparent 76%) 17px,
+      color-mix(in srgb, var(--theme-field-rule,var(--rule)) 24%, transparent 76%) 18px
+    ),
+    linear-gradient(180deg, color-mix(in srgb, var(--paper) 94%, white 6%), color-mix(in srgb, var(--paper-2) 94%, white 6%));
+}
+.field-ops-right[data-board-state-mode="ledger-board"] .password-extract{
+  border-left:none;
+  border-top:1px solid color-mix(in srgb, var(--accent) 55%, transparent 45%);
+  padding-left:0;
+  padding-top:4px;
+}
+.field-ops-right[data-board-state-mode="ledger-board"] .oracle-zone{
+  border-top-style:dashed;
 }
 
 .companion-page{

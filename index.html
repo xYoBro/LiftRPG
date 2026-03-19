@@ -625,6 +625,7 @@
       justify-content: center;
       flex-shrink: 0;
       transition: background .2s;
+      cursor: pointer;
     }
 
     .wizard-num.active { background: var(--accent); }
@@ -636,6 +637,7 @@
       letter-spacing: .2em;
       text-transform: uppercase;
       color: var(--muted);
+      cursor: pointer;
     }
 
     .wizard-step-label.active { color: var(--accent); }
@@ -720,6 +722,62 @@
     }
 
     .wizard-draft-clear {
+      border: 1px solid rgba(24, 23, 20, .16);
+      background: rgba(255, 255, 255, .5);
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 6pt;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+
+    .wizard-draft-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .wizard-build-meta,
+    .wizard-stage-health {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(24, 23, 20, .08);
+      font-family: var(--mono);
+      font-size: 6pt;
+      letter-spacing: .04em;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .wizard-resume-banner {
+      display: none;
+      margin-top: 12px;
+      border: 1px solid rgba(24, 23, 20, .12);
+      background: rgba(255, 255, 255, .45);
+      padding: 10px 12px;
+    }
+
+    .wizard-resume-banner.is-visible {
+      display: block;
+    }
+
+    .wizard-resume-copy {
+      font-size: 7pt;
+      line-height: 1.6;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .wizard-resume-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .wizard-action-btn {
       border: 1px solid rgba(24, 23, 20, .16);
       background: rgba(255, 255, 255, .5);
       color: var(--ink);
@@ -1019,6 +1077,14 @@
 
       <button class="gen-submit" id="gen-submit" type="button">Build Layer Bible &rarr;</button>
 
+      <div class="wizard-resume-banner" id="wiz-resume-banner">
+        <div class="wizard-resume-copy" id="wiz-resume-copy">A saved manual draft is available on this device.</div>
+        <div class="wizard-resume-actions">
+          <button class="wizard-action-btn" id="wiz-resume-btn" type="button">Resume Draft</button>
+          <button class="wizard-action-btn" id="wiz-start-fresh-btn" type="button">Start Fresh</button>
+        </div>
+      </div>
+
       <div class="chat-wizard" id="chat-wizard">
 
         <div class="wizard-step-row">
@@ -1047,9 +1113,16 @@
           <div class="wizard-current-help" id="wiz-current-help">Copy the prompt into your LLM, paste back only the JSON, then continue to Campaign.</div>
           <div class="wizard-locked-in" id="wiz-locked-in">Nothing locked in yet.</div>
           <div class="wizard-recovery-note" id="wiz-recovery-note">If a step fails validation, use the repair prompt shown below that step and repaste only that stage.</div>
+          <div class="wizard-stage-health" id="wiz-stage-health">Stages: no validated stages yet.</div>
+          <div class="wizard-build-meta" id="wiz-build-meta">Build: pending.</div>
           <div class="wizard-draft-row">
             <div class="wizard-draft-status" id="wiz-draft-status">Drafts are not saved yet.</div>
-            <button class="wizard-draft-clear" id="wiz-clear-draft" type="button">Clear Draft</button>
+            <div class="wizard-draft-actions">
+              <button class="wizard-action-btn" id="wiz-export-draft" type="button">Export Draft</button>
+              <button class="wizard-action-btn" id="wiz-import-draft" type="button">Import Draft</button>
+              <button class="wizard-draft-clear" id="wiz-clear-draft" type="button">Clear Draft</button>
+            </div>
+            <input id="wiz-import-input" type="file" accept="application/json,.json" hidden>
           </div>
         </div>
 
@@ -1247,12 +1320,25 @@
       var wizCurrentHelp = document.getElementById('wiz-current-help');
       var wizLockedIn = document.getElementById('wiz-locked-in');
       var wizRecoveryNote = document.getElementById('wiz-recovery-note');
+      var wizStageHealth = document.getElementById('wiz-stage-health');
+      var wizBuildMeta = document.getElementById('wiz-build-meta');
       var wizDraftStatus = document.getElementById('wiz-draft-status');
       var wizClearDraftBtn = document.getElementById('wiz-clear-draft');
+      var wizExportDraftBtn = document.getElementById('wiz-export-draft');
+      var wizImportDraftBtn = document.getElementById('wiz-import-draft');
+      var wizImportInput = document.getElementById('wiz-import-input');
+      var wizResumeBanner = document.getElementById('wiz-resume-banner');
+      var wizResumeCopy = document.getElementById('wiz-resume-copy');
+      var wizResumeBtn = document.getElementById('wiz-resume-btn');
+      var wizStartFreshBtn = document.getElementById('wiz-start-fresh-btn');
       var weeksStageEl = document.getElementById('wiz-weeks-stage');
       var fragmentsStageEl = document.getElementById('wiz-fragments-stage');
       var assemblyResultEl = document.getElementById('wiz-assembly-result');
-      var WIZARD_DRAFT_KEY = 'liftrpg_manual_wizard_draft_v1';
+      var WIZARD_DRAFT_KEY = 'liftrpg_manual_wizard_draft_v2';
+      var LEGACY_WIZARD_DRAFT_KEY = 'liftrpg_manual_wizard_draft_v1';
+      var WIZARD_BUILD_VERSION = '2.1.0';
+      var WIZARD_DRAFT_SCHEMA_VERSION = 2;
+      var WIZARD_STAGE_KEYS = ['layerBible', 'campaignPlan', 'shell', 'weeks', 'fragments', 'endings'];
 
       var wizStep = 0;
       var wizData = {};
@@ -1302,10 +1388,18 @@
         if (wizDraftStatus) wizDraftStatus.textContent = message;
       }
 
+      function setResumeBannerVisible(visible, message) {
+        if (!wizResumeBanner) return;
+        wizResumeBanner.classList.toggle('is-visible', !!visible);
+        if (message && wizResumeCopy) wizResumeCopy.textContent = message;
+      }
+
       function getWizardDraft() {
         try {
           var raw = localStorage.getItem(WIZARD_DRAFT_KEY);
-          return raw ? JSON.parse(raw) : null;
+          if (raw) return JSON.parse(raw);
+          var legacyRaw = localStorage.getItem(LEGACY_WIZARD_DRAFT_KEY);
+          return legacyRaw ? JSON.parse(legacyRaw) : null;
         } catch (error) {
           return null;
         }
@@ -1319,15 +1413,23 @@
 
       function collectWizardDraft() {
         return {
+          schemaVersion: WIZARD_DRAFT_SCHEMA_VERSION,
           savedAt: new Date().toISOString(),
           modalOpen: modal.classList.contains('is-open'),
           wizardVisible: chatWizard.classList.contains('is-visible'),
           wizStep: wizStep,
+          build: {
+            app: WIZARD_BUILD_VERSION,
+            draftSchema: WIZARD_DRAFT_SCHEMA_VERSION
+          },
           workout: workoutEl.value,
           brief: briefEl.value,
           dice: getDiceValue(),
           wizData: wizData,
           wizState: wizState,
+          validation: {
+            stageHealth: getStageHealthItems()
+          },
           prompts: Object.keys(wizPrompts).reduce(function (acc, key) {
             acc[key] = wizPrompts[key].value;
             return acc;
@@ -1348,6 +1450,7 @@
           var draft = collectWizardDraft();
           if (!draft.wizardVisible && !draft.modalOpen && !draft.workout.trim() && !draft.brief.trim()) return;
           localStorage.setItem(WIZARD_DRAFT_KEY, JSON.stringify(draft));
+          try { localStorage.removeItem(LEGACY_WIZARD_DRAFT_KEY); } catch (error) {}
           var stamp = '';
           if (draft.savedAt) {
             try {
@@ -1355,6 +1458,7 @@
             } catch (error) {}
           }
           setDraftStatus('Draft autosaved locally.' + stamp);
+          setResumeBannerVisible(false);
         } catch (error) {
           setDraftStatus('Draft could not be saved locally.');
         }
@@ -1363,8 +1467,84 @@
       function clearWizardDraft(statusMessage) {
         try {
           localStorage.removeItem(WIZARD_DRAFT_KEY);
+          localStorage.removeItem(LEGACY_WIZARD_DRAFT_KEY);
         } catch (error) {}
         setDraftStatus(statusMessage || 'Draft cleared.');
+        setResumeBannerVisible(false);
+      }
+
+      function exportWizardDraft() {
+        var draft = collectWizardDraft();
+        var blob = new Blob([JSON.stringify(draft, null, 2)], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'liftrpg-manual-draft.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setDraftStatus('Draft bundle exported.');
+      }
+
+      function readImportedDraft(file) {
+        return new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function () {
+            try {
+              resolve(JSON.parse(String(reader.result || '')));
+            } catch (error) {
+              reject(new Error('Imported file is not valid JSON.'));
+            }
+          };
+          reader.onerror = function () {
+            reject(new Error('Could not read the selected draft file.'));
+          };
+          reader.readAsText(file);
+        });
+      }
+
+      function getStageHealthItems() {
+        var stageFlags = (wizState && wizState.stageFlags) || {};
+        var weekChunksPlanned = (wizState.weekChunks || []).length;
+        var weekChunksDone = (wizData.weekChunkOutputs || []).length;
+        var fragmentBatchesPlanned = (wizState.fragmentBatches || []).length;
+        var fragmentBatchesDone = (wizState.fragmentBatchOutputs || []).length;
+        var fragmentRegistryCount = Array.isArray((wizData.campaignPlan || {}).fragmentRegistry) ? wizData.campaignPlan.fragmentRegistry.length : 0;
+
+        function resolveStatus(key, fallback) {
+          return stageFlags[key] && stageFlags[key].status ? stageFlags[key].status : fallback;
+        }
+
+        return [
+          { label: 'Layer Bible', status: resolveStatus('layerBible', wizData.layerBible ? 'valid' : (wizResults[1] && wizResults[1].value.trim() ? 'drafted' : 'empty')), reason: stageFlags.layerBible && stageFlags.layerBible.reason || '' },
+          { label: 'Campaign', status: resolveStatus('campaignPlan', wizData.campaignPlan ? 'valid' : (wizResults[2] && wizResults[2].value.trim() ? 'drafted' : 'empty')), reason: stageFlags.campaignPlan && stageFlags.campaignPlan.reason || '' },
+          { label: 'Shell', status: resolveStatus('shell', wizData.shell ? 'valid' : (wizResults[3] && wizResults[3].value.trim() ? 'drafted' : 'empty')), reason: stageFlags.shell && stageFlags.shell.reason || '' },
+          { label: 'Weeks', status: resolveStatus('weeks', weekChunksDone > 0 && weekChunksDone === weekChunksPlanned ? 'valid' : (weekChunksDone > 0 ? 'in progress' : 'empty')), reason: stageFlags.weeks && stageFlags.weeks.reason || '' },
+          { label: 'Fragments', status: resolveStatus('fragments', fragmentRegistryCount === 0 && wizData.campaignPlan ? 'not needed' : (fragmentBatchesDone > 0 && fragmentBatchesDone === fragmentBatchesPlanned ? 'valid' : (fragmentBatchesDone > 0 ? 'in progress' : 'empty'))), reason: stageFlags.fragments && stageFlags.fragments.reason || '' },
+          { label: 'Endings', status: resolveStatus('endings', wizData.endingsOutput ? 'valid' : (wizResults[6] && wizResults[6].value.trim() ? 'drafted' : 'empty')), reason: stageFlags.endings && stageFlags.endings.reason || '' }
+        ];
+      }
+
+      function updateStageHealth() {
+        var items = getStageHealthItems();
+        if (wizStageHealth) {
+          wizStageHealth.textContent = 'Stages: ' + items.map(function (item) {
+            return item.label + ' ' + item.status;
+          }).join(' • ');
+        }
+        wizNums.forEach(function (num, index) {
+          var item = items[index];
+          if (!item) return;
+          var title = item.label + ': ' + item.status + (item.reason ? ' — ' + item.reason : '');
+          num.setAttribute('title', title);
+          wizLabels[index].setAttribute('title', title);
+        });
+      }
+
+      function updateBuildMeta() {
+        if (!wizBuildMeta) return;
+        wizBuildMeta.textContent = 'Build ' + WIZARD_BUILD_VERSION + ' • draft schema v' + WIZARD_DRAFT_SCHEMA_VERSION;
       }
 
       function ensureWeekChunksPlanned() {
@@ -1392,7 +1572,8 @@
           weekChunkIndex: 0,
           fragmentBatches: [],
           fragmentBatchIndex: 0,
-          fragmentBatchOutputs: []
+          fragmentBatchOutputs: [],
+          stageFlags: {}
         };
 
         Object.keys(wizResults).forEach(function (key) {
@@ -1408,6 +1589,8 @@
         weeksStageEl.innerHTML = '';
         fragmentsStageEl.innerHTML = '';
         assemblyResultEl.innerHTML = '';
+        updateBuildMeta();
+        updateStageHealth();
         updateWizardOverview(0);
         if (!options.keepDraft) clearWizardDraft('Draft cleared.');
       }
@@ -1422,6 +1605,7 @@
 
         wizData = draft.wizData;
         wizState = draft.wizState;
+        if (!wizState.stageFlags) wizState.stageFlags = {};
 
         Object.keys(wizPrompts).forEach(function (key) {
           if (draft.prompts && typeof draft.prompts[key] === 'string') {
@@ -1477,6 +1661,9 @@
           } catch (error) {}
         }
         setDraftStatus('Recovered local draft.' + restoredAt);
+        updateBuildMeta();
+        updateStageHealth();
+        setResumeBannerVisible(false);
         return true;
       }
 
@@ -1484,6 +1671,8 @@
         modal.classList.add('is-open');
         document.body.style.overflow = 'hidden';
         workoutEl.focus();
+        updateBuildMeta();
+        updateStageHealth();
         saveWizardDraft();
       }
 
@@ -1542,6 +1731,48 @@
         chatWizard.classList.remove('is-visible');
         clearWizardDraft('Draft cleared. Starting fresh will create a new one.');
       });
+      if (wizExportDraftBtn) wizExportDraftBtn.addEventListener('click', exportWizardDraft);
+      if (wizImportDraftBtn) {
+        wizImportDraftBtn.addEventListener('click', function () {
+          if (wizImportInput) wizImportInput.click();
+        });
+      }
+      if (wizImportInput) {
+        wizImportInput.addEventListener('change', function () {
+          var file = wizImportInput.files && wizImportInput.files[0];
+          if (!file) return;
+          readImportedDraft(file)
+            .then(function (draft) {
+              if (!restoreWizardDraft(draft)) {
+                throw new Error('Imported draft does not contain LiftRPG wizard data.');
+              }
+              saveWizardDraft();
+              setDraftStatus('Imported draft bundle.');
+            })
+            .catch(function (error) {
+              alert(error && error.message ? error.message : 'Could not import draft bundle.');
+            })
+            .finally(function () {
+              wizImportInput.value = '';
+            });
+        });
+      }
+      if (wizResumeBtn) {
+        wizResumeBtn.addEventListener('click', function () {
+          var draft = getWizardDraft();
+          if (!draft) return;
+          restoreWizardDraft(draft);
+          openModal();
+        });
+      }
+      if (wizStartFreshBtn) {
+        wizStartFreshBtn.addEventListener('click', function () {
+          resetWizardState({ keepDraft: true });
+          clearWizardDraft('Draft cleared. Starting fresh.');
+          setResumeBannerVisible(false);
+          openModal();
+        });
+      }
 
       function getDiceValue() {
         var diceRadio = document.querySelector('input[name="gen-dice"]:checked');
@@ -1562,6 +1793,7 @@
         });
         var prompt = wizPrompts[idx + 1];
         if (prompt) prompt.scrollTop = 0;
+        updateStageHealth();
         updateWizardOverview(idx);
         saveWizardDraft();
       }
@@ -1593,7 +1825,193 @@
             ? 'Locked in: ' + items.join(' • ')
             : 'Nothing locked in yet.';
         }
+        updateBuildMeta();
+        updateStageHealth();
       }
+
+      function canNavigateToStep(stepIndex) {
+        if (stepIndex === wizStep) return true;
+        if (stepIndex < wizStep) return true;
+        if (stepIndex === 0) return true;
+        if (stepIndex === 1) return !!wizData.layerBible;
+        if (stepIndex === 2) return !!wizData.campaignPlan;
+        if (stepIndex === 3) return !!wizData.shell;
+        if (stepIndex === 4) return (wizData.weekChunkOutputs || []).length > 0;
+        if (stepIndex === 5) return !!wizData.shell;
+        return false;
+      }
+
+      function jumpToStep(stepIndex) {
+        if (!canNavigateToStep(stepIndex)) return;
+        if (stepIndex === 3 && wizData.campaignPlan && wizData.shell) {
+          ensureWeekChunksPlanned();
+          if (wizState.weekChunkIndex < wizState.weekChunks.length || weeksStageEl.innerHTML === '') {
+            renderWeekChunkStage();
+          }
+        }
+        if (stepIndex === 4 && wizData.campaignPlan) {
+          if (!wizState.fragmentBatches || wizState.fragmentBatches.length === 0) {
+            prepareFragmentsStage();
+            return;
+          }
+          renderFragmentBatchStage();
+        }
+        if (stepIndex === 5 && wizData.shell) {
+          prepareEndingsStage();
+          return;
+        }
+        wizSetStep(stepIndex);
+      }
+
+      function clearDynamicResultValue(id) {
+        var el = document.getElementById(id);
+        if (el) el.value = '';
+      }
+
+      function setStageFlag(stageKey, status, reason) {
+        wizState.stageFlags = wizState.stageFlags || {};
+        wizState.stageFlags[stageKey] = { status: status, reason: reason || '' };
+      }
+
+      function clearStageFlag(stageKey) {
+        if (!wizState.stageFlags) return;
+        delete wizState.stageFlags[stageKey];
+      }
+
+      function stableJson(value) {
+        if (value === null || value === undefined) return 'null';
+        if (Array.isArray(value)) return '[' + value.map(stableJson).join(',') + ']';
+        if (typeof value === 'object') {
+          return '{' + Object.keys(value).sort().map(function (key) {
+            return JSON.stringify(key) + ':' + stableJson(value[key]);
+          }).join(',') + '}';
+        }
+        return JSON.stringify(value);
+      }
+
+      function buildCampaignSignature(plan) {
+        plan = plan || {};
+        return stableJson({
+          weeks: (plan.weeks || []).map(function (week) {
+            return {
+              weekNumber: week.weekNumber,
+              title: week.title || '',
+              weeklyComponentType: week.weeklyComponentType || ''
+            };
+          }),
+          fragmentRegistry: (plan.fragmentRegistry || []).map(function (entry) { return entry.id || ''; }),
+          overflowRegistry: (plan.overflowRegistry || []).map(function (entry) { return entry.id || ''; }),
+          topology: plan.topology || {},
+          bossPlan: plan.bossPlan || {}
+        });
+      }
+
+      function buildShellSignature(shell) {
+        shell = shell || {};
+        return stableJson({
+          meta: {
+            weekCount: shell.meta && shell.meta.weekCount,
+            weeklyComponentType: shell.meta && shell.meta.weeklyComponentType,
+            artifactIdentity: shell.meta && shell.meta.artifactIdentity
+          },
+          cover: shell.cover || {},
+          theme: shell.theme || {},
+          rulesSpread: shell.rulesSpread || {}
+        });
+      }
+
+      function clearWeeksState(options) {
+        options = options || {};
+        wizData.weekChunkOutputs = [];
+        wizData.weekSummaries = [];
+        wizState.weekChunkIndex = 0;
+        if (!options.keepPlan) {
+          wizState.weekChunks = [];
+        }
+        weeksStageEl.innerHTML = '';
+        clearDynamicResultValue('wiz-weeks-result-current');
+      }
+
+      function clearFragmentsState() {
+        wizData.fragmentsOutput = { fragments: [] };
+        wizState.fragmentBatches = [];
+        wizState.fragmentBatchIndex = 0;
+        wizState.fragmentBatchOutputs = [];
+        fragmentsStageEl.innerHTML = '';
+        clearDynamicResultValue('wiz-fragments-result-current');
+      }
+
+      function clearEndingsState() {
+        wizData.endingsOutput = null;
+        wizResults[6].value = '';
+        clearStageError(6);
+        renderRepairPrompt(wizRepair[6], 'endings', 'Return only `{ "endings": [...] }`.', '', []);
+      }
+
+      function clearAssemblyState() {
+        assemblyResultEl.innerHTML = '';
+        assemblyResultEl._assembledData = null;
+      }
+
+      function invalidateAfterLayerBible(reason) {
+        wizData.campaignPlan = null;
+        wizData.shell = null;
+        wizData.shellContext = null;
+        wizPrompts[2].value = '';
+        wizPrompts[3].value = '';
+        wizPrompts[6].value = '';
+        wizResults[2].value = '';
+        wizResults[3].value = '';
+        clearWeeksState();
+        clearFragmentsState();
+        clearEndingsState();
+        clearAssemblyState();
+        setStageFlag('campaignPlan', 'invalidated', reason);
+        setStageFlag('shell', 'invalidated', reason);
+        setStageFlag('weeks', 'invalidated', reason);
+        setStageFlag('fragments', 'invalidated', reason);
+        setStageFlag('endings', 'invalidated', reason);
+      }
+
+      function invalidateAfterCampaign(reason, shellNeedsReview) {
+        clearWeeksState({ keepPlan: false });
+        clearFragmentsState();
+        clearEndingsState();
+        clearAssemblyState();
+        setStageFlag('weeks', 'invalidated', reason);
+        setStageFlag('fragments', 'invalidated', reason);
+        setStageFlag('endings', 'invalidated', reason);
+        if (shellNeedsReview && wizData.shell) {
+          setStageFlag('shell', 'needs review', reason);
+        }
+      }
+
+      function invalidateAfterShell(reason) {
+        clearEndingsState();
+        clearAssemblyState();
+        setStageFlag('endings', 'invalidated', reason);
+      }
+
+      function invalidateAfterWeeks(reason) {
+        clearFragmentsState();
+        clearEndingsState();
+        clearAssemblyState();
+        setStageFlag('fragments', 'invalidated', reason);
+        setStageFlag('endings', 'invalidated', reason);
+      }
+
+      function invalidateAfterFragments(reason) {
+        clearEndingsState();
+        clearAssemblyState();
+        setStageFlag('endings', 'invalidated', reason);
+      }
+
+      wizNums.forEach(function (num, index) {
+        num.addEventListener('click', function () { jumpToStep(index); });
+      });
+      wizLabels.forEach(function (label, index) {
+        label.addEventListener('click', function () { jumpToStep(index); });
+      });
 
       function copyText(text, button, defaultLabel) {
         if (!text) return;
@@ -1908,6 +2326,28 @@
         return '<div class="result-meta">' + items.map(escapeForHtml).join(' &middot; ') + '</div>';
       }
 
+      function renderWeekChunkSelector() {
+        if (!wizState.weekChunks || !wizState.weekChunks.length) return '';
+        return '<div class="result-actions" style="margin-top:8px">' + wizState.weekChunks.map(function (chunk, index) {
+          var label = chunk.length === 1
+            ? 'Week ' + chunk[0]
+            : 'Weeks ' + chunk[0] + '-' + chunk[chunk.length - 1];
+          var actionLabel = (wizData.weekChunkOutputs[index] ? 'Replace ' : 'Open ') + label;
+          return '<button type="button" class="result-btn-secondary wiz-week-select-btn" data-week-chunk-index="' + index + '">' + escapeForHtml(actionLabel) + '</button>';
+        }).join('') + '</div>';
+      }
+
+      function renderFragmentBatchSelector() {
+        if (!wizState.fragmentBatches || !wizState.fragmentBatches.length) return '';
+        return '<div class="result-actions" style="margin-top:8px">' + wizState.fragmentBatches.map(function (batch, index) {
+          var label = batch.weekNumbers.length === 1
+            ? 'Week ' + batch.weekNumbers[0]
+            : 'Weeks ' + batch.weekNumbers[0] + '-' + batch.weekNumbers[batch.weekNumbers.length - 1];
+          var actionLabel = (wizState.fragmentBatchOutputs[index] ? 'Replace ' : 'Open ') + label;
+          return '<button type="button" class="result-btn-secondary wiz-fragment-select-btn" data-fragment-batch-index="' + index + '">' + escapeForHtml(actionLabel) + '</button>';
+        }).join('') + '</div>';
+      }
+
       function getCurrentPriorWeeks() {
         var prior = [];
         wizData.weekChunkOutputs.forEach(function (chunk) {
@@ -1955,6 +2395,7 @@
 
         weeksStageEl.innerHTML =
           renderStepSummary(completed, 'No validated week chunks yet.') +
+          renderWeekChunkSelector() +
           '<div class="wizard-stage-card">' +
             '<div class="wizard-stage-kicker">What To Do Now</div>' +
             '<div class="wizard-stage-copy"><strong>Generate only ' + escapeForHtml(label) + '</strong>, then paste back just the `weeks` JSON. If this chunk fails, repair this chunk only.</div>' +
@@ -1967,7 +2408,9 @@
           '<div class="wizard-error" id="wiz-weeks-error-current">Invalid JSON.</div>' +
           '<div id="wiz-weeks-repair-current"></div>' +
           '<button class="gen-submit" id="wiz-weeks-next-current" type="button" style="margin-top:12px">' +
-            (chunkIndex + 1 === wizState.weekChunks.length ? 'Next: Build Fragments →' : 'Validate Chunk & Next →') +
+            (wizData.weekChunkOutputs[chunkIndex]
+              ? 'Replace Chunk & Continue →'
+              : (chunkIndex + 1 === wizState.weekChunks.length ? 'Next: Build Fragments →' : 'Validate Chunk & Next →')) +
           '</button>';
 
         var promptEl = document.getElementById('wiz-weeks-prompt-current');
@@ -1976,6 +2419,16 @@
         var errorEl = document.getElementById('wiz-weeks-error-current');
         var repairEl = document.getElementById('wiz-weeks-repair-current');
         promptEl.value = prompt;
+        if (wizData.weekChunkOutputs[chunkIndex]) {
+          resultEl.value = JSON.stringify(wizData.weekChunkOutputs[chunkIndex], null, 2);
+        }
+        Array.prototype.forEach.call(weeksStageEl.querySelectorAll('.wiz-week-select-btn'), function (button) {
+          button.addEventListener('click', function () {
+            wizState.weekChunkIndex = Number(button.getAttribute('data-week-chunk-index') || 0);
+            renderWeekChunkStage();
+            saveWizardDraft();
+          });
+        });
         copyBtn.addEventListener('click', makeCopyHandler(promptEl, copyBtn, 'Copy Prompt'));
         resultEl.addEventListener('input', saveWizardDraft);
         document.getElementById('wiz-weeks-next-current').addEventListener('click', function () {
@@ -1990,6 +2443,14 @@
           try {
             var chunk = extractJson(raw);
             var errors = validateWeekChunk(chunk, weekNumbers);
+            if (errors.length === 0 && manualApi() && typeof manualApi().validateWeekChunkContinuity === 'function') {
+              errors = manualApi().validateWeekChunkContinuity(chunk, {
+                expectedWeeks: weekNumbers,
+                campaignPlan: wizData.campaignPlan,
+                shell: wizData.shell,
+                priorWeekChunkOutputs: wizData.weekChunkOutputs
+              });
+            }
             if (errors.length > 0) {
               errorEl.textContent = errors[0];
               errorEl.classList.add('is-visible');
@@ -1997,7 +2458,13 @@
               return;
             }
             renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, []);
-            wizData.weekChunkOutputs.push(chunk);
+            var priorChunk = wizData.weekChunkOutputs[chunkIndex];
+            if (priorChunk && stableJson(priorChunk) !== stableJson(chunk)) {
+              invalidateAfterWeeks(label + ' changed. Rebuild affected fragment batches and endings.');
+            }
+            if (priorChunk) wizData.weekChunkOutputs[chunkIndex] = chunk;
+            else wizData.weekChunkOutputs.push(chunk);
+            clearStageFlag('weeks');
             wizState.weekChunkIndex += 1;
             updateWizardOverview(3);
             if (wizState.weekChunkIndex < wizState.weekChunks.length) {
@@ -2043,6 +2510,7 @@
 
         fragmentsStageEl.innerHTML =
           renderStepSummary(completed, 'No validated fragment batches yet.') +
+          renderFragmentBatchSelector() +
           '<div class="wizard-stage-card">' +
             '<div class="wizard-stage-kicker">What To Do Now</div>' +
             '<div class="wizard-stage-copy"><strong>Generate only the current fragment batch</strong>, then paste back just the `fragments` JSON. If this batch fails, repair only this batch.</div>' +
@@ -2055,7 +2523,9 @@
           '<div class="wizard-error" id="wiz-fragments-error-current">Invalid JSON.</div>' +
           '<div id="wiz-fragments-repair-current"></div>' +
           '<button class="gen-submit" id="wiz-fragments-next-current" type="button" style="margin-top:12px">' +
-            (batchIndex + 1 === wizState.fragmentBatches.length ? 'Next: Build Endings →' : 'Validate Batch & Next →') +
+            (wizState.fragmentBatchOutputs[batchIndex]
+              ? 'Replace Batch & Continue →'
+              : (batchIndex + 1 === wizState.fragmentBatches.length ? 'Next: Build Endings →' : 'Validate Batch & Next →')) +
           '</button>';
 
         var promptEl = document.getElementById('wiz-fragments-prompt-current');
@@ -2064,6 +2534,16 @@
         var errorEl = document.getElementById('wiz-fragments-error-current');
         var repairEl = document.getElementById('wiz-fragments-repair-current');
         promptEl.value = prompt;
+        if (wizState.fragmentBatchOutputs[batchIndex]) {
+          resultEl.value = JSON.stringify(wizState.fragmentBatchOutputs[batchIndex], null, 2);
+        }
+        Array.prototype.forEach.call(fragmentsStageEl.querySelectorAll('.wiz-fragment-select-btn'), function (button) {
+          button.addEventListener('click', function () {
+            wizState.fragmentBatchIndex = Number(button.getAttribute('data-fragment-batch-index') || 0);
+            renderFragmentBatchStage();
+            saveWizardDraft();
+          });
+        });
         copyBtn.addEventListener('click', makeCopyHandler(promptEl, copyBtn, 'Copy Prompt'));
         resultEl.addEventListener('input', saveWizardDraft);
         document.getElementById('wiz-fragments-next-current').addEventListener('click', function () {
@@ -2078,6 +2558,14 @@
           try {
             var batchOutput = extractJson(raw);
             var errors = validateFragmentBatch(batchOutput, batch.registry);
+            if (errors.length === 0 && manualApi() && typeof manualApi().validateFragmentBatchContinuity === 'function') {
+              errors = manualApi().validateFragmentBatchContinuity(batchOutput, {
+                expectedRegistry: batch.registry,
+                campaignPlan: wizData.campaignPlan,
+                shell: wizData.shell,
+                weekChunkOutputs: wizData.weekChunkOutputs
+              });
+            }
             if (errors.length > 0) {
               errorEl.textContent = errors[0];
               errorEl.classList.add('is-visible');
@@ -2085,7 +2573,13 @@
               return;
             }
             renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, []);
-            wizState.fragmentBatchOutputs.push(batchOutput);
+            var priorBatch = wizState.fragmentBatchOutputs[batchIndex];
+            if (priorBatch && stableJson(priorBatch) !== stableJson(batchOutput)) {
+              invalidateAfterFragments(batchLabel + ' fragments changed. Rebuild endings before export.');
+            }
+            if (priorBatch) wizState.fragmentBatchOutputs[batchIndex] = batchOutput;
+            else wizState.fragmentBatchOutputs.push(batchOutput);
+            clearStageFlag('fragments');
             wizState.fragmentBatchIndex += 1;
             updateWizardOverview(4);
             if (wizState.fragmentBatchIndex < wizState.fragmentBatches.length) {
@@ -2103,6 +2597,7 @@
               return;
             }
             wizData.fragmentsOutput = { fragments: mergeResult.fragments || [] };
+            clearStageFlag('fragments');
             prepareEndingsStage();
           } catch (error) {
             errorEl.textContent = error.message || 'Invalid JSON.';
@@ -2126,6 +2621,7 @@
 
         if (!wizState.fragmentBatches.length) {
           wizData.fragmentsOutput = { fragments: [] };
+          clearStageFlag('fragments');
           prepareEndingsStage();
           return;
         }
@@ -2271,7 +2767,11 @@
           'Return only the layer bible JSON with storyLayer, gameLayer, governingLayer, designPrinciples, and designLedger.'
         );
         if (!layerBible) return;
+        if (wizData.layerBible && stableJson(wizData.layerBible) !== stableJson(layerBible)) {
+          invalidateAfterLayerBible('Layer Bible changed. All downstream stages need regeneration.');
+        }
         wizData.layerBible = layerBible;
+        clearStageFlag('layerBible');
         wizPrompts[2].value = window.generateStage2Prompt(workoutEl.value.trim(), briefEl.value.trim(), getDiceValue(), layerBible);
         wizSetStep(1);
       });
@@ -2285,7 +2785,12 @@
           'Return only campaign plan JSON with topology, weeks, bossPlan, fragmentRegistry, and overflowRegistry.'
         );
         if (!campaignPlan) return;
+        var campaignChanged = !!wizData.campaignPlan && stableJson(buildCampaignSignature(wizData.campaignPlan)) !== stableJson(buildCampaignSignature(campaignPlan));
+        if (campaignChanged) {
+          invalidateAfterCampaign('Campaign changed. Weeks, fragments, and endings were invalidated.', true);
+        }
         wizData.campaignPlan = campaignPlan;
+        clearStageFlag('campaignPlan');
         wizPrompts[3].value = window.generateShellPrompt(briefEl.value.trim(), wizData.layerBible, campaignPlan);
         wizSetStep(2);
       });
@@ -2299,8 +2804,16 @@
           'Return only shell JSON with meta, cover, rulesSpread, and theme.'
         );
         if (!shell) return;
+        var shellChanged = !!wizData.shell && stableJson(buildShellSignature(wizData.shell)) !== stableJson(buildShellSignature(shell));
+        if (manualApi() && typeof manualApi().ensureArtifactIdentity === 'function') {
+          manualApi().ensureArtifactIdentity(shell, wizData.campaignPlan);
+        }
+        if (shellChanged) {
+          invalidateAfterShell('Shell changed. Endings and final assembly need regeneration.');
+        }
         wizData.shell = shell;
         wizData.shellContext = manualApi().extractShellContext ? manualApi().extractShellContext(shell) : null;
+        clearStageFlag('shell');
         var plannedWeeks = Array.isArray(wizData.campaignPlan.weeks) ? wizData.campaignPlan.weeks.length : 0;
         wizState.weekChunks = typeof window.planWeekChunks === 'function'
           ? window.planWeekChunks(plannedWeeks)
@@ -2321,14 +2834,29 @@
           'Return only `{ "endings": [...] }`. Do not invent encrypted ending ciphertext.'
         );
         if (!endingsOutput) return;
+        if (manualApi() && typeof manualApi().validateEndingsContinuity === 'function') {
+          var endingContinuityErrors = manualApi().validateEndingsContinuity(endingsOutput, {
+            campaignPlan: wizData.campaignPlan,
+            shell: wizData.shell,
+            weekChunkOutputs: wizData.weekChunkOutputs,
+            fragmentsOutput: wizData.fragmentsOutput
+          });
+          if (endingContinuityErrors.length > 0) {
+            setStageError(6, endingContinuityErrors[0]);
+            renderRepairPrompt(wizRepair[6], 'endings', 'Return only `{ "endings": [...] }`. Preserve the established boss inputs, provenance, and sealed-state rules.', wizResults[6].value, endingContinuityErrors);
+            return;
+          }
+        }
 
         wizData.endingsOutput = endingsOutput;
+        clearStageFlag('endings');
         updateWizardOverview(5);
         var booklet = manualApi().assembleBooklet(
           wizData.shell,
           wizData.weekChunkOutputs,
           wizData.fragmentsOutput || { fragments: [] },
-          endingsOutput
+          endingsOutput,
+          wizData.campaignPlan
         );
 
         var errors = api() && typeof api()._validateAssembled === 'function'
@@ -2345,8 +2873,18 @@
         saveWizardDraft();
       });
 
+      updateBuildMeta();
+      updateStageHealth();
       var existingWizardDraft = getWizardDraft();
-      if (existingWizardDraft) restoreWizardDraft(existingWizardDraft);
+      if (existingWizardDraft) {
+        var draftStamp = '';
+        if (existingWizardDraft.savedAt) {
+          try {
+            draftStamp = ' Last saved ' + new Date(existingWizardDraft.savedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + '.';
+          } catch (error) {}
+        }
+        setResumeBannerVisible(true, 'A saved manual draft is available on this device.' + draftStamp);
+      }
     })();
   </script>
 </body>

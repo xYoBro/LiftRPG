@@ -4,6 +4,40 @@ import { getAtomDefinition } from './engine/atom-registry.js';
 
 const WORKOUT_PAGE_TYPES = new Set(['week-header', 'session-card', 'week-footer']);
 const MECHANIC_PAGE_TYPES = new Set(['cipher-panel', 'oracle-table', 'map-panel', 'tracker']);
+const DEFAULT_ARTIFACT_IDENTITY = {
+  shellFamily: 'field-survey',
+  boardStateMode: 'survey-grid',
+  attachmentStrategy: 'split-technical',
+};
+const BOARD_STATE_LAYOUTS = {
+  'survey-grid': 'balanced',
+  'node-graph': 'map-dominant',
+  'ledger-board': 'cipher-dominant',
+  'timeline-reconstruction': 'timeline-dominant',
+  'testimony-matrix': 'matrix-dominant',
+};
+const BOARD_STATE_COPY = {
+  'survey-grid': {
+    pageTitle: 'Field Operations',
+    companionLabel: 'Companion Surface',
+  },
+  'node-graph': {
+    pageTitle: 'Route Network',
+    companionLabel: 'Support Nodes',
+  },
+  'ledger-board': {
+    pageTitle: 'Procedure Ledger',
+    companionLabel: 'Tracking Ledger',
+  },
+  'timeline-reconstruction': {
+    pageTitle: 'Reconstruction Board',
+    companionLabel: 'Witness Notes',
+  },
+  'testimony-matrix': {
+    pageTitle: 'Evidence Matrix',
+    companionLabel: 'Case Surface',
+  },
+};
 
 function isWorkoutPlacement(placement) {
   return WORKOUT_PAGE_TYPES.has(placement.type);
@@ -42,6 +76,34 @@ function weekContextFromPlacements(placements) {
 
   if (weekIndex == null || totalWeeks <= 0) return null;
   return { weekIndex, totalWeeks };
+}
+
+function resolveArtifactIdentity(placements) {
+  for (const placement of placements) {
+    const data = placement.atom?.data || placement.data || {};
+    if (data.artifactIdentity && typeof data.artifactIdentity === 'object') {
+      return {
+        ...DEFAULT_ARTIFACT_IDENTITY,
+        ...data.artifactIdentity,
+      };
+    }
+  }
+  return DEFAULT_ARTIFACT_IDENTITY;
+}
+
+function resolveMechanicLayoutVariant(placements, artifactIdentity) {
+  const explicit = placements.find((placement) => {
+    const data = placement.atom?.data || placement.data || {};
+    return data.layoutVariant;
+  });
+  if (explicit) {
+    return explicit.atom?.data?.layoutVariant || explicit.data?.layoutVariant;
+  }
+  return BOARD_STATE_LAYOUTS[artifactIdentity.boardStateMode] || 'balanced';
+}
+
+function resolveMechanicCopy(artifactIdentity) {
+  return BOARD_STATE_COPY[artifactIdentity.boardStateMode] || BOARD_STATE_COPY['survey-grid'];
 }
 
 export function renderPlacementInto(target, placement) {
@@ -122,16 +184,34 @@ function renderWorkoutPage(placements, planIndex) {
 }
 
 function renderMechanicPage(placements, planIndex) {
+  const artifactIdentity = resolveArtifactIdentity(placements);
+  const copy = resolveMechanicCopy(artifactIdentity);
+  const layoutVariant = resolveMechanicLayoutVariant(placements, artifactIdentity);
   const { page, frame } = createBoundedPage(
     'field-ops',
     'field-ops-right',
-    { boundaryRole: 'field-ops', pageClass: 'page-field-ops' },
+    { boundaryRole: 'field-ops', pageClass: 'page-field-ops', layoutVariant },
   );
 
   page.setAttribute('data-plan-index', String(planIndex));
   page.setAttribute('data-engine', 'v2');
+  page.setAttribute('data-shell-family', artifactIdentity.shellFamily || DEFAULT_ARTIFACT_IDENTITY.shellFamily);
+  page.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || DEFAULT_ARTIFACT_IDENTITY.boardStateMode);
+  page.setAttribute('data-attachment-strategy', artifactIdentity.attachmentStrategy || DEFAULT_ARTIFACT_IDENTITY.attachmentStrategy);
+
+  frame.setAttribute('data-shell-family', artifactIdentity.shellFamily || DEFAULT_ARTIFACT_IDENTITY.shellFamily);
+  frame.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || DEFAULT_ARTIFACT_IDENTITY.boardStateMode);
+  frame.setAttribute('data-attachment-strategy', artifactIdentity.attachmentStrategy || DEFAULT_ARTIFACT_IDENTITY.attachmentStrategy);
+
+  const header = make('header', 'rp-header');
+  header.appendChild(make('span', '', copy.pageTitle || 'Field Operations'));
+  header.appendChild(make('span', 'page-num', ''));
+  frame.appendChild(header);
 
   const content = make('div', 'rp-content');
+  content.setAttribute('data-shell-family', artifactIdentity.shellFamily || DEFAULT_ARTIFACT_IDENTITY.shellFamily);
+  content.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || DEFAULT_ARTIFACT_IDENTITY.boardStateMode);
+  content.setAttribute('data-attachment-strategy', artifactIdentity.attachmentStrategy || DEFAULT_ARTIFACT_IDENTITY.attachmentStrategy);
   const companionPlacements = placements.filter((placement) => placement.type === 'tracker');
 
   placements
@@ -141,7 +221,7 @@ function renderMechanicPage(placements, planIndex) {
   if (companionPlacements.length > 0) {
     content.setAttribute('data-has-companion', 'true');
     const companionZone = make('section', 'companion-zone');
-    companionZone.appendChild(make('div', 'doc-label', 'Companion Surface'));
+    companionZone.appendChild(make('div', 'doc-label', copy.companionLabel || 'Companion Surface'));
     companionPlacements.forEach((placement) => renderPlacementInto(companionZone, placement));
     content.appendChild(companionZone);
   }

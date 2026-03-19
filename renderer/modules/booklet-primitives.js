@@ -169,6 +169,7 @@ export function renderCoverPage(model) {
   const page = scaffold.page;
   const frame = scaffold.frame;
   frame.setAttribute('data-structural-resolution', model.meta.structuralShape && model.meta.structuralShape.resolution || '');
+  frame.setAttribute('data-shell-family', model.artifactIdentity && model.artifactIdentity.shellFamily || 'field-survey');
 
   if (model.designation) {
     frame.appendChild(make('div', 'cover-designation', model.designation));
@@ -204,6 +205,7 @@ export function renderRulesLeftPage(model) {
   });
   const page = scaffold.page;
   const frame = scaffold.frame;
+  frame.setAttribute('data-shell-family', model.artifactIdentity && model.artifactIdentity.shellFamily || 'field-survey');
 
   const header = make('header', 'rules-header');
   header.appendChild(make('span', '', 'Orientation'));
@@ -238,6 +240,7 @@ export function renderSealedPage(model) {
   });
   const page = scaffold.page;
   const frame = scaffold.frame;
+  frame.setAttribute('data-shell-family', model.artifactIdentity && model.artifactIdentity.shellFamily || 'field-survey');
 
   frame.appendChild(make('div', 'sealed-lock', '🔒'));
   frame.appendChild(make('div', 'sealed-title', model.title));
@@ -263,6 +266,7 @@ export function renderGaugeLogPage(model) {
   });
   const page = scaffold.page;
   const frame = scaffold.frame;
+  frame.setAttribute('data-shell-family', model.artifactIdentity && model.artifactIdentity.shellFamily || 'field-survey');
 
   const header = make('header', 'rules-header');
   header.appendChild(make('span', '', model.title));
@@ -284,7 +288,7 @@ export function renderGaugeLogPage(model) {
   frame.appendChild(grid);
 
   const finalBlock = make('div', 'password-final');
-  finalBlock.appendChild(make('div', 'password-final-label', 'Complete Password'));
+  finalBlock.appendChild(make('div', 'password-final-label', model.artifactIdentity && model.artifactIdentity.copy && model.artifactIdentity.copy.gaugeLabel || 'Complete Password'));
   finalBlock.appendChild(makePasswordBoxes(model.passwordLength, 'password-final-box'));
   frame.appendChild(finalBlock);
 
@@ -298,6 +302,7 @@ export function renderAssemblyPage(model) {
   });
   const page = scaffold.page;
   const frame = scaffold.frame;
+  frame.setAttribute('data-shell-family', model.artifactIdentity && model.artifactIdentity.shellFamily || 'field-survey');
 
   frame.appendChild(make('h2', 'password-assembly-title', model.title));
   frame.appendChild(make('p', 'password-assembly-subtitle', model.subtitle));
@@ -314,7 +319,7 @@ export function renderAssemblyPage(model) {
   frame.appendChild(list);
 
   const finalBlock = make('div', 'password-final-assembly');
-  finalBlock.appendChild(make('div', 'password-final-label', 'Final Word'));
+  finalBlock.appendChild(make('div', 'password-final-label', model.artifactIdentity && model.artifactIdentity.copy && model.artifactIdentity.copy.finalLabel || 'Final Word'));
   const passwordBoxes = make('div', 'password-final-row');
   for (let i = 0; i < model.passwordLength; i += 1) {
     passwordBoxes.appendChild(make('div', 'password-final-cell'));
@@ -332,19 +337,12 @@ export function renderLockedEndingPage(model) {
   });
   const page = scaffold.page;
   const frame = scaffold.frame;
+  frame.setAttribute('data-shell-family', model.artifactIdentity && model.artifactIdentity.shellFamily || 'field-survey');
   frame.appendChild(make('h2', 'endings-title', model.title));
 
   const body = make('div', 'endings-body');
   body.appendChild(make('p', '', model.body));
   frame.appendChild(body);
-
-  if ((model.variants || []).length) {
-    const variants = make('div', 'chip-row');
-    model.variants.forEach((variant) => {
-      variants.appendChild(make('div', 'chip chip-muted', variant));
-    });
-    frame.appendChild(variants);
-  }
 
   return page;
 }
@@ -395,6 +393,7 @@ export function renderBackCover(model) {
   });
   const page = scaffold.page;
   const frame = scaffold.frame;
+  frame.setAttribute('data-shell-family', model.artifactIdentity && model.artifactIdentity.shellFamily || 'field-survey');
   frame.appendChild(make('p', 'back-cover-colophon', model.colophon));
   if (model.generatedAt || model.weekCount || model.totalSessions) {
     const meta = make('div', 'back-cover-meta');
