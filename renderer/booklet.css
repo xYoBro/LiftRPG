@@ -1935,8 +1935,10 @@ body[data-demo-view="true"] #booklet-container{
 }
 .rp-content[data-solo-surface="tracker"]{
   grid-template-columns:1fr;
-  grid-template-rows:minmax(0, 1fr);
-  grid-template-areas:"companion";
+  grid-template-rows:minmax(0, 1fr) auto;
+  grid-template-areas:
+    "companion"
+    "worksheet";
 }
 
 /* Zone containers */
@@ -1956,6 +1958,25 @@ body[data-demo-view="true"] #booklet-container{
 .field-ops-right[data-shell-family="classified-packet"] .rp-header{
   border-bottom-width:2px;
 }
+.field-ops-right[data-shell-family="classified-packet"],
+.fragment-page[data-shell-family="classified-packet"],
+.boss-right[data-shell-family="classified-packet"]{
+  --accent:#395a78;
+  --rule:#97a3aa;
+  --paper:#e3ded3;
+  --paper-2:#d8d3c8;
+  --warm:#dad5ca;
+  --muted:#556169;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, white 82%, var(--paper) 18%), color-mix(in srgb, white 70%, var(--paper-2) 30%)),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 32px,
+      color-mix(in srgb, var(--rule) 10%, transparent 90%) 32px,
+      color-mix(in srgb, var(--rule) 10%, transparent 90%) 33px
+    );
+}
 .field-ops-right[data-shell-family="classified-packet"] .rp-content{
   gap:6px 7px;
 }
@@ -1963,9 +1984,20 @@ body[data-demo-view="true"] #booklet-container{
 .field-ops-right[data-shell-family="classified-packet"] .map-zone,
 .field-ops-right[data-shell-family="classified-packet"] .oracle-zone,
 .field-ops-right[data-shell-family="classified-packet"] .companion-zone{
+  position:relative;
   padding:5px 6px 6px;
   border:1px solid color-mix(in srgb, var(--theme-panel-border,var(--rule)) 72%, transparent 28%);
   background:color-mix(in srgb, var(--paper) 92%, white 8%);
+}
+.field-ops-right[data-shell-family="classified-packet"] .cipher-zone::before,
+.field-ops-right[data-shell-family="classified-packet"] .map-zone::before,
+.field-ops-right[data-shell-family="classified-packet"] .oracle-zone::before,
+.field-ops-right[data-shell-family="classified-packet"] .companion-zone::before{
+  content:"";
+  position:absolute;
+  inset:5px;
+  border:1px solid color-mix(in srgb, var(--rule) 12%, transparent 88%);
+  pointer-events:none;
 }
 .field-ops-right[data-shell-family="classified-packet"] .oracle-zone{
   border-top:1px solid color-mix(in srgb, var(--theme-panel-border,var(--rule)) 72%, transparent 28%);
@@ -2037,10 +2069,69 @@ body[data-demo-view="true"] #booklet-container{
     linear-gradient(180deg, color-mix(in srgb, var(--paper) 95%, white 5%), color-mix(in srgb, var(--paper-2) 94%, white 6%)),
     repeating-linear-gradient(90deg, transparent, transparent 35px, color-mix(in srgb, var(--theme-field-rule,var(--rule)) 14%, transparent 86%) 35px, color-mix(in srgb, var(--theme-field-rule,var(--rule)) 14%, transparent 86%) 36px);
 }
+.field-ops-right[data-shell-family="classified-packet"] .map-network::before{
+  content:"";
+  position:absolute;
+  inset:8px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 22%, transparent 78%) 0 14px, transparent 14px calc(100% - 14px), color-mix(in srgb, var(--accent) 22%, transparent 78%) calc(100% - 14px) 100%),
+    linear-gradient(color-mix(in srgb, var(--accent) 22%, transparent 78%) 0 14px, transparent 14px calc(100% - 14px), color-mix(in srgb, var(--accent) 22%, transparent 78%) calc(100% - 14px) 100%);
+  opacity:.32;
+  pointer-events:none;
+}
+.field-ops-right[data-shell-family="classified-packet"] .map-network::after{
+  content:"TOPOLOGY SURFACE";
+  position:absolute;
+  top:9px;
+  left:10px;
+  font-family:var(--mono);
+  font-size:4.7pt;
+  letter-spacing:.18em;
+  color:color-mix(in srgb, var(--accent) 56%, var(--paper) 44%);
+  pointer-events:none;
+}
 .field-ops-right[data-shell-family="classified-packet"] .companion-component{
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--paper) 95%, white 5%), color-mix(in srgb, var(--paper-2) 95%, white 5%));
   justify-content:flex-start;
+  position:relative;
+}
+.field-ops-right[data-shell-family="classified-packet"] .companion-component[data-component-type="stress-track"]::before,
+.field-ops-right[data-shell-family="classified-packet"] .companion-component[data-component-type="token-sheet"]::before{
+  content:"ACTIVE TRACK";
+  align-self:flex-end;
+  font-family:var(--mono);
+  font-size:4.5pt;
+  letter-spacing:.18em;
+  color:color-mix(in srgb, var(--accent) 52%, var(--paper) 48%);
+}
+.field-ops-right[data-shell-family="classified-packet"] .companion-component[data-component-type="token-sheet"]::before{
+  content:"CLEARANCE TRACK";
+}
+.field-ops-right[data-shell-family="classified-packet"] .companion-component[data-component-type="stress-track"]::after,
+.field-ops-right[data-shell-family="classified-packet"] .companion-component[data-component-type="token-sheet"]::after{
+  content:"";
+  display:block;
+  min-height:42px;
+  margin-top:auto;
+  border-top:1px solid color-mix(in srgb, var(--rule) 28%, transparent 72%);
+  background:
+    linear-gradient(90deg, transparent, transparent calc(33.333% - 1px), color-mix(in srgb, var(--rule) 24%, transparent 76%) calc(33.333% - 1px), color-mix(in srgb, var(--rule) 24%, transparent 76%) 33.333%, transparent 33.333%, transparent calc(66.666% - 1px), color-mix(in srgb, var(--rule) 24%, transparent 76%) calc(66.666% - 1px), color-mix(in srgb, var(--rule) 24%, transparent 76%) 66.666%, transparent 66.666%),
+    repeating-linear-gradient(to bottom, transparent, transparent 12px, color-mix(in srgb, var(--rule) 18%, transparent 82%) 12px, color-mix(in srgb, var(--rule) 18%, transparent 82%) 13px);
+}
+.field-ops-right[data-shell-family="classified-packet"] .map-title,
+.field-ops-right[data-shell-family="classified-packet"] .puzzle-title,
+.field-ops-right[data-shell-family="classified-packet"] .oracle-header,
+.field-ops-right[data-shell-family="classified-packet"] .companion-title{
+  font-family:var(--mono);
+  letter-spacing:.16em;
+}
+.field-ops-right[data-shell-family="classified-packet"] .map-note,
+.field-ops-right[data-shell-family="classified-packet"] .map-annotation,
+.field-ops-right[data-shell-family="classified-packet"] .oracle-text,
+.field-ops-right[data-shell-family="classified-packet"] .companion-body{
+  font-family:var(--mono);
+  letter-spacing:.01em;
 }
 .field-ops-right[data-shell-family="classified-packet"] .companion-token{
   border-style:solid;
@@ -2057,6 +2148,58 @@ body[data-demo-view="true"] #booklet-container{
 .rp-content[data-solo-surface="map-panel"] .map-network{
   min-height:0;
 }
+.rp-content[data-solo-surface="map-panel"] .map-content[data-shell-family="classified-packet"][data-board-state-mode="node-graph"]{
+  gap:2px;
+  position:relative;
+  padding-left:22px;
+}
+.rp-content[data-solo-surface="map-panel"] .map-content[data-shell-family="classified-packet"][data-board-state-mode="node-graph"]::before{
+  content:"SECTOR GRID";
+  position:absolute;
+  left:0;
+  top:2px;
+  bottom:18px;
+  width:18px;
+  writing-mode:vertical-rl;
+  transform:rotate(180deg);
+  font-family:var(--mono);
+  font-size:4.7pt;
+  letter-spacing:.18em;
+  color:color-mix(in srgb, var(--accent) 58%, var(--paper) 42%);
+  background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 9%, transparent 91%), color-mix(in srgb, var(--accent) 3%, transparent 97%));
+  border-right:1px solid color-mix(in srgb, var(--rule) 28%, transparent 72%);
+  padding-right:5px;
+}
+.rp-content[data-solo-surface="map-panel"] .map-content[data-shell-family="classified-packet"][data-board-state-mode="node-graph"] .map-title{
+  margin-bottom:1px;
+  font-size:6.3pt;
+  letter-spacing:.16em;
+}
+.rp-content[data-solo-surface="map-panel"] .map-content[data-shell-family="classified-packet"][data-board-state-mode="node-graph"] .map-network{
+  min-height:0;
+  border-width:1.5px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 7%, transparent 93%) 0 46px, transparent 46px),
+    linear-gradient(180deg, color-mix(in srgb, var(--paper) 95%, white 5%), color-mix(in srgb, var(--paper-2) 94%, white 6%)),
+    repeating-linear-gradient(90deg, transparent, transparent 35px, color-mix(in srgb, var(--theme-field-rule,var(--rule)) 14%, transparent 86%) 35px, color-mix(in srgb, var(--theme-field-rule,var(--rule)) 14%, transparent 86%) 36px);
+}
+.rp-content[data-solo-surface="map-panel"] .map-content[data-shell-family="classified-packet"][data-board-state-mode="node-graph"] .map-network-legend{
+  top:8px;
+  bottom:auto;
+  right:8px;
+  left:auto;
+  width:max-content;
+  max-width:52%;
+  justify-content:flex-end;
+}
+.rp-content[data-solo-surface="map-panel"] .map-content[data-shell-family="classified-packet"][data-board-state-mode="node-graph"] .map-network-chip{
+  background:color-mix(in srgb, white 82%, var(--paper) 18%);
+}
+.rp-content[data-solo-surface="map-panel"] .map-content[data-shell-family="classified-packet"][data-board-state-mode="node-graph"] .map-note{
+  margin-top:2px;
+  padding:4px 6px 0;
+  border-top:1px dashed color-mix(in srgb, var(--theme-field-rule,var(--rule)) 54%, transparent 46%);
+}
 .rp-content[data-solo-surface="map-panel"] .map-grid{
   grid-auto-rows:minmax(42px, 1fr);
 }
@@ -2072,6 +2215,124 @@ body[data-demo-view="true"] #booklet-container{
 .rp-content[data-solo-surface="tracker"] .companion-component{
   min-height:0;
   flex:1;
+}
+.board-worksheet{
+  grid-area:worksheet;
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  min-height:0;
+  padding-top:4px;
+}
+.board-worksheet-lines{
+  display:grid;
+  gap:8px;
+}
+.board-worksheet-line{
+  min-height:18px;
+  border-bottom:1px dashed color-mix(in srgb, var(--theme-field-rule,var(--rule)) 62%, transparent 38%);
+}
+.board-worksheet-ledger{
+  display:grid;
+  gap:0;
+  border-top:1px solid color-mix(in srgb, var(--theme-field-rule,var(--rule)) 52%, transparent 48%);
+  border-left:1px solid color-mix(in srgb, var(--theme-field-rule,var(--rule)) 34%, transparent 66%);
+}
+.board-ledger-row{
+  display:grid;
+  grid-template-columns:minmax(0, .8fr) minmax(0, .9fr) minmax(0, 1.3fr);
+}
+.board-worksheet[data-worksheet-type="clearance-ledger"] .board-ledger-row,
+.board-worksheet[data-worksheet-type="alignment-ledger"] .board-ledger-row{
+  grid-template-columns:minmax(0, .7fr) minmax(0, 1.45fr) minmax(0, .7fr);
+}
+.board-ledger-header{
+  background:color-mix(in srgb, white 76%, var(--paper) 24%);
+}
+.board-ledger-cell{
+  min-height:20px;
+  padding:4px 5px;
+  border-right:1px solid color-mix(in srgb, var(--theme-field-rule,var(--rule)) 34%, transparent 66%);
+  border-bottom:1px solid color-mix(in srgb, var(--theme-field-rule,var(--rule)) 34%, transparent 66%);
+  font-family:var(--mono);
+  font-size:4.9pt;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:color-mix(in srgb, var(--ink) 72%, var(--muted) 28%);
+}
+.board-ledger-row:not(.board-ledger-header) .board-ledger-cell{
+  color:transparent;
+}
+.board-ledger-row:not(.board-ledger-header) .board-ledger-cell-wide{
+  background:
+    linear-gradient(180deg, transparent 0, transparent calc(100% - 1px), color-mix(in srgb, var(--theme-field-rule,var(--rule)) 22%, transparent 78%) calc(100% - 1px));
+}
+.board-ledger-row:not(.board-ledger-header) .board-ledger-cell-mark{
+  position:relative;
+}
+.board-ledger-row:not(.board-ledger-header) .board-ledger-cell-mark::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:9px;
+  height:9px;
+  border:1px solid color-mix(in srgb, var(--theme-box-border,var(--ink)) 74%, transparent 26%);
+  transform:translate(-50%, -50%);
+}
+.rp-content[data-solo-surface="tracker"] .companion-component[data-component-type="stress-track"] .companion-track-dossier{
+  min-height:320px;
+}
+.rp-content[data-solo-surface="tracker"] .companion-component[data-component-type="stress-track"] .companion-dossier-lines{
+  flex:1;
+  min-height:168px;
+  align-content:start;
+  grid-auto-rows:1fr;
+}
+.field-ops-right[data-shell-family="classified-packet"] .board-worksheet{
+  border-top:1px dashed color-mix(in srgb, var(--theme-field-rule,var(--rule)) 56%, transparent 44%);
+}
+.archive-footer{
+  margin-top:auto;
+  padding-top:6px;
+  border-top:1px dashed color-mix(in srgb, var(--theme-field-rule,var(--rule)) 48%, transparent 52%);
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.archive-footer-grid{
+  display:grid;
+  gap:0;
+  border-top:1px solid color-mix(in srgb, var(--theme-field-rule,var(--rule)) 40%, transparent 60%);
+  border-left:1px solid color-mix(in srgb, var(--theme-field-rule,var(--rule)) 28%, transparent 72%);
+}
+.archive-footer-row{
+  display:grid;
+  grid-template-columns:minmax(0, .7fr) minmax(0, 1.3fr) 52px;
+}
+.archive-footer-row-header{
+  background:color-mix(in srgb, white 80%, var(--paper) 20%);
+}
+.archive-footer-cell{
+  min-height:18px;
+  padding:3px 5px;
+  border-right:1px solid color-mix(in srgb, var(--theme-field-rule,var(--rule)) 28%, transparent 72%);
+  border-bottom:1px solid color-mix(in srgb, var(--theme-field-rule,var(--rule)) 28%, transparent 72%);
+  font-family:var(--mono);
+  font-size:4.7pt;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:color-mix(in srgb, var(--ink) 72%, var(--muted) 28%);
+}
+.archive-footer-cell-mark{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.archive-footer-checkbox{
+  width:10px;
+  height:10px;
+  border:1px solid color-mix(in srgb, var(--theme-box-border,var(--ink)) 76%, transparent 24%);
 }
 .field-ops-right[data-board-state-mode="ledger-board"] .cipher-zone{
   background:
@@ -2352,8 +2613,48 @@ body[data-demo-view="true"] #booklet-container{
   width:100%;
   height:100%;
 }
+.map-network[data-has-rail="true"] .map-network-svg,
+.map-network[data-has-rail="true"] .map-network-nodes{
+  left:46px;
+  width:calc(100% - 46px);
+}
 .map-network-nodes{
   pointer-events:none;
+}
+.map-network-rail{
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
+  width:42px;
+  padding:24px 4px 8px;
+  border-right:1px solid color-mix(in srgb, var(--rule) 28%, transparent 72%);
+  background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, transparent 92%), color-mix(in srgb, var(--accent) 3%, transparent 97%));
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  z-index:1;
+}
+.map-network-rail-item{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.map-network-rail-label{
+  font-family:var(--mono);
+  font-size:4.4pt;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:color-mix(in srgb, var(--accent) 56%, var(--paper) 44%);
+}
+.map-network-rail-value{
+  font-family:var(--mono);
+  font-size:4.9pt;
+  line-height:1.15;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:color-mix(in srgb, var(--ink) 72%, var(--muted) 28%);
+  overflow-wrap:anywhere;
 }
 .map-network-legend{
   position:absolute;
@@ -2926,6 +3227,11 @@ body[data-demo-view="true"] #booklet-container{
   grid-template-columns:repeat(2, minmax(0, 1fr));
   gap:5px;
 }
+.companion-component[data-component-type="token-sheet"] .companion-level-ladder{
+  flex:1;
+  align-content:start;
+  grid-auto-rows:minmax(56px, 1fr);
+}
 .companion-level-card{
   display:grid;
   grid-template-columns:90px 1fr auto;
@@ -3243,6 +3549,84 @@ body[data-demo-view="true"] #booklet-container{
 .boss-right[data-shell-family="classified-packet"] .boss-convergence{
   padding-top:10px;
   border-top-style:dashed;
+}
+.boss-appendix-grid{
+  display:grid;
+  grid-template-columns:minmax(0, .92fr) minmax(0, 1.08fr);
+  gap:6px;
+  margin-bottom:8px;
+}
+.boss-right[data-continuation-segment="followup"][data-shell-family="classified-packet"]{
+  background:
+    linear-gradient(180deg, color-mix(in srgb, white 90%, var(--paper) 10%), color-mix(in srgb, white 78%, var(--paper-2) 22%)),
+    repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent 18px,
+      color-mix(in srgb, var(--theme-field-rule,var(--rule)) 10%, transparent 90%) 18px,
+      color-mix(in srgb, var(--theme-field-rule,var(--rule)) 10%, transparent 90%) 19px
+    );
+}
+.boss-right[data-continuation-segment="followup"][data-shell-family="classified-packet"] .boss-header{
+  margin-bottom:4px;
+  padding-bottom:3px;
+}
+.boss-right[data-continuation-segment="followup"][data-shell-family="classified-packet"] .boss-title{
+  font-size:13.2pt;
+  margin-bottom:6px;
+}
+.boss-right[data-continuation-segment="followup"][data-shell-family="classified-packet"] .boss-branch-note,
+.boss-right[data-continuation-segment="followup"][data-shell-family="classified-packet"] .boss-proof{
+  min-height:0;
+  margin-bottom:0;
+  padding:6px 7px;
+}
+.boss-right[data-continuation-segment="followup"][data-shell-family="classified-packet"] .boss-branch-note{
+  border-left:3px solid color-mix(in srgb, var(--accent) 62%, transparent 38%);
+  background:color-mix(in srgb, white 84%, var(--paper) 16%);
+}
+.boss-right[data-continuation-segment="followup"][data-shell-family="classified-packet"] .boss-branch-note p{
+  font-size:6.1pt;
+  line-height:1.28;
+  margin-bottom:3px;
+}
+.boss-right[data-continuation-segment="followup"][data-shell-family="classified-packet"] .boss-proof{
+  border-style:solid;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, white 86%, var(--paper) 14%), color-mix(in srgb, white 74%, var(--paper-2) 26%));
+}
+.boss-right[data-continuation-segment="followup"][data-shell-family="classified-packet"] .boss-proof::after{
+  content:"RECONCILED RECORD";
+  display:block;
+  margin-top:5px;
+  padding-top:4px;
+  border-top:1px solid color-mix(in srgb, var(--rule) 26%, transparent 74%);
+  font-family:var(--mono);
+  font-size:4.8pt;
+  letter-spacing:.18em;
+  color:color-mix(in srgb, var(--accent) 54%, var(--paper) 46%);
+}
+.boss-right[data-continuation-segment="followup"][data-shell-family="classified-packet"] .boss-proof-label{
+  margin-bottom:3px;
+  font-size:5.3pt;
+}
+.boss-right[data-continuation-segment="followup"][data-shell-family="classified-packet"] .boss-proof p{
+  font-size:5.55pt;
+  line-height:1.22;
+  margin-bottom:2px;
+}
+.boss-right[data-continuation-segment="followup"][data-shell-family="classified-packet"] .boss-convergence{
+  margin-top:6px;
+  padding-top:6px;
+}
+.boss-right[data-continuation-segment="followup"][data-shell-family="classified-packet"] .boss-convergence-instruction{
+  font-size:6.1pt;
+  line-height:1.25;
+  margin-bottom:4px;
+}
+.boss-right[data-continuation-segment="followup"][data-shell-family="classified-packet"] .boss-password-box{
+  width:20px;
+  height:20px;
 }
 .boss-right[data-layout-variant="dense"] .boss-convergence{
   margin-top:8px;
@@ -3571,6 +3955,78 @@ body[data-demo-view="true"] #booklet-container{
 .page-fragment-doc[data-fragment-count="2"]{
   justify-content:flex-start;
 }
+.fragment-evidence-layout{
+  flex:1;
+  display:grid;
+  grid-template-columns:minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap:8px;
+  min-height:0;
+}
+.fragment-evidence-layout[data-fragment-count="3"],
+.fragment-evidence-layout[data-fragment-count="4"]{
+  grid-template-columns:1fr;
+  grid-template-rows:minmax(0, 1.05fr) minmax(0, 0.95fr);
+}
+.fragment-evidence-primary,
+.fragment-evidence-sidebar,
+.fragment-evidence-secondary,
+.fragment-evidence-cell{
+  min-height:0;
+}
+.fragment-evidence-primary{
+  display:flex;
+  min-height:0;
+}
+.fragment-evidence-sidebar{
+  display:flex;
+  min-height:0;
+}
+.fragment-evidence-secondary{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:8px;
+  min-height:0;
+}
+.fragment-evidence-layout[data-fragment-count="4"] .fragment-evidence-secondary{
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+}
+.fragment-evidence-cell{
+  display:flex;
+}
+.fragment-page[data-shell-family="classified-packet"]{
+  position:relative;
+}
+.fragment-page[data-shell-family="classified-packet"]::before{
+  content:"ARCHIVE PACKET";
+  position:absolute;
+  top:7px;
+  right:10px;
+  font-family:var(--mono);
+  font-size:4.8pt;
+  letter-spacing:.18em;
+  color:color-mix(in srgb, var(--accent) 68%, var(--paper) 32%);
+}
+.fragment-page[data-shell-family="classified-packet"] .page-header{
+  border-bottom-width:2px;
+}
+.fragment-page[data-shell-family="classified-packet"] .page-header,
+.fragment-page[data-shell-family="classified-packet"] .fragment-doc-type,
+.fragment-page[data-shell-family="classified-packet"] .fragment-doc-header,
+.fragment-page[data-shell-family="classified-packet"] .fragment-doc-sig{
+  font-family:var(--mono);
+}
+.fragment-page[data-shell-family="classified-packet"][data-fragment-count="2"] .fragment-block:first-of-type{
+  max-width:97%;
+  align-self:flex-start;
+}
+.fragment-page[data-shell-family="classified-packet"][data-fragment-count="2"] .fragment-block:nth-of-type(2){
+  max-width:89%;
+  align-self:flex-end;
+}
+.fragment-page[data-shell-family="classified-packet"] .fragment-doc-body{
+  font-size:6.05pt;
+  line-height:1.28;
+}
 
 /* Individual fragment */
 .fragment-block{
@@ -3616,6 +4072,66 @@ body[data-demo-view="true"] #booklet-container{
 }
 .fragment-block[data-has-annotations="true"] .fragment-doc{
   box-shadow:inset 0 0 0 1px rgba(139,42,42,.08);
+}
+.fragment-block[data-shell-family="classified-packet"] .fragment-doc{
+  background:
+    linear-gradient(180deg, color-mix(in srgb, white 82%, var(--paper) 18%), color-mix(in srgb, white 68%, var(--paper-2) 32%));
+  border-width:1.4px;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--theme-panel-border,var(--rule)) 18%, transparent 82%);
+}
+.fragment-block[data-shell-family="classified-packet"] .fragment-doc.form::before,
+.fragment-block[data-shell-family="classified-packet"] .fragment-doc.report::before,
+.fragment-block[data-shell-family="classified-packet"] .fragment-doc.inspection::before{
+  content:"FILED SURFACE";
+  display:block;
+  margin-bottom:5px;
+  padding-bottom:4px;
+  border-bottom:1px solid color-mix(in srgb, var(--rule) 28%, transparent 72%);
+  font-family:var(--mono);
+  font-size:4.8pt;
+  letter-spacing:.2em;
+  color:color-mix(in srgb, var(--accent) 54%, var(--paper) 46%);
+}
+.fragment-block[data-shell-family="classified-packet"] .fragment-doc.report::before{
+  content:"ANALYSIS RECORD";
+}
+.fragment-block[data-shell-family="classified-packet"] .fragment-doc.inspection::before{
+  content:"INSPECTION SURFACE";
+}
+.fragment-block[data-shell-family="classified-packet"] .fragment-doc-header{
+  border-bottom:1px solid color-mix(in srgb, var(--theme-field-rule,var(--rule)) 62%, transparent 38%);
+  padding-bottom:5px;
+  margin-bottom:5px;
+}
+.fragment-block[data-shell-family="classified-packet"] .fragment-doc-body{
+  background:
+    linear-gradient(180deg, transparent 0, transparent calc(100% - 1px), color-mix(in srgb, var(--theme-field-rule,var(--rule)) 10%, transparent 90%) calc(100% - 1px));
+}
+.fragment-block[data-shell-family="classified-packet"] .fragment-doc.form,
+.fragment-block[data-shell-family="classified-packet"] .fragment-doc.inspection{
+  border-width:2px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, white 86%, var(--paper) 14%), color-mix(in srgb, white 74%, var(--paper-2) 26%));
+}
+.fragment-block[data-shell-family="classified-packet"] .fragment-doc.form .fragment-doc-body,
+.fragment-block[data-shell-family="classified-packet"] .fragment-doc.inspection .fragment-doc-body,
+.fragment-block[data-shell-family="classified-packet"] .fragment-doc.report .fragment-doc-body{
+  font-family:var(--mono);
+}
+.fragment-block[data-shell-family="classified-packet"] .fragment-doc.field-note{
+  border-style:solid;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      color-mix(in srgb, white 88%, var(--paper) 12%),
+      color-mix(in srgb, white 88%, var(--paper) 12%) 18px,
+      color-mix(in srgb, var(--theme-field-rule,var(--rule)) 10%, white 90%) 18px,
+      color-mix(in srgb, var(--theme-field-rule,var(--rule)) 10%, white 90%) 19px
+    );
+}
+.fragment-block[data-shell-family="classified-packet"] .fragment-doc-type{
+  letter-spacing:.16em;
 }
 
 /* Large fragment number in margin */

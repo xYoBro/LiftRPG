@@ -141,6 +141,24 @@ function renderGridMap(mapState) {
 
 function renderPointMap(mapState) {
   const wrap = make('div', 'map-network');
+  const shellFamily = ((mapState.artifactIdentity || {}).shellFamily || '').toLowerCase();
+  const useInstrumentationRail = shellFamily === 'classified-packet';
+  if (useInstrumentationRail) {
+    wrap.setAttribute('data-has-rail', 'true');
+    const rail = make('div', 'map-network-rail');
+    [
+      ['Sector', mapState.title || 'Topology'],
+      ['Current', mapState.currentNode || '--'],
+      ['Routes', String((mapState.edges || []).length || 0)],
+    ].forEach(([label, value]) => {
+      const item = make('div', 'map-network-rail-item');
+      item.appendChild(make('div', 'map-network-rail-label', label));
+      item.appendChild(make('div', 'map-network-rail-value', value));
+      rail.appendChild(item);
+    });
+    wrap.appendChild(rail);
+  }
+
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('class', 'map-network-svg');
   svg.setAttribute('viewBox', '0 0 100 100');
@@ -638,6 +656,8 @@ export function renderBossPage(model) {
   const page = scaffold.page;
   const frame = scaffold.frame;
   frame.setAttribute('data-shell-family', model.shellFamily || (model.artifactIdentity && model.artifactIdentity.shellFamily) || 'field-survey');
+  const isClassifiedFollowup = (model.shellFamily || (model.artifactIdentity && model.artifactIdentity.shellFamily) || '') === 'classified-packet'
+    && model.continuationSegment === 'followup';
 
   if (model.convergenceProof) {
     frame.setAttribute('data-has-convergence-proof', 'true');
@@ -666,6 +686,11 @@ export function renderBossPage(model) {
     frame.appendChild(make('div', 'doc-label continuation-label', model.continuationLabel));
   }
   frame.appendChild(make('h2', 'boss-title', model.title));
+
+  let appendixGrid = null;
+  if (isClassifiedFollowup) {
+    appendixGrid = make('div', 'boss-appendix-grid');
+  }
 
   if ((model.narrativeParagraphs || []).length) {
     const narrative = make('div', 'boss-narrative');
@@ -716,7 +741,7 @@ export function renderBossPage(model) {
     if (model.binaryChoiceAcknowledgement.ifB) {
       branch.appendChild(make('p', '', 'If B: ' + model.binaryChoiceAcknowledgement.ifB));
     }
-    frame.appendChild(branch);
+    (appendixGrid || frame).appendChild(branch);
   }
 
   if ((model.convergenceProofParagraphs || []).length) {
@@ -725,7 +750,11 @@ export function renderBossPage(model) {
     model.convergenceProofParagraphs.slice(0, 2).forEach((paragraph) => {
       proof.appendChild(make('p', '', paragraph));
     });
-    frame.appendChild(proof);
+    (appendixGrid || frame).appendChild(proof);
+  }
+
+  if (appendixGrid && appendixGrid.childNodes.length) {
+    frame.appendChild(appendixGrid);
   }
 
   const convergence = make('div', 'boss-convergence');

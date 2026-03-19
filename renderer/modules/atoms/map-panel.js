@@ -46,7 +46,10 @@ registerAtom('map-panel', {
     const map = data.map || {};
     const artifactIdentity = data.artifactIdentity || {};
 
-    const mapModel = buildMapModel(map, null);
+    const mapModel = buildMapModel({
+      ...map,
+      artifactIdentity,
+    }, null);
     const el = renderMapSection(mapModel);
     el.setAttribute('data-shell-family', artifactIdentity.shellFamily || 'field-survey');
     el.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || 'survey-grid');

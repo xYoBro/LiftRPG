@@ -51,7 +51,8 @@ export function buildFragmentModel(fragment) {
     authenticityChecks: normalizeAuthenticityChecks(fragment),
     continuationLabel: fragment.continuationLabel || '',
     partIndex: fragment.partIndex || 0,
-    partCount: fragment.partCount || 0
+    partCount: fragment.partCount || 0,
+    artifactIdentity: fragment.artifactIdentity || {}
   };
 }
 

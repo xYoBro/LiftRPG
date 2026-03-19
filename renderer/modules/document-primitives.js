@@ -12,6 +12,7 @@ function buildMetaLines(fragmentModel) {
 
 export function renderFoundDocument(fragmentModel) {
   const block = make('div', 'fragment-block');
+  const shellFamily = (fragmentModel.artifactIdentity || {}).shellFamily || 'field-survey';
   block.setAttribute('data-paper-tone', fragmentModel.designSpec.paperTone);
   block.setAttribute('data-primary-typeface', fragmentModel.designSpec.primaryTypeface);
   block.setAttribute('data-header-style', fragmentModel.designSpec.headerStyle);
@@ -20,12 +21,14 @@ export function renderFoundDocument(fragmentModel) {
   block.setAttribute('data-has-irrelevant-detail', String(fragmentModel.authenticityChecks.hasIrrelevantDetail));
   block.setAttribute('data-could-exist-elsewhere', String(fragmentModel.authenticityChecks.couldExistInDifferentStory));
   block.setAttribute('data-document-family', fragmentModel.atomFamily || 'custom-document');
+  block.setAttribute('data-shell-family', shellFamily);
 
   if (fragmentModel.id) {
     block.appendChild(make('div', 'fragment-number', fragmentModel.numberText));
   }
 
   const doc = make('div', 'fragment-doc ' + fragmentModel.documentClass);
+  doc.setAttribute('data-shell-family', shellFamily);
   doc.appendChild(make('div', 'fragment-doc-type', fragmentModel.documentType));
   if (fragmentModel.continuationLabel) {
     doc.appendChild(make('div', 'fragment-doc-continuation', fragmentModel.continuationLabel));

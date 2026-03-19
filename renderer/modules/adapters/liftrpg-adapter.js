@@ -432,7 +432,10 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
       sequence: fi,
       sizeHint: hint,
       pageAffinity: 'either',
-      data: frag,
+      data: {
+        ...frag,
+        artifactIdentity,
+      },
     }));
   }
 

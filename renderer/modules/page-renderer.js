@@ -174,6 +174,112 @@ function renderMechanicStrip(artifactIdentity, placements) {
   return strip;
 }
 
+function resolveWorksheetLabel(companionPlacements) {
+  const trackType = String((companionPlacements[0]?.atom?.data?.trackType) || '').trim().toLowerCase();
+  if (trackType === 'stress-track') return 'Incident Log';
+  if (trackType === 'token-sheet') return 'Clearance Notes';
+  if (trackType === 'overlay-window') return 'Alignment Notes';
+  if (trackType === 'usage-die') return 'Legibility Notes';
+  return 'Board Notes';
+}
+
+function resolveWorksheetType(companionPlacements) {
+  const trackType = String((companionPlacements[0]?.atom?.data?.trackType) || '').trim().toLowerCase();
+  if (trackType === 'stress-track') return 'incident-log';
+  if (trackType === 'token-sheet') return 'clearance-ledger';
+  if (trackType === 'overlay-window') return 'alignment-ledger';
+  return 'notes';
+}
+
+function buildBoardWorksheet(label, worksheetType = 'notes', rowCount = 4) {
+  const wrap = make('section', 'board-worksheet');
+  wrap.setAttribute('data-worksheet-type', worksheetType);
+  wrap.appendChild(make('div', 'doc-label', label));
+
+  if (worksheetType === 'incident-log') {
+    const ledger = make('div', 'board-worksheet-ledger');
+    const header = make('div', 'board-ledger-row board-ledger-header');
+    ['Trigger', 'Shift', 'Record'].forEach((text) => header.appendChild(make('div', 'board-ledger-cell', text)));
+    ledger.appendChild(header);
+    for (let index = 0; index < Math.max(3, rowCount - 1); index += 1) {
+      const row = make('div', 'board-ledger-row');
+      row.appendChild(make('div', 'board-ledger-cell board-ledger-cell-mark'));
+      row.appendChild(make('div', 'board-ledger-cell board-ledger-cell-short'));
+      row.appendChild(make('div', 'board-ledger-cell board-ledger-cell-wide'));
+      ledger.appendChild(row);
+    }
+    wrap.appendChild(ledger);
+    return wrap;
+  }
+
+  if (worksheetType === 'clearance-ledger' || worksheetType === 'alignment-ledger') {
+    const ledger = make('div', 'board-worksheet-ledger');
+    const header = make('div', 'board-ledger-row board-ledger-header');
+    const headings = worksheetType === 'clearance-ledger'
+      ? ['Tier', 'Finding', 'Filed']
+      : ['Window', 'Offset', 'Result'];
+    headings.forEach((text) => header.appendChild(make('div', 'board-ledger-cell', text)));
+    ledger.appendChild(header);
+    for (let index = 0; index < Math.max(3, rowCount - 1); index += 1) {
+      const row = make('div', 'board-ledger-row');
+      row.appendChild(make('div', 'board-ledger-cell board-ledger-cell-short'));
+      row.appendChild(make('div', 'board-ledger-cell board-ledger-cell-wide'));
+      row.appendChild(make('div', 'board-ledger-cell board-ledger-cell-mark'));
+      ledger.appendChild(row);
+    }
+    wrap.appendChild(ledger);
+    return wrap;
+  }
+
+  const lines = make('div', 'board-worksheet-lines');
+  for (let index = 0; index < rowCount; index += 1) {
+    lines.appendChild(make('div', 'board-worksheet-line'));
+  }
+  wrap.appendChild(lines);
+  return wrap;
+}
+
+function buildArchiveFooter(placements) {
+  const footer = make('section', 'archive-footer');
+  footer.appendChild(make('div', 'doc-label', 'Packet Ledger'));
+
+  const grid = make('div', 'archive-footer-grid');
+  const header = make('div', 'archive-footer-row archive-footer-row-header');
+  ['Ref', 'Type', 'Checked'].forEach((text) => {
+    header.appendChild(make('div', 'archive-footer-cell', text));
+  });
+  grid.appendChild(header);
+
+  placements.slice(0, 3).forEach((placement) => {
+    const data = placement.atom?.data || placement.data || {};
+    const row = make('div', 'archive-footer-row');
+    row.appendChild(make('div', 'archive-footer-cell', data.id || placement.id || 'F.--'));
+    row.appendChild(make('div', 'archive-footer-cell', String(data.documentType || 'Document')));
+    const mark = make('div', 'archive-footer-cell archive-footer-cell-mark');
+    mark.appendChild(make('div', 'archive-footer-checkbox'));
+    row.appendChild(mark);
+    grid.appendChild(row);
+  });
+
+  footer.appendChild(grid);
+  return footer;
+}
+
+function shouldUsePacketEvidenceLayout(placements) {
+  if (placements.length !== 2) return false;
+
+  return placements.every((placement) => {
+    const data = placement.atom?.data || placement.data || {};
+    const documentType = String(data.documentType || '').trim().toLowerCase();
+    const denseTypes = new Set(['form', 'inspection', 'report', 'transcript', 'anomaly']);
+    if (denseTypes.has(documentType)) return false;
+
+    const body = String(data.bodyText || data.body || data.content || '').trim();
+    const paragraphCount = body ? body.split(/\n\s*\n|\n/).filter(Boolean).length : 0;
+    return body.length <= 420 && paragraphCount <= 4;
+  });
+}
+
 export function renderPlacementInto(target, placement) {
   const def = getAtomDefinition(placement.type);
   if (!def) {
@@ -286,7 +392,8 @@ function renderMechanicPage(placements, planIndex) {
   const companionPlacements = placements.filter((placement) => placement.type === 'tracker');
   const briefing = buildMechanicBriefing(artifactIdentity, placements);
   const isSoloCompanionPage = surfacePlacements.length === 0 && companionPlacements.length === 1;
-  if (briefing && !isSoloCompanionPage && (surfacePlacements.length <= 1 || companionPlacements.length > 0)) {
+  const isSoloMapPage = surfacePlacements.length === 1 && surfacePlacements[0].type === 'map-panel' && companionPlacements.length === 0;
+  if (briefing && !isSoloCompanionPage && !isSoloMapPage && (surfacePlacements.length <= 1 || companionPlacements.length > 0)) {
     frame.appendChild(briefing);
   }
 
@@ -309,6 +416,14 @@ function renderMechanicPage(placements, planIndex) {
     companionZone.appendChild(make('div', 'doc-label', copy.companionLabel || 'Companion Surface'));
     companionPlacements.forEach((placement) => renderPlacementInto(companionZone, placement));
     content.appendChild(companionZone);
+
+    if (artifactIdentity.shellFamily === 'classified-packet' && surfacePlacements.length === 0 && companionPlacements.length === 1) {
+      content.appendChild(buildBoardWorksheet(
+        resolveWorksheetLabel(companionPlacements),
+        resolveWorksheetType(companionPlacements),
+        4
+      ));
+    }
   }
 
   frame.appendChild(content);
@@ -362,11 +477,35 @@ export function renderPageFromPlacements(placements, spreadType, planIndex) {
   page.setAttribute('data-plan-index', String(planIndex));
   page.setAttribute('data-engine', 'v2');
   if (primaryType === 'fragment-doc') {
+    const artifactIdentity = resolveArtifactIdentity(placements);
     frame.setAttribute('data-fragment-count', String(placements.length));
+    frame.setAttribute('data-shell-family', artifactIdentity.shellFamily || DEFAULT_ARTIFACT_IDENTITY.shellFamily);
+    frame.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || DEFAULT_ARTIFACT_IDENTITY.boardStateMode);
+
+    if ((artifactIdentity.shellFamily || '') === 'classified-packet' && shouldUsePacketEvidenceLayout(placements)) {
+      const evidenceLayout = make('div', 'fragment-evidence-layout');
+      evidenceLayout.setAttribute('data-fragment-count', String(placements.length));
+      placements.forEach((placement, index) => {
+        const cell = make('div', index === 0 ? 'fragment-evidence-primary' : 'fragment-evidence-sidebar');
+        renderPlacementInto(cell, placement);
+        evidenceLayout.appendChild(cell);
+      });
+
+      frame.appendChild(evidenceLayout);
+      frame.appendChild(buildArchiveFooter(placements));
+      return page;
+    }
   }
 
   for (const placement of placements) {
     renderPlacementInto(frame, placement);
+  }
+
+  if (primaryType === 'fragment-doc') {
+    const artifactIdentity = resolveArtifactIdentity(placements);
+    if ((artifactIdentity.shellFamily || '') === 'classified-packet' && placements.length <= 2) {
+      frame.appendChild(buildArchiveFooter(placements));
+    }
   }
 
   return page;

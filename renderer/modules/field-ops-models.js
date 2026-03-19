@@ -316,6 +316,7 @@ export function buildMapModel(mapState, mechanicProfile = null) {
 
   return {
     family,
+    artifactIdentity: mapState.artifactIdentity || null,
     mapType: mapState.mapType || 'grid',
     title: mapState.title || 'Map',
     mapNote: mapState.mapNote || '',

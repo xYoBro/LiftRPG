@@ -276,7 +276,7 @@ function buildStressTrack(data) {
       });
       board.appendChild(noteList);
     }
-    board.appendChild(buildDossierLines(thresholdNotes.length ? 2 : 3));
+    board.appendChild(buildDossierLines(thresholdNotes.length ? 4 : 5));
 
     return board;
   }
