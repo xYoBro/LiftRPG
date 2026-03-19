@@ -698,6 +698,39 @@
       color: var(--muted);
     }
 
+    .wizard-draft-row {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(24, 23, 20, .08);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .wizard-draft-status {
+      font-family: var(--mono);
+      font-size: 6pt;
+      letter-spacing: .04em;
+      color: var(--muted);
+      line-height: 1.6;
+      flex: 1;
+      min-width: 220px;
+    }
+
+    .wizard-draft-clear {
+      border: 1px solid rgba(24, 23, 20, .16);
+      background: rgba(255, 255, 255, .5);
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 6pt;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+
     .wizard-pane {
       display: none;
     }
@@ -1014,6 +1047,10 @@
           <div class="wizard-current-help" id="wiz-current-help">Copy the prompt into your LLM, paste back only the JSON, then continue to Campaign.</div>
           <div class="wizard-locked-in" id="wiz-locked-in">Nothing locked in yet.</div>
           <div class="wizard-recovery-note" id="wiz-recovery-note">If a step fails validation, use the repair prompt shown below that step and repaste only that stage.</div>
+          <div class="wizard-draft-row">
+            <div class="wizard-draft-status" id="wiz-draft-status">Drafts are not saved yet.</div>
+            <button class="wizard-draft-clear" id="wiz-clear-draft" type="button">Clear Draft</button>
+          </div>
         </div>
 
         <div class="wizard-pane is-visible" id="wiz-pane-1">
@@ -1210,9 +1247,12 @@
       var wizCurrentHelp = document.getElementById('wiz-current-help');
       var wizLockedIn = document.getElementById('wiz-locked-in');
       var wizRecoveryNote = document.getElementById('wiz-recovery-note');
+      var wizDraftStatus = document.getElementById('wiz-draft-status');
+      var wizClearDraftBtn = document.getElementById('wiz-clear-draft');
       var weeksStageEl = document.getElementById('wiz-weeks-stage');
       var fragmentsStageEl = document.getElementById('wiz-fragments-stage');
       var assemblyResultEl = document.getElementById('wiz-assembly-result');
+      var WIZARD_DRAFT_KEY = 'liftrpg_manual_wizard_draft_v1';
 
       var wizStep = 0;
       var wizData = {};
@@ -1258,7 +1298,85 @@
         return api() && api().manual ? api().manual : null;
       }
 
-      function resetWizardState() {
+      function setDraftStatus(message) {
+        if (wizDraftStatus) wizDraftStatus.textContent = message;
+      }
+
+      function getWizardDraft() {
+        try {
+          var raw = localStorage.getItem(WIZARD_DRAFT_KEY);
+          return raw ? JSON.parse(raw) : null;
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function selectDiceValue(value) {
+        var target = value || '2d6';
+        var radio = document.querySelector('input[name="gen-dice"][value="' + target + '"]');
+        if (radio) radio.checked = true;
+      }
+
+      function collectWizardDraft() {
+        return {
+          savedAt: new Date().toISOString(),
+          modalOpen: modal.classList.contains('is-open'),
+          wizardVisible: chatWizard.classList.contains('is-visible'),
+          wizStep: wizStep,
+          workout: workoutEl.value,
+          brief: briefEl.value,
+          dice: getDiceValue(),
+          wizData: wizData,
+          wizState: wizState,
+          prompts: Object.keys(wizPrompts).reduce(function (acc, key) {
+            acc[key] = wizPrompts[key].value;
+            return acc;
+          }, {}),
+          results: Object.keys(wizResults).reduce(function (acc, key) {
+            acc[key] = wizResults[key].value;
+            return acc;
+          }, {}),
+          dynamic: {
+            weekResult: document.getElementById('wiz-weeks-result-current') ? document.getElementById('wiz-weeks-result-current').value : '',
+            fragmentResult: document.getElementById('wiz-fragments-result-current') ? document.getElementById('wiz-fragments-result-current').value : ''
+          }
+        };
+      }
+
+      function saveWizardDraft() {
+        try {
+          var draft = collectWizardDraft();
+          if (!draft.wizardVisible && !draft.modalOpen && !draft.workout.trim() && !draft.brief.trim()) return;
+          localStorage.setItem(WIZARD_DRAFT_KEY, JSON.stringify(draft));
+          var stamp = '';
+          if (draft.savedAt) {
+            try {
+              stamp = ' Last saved ' + new Date(draft.savedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.';
+            } catch (error) {}
+          }
+          setDraftStatus('Draft autosaved locally.' + stamp);
+        } catch (error) {
+          setDraftStatus('Draft could not be saved locally.');
+        }
+      }
+
+      function clearWizardDraft(statusMessage) {
+        try {
+          localStorage.removeItem(WIZARD_DRAFT_KEY);
+        } catch (error) {}
+        setDraftStatus(statusMessage || 'Draft cleared.');
+      }
+
+      function ensureWeekChunksPlanned() {
+        if (wizState.weekChunks && wizState.weekChunks.length > 0) return;
+        var plannedWeeks = Array.isArray((wizData.campaignPlan || {}).weeks) ? wizData.campaignPlan.weeks.length : 0;
+        wizState.weekChunks = typeof window.planWeekChunks === 'function'
+          ? window.planWeekChunks(plannedWeeks)
+          : [Array.from({ length: plannedWeeks }, function (_, i) { return i + 1; })];
+      }
+
+      function resetWizardState(options) {
+        options = options || {};
         wizData = {
           layerBible: null,
           campaignPlan: null,
@@ -1291,17 +1409,88 @@
         fragmentsStageEl.innerHTML = '';
         assemblyResultEl.innerHTML = '';
         updateWizardOverview(0);
+        if (!options.keepDraft) clearWizardDraft('Draft cleared.');
+      }
+
+      function restoreWizardDraft(draft) {
+        if (!draft || !draft.wizData || !draft.wizState) return false;
+
+        resetWizardState({ keepDraft: true });
+        workoutEl.value = draft.workout || '';
+        briefEl.value = draft.brief || '';
+        selectDiceValue(draft.dice || '2d6');
+
+        wizData = draft.wizData;
+        wizState = draft.wizState;
+
+        Object.keys(wizPrompts).forEach(function (key) {
+          if (draft.prompts && typeof draft.prompts[key] === 'string') {
+            wizPrompts[key].value = draft.prompts[key];
+          }
+        });
+        Object.keys(wizResults).forEach(function (key) {
+          if (draft.results && typeof draft.results[key] === 'string') {
+            wizResults[key].value = draft.results[key];
+          }
+        });
+
+        if (draft.wizardVisible || wizData.layerBible || wizData.campaignPlan || wizData.shell) {
+          chatWizard.classList.add('is-visible');
+        }
+
+        var restoreStep = typeof draft.wizStep === 'number' ? draft.wizStep : 0;
+        if (restoreStep === 3) {
+          ensureWeekChunksPlanned();
+          renderWeekChunkStage();
+          if (draft.dynamic && typeof draft.dynamic.weekResult === 'string') {
+            var weekResultEl = document.getElementById('wiz-weeks-result-current');
+            if (weekResultEl) weekResultEl.value = draft.dynamic.weekResult;
+          }
+        } else if (restoreStep === 4) {
+          if (!wizState.fragmentBatches || wizState.fragmentBatches.length === 0) {
+            wizData.weekSummaries = manualApi() && typeof manualApi().extractWeekSummaries === 'function'
+              ? manualApi().extractWeekSummaries(wizData.weekChunkOutputs || [])
+              : [];
+            wizState.fragmentBatches = manualApi() && typeof manualApi().buildFragmentBatches === 'function'
+              ? manualApi().buildFragmentBatches((wizData.campaignPlan || {}).fragmentRegistry || [], wizData.weekSummaries)
+              : [];
+          }
+          renderFragmentBatchStage();
+          if (draft.dynamic && typeof draft.dynamic.fragmentResult === 'string') {
+            var fragmentResultEl = document.getElementById('wiz-fragments-result-current');
+            if (fragmentResultEl) fragmentResultEl.value = draft.dynamic.fragmentResult;
+          }
+        } else if (restoreStep === 5) {
+          prepareEndingsStage();
+          if (draft.results && typeof draft.results[6] === 'string') {
+            wizResults[6].value = draft.results[6];
+          }
+        } else {
+          wizSetStep(restoreStep);
+        }
+
+        if (draft.modalOpen) openModal();
+        var restoredAt = '';
+        if (draft.savedAt) {
+          try {
+            restoredAt = ' Recovered ' + new Date(draft.savedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + '.';
+          } catch (error) {}
+        }
+        setDraftStatus('Recovered local draft.' + restoredAt);
+        return true;
       }
 
       function openModal() {
         modal.classList.add('is-open');
         document.body.style.overflow = 'hidden';
         workoutEl.focus();
+        saveWizardDraft();
       }
 
       function closeModal() {
         modal.classList.remove('is-open');
         document.body.style.overflow = '';
+        saveWizardDraft();
       }
 
       openBtn.addEventListener('click', openModal);
@@ -1339,6 +1528,19 @@
           workoutError.classList.remove('is-visible');
           workoutEl.style.borderColor = '';
         }
+        saveWizardDraft();
+      });
+      briefEl.addEventListener('input', saveWizardDraft);
+      document.querySelectorAll('input[name="gen-dice"]').forEach(function (radio) {
+        radio.addEventListener('change', saveWizardDraft);
+      });
+      Object.keys(wizResults).forEach(function (key) {
+        wizResults[key].addEventListener('input', saveWizardDraft);
+      });
+      wizClearDraftBtn.addEventListener('click', function () {
+        resetWizardState({ keepDraft: true });
+        chatWizard.classList.remove('is-visible');
+        clearWizardDraft('Draft cleared. Starting fresh will create a new one.');
       });
 
       function getDiceValue() {
@@ -1361,6 +1563,7 @@
         var prompt = wizPrompts[idx + 1];
         if (prompt) prompt.scrollTop = 0;
         updateWizardOverview(idx);
+        saveWizardDraft();
       }
 
       function collectLockedInItems() {
@@ -1774,6 +1977,7 @@
         var repairEl = document.getElementById('wiz-weeks-repair-current');
         promptEl.value = prompt;
         copyBtn.addEventListener('click', makeCopyHandler(promptEl, copyBtn, 'Copy Prompt'));
+        resultEl.addEventListener('input', saveWizardDraft);
         document.getElementById('wiz-weeks-next-current').addEventListener('click', function () {
           errorEl.classList.remove('is-visible');
           var raw = resultEl.value.trim();
@@ -1861,6 +2065,7 @@
         var repairEl = document.getElementById('wiz-fragments-repair-current');
         promptEl.value = prompt;
         copyBtn.addEventListener('click', makeCopyHandler(promptEl, copyBtn, 'Copy Prompt'));
+        resultEl.addEventListener('input', saveWizardDraft);
         document.getElementById('wiz-fragments-next-current').addEventListener('click', function () {
           errorEl.classList.remove('is-visible');
           var raw = resultEl.value.trim();
@@ -2132,11 +2337,16 @@
 
         if (errors.length > 0) {
           renderAssemblyErrors(errors);
+          saveWizardDraft();
           return;
         }
 
         renderAssemblySuccess(booklet);
+        saveWizardDraft();
       });
+
+      var existingWizardDraft = getWizardDraft();
+      if (existingWizardDraft) restoreWizardDraft(existingWizardDraft);
     })();
   </script>
 </body>

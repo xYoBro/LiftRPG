@@ -1413,7 +1413,8 @@ window.LiftRPGAPI = (function () {
     });
 
     function fragmentExists(ref) {
-      return fragmentIds[ref] || fragmentIdsNorm[normalizeId(ref)];
+      var nid = normalizeId(ref);
+      return fragmentIds[ref] || fragmentIdsNorm[nid] || allDocIds[nid] === 'overflow';
     }
 
     // ── Collect non-boss weeklyComponent values for boss verification ────────
@@ -1430,7 +1431,7 @@ window.LiftRPGAPI = (function () {
       // -- Sessions --
       (week.sessions || []).forEach(function (s, si) {
         if (s.fragmentRef && !fragmentExists(s.fragmentRef)) {
-          errors.push(wn + ' session ' + (si + 1) + ': fragmentRef "' + s.fragmentRef + '" not found in fragments[]');
+          errors.push(wn + ' session ' + (si + 1) + ': fragmentRef "' + s.fragmentRef + '" not found in fragments[] or overflowDocument IDs');
         }
         if (s.binaryChoice) {
           hasBinaryChoice = true;
@@ -1449,7 +1450,7 @@ window.LiftRPGAPI = (function () {
           errors.push(wn + ' oracle[' + ei + ']: type "fragment" missing fragmentRef');
         }
         if (entry.fragmentRef && !fragmentExists(entry.fragmentRef)) {
-          errors.push(wn + ' oracle[' + ei + ']: fragmentRef "' + entry.fragmentRef + '" not found in fragments[]');
+          errors.push(wn + ' oracle[' + ei + ']: fragmentRef "' + entry.fragmentRef + '" not found in fragments[] or overflowDocument IDs');
         }
       });
 
@@ -3003,15 +3004,20 @@ window.LiftRPGAPI = (function () {
     // ── Helper: collect all fragment IDs (soft-matching via normalizeId) ────
     var fragmentIdSet = {};     // exact ID → fragment
     var fragmentIdSetNorm = {}; // normalizeId(ID) → fragment
+    var overflowIdSetNorm = {}; // normalizeId(ID) → overflow document
     fragments.forEach(function (f) {
       if (f.id) {
         fragmentIdSet[f.id] = f;
         fragmentIdSetNorm[normalizeId(f.id)] = f;
       }
     });
+    weeks.forEach(function (week) {
+      var od = week && week.overflowDocument;
+      if (od && od.id) overflowIdSetNorm[normalizeId(od.id)] = od;
+    });
 
     function fragmentExistsQR(ref) {
-      return fragmentIdSet[ref] || fragmentIdSetNorm[normalizeId(ref)];
+      return fragmentIdSet[ref] || fragmentIdSetNorm[normalizeId(ref)] || overflowIdSetNorm[normalizeId(ref)];
     }
 
     // ── Continuity coherence ───────────────────────────────────────────────
