@@ -211,6 +211,14 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
     }));
 
     if (isBoss) {
+      const needsBossAppendix = shellFamily === 'classified-packet'
+        && week.bossEncounter
+        && (
+          !!week.bossEncounter.convergenceProof
+          || !!(week.bossEncounter.binaryChoiceAcknowledgement
+            && (week.bossEncounter.binaryChoiceAcknowledgement.ifA || week.bossEncounter.binaryChoiceAcknowledgement.ifB))
+        );
+
       // Boss encounter (right page)
       atoms.push(createAtom({
         type: 'boss-encounter',
@@ -223,6 +231,26 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         pageAffinity: 'right',
         data: { week, data, weekIndex: wi, totalWeeks },
       }));
+
+      if (needsBossAppendix) {
+        atoms.push(createAtom({
+          type: 'boss-encounter',
+          id: `w${wi}-boss-appendix`,
+          group: `week-${wi}-boss-appendix`,
+          section: 'body',
+          sequence: wi * 1000 + 101,
+          sizeHint: 'full-page',
+          pageAffinity: 'right',
+          data: {
+            week,
+            data,
+            weekIndex: wi,
+            totalWeeks,
+            continuationSegment: 'followup',
+            continuationLabel: 'Convergence Appendix',
+          },
+        }));
+      }
     } else {
       // Cipher panel
       if (week.weeklyComponent || (week.fieldOps && week.fieldOps.cipher)) {
@@ -288,6 +316,25 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
       if (profile.needsCompanionSpread && profile.companionComponents) {
         for (let ci = 0; ci < profile.companionComponents.length; ci++) {
           const comp = profile.companionComponents[ci];
+          const trackType = comp.type || comp.family || 'track';
+          const primaryTrack = Array.isArray(comp.tracks) && comp.tracks.length ? comp.tracks[0] : null;
+          const derivedSlots = Array.isArray(comp.slots)
+            ? comp.slots.length
+            : (typeof comp.slots === 'number' ? comp.slots : 0);
+          const derivedSegments = Number.isFinite(primaryTrack && primaryTrack.segments)
+            ? primaryTrack.segments
+            : (Number.isFinite(comp.maxValue) ? comp.maxValue : derivedSlots || 6);
+          const derivedStartValue = Number.isFinite(primaryTrack && primaryTrack.startValue)
+            ? primaryTrack.startValue
+            : (Number.isFinite(comp.currentValue)
+              ? comp.currentValue
+              : (Number.isFinite(comp.startValue) ? comp.startValue : 0));
+          const richBody = ['stress-track', 'token-sheet', 'overlay-window', 'memory-slots', 'inventory-grid', 'dashboard'].includes(trackType)
+            ? (comp.body || comp.description || '')
+            : (comp.body || '');
+          const guidance = ['stress-track', 'token-sheet', 'overlay-window', 'memory-slots', 'inventory-grid', 'dashboard'].includes(trackType)
+            ? (comp.instruction || comp.description || '')
+            : (comp.instruction || '');
           atoms.push(createAtom({
             type: 'tracker',
             id: `w${wi}-companion-${ci}`,
@@ -297,12 +344,24 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
             sizeHint: resolveTrackerSizeHint(artifactIdentity, comp),
             pageAffinity: 'either',
             data: {
-              trackType: comp.type || comp.family || 'track',
+              trackType,
               label: comp.label || comp.title || 'Component',
-              slots: comp.slots || 0,
-              instruction: comp.instruction || '',
-              segments: (comp.tracks && comp.tracks[0] && comp.tracks[0].segments) || comp.slots || 6,
-              startValue: (comp.tracks && comp.tracks[0] && comp.tracks[0].startValue) || 0,
+              title: comp.title || '',
+              subtitle: comp.subtitle || '',
+              body: richBody,
+              instruction: guidance,
+              slots: derivedSlots,
+              slotDefinitions: Array.isArray(comp.slots) ? comp.slots : [],
+              rows: comp.rows || 0,
+              cols: comp.cols || 0,
+              segments: derivedSegments,
+              startValue: derivedStartValue,
+              currentValue: Number.isFinite(comp.currentValue) ? comp.currentValue : derivedStartValue,
+              maxValue: Number.isFinite(comp.maxValue) ? comp.maxValue : derivedSegments,
+              tracks: Array.isArray(comp.tracks) ? comp.tracks : [],
+              tokens: Array.isArray(comp.tokens) ? comp.tokens : [],
+              windows: Array.isArray(comp.windows) ? comp.windows : [],
+              footprint: comp.footprint || '',
               weekIndex: wi,
               totalWeeks,
               artifactIdentity,

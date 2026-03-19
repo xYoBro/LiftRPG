@@ -45,6 +45,10 @@ function estimateBossHeight(data, density) {
   const normalizedDensity = Number.isFinite(density) ? density : 0.6;
   const week = (data || {}).week || {};
   const bookletData = (data || {}).data || {};
+  const continuationSegment = (data || {}).continuationSegment || '';
+  if (continuationSegment === 'followup') {
+    return FULL_PAGE_HEIGHT - normalizedDensity * 120;
+  }
   const overflowAllowance = BOSS_BASE_OVERFLOW + bossContentWeight(week, bookletData) * 22;
 
   return FULL_PAGE_HEIGHT + overflowAllowance - normalizedDensity * BOSS_MAX_SHRINK;
@@ -75,7 +79,11 @@ registerAtom('boss-encounter', {
     const layoutVariant = bossLayoutVariant(density);
 
     // buildBossPageModel(data, week, options)
-    const bossModel = buildBossPageModel(bookletData, week, layoutVariant);
+    const bossModel = buildBossPageModel(bookletData, week, {
+      layoutVariant,
+      continuationSegment: data.continuationSegment || 'full',
+      continuationLabel: data.continuationLabel || '',
+    });
     return renderBossPage(bossModel);
   },
 });

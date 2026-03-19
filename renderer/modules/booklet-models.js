@@ -260,19 +260,28 @@ export function buildRulesLeftPageModelWithVariant(data, layoutVariant) {
   const leftPage = (data.rulesSpread || {}).leftPage || {};
   const reEntry = leftPage.reEntryRule;
   const reEntryText = typeof reEntry === 'string' ? reEntry : reEntry && reEntry.ruleText;
+  const sections = (leftPage.sections || []).map(function (section) {
+    return {
+      ...section,
+      body: normalizeD100Language(section.body || section.text || ''),
+      text: normalizeD100Language(section.text || section.body || '')
+    };
+  });
+  const sectionTextLength = sections.reduce(function (sum, section) {
+    return sum + String(section.body || section.text || '').length;
+  }, 0);
+  const resolvedVariant = layoutVariant === 'standard'
+    && artifactIdentity.shellFamily === 'classified-packet'
+    && sectionTextLength > 520
+    ? 'dense'
+    : (layoutVariant || 'standard');
 
   return {
     meta,
     artifactIdentity,
-    layoutVariant: layoutVariant || 'standard',
+    layoutVariant: resolvedVariant,
     title: leftPage.title || artifactIdentity.copy.rulesTitle,
-    sections: (leftPage.sections || []).map(function (section) {
-      return {
-        ...section,
-        body: normalizeD100Language(section.body || section.text || ''),
-        text: normalizeD100Language(section.text || section.body || '')
-      };
-    }),
+    sections: sections,
     reEntryText: normalizeD100Language(reEntryText || ''),
     supportNote: 'No worries if you do not have dice. Ask Google to roll a d100.'
   };

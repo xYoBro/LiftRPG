@@ -38,6 +38,80 @@ function normalizeEntries(entries) {
   }));
 }
 
+function splitLongNarrativeParagraphs(paragraphs) {
+  var head = [];
+  var tail = [];
+
+  (paragraphs || []).forEach(function (paragraph, index) {
+    var text = String(paragraph || '').trim();
+    if (!text) return;
+
+    if (index > 0) {
+      tail.push(text);
+      return;
+    }
+
+    if (text.length <= 260) {
+      head.push(text);
+      return;
+    }
+
+    var sentences = text.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) || [text];
+    var first = '';
+    var remainder = [];
+    sentences.forEach(function (sentence) {
+      var clean = String(sentence || '').trim();
+      if (!clean) return;
+      if (!first) {
+        first = clean;
+        return;
+      }
+      if ((first + ' ' + clean).length <= 260) {
+        first += ' ' + clean;
+      } else {
+        remainder.push(clean);
+      }
+    });
+
+    head.push(first || text);
+    if (remainder.length) tail.push(remainder.join(' '));
+  });
+
+  return {
+    head: head,
+    tail: tail
+  };
+}
+
+function splitLongInstruction(text, maxLength) {
+  var value = String(text || '').trim();
+  if (!value || value.length <= maxLength) {
+    return { head: value, tail: '' };
+  }
+
+  var sentences = value.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) || [value];
+  var head = '';
+  var tail = [];
+  sentences.forEach(function (sentence) {
+    var clean = String(sentence || '').trim();
+    if (!clean) return;
+    if (!head) {
+      head = clean;
+      return;
+    }
+    if ((head + ' ' + clean).length <= maxLength) {
+      head += ' ' + clean;
+    } else {
+      tail.push(clean);
+    }
+  });
+
+  return {
+    head: head || value,
+    tail: tail.join(' ')
+  };
+}
+
 export function buildFieldOpsPageModels(data, week, layoutPlan = {}) {
   const fieldOps = week.fieldOps || {};
   const oracleTable = fieldOps.oracleTable || null;
@@ -95,7 +169,7 @@ export function buildBossPageModel(data, week, options = 'standard') {
   const boss = week.bossEncounter || {};
   const decodingKey = boss.decodingKey || {};
   const entry = options && typeof options === 'object' ? options : {};
-  const layoutVariant = typeof options === 'string' ? options : (entry.layoutVariant || 'standard');
+  const requestedLayoutVariant = typeof options === 'string' ? options : (entry.layoutVariant || 'standard');
   const continuationSegment = entry.continuationSegment || 'full';
   const isContinuation = continuationSegment === 'followup';
   const artifactIdentity = resolveArtifactIdentity(data || {});
@@ -104,6 +178,22 @@ export function buildBossPageModel(data, week, options = 'standard') {
     boss.convergenceProof
     || (boss.binaryChoiceAcknowledgement && (boss.binaryChoiceAcknowledgement.ifA || boss.binaryChoiceAcknowledgement.ifB))
   );
+  const layoutVariant = shellFamily === 'classified-packet' && hasConvergenceAppendix
+    ? 'tight'
+    : requestedLayoutVariant;
+  const narrativeParagraphs = splitParagraphs(boss.narrative || '');
+  const splitNarrative = splitLongNarrativeParagraphs(narrativeParagraphs);
+  const mechanismParagraphs = splitParagraphs(boss.mechanismDescription || '');
+  const splitInstruction = splitLongInstruction(decodingKey.instruction || '', 170);
+  const continuationAppendixParagraphs = hasConvergenceAppendix
+    ? []
+    : splitParagraphs(boss.convergenceProof || '');
+  if (hasConvergenceAppendix) {
+    continuationAppendixParagraphs.push.apply(continuationAppendixParagraphs, splitNarrative.tail);
+    if (splitInstruction.tail) continuationAppendixParagraphs.push(splitInstruction.tail);
+    continuationAppendixParagraphs.push.apply(continuationAppendixParagraphs, mechanismParagraphs.slice(1));
+    continuationAppendixParagraphs.push.apply(continuationAppendixParagraphs, splitParagraphs(boss.convergenceProof || ''));
+  }
 
   return {
     layoutVariant,
@@ -115,9 +205,9 @@ export function buildBossPageModel(data, week, options = 'standard') {
     title: isContinuation
       ? ((boss.title || week.title || 'Convergence') + ' — Continued')
       : (boss.title || week.title || 'Convergence'),
-    narrativeParagraphs: isContinuation ? [] : splitParagraphs(boss.narrative || ''),
-    mechanismParagraphs: isContinuation ? [] : splitParagraphs(boss.mechanismDescription || ''),
-    decodingInstruction: isContinuation ? '' : (decodingKey.instruction || ''),
+    narrativeParagraphs: isContinuation ? [] : (hasConvergenceAppendix ? splitNarrative.head : narrativeParagraphs),
+    mechanismParagraphs: isContinuation ? [] : (hasConvergenceAppendix ? mechanismParagraphs.slice(0, 1) : mechanismParagraphs),
+    decodingInstruction: isContinuation ? '' : (hasConvergenceAppendix ? splitInstruction.head : (decodingKey.instruction || '')),
     decodingTable: isContinuation ? '' : (decodingKey.referenceTable || ''),
     componentInputs: isContinuation ? [] : (boss.componentInputs || []).map((item, index) => ({
       weekLabel: 'W' + pad2(index + 1),
@@ -128,7 +218,7 @@ export function buildBossPageModel(data, week, options = 'standard') {
     passwordRevealInstruction: boss.passwordRevealInstruction || 'When the final word is assembled, enter it at liftrpg.co to unlock the ending.',
     passwordLength: getPasswordLength(data, (boss.componentInputs || []).length || 6),
     convergenceProof: (!isContinuation && hasConvergenceAppendix) ? '' : (boss.convergenceProof || ''),
-    convergenceProofParagraphs: isContinuation ? splitParagraphs(boss.convergenceProof || '') : [],
+    convergenceProofParagraphs: isContinuation ? continuationAppendixParagraphs : [],
     binaryChoiceAcknowledgement: isContinuation ? (boss.binaryChoiceAcknowledgement || null) : null
   };
 }

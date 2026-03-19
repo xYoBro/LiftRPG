@@ -63,6 +63,25 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+function splitSentences(text) {
+  return String(text || '')
+    .match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g)
+    ?.map((sentence) => sentence.trim())
+    .filter(Boolean) || [];
+}
+
+function extractThresholdNotes(text) {
+  return splitSentences(text).filter((sentence) => /^at\s+\d+/i.test(sentence)).slice(0, 3);
+}
+
+function buildDossierLines(count) {
+  const container = make('div', 'companion-dossier-lines');
+  for (let index = 0; index < count; index += 1) {
+    container.appendChild(make('div', 'companion-dossier-line'));
+  }
+  return container;
+}
+
 // ---------------------------------------------------------------------------
 // Generic visual builders (gauge, clock, track, tally)
 // ---------------------------------------------------------------------------
@@ -234,6 +253,34 @@ function buildDashboard(data) {
 function buildStressTrack(data) {
   const segments = clamp(data.segments || data.slots || 8, 1, 16);
   const startValue = clamp(data.startValue || 0, 0, segments);
+  const shellFamily = ((data.artifactIdentity || {}).shellFamily || '').toLowerCase();
+  const thresholdNotes = extractThresholdNotes(data.instruction || data.body || '');
+
+  if (shellFamily === 'classified-packet') {
+    const board = make('div', 'companion-track companion-track-dossier');
+    const boxes = make('div', 'companion-track-boxes companion-track-boxes-large');
+    for (let i = 0; i < segments; i += 1) {
+      const box = make('div', 'companion-track-box companion-track-box-large');
+      box.dataset.index = String(i + 1);
+      if (i < startValue) box.dataset.filled = 'true';
+      box.appendChild(make('div', 'companion-track-index', String(i + 1).padStart(2, '0')));
+      box.appendChild(make('div', 'companion-track-mark'));
+      boxes.appendChild(box);
+    }
+    board.appendChild(boxes);
+
+    if (thresholdNotes.length) {
+      const noteList = make('div', 'companion-threshold-list');
+      thresholdNotes.forEach((note) => {
+        noteList.appendChild(make('div', 'companion-threshold-note', note));
+      });
+      board.appendChild(noteList);
+    }
+    board.appendChild(buildDossierLines(thresholdNotes.length ? 2 : 3));
+
+    return board;
+  }
+
   const track = make('div', 'companion-track');
   const boxes = make('div', 'companion-track-boxes');
   for (let i = 0; i < segments; i++) {
@@ -286,7 +333,35 @@ function buildUsageDie() {
 }
 
 function buildTokenSheet(data) {
-  const total = Math.max(4, (data.rows || 2) * (data.cols || 4), data.slots || 0);
+  const shellFamily = ((data.artifactIdentity || {}).shellFamily || '').toLowerCase();
+  const rows = Number.isFinite(data.rows) && data.rows > 0 ? data.rows : 0;
+  const cols = Number.isFinite(data.cols) && data.cols > 0 ? data.cols : 0;
+  const total = Math.max(4, (rows && cols) ? rows * cols : 0, data.slots || data.maxValue || 0);
+  const currentValue = clamp(data.currentValue || data.startValue || 0, 0, total);
+  const bodySentences = splitSentences(data.body || data.instruction || '').slice(0, 5);
+
+  if (shellFamily === 'classified-packet' && total <= 6) {
+    const ladder = make('div', 'companion-level-ladder');
+    for (let index = 0; index < total; index += 1) {
+      const card = make('div', 'companion-level-card');
+      if (index < currentValue) card.dataset.active = 'true';
+      card.appendChild(make('div', 'companion-level-kicker', 'Access Tier'));
+      card.appendChild(make('div', 'companion-level-label', 'Level ' + String(index + 1).padStart(2, '0')));
+      card.appendChild(make('div', 'companion-level-status', index < currentValue ? 'Current / cleared' : 'Locked'));
+      ladder.appendChild(card);
+    }
+
+    if (!data.body && bodySentences.length) {
+      const annotations = make('div', 'companion-level-notes');
+      bodySentences.forEach((sentence) => {
+        annotations.appendChild(make('div', 'companion-threshold-note', sentence));
+      });
+      ladder.appendChild(annotations);
+    }
+
+    return ladder;
+  }
+
   const grid = make('div', 'companion-token-sheet');
   for (let i = 0; i < total; i += 1) {
     const item = make('div', 'companion-token');
@@ -323,7 +398,10 @@ function renderCompanionComponent(data) {
   if (data.label) {
     el.appendChild(make('div', 'companion-title', data.label));
   }
-  if (data.instruction) {
+  if (data.body) {
+    el.appendChild(make('div', 'companion-body', data.body));
+  }
+  if (data.instruction && data.instruction !== data.body) {
     el.appendChild(make('div', 'companion-reminder', data.instruction));
   }
 

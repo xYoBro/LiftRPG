@@ -33,14 +33,13 @@ function renderClassifiedRulesCallout(model) {
   const wrap = make('aside', 'rules-sidecar');
   wrap.appendChild(make('div', 'doc-label', 'Packet Handling'));
   [
-    'Read the procedure text before opening any weekly record.',
-    'Treat empty logs and redacted forms as authored evidence, not filler.',
-    'Do not unseal the annex until the packet ledger fully reconciles.',
+    'Read the procedure before opening any weekly record.',
+    'Treat redactions as evidence. Do not unseal the annex until the packet ledger reconciles.',
   ].forEach((item) => {
     wrap.appendChild(make('div', 'rules-sidecar-item', item));
   });
-  if (model.meta && model.meta.weeklyComponentLabel) {
-    wrap.appendChild(make('div', 'rules-sidecar-chip', model.meta.weeklyComponentLabel));
+  if (model.supportNote) {
+    wrap.appendChild(make('div', 'rules-sidecar-item', model.supportNote));
   }
   return wrap;
 }
@@ -266,24 +265,30 @@ export function renderRulesLeftPage(model) {
 
   const body = make('div', 'rules-body');
   (model.sections || []).forEach((section) => {
-    body.appendChild(make('h3', '', section.heading || 'Procedure'));
+    const block = make('section', 'rules-section');
+    block.appendChild(make('h3', '', section.heading || 'Procedure'));
     splitRichText(section.body || section.text).forEach((para) => {
-      body.appendChild(make('p', '', para));
+      block.appendChild(make('p', '', para));
     });
+    body.appendChild(block);
   });
 
   if (model.reEntryText) {
-    body.appendChild(make('h3', '', 'Re-entry Procedure'));
+    const block = make('section', 'rules-section');
+    block.appendChild(make('h3', '', 'Re-entry Procedure'));
     splitRichText(model.reEntryText).forEach((para) => {
-      body.appendChild(make('p', '', para));
+      block.appendChild(make('p', '', para));
     });
+    body.appendChild(block);
   }
 
-  if (model.supportNote) {
-    body.appendChild(make('h3', '', 'Roll Support'));
+  if (model.supportNote && !(model.artifactIdentity && model.artifactIdentity.shellFamily === 'classified-packet')) {
+    const block = make('section', 'rules-section');
+    block.appendChild(make('h3', '', 'Roll Support'));
     splitRichText(model.supportNote).forEach((para) => {
-      body.appendChild(make('p', '', para));
+      block.appendChild(make('p', '', para));
     });
+    body.appendChild(block);
   }
 
   frame.appendChild(body);

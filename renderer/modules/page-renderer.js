@@ -285,7 +285,8 @@ function renderMechanicPage(placements, planIndex) {
 
   const companionPlacements = placements.filter((placement) => placement.type === 'tracker');
   const briefing = buildMechanicBriefing(artifactIdentity, placements);
-  if (briefing && (surfacePlacements.length <= 1 || companionPlacements.length > 0)) {
+  const isSoloCompanionPage = surfacePlacements.length === 0 && companionPlacements.length === 1;
+  if (briefing && !isSoloCompanionPage && (surfacePlacements.length <= 1 || companionPlacements.length > 0)) {
     frame.appendChild(briefing);
   }
 
