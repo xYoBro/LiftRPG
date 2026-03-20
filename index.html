@@ -700,6 +700,153 @@
       color: var(--muted);
     }
 
+    .wizard-state-board {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(24, 23, 20, .08);
+      display: grid;
+      gap: 10px;
+    }
+
+    .wizard-state-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .wizard-state-card {
+      border: 1px solid rgba(24, 23, 20, .08);
+      background: rgba(255, 255, 255, .48);
+      padding: 10px 11px;
+      min-height: 86px;
+    }
+
+    .wizard-state-label {
+      font-family: var(--mono);
+      font-size: 5.6pt;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .wizard-state-value {
+      font-family: var(--display);
+      font-size: 11.5pt;
+      line-height: 1.14;
+      color: var(--ink);
+      margin-bottom: 5px;
+    }
+
+    .wizard-state-caption {
+      font-size: 6pt;
+      line-height: 1.6;
+      letter-spacing: .02em;
+      color: var(--muted);
+    }
+
+    .wizard-stage-ledger {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .wizard-stage-item {
+      border: 1px solid rgba(24, 23, 20, .08);
+      background: rgba(255, 255, 255, .36);
+      padding: 9px 10px;
+      display: grid;
+      gap: 7px;
+      min-height: 92px;
+    }
+
+    .wizard-stage-item.is-current {
+      border-color: rgba(191, 106, 79, .28);
+      box-shadow: inset 0 0 0 1px rgba(191, 106, 79, .12);
+      background: rgba(255, 250, 246, .72);
+    }
+
+    .wizard-stage-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .wizard-stage-name {
+      font-family: var(--mono);
+      font-size: 5.8pt;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+
+    .wizard-status-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 18px;
+      padding: 0 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(24, 23, 20, .12);
+      background: rgba(24, 23, 20, .05);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 5.4pt;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .wizard-status-chip.is-valid,
+    .wizard-stage-item.is-valid {
+      border-color: rgba(24, 23, 20, .12);
+    }
+
+    .wizard-status-chip.is-valid {
+      background: rgba(24, 23, 20, .92);
+      color: var(--paper);
+    }
+
+    .wizard-status-chip.is-in-progress {
+      background: rgba(191, 106, 79, .12);
+      border-color: rgba(191, 106, 79, .24);
+      color: var(--accent);
+    }
+
+    .wizard-status-chip.is-drafted {
+      background: rgba(140, 116, 94, .12);
+      border-color: rgba(140, 116, 94, .18);
+      color: var(--ink);
+    }
+
+    .wizard-status-chip.is-needs-review,
+    .wizard-status-chip.is-invalidated {
+      background: rgba(191, 106, 79, .1);
+      border-color: rgba(191, 106, 79, .3);
+      color: var(--accent);
+    }
+
+    .wizard-status-chip.is-not-needed,
+    .wizard-status-chip.is-empty {
+      background: rgba(24, 23, 20, .04);
+      color: var(--muted);
+    }
+
+    .wizard-stage-detail {
+      font-size: 6.4pt;
+      line-height: 1.6;
+      color: var(--ink);
+    }
+
+    .wizard-stage-meta {
+      font-family: var(--mono);
+      font-size: 5.6pt;
+      letter-spacing: .06em;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
     .wizard-draft-row {
       margin-top: 8px;
       padding-top: 8px;
@@ -964,6 +1111,11 @@
 
     /* ── Responsive ────────────────── */
     @media (max-width:520px) {
+      .wizard-state-grid,
+      .wizard-stage-ledger {
+        grid-template-columns: 1fr;
+      }
+
       .card {
         padding: 24px 20px;
       }
@@ -1108,6 +1260,26 @@
           <div class="wizard-current-help" id="wiz-current-help">Copy the prompt into your LLM, paste back only the JSON, then continue to Campaign.</div>
           <div class="wizard-locked-in" id="wiz-locked-in">Nothing locked in yet.</div>
           <div class="wizard-recovery-note" id="wiz-recovery-note">If a step fails validation, use the repair prompt shown below that step and repaste only that stage.</div>
+          <div class="wizard-state-board">
+            <div class="wizard-state-grid">
+              <div class="wizard-state-card">
+                <div class="wizard-state-label">Pipeline State</div>
+                <div class="wizard-state-value" id="wiz-state-summary">Waiting for Layer Bible</div>
+                <div class="wizard-state-caption" id="wiz-state-summary-caption">Nothing is locked in yet.</div>
+              </div>
+              <div class="wizard-state-card">
+                <div class="wizard-state-label">Current Target</div>
+                <div class="wizard-state-value" id="wiz-state-target">Layer Bible</div>
+                <div class="wizard-state-caption" id="wiz-state-target-caption">Paste the first validated stage to unlock Campaign.</div>
+              </div>
+              <div class="wizard-state-card">
+                <div class="wizard-state-label">Pipeline Progress</div>
+                <div class="wizard-state-value" id="wiz-state-progress">0 / 6 locked</div>
+                <div class="wizard-state-caption" id="wiz-state-progress-caption">Weeks 0/0 · Fragments 0/0 · Assembly not ready.</div>
+              </div>
+            </div>
+            <div class="wizard-stage-ledger" id="wiz-stage-ledger"></div>
+          </div>
           <div class="wizard-stage-health" id="wiz-stage-health">Stages: no validated stages yet.</div>
           <div class="wizard-build-meta" id="wiz-build-meta">Build: pending.</div>
           <div class="wizard-draft-row">
@@ -1315,6 +1487,13 @@
       var wizCurrentHelp = document.getElementById('wiz-current-help');
       var wizLockedIn = document.getElementById('wiz-locked-in');
       var wizRecoveryNote = document.getElementById('wiz-recovery-note');
+      var wizStateSummary = document.getElementById('wiz-state-summary');
+      var wizStateSummaryCaption = document.getElementById('wiz-state-summary-caption');
+      var wizStateTarget = document.getElementById('wiz-state-target');
+      var wizStateTargetCaption = document.getElementById('wiz-state-target-caption');
+      var wizStateProgress = document.getElementById('wiz-state-progress');
+      var wizStateProgressCaption = document.getElementById('wiz-state-progress-caption');
+      var wizStageLedger = document.getElementById('wiz-stage-ledger');
       var wizStageHealth = document.getElementById('wiz-stage-health');
       var wizBuildMeta = document.getElementById('wiz-build-meta');
       var wizDraftStatus = document.getElementById('wiz-draft-status');
@@ -1519,13 +1698,294 @@
         ];
       }
 
+      function formatStatusLabel(status) {
+        var value = String(status || 'empty');
+        if (value === 'in progress') return 'In Progress';
+        if (value === 'needs review') return 'Needs Review';
+        if (value === 'not needed') return 'Not Needed';
+        if (value === 'drafted') return 'Drafted';
+        if (value === 'valid') return 'Locked';
+        if (value === 'invalidated') return 'Invalidated';
+        return value.charAt(0).toUpperCase() + value.slice(1);
+      }
+
+      function getStatusTone(status) {
+        var value = String(status || 'empty').toLowerCase().replace(/\s+/g, '-');
+        if (value === 'valid') return 'is-valid';
+        if (value === 'in-progress') return 'is-in-progress';
+        if (value === 'drafted') return 'is-drafted';
+        if (value === 'needs-review') return 'is-needs-review';
+        if (value === 'invalidated') return 'is-invalidated';
+        if (value === 'not-needed') return 'is-not-needed';
+        return 'is-empty';
+      }
+
+      function getWeekChunkLabel(chunkIndex) {
+        var chunk = (wizState.weekChunks || [])[chunkIndex];
+        if (!chunk || !chunk.length) return 'week chunk';
+        return chunk.length === 1
+          ? 'Week ' + chunk[0]
+          : 'Weeks ' + chunk[0] + '-' + chunk[chunk.length - 1];
+      }
+
+      function getFragmentBatchLabel(batchIndex) {
+        var batch = (wizState.fragmentBatches || [])[batchIndex];
+        if (!batch || !batch.weekNumbers || !batch.weekNumbers.length) return 'fragment batch';
+        return batch.weekNumbers.length === 1
+          ? 'Week ' + batch.weekNumbers[0]
+          : 'Weeks ' + batch.weekNumbers[0] + '-' + batch.weekNumbers[batch.weekNumbers.length - 1];
+      }
+
+      function getStageDetail(item) {
+        if (!item) return '';
+        if (item.status === 'invalidated') {
+          return item.reason || 'An upstream change invalidated this stage. Rebuild it before export.';
+        }
+        if (item.status === 'needs review') {
+          return item.reason || 'An upstream change may have broken continuity here. Review and revalidate this stage.';
+        }
+        if (item.label === 'Layer Bible') {
+          if (item.status === 'valid') return 'World contract, institution, and design ledger are locked.';
+          if (item.status === 'drafted') return 'Prompt is out. Waiting for validated planning JSON.';
+          return 'Foundation stage. Nothing downstream can lock until this is validated.';
+        }
+        if (item.label === 'Campaign') {
+          var weekCount = Array.isArray((wizData.campaignPlan || {}).weeks) ? wizData.campaignPlan.weeks.length : 0;
+          var fragmentCount = Array.isArray((wizData.campaignPlan || {}).fragmentRegistry) ? wizData.campaignPlan.fragmentRegistry.length : 0;
+          if (item.status === 'valid') return weekCount + ' weeks planned · ' + fragmentCount + ' fragment IDs assigned.';
+          if (item.status === 'drafted') return 'Awaiting the week arc, fragment registry, and boss convergence plan.';
+          return 'Defines the week map, fragment registry, and boss logic.';
+        }
+        if (item.label === 'Shell') {
+          var shellFamily = (((wizData.shell || {}).meta || {}).artifactIdentity || {}).shellFamily;
+          if (item.status === 'valid') return 'Shell locked' + (shellFamily ? ' · ' + shellFamily : '') + '.';
+          if (item.status === 'drafted') return 'Awaiting meta, cover, rules spread, and theme JSON.';
+          return 'Renderer-facing identity: title, cover, rules, theme, artifact contract.';
+        }
+        if (item.label === 'Weeks') {
+          var planned = (wizState.weekChunks || []).length;
+          var done = (wizData.weekChunkOutputs || []).length;
+          if (item.status === 'valid') return done + ' of ' + planned + ' chunks validated.';
+          if (item.status === 'in progress') return done + ' of ' + planned + ' chunks validated · active: ' + getWeekChunkLabel(wizState.weekChunkIndex) + '.';
+          return planned > 0 ? planned + ' chunks planned. Nothing validated yet.' : 'Week chunks will appear after Shell is locked.';
+        }
+        if (item.label === 'Fragments') {
+          var batches = (wizState.fragmentBatches || []).length;
+          var completed = (wizState.fragmentBatchOutputs || []).length;
+          if (item.status === 'not needed') return 'No fragment batches are required for this campaign plan.';
+          if (item.status === 'valid') return completed + ' of ' + batches + ' batches validated.';
+          if (item.status === 'in progress') return completed + ' of ' + batches + ' batches validated · active: ' + getFragmentBatchLabel(wizState.fragmentBatchIndex) + '.';
+          return batches > 0 ? batches + ' fragment batches planned. None validated yet.' : 'Fragment batching becomes available after Weeks are validated.';
+        }
+        if (item.label === 'Endings') {
+          if (item.status === 'valid') return 'Ending subtree is ready for local assembly.';
+          if (item.status === 'drafted') return 'Awaiting the final endings JSON before assembly.';
+          return 'Final narrative payoff. Assembly unlocks after this stage validates.';
+        }
+        return item.reason || '';
+      }
+
+      function getStageMeta(item) {
+        if (!item) return '';
+        if (item.status === 'invalidated') return 'Rebuild required before downstream assembly can pass.';
+        if (item.status === 'needs review') return 'Review required because an upstream dependency changed.';
+        if (item.reason) return item.reason;
+        if (item.label === 'Weeks') {
+          return 'Chunking keeps repairs local and preserves earlier validated weeks.';
+        }
+        if (item.label === 'Fragments') {
+          return 'Batches preserve document voice and cross-reference continuity.';
+        }
+        if (item.label === 'Endings') {
+          return 'Assembly and quality gating happen on-device after this step.';
+        }
+        return formatStatusLabel(item.status);
+      }
+
+      function getStageAction(item) {
+        if (!item) return null;
+        if (item.label === 'Layer Bible') {
+          return {
+            stageLabel: item.label,
+            title: item.status === 'needs review' ? 'Review Layer Bible' : 'Validate Layer Bible',
+            detail: item.reason || 'Paste the first approved planning JSON to unlock Campaign.'
+          };
+        }
+        if (item.label === 'Campaign') {
+          return {
+            stageLabel: item.label,
+            title: item.status === 'needs review' ? 'Review Campaign Plan' : 'Validate Campaign Plan',
+            detail: item.reason || 'Lock the week arc, fragment registry, and boss plan before building the shell.'
+          };
+        }
+        if (item.label === 'Shell') {
+          return {
+            stageLabel: item.label,
+            title: item.status === 'needs review' ? 'Review Shell' : 'Validate Shell',
+            detail: item.reason || 'Lock title, cover, rules, theme, and shell identity before generating weeks.'
+          };
+        }
+        if (item.label === 'Weeks') {
+          return {
+            stageLabel: item.label,
+            title: item.status === 'invalidated' ? 'Regenerate Weeks' : 'Validate ' + getWeekChunkLabel(wizState.weekChunkIndex),
+            detail: item.reason || 'Earlier week chunks stay locked while the active chunk is repaired or approved.'
+          };
+        }
+        if (item.label === 'Fragments') {
+          return {
+            stageLabel: item.label,
+            title: item.status === 'invalidated' ? 'Regenerate Fragments' : 'Validate ' + getFragmentBatchLabel(wizState.fragmentBatchIndex),
+            detail: item.reason || 'Only the current fragment batch is mutable; prior batches stay locked.'
+          };
+        }
+        if (item.label === 'Endings') {
+          return {
+            stageLabel: item.label,
+            title: item.status === 'invalidated' ? 'Regenerate Endings' : 'Validate Endings',
+            detail: item.reason || 'Paste the final endings subtree so local assembly can run.'
+          };
+        }
+        return null;
+      }
+
+      function getNextAction(items) {
+        items = Array.isArray(items) ? items : getStageHealthItems();
+        var flagged = items.find(function (item) {
+          return item.status === 'invalidated' || item.status === 'needs review';
+        });
+        if (flagged) {
+          return getStageAction(flagged);
+        }
+        var drafted = items.find(function (item) {
+          return item.status === 'drafted';
+        });
+        if (drafted) {
+          return getStageAction(drafted);
+        }
+        if (!wizData.layerBible) {
+          return {
+            stageLabel: 'Layer Bible',
+            title: 'Validate Layer Bible',
+            detail: 'Paste the first approved planning JSON to unlock Campaign.'
+          };
+        }
+        if (!wizData.campaignPlan) {
+          return {
+            stageLabel: 'Campaign',
+            title: 'Validate Campaign Plan',
+            detail: 'Lock the week arc, fragment registry, and boss plan before building the shell.'
+          };
+        }
+        if (!wizData.shell) {
+          return {
+            stageLabel: 'Shell',
+            title: 'Validate Shell',
+            detail: 'Lock title, cover, rules, theme, and shell identity before generating weeks.'
+          };
+        }
+        if ((wizData.weekChunkOutputs || []).length < (wizState.weekChunks || []).length) {
+          return {
+            stageLabel: 'Weeks',
+            title: 'Validate ' + getWeekChunkLabel(wizState.weekChunkIndex),
+            detail: 'Earlier week chunks stay locked while the active chunk is repaired or approved.'
+          };
+        }
+        var fragmentRegistryCount = Array.isArray((wizData.campaignPlan || {}).fragmentRegistry) ? wizData.campaignPlan.fragmentRegistry.length : 0;
+        if (fragmentRegistryCount > 0 && (wizState.fragmentBatchOutputs || []).length < (wizState.fragmentBatches || []).length) {
+          return {
+            stageLabel: 'Fragments',
+            title: 'Validate ' + getFragmentBatchLabel(wizState.fragmentBatchIndex),
+            detail: 'Only the current fragment batch is mutable; prior batches stay locked.'
+          };
+        }
+        if (!wizData.endingsOutput) {
+          return {
+            stageLabel: 'Endings',
+            title: 'Validate Endings',
+            detail: 'Paste the final endings subtree so local assembly can run.'
+          };
+        }
+        return {
+          stageLabel: 'Endings',
+          title: 'Assemble Booklet',
+          detail: 'All generation stages are locked. Run local validation and export when ready.'
+        };
+      }
+
+      function getPipelineSummary(items) {
+        var lockedCount = items.filter(function (item) {
+          return item.status === 'valid' || item.status === 'not needed';
+        }).length;
+        var weekChunksPlanned = (wizState.weekChunks || []).length;
+        var weekChunksDone = (wizData.weekChunkOutputs || []).length;
+        var fragmentBatchesPlanned = (wizState.fragmentBatches || []).length;
+        var fragmentBatchesDone = (wizState.fragmentBatchOutputs || []).length;
+        var hasInvalidation = items.some(function (item) {
+          return item.status === 'invalidated' || item.status === 'needs review';
+        });
+        var hasDraft = items.some(function (item) {
+          return item.status === 'drafted';
+        });
+        var hasWork = lockedCount > 0;
+        var nextAction = getNextAction(items);
+        var stateTitle = hasInvalidation
+          ? 'Needs Regeneration'
+          : wizData.endingsOutput
+            ? 'Ready To Assemble'
+            : hasDraft
+              ? 'Awaiting Validation'
+              : hasWork
+                ? 'In Progress'
+                : 'Waiting To Start';
+        var stateCaption = hasInvalidation
+          ? nextAction.detail
+          : nextAction.detail;
+        return {
+          lockedCount: lockedCount,
+          stateTitle: stateTitle,
+          stateCaption: stateCaption,
+          progressTitle: lockedCount + ' / ' + items.length + ' locked',
+          progressCaption: 'Weeks ' + weekChunksDone + '/' + weekChunksPlanned +
+            ' · Fragments ' + fragmentBatchesDone + '/' + fragmentBatchesPlanned +
+            ' · ' + (wizData.endingsOutput ? 'Assembly ready.' : 'Assembly not ready.')
+        };
+      }
+
+      function renderStageLedger(items, nextAction) {
+        if (!wizStageLedger) return;
+        var activeLabel = nextAction && nextAction.stageLabel ? nextAction.stageLabel : '';
+        wizStageLedger.innerHTML = items.map(function (item) {
+          var tone = getStatusTone(item.status);
+          var currentClass = item.label === activeLabel ? ' is-current' : '';
+          return '' +
+            '<div class="wizard-stage-item ' + tone + currentClass + '">' +
+              '<div class="wizard-stage-head">' +
+                '<div class="wizard-stage-name">' + escapeForHtml(item.label) + '</div>' +
+                '<div class="wizard-status-chip ' + tone + '">' + escapeForHtml(formatStatusLabel(item.status)) + '</div>' +
+              '</div>' +
+              '<div class="wizard-stage-detail">' + escapeForHtml(getStageDetail(item)) + '</div>' +
+              '<div class="wizard-stage-meta">' + escapeForHtml(getStageMeta(item)) + '</div>' +
+            '</div>';
+        }).join('');
+      }
+
       function updateStageHealth() {
         var items = getStageHealthItems();
+        var summary = getPipelineSummary(items);
+        var nextAction = getNextAction(items);
         if (wizStageHealth) {
           wizStageHealth.textContent = 'Stages: ' + items.map(function (item) {
             return item.label + ' ' + item.status;
           }).join(' • ');
         }
+        if (wizStateSummary) wizStateSummary.textContent = summary.stateTitle;
+        if (wizStateSummaryCaption) wizStateSummaryCaption.textContent = summary.stateCaption;
+        if (wizStateTarget) wizStateTarget.textContent = nextAction.title;
+        if (wizStateTargetCaption) wizStateTargetCaption.textContent = nextAction.detail;
+        if (wizStateProgress) wizStateProgress.textContent = summary.progressTitle;
+        if (wizStateProgressCaption) wizStateProgressCaption.textContent = summary.progressCaption;
+        renderStageLedger(items, nextAction);
         wizNums.forEach(function (num, index) {
           var item = items[index];
           if (!item) return;
