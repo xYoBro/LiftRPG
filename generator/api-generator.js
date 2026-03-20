@@ -30,38 +30,44 @@ window.LiftRPGAPI = (function () {
       label: 'Claude (Anthropic)',
       baseUrl: 'https://api.anthropic.com',
       defaultModel: 'claude-opus-4-6',
-      format: 'anthropic'
+      format: 'anthropic',
+      modelDiscovery: 'anthropic'
     },
     openai: {
       label: 'OpenAI',
       baseUrl: 'https://api.openai.com/v1',
       defaultModel: 'gpt-4o',
-      format: 'openai'
+      format: 'openai',
+      modelDiscovery: 'openai'
     },
     groq: {
       label: 'Groq',
       baseUrl: 'https://api.groq.com/openai/v1',
       defaultModel: 'llama-3.3-70b-versatile',
-      format: 'openai'
+      format: 'openai',
+      modelDiscovery: 'openai'
     },
     ollama: {
       label: 'Ollama (local)',
       baseUrl: 'http://localhost:11434/v1',
       defaultModel: 'llama3.2',
       format: 'openai',
+      modelDiscovery: 'ollama',
       noKey: true
     },
     gemini: {
       label: 'Google Gemini',
       baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
       defaultModel: 'gemini-2.5-pro-preview',
-      format: 'openai'
+      format: 'openai',
+      modelDiscovery: 'gemini'
     },
     custom: {
       label: 'Custom (OpenAI-compatible)',
       baseUrl: '',
       defaultModel: '',
-      format: 'openai'
+      format: 'openai',
+      modelDiscovery: 'openai'
     }
   };
 
@@ -85,6 +91,186 @@ window.LiftRPGAPI = (function () {
         throw err;
       })
       .finally(function () { clearTimeout(timer); });
+  }
+
+  function normalizeUrl(url) {
+    return String(url || '').replace(/\/+$/, '');
+  }
+
+  function fetchJsonWithTimeout(url, options, timeoutMs) {
+    return fetchWithTimeout(url, options, timeoutMs).then(async function (resp) {
+      var text = await resp.text();
+      if (!resp.ok) {
+        throw new Error('Provider returned ' + resp.status + ' for ' + url + ': ' + text);
+      }
+      try {
+        return JSON.parse(text);
+      } catch (error) {
+        throw new Error('Provider returned invalid JSON for ' + url + '.');
+      }
+    });
+  }
+
+  function uniqueStrings(values) {
+    var seen = Object.create(null);
+    return (values || []).map(function (value) {
+      return String(value || '').trim();
+    }).filter(Boolean).filter(function (value) {
+      if (seen[value]) return false;
+      seen[value] = true;
+      return true;
+    });
+  }
+
+  function isLikelyGenerationModel(modelId) {
+    var lower = String(modelId || '').toLowerCase();
+    if (!lower) return false;
+    if (/(?:^|[-_/])(embedding|embeddings)(?:[-_/]|$)/.test(lower)) return false;
+    if (/(?:^|[-_/])(tts|speech|whisper|transcribe|translate)(?:[-_/]|$)/.test(lower)) return false;
+    if (/(?:^|[-_/])(moderation|omni-moderation)(?:[-_/]|$)/.test(lower)) return false;
+    if (/(?:^|[-_/])(image|images|dall-e)(?:[-_/]|$)/.test(lower)) return false;
+    return true;
+  }
+
+  function normalizeModelIds(values) {
+    return uniqueStrings(values).filter(isLikelyGenerationModel);
+  }
+
+  function buildOpenAICompatModelsUrl(baseUrl) {
+    return normalizeUrl(baseUrl) + '/models';
+  }
+
+  function buildOllamaTagsUrl(baseUrl) {
+    var normalized = normalizeUrl(baseUrl || PROVIDERS.ollama.baseUrl);
+    if (/\/api\/tags$/i.test(normalized)) return normalized;
+    if (/\/api$/i.test(normalized)) return normalized + '/tags';
+    if (/\/v1$/i.test(normalized)) return normalized.replace(/\/v1$/i, '') + '/api/tags';
+    return normalized + '/api/tags';
+  }
+
+  function buildGeminiNativeModelsUrl() {
+    return 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000';
+  }
+
+  // Model discovery keeps the BYOK surface current without bloating the
+  // generation prompts. We ask providers for the latest model IDs at setup
+  // time, but still allow manual entry when a provider's catalog is partial.
+  async function listOpenAICompatModels(apiKey, baseUrl, timeoutMs) {
+    if (!baseUrl) throw new Error('Base URL is required to load models.');
+    var headers = { 'content-type': 'application/json' };
+    if (apiKey) headers.Authorization = 'Bearer ' + apiKey;
+    var body = await fetchJsonWithTimeout(buildOpenAICompatModelsUrl(baseUrl), {
+      method: 'GET',
+      headers: headers
+    }, timeoutMs);
+    return {
+      models: normalizeModelIds((body.data || []).map(function (entry) { return entry && entry.id; })),
+      source: 'openai-models'
+    };
+  }
+
+  async function listAnthropicModels(apiKey, timeoutMs) {
+    if (!apiKey) throw new Error('API key required to load Anthropic models.');
+    var body = await fetchJsonWithTimeout('https://api.anthropic.com/v1/models?limit=1000', {
+      method: 'GET',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'content-type': 'application/json'
+      }
+    }, timeoutMs);
+    return {
+      models: uniqueStrings((body.data || []).map(function (entry) { return entry && entry.id; })),
+      source: 'anthropic-models'
+    };
+  }
+
+  async function listOllamaModels(baseUrl, apiKey, timeoutMs) {
+    var headers = { 'content-type': 'application/json' };
+    if (apiKey) headers.Authorization = 'Bearer ' + apiKey;
+    var body = await fetchJsonWithTimeout(buildOllamaTagsUrl(baseUrl), {
+      method: 'GET',
+      headers: headers
+    }, timeoutMs);
+    return {
+      models: uniqueStrings((body.models || []).map(function (entry) {
+        return (entry && (entry.model || entry.name)) || '';
+      })),
+      source: 'ollama-tags'
+    };
+  }
+
+  async function listGeminiModels(apiKey, baseUrl, timeoutMs) {
+    if (!apiKey) throw new Error('API key required to load Gemini models.');
+
+    try {
+      var compat = await listOpenAICompatModels(apiKey, baseUrl || PROVIDERS.gemini.baseUrl, timeoutMs);
+      if (compat.models.length) return compat;
+    } catch (_compatError) {
+      // Fall through to Gemini's native models API. This keeps discovery
+      // resilient even if the OpenAI-compatible listing drifts or lags.
+    }
+
+    var body = await fetchJsonWithTimeout(buildGeminiNativeModelsUrl(), {
+      method: 'GET',
+      headers: {
+        'x-goog-api-key': apiKey,
+        'content-type': 'application/json'
+      }
+    }, timeoutMs);
+    return {
+      models: normalizeModelIds((body.models || []).filter(function (entry) {
+        var methods = entry && entry.supportedGenerationMethods;
+        return Array.isArray(methods) && methods.indexOf('generateContent') !== -1;
+      }).map(function (entry) {
+        return (entry && (entry.baseModelId || String(entry.name || '').replace(/^models\//, ''))) || '';
+      })),
+      source: 'gemini-native-models'
+    };
+  }
+
+  async function listProviderModels(settings) {
+    var resolved = Object.assign({}, settings || {});
+    var providerId = String(resolved.provider || resolved.providerId || resolved._providerId || '').trim();
+    var preset = PROVIDERS[providerId] || null;
+    var discoveryKind = resolved.modelDiscovery || (preset && preset.modelDiscovery) || '';
+    var baseUrl = resolved.baseUrl || (preset && preset.baseUrl) || '';
+    var apiKey = resolved.apiKey || '';
+    var format = resolved.format || (preset && preset.format) || 'openai';
+    var timeoutMs = resolved.requestTimeoutMs || DEFAULT_TIMEOUT_MS;
+
+    if (!discoveryKind) {
+      if (providerId === 'anthropic' || normalizeUrl(baseUrl) === normalizeUrl(PROVIDERS.anthropic.baseUrl) || format === 'anthropic') {
+        discoveryKind = 'anthropic';
+      } else if (providerId === 'gemini' || normalizeUrl(baseUrl) === normalizeUrl(PROVIDERS.gemini.baseUrl)) {
+        discoveryKind = 'gemini';
+      } else if (providerId === 'ollama' || normalizeUrl(baseUrl) === normalizeUrl(PROVIDERS.ollama.baseUrl) || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(baseUrl)) {
+        discoveryKind = 'ollama';
+      } else {
+        discoveryKind = 'openai';
+      }
+    }
+
+    var result;
+    if (discoveryKind === 'anthropic') {
+      result = await listAnthropicModels(apiKey, timeoutMs);
+    } else if (discoveryKind === 'gemini') {
+      result = await listGeminiModels(apiKey, baseUrl, timeoutMs);
+    } else if (discoveryKind === 'ollama') {
+      result = await listOllamaModels(baseUrl, apiKey, timeoutMs);
+    } else {
+      if (!baseUrl) throw new Error('Base URL is required to load models for this provider.');
+      result = await listOpenAICompatModels(apiKey, baseUrl, timeoutMs);
+    }
+
+    return {
+      models: result.models,
+      source: result.source,
+      provider: providerId || discoveryKind,
+      baseUrl: baseUrl || '',
+      fetchedAt: new Date().toISOString()
+    };
   }
 
   // ── Content extraction helpers ────────────────────────────────────────────
@@ -5183,6 +5369,7 @@ window.LiftRPGAPI = (function () {
 
   return {
     PROVIDERS: PROVIDERS,
+    listProviderModels: listProviderModels,
     generate: generate,
     generateMultiStage: generateMultiStage,
     generateStructured: generateStructured,

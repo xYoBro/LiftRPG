@@ -709,6 +709,52 @@
       border-color: var(--accent);
     }
 
+    .api-model-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .api-inline-btn {
+      min-width: 142px;
+      padding: 0 14px;
+      border: 1.5px solid var(--ink);
+      background: none;
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 6.2pt;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+
+    .api-inline-btn:hover:not(:disabled) {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    .api-inline-btn:disabled {
+      opacity: .45;
+      cursor: default;
+    }
+
+    .api-model-status {
+      font-size: 5.8pt;
+      line-height: 1.55;
+      letter-spacing: .03em;
+      color: var(--muted);
+    }
+
+    .api-model-status.is-live {
+      color: var(--accent);
+    }
+
+    .api-model-status.is-error {
+      color: #9c4033;
+    }
+
     .api-note {
       font-size: 6pt;
       line-height: 1.65;
@@ -1470,7 +1516,12 @@
             </div>
             <div class="api-field">
               <label class="field-label" for="api-model">Model</label>
-              <input class="api-input" id="api-model" type="text" placeholder="gpt-4o">
+              <div class="api-model-row">
+                <input class="api-input" id="api-model" type="text" placeholder="gpt-4o" list="api-model-options">
+                <button class="api-inline-btn" id="api-model-refresh" type="button">Refresh Models</button>
+              </div>
+              <datalist id="api-model-options"></datalist>
+              <div class="api-model-status" id="api-model-status">LiftRPG can load the current model list from supported providers so you do not have to keep updating this field by hand.</div>
             </div>
             <div class="api-field">
               <label class="field-label" for="api-base-url">Base URL</label>
@@ -1731,6 +1782,9 @@
       var apiProviderEl = document.getElementById('api-provider');
       var apiMethodEl = document.getElementById('api-method');
       var apiModelEl = document.getElementById('api-model');
+      var apiModelOptionsEl = document.getElementById('api-model-options');
+      var apiModelStatusEl = document.getElementById('api-model-status');
+      var apiModelRefreshBtn = document.getElementById('api-model-refresh');
       var apiBaseUrlEl = document.getElementById('api-base-url');
       var apiKeyEl = document.getElementById('api-key');
       var apiSubmitBtn = document.getElementById('api-submit');
@@ -1825,6 +1879,7 @@
       var WIZARD_DRAFT_KEY = 'liftrpg_manual_wizard_draft_v2';
       var LEGACY_WIZARD_DRAFT_KEY = 'liftrpg_manual_wizard_draft_v1';
       var API_PREFS_KEY = 'liftrpg_api_prefs_v1';
+      var LEGACY_API_PREF_KEYS = ['liftrpg_api_provider', 'liftrpg_api_model'];
       var WIZARD_BUILD_VERSION = '2.2.0';
       var WIZARD_DRAFT_SCHEMA_VERSION = 2;
       var WIZARD_STAGE_KEYS = ['layerBible', 'campaignPlan', 'shell', 'weeks', 'fragments', 'endings'];
@@ -1844,6 +1899,8 @@
       var currentGenerationMode = 'manual';
       var currentGeneratorSurface = 'intake';
       var activeApiRunId = 0;
+      var apiModelDiscoveryRunId = 0;
+      var apiModelDiscoveryTimer = 0;
       var apiRunState = null;
       var stepText = [
         {
@@ -1932,6 +1989,112 @@
         } catch (error) {}
       }
 
+      function clearLegacyApiPrefs() {
+        LEGACY_API_PREF_KEYS.forEach(function (key) {
+          try { localStorage.removeItem(key); } catch (error) {}
+          try { sessionStorage.removeItem(key); } catch (error) {}
+        });
+      }
+
+      function providerAllowsEmptyApiKey(providerId, baseUrl) {
+        var preset = getProviderPreset(providerId);
+        var normalizedBaseUrl = String(baseUrl || '').trim();
+        return !!(preset && preset.noKey)
+          || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(normalizedBaseUrl);
+      }
+
+      function setApiModelStatus(message, tone) {
+        if (!apiModelStatusEl) return;
+        apiModelStatusEl.textContent = message || '';
+        apiModelStatusEl.classList.toggle('is-live', tone === 'live');
+        apiModelStatusEl.classList.toggle('is-error', tone === 'error');
+      }
+
+      function renderApiModelOptions(models) {
+        if (!apiModelOptionsEl) return;
+        var list = Array.isArray(models) ? models : [];
+        apiModelOptionsEl.innerHTML = list.map(function (modelId) {
+          return '<option value="' + escapeForHtml(modelId) + '"></option>';
+        }).join('');
+      }
+
+      function buildApiModelDiscoverySettings() {
+        var providerId = apiProviderEl ? apiProviderEl.value : 'openai';
+        var preset = getProviderPreset(providerId);
+        return {
+          provider: providerId,
+          providerId: providerId,
+          modelDiscovery: preset && preset.modelDiscovery ? preset.modelDiscovery : '',
+          format: preset && preset.format ? preset.format : 'openai',
+          apiKey: apiKeyEl ? apiKeyEl.value.trim() : '',
+          baseUrl: apiBaseUrlEl ? apiBaseUrlEl.value.trim() : '',
+          requestTimeoutMs: 45000
+        };
+      }
+
+      function describeModelDiscoveryBlocker(settings) {
+        if (!settings) return 'Choose a provider to load live models.';
+        if (settings.format === 'openai' && !settings.baseUrl && settings.provider !== 'anthropic') {
+          return 'Add a base URL before loading live models for this provider.';
+        }
+        if (!settings.apiKey && !providerAllowsEmptyApiKey(settings.provider, settings.baseUrl)) {
+          return 'Enter an API key to load the current model list for this provider.';
+        }
+        return '';
+      }
+
+      async function requestApiModelDiscovery(options) {
+        options = options || {};
+        if (!api() || typeof api().listProviderModels !== 'function') {
+          setApiModelStatus('Live model discovery is unavailable because the API helper did not load.', 'error');
+          return;
+        }
+
+        var settings = buildApiModelDiscoverySettings();
+        var blocker = describeModelDiscoveryBlocker(settings);
+        if (blocker && !options.force) {
+          renderApiModelOptions([]);
+          if (apiModelRefreshBtn) apiModelRefreshBtn.disabled = !!(apiRunState && apiRunState.status === 'running');
+          setApiModelStatus(blocker, '');
+          return;
+        }
+
+        var runId = ++apiModelDiscoveryRunId;
+        if (apiModelRefreshBtn) apiModelRefreshBtn.disabled = true;
+        setApiModelStatus('Loading live model list from the provider…', '');
+
+        try {
+          var result = await api().listProviderModels(settings);
+          if (runId !== apiModelDiscoveryRunId) return;
+          var models = result && Array.isArray(result.models) ? result.models : [];
+          renderApiModelOptions(models);
+          if (!apiModelEl.value.trim() && models.length) {
+            apiModelEl.value = models[0];
+          }
+          if (models.length) {
+            setApiModelStatus('Loaded ' + models.length + ' live model' + (models.length === 1 ? '' : 's') + ' from the provider. You can still type a custom model if needed.', 'live');
+          } else {
+            setApiModelStatus('The provider responded, but no compatible text-generation models were found. You can still type a model ID manually.', '');
+          }
+        } catch (error) {
+          if (runId !== apiModelDiscoveryRunId) return;
+          renderApiModelOptions([]);
+          setApiModelStatus('Could not load live models: ' + (error.message || error) + ' You can still type a model ID manually.', 'error');
+        } finally {
+          if (runId === apiModelDiscoveryRunId && apiModelRefreshBtn) {
+            apiModelRefreshBtn.disabled = !!(apiRunState && apiRunState.status === 'running');
+          }
+        }
+      }
+
+      function scheduleApiModelDiscovery(options) {
+        options = options || {};
+        clearTimeout(apiModelDiscoveryTimer);
+        apiModelDiscoveryTimer = setTimeout(function () {
+          requestApiModelDiscovery(options);
+        }, options.immediate ? 0 : 360);
+      }
+
       function getProviderPreset(providerId) {
         var presets = api() && api().PROVIDERS ? api().PROVIDERS : {};
         return presets[providerId] || null;
@@ -1968,6 +2131,7 @@
       }
 
       function initializeApiSettings() {
+        clearLegacyApiPrefs();
         populateProviderOptions();
         var prefs = loadApiPrefs() || {};
         var providerId = getProviderPreset(prefs.provider) ? prefs.provider : 'openai';
@@ -1979,6 +2143,7 @@
           keepModel: !!prefs.model,
           keepBaseUrl: !!prefs.baseUrl
         });
+        scheduleApiModelDiscovery({ immediate: true });
       }
 
       function setGenerationMode(mode) {
@@ -1997,6 +2162,9 @@
         }
         if (currentGenerationMode === 'api' && apiRunState === null) {
           apiRunState = createApiRunState();
+        }
+        if (currentGenerationMode === 'api') {
+          scheduleApiModelDiscovery({ immediate: true });
         }
         if (currentGeneratorSurface === 'intake') {
           setGeneratorSurface('intake');
@@ -2023,6 +2191,9 @@
         if (apiStatusBackBtn) {
           apiStatusBackBtn.disabled = !!apiRunState && apiRunState.status === 'running';
           apiStatusBackBtn.hidden = !!apiRunState && apiRunState.status === 'running';
+        }
+        if (currentGeneratorSurface === 'api-config') {
+          scheduleApiModelDiscovery({ immediate: true });
         }
 
         if (options.skipFocus) return;
@@ -2102,7 +2273,7 @@
       }
 
       function setApiControlsDisabled(disabled) {
-        [manualModeBtn, apiModeBtn, apiProviderEl, apiMethodEl, apiModelEl, apiBaseUrlEl, apiKeyEl, apiSubmitBtn, submitBtn].forEach(function (el) {
+        [manualModeBtn, apiModeBtn, apiProviderEl, apiMethodEl, apiModelEl, apiModelRefreshBtn, apiBaseUrlEl, apiKeyEl, apiSubmitBtn, submitBtn].forEach(function (el) {
           if (!el) return;
           if (el === apiKeyEl && apiKeyEl.disabled && !disabled) return;
           el.disabled = !!disabled;
@@ -2854,6 +3025,7 @@
         apiProviderEl.addEventListener('change', function () {
           applyProviderPreset(apiProviderEl.value);
           resetApiRunStateForConfigChange('Provider changed. Previous run state cleared for a fresh API pass.');
+          scheduleApiModelDiscovery({ immediate: true });
           renderApiRunState();
         });
       }
@@ -2862,16 +3034,29 @@
         el.addEventListener('input', function () {
           saveApiPrefs();
           resetApiRunStateForConfigChange('API configuration changed. Previous run state cleared.');
+          if (el === apiBaseUrlEl) scheduleApiModelDiscovery();
           renderApiRunState();
         });
         el.addEventListener('change', function () {
           saveApiPrefs();
           resetApiRunStateForConfigChange('API configuration changed. Previous run state cleared.');
+          if (el === apiBaseUrlEl) scheduleApiModelDiscovery({ immediate: true });
           renderApiRunState();
         });
       });
       if (apiKeyEl) {
-        apiKeyEl.addEventListener('input', renderApiRunState);
+        apiKeyEl.addEventListener('input', function () {
+          scheduleApiModelDiscovery();
+          renderApiRunState();
+        });
+        apiKeyEl.addEventListener('change', function () {
+          scheduleApiModelDiscovery({ immediate: true });
+        });
+      }
+      if (apiModelRefreshBtn) {
+        apiModelRefreshBtn.addEventListener('click', function () {
+          requestApiModelDiscovery({ force: true });
+        });
       }
       if (apiConfigBackBtn) {
         apiConfigBackBtn.addEventListener('click', function () {
