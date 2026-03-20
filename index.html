@@ -601,8 +601,73 @@
       color: var(--muted);
     }
 
-    .api-panel {
+    .generator-flow-panel {
+      display: none;
+      margin-top: 14px;
+    }
+
+    .generator-flow-panel.is-active {
+      display: block;
+    }
+
+    .generator-flow-head {
+      display: grid;
+      gap: 5px;
+      margin-bottom: 12px;
+    }
+
+    .generator-flow-kicker {
+      font-family: var(--mono);
+      font-size: 5.8pt;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .generator-flow-title {
+      font-family: var(--display);
+      font-size: 13pt;
+      line-height: 1.14;
+      color: var(--ink);
+    }
+
+    .generator-flow-copy {
+      font-size: 6.4pt;
+      line-height: 1.65;
+      letter-spacing: .03em;
+      color: var(--muted);
+    }
+
+    .generator-flow-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
       margin-top: 12px;
+    }
+
+    .generator-flow-back {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 8px 14px;
+      border: 1.5px solid var(--ink);
+      background: none;
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 6.6pt;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+
+    .generator-flow-back:hover {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    .api-panel {
       display: grid;
       gap: 12px;
     }
@@ -1341,60 +1406,98 @@
       <div class="kicker">Booklet Generator</div>
       <div class="rule"></div>
 
-      <label class="field-label" for="gen-workout">Workout Program</label>
-      <textarea id="gen-workout" class="gen-input" rows="6"
-        placeholder="Paste your Liftosaur Liftoscript export, or describe your program in plain text"></textarea>
-      <div class="field-error" id="workout-error">A workout program is required</div>
-
-      <label class="field-label" for="gen-brief">Creative Direction</label>
-      <textarea id="gen-brief" class="gen-input" rows="4"
-        placeholder="Artifact type, tone, authors/books to echo, mechanic feel, realism vs. genre, emotional stakes — or leave blank for a surprise"></textarea>
-      <div class="dice-tip">Better results: mention the kind of artifact you want, the voice/style, the mechanic feel, and whether you want quiet realism or overt genre. A few words still works.</div>
-
-      <div class="dice-fieldset">
-        <div class="field-label">Randomizer</div>
-        <div class="dice-option">
-          <span>d100 <span class="dice-note">(00-99 percentile bands)</span></span>
+      <div class="generator-flow-panel is-active" id="generator-intake-panel">
+        <div class="generator-flow-head">
+          <div class="generator-flow-kicker">Step 1</div>
+          <div class="generator-flow-title">Set the brief</div>
+          <div class="generator-flow-copy">Start with the workout and creative direction only. Once those are locked, LiftRPG will move you to the next surface instead of leaving everything on screen at once.</div>
         </div>
-        <div class="dice-tip">No worries if you don&rsquo;t have dice. Ask Google to roll a d100.</div>
-      </div>
 
-      <div class="generator-mode-switch">
-        <button class="generator-mode-btn is-active" id="gen-mode-manual" type="button">Manual Prompts</button>
-        <button class="generator-mode-btn" id="gen-mode-api" type="button">Use My AI Key</button>
-      </div>
-      <div class="generator-mode-copy" id="gen-mode-copy">Manual mode keeps the copy/paste wizard and validates each stage locally before you move on.</div>
+        <label class="field-label" for="gen-workout">Workout Program</label>
+        <textarea id="gen-workout" class="gen-input" rows="6"
+          placeholder="Paste your Liftosaur Liftoscript export, or describe your program in plain text"></textarea>
+        <div class="field-error" id="workout-error">A workout program is required</div>
 
-      <button class="gen-submit" id="gen-submit" type="button">Start Manual Wizard &rarr;</button>
+        <label class="field-label" for="gen-brief">Creative Direction</label>
+        <textarea id="gen-brief" class="gen-input" rows="4"
+          placeholder="Artifact type, tone, authors/books to echo, mechanic feel, realism vs. genre, emotional stakes — or leave blank for a surprise"></textarea>
+        <div class="dice-tip">Better results: mention the kind of artifact you want, the voice/style, the mechanic feel, and whether you want quiet realism or overt genre. A few words still works.</div>
 
-      <div class="api-panel" id="api-panel" hidden>
-        <div class="api-config-grid">
-          <div class="api-field">
-            <label class="field-label" for="api-provider">Provider</label>
-            <select class="api-select" id="api-provider"></select>
+        <div class="dice-fieldset">
+          <div class="field-label">Randomizer</div>
+          <div class="dice-option">
+            <span>d100 <span class="dice-note">(00-99 percentile bands)</span></span>
           </div>
-          <div class="api-field">
-            <label class="field-label" for="api-method">Pipeline</label>
-            <select class="api-select" id="api-method">
-              <option value="generateMultiStage">Multi-stage API (Recommended)</option>
-              <option value="generateStructured">Structured API</option>
-            </select>
-          </div>
-          <div class="api-field">
-            <label class="field-label" for="api-model">Model</label>
-            <input class="api-input" id="api-model" type="text" placeholder="gpt-4o">
-          </div>
-          <div class="api-field">
-            <label class="field-label" for="api-base-url">Base URL</label>
-            <input class="api-input" id="api-base-url" type="text" placeholder="https://api.openai.com/v1">
-          </div>
-          <div class="api-field" style="grid-column:1 / -1">
-            <label class="field-label" for="api-key">API Key</label>
-            <input class="api-input" id="api-key" type="password" placeholder="Paste your key for this session" autocomplete="off">
+          <div class="dice-tip">No worries if you don&rsquo;t have dice. Ask Google to roll a d100.</div>
+        </div>
+
+        <div class="generator-mode-switch">
+          <button class="generator-mode-btn is-active" id="gen-mode-manual" type="button">Manual Prompts</button>
+          <button class="generator-mode-btn" id="gen-mode-api" type="button">Use My AI Key</button>
+        </div>
+        <div class="generator-mode-copy" id="gen-mode-copy">Manual mode keeps the copy/paste wizard and validates each stage locally before you move on.</div>
+
+        <button class="gen-submit" id="gen-submit" type="button">Start Manual Wizard &rarr;</button>
+
+        <div class="wizard-resume-banner" id="wiz-resume-banner">
+          <div class="wizard-resume-copy" id="wiz-resume-copy">A saved manual draft is available on this device.</div>
+          <div class="wizard-resume-actions">
+            <button class="wizard-action-btn" id="wiz-resume-btn" type="button">Resume Draft</button>
+            <button class="wizard-action-btn" id="wiz-start-fresh-btn" type="button">Start Fresh</button>
           </div>
         </div>
-        <div class="api-note">Your key is sent directly from this browser to the provider you choose. LiftRPG does not proxy or store it on a server. Provider, model, base URL, and pipeline preference are saved locally on this device for convenience.</div>
-        <button class="gen-submit" id="api-submit" type="button">Generate Booklet via API &rarr;</button>
+      </div>
+
+      <div class="generator-flow-panel" id="api-config-panel">
+        <div class="generator-flow-head">
+          <div class="generator-flow-kicker">Step 2</div>
+          <div class="generator-flow-title">Connect your model</div>
+          <div class="generator-flow-copy">The brief is set. Now configure the provider contract for this run. After you start generation, this setup surface will disappear and the live run state will take over.</div>
+        </div>
+
+        <div class="api-panel" id="api-panel">
+          <div class="api-config-grid">
+            <div class="api-field">
+              <label class="field-label" for="api-provider">Provider</label>
+              <select class="api-select" id="api-provider"></select>
+            </div>
+            <div class="api-field">
+              <label class="field-label" for="api-method">Pipeline</label>
+              <select class="api-select" id="api-method">
+                <option value="generateMultiStage">Multi-stage API (Recommended)</option>
+                <option value="generateStructured">Structured API</option>
+              </select>
+            </div>
+            <div class="api-field">
+              <label class="field-label" for="api-model">Model</label>
+              <input class="api-input" id="api-model" type="text" placeholder="gpt-4o">
+            </div>
+            <div class="api-field">
+              <label class="field-label" for="api-base-url">Base URL</label>
+              <input class="api-input" id="api-base-url" type="text" placeholder="https://api.openai.com/v1">
+            </div>
+            <div class="api-field" style="grid-column:1 / -1">
+              <label class="field-label" for="api-key">API Key</label>
+              <input class="api-input" id="api-key" type="password" placeholder="Paste your key for this session" autocomplete="off">
+            </div>
+          </div>
+          <div class="api-note">Your key is sent directly from this browser to the provider you choose. LiftRPG does not proxy or store it on a server. Provider, model, base URL, and pipeline preference are saved locally on this device for convenience.</div>
+          <div class="generator-flow-actions">
+            <button class="generator-flow-back" id="api-config-back" type="button">Back To Brief</button>
+            <button class="gen-submit" id="api-submit" type="button" style="margin-top:0; flex:1">Generate Booklet via API &rarr;</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="generator-flow-panel" id="api-status-panel">
+        <div class="generator-flow-head">
+          <div class="generator-flow-kicker">Step 3</div>
+          <div class="generator-flow-title">Track the run</div>
+          <div class="generator-flow-copy">This is now the only active surface. The provider setup has been tucked away so you can focus on stage state, failures, and renderer handoff.</div>
+        </div>
+        <div class="generator-flow-actions">
+          <button class="generator-flow-back" id="api-status-back" type="button">Back To API Setup</button>
+        </div>
         <div class="wizard-state-board api-run-board">
           <div class="wizard-state-grid">
             <div class="wizard-state-card">
@@ -1416,14 +1519,6 @@
           <div class="wizard-stage-ledger" id="api-stage-ledger"></div>
           <div class="api-run-log" id="api-run-log">API mode is ready. Add your provider settings, then start the generation run.</div>
           <div class="api-run-actions" id="api-run-actions"></div>
-        </div>
-      </div>
-
-      <div class="wizard-resume-banner" id="wiz-resume-banner">
-        <div class="wizard-resume-copy" id="wiz-resume-copy">A saved manual draft is available on this device.</div>
-        <div class="wizard-resume-actions">
-          <button class="wizard-action-btn" id="wiz-resume-btn" type="button">Resume Draft</button>
-          <button class="wizard-action-btn" id="wiz-start-fresh-btn" type="button">Start Fresh</button>
         </div>
       </div>
 
@@ -1624,10 +1719,15 @@
       var openBtn = document.getElementById('open-generator');
       var closeBtn = document.getElementById('modal-close');
       var submitBtn = document.getElementById('gen-submit');
+      var intakePanel = document.getElementById('generator-intake-panel');
+      var apiConfigPanel = document.getElementById('api-config-panel');
+      var apiStatusPanel = document.getElementById('api-status-panel');
       var manualModeBtn = document.getElementById('gen-mode-manual');
       var apiModeBtn = document.getElementById('gen-mode-api');
       var modeCopyEl = document.getElementById('gen-mode-copy');
       var apiPanel = document.getElementById('api-panel');
+      var apiConfigBackBtn = document.getElementById('api-config-back');
+      var apiStatusBackBtn = document.getElementById('api-status-back');
       var apiProviderEl = document.getElementById('api-provider');
       var apiMethodEl = document.getElementById('api-method');
       var apiModelEl = document.getElementById('api-model');
@@ -1742,6 +1842,7 @@
       var wizData = {};
       var wizState = {};
       var currentGenerationMode = 'manual';
+      var currentGeneratorSurface = 'intake';
       var activeApiRunId = 0;
       var apiRunState = null;
       var stepText = [
@@ -1884,10 +1985,11 @@
         currentGenerationMode = mode === 'api' ? 'api' : 'manual';
         if (manualModeBtn) manualModeBtn.classList.toggle('is-active', currentGenerationMode === 'manual');
         if (apiModeBtn) apiModeBtn.classList.toggle('is-active', currentGenerationMode === 'api');
-        if (submitBtn) submitBtn.hidden = currentGenerationMode !== 'manual';
-        if (apiPanel) apiPanel.hidden = currentGenerationMode !== 'api';
-        if (chatWizard) chatWizard.hidden = currentGenerationMode !== 'manual';
-        if (wizResumeBanner) wizResumeBanner.hidden = currentGenerationMode !== 'manual' || !wizResumeBanner.classList.contains('is-visible');
+        if (submitBtn) {
+          submitBtn.textContent = currentGenerationMode === 'manual'
+            ? 'Start Manual Wizard →'
+            : 'Continue To API Setup →';
+        }
         if (modeCopyEl) {
           modeCopyEl.textContent = currentGenerationMode === 'manual'
             ? 'Manual mode keeps the copy/paste wizard and validates each stage locally before you move on.'
@@ -1896,7 +1998,41 @@
         if (currentGenerationMode === 'api' && apiRunState === null) {
           apiRunState = createApiRunState();
         }
+        if (currentGeneratorSurface === 'intake') {
+          setGeneratorSurface('intake');
+        }
         renderApiRunState();
+      }
+
+      function setGeneratorSurface(surface, options) {
+        options = options || {};
+        currentGeneratorSurface = surface || 'intake';
+        if (intakePanel) intakePanel.classList.toggle('is-active', currentGeneratorSurface === 'intake');
+        if (apiConfigPanel) apiConfigPanel.classList.toggle('is-active', currentGeneratorSurface === 'api-config');
+        if (apiStatusPanel) apiStatusPanel.classList.toggle('is-active', currentGeneratorSurface === 'api-status');
+        if (chatWizard) {
+          var showManual = currentGeneratorSurface === 'manual';
+          chatWizard.classList.toggle('is-visible', showManual);
+          chatWizard.hidden = !showManual;
+        }
+        if (wizResumeBanner) {
+          wizResumeBanner.hidden = currentGeneratorSurface !== 'intake' ||
+            currentGenerationMode !== 'manual' ||
+            !wizResumeBanner.classList.contains('is-visible');
+        }
+        if (apiStatusBackBtn) {
+          apiStatusBackBtn.disabled = !!apiRunState && apiRunState.status === 'running';
+          apiStatusBackBtn.hidden = !!apiRunState && apiRunState.status === 'running';
+        }
+
+        if (options.skipFocus) return;
+        if (currentGeneratorSurface === 'intake' && workoutEl) {
+          workoutEl.focus();
+        } else if (currentGeneratorSurface === 'api-config' && apiProviderEl) {
+          apiProviderEl.focus();
+        } else if (currentGeneratorSurface === 'manual' && wizResults[1]) {
+          wizResults[1].focus();
+        }
       }
 
       function pushApiLog(message) {
@@ -2071,6 +2207,10 @@
         apiRunLog.innerHTML = apiRunState.log.map(function (line) {
           return escapeForHtml(line);
         }).join('<br>');
+        if (apiStatusBackBtn) {
+          apiStatusBackBtn.disabled = apiRunState.status === 'running';
+          apiStatusBackBtn.hidden = apiRunState.status === 'running';
+        }
         renderApiActions();
       }
 
@@ -2591,6 +2731,7 @@
 
         if (draft.wizardVisible || wizData.layerBible || wizData.campaignPlan || wizData.shell) {
           chatWizard.classList.add('is-visible');
+          setGeneratorSurface('manual', { skipFocus: true });
         }
 
         var restoreStep = typeof draft.wizStep === 'number' ? draft.wizStep : 0;
@@ -2641,11 +2782,17 @@
       function openModal() {
         modal.classList.add('is-open');
         document.body.style.overflow = 'hidden';
-        if (currentGenerationMode === 'api' && apiProviderEl) apiProviderEl.focus();
-        else workoutEl.focus();
+        if (chatWizard && chatWizard.classList.contains('is-visible')) {
+          setGeneratorSurface('manual', { skipFocus: true });
+        } else if (currentGeneratorSurface === 'api-status' || currentGeneratorSurface === 'api-config') {
+          setGeneratorSurface(currentGeneratorSurface, { skipFocus: true });
+        } else {
+          setGeneratorSurface('intake', { skipFocus: true });
+        }
         updateBuildMeta();
         updateStageHealth();
         renderApiRunState();
+        setGeneratorSurface(currentGeneratorSurface);
         saveWizardDraft();
       }
 
@@ -2726,6 +2873,17 @@
       if (apiKeyEl) {
         apiKeyEl.addEventListener('input', renderApiRunState);
       }
+      if (apiConfigBackBtn) {
+        apiConfigBackBtn.addEventListener('click', function () {
+          setGeneratorSurface('intake');
+        });
+      }
+      if (apiStatusBackBtn) {
+        apiStatusBackBtn.addEventListener('click', function () {
+          if (apiRunState && apiRunState.status === 'running') return;
+          setGeneratorSurface('api-config');
+        });
+      }
       document.querySelectorAll('input[name="gen-dice"]').forEach(function (radio) {
         radio.addEventListener('change', saveWizardDraft);
       });
@@ -2734,7 +2892,7 @@
       });
       wizClearDraftBtn.addEventListener('click', function () {
         resetWizardState({ keepDraft: true });
-        chatWizard.classList.remove('is-visible');
+        setGeneratorSurface('intake', { skipFocus: true });
         clearWizardDraft('Draft cleared. Starting fresh will create a new one.');
       });
       if (wizExportDraftBtn) wizExportDraftBtn.addEventListener('click', exportWizardDraft);
@@ -2776,6 +2934,7 @@
           resetWizardState({ keepDraft: true });
           clearWizardDraft('Draft cleared. Starting fresh.');
           setResumeBannerVisible(false);
+          setGeneratorSurface('intake', { skipFocus: true });
           openModal();
         });
       }
@@ -3813,12 +3972,22 @@
 
         resetWizardState();
         if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
-        chatWizard.classList.add('is-visible');
+        setGeneratorSurface('manual');
         wizPrompts[1].value = window.generateStage1Prompt(workout, briefEl.value.trim(), getDiceValue());
         wizSetStep(0);
       }
 
-      submitBtn.addEventListener('click', handleManualGenerate);
+      function handlePrimaryContinue() {
+        var workout = validateWorkout();
+        if (!workout) return;
+        if (currentGenerationMode === 'api') {
+          setGeneratorSurface('api-config');
+          return;
+        }
+        handleManualGenerate();
+      }
+
+      submitBtn.addEventListener('click', handlePrimaryContinue);
 
       async function handleApiGenerate() {
         var workout = validateWorkout();
@@ -3871,6 +4040,7 @@
         apiRunState.log = [];
         pushApiLog('Starting ' + settings._providerLabel + ' · ' + settings.model + ' via ' + (apiMethodEl.value === 'generateStructured' ? 'structured API.' : 'multi-stage API.') );
         renderApiRunState();
+        setGeneratorSurface('api-status', { skipFocus: true });
 
         var runId = ++activeApiRunId;
         setApiControlsDisabled(true);
@@ -3915,6 +4085,7 @@
           apiRunState.booklet = booklet;
           pushApiLog('Generation complete. The booklet is ready for renderer handoff or download.');
           renderApiRunState();
+          setGeneratorSurface('api-status', { skipFocus: true });
         } catch (error) {
           if (runId !== activeApiRunId) return;
           var failureMessage = (error && error.message) ? error.message : String(error || 'Generation failed.');
@@ -3940,6 +4111,7 @@
           apiRunState.error = failureMessage;
           pushApiLog(failureMessage);
           renderApiRunState();
+          setGeneratorSurface('api-status', { skipFocus: true });
         } finally {
           if (runId === activeApiRunId) {
             setApiControlsDisabled(false);
@@ -4086,6 +4258,7 @@
       initializeApiSettings();
       apiRunState = createApiRunState();
       setGenerationMode('manual');
+      setGeneratorSurface('intake', { skipFocus: true });
       var existingWizardDraft = getWizardDraft();
       if (existingWizardDraft) {
         var draftStamp = '';
