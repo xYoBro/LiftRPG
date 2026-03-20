@@ -2610,4 +2610,627 @@
     return parts.join('\n');
   };
 
+  // ── Compact API prompt builders ──────────────────────────────────────────
+  //
+  // Manual mode keeps the full doctrine above because the human-guided wizard
+  // benefits from seeing the complete narrative contract. API mode uses the
+  // helpers below instead: rich early planning survives in approved stage
+  // outputs, and downstream prompts carry only the identity- and
+  // continuity-critical slices that later stages actually need.
+
+  function compactJson(value) {
+    return JSON.stringify(value || {});
+  }
+
+  function truncateText(value, maxLength) {
+    var text = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!maxLength || text.length <= maxLength) return text;
+    return text.slice(0, Math.max(0, maxLength - 3)).replace(/\s+\S*$/, '') + '...';
+  }
+
+  function summarizeDesignBiasForApi(blend) {
+    blend = blend || {};
+    var primary = blend.primary || {};
+    var secondary = blend.secondary || null;
+    return {
+      primaryProfile: primary.id || '',
+      secondaryProfile: secondary ? secondary.id : '',
+      storyLens: primary.storyLens || '',
+      topologyBias: mergeUnique(primary.mapType ? [primary.mapType] : [], secondary && secondary.mapType ? [secondary.mapType] : []),
+      puzzleBias: mergeUnique(primary.puzzleFamilies || [], secondary && secondary.puzzleFamilies || []).slice(0, 4),
+      documentBias: mergeUnique(primary.documentTypes || [], secondary && secondary.documentTypes || []).slice(0, 4),
+      themeBias: mergeUnique(primary.themeHints || [], secondary && secondary.themeHints || []).slice(0, 3)
+    };
+  }
+
+  function buildApiCompactRules(stageName) {
+    var rules = [
+      'Preserve artifact-grade fiction: distinctive voice, document ecology, clue economy, spatial continuity, strong endings.',
+      'Do not genericize the shell, the relationship web, or the governing institution.',
+      'Every output must advance mystery, map state, relationship state, or reveal structure.',
+      'Trust deterministic validators for shape; spend tokens on concrete fiction and continuity instead of re-explaining JSON.',
+      'Return JSON only.'
+    ];
+
+    if (stageName === 'weeks') {
+      rules.push('Write only the requested week slice. Preserve topology family, approved shell identity, and fragment ID discipline.');
+    } else if (stageName === 'fragments') {
+      rules.push('Make each document feel authored, cross-referenceable, and specific to this booklet rather than generic lore delivery.');
+    } else if (stageName === 'endings') {
+      rules.push('Pay off the protagonist arc, binary choice, and boss convergence without flattening the established register.');
+    } else if (stageName === 'shell') {
+      rules.push('Lock the renderer-facing shell contract now so later stages can inherit it without renegotiating identity.');
+    }
+
+    return rules;
+  }
+
+  function summarizeLayerBibleForShell(layerBible) {
+    var story = (layerBible || {}).storyLayer || {};
+    var game = (layerBible || {}).gameLayer || {};
+    var governing = (layerBible || {}).governingLayer || {};
+    var ledger = (layerBible || {}).designLedger || {};
+    return {
+      premise: truncateText(story.premise, 220),
+      protagonist: story.protagonist || {},
+      relationshipWeb: (story.relationshipWeb || []).slice(0, 6).map(function (entry) {
+        return {
+          name: entry.name || '',
+          role: truncateText(entry.role, 70),
+          arcFunction: truncateText(entry.arcFunction, 90)
+        };
+      }),
+      motifs: story.recurringMotifs || {},
+      institution: {
+        name: governing.institutionName || '',
+        departments: (governing.departments || []).slice(0, 5),
+        procedures: (governing.proceduresThatAffectPlay || []).slice(0, 4),
+        documentVoices: (governing.documentVoiceRules || []).slice(0, 4)
+      },
+      shellSignals: {
+        topology: truncateText(game.persistentTopology, 150),
+        weeklyComponentType: game.weeklyComponentType || '',
+        boardStateArc: truncateText(game.boardStateArc, 120),
+        informationLayers: truncateText(game.informationLayers, 140)
+      },
+      clueEconomy: ledger.clueEconomy || {},
+      finalReveal: truncateText(ledger.finalRevealRecontextualizes, 180)
+    };
+  }
+
+  function summarizeLayerBibleForWeeks(layerBible, weekNumbers) {
+    var story = (layerBible || {}).storyLayer || {};
+    var game = (layerBible || {}).gameLayer || {};
+    var governing = (layerBible || {}).governingLayer || {};
+    var ledger = (layerBible || {}).designLedger || {};
+    var requestedWeeks = Array.isArray(weekNumbers) && weekNumbers.length ? weekNumbers : null;
+
+    return {
+      worldContract: truncateText(story.premise, 220),
+      protagonist: story.protagonist || {},
+      antagonistPressure: truncateText(story.antagonistPressure, 140),
+      relationshipWeb: (story.relationshipWeb || []).slice(0, 6).map(function (entry) {
+        return {
+          name: entry.name || '',
+          role: truncateText(entry.role, 60),
+          initialStance: truncateText(entry.initialStance, 70),
+          secret: truncateText(entry.secret, 90),
+          arcFunction: truncateText(entry.arcFunction, 90)
+        };
+      }),
+      motifs: story.recurringMotifs || {},
+      midpointReversal: truncateText(story.midpointReversal, 150),
+      darkestMoment: truncateText(story.darkestMoment, 150),
+      bossTruth: truncateText(story.bossTruth, 150),
+      topology: {
+        coreLoop: truncateText(game.coreLoop, 120),
+        persistentTopology: truncateText(game.persistentTopology, 180),
+        majorZones: (game.majorZones || []).slice(0, 6),
+        gatesAndKeys: (game.gatesAndKeys || []).slice(0, 8),
+        progressionGates: (game.progressionGates || []).filter(function (entry) {
+          return !requestedWeeks || requestedWeeks.indexOf(entry.week) !== -1;
+        }).map(function (entry) {
+          return {
+            week: entry.week,
+            playerGains: truncateText(entry.playerGains, 90),
+            unlocks: truncateText(entry.unlocks, 90),
+            requires: truncateText(entry.requires, 90)
+          };
+        }),
+        persistentPressures: (game.persistentPressures || []).slice(0, 5),
+        companionSurfaces: (game.companionSurfaces || []).slice(0, 4),
+        revisitLogic: truncateText(game.revisitLogic, 140),
+        boardStateArc: truncateText(game.boardStateArc, 140),
+        bossConvergence: truncateText(game.bossConvergence, 160),
+        informationLayers: truncateText(game.informationLayers, 150)
+      },
+      governingLayer: {
+        institutionName: governing.institutionName || '',
+        departments: (governing.departments || []).slice(0, 5),
+        procedures: (governing.proceduresThatAffectPlay || []).slice(0, 5),
+        recordsAndForms: (governing.recordsAndForms || []).slice(0, 5),
+        documentVoiceRules: (governing.documentVoiceRules || []).slice(0, 4)
+      },
+      designLedger: {
+        mysteryQuestions: (ledger.mysteryQuestions || []).slice(0, 3),
+        falseAssumptions: (ledger.falseAssumptions || []).slice(0, 3),
+        motifPayoffs: (ledger.motifPayoffs || []).slice(0, 5),
+        weekTransformations: (ledger.weekTransformations || []).filter(function (entry) {
+          return !requestedWeeks || requestedWeeks.indexOf(entry.week) !== -1;
+        }),
+        clueEconomy: ledger.clueEconomy || {},
+        finalRevealRecontextualizes: truncateText(ledger.finalRevealRecontextualizes, 180)
+      }
+    };
+  }
+
+  function summarizeCampaignPlanForWeeks(campaignPlan, weekNumbers) {
+    var plan = campaignPlan || {};
+    var requestedWeeks = Array.isArray(weekNumbers) ? weekNumbers : [];
+    var weekLookup = {};
+    requestedWeeks.forEach(function (weekNumber) { weekLookup[weekNumber] = true; });
+    return {
+      topology: plan.topology || {},
+      weeks: (plan.weeks || []).filter(function (week) {
+        return weekLookup[week.weekNumber];
+      }).map(function (week) {
+        return {
+          weekNumber: week.weekNumber,
+          arcBeat: truncateText(week.arcBeat, 80),
+          npcBeat: truncateText(week.npcBeat, 100),
+          stateSnapshot: truncateText(week.stateSnapshot, 110),
+          playerGains: truncateText(week.playerGains, 110),
+          zoneFocus: truncateText(week.zoneFocus, 90),
+          mapReuse: week.mapReuse || '',
+          stateChange: truncateText(week.stateChange, 120),
+          newGateOrUnlock: truncateText(week.newGateOrUnlock, 120),
+          weeklyComponentMeaning: truncateText(week.weeklyComponentMeaning, 120),
+          oraclePressure: truncateText(week.oraclePressure, 120),
+          fragmentFunction: truncateText(week.fragmentFunction, 120),
+          governingProcedure: truncateText(week.governingProcedure, 120),
+          companionChange: truncateText(week.companionChange, 120),
+          isBossWeek: !!week.isBossWeek,
+          isBinaryChoiceWeek: !!week.isBinaryChoiceWeek,
+          sessionBeatTypes: (week.sessionBeatTypes || []).slice(0, 6)
+        };
+      }),
+      bossPlan: (plan.bossPlan || {})
+    };
+  }
+
+  function summarizeFragmentRegistryForChunk(fragmentRegistry, weekNumbers) {
+    var weekLookup = {};
+    (weekNumbers || []).forEach(function (weekNumber) { weekLookup[weekNumber] = true; });
+    return (fragmentRegistry || []).filter(function (entry) {
+      return entry && entry.weekRef && weekLookup[entry.weekRef];
+    }).map(function (entry) {
+      return {
+        id: entry.id || '',
+        title: truncateText(entry.title, 80),
+        documentType: entry.documentType || '',
+        author: truncateText(entry.author, 60),
+        revealPurpose: truncateText(entry.revealPurpose, 110),
+        clueFunction: entry.clueFunction || '',
+        weekRef: entry.weekRef
+      };
+    });
+  }
+
+  function summarizeWeekSummariesForFragments(weekSummaries, focusWeekNumbers) {
+    var focusLookup = null;
+    if (Array.isArray(focusWeekNumbers) && focusWeekNumbers.length) {
+      focusLookup = {};
+      focusWeekNumbers.forEach(function (weekNumber) { focusLookup[weekNumber] = true; });
+    }
+    return (weekSummaries || []).filter(function (summary) {
+      return !focusLookup || focusLookup[summary.weekNumber];
+    }).map(function (summary) {
+      return {
+        weekNumber: summary.weekNumber,
+        title: truncateText(summary.title, 80),
+        keyPrompts: (summary.sessions || []).slice(0, 2).map(function (session) {
+          return truncateText(session.storyPrompt, 90);
+        }).filter(Boolean),
+        fragmentRefs: (summary.fragmentRefs || []).slice(0, 6),
+        cipher: summary.cipher ? {
+          type: summary.cipher.type || '',
+          title: truncateText(summary.cipher.title, 80),
+          extractionInstruction: truncateText(summary.cipher.extractionInstruction, 110)
+        } : null,
+        mapNote: summary.mapState ? truncateText(summary.mapState.mapNote, 110) : '',
+        overflowDocument: summary.overflowDocument ? {
+          id: summary.overflowDocument.id || '',
+          documentType: summary.overflowDocument.documentType || '',
+          purpose: truncateText(summary.overflowDocument.inWorldPurpose, 100)
+        } : null,
+        weeklyComponent: summary.weeklyComponent ? {
+          value: summary.weeklyComponent.value,
+          type: summary.weeklyComponent.type || ''
+        } : null,
+        binaryChoice: summary.binaryChoice ? {
+          choiceLabel: truncateText(summary.binaryChoice.choiceLabel, 100),
+          promptA: truncateText(summary.binaryChoice.promptA, 70),
+          promptB: truncateText(summary.binaryChoice.promptB, 70)
+        } : null,
+        bossEncounter: summary.bossEncounter ? {
+          title: truncateText(summary.bossEncounter.title, 80),
+          componentInputs: (summary.bossEncounter.componentInputs || []).slice(0, 12),
+          convergenceExcerpt: truncateText(summary.bossEncounter.convergenceExcerpt, 130)
+        } : null
+      };
+    });
+  }
+
+  function summarizeBossAndArcForEndings(layerBible, campaignPlan, bossWeek, binaryChoiceWeek, weekSummaries) {
+    var story = (layerBible || {}).storyLayer || {};
+    var binaryChoice = null;
+    (binaryChoiceWeek && binaryChoiceWeek.sessions || []).forEach(function (session) {
+      if (session.binaryChoice && !binaryChoice) binaryChoice = session.binaryChoice;
+    });
+
+    return {
+      protagonistArc: {
+        protagonist: story.protagonist || {},
+        darkestMoment: truncateText(story.darkestMoment, 140),
+        resolutionMode: truncateText(story.resolutionMode, 60),
+        motifs: story.recurringMotifs || {}
+      },
+      relationshipWeb: (story.relationshipWeb || []).slice(0, 6).map(function (entry) {
+        return {
+          name: entry.name || '',
+          role: truncateText(entry.role, 60),
+          arcFunction: truncateText(entry.arcFunction, 90),
+          secret: truncateText(entry.secret, 90)
+        };
+      }),
+      binaryChoice: binaryChoice ? {
+        choiceLabel: truncateText(binaryChoice.choiceLabel, 110),
+        promptA: truncateText(binaryChoice.promptA, 100),
+        promptB: truncateText(binaryChoice.promptB, 100)
+      } : null,
+      boss: {
+        title: truncateText(((bossWeek || {}).bossEncounter || {}).title, 80),
+        narrative: truncateText(((bossWeek || {}).bossEncounter || {}).narrative, 220),
+        convergenceProof: truncateText(((bossWeek || {}).bossEncounter || {}).convergenceProof, 220),
+        componentInputs: (((bossWeek || {}).bossEncounter || {}).componentInputs || []).slice(0, 12)
+      },
+      campaignResolution: {
+        bossPlan: (campaignPlan || {}).bossPlan || {},
+        payoffAnchors: summarizeWeekSummariesForFragments(weekSummaries).map(function (summary) {
+          return {
+            weekNumber: summary.weekNumber,
+            title: summary.title,
+            keyPrompts: summary.keyPrompts,
+            fragmentRefs: summary.fragmentRefs,
+            weeklyComponent: summary.weeklyComponent,
+            binaryChoice: summary.binaryChoice
+          };
+        })
+      }
+    };
+  }
+
+  function summarizeShellContractForApi(shellContext) {
+    if (!shellContext) return null;
+    return {
+      worldContract: truncateText(shellContext.worldContract, 220),
+      narrativeVoice: shellContext.narrativeVoice || null,
+      literaryRegister: shellContext.literaryRegister || null,
+      structuralShape: shellContext.structuralShape || null,
+      artifactIdentity: shellContext.artifactIdentity || null
+    };
+  }
+
+  function summarizeContinuityForChunk(continuity) {
+    if (!continuity) return null;
+    return {
+      generatedWeeks: continuity.weekCount || 0,
+      priorWeeks: (continuity.weekSummaries || []).slice(-4),
+      componentValues: (continuity.componentValues || []).slice(-6),
+      cipherProgression: (continuity.cipherProgression || []).slice(-4),
+      usedFragmentRefs: (continuity.usedFragmentRefs || []).slice(-12),
+      overflowDocs: (continuity.overflowDocs || []).slice(-4),
+      recentOracles: (continuity.recentOracles || []).slice(-2),
+      mapProgression: continuity.mapProgression || null,
+      binaryChoice: continuity.binaryChoice || null,
+      clocks: (continuity.clocks || []).slice(0, 4)
+    };
+  }
+
+  function summarizePriorFragmentsForApi(priorFragments) {
+    return (priorFragments || []).slice(-8).map(function (fragment) {
+      return {
+        id: fragment.id || '',
+        documentType: fragment.documentType || '',
+        author: truncateText(fragment.inWorldAuthor, 60),
+        purpose: truncateText(fragment.inWorldPurpose, 90)
+      };
+    });
+  }
+
+  var API_STAGE1_FIELD_CONTRACT = [
+    'Return { storyLayer, gameLayer, governingLayer, designPrinciples, designLedger }.',
+    'storyLayer: premise; protagonist{role,want,need,flaw,wound,arc}; antagonistPressure; relationshipWeb[4-6]{name,role,initialStance,secret,arcFunction}; midpointReversal; darkestMoment; resolutionMode; bossTruth; recurringMotifs{object,place,phrase,sensory}.',
+    'gameLayer: coreLoop; persistentTopology; majorZones[]; gatesAndKeys[]; progressionGates[]; persistentPressures[]; companionSurfaces[]; revisitLogic; boardStateArc; bossConvergence; informationLayers.',
+    'governingLayer: institutionName; departments[]; proceduresThatAffectPlay[]; recordsAndForms[]; documentVoiceRules[].',
+    'designLedger: mysteryQuestions[3]; falseAssumptions[3]; motifPayoffs[4-6]; weekTransformations[one per week]; clueEconomy{hardClues,softClues,misdirections,confirmations}; finalRevealRecontextualizes.'
+  ].join('\n');
+
+  var API_STAGE2_FIELD_CONTRACT = [
+    'Return { topology, weeks, bossPlan, fragmentRegistry, overflowRegistry }.',
+    'weeks[]: weekNumber, arcBeat, npcBeat, stateSnapshot, playerGains, zoneFocus, mapReuse, stateChange, newGateOrUnlock, weeklyComponentMeaning, oraclePressure, fragmentFunction, governingProcedure, companionChange, isBossWeek, isBinaryChoiceWeek, sessionBeatTypes.',
+    'fragmentRegistry[]: id, title, documentType, author, revealPurpose, clueFunction, weekRef, sessionRef.',
+    'overflowRegistry[]: id, weekNumber, documentType, author, narrativeFunction, tonalIntent, arcRelationship.',
+    'bossPlan: decodeLogic, whyItFeelsEarned, requiredPriorKnowledge[].'
+  ].join('\n');
+
+  var API_SHELL_FIELD_CONTRACT = [
+    'Return { meta, cover, rulesSpread, theme } only.',
+    'meta must include schemaVersion, generatedAt, blockTitle, blockSubtitle, worldContract, narrativeVoice, literaryRegister, structuralShape, artifactIdentity, weeklyComponentType, passwordLength, weekCount, totalSessions.',
+    'artifactIdentity must keep shellFamily, boardStateMode, openingMode, rulesDeliveryMode, unlockLogic, attachmentStrategy distinct and renderer-ready.',
+    'cover/rules/theme must feel like the same artifact family promised by meta.artifactIdentity.'
+  ].join('\n');
+
+  var API_WEEKS_FIELD_CONTRACT = [
+    'Return { weeks:[...] } only for the requested week numbers.',
+    'Each non-boss week needs weekNumber, title, epigraph, isBossWeek:false, weeklyComponent, sessions, fieldOps{mapState,cipher,oracleTable,companionComponents?}, overflow, overflowDocument? and interlude?/gameplayClocks? when needed.',
+    'Boss week needs weekNumber, title, epigraph, isBossWeek:true, weeklyComponent.value:null, sessions, bossEncounter, overflow, overflowDocument? and optional interlude/gameplayClocks.',
+    'Oracle tables must use 10 d100 bands 00-09..90-99, text field only, and fragment entries must include real fragmentRef IDs.',
+    'Preserve the approved map family instead of flattening everything into a generic grid.'
+  ].join('\n');
+
+  var API_FRAGMENTS_FIELD_CONTRACT = [
+    'Return { fragments:[...] } only.',
+    'Each fragment must match its assigned registry entry and include id, documentType, inWorldAuthor, inWorldRecipient, inWorldPurpose, content, designSpec, authenticityChecks.',
+    'Documents must carry clue function, cross-reference value, and artifact-specific material detail.'
+  ].join('\n');
+
+  var API_ENDINGS_FIELD_CONTRACT = [
+    'Return { endings:[...] } only.',
+    'Each ending must be { variant, content:{ documentType, body, finalLine }, designSpec }.',
+    'Variants must diverge in emotional register and consequence, not just wording.'
+  ].join('\n');
+
+  window.generateApiStage1Prompt = function (workout, brief, dice, options) {
+    options = options || {};
+    var blend = deriveDesignBlend(brief, workout);
+    return [
+      '# API Stage 1 — Layer Bible',
+      '',
+      API_STAGE1_FIELD_CONTRACT,
+      '',
+      '## Compact Rules',
+      buildApiCompactRules('layer-bible').map(function (line) { return '- ' + line; }).join('\n'),
+      '- Plan a persistent topology with explicit gates, named keys, revisitation logic, and boss convergence requirements.',
+      '- Keep the protagonist arc specific: role, want, need, flaw, wound, arc, darkest moment, and costly transformation.',
+      '- Relationship web must use 4-6 named characters with distinct secrets and arc functions.',
+      '- Design ledger commitments are binding; later API stages will inherit these instead of re-planning the book.',
+      '',
+      '## Inputs',
+      'Workout: ' + truncateText(workout, 3200),
+      'Creative direction: ' + truncateText(brief || buildDefaultBrief(workout, blend), 1800),
+      'Design bias: ' + compactJson(summarizeDesignBiasForApi(blend)),
+      'Dice: ' + String(dice || 'd100'),
+      options.retryMode ? 'Retry mode: keep prose concrete and compact so the full JSON finishes cleanly.' : '',
+      '',
+      'JSON only.'
+    ].filter(Boolean).join('\n');
+  };
+
+  window.generateApiStage2Prompt = function (workout, brief, dice, layerBible, options) {
+    options = options || {};
+    var weekCount = window.parseWeekCount(workout);
+    return [
+      '# API Stage 2 — Campaign Plan',
+      '',
+      API_STAGE2_FIELD_CONTRACT,
+      '',
+      '## Compact Rules',
+      buildApiCompactRules('campaign').map(function (line) { return '- ' + line; }).join('\n'),
+      '- Use exactly ' + weekCount + ' weeks; mark the final week as boss and the midpoint week as the binary choice week.',
+      '- Map each mystery question, false assumption, motif payoff, and week transformation into the week plan.',
+      '- Fragment registry must create clue economy: establish early, complicate mid-block, reveal late; no lore-dump placeholders.',
+      '- Boss convergence must require outputs from map progression, institutional procedure, and relationship state.',
+      '',
+      '## Layer Bible Summary',
+      compactJson(summarizeLayerBibleForWeeks(layerBible)),
+      '',
+      '## Inputs',
+      'Workout: ' + truncateText(workout, 2200),
+      'Creative direction: ' + truncateText(brief || '', 900),
+      'Dice: ' + String(dice || 'd100'),
+      options.retryMode ? 'Retry mode: shorten descriptions where needed, but keep clue economy and week transformations intact.' : '',
+      '',
+      'JSON only.'
+    ].filter(Boolean).join('\n');
+  };
+
+  window.generateApiShellPrompt = function (brief, layerBible, campaignPlan, options) {
+    options = options || {};
+    var blendContext = buildBlendContextFromPlans(layerBible, campaignPlan);
+    var blend = deriveDesignBlend(brief, blendContext);
+    var weekCount = (campaignPlan.weeks || []).length || 6;
+    return [
+      '# API Stage 3 — Booklet Shell',
+      '',
+      API_SHELL_FIELD_CONTRACT,
+      '',
+      '## Compact Rules',
+      buildApiCompactRules('shell').map(function (line) { return '- ' + line; }).join('\n'),
+      '- worldContract is the booklet north star. It must read like a testable governing tension, not a summary.',
+      '- narrativeVoice, literaryRegister, structuralShape, and artifactIdentity are downstream contracts; make them strong enough that later stages can follow them exactly.',
+      '- Cover, rules spread, and theme must all feel like one coherent shell family, not adjacent UI labels.',
+      '- passwordEncryptedEnding stays blank; trusted tooling seals it later.',
+      '',
+      '## Layer Bible Summary',
+      compactJson(summarizeLayerBibleForShell(layerBible)),
+      '',
+      '## Campaign Summary',
+      compactJson({
+        weekCount: weekCount,
+        topology: campaignPlan.topology || {},
+        bossPlan: campaignPlan.bossPlan || {},
+        fragmentCount: (campaignPlan.fragmentRegistry || []).length,
+        overflowCount: (campaignPlan.overflowRegistry || []).length
+      }),
+      '',
+      '## Creative Direction',
+      truncateText(brief || buildDefaultBrief(blendContext, blend), 1200),
+      '',
+      '## Design Bias',
+      compactJson(summarizeDesignBiasForApi(blend)),
+      options.retryMode ? 'Retry mode: keep shells concise, specific, and renderer-safe.' : '',
+      '',
+      'JSON only.'
+    ].filter(Boolean).join('\n');
+  };
+
+  window.generateApiWeekChunkPrompt = function (workout, brief, layerBible, campaignPlan, weekNumbers, continuity, allComponentValues, shellContext, options) {
+    options = options || {};
+    var blend = deriveDesignBlend(brief, workout);
+    var weekCount = (campaignPlan.weeks || []).length || 6;
+    var isBossChunk = weekNumbers.indexOf(weekCount) !== -1;
+    var weekWorkout = window.extractWeekWorkout(workout, weekNumbers);
+    var weekLabel = weekNumbers.length === 1
+      ? 'Week ' + weekNumbers[0]
+      : 'Weeks ' + weekNumbers[0] + '-' + weekNumbers[weekNumbers.length - 1];
+    var overflowRegistry = (campaignPlan.overflowRegistry || []).filter(function (entry) {
+      return weekNumbers.indexOf(entry.weekNumber) !== -1;
+    });
+
+    return [
+      '# API Week Chunk — ' + weekLabel + (isBossChunk ? ' (Boss)' : ''),
+      '',
+      API_WEEKS_FIELD_CONTRACT,
+      '',
+      '## Compact Rules',
+      buildApiCompactRules('weeks').map(function (line) { return '- ' + line; }).join('\n'),
+      '- Use only the supplied week slice, shell contract, continuity packet, and fragment IDs. Do not regenerate other weeks.',
+      '- Story prompts must contain action, sensory specificity, and named places/objects from the approved world.',
+      '- Preserve map continuity, progression gates, clue economy, relationship state, and the shell artifact family.',
+      '- Boss week must convert prior component values into componentInputs and a decodingKey without contradicting earlier weeks.',
+      '',
+      '## Shell Contract',
+      compactJson(summarizeShellContractForApi(shellContext)),
+      '',
+      '## Layer Bible Slice',
+      compactJson(summarizeLayerBibleForWeeks(layerBible, weekNumbers)),
+      '',
+      '## Campaign Slice',
+      compactJson(summarizeCampaignPlanForWeeks(campaignPlan, weekNumbers)),
+      '',
+      '## Allowed Fragment IDs',
+      compactJson(summarizeFragmentRegistryForChunk(campaignPlan.fragmentRegistry || [], weekNumbers)),
+      overflowRegistry.length ? '' : null,
+      overflowRegistry.length ? '## Planned Overflow Documents' : null,
+      overflowRegistry.length ? compactJson(overflowRegistry) : null,
+      continuity ? '' : null,
+      continuity ? '## Continuity Packet' : null,
+      continuity ? compactJson(summarizeContinuityForChunk(continuity)) : null,
+      isBossChunk && allComponentValues && allComponentValues.length ? '' : null,
+      isBossChunk && allComponentValues && allComponentValues.length ? '## Prior Component Values' : null,
+      isBossChunk && allComponentValues && allComponentValues.length ? compactJson(allComponentValues) : null,
+      '',
+      '## Workout Slice',
+      truncateText(weekWorkout, 1800),
+      '',
+      '## Creative Direction',
+      truncateText(brief || buildDefaultBrief(workout, blend), 1000),
+      '',
+      '## Design Bias',
+      compactJson(summarizeDesignBiasForApi(blend)),
+      options.retryMode ? 'Retry mode: keep prose tight enough to finish, but preserve named continuity anchors and playable consequences.' : '',
+      '',
+      'JSON only.'
+    ].filter(Boolean).join('\n');
+  };
+
+  window.generateApiFragmentsPrompt = function (layerBible, campaignPlan, weekSummaries, shellContext, options) {
+    options = options || {};
+    return [
+      '# API Fragments',
+      '',
+      API_FRAGMENTS_FIELD_CONTRACT,
+      '',
+      '## Compact Rules',
+      buildApiCompactRules('fragments').map(function (line) { return '- ' + line; }).join('\n'),
+      '- Generate exactly one fragment per registry entry.',
+      '- Honor revealPurpose and clueFunction so the set escalates from establish to complicate to reveal.',
+      '- Include operational or material detail that makes each document feel found rather than narrated.',
+      '',
+      '## Shell Contract',
+      compactJson(summarizeShellContractForApi(shellContext)),
+      '',
+      '## Layer Bible Slice',
+      compactJson(summarizeLayerBibleForWeeks(layerBible)),
+      '',
+      '## Fragment Registry',
+      compactJson(campaignPlan.fragmentRegistry || []),
+      '',
+      '## Relevant Week Summaries',
+      compactJson(summarizeWeekSummariesForFragments(weekSummaries)),
+      options.retryMode ? 'Retry mode: compress prose slightly but keep cross-reference density and artifact specificity.' : '',
+      '',
+      'JSON only.'
+    ].filter(Boolean).join('\n');
+  };
+
+  window.generateApiFragmentBatchPrompt = function (layerBible, batchRegistry, batchWeekSummaries, allWeekSummaries, priorFragments, batchIndex, totalBatches, shellContext, options) {
+    options = options || {};
+    var focusWeeks = (batchWeekSummaries || []).map(function (summary) { return summary.weekNumber; });
+    return [
+      '# API Fragment Batch ' + (batchIndex + 1) + ' of ' + totalBatches,
+      '',
+      API_FRAGMENTS_FIELD_CONTRACT,
+      '',
+      '## Compact Rules',
+      buildApiCompactRules('fragments').map(function (line) { return '- ' + line; }).join('\n'),
+      '- Generate exactly these fragment IDs; do not invent extras.',
+      '- Use the week summaries for cross-reference anchors and the prior fragment signatures to avoid repetition or voice drift.',
+      '- Preserve shell identity, document ecology, and contradiction depth across batches.',
+      '',
+      '## Shell Contract',
+      compactJson(summarizeShellContractForApi(shellContext)),
+      '',
+      '## Layer Bible Slice',
+      compactJson(summarizeLayerBibleForWeeks(layerBible, focusWeeks)),
+      '',
+      '## Batch Registry',
+      compactJson(batchRegistry || []),
+      '',
+      '## Relevant Week Summaries',
+      compactJson(summarizeWeekSummariesForFragments(batchWeekSummaries, focusWeeks)),
+      '',
+      '## Prior Fragment Signatures',
+      compactJson(summarizePriorFragmentsForApi(priorFragments)),
+      options.retryMode ? 'Retry mode: shorten routine details before sacrificing specificity or cross-reference density.' : '',
+      '',
+      'JSON only.'
+    ].filter(Boolean).join('\n');
+  };
+
+  window.generateApiEndingsPrompt = function (layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext, weekSummaries, options) {
+    options = options || {};
+    return [
+      '# API Endings',
+      '',
+      API_ENDINGS_FIELD_CONTRACT,
+      '',
+      '## Compact Rules',
+      buildApiCompactRules('endings').map(function (line) { return '- ' + line; }).join('\n'),
+      '- The ending must sound like the same artifact family promised by the shell contract.',
+      '- Pay off the protagonist need, relationship web, motifs, binary choice consequences, and boss convergence anchors already on the page.',
+      '- Strong endings reveal or refract prior evidence; they do not summarize the plot.',
+      '',
+      '## Shell Contract',
+      compactJson(summarizeShellContractForApi(shellContext)),
+      '',
+      '## Boss And Arc Summary',
+      compactJson(summarizeBossAndArcForEndings(layerBible, campaignPlan, bossWeek, binaryChoiceWeek, weekSummaries)),
+      options.retryMode ? 'Retry mode: keep the ending leaner in length, not smaller in consequence.' : '',
+      '',
+      'JSON only.'
+    ].filter(Boolean).join('\n');
+  };
+
 })();

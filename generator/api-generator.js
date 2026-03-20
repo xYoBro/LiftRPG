@@ -2280,6 +2280,750 @@ window.LiftRPGAPI = (function () {
     return errors;
   }
 
+  // ── Multi-stage pipeline helpers ────────────────────────────────────────
+
+  function unwrapIfNeeded(result, expectedKey) {
+    if (!result || typeof result !== 'object') return result;
+    if (result[expectedKey]) return result;
+    var keys = Object.keys(result);
+    if (keys.length === 1) {
+      var inner = result[keys[0]];
+      if (inner && typeof inner === 'object' && inner[expectedKey]) {
+        console.warn('[LiftRPG] Stage output wrapped in "' + keys[0] + '" key — unwrapping to get "' + expectedKey + '"');
+        return inner;
+      }
+    }
+    return result;
+  }
+
+  function buildOpenAICompatUrl(baseUrl) {
+    return String(baseUrl || '').replace(/\/+$/, '') + '/chat/completions';
+  }
+
+  function buildOpenAICompatHeaders(apiKey) {
+    var headers = { 'content-type': 'application/json' };
+    if (apiKey) headers.Authorization = 'Bearer ' + apiKey;
+    return headers;
+  }
+
+  function isStructuredOutputUnsupportedMessage(message) {
+    var lower = String(message || '').toLowerCase();
+    return lower.indexOf('response_format') !== -1
+      || lower.indexOf('json_schema') !== -1
+      || lower.indexOf('unsupported') !== -1
+      || lower.indexOf('not supported') !== -1
+      || lower.indexOf('unknown parameter') !== -1
+      || lower.indexOf('invalid parameter') !== -1;
+  }
+
+  function buildStructuredStageName(stageName) {
+    return String(stageName || 'stage')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 48) || 'stage';
+  }
+
+  function isLikelyTruncationError(err) {
+    var lower = String((err && err.message) || err || '').toLowerCase();
+    return lower.indexOf('truncated') !== -1
+      || lower.indexOf('max_tokens') !== -1
+      || lower.indexOf('output token limit') !== -1
+      || lower.indexOf('finish_reason') !== -1 && lower.indexOf('length') !== -1
+      || lower.indexOf('unexpected end') !== -1
+      || lower.indexOf('unexpected eof') !== -1
+      || lower.indexOf('unterminated') !== -1;
+  }
+
+  function isLikelyJsonFailure(err) {
+    var lower = String((err && err.message) || err || '').toLowerCase();
+    return lower.indexOf('malformed json') !== -1
+      || lower.indexOf('json') !== -1 && lower.indexOf('repair') !== -1
+      || lower.indexOf('parse') !== -1 && lower.indexOf('json') !== -1
+      || lower.indexOf('no json object found') !== -1;
+  }
+
+  function isLikelySchemaFailure(err) {
+    var lower = String((err && err.message) || err || '').toLowerCase();
+    return lower.indexOf('missing required') !== -1
+      || lower.indexOf('expected ') !== -1
+      || lower.indexOf('returned weeks') !== -1
+      || lower.indexOf('returned fragments') !== -1
+      || lower.indexOf('stage validation') !== -1
+      || lower.indexOf('missing required sections') !== -1;
+  }
+
+  function shouldFallbackFromStructured(err) {
+    var message = (err && err.message) || '';
+    return !!(err && err.structuredUnsupported)
+      || isStructuredOutputUnsupportedMessage((err && err.message) || '')
+      || String(message).toLowerCase().indexOf('unexpected structured response shape') !== -1
+      || (isLikelyJsonFailure(err) && !isLikelyTruncationError(err));
+  }
+
+  function shouldRetryStageError(err) {
+    return isLikelyTruncationError(err) || isLikelyJsonFailure(err) || isLikelySchemaFailure(err);
+  }
+
+  function shouldSplitWeekChunk(err, weekNumbers) {
+    return weekNumbers.length > 1 && shouldRetryStageError(err);
+  }
+
+  function shouldSplitFragmentBatch(err, registry) {
+    return registry.length > 1 && shouldRetryStageError(err);
+  }
+
+  function truncateText(value, maxLength) {
+    var text = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!maxLength || text.length <= maxLength) return text;
+    return text.slice(0, Math.max(0, maxLength - 3)).replace(/\s+\S*$/, '') + '...';
+  }
+
+  async function callOpenAICompatStructured(apiKey, baseUrl, model, prompt, schema, maxTokens, timeoutMs, stageName) {
+    var resp = await fetchWithTimeout(buildOpenAICompatUrl(baseUrl), {
+      method: 'POST',
+      headers: buildOpenAICompatHeaders(apiKey),
+      body: JSON.stringify({
+        model: model,
+        max_tokens: maxTokens || 65536,
+        max_completion_tokens: maxTokens || 65536,
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: buildStructuredStageName(stageName),
+            strict: false,
+            schema: schema
+          }
+        },
+        messages: [{ role: 'user', content: prompt }]
+      })
+    }, timeoutMs);
+
+    var body = await resp.json();
+    var errObj = Array.isArray(body) ? body[0] : body;
+    if (!resp.ok) {
+      var errMsg = (errObj.error && errObj.error.message)
+        || (errObj.error && errObj.error.status && (errObj.error.status + ': ' + JSON.stringify(errObj.error)))
+        || errObj.message
+        || ('HTTP ' + resp.status + ' — ' + JSON.stringify(body).slice(0, 500));
+      var err = new Error('API error: ' + errMsg);
+      if (isStructuredOutputUnsupportedMessage(errMsg)) err.structuredUnsupported = true;
+      throw err;
+    }
+
+    if (!body.choices || !body.choices[0] || !body.choices[0].message) {
+      throw new Error('Unexpected structured response shape. Check the console.');
+    }
+
+    var message = body.choices[0].message;
+    if (message.parsed && typeof message.parsed === 'object') {
+      return cloneSimple(message.parsed);
+    }
+
+    var rawText = extractTextContent(message.content);
+    window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
+    window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = {
+      finish_reason: body.choices[0].finish_reason,
+      model: body.model,
+      usage: body.usage,
+      response_mode: 'json_schema'
+    });
+
+    if (body.choices[0].finish_reason === 'length') {
+      throw new Error(
+        'Response truncated: the model hit the output token limit before completing the JSON.\n\n' +
+        'The stage output requires more output tokens than this model provided.'
+      );
+    }
+
+    try {
+      return JSON.parse(rawText);
+    } catch (parseErr) {
+      console.warn('[LiftRPG] Structured response for ' + stageName + ' was not directly parseable; attempting JSON repair fallback');
+      return extractJson(rawText);
+    }
+  }
+
+  async function callProviderStructured(settings, prompt, schema, maxTokens, stageName) {
+    if (!schema || settings.format === 'anthropic') {
+      return extractJson(await callProvider(settings, prompt, maxTokens));
+    }
+
+    try {
+      return await callOpenAICompatStructured(
+        settings.apiKey,
+        settings.baseUrl,
+        settings.model,
+        prompt,
+        schema,
+        maxTokens,
+        settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS,
+        stageName
+      );
+    } catch (err) {
+      if (!shouldFallbackFromStructured(err) || isLikelyTruncationError(err)) throw err;
+      console.warn('[LiftRPG] Structured output unavailable for ' + stageName + '; falling back to freeform JSON repair:', err.message);
+      return extractJson(await callProvider(settings, prompt, maxTokens));
+    }
+  }
+
+  function buildRetryDirective(stageName, attempt, err) {
+    return [
+      '',
+      '## Retry Directive',
+      '- This is retry ' + (attempt + 1) + ' for ' + stageName + '.',
+      '- Keep prose concrete and high-signal, but slightly tighter so the full JSON completes cleanly.',
+      '- Preserve named characters, shell identity, clue economy, and map continuity.',
+      '- Fix the failure that caused the retry: ' + truncateText(((err && err.message) || 'unknown issue'), 240)
+    ].join('\n');
+  }
+
+  function prefixStageError(stageName, err) {
+    var message = String((err && err.message) || err || 'Unknown error');
+    if (message.indexOf('[' + stageName + '] ') === 0) return err instanceof Error ? err : new Error(message);
+    return new Error('[' + stageName + '] ' + message);
+  }
+
+  function getApiPromptBuilders() {
+    return {
+      stage1: window.generateApiStage1Prompt || window.generateStage1Prompt,
+      stage2: window.generateApiStage2Prompt || window.generateStage2Prompt,
+      shell: window.generateApiShellPrompt || window.generateShellPrompt,
+      weeks: window.generateApiWeekChunkPrompt || window.generateWeekChunkPrompt,
+      fragments: window.generateApiFragmentsPrompt || window.generateFragmentsPrompt,
+      fragmentBatch: window.generateApiFragmentBatchPrompt || window.generateFragmentBatchPrompt,
+      endings: window.generateApiEndingsPrompt || window.generateEndingsPrompt
+    };
+  }
+
+  function assertApiPromptBuilders(builders) {
+    if (!builders.stage1 || !builders.stage2 || !builders.shell || !builders.weeks ||
+      !builders.fragments || !builders.fragmentBatch || !builders.endings) {
+      throw new Error('Pipeline generators not loaded. Please reload the page.');
+    }
+  }
+
+  function validateLayerBibleStage(result) {
+    if (!result || !result.storyLayer || !result.gameLayer || !result.governingLayer) {
+      return 'Stage 1 failed: layer bible missing required sections (storyLayer, gameLayer, governingLayer).';
+    }
+    if (!result.designLedger || !result.designLedger.mysteryQuestions || !result.designLedger.weekTransformations) {
+      return 'Stage 1 failed: designLedger is missing mysteryQuestions or weekTransformations.';
+    }
+    return '';
+  }
+
+  function validateCampaignPlanStage(result) {
+    if (!result || !Array.isArray(result.weeks) || !result.bossPlan) {
+      return 'Stage 2 failed: campaign plan missing required sections (weeks[], bossPlan).';
+    }
+    return '';
+  }
+
+  function validateShellStage(result) {
+    if (!result || !result.meta || !result.cover || !result.rulesSpread) {
+      return 'Stage 3 failed: booklet shell missing required keys (meta, cover, rulesSpread).';
+    }
+    return '';
+  }
+
+  function validateWeeksStage(result, expectedWeeks) {
+    if (!result || !Array.isArray(result.weeks)) {
+      return 'Week stage validation failed: expected a { weeks:[...] } object.';
+    }
+    var requested = (expectedWeeks || []).slice().sort(function (a, b) { return a - b; });
+    var returned = result.weeks.map(function (week) { return week.weekNumber; }).sort(function (a, b) { return a - b; });
+    if (requested.length !== returned.length) {
+      return 'Week stage validation failed: expected ' + requested.length + ' weeks but received ' + returned.length + '.';
+    }
+    for (var i = 0; i < requested.length; i++) {
+      if (requested[i] !== returned[i]) {
+        return 'Week stage validation failed: expected weeks [' + requested.join(', ') + '] but received [' + returned.join(', ') + '].';
+      }
+    }
+    return '';
+  }
+
+  function validateFragmentsStage(result, expectedRegistry) {
+    if (!result || !Array.isArray(result.fragments)) {
+      return 'Fragment stage validation failed: expected a { fragments:[...] } object.';
+    }
+    var expected = (expectedRegistry || []).map(function (entry) { return normalizeId(entry.id); }).filter(Boolean);
+    if (!expected.length) return '';
+    var seen = {};
+    var extras = [];
+    result.fragments.forEach(function (fragment) {
+      var id = normalizeId(fragment && fragment.id);
+      if (!id) return;
+      seen[id] = true;
+      if (expected.indexOf(id) === -1) extras.push(fragment.id);
+    });
+    var missing = expected.filter(function (id) { return !seen[id]; });
+    if (missing.length > 0) {
+      return 'Fragment stage validation failed: missing IDs ' + missing.slice(0, 8).join(', ') + '.';
+    }
+    if (extras.length > 0) {
+      return 'Fragment stage validation failed: unexpected IDs ' + extras.slice(0, 8).join(', ') + '.';
+    }
+    return '';
+  }
+
+  function validateEndingsStage(result) {
+    if (!result || !Array.isArray(result.endings) || result.endings.length === 0) {
+      return 'Endings stage validation failed: expected a non-empty endings array.';
+    }
+    return '';
+  }
+
+  async function runJsonStage(settings, config) {
+    var attemptCount = config.maxAttempts || 2;
+    var lastErr = null;
+
+    for (var attempt = 0; attempt < attemptCount; attempt++) {
+      var prompt = config.buildPrompt({ attempt: attempt, error: lastErr });
+      if (attempt > 0) prompt += buildRetryDirective(config.stageName, attempt, lastErr);
+
+      try {
+        var result = config.schema
+          ? await callProviderStructured(settings, prompt, config.schema, config.maxTokens, config.stageName)
+          : extractJson(await callProvider(settings, prompt, config.maxTokens));
+
+        if (config.unwrapKey) result = unwrapIfNeeded(result, config.unwrapKey);
+        if (config.normalizeResult) result = config.normalizeResult(result);
+        if (config.validate) {
+          var validationMessage = config.validate(result);
+          if (validationMessage) throw new Error(validationMessage);
+        }
+        return result;
+      } catch (err) {
+        lastErr = err;
+        console.warn('[LiftRPG] ' + config.stageName + ' attempt ' + (attempt + 1) + '/' + attemptCount + ' failed:', err.message);
+        if (attempt === attemptCount - 1 || !shouldRetryStageError(err)) {
+          throw prefixStageError(config.stageName, err);
+        }
+      }
+    }
+
+    throw prefixStageError(config.stageName, lastErr || new Error('Unknown stage failure'));
+  }
+
+  function collectWeeksAndValues(targetWeeks, targetValues, chunkOutput) {
+    (chunkOutput.weeks || []).forEach(function (week) {
+      targetWeeks.push(week);
+      if (!week.isBossWeek && week.weeklyComponent &&
+        week.weeklyComponent.value !== undefined && week.weeklyComponent.value !== null && week.weeklyComponent.value !== '') {
+        targetValues.push(week.weeklyComponent.value);
+      }
+    });
+  }
+
+  async function generateWeekChunkAdaptive(settings, builders, config) {
+    var stageName = config.weekNumbers.length === 1
+      ? 'Week ' + config.weekNumbers[0]
+      : 'Weeks ' + config.weekNumbers.join(',');
+
+    try {
+      return [await runJsonStage(settings, {
+        stageName: stageName,
+        schema: STRUCTURED_SCHEMA_WEEKS,
+        maxTokens: 32000,
+        unwrapKey: 'weeks',
+        maxAttempts: 2,
+        normalizeResult: function (result) {
+          if (result && result.meta && Array.isArray(result.weeks)) {
+            console.warn('[LiftRPG] Week chunk output a full booklet — extracting weeks only');
+            return { weeks: result.weeks };
+          }
+          return result;
+        },
+        validate: function (result) {
+          return validateWeeksStage(result, config.weekNumbers);
+        },
+        buildPrompt: function (retryState) {
+          return builders.weeks(
+            config.workout,
+            config.brief,
+            config.layerBible,
+            config.campaignPlan,
+            config.weekNumbers,
+            buildChunkContinuity(config.allPriorWeeks),
+            config.allComponentValues,
+            config.shellContext,
+            retryState.attempt > 0 ? { retryMode: 'tight' } : undefined
+          );
+        }
+      })];
+    } catch (err) {
+      if (!shouldSplitWeekChunk(err, config.weekNumbers)) throw err;
+      console.warn('[LiftRPG] Splitting week chunk [' + config.weekNumbers.join(', ') + '] after failure:', err.message);
+
+      var outputs = [];
+      var stagedWeeks = config.allPriorWeeks.slice();
+      var stagedValues = config.allComponentValues.slice();
+
+      for (var i = 0; i < config.weekNumbers.length; i++) {
+        var splitOutputs = await generateWeekChunkAdaptive(settings, builders, {
+          workout: config.workout,
+          brief: config.brief,
+          layerBible: config.layerBible,
+          campaignPlan: config.campaignPlan,
+          weekNumbers: [config.weekNumbers[i]],
+          allPriorWeeks: stagedWeeks,
+          allComponentValues: stagedValues,
+          shellContext: config.shellContext
+        });
+        splitOutputs.forEach(function (chunkOutput) {
+          outputs.push(chunkOutput);
+          collectWeeksAndValues(stagedWeeks, stagedValues, chunkOutput);
+        });
+      }
+
+      return outputs;
+    }
+  }
+
+  function splitRegistryForRetry(registry) {
+    var midpoint = Math.ceil(registry.length / 2);
+    return [registry.slice(0, midpoint), registry.slice(midpoint)];
+  }
+
+  function weekSummariesForRegistry(registry, allWeekSummaries, fallbackSummaries) {
+    var lookup = {};
+    (registry || []).forEach(function (entry) {
+      if (entry && entry.weekRef) lookup[entry.weekRef] = true;
+    });
+    var scoped = (allWeekSummaries || []).filter(function (summary) {
+      return lookup[summary.weekNumber];
+    });
+    return scoped.length ? scoped : (fallbackSummaries || []);
+  }
+
+  async function generateFragmentBatchAdaptive(settings, builders, config) {
+    try {
+      return await runJsonStage(settings, {
+        stageName: config.label,
+        schema: STRUCTURED_SCHEMA_FRAGMENTS,
+        maxTokens: 32000,
+        unwrapKey: 'fragments',
+        maxAttempts: 2,
+        validate: function (result) {
+          return validateFragmentsStage(result, config.registry);
+        },
+        buildPrompt: function (retryState) {
+          return builders.fragmentBatch(
+            config.layerBible,
+            config.registry,
+            config.batchWeekSummaries,
+            config.allWeekSummaries,
+            config.priorFragments,
+            config.batchIndex,
+            config.totalBatches,
+            config.shellContext,
+            retryState.attempt > 0 ? { retryMode: 'tight' } : undefined
+          );
+        }
+      });
+    } catch (err) {
+      if (!shouldSplitFragmentBatch(err, config.registry)) throw err;
+      console.warn('[LiftRPG] Splitting fragment batch after failure:', config.label, err.message);
+
+      var halves = splitRegistryForRetry(config.registry);
+      var leftRegistry = halves[0];
+      var rightRegistry = halves[1];
+      var leftSummaries = weekSummariesForRegistry(leftRegistry, config.allWeekSummaries, config.batchWeekSummaries);
+      var rightSummaries = weekSummariesForRegistry(rightRegistry, config.allWeekSummaries, config.batchWeekSummaries);
+
+      var leftOutput = await generateFragmentBatchAdaptive(settings, builders, {
+        layerBible: config.layerBible,
+        registry: leftRegistry,
+        batchWeekSummaries: leftSummaries,
+        allWeekSummaries: config.allWeekSummaries,
+        priorFragments: config.priorFragments,
+        batchIndex: config.batchIndex,
+        totalBatches: config.totalBatches,
+        shellContext: config.shellContext,
+        label: config.label + 'A'
+      });
+
+      var priorForRight = config.priorFragments.concat(leftOutput.fragments || []);
+      var rightOutput = await generateFragmentBatchAdaptive(settings, builders, {
+        layerBible: config.layerBible,
+        registry: rightRegistry,
+        batchWeekSummaries: rightSummaries,
+        allWeekSummaries: config.allWeekSummaries,
+        priorFragments: priorForRight,
+        batchIndex: config.batchIndex,
+        totalBatches: config.totalBatches,
+        shellContext: config.shellContext,
+        label: config.label + 'B'
+      });
+
+      return { fragments: (leftOutput.fragments || []).concat(rightOutput.fragments || []) };
+    }
+  }
+
+  async function patchAssembledBooklet(settings, booklet, errors, identityContract) {
+    try {
+      var rawPatched = await callProvider(
+        settings,
+        generatePatchPrompt(JSON.stringify(booklet, null, 2), errors, {
+          identityContract: identityContract
+        }),
+        32000
+      );
+      var patched = extractJson(rawPatched);
+      enforceIdentityContract(patched, identityContract);
+      enforceBookletDerivedFields(patched);
+      var identityDrift = compareIdentityContract(patched, identityContract);
+      if (identityDrift.length > 0) {
+        console.warn('[LiftRPG] Patch drifted shell identity; restoring approved shell contract:', identityDrift);
+        enforceIdentityContract(patched, identityContract);
+      }
+      return patched;
+    } catch (patchErr) {
+      console.warn('[LiftRPG] Patch stage failed, returning unpatched booklet:', patchErr.message);
+      return booklet;
+    }
+  }
+
+  async function runApiPipeline(options) {
+    if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
+
+    var settings = options.settings || {};
+    var builders = getApiPromptBuilders();
+    assertApiPromptBuilders(builders);
+
+    var workout = options.workout;
+    var brief = options.brief;
+    var dice = options.dice;
+    var weekCount = options.weekCount || window.parseWeekCount(workout);
+    var chunks = window.planWeekChunks(weekCount);
+    var totalStages = 3 + chunks.length + 2;
+    var stageNum = 0;
+    var onProgress = options.onProgress;
+
+    function progress(message) {
+      stageNum++;
+      if (onProgress) onProgress(stageNum, totalStages, message);
+    }
+
+    progress('Building layer bible…');
+    var layerBible = await runJsonStage(settings, {
+      stageName: 'Layer Bible',
+      schema: STRUCTURED_SCHEMA_BIBLE,
+      maxTokens: 8192,
+      maxAttempts: 2,
+      validate: validateLayerBibleStage,
+      buildPrompt: function (retryState) {
+        return builders.stage1(workout, brief, dice, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined);
+      }
+    });
+
+    progress('Planning campaign…');
+    var campaignPlan = await runJsonStage(settings, {
+      stageName: 'Campaign Plan',
+      schema: STRUCTURED_SCHEMA_CAMPAIGN,
+      maxTokens: 16384,
+      maxAttempts: 2,
+      validate: validateCampaignPlanStage,
+      buildPrompt: function (retryState) {
+        return builders.stage2(workout, brief, dice, layerBible, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined);
+      }
+    });
+
+    if (!Array.isArray(campaignPlan.fragmentRegistry)) campaignPlan.fragmentRegistry = [];
+    if (!Array.isArray(campaignPlan.overflowRegistry)) campaignPlan.overflowRegistry = [];
+
+    var plannedFragBatches = buildFragmentBatches(campaignPlan.fragmentRegistry, null);
+    totalStages = 3 + chunks.length + Math.max(plannedFragBatches.length, 1) + 1;
+
+    progress('Building booklet shell…');
+    var shell = await runJsonStage(settings, {
+      stageName: 'Booklet Shell',
+      schema: STRUCTURED_SCHEMA_SHELL,
+      maxTokens: 16384,
+      unwrapKey: 'meta',
+      maxAttempts: 2,
+      normalizeResult: function (result) {
+        if (result && result.meta && Array.isArray(result.weeks)) {
+          console.warn('[LiftRPG] Shell stage output included weeks/fragments/endings — stripping');
+          delete result.weeks;
+          delete result.fragments;
+          delete result.endings;
+        }
+        return result;
+      },
+      validate: validateShellStage,
+      buildPrompt: function (retryState) {
+        return builders.shell(brief, layerBible, campaignPlan, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined);
+      }
+    });
+
+    var identityContract = buildIdentityContract(shell, campaignPlan);
+    var shellContext = extractShellContext(shell);
+    var weekChunkOutputs = [];
+    var allPriorWeeks = [];
+    var allComponentValues = [];
+
+    for (var ci = 0; ci < chunks.length; ci++) {
+      var weekNums = chunks[ci];
+      var isBoss = weekNums.indexOf(weekCount) !== -1;
+      progress(isBoss
+        ? 'Generating boss week…'
+        : weekNums.length === 1
+          ? 'Generating week ' + weekNums[0] + '…'
+          : 'Generating weeks ' + weekNums[0] + '–' + weekNums[weekNums.length - 1] + '…');
+
+      var outputs = await generateWeekChunkAdaptive(settings, builders, {
+        workout: workout,
+        brief: brief,
+        layerBible: layerBible,
+        campaignPlan: campaignPlan,
+        weekNumbers: weekNums,
+        allPriorWeeks: allPriorWeeks,
+        allComponentValues: allComponentValues,
+        shellContext: shellContext
+      });
+
+      outputs.forEach(function (chunkOutput) {
+        weekChunkOutputs.push(chunkOutput);
+        collectWeeksAndValues(allPriorWeeks, allComponentValues, chunkOutput);
+      });
+    }
+
+    var weekSummaries = extractWeekSummaries(weekChunkOutputs);
+    var fragBatches = buildFragmentBatches(campaignPlan.fragmentRegistry, weekSummaries);
+    var fragmentsOutput = { fragments: [] };
+
+    if (fragBatches.length <= 1) {
+      progress('Generating fragments…');
+      try {
+        fragmentsOutput = await runJsonStage(settings, {
+          stageName: 'Fragments',
+          schema: STRUCTURED_SCHEMA_FRAGMENTS,
+          maxTokens: 32000,
+          unwrapKey: 'fragments',
+          maxAttempts: 2,
+          validate: function (result) {
+            return validateFragmentsStage(result, campaignPlan.fragmentRegistry);
+          },
+          buildPrompt: function (retryState) {
+            return builders.fragments(
+              layerBible,
+              campaignPlan,
+              weekSummaries,
+              shellContext,
+              retryState.attempt > 0 ? { retryMode: 'tight' } : undefined
+            );
+          }
+        });
+      } catch (fragmentErr) {
+        if (!shouldSplitFragmentBatch(fragmentErr, campaignPlan.fragmentRegistry || [])) throw fragmentErr;
+        console.warn('[LiftRPG] Monolithic fragments stage failed; retrying as smaller batches:', fragmentErr.message);
+        var splitOutput = await generateFragmentBatchAdaptive(settings, builders, {
+          layerBible: layerBible,
+          registry: campaignPlan.fragmentRegistry || [],
+          batchWeekSummaries: weekSummaries,
+          allWeekSummaries: weekSummaries,
+          priorFragments: [],
+          batchIndex: 0,
+          totalBatches: 1,
+          shellContext: shellContext,
+          label: 'Fragments'
+        });
+        fragmentsOutput = { fragments: splitOutput.fragments || [] };
+      }
+    } else {
+      var batchOutputs = [];
+      var priorFragments = [];
+
+      for (var fi = 0; fi < fragBatches.length; fi++) {
+        var batch = fragBatches[fi];
+        var batchLabel = 'Fragments ' + (fi + 1) + '/' + fragBatches.length + ' (weeks ' + batch.weekNumbers.join(',') + ')';
+        progress('Generating ' + batchLabel.toLowerCase() + '…');
+
+        var batchOutput = await generateFragmentBatchAdaptive(settings, builders, {
+          layerBible: layerBible,
+          registry: batch.registry,
+          batchWeekSummaries: batch.weekSummaries,
+          allWeekSummaries: weekSummaries,
+          priorFragments: priorFragments,
+          batchIndex: fi,
+          totalBatches: fragBatches.length,
+          shellContext: shellContext,
+          label: batchLabel
+        });
+
+        batchOutputs.push(batchOutput);
+        (batchOutput.fragments || []).forEach(function (fragment) {
+          priorFragments.push(fragment);
+        });
+      }
+
+      var mergeResult = mergeFragmentBatches(batchOutputs, campaignPlan.fragmentRegistry);
+      if (mergeResult.errors.length > 0) {
+        console.warn('[LiftRPG] Fragment batch merge issues:', mergeResult.errors);
+      }
+      fragmentsOutput = { fragments: mergeResult.fragments };
+    }
+
+    progress('Generating endings…');
+    var lastChunkWeeks = weekChunkOutputs[weekChunkOutputs.length - 1].weeks || [];
+    var bossWeek = lastChunkWeeks[lastChunkWeeks.length - 1] || {};
+    var binaryChoiceWeek = findBinaryChoiceWeek(weekChunkOutputs);
+    var endingsOutput = await runJsonStage(settings, {
+      stageName: 'Endings',
+      schema: STRUCTURED_SCHEMA_ENDINGS,
+      maxTokens: 8192,
+      unwrapKey: 'endings',
+      maxAttempts: 2,
+      validate: validateEndingsStage,
+      buildPrompt: function (retryState) {
+        return builders.endings(
+          layerBible,
+          campaignPlan,
+          bossWeek,
+          binaryChoiceWeek,
+          shellContext,
+          weekSummaries,
+          retryState.attempt > 0 ? { retryMode: 'tight' } : undefined
+        );
+      }
+    });
+
+    console.log('[LiftRPG] Assembling booklet from', weekChunkOutputs.length, 'week chunks,',
+      ((fragmentsOutput || {}).fragments || []).length, 'fragments,',
+      ((endingsOutput || {}).endings || []).length, 'endings');
+
+    var booklet = options.assemble(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan);
+    enforceIdentityContract(booklet, identityContract);
+
+    var errors = validateAssembledBooklet(booklet);
+    if (errors.warnings && errors.warnings.length > 0) {
+      console.warn('[LiftRPG] Validation warnings:', errors.warnings);
+    }
+    if (errors.length > 0 && options.allowPatch !== false) {
+      console.warn('[LiftRPG] Assembled booklet has', errors.length, 'validation errors:', errors);
+      totalStages++;
+      progress('Patching ' + (errors.length === 1 ? '1 error' : errors.length + ' errors') + '…');
+      booklet = await patchAssembledBooklet(settings, booklet, errors, identityContract);
+      var remaining = validateAssembledBooklet(booklet);
+      if (remaining.length > 0) {
+        console.warn('[LiftRPG] Patch did not fully resolve errors (' + remaining.length + ' remaining):', remaining);
+      }
+    }
+
+    var report = generateQualityReport(booklet);
+    var qualityGate = buildQualityGate(report);
+    if (!qualityGate.passed) {
+      throw new Error('Quality gate failed:\n' + qualityGate.blockers.map(function (entry) {
+        return '- ' + entry.message;
+      }).join('\n'));
+    }
+
+    return booklet;
+  }
+
   // ── 10-Stage Multi-Stage Generator ──────────────────────────────────────
   //
   // Pipeline: Layer Bible → Campaign Plan → Shell → Week Chunks → Fragments → Endings → Validate → Patch
@@ -3575,6 +4319,81 @@ window.LiftRPGAPI = (function () {
     }
 
     return booklet;
+  }
+
+  function resolveStructuredPipelineSettings(settings) {
+    var resolved = Object.assign({}, settings || {});
+
+    if (!resolved.apiKey && resolved.geminiApiKey) resolved.apiKey = resolved.geminiApiKey;
+    if (!resolved.model && resolved.geminiModel) resolved.model = resolved.geminiModel;
+    if (!resolved.baseUrl && (resolved.geminiApiKey || resolved.format === 'gemini')) {
+      resolved.baseUrl = PROVIDERS.gemini.baseUrl;
+    }
+    if (!resolved.model && resolved.baseUrl === PROVIDERS.gemini.baseUrl) {
+      resolved.model = PROVIDERS.gemini.defaultModel;
+    }
+    if (!resolved.format || resolved.format === 'gemini') {
+      resolved.format = resolved.baseUrl === PROVIDERS.anthropic.baseUrl ? 'anthropic' : 'openai';
+    }
+    if (!resolved.baseUrl && resolved.format !== 'anthropic') {
+      resolved.baseUrl = PROVIDERS.openai.baseUrl;
+    }
+    if (!resolved.model) {
+      if (resolved.format === 'anthropic') resolved.model = PROVIDERS.anthropic.defaultModel;
+      else if (resolved.baseUrl === PROVIDERS.gemini.baseUrl) resolved.model = PROVIDERS.gemini.defaultModel;
+      else resolved.model = PROVIDERS.openai.defaultModel;
+    }
+
+    return resolved;
+  }
+
+  function allowsEmptyApiKey(settings) {
+    var baseUrl = String((settings && settings.baseUrl) || '').replace(/\/+$/, '');
+    return !!(settings && settings.noKey)
+      || baseUrl === String(PROVIDERS.ollama.baseUrl || '').replace(/\/+$/, '')
+      || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(baseUrl);
+  }
+
+  // ── Overridden pipeline entrypoints ──────────────────────────────────────
+  // The legacy implementations remain above for reference, but these later
+  // declarations are the exported versions used by the runtime.
+
+  async function generateMultiStage(settings, workout, brief, dice, onProgress) {
+    return runApiPipeline({
+      settings: settings,
+      workout: workout,
+      brief: brief,
+      dice: dice,
+      onProgress: onProgress,
+      allowPatch: true,
+      assemble: function (shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan) {
+        return assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan);
+      }
+    });
+  }
+
+  async function generateStructured(settings, workout, brief, dice, onProgress) {
+    var resolvedSettings = resolveStructuredPipelineSettings(settings);
+    if (!resolvedSettings.apiKey && resolvedSettings.format !== 'anthropic' && !allowsEmptyApiKey(resolvedSettings)) {
+      throw new Error('API key required for structured generation.');
+    }
+
+    var nw = normalizeWorkoutParam(workout);
+    var workoutText = nw.weeks.length > 0 ? formatNormalizedForPrompt(nw) : nw.rawText;
+    var weekCount = nw.weekCount || (typeof window.parseWeekCount === 'function' ? window.parseWeekCount(workoutText) : 6);
+
+    return runApiPipeline({
+      settings: resolvedSettings,
+      workout: workoutText,
+      brief: brief,
+      dice: dice,
+      onProgress: onProgress,
+      weekCount: weekCount,
+      allowPatch: true,
+      assemble: function (shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan) {
+        return assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, nw, campaignPlan);
+      }
+    });
   }
 
   // ── Public API ──────────────────────────────────────────────────────────────
