@@ -111,6 +111,18 @@ window.LiftRPGAPI = (function () {
     });
   }
 
+  function buildOpenAICompatChatPayload(model, prompt, maxTokens, extra) {
+    var payload = Object.assign({
+      model: model,
+      // Keep the chat-completions contract conservative across OpenAI-style
+      // providers. Some providers reject requests that include both legacy and
+      // newer token-limit fields in the same payload.
+      max_tokens: maxTokens || 65536,
+      messages: [{ role: 'user', content: prompt }]
+    }, extra || {});
+    return payload;
+  }
+
   function uniqueStrings(values) {
     var seen = Object.create(null);
     return (values || []).map(function (value) {
@@ -345,12 +357,7 @@ window.LiftRPGAPI = (function () {
     var resp = await fetchWithTimeout(url, {
       method: 'POST',
       headers: headers,
-      body: JSON.stringify({
-        model: model,
-        max_tokens: maxTokens || 65536,
-        max_completion_tokens: maxTokens || 65536,
-        messages: [{ role: 'user', content: prompt }]
-      })
+      body: JSON.stringify(buildOpenAICompatChatPayload(model, prompt, maxTokens))
     }, timeoutMs);
 
     var body = await resp.json();
@@ -2569,10 +2576,7 @@ window.LiftRPGAPI = (function () {
     var resp = await fetchWithTimeout(buildOpenAICompatUrl(baseUrl), {
       method: 'POST',
       headers: buildOpenAICompatHeaders(apiKey),
-      body: JSON.stringify({
-        model: model,
-        max_tokens: maxTokens || 65536,
-        max_completion_tokens: maxTokens || 65536,
+      body: JSON.stringify(buildOpenAICompatChatPayload(model, prompt, maxTokens, {
         response_format: {
           type: 'json_schema',
           json_schema: {
@@ -2580,9 +2584,8 @@ window.LiftRPGAPI = (function () {
             strict: false,
             schema: schema
           }
-        },
-        messages: [{ role: 'user', content: prompt }]
-      })
+        }
+      }))
     }, timeoutMs);
 
     var body = await resp.json();
