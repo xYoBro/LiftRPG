@@ -2643,6 +2643,162 @@
     };
   }
 
+  // Compact voice packets preserve artifact quality without re-sending the full
+  // doctrine. They carry the few binding aesthetic pressures later stages need:
+  // motive, register, shell identity, named human pressure, and payoff burden.
+  function collectMotifSignals(motifs) {
+    if (!motifs || typeof motifs !== 'object') return [];
+    return Object.keys(motifs).map(function (key) {
+      return key + ': ' + truncateText(motifs[key], 60);
+    }).filter(Boolean).slice(0, 4);
+  }
+
+  function summarizeVoiceContractForApi(shellContext) {
+    if (!shellContext) return null;
+    var voice = shellContext.narrativeVoice || {};
+    var register = shellContext.literaryRegister || {};
+    var shape = shellContext.structuralShape || {};
+    var identity = shellContext.artifactIdentity || {};
+    return {
+      worldContract: truncateText(shellContext.worldContract, 180),
+      narrator: [voice.person, voice.tense, voice.narratorStance].filter(Boolean).join(' / '),
+      register: {
+        name: register.name || '',
+        behavior: truncateText(register.behaviorDescription, 90),
+        forbiddenMoves: (register.forbiddenMoves || []).slice(0, 3),
+        typography: truncateText(register.typographicBehavior, 70)
+      },
+      shape: {
+        resolution: shape.resolution || '',
+        temporalOrder: shape.temporalOrder || '',
+        narratorReliability: shape.narratorReliability || '',
+        promptFragmentRelationship: shape.promptFragmentRelationship || ''
+      },
+      shellIdentity: {
+        shellFamily: identity.shellFamily || '',
+        authorialMode: identity.authorialMode || '',
+        openingMode: identity.openingMode || '',
+        rulesDeliveryMode: identity.rulesDeliveryMode || '',
+        unlockLogic: identity.unlockLogic || '',
+        attachmentStrategy: identity.attachmentStrategy || '',
+        documentEcology: truncateText(identity.documentEcology, 80),
+        materialCulture: truncateText(identity.materialCulture, 80)
+      }
+    };
+  }
+
+  function summarizeShellVoicePacket(layerBible, campaignPlan, blend) {
+    var story = (layerBible || {}).storyLayer || {};
+    var protagonist = story.protagonist || {};
+    var relationships = (story.relationshipWeb || []).slice(0, 4);
+    return {
+      shellPressure: {
+        protagonistNeed: truncateText(protagonist.need, 70),
+        protagonistWound: truncateText(protagonist.wound, 70),
+        protagonistArc: truncateText(protagonist.arc, 90),
+        institutionName: ((layerBible || {}).governingLayer || {}).institutionName || '',
+        weeklyComponentType: ((layerBible || {}).gameLayer || {}).weeklyComponentType || '',
+        topologyBias: truncateText((((campaignPlan || {}).topology || {}).identity || ((campaignPlan || {}).topology || {}).description), 90)
+      },
+      namedHumanPressure: relationships.map(function (entry) {
+        return {
+          name: entry.name || '',
+          role: truncateText(entry.role, 40),
+          arcFunction: truncateText(entry.arcFunction, 70)
+        };
+      }),
+      motifSignals: collectMotifSignals(story.recurringMotifs),
+      campaignTexture: {
+        topologyTone: truncateText((((campaignPlan || {}).topology || {}).identity || ((campaignPlan || {}).topology || {}).description), 90),
+        bossCost: truncateText((((campaignPlan || {}).bossPlan || {}).whyItFeelsEarned), 100),
+        designBias: summarizeDesignBiasForApi(blend)
+      }
+    };
+  }
+
+  function summarizeFragmentRegistryForApi(fragmentRegistry) {
+    return (fragmentRegistry || []).map(function (entry) {
+      return {
+        id: entry.id || '',
+        weekRef: entry.weekRef,
+        title: truncateText(entry.title, 72),
+        documentType: entry.documentType || '',
+        author: truncateText(entry.author, 56),
+        revealPurpose: truncateText(entry.revealPurpose, 95),
+        clueFunction: entry.clueFunction || ''
+      };
+    });
+  }
+
+  function summarizeFragmentVoicePacket(layerBible, batchRegistry, batchWeekSummaries, priorFragments, shellContext) {
+    var story = (layerBible || {}).storyLayer || {};
+    return {
+      shellVoice: summarizeVoiceContractForApi(shellContext),
+      motifSignals: collectMotifSignals(story.recurringMotifs),
+      namedWitnesses: (story.relationshipWeb || []).slice(0, 4).map(function (entry) {
+        return {
+          name: entry.name || '',
+          role: truncateText(entry.role, 40),
+          secretPressure: truncateText(entry.secret, 70)
+        };
+      }),
+      documentSpread: (batchRegistry || []).map(function (entry) {
+        return {
+          id: entry.id || '',
+          documentType: entry.documentType || '',
+          author: truncateText(entry.author, 50),
+          revealPurpose: truncateText(entry.revealPurpose, 80)
+        };
+      }),
+      weekEchoes: (batchWeekSummaries || []).map(function (summary) {
+        return {
+          weekNumber: summary.weekNumber,
+          title: truncateText(summary.title, 60),
+          pressure: (summary.keyPrompts || []).slice(0, 1)[0] || truncateText(summary.mapNote, 70),
+          fragmentRefs: (summary.fragmentRefs || []).slice(0, 4)
+        };
+      }),
+      repetitionGuard: summarizePriorFragmentsForApi(priorFragments)
+    };
+  }
+
+  function summarizeEndingVoicePacket(layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext) {
+    var story = (layerBible || {}).storyLayer || {};
+    var protagonist = story.protagonist || {};
+    var binaryChoice = null;
+    (binaryChoiceWeek && binaryChoiceWeek.sessions || []).forEach(function (session) {
+      if (session.binaryChoice && !binaryChoice) binaryChoice = session.binaryChoice;
+    });
+    return {
+      shellVoice: summarizeVoiceContractForApi(shellContext),
+      endingBurden: {
+        protagonistNeed: truncateText(protagonist.need, 70),
+        protagonistWound: truncateText(protagonist.wound, 70),
+        costlyArc: truncateText(protagonist.arc, 90),
+        bossTruth: truncateText(story.bossTruth, 100),
+        finalReveal: truncateText((((layerBible || {}).designLedger || {}).finalRevealRecontextualizes), 110)
+      },
+      namedWitnesses: (story.relationshipWeb || []).slice(0, 4).map(function (entry) {
+        return {
+          name: entry.name || '',
+          arcFunction: truncateText(entry.arcFunction, 70),
+          secret: truncateText(entry.secret, 70)
+        };
+      }),
+      consequenceFork: binaryChoice ? {
+        choiceLabel: truncateText(binaryChoice.choiceLabel, 80),
+        promptA: truncateText(binaryChoice.promptA, 70),
+        promptB: truncateText(binaryChoice.promptB, 70)
+      } : null,
+      bossTexture: {
+        title: truncateText((((bossWeek || {}).bossEncounter || {}).title), 70),
+        convergenceProof: truncateText((((bossWeek || {}).bossEncounter || {}).convergenceProof), 110),
+        earnedBy: truncateText((((campaignPlan || {}).bossPlan || {}).whyItFeelsEarned), 100)
+      },
+      motifSignals: collectMotifSignals(story.recurringMotifs)
+    };
+  }
+
   function buildApiCompactRules(stageName) {
     var rules = [
       'Preserve artifact-grade fiction: distinctive voice, document ecology, clue economy, spatial continuity, strong endings.',
@@ -2656,10 +2812,13 @@
       rules.push('Write only the requested week slice. Preserve topology family, approved shell identity, and fragment ID discipline.');
     } else if (stageName === 'fragments') {
       rules.push('Make each document feel authored, cross-referenceable, and specific to this booklet rather than generic lore delivery.');
+      rules.push('Use document voice, material detail, and contradiction pressure instead of exposition bulk.');
     } else if (stageName === 'endings') {
       rules.push('Pay off the protagonist arc, binary choice, and boss convergence without flattening the established register.');
+      rules.push('Aim for a final document that recontextualizes evidence instead of summarizing plot events.');
     } else if (stageName === 'shell') {
       rules.push('Lock the renderer-facing shell contract now so later stages can inherit it without renegotiating identity.');
+      rules.push('Make the shell feel authored and singular enough that later stages can imitate it without more doctrine.');
     }
 
     return rules;
@@ -2939,11 +3098,16 @@
 
   function summarizePriorFragmentsForApi(priorFragments) {
     return (priorFragments || []).slice(-8).map(function (fragment) {
+      var contentValue = '';
+      if (fragment && typeof fragment.content === 'string') contentValue = fragment.content;
+      else if (fragment && fragment.content && typeof fragment.content === 'object') contentValue = fragment.content.body || fragment.content.html || '';
+      else if (fragment && fragment.body) contentValue = fragment.body;
       return {
         id: fragment.id || '',
         documentType: fragment.documentType || '',
         author: truncateText(fragment.inWorldAuthor, 60),
-        purpose: truncateText(fragment.inWorldPurpose, 90)
+        purpose: truncateText(fragment.inWorldPurpose, 90),
+        openingCue: truncateText(contentValue, 70)
       };
     });
   }
@@ -3074,12 +3238,15 @@
         overflowCount: (campaignPlan.overflowRegistry || []).length
       }),
       '',
+      '## Voice Packet',
+      compactJson(summarizeShellVoicePacket(layerBible, campaignPlan, blend)),
+      '',
       '## Creative Direction',
       truncateText(brief || buildDefaultBrief(blendContext, blend), 1200),
       '',
       '## Design Bias',
       compactJson(summarizeDesignBiasForApi(blend)),
-      options.retryMode ? 'Retry mode: keep shells concise, specific, and renderer-safe.' : '',
+      options.retryMode ? 'Retry mode: keep shells concise, specific, renderer-safe, and distinctive in diction before adding more labels.' : '',
       '',
       'JSON only.'
     ].filter(Boolean).join('\n');
@@ -3161,15 +3328,18 @@
       '## Shell Contract',
       compactJson(summarizeShellContractForApi(shellContext)),
       '',
+      '## Fragment Voice Packet',
+      compactJson(summarizeFragmentVoicePacket(layerBible, campaignPlan.fragmentRegistry || [], weekSummaries, [], shellContext)),
+      '',
       '## Layer Bible Slice',
       compactJson(summarizeLayerBibleForWeeks(layerBible)),
       '',
       '## Fragment Registry',
-      compactJson(campaignPlan.fragmentRegistry || []),
+      compactJson(summarizeFragmentRegistryForApi(campaignPlan.fragmentRegistry || [])),
       '',
       '## Relevant Week Summaries',
       compactJson(summarizeWeekSummariesForFragments(weekSummaries)),
-      options.retryMode ? 'Retry mode: compress prose slightly but keep cross-reference density and artifact specificity.' : '',
+      options.retryMode ? 'Retry mode: compress routine phrasing before sacrificing contradiction, material detail, or cross-reference density.' : '',
       '',
       'JSON only.'
     ].filter(Boolean).join('\n');
@@ -3192,18 +3362,21 @@
       '## Shell Contract',
       compactJson(summarizeShellContractForApi(shellContext)),
       '',
+      '## Fragment Voice Packet',
+      compactJson(summarizeFragmentVoicePacket(layerBible, batchRegistry || [], batchWeekSummaries, priorFragments, shellContext)),
+      '',
       '## Layer Bible Slice',
       compactJson(summarizeLayerBibleForWeeks(layerBible, focusWeeks)),
       '',
       '## Batch Registry',
-      compactJson(batchRegistry || []),
+      compactJson(summarizeFragmentRegistryForApi(batchRegistry || [])),
       '',
       '## Relevant Week Summaries',
       compactJson(summarizeWeekSummariesForFragments(batchWeekSummaries, focusWeeks)),
       '',
       '## Prior Fragment Signatures',
       compactJson(summarizePriorFragmentsForApi(priorFragments)),
-      options.retryMode ? 'Retry mode: shorten routine details before sacrificing specificity or cross-reference density.' : '',
+      options.retryMode ? 'Retry mode: shorten routine details before sacrificing specificity, authorial signatures, or cross-reference density.' : '',
       '',
       'JSON only.'
     ].filter(Boolean).join('\n');
@@ -3225,9 +3398,12 @@
       '## Shell Contract',
       compactJson(summarizeShellContractForApi(shellContext)),
       '',
+      '## Ending Voice Packet',
+      compactJson(summarizeEndingVoicePacket(layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext)),
+      '',
       '## Boss And Arc Summary',
       compactJson(summarizeBossAndArcForEndings(layerBible, campaignPlan, bossWeek, binaryChoiceWeek, weekSummaries)),
-      options.retryMode ? 'Retry mode: keep the ending leaner in length, not smaller in consequence.' : '',
+      options.retryMode ? 'Retry mode: keep the ending leaner in length, not smaller in consequence, voice, or evidentiary payoff.' : '',
       '',
       'JSON only.'
     ].filter(Boolean).join('\n');

@@ -562,6 +562,142 @@
       border-color: var(--accent);
     }
 
+    .generator-mode-switch {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .generator-mode-btn {
+      flex: 1;
+      font-family: var(--mono);
+      font-size: 6pt;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      border: 1.5px solid var(--ink);
+      background: none;
+      color: var(--ink);
+      padding: 9px 12px;
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+
+    .generator-mode-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .generator-mode-btn.is-active {
+      background: var(--ink);
+      color: var(--paper);
+      border-color: var(--ink);
+    }
+
+    .generator-mode-copy {
+      margin-top: 8px;
+      font-size: 6pt;
+      line-height: 1.6;
+      letter-spacing: .03em;
+      color: var(--muted);
+    }
+
+    .api-panel {
+      margin-top: 12px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .api-panel[hidden] {
+      display: none !important;
+    }
+
+    .api-config-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .api-field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .api-field .field-label {
+      margin-bottom: 0;
+    }
+
+    .api-select,
+    .api-input {
+      width: 100%;
+      font-family: var(--body);
+      font-size: 8pt;
+      padding: 12px 14px;
+      border: 1px solid rgba(24, 23, 20, .15);
+      background: rgba(255, 255, 255, .86);
+      color: var(--ink);
+      box-sizing: border-box;
+    }
+
+    .api-select:focus,
+    .api-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .api-note {
+      font-size: 6pt;
+      line-height: 1.65;
+      letter-spacing: .03em;
+      color: var(--muted);
+    }
+
+    .api-run-board {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    .api-run-log {
+      border: 1px solid rgba(24, 23, 20, .08);
+      background: rgba(255, 255, 255, .42);
+      padding: 10px 11px;
+      min-height: 86px;
+      font-size: 6pt;
+      line-height: 1.7;
+      color: var(--muted);
+      white-space: pre-wrap;
+    }
+
+    .api-run-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .api-run-actions button {
+      flex: 1 1 180px;
+      font-family: var(--mono);
+      font-size: 7pt;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 8px 14px;
+      cursor: pointer;
+      border: 1.5px solid var(--ink);
+      transition: background .15s, color .15s;
+      background: none;
+      color: var(--ink);
+    }
+
+    .api-run-actions button:hover:not(:disabled) {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    .api-run-actions button:disabled {
+      opacity: .45;
+      cursor: default;
+    }
+
     /* ── Output section ───────────── */
     .gen-output {
       background: rgba(24, 23, 20, .04);
@@ -1111,6 +1247,7 @@
 
     /* ── Responsive ────────────────── */
     @media (max-width:520px) {
+      .api-config-grid,
       .wizard-state-grid,
       .wizard-stage-ledger {
         grid-template-columns: 1fr;
@@ -1152,10 +1289,10 @@
             <summary>How it Works</summary>
             <div class="how-content">
               <ol>
-                <li><a href="#" id="how-generate"><strong>Generate a Prompt</strong></a> &mdash; enter your workout (<a
+                <li><a href="#" id="how-generate"><strong>Start a Booklet</strong></a> &mdash; enter your workout (<a
                     href="https://www.liftosaur.com/" target="_blank" rel="noopener">Liftosaur</a> or plain text) and a
                   story idea</li>
-                <li>Paste it into any LLM &mdash; Claude, ChatGPT, or Gemini &mdash; and save the JSON it returns</li>
+                <li>Choose manual prompts or run the full pipeline here with your own API key</li>
                 <li>Upload the JSON to <a href="renderer/">Render</a> &mdash; print your saddle-stitched booklet</li>
                 <li>Train the program for six weeks, pencil in hand</li>
                 <li>Return to <a href="renderer/">Render</a> with your assembled password to unlock the ending</li>
@@ -1165,8 +1302,8 @@
 
           <nav class="workflow">
             <button class="workflow-btn" id="open-generator" type="button">
-              Generate a Prompt
-              <span class="link-sub">Build an LLM prompt from your workout + story idea</span>
+              Start a Booklet
+              <span class="link-sub">Manual prompts or full BYOK API generation</span>
             </button>
             <a href="renderer/">
               Render
@@ -1201,7 +1338,7 @@
   <div class="modal-overlay" id="generator-modal">
     <div class="modal-panel">
       <button class="modal-close" id="modal-close" type="button" aria-label="Close">&times;</button>
-      <div class="kicker">Prompt Generator</div>
+      <div class="kicker">Booklet Generator</div>
       <div class="rule"></div>
 
       <label class="field-label" for="gen-workout">Workout Program</label>
@@ -1222,7 +1359,65 @@
         <div class="dice-tip">No worries if you don&rsquo;t have dice. Ask Google to roll a d100.</div>
       </div>
 
-      <button class="gen-submit" id="gen-submit" type="button">Build Layer Bible &rarr;</button>
+      <div class="generator-mode-switch">
+        <button class="generator-mode-btn is-active" id="gen-mode-manual" type="button">Manual Prompts</button>
+        <button class="generator-mode-btn" id="gen-mode-api" type="button">Use My AI Key</button>
+      </div>
+      <div class="generator-mode-copy" id="gen-mode-copy">Manual mode keeps the copy/paste wizard and validates each stage locally before you move on.</div>
+
+      <button class="gen-submit" id="gen-submit" type="button">Start Manual Wizard &rarr;</button>
+
+      <div class="api-panel" id="api-panel" hidden>
+        <div class="api-config-grid">
+          <div class="api-field">
+            <label class="field-label" for="api-provider">Provider</label>
+            <select class="api-select" id="api-provider"></select>
+          </div>
+          <div class="api-field">
+            <label class="field-label" for="api-method">Pipeline</label>
+            <select class="api-select" id="api-method">
+              <option value="generateMultiStage">Multi-stage API (Recommended)</option>
+              <option value="generateStructured">Structured API</option>
+            </select>
+          </div>
+          <div class="api-field">
+            <label class="field-label" for="api-model">Model</label>
+            <input class="api-input" id="api-model" type="text" placeholder="gpt-4o">
+          </div>
+          <div class="api-field">
+            <label class="field-label" for="api-base-url">Base URL</label>
+            <input class="api-input" id="api-base-url" type="text" placeholder="https://api.openai.com/v1">
+          </div>
+          <div class="api-field" style="grid-column:1 / -1">
+            <label class="field-label" for="api-key">API Key</label>
+            <input class="api-input" id="api-key" type="password" placeholder="Paste your key for this session" autocomplete="off">
+          </div>
+        </div>
+        <div class="api-note">Your key is sent directly from this browser to the provider you choose. LiftRPG does not proxy or store it on a server. Provider, model, base URL, and pipeline preference are saved locally on this device for convenience.</div>
+        <button class="gen-submit" id="api-submit" type="button">Generate Booklet via API &rarr;</button>
+        <div class="wizard-state-board api-run-board">
+          <div class="wizard-state-grid">
+            <div class="wizard-state-card">
+              <div class="wizard-state-label">API State</div>
+              <div class="wizard-state-value" id="api-state-summary">Waiting For Settings</div>
+              <div class="wizard-state-caption" id="api-state-summary-caption">Choose a provider and pipeline mode to begin.</div>
+            </div>
+            <div class="wizard-state-card">
+              <div class="wizard-state-label">Current Target</div>
+              <div class="wizard-state-value" id="api-state-target">Provider Setup</div>
+              <div class="wizard-state-caption" id="api-state-target-caption">No request has been sent yet.</div>
+            </div>
+            <div class="wizard-state-card">
+              <div class="wizard-state-label">Pipeline Progress</div>
+              <div class="wizard-state-value" id="api-state-progress">0 / 0 stages</div>
+              <div class="wizard-state-caption" id="api-state-progress-caption">The API pipeline will report each stage here as it runs.</div>
+            </div>
+          </div>
+          <div class="wizard-stage-ledger" id="api-stage-ledger"></div>
+          <div class="api-run-log" id="api-run-log">API mode is ready. Add your provider settings, then start the generation run.</div>
+          <div class="api-run-actions" id="api-run-actions"></div>
+        </div>
+      </div>
 
       <div class="wizard-resume-banner" id="wiz-resume-banner">
         <div class="wizard-resume-copy" id="wiz-resume-copy">A saved manual draft is available on this device.</div>
@@ -1429,6 +1624,25 @@
       var openBtn = document.getElementById('open-generator');
       var closeBtn = document.getElementById('modal-close');
       var submitBtn = document.getElementById('gen-submit');
+      var manualModeBtn = document.getElementById('gen-mode-manual');
+      var apiModeBtn = document.getElementById('gen-mode-api');
+      var modeCopyEl = document.getElementById('gen-mode-copy');
+      var apiPanel = document.getElementById('api-panel');
+      var apiProviderEl = document.getElementById('api-provider');
+      var apiMethodEl = document.getElementById('api-method');
+      var apiModelEl = document.getElementById('api-model');
+      var apiBaseUrlEl = document.getElementById('api-base-url');
+      var apiKeyEl = document.getElementById('api-key');
+      var apiSubmitBtn = document.getElementById('api-submit');
+      var apiStateSummary = document.getElementById('api-state-summary');
+      var apiStateSummaryCaption = document.getElementById('api-state-summary-caption');
+      var apiStateTarget = document.getElementById('api-state-target');
+      var apiStateTargetCaption = document.getElementById('api-state-target-caption');
+      var apiStateProgress = document.getElementById('api-state-progress');
+      var apiStateProgressCaption = document.getElementById('api-state-progress-caption');
+      var apiStageLedger = document.getElementById('api-stage-ledger');
+      var apiRunLog = document.getElementById('api-run-log');
+      var apiRunActions = document.getElementById('api-run-actions');
       var workoutEl = document.getElementById('gen-workout');
       var briefEl = document.getElementById('gen-brief');
       var workoutError = document.getElementById('workout-error');
@@ -1510,13 +1724,26 @@
       var assemblyResultEl = document.getElementById('wiz-assembly-result');
       var WIZARD_DRAFT_KEY = 'liftrpg_manual_wizard_draft_v2';
       var LEGACY_WIZARD_DRAFT_KEY = 'liftrpg_manual_wizard_draft_v1';
+      var API_PREFS_KEY = 'liftrpg_api_prefs_v1';
       var WIZARD_BUILD_VERSION = '2.2.0';
       var WIZARD_DRAFT_SCHEMA_VERSION = 2;
       var WIZARD_STAGE_KEYS = ['layerBible', 'campaignPlan', 'shell', 'weeks', 'fragments', 'endings'];
+      var API_STAGE_ORDER = [
+        { key: 'layerBible', label: 'Layer Bible' },
+        { key: 'campaign', label: 'Campaign' },
+        { key: 'shell', label: 'Shell' },
+        { key: 'weeks', label: 'Weeks' },
+        { key: 'fragments', label: 'Fragments' },
+        { key: 'endings', label: 'Endings' },
+        { key: 'quality', label: 'Quality' }
+      ];
 
       var wizStep = 0;
       var wizData = {};
       var wizState = {};
+      var currentGenerationMode = 'manual';
+      var activeApiRunId = 0;
+      var apiRunState = null;
       var stepText = [
         {
           title: 'Build the Layer Bible',
@@ -1558,13 +1785,304 @@
         return api() && api().manual ? api().manual : null;
       }
 
+      function createApiRunState() {
+        var ledger = {};
+        API_STAGE_ORDER.forEach(function (stage) {
+          ledger[stage.key] = 'empty';
+        });
+        return {
+          status: 'idle',
+          summary: 'Waiting For Settings',
+          summaryCaption: 'Choose a provider and pipeline mode to begin.',
+          target: 'Provider Setup',
+          targetCaption: 'No request has been sent yet.',
+          progress: '0 / 0 stages',
+          progressCaption: 'The API pipeline will report each stage here as it runs.',
+          providerLabel: '',
+          model: '',
+          totalStages: 0,
+          stageIndex: 0,
+          currentStageKey: '',
+          log: ['API mode is ready. Add your provider settings, then start the generation run.'],
+          ledger: ledger,
+          booklet: null,
+          error: '',
+          qualityReport: null
+        };
+      }
+
+      function loadApiPrefs() {
+        try {
+          var raw = localStorage.getItem(API_PREFS_KEY);
+          return raw ? JSON.parse(raw) : null;
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function saveApiPrefs() {
+        try {
+          localStorage.setItem(API_PREFS_KEY, JSON.stringify({
+            provider: apiProviderEl ? apiProviderEl.value : 'openai',
+            method: apiMethodEl ? apiMethodEl.value : 'generateMultiStage',
+            model: apiModelEl ? apiModelEl.value.trim() : '',
+            baseUrl: apiBaseUrlEl ? apiBaseUrlEl.value.trim() : ''
+          }));
+        } catch (error) {}
+      }
+
+      function getProviderPreset(providerId) {
+        var presets = api() && api().PROVIDERS ? api().PROVIDERS : {};
+        return presets[providerId] || null;
+      }
+
+      function populateProviderOptions() {
+        if (!apiProviderEl) return;
+        var presets = api() && api().PROVIDERS ? api().PROVIDERS : {};
+        var ids = Object.keys(presets);
+        apiProviderEl.innerHTML = ids.map(function (id) {
+          var label = (presets[id] && presets[id].label) || id;
+          return '<option value="' + escapeForHtml(id) + '">' + escapeForHtml(label) + '</option>';
+        }).join('');
+      }
+
+      function applyProviderPreset(providerId, options) {
+        options = options || {};
+        var preset = getProviderPreset(providerId);
+        if (!preset) return;
+        if (!options.keepModel || !(apiModelEl && apiModelEl.value.trim())) {
+          if (apiModelEl) apiModelEl.value = preset.defaultModel || '';
+        }
+        if (!options.keepBaseUrl || !(apiBaseUrlEl && apiBaseUrlEl.value.trim())) {
+          if (apiBaseUrlEl) apiBaseUrlEl.value = preset.baseUrl || '';
+        }
+        if (apiKeyEl) {
+          apiKeyEl.disabled = !!preset.noKey;
+          apiKeyEl.placeholder = preset.noKey
+            ? 'Not required for this provider'
+            : 'Paste your key for this session';
+          if (preset.noKey) apiKeyEl.value = '';
+        }
+        saveApiPrefs();
+      }
+
+      function initializeApiSettings() {
+        populateProviderOptions();
+        var prefs = loadApiPrefs() || {};
+        var providerId = getProviderPreset(prefs.provider) ? prefs.provider : 'openai';
+        if (apiProviderEl) apiProviderEl.value = providerId;
+        if (apiMethodEl) apiMethodEl.value = prefs.method || 'generateMultiStage';
+        if (apiModelEl && prefs.model) apiModelEl.value = prefs.model;
+        if (apiBaseUrlEl && prefs.baseUrl) apiBaseUrlEl.value = prefs.baseUrl;
+        applyProviderPreset(providerId, {
+          keepModel: !!prefs.model,
+          keepBaseUrl: !!prefs.baseUrl
+        });
+      }
+
+      function setGenerationMode(mode) {
+        currentGenerationMode = mode === 'api' ? 'api' : 'manual';
+        if (manualModeBtn) manualModeBtn.classList.toggle('is-active', currentGenerationMode === 'manual');
+        if (apiModeBtn) apiModeBtn.classList.toggle('is-active', currentGenerationMode === 'api');
+        if (submitBtn) submitBtn.hidden = currentGenerationMode !== 'manual';
+        if (apiPanel) apiPanel.hidden = currentGenerationMode !== 'api';
+        if (chatWizard) chatWizard.hidden = currentGenerationMode !== 'manual';
+        if (wizResumeBanner) wizResumeBanner.hidden = currentGenerationMode !== 'manual' || !wizResumeBanner.classList.contains('is-visible');
+        if (modeCopyEl) {
+          modeCopyEl.textContent = currentGenerationMode === 'manual'
+            ? 'Manual mode keeps the copy/paste wizard and validates each stage locally before you move on.'
+            : 'BYOK mode runs the staged API pipeline in-browser and shows exactly where the run is at every moment.';
+        }
+        if (currentGenerationMode === 'api' && apiRunState === null) {
+          apiRunState = createApiRunState();
+        }
+        renderApiRunState();
+      }
+
+      function pushApiLog(message) {
+        if (!apiRunState) apiRunState = createApiRunState();
+        apiRunState.log.unshift(message);
+        apiRunState.log = apiRunState.log.slice(0, 8);
+      }
+
+      function markApiStageInProgress(stageKey) {
+        if (!apiRunState || !stageKey) return;
+        if (apiRunState.currentStageKey && apiRunState.currentStageKey !== stageKey && apiRunState.ledger[apiRunState.currentStageKey] === 'in progress') {
+          apiRunState.ledger[apiRunState.currentStageKey] = 'valid';
+        }
+        apiRunState.currentStageKey = stageKey;
+        apiRunState.ledger[stageKey] = 'in progress';
+      }
+
+      function markAllApiStages(status) {
+        if (!apiRunState) return;
+        API_STAGE_ORDER.forEach(function (stage) {
+          apiRunState.ledger[stage.key] = status;
+        });
+      }
+
+      function inferApiStageKey(message) {
+        var lower = String(message || '').toLowerCase();
+        if (lower.indexOf('layer bible') !== -1) return 'layerBible';
+        if (lower.indexOf('campaign') !== -1) return 'campaign';
+        if (lower.indexOf('shell') !== -1) return 'shell';
+        if (lower.indexOf('boss week') !== -1 || lower.indexOf('week ') !== -1 || lower.indexOf('weeks ') !== -1) return 'weeks';
+        if (lower.indexOf('fragment') !== -1) return 'fragments';
+        if (lower.indexOf('ending') !== -1) return 'endings';
+        if (lower.indexOf('patch') !== -1 || lower.indexOf('quality') !== -1) return 'quality';
+        return '';
+      }
+
+      function buildApiSettings() {
+        var providerId = apiProviderEl ? apiProviderEl.value : 'openai';
+        var preset = getProviderPreset(providerId);
+        var settings = {
+          format: preset && preset.format ? preset.format : 'openai',
+          apiKey: apiKeyEl ? apiKeyEl.value.trim() : '',
+          baseUrl: apiBaseUrlEl ? apiBaseUrlEl.value.trim() : '',
+          model: apiModelEl ? apiModelEl.value.trim() : ''
+        };
+        if (!settings.model) {
+          throw new Error('Choose a model before starting the API run.');
+        }
+        if (settings.format === 'openai' && !settings.baseUrl) {
+          throw new Error('Base URL is required for OpenAI-compatible providers.');
+        }
+        if (!(preset && preset.noKey) && !settings.apiKey) {
+          throw new Error('API key required for this provider.');
+        }
+        settings._providerId = providerId;
+        settings._providerLabel = preset && preset.label ? preset.label : providerId;
+        return settings;
+      }
+
+      function getApiConfigSignature() {
+        return JSON.stringify({
+          provider: apiProviderEl ? apiProviderEl.value : '',
+          method: apiMethodEl ? apiMethodEl.value : '',
+          model: apiModelEl ? apiModelEl.value.trim() : '',
+          baseUrl: apiBaseUrlEl ? apiBaseUrlEl.value.trim() : ''
+        });
+      }
+
+      function setApiControlsDisabled(disabled) {
+        [manualModeBtn, apiModeBtn, apiProviderEl, apiMethodEl, apiModelEl, apiBaseUrlEl, apiKeyEl, apiSubmitBtn, submitBtn].forEach(function (el) {
+          if (!el) return;
+          if (el === apiKeyEl && apiKeyEl.disabled && !disabled) return;
+          el.disabled = !!disabled;
+        });
+      }
+
+      function resetApiRunStateForConfigChange(message) {
+        if (!apiRunState || apiRunState.status === 'running') return;
+        if (apiRunState.status === 'idle' && !apiRunState.booklet && !apiRunState.error) {
+          renderApiRunState();
+          return;
+        }
+        apiRunState = createApiRunState();
+        apiRunState.summary = 'Configuration Changed';
+        apiRunState.summaryCaption = 'Provider settings were updated after the previous run.';
+        apiRunState.target = 'Start New Run';
+        apiRunState.targetCaption = 'The next API generation will use the new provider configuration.';
+        if (message) pushApiLog(message);
+        renderApiRunState();
+      }
+
+      function renderApiActions() {
+        if (!apiRunActions) return;
+        if (!apiRunState || !apiRunState.booklet) {
+          apiRunActions.innerHTML = '';
+          return;
+        }
+        apiRunActions.innerHTML = '' +
+          '<button type="button" id="api-open-renderer">Open In Renderer</button>' +
+          '<button type="button" id="api-download-json">Download JSON</button>';
+
+        var openRendererBtn = document.getElementById('api-open-renderer');
+        var downloadBtn = document.getElementById('api-download-json');
+
+        if (openRendererBtn) {
+          openRendererBtn.addEventListener('click', function () {
+            try {
+              sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(apiRunState.booklet));
+              window.open('renderer/?source=session', '_blank');
+            } catch (error) {
+              pushApiLog('Could not hand off the booklet to the renderer: ' + (error.message || error));
+              renderApiRunState();
+            }
+          });
+        }
+
+        if (downloadBtn) {
+          downloadBtn.addEventListener('click', function () {
+            var title = (((apiRunState.booklet || {}).cover || {}).title || 'liftrpg-booklet')
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-+|-+$/g, '') || 'liftrpg-booklet';
+            var blob = new Blob([JSON.stringify(apiRunState.booklet, null, 2)], { type: 'application/json' });
+            var url = URL.createObjectURL(blob);
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = title + '.json';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+          });
+        }
+      }
+
+      function renderApiRunState() {
+        if (!apiStateSummary || !apiStageLedger || !apiRunLog) return;
+        if (!apiRunState) apiRunState = createApiRunState();
+        var selectedPreset = getProviderPreset(apiProviderEl ? apiProviderEl.value : '');
+        var providerDisplay = apiRunState.providerLabel || (selectedPreset && selectedPreset.label ? selectedPreset.label : '');
+        var modelDisplay = apiRunState.model || (apiModelEl ? apiModelEl.value.trim() : '');
+        if (apiRunState.status === 'idle' && providerDisplay) {
+          apiRunState.summaryCaption = 'Configured for ' + providerDisplay + (modelDisplay ? ' · ' + modelDisplay : '') + '.';
+          apiRunState.progressCaption = 'Ready to start the in-browser API pipeline.';
+        }
+        apiStateSummary.textContent = apiRunState.summary;
+        apiStateSummaryCaption.textContent = apiRunState.summaryCaption;
+        apiStateTarget.textContent = apiRunState.target;
+        apiStateTargetCaption.textContent = apiRunState.targetCaption;
+        apiStateProgress.textContent = apiRunState.progress;
+        apiStateProgressCaption.textContent = apiRunState.progressCaption;
+        apiStageLedger.innerHTML = API_STAGE_ORDER.map(function (stage) {
+          var status = apiRunState.ledger[stage.key] || 'empty';
+          var tone = getStatusTone(status);
+          var currentClass = apiRunState.currentStageKey === stage.key ? ' is-current' : '';
+          var detail = stage.key === 'quality'
+            ? 'Validation, patch pass, and quality gate.'
+            : 'Stage state is tracked live while the API pipeline runs.';
+          if (status === 'valid') detail = 'Completed in this run.';
+          if (status === 'in progress') detail = apiRunState.targetCaption;
+          if (status === 'invalidated') detail = apiRunState.error || 'This run stopped on this stage.';
+          return '' +
+            '<div class="wizard-stage-item ' + tone + currentClass + '">' +
+              '<div class="wizard-stage-head">' +
+                '<div class="wizard-stage-name">' + escapeForHtml(stage.label) + '</div>' +
+                '<div class="wizard-status-chip ' + tone + '">' + escapeForHtml(formatStatusLabel(status)) + '</div>' +
+              '</div>' +
+              '<div class="wizard-stage-detail">' + escapeForHtml(detail) + '</div>' +
+              '<div class="wizard-stage-meta">' + escapeForHtml(providerDisplay ? (providerDisplay + (modelDisplay ? ' · ' + modelDisplay : '')) : 'No provider active yet.') + '</div>' +
+            '</div>';
+        }).join('');
+        apiRunLog.innerHTML = apiRunState.log.map(function (line) {
+          return escapeForHtml(line);
+        }).join('<br>');
+        renderApiActions();
+      }
+
       function setDraftStatus(message) {
         if (wizDraftStatus) wizDraftStatus.textContent = message;
       }
 
       function setResumeBannerVisible(visible, message) {
         if (!wizResumeBanner) return;
-        wizResumeBanner.classList.toggle('is-visible', !!visible);
+        var shouldShow = !!visible && currentGenerationMode === 'manual';
+        wizResumeBanner.classList.toggle('is-visible', shouldShow);
+        wizResumeBanner.hidden = !shouldShow;
         if (message && wizResumeCopy) wizResumeCopy.textContent = message;
       }
 
@@ -2123,9 +2641,11 @@
       function openModal() {
         modal.classList.add('is-open');
         document.body.style.overflow = 'hidden';
-        workoutEl.focus();
+        if (currentGenerationMode === 'api' && apiProviderEl) apiProviderEl.focus();
+        else workoutEl.focus();
         updateBuildMeta();
         updateStageHealth();
+        renderApiRunState();
         saveWizardDraft();
       }
 
@@ -2173,6 +2693,39 @@
         saveWizardDraft();
       });
       briefEl.addEventListener('input', saveWizardDraft);
+      if (manualModeBtn) {
+        manualModeBtn.addEventListener('click', function () {
+          setGenerationMode('manual');
+        });
+      }
+      if (apiModeBtn) {
+        apiModeBtn.addEventListener('click', function () {
+          setGenerationMode('api');
+        });
+      }
+      if (apiProviderEl) {
+        apiProviderEl.addEventListener('change', function () {
+          applyProviderPreset(apiProviderEl.value);
+          resetApiRunStateForConfigChange('Provider changed. Previous run state cleared for a fresh API pass.');
+          renderApiRunState();
+        });
+      }
+      [apiMethodEl, apiModelEl, apiBaseUrlEl].forEach(function (el) {
+        if (!el) return;
+        el.addEventListener('input', function () {
+          saveApiPrefs();
+          resetApiRunStateForConfigChange('API configuration changed. Previous run state cleared.');
+          renderApiRunState();
+        });
+        el.addEventListener('change', function () {
+          saveApiPrefs();
+          resetApiRunStateForConfigChange('API configuration changed. Previous run state cleared.');
+          renderApiRunState();
+        });
+      });
+      if (apiKeyEl) {
+        apiKeyEl.addEventListener('input', renderApiRunState);
+      }
       document.querySelectorAll('input[name="gen-dice"]').forEach(function (radio) {
         radio.addEventListener('change', saveWizardDraft);
       });
@@ -3267,6 +3820,139 @@
 
       submitBtn.addEventListener('click', handleManualGenerate);
 
+      async function handleApiGenerate() {
+        var workout = validateWorkout();
+        if (!workout) return;
+
+        if (!api() || typeof api().generateMultiStage !== 'function' || typeof api().generateStructured !== 'function') {
+          apiRunState = createApiRunState();
+          apiRunState.status = 'error';
+          apiRunState.summary = 'API Generator Unavailable';
+          apiRunState.summaryCaption = 'The API runtime did not load correctly. Reload the page and try again.';
+          apiRunState.target = 'Reload Page';
+          apiRunState.targetCaption = 'LiftRPGAPI is missing required generation methods.';
+          apiRunState.progress = '0 / 0 stages';
+          apiRunState.progressCaption = 'No requests were sent.';
+          apiRunState.error = 'Generator unavailable.';
+          pushApiLog('API generator unavailable. Reload the page and try again.');
+          renderApiRunState();
+          return;
+        }
+
+        var settings;
+        try {
+          settings = buildApiSettings();
+        } catch (error) {
+          apiRunState = createApiRunState();
+          apiRunState.status = 'error';
+          apiRunState.summary = 'Configuration Needed';
+          apiRunState.summaryCaption = error.message || 'Fill in the provider settings before starting.';
+          apiRunState.target = 'Provider Setup';
+          apiRunState.targetCaption = 'Generation did not start because the provider contract is incomplete.';
+          apiRunState.progress = '0 / 0 stages';
+          apiRunState.progressCaption = 'No requests were sent.';
+          apiRunState.error = error.message || 'Invalid settings.';
+          pushApiLog(apiRunState.error);
+          renderApiRunState();
+          return;
+        }
+
+        saveApiPrefs();
+        apiRunState = createApiRunState();
+        apiRunState.status = 'running';
+        apiRunState.summary = 'Connecting To Provider';
+        apiRunState.summaryCaption = 'Requests are sent directly from this browser to ' + settings._providerLabel + '.';
+        apiRunState.target = 'Initialize Pipeline';
+        apiRunState.targetCaption = 'Preparing the staged generation run.';
+        apiRunState.progress = '0 / 0 stages';
+        apiRunState.progressCaption = settings._providerLabel + (settings.model ? ' · ' + settings.model : '');
+        apiRunState.providerLabel = settings._providerLabel;
+        apiRunState.model = settings.model;
+        apiRunState.log = [];
+        pushApiLog('Starting ' + settings._providerLabel + ' · ' + settings.model + ' via ' + (apiMethodEl.value === 'generateStructured' ? 'structured API.' : 'multi-stage API.') );
+        renderApiRunState();
+
+        var runId = ++activeApiRunId;
+        setApiControlsDisabled(true);
+
+        try {
+          var methodName = apiMethodEl && apiMethodEl.value === 'generateStructured'
+            ? 'generateStructured'
+            : 'generateMultiStage';
+          var booklet = await api()[methodName](settings, workout, briefEl.value.trim(), getDiceValue(), function (stageIndex, totalStages, message) {
+            if (runId !== activeApiRunId) return;
+            var stageKey = inferApiStageKey(message);
+            apiRunState.status = 'running';
+            apiRunState.stageIndex = stageIndex;
+            apiRunState.totalStages = totalStages;
+            apiRunState.summary = 'Generation In Progress';
+            apiRunState.summaryCaption = 'LiftRPG is advancing one validated stage at a time.';
+            apiRunState.target = stageKey ? (API_STAGE_ORDER.filter(function (stage) { return stage.key === stageKey; })[0] || {}).label || 'Pipeline Stage' : 'Pipeline Stage';
+            apiRunState.targetCaption = message;
+            apiRunState.progress = stageIndex + ' / ' + totalStages + ' stages';
+            apiRunState.progressCaption = settings._providerLabel + (settings.model ? ' · ' + settings.model : '');
+            markApiStageInProgress(stageKey);
+            pushApiLog(stageIndex + '/' + totalStages + ' ' + message);
+            renderApiRunState();
+          });
+
+          if (runId !== activeApiRunId) return;
+
+          markAllApiStages('valid');
+          apiRunState.currentStageKey = 'quality';
+          apiRunState.status = 'success';
+          apiRunState.summary = 'Booklet Ready';
+          apiRunState.summaryCaption = 'The API pipeline completed and the booklet passed local validation.';
+          apiRunState.target = 'Open Or Download';
+          apiRunState.targetCaption = 'Send the generated booklet to the renderer or download the JSON.';
+          apiRunState.progress = apiRunState.totalStages + ' / ' + apiRunState.totalStages + ' stages';
+          var report = api().lastQualityReport || null;
+          apiRunState.qualityReport = report;
+          apiRunState.runSignature = getApiConfigSignature();
+          apiRunState.progressCaption = report && report.scores && report.scores.aggregate
+            ? 'Quality score ' + report.scores.aggregate.score + ' · ' + settings._providerLabel
+            : settings._providerLabel + (settings.model ? ' · ' + settings.model : '');
+          apiRunState.booklet = booklet;
+          pushApiLog('Generation complete. The booklet is ready for renderer handoff or download.');
+          renderApiRunState();
+        } catch (error) {
+          if (runId !== activeApiRunId) return;
+          var failureMessage = (error && error.message) ? error.message : String(error || 'Generation failed.');
+          var failingStageKey = failureMessage.indexOf('Quality gate failed') === 0
+            ? 'quality'
+            : (apiRunState.currentStageKey || inferApiStageKey(failureMessage));
+          if (failingStageKey) {
+            if (apiRunState.currentStageKey && apiRunState.currentStageKey !== failingStageKey && apiRunState.ledger[apiRunState.currentStageKey] === 'in progress') {
+              apiRunState.ledger[apiRunState.currentStageKey] = 'valid';
+            }
+            apiRunState.ledger[failingStageKey] = 'invalidated';
+            apiRunState.currentStageKey = failingStageKey;
+          }
+          apiRunState.status = 'error';
+          apiRunState.summary = 'Generation Stopped';
+          apiRunState.summaryCaption = failureMessage.split('\n')[0];
+          apiRunState.target = failingStageKey
+            ? (API_STAGE_ORDER.filter(function (stage) { return stage.key === failingStageKey; })[0] || {}).label || 'Review Failure'
+            : 'Review Failure';
+          apiRunState.targetCaption = 'The log below shows the last completed step and the failure reason.';
+          apiRunState.progress = apiRunState.stageIndex + ' / ' + apiRunState.totalStages + ' stages';
+          apiRunState.progressCaption = 'No booklet was committed to the renderer.';
+          apiRunState.error = failureMessage;
+          pushApiLog(failureMessage);
+          renderApiRunState();
+        } finally {
+          if (runId === activeApiRunId) {
+            setApiControlsDisabled(false);
+            applyProviderPreset(apiProviderEl ? apiProviderEl.value : '', {
+              keepModel: true,
+              keepBaseUrl: true
+            });
+          }
+        }
+      }
+
+      if (apiSubmitBtn) apiSubmitBtn.addEventListener('click', handleApiGenerate);
+
       document.getElementById('wiz-next-1').addEventListener('click', function () {
         var layerBible = parseStageJson(
           wizResults[1].value,
@@ -3397,6 +4083,9 @@
 
       updateBuildMeta();
       updateStageHealth();
+      initializeApiSettings();
+      apiRunState = createApiRunState();
+      setGenerationMode('manual');
       var existingWizardDraft = getWizardDraft();
       if (existingWizardDraft) {
         var draftStamp = '';
