@@ -716,6 +716,16 @@
       align-items: stretch;
     }
 
+    .api-model-select-wrap {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .api-model-custom[hidden] {
+      display: none !important;
+    }
+
     .api-inline-btn {
       min-width: 142px;
       padding: 0 14px;
@@ -1517,10 +1527,12 @@
             <div class="api-field">
               <label class="field-label" for="api-model">Model</label>
               <div class="api-model-row">
-                <input class="api-input" id="api-model" type="text" placeholder="gpt-4o" list="api-model-options">
+                <div class="api-model-select-wrap">
+                  <select class="api-select" id="api-model"></select>
+                  <input class="api-input api-model-custom" id="api-model-custom" type="text" placeholder="Enter a custom model ID" hidden>
+                </div>
                 <button class="api-inline-btn" id="api-model-refresh" type="button">Refresh Models</button>
               </div>
-              <datalist id="api-model-options"></datalist>
               <div class="api-model-status" id="api-model-status">LiftRPG can load the current model list from supported providers so you do not have to keep updating this field by hand.</div>
             </div>
             <div class="api-field">
@@ -1782,7 +1794,7 @@
       var apiProviderEl = document.getElementById('api-provider');
       var apiMethodEl = document.getElementById('api-method');
       var apiModelEl = document.getElementById('api-model');
-      var apiModelOptionsEl = document.getElementById('api-model-options');
+      var apiModelCustomEl = document.getElementById('api-model-custom');
       var apiModelStatusEl = document.getElementById('api-model-status');
       var apiModelRefreshBtn = document.getElementById('api-model-refresh');
       var apiBaseUrlEl = document.getElementById('api-base-url');
@@ -1901,6 +1913,7 @@
       var activeApiRunId = 0;
       var apiModelDiscoveryRunId = 0;
       var apiModelDiscoveryTimer = 0;
+      var apiModelChoices = [];
       var apiRunState = null;
       var stepText = [
         {
@@ -1983,7 +1996,7 @@
           localStorage.setItem(API_PREFS_KEY, JSON.stringify({
             provider: apiProviderEl ? apiProviderEl.value : 'openai',
             method: apiMethodEl ? apiMethodEl.value : 'generateMultiStage',
-            model: apiModelEl ? apiModelEl.value.trim() : '',
+            model: getApiModelValue(),
             baseUrl: apiBaseUrlEl ? apiBaseUrlEl.value.trim() : ''
           }));
         } catch (error) {}
@@ -2010,12 +2023,46 @@
         apiModelStatusEl.classList.toggle('is-error', tone === 'error');
       }
 
+      function getApiModelValue() {
+        if (!apiModelEl) return '';
+        if (apiModelEl.value === '__custom__') {
+          return apiModelCustomEl ? apiModelCustomEl.value.trim() : '';
+        }
+        return apiModelEl.value.trim();
+      }
+
+      function setApiModelValue(value) {
+        var normalized = String(value || '').trim();
+        var known = apiModelChoices.indexOf(normalized) !== -1;
+        if (apiModelEl) {
+          apiModelEl.value = normalized && known ? normalized : '__custom__';
+        }
+        if (apiModelCustomEl) {
+          apiModelCustomEl.hidden = !!normalized && known;
+          apiModelCustomEl.value = normalized && !known ? normalized : '';
+        }
+      }
+
+      function syncApiModelControlVisibility() {
+        if (!apiModelCustomEl || !apiModelEl) return;
+        apiModelCustomEl.hidden = apiModelEl.value !== '__custom__';
+      }
+
       function renderApiModelOptions(models) {
-        if (!apiModelOptionsEl) return;
         var list = Array.isArray(models) ? models : [];
-        apiModelOptionsEl.innerHTML = list.map(function (modelId) {
-          return '<option value="' + escapeForHtml(modelId) + '"></option>';
-        }).join('');
+        var current = getApiModelValue();
+        apiModelChoices = list.slice();
+        if (!apiModelEl) return;
+        var options = [
+          '<option value="">Choose a model…</option>'
+        ].concat(list.map(function (modelId) {
+          return '<option value="' + escapeForHtml(modelId) + '">' + escapeForHtml(modelId) + '</option>';
+        })).concat([
+          '<option value="__custom__">Custom model ID…</option>'
+        ]);
+        apiModelEl.innerHTML = options.join('');
+        setApiModelValue(current);
+        syncApiModelControlVisibility();
       }
 
       function buildApiModelDiscoverySettings() {
@@ -2068,18 +2115,18 @@
           if (runId !== apiModelDiscoveryRunId) return;
           var models = result && Array.isArray(result.models) ? result.models : [];
           renderApiModelOptions(models);
-          if (!apiModelEl.value.trim() && models.length) {
-            apiModelEl.value = models[0];
+          if (!getApiModelValue() && models.length) {
+            setApiModelValue(models[0]);
           }
           if (models.length) {
-            setApiModelStatus('Loaded ' + models.length + ' live model' + (models.length === 1 ? '' : 's') + ' from the provider. You can still type a custom model if needed.', 'live');
+            setApiModelStatus('Loaded ' + models.length + ' live model' + (models.length === 1 ? '' : 's') + ' from the provider. Choose from the list or switch to a custom model ID if needed.', 'live');
           } else {
-            setApiModelStatus('The provider responded, but no compatible text-generation models were found. You can still type a model ID manually.', '');
+            setApiModelStatus('The provider responded, but no compatible text-generation models were found. Use the custom model option if you know the exact ID.', '');
           }
         } catch (error) {
           if (runId !== apiModelDiscoveryRunId) return;
           renderApiModelOptions([]);
-          setApiModelStatus('Could not load live models: ' + (error.message || error) + ' You can still type a model ID manually.', 'error');
+          setApiModelStatus('Could not load live models: ' + (error.message || error) + ' Use the custom model option if you need to continue manually.', 'error');
         } finally {
           if (runId === apiModelDiscoveryRunId && apiModelRefreshBtn) {
             apiModelRefreshBtn.disabled = !!(apiRunState && apiRunState.status === 'running');
@@ -2114,8 +2161,8 @@
         options = options || {};
         var preset = getProviderPreset(providerId);
         if (!preset) return;
-        if (!options.keepModel || !(apiModelEl && apiModelEl.value.trim())) {
-          if (apiModelEl) apiModelEl.value = preset.defaultModel || '';
+        if (!options.keepModel || !getApiModelValue()) {
+          setApiModelValue(preset.defaultModel || '');
         }
         if (!options.keepBaseUrl || !(apiBaseUrlEl && apiBaseUrlEl.value.trim())) {
           if (apiBaseUrlEl) apiBaseUrlEl.value = preset.baseUrl || '';
@@ -2137,7 +2184,8 @@
         var providerId = getProviderPreset(prefs.provider) ? prefs.provider : 'openai';
         if (apiProviderEl) apiProviderEl.value = providerId;
         if (apiMethodEl) apiMethodEl.value = prefs.method || 'generateMultiStage';
-        if (apiModelEl && prefs.model) apiModelEl.value = prefs.model;
+        renderApiModelOptions([]);
+        if (prefs.model) setApiModelValue(prefs.model);
         if (apiBaseUrlEl && prefs.baseUrl) apiBaseUrlEl.value = prefs.baseUrl;
         applyProviderPreset(providerId, {
           keepModel: !!prefs.model,
@@ -2247,7 +2295,7 @@
           format: preset && preset.format ? preset.format : 'openai',
           apiKey: apiKeyEl ? apiKeyEl.value.trim() : '',
           baseUrl: apiBaseUrlEl ? apiBaseUrlEl.value.trim() : '',
-          model: apiModelEl ? apiModelEl.value.trim() : ''
+          model: getApiModelValue()
         };
         if (!settings.model) {
           throw new Error('Choose a model before starting the API run.');
@@ -2267,13 +2315,13 @@
         return JSON.stringify({
           provider: apiProviderEl ? apiProviderEl.value : '',
           method: apiMethodEl ? apiMethodEl.value : '',
-          model: apiModelEl ? apiModelEl.value.trim() : '',
+          model: getApiModelValue(),
           baseUrl: apiBaseUrlEl ? apiBaseUrlEl.value.trim() : ''
         });
       }
 
       function setApiControlsDisabled(disabled) {
-        [manualModeBtn, apiModeBtn, apiProviderEl, apiMethodEl, apiModelEl, apiModelRefreshBtn, apiBaseUrlEl, apiKeyEl, apiSubmitBtn, submitBtn].forEach(function (el) {
+        [manualModeBtn, apiModeBtn, apiProviderEl, apiMethodEl, apiModelEl, apiModelCustomEl, apiModelRefreshBtn, apiBaseUrlEl, apiKeyEl, apiSubmitBtn, submitBtn].forEach(function (el) {
           if (!el) return;
           if (el === apiKeyEl && apiKeyEl.disabled && !disabled) return;
           el.disabled = !!disabled;
@@ -2344,7 +2392,7 @@
         if (!apiRunState) apiRunState = createApiRunState();
         var selectedPreset = getProviderPreset(apiProviderEl ? apiProviderEl.value : '');
         var providerDisplay = apiRunState.providerLabel || (selectedPreset && selectedPreset.label ? selectedPreset.label : '');
-        var modelDisplay = apiRunState.model || (apiModelEl ? apiModelEl.value.trim() : '');
+        var modelDisplay = apiRunState.model || getApiModelValue();
         if (apiRunState.status === 'idle' && providerDisplay) {
           apiRunState.summaryCaption = 'Configured for ' + providerDisplay + (modelDisplay ? ' · ' + modelDisplay : '') + '.';
           apiRunState.progressCaption = 'Ready to start the in-browser API pipeline.';
@@ -3029,15 +3077,17 @@
           renderApiRunState();
         });
       }
-      [apiMethodEl, apiModelEl, apiBaseUrlEl].forEach(function (el) {
+      [apiMethodEl, apiModelEl, apiModelCustomEl, apiBaseUrlEl].forEach(function (el) {
         if (!el) return;
         el.addEventListener('input', function () {
+          if (el === apiModelEl) syncApiModelControlVisibility();
           saveApiPrefs();
           resetApiRunStateForConfigChange('API configuration changed. Previous run state cleared.');
           if (el === apiBaseUrlEl) scheduleApiModelDiscovery();
           renderApiRunState();
         });
         el.addEventListener('change', function () {
+          if (el === apiModelEl) syncApiModelControlVisibility();
           saveApiPrefs();
           resetApiRunStateForConfigChange('API configuration changed. Previous run state cleared.');
           if (el === apiBaseUrlEl) scheduleApiModelDiscovery({ immediate: true });
