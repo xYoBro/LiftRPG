@@ -43,7 +43,20 @@
     'Rural telephone switchboard conspiracy: voices arrive from lines buried decades ago',
     'University physics department cover-up: the lab notes explain too much and not enough',
     'Probationary museum registrar mystery: every mislabeled object points to the same erased donor',
-    'Community astronomy logbook: the sky repeats a pattern no one else records'
+    'Community astronomy logbook: the sky repeats a pattern no one else records',
+    'Small-town summer: a teenager has one season to fix what their parent broke',
+    'Cross-country road trip falling apart in the best possible way',
+    'Two rival chefs competing for the same kitchen, the same memory, the same person',
+    'Heist in a museum after hours — the target is not what it looks like',
+    'Fantasy village where the dragon is the only one telling the truth',
+    'Retired detective pulled back by the one case they never closed',
+    'Sports team in freefall, one season to get it back together',
+    'A ghost who does not know what they are haunting and why',
+    'Kids on a summer mission: find what adults buried in the woods',
+    'Two people stuck in an airport talking through a layover that keeps extending',
+    'Rival siblings inheriting the same failing business and the same grudge',
+    'Fantasy court intrigue where the kingdom is shaped like the wrong kind of family',
+    'Thriller: one person knows where the body is, one person is looking for it'
   ];
 
   var DESIGN_PROFILES = [
@@ -334,6 +347,114 @@
       interludePayloads: ['clock', 'map', 'password-element'],
       documentTypes: ['inspection', 'report', 'memo', 'form', 'fieldNote', 'transcript'],
       themeHints: ['government', 'scifi', 'noir']
+    },
+    {
+      id: 'simple-quest',
+      keywords: ['quest', 'adventure', 'hero', 'dragon', 'wizard', 'knight', 'sword', 'warrior', 'magic', 'dungeon', 'monster', 'treasure', 'rescue', 'battle', 'journey', 'prophecy', 'portal', 'realm', 'chosen', 'enemy'],
+      storyLens: 'a clear goal pursued through escalating obstacles, with stakes defined by loyalty and the cost of winning',
+      settingLayers: [
+        'the familiar starting world before the goal comes into focus',
+        'the territory the protagonist must cross, with its hazards and helpers',
+        'the enemy\'s domain or the final obstacle\'s domain',
+        'the world that will exist after — different regardless of outcome'
+      ],
+      characterWeb: [
+        'one loyal companion whose limits matter as much as their strengths',
+        'one antagonist with a coherent reason for opposing the goal',
+        'one mentor, guide, or threshold keeper who cannot go all the way',
+        'one bystander or civilian whose fate raises the stakes personally'
+      ],
+      secretShapes: [
+        'the goal is not quite what it seemed at the start',
+        'the antagonist and protagonist want the same thing for different reasons',
+        'the protagonist\'s flaw is the only thing that can solve the final obstacle'
+      ],
+      arcMoves: [
+        'call and departure',
+        'complication or reversal on the road',
+        'darkest moment: the price of commitment',
+        'climax that requires sacrifice, not just skill'
+      ],
+      mapType: 'point-to-point',
+      oracleMode: 'banded-d100',
+      puzzleFamilies: ['path tracing', 'route adjacency', 'constraint logic', 'resource clock pressure'],
+      pressureClocks: ['Distance', 'Enemy Pursuit', 'Ally Endurance'],
+      scarcitySurfaces: ['inventory-grid', 'stress-track', 'dashboard'],
+      interludePayloads: ['narrative', 'map', 'companion'],
+      documentTypes: ['fieldNote', 'letter', 'report', 'correspondence'],
+      themeHints: ['fantasy', 'scifi', 'pastoral']
+    },
+    {
+      id: 'comedy-absurdist',
+      keywords: ['funny', 'comedy', 'absurd', 'silly', 'ridiculous', 'wacky', 'whimsical', 'cartoon', 'parody', 'satire', 'humor', 'humour', 'joke', 'fights', 'versus', 'argue', 'chaos', 'disaster', 'mishap', 'awkward', 'bizarre', 'surreal', 'impossible', 'impossible'],
+      storyLens: 'a premise played straight inside a world where the rules are wrong, and the comedy comes from everyone behaving sensibly inside nonsense',
+      settingLayers: [
+        'the surface world that looks normal until you look twice',
+        'the broken or absurd logic underneath that everyone has adapted to',
+        'the thing nobody will acknowledge is wrong even when it obviously is',
+        'the moment the protagonist accepts the rules and uses them'
+      ],
+      characterWeb: [
+        'one straight-man protagonist who keeps trying to apply normal logic',
+        'one character who has completely normalized the absurdity',
+        'one character who benefits from the chaos and wants it to continue',
+        'one absent or offscreen authority who created the situation and has no idea'
+      ],
+      secretShapes: [
+        'the absurd situation has an internally consistent logic once you find it',
+        'the biggest obstacle is that everyone agrees not to name what is wrong',
+        'the resolution requires the protagonist to stop fighting the rules and use them'
+      ],
+      arcMoves: [
+        'normal person confronts impossible situation',
+        'failed attempts using normal logic',
+        'the turn: accepting or exploiting the logic',
+        'resolution that leaves the absurd world intact but transformed'
+      ],
+      mapType: 'grid',
+      oracleMode: 'banded-d100',
+      puzzleFamilies: ['observational anomaly hunting', 'logic deduction', 'pattern recognition', 'contextual-question'],
+      pressureClocks: ['Credibility', 'Chaos Level', 'Time Before Discovery'],
+      scarcitySurfaces: ['stress-track', 'memory-slots', 'return-box'],
+      interludePayloads: ['narrative', 'companion', 'fragment-ref'],
+      documentTypes: ['memo', 'form', 'transcript', 'fieldNote', 'letter'],
+      themeHints: ['pastoral', 'fantasy', 'minimalist']
+    },
+    {
+      id: 'character-drama',
+      keywords: ['love', 'romance', 'relationship', 'family', 'grief', 'loss', 'divorce', 'marriage', 'breakup', 'reunion', 'siblings', 'parent', 'child', 'estranged', 'forgiveness', 'regret', 'memory', 'inheritance', 'homecoming', 'reconcile'],
+      storyLens: 'two or more people whose histories make the present impossible to navigate cleanly, and the cost of staying or leaving',
+      settingLayers: [
+        'the shared space that holds both the relationship and its history',
+        'the private spaces where each person processes what they cannot say',
+        'the outside world that keeps pressing in and forcing decisions',
+        'the past — a specific event or period whose weight still organizes the present'
+      ],
+      characterWeb: [
+        'one person who wants things to stay as they are',
+        'one person who cannot continue without a change',
+        'one person from outside the central relationship who sees it clearly',
+        'one absent or lost figure whose influence still shapes every interaction'
+      ],
+      secretShapes: [
+        'both people are protecting the same wound from different angles',
+        'the relationship\'s public version and private experience are completely different',
+        'the thing they are arguing about is not the thing it is about'
+      ],
+      arcMoves: [
+        'current equilibrium with visible cracks',
+        'external pressure that forces a confrontation',
+        'the moment someone says the thing that cannot be unsaid',
+        'aftermath: a new equilibrium that costs something permanent'
+      ],
+      mapType: 'point-to-point',
+      oracleMode: 'banded-d100',
+      puzzleFamilies: ['fragment cross-reference', 'logic deduction', 'witness contradiction', 'branch consequence tracking'],
+      pressureClocks: ['Trust', 'Distance', 'Time Left'],
+      scarcitySurfaces: ['memory-slots', 'stress-track', 'dashboard'],
+      interludePayloads: ['narrative', 'fragment-ref', 'companion'],
+      documentTypes: ['letter', 'correspondence', 'transcript', 'memo', 'fieldNote'],
+      themeHints: ['pastoral', 'minimalist', 'noir']
     }
   ];
 
@@ -471,7 +592,7 @@
     return [
       '## Story And Game Bias',
       '',
-      'Use this as the preferred design bias unless the user brief strongly demands a better fit.',
+      'Use this as a structural scaffold. The user brief takes precedence on tone, genre, and register — even a short or simple brief overrides these defaults.',
       '- Primary booklet logic: ' + primary.storyLens,
       secondary ? '- Secondary blend: ' + secondary.storyLens : '- Secondary blend: none; lean harder into the primary identity.',
       '- World layers to give concrete form: ' + worldLayers.join('; '),
@@ -496,13 +617,9 @@
     var picks = pickStable(GENRE_POOL, seed, 4);
     return [
       'No specific creative direction provided.',
-      'Default to a deep, slow-burn mystery with a strong human core, layered setting, and real board-state consequences.',
-      'Occupational specificity is welcome. A gauge reader, registrar, dispatcher, archive clerk, utility inspector, ferry worker, toll operator, or facilities tech can carry a compelling story if the world around them has layers.',
+      'Let the design profile and workout structure determine the genre, tone, and complexity. Do not default to institutional mystery or a specific aesthetic — follow where the profile leads.',
       '',
       'Do not default to these overused fallbacks: ' + BANNED_TROPES.join('; ') + '.',
-      '',
-      'Aim for a rich environment with a public layer, a working layer, a hidden layer, and a historical layer.',
-      'Unless the block is intentionally comic, give the cast robust inner lives, contradictory motives, and distinct voices across prompts and documents.',
       '',
       'Possible directions if you want a push:',
       '- ' + (picks[0] || GENRE_POOL[0]),
@@ -763,6 +880,38 @@
   var INSTRUCTIONS = [
     '# Generation Instructions',
     '',
+    '## Brief Interpretation (run silently before everything else)',
+    'Before writing any fields or world contract, decode the creative direction brief. Do not output this step.',
+    '',
+    'If the brief is a MASHUP (X meets Y, X + Y, like X but with Y):',
+    '- Identify the genre, tone, emotional register, and defining conventions of each element separately.',
+    '- Find the creative tension between them — the interesting collision, not the safe middle ground.',
+    '- Example: "Oldboy meets Project Hail Mary" → Oldboy (psychological revenge thriller, identity horror, shocking reversal, claustrophobic) + Project Hail Mary (optimistic hard sci-fi, isolation, alien contact, problem-solving under pressure) → the collision: a protagonist solving an impossible problem who discovers the mission itself was designed as punishment for something they did. The optimism of competence meets the horror of complicity. The "alien contact" is the person they wronged.',
+    '- The creative tension IS the story. Do not average the two elements into something neither. Honor the dissonance.',
+    '',
+    'If the brief contains a NAMED PERSONAL CHARACTER (a real pet, a family member, a named person in the user's life):',
+    '- That character is real and specific. Center the story around them literally, not metaphorically.',
+    '- A named pet implies: POV close to that character, tone scaled to their nature, the world experienced through their frame.',
+    '- Example: "my yorkie Jasper goes back to Turkey where he's from and has an existential crisis and comes home" → Jasper is real. Turkey is real. The existential crisis (identity, origin, belonging) is the emotional spine. The homecoming is the resolution. The story IS this arc, not a metaphor for it.',
+    '- Do not abstract or universalize what is personal and specific.',
+    '',
+    'If the brief names a FILM, BOOK, GAME, SHOW, or CULTURAL REFERENCE:',
+    '- Extract its defining genre conventions, emotional register, protagonist type, and structural shape.',
+    '- Use those as your primary creative template, not as decoration or surface texture.',
+    '- An LLM should know these works. If you know them, use what you know. If a reference is obscure, treat the name as a tone signal and infer from surrounding context.',
+    '',
+    'After interpreting the brief, fix these design signals internally (do not output them):',
+    '- TONE: the emotional register (dark, hopeful, comedic, melancholic, tense, wondrous, intimate, etc.)',
+    '- REGISTER: the prose style (literary, pulp, intimate, procedural, whimsical, etc.)',
+    '- POV CHARACTER: who experiences this story (named person, animal, institution, unnamed protagonist, etc.)',
+    '- IMPLIED SETTING: where and when — specific place if named, composite if implied',
+    '- EMOTIONAL ARC: what changes for the protagonist emotionally by the end',
+    '- GENRE TEMPLATE: what genre conventions apply (revenge thriller, sci-fi isolation, coming-of-age, road trip, etc.)',
+    '',
+    'These extracted signals own the story. The design bias in the prompt owns the game mechanics. They do not compete.',
+    'Brief interpretation overrides: storyLens, characterWeb, secretShapes, arcMoves from the design bias.',
+    'Design bias still governs: mapType, puzzleFamilies, pressureClocks, scarcitySurfaces, documentTypes.',
+    '',
     '## Output Rules',
     '- Return valid JSON only. No markdown fences, no explanation, no comments.',
     '- The JSON must parse with JSON.parse().',
@@ -788,6 +937,16 @@
     '- Prefer the minimum valid count of fragments and endings unless the brief clearly requires more.',
     '- Avoid quoted dialogue unless it materially advances story or game state.',
     '',
+    '## Brief Fidelity',
+    'The user\'s creative direction brief is the primary authority on tone, register, and premise — weight it above the design profile defaults.',
+    '- If the brief is playful, whimsical, or comedic (e.g. "a chair fights a bookcase"), produce a story that matches that register. Do not add institutional complexity, hidden layers, or found-document gravity the brief did not ask for.',
+    '- If the brief is literal, take it literally first before reaching for metaphor or subtext.',
+    '- If the brief is minimal or abstract, treat its simplicity as permission to be simple. Use the design profile for structure, but do not elevate stakes or setting complexity beyond what the brief implies.',
+    '- If the brief names a specific genre (adventure, romance, horror, comedy), that genre is the story even if the design profile points elsewhere.',
+    '- The four-layer world, found-document fragments, and institutional character webs are defaults, not requirements. A playful or simple brief can have a two-layer world and a straightforward cast.',
+    '- Do not interpret brevity in the brief as an invitation to add depth the user did not ask for. A short brief means stay close to what was said.',
+    '- The design bias is a structural scaffold. The brief is the voice. Never let the scaffold drown the voice.',
+    '',
     '## World Contract First',
     '- Write `meta.worldContract` before anything else.',
     '- Every later decision must justify itself through that world contract.',
@@ -799,7 +958,7 @@
     '- The week prompts, fragments, rules spread, boss page, and endings must all feel like consequences of the same hidden story engine.',
     '',
     '## Rich Environment',
-    '- Every setting must have at least four layers: public layer, working layer, hidden layer, and historical layer.',
+    '- For serious or complex briefs, give the setting at least four layers: public layer, working layer, hidden layer, and historical layer. For playful, comedic, or simple briefs, two or three layers are sufficient — match depth to tone.',
     '- Even a bland building, office, clinic, dam, station, depot, or archive can be compelling if the labor, wear, jurisdiction, rumor, and buried history are specific.',
     '- Define 8-12 world-native nouns early and reuse them across prompts, fragments, map labels, and interface labels.',
     '- Give the world material specificity: one recurring smell, one recurring sound, one recurring object, one recurring bureaucratic or folk phrase.',
@@ -823,7 +982,7 @@
     '  Midpoint: binary choice that recontextualizes prior evidence AND costs a relationship.',
     '  Late weeks: convergence, darkest moment (relational or ethical cost), escalation.',
     '  Boss week: culmination that tests spatial mastery, institutional knowledge, and relationship stakes.',
-    '- The darkest moment must cost the protagonist something they cannot recover: a relationship damaged, a belief overturned, an ethical line crossed, or an institutional protection lost.',
+    '- Unless the block is intentionally comic or the brief signals a lighter register, the darkest moment must cost the protagonist something they cannot recover: a relationship damaged, a belief overturned, an ethical line crossed, or an institutional protection lost.',
     '- The ending must acknowledge the binary choice, the boss outcome, and at least one relationship consequence.',
     '',
     '## Workout-Story Fusion',
