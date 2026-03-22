@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LiftRPG &mdash; Render</title>
+  <title>LiftRPG &mdash; Renderer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -27,24 +27,35 @@
   <!-- ── APP CONTROLS (hidden in print) ─────────────── -->
   <div class="app-chrome no-print">
     <div class="app-header">
-      <a href="../" class="app-back"><span class="back-chevron">&#x2039;</span>LIFTRPG</a>
-      <span class="app-version">Render</span>
+      <a href="../" class="app-back"><span class="back-chevron">&#x2039;</span>Back To Home</a>
+      <span class="app-version">Renderer</span>
+    </div>
+
+    <div class="app-summary">
+      <div class="app-kicker">Booklet Renderer</div>
+      <div class="app-title">Load, preview, and print.</div>
+      <div class="app-copy">Bring in a LiftRPG JSON file, check the pages, then print when it looks right.</div>
     </div>
 
     <div class="app-toolbar">
-      <label class="upload-btn" for="json-input">
-        <span class="upload-icon">&#x2B06;</span> Load JSON
-        <input type="file" id="json-input" accept=".json" hidden />
-      </label>
-      <button id="print-btn" disabled>Print Booklet</button>
-      <label class="view-toggle">
-        Preview:
-        <select id="layout-mode" class="mode-select">
-          <option value="single">Single Page</option>
-          <option value="spread">Reader Spread</option>
-          <option value="booklet">Printer Spread</option>
-        </select>
-      </label>
+      <div class="app-action-group">
+        <label class="upload-btn" for="json-input">
+          <span class="upload-icon">&#x2B06;</span> Load JSON
+          <input type="file" id="json-input" accept=".json" hidden />
+        </label>
+        <a href="?demo=liftrpg-eastern-shore&demoView=1&mode=spread" class="app-link-btn">Open Sample</a>
+      </div>
+      <div class="app-action-group app-action-group--compact">
+        <label class="view-toggle" for="layout-mode">
+          View
+          <select id="layout-mode" class="mode-select">
+            <option value="single">Read One Page</option>
+            <option value="spread">Read Two Pages</option>
+            <option value="booklet">Print Booklet Layout</option>
+          </select>
+        </label>
+        <button id="print-btn" disabled>Print Booklet</button>
+      </div>
     </div>
     <div id="encrypt-row" class="author-tools" style="display:none;">
       <span class="author-tools-label">Author Tools</span>
@@ -57,20 +68,52 @@
     <div id="status" class="app-status"></div>
   </div>
 
+  <div id="renderer-empty-state" class="renderer-empty-state no-print">
+    <div class="renderer-empty-panel">
+      <div class="renderer-empty-kicker">Ready To Render</div>
+      <div class="renderer-empty-title">Bring your booklet in and make sure it looks right.</div>
+      <div class="renderer-empty-copy">Load a LiftRPG JSON file, flip through the pages, then print when you are satisfied.</div>
+      <div class="renderer-empty-steps">
+        <div class="renderer-empty-step">
+          <div class="renderer-empty-step-index">1</div>
+          <div class="renderer-empty-step-title">Load JSON</div>
+          <div class="renderer-empty-step-copy">Use the booklet file you exported from the generator.</div>
+        </div>
+        <div class="renderer-empty-step">
+          <div class="renderer-empty-step-index">2</div>
+          <div class="renderer-empty-step-title">Check Pages</div>
+          <div class="renderer-empty-step-copy">Switch between read-one-page and read-two-pages views until the layout feels right.</div>
+        </div>
+        <div class="renderer-empty-step">
+          <div class="renderer-empty-step-index">3</div>
+          <div class="renderer-empty-step-title">Print</div>
+          <div class="renderer-empty-step-copy">Use print booklet layout when you are ready to make the booklet.</div>
+        </div>
+      </div>
+      <div class="renderer-empty-actions">
+        <label class="upload-btn renderer-empty-upload" for="json-input">
+          <span class="upload-icon">&#x2B06;</span> Load JSON
+        </label>
+        <a href="?demo=liftrpg-eastern-shore&demoView=1&mode=spread" class="app-link-btn">Open Sample Booklet</a>
+      </div>
+    </div>
+  </div>
+
   <!-- ── BOOKLET OUTPUT ─────────────────────────────── -->
   <div id="booklet-container"></div>
   <div id="unlock-row" class="reader-unlock no-print" style="display:none;" data-state="locked">
     <div class="reader-unlock-bar">
       <div class="reader-unlock-copy">
         <span class="unlock-icon">&#x1F512;</span>
-        <span id="unlock-label" class="reader-unlock-label">Try decrypting the ending:</span>
+        <span id="unlock-label" class="reader-unlock-label">Unlock the ending:</span>
       </div>
       <input id="unlock-password" class="reader-unlock-input" type="text" placeholder="ENTER PASSWORD"
         spellcheck="false" autocomplete="off" autocapitalize="characters" />
       <button id="unlock-btn" class="reader-unlock-btn" type="button">Unlock</button>
+      <button id="unlock-reveal-demo" class="reader-unlock-alt" type="button" style="display:none;">Reveal Demo Password</button>
       <span id="unlock-status" class="reader-unlock-status"></span>
     </div>
-    <div class="reader-unlock-hint">Scroll to explore the full booklet</div>
+    <div id="unlock-hint" class="reader-unlock-hint">Use the final designation/password from your booklet. Scroll to explore the full booklet.</div>
   </div>
 
   <!-- PDF generation (Safari can't print booklet spreads via CSS) -->

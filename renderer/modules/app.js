@@ -26,6 +26,10 @@ function setStatus(message, tone) {
   refs.status.setAttribute('data-tone', tone || 'neutral');
 }
 
+function syncLoadedState() {
+  document.body.setAttribute('data-booklet-loaded', state.data ? 'true' : 'false');
+}
+
 function isSafariBrowser() {
   return /^((?!chrome|android).)*safari/i.test(window.navigator.userAgent);
 }
@@ -282,7 +286,7 @@ function syncUnlockUi(status) {
   }
 
   refs.unlockRow.style.display = status && status.visible ? 'block' : 'none';
-  refs.unlockLabel.textContent = status && status.label ? status.label : 'Try decrypting the ending:';
+  refs.unlockLabel.textContent = status && status.label ? status.label : 'Unlock the ending:';
   refs.unlockStatus.textContent = status && status.message ? status.message : '';
   refs.unlockStatus.style.display = status && status.message ? 'inline-flex' : 'none';
 
@@ -295,6 +299,16 @@ function syncUnlockUi(status) {
   refs.unlockPassword.disabled = !!(status && status.inputDisabled);
   refs.unlockPassword.readOnly = !!(status && status.inputDisabled);
   refs.unlockBtn.disabled = !!(status && status.buttonDisabled);
+  if (refs.unlockRevealDemo) {
+    refs.unlockRevealDemo.style.display = state.demoMode && status && status.visible && !state.demoPasswordRevealed && !(status && status.inputDisabled)
+      ? 'inline-flex'
+      : 'none';
+  }
+  if (refs.unlockHint) {
+    refs.unlockHint.textContent = state.demoMode && status && status.visible
+      ? 'Sample booklet loaded. Use Reveal Demo Password if you want to test the sample unlock.'
+      : 'Use the final designation/password from your booklet. Scroll to explore the full booklet.';
+  }
 }
 
 async function renderWithMode(layoutMode) {
@@ -334,10 +348,13 @@ async function handlePrint() {
 function loadBooklet(data, sourceLabel) {
   const errors = validateBooklet(data);
   if (errors.length) {
-    refs.booklet.innerHTML = '';
-    refs.printBtn.disabled = true;
-    refs.unlockRow.style.display = 'none';
-    refs.encryptRow.style.display = 'none';
+    if (!state.data) {
+      refs.booklet.innerHTML = '';
+      refs.printBtn.disabled = true;
+      refs.unlockRow.style.display = 'none';
+      refs.encryptRow.style.display = 'none';
+      syncLoadedState();
+    }
     setStatus(errors.join(' '), 'error');
     return;
   }
@@ -346,6 +363,7 @@ function loadBooklet(data, sourceLabel) {
   state.unlockedEnding = null;
   state.demoPasswordRevealed = false;
   refs.layoutMode.value = state.layoutMode;
+  syncLoadedState();
   renderCurrentBooklet();
   scheduleFontAwareRerender();
 
@@ -356,7 +374,7 @@ function loadBooklet(data, sourceLabel) {
   syncUnlockUi({
     visible: hasEncryptedEnding,
     state: 'locked',
-    label: 'Try decrypting the ending:',
+    label: 'Unlock the ending:',
     message: '',
     password: demoPassword,
     inputDisabled: false,
@@ -372,6 +390,14 @@ function loadBooklet(data, sourceLabel) {
   }
   if (!state.authorMode) {
     refs.encryptRow.style.display = 'none';
+  }
+  if (sourceLabel === 'Booklet From Generator') {
+    setStatus('Booklet opened from the generator. Review the pages, then switch to Print Booklet Layout when you are ready.', 'success');
+    return;
+  }
+  if (state.demoMode) {
+    setStatus('Sample booklet loaded. Review the pages or test the ending below.', 'neutral');
+    return;
   }
   setStatus('Loaded ' + sourceLabel + '.', 'success');
 }
@@ -444,7 +470,7 @@ function attemptUnlock() {
     syncUnlockUi({
       visible: true,
       state: 'error',
-      label: 'Try decrypting the ending:',
+      label: 'Unlock the ending:',
       message: 'Enter password',
       password: '',
       inputDisabled: false,
@@ -461,7 +487,7 @@ function attemptUnlock() {
   syncUnlockUi({
     visible: true,
     state: 'pending',
-    label: 'Try decrypting the ending:',
+    label: 'Unlock the ending:',
     message: 'Unlocking…',
     password,
     inputDisabled: false,
@@ -480,7 +506,7 @@ function attemptUnlock() {
       syncUnlockUi({
         visible: true,
         state: 'error',
-        label: 'Try decrypting the ending:',
+        label: 'Unlock the ending:',
         message: 'Password rejected',
         password,
         inputDisabled: false,
@@ -565,15 +591,26 @@ function wireUi() {
   refs.layoutMode.addEventListener('change', () => {
     renderWithMode(refs.layoutMode.value);
   });
-  refs.unlockPassword.addEventListener('click', () => {
-    if (!state.demoMode || state.demoPasswordRevealed) return;
-    state.demoPasswordRevealed = true;
-    refs.unlockPassword.setAttribute('data-revealed', 'true');
-    refs.unlockPassword.select();
-  });
   refs.unlockBtn.addEventListener('click', attemptUnlock);
   refs.unlockPassword.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') attemptUnlock();
+  });
+  refs.unlockRevealDemo.addEventListener('click', () => {
+    if (!state.demoMode || !state.data) return;
+    state.demoPasswordRevealed = true;
+    refs.unlockPassword.value = deriveBookletPassword(state.data);
+    refs.unlockPassword.setAttribute('data-revealed', 'true');
+    refs.unlockPassword.focus();
+    refs.unlockPassword.select();
+    syncUnlockUi({
+      visible: true,
+      state: refs.unlockRow.getAttribute('data-state') || 'locked',
+      label: refs.unlockLabel.textContent || 'Unlock the ending:',
+      message: refs.unlockStatus.textContent || '',
+      password: refs.unlockPassword.value,
+      inputDisabled: refs.unlockPassword.disabled,
+      buttonDisabled: refs.unlockBtn.disabled
+    });
   });
   refs.encryptBtn.addEventListener('click', attemptEncrypt);
   refs.encryptDownload.addEventListener('click', downloadJson);
@@ -590,12 +627,15 @@ function captureRefs() {
     unlockLabel: qs('unlock-label'),
     unlockPassword: qs('unlock-password'),
     unlockBtn: qs('unlock-btn'),
+    unlockRevealDemo: qs('unlock-reveal-demo'),
     unlockStatus: qs('unlock-status'),
+    unlockHint: qs('unlock-hint'),
     encryptRow: qs('encrypt-row'),
     encryptPassword: qs('encrypt-password'),
     encryptBtn: qs('encrypt-btn'),
     encryptDownload: qs('encrypt-download'),
-    encryptStatus: qs('encrypt-status')
+    encryptStatus: qs('encrypt-status'),
+    emptyState: qs('renderer-empty-state')
   };
 }
 
@@ -634,6 +674,7 @@ export function initRendererApp() {
     : null;
   document.body.setAttribute('data-review-mode', state.reviewMode ? 'true' : 'false');
   document.body.setAttribute('data-demo-view', state.demoView ? 'true' : 'false');
+  syncLoadedState();
   if (state.auditConfig) {
     document.title = 'LIFTRPG_AUDIT_PENDING';
   }
@@ -650,9 +691,9 @@ export function initRendererApp() {
         setStatus('Generated JSON was invalid — could not load.', 'error');
         return;
       }
-      autoEncryptAndLoad(parsed);
+      autoEncryptAndLoad(parsed, 'Booklet From Generator');
     } else {
-      setStatus('No generated booklet found in session — it may have already been loaded.', 'error');
+      setStatus('No booklet was passed from the generator. Return home to reopen the generator, or load a saved JSON here.', 'error');
     }
     return;
   }

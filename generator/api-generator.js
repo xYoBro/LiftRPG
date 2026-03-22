@@ -2694,7 +2694,7 @@ window.LiftRPGAPI = (function () {
 
   function validateLayerBibleStage(result) {
     if (!result || !result.storyLayer || !result.gameLayer || !result.governingLayer) {
-      return 'Stage 1 failed: layer bible missing required sections (storyLayer, gameLayer, governingLayer).';
+      return 'Stage 1 failed: Layer Codex missing required sections (storyLayer, gameLayer, governingLayer).';
     }
     if (!result.designLedger || !result.designLedger.mysteryQuestions || !result.designLedger.weekTransformations) {
       return 'Stage 1 failed: designLedger is missing mysteryQuestions or weekTransformations.';
@@ -2711,7 +2711,7 @@ window.LiftRPGAPI = (function () {
 
   function validateShellStage(result) {
     if (!result || !result.meta || !result.cover || !result.rulesSpread) {
-      return 'Stage 3 failed: booklet shell missing required keys (meta, cover, rulesSpread).';
+      return 'Stage 3 failed: booklet setup missing required keys (meta, cover, rulesSpread).';
     }
     return '';
   }
@@ -2759,7 +2759,7 @@ window.LiftRPGAPI = (function () {
 
   function validateEndingsStage(result) {
     if (!result || !Array.isArray(result.endings) || result.endings.length === 0) {
-      return 'Endings stage validation failed: expected a non-empty endings array.';
+      return 'Finale stage validation failed: expected a non-empty endings array.';
     }
     return '';
   }
@@ -2996,9 +2996,9 @@ window.LiftRPGAPI = (function () {
       if (onProgress) onProgress(stageNum, totalStages, message);
     }
 
-    progress('Building layer bible…');
+    progress('Building layer codex…');
     var layerBible = await runJsonStage(settings, {
-      stageName: 'Layer Bible',
+      stageName: 'Layer Codex',
       schema: STRUCTURED_SCHEMA_BIBLE,
       maxTokens: 8192,
       maxAttempts: 2,
@@ -3008,9 +3008,9 @@ window.LiftRPGAPI = (function () {
       }
     });
 
-    progress('Planning campaign…');
+    progress('Planning story…');
     var campaignPlan = await runJsonStage(settings, {
-      stageName: 'Campaign Plan',
+      stageName: 'Story Plan',
       schema: STRUCTURED_SCHEMA_CAMPAIGN,
       maxTokens: 16384,
       maxAttempts: 2,
@@ -3026,9 +3026,9 @@ window.LiftRPGAPI = (function () {
     var plannedFragBatches = buildFragmentBatches(campaignPlan.fragmentRegistry, null);
     totalStages = 3 + chunks.length + Math.max(plannedFragBatches.length, 1) + 1;
 
-    progress('Building booklet shell…');
+    progress('Building booklet setup…');
     var shell = await runJsonStage(settings, {
-      stageName: 'Booklet Shell',
+      stageName: 'Booklet Setup',
       schema: STRUCTURED_SCHEMA_SHELL,
       maxTokens: 16384,
       unwrapKey: 'meta',
@@ -3088,7 +3088,7 @@ window.LiftRPGAPI = (function () {
       progress('Generating fragments…');
       try {
         fragmentsOutput = await runJsonStage(settings, {
-          stageName: 'Fragments',
+          stageName: 'Bonus Pages',
           schema: STRUCTURED_SCHEMA_FRAGMENTS,
           maxTokens: 32000,
           unwrapKey: 'fragments',
@@ -3118,7 +3118,7 @@ window.LiftRPGAPI = (function () {
           batchIndex: 0,
           totalBatches: 1,
           shellContext: shellContext,
-          label: 'Fragments'
+          label: 'Bonus Pages'
         });
         fragmentsOutput = { fragments: splitOutput.fragments || [] };
       }
@@ -3128,7 +3128,7 @@ window.LiftRPGAPI = (function () {
 
       for (var fi = 0; fi < fragBatches.length; fi++) {
         var batch = fragBatches[fi];
-        var batchLabel = 'Fragments ' + (fi + 1) + '/' + fragBatches.length + ' (weeks ' + batch.weekNumbers.join(',') + ')';
+        var batchLabel = 'Bonus Pages ' + (fi + 1) + '/' + fragBatches.length + ' (weeks ' + batch.weekNumbers.join(',') + ')';
         progress('Generating ' + batchLabel.toLowerCase() + '…');
 
         var batchOutput = await generateFragmentBatchAdaptive(settings, builders, {
@@ -3156,12 +3156,12 @@ window.LiftRPGAPI = (function () {
       fragmentsOutput = { fragments: mergeResult.fragments };
     }
 
-    progress('Generating endings…');
+    progress('Generating finale…');
     var lastChunkWeeks = weekChunkOutputs[weekChunkOutputs.length - 1].weeks || [];
     var bossWeek = lastChunkWeeks[lastChunkWeeks.length - 1] || {};
     var binaryChoiceWeek = findBinaryChoiceWeek(weekChunkOutputs);
     var endingsOutput = await runJsonStage(settings, {
-      stageName: 'Endings',
+      stageName: 'Finale',
       schema: STRUCTURED_SCHEMA_ENDINGS,
       maxTokens: 8192,
       unwrapKey: 'endings',
@@ -3215,7 +3215,7 @@ window.LiftRPGAPI = (function () {
 
   // ── 10-Stage Multi-Stage Generator ──────────────────────────────────────
   //
-  // Pipeline: Layer Bible → Campaign Plan → Shell → Week Chunks → Fragments → Endings → Validate → Patch
+  // Pipeline: Layer Codex → Story Plan → Booklet Setup → Week Chunks → Bonus Pages → Finale → Validate → Patch
   //
   // onProgress(stageIndex, totalStages, message) — UI callback
 
@@ -3269,21 +3269,21 @@ window.LiftRPGAPI = (function () {
       return result;
     }
 
-    // 1. Layer Bible
-    progress('Building layer bible\u2026');
-    var raw1 = await callStage(window.generateStage1Prompt(workout, brief, dice), 8192, 'Layer Bible');
+    // 1. Layer Codex
+    progress('Building layer codex\u2026');
+    var raw1 = await callStage(window.generateStage1Prompt(workout, brief, dice), 8192, 'Layer Codex');
     var layerBible = extractJson(raw1);
 
     if (!layerBible.storyLayer || !layerBible.gameLayer || !layerBible.governingLayer) {
       throw new Error(
-        'Stage 1 failed: layer bible missing required sections (storyLayer, gameLayer, governingLayer).\n' +
+        'Stage 1 failed: Layer Codex missing required sections (storyLayer, gameLayer, governingLayer).\n' +
         'The model may not have followed the output schema. Try again.'
       );
     }
 
-    // 2. Campaign Plan + Fragment Registry
-    progress('Planning campaign\u2026');
-    var raw2 = await callStage(window.generateStage2Prompt(workout, brief, dice, layerBible), 16384, 'Campaign Plan');
+    // 2. Story Plan + Fragment Registry
+    progress('Planning story\u2026');
+    var raw2 = await callStage(window.generateStage2Prompt(workout, brief, dice, layerBible), 16384, 'Story Plan');
     var campaignPlan = extractJson(raw2);
 
     if (!campaignPlan.weeks || !Array.isArray(campaignPlan.weeks) || !campaignPlan.bossPlan) {
@@ -3307,9 +3307,9 @@ window.LiftRPGAPI = (function () {
     var fragBatchCount = Math.max(plannedFragBatches.length, 1); // at least 1 for monolithic fallback
     totalStages = 3 + chunks.length + fragBatchCount + 1; // planning(2) + shell(1) + weeks(N) + fragBatches(B) + endings(1)
 
-    // 3. Booklet Shell
-    progress('Building booklet shell\u2026');
-    var raw3 = await callStage(window.generateShellPrompt(brief, layerBible, campaignPlan), 16384, 'Booklet Shell');
+    // 3. Booklet Setup
+    progress('Building booklet setup\u2026');
+    var raw3 = await callStage(window.generateShellPrompt(brief, layerBible, campaignPlan), 16384, 'Booklet Setup');
     var shell = extractJson(raw3);
     shell = unwrapIfNeeded(shell, 'meta');
     // If model output full booklet instead of shell, strip week/fragment/endings keys
@@ -3322,7 +3322,7 @@ window.LiftRPGAPI = (function () {
 
     if (!shell.meta || !shell.cover || !shell.rulesSpread) {
       throw new Error(
-        'Stage 3 failed: booklet shell missing required keys (meta, cover, rulesSpread).\n' +
+        'Stage 3 failed: booklet setup missing required keys (meta, cover, rulesSpread).\n' +
         'The model may not have followed the output schema. Try again.'
       );
     }
@@ -3371,18 +3371,18 @@ window.LiftRPGAPI = (function () {
       });
     }
 
-    // N-2. Fragments (batched by week association)
+    // N-2. Bonus Pages (batched by week association)
     var weekSummaries = extractWeekSummaries(weekChunkOutputs);
     var fragBatches = buildFragmentBatches(campaignPlan.fragmentRegistry, weekSummaries);
     var fragmentsOutput;
 
     if (fragBatches.length <= 1) {
       // Small registry or no weekRef data — single call (monolithic fallback)
-      progress('Generating fragments\u2026');
+      progress('Generating bonus pages\u2026');
       var rawFrags = await callStage(
         window.generateFragmentsPrompt(layerBible, campaignPlan, weekSummaries, shellContext),
         32000,
-        'Fragments'
+        'Bonus Pages'
       );
       fragmentsOutput = extractJson(rawFrags);
       fragmentsOutput = unwrapIfNeeded(fragmentsOutput, 'fragments');
@@ -3393,7 +3393,7 @@ window.LiftRPGAPI = (function () {
 
       for (var fi = 0; fi < fragBatches.length; fi++) {
         var batch = fragBatches[fi];
-        var batchLabel = 'Fragments ' + (fi + 1) + '/' + fragBatches.length +
+        var batchLabel = 'Bonus Pages ' + (fi + 1) + '/' + fragBatches.length +
           ' (weeks ' + batch.weekNumbers.join(',') + ')';
         progress('Generating ' + batchLabel.toLowerCase() + '\u2026');
 
@@ -3429,15 +3429,15 @@ window.LiftRPGAPI = (function () {
       fragmentsOutput = { fragments: mergeResult.fragments };
     }
 
-    // N-1. Endings
-    progress('Generating endings\u2026');
+    // N-1. Finale
+    progress('Generating finale\u2026');
     var lastChunkWeeks = weekChunkOutputs[weekChunkOutputs.length - 1].weeks || [];
     var bossWeek = lastChunkWeeks[lastChunkWeeks.length - 1] || {};
     var binaryChoiceWeek = findBinaryChoiceWeek(weekChunkOutputs);
     var rawEndings = await callStage(
       window.generateEndingsPrompt(layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext, weekSummaries),
       8192,
-      'Endings'
+      'Finale'
     );
     var endingsOutput = extractJson(rawEndings);
     endingsOutput = unwrapIfNeeded(endingsOutput, 'endings');
@@ -4275,7 +4275,7 @@ window.LiftRPGAPI = (function () {
 
   // ── 5-Stage Structured Generator ──────────────────────────────────────────
   //
-  // Pipeline: World+Campaign → Shell → Weeks → Fragments → Endings
+  // Pipeline: World+Story → Booklet Setup → Weeks → Bonus Pages → Finale
   //
   // Uses native Gemini API with responseJsonSchema for typed JSON output.
   // No extractJson/repairJson step. Reuses existing prompt generators from
@@ -4337,19 +4337,19 @@ window.LiftRPGAPI = (function () {
     progress('Building world + campaign\u2026');
     var layerBible = await callStage(
       window.generateStage1Prompt(workoutText, brief, dice),
-      STRUCTURED_SCHEMA_BIBLE, 16384, 'Layer Bible'
+      STRUCTURED_SCHEMA_BIBLE, 16384, 'Layer Codex'
     );
 
     if (!layerBible.storyLayer || !layerBible.gameLayer || !layerBible.governingLayer) {
       throw new Error(
-        'Stage 1 failed: layer bible missing required sections (storyLayer, gameLayer, governingLayer).\n' +
+        'Stage 1 failed: Layer Codex missing required sections (storyLayer, gameLayer, governingLayer).\n' +
         'The model may not have followed the output schema. Try again.'
       );
     }
 
     var campaignPlan = await callStage(
       window.generateStage2Prompt(workoutText, brief, dice, layerBible),
-      STRUCTURED_SCHEMA_CAMPAIGN, 16384, 'Campaign Plan'
+      STRUCTURED_SCHEMA_CAMPAIGN, 16384, 'Story Plan'
     );
 
     if (!campaignPlan.weeks || !Array.isArray(campaignPlan.weeks) || !campaignPlan.bossPlan) {
@@ -4373,16 +4373,16 @@ window.LiftRPGAPI = (function () {
     var fragBatchCount = Math.max(plannedFragBatches.length, 1);
     totalStages = 3 + fragBatchCount + 1; // world+campaign(1) + shell(1) + weeks(1) + fragBatches(B) + endings(1)
 
-    // Stage 2 — Booklet Shell
-    progress('Building booklet shell\u2026');
+    // Stage 2 — Booklet Setup
+    progress('Building booklet setup\u2026');
     var shell = await callStage(
       window.generateShellPrompt(brief, layerBible, campaignPlan),
-      STRUCTURED_SCHEMA_SHELL, 16384, 'Booklet Shell'
+      STRUCTURED_SCHEMA_SHELL, 16384, 'Booklet Setup'
     );
 
     if (!shell.meta || !shell.cover || !shell.rulesSpread) {
       throw new Error(
-        'Stage 3 failed: booklet shell missing required keys (meta, cover, rulesSpread).\n' +
+        'Stage 3 failed: booklet setup missing required keys (meta, cover, rulesSpread).\n' +
         'The model may not have followed the output schema. Try again.'
       );
     }
@@ -4419,17 +4419,17 @@ window.LiftRPGAPI = (function () {
       });
     }
 
-    // Stage 4 — Fragments (batched by week association)
+    // Stage 4 — Bonus Pages (batched by week association)
     var weekSummaries = extractWeekSummaries(weekChunkOutputs);
     var fragBatches = buildFragmentBatches(campaignPlan.fragmentRegistry, weekSummaries);
     var fragmentsOutput;
 
     if (fragBatches.length <= 1) {
       // Small registry or no weekRef data — single call (monolithic fallback)
-      progress('Generating fragments\u2026');
+      progress('Generating bonus pages\u2026');
       fragmentsOutput = await callStage(
         window.generateFragmentsPrompt(layerBible, campaignPlan, weekSummaries, shellContext),
-        STRUCTURED_SCHEMA_FRAGMENTS, 32000, 'Fragments'
+        STRUCTURED_SCHEMA_FRAGMENTS, 32000, 'Bonus Pages'
       );
     } else {
       // Batched generation
@@ -4438,7 +4438,7 @@ window.LiftRPGAPI = (function () {
 
       for (var fi = 0; fi < fragBatches.length; fi++) {
         var batch = fragBatches[fi];
-        var batchLabel = 'Fragments ' + (fi + 1) + '/' + fragBatches.length +
+        var batchLabel = 'Bonus Pages ' + (fi + 1) + '/' + fragBatches.length +
           ' (weeks ' + batch.weekNumbers.join(',') + ')';
         progress('Generating ' + batchLabel.toLowerCase() + '\u2026');
 
@@ -4471,14 +4471,14 @@ window.LiftRPGAPI = (function () {
       fragmentsOutput = { fragments: mergeResult.fragments };
     }
 
-    // Stage 5 — Endings
-    progress('Generating endings\u2026');
+    // Stage 5 — Finale
+    progress('Generating finale\u2026');
     var lastChunkWeeks = weekChunkOutputs[weekChunkOutputs.length - 1].weeks || [];
     var bossWeek = lastChunkWeeks[lastChunkWeeks.length - 1] || {};
     var binaryChoiceWeek = findBinaryChoiceWeek(weekChunkOutputs);
     var endingsOutput = await callStage(
       window.generateEndingsPrompt(layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext, weekSummaries),
-      STRUCTURED_SCHEMA_ENDINGS, 8192, 'Endings'
+      STRUCTURED_SCHEMA_ENDINGS, 8192, 'Finale'
     );
 
     // Assemble with exercise override

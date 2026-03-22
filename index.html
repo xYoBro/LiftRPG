@@ -431,7 +431,7 @@
       background: var(--paper);
       padding: 32px 42px;
       width: 100%;
-      max-width: 520px;
+      max-width: 920px;
       position: relative;
       box-shadow: 0 8px 40px rgba(0, 0, 0, .6);
     }
@@ -608,6 +608,17 @@
 
     .generator-flow-panel.is-active {
       display: block;
+    }
+
+    #generator-intake-panel,
+    #api-config-panel {
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    #api-status-panel {
+      max-width: 760px;
+      margin: 0 auto;
     }
 
     .generator-flow-head {
@@ -858,15 +869,12 @@
     }
 
     .chat-wizard.is-visible {
-      display: block;
+      display: grid;
+      gap: 10px;
     }
 
     .wizard-step-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 12px;
-      flex-wrap: wrap;
+      display: none;
     }
 
     .wizard-num {
@@ -908,10 +916,43 @@
     }
 
     .wizard-overview {
-      border: 1px solid rgba(24, 23, 20, .09);
-      background: rgba(255, 255, 255, .42);
-      padding: 12px 14px;
-      margin-bottom: 14px;
+      display: grid;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+
+    .wizard-shell-head {
+      display: grid;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+
+    .wizard-shell-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .wizard-shell-kicker {
+      font-size: 6pt;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .wizard-shell-title {
+      font-family: var(--display);
+      font-style: italic;
+      font-size: 13.5pt;
+      line-height: 1.12;
+      color: var(--ink);
+    }
+
+    .wizard-shell-copy {
+      font-size: 6.5pt;
+      line-height: 1.6;
+      color: var(--muted);
     }
 
     .wizard-current-kicker {
@@ -919,7 +960,7 @@
       letter-spacing: .22em;
       text-transform: uppercase;
       color: var(--accent);
-      margin-bottom: 6px;
+      display: block;
     }
 
     .wizard-current-title {
@@ -928,39 +969,30 @@
       font-size: 15pt;
       line-height: 1.12;
       color: var(--ink);
-      margin-bottom: 6px;
+      display: block;
     }
 
     .wizard-current-help {
       font-size: 7pt;
       line-height: 1.65;
       color: var(--muted);
-      margin-bottom: 10px;
+      margin-bottom: 0;
+      display: block;
     }
 
-    .wizard-locked-in {
-      font-size: 6pt;
-      line-height: 1.6;
-      letter-spacing: .04em;
-      color: var(--muted);
-      padding-top: 8px;
-      border-top: 1px solid rgba(24, 23, 20, .08);
-    }
-
-    .wizard-recovery-note {
-      margin-top: 8px;
-      padding-top: 8px;
-      border-top: 1px solid rgba(24, 23, 20, .08);
-      font-size: 6pt;
-      line-height: 1.65;
-      letter-spacing: .04em;
-      color: var(--muted);
+    .wizard-project-bar {
+      border: 1px solid rgba(24, 23, 20, .08);
+      background: rgba(255, 255, 255, .32);
+      padding: 10px 12px;
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
     }
 
     .wizard-state-board {
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid rgba(24, 23, 20, .08);
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
       display: grid;
       gap: 10px;
     }
@@ -1006,6 +1038,10 @@
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 8px;
+      margin-bottom: 4px;
+      padding: 10px;
+      border: 1px solid rgba(24, 23, 20, .07);
+      background: rgba(255, 255, 255, .22);
     }
 
     .wizard-stage-item {
@@ -1014,7 +1050,10 @@
       padding: 9px 10px;
       display: grid;
       gap: 7px;
-      min-height: 92px;
+      min-height: 78px;
+      width: 100%;
+      text-align: left;
+      color: inherit;
     }
 
     .wizard-stage-item.is-current {
@@ -1023,11 +1062,43 @@
       background: rgba(255, 250, 246, .72);
     }
 
+    button.wizard-stage-item {
+      appearance: none;
+      cursor: pointer;
+      transition: transform .15s ease, border-color .15s ease, background .15s ease;
+    }
+
+    button.wizard-stage-item.is-clickable:hover,
+    button.wizard-stage-item.is-clickable:focus-visible {
+      transform: translateY(-1px);
+      border-color: rgba(24, 23, 20, .2);
+      outline: none;
+    }
+
+    button.wizard-stage-item:disabled {
+      cursor: default;
+      opacity: .88;
+    }
+
     .wizard-stage-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
+    }
+
+    .wizard-stage-head-main {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .wizard-stage-step {
+      font-family: var(--mono);
+      font-size: 5pt;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--muted);
     }
 
     .wizard-stage-name {
@@ -1105,9 +1176,6 @@
     }
 
     .wizard-draft-row {
-      margin-top: 8px;
-      padding-top: 8px;
-      border-top: 1px solid rgba(24, 23, 20, .08);
       display: flex;
       gap: 10px;
       align-items: center;
@@ -1146,9 +1214,6 @@
 
     .wizard-build-meta,
     .wizard-stage-health {
-      margin-top: 8px;
-      padding-top: 8px;
-      border-top: 1px solid rgba(24, 23, 20, .08);
       font-family: var(--mono);
       font-size: 6pt;
       letter-spacing: .04em;
@@ -1199,6 +1264,11 @@
 
     .wizard-pane.is-visible {
       display: block;
+      padding: 12px 14px 14px;
+      border: 1px solid rgba(24, 23, 20, .09);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255, 251, 247, .82), rgba(255, 255, 255, .6));
+      box-shadow: 0 10px 30px rgba(24, 23, 20, .05);
     }
 
     .wizard-hint {
@@ -1206,7 +1276,7 @@
       font-size: 6pt;
       letter-spacing: .04em;
       color: var(--muted);
-      margin: 0 0 8px;
+      margin: 0 0 6px;
       line-height: 1.6;
     }
 
@@ -1222,10 +1292,32 @@
     .wizard-error.is-visible { display: block; }
 
     .wizard-stage-card {
-      margin-top: 10px;
+      margin-top: 0;
       border: 1px solid rgba(24, 23, 20, .09);
       background: rgba(255, 255, 255, .34);
-      padding: 10px 12px;
+      padding: 12px 13px;
+    }
+
+    .wizard-flow-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .wizard-stage-card.is-soft {
+      background: rgba(255, 255, 255, .46);
+      box-shadow: inset 3px 0 0 rgba(24, 23, 20, .08);
+    }
+
+    .wizard-stage-card.is-emphasis {
+      background: rgba(255, 250, 246, .74);
+      border-color: rgba(191, 106, 79, .18);
+      box-shadow: inset 3px 0 0 rgba(191, 106, 79, .24);
+    }
+
+    .wizard-stage-card.is-repair {
+      background: rgba(255, 247, 243, .8);
+      border-color: rgba(191, 106, 79, .18);
+      box-shadow: inset 3px 0 0 rgba(191, 106, 79, .2);
     }
 
     .wizard-stage-kicker {
@@ -1245,6 +1337,208 @@
     .wizard-stage-copy strong {
       color: var(--ink);
       font-weight: 600;
+    }
+
+    .wizard-stage-copy-note {
+      font-size: 6pt;
+      line-height: 1.65;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .wizard-stage-details {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(24, 23, 20, .08);
+    }
+
+    .wizard-stage-details summary {
+      list-style: none;
+      font-family: var(--mono);
+      font-size: 6pt;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--accent);
+      cursor: pointer;
+    }
+
+    .wizard-stage-details summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .wizard-stage-details summary::before {
+      content: '+ ';
+    }
+
+    .wizard-stage-details[open] summary::before {
+      content: '\2212  ';
+    }
+
+    .wizard-stage-details[open] summary {
+      margin-bottom: 8px;
+    }
+
+    .wizard-stage-stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .wizard-action-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .wizard-progress-shelf {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 10px;
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(24, 23, 20, .08);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .76), rgba(255, 252, 248, .62));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7);
+    }
+
+    .wizard-progress-head {
+      display: grid;
+      gap: 4px;
+    }
+
+    .wizard-progress-kicker {
+      font-family: var(--mono);
+      font-size: 5.6pt;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .wizard-progress-title {
+      font-family: var(--display);
+      font-size: 12.5pt;
+      line-height: 1.08;
+      color: var(--ink);
+    }
+
+    .wizard-progress-copy {
+      font-size: 6.4pt;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    .wizard-progress-rail {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .wizard-progress-pill {
+      appearance: none;
+      border: 1px solid rgba(24, 23, 20, .1);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, .72);
+      padding: 9px 11px;
+      min-width: 140px;
+      display: grid;
+      gap: 3px;
+      text-align: left;
+      color: var(--ink);
+      cursor: pointer;
+      transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, background .15s ease;
+      box-shadow: 0 4px 14px rgba(24, 23, 20, .04);
+    }
+
+    .wizard-progress-pill:hover,
+    .wizard-progress-pill:focus-visible {
+      outline: none;
+      transform: translateY(-1px);
+      border-color: rgba(24, 23, 20, .18);
+      box-shadow: 0 8px 20px rgba(24, 23, 20, .08);
+    }
+
+    .wizard-progress-pill.is-current {
+      border-color: rgba(191, 106, 79, .26);
+      background: rgba(255, 249, 244, .9);
+      box-shadow: 0 10px 24px rgba(191, 106, 79, .08);
+    }
+
+    .wizard-progress-pill.is-ready {
+      background: rgba(255, 255, 255, .88);
+    }
+
+    .wizard-progress-pill.is-upcoming {
+      background: rgba(255, 255, 255, .56);
+    }
+
+    .wizard-progress-pill-title {
+      font-family: var(--mono);
+      font-size: 7pt;
+      letter-spacing: .08em;
+      color: var(--ink);
+    }
+
+    .wizard-progress-pill-meta {
+      font-family: var(--mono);
+      font-size: 5.6pt;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .wizard-progress-pill.is-current .wizard-progress-pill-meta {
+      color: var(--accent);
+    }
+
+    .wizard-progress-pill.is-ready .wizard-progress-pill-meta {
+      color: var(--ink);
+    }
+
+    .wizard-stage-card.is-action {
+      display: grid;
+      gap: 8px;
+    }
+
+    .wizard-action-index {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 18px;
+      width: fit-content;
+      padding: 0 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(24, 23, 20, .12);
+      background: rgba(24, 23, 20, .05);
+      font-family: var(--mono);
+      font-size: 5.2pt;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .wizard-inline-note {
+      margin-top: 6px;
+      font-size: 6.2pt;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    .wizard-inline-details,
+    .wizard-repair-details {
+      margin-top: 10px;
+      border-top: 1px solid rgba(24, 23, 20, .08);
+      padding-top: 8px;
+    }
+
+    .wizard-inline-details summary,
+    .wizard-repair-details summary {
+      font-size: 5.8pt;
+      letter-spacing: .16em;
+      color: var(--ink);
+    }
+
+    .wizard-inline-details textarea,
+    .wizard-repair-details textarea {
+      margin-top: 10px;
     }
 
     /* ── JSON Assembly ─────────────── */
@@ -1366,11 +1660,54 @@
       padding-top: 12px;
     }
 
+    @media (min-width:860px) {
+      .wizard-stage-ledger {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+      }
+
+      .wizard-overview {
+        grid-template-columns: 1fr;
+        gap: 5px;
+      }
+
+      .wizard-stage-stack {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px 14px;
+      }
+
+      .wizard-action-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px 12px;
+      }
+
+      .wizard-stage-stack .wizard-stage-card.is-emphasis,
+      .wizard-stage-card.is-repair {
+        grid-column: 1 / -1;
+      }
+
+      .wizard-action-grid .wizard-stage-card.is-emphasis {
+        grid-column: auto;
+      }
+    }
+
     /* ── Responsive ────────────────── */
     @media (max-width:520px) {
       .api-config-grid,
       .wizard-state-grid,
       .wizard-stage-ledger {
+        grid-template-columns: 1fr;
+      }
+
+      .wizard-progress-rail {
+        flex-direction: column;
+      }
+
+      .wizard-progress-pill {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .wizard-primary-meta {
         grid-template-columns: 1fr;
       }
 
@@ -1384,6 +1721,7 @@
 
       .modal-panel {
         padding: 24px 20px;
+        max-width: 520px;
       }
     }
   </style>
@@ -1411,12 +1749,12 @@
             <div class="how-content">
               <ol>
                 <li><a href="#" id="how-generate"><strong>Start a Booklet</strong></a> &mdash; enter your workout (<a
-                    href="https://www.liftosaur.com/" target="_blank" rel="noopener">Liftosaur</a> or plain text) and a
-                  story idea</li>
-                <li>Choose manual prompts or run the full pipeline here with your own API key</li>
-                <li>Upload the JSON to <a href="renderer/">Render</a> &mdash; print your saddle-stitched booklet</li>
+                    href="https://www.liftosaur.com/" target="_blank" rel="noopener">Liftosaur</a> or plain text) and your
+                  booklet direction</li>
+                <li>Choose a guided build or run the full booklet build here with your own API key</li>
+                <li>Upload the JSON to <a href="renderer/">Renderer</a> &mdash; check pages and print your saddle-stitched booklet</li>
                 <li>Train the program for six weeks, pencil in hand</li>
-                <li>Return to <a href="renderer/">Render</a> with your assembled password to unlock the ending</li>
+                <li>Return to <a href="renderer/">Renderer</a>, load your booklet JSON, then enter the password to unlock the ending</li>
               </ol>
             </div>
           </details>
@@ -1424,11 +1762,11 @@
           <nav class="workflow">
             <button class="workflow-btn" id="open-generator" type="button">
               Start a Booklet
-              <span class="link-sub">Manual prompts or full BYOK API generation</span>
+              <span class="link-sub">Guided build or full BYOK API generation</span>
             </button>
             <a href="renderer/">
-              Render
-              <span class="link-sub">Upload your JSON &rarr; render, print, and unlock the ending</span>
+              Renderer
+              <span class="link-sub">Load your JSON &rarr; review pages, print, and unlock the ending</span>
             </a>
           </nav>
 
@@ -1464,9 +1802,9 @@
 
       <div class="generator-flow-panel is-active" id="generator-intake-panel">
         <div class="generator-flow-head">
-          <div class="generator-flow-kicker">Step 1</div>
-          <div class="generator-flow-title">Set the brief</div>
-          <div class="generator-flow-copy">Start with the workout and creative direction only. Once those are locked, LiftRPG will move you to the next surface instead of leaving everything on screen at once.</div>
+          <div class="generator-flow-kicker">Start Here</div>
+          <div class="generator-flow-title">Set your workout and booklet direction</div>
+          <div class="generator-flow-copy">Start with your workout and booklet direction only. Once those are set, LiftRPG moves you into the build flow instead of leaving the whole system open at once.</div>
         </div>
 
         <label class="field-label" for="gen-workout">Workout Program</label>
@@ -1474,41 +1812,39 @@
           placeholder="Paste your Liftosaur Liftoscript export, or describe your program in plain text"></textarea>
         <div class="field-error" id="workout-error">A workout program is required</div>
 
-        <label class="field-label" for="gen-brief">Creative Direction</label>
+        <label class="field-label" for="gen-brief">Booklet Direction</label>
         <textarea id="gen-brief" class="gen-input" rows="4"
-          placeholder="Artifact type, tone, authors/books to echo, mechanic feel, realism vs. genre, emotional stakes — or leave blank for a surprise"></textarea>
-        <div class="dice-tip">Better results: mention the kind of artifact you want, the voice/style, the mechanic feel, and whether you want quiet realism or overt genre. A few words still works.</div>
+          placeholder="Booklet format, tone, authors/books to echo, mechanic feel, realism vs. genre, emotional stakes — or leave blank for a surprise"></textarea>
+        <div class="dice-tip">Better results: mention the kind of booklet you want, the voice/style, the mechanic feel, and whether you want quiet realism or overt genre. A few words still works.</div>
 
         <div class="dice-fieldset">
           <div class="field-label">Randomizer</div>
           <div class="dice-option">
             <span>d100 <span class="dice-note">(00-99 percentile bands)</span></span>
           </div>
-          <div class="dice-tip">No worries if you don&rsquo;t have dice. Ask Google to roll a d100.</div>
+          <div class="dice-tip">No dice? Google &quot;roll d100&quot;.</div>
         </div>
 
         <div class="generator-mode-switch">
-          <button class="generator-mode-btn is-active" id="gen-mode-manual" type="button">Manual Prompts</button>
-          <button class="generator-mode-btn" id="gen-mode-api" type="button">Use My AI Key</button>
+          <button class="generator-mode-btn is-active" id="gen-mode-manual" type="button">Guided Build</button>
+          <button class="generator-mode-btn" id="gen-mode-api" type="button">Use My API</button>
         </div>
-        <div class="generator-mode-copy" id="gen-mode-copy">Manual mode keeps the copy/paste wizard and validates each stage locally before you move on.</div>
-
-        <button class="gen-submit" id="gen-submit" type="button">Start Manual Wizard &rarr;</button>
+        <div class="generator-mode-copy" id="gen-mode-copy">Guided Build keeps the flow step by step and checks each part on this device before you move on.</div>
 
         <div class="wizard-resume-banner" id="wiz-resume-banner">
-          <div class="wizard-resume-copy" id="wiz-resume-copy">A saved manual draft is available on this device.</div>
+          <div class="wizard-resume-copy" id="wiz-resume-copy">A saved project is available on this device.</div>
           <div class="wizard-resume-actions">
-            <button class="wizard-action-btn" id="wiz-resume-btn" type="button">Resume Draft</button>
-            <button class="wizard-action-btn" id="wiz-start-fresh-btn" type="button">Start Fresh</button>
+            <button class="wizard-action-btn" id="wiz-resume-btn" type="button">Resume Project</button>
+            <button class="wizard-action-btn" id="wiz-start-fresh-btn" type="button">Start New Project</button>
           </div>
         </div>
       </div>
 
       <div class="generator-flow-panel" id="api-config-panel">
         <div class="generator-flow-head">
-          <div class="generator-flow-kicker">Step 2</div>
-          <div class="generator-flow-title">Connect your model</div>
-          <div class="generator-flow-copy">The brief is set. Now configure the provider contract for this run. After you start generation, this setup surface will disappear and the live run state will take over.</div>
+          <div class="generator-flow-kicker">Use Your API</div>
+          <div class="generator-flow-title">Connect your API and start the build</div>
+          <div class="generator-flow-copy">Your workout and booklet direction are locked in. Add your API settings, then LiftRPG will run the full build here in the browser.</div>
         </div>
 
         <div class="api-panel" id="api-panel">
@@ -1546,19 +1882,20 @@
           </div>
           <div class="api-note">Your key is sent directly from this browser to the provider you choose. LiftRPG does not proxy or store it on a server. Provider, model, base URL, and pipeline preference are saved locally on this device for convenience.</div>
           <div class="generator-flow-actions">
-            <button class="generator-flow-back" id="api-config-back" type="button">Back To Brief</button>
-            <button class="gen-submit" id="api-submit" type="button" style="margin-top:0; flex:1">Generate Booklet via API &rarr;</button>
+          <button class="generator-flow-back" id="api-config-back" type="button">Back To Brief</button>
+          <button class="gen-submit" id="api-submit" type="button" style="margin-top:0; flex:1">Build Booklet With My API &rarr;</button>
           </div>
         </div>
       </div>
 
       <div class="generator-flow-panel" id="api-status-panel">
         <div class="generator-flow-head">
-          <div class="generator-flow-kicker">Step 3</div>
-          <div class="generator-flow-title">Track the run</div>
-          <div class="generator-flow-copy">This is now the only active surface. The provider setup has been tucked away so you can focus on stage state, failures, and renderer handoff.</div>
+          <div class="generator-flow-kicker">Live Run</div>
+          <div class="generator-flow-title">Track the booklet build</div>
+          <div class="generator-flow-copy">This is the live API build view. Stay here to see what LiftRPG is building, where it stops, and when the booklet is ready for the renderer.</div>
         </div>
         <div class="generator-flow-actions">
+          <button class="generator-flow-back" id="api-status-brief" type="button">Back To Brief</button>
           <button class="generator-flow-back" id="api-status-back" type="button">Back To API Setup</button>
         </div>
         <div class="wizard-state-board api-run-board">
@@ -1566,159 +1903,193 @@
             <div class="wizard-state-card">
               <div class="wizard-state-label">API State</div>
               <div class="wizard-state-value" id="api-state-summary">Waiting For Settings</div>
-              <div class="wizard-state-caption" id="api-state-summary-caption">Choose a provider and pipeline mode to begin.</div>
+              <div class="wizard-state-caption" id="api-state-summary-caption">Choose a provider and build method to begin.</div>
             </div>
             <div class="wizard-state-card">
-              <div class="wizard-state-label">Current Target</div>
+              <div class="wizard-state-label">Next Step</div>
               <div class="wizard-state-value" id="api-state-target">Provider Setup</div>
               <div class="wizard-state-caption" id="api-state-target-caption">No request has been sent yet.</div>
             </div>
             <div class="wizard-state-card">
-              <div class="wizard-state-label">Pipeline Progress</div>
+              <div class="wizard-state-label">Run Progress</div>
               <div class="wizard-state-value" id="api-state-progress">0 / 0 stages</div>
               <div class="wizard-state-caption" id="api-state-progress-caption">The API pipeline will report each stage here as it runs.</div>
             </div>
           </div>
           <div class="wizard-stage-ledger" id="api-stage-ledger"></div>
-          <div class="api-run-log" id="api-run-log">API mode is ready. Add your provider settings, then start the generation run.</div>
+          <div class="api-run-log" id="api-run-log">API build is ready. Add your provider settings, then start the booklet build.</div>
           <div class="api-run-actions" id="api-run-actions"></div>
         </div>
       </div>
 
       <div class="chat-wizard" id="chat-wizard">
 
-        <div class="wizard-step-row">
-          <div class="wizard-num active" id="wiz-num-1">1</div>
-          <span class="wizard-step-label active" id="wiz-label-1">Layer Bible</span>
+        <div class="wizard-shell-head">
+          <div class="wizard-shell-kicker">Guided Build</div>
+          <div class="wizard-shell-title">Booklet Build Status</div>
+          <div class="wizard-shell-copy">Finish one step at a time. Copy the prompt, paste the AI reply back, then move on.</div>
+          <div class="wizard-shell-actions">
+            <button class="generator-flow-back" id="wiz-back-to-brief" type="button">Back To Brief</button>
+          </div>
+        </div>
+
+          <div class="wizard-step-row">
+            <div class="wizard-num active" id="wiz-num-1">1</div>
+          <span class="wizard-step-label active" id="wiz-label-1">Foundation</span>
           <div class="wizard-divider"></div>
           <div class="wizard-num" id="wiz-num-2">2</div>
-          <span class="wizard-step-label" id="wiz-label-2">Campaign</span>
+          <span class="wizard-step-label" id="wiz-label-2">Booklet Plan</span>
           <div class="wizard-divider"></div>
           <div class="wizard-num" id="wiz-num-3">3</div>
-          <span class="wizard-step-label" id="wiz-label-3">Shell</span>
+          <span class="wizard-step-label" id="wiz-label-3">Identity</span>
           <div class="wizard-divider"></div>
           <div class="wizard-num" id="wiz-num-4">4</div>
           <span class="wizard-step-label" id="wiz-label-4">Weeks</span>
           <div class="wizard-divider"></div>
           <div class="wizard-num" id="wiz-num-5">5</div>
-          <span class="wizard-step-label" id="wiz-label-5">Fragments</span>
+          <span class="wizard-step-label" id="wiz-label-5">Extras</span>
           <div class="wizard-divider"></div>
           <div class="wizard-num" id="wiz-num-6">6</div>
-          <span class="wizard-step-label" id="wiz-label-6">Endings</span>
+          <span class="wizard-step-label" id="wiz-label-6">Ending</span>
         </div>
 
+        <div class="wizard-stage-ledger" id="wiz-stage-ledger"></div>
+
         <div class="wizard-overview">
-          <div class="wizard-current-kicker" id="wiz-current-kicker">Step 1 of 6</div>
-          <div class="wizard-current-title" id="wiz-current-title">Build the Layer Bible</div>
-          <div class="wizard-current-help" id="wiz-current-help">Copy the prompt into your LLM, paste back only the JSON, then continue to Campaign.</div>
-          <div class="wizard-locked-in" id="wiz-locked-in">Nothing locked in yet.</div>
-          <div class="wizard-recovery-note" id="wiz-recovery-note">If a step fails validation, use the repair prompt shown below that step and repaste only that stage.</div>
-          <div class="wizard-state-board">
-            <div class="wizard-state-grid">
-              <div class="wizard-state-card">
-                <div class="wizard-state-label">Pipeline State</div>
-                <div class="wizard-state-value" id="wiz-state-summary">Waiting for Layer Bible</div>
-                <div class="wizard-state-caption" id="wiz-state-summary-caption">Nothing is locked in yet.</div>
-              </div>
-              <div class="wizard-state-card">
-                <div class="wizard-state-label">Current Target</div>
-                <div class="wizard-state-value" id="wiz-state-target">Layer Bible</div>
-                <div class="wizard-state-caption" id="wiz-state-target-caption">Paste the first validated stage to unlock Campaign.</div>
-              </div>
-              <div class="wizard-state-card">
-                <div class="wizard-state-label">Pipeline Progress</div>
-                <div class="wizard-state-value" id="wiz-state-progress">0 / 6 locked</div>
-                <div class="wizard-state-caption" id="wiz-state-progress-caption">Weeks 0/0 · Fragments 0/0 · Assembly not ready.</div>
-              </div>
-            </div>
-            <div class="wizard-stage-ledger" id="wiz-stage-ledger"></div>
-          </div>
-          <div class="wizard-stage-health" id="wiz-stage-health">Stages: no validated stages yet.</div>
-          <div class="wizard-build-meta" id="wiz-build-meta">Build: pending.</div>
-          <div class="wizard-draft-row">
-            <div class="wizard-draft-status" id="wiz-draft-status">Drafts are not saved yet.</div>
-            <div class="wizard-draft-actions">
-              <button class="wizard-action-btn" id="wiz-export-draft" type="button">Export Draft</button>
-              <button class="wizard-action-btn" id="wiz-import-draft" type="button">Import Draft</button>
-              <button class="wizard-draft-clear" id="wiz-clear-draft" type="button">Clear Draft</button>
-            </div>
-            <input id="wiz-import-input" type="file" accept="application/json,.json" hidden>
-          </div>
+          <div class="wizard-current-kicker" id="wiz-current-kicker">Current Step</div>
+          <div class="wizard-current-title" id="wiz-current-title">Foundation</div>
+          <div class="wizard-current-help" id="wiz-current-help">Two moves only: copy the prompt into your AI, then paste the AI reply back here.</div>
         </div>
 
         <div class="wizard-pane is-visible" id="wiz-pane-1">
-          <p class="wizard-hint">Copy &rarr; paste into your LLM &rarr; copy the JSON result back below</p>
-          <div class="wizard-stage-card">
-            <div class="wizard-stage-kicker">This Step Produces</div>
-            <div class="wizard-stage-copy"><strong>The Layer Bible</strong>: the world, game structure, institution, and design ledger that every later step must follow.</div>
+          <p class="wizard-hint">This step sets the tone, mechanics, and core structure for the rest of the booklet.</p>
+          <div class="wizard-action-grid">
+            <div class="wizard-stage-card is-action">
+              <div class="wizard-action-index">Step 1</div>
+              <div class="wizard-stage-kicker">Copy To Your AI</div>
+              <div class="wizard-stage-copy"><strong>Copy the step prompt and paste it into ChatGPT, Claude, or another LLM</strong> so it can generate the booklet foundation JSON.</div>
+              <button class="gen-copy" id="wiz-copy-1" type="button">Copy Step Prompt</button>
+              <details class="wizard-inline-details wizard-stage-details">
+                <summary>Show Step Prompt</summary>
+                <textarea id="wiz-prompt-1" class="gen-input gen-output" rows="8" readonly></textarea>
+              </details>
+            </div>
+            <div class="wizard-stage-card is-emphasis is-action">
+              <div class="wizard-action-index">Step 2</div>
+              <div class="wizard-stage-kicker">Paste It Back Here</div>
+              <div class="wizard-stage-copy"><strong>Once the LLM has produced the JSON, paste it back here</strong> and LiftRPG will pull out the foundation data automatically.</div>
+              <label class="field-label" for="wiz-result-1" style="margin-top:10px">Paste AI Reply</label>
+              <textarea id="wiz-result-1" class="gen-input" rows="5"
+                placeholder='Paste the AI reply for the foundation step here.'></textarea>
+              <div class="wizard-error" id="wiz-error-1">LiftRPG could not read that response yet.</div>
+              <div id="wiz-repair-1"></div>
+            </div>
           </div>
-          <textarea id="wiz-prompt-1" class="gen-input gen-output" rows="8" readonly></textarea>
-          <button class="gen-copy" id="wiz-copy-1" type="button">Copy Prompt</button>
-          <label class="field-label" for="wiz-result-1" style="margin-top:14px">Paste Layer Bible Result</label>
-          <textarea id="wiz-result-1" class="gen-input" rows="5"
-            placeholder='{"storyLayer":{...},"gameLayer":{...},"governingLayer":{...}}'></textarea>
-          <div class="wizard-error" id="wiz-error-1">Invalid JSON &mdash; paste the raw JSON the LLM returned</div>
-          <div id="wiz-repair-1"></div>
-          <button class="gen-submit" id="wiz-next-1" type="button" style="margin-top:12px">Next: Plan Campaign &rarr;</button>
+          <button class="gen-submit" id="wiz-next-1" type="button" style="margin-top:12px">Next: Plan Story &rarr;</button>
         </div>
 
         <div class="wizard-pane" id="wiz-pane-2">
-          <p class="wizard-hint">Copy &rarr; paste into your LLM &rarr; copy the JSON result back below</p>
-          <div class="wizard-stage-card">
-            <div class="wizard-stage-kicker">This Step Produces</div>
-            <div class="wizard-stage-copy"><strong>The Campaign Plan</strong>: the week arc, fragment registry, and boss logic. If this is wrong, fix it here before moving on.</div>
+          <p class="wizard-hint">This step locks the week plan, extras, and ending logic before writing starts.</p>
+          <div class="wizard-action-grid">
+            <div class="wizard-stage-card is-action">
+              <div class="wizard-action-index">Step 1</div>
+              <div class="wizard-stage-kicker">Copy To Your AI</div>
+              <div class="wizard-stage-copy"><strong>Copy the step prompt and paste it into ChatGPT, Claude, or another LLM</strong> so it can generate the booklet plan JSON.</div>
+              <button class="gen-copy" id="wiz-copy-2" type="button">Copy Step Prompt</button>
+              <details class="wizard-inline-details wizard-stage-details">
+                <summary>Show Step Prompt</summary>
+                <textarea id="wiz-prompt-2" class="gen-input gen-output" rows="8" readonly></textarea>
+              </details>
+            </div>
+            <div class="wizard-stage-card is-emphasis is-action">
+              <div class="wizard-action-index">Step 2</div>
+              <div class="wizard-stage-kicker">Paste It Back Here</div>
+              <div class="wizard-stage-copy"><strong>Once the LLM has produced the JSON, paste it back here</strong> and LiftRPG will validate the booklet plan before you move on.</div>
+              <label class="field-label" for="wiz-result-2" style="margin-top:10px">Paste AI Reply</label>
+              <textarea id="wiz-result-2" class="gen-input" rows="5"
+                placeholder='Paste the AI reply for the booklet plan here.'></textarea>
+              <div class="wizard-error" id="wiz-error-2">LiftRPG could not read that response yet.</div>
+              <div id="wiz-repair-2"></div>
+            </div>
           </div>
-          <textarea id="wiz-prompt-2" class="gen-input gen-output" rows="8" readonly></textarea>
-          <button class="gen-copy" id="wiz-copy-2" type="button">Copy Prompt</button>
-          <label class="field-label" for="wiz-result-2" style="margin-top:14px">Paste Campaign Plan Result</label>
-          <textarea id="wiz-result-2" class="gen-input" rows="5"
-            placeholder='{"topology":{...},"weeks":[...],"bossPlan":{...}}'></textarea>
-          <div class="wizard-error" id="wiz-error-2">Invalid JSON &mdash; paste the raw JSON the LLM returned</div>
-          <div id="wiz-repair-2"></div>
-          <button class="gen-submit" id="wiz-next-2" type="button" style="margin-top:12px">Next: Build Shell &rarr;</button>
+          <button class="gen-submit" id="wiz-next-2" type="button" style="margin-top:12px">Next: Set Up Booklet &rarr;</button>
         </div>
 
         <div class="wizard-pane" id="wiz-pane-3">
-          <p class="wizard-hint">Generate the booklet shell only: meta, cover, rules, and theme</p>
-          <div class="wizard-stage-card">
-            <div class="wizard-stage-kicker">This Step Produces</div>
-            <div class="wizard-stage-copy"><strong>The Shell</strong>: title, cover, rules, and theme. No weeks, fragments, or endings yet.</div>
+          <p class="wizard-hint">This step sets the title, cover, rules, and theme before the content pages begin.</p>
+          <div class="wizard-action-grid">
+            <div class="wizard-stage-card is-action">
+              <div class="wizard-action-index">Step 1</div>
+              <div class="wizard-stage-kicker">Copy To Your AI</div>
+              <div class="wizard-stage-copy"><strong>Copy the step prompt and paste it into ChatGPT, Claude, or another LLM</strong> so it can generate the booklet identity JSON.</div>
+              <button class="gen-copy" id="wiz-copy-3" type="button">Copy Step Prompt</button>
+              <details class="wizard-inline-details wizard-stage-details">
+                <summary>Show Step Prompt</summary>
+                <textarea id="wiz-prompt-3" class="gen-input gen-output" rows="10" readonly></textarea>
+              </details>
+            </div>
+            <div class="wizard-stage-card is-emphasis is-action">
+              <div class="wizard-action-index">Step 2</div>
+              <div class="wizard-stage-kicker">Paste It Back Here</div>
+              <div class="wizard-stage-copy"><strong>Once the LLM has produced the JSON, paste it back here</strong> and LiftRPG will check the booklet setup before weeks begin.</div>
+              <label class="field-label" for="wiz-result-3" style="margin-top:10px">Paste AI Reply</label>
+              <textarea id="wiz-result-3" class="gen-input" rows="7"
+                placeholder='Paste the AI reply for the booklet identity step here.'></textarea>
+              <div class="wizard-error" id="wiz-error-3">LiftRPG could not read that response yet.</div>
+              <div id="wiz-repair-3"></div>
+            </div>
           </div>
-          <textarea id="wiz-prompt-3" class="gen-input gen-output" rows="10" readonly></textarea>
-          <button class="gen-copy" id="wiz-copy-3" type="button">Copy Prompt</button>
-          <label class="field-label" for="wiz-result-3" style="margin-top:14px">Paste Shell Result</label>
-          <textarea id="wiz-result-3" class="gen-input" rows="7"
-            placeholder='{"meta":{...},"cover":{...},"rulesSpread":{...},"theme":{...}}'></textarea>
-          <div class="wizard-error" id="wiz-error-3">Invalid JSON &mdash; paste the raw JSON the LLM returned</div>
-          <div id="wiz-repair-3"></div>
-          <button class="gen-submit" id="wiz-next-3" type="button" style="margin-top:12px">Next: Build Weeks &rarr;</button>
+          <button class="gen-submit" id="wiz-next-3" type="button" style="margin-top:12px">Next: Write Weeks &rarr;</button>
         </div>
 
         <div class="wizard-pane" id="wiz-pane-4">
-          <p class="wizard-hint">Generate only the requested week chunk. Each chunk is validated before you move on.</p>
+          <p class="wizard-hint">Focus on one approved week group at a time so fixes stay local and easy to understand.</p>
           <div id="wiz-weeks-stage"></div>
         </div>
 
         <div class="wizard-pane" id="wiz-pane-5">
-          <p class="wizard-hint">Generate fragments in smaller batches so repairs stay local.</p>
+          <p class="wizard-hint">Focus on one extras batch at a time so the document voices stay specific without turning into a full-book rewrite.</p>
           <div id="wiz-fragments-stage"></div>
         </div>
 
         <div class="wizard-pane" id="wiz-pane-6">
-          <p class="wizard-hint">Generate the endings subtree, then assemble and validate the full booklet locally.</p>
-          <div class="wizard-stage-card">
-            <div class="wizard-stage-kicker">This Step Produces</div>
-            <div class="wizard-stage-copy"><strong>The Endings</strong>: the final narrative payoff. After this, LiftRPG assembles and validates the whole booklet on-device.</div>
+          <p class="wizard-hint">This is the last AI step. After this, LiftRPG assembles and validates the booklet on this device.</p>
+          <div class="wizard-action-grid">
+            <div class="wizard-stage-card is-action">
+              <div class="wizard-action-index">Step 1</div>
+              <div class="wizard-stage-kicker">Copy To Your AI</div>
+              <div class="wizard-stage-copy"><strong>Copy the step prompt and paste it into ChatGPT, Claude, or another LLM</strong> so it can generate the ending JSON.</div>
+              <button class="gen-copy" id="wiz-copy-6" type="button">Copy Step Prompt</button>
+              <details class="wizard-inline-details wizard-stage-details">
+                <summary>Show Step Prompt</summary>
+                <textarea id="wiz-prompt-6" class="gen-input gen-output" rows="10" readonly></textarea>
+              </details>
+            </div>
+            <div class="wizard-stage-card is-emphasis is-action">
+              <div class="wizard-action-index">Step 2</div>
+              <div class="wizard-stage-kicker">Paste It Back Here</div>
+              <div class="wizard-stage-copy"><strong>Once the LLM has produced the JSON, paste it back here</strong> and LiftRPG will check it before final assembly.</div>
+              <label class="field-label" for="wiz-result-6" style="margin-top:10px">Paste AI Reply</label>
+              <textarea id="wiz-result-6" class="gen-input" rows="7"
+                placeholder='Paste the AI reply for the ending step here.'></textarea>
+              <div class="wizard-error" id="wiz-error-6">LiftRPG could not read that response yet.</div>
+              <div id="wiz-repair-6"></div>
+            </div>
           </div>
-          <textarea id="wiz-prompt-6" class="gen-input gen-output" rows="10" readonly></textarea>
-          <button class="gen-copy" id="wiz-copy-6" type="button">Copy Prompt</button>
-          <label class="field-label" for="wiz-result-6" style="margin-top:14px">Paste Endings Result</label>
-          <textarea id="wiz-result-6" class="gen-input" rows="7"
-            placeholder='{"endings":[...]}'></textarea>
-          <div class="wizard-error" id="wiz-error-6">Invalid JSON &mdash; paste the raw JSON the LLM returned</div>
-          <div id="wiz-repair-6"></div>
           <button class="gen-submit" id="wiz-assemble-submit" type="button" style="margin-top:12px">Assemble &amp; Validate Booklet</button>
           <div id="wiz-assembly-result"></div>
+        </div>
+
+        <div class="wizard-project-bar">
+          <div class="wizard-draft-row">
+            <div class="wizard-draft-status" id="wiz-draft-status">Projects are not saved yet.</div>
+            <div class="wizard-draft-actions">
+              <button class="wizard-action-btn" id="wiz-export-draft" type="button">Save Project</button>
+              <button class="wizard-action-btn" id="wiz-import-draft" type="button">Open Project</button>
+              <button class="wizard-draft-clear" id="wiz-clear-draft" type="button">Clear Project</button>
+            </div>
+            <input id="wiz-import-input" type="file" accept="application/json,.json" hidden>
+          </div>
         </div>
 
       </div>
@@ -1791,6 +2162,7 @@
       var apiPanel = document.getElementById('api-panel');
       var apiConfigBackBtn = document.getElementById('api-config-back');
       var apiStatusBackBtn = document.getElementById('api-status-back');
+      var apiStatusBriefBtn = document.getElementById('api-status-brief');
       var apiProviderEl = document.getElementById('api-provider');
       var apiMethodEl = document.getElementById('api-method');
       var apiModelEl = document.getElementById('api-model');
@@ -1865,14 +2237,7 @@
       var wizCurrentKicker = document.getElementById('wiz-current-kicker');
       var wizCurrentTitle = document.getElementById('wiz-current-title');
       var wizCurrentHelp = document.getElementById('wiz-current-help');
-      var wizLockedIn = document.getElementById('wiz-locked-in');
-      var wizRecoveryNote = document.getElementById('wiz-recovery-note');
-      var wizStateSummary = document.getElementById('wiz-state-summary');
-      var wizStateSummaryCaption = document.getElementById('wiz-state-summary-caption');
-      var wizStateTarget = document.getElementById('wiz-state-target');
-      var wizStateTargetCaption = document.getElementById('wiz-state-target-caption');
-      var wizStateProgress = document.getElementById('wiz-state-progress');
-      var wizStateProgressCaption = document.getElementById('wiz-state-progress-caption');
+      var wizBackToBriefBtn = document.getElementById('wiz-back-to-brief');
       var wizStageLedger = document.getElementById('wiz-stage-ledger');
       var wizStageHealth = document.getElementById('wiz-stage-health');
       var wizBuildMeta = document.getElementById('wiz-build-meta');
@@ -1892,17 +2257,26 @@
       var LEGACY_WIZARD_DRAFT_KEY = 'liftrpg_manual_wizard_draft_v1';
       var API_PREFS_KEY = 'liftrpg_api_prefs_v1';
       var LEGACY_API_PREF_KEYS = ['liftrpg_api_provider', 'liftrpg_api_model'];
-      var WIZARD_BUILD_VERSION = '2.2.0';
+      var WIZARD_BUILD_VERSION = '2.4.0';
       var WIZARD_DRAFT_SCHEMA_VERSION = 2;
       var WIZARD_STAGE_KEYS = ['layerBible', 'campaignPlan', 'shell', 'weeks', 'fragments', 'endings'];
+      var STAGE_LABELS = {
+        layerBible: 'Foundation',
+        campaignPlan: 'Booklet Plan',
+        shell: 'Identity',
+        weeks: 'Weeks',
+        fragments: 'Extras',
+        endings: 'Ending',
+        quality: 'Quality Check'
+      };
       var API_STAGE_ORDER = [
-        { key: 'layerBible', label: 'Layer Bible' },
-        { key: 'campaign', label: 'Campaign' },
-        { key: 'shell', label: 'Shell' },
-        { key: 'weeks', label: 'Weeks' },
-        { key: 'fragments', label: 'Fragments' },
-        { key: 'endings', label: 'Endings' },
-        { key: 'quality', label: 'Quality' }
+        { key: 'layerBible', label: STAGE_LABELS.layerBible },
+        { key: 'campaign', label: STAGE_LABELS.campaignPlan },
+        { key: 'shell', label: STAGE_LABELS.shell },
+        { key: 'weeks', label: STAGE_LABELS.weeks },
+        { key: 'fragments', label: STAGE_LABELS.fragments },
+        { key: 'endings', label: STAGE_LABELS.endings },
+        { key: 'quality', label: STAGE_LABELS.quality }
       ];
 
       var wizStep = 0;
@@ -1917,36 +2291,40 @@
       var apiRunState = null;
       var stepText = [
         {
-          title: 'Build the Layer Bible',
-          help: 'Copy the prompt into your LLM, then paste back only the layer-bible JSON before continuing.',
-          recovery: 'If the JSON is malformed or missing sections, use the repair prompt shown below and repaste only the Layer Bible.'
+          title: 'Foundation',
+          help: 'Copy the step prompt into your AI, then paste the reply back here.',
+          recovery: 'If the response is missing structure or fields, use the repair instructions for this step and repaste only the updated response.'
         },
         {
-          title: 'Plan the Campaign',
-          help: 'This defines the week-by-week structure, fragment registry, and boss logic that the rest of the booklet will inherit.',
-          recovery: 'If this fails, repair only the Campaign Plan here. Do not regenerate the whole booklet.'
+          title: 'Booklet Plan',
+          help: 'Copy the step prompt into your AI, then paste the reply back here.',
+          recovery: 'If this step needs corrections, fix only the booklet plan here instead of regenerating the whole booklet.'
         },
         {
-          title: 'Set the Shell',
-          help: 'Generate only the shell: meta, cover, rules, and theme. Weeks, fragments, and endings come later.',
-          recovery: 'If this step is off, repair only the Shell. The rest of the booklet can stay untouched.'
+          title: 'Identity',
+          help: 'Copy the step prompt into your AI, then paste the reply back here.',
+          recovery: 'If this step is off, fix only the booklet identity here. The rest of the booklet can stay untouched.'
         },
         {
-          title: 'Generate the Weeks',
-          help: 'Work chunk by chunk. Validate each week group before moving to the next so errors stay local.',
-          recovery: 'If a chunk fails, repair only that week chunk and repaste it. Earlier validated chunks stay locked in.'
+          title: 'Weeks',
+          help: 'Finish one week group at a time. Copy the prompt, then paste the reply back here.',
+          recovery: 'If a week group fails, fix only that group and paste that updated response back here.'
         },
         {
-          title: 'Generate the Fragments',
-          help: 'Fragments are batched so voice and document logic can stay rich without forcing a full-book rewrite.',
-          recovery: 'If a fragment batch fails, repair only that batch. Previously validated batches remain locked in.'
+          title: 'Extras',
+          help: 'Finish one bonus-page batch at a time. Copy the prompt, then paste the reply back here.',
+          recovery: 'If a bonus page batch fails, fix only that batch and paste the updated response back here.'
         },
         {
-          title: 'Finish the Endings',
-          help: 'Paste the endings JSON, then LiftRPG assembles and validates the full booklet locally before export.',
-          recovery: 'If final validation fails, return only to the flagged stage instead of redoing everything.'
+          title: 'Ending',
+          help: 'Copy the final prompt into your AI, then paste the reply back here so LiftRPG can assemble the booklet.',
+          recovery: 'If final validation fails, return only to the flagged step instead of redoing everything.'
         }
       ];
+
+      function getStageLabel(stageKey) {
+        return STAGE_LABELS[stageKey] || stageKey;
+      }
 
       function api() {
         return window.LiftRPGAPI || null;
@@ -2198,15 +2576,10 @@
         currentGenerationMode = mode === 'api' ? 'api' : 'manual';
         if (manualModeBtn) manualModeBtn.classList.toggle('is-active', currentGenerationMode === 'manual');
         if (apiModeBtn) apiModeBtn.classList.toggle('is-active', currentGenerationMode === 'api');
-        if (submitBtn) {
-          submitBtn.textContent = currentGenerationMode === 'manual'
-            ? 'Start Manual Wizard →'
-            : 'Continue To API Setup →';
-        }
         if (modeCopyEl) {
           modeCopyEl.textContent = currentGenerationMode === 'manual'
-            ? 'Manual mode keeps the copy/paste wizard and validates each stage locally before you move on.'
-            : 'BYOK mode runs the staged API pipeline in-browser and shows exactly where the run is at every moment.';
+            ? 'Guided Build keeps the flow step by step and checks each part locally before you move on.'
+            : 'Use My API runs the full booklet build in the browser and shows exactly what LiftRPG is doing.';
         }
         if (currentGenerationMode === 'api' && apiRunState === null) {
           apiRunState = createApiRunState();
@@ -2236,10 +2609,13 @@
             currentGenerationMode !== 'manual' ||
             !wizResumeBanner.classList.contains('is-visible');
         }
-        if (apiStatusBackBtn) {
-          apiStatusBackBtn.disabled = !!apiRunState && apiRunState.status === 'running';
-          apiStatusBackBtn.hidden = !!apiRunState && apiRunState.status === 'running';
-        }
+      if (apiStatusBackBtn) {
+        apiStatusBackBtn.disabled = !!apiRunState && apiRunState.status === 'running';
+        apiStatusBackBtn.hidden = !!apiRunState && apiRunState.status === 'running';
+      }
+      if (apiStatusBriefBtn) {
+        apiStatusBriefBtn.disabled = !!apiRunState && apiRunState.status === 'running';
+      }
         if (currentGeneratorSurface === 'api-config') {
           scheduleApiModelDiscovery({ immediate: true });
         }
@@ -2249,8 +2625,12 @@
           workoutEl.focus();
         } else if (currentGeneratorSurface === 'api-config' && apiProviderEl) {
           apiProviderEl.focus();
-        } else if (currentGeneratorSurface === 'manual' && wizResults[1]) {
-          wizResults[1].focus();
+        } else if (currentGeneratorSurface === 'manual') {
+          var activePane = wizPanes[wizStep] || wizPanes[0];
+          var nextActionEl = activePane && activePane.querySelector('.gen-copy');
+          if (!nextActionEl && activePane) nextActionEl = activePane.querySelector('.gen-submit');
+          if (!nextActionEl && activePane) nextActionEl = activePane.querySelector('textarea');
+          if (nextActionEl && typeof nextActionEl.focus === 'function') nextActionEl.focus();
         }
       }
 
@@ -2350,7 +2730,7 @@
           return;
         }
         apiRunActions.innerHTML = '' +
-          '<button type="button" id="api-open-renderer">Open In Renderer</button>' +
+          '<button type="button" id="api-open-renderer">Open Booklet In Renderer</button>' +
           '<button type="button" id="api-download-json">Download JSON</button>';
 
         var openRendererBtn = document.getElementById('api-open-renderer');
@@ -2506,10 +2886,10 @@
               stamp = ' Last saved ' + new Date(draft.savedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.';
             } catch (error) {}
           }
-          setDraftStatus('Draft autosaved locally.' + stamp);
+          setDraftStatus('Project autosaved on this device.' + stamp);
           setResumeBannerVisible(false);
         } catch (error) {
-          setDraftStatus('Draft could not be saved locally.');
+          setDraftStatus('Project could not be saved on this device.');
         }
       }
 
@@ -2518,7 +2898,7 @@
           localStorage.removeItem(WIZARD_DRAFT_KEY);
           localStorage.removeItem(LEGACY_WIZARD_DRAFT_KEY);
         } catch (error) {}
-        setDraftStatus(statusMessage || 'Draft cleared.');
+        setDraftStatus(statusMessage || 'Project cleared.');
         setResumeBannerVisible(false);
       }
 
@@ -2528,12 +2908,12 @@
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a');
         a.href = url;
-        a.download = 'liftrpg-manual-draft.json';
+        a.download = 'liftrpg-project.json';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        setDraftStatus('Draft bundle exported.');
+        setDraftStatus('Project file saved.');
       }
 
       function readImportedDraft(file) {
@@ -2566,23 +2946,23 @@
         }
 
         return [
-          { label: 'Layer Bible', status: resolveStatus('layerBible', wizData.layerBible ? 'valid' : (wizResults[1] && wizResults[1].value.trim() ? 'drafted' : 'empty')), reason: stageFlags.layerBible && stageFlags.layerBible.reason || '' },
-          { label: 'Campaign', status: resolveStatus('campaignPlan', wizData.campaignPlan ? 'valid' : (wizResults[2] && wizResults[2].value.trim() ? 'drafted' : 'empty')), reason: stageFlags.campaignPlan && stageFlags.campaignPlan.reason || '' },
-          { label: 'Shell', status: resolveStatus('shell', wizData.shell ? 'valid' : (wizResults[3] && wizResults[3].value.trim() ? 'drafted' : 'empty')), reason: stageFlags.shell && stageFlags.shell.reason || '' },
-          { label: 'Weeks', status: resolveStatus('weeks', weekChunksDone > 0 && weekChunksDone === weekChunksPlanned ? 'valid' : (weekChunksDone > 0 ? 'in progress' : 'empty')), reason: stageFlags.weeks && stageFlags.weeks.reason || '' },
-          { label: 'Fragments', status: resolveStatus('fragments', fragmentRegistryCount === 0 && wizData.campaignPlan ? 'not needed' : (fragmentBatchesDone > 0 && fragmentBatchesDone === fragmentBatchesPlanned ? 'valid' : (fragmentBatchesDone > 0 ? 'in progress' : 'empty'))), reason: stageFlags.fragments && stageFlags.fragments.reason || '' },
-          { label: 'Endings', status: resolveStatus('endings', wizData.endingsOutput ? 'valid' : (wizResults[6] && wizResults[6].value.trim() ? 'drafted' : 'empty')), reason: stageFlags.endings && stageFlags.endings.reason || '' }
+          { key: 'layerBible', label: getStageLabel('layerBible'), status: resolveStatus('layerBible', wizData.layerBible ? 'valid' : (wizResults[1] && wizResults[1].value.trim() ? 'drafted' : 'empty')), reason: stageFlags.layerBible && stageFlags.layerBible.reason || '' },
+          { key: 'campaignPlan', label: getStageLabel('campaignPlan'), status: resolveStatus('campaignPlan', wizData.campaignPlan ? 'valid' : (wizResults[2] && wizResults[2].value.trim() ? 'drafted' : 'empty')), reason: stageFlags.campaignPlan && stageFlags.campaignPlan.reason || '' },
+          { key: 'shell', label: getStageLabel('shell'), status: resolveStatus('shell', wizData.shell ? 'valid' : (wizResults[3] && wizResults[3].value.trim() ? 'drafted' : 'empty')), reason: stageFlags.shell && stageFlags.shell.reason || '' },
+          { key: 'weeks', label: getStageLabel('weeks'), status: resolveStatus('weeks', weekChunksDone > 0 && weekChunksDone === weekChunksPlanned ? 'valid' : (weekChunksDone > 0 ? 'in progress' : 'empty')), reason: stageFlags.weeks && stageFlags.weeks.reason || '' },
+          { key: 'fragments', label: getStageLabel('fragments'), status: resolveStatus('fragments', fragmentRegistryCount === 0 && wizData.campaignPlan ? 'not needed' : (fragmentBatchesDone > 0 && fragmentBatchesDone === fragmentBatchesPlanned ? 'valid' : (fragmentBatchesDone > 0 ? 'in progress' : 'empty'))), reason: stageFlags.fragments && stageFlags.fragments.reason || '' },
+          { key: 'endings', label: getStageLabel('endings'), status: resolveStatus('endings', wizData.endingsOutput ? 'valid' : (wizResults[6] && wizResults[6].value.trim() ? 'drafted' : 'empty')), reason: stageFlags.endings && stageFlags.endings.reason || '' }
         ];
       }
 
       function formatStatusLabel(status) {
         var value = String(status || 'empty');
         if (value === 'in progress') return 'In Progress';
-        if (value === 'needs review') return 'Needs Review';
+        if (value === 'needs review') return 'Review Needed';
         if (value === 'not needed') return 'Not Needed';
-        if (value === 'drafted') return 'Drafted';
-        if (value === 'valid') return 'Locked';
-        if (value === 'invalidated') return 'Invalidated';
+        if (value === 'drafted') return 'Needs Check';
+        if (value === 'valid') return 'Ready';
+        if (value === 'invalidated') return 'Needs Attention';
         return value.charAt(0).toUpperCase() + value.slice(1);
       }
 
@@ -2616,111 +2996,117 @@
       function getStageDetail(item) {
         if (!item) return '';
         if (item.status === 'invalidated') {
-          return item.reason || 'An upstream change invalidated this stage. Rebuild it before export.';
+          return item.reason || 'An earlier change means this step needs an update before export.';
         }
         if (item.status === 'needs review') {
-          return item.reason || 'An upstream change may have broken continuity here. Review and revalidate this stage.';
+          return item.reason || 'An earlier change may have affected this step. Review it before you finish.';
         }
-        if (item.label === 'Layer Bible') {
-          if (item.status === 'valid') return 'World contract, institution, and design ledger are locked.';
-          if (item.status === 'drafted') return 'Prompt is out. Waiting for validated planning JSON.';
-          return 'Foundation stage. Nothing downstream can lock until this is validated.';
+        if (item.key === 'layerBible') {
+          if (item.status === 'valid') return 'World rules, institution, and design logic are ready.';
+          if (item.status === 'drafted') return 'The instructions are ready. Paste back the approved AI response.';
+          return 'This is the foundation step. Everything else depends on it.';
         }
-        if (item.label === 'Campaign') {
+        if (item.key === 'campaignPlan') {
           var weekCount = Array.isArray((wizData.campaignPlan || {}).weeks) ? wizData.campaignPlan.weeks.length : 0;
           var fragmentCount = Array.isArray((wizData.campaignPlan || {}).fragmentRegistry) ? wizData.campaignPlan.fragmentRegistry.length : 0;
-          if (item.status === 'valid') return weekCount + ' weeks planned · ' + fragmentCount + ' fragment IDs assigned.';
-          if (item.status === 'drafted') return 'Awaiting the week arc, fragment registry, and boss convergence plan.';
-          return 'Defines the week map, fragment registry, and boss logic.';
+          if (item.status === 'valid') return weekCount + ' weeks planned · ' + fragmentCount + ' bonus page IDs assigned.';
+          if (item.status === 'drafted') return 'Waiting for the week arc, extras registry, and ending logic.';
+          return 'This defines the week map, extras, and ending logic.';
         }
-        if (item.label === 'Shell') {
+        if (item.key === 'shell') {
           var shellFamily = (((wizData.shell || {}).meta || {}).artifactIdentity || {}).shellFamily;
-          if (item.status === 'valid') return 'Shell locked' + (shellFamily ? ' · ' + shellFamily : '') + '.';
-          if (item.status === 'drafted') return 'Awaiting meta, cover, rules spread, and theme JSON.';
-          return 'Renderer-facing identity: title, cover, rules, theme, artifact contract.';
+          if (item.status === 'valid') return 'Booklet identity ready' + (shellFamily ? ' · ' + shellFamily : '') + '.';
+          if (item.status === 'drafted') return 'Waiting for the approved AI response for title, cover, rules, and theme.';
+          return 'This sets the title, cover, rules, theme, and booklet identity.';
         }
-        if (item.label === 'Weeks') {
+        if (item.key === 'weeks') {
           var planned = (wizState.weekChunks || []).length;
           var done = (wizData.weekChunkOutputs || []).length;
-          if (item.status === 'valid') return done + ' of ' + planned + ' chunks validated.';
-          if (item.status === 'in progress') return done + ' of ' + planned + ' chunks validated · active: ' + getWeekChunkLabel(wizState.weekChunkIndex) + '.';
-          return planned > 0 ? planned + ' chunks planned. Nothing validated yet.' : 'Week chunks will appear after Shell is locked.';
+          if (item.status === 'valid') return done + ' of ' + planned + ' week groups ready.';
+          if (item.status === 'in progress') return done + ' of ' + planned + ' week groups ready · active: ' + getWeekChunkLabel(wizState.weekChunkIndex) + '.';
+          return planned > 0 ? planned + ' week groups planned. Nothing finished yet.' : 'Week groups appear after Identity is ready.';
         }
-        if (item.label === 'Fragments') {
+        if (item.key === 'fragments') {
           var batches = (wizState.fragmentBatches || []).length;
           var completed = (wizState.fragmentBatchOutputs || []).length;
-          if (item.status === 'not needed') return 'No fragment batches are required for this campaign plan.';
-          if (item.status === 'valid') return completed + ' of ' + batches + ' batches validated.';
-          if (item.status === 'in progress') return completed + ' of ' + batches + ' batches validated · active: ' + getFragmentBatchLabel(wizState.fragmentBatchIndex) + '.';
-          return batches > 0 ? batches + ' fragment batches planned. None validated yet.' : 'Fragment batching becomes available after Weeks are validated.';
+          if (item.status === 'not needed') return 'This booklet plan does not require extras.';
+          if (item.status === 'valid') return completed + ' of ' + batches + ' extras batches ready.';
+          if (item.status === 'in progress') return completed + ' of ' + batches + ' extras batches ready · active: ' + getFragmentBatchLabel(wizState.fragmentBatchIndex) + '.';
+          return batches > 0 ? batches + ' extras batches planned. None finished yet.' : 'Extras appear after Weeks are ready.';
         }
-        if (item.label === 'Endings') {
-          if (item.status === 'valid') return 'Ending subtree is ready for local assembly.';
-          if (item.status === 'drafted') return 'Awaiting the final endings JSON before assembly.';
-          return 'Final narrative payoff. Assembly unlocks after this stage validates.';
+        if (item.key === 'endings') {
+          if (item.status === 'valid') return 'The ending is ready for local assembly.';
+          if (item.status === 'drafted') return 'Waiting for the approved AI response for the ending before assembly.';
+          return 'This is the final narrative payoff. Assembly unlocks after this step.';
         }
         return item.reason || '';
       }
 
       function getStageMeta(item) {
         if (!item) return '';
-        if (item.status === 'invalidated') return 'Rebuild required before downstream assembly can pass.';
-        if (item.status === 'needs review') return 'Review required because an upstream dependency changed.';
+        if (item.status === 'invalidated') return 'An update is required before final assembly can pass.';
+        if (item.status === 'needs review') return 'Review is required because an earlier dependency changed.';
         if (item.reason) return item.reason;
-        if (item.label === 'Weeks') {
-          return 'Chunking keeps repairs local and preserves earlier validated weeks.';
+        if (item.key === 'weeks') {
+          return 'Grouping weeks keeps fixes local and preserves earlier approved work.';
         }
-        if (item.label === 'Fragments') {
-          return 'Batches preserve document voice and cross-reference continuity.';
+        if (item.key === 'fragments') {
+          return 'Batching preserves document voice and cross-reference continuity.';
         }
-        if (item.label === 'Endings') {
-          return 'Assembly and quality gating happen on-device after this step.';
+        if (item.key === 'endings') {
+          return 'Assembly and quality checks happen on this device after this step.';
         }
         return formatStatusLabel(item.status);
       }
 
       function getStageAction(item) {
         if (!item) return null;
-        if (item.label === 'Layer Bible') {
+        if (item.key === 'layerBible') {
           return {
+            stageKey: item.key,
             stageLabel: item.label,
-            title: item.status === 'needs review' ? 'Review Layer Bible' : 'Validate Layer Bible',
-            detail: item.reason || 'Paste the first approved planning JSON to unlock Campaign.'
+            title: 'Foundation',
+            detail: item.reason || 'Paste the first approved AI response to unlock the booklet plan.'
           };
         }
-        if (item.label === 'Campaign') {
+        if (item.key === 'campaignPlan') {
           return {
+            stageKey: item.key,
             stageLabel: item.label,
-            title: item.status === 'needs review' ? 'Review Campaign Plan' : 'Validate Campaign Plan',
-            detail: item.reason || 'Lock the week arc, fragment registry, and boss plan before building the shell.'
+            title: 'Booklet Plan',
+            detail: item.reason || 'Lock the week arc, extras registry, and ending plan before setting up the booklet.'
           };
         }
-        if (item.label === 'Shell') {
+        if (item.key === 'shell') {
           return {
+            stageKey: item.key,
             stageLabel: item.label,
-            title: item.status === 'needs review' ? 'Review Shell' : 'Validate Shell',
-            detail: item.reason || 'Lock title, cover, rules, theme, and shell identity before generating weeks.'
+            title: 'Identity',
+            detail: item.reason || 'Lock title, cover, rules, theme, and booklet identity before writing weeks.'
           };
         }
-        if (item.label === 'Weeks') {
+        if (item.key === 'weeks') {
           return {
+            stageKey: item.key,
             stageLabel: item.label,
-            title: item.status === 'invalidated' ? 'Regenerate Weeks' : 'Validate ' + getWeekChunkLabel(wizState.weekChunkIndex),
-            detail: item.reason || 'Earlier week chunks stay locked while the active chunk is repaired or approved.'
+            title: getWeekChunkLabel(wizState.weekChunkIndex),
+            detail: item.reason || 'Earlier week groups stay in place while the current group is checked.'
           };
         }
-        if (item.label === 'Fragments') {
+        if (item.key === 'fragments') {
           return {
+            stageKey: item.key,
             stageLabel: item.label,
-            title: item.status === 'invalidated' ? 'Regenerate Fragments' : 'Validate ' + getFragmentBatchLabel(wizState.fragmentBatchIndex),
-            detail: item.reason || 'Only the current fragment batch is mutable; prior batches stay locked.'
+            title: getFragmentBatchLabel(wizState.fragmentBatchIndex),
+            detail: item.reason || 'Only the current extras batch is editable; earlier batches stay in place.'
           };
         }
-        if (item.label === 'Endings') {
+        if (item.key === 'endings') {
           return {
+            stageKey: item.key,
             stageLabel: item.label,
-            title: item.status === 'invalidated' ? 'Regenerate Endings' : 'Validate Endings',
-            detail: item.reason || 'Paste the final endings subtree so local assembly can run.'
+            title: 'Ending',
+            detail: item.reason || 'Paste the final approved AI response so local assembly can run.'
           };
         }
         return null;
@@ -2742,51 +3128,58 @@
         }
         if (!wizData.layerBible) {
           return {
-            stageLabel: 'Layer Bible',
-            title: 'Validate Layer Bible',
-            detail: 'Paste the first approved planning JSON to unlock Campaign.'
+            stageKey: 'layerBible',
+            stageLabel: getStageLabel('layerBible'),
+            title: 'Foundation',
+            detail: 'Paste the first approved AI response to unlock the booklet plan.'
           };
         }
         if (!wizData.campaignPlan) {
           return {
-            stageLabel: 'Campaign',
-            title: 'Validate Campaign Plan',
-            detail: 'Lock the week arc, fragment registry, and boss plan before building the shell.'
+            stageKey: 'campaignPlan',
+            stageLabel: getStageLabel('campaignPlan'),
+            title: 'Booklet Plan',
+            detail: 'Lock the week arc, extras registry, and ending plan before setting up the booklet.'
           };
         }
         if (!wizData.shell) {
           return {
-            stageLabel: 'Shell',
-            title: 'Validate Shell',
-            detail: 'Lock title, cover, rules, theme, and shell identity before generating weeks.'
+            stageKey: 'shell',
+            stageLabel: getStageLabel('shell'),
+            title: 'Identity',
+            detail: 'Lock title, cover, rules, theme, and booklet identity before writing weeks.'
           };
         }
         if ((wizData.weekChunkOutputs || []).length < (wizState.weekChunks || []).length) {
           return {
-            stageLabel: 'Weeks',
-            title: 'Validate ' + getWeekChunkLabel(wizState.weekChunkIndex),
-            detail: 'Earlier week chunks stay locked while the active chunk is repaired or approved.'
+            stageKey: 'weeks',
+            stageLabel: getStageLabel('weeks'),
+            title: getWeekChunkLabel(wizState.weekChunkIndex),
+            detail: 'Earlier week groups stay in place while the current group is checked.'
           };
         }
         var fragmentRegistryCount = Array.isArray((wizData.campaignPlan || {}).fragmentRegistry) ? wizData.campaignPlan.fragmentRegistry.length : 0;
         if (fragmentRegistryCount > 0 && (wizState.fragmentBatchOutputs || []).length < (wizState.fragmentBatches || []).length) {
           return {
-            stageLabel: 'Fragments',
-            title: 'Validate ' + getFragmentBatchLabel(wizState.fragmentBatchIndex),
-            detail: 'Only the current fragment batch is mutable; prior batches stay locked.'
+            stageKey: 'fragments',
+            stageLabel: getStageLabel('fragments'),
+            title: getFragmentBatchLabel(wizState.fragmentBatchIndex),
+            detail: 'Only the current extras batch is editable; earlier batches stay in place.'
           };
         }
         if (!wizData.endingsOutput) {
           return {
-            stageLabel: 'Endings',
-            title: 'Validate Endings',
-            detail: 'Paste the final endings subtree so local assembly can run.'
+            stageKey: 'endings',
+            stageLabel: getStageLabel('endings'),
+            title: 'Ending',
+            detail: 'Paste the final approved AI response so local assembly can run.'
           };
         }
         return {
-          stageLabel: 'Endings',
+          stageKey: 'endings',
+          stageLabel: getStageLabel('endings'),
           title: 'Assemble Booklet',
-          detail: 'All generation stages are locked. Run local validation and export when ready.'
+          detail: 'All creation steps are ready. Run local validation and export when ready.'
         };
       }
 
@@ -2807,61 +3200,65 @@
         var hasWork = lockedCount > 0;
         var nextAction = getNextAction(items);
         var stateTitle = hasInvalidation
-          ? 'Needs Regeneration'
+          ? 'Needs Attention'
           : wizData.endingsOutput
-            ? 'Ready To Assemble'
+            ? 'Ready to Finish'
             : hasDraft
-              ? 'Awaiting Validation'
+              ? 'Awaiting Review'
               : hasWork
                 ? 'In Progress'
-                : 'Waiting To Start';
-        var stateCaption = hasInvalidation
-          ? nextAction.detail
-          : nextAction.detail;
+                : 'Waiting to Start';
+        var stateCaption = nextAction.detail;
         return {
           lockedCount: lockedCount,
           stateTitle: stateTitle,
           stateCaption: stateCaption,
-          progressTitle: lockedCount + ' / ' + items.length + ' locked',
+          progressTitle: lockedCount + ' / ' + items.length + ' ready',
           progressCaption: 'Weeks ' + weekChunksDone + '/' + weekChunksPlanned +
-            ' · Fragments ' + fragmentBatchesDone + '/' + fragmentBatchesPlanned +
+            ' · Extras ' + fragmentBatchesDone + '/' + fragmentBatchesPlanned +
             ' · ' + (wizData.endingsOutput ? 'Assembly ready.' : 'Assembly not ready.')
         };
       }
 
       function renderStageLedger(items, nextAction) {
         if (!wizStageLedger) return;
-        var activeLabel = nextAction && nextAction.stageLabel ? nextAction.stageLabel : '';
+        var activeKey = nextAction && nextAction.stageKey ? nextAction.stageKey : '';
         wizStageLedger.innerHTML = items.map(function (item) {
           var tone = getStatusTone(item.status);
-          var currentClass = item.label === activeLabel ? ' is-current' : '';
+          var stageIndex = WIZARD_STAGE_KEYS.indexOf(item.key);
+          var currentClass = stageIndex === wizStep ? ' is-current' : '';
+          var canJump = stageIndex >= 0 ? canNavigateToStep(stageIndex) : false;
           return '' +
-            '<div class="wizard-stage-item ' + tone + currentClass + '">' +
+            '<button type="button" class="wizard-stage-item ' + tone + currentClass + (canJump ? ' is-clickable' : '') + '" data-stage-index="' + stageIndex + '"' + (canJump ? '' : ' disabled') + (item.key === activeKey ? ' aria-current="step"' : '') + '>' +
               '<div class="wizard-stage-head">' +
-                '<div class="wizard-stage-name">' + escapeForHtml(item.label) + '</div>' +
+                '<div class="wizard-stage-head-main">' +
+                  '<div class="wizard-stage-step">Step ' + (stageIndex + 1) + '</div>' +
+                  '<div class="wizard-stage-name">' + escapeForHtml(item.label) + '</div>' +
+                '</div>' +
                 '<div class="wizard-status-chip ' + tone + '">' + escapeForHtml(formatStatusLabel(item.status)) + '</div>' +
               '</div>' +
               '<div class="wizard-stage-detail">' + escapeForHtml(getStageDetail(item)) + '</div>' +
               '<div class="wizard-stage-meta">' + escapeForHtml(getStageMeta(item)) + '</div>' +
-            '</div>';
+            '</button>';
         }).join('');
+        Array.prototype.forEach.call(wizStageLedger.querySelectorAll('[data-stage-index]'), function (button) {
+          button.addEventListener('click', function () {
+            jumpToStep(Number(button.getAttribute('data-stage-index')));
+          });
+        });
       }
 
       function updateStageHealth() {
         var items = getStageHealthItems();
-        var summary = getPipelineSummary(items);
         var nextAction = getNextAction(items);
         if (wizStageHealth) {
-          wizStageHealth.textContent = 'Stages: ' + items.map(function (item) {
-            return item.label + ' ' + item.status;
-          }).join(' • ');
+          var attentionCount = items.filter(function (item) {
+            return item.status === 'invalidated' || item.status === 'needs review';
+          }).length;
+          wizStageHealth.textContent = attentionCount > 0
+            ? attentionCount + ' step' + (attentionCount === 1 ? '' : 's') + ' need attention.'
+            : 'No step issues right now.';
         }
-        if (wizStateSummary) wizStateSummary.textContent = summary.stateTitle;
-        if (wizStateSummaryCaption) wizStateSummaryCaption.textContent = summary.stateCaption;
-        if (wizStateTarget) wizStateTarget.textContent = nextAction.title;
-        if (wizStateTargetCaption) wizStateTargetCaption.textContent = nextAction.detail;
-        if (wizStateProgress) wizStateProgress.textContent = summary.progressTitle;
-        if (wizStateProgressCaption) wizStateProgressCaption.textContent = summary.progressCaption;
         renderStageLedger(items, nextAction);
         wizNums.forEach(function (num, index) {
           var item = items[index];
@@ -2874,7 +3271,7 @@
 
       function updateBuildMeta() {
         if (!wizBuildMeta) return;
-        wizBuildMeta.textContent = 'Build ' + WIZARD_BUILD_VERSION + ' • draft schema v' + WIZARD_DRAFT_SCHEMA_VERSION;
+        wizBuildMeta.textContent = 'App ' + WIZARD_BUILD_VERSION + ' • schema v' + WIZARD_DRAFT_SCHEMA_VERSION;
       }
 
       function ensureWeekChunksPlanned() {
@@ -2922,7 +3319,7 @@
         updateBuildMeta();
         updateStageHealth();
         updateWizardOverview(0);
-        if (!options.keepDraft) clearWizardDraft('Draft cleared.');
+        if (!options.keepDraft) clearWizardDraft('Project cleared.');
       }
 
       function restoreWizardDraft(draft) {
@@ -2991,7 +3388,7 @@
             restoredAt = ' Recovered ' + new Date(draft.savedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + '.';
           } catch (error) {}
         }
-        setDraftStatus('Recovered local draft.' + restoredAt);
+        setDraftStatus('Recovered project.' + restoredAt);
         updateBuildMeta();
         updateStageHealth();
         setResumeBannerVisible(false);
@@ -3062,11 +3459,13 @@
       if (manualModeBtn) {
         manualModeBtn.addEventListener('click', function () {
           setGenerationMode('manual');
+          handlePrimaryContinue();
         });
       }
       if (apiModeBtn) {
         apiModeBtn.addEventListener('click', function () {
           setGenerationMode('api');
+          handlePrimaryContinue();
         });
       }
       if (apiProviderEl) {
@@ -3113,10 +3512,21 @@
           setGeneratorSurface('intake');
         });
       }
+      if (apiStatusBriefBtn) {
+        apiStatusBriefBtn.addEventListener('click', function () {
+          if (apiRunState && apiRunState.status === 'running') return;
+          setGeneratorSurface('intake');
+        });
+      }
       if (apiStatusBackBtn) {
         apiStatusBackBtn.addEventListener('click', function () {
           if (apiRunState && apiRunState.status === 'running') return;
           setGeneratorSurface('api-config');
+        });
+      }
+      if (wizBackToBriefBtn) {
+        wizBackToBriefBtn.addEventListener('click', function () {
+          setGeneratorSurface('intake');
         });
       }
       document.querySelectorAll('input[name="gen-dice"]').forEach(function (radio) {
@@ -3125,11 +3535,11 @@
       Object.keys(wizResults).forEach(function (key) {
         wizResults[key].addEventListener('input', saveWizardDraft);
       });
-      wizClearDraftBtn.addEventListener('click', function () {
-        resetWizardState({ keepDraft: true });
-        setGeneratorSurface('intake', { skipFocus: true });
-        clearWizardDraft('Draft cleared. Starting fresh will create a new one.');
-      });
+        wizClearDraftBtn.addEventListener('click', function () {
+          resetWizardState({ keepDraft: true });
+          setGeneratorSurface('intake', { skipFocus: true });
+          clearWizardDraft('Project cleared. Starting fresh will create a new one.');
+        });
       if (wizExportDraftBtn) wizExportDraftBtn.addEventListener('click', exportWizardDraft);
       if (wizImportDraftBtn) {
         wizImportDraftBtn.addEventListener('click', function () {
@@ -3143,13 +3553,13 @@
           readImportedDraft(file)
             .then(function (draft) {
               if (!restoreWizardDraft(draft)) {
-                throw new Error('Imported draft does not contain LiftRPG wizard data.');
+                throw new Error('Imported project file does not contain LiftRPG wizard data.');
               }
               saveWizardDraft();
-              setDraftStatus('Imported draft bundle.');
+              setDraftStatus('Project file opened.');
             })
             .catch(function (error) {
-              alert(error && error.message ? error.message : 'Could not import draft bundle.');
+              alert(error && error.message ? error.message : 'Could not open the project file.');
             })
             .finally(function () {
               wizImportInput.value = '';
@@ -3167,7 +3577,7 @@
       if (wizStartFreshBtn) {
         wizStartFreshBtn.addEventListener('click', function () {
           resetWizardState({ keepDraft: true });
-          clearWizardDraft('Draft cleared. Starting fresh.');
+          clearWizardDraft('Project cleared. Starting fresh.');
           setResumeBannerVisible(false);
           setGeneratorSurface('intake', { skipFocus: true });
           openModal();
@@ -3197,33 +3607,11 @@
         saveWizardDraft();
       }
 
-      function collectLockedInItems() {
-        var items = [];
-        if (wizData.layerBible) items.push('Layer Bible saved');
-        if (wizData.campaignPlan) items.push('Campaign saved');
-        if (wizData.shell) items.push('Shell saved');
-        if (wizData.weekChunkOutputs && wizData.weekChunkOutputs.length > 0) {
-          items.push(wizData.weekChunkOutputs.length + ' week chunk' + (wizData.weekChunkOutputs.length === 1 ? '' : 's') + ' validated');
-        }
-        if (wizState.fragmentBatchOutputs && wizState.fragmentBatchOutputs.length > 0) {
-          items.push(wizState.fragmentBatchOutputs.length + ' fragment batch' + (wizState.fragmentBatchOutputs.length === 1 ? '' : 'es') + ' validated');
-        }
-        if (wizData.endingsOutput) items.push('Endings ready');
-        return items;
-      }
-
       function updateWizardOverview(idx) {
         var entry = stepText[idx] || stepText[0];
-        if (wizCurrentKicker) wizCurrentKicker.textContent = 'Step ' + (idx + 1) + ' of ' + wizPanes.length;
+        if (wizCurrentKicker) wizCurrentKicker.textContent = 'Current Step';
         if (wizCurrentTitle) wizCurrentTitle.textContent = entry.title;
         if (wizCurrentHelp) wizCurrentHelp.textContent = entry.help;
-        if (wizRecoveryNote) wizRecoveryNote.textContent = entry.recovery;
-        if (wizLockedIn) {
-          var items = collectLockedInItems();
-          wizLockedIn.textContent = items.length > 0
-            ? 'Locked in: ' + items.join(' • ')
-            : 'Nothing locked in yet.';
-        }
         updateBuildMeta();
         updateStageHealth();
       }
@@ -3441,13 +3829,13 @@
       }
 
       document.getElementById('wiz-copy-1').addEventListener('click',
-        makeCopyHandler(wizPrompts[1], document.getElementById('wiz-copy-1'), 'Copy Prompt'));
+        makeCopyHandler(wizPrompts[1], document.getElementById('wiz-copy-1'), 'Copy Step Prompt'));
       document.getElementById('wiz-copy-2').addEventListener('click',
-        makeCopyHandler(wizPrompts[2], document.getElementById('wiz-copy-2'), 'Copy Prompt'));
+        makeCopyHandler(wizPrompts[2], document.getElementById('wiz-copy-2'), 'Copy Step Prompt'));
       document.getElementById('wiz-copy-3').addEventListener('click',
-        makeCopyHandler(wizPrompts[3], document.getElementById('wiz-copy-3'), 'Copy Prompt'));
+        makeCopyHandler(wizPrompts[3], document.getElementById('wiz-copy-3'), 'Copy Step Prompt'));
       document.getElementById('wiz-copy-6').addEventListener('click',
-        makeCopyHandler(wizPrompts[6], document.getElementById('wiz-copy-6'), 'Copy Prompt'));
+        makeCopyHandler(wizPrompts[6], document.getElementById('wiz-copy-6'), 'Copy Step Prompt'));
 
       function fallbackFindJsonBounds(text) {
         var depth = 0;
@@ -3503,6 +3891,38 @@
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;');
+      }
+
+      function renderPromptPreview(textareaId, buttonId, rows, copyLabel) {
+        return '<button class="gen-copy" id="' + escapeForHtml(buttonId) + '" type="button">' + escapeForHtml(copyLabel || 'Copy Step Prompt') + '</button>' +
+          '<details class="wizard-inline-details wizard-stage-details">' +
+            '<summary>Show Step Prompt</summary>' +
+            '<textarea id="' + escapeForHtml(textareaId) + '" class="gen-input gen-output" rows="' + rows + '" readonly></textarea>' +
+          '</details>';
+      }
+
+      function renderResponseCapture(resultId, errorId, repairId, rows, responseIntro, placeholder, noteText) {
+        return '<div class="wizard-stage-card is-emphasis">' +
+          '<div class="wizard-stage-kicker">Bring It Back Here</div>' +
+          '<div class="wizard-stage-copy">' + escapeForHtml(responseIntro) + '</div>' +
+          '<label class="field-label" for="' + escapeForHtml(resultId) + '" style="margin-top:10px">Paste AI Reply</label>' +
+          '<textarea id="' + escapeForHtml(resultId) + '" class="gen-input" rows="' + rows + '" placeholder="' + escapeForHtml(placeholder || 'Paste the AI reply here.') + '"></textarea>' +
+          (noteText ? '<div class="wizard-inline-note">' + escapeForHtml(noteText) + '</div>' : '') +
+          '<div class="wizard-error" id="' + escapeForHtml(errorId) + '">LiftRPG could not read that response yet.</div>' +
+          '<div id="' + escapeForHtml(repairId) + '"></div>' +
+        '</div>';
+      }
+
+      function formatFriendlyParseError(error) {
+        var message = error && error.message ? error.message : 'LiftRPG could not read that response yet.';
+        var lower = message.toLowerCase();
+        if (lower.indexOf('no json object found') !== -1) {
+          return 'LiftRPG could not find the step data in that response. Ask your AI to return only the structured result, then paste it again.';
+        }
+        if (lower.indexOf('unexpected token') !== -1 || lower.indexOf('unterminated') !== -1 || lower.indexOf('json') !== -1) {
+          return 'LiftRPG could not read that response yet. Ask your AI to return only the structured result, then paste it again.';
+        }
+        return message;
       }
 
       function setActionBusy(button, busyText, callback) {
@@ -3583,12 +4003,12 @@
             '- Preserve all validated content outside the repaired subtree.',
             '- Do not rewrite the booklet into a safer or more generic format.'
           ];
-          if (label === 'layer bible') {
+          if (label === 'layer codex') {
             lines.push('- Keep the approved design ledger logic intact. Repair shape, not concept.');
           } else if (label === 'campaign plan') {
             lines.push('- Do not renumber weeks, fragment IDs, or overflow IDs.');
             lines.push('- Preserve the planned mystery progression, boss plan, and week transformations.');
-          } else if (label === 'booklet shell') {
+          } else if (label === 'booklet shell' || label === 'booklet setup') {
             lines.push('- Preserve the chosen voice, register, cover object, and shell identity.');
             lines.push('- Do not collapse the shell into the default LiftRPG cover/rules grammar.');
           } else if (label === 'week chunk') {
@@ -3628,14 +4048,20 @@
         ].join('\n');
 
         container.innerHTML =
-          '<label class="field-label" style="margin-top:14px">Targeted Repair Prompt</label>' +
-          '<textarea class="gen-input gen-output" rows="9" readonly></textarea>' +
-          '<button class="gen-copy" type="button">Copy Repair Prompt</button>';
+          '<div class="wizard-stage-card is-repair">' +
+            '<div class="wizard-stage-kicker">Need A Repair Pass?</div>' +
+            '<div class="wizard-stage-copy">Use this only if the pasted AI response did not validate. Copy the repair instructions into your AI, then paste the updated response back here.</div>' +
+            '<details class="wizard-repair-details wizard-stage-details">' +
+              '<summary>Show repair instructions</summary>' +
+              '<textarea class="gen-input gen-output" rows="9" readonly></textarea>' +
+              '<button class="gen-copy" type="button">Copy Repair Instructions</button>' +
+            '</details>' +
+          '</div>';
 
         var textarea = container.querySelector('textarea');
         var button = container.querySelector('button');
         textarea.value = promptText;
-        button.addEventListener('click', makeCopyHandler(textarea, button, 'Copy Repair Prompt'));
+        button.addEventListener('click', makeCopyHandler(textarea, button, 'Copy Repair Instructions'));
       }
 
       function setStageError(stageNumber, message) {
@@ -3653,7 +4079,7 @@
 
       function parseStageJson(rawText, validator, stageNumber, stageLabel, contract) {
         if (!rawText.trim()) {
-          var emptyMsg = 'Paste the JSON the LLM returned.';
+          var emptyMsg = 'Paste the AI response from this step.';
           setStageError(stageNumber, emptyMsg);
           renderRepairPrompt(wizRepair[stageNumber], stageLabel, contract, rawText, [emptyMsg]);
           return null;
@@ -3671,8 +4097,9 @@
           renderRepairPrompt(wizRepair[stageNumber], stageLabel, contract, rawText, []);
           return data;
         } catch (error) {
-          setStageError(stageNumber, error.message || 'Invalid JSON.');
-          renderRepairPrompt(wizRepair[stageNumber], stageLabel, contract, rawText, [error.message || 'Invalid JSON.']);
+          var friendlyError = formatFriendlyParseError(error);
+          setStageError(stageNumber, friendlyError);
+          renderRepairPrompt(wizRepair[stageNumber], stageLabel, contract, rawText, [friendlyError]);
           return null;
         }
       }
@@ -3774,26 +4201,49 @@
         return '<div class="result-meta">' + items.map(escapeForHtml).join(' &middot; ') + '</div>';
       }
 
+      function renderProgressShelf(kicker, title, copy, buttonsHtml) {
+        return '<div class="wizard-progress-shelf">' +
+          '<div class="wizard-progress-head">' +
+            '<div class="wizard-progress-kicker">' + escapeForHtml(kicker) + '</div>' +
+            '<div class="wizard-progress-title">' + escapeForHtml(title) + '</div>' +
+            '<div class="wizard-progress-copy">' + escapeForHtml(copy) + '</div>' +
+          '</div>' +
+          '<div class="wizard-progress-rail">' + buttonsHtml + '</div>' +
+        '</div>';
+      }
+
       function renderWeekChunkSelector() {
         if (!wizState.weekChunks || !wizState.weekChunks.length) return '';
-        return '<div class="result-actions" style="margin-top:8px">' + wizState.weekChunks.map(function (chunk, index) {
+        return wizState.weekChunks.map(function (chunk, index) {
           var label = chunk.length === 1
             ? 'Week ' + chunk[0]
             : 'Weeks ' + chunk[0] + '-' + chunk[chunk.length - 1];
-          var actionLabel = (wizData.weekChunkOutputs[index] ? 'Replace ' : 'Open ') + label;
-          return '<button type="button" class="result-btn-secondary wiz-week-select-btn" data-week-chunk-index="' + index + '">' + escapeForHtml(actionLabel) + '</button>';
-        }).join('') + '</div>';
+          var isReady = !!wizData.weekChunkOutputs[index];
+          var isCurrent = index === wizState.weekChunkIndex;
+          var statusClass = isCurrent ? ' is-current' : (isReady ? ' is-ready' : ' is-upcoming');
+          var meta = isCurrent ? 'In progress' : (isReady ? 'Ready · Edit' : 'Up next · Open');
+          return '<button type="button" class="wizard-progress-pill wiz-week-select-btn' + statusClass + '" data-week-chunk-index="' + index + '">' +
+            '<span class="wizard-progress-pill-title">' + escapeForHtml(label) + '</span>' +
+            '<span class="wizard-progress-pill-meta">' + escapeForHtml(meta) + '</span>' +
+          '</button>';
+        }).join('');
       }
 
       function renderFragmentBatchSelector() {
         if (!wizState.fragmentBatches || !wizState.fragmentBatches.length) return '';
-        return '<div class="result-actions" style="margin-top:8px">' + wizState.fragmentBatches.map(function (batch, index) {
+        return wizState.fragmentBatches.map(function (batch, index) {
           var label = batch.weekNumbers.length === 1
             ? 'Week ' + batch.weekNumbers[0]
             : 'Weeks ' + batch.weekNumbers[0] + '-' + batch.weekNumbers[batch.weekNumbers.length - 1];
-          var actionLabel = (wizState.fragmentBatchOutputs[index] ? 'Replace ' : 'Open ') + label;
-          return '<button type="button" class="result-btn-secondary wiz-fragment-select-btn" data-fragment-batch-index="' + index + '">' + escapeForHtml(actionLabel) + '</button>';
-        }).join('') + '</div>';
+          var isReady = !!wizState.fragmentBatchOutputs[index];
+          var isCurrent = index === wizState.fragmentBatchIndex;
+          var statusClass = isCurrent ? ' is-current' : (isReady ? ' is-ready' : ' is-upcoming');
+          var meta = isCurrent ? 'In progress' : (isReady ? 'Ready · Edit' : 'Up next · Open');
+          return '<button type="button" class="wizard-progress-pill wiz-fragment-select-btn' + statusClass + '" data-fragment-batch-index="' + index + '">' +
+            '<span class="wizard-progress-pill-title">' + escapeForHtml(label) + '</span>' +
+            '<span class="wizard-progress-pill-meta">' + escapeForHtml(meta) + '</span>' +
+          '</button>';
+        }).join('');
       }
 
       function getCurrentPriorWeeks() {
@@ -3836,29 +4286,38 @@
         var label = weekNumbers.length === 1
           ? 'Week ' + weekNumbers[0]
           : 'Weeks ' + weekNumbers[0] + '-' + weekNumbers[weekNumbers.length - 1];
-        var completed = wizData.weekChunkOutputs.map(function (chunk) {
-          var nums = (chunk.weeks || []).map(function (week) { return week.weekNumber; });
-          return nums.length === 1 ? 'Week ' + nums[0] + ' validated' : 'Weeks ' + nums[0] + '-' + nums[nums.length - 1] + ' validated';
-        });
+        var completedCount = wizData.weekChunkOutputs.filter(Boolean).length;
+        var plannedCount = wizState.weekChunks.length;
+        var shelfTitle = completedCount + ' of ' + plannedCount + ' week groups ready';
+        var shelfCopy = completedCount > 0
+          ? 'Open any finished group to review it, or keep going with ' + label + '.'
+          : 'Stay on one group at a time. Start with ' + label + ' and earlier approvals will stack here.';
 
         weeksStageEl.innerHTML =
-          renderStepSummary(completed, 'No validated week chunks yet.') +
-          renderWeekChunkSelector() +
-          '<div class="wizard-stage-card">' +
-            '<div class="wizard-stage-kicker">What To Do Now</div>' +
-            '<div class="wizard-stage-copy"><strong>Generate only ' + escapeForHtml(label) + '</strong>, then paste back just the `weeks` JSON. If this chunk fails, repair this chunk only.</div>' +
+          renderProgressShelf('Week Groups', shelfTitle, shelfCopy, renderWeekChunkSelector()) +
+          '<div class="wizard-action-grid">' +
+            '<div class="wizard-stage-card is-action">' +
+              '<div class="wizard-action-index">Step 1</div>' +
+              '<div class="wizard-stage-kicker">Copy To Your AI</div>' +
+              '<div class="wizard-stage-copy"><strong>Copy the step prompt and paste it into ChatGPT, Claude, or another LLM</strong> so it creates only ' + escapeForHtml(label) + '.</div>' +
+              '<div class="wizard-inline-note">Current Group: ' + escapeForHtml(label) + ' (' + (chunkIndex + 1) + ' of ' + wizState.weekChunks.length + ')</div>' +
+              renderPromptPreview('wiz-weeks-prompt-current', 'wiz-weeks-copy-current', 12, 'Copy Step Prompt') +
+            '</div>' +
+            '<div class="wizard-stage-card is-emphasis is-action">' +
+              '<div class="wizard-action-index">Step 2</div>' +
+              '<div class="wizard-stage-kicker">Paste It Back Here</div>' +
+              '<div class="wizard-stage-copy"><strong>Once the LLM has produced the JSON, paste it back here</strong> and LiftRPG will check the assigned week numbers before you continue.</div>' +
+              '<label class="field-label" for="wiz-weeks-result-current" style="margin-top:10px">Paste AI Reply</label>' +
+              '<textarea id="wiz-weeks-result-current" class="gen-input" rows="9" placeholder="Paste the AI reply for this week group here."></textarea>' +
+              '<div class="wizard-inline-note">Only this week group changes here, so review stays small and local.</div>' +
+              '<div class="wizard-error" id="wiz-weeks-error-current">LiftRPG could not read that response yet.</div>' +
+              '<div id="wiz-weeks-repair-current"></div>' +
+            '</div>' +
           '</div>' +
-          '<label class="field-label" style="margin-top:14px">Current Chunk: ' + escapeForHtml(label) + ' (' + (chunkIndex + 1) + ' of ' + wizState.weekChunks.length + ')</label>' +
-          '<textarea id="wiz-weeks-prompt-current" class="gen-input gen-output" rows="12" readonly></textarea>' +
-          '<button class="gen-copy" id="wiz-weeks-copy-current" type="button">Copy Prompt</button>' +
-          '<label class="field-label" for="wiz-weeks-result-current" style="margin-top:14px">Paste Week Chunk Result</label>' +
-          '<textarea id="wiz-weeks-result-current" class="gen-input" rows="9" placeholder=\'{"weeks":[...]}\'></textarea>' +
-          '<div class="wizard-error" id="wiz-weeks-error-current">Invalid JSON.</div>' +
-          '<div id="wiz-weeks-repair-current"></div>' +
           '<button class="gen-submit" id="wiz-weeks-next-current" type="button" style="margin-top:12px">' +
             (wizData.weekChunkOutputs[chunkIndex]
-              ? 'Replace Chunk & Continue →'
-              : (chunkIndex + 1 === wizState.weekChunks.length ? 'Next: Build Fragments →' : 'Validate Chunk & Next →')) +
+              ? 'Save Changes & Continue →'
+              : (chunkIndex + 1 === wizState.weekChunks.length ? 'Next: Add Extras →' : 'Save Week Group & Next →')) +
           '</button>';
 
         var promptEl = document.getElementById('wiz-weeks-prompt-current');
@@ -3877,15 +4336,15 @@
             saveWizardDraft();
           });
         });
-        copyBtn.addEventListener('click', makeCopyHandler(promptEl, copyBtn, 'Copy Prompt'));
+        copyBtn.addEventListener('click', makeCopyHandler(promptEl, copyBtn, 'Copy Step Prompt'));
         resultEl.addEventListener('input', saveWizardDraft);
         document.getElementById('wiz-weeks-next-current').addEventListener('click', function () {
           errorEl.classList.remove('is-visible');
           var raw = resultEl.value.trim();
           if (!raw) {
-            errorEl.textContent = 'Paste the JSON the LLM returned.';
+            errorEl.textContent = 'Paste the AI reply for this week group.';
             errorEl.classList.add('is-visible');
-            renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, ['Paste the JSON the LLM returned.']);
+            renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, ['Paste the AI reply for this week group.']);
             return;
           }
           try {
@@ -3908,10 +4367,9 @@
             renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, []);
             var priorChunk = wizData.weekChunkOutputs[chunkIndex];
             if (priorChunk && stableJson(priorChunk) !== stableJson(chunk)) {
-              invalidateAfterWeeks(label + ' changed. Rebuild affected fragment batches and endings.');
+              invalidateAfterWeeks(label + ' changed. Update affected bonus-page batches and the finale.');
             }
-            if (priorChunk) wizData.weekChunkOutputs[chunkIndex] = chunk;
-            else wizData.weekChunkOutputs.push(chunk);
+            wizData.weekChunkOutputs[chunkIndex] = chunk;
             clearStageFlag('weeks');
             wizState.weekChunkIndex += 1;
             updateWizardOverview(3);
@@ -3921,9 +4379,9 @@
             }
             prepareFragmentsStage();
           } catch (error) {
-            errorEl.textContent = error.message || 'Invalid JSON.';
+            errorEl.textContent = formatFriendlyParseError(error);
             errorEl.classList.add('is-visible');
-            renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, [error.message || 'Invalid JSON.']);
+            renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, [formatFriendlyParseError(error)]);
           }
         });
       }
@@ -3948,32 +4406,38 @@
         var batchLabel = batch.weekNumbers.length === 1
           ? 'Week ' + batch.weekNumbers[0]
           : 'Weeks ' + batch.weekNumbers[0] + '-' + batch.weekNumbers[batch.weekNumbers.length - 1];
-        var completed = wizState.fragmentBatchOutputs.map(function (output, idx) {
-          var doneBatch = wizState.fragmentBatches[idx];
-          var doneLabel = doneBatch.weekNumbers.length === 1
-            ? 'Week ' + doneBatch.weekNumbers[0]
-            : 'Weeks ' + doneBatch.weekNumbers[0] + '-' + doneBatch.weekNumbers[doneBatch.weekNumbers.length - 1];
-          return doneLabel + ' fragments validated';
-        });
+        var completedCount = wizState.fragmentBatchOutputs.filter(Boolean).length;
+        var plannedCount = wizState.fragmentBatches.length;
+        var shelfTitle = completedCount + ' of ' + plannedCount + ' extras batches ready';
+        var shelfCopy = completedCount > 0
+          ? 'Open any finished batch to review it, or keep going with ' + batchLabel + '.'
+          : 'Keep extras local and reviewable. Start with ' + batchLabel + '.';
 
         fragmentsStageEl.innerHTML =
-          renderStepSummary(completed, 'No validated fragment batches yet.') +
-          renderFragmentBatchSelector() +
-          '<div class="wizard-stage-card">' +
-            '<div class="wizard-stage-kicker">What To Do Now</div>' +
-            '<div class="wizard-stage-copy"><strong>Generate only the current fragment batch</strong>, then paste back just the `fragments` JSON. If this batch fails, repair only this batch.</div>' +
+          renderProgressShelf('Extras Batches', shelfTitle, shelfCopy, renderFragmentBatchSelector()) +
+          '<div class="wizard-action-grid">' +
+            '<div class="wizard-stage-card is-action">' +
+              '<div class="wizard-action-index">Step 1</div>' +
+              '<div class="wizard-stage-kicker">Copy To Your AI</div>' +
+              '<div class="wizard-stage-copy"><strong>Copy the step prompt and paste it into ChatGPT, Claude, or another LLM</strong> so it creates only the current extras batch.</div>' +
+              '<div class="wizard-inline-note">Current Batch: ' + escapeForHtml(batchLabel) + ' (' + (batchIndex + 1) + ' of ' + wizState.fragmentBatches.length + ')</div>' +
+              renderPromptPreview('wiz-fragments-prompt-current', 'wiz-fragments-copy-current', 12, 'Copy Step Prompt') +
+            '</div>' +
+            '<div class="wizard-stage-card is-emphasis is-action">' +
+              '<div class="wizard-action-index">Step 2</div>' +
+              '<div class="wizard-stage-kicker">Paste It Back Here</div>' +
+              '<div class="wizard-stage-copy"><strong>Once the LLM has produced the JSON, paste it back here</strong> and LiftRPG will check the assigned registry IDs before you continue.</div>' +
+              '<label class="field-label" for="wiz-fragments-result-current" style="margin-top:10px">Paste AI Reply</label>' +
+              '<textarea id="wiz-fragments-result-current" class="gen-input" rows="9" placeholder="Paste the AI reply for this extras batch here."></textarea>' +
+              '<div class="wizard-inline-note">Only this batch changes here, so the document voices stay easier to review.</div>' +
+              '<div class="wizard-error" id="wiz-fragments-error-current">LiftRPG could not read that response yet.</div>' +
+              '<div id="wiz-fragments-repair-current"></div>' +
+            '</div>' +
           '</div>' +
-          '<label class="field-label" style="margin-top:14px">Current Batch: ' + escapeForHtml(batchLabel) + ' (' + (batchIndex + 1) + ' of ' + wizState.fragmentBatches.length + ')</label>' +
-          '<textarea id="wiz-fragments-prompt-current" class="gen-input gen-output" rows="12" readonly></textarea>' +
-          '<button class="gen-copy" id="wiz-fragments-copy-current" type="button">Copy Prompt</button>' +
-          '<label class="field-label" for="wiz-fragments-result-current" style="margin-top:14px">Paste Fragment Batch Result</label>' +
-          '<textarea id="wiz-fragments-result-current" class="gen-input" rows="9" placeholder=\'{"fragments":[...]}\'></textarea>' +
-          '<div class="wizard-error" id="wiz-fragments-error-current">Invalid JSON.</div>' +
-          '<div id="wiz-fragments-repair-current"></div>' +
           '<button class="gen-submit" id="wiz-fragments-next-current" type="button" style="margin-top:12px">' +
             (wizState.fragmentBatchOutputs[batchIndex]
-              ? 'Replace Batch & Continue →'
-              : (batchIndex + 1 === wizState.fragmentBatches.length ? 'Next: Build Endings →' : 'Validate Batch & Next →')) +
+              ? 'Save Changes & Continue →'
+              : (batchIndex + 1 === wizState.fragmentBatches.length ? 'Next: Finish Ending →' : 'Save Extras & Next →')) +
           '</button>';
 
         var promptEl = document.getElementById('wiz-fragments-prompt-current');
@@ -3992,15 +4456,15 @@
             saveWizardDraft();
           });
         });
-        copyBtn.addEventListener('click', makeCopyHandler(promptEl, copyBtn, 'Copy Prompt'));
+        copyBtn.addEventListener('click', makeCopyHandler(promptEl, copyBtn, 'Copy Step Prompt'));
         resultEl.addEventListener('input', saveWizardDraft);
         document.getElementById('wiz-fragments-next-current').addEventListener('click', function () {
           errorEl.classList.remove('is-visible');
           var raw = resultEl.value.trim();
           if (!raw) {
-            errorEl.textContent = 'Paste the JSON the LLM returned.';
+            errorEl.textContent = 'Paste the AI reply for this bonus-page batch.';
             errorEl.classList.add('is-visible');
-            renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, ['Paste the JSON the LLM returned.']);
+            renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, ['Paste the AI reply for this bonus-page batch.']);
             return;
           }
           try {
@@ -4023,10 +4487,9 @@
             renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, []);
             var priorBatch = wizState.fragmentBatchOutputs[batchIndex];
             if (priorBatch && stableJson(priorBatch) !== stableJson(batchOutput)) {
-              invalidateAfterFragments(batchLabel + ' fragments changed. Rebuild endings before export.');
+              invalidateAfterFragments(batchLabel + ' bonus pages changed. Rebuild the finale before export.');
             }
-            if (priorBatch) wizState.fragmentBatchOutputs[batchIndex] = batchOutput;
-            else wizState.fragmentBatchOutputs.push(batchOutput);
+            wizState.fragmentBatchOutputs[batchIndex] = batchOutput;
             clearStageFlag('fragments');
             wizState.fragmentBatchIndex += 1;
             updateWizardOverview(4);
@@ -4048,9 +4511,9 @@
             clearStageFlag('fragments');
             prepareEndingsStage();
           } catch (error) {
-            errorEl.textContent = error.message || 'Invalid JSON.';
+            errorEl.textContent = formatFriendlyParseError(error);
             errorEl.classList.add('is-visible');
-            renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, [error.message || 'Invalid JSON.']);
+            renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, [formatFriendlyParseError(error)]);
           }
         });
       }
@@ -4222,7 +4685,7 @@
         handleManualGenerate();
       }
 
-      submitBtn.addEventListener('click', handlePrimaryContinue);
+      if (submitBtn) submitBtn.addEventListener('click', handlePrimaryContinue);
 
       async function handleApiGenerate() {
         var workout = validateWorkout();
@@ -4365,12 +4828,12 @@
           wizResults[1].value,
           validateLayerBible,
           1,
-          'layer bible',
-          'Return only the layer bible JSON with storyLayer, gameLayer, governingLayer, designPrinciples, and designLedger.'
+          'foundation',
+          'Return only the foundation JSON with storyLayer, gameLayer, governingLayer, designPrinciples, and designLedger.'
         );
         if (!layerBible) return;
         if (wizData.layerBible && stableJson(wizData.layerBible) !== stableJson(layerBible)) {
-          invalidateAfterLayerBible('Layer Bible changed. All downstream stages need regeneration.');
+          invalidateAfterLayerBible('Foundation changed. Everything after it needs a refresh.');
         }
         wizData.layerBible = layerBible;
         clearStageFlag('layerBible');
@@ -4389,7 +4852,7 @@
         if (!campaignPlan) return;
         var campaignChanged = !!wizData.campaignPlan && stableJson(buildCampaignSignature(wizData.campaignPlan)) !== stableJson(buildCampaignSignature(campaignPlan));
         if (campaignChanged) {
-          invalidateAfterCampaign('Campaign changed. Weeks, fragments, and endings were invalidated.', true);
+          invalidateAfterCampaign('Booklet plan changed. Weeks, extras, and the ending need attention.', true);
         }
         wizData.campaignPlan = campaignPlan;
         clearStageFlag('campaignPlan');
@@ -4402,8 +4865,8 @@
           wizResults[3].value,
           validateShell,
           3,
-          'booklet shell',
-          'Return only shell JSON with meta, cover, rulesSpread, and theme.'
+          'booklet identity',
+          'Return only the booklet identity JSON with meta, cover, rulesSpread, and theme.'
         );
         if (!shell) return;
         var shellChanged = !!wizData.shell && stableJson(buildShellSignature(wizData.shell)) !== stableJson(buildShellSignature(shell));
@@ -4411,7 +4874,7 @@
           manualApi().ensureArtifactIdentity(shell, wizData.campaignPlan);
         }
         if (shellChanged) {
-          invalidateAfterShell('Shell changed. Endings and final assembly need regeneration.');
+          invalidateAfterShell('Booklet identity changed. Ending and final assembly need attention.');
         }
         wizData.shell = shell;
         wizData.shellContext = manualApi().extractShellContext ? manualApi().extractShellContext(shell) : null;
@@ -4502,7 +4965,7 @@
             draftStamp = ' Last saved ' + new Date(existingWizardDraft.savedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + '.';
           } catch (error) {}
         }
-        setResumeBannerVisible(true, 'A saved manual draft is available on this device.' + draftStamp);
+        setResumeBannerVisible(true, 'A saved project is available on this device.' + draftStamp);
       }
     })();
   </script>

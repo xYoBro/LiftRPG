@@ -283,7 +283,7 @@ export function buildRulesLeftPageModelWithVariant(data, layoutVariant) {
     title: leftPage.title || artifactIdentity.copy.rulesTitle,
     sections: sections,
     reEntryText: normalizeD100Language(reEntryText || ''),
-    supportNote: 'No worries if you do not have dice. Ask Google to roll a d100.'
+    supportNote: 'No dice? Google "roll d100".'
   };
 }
 

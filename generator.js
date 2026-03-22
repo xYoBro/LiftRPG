@@ -1104,7 +1104,7 @@
       '## Randomizer',
       '',
       dice || 'd100',
-      'If the player has no dice, tell them to ask Google to roll a d100.',
+      'If the player has no dice, use this note: No dice? Google "roll d100".',
       '',
       '---',
       '',
@@ -1317,10 +1317,10 @@
   window.generateStage1Prompt = function (workout, brief, dice) {
     var blend = deriveDesignBlend(brief, workout);
     var parts = [
-      '# Stage 1 — Layer Bible',
+      '# Stage 1 — Layer Codex',
       '',
       'You are architecting a print-and-play solo workout journal with the structural',
-      'depth of a stateful paper game. This is planning only — return the layer bible JSON.',
+      'depth of a stateful paper game. This is planning only — return the layer codex JSON.',
       '',
       '## Structural DNA (genre-neutral, non-negotiable)',
       '- **Persistent topology.** One map reused across weeks. Player revisits spaces with new understanding.',
@@ -1458,16 +1458,16 @@
     var midpoint = Math.ceil(weekCount / 2);
     var minReuse = Math.max(weekCount - 2, 3);
     var parts = [
-      '# Stage 2 — Campaign Plan',
+      '# Stage 2 — Story Plan',
       '',
-      'Using the approved layer bible, generate the per-week campaign plan.',
+      'Using the approved layer codex, generate the per-week story plan.',
       'Do not output the final booklet JSON yet.',
       '',
-      '## Approved Layer Bible',
+      '## Approved Layer Codex',
       '',
       JSON.stringify(layerBible, null, 2),
       '',
-      '## Campaign Plan Rules',
+      '## Story Plan Rules',
       '- Use ' + weekCount + ' weeks to match the workout programme.',
       '- At least ' + minReuse + ' non-boss weeks must reuse the same main topology.',
       '  Set mapReuse to "full", "zoom", or "overlay" for those weeks.',
@@ -1475,7 +1475,7 @@
       '- Week ' + weekCount + ' is the boss week (isBossWeek: true).',
       '',
       '## Design Ledger Enforcement',
-      'The layer bible includes a designLedger with prewriting commitments.',
+      'The layer codex includes a designLedger with prewriting commitments.',
       'The campaign plan must honor all of them:',
       '- Map each mystery question to the weeks where evidence appears.',
       '- Map each false assumption to the week that plants it and the week that corrects it.',
@@ -1486,7 +1486,7 @@
       '- finalRevealRecontextualizes must connect to the bossPlan.',
       '',
       '## Topology Doctrine',
-      '- The persistent topology from the layer bible must have 3+ distinct zones.',
+      '- The persistent topology from the layer codex must have 3+ distinct zones.',
       '- Each zone has a dominant activity (patrol, search, decode, observe, extract, survey).',
       '- At least 2 zones are locked in Week 1 and opened through play by the penultimate week.',
       '- Gate state changes are explicit per week: "Week X clears node Y, unlocks zone Z."',
@@ -1646,10 +1646,10 @@
       '',
       '## Reference Context (do not output these formats — they inform your decisions)',
       '',
-      '### Approved Layer Bible',
+      '### Approved Layer Codex',
       JSON.stringify(layerBible),
       '',
-      '### Approved Campaign Plan',
+      '### Approved Story Plan',
       JSON.stringify(campaignPlan),
       '',
       '---',
@@ -1669,7 +1669,7 @@
       '## Randomizer',
       '',
       dice || 'd100',
-      'If the player has no dice, tell them to ask Google to roll a d100.',
+      'If the player has no dice, use this note: No dice? Google "roll d100".',
       '',
       '---',
       '',
@@ -1726,7 +1726,7 @@
     var blend = deriveDesignBlend(brief, blendContext);
     var weekCount = (campaignPlan.weeks || []).length || 6;
     var parts = [
-      '# Booklet Shell — meta, cover, rulesSpread, theme',
+      '# Booklet Setup — meta, cover, rulesSpread, theme',
       '',
       'Generate the booklet infrastructure as a partial JSON object.',
       'Output a JSON object with exactly these top-level keys: meta, cover, rulesSpread, theme.',
@@ -1740,10 +1740,10 @@
       '',
       '## Reference Context (do not output these formats)',
       '',
-      '### Approved Layer Bible',
+      '### Approved Layer Codex',
       JSON.stringify(layerBible),
       '',
-      '### Approved Campaign Plan (summary)',
+      '### Approved Story Plan (summary)',
       JSON.stringify({
         weekCount: weekCount,
         bossPlan: campaignPlan.bossPlan,
@@ -1758,11 +1758,11 @@
       '',
       formatDesignBias(blend),
       '',
-      '## Shell Requirements',
+      '## Booklet Setup Requirements',
       '',
       '### Structural',
       '- meta.weekCount must equal ' + weekCount,
-      '- meta.weeklyComponentType should match the layer bible&apos;s game layer',
+      '- meta.weeklyComponentType should match the layer codex&apos;s game layer',
       '- meta.passwordLength should match the number of non-boss weeks (' + (weekCount - 1) + ')',
       '- meta.passwordEncryptedEnding: omit it or leave it empty; trusted tooling seals the ending later',
       '- meta.artifactIdentity is required. It is a renderer-facing contract, not flavor text.',
@@ -1803,7 +1803,7 @@
       '- Cover title and designation must feel like a real artifact: a dossier, journal,',
       '  field report, operations manual, maintenance log, or similar in-world object.',
       '- The cover, rules spread, sealed page, and password assembly must all feel like the SAME object family.',
-      '- Rules sections must explain the play cadence diegetically, using the layer bible&apos;s',
+      '- Rules sections must explain the play cadence diegetically, using the layer codex&apos;s',
       '  governing procedures. A player who reads only the rules spread should understand',
       '  what the institution expects them to do and why the weekly routine matters.',
       '',
@@ -1864,10 +1864,10 @@
       '',
       '## Reference Context',
       '',
-      '### Approved Layer Bible',
+      '### Approved Layer Codex',
       JSON.stringify(layerBible),
       '',
-      '### Campaign Plan for ' + weekLabel,
+      '### Story Plan for ' + weekLabel,
       JSON.stringify(relevantPlanWeeks),
       '',
       '### Fragment Registry (use these IDs for fragmentRef in sessions and oracle entries)',
@@ -2081,7 +2081,7 @@
     parts.push('');
     parts.push('### Story Prompts');
     parts.push('- Each storyPrompt is 2-4 sentences containing one physical action, one sensory');
-    parts.push('  detail, and one named object or place from the layer bible.');
+    parts.push('  detail, and one named object or place from the layer codex.');
     parts.push('- Prompts must advance the mystery or alter a relationship — not just describe atmosphere.');
     parts.push('- At least one prompt per week must reference a specific map node, fragment, or clock by name.');
     parts.push('- End on unresolved pressure. Never resolve a story beat at session end.');
@@ -2091,7 +2091,7 @@
     parts.push('- Preserve the established mapType unless the campaign plan explicitly justifies a zoom or overlay shift.');
     parts.push('- Do not silently collapse point-to-point, linear-track, or player-drawn spaces into a grid.');
     parts.push('- Tiles changed from prior weeks: update type (locked→cleared, empty→anomaly, etc.).');
-    parts.push('- New tiles must have labels drawn from the layer bible&apos;s governing layer or topology.');
+    parts.push('- New tiles must have labels drawn from the layer codex&apos;s governing layer or topology.');
     parts.push('- currentPosition must make spatial sense given the zone focus.');
     parts.push('- mapNote must describe what is observably different this week, not repeat prior notes.');
     parts.push('');
@@ -2151,7 +2151,7 @@
    */
   window.generateFragmentsPrompt = function (layerBible, campaignPlan, weekSummaries, shellContext) {
     var parts = [
-      '# Generate All Fragments',
+      '# Generate Bonus Pages',
       '',
       'Generate a partial JSON object with a single `fragments` array.',
       'This array contains ALL found documents for the entire booklet.',
@@ -2169,7 +2169,7 @@
       '',
       '## Reference Context',
       '',
-      '### Approved Layer Bible',
+      '### Approved Layer Codex',
       JSON.stringify(layerBible),
       ''
     ];
@@ -2325,7 +2325,7 @@
       '',
       '## Reference Context',
       '',
-      '### Approved Layer Bible',
+      '### Approved Layer Codex',
       JSON.stringify(layerBible),
       ''
     ];
@@ -2449,7 +2449,7 @@
    */
   window.generateEndingsPrompt = function (layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext, weekSummaries) {
     var parts = [
-      '# Generate Endings',
+      '# Generate Finale',
       '',
       'Generate a partial JSON object with a single `endings` array.',
       'Output ONLY the endings array. Do not output weeks, meta, or fragments.',
@@ -2515,7 +2515,7 @@
       }
     }
 
-    parts.push('### Campaign Plan Resolution');
+    parts.push('### Story Plan Resolution');
     parts.push(JSON.stringify({
       bossPlan: campaignPlan.bossPlan,
       structuralShape: (layerBible.storyLayer || {}).resolutionMode
@@ -3159,7 +3159,7 @@
     options = options || {};
     var blend = deriveDesignBlend(brief, workout);
     return [
-      '# API Stage 1 — Layer Bible',
+      '# API Stage 1 — Layer Codex',
       '',
       API_STAGE1_FIELD_CONTRACT,
       '',
@@ -3185,7 +3185,7 @@
     options = options || {};
     var weekCount = window.parseWeekCount(workout);
     return [
-      '# API Stage 2 — Campaign Plan',
+      '# API Stage 2 — Story Plan',
       '',
       API_STAGE2_FIELD_CONTRACT,
       '',
@@ -3196,7 +3196,7 @@
       '- Fragment registry must create clue economy: establish early, complicate mid-block, reveal late; no lore-dump placeholders.',
       '- Boss convergence must require outputs from map progression, institutional procedure, and relationship state.',
       '',
-      '## Layer Bible Summary',
+      '## Layer Codex Summary',
       compactJson(summarizeLayerBibleForWeeks(layerBible)),
       '',
       '## Inputs',
@@ -3215,7 +3215,7 @@
     var blend = deriveDesignBlend(brief, blendContext);
     var weekCount = (campaignPlan.weeks || []).length || 6;
     return [
-      '# API Stage 3 — Booklet Shell',
+      '# API Stage 3 — Booklet Setup',
       '',
       API_SHELL_FIELD_CONTRACT,
       '',
@@ -3226,7 +3226,7 @@
       '- Cover, rules spread, and theme must all feel like one coherent shell family, not adjacent UI labels.',
       '- passwordEncryptedEnding stays blank; trusted tooling seals it later.',
       '',
-      '## Layer Bible Summary',
+      '## Layer Codex Summary',
       compactJson(summarizeLayerBibleForShell(layerBible)),
       '',
       '## Campaign Summary',
@@ -3277,10 +3277,10 @@
       '- Preserve map continuity, progression gates, clue economy, relationship state, and the shell artifact family.',
       '- Boss week must convert prior component values into componentInputs and a decodingKey without contradicting earlier weeks.',
       '',
-      '## Shell Contract',
+      '## Booklet Setup Contract',
       compactJson(summarizeShellContractForApi(shellContext)),
       '',
-      '## Layer Bible Slice',
+      '## Layer Codex Slice',
       compactJson(summarizeLayerBibleForWeeks(layerBible, weekNumbers)),
       '',
       '## Campaign Slice',
@@ -3315,7 +3315,7 @@
   window.generateApiFragmentsPrompt = function (layerBible, campaignPlan, weekSummaries, shellContext, options) {
     options = options || {};
     return [
-      '# API Fragments',
+      '# API Bonus Pages',
       '',
       API_FRAGMENTS_FIELD_CONTRACT,
       '',
@@ -3325,13 +3325,13 @@
       '- Honor revealPurpose and clueFunction so the set escalates from establish to complicate to reveal.',
       '- Include operational or material detail that makes each document feel found rather than narrated.',
       '',
-      '## Shell Contract',
+      '## Booklet Setup Contract',
       compactJson(summarizeShellContractForApi(shellContext)),
       '',
       '## Fragment Voice Packet',
       compactJson(summarizeFragmentVoicePacket(layerBible, campaignPlan.fragmentRegistry || [], weekSummaries, [], shellContext)),
       '',
-      '## Layer Bible Slice',
+      '## Layer Codex Slice',
       compactJson(summarizeLayerBibleForWeeks(layerBible)),
       '',
       '## Fragment Registry',
@@ -3359,13 +3359,13 @@
       '- Use the week summaries for cross-reference anchors and the prior fragment signatures to avoid repetition or voice drift.',
       '- Preserve shell identity, document ecology, and contradiction depth across batches.',
       '',
-      '## Shell Contract',
+      '## Booklet Setup Contract',
       compactJson(summarizeShellContractForApi(shellContext)),
       '',
       '## Fragment Voice Packet',
       compactJson(summarizeFragmentVoicePacket(layerBible, batchRegistry || [], batchWeekSummaries, priorFragments, shellContext)),
       '',
-      '## Layer Bible Slice',
+      '## Layer Codex Slice',
       compactJson(summarizeLayerBibleForWeeks(layerBible, focusWeeks)),
       '',
       '## Batch Registry',
@@ -3385,7 +3385,7 @@
   window.generateApiEndingsPrompt = function (layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext, weekSummaries, options) {
     options = options || {};
     return [
-      '# API Endings',
+      '# API Finale',
       '',
       API_ENDINGS_FIELD_CONTRACT,
       '',
@@ -3395,7 +3395,7 @@
       '- Pay off the protagonist need, relationship web, motifs, binary choice consequences, and boss convergence anchors already on the page.',
       '- Strong endings reveal or refract prior evidence; they do not summarize the plot.',
       '',
-      '## Shell Contract',
+      '## Booklet Setup Contract',
       compactJson(summarizeShellContractForApi(shellContext)),
       '',
       '## Ending Voice Packet',
