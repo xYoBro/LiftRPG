@@ -4996,9 +4996,15 @@
 
       if (submitBtn) submitBtn.addEventListener('click', handlePrimaryContinue);
 
+      var _apiGenerateRunning = false;
       async function handleApiGenerate() {
+        if (_apiGenerateRunning) {
+          console.warn('[LiftRPG] Generation already in progress — ignoring duplicate click.');
+          return;
+        }
         var workout = validateWorkout();
         if (!workout) return;
+        _apiGenerateRunning = true;
 
         if (!api() || typeof api().generateMultiStage !== 'function' || typeof api().generateStructured !== 'function') {
           apiRunState = createApiRunState();
@@ -5012,6 +5018,7 @@
           apiRunState.error = 'Generator unavailable.';
           pushApiLog('API generator unavailable. Reload the page and try again.');
           renderApiRunState();
+          _apiGenerateRunning = false;
           return;
         }
 
@@ -5030,6 +5037,7 @@
           apiRunState.error = error.message || 'Invalid settings.';
           pushApiLog(apiRunState.error);
           renderApiRunState();
+          _apiGenerateRunning = false;
           return;
         }
 
@@ -5174,6 +5182,7 @@
           renderApiRunState();
           setGeneratorSurface('api-status', { skipFocus: true });
         } finally {
+          _apiGenerateRunning = false;
           if (runId === activeApiRunId) {
             setApiControlsDisabled(false);
             applyProviderPreset(apiProviderEl ? apiProviderEl.value : '', {

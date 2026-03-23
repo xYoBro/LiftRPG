@@ -2374,6 +2374,9 @@ window.LiftRPGAPI = (function () {
       booklet.weeks = booklet.weeks.concat(chunk.weeks || []);
     });
 
+    // Normalize data shapes that models commonly get wrong
+    booklet.weeks.forEach(normalizeCompanionComponents);
+
     // Enforce deterministic derived fields (meta counts, componentInputs, password)
     var result = enforceBookletDerivedFields(booklet);
     if (result.warnings.length > 0) {
@@ -2404,6 +2407,9 @@ window.LiftRPGAPI = (function () {
     weekChunkOutputs.forEach(function (chunk) {
       booklet.weeks = booklet.weeks.concat(chunk.weeks || []);
     });
+
+    // Normalize data shapes that models commonly get wrong
+    booklet.weeks.forEach(normalizeCompanionComponents);
 
     // Override exercises with normalized data when available
     var nw = normalizedWorkout || {};
@@ -3276,6 +3282,26 @@ window.LiftRPGAPI = (function () {
       }
     }
     return result;
+  }
+
+  // Normalize companionComponents: model sometimes returns an object keyed by
+  // component name instead of the expected array. Convert in place.
+  function normalizeCompanionComponents(week) {
+    var fo = week.fieldOps || week.bossEncounter;
+    if (!fo || !fo.companionComponents) return;
+    if (Array.isArray(fo.companionComponents)) return;
+    if (typeof fo.companionComponents === 'object' && fo.companionComponents !== null) {
+      var cc = fo.companionComponents;
+      fo.companionComponents = Object.keys(cc).map(function (key) {
+        var val = cc[key];
+        if (typeof val === 'object' && val !== null) {
+          if (!val.type) val.type = key;
+          return val;
+        }
+        return { type: key, value: val };
+      });
+      console.warn('[LiftRPG] Normalized companionComponents from object to array (' + fo.companionComponents.length + ' items)');
+    }
   }
 
   function buildOpenAICompatUrl(baseUrl) {
@@ -4293,7 +4319,7 @@ window.LiftRPGAPI = (function () {
         onProgress: onProgress,
         getTotalStages: function () { return totalStages; },
         schema: null,
-        maxTokens: 8192,
+        maxTokens: isBossWeek ? 12288 : 8192,
         requestTimeoutMs: 180000,
         maxAttempts: 3,
         normalizeResult: function (result) {
@@ -4302,18 +4328,20 @@ window.LiftRPGAPI = (function () {
           if (result && Array.isArray(result.weeks) && result.weeks.length > 0) {
             console.warn('[LiftRPG] Week stage returned weeks[] wrapper — unwrapping');
             var match = result.weeks.filter(function (wk) { return Number(wk.weekNumber) === w; })[0];
-            return match || result.weeks[0];
+            result = match || result.weeks[0];
           }
           if (result && result.meta && Array.isArray(result.weeks) && result.weeks.length > 0) {
             console.warn('[LiftRPG] Week stage returned full booklet — extracting week');
             var match2 = result.weeks.filter(function (wk) { return Number(wk.weekNumber) === w; })[0];
-            return match2 || result.weeks[0];
+            result = match2 || result.weeks[0];
           }
           // Model returned a shell (meta/cover) without any weeks — reject it
           if (result && result.meta && !result.title && !result.sessions) {
             console.warn('[LiftRPG] Week stage returned booklet shell instead of week — rejecting');
             return null;
           }
+          // Normalize companionComponents: model sometimes returns object instead of array
+          if (result) normalizeCompanionComponents(result);
           return result;
         },
         validate: function (result) {
