@@ -3799,14 +3799,13 @@ window.LiftRPGAPI = (function () {
       try {
         var response = config.schema
           ? await callProviderStructured(stageSettings, prompt, config.schema, resolvedMaxTokens, config.stageName)
-          : (function () {
-            return callProvider(stageSettings, prompt, resolvedMaxTokens).then(function (rawResponse) {
-              return {
-                result: extractJson(rawResponse.text),
-                meta: rawResponse.meta,
-                usage: rawResponse.usage
-              };
-            });
+          : await (async function () {
+            var rawResponse = await callProvider(stageSettings, prompt, resolvedMaxTokens);
+            return {
+              result: extractJson(rawResponse.text),
+              meta: rawResponse.meta,
+              usage: rawResponse.usage
+            };
           })();
         var result = response.result;
         recordStageUsage(stageTelemetry, response);
