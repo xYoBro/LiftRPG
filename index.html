@@ -999,7 +999,7 @@
 
     .wizard-state-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
       gap: 10px;
     }
 
@@ -1036,7 +1036,7 @@
 
     .wizard-stage-ledger {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 8px;
       margin-bottom: 4px;
       padding: 10px;
@@ -1173,6 +1173,28 @@
       letter-spacing: .06em;
       color: var(--muted);
       line-height: 1.6;
+    }
+
+    .wizard-stage-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .wizard-stage-stat {
+      display: inline-flex;
+      align-items: center;
+      min-height: 18px;
+      padding: 0 7px;
+      border-radius: 999px;
+      background: rgba(24, 23, 20, .05);
+      border: 1px solid rgba(24, 23, 20, .08);
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 5.2pt;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      white-space: nowrap;
     }
 
     .wizard-draft-row {
@@ -1875,6 +1897,15 @@
               <label class="field-label" for="api-base-url">Base URL</label>
               <input class="api-input" id="api-base-url" type="text" placeholder="https://api.openai.com/v1">
             </div>
+            <div class="api-field">
+              <label class="field-label" for="api-timeout">Request Timeout</label>
+              <select class="api-select" id="api-timeout">
+                <option value="300000">5 minutes</option>
+                <option value="600000" selected>10 minutes (Recommended)</option>
+                <option value="900000">15 minutes</option>
+                <option value="1200000">20 minutes</option>
+              </select>
+            </div>
             <div class="api-field" style="grid-column:1 / -1">
               <label class="field-label" for="api-key">API Key</label>
               <input class="api-input" id="api-key" type="password" placeholder="Paste your key for this session" autocomplete="off">
@@ -1914,6 +1945,16 @@
               <div class="wizard-state-label">Run Progress</div>
               <div class="wizard-state-value" id="api-state-progress">0 / 0 stages</div>
               <div class="wizard-state-caption" id="api-state-progress-caption">The API pipeline will report each stage here as it runs.</div>
+            </div>
+            <div class="wizard-state-card">
+              <div class="wizard-state-label">Token Usage</div>
+              <div class="wizard-state-value" id="api-state-tokens">0 tokens</div>
+              <div class="wizard-state-caption" id="api-state-tokens-caption">Prompt and completion totals appear here as each stage finishes.</div>
+            </div>
+            <div class="wizard-state-card">
+              <div class="wizard-state-label">Estimated Cost</div>
+              <div class="wizard-state-value" id="api-state-cost">$0.00</div>
+              <div class="wizard-state-caption" id="api-state-cost-caption">LiftRPG refreshes pricing from official docs before each run, then falls back locally if the source is unavailable.</div>
             </div>
           </div>
           <div class="wizard-stage-ledger" id="api-stage-ledger"></div>
@@ -2174,6 +2215,7 @@
       var apiModelStatusEl = document.getElementById('api-model-status');
       var apiModelRefreshBtn = document.getElementById('api-model-refresh');
       var apiBaseUrlEl = document.getElementById('api-base-url');
+      var apiTimeoutEl = document.getElementById('api-timeout');
       var apiKeyEl = document.getElementById('api-key');
       var apiSubmitBtn = document.getElementById('api-submit');
       var apiStateSummary = document.getElementById('api-state-summary');
@@ -2182,6 +2224,10 @@
       var apiStateTargetCaption = document.getElementById('api-state-target-caption');
       var apiStateProgress = document.getElementById('api-state-progress');
       var apiStateProgressCaption = document.getElementById('api-state-progress-caption');
+      var apiStateTokens = document.getElementById('api-state-tokens');
+      var apiStateTokensCaption = document.getElementById('api-state-tokens-caption');
+      var apiStateCost = document.getElementById('api-state-cost');
+      var apiStateCostCaption = document.getElementById('api-state-cost-caption');
       var apiStageLedger = document.getElementById('api-stage-ledger');
       var apiRunLog = document.getElementById('api-run-log');
       var apiRunActions = document.getElementById('api-run-actions');
@@ -2330,6 +2376,106 @@
         return STAGE_LABELS[stageKey] || stageKey;
       }
 
+      function formatCompactTokens(value) {
+        var num = Number(value || 0);
+        if (!Number.isFinite(num) || num <= 0) return '0';
+        if (num >= 1000000) return (Math.round(num / 100000) / 10) + 'M';
+        if (num >= 1000) return (Math.round(num / 100) / 10) + 'k';
+        return String(Math.round(num));
+      }
+
+      function formatTokenSummary(usage) {
+        usage = usage || {};
+        var input = Number(usage.inputTokens || 0);
+        var output = Number(usage.outputTokens || 0);
+        if (!input && !output) return 'No billed tokens yet.';
+        return formatCompactTokens(input) + ' input · ' + formatCompactTokens(output) + ' output';
+      }
+
+      function formatUsd(value) {
+        var amount = Number(value || 0);
+        if (!Number.isFinite(amount) || amount <= 0) return '$0.00';
+        if (amount >= 100) return '$' + amount.toFixed(0);
+        if (amount >= 10) return '$' + amount.toFixed(2);
+        if (amount >= 1) return '$' + amount.toFixed(3);
+        if (amount >= 0.01) return '$' + amount.toFixed(4);
+        return '$' + amount.toFixed(5);
+      }
+
+      function formatTimeoutLabel(ms) {
+        var minutes = Math.round((Number(ms || 0) / 60000) * 10) / 10;
+        if (!minutes) return 'default timeout';
+        if (minutes === 1) return '1 minute timeout';
+        return minutes + ' min timeout';
+      }
+
+      function formatPricingTimestamp(value) {
+        if (!value) return '';
+        var date = new Date(value);
+        if (!Number.isFinite(date.getTime())) return '';
+        return date.toLocaleString([], {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit'
+        });
+      }
+
+      function describePricingSource(pricing) {
+        if (!pricing || !pricing.sourceLabel) return '';
+        if (pricing.live && pricing.fetchedAt) {
+          return pricing.sourceLabel + ' · refreshed ' + formatPricingTimestamp(pricing.fetchedAt);
+        }
+        if (pricing.verifiedAt) {
+          return pricing.sourceLabel + ' · verified ' + pricing.verifiedAt;
+        }
+        return pricing.sourceLabel;
+      }
+
+      function buildPricingCostCaption(pricing, modelLabel, fallbackReason) {
+        if (!pricing || !pricing.sourceLabel) {
+          return 'LiftRPG refreshes pricing from official docs before each run, then falls back locally if the source is unavailable.';
+        }
+        var caption = pricing.live
+          ? 'Live pricing refreshed from ' + pricing.sourceLabel
+          : 'Estimated from ' + pricing.sourceLabel;
+        if (pricing.live && pricing.fetchedAt) {
+          caption += ' at ' + formatPricingTimestamp(pricing.fetchedAt);
+        }
+        caption += ' for ' + (modelLabel || 'the selected model') + '.';
+        if (!pricing.live && fallbackReason) {
+          caption += ' Using the local pricing table because the live source could not be refreshed.';
+        }
+        return caption;
+      }
+
+      function createApiUsageTotals() {
+        return {
+          inputTokens: 0,
+          outputTokens: 0,
+          cachedInputTokens: 0,
+          cacheWriteTokens: 0,
+          cacheReadTokens: 0,
+          reasoningTokens: 0,
+          totalTokens: 0,
+          estimatedCostUsd: 0
+        };
+      }
+
+      function createApiStageMetrics() {
+        var usage = createApiUsageTotals();
+        return {
+          usage: usage,
+          estimatedCostUsd: 0,
+          attempts: 0,
+          provider: '',
+          model: '',
+          pricing: null,
+          lastStageName: '',
+          lastDetail: ''
+        };
+      }
+
       function api() {
         return window.LiftRPGAPI || null;
       }
@@ -2340,8 +2486,10 @@
 
       function createApiRunState() {
         var ledger = {};
+        var stageMetrics = {};
         API_STAGE_ORDER.forEach(function (stage) {
           ledger[stage.key] = 'empty';
+          stageMetrics[stage.key] = createApiStageMetrics();
         });
         return {
           status: 'idle',
@@ -2356,6 +2504,18 @@
           totalStages: 0,
           stageIndex: 0,
           currentStageKey: '',
+          tokens: '0 tokens',
+          tokensCaption: 'Prompt and completion totals appear here as each stage finishes.',
+          cost: '$0.00',
+          costCaption: 'LiftRPG refreshes pricing from official docs before each run, then falls back locally if the source is unavailable.',
+          usageTotals: createApiUsageTotals(),
+          stageMetrics: stageMetrics,
+          pricingLabel: '',
+          pricingUrl: '',
+          pricingLive: false,
+          pricingError: '',
+          pricingRefreshedAt: '',
+          requestTimeoutMs: 600000,
           log: ['API mode is ready. Add your provider settings, then start the generation run.'],
           ledger: ledger,
           booklet: null,
@@ -2379,7 +2539,8 @@
             provider: apiProviderEl ? apiProviderEl.value : 'openai',
             method: apiMethodEl ? apiMethodEl.value : 'generateMultiStage',
             model: getApiModelValue(),
-            baseUrl: apiBaseUrlEl ? apiBaseUrlEl.value.trim() : ''
+            baseUrl: apiBaseUrlEl ? apiBaseUrlEl.value.trim() : '',
+            requestTimeoutMs: apiTimeoutEl ? Number(apiTimeoutEl.value || 600000) : 600000
           }));
         } catch (error) {}
       }
@@ -2566,6 +2727,7 @@
         var providerId = getProviderPreset(prefs.provider) ? prefs.provider : 'openai';
         if (apiProviderEl) apiProviderEl.value = providerId;
         if (apiMethodEl) apiMethodEl.value = prefs.method || 'generateMultiStage';
+        if (apiTimeoutEl) apiTimeoutEl.value = String(Number(prefs.requestTimeoutMs || 600000));
         renderApiModelOptions([]);
         if (prefs.model) setApiModelValue(prefs.model);
         if (apiBaseUrlEl && prefs.baseUrl) apiBaseUrlEl.value = prefs.baseUrl;
@@ -2660,14 +2822,69 @@
         });
       }
 
+      function applyApiStageTelemetry(stageKey, telemetry, detail) {
+        if (!apiRunState || !stageKey || !telemetry) return;
+        var metrics = apiRunState.stageMetrics[stageKey] || createApiStageMetrics();
+        apiRunState.stageMetrics[stageKey] = metrics;
+        var usage = telemetry.usage || {};
+        metrics.usage.inputTokens += Number(usage.inputTokens || 0);
+        metrics.usage.outputTokens += Number(usage.outputTokens || 0);
+        metrics.usage.cachedInputTokens += Number(usage.cachedInputTokens || 0);
+        metrics.usage.cacheWriteTokens += Number(usage.cacheWriteTokens || 0);
+        metrics.usage.cacheReadTokens += Number(usage.cacheReadTokens || 0);
+        metrics.usage.reasoningTokens += Number(usage.reasoningTokens || 0);
+        metrics.usage.totalTokens += Number(usage.totalTokens || 0);
+        metrics.estimatedCostUsd += Number(telemetry.estimatedCostUsd || 0);
+        metrics.attempts += Number(telemetry.attempts || 0);
+        metrics.provider = telemetry.provider || metrics.provider;
+        metrics.model = telemetry.model || metrics.model;
+        metrics.pricing = telemetry.pricing || metrics.pricing;
+        metrics.lastStageName = telemetry.stageName || metrics.lastStageName;
+        metrics.lastDetail = detail || metrics.lastDetail;
+
+        apiRunState.usageTotals.inputTokens += Number(usage.inputTokens || 0);
+        apiRunState.usageTotals.outputTokens += Number(usage.outputTokens || 0);
+        apiRunState.usageTotals.cachedInputTokens += Number(usage.cachedInputTokens || 0);
+        apiRunState.usageTotals.cacheWriteTokens += Number(usage.cacheWriteTokens || 0);
+        apiRunState.usageTotals.cacheReadTokens += Number(usage.cacheReadTokens || 0);
+        apiRunState.usageTotals.reasoningTokens += Number(usage.reasoningTokens || 0);
+        apiRunState.usageTotals.totalTokens += Number(usage.totalTokens || 0);
+        apiRunState.usageTotals.estimatedCostUsd += Number(telemetry.estimatedCostUsd || 0);
+
+        apiRunState.tokens = formatCompactTokens(apiRunState.usageTotals.totalTokens) + ' tokens';
+        apiRunState.tokensCaption = formatTokenSummary(apiRunState.usageTotals);
+        apiRunState.cost = formatUsd(apiRunState.usageTotals.estimatedCostUsd);
+        if (metrics.pricing && metrics.pricing.sourceLabel) {
+          apiRunState.pricingLabel = describePricingSource(metrics.pricing);
+          apiRunState.pricingUrl = metrics.pricing.sourceUrl || '';
+          apiRunState.pricingLive = !!metrics.pricing.live;
+          apiRunState.pricingError = metrics.pricing.fallbackReason || '';
+          apiRunState.pricingRefreshedAt = metrics.pricing.fetchedAt || '';
+          apiRunState.costCaption = buildPricingCostCaption(metrics.pricing, metrics.model || apiRunState.model || 'the selected model', metrics.pricing.fallbackReason || '');
+        } else if (!apiRunState.usageTotals.estimatedCostUsd && apiRunState.usageTotals.totalTokens > 0) {
+          apiRunState.costCaption = 'Token totals are available, but pricing is not mapped for this model yet.';
+        }
+      }
+
+      function markApiStageComplete(stageKey, detail) {
+        if (!apiRunState || !stageKey) return;
+        apiRunState.ledger[stageKey] = 'valid';
+        if (detail && apiRunState.stageMetrics[stageKey]) {
+          apiRunState.stageMetrics[stageKey].lastDetail = detail;
+        }
+        if (apiRunState.currentStageKey === stageKey) {
+          apiRunState.currentStageKey = '';
+        }
+      }
+
       function inferApiStageKey(message) {
         var lower = String(message || '').toLowerCase();
-        if (lower.indexOf('layer bible') !== -1) return 'layerBible';
-        if (lower.indexOf('campaign') !== -1) return 'campaign';
-        if (lower.indexOf('shell') !== -1) return 'shell';
+        if (lower.indexOf('layer bible') !== -1 || lower.indexOf('layer codex') !== -1 || lower.indexOf('foundation') !== -1) return 'layerBible';
+        if (lower.indexOf('campaign') !== -1 || lower.indexOf('story plan') !== -1 || lower.indexOf('planning story') !== -1) return 'campaign';
+        if (lower.indexOf('shell') !== -1 || lower.indexOf('booklet setup') !== -1 || lower.indexOf('identity') !== -1) return 'shell';
         if (lower.indexOf('boss week') !== -1 || lower.indexOf('week ') !== -1 || lower.indexOf('weeks ') !== -1) return 'weeks';
-        if (lower.indexOf('fragment') !== -1) return 'fragments';
-        if (lower.indexOf('ending') !== -1) return 'endings';
+        if (lower.indexOf('fragment') !== -1 || lower.indexOf('bonus page') !== -1 || lower.indexOf('extras') !== -1) return 'fragments';
+        if (lower.indexOf('ending') !== -1 || lower.indexOf('finale') !== -1) return 'endings';
         if (lower.indexOf('patch') !== -1 || lower.indexOf('quality') !== -1) return 'quality';
         return '';
       }
@@ -2679,7 +2896,8 @@
           format: preset && preset.format ? preset.format : 'openai',
           apiKey: apiKeyEl ? apiKeyEl.value.trim() : '',
           baseUrl: apiBaseUrlEl ? apiBaseUrlEl.value.trim() : '',
-          model: getApiModelValue()
+          model: getApiModelValue(),
+          requestTimeoutMs: apiTimeoutEl ? Number(apiTimeoutEl.value || 600000) : 600000
         };
         if (!settings.model) {
           throw new Error('Choose a model before starting the API run.');
@@ -2687,7 +2905,7 @@
         if (settings.format === 'openai' && !settings.baseUrl) {
           throw new Error('Base URL is required for OpenAI-compatible providers.');
         }
-        if (!(preset && preset.noKey) && !settings.apiKey) {
+        if (!providerAllowsEmptyApiKey(providerId, settings.baseUrl) && !settings.apiKey) {
           throw new Error('API key required for this provider.');
         }
         settings._providerId = providerId;
@@ -2700,12 +2918,13 @@
           provider: apiProviderEl ? apiProviderEl.value : '',
           method: apiMethodEl ? apiMethodEl.value : '',
           model: getApiModelValue(),
-          baseUrl: apiBaseUrlEl ? apiBaseUrlEl.value.trim() : ''
+          baseUrl: apiBaseUrlEl ? apiBaseUrlEl.value.trim() : '',
+          requestTimeoutMs: apiTimeoutEl ? Number(apiTimeoutEl.value || 600000) : 600000
         });
       }
 
       function setApiControlsDisabled(disabled) {
-        [manualModeBtn, apiModeBtn, apiProviderEl, apiMethodEl, apiModelEl, apiModelCustomEl, apiModelRefreshBtn, apiBaseUrlEl, apiKeyEl, apiSubmitBtn, submitBtn].forEach(function (el) {
+        [manualModeBtn, apiModeBtn, apiProviderEl, apiMethodEl, apiModelEl, apiModelCustomEl, apiModelRefreshBtn, apiBaseUrlEl, apiTimeoutEl, apiKeyEl, apiSubmitBtn, submitBtn].forEach(function (el) {
           if (!el) return;
           if (el === apiKeyEl && apiKeyEl.disabled && !disabled) return;
           el.disabled = !!disabled;
@@ -2725,6 +2944,46 @@
         apiRunState.targetCaption = 'The next API generation will use the new provider configuration.';
         if (message) pushApiLog(message);
         renderApiRunState();
+      }
+
+      function applyPricingRefreshResult(result) {
+        if (!apiRunState) apiRunState = createApiRunState();
+        result = result || {};
+        var pricing = result.pricing || null;
+        apiRunState.pricingLabel = pricing ? describePricingSource(pricing) : '';
+        apiRunState.pricingUrl = pricing && pricing.sourceUrl ? pricing.sourceUrl : '';
+        apiRunState.pricingLive = !!result.live;
+        apiRunState.pricingError = result.error || (pricing && pricing.fallbackReason) || '';
+        apiRunState.pricingRefreshedAt = pricing && pricing.fetchedAt ? pricing.fetchedAt : '';
+        if (pricing) {
+          apiRunState.costCaption = buildPricingCostCaption(pricing, result.model || apiRunState.model || 'the selected model', apiRunState.pricingError);
+          return;
+        }
+        if (apiRunState.pricingError) {
+          apiRunState.costCaption = 'Pricing could not be refreshed for ' + (result.model || apiRunState.model || 'the selected model') + '. ' + apiRunState.pricingError;
+          return;
+        }
+        apiRunState.costCaption = 'Token totals are available, but pricing is not mapped for this model yet.';
+      }
+
+      function renderApiStageStatsHtml(metrics) {
+        metrics = metrics || createApiStageMetrics();
+        var usage = metrics.usage || {};
+        var stats = [];
+        if (Number(usage.inputTokens || 0) > 0) {
+          stats.push('<span class="wizard-stage-stat">' + escapeForHtml(formatCompactTokens(usage.inputTokens)) + ' in</span>');
+        }
+        if (Number(usage.outputTokens || 0) > 0) {
+          stats.push('<span class="wizard-stage-stat">' + escapeForHtml(formatCompactTokens(usage.outputTokens)) + ' out</span>');
+        }
+        if (Number(metrics.estimatedCostUsd || 0) > 0) {
+          stats.push('<span class="wizard-stage-stat">' + escapeForHtml(formatUsd(metrics.estimatedCostUsd)) + ' est</span>');
+        }
+        if (Number(metrics.attempts || 0) > 1) {
+          stats.push('<span class="wizard-stage-stat">' + escapeForHtml(String(metrics.attempts)) + ' attempts</span>');
+        }
+        if (!stats.length) return '';
+        return '<div class="wizard-stage-stats">' + stats.join('') + '</div>';
       }
 
       function renderApiActions() {
@@ -2779,7 +3038,7 @@
         var modelDisplay = apiRunState.model || getApiModelValue();
         if (apiRunState.status === 'idle' && providerDisplay) {
           apiRunState.summaryCaption = 'Configured for ' + providerDisplay + (modelDisplay ? ' · ' + modelDisplay : '') + '.';
-          apiRunState.progressCaption = 'Ready to start the in-browser API pipeline.';
+          apiRunState.progressCaption = 'Ready to start the in-browser API pipeline. ' + formatTimeoutLabel(apiTimeoutEl ? Number(apiTimeoutEl.value || 600000) : apiRunState.requestTimeoutMs || 600000) + '.';
         }
         apiStateSummary.textContent = apiRunState.summary;
         apiStateSummaryCaption.textContent = apiRunState.summaryCaption;
@@ -2787,16 +3046,25 @@
         apiStateTargetCaption.textContent = apiRunState.targetCaption;
         apiStateProgress.textContent = apiRunState.progress;
         apiStateProgressCaption.textContent = apiRunState.progressCaption;
+        if (apiStateTokens) apiStateTokens.textContent = apiRunState.tokens || '0 tokens';
+        if (apiStateTokensCaption) apiStateTokensCaption.textContent = apiRunState.tokensCaption || 'Prompt and completion totals appear here as each stage finishes.';
+        if (apiStateCost) apiStateCost.textContent = apiRunState.cost || '$0.00';
+        if (apiStateCostCaption) apiStateCostCaption.textContent = apiRunState.costCaption || 'LiftRPG refreshes pricing from official docs before each run, then falls back locally if the source is unavailable.';
         apiStageLedger.innerHTML = API_STAGE_ORDER.map(function (stage) {
           var status = apiRunState.ledger[stage.key] || 'empty';
           var tone = getStatusTone(status);
           var currentClass = apiRunState.currentStageKey === stage.key ? ' is-current' : '';
+          var metrics = apiRunState.stageMetrics[stage.key] || createApiStageMetrics();
           var detail = stage.key === 'quality'
             ? 'Validation, patch pass, and quality gate.'
             : 'Stage state is tracked live while the API pipeline runs.';
-          if (status === 'valid') detail = 'Completed in this run.';
+          if (status === 'valid') detail = metrics.lastDetail || 'Completed in this run.';
           if (status === 'in progress') detail = apiRunState.targetCaption;
           if (status === 'invalidated') detail = apiRunState.error || 'This run stopped on this stage.';
+          var meta = providerDisplay ? (providerDisplay + (modelDisplay ? ' · ' + modelDisplay : '')) : 'No provider active yet.';
+          if (metrics.pricing && metrics.pricing.sourceLabel) {
+            meta += ' · ' + describePricingSource(metrics.pricing);
+          }
           return '' +
             '<div class="wizard-stage-item ' + tone + currentClass + '">' +
               '<div class="wizard-stage-head">' +
@@ -2804,7 +3072,8 @@
                 '<div class="wizard-status-chip ' + tone + '">' + escapeForHtml(formatStatusLabel(status)) + '</div>' +
               '</div>' +
               '<div class="wizard-stage-detail">' + escapeForHtml(detail) + '</div>' +
-              '<div class="wizard-stage-meta">' + escapeForHtml(providerDisplay ? (providerDisplay + (modelDisplay ? ' · ' + modelDisplay : '')) : 'No provider active yet.') + '</div>' +
+              renderApiStageStatsHtml(metrics) +
+              '<div class="wizard-stage-meta">' + escapeForHtml(meta) + '</div>' +
             '</div>';
         }).join('');
         apiRunLog.innerHTML = apiRunState.log.map(function (line) {
@@ -3480,7 +3749,7 @@
           renderApiRunState();
         });
       }
-      [apiMethodEl, apiModelEl, apiModelCustomEl, apiBaseUrlEl].forEach(function (el) {
+      [apiMethodEl, apiModelEl, apiModelCustomEl, apiBaseUrlEl, apiTimeoutEl].forEach(function (el) {
         if (!el) return;
         el.addEventListener('input', function () {
           if (el === apiModelEl) syncApiModelControlVisibility();
@@ -4731,40 +5000,93 @@
         saveApiPrefs();
         apiRunState = createApiRunState();
         apiRunState.status = 'running';
-        apiRunState.summary = 'Connecting To Provider';
-        apiRunState.summaryCaption = 'Requests are sent directly from this browser to ' + settings._providerLabel + '.';
-        apiRunState.target = 'Initialize Pipeline';
-        apiRunState.targetCaption = 'Preparing the staged generation run.';
+        apiRunState.summary = 'Refreshing Live Pricing';
+        apiRunState.summaryCaption = 'LiftRPG checks the latest official pricing for the selected model before the first stage starts.';
+        apiRunState.target = 'Pricing Preflight';
+        apiRunState.targetCaption = 'Fetching current pricing for ' + settings.model + '.';
         apiRunState.progress = '0 / 0 stages';
-        apiRunState.progressCaption = settings._providerLabel + (settings.model ? ' · ' + settings.model : '');
+        apiRunState.progressCaption = settings._providerLabel + (settings.model ? ' · ' + settings.model : '') + ' · ' + formatTimeoutLabel(settings.requestTimeoutMs);
         apiRunState.providerLabel = settings._providerLabel;
         apiRunState.model = settings.model;
+        apiRunState.requestTimeoutMs = settings.requestTimeoutMs;
+        apiRunState.tokens = '0 tokens';
+        apiRunState.tokensCaption = 'Prompt and completion totals appear here as each stage finishes.';
+        apiRunState.cost = '$0.00';
+        apiRunState.costCaption = 'LiftRPG is refreshing the latest official pricing for this run.';
         apiRunState.log = [];
-        pushApiLog('Starting ' + settings._providerLabel + ' · ' + settings.model + ' via ' + (apiMethodEl.value === 'generateStructured' ? 'structured API.' : 'multi-stage API.') );
+        pushApiLog('Refreshing live pricing for ' + settings._providerLabel + ' · ' + settings.model + '.');
         renderApiRunState();
         setGeneratorSurface('api-status', { skipFocus: true });
 
         var runId = ++activeApiRunId;
         setApiControlsDisabled(true);
 
+        if (api() && typeof api().refreshPricing === 'function') {
+          try {
+            var pricingResult = await api().refreshPricing(settings);
+            if (runId !== activeApiRunId) return;
+            applyPricingRefreshResult(pricingResult);
+            if (pricingResult && pricingResult.pricing && pricingResult.live) {
+              pushApiLog('Live pricing refreshed from ' + pricingResult.pricing.sourceLabel + ' for ' + settings.model + '.');
+            } else if (pricingResult && pricingResult.pricing) {
+              pushApiLog('Live pricing unavailable. Using the local pricing table for ' + settings.model + (pricingResult.error ? ' (' + pricingResult.error + ').' : '.'));
+            } else if (pricingResult && pricingResult.error) {
+              pushApiLog('Pricing unavailable for ' + settings.model + ': ' + pricingResult.error);
+            } else {
+              pushApiLog('Pricing is not mapped for ' + settings.model + '. Token totals will still be tracked.');
+            }
+            renderApiRunState();
+          } catch (pricingError) {
+            if (runId !== activeApiRunId) return;
+            applyPricingRefreshResult({
+              model: settings.model,
+              pricing: null,
+              live: false,
+              error: pricingError && pricingError.message ? pricingError.message : String(pricingError || 'Pricing refresh failed.')
+            });
+            pushApiLog('Live pricing refresh failed for ' + settings.model + '. Token totals will still be tracked.');
+            renderApiRunState();
+          }
+        }
+
         try {
+          apiRunState.summary = 'Connecting To Provider';
+          apiRunState.summaryCaption = 'Requests are sent directly from this browser to ' + settings._providerLabel + '.';
+          apiRunState.target = 'Initialize Pipeline';
+          apiRunState.targetCaption = 'Preparing the staged generation run.';
+          pushApiLog('Starting ' + settings._providerLabel + ' · ' + settings.model + ' via ' + (apiMethodEl.value === 'generateStructured' ? 'structured API.' : 'multi-stage API.') + ' ' + formatTimeoutLabel(settings.requestTimeoutMs) + '.');
+          renderApiRunState();
           var methodName = apiMethodEl && apiMethodEl.value === 'generateStructured'
             ? 'generateStructured'
             : 'generateMultiStage';
-          var booklet = await api()[methodName](settings, workout, briefEl.value.trim(), getDiceValue(), function (stageIndex, totalStages, message) {
+          var booklet = await api()[methodName](settings, workout, briefEl.value.trim(), getDiceValue(), function (stageIndex, totalStages, message, meta) {
             if (runId !== activeApiRunId) return;
-            var stageKey = inferApiStageKey(message);
+            meta = meta || {};
+            var stageKey = meta.stageKey || inferApiStageKey(message);
+            var phase = meta.phase || 'start';
             apiRunState.status = 'running';
-            apiRunState.stageIndex = stageIndex;
             apiRunState.totalStages = totalStages;
             apiRunState.summary = 'Generation In Progress';
             apiRunState.summaryCaption = 'LiftRPG is advancing one validated stage at a time.';
-            apiRunState.target = stageKey ? (API_STAGE_ORDER.filter(function (stage) { return stage.key === stageKey; })[0] || {}).label || 'Pipeline Stage' : 'Pipeline Stage';
-            apiRunState.targetCaption = message;
-            apiRunState.progress = stageIndex + ' / ' + totalStages + ' stages';
-            apiRunState.progressCaption = settings._providerLabel + (settings.model ? ' · ' + settings.model : '');
-            markApiStageInProgress(stageKey);
-            pushApiLog(stageIndex + '/' + totalStages + ' ' + message);
+            apiRunState.progressCaption = settings._providerLabel + (settings.model ? ' · ' + settings.model : '') + ' · ' + formatTimeoutLabel(settings.requestTimeoutMs);
+            if (phase === 'start') {
+              apiRunState.stageIndex = stageIndex;
+              apiRunState.target = stageKey ? (API_STAGE_ORDER.filter(function (stage) { return stage.key === stageKey; })[0] || {}).label || 'Pipeline Stage' : 'Pipeline Stage';
+              apiRunState.targetCaption = message;
+              apiRunState.progress = stageIndex + ' / ' + totalStages + ' stages';
+              markApiStageInProgress(stageKey);
+              pushApiLog(stageIndex + '/' + totalStages + ' ' + message);
+            } else if (phase === 'complete') {
+              if (meta.telemetry) {
+                applyApiStageTelemetry(stageKey, meta.telemetry, message);
+              }
+              markApiStageComplete(stageKey, message);
+              pushApiLog((stageKey ? getStageLabel(stageKey) : 'Stage') + ' complete · ' + (meta.telemetry ? formatTokenSummary(meta.telemetry.usage) : 'No token data') + (meta.telemetry && meta.telemetry.estimatedCostUsd ? ' · ' + formatUsd(meta.telemetry.estimatedCostUsd) + ' est' : ''));
+            } else if (phase === 'failed') {
+              if (meta.telemetry) {
+                applyApiStageTelemetry(stageKey, meta.telemetry, meta.error || message);
+              }
+            }
             renderApiRunState();
           });
 
@@ -4785,7 +5107,9 @@
             ? 'Quality score ' + report.scores.aggregate.score + ' · ' + settings._providerLabel
             : settings._providerLabel + (settings.model ? ' · ' + settings.model : '');
           apiRunState.booklet = booklet;
-          pushApiLog('Generation complete. The booklet is ready for renderer handoff or download.');
+          apiRunState.costCaption = (apiRunState.pricingLabel ? 'Estimated from ' + apiRunState.pricingLabel + '. ' : '') +
+            'Run total: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + '.';
+          pushApiLog('Generation complete. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.');
           renderApiRunState();
           setGeneratorSurface('api-status', { skipFocus: true });
         } catch (error) {
@@ -4811,6 +5135,9 @@
           apiRunState.progress = apiRunState.stageIndex + ' / ' + apiRunState.totalStages + ' stages';
           apiRunState.progressCaption = 'No booklet was committed to the renderer.';
           apiRunState.error = failureMessage;
+          if (apiRunState.usageTotals && apiRunState.usageTotals.totalTokens > 0) {
+            apiRunState.costCaption = 'Usage before failure: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.';
+          }
           pushApiLog(failureMessage);
           renderApiRunState();
           setGeneratorSurface('api-status', { skipFocus: true });

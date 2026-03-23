@@ -17,7 +17,9 @@ window.LiftRPGAPI = (function () {
 
   // ── Constants ─────────────────────────────────────────────────────────────
 
-  var DEFAULT_TIMEOUT_MS = 300000; // 5 minutes — generous for long LLM generations
+  var DEFAULT_TIMEOUT_MS = 600000; // 10 minutes — long frontier-model stages often exceed 5m
+  var DEFAULT_PRICING_REFRESH_TIMEOUT_MS = 20000;
+  var PRICING_VERIFIED_AT = '2026-03-23';
 
   // Canonical document type list — single source of truth for schema enums + validator
   var DOCUMENT_TYPE_ENUM = ['memo', 'report', 'inspection', 'fieldNote',
@@ -29,7 +31,7 @@ window.LiftRPGAPI = (function () {
     anthropic: {
       label: 'Claude (Anthropic)',
       baseUrl: 'https://api.anthropic.com',
-      defaultModel: 'claude-opus-4-6',
+      defaultModel: 'claude-sonnet-4-6',
       format: 'anthropic',
       modelDiscovery: 'anthropic'
     },
@@ -58,7 +60,7 @@ window.LiftRPGAPI = (function () {
     gemini: {
       label: 'Google Gemini',
       baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-      defaultModel: 'gemini-2.5-pro-preview',
+      defaultModel: 'gemini-2.5-pro',
       format: 'openai',
       modelDiscovery: 'gemini'
     },
@@ -71,9 +73,167 @@ window.LiftRPGAPI = (function () {
     }
   };
 
+  var PRICING_SOURCES = {
+    anthropic: {
+      label: 'Anthropic pricing',
+      url: 'https://docs.anthropic.com/en/docs/about-claude/pricing'
+    },
+    openai: {
+      label: 'OpenAI pricing',
+      url: 'https://platform.openai.com/pricing'
+    },
+    groq: {
+      label: 'Groq model pricing',
+      url: 'https://console.groq.com/docs/models'
+    },
+    gemini: {
+      label: 'Gemini Developer API pricing',
+      url: 'https://ai.google.dev/pricing'
+    }
+  };
+
+  var MODEL_PRICING_RULES = [
+    {
+      provider: 'anthropic',
+      match: /^claude-(?:sonnet-4(?:[-_.]\d+)?|sonnet-4(?:[-_.]6)?|sonnet-4(?:[-_.]5)?)/i,
+      label: 'Claude Sonnet 4',
+      inputPerMillion: 3,
+      outputPerMillion: 15,
+      cacheWritePerMillion: 3.75,
+      cacheReadPerMillion: 0.30,
+      source: PRICING_SOURCES.anthropic
+    },
+    {
+      provider: 'anthropic',
+      match: /^claude-(?:opus-4(?:[-_.]\d+)?|opus-4(?:[-_.]1)?)/i,
+      label: 'Claude Opus 4',
+      inputPerMillion: 15,
+      outputPerMillion: 75,
+      cacheWritePerMillion: 18.75,
+      cacheReadPerMillion: 1.50,
+      source: PRICING_SOURCES.anthropic
+    },
+    {
+      provider: 'anthropic',
+      match: /^claude-(?:haiku-3(?:[-_.]5)?)/i,
+      label: 'Claude Haiku 3.5',
+      inputPerMillion: 0.80,
+      outputPerMillion: 4,
+      cacheWritePerMillion: 1,
+      cacheReadPerMillion: 0.08,
+      source: PRICING_SOURCES.anthropic
+    },
+    {
+      provider: 'openai',
+      match: /^gpt-4o(?:$|[-_])/i,
+      label: 'GPT-4o',
+      inputPerMillion: 2.5,
+      cachedInputPerMillion: 1.25,
+      outputPerMillion: 10,
+      source: PRICING_SOURCES.openai
+    },
+    {
+      provider: 'openai',
+      match: /^gpt-4\.1(?:$|[-_])/i,
+      label: 'GPT-4.1',
+      inputPerMillion: 2,
+      cachedInputPerMillion: 0.50,
+      outputPerMillion: 8,
+      source: PRICING_SOURCES.openai
+    },
+    {
+      provider: 'openai',
+      match: /^gpt-4\.1-mini(?:$|[-_])/i,
+      label: 'GPT-4.1 mini',
+      inputPerMillion: 0.40,
+      cachedInputPerMillion: 0.10,
+      outputPerMillion: 1.60,
+      source: PRICING_SOURCES.openai
+    },
+    {
+      provider: 'openai',
+      match: /^gpt-4\.1-nano(?:$|[-_])/i,
+      label: 'GPT-4.1 nano',
+      inputPerMillion: 0.10,
+      cachedInputPerMillion: 0.025,
+      outputPerMillion: 0.40,
+      source: PRICING_SOURCES.openai
+    },
+    {
+      provider: 'openai',
+      match: /^gpt-5(?:\.4)?(?:$|[-_])(?!mini|nano|pro)/i,
+      label: 'GPT-5',
+      inputPerMillion: 1.25,
+      cachedInputPerMillion: 0.125,
+      outputPerMillion: 10,
+      source: PRICING_SOURCES.openai
+    },
+    {
+      provider: 'openai',
+      match: /^gpt-5(?:\.4)?-mini(?:$|[-_])/i,
+      label: 'GPT-5 mini',
+      inputPerMillion: 0.25,
+      cachedInputPerMillion: 0.025,
+      outputPerMillion: 2,
+      source: PRICING_SOURCES.openai
+    },
+    {
+      provider: 'openai',
+      match: /^gpt-5(?:\.4)?-nano(?:$|[-_])/i,
+      label: 'GPT-5 nano',
+      inputPerMillion: 0.05,
+      cachedInputPerMillion: 0.005,
+      outputPerMillion: 0.40,
+      source: PRICING_SOURCES.openai
+    },
+    {
+      provider: 'openai',
+      match: /^gpt-5(?:\.4)?-pro(?:$|[-_])/i,
+      label: 'GPT-5 pro',
+      inputPerMillion: 15,
+      outputPerMillion: 120,
+      source: PRICING_SOURCES.openai
+    },
+    {
+      provider: 'groq',
+      match: /^llama-3\.3-70b-versatile$/i,
+      label: 'Llama 3.3 70B Versatile',
+      inputPerMillion: 0.59,
+      outputPerMillion: 0.79,
+      source: PRICING_SOURCES.groq
+    },
+    {
+      provider: 'gemini',
+      match: /^gemini-2\.5-pro(?:$|[-_])/i,
+      label: 'Gemini 2.5 Pro',
+      inputPerMillion: 1.25,
+      outputPerMillion: 10,
+      longContextThresholdTokens: 200000,
+      longContextInputPerMillion: 2.50,
+      longContextOutputPerMillion: 15,
+      source: PRICING_SOURCES.gemini
+    },
+    {
+      provider: 'gemini',
+      match: /^gemini-2\.5-flash(?:$|[-_])(?!lite)/i,
+      label: 'Gemini 2.5 Flash',
+      inputPerMillion: 0.30,
+      outputPerMillion: 2.50,
+      source: PRICING_SOURCES.gemini
+    },
+    {
+      provider: 'gemini',
+      match: /^gemini-2\.5-flash-lite(?:$|[-_])/i,
+      label: 'Gemini 2.5 Flash-Lite',
+      inputPerMillion: 0.10,
+      outputPerMillion: 0.40,
+      source: PRICING_SOURCES.gemini
+    }
+  ];
+
   // ── Fetch with timeout ────────────────────────────────────────────────────
   // Wraps fetch() with an AbortController so long-running requests don't hang
-  // silently. Default 5 minutes; override via settings.requestTimeoutMs.
+  // silently. Default 10 minutes; override via settings.requestTimeoutMs.
 
   function fetchWithTimeout(url, options, timeoutMs) {
     var ms = timeoutMs || DEFAULT_TIMEOUT_MS;
@@ -95,6 +255,523 @@ window.LiftRPGAPI = (function () {
 
   function normalizeUrl(url) {
     return String(url || '').replace(/\/+$/, '');
+  }
+
+  function safeNumber(value) {
+    var num = Number(value);
+    return Number.isFinite(num) && num > 0 ? num : 0;
+  }
+
+  function normalizeModelId(value) {
+    return String(value || '').trim().toLowerCase();
+  }
+
+  function escapeRegex(value) {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function normalizeModelFamilyId(modelId) {
+    return normalizeModelId(modelId)
+      .replace(/-\d{8}(?=$|[-_.\/])/g, '')
+      .replace(/-\d{4}-\d{2}-\d{2}(?=$|[-_.\/])/g, '')
+      .replace(/-latest(?=$|[-_.\/])/g, '');
+  }
+
+  function buildModelFamilyRegex(modelId) {
+    var family = normalizeModelFamilyId(modelId);
+    if (!family) return /^$/i;
+    return new RegExp('^' + escapeRegex(family) + '(?:$|[-_.\\/])', 'i');
+  }
+
+  function clonePricingSource(source) {
+    return {
+      label: source && source.label ? source.label : '',
+      url: source && source.url ? source.url : ''
+    };
+  }
+
+  function clonePricingRule(rule) {
+    if (!rule) return null;
+    var cloned = {};
+    Object.keys(rule).forEach(function (key) {
+      if (key === 'match' && rule.match instanceof RegExp) {
+        cloned.match = new RegExp(rule.match.source, rule.match.flags || '');
+        return;
+      }
+      if (key === 'source' && rule.source) {
+        cloned.source = clonePricingSource(rule.source);
+        return;
+      }
+      cloned[key] = rule[key];
+    });
+    return cloned;
+  }
+
+  function findMatchingPricingRule(rules, providerId, modelId) {
+    var normalizedModel = normalizeModelId(modelId);
+    return (rules || []).filter(function (entry) {
+      return entry && entry.provider === providerId && entry.match && entry.match.test(normalizedModel);
+    })[0] || null;
+  }
+
+  function mergePricingRule(baseRule, overrideRule) {
+    if (!baseRule) return clonePricingRule(overrideRule);
+    if (!overrideRule) return clonePricingRule(baseRule);
+    var merged = clonePricingRule(baseRule) || {};
+    Object.keys(overrideRule).forEach(function (key) {
+      if (key === 'match' && overrideRule.match instanceof RegExp) {
+        merged.match = new RegExp(overrideRule.match.source, overrideRule.match.flags || '');
+        return;
+      }
+      if (key === 'source' && overrideRule.source) {
+        merged.source = clonePricingSource(overrideRule.source);
+        return;
+      }
+      if (overrideRule[key] !== undefined && overrideRule[key] !== null && overrideRule[key] !== '') {
+        merged[key] = overrideRule[key];
+      }
+    });
+    return merged;
+  }
+
+  function detectProviderId(settings, responseProviderId) {
+    if (responseProviderId) return responseProviderId;
+    var providerId = String((settings && (settings.provider || settings.providerId || settings._providerId)) || '').trim().toLowerCase();
+    if (providerId && PROVIDERS[providerId]) return providerId;
+    var format = String((settings && settings.format) || '').trim().toLowerCase();
+    var baseUrl = normalizeUrl((settings && settings.baseUrl) || '');
+    if (format === 'anthropic' || baseUrl === normalizeUrl(PROVIDERS.anthropic.baseUrl)) return 'anthropic';
+    if (baseUrl === normalizeUrl(PROVIDERS.groq.baseUrl)) return 'groq';
+    if (baseUrl === normalizeUrl(PROVIDERS.gemini.baseUrl)) return 'gemini';
+    if (baseUrl === normalizeUrl(PROVIDERS.ollama.baseUrl)) return 'ollama';
+    return providerId || 'openai';
+  }
+
+  function normalizeUsageMetrics(providerId, usage) {
+    usage = usage || {};
+    if (providerId === 'anthropic') {
+      var anthropicInput = safeNumber(usage.input_tokens);
+      var anthropicOutput = safeNumber(usage.output_tokens);
+      var anthropicCacheWrite = safeNumber(usage.cache_creation_input_tokens);
+      var anthropicCacheRead = safeNumber(usage.cache_read_input_tokens);
+      return {
+        inputTokens: anthropicInput,
+        outputTokens: anthropicOutput,
+        cachedInputTokens: 0,
+        cacheWriteTokens: anthropicCacheWrite,
+        cacheReadTokens: anthropicCacheRead,
+        reasoningTokens: 0,
+        totalTokens: safeNumber(usage.total_tokens) || (anthropicInput + anthropicOutput + anthropicCacheWrite + anthropicCacheRead)
+      };
+    }
+
+    var promptTokens = safeNumber(usage.prompt_tokens);
+    var completionTokens = safeNumber(usage.completion_tokens);
+    var promptDetails = usage.prompt_tokens_details || {};
+    var completionDetails = usage.completion_tokens_details || {};
+    var cachedTokens = safeNumber(promptDetails.cached_tokens);
+    return {
+      inputTokens: promptTokens,
+      outputTokens: completionTokens,
+      cachedInputTokens: cachedTokens,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 0,
+      reasoningTokens: safeNumber(completionDetails.reasoning_tokens),
+      totalTokens: safeNumber(usage.total_tokens) || (promptTokens + completionTokens)
+    };
+  }
+
+  function resolvePricingFromRule(rule, usage) {
+    if (!rule) return null;
+
+    var resolved = {
+      label: rule.label,
+      sourceLabel: rule.source && rule.source.label ? rule.source.label : '',
+      sourceUrl: rule.source && rule.source.url ? rule.source.url : '',
+      verifiedAt: rule.verifiedAt || PRICING_VERIFIED_AT,
+      fetchedAt: rule.fetchedAt || '',
+      live: !!rule.live,
+      inputPerMillion: rule.inputPerMillion,
+      outputPerMillion: rule.outputPerMillion,
+      cachedInputPerMillion: rule.cachedInputPerMillion,
+      cacheWritePerMillion: rule.cacheWritePerMillion,
+      cacheReadPerMillion: rule.cacheReadPerMillion,
+      longContextApplied: false
+    };
+
+    var promptTokens = safeNumber(usage && usage.inputTokens);
+    if (rule.longContextThresholdTokens && promptTokens > rule.longContextThresholdTokens) {
+      if (rule.longContextInputPerMillion !== undefined) resolved.inputPerMillion = rule.longContextInputPerMillion;
+      if (rule.longContextOutputPerMillion !== undefined) resolved.outputPerMillion = rule.longContextOutputPerMillion;
+      if (rule.longContextCachedInputPerMillion !== undefined) resolved.cachedInputPerMillion = rule.longContextCachedInputPerMillion;
+      if (rule.longContextCacheWritePerMillion !== undefined) resolved.cacheWritePerMillion = rule.longContextCacheWritePerMillion;
+      if (rule.longContextCacheReadPerMillion !== undefined) resolved.cacheReadPerMillion = rule.longContextCacheReadPerMillion;
+      resolved.longContextApplied = true;
+    }
+
+    return resolved;
+  }
+
+  function resolveModelPricing(providerId, modelId, usage, overrideRule) {
+    var normalizedModel = normalizeModelId(modelId);
+    if (!providerId || !normalizedModel) return null;
+
+    var rule = null;
+    if (overrideRule && overrideRule.provider === providerId && overrideRule.match && overrideRule.match.test(normalizedModel)) {
+      rule = overrideRule;
+    }
+    if (!rule) {
+      rule = findMatchingPricingRule(MODEL_PRICING_RULES, providerId, normalizedModel);
+    }
+    return resolvePricingFromRule(rule, usage);
+  }
+
+  function estimateUsageCostUsd(usage, pricing) {
+    if (!pricing || !usage) return null;
+    var cachedInput = Math.min(safeNumber(usage.cachedInputTokens), safeNumber(usage.inputTokens));
+    var uncachedInput = Math.max(0, safeNumber(usage.inputTokens) - cachedInput);
+    var cacheWriteTokens = safeNumber(usage.cacheWriteTokens);
+    var cacheReadTokens = safeNumber(usage.cacheReadTokens);
+    var outputTokens = safeNumber(usage.outputTokens);
+
+    var total =
+      (uncachedInput * safeNumber(pricing.inputPerMillion)) / 1000000 +
+      (cachedInput * safeNumber(pricing.cachedInputPerMillion !== undefined ? pricing.cachedInputPerMillion : pricing.inputPerMillion)) / 1000000 +
+      (cacheWriteTokens * safeNumber(pricing.cacheWritePerMillion !== undefined ? pricing.cacheWritePerMillion : pricing.inputPerMillion)) / 1000000 +
+      (cacheReadTokens * safeNumber(pricing.cacheReadPerMillion !== undefined ? pricing.cacheReadPerMillion : (pricing.cachedInputPerMillion !== undefined ? pricing.cachedInputPerMillion : pricing.inputPerMillion))) / 1000000 +
+      (outputTokens * safeNumber(pricing.outputPerMillion)) / 1000000;
+
+    return total > 0 ? total : 0;
+  }
+
+  function buildUsageSnapshot(providerId, modelId, usage, pricingRule) {
+    var normalizedUsage = normalizeUsageMetrics(providerId, usage);
+    var pricing = resolveModelPricing(providerId, modelId, normalizedUsage, pricingRule);
+    return {
+      provider: providerId,
+      model: String(modelId || '').trim(),
+      usage: normalizedUsage,
+      pricing: pricing,
+      estimatedCostUsd: estimateUsageCostUsd(normalizedUsage, pricing)
+    };
+  }
+
+  function blankUsageTotals() {
+    return {
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedInputTokens: 0,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 0,
+      reasoningTokens: 0,
+      totalTokens: 0
+    };
+  }
+
+  function addUsageTotals(target, sample) {
+    if (!sample || !sample.usage) return target;
+    target.inputTokens += safeNumber(sample.usage.inputTokens);
+    target.outputTokens += safeNumber(sample.usage.outputTokens);
+    target.cachedInputTokens += safeNumber(sample.usage.cachedInputTokens);
+    target.cacheWriteTokens += safeNumber(sample.usage.cacheWriteTokens);
+    target.cacheReadTokens += safeNumber(sample.usage.cacheReadTokens);
+    target.reasoningTokens += safeNumber(sample.usage.reasoningTokens);
+    target.totalTokens += safeNumber(sample.usage.totalTokens);
+    return target;
+  }
+
+  function parseMoneyValue(value) {
+    var match = String(value || '').match(/([0-9]+(?:\.[0-9]+)?)/);
+    return match ? Number(match[1]) : 0;
+  }
+
+  function extractHtmlText(html) {
+    var raw = String(html || '');
+    if (!raw) return '';
+    if (typeof DOMParser !== 'undefined') {
+      try {
+        var doc = new DOMParser().parseFromString(raw, 'text/html');
+        if (doc && doc.body && doc.body.textContent) {
+          return doc.body.textContent;
+        }
+      } catch (_error) {}
+    }
+    return raw
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ');
+  }
+
+  function normalizePricingPageText(value) {
+    return String(value || '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/\r/g, '\n')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function humanizeModelLabel(modelId) {
+    var label = String(modelId || '')
+      .replace(/^openai\//i, '')
+      .replace(/[-_/]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!label) return 'Selected model';
+    label = label.replace(/\bgpt\b/gi, 'GPT');
+    label = label.replace(/\bo\d+\b/gi, function (token) { return token.toLowerCase(); });
+    label = label.replace(/\bclaude\b/gi, 'Claude');
+    label = label.replace(/\bgemini\b/gi, 'Gemini');
+    return label.replace(/\b([a-z])/g, function (_, chr) { return chr.toUpperCase(); });
+  }
+
+  function buildAnthropicPricingLabels(modelId) {
+    var normalized = normalizeModelFamilyId(modelId);
+    var modern = normalized.match(/^claude-(opus|sonnet|haiku)-(\d)(?:[-_.](\d))?/i);
+    var legacy = normalized.match(/^claude-(\d)(?:[-_.](\d))?-(opus|sonnet|haiku)/i);
+    var family = '';
+    var major = '';
+    var minor = '';
+    if (modern) {
+      family = modern[1];
+      major = modern[2];
+      minor = modern[3] || '';
+    } else if (legacy) {
+      family = legacy[3];
+      major = legacy[1];
+      minor = legacy[2] || '';
+    }
+    if (!family || !major) return [humanizeModelLabel(modelId)];
+    return ['Claude ' + family.charAt(0).toUpperCase() + family.slice(1) + ' ' + major + (minor ? '.' + minor : '')];
+  }
+
+  function buildOpenAIModelDocsUrl(modelId) {
+    return 'https://developers.openai.com/api/docs/models/' + encodeURIComponent(normalizeModelFamilyId(modelId));
+  }
+
+  async function fetchTextWithTimeout(url, timeoutMs) {
+    var resp = await fetchWithTimeout(url, {
+      method: 'GET',
+      cache: 'no-store',
+      credentials: 'omit',
+      headers: {
+        'accept': 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8'
+      }
+    }, timeoutMs);
+    var text = await resp.text();
+    if (!resp.ok) {
+      throw new Error('Pricing source returned HTTP ' + resp.status + '.');
+    }
+    return text;
+  }
+
+  function buildLivePricingRule(providerId, modelId, fields) {
+    fields = fields || {};
+    return {
+      provider: providerId,
+      match: buildModelFamilyRegex(modelId),
+      label: fields.label || humanizeModelLabel(modelId),
+      inputPerMillion: fields.inputPerMillion,
+      outputPerMillion: fields.outputPerMillion,
+      cachedInputPerMillion: fields.cachedInputPerMillion,
+      cacheWritePerMillion: fields.cacheWritePerMillion,
+      cacheReadPerMillion: fields.cacheReadPerMillion,
+      longContextThresholdTokens: fields.longContextThresholdTokens,
+      longContextInputPerMillion: fields.longContextInputPerMillion,
+      longContextOutputPerMillion: fields.longContextOutputPerMillion,
+      longContextCachedInputPerMillion: fields.longContextCachedInputPerMillion,
+      longContextCacheWritePerMillion: fields.longContextCacheWritePerMillion,
+      longContextCacheReadPerMillion: fields.longContextCacheReadPerMillion,
+      source: fields.source || { label: '', url: '' },
+      live: true,
+      fetchedAt: fields.fetchedAt || '',
+      verifiedAt: fields.verifiedAt || (fields.fetchedAt ? String(fields.fetchedAt).slice(0, 10) : PRICING_VERIFIED_AT)
+    };
+  }
+
+  function parseAnthropicPricingRule(pageText, modelId, fetchedAt) {
+    var labels = buildAnthropicPricingLabels(modelId);
+    for (var i = 0; i < labels.length; i++) {
+      var label = labels[i];
+      var row = new RegExp(
+        escapeRegex(label) +
+        '\\s*\\$([0-9]+(?:\\.[0-9]+)?)\\s*/\\s*MTok' +
+        '\\s*\\$([0-9]+(?:\\.[0-9]+)?)\\s*/\\s*MTok' +
+        '\\s*\\$([0-9]+(?:\\.[0-9]+)?)\\s*/\\s*MTok' +
+        '\\s*\\$([0-9]+(?:\\.[0-9]+)?)\\s*/\\s*MTok' +
+        '\\s*\\$([0-9]+(?:\\.[0-9]+)?)\\s*/\\s*MTok',
+        'i'
+      ).exec(pageText);
+      if (!row) continue;
+      var rule = buildLivePricingRule('anthropic', modelId, {
+        label: label,
+        inputPerMillion: parseMoneyValue(row[1]),
+        cacheWritePerMillion: parseMoneyValue(row[2]),
+        cacheReadPerMillion: parseMoneyValue(row[4]),
+        outputPerMillion: parseMoneyValue(row[5]),
+        source: {
+          label: 'Anthropic pricing (live)',
+          url: PRICING_SOURCES.anthropic.url
+        },
+        fetchedAt: fetchedAt
+      });
+      if (/^claude-(?:sonnet-4(?:[-_.]5)?|4(?:[-_.]5)?-sonnet)$/i.test(normalizeModelFamilyId(modelId))) {
+        var longMatch = /Claude Sonnet 4\.5\s*\/\s*4\s*\$([0-9]+(?:\.[0-9]+)?)\s*\/\s*MTok\s*\$([0-9]+(?:\.[0-9]+)?)\s*\/\s*MTok\s*\$([0-9]+(?:\.[0-9]+)?)\s*\/\s*MTok\s*\$([0-9]+(?:\.[0-9]+)?)\s*\/\s*MTok/i.exec(pageText);
+        if (longMatch) {
+          rule.longContextThresholdTokens = 200000;
+          rule.longContextInputPerMillion = parseMoneyValue(longMatch[3]);
+          rule.longContextOutputPerMillion = parseMoneyValue(longMatch[4]);
+        }
+      }
+      return rule;
+    }
+    return null;
+  }
+
+  function parseOpenAIPricingRule(pageText, modelId, url, fetchedAt) {
+    var pricingBlock = pageText;
+    var pricingIndex = pricingBlock.toLowerCase().indexOf('pricing');
+    if (pricingIndex !== -1) pricingBlock = pricingBlock.slice(pricingIndex, pricingIndex + 2200);
+    var ioMatch = /Text tokens[\s\S]{0,700}?Input\s*\$([0-9]+(?:\.[0-9]+)?)\s*[\s\S]{0,160}?Output\s*\$([0-9]+(?:\.[0-9]+)?)/i.exec(pricingBlock)
+      || /Pricing[\s\S]{0,900}?Input\s*\$([0-9]+(?:\.[0-9]+)?)\s*[\s\S]{0,160}?Output\s*\$([0-9]+(?:\.[0-9]+)?)/i.exec(pricingBlock);
+    if (!ioMatch) return null;
+    var cachedMatch = /Cached input\s*\$([0-9]+(?:\.[0-9]+)?)/i.exec(pricingBlock);
+    var labelMatch = /([A-Za-z0-9 .-]+?)\s+Model\s*\|\s*OpenAI API/i.exec(pageText);
+    return buildLivePricingRule('openai', modelId, {
+      label: labelMatch ? labelMatch[1].trim() : humanizeModelLabel(modelId),
+      inputPerMillion: parseMoneyValue(ioMatch[1]),
+      outputPerMillion: parseMoneyValue(ioMatch[2]),
+      cachedInputPerMillion: cachedMatch ? parseMoneyValue(cachedMatch[1]) : undefined,
+      source: {
+        label: 'OpenAI model docs (live)',
+        url: url
+      },
+      fetchedAt: fetchedAt
+    });
+  }
+
+  function parseGeminiPricingRule(pageText, modelId, fetchedAt) {
+    var canonical = normalizeModelFamilyId(modelId);
+    var blockMatch = new RegExp(
+      escapeRegex(canonical) +
+      '[\\s\\S]{0,1200}?Input price[^$]*\\$([0-9]+(?:\\.[0-9]+)?)(?:[^$]*\\$([0-9]+(?:\\.[0-9]+)?))?' +
+      '[\\s\\S]{0,260}?Output price[^$]*\\$([0-9]+(?:\\.[0-9]+)?)(?:[^$]*\\$([0-9]+(?:\\.[0-9]+)?))?',
+      'i'
+    ).exec(pageText);
+    if (!blockMatch) return null;
+    var cacheMatch = new RegExp(
+      escapeRegex(canonical) +
+      '[\\s\\S]{0,1300}?Context caching price[^$]*\\$([0-9]+(?:\\.[0-9]+)?)(?:[^$]*\\$([0-9]+(?:\\.[0-9]+)?))?',
+      'i'
+    ).exec(pageText);
+    return buildLivePricingRule('gemini', modelId, {
+      label: humanizeModelLabel(modelId),
+      inputPerMillion: parseMoneyValue(blockMatch[1]),
+      outputPerMillion: parseMoneyValue(blockMatch[3]),
+      cachedInputPerMillion: cacheMatch ? parseMoneyValue(cacheMatch[1]) : undefined,
+      longContextThresholdTokens: blockMatch[2] || blockMatch[4] ? 200000 : undefined,
+      longContextInputPerMillion: blockMatch[2] ? parseMoneyValue(blockMatch[2]) : undefined,
+      longContextOutputPerMillion: blockMatch[4] ? parseMoneyValue(blockMatch[4]) : undefined,
+      longContextCachedInputPerMillion: cacheMatch && cacheMatch[2] ? parseMoneyValue(cacheMatch[2]) : undefined,
+      source: {
+        label: 'Gemini pricing (live)',
+        url: PRICING_SOURCES.gemini.url
+      },
+      fetchedAt: fetchedAt
+    });
+  }
+
+  function parseGroqPricingRule(pageText, modelId, fetchedAt) {
+    var row = new RegExp(
+      escapeRegex(normalizeModelId(modelId)) +
+      '\\s*[\\s\\S]{0,160}?\\$([0-9]+(?:\\.[0-9]+)?)\\s*input\\s*\\$([0-9]+(?:\\.[0-9]+)?)\\s*output',
+      'i'
+    ).exec(normalizeModelId(pageText));
+    if (!row) return null;
+    return buildLivePricingRule('groq', modelId, {
+      label: humanizeModelLabel(modelId),
+      inputPerMillion: parseMoneyValue(row[1]),
+      outputPerMillion: parseMoneyValue(row[2]),
+      source: {
+        label: 'Groq model pricing (live)',
+        url: PRICING_SOURCES.groq.url
+      },
+      fetchedAt: fetchedAt
+    });
+  }
+
+  async function fetchLivePricingRule(providerId, modelId, timeoutMs) {
+    var fetchedAt = new Date().toISOString();
+    if (!providerId || !modelId) return null;
+
+    if (providerId === 'anthropic') {
+      var anthropicHtml = await fetchTextWithTimeout(PRICING_SOURCES.anthropic.url, timeoutMs);
+      return parseAnthropicPricingRule(normalizePricingPageText(extractHtmlText(anthropicHtml)), modelId, fetchedAt);
+    }
+    if (providerId === 'openai') {
+      var openAiUrl = buildOpenAIModelDocsUrl(modelId);
+      var openAiHtml = await fetchTextWithTimeout(openAiUrl, timeoutMs);
+      return parseOpenAIPricingRule(normalizePricingPageText(extractHtmlText(openAiHtml)), modelId, openAiUrl, fetchedAt);
+    }
+    if (providerId === 'gemini') {
+      var geminiHtml = await fetchTextWithTimeout(PRICING_SOURCES.gemini.url, timeoutMs);
+      return parseGeminiPricingRule(normalizePricingPageText(extractHtmlText(geminiHtml)), modelId, fetchedAt);
+    }
+    if (providerId === 'groq') {
+      var groqHtml = await fetchTextWithTimeout(PRICING_SOURCES.groq.url, timeoutMs);
+      return parseGroqPricingRule(normalizePricingPageText(extractHtmlText(groqHtml)), modelId, fetchedAt);
+    }
+    return null;
+  }
+
+  async function refreshPricing(settings, options) {
+    var resolved = Object.assign({}, settings || {});
+    var providerId = detectProviderId(resolved);
+    var modelId = String(resolved.model || '').trim();
+    var timeoutMs = (options && options.timeoutMs) || Math.min(resolved.requestTimeoutMs || DEFAULT_TIMEOUT_MS, DEFAULT_PRICING_REFRESH_TIMEOUT_MS);
+    var fallbackRule = findMatchingPricingRule(MODEL_PRICING_RULES, providerId, modelId);
+    var liveRule = null;
+    var refreshError = '';
+
+    try {
+      liveRule = await fetchLivePricingRule(providerId, modelId, timeoutMs);
+      if (!liveRule) {
+        refreshError = 'Official pricing did not expose a parseable entry for ' + (modelId || 'the selected model') + '.';
+      }
+    } catch (error) {
+      refreshError = error && error.message ? error.message : String(error || 'Live pricing refresh failed.');
+    }
+
+    var effectiveRule = null;
+    var live = false;
+    if (liveRule) {
+      effectiveRule = mergePricingRule(fallbackRule, liveRule);
+      live = true;
+    } else if (fallbackRule) {
+      effectiveRule = clonePricingRule(fallbackRule);
+    }
+
+    resolved._pricingRule = effectiveRule || null;
+    if (settings && typeof settings === 'object') {
+      settings._pricingRule = effectiveRule || null;
+    }
+
+    var pricing = effectiveRule ? resolvePricingFromRule(effectiveRule, blankUsageTotals()) : null;
+    var result = {
+      provider: providerId,
+      model: modelId,
+      matched: !!pricing,
+      live: live,
+      pricing: pricing,
+      error: refreshError
+    };
+    if (result.pricing && !live && refreshError) {
+      result.pricing.fallbackReason = refreshError;
+    }
+    if (typeof window !== 'undefined' && window.LiftRPGAPI) {
+      window.LiftRPGAPI.lastPricing = result;
+    }
+    return result;
   }
 
   function fetchJsonWithTimeout(url, options, timeoutMs) {
@@ -302,7 +979,7 @@ window.LiftRPGAPI = (function () {
 
   // ── Request handlers ────────────────────────────────────────────────────────
 
-  async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs) {
+  async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs, pricingRule) {
     var resp = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -330,12 +1007,14 @@ window.LiftRPGAPI = (function () {
     }
 
     var rawText = body.content[0].text;
-    window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
-    window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = {
+    var meta = {
+      provider: 'anthropic',
       stop_reason: body.stop_reason,
       model: body.model,
       usage: body.usage
-    });
+    };
+    window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
+    window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = meta);
     if (body.stop_reason === 'max_tokens') {
       throw new Error(
         'Response truncated: the model hit the output token limit before completing the JSON.\n\n' +
@@ -344,10 +1023,14 @@ window.LiftRPGAPI = (function () {
         'Tip: open generator/test-repair.html and click \'Load lastRaw\' to inspect the partial output.'
       );
     }
-    return rawText;
+    return {
+      text: rawText,
+      meta: meta,
+      usage: buildUsageSnapshot('anthropic', body.model || model, body.usage, pricingRule)
+    };
   }
 
-  async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens, timeoutMs) {
+  async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens, timeoutMs, pricingRule) {
     var url = baseUrl.replace(/\/+$/, '') + '/chat/completions';
     var headers = { 'content-type': 'application/json' };
     if (apiKey) {
@@ -377,12 +1060,17 @@ window.LiftRPGAPI = (function () {
     }
 
     var rawText = extractTextContent(body.choices[0].message.content);
-    window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
-    window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = {
+    var meta = {
+      provider: normalizeUrl(baseUrl) === normalizeUrl(PROVIDERS.groq.baseUrl) ? 'groq'
+        : normalizeUrl(baseUrl) === normalizeUrl(PROVIDERS.gemini.baseUrl) ? 'gemini'
+          : normalizeUrl(baseUrl) === normalizeUrl(PROVIDERS.ollama.baseUrl) ? 'ollama'
+            : 'openai',
       finish_reason: body.choices[0].finish_reason,
       model: body.model,
       usage: body.usage
-    });
+    };
+    window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
+    window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = meta);
     if (body.choices[0].finish_reason === 'length') {
       throw new Error(
         'Response truncated: the model hit the output token limit before completing the JSON.\n\n' +
@@ -391,7 +1079,11 @@ window.LiftRPGAPI = (function () {
         'Tip: open generator/test-repair.html and click \'Load lastRaw\' to inspect the partial output.'
       );
     }
-    return rawText;
+    return {
+      text: rawText,
+      meta: meta,
+      usage: buildUsageSnapshot(meta.provider, body.model || model, body.usage, pricingRule)
+    };
   }
 
   // ── JSON repair ─────────────────────────────────────────────────────────────
@@ -665,9 +1357,9 @@ window.LiftRPGAPI = (function () {
   async function callProvider(settings, prompt, maxTokens) {
     var timeoutMs = settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS;
     if (settings.format === 'anthropic') {
-      return callAnthropic(settings.apiKey, settings.model, prompt, maxTokens, timeoutMs);
+      return callAnthropic(settings.apiKey, settings.model, prompt, maxTokens, timeoutMs, settings._pricingRule);
     }
-    return callOpenAICompat(settings.apiKey, settings.baseUrl, settings.model, prompt, maxTokens, timeoutMs);
+    return callOpenAICompat(settings.apiKey, settings.baseUrl, settings.model, prompt, maxTokens, timeoutMs, settings._pricingRule);
   }
 
   // ── ID normalisation ────────────────────────────────────────────────────────
@@ -2572,7 +3264,7 @@ window.LiftRPGAPI = (function () {
     return text.slice(0, Math.max(0, maxLength - 3)).replace(/\s+\S*$/, '') + '...';
   }
 
-  async function callOpenAICompatStructured(apiKey, baseUrl, model, prompt, schema, maxTokens, timeoutMs, stageName) {
+  async function callOpenAICompatStructured(apiKey, baseUrl, model, prompt, schema, maxTokens, timeoutMs, stageName, pricingRule) {
     var resp = await fetchWithTimeout(buildOpenAICompatUrl(baseUrl), {
       method: 'POST',
       headers: buildOpenAICompatHeaders(apiKey),
@@ -2605,18 +3297,32 @@ window.LiftRPGAPI = (function () {
     }
 
     var message = body.choices[0].message;
-    if (message.parsed && typeof message.parsed === 'object') {
-      return cloneSimple(message.parsed);
-    }
-
-    var rawText = extractTextContent(message.content);
-    window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
-    window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = {
+    var providerId = normalizeUrl(baseUrl) === normalizeUrl(PROVIDERS.groq.baseUrl) ? 'groq'
+      : normalizeUrl(baseUrl) === normalizeUrl(PROVIDERS.gemini.baseUrl) ? 'gemini'
+        : normalizeUrl(baseUrl) === normalizeUrl(PROVIDERS.ollama.baseUrl) ? 'ollama'
+          : 'openai';
+    var meta = {
+      provider: providerId,
       finish_reason: body.choices[0].finish_reason,
       model: body.model,
       usage: body.usage,
       response_mode: 'json_schema'
-    });
+    };
+    var usageSnapshot = buildUsageSnapshot(providerId, body.model || model, body.usage, pricingRule);
+
+    if (message.parsed && typeof message.parsed === 'object') {
+      window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = JSON.stringify(message.parsed, null, 2));
+      window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = meta);
+      return {
+        result: cloneSimple(message.parsed),
+        meta: meta,
+        usage: usageSnapshot
+      };
+    }
+
+    var rawText = extractTextContent(message.content);
+    window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
+    window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = meta);
 
     if (body.choices[0].finish_reason === 'length') {
       throw new Error(
@@ -2626,16 +3332,29 @@ window.LiftRPGAPI = (function () {
     }
 
     try {
-      return JSON.parse(rawText);
+      return {
+        result: JSON.parse(rawText),
+        meta: meta,
+        usage: usageSnapshot
+      };
     } catch (parseErr) {
       console.warn('[LiftRPG] Structured response for ' + stageName + ' was not directly parseable; attempting JSON repair fallback');
-      return extractJson(rawText);
+      return {
+        result: extractJson(rawText),
+        meta: meta,
+        usage: usageSnapshot
+      };
     }
   }
 
   async function callProviderStructured(settings, prompt, schema, maxTokens, stageName) {
     if (!schema || settings.format === 'anthropic') {
-      return extractJson(await callProvider(settings, prompt, maxTokens));
+      var unstructuredResponse = await callProvider(settings, prompt, maxTokens);
+      return {
+        result: extractJson(unstructuredResponse.text),
+        meta: unstructuredResponse.meta,
+        usage: unstructuredResponse.usage
+      };
     }
 
     try {
@@ -2647,12 +3366,18 @@ window.LiftRPGAPI = (function () {
         schema,
         maxTokens,
         settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS,
-        stageName
+        stageName,
+        settings._pricingRule
       );
     } catch (err) {
       if (!shouldFallbackFromStructured(err) || isLikelyTruncationError(err)) throw err;
       console.warn('[LiftRPG] Structured output unavailable for ' + stageName + '; falling back to freeform JSON repair:', err.message);
-      return extractJson(await callProvider(settings, prompt, maxTokens));
+      var fallbackResponse = await callProvider(settings, prompt, maxTokens);
+      return {
+        result: extractJson(fallbackResponse.text),
+        meta: fallbackResponse.meta,
+        usage: fallbackResponse.usage
+      };
     }
   }
 
@@ -2679,15 +3404,21 @@ window.LiftRPGAPI = (function () {
       stage2: window.generateApiStage2Prompt || window.generateStage2Prompt,
       shell: window.generateApiShellPrompt || window.generateShellPrompt,
       weeks: window.generateApiWeekChunkPrompt || window.generateWeekChunkPrompt,
+      weekPlan: window.generateSingleWeekPlanPrompt,
+      singleWeekFinal: window.generateSingleWeekFinalPrompt,
       fragments: window.generateApiFragmentsPrompt || window.generateFragmentsPrompt,
+      singleFragment: window.generateSingleFragmentPrompt,
       fragmentBatch: window.generateApiFragmentBatchPrompt || window.generateFragmentBatchPrompt,
-      endings: window.generateApiEndingsPrompt || window.generateEndingsPrompt
+      endings: window.generateApiEndingsPrompt || window.generateEndingsPrompt,
+      singleEnding: window.generateSingleEndingPrompt
     };
   }
 
   function assertApiPromptBuilders(builders) {
     if (!builders.stage1 || !builders.stage2 || !builders.shell || !builders.weeks ||
-      !builders.fragments || !builders.fragmentBatch || !builders.endings) {
+      !builders.weekPlan || !builders.singleWeekFinal ||
+      !builders.fragments || !builders.singleFragment ||
+      !builders.fragmentBatch || !builders.endings || !builders.singleEnding) {
       throw new Error('Pipeline generators not loaded. Please reload the page.');
     }
   }
@@ -2764,18 +3495,85 @@ window.LiftRPGAPI = (function () {
     return '';
   }
 
+  function createStageTelemetry(stageKey, stageName) {
+    return {
+      stageKey: stageKey || '',
+      stageName: stageName || '',
+      attempts: 0,
+      provider: '',
+      model: '',
+      usage: blankUsageTotals(),
+      estimatedCostUsd: 0,
+      pricing: null
+    };
+  }
+
+  function summarizeStageTelemetry(telemetry) {
+    var usage = telemetry && telemetry.usage ? telemetry.usage : blankUsageTotals();
+    return {
+      stageKey: telemetry && telemetry.stageKey ? telemetry.stageKey : '',
+      stageName: telemetry && telemetry.stageName ? telemetry.stageName : '',
+      attempts: telemetry && telemetry.attempts ? telemetry.attempts : 0,
+      provider: telemetry && telemetry.provider ? telemetry.provider : '',
+      model: telemetry && telemetry.model ? telemetry.model : '',
+      usage: {
+        inputTokens: safeNumber(usage.inputTokens),
+        outputTokens: safeNumber(usage.outputTokens),
+        cachedInputTokens: safeNumber(usage.cachedInputTokens),
+        cacheWriteTokens: safeNumber(usage.cacheWriteTokens),
+        cacheReadTokens: safeNumber(usage.cacheReadTokens),
+        reasoningTokens: safeNumber(usage.reasoningTokens),
+        totalTokens: safeNumber(usage.totalTokens)
+      },
+      estimatedCostUsd: telemetry ? telemetry.estimatedCostUsd : 0,
+      pricing: telemetry && telemetry.pricing ? Object.assign({}, telemetry.pricing) : null
+    };
+  }
+
+  function recordStageUsage(telemetry, response) {
+    if (!telemetry || !response || !response.usage) return;
+    telemetry.attempts += 1;
+    telemetry.provider = response.usage.provider || telemetry.provider;
+    telemetry.model = response.usage.model || telemetry.model;
+    addUsageTotals(telemetry.usage, response.usage);
+    if (response.usage.pricing) telemetry.pricing = response.usage.pricing;
+    telemetry.estimatedCostUsd += safeNumber(response.usage.estimatedCostUsd);
+  }
+
+  function emitPipelineEvent(handler, stageIndex, totalStages, message, meta) {
+    if (!handler) return;
+    if (typeof handler === 'function') {
+      handler(stageIndex, totalStages, message, meta || null);
+      return;
+    }
+    if (typeof handler.onProgress === 'function') {
+      handler.onProgress(stageIndex, totalStages, message, meta || null);
+    }
+  }
+
   async function runJsonStage(settings, config) {
     var attemptCount = config.maxAttempts || 2;
     var lastErr = null;
+    var stageTelemetry = createStageTelemetry(config.stageKey, config.stageName);
 
     for (var attempt = 0; attempt < attemptCount; attempt++) {
       var prompt = config.buildPrompt({ attempt: attempt, error: lastErr });
       if (attempt > 0) prompt += buildRetryDirective(config.stageName, attempt, lastErr);
 
       try {
-        var result = config.schema
+        var response = config.schema
           ? await callProviderStructured(settings, prompt, config.schema, config.maxTokens, config.stageName)
-          : extractJson(await callProvider(settings, prompt, config.maxTokens));
+          : (function () {
+            return callProvider(settings, prompt, config.maxTokens).then(function (rawResponse) {
+              return {
+                result: extractJson(rawResponse.text),
+                meta: rawResponse.meta,
+                usage: rawResponse.usage
+              };
+            });
+          })();
+        var result = response.result;
+        recordStageUsage(stageTelemetry, response);
 
         if (config.unwrapKey) result = unwrapIfNeeded(result, config.unwrapKey);
         if (config.normalizeResult) result = config.normalizeResult(result);
@@ -2783,11 +3581,24 @@ window.LiftRPGAPI = (function () {
           var validationMessage = config.validate(result);
           if (validationMessage) throw new Error(validationMessage);
         }
+        emitPipelineEvent(config.onProgress, config.stageIndex || 0, config.getTotalStages ? config.getTotalStages() : 0, config.completeMessage || config.stageName, {
+          phase: 'complete',
+          stageKey: config.stageKey || '',
+          stageName: config.stageName,
+          telemetry: summarizeStageTelemetry(stageTelemetry)
+        });
         return result;
       } catch (err) {
         lastErr = err;
         console.warn('[LiftRPG] ' + config.stageName + ' attempt ' + (attempt + 1) + '/' + attemptCount + ' failed:', err.message);
         if (attempt === attemptCount - 1 || !shouldRetryStageError(err)) {
+          emitPipelineEvent(config.onProgress, config.stageIndex || 0, config.getTotalStages ? config.getTotalStages() : 0, config.stageName + ' failed', {
+            phase: 'failed',
+            stageKey: config.stageKey || '',
+            stageName: config.stageName,
+            error: String((err && err.message) || err || ''),
+            telemetry: summarizeStageTelemetry(stageTelemetry)
+          });
           throw prefixStageError(config.stageName, err);
         }
       }
@@ -2953,14 +3764,14 @@ window.LiftRPGAPI = (function () {
 
   async function patchAssembledBooklet(settings, booklet, errors, identityContract) {
     try {
-      var rawPatched = await callProvider(
+      var patchedResponse = await callProvider(
         settings,
         generatePatchPrompt(JSON.stringify(booklet, null, 2), errors, {
           identityContract: identityContract
         }),
         32000
       );
-      var patched = extractJson(rawPatched);
+      var patched = extractJson(patchedResponse.text);
       enforceIdentityContract(patched, identityContract);
       enforceBookletDerivedFields(patched);
       var identityDrift = compareIdentityContract(patched, identityContract);
@@ -2992,15 +3803,24 @@ window.LiftRPGAPI = (function () {
     var stageNum = 0;
     var onProgress = options.onProgress;
 
-    function progress(message) {
+    function progress(stageKey, message) {
       stageNum++;
-      if (onProgress) onProgress(stageNum, totalStages, message);
+      emitPipelineEvent(onProgress, stageNum, totalStages, message, {
+        phase: 'start',
+        stageKey: stageKey || '',
+        stageName: message
+      });
     }
 
     // ── STAGES 1, 2, 3 (Shell Setup) ──────────────────────────
-    progress('Building layer codex…');
+    progress('layerBible', 'Building layer codex…');
     var layerBible = await runJsonStage(settings, {
+      stageKey: 'layerBible',
       stageName: 'Layer Codex',
+      stageIndex: stageNum,
+      completeMessage: 'Layer codex complete.',
+      onProgress: onProgress,
+      getTotalStages: function () { return totalStages; },
       schema: STRUCTURED_SCHEMA_BIBLE,
       maxTokens: 8192,
       maxAttempts: 2,
@@ -3008,9 +3828,14 @@ window.LiftRPGAPI = (function () {
       buildPrompt: function (retryState) { return builders.stage1(workout, brief, dice, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
     });
 
-    progress('Planning story…');
+    progress('campaign', 'Planning story…');
     var campaignPlan = await runJsonStage(settings, {
+      stageKey: 'campaign',
       stageName: 'Story Plan',
+      stageIndex: stageNum,
+      completeMessage: 'Story plan complete.',
+      onProgress: onProgress,
+      getTotalStages: function () { return totalStages; },
       schema: STRUCTURED_SCHEMA_CAMPAIGN,
       maxTokens: 16384,
       maxAttempts: 2,
@@ -3024,9 +3849,14 @@ window.LiftRPGAPI = (function () {
     // Update totalStages with exact fragment count
     totalStages = 3 + (weekCount * 2) + campaignPlan.fragmentRegistry.length + 1;
 
-    progress('Building booklet setup…');
+    progress('shell', 'Building booklet setup…');
     var shell = await runJsonStage(settings, {
+      stageKey: 'shell',
       stageName: 'Booklet Setup',
+      stageIndex: stageNum,
+      completeMessage: 'Booklet setup complete.',
+      onProgress: onProgress,
+      getTotalStages: function () { return totalStages; },
       schema: STRUCTURED_SCHEMA_SHELL,
       maxTokens: 16384,
       unwrapKey: 'meta',
@@ -3052,9 +3882,14 @@ window.LiftRPGAPI = (function () {
       var isBossWeek = w === weekCount;
       var continuityPacket = buildChunkContinuity(finalWeeks);
       
-      progress('Planning Week ' + w + '…');
+      progress('weeks', 'Planning Week ' + w + '…');
       var weekPlan = await runJsonStage(settings, {
+        stageKey: 'weeks',
         stageName: 'Plan Week ' + w,
+        stageIndex: stageNum,
+        completeMessage: 'Week ' + w + ' plan complete.',
+        onProgress: onProgress,
+        getTotalStages: function () { return totalStages; },
         schema: null, // text-based internal JSON
         maxTokens: 2048,
         maxAttempts: 2,
@@ -3063,9 +3898,14 @@ window.LiftRPGAPI = (function () {
         }
       });
 
-      progress('Writing Week ' + w + (isBossWeek ? ' (Boss)' : '') + '…');
+      progress('weeks', 'Writing Week ' + w + (isBossWeek ? ' (Boss)' : '') + '…');
       var weekObject = await runJsonStage(settings, {
+        stageKey: 'weeks',
         stageName: 'Write Week ' + w,
+        stageIndex: stageNum,
+        completeMessage: 'Week ' + w + ' complete.',
+        onProgress: onProgress,
+        getTotalStages: function () { return totalStages; },
         schema: null, 
         maxTokens: 8192,
         maxAttempts: 3, // slightly higher retry capability for single units
@@ -3098,9 +3938,14 @@ window.LiftRPGAPI = (function () {
 
     for (var f = 0; f < registry.length; f++) {
       var regEntry = registry[f];
-      progress('Writing Fragment ' + regEntry.id + '…');
+      progress('fragments', 'Writing Fragment ' + regEntry.id + '…');
       var fragmentObj = await runJsonStage(settings, {
+        stageKey: 'fragments',
         stageName: 'Fragment ' + regEntry.id,
+        stageIndex: stageNum,
+        completeMessage: 'Fragment ' + regEntry.id + ' complete.',
+        onProgress: onProgress,
+        getTotalStages: function () { return totalStages; },
         schema: null,
         maxTokens: 4096,
         maxAttempts: 2,
@@ -3120,10 +3965,15 @@ window.LiftRPGAPI = (function () {
     var assembledFragmentsOutput = { fragments: finalFragments };
 
     // ── TARGETED UNIT GENERATION: ENDING ────────────────────────
-    progress('Writing Finale…');
+    progress('endings', 'Writing finale…');
     var finalEndings = [];
     var endingObj = await runJsonStage(settings, {
+      stageKey: 'endings',
       stageName: 'Finale Variant',
+      stageIndex: stageNum,
+      completeMessage: 'Finale complete.',
+      onProgress: onProgress,
+      getTotalStages: function () { return totalStages; },
       schema: null,
       maxTokens: 4096,
       maxAttempts: 2,
@@ -3174,7 +4024,7 @@ window.LiftRPGAPI = (function () {
   //
   // onProgress(stageIndex, totalStages, message) — UI callback
 
-  async function generateMultiStage(settings, workout, brief, dice, onProgress) {
+  async function legacyGenerateMultiStageReference(settings, workout, brief, dice, onProgress) {
     if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
     // Check required generators
     if (typeof window.generateStage1Prompt !== 'function' ||
@@ -3202,7 +4052,8 @@ window.LiftRPGAPI = (function () {
     // Helper: wrap callProvider to tag errors with stage name
     async function callStage(prompt, maxTokens, stageName) {
       try {
-        return await callProvider(settings, prompt, maxTokens);
+        var response = await callProvider(settings, prompt, maxTokens);
+        return response.text;
       } catch (err) {
         throw new Error('[' + stageName + '] ' + err.message);
       }
@@ -4238,7 +5089,7 @@ window.LiftRPGAPI = (function () {
   //
   // onProgress(stageIndex, totalStages, message) — UI callback
 
-  async function generateStructured(settings, workout, brief, dice, onProgress) {
+  async function legacyGenerateStructuredReference(settings, workout, brief, dice, onProgress) {
     if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
     // Validate required prompt generators
     if (typeof window.generateStage1Prompt !== 'function' ||
@@ -4281,8 +5132,8 @@ window.LiftRPGAPI = (function () {
     var geminiOpenAIBase = 'https://generativelanguage.googleapis.com/v1beta/openai';
     async function callStage(prompt, _schema, maxTokens, stageName) {
       try {
-        var raw = await callOpenAICompat(apiKey, geminiOpenAIBase, model, prompt, maxTokens, timeoutMs);
-        return extractJson(raw);
+        var rawResponse = await callOpenAICompat(apiKey, geminiOpenAIBase, model, prompt, maxTokens, timeoutMs);
+        return extractJson(rawResponse.text);
       } catch (err) {
         throw new Error('[' + stageName + '] ' + err.message);
       }
@@ -4498,9 +5349,9 @@ window.LiftRPGAPI = (function () {
       || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(baseUrl);
   }
 
-  // ── Overridden pipeline entrypoints ──────────────────────────────────────
-  // The legacy implementations remain above for reference, but these later
-  // declarations are the exported versions used by the runtime.
+  // ── Runtime pipeline entrypoints ─────────────────────────────────────────
+  // The exported runtime flows are defined here. Older reference flows above
+  // are intentionally renamed so they no longer shadow the live entrypoints.
 
   async function generateMultiStage(settings, workout, brief, dice, onProgress) {
     return runApiPipeline({
@@ -4552,7 +5403,7 @@ window.LiftRPGAPI = (function () {
    *   apiKey:  string
    *   baseUrl: string       (openai format only)
    *   model:   string
-   *   requestTimeoutMs: number (optional, default 300000)
+   *   requestTimeoutMs: number (optional, default 600000)
    * }
    */
   async function generate(settings, workout, brief, dice) {
@@ -4562,8 +5413,8 @@ window.LiftRPGAPI = (function () {
     }
 
     var prompt = window.generatePrompt(workout, brief, dice);
-    var raw = await callProvider(settings, prompt);
-    return extractJson(raw);
+    var rawResponse = await callProvider(settings, prompt);
+    return extractJson(rawResponse.text);
   }
 
   // ── Quality Report ────────────────────────────────────────────────────────
@@ -5328,6 +6179,7 @@ window.LiftRPGAPI = (function () {
   return {
     PROVIDERS: PROVIDERS,
     listProviderModels: listProviderModels,
+    refreshPricing: refreshPricing,
     generate: generate,
     generateMultiStage: generateMultiStage,
     generateStructured: generateStructured,
@@ -5358,6 +6210,7 @@ window.LiftRPGAPI = (function () {
     qualityReport: generateQualityReport,
     qualityGate: buildQualityGate,
     compareToTarget: compareToTarget,
-    lastQualityReport: null
+    lastQualityReport: null,
+    lastPricing: null
   };
 })();
