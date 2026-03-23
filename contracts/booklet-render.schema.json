@@ -1,0 +1,597 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://liftrpg.co/schema/render-contract/v1",
+  "title": "LiftRPG Canonical Render Contract v1",
+  "description": "Renderer-aligned contract for printable LiftRPG booklets. This file defines the machine-readable structure the current renderer expects. Additional authored fields are allowed so the generator can carry richer planning metadata while the render contract tightens over time.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "meta",
+    "weeks",
+    "fragments",
+    "cover",
+    "rulesSpread",
+    "endings"
+  ],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "schemaVersion",
+        "generatedAt",
+        "blockTitle",
+        "weeklyComponentType",
+        "weekCount",
+        "totalSessions"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "x-liftrpg-status": "validated-only"
+        },
+        "generatedAt": {
+          "type": "string",
+          "x-liftrpg-status": "rendered"
+        },
+        "blockTitle": {
+          "type": "string",
+          "minLength": 1,
+          "x-liftrpg-status": "rendered"
+        },
+        "blockSubtitle": {
+          "type": "string",
+          "x-liftrpg-status": "rendered"
+        },
+        "worldContract": {
+          "type": "string",
+          "x-liftrpg-status": "supporting"
+        },
+        "narrativeVoice": {
+          "type": "object",
+          "additionalProperties": true,
+          "x-liftrpg-status": "supporting"
+        },
+        "literaryRegister": {
+          "type": "object",
+          "additionalProperties": true,
+          "x-liftrpg-status": "supporting"
+        },
+        "structuralShape": {
+          "type": "object",
+          "additionalProperties": true,
+          "x-liftrpg-status": "supporting"
+        },
+        "weeklyComponentType": {
+          "type": "string",
+          "minLength": 1,
+          "x-liftrpg-status": "supporting"
+        },
+        "weekCount": {
+          "type": "integer",
+          "minimum": 1,
+          "x-liftrpg-status": "rendered"
+        },
+        "totalSessions": {
+          "type": "integer",
+          "minimum": 1,
+          "x-liftrpg-status": "rendered"
+        },
+        "demoPassword": {
+          "type": "string",
+          "minLength": 1,
+          "x-liftrpg-status": "supporting"
+        },
+        "passwordPlaintext": {
+          "type": "string",
+          "minLength": 1,
+          "x-liftrpg-status": "contract-debt"
+        },
+        "passwordLength": {
+          "type": "integer",
+          "minimum": 1,
+          "x-liftrpg-status": "rendered"
+        },
+        "passwordEncryptedEnding": {
+          "type": "string",
+          "x-liftrpg-status": "rendered"
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": true,
+          "x-liftrpg-status": "rendered"
+        }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": true,
+      "x-liftrpg-status": "supporting",
+      "properties": {
+        "visualArchetype": {
+          "type": "string"
+        },
+        "palette": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "ink": { "type": "string" },
+            "paper": { "type": "string" },
+            "accent": { "type": "string" },
+            "muted": { "type": "string" },
+            "rule": { "type": "string" },
+            "fog": { "type": "string" }
+          }
+        }
+      }
+    },
+    "cover": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "designation",
+        "tagline",
+        "colophonLines"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "x-liftrpg-status": "rendered"
+        },
+        "designation": {
+          "type": "string",
+          "x-liftrpg-status": "rendered"
+        },
+        "tagline": {
+          "type": "string",
+          "x-liftrpg-status": "rendered"
+        },
+        "colophonLines": {
+          "type": "array",
+          "items": { "type": "string" },
+          "x-liftrpg-status": "rendered"
+        },
+        "svgArt": {
+          "type": "string",
+          "x-liftrpg-status": "rendered"
+        },
+        "coverArtCaption": {
+          "type": "string",
+          "x-liftrpg-status": "rendered"
+        }
+      }
+    },
+    "rulesSpread": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "leftPage",
+        "rightPage"
+      ],
+      "properties": {
+        "leftPage": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "title"
+          ],
+          "properties": {
+            "title": {
+              "type": "string",
+              "x-liftrpg-status": "rendered"
+            },
+            "sections": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "heading": { "type": "string" },
+                  "body": { "type": "string" },
+                  "text": { "type": "string" }
+                }
+              },
+              "x-liftrpg-status": "rendered"
+            },
+            "reEntryRule": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              ],
+              "x-liftrpg-status": "rendered"
+            }
+          }
+        },
+        "rightPage": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "title",
+            "instruction"
+          ],
+          "properties": {
+            "title": {
+              "type": "string",
+              "x-liftrpg-status": "rendered"
+            },
+            "instruction": {
+              "type": "string",
+              "x-liftrpg-status": "rendered"
+            },
+            "unlockUrl": {
+              "type": "string",
+              "x-liftrpg-status": "supporting"
+            }
+          }
+        }
+      }
+    },
+    "weeks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "weekNumber",
+          "title",
+          "epigraph",
+          "sessions",
+          "isBossWeek",
+          "weeklyComponent",
+          "overflow"
+        ],
+        "properties": {
+          "weekNumber": { "type": "integer" },
+          "title": { "type": "string" },
+          "epigraph": {
+            "type": "object",
+            "required": [
+              "text",
+              "attribution"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "text": { "type": "string" },
+              "attribution": { "type": "string" }
+            }
+          },
+          "isBossWeek": { "type": "boolean" },
+          "overflow": { "type": "boolean" },
+          "isDeload": {
+            "type": "boolean",
+            "x-liftrpg-status": "contract-debt"
+          },
+          "weeklyComponent": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": { "type": "string" },
+              "value": {},
+              "extractionInstruction": { "type": "string" }
+            }
+          },
+          "sessions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "sessionNumber",
+                "label",
+                "exercises"
+              ],
+              "properties": {
+                "sessionNumber": { "type": "integer" },
+                "label": { "type": "string" },
+                "storyPrompt": { "type": "string" },
+                "fragmentRef": { "type": "string" },
+                "binaryChoice": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "choiceLabel": { "type": "string" },
+                    "promptA": { "type": "string" },
+                    "promptB": { "type": "string" }
+                  }
+                },
+                "exercises": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "required": [
+                      "name"
+                    ],
+                    "properties": {
+                      "name": { "type": "string" },
+                      "sets": {},
+                      "repsPerSet": {},
+                      "weightField": {},
+                      "notes": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "fieldOps": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "mapState": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "cipher": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "oracleTable": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "companionComponents": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": [
+                    "type"
+                  ],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "subtitle": { "type": "string" },
+                    "body": { "type": "string" },
+                    "instruction": { "type": "string" },
+                    "prompt": { "type": "string" },
+                    "reminder": { "type": "string" },
+                    "usageDie": { "type": "string" },
+                    "playWindow": { "type": "string" },
+                    "footprint": {
+                      "type": "string",
+                      "enum": [
+                        "quarter-page",
+                        "half-page",
+                        "full-page"
+                      ]
+                    },
+                    "rows": { "type": "integer", "minimum": 0 },
+                    "cols": { "type": "integer", "minimum": 0 },
+                    "slots": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "properties": {
+                          "label": { "type": "string" }
+                        }
+                      }
+                    },
+                    "tracks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "properties": {
+                          "label": { "type": "string" },
+                          "segments": { "type": "integer", "minimum": 1 },
+                          "startValue": { "type": "integer", "minimum": 0 }
+                        }
+                      }
+                    },
+                    "tokens": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "properties": {
+                          "label": { "type": "string" },
+                          "name": { "type": "string" }
+                        }
+                      }
+                    },
+                    "conditions": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          { "type": "string" },
+                          {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "properties": {
+                              "label": { "type": "string" }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "windows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "properties": {
+                          "label": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                },
+                "x-liftrpg-status": "rendered"
+              }
+            }
+          },
+          "bossEncounter": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "title": { "type": "string" },
+              "narrative": { "type": "string" },
+              "mechanismDescription": { "type": "string" },
+              "componentInputs": {
+                "type": "array"
+              },
+              "decodingKey": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "instruction": { "type": "string" },
+                  "referenceTable": { "type": "string" }
+                }
+              },
+              "passwordRevealInstruction": { "type": "string" },
+              "convergenceProof": {
+                "type": "string",
+                "x-liftrpg-status": "supporting"
+              },
+              "binaryChoiceAcknowledgement": {
+                "type": "object",
+                "additionalProperties": true,
+                "x-liftrpg-status": "rendered"
+              }
+            }
+          },
+          "overflowDocument": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "interlude": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "title",
+              "reason",
+              "body"
+            ],
+            "properties": {
+              "title": { "type": "string" },
+              "reason": { "type": "string" },
+              "body": { "type": "string" },
+              "spreadAware": { "type": "boolean" },
+              "payload": {
+                "type": "object",
+                "additionalProperties": true,
+                "x-liftrpg-status": "rendered"
+              },
+              "payloadType": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "narrative",
+                  "cipher",
+                  "map",
+                  "clock",
+                  "companion",
+                  "fragment-ref",
+                  "password-element"
+                ],
+                "x-liftrpg-status": "rendered"
+              }
+            },
+            "x-liftrpg-status": "rendered"
+          },
+          "gameplayClocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "clockName",
+                "segments"
+              ],
+              "properties": {
+                "clockName": { "type": "string" },
+                "segments": { "type": "integer", "minimum": 1 },
+                "clockType": { "type": "string" },
+                "startValue": { "type": "integer", "minimum": 0 },
+                "direction": { "type": "string" },
+                "linkedClockName": { "type": "string" },
+                "opposedClockName": { "type": "string" },
+                "thresholds": {
+                  "type": "array",
+                  "items": {}
+                },
+                "consequenceOnFull": { "type": "string" }
+              }
+            },
+            "x-liftrpg-status": "rendered"
+          }
+        }
+      }
+    },
+    "fragments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "documentType"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "documentType": { "type": "string" },
+          "inWorldAuthor": { "type": "string" },
+          "inWorldRecipient": { "type": "string" },
+          "title": { "type": "string" },
+          "date": { "type": "string" },
+          "content": { "type": "string" },
+          "body": { "type": "string" },
+          "bodyText": { "type": "string" },
+          "designSpec": {
+            "type": "object",
+            "additionalProperties": true,
+            "x-liftrpg-status": "rendered"
+          },
+          "authenticityChecks": {
+            "type": "object",
+            "additionalProperties": true,
+            "x-liftrpg-status": "supporting"
+          }
+        }
+      }
+    },
+    "endings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "variant"
+        ],
+        "properties": {
+          "variant": { "type": "string" },
+          "content": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "documentType": { "type": "string" },
+              "title": { "type": "string" },
+              "kicker": { "type": "string" },
+              "body": { "type": "string" },
+              "content": { "type": "string" },
+              "finalLine": { "type": "string" }
+            }
+          },
+          "designSpec": {
+            "type": "string",
+            "x-liftrpg-status": "rendered"
+          }
+        }
+      }
+    }
+  }
+}

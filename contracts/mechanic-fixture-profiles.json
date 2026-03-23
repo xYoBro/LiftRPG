@@ -1,0 +1,23 @@
+{
+  "content/The-Pressure-Field.json": {
+    "requiredCompanionTypes": ["stress-track", "dashboard"],
+    "requiredClockTypes": ["danger-clock", "linked-clock", "project-clock"],
+    "requiredInterludePayloadTypes": ["clock"],
+    "requiredMapTypes": ["linear-track", "point-to-point", "player-drawn", "grid"],
+    "requireCoverArt": true
+  },
+  "content/Supply-Line-Breach.json": {
+    "requiredCompanionTypes": ["inventory-grid", "usage-die"],
+    "requiredClockTypes": ["racing-clock", "linked-clock"],
+    "requiredInterludePayloadTypes": ["map"],
+    "requiredMapTypes": ["grid", "linear-track", "point-to-point", "player-drawn"],
+    "requireCoverArt": false
+  },
+  "content/Palimpsest-House.json": {
+    "requiredCompanionTypes": ["memory-slots", "return-box"],
+    "requiredClockTypes": ["project-clock", "linked-clock"],
+    "requiredInterludePayloadTypes": ["companion"],
+    "requiredMapTypes": [],
+    "requireCoverArt": true
+  }
+}

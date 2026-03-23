@@ -1,0 +1,790 @@
+{
+  "version": "1.0.0",
+  "description": "Machine-readable inventory of booklet JSON fields and how the current renderer treats them.",
+  "entries": [
+    {
+      "path": "meta.schemaVersion",
+      "status": "validated-only",
+      "presence": "required",
+      "renderer": [
+        "validateBooklet"
+      ]
+    },
+    {
+      "path": "meta.generatedAt",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderBackCover"
+      ]
+    },
+    {
+      "path": "meta.blockTitle",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderCover",
+        "renderRulesLeft",
+        "renderWorkoutLeft"
+      ]
+    },
+    {
+      "path": "meta.blockSubtitle",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildBookletMetaModel",
+        "renderCover"
+      ]
+    },
+    {
+      "path": "meta.worldContract",
+      "status": "supporting",
+      "presence": "optional",
+      "renderer": [
+        "buildBookletMetaModel"
+      ]
+    },
+    {
+      "path": "meta.narrativeVoice",
+      "status": "supporting",
+      "presence": "optional",
+      "renderer": [
+        "buildBookletMetaModel",
+        "renderBooklet"
+      ]
+    },
+    {
+      "path": "meta.literaryRegister",
+      "status": "supporting",
+      "presence": "optional",
+      "renderer": [
+        "buildBookletMetaModel"
+      ]
+    },
+    {
+      "path": "meta.structuralShape",
+      "status": "supporting",
+      "presence": "optional",
+      "renderer": [
+        "buildBookletMetaModel",
+        "renderBooklet"
+      ]
+    },
+    {
+      "path": "meta.weeklyComponentType",
+      "status": "supporting",
+      "presence": "required",
+      "renderer": [
+        "validateBooklet",
+        "buildBookletMetaModel",
+        "renderBooklet"
+      ]
+    },
+    {
+      "path": "meta.weekCount",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderRulesRight",
+        "renderPasswordAssembly",
+        "renderBackCover"
+      ]
+    },
+    {
+      "path": "meta.totalSessions",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "validateBooklet",
+        "renderBackCover"
+      ]
+    },
+    {
+      "path": "meta.demoPassword",
+      "status": "supporting",
+      "presence": "optional",
+      "renderer": [
+        "getPasswordLength",
+        "renderRulesRight",
+        "renderBossRight",
+        "renderPasswordAssembly",
+        "demoUnlock"
+      ],
+      "notes": "Demo-only unlock affordance for preview fixtures. Production artifacts should omit this."
+    },
+    {
+      "path": "meta.passwordPlaintext",
+      "status": "contract-debt",
+      "presence": "optional",
+      "warnIfPresent": true,
+      "renderer": [
+        "getPasswordLength",
+        "demoUnlock"
+      ],
+      "notes": "Legacy spoiler-prone demo field. Replace with meta.demoPassword."
+    },
+    {
+      "path": "meta.passwordLength",
+      "status": "rendered",
+      "presence": "recommended",
+      "renderer": [
+        "getPasswordLength",
+        "renderRulesRight",
+        "renderBossRight",
+        "renderPasswordAssembly"
+      ],
+      "notes": "Non-secret render metadata for password box counts."
+    },
+    {
+      "path": "meta.passwordEncryptedEnding",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderEndingsPage",
+        "attemptUnlock",
+        "attemptEncrypt"
+      ]
+    },
+    {
+      "path": "meta.labels",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildLabels"
+      ]
+    },
+    {
+      "path": "theme.visualArchetype",
+      "status": "supporting",
+      "presence": "recommended",
+      "renderer": [
+        "render"
+      ]
+    },
+    {
+      "path": "theme.palette",
+      "status": "supporting",
+      "presence": "recommended",
+      "renderer": [
+        "render"
+      ]
+    },
+    {
+      "path": "cover.title",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildCoverPageModel",
+        "renderCover"
+      ]
+    },
+    {
+      "path": "cover.designation",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderCover"
+      ]
+    },
+    {
+      "path": "cover.tagline",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderCover"
+      ]
+    },
+    {
+      "path": "cover.colophonLines[]",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderCover"
+      ]
+    },
+    {
+      "path": "cover.svgArt",
+      "status": "rendered",
+      "presence": "optional",
+      "warnIfPresent": false,
+      "renderer": [
+        "buildCoverPageModel",
+        "renderCover"
+      ],
+      "notes": "Optional sanitized inline SVG art rendered as a sparse cover artifact."
+    },
+    {
+      "path": "cover.coverArtCaption",
+      "status": "rendered",
+      "presence": "optional",
+      "warnIfPresent": false,
+      "renderer": [
+        "buildCoverPageModel",
+        "renderCover"
+      ]
+    },
+    {
+      "path": "rulesSpread.leftPage.title",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderRulesLeft"
+      ]
+    },
+    {
+      "path": "rulesSpread.leftPage.sections[]",
+      "status": "rendered",
+      "presence": "recommended",
+      "renderer": [
+        "renderRulesLeft"
+      ]
+    },
+    {
+      "path": "rulesSpread.leftPage.reEntryRule",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderRulesLeft"
+      ]
+    },
+    {
+      "path": "rulesSpread.rightPage.title",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderRulesRight"
+      ]
+    },
+    {
+      "path": "rulesSpread.rightPage.instruction",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderRulesRight"
+      ]
+    },
+    {
+      "path": "weeks[].weekNumber",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderWorkoutLeft",
+        "renderBossRight"
+      ]
+    },
+    {
+      "path": "weeks[].title",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderWorkoutLeft"
+      ]
+    },
+    {
+      "path": "weeks[].epigraph.text",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderWorkoutLeft"
+      ]
+    },
+    {
+      "path": "weeks[].epigraph.attribution",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderWorkoutLeft"
+      ]
+    },
+    {
+      "path": "weeks[].isBossWeek",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "render",
+        "validateBooklet"
+      ]
+    },
+    {
+      "path": "weeks[].overflow",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "render"
+      ]
+    },
+    {
+      "path": "weeks[].isDeload",
+      "status": "contract-debt",
+      "presence": "optional",
+      "warnIfPresent": false,
+      "renderer": [],
+      "notes": "Present in schema/content, currently unused by renderer."
+    },
+    {
+      "path": "weeks[].weeklyComponent.type",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderPasswordAssembly",
+        "validateBooklet"
+      ]
+    },
+    {
+      "path": "weeks[].weeklyComponent.value",
+      "status": "validated-only",
+      "presence": "recommended",
+      "renderer": [
+        "validateBooklet"
+      ]
+    },
+    {
+      "path": "weeks[].weeklyComponent.extractionInstruction",
+      "status": "rendered",
+      "presence": "recommended",
+      "renderer": [
+        "renderRulesRight"
+      ]
+    },
+    {
+      "path": "weeks[].sessions[].label",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderWorkoutLeft"
+      ]
+    },
+    {
+      "path": "weeks[].sessions[].storyPrompt",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderWorkoutLeft"
+      ]
+    },
+    {
+      "path": "weeks[].sessions[].fragmentRef",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderWorkoutLeft",
+        "buildOracleZone",
+        "validateBooklet"
+      ]
+    },
+    {
+      "path": "weeks[].sessions[].binaryChoice",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderWorkoutLeft",
+        "validateBooklet"
+      ]
+    },
+    {
+      "path": "weeks[].sessions[].exercises[]",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderWorkoutLeft"
+      ]
+    },
+    {
+      "path": "weeks[].fieldOps.mapState",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildMapZone",
+        "getFieldOpsLayout"
+      ]
+    },
+    {
+      "path": "weeks[].fieldOps.cipher",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildCipherZone",
+        "getFieldOpsLayout"
+      ]
+    },
+    {
+      "path": "weeks[].fieldOps.oracleTable.title",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildOracleZone"
+      ]
+    },
+    {
+      "path": "weeks[].fieldOps.oracleTable.instruction",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildOracleZone"
+      ]
+    },
+    {
+      "path": "weeks[].fieldOps.oracleTable.mode",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildOracleZone",
+        "validateBooklet"
+      ]
+    },
+    {
+      "path": "weeks[].fieldOps.oracleTable.entries[].roll",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildOracleZone"
+      ]
+    },
+    {
+      "path": "weeks[].fieldOps.oracleTable.entries[].text",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildOracleZone"
+      ]
+    },
+    {
+      "path": "weeks[].fieldOps.oracleTable.entries[].fragmentRef",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildOracleZone",
+        "validateBooklet"
+      ]
+    },
+    {
+      "path": "weeks[].fieldOps.oracleTable.entries[].type",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildOracleZone"
+      ],
+      "notes": "Renderer applies entry type as a CSS class for diegetic styling."
+    },
+    {
+      "path": "weeks[].fieldOps.oracleTable.entries[].paperAction",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildOracleZone"
+      ],
+      "notes": "Printed as a secondary line so consequence mechanics survive to paper."
+    },
+    {
+      "path": "weeks[].fieldOps.companionComponents[]",
+      "status": "rendered",
+      "presence": "optional",
+      "warnIfPresent": false,
+      "renderer": [
+        "resolveWeekMechanicProfile",
+        "buildFieldOpsPageModels",
+        "renderFieldOpsPage"
+      ],
+      "notes": "Optional immersive print-and-play support surfaces rendered beneath the primary field-ops atoms."
+    },
+    {
+      "path": "weeks[].gameplayClocks[]",
+      "status": "rendered",
+      "presence": "optional",
+      "warnIfPresent": false,
+      "renderer": [
+        "buildFieldOpsPageModels",
+        "renderFieldOpsPage"
+      ],
+      "notes": "Rendered as visible progress, danger, racing, linked, tug-of-war, or project clock surfaces."
+    },
+    {
+      "path": "weeks[].bossEncounter.title",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderBossRight"
+      ]
+    },
+    {
+      "path": "weeks[].bossEncounter.narrative",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderBossRight"
+      ]
+    },
+    {
+      "path": "weeks[].bossEncounter.mechanismDescription",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderBossRight"
+      ]
+    },
+    {
+      "path": "weeks[].bossEncounter.componentInputs[]",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderBossRight",
+        "validateBooklet"
+      ]
+    },
+    {
+      "path": "weeks[].bossEncounter.decodingKey.instruction",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderBossRight"
+      ]
+    },
+    {
+      "path": "weeks[].bossEncounter.decodingKey.referenceTable",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderBossRight"
+      ]
+    },
+    {
+      "path": "weeks[].bossEncounter.passwordRevealInstruction",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderBossRight"
+      ]
+    },
+    {
+      "path": "weeks[].bossEncounter.convergenceProof",
+      "status": "supporting",
+      "presence": "optional",
+      "warnIfPresent": false,
+      "renderer": [
+        "buildBossPageModel"
+      ],
+      "notes": "Authored convergence explanation is now preserved as structured support metadata for boss-page treatment."
+    },
+    {
+      "path": "weeks[].bossEncounter.binaryChoiceAcknowledgement",
+      "status": "rendered",
+      "presence": "optional",
+      "warnIfPresent": false,
+      "renderer": [
+        "buildBossPageModel",
+        "renderBossRight"
+      ],
+      "notes": "Rendered as a boss-page branch reconciliation note when present."
+    },
+    {
+      "path": "weeks[].overflowDocument",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderOverflowRight"
+      ]
+    },
+    {
+      "path": "weeks[].interlude.title",
+      "status": "rendered",
+      "presence": "optional",
+      "warnIfPresent": false,
+      "renderer": [
+        "buildInterludePageModel",
+        "renderInterludePage"
+      ]
+    },
+    {
+      "path": "weeks[].interlude.reason",
+      "status": "rendered",
+      "presence": "optional",
+      "warnIfPresent": false,
+      "renderer": [
+        "buildInterludePageModel",
+        "renderInterludePage",
+        "validateBooklet"
+      ],
+      "notes": "Rendered as the interlude's structural justification line and validated against authored world/register context."
+    },
+    {
+      "path": "weeks[].interlude.body",
+      "status": "rendered",
+      "presence": "optional",
+      "warnIfPresent": false,
+      "renderer": [
+        "buildInterludePageModel",
+        "renderInterludePage"
+      ]
+    },
+    {
+      "path": "weeks[].interlude.spreadAware",
+      "status": "supporting",
+      "presence": "optional",
+      "warnIfPresent": false,
+      "renderer": [
+        "buildInterludePageModel"
+      ]
+    },
+    {
+      "path": "weeks[].interlude.payloadType",
+      "status": "rendered",
+      "presence": "optional",
+      "warnIfPresent": false,
+      "renderer": [
+        "buildInterludePageModel",
+        "renderInterludePage"
+      ]
+    },
+    {
+      "path": "weeks[].interlude.payload",
+      "status": "rendered",
+      "presence": "optional",
+      "warnIfPresent": false,
+      "renderer": [
+        "buildInterludePageModel",
+        "renderInterludePage"
+      ],
+      "notes": "Interlude payloads now render as embedded cipher, map, clock, companion, fragment-reference, password-element, or narrative surfaces."
+    },
+    {
+      "path": "fragments[].id",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderFragmentPage",
+        "validateBooklet"
+      ]
+    },
+    {
+      "path": "fragments[].documentType",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "renderFragmentPage",
+        "renderFoundDocument"
+      ]
+    },
+    {
+      "path": "fragments[].inWorldAuthor",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderFragmentPage",
+        "renderFoundDocument"
+      ]
+    },
+    {
+      "path": "fragments[].inWorldRecipient",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderFragmentPage",
+        "renderFoundDocument"
+      ]
+    },
+    {
+      "path": "fragments[].title",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderFragmentPage",
+        "renderFoundDocument"
+      ]
+    },
+    {
+      "path": "fragments[].content",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderFragmentPage",
+        "renderFoundDocument"
+      ]
+    },
+    {
+      "path": "fragments[].designSpec",
+      "status": "rendered",
+      "presence": "optional",
+      "warnIfPresent": false,
+      "renderer": [
+        "buildFragmentModel",
+        "renderFoundDocument"
+      ],
+      "notes": "Maps onto fragment treatment attributes such as paper tone, typeface, and header style."
+    },
+    {
+      "path": "fragments[].authenticityChecks",
+      "status": "supporting",
+      "presence": "optional",
+      "warnIfPresent": false,
+      "renderer": [
+        "buildFragmentModel",
+        "renderFoundDocument"
+      ],
+      "notes": "Preserved as supporting metadata on found-document atoms."
+    },
+    {
+      "path": "endings[].variant",
+      "status": "rendered",
+      "presence": "required",
+      "renderer": [
+        "buildLockedEndingPageModel",
+        "buildUnlockedEndingPageModel"
+      ]
+    },
+    {
+      "path": "endings[].content.body",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderEndingsPage"
+      ]
+    },
+    {
+      "path": "endings[].content.documentType",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildUnlockedEndingPageModel",
+        "renderEndingsPage"
+      ]
+    },
+    {
+      "path": "endings[].content.title",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildUnlockedEndingPageModel",
+        "renderEndingsPage"
+      ]
+    },
+    {
+      "path": "endings[].content.kicker",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildUnlockedEndingPageModel",
+        "renderEndingsPage"
+      ]
+    },
+    {
+      "path": "endings[].content.finalLine",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "renderEndingsPage"
+      ]
+    },
+    {
+      "path": "endings[].designSpec",
+      "status": "rendered",
+      "presence": "optional",
+      "warnIfPresent": false,
+      "renderer": [
+        "buildUnlockedEndingPageModel",
+        "renderEndingsPage"
+      ],
+      "notes": "Used to infer ending-page treatment and preserve authored arrival tone."
+    }
+  ]
+}

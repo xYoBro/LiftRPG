@@ -10,53 +10,32 @@
   ];
 
   var GENRE_POOL = [
+    'Traditional pulp adventure: ancient temples, hidden traps, and rival explorers',
+    'Cozy village mystery: a missing baker, local gossip, and secrets behind the counter',
+    'Space opera western: a dusty outpost on the edge of the galaxy holding out against a mega-corp',
+    'Classic epic fantasy: a motley crew must deliver an artifact to a dangerous realm',
+    'Sports underdog drama: a disgraced coach and a team of misfits with one last shot at the championship',
+    'Lighthearted slice-of-life: a magical coffee shop where the drinks change people\'s memories',
+    'Superhero street-level resistance: ordinary citizens pushing back against a corrupt vigilante',
+    'High-tech corporate heist: stealing a prototype from a floating casino',
+    'Romantic comedy with a supernatural twist: matchmaking for ghosts who unfinished business',
+    'Hardboiled detective noir: it started with a missing pet and ended with the mayor\'s secrets',
+    'Survival horror in a completely mundane setting: getting lost in an infinite suburban open house',
     'Corporate accounting horror: an audit trail that audits you back',
     'Competitive birdwatching noir: binoculars, betrayal, and rare sightings',
     'Municipal zoning board cosmic horror: the variance was never approved',
     'Insurance fraud romance: two adjusters, one suspicious claim',
     'Deep-sea botanical survey: cataloguing organisms that should not photosynthesize',
-    'Antarctic radio station mystery: the signal predates the station',
-    'Venetian glassblowing espionage: secrets encoded in crystal',
-    '1970s brutalist architecture thriller: the building is watching',
-    'Lost pet investigation told through flyers and hand-drawn maps',
-    'HOA meeting minutes that get increasingly disturbing',
-    'Recipe collection hiding a conspiracy: the ingredients do not exist',
-    'Veterinary clinic case files gone wrong: the animals remember',
-    'Sumerian tax collector diary: debts older than writing',
-    'Byzantine bureaucratic intrigue: forms within forms within forms',
     'Victorian sewer cartography: mapping what lives below',
     'Cold War library science: banned books as dead drops',
-    'Competitive origami underground: folding is a blood sport',
-    'Elevator inspector existential crisis: between floors, between worlds',
-    'Weather station at the edge of reality: the forecast is always wrong',
-    'Lighthouse keepers union dispute: the light must not go out',
-    'Plague doctor apprentice journal: the cure is the disease',
-    'Archaeological dig procedural: every layer is a lie',
-    'Train conductor logbook on a route that should not exist',
-    'Beekeeping cooperative thriller: the hive has a plan',
-    'Cartographer of impossible coastlines: the shore moves at night',
-    'Deep space janitor maintenance log: someone has to clean up after first contact',
-    'Monastery brewery conspiracy: the recipe is a prayer is a weapon',
     'Professional cheese cave inspector: aging reveals terrible truths',
-    'Retired circus performer memoir: the tent is still standing somewhere',
-    'County water archive mystery: missing ledgers, recurring names, one wrong map',
-    'Rural telephone switchboard conspiracy: voices arrive from lines buried decades ago',
-    'University physics department cover-up: the lab notes explain too much and not enough',
-    'Probationary museum registrar mystery: every mislabeled object points to the same erased donor',
-    'Community astronomy logbook: the sky repeats a pattern no one else records',
     'Small-town summer: a teenager has one season to fix what their parent broke',
     'Cross-country road trip falling apart in the best possible way',
     'Two rival chefs competing for the same kitchen, the same memory, the same person',
     'Heist in a museum after hours — the target is not what it looks like',
     'Fantasy village where the dragon is the only one telling the truth',
     'Retired detective pulled back by the one case they never closed',
-    'Sports team in freefall, one season to get it back together',
-    'A ghost who does not know what they are haunting and why',
-    'Kids on a summer mission: find what adults buried in the woods',
-    'Two people stuck in an airport talking through a layover that keeps extending',
-    'Rival siblings inheriting the same failing business and the same grudge',
-    'Fantasy court intrigue where the kingdom is shaped like the wrong kind of family',
-    'Thriller: one person knows where the body is, one person is looking for it'
+    'Kids on a summer mission: find what adults buried in the woods'
   ];
 
   var DESIGN_PROFILES = [
@@ -455,6 +434,42 @@
       interludePayloads: ['narrative', 'fragment-ref', 'companion'],
       documentTypes: ['letter', 'correspondence', 'transcript', 'memo', 'fieldNote'],
       themeHints: ['pastoral', 'minimalist', 'noir']
+    },
+    {
+      id: 'modern-action',
+      keywords: ['gun', 'fight', 'action', 'spy', 'heist', 'cop', 'detective', 'chase', 'combat', 'war', 'battle', 'soldier', 'mercenary', 'cartel', 'gang', 'heist', 'thief', 'assassin', 'sniper'],
+      storyLens: 'high-stakes tactical problem solving where leverage, timing, and violence are the only currencies',
+      settingLayers: [
+        'the public surface where the target or objective is hidden',
+        'the tactical routes, sightlines, and cover points only operators see',
+        'the compromised safehouses or extraction points',
+        'the aftermath of sudden, localized violence'
+      ],
+      characterWeb: [
+        'a handler or contractor whose loyalties are conditional',
+        'a target or VIP who refuses to cooperate cleanly',
+        'a rival operator working the same objective from a different angle',
+        'a civilian bystander caught in the crossfire'
+      ],
+      secretShapes: [
+        'the objective is a decoy for a larger operation',
+        'the employer has already sold the protagonist out',
+        'the rules of engagement were written to ensure failure'
+      ],
+      arcMoves: [
+        'reconnaissance and staging',
+        'the plan makes contact with the enemy',
+        'midpoint escalation or extraction failure',
+        'costly exfiltration'
+      ],
+      mapType: 'point-to-point',
+      oracleMode: 'banded-d100',
+      puzzleFamilies: ['path tracing', 'route adjacency', 'constraint logic', 'resource clock pressure'],
+      pressureClocks: ['Security Response', 'Target Escaping', 'Ammo/Supplies'],
+      scarcitySurfaces: ['inventory-grid', 'stress-track', 'dashboard'],
+      interludePayloads: ['map', 'cipher', 'fragment-ref'],
+      documentTypes: ['memo', 'report', 'inspection', 'form'],
+      themeHints: ['noir', 'minimalist', 'cyberpunk']
     }
   ];
 
@@ -610,6 +625,21 @@
       '',
       'The goal is not to make every week look the same. The goal is to make every week feel like it belongs to the same living system.'
     ].join('\n');
+  }
+
+  function formatUserBrief(brief, fallbackText) {
+    var raw = String(brief || '').trim();
+    if (!raw) return fallbackText;
+    if (raw.split(/\s+/).length < 15) {
+      return raw + '\n\n' +
+        '[ENGINE CONSTRAINT]: The user provided a minimal, raw premise. ' +
+        'Do not attempt to make this epic, and do not use flowery, omniscient summaries. ' +
+        'Treat this premise as literal reality. Ground it in sensory details. ' +
+        'Choose a strict document format (like a logbook, letters, or inspection notes) to frame the narrative. ' +
+        'Restrict your vocabulary: do not use phrases like "palpable tension", "a testament to", or "little did they know". ' +
+        'Withhold information and enforce a slow-burn progression across the weeks.';
+    }
+    return raw;
   }
 
   function buildDefaultBrief(workout, blend) {
@@ -1256,7 +1286,7 @@
       '',
       '## Creative Direction',
       '',
-      brief || buildDefaultBrief(workout, blend),
+      formatUserBrief(brief, buildDefaultBrief(workout, blend)),
       '',
       formatDesignBias(blend),
       '',
@@ -1595,7 +1625,7 @@
       '',
       '## Creative Direction',
       '',
-      brief || buildDefaultBrief(workout, blend),
+      formatUserBrief(brief, buildDefaultBrief(workout, blend)),
       '',
       formatDesignBias(blend),
       '',
@@ -1821,7 +1851,7 @@
       '',
       '## Creative Direction',
       '',
-      brief || buildDefaultBrief(workout, blend),
+      formatUserBrief(brief, buildDefaultBrief(workout, blend)),
       '',
       formatDesignBias(blend),
       '',
@@ -1913,7 +1943,7 @@
       '',
       '## Creative Direction',
       '',
-      brief || buildDefaultBrief(blendContext, blend),
+      formatUserBrief(brief, buildDefaultBrief(blendContext, blend)),
       '',
       formatDesignBias(blend),
       '',
@@ -2201,7 +2231,7 @@
     parts.push('');
     parts.push('## Creative Direction');
     parts.push('');
-    parts.push(brief || buildDefaultBrief(workout, blend));
+    parts.push(formatUserBrief(brief, buildDefaultBrief(workout, blend)));
     parts.push('');
     parts.push(formatDesignBias(blend));
     parts.push('');
@@ -3331,7 +3361,7 @@
       '',
       '## Inputs',
       'Workout: ' + truncateText(workout, 3200),
-      'Creative direction: ' + truncateText(brief || buildDefaultBrief(workout, blend), 1800),
+      'Creative direction: ' + truncateText(formatUserBrief(brief, buildDefaultBrief(workout, blend)), 1800),
       'Design bias: ' + compactJson(summarizeDesignBiasForApi(blend)),
       'Dice: ' + String(dice || 'd100'),
       options.retryMode ? 'Retry mode: keep prose concrete and compact so the full JSON finishes cleanly.' : '',
@@ -3401,7 +3431,7 @@
       compactJson(summarizeShellVoicePacket(layerBible, campaignPlan, blend)),
       '',
       '## Creative Direction',
-      truncateText(brief || buildDefaultBrief(blendContext, blend), 1200),
+      truncateText(formatUserBrief(brief, buildDefaultBrief(blendContext, blend)), 1200),
       '',
       '## Design Bias',
       compactJson(summarizeDesignBiasForApi(blend)),
@@ -3461,7 +3491,7 @@
       truncateText(weekWorkout, 1800),
       '',
       '## Creative Direction',
-      truncateText(brief || buildDefaultBrief(workout, blend), 1000),
+      truncateText(formatUserBrief(brief, buildDefaultBrief(workout, blend)), 1000),
       '',
       '## Design Bias',
       compactJson(summarizeDesignBiasForApi(blend)),

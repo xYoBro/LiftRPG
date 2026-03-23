@@ -1,0 +1,22 @@
+{
+  "liftrpg-eastern-shore": {
+    "demo": "liftrpg-eastern-shore",
+    "source": "content/liftrpg-eastern-shore.json",
+    "maxFooterBottomGapPx": 16,
+    "maxWorkoutSlackPx": 24,
+    "maxMechanicSlackPx": 36,
+    "maxStaticContentGapPx": 118,
+    "staticPageTypes": [
+      "fragment-page",
+      "overflow-doc",
+      "interlude",
+      "assembly",
+      "gauge-log"
+    ],
+    "requirePageTypes": [
+      "workout-left",
+      "field-ops",
+      "boss"
+    ]
+  }
+}

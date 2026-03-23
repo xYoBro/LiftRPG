@@ -1,0 +1,154 @@
+{
+  "content/liftrpg-eastern-shore.json": {
+    "normalizedPageCount": 56,
+    "sheetCount": 28,
+    "counts": {
+      "cover": 1,
+      "rules-left": 1,
+      "rules-right": 1,
+      "workout-left": 12,
+      "field-ops": 5,
+      "overflow-doc": 6,
+      "boss": 1,
+      "fragment-page": 22,
+      "assembly": 1,
+      "gauge-log": 1,
+      "ending-locked": 1,
+      "notes": 3,
+      "back-cover": 1
+    },
+    "prefix": ["cover", "rules-left", "rules-right"],
+    "suffix": ["ending-locked", "notes", "notes", "notes", "back-cover"],
+    "mustNotContain": ["interlude", "blank-filler"]
+  },
+  "content/The-Air-Gapped-Choir.json": {
+    "normalizedPageCount": 28,
+    "sheetCount": 14,
+    "counts": {
+      "cover": 1,
+      "rules-left": 1,
+      "rules-right": 1,
+      "workout-left": 5,
+      "field-ops": 4,
+      "interlude": 1,
+      "boss": 1,
+      "fragment-page": 10,
+      "assembly": 1,
+      "gauge-log": 1,
+      "ending-locked": 1,
+      "back-cover": 1
+    },
+    "prefix": ["cover", "rules-left", "rules-right"],
+    "suffix": ["fragment-page", "assembly", "gauge-log", "ending-locked", "back-cover"],
+    "mustContain": ["interlude"]
+  },
+  "content/The-Hinge.json": {
+    "normalizedPageCount": 48,
+    "sheetCount": 24,
+    "counts": {
+      "cover": 1,
+      "rules-left": 1,
+      "rules-right": 1,
+      "workout-left": 12,
+      "field-ops": 5,
+      "overflow-doc": 6,
+      "interlude": 1,
+      "boss": 1,
+      "fragment-page": 14,
+      "assembly": 1,
+      "gauge-log": 1,
+      "ending-locked": 1,
+      "notes": 2,
+      "back-cover": 1
+    },
+    "prefix": ["cover", "rules-left", "rules-right"],
+    "suffix": ["gauge-log", "ending-locked", "notes", "notes", "back-cover"],
+    "mustContain": ["interlude"]
+  },
+  "content/cartographer-full.json": {
+    "normalizedPageCount": 28,
+    "sheetCount": 14,
+    "counts": {
+      "cover": 1,
+      "rules-left": 1,
+      "rules-right": 1,
+      "workout-left": 6,
+      "field-ops": 5,
+      "boss": 1,
+      "fragment-page": 7,
+      "assembly": 1,
+      "gauge-log": 1,
+      "ending-locked": 1,
+      "notes": 2,
+      "back-cover": 1
+    },
+    "prefix": ["cover", "rules-left", "rules-right"],
+    "suffix": ["gauge-log", "ending-locked", "notes", "notes", "back-cover"]
+  },
+  "content/The-Pressure-Field.json": {
+    "normalizedPageCount": 28,
+    "sheetCount": 14,
+    "counts": {
+      "cover": 1,
+      "rules-left": 1,
+      "rules-right": 1,
+      "workout-left": 5,
+      "field-ops": 4,
+      "interlude": 1,
+      "boss": 1,
+      "fragment-page": 10,
+      "assembly": 1,
+      "gauge-log": 1,
+      "ending-locked": 1,
+      "back-cover": 1
+    },
+    "prefix": ["cover", "rules-left", "rules-right"],
+    "suffix": ["fragment-page", "assembly", "gauge-log", "ending-locked", "back-cover"],
+    "mustContain": ["interlude"]
+  },
+  "content/Supply-Line-Breach.json": {
+    "normalizedPageCount": 48,
+    "sheetCount": 24,
+    "counts": {
+      "cover": 1,
+      "rules-left": 1,
+      "rules-right": 1,
+      "workout-left": 12,
+      "field-ops": 5,
+      "overflow-doc": 6,
+      "interlude": 1,
+      "boss": 1,
+      "fragment-page": 14,
+      "assembly": 1,
+      "gauge-log": 1,
+      "ending-locked": 1,
+      "notes": 2,
+      "back-cover": 1
+    },
+    "prefix": ["cover", "rules-left", "rules-right"],
+    "suffix": ["gauge-log", "ending-locked", "notes", "notes", "back-cover"],
+    "mustContain": ["interlude"]
+  },
+  "content/Palimpsest-House.json": {
+    "normalizedPageCount": 28,
+    "sheetCount": 14,
+    "counts": {
+      "cover": 1,
+      "rules-left": 1,
+      "rules-right": 1,
+      "workout-left": 6,
+      "field-ops": 5,
+      "interlude": 1,
+      "boss": 1,
+      "fragment-page": 7,
+      "assembly": 1,
+      "gauge-log": 1,
+      "ending-locked": 1,
+      "notes": 1,
+      "back-cover": 1
+    },
+    "prefix": ["cover", "rules-left", "rules-right"],
+    "suffix": ["assembly", "gauge-log", "ending-locked", "notes", "back-cover"],
+    "mustContain": ["interlude"]
+  }
+}
