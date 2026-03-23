@@ -4122,7 +4122,7 @@ window.LiftRPGAPI = (function () {
         'You are generating components of a LiftRPG print-and-play booklet.',
         'World contract: ' + (shellContext.worldContract || ''),
         'Identity contract: ' + JSON.stringify(identityContract),
-        'Layer codex summary: ' + JSON.stringify(summarizeLayerBibleForShell(layerBible)),
+        'Layer codex premise: ' + ((layerBible.storyLayer || {}).premise || ''),
         'Return valid JSON only. No markdown fences, no commentary.'
       ].join('\n');
     }
