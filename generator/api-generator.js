@@ -4158,7 +4158,7 @@ window.LiftRPGAPI = (function () {
         onProgress: onProgress,
         getTotalStages: function () { return totalStages; },
         schema: STRUCTURED_SCHEMA_BIBLE,
-        maxTokens: 8192,
+        maxTokens: 12288,
         requestTimeoutMs: 300000,
         maxAttempts: 2,
         validate: validateLayerBibleStage,
@@ -4297,17 +4297,25 @@ window.LiftRPGAPI = (function () {
           // of a bare week object. Unwrap to get the single week.
           if (result && Array.isArray(result.weeks) && result.weeks.length > 0) {
             console.warn('[LiftRPG] Week stage returned weeks[] wrapper — unwrapping');
-            return result.weeks[0];
+            var match = result.weeks.filter(function (wk) { return Number(wk.weekNumber) === w; })[0];
+            return match || result.weeks[0];
           }
-          if (result && result.meta && Array.isArray(result.weeks)) {
+          if (result && result.meta && Array.isArray(result.weeks) && result.weeks.length > 0) {
             console.warn('[LiftRPG] Week stage returned full booklet — extracting week');
-            var match = (result.weeks || []).filter(function (wk) { return wk.weekNumber === w; })[0];
-            return match || (result.weeks[0] || result);
+            var match2 = result.weeks.filter(function (wk) { return Number(wk.weekNumber) === w; })[0];
+            return match2 || result.weeks[0];
+          }
+          // Model returned a shell (meta/cover) without any weeks — reject it
+          if (result && result.meta && !result.title && !result.sessions) {
+            console.warn('[LiftRPG] Week stage returned booklet shell instead of week — rejecting');
+            return null;
           }
           return result;
         },
         validate: function (result) {
-          if (!result || !result.title || !result.sessions) return 'Week must contain a title and sessions array.';
+          if (!result) return 'Week generation returned empty result. Model may have returned a shell instead of a week object.';
+          if (!result.title) return 'Week object missing "title" field. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
+          if (!result.sessions) return 'Week object missing "sessions" array. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
           return '';
         },
         buildPrompt: function (retryState) {

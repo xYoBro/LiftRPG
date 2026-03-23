@@ -2370,7 +2370,9 @@
     var parts = [
       '# Write Week ' + weekPlan.weekNumber,
       '',
-      'Generate exactly ONE week object as valid JSON. Do not over-explain or add outer wrappers.',
+      'Generate exactly ONE week object as valid JSON.',
+      'The root object MUST have "title" and "sessions" keys. Do NOT output meta, cover, rulesSpread, or theme.',
+      'Do NOT regenerate the booklet shell. Output ONLY the week.',
       '',
       '---',
       window.SCHEMA_SINGLE_WEEK.join('\n'),
