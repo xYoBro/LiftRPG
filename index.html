@@ -3019,7 +3019,10 @@
         if (openRendererBtn) {
           openRendererBtn.addEventListener('click', function () {
             try {
-              sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(apiRunState.booklet));
+              var cleanBooklet = Object.assign({}, apiRunState.booklet);
+              delete cleanBooklet._qualityReport;
+              delete cleanBooklet._qualityGate;
+              sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(cleanBooklet));
               window.open('renderer/?source=session', '_blank');
             } catch (error) {
               pushApiLog('Could not hand off the booklet to the renderer: ' + (error.message || error));
@@ -5029,35 +5032,26 @@
         apiRunState.tokens = '0 tokens';
         apiRunState.tokensCaption = 'Prompt and completion totals appear here as each stage finishes.';
         apiRunState.cost = '$0.00';
-        apiRunState.costCaption = 'LiftRPG is refreshing the latest official pricing for this run.';
+        apiRunState.costCaption = 'Using local pricing table. Live refresh runs in the background.';
         apiRunState.log = [];
-        pushApiLog('Refreshing live pricing for ' + settings._providerLabel + ' · ' + settings.model + '.');
         renderApiRunState();
         setGeneratorSurface('api-status', { skipFocus: true });
 
         var runId = ++activeApiRunId;
         setApiControlsDisabled(true);
 
+        // Fire-and-forget: refresh pricing in the background without blocking generation
         if (api() && typeof api().refreshPricing === 'function') {
-          try {
-            var pricingResult = await api().refreshPricing(settings);
+          api().refreshPricing(settings).then(function (pricingResult) {
             if (runId !== activeApiRunId) return;
             applyPricingRefreshResult(pricingResult);
             if (pricingResult && pricingResult.pricing && pricingResult.live) {
-              if (pricingResult.sourcePath === 'third-party' && pricingResult.error) {
-                pushApiLog('Official pricing was unavailable. Live pricing refreshed from ' + pricingResult.pricing.sourceLabel + ' for ' + settings.model + '.');
-              } else {
-                pushApiLog('Live pricing refreshed from ' + pricingResult.pricing.sourceLabel + ' for ' + settings.model + '.');
-              }
+              pushApiLog('Live pricing refreshed from ' + pricingResult.pricing.sourceLabel + ' for ' + settings.model + '.');
             } else if (pricingResult && pricingResult.pricing) {
-              pushApiLog('Live pricing unavailable. Using the local pricing table for ' + settings.model + (pricingResult.error ? ' (' + pricingResult.error + ').' : '.'));
-            } else if (pricingResult && pricingResult.error) {
-              pushApiLog('Pricing unavailable for ' + settings.model + ': ' + pricingResult.error);
-            } else {
-              pushApiLog('Pricing is not mapped for ' + settings.model + '. Token totals will still be tracked.');
+              pushApiLog('Using local pricing table for ' + settings.model + '.');
             }
             renderApiRunState();
-          } catch (pricingError) {
+          }).catch(function (pricingError) {
             if (runId !== activeApiRunId) return;
             applyPricingRefreshResult({
               model: settings.model,
@@ -5065,9 +5059,8 @@
               live: false,
               error: pricingError && pricingError.message ? pricingError.message : String(pricingError || 'Pricing refresh failed.')
             });
-            pushApiLog('Live pricing refresh failed for ' + settings.model + '. Token totals will still be tracked.');
             renderApiRunState();
-          }
+          });
         }
 
         try {
@@ -5115,9 +5108,13 @@
 
           markAllApiStages('valid');
           apiRunState.currentStageKey = 'quality';
+          var qualityGate = booklet._qualityGate || { passed: true, blockers: [] };
+          var hasQualityWarnings = !qualityGate.passed && qualityGate.blockers && qualityGate.blockers.length > 0;
           apiRunState.status = 'success';
-          apiRunState.summary = 'Booklet Ready';
-          apiRunState.summaryCaption = 'The API pipeline completed and the booklet passed local validation.';
+          apiRunState.summary = hasQualityWarnings ? 'Booklet Ready (with warnings)' : 'Booklet Ready';
+          apiRunState.summaryCaption = hasQualityWarnings
+            ? 'The API pipeline completed but the booklet has quality warnings: ' + qualityGate.blockers.map(function (b) { return b.message; }).join('; ')
+            : 'The API pipeline completed and the booklet passed local validation.';
           apiRunState.target = 'Open Or Download';
           apiRunState.targetCaption = 'Send the generated booklet to the renderer or download the JSON.';
           apiRunState.progress = apiRunState.totalStages + ' / ' + apiRunState.totalStages + ' stages';
@@ -5136,9 +5133,7 @@
         } catch (error) {
           if (runId !== activeApiRunId) return;
           var failureMessage = (error && error.message) ? error.message : String(error || 'Generation failed.');
-          var failingStageKey = failureMessage.indexOf('Quality gate failed') === 0
-            ? 'quality'
-            : (apiRunState.currentStageKey || inferApiStageKey(failureMessage));
+          var failingStageKey = apiRunState.currentStageKey || inferApiStageKey(failureMessage);
           if (failingStageKey) {
             if (apiRunState.currentStageKey && apiRunState.currentStageKey !== failingStageKey && apiRunState.ledger[apiRunState.currentStageKey] === 'in progress') {
               apiRunState.ledger[apiRunState.currentStageKey] = 'valid';

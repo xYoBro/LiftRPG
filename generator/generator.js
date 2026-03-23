@@ -275,8 +275,8 @@
   // ── Week count + chunking utilities ────────────────────────────────────────
 
   window.parseWeekCount = function (workout) {
-    window.match = String(workout || '').match(/(\d+)\s*weeks?\b/i);
-    window.n = match ? parseInt(match[1], 10) : 6;
+    var match = String(workout || '').match(/(\d+)\s*weeks?\b/i);
+    var n = match ? parseInt(match[1], 10) : 6;
     return Math.max(4, Math.min(12, n || 6));
   };
 
@@ -285,11 +285,11 @@
    * Dynamic chunker: isolates midpoint + boss, groups the rest in ≤ 3.
    */
   window.planWeekChunks = function (weekCount) {
-    window.midpoint = Math.ceil(weekCount / 2);
-    window.chunks = [];
+    var midpoint = Math.ceil(weekCount / 2);
+    var chunks = [];
 
     // Early weeks: 1 to midpoint-1, in groups of max 2
-    window.early = [];
+    var early = [];
     for (var i = 1; i < midpoint; i++) early.push(i);
     while (early.length > 0) chunks.push(early.splice(0, 2));
 
@@ -297,7 +297,7 @@
     chunks.push([midpoint]);
 
     // Late weeks: midpoint+1 to weekCount-1, in groups of max 2
-    window.late = [];
+    var late = [];
     for (var i = midpoint + 1; i < weekCount; i++) late.push(i);
     while (late.length > 0) chunks.push(late.splice(0, 2));
 
@@ -312,20 +312,20 @@
    * Extracts workout sections for specific weeks. Falls back to full text.
    */
   window.extractWeekWorkout = function (workout, weekNumbers) {
-    window.text = String(workout || '');
-    window.weekPattern = /(?:^|\n)\s*(?:week\s*)(\d+)\s*[:\-\u2013\u2014]/gi;
-    window.matches = [];
-    window.m;
+    var text = String(workout || '');
+    var weekPattern = /(?:^|\n)\s*(?:week\s*)(\d+)\s*[:\-\u2013\u2014]/gi;
+    var matches = [];
+    var m;
     while ((m = weekPattern.exec(text)) !== null) {
       matches.push({ weekNum: parseInt(m[1], 10), start: m.index });
     }
     if (matches.length === 0) return text;
-    window.sections = {};
+    var sections = {};
     for (var i = 0; i < matches.length; i++) {
-      window.end = (i + 1 < matches.length) ? matches[i + 1].start : text.length;
+      var end = (i + 1 < matches.length) ? matches[i + 1].start : text.length;
       sections[matches[i].weekNum] = text.slice(matches[i].start, end).trim();
     }
-    window.result = [];
+    var result = [];
     weekNumbers.forEach(function (wn) {
       if (sections[wn]) result.push(sections[wn]);
     });
@@ -488,7 +488,7 @@
       '',
       '## Approved Layer Codex',
       '',
-      JSON.stringify(layerBible, null, 2),
+      JSON.stringify(layerBible),
       '',
       '## Story Plan Rules',
       '- Use ' + weekCount + ' weeks to match the workout programme.',
@@ -601,108 +601,6 @@
     return parts.join('\n');
   };
 
-  window.generateStage3Prompt = function (workout, brief, dice, layerBible, campaignPlan) {
-    var blend = deriveDesignBlend(brief, workout);
-    var authorProfile = deriveAuthorBlend(brief);
-    var STAGE3_POSTCHECKS = [
-      '',
-      '## Stage 3 Postchecks — enforce before outputting',
-      '- Oracle entries must use `text`, never `description`.',
-      '- Fragment oracle entries (type: "fragment") must include `fragmentRef`.',
-      '- Oracle tables need exactly 10 entries with roll bands "00-09" through "90-99".',
-      '- `fieldOps.cipher.body` must be an object, not a string.',
-      '- `interlude.payloadType` must be one of: "none" | "narrative" | "cipher" | "map" | "clock" | "companion" | "fragment-ref" | "password-element".',
-      '- Verify every check before outputting. If any fails, fix it first.'
-    ].join('\n');
-
-    var TRANSLATION_GUIDE = [
-      '## How to Use the Approved Plans',
-      '',
-      'The planning JSONs below are reference context. Do NOT output their format.',
-      'Your output must be a single booklet JSON matching the schema above.',
-      'Translate the planning fields into booklet fields as follows:',
-      '',
-      '- `storyLayer.premise` → `meta.worldContract`',
-      '- `storyLayer.protagonist` → shape `sessions[].storyPrompt` and `endings`',
-      '- `storyLayer.recurringMotifs` → weave into fragments, map labels, oracle entries',
-      '- `storyLayer.midpointReversal` → the binary choice week\'s storyPrompt and oracle pressure',
-      '- `storyLayer.bossTruth` → `bossEncounter.narrative` and `bossEncounter.convergenceProof`',
-      '- `gameLayer.persistentTopology` → `fieldOps.mapState` (reuse across non-boss weeks)',
-      '- `gameLayer.gatesAndKeys` → locked nodes, denied routes, interlude payloads',
-      '- `gameLayer.persistentPressures` → `gameplayClocks` and oracle consequences',
-      '- `gameLayer.companionSurfaces` → `companionComponents` types and state',
-      '- `governingLayer.departments` → fragment `inWorldAuthor` sources',
-      '- `governingLayer.proceduresThatAffectPlay` → cipher mechanics, oracle consequences, interlude payloads',
-      '- `governingLayer.recordsAndForms` → `fragments[].documentType` and `designSpec`',
-      '- `weeks[].zoneFocus` → each week\'s mapState tile/node labels and floorLabel',
-      '- `weeks[].weeklyComponentMeaning` → `weeklyComponent.extractionInstruction`',
-      '- `weeks[].oraclePressure` → `oracleTable` entries and consequences',
-      '- `weeks[].fragmentFunction` → which `fragments[]` to assign to each week\'s oracle and sessions',
-      '- `storyLayer.protagonist.need` → hidden arc in storyPrompts (want drives early weeks, need emerges by darkest moment)',
-      '- `storyLayer.protagonist.wound` → shapes the darkest moment\'s specific cost',
-      '- `storyLayer.darkestMoment` → the specific week\'s storyPrompt + oracle pressure',
-      '- `storyLayer.resolutionMode` → endings tone and structure',
-      '- `storyLayer.relationshipWeb[].name` → reuse in fragment `inWorldAuthor`, storyPrompt named references',
-      '- `storyLayer.relationshipWeb[].arcFunction` → paced NPC revelation across weeks',
-      '- `gameLayer.progressionGates` → what each week\'s cipher/oracle/interlude unlocks on the map',
-      '- `gameLayer.boardStateArc` → mapState evolution week over week',
-      '- `weeks[].arcBeat` → storyPrompt tone and intensity for that week',
-      '- `weeks[].npcBeat` → which characters appear in storyPrompts and fragments that week',
-      '- `weeks[].stateSnapshot` → mapState initial conditions for that week',
-      '- `weeks[].playerGains` → cipher payoff, interlude payload, oracle consequence direction',
-      '- `bossPlan.decodeLogic` → `bossEncounter.decodingKey`',
-      '- `bossPlan.requiredPriorKnowledge` → `bossEncounter.componentInputs` ordering'
-    ].join('\n');
-
-    var parts = [
-      '# Stage 3 — Final Compile',
-      '',
-      'You have completed planning. Now compile the final LiftRPG booklet JSON.',
-      'Your output must be valid JSON matching the booklet schema below — nothing else.',
-      '',
-      '---',
-      '',
-      SCHEMA_SPEC,
-      '',
-      '---',
-      '',
-      TRANSLATION_GUIDE,
-      '',
-      '## Reference Context (do not output these formats — they inform your decisions)',
-      '',
-      '### Approved Layer Codex',
-      JSON.stringify(layerBible),
-      '',
-      '### Approved Story Plan',
-      JSON.stringify(campaignPlan),
-      '',
-      '---',
-      '',
-      '# Your Inputs',
-      '',
-      '## Workout Programme',
-      '',
-      workout,
-      '',
-      '## Creative Direction',
-      '',
-      formatUserBrief(brief, buildDefaultBrief(workout, blend)),
-      '',
-      formatDesignBias(blend),
-      formatAuthorBias(authorProfile || window.authorProfile),
-      '',
-      '## Randomizer',
-      '',
-      dice || 'd100',
-      'If the player has no dice, use this note: No dice? Google "roll d100".',
-      '',
-      '---',
-      '',
-      INSTRUCTIONS,
-      STAGE3_POSTCHECKS
-    ];
-    return parts.join('\n');
-  };
 
   // ── 10-Stage Partial-JSON Pipeline Generators ─────────────────────────────
   //
@@ -911,7 +809,7 @@
       parts.push('### Planned Overflow Documents (generate these exactly when overflow is true)');
       parts.push('When a week has > 3 sessions, it gets overflow: true and needs an overflowDocument.');
       parts.push('Use the planned document below instead of inventing one:');
-      parts.push(JSON.stringify(relevantOverflows, null, 2));
+      parts.push(JSON.stringify(relevantOverflows));
       parts.push('');
     }
 
@@ -1192,7 +1090,7 @@
       '',
       '## Fragment Registry (your contract — generate one fragment per entry)',
       '',
-      JSON.stringify(campaignPlan.fragmentRegistry || [], null, 2),
+      JSON.stringify(campaignPlan.fragmentRegistry || []),
       '',
       '## Reference Context',
       '',
@@ -1348,7 +1246,7 @@
       '',
       '## Fragment Registry (your contract — generate exactly these fragments)',
       '',
-      JSON.stringify(batchRegistry, null, 2),
+      JSON.stringify(batchRegistry),
       '',
       '## Reference Context',
       '',
@@ -1537,7 +1435,7 @@
       });
       if (binaryChoice) {
         parts.push('### Binary Choice (the player chose one of these)');
-        parts.push(JSON.stringify(binaryChoice, null, 2));
+        parts.push(JSON.stringify(binaryChoice));
         parts.push('');
       }
     }
@@ -2478,7 +2376,7 @@
       '---',
       '',
       '## The Plan to Execute',
-      JSON.stringify(weekPlan, null, 2),
+      JSON.stringify(weekPlan),
       '',
       '## Required Context',
       '**World Contract:** ' + (shellContext.worldContract || ''),
@@ -2510,7 +2408,7 @@
       '---',
       '',
       '## Fragment Registry Assignment',
-      JSON.stringify(registryEntry, null, 2),
+      JSON.stringify(registryEntry),
       '',
       '## Context',
       '**World Contract:** ' + (shellContext.worldContract || ''),

@@ -1064,7 +1064,23 @@ window.LiftRPGAPI = (function () {
 
   // ── Request handlers ────────────────────────────────────────────────────────
 
-  async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs, pricingRule) {
+  async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs, pricingRule, systemPrompt) {
+    var payload = {
+      model: model,
+      max_tokens: maxTokens || 32000,
+      messages: [{ role: 'user', content: prompt }]
+    };
+
+    // Prompt caching: if a system prompt is provided, mark it ephemeral so
+    // subsequent calls in the same session get cache hits (~90% cheaper input).
+    if (systemPrompt) {
+      payload.system = [{
+        type: 'text',
+        text: systemPrompt,
+        cache_control: { type: 'ephemeral' }
+      }];
+    }
+
     var resp = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -1073,11 +1089,7 @@ window.LiftRPGAPI = (function () {
         'anthropic-dangerous-direct-browser-access': 'true',
         'content-type': 'application/json'
       },
-      body: JSON.stringify({
-        model: model,
-        max_tokens: maxTokens || 32000,
-        messages: [{ role: 'user', content: prompt }]
-      })
+      body: JSON.stringify(payload)
     }, timeoutMs);
 
     var body = await resp.json();
@@ -1442,7 +1454,7 @@ window.LiftRPGAPI = (function () {
   async function callProvider(settings, prompt, maxTokens) {
     var timeoutMs = settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS;
     if (settings.format === 'anthropic') {
-      return callAnthropic(settings.apiKey, settings.model, prompt, maxTokens, timeoutMs, settings._pricingRule);
+      return callAnthropic(settings.apiKey, settings.model, prompt, maxTokens, timeoutMs, settings._pricingRule, settings._systemPrompt);
     }
     return callOpenAICompat(settings.apiKey, settings.baseUrl, settings.model, prompt, maxTokens, timeoutMs, settings._pricingRule);
   }
@@ -4014,8 +4026,8 @@ window.LiftRPGAPI = (function () {
     var dice = options.dice || 'd100';
     var weekCount = options.weekCount || (typeof window.parseWeekCount === 'function' ? window.parseWeekCount(workout) : 6);
 
-    // Initial estimation: 3 setup + (weekCount * 2) for (plan + write) + endings 
-    var totalStages = 3 + (weekCount * 2) + 2; 
+    // Initial estimation: 3 setup + weekCount (single-stage per week) + endings
+    var totalStages = 3 + weekCount + 2;
     var stageNum = 0;
     var onProgress = options.onProgress;
 
@@ -4039,13 +4051,15 @@ window.LiftRPGAPI = (function () {
       getTotalStages: function () { return totalStages; },
       schema: STRUCTURED_SCHEMA_BIBLE,
       maxTokens: 8192,
+      requestTimeoutMs: 300000, // 5 min — small planning output
       maxAttempts: 2,
       validate: validateLayerBibleStage,
       buildPrompt: function (retryState) { return builders.stage1(workout, brief, dice, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
     });
 
     progress('campaign', 'Planning story…');
-    var compactCampaignFirstPass = isSlowPlanningModel(settings);
+    // Always use compact prompt — full doctrine is redundant when the layer codex
+    // already captures all planning decisions. Saves ~40% input tokens + faster.
     var campaignPlan = await runJsonStage(settings, {
       stageKey: 'campaign',
       stageName: 'Story Plan',
@@ -4055,25 +4069,15 @@ window.LiftRPGAPI = (function () {
       getTotalStages: function () { return totalStages; },
       schema: STRUCTURED_SCHEMA_CAMPAIGN,
       requestTimeoutMs: function (retryState) {
-        if (!retryState || retryState.attempt <= 0) {
-          return compactCampaignFirstPass ? Math.max(settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS, 720000) : (settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS);
-        }
-        return Math.max(Math.min(settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS, 540000), 420000);
+        return retryState && retryState.attempt > 0 ? 300000 : 420000; // 7 min first, 5 min retry
       },
       maxTokens: function (retryState) {
-        if (retryState && retryState.attempt > 0) return 8192;
-        return compactCampaignFirstPass ? 12288 : 14336;
+        return retryState && retryState.attempt > 0 ? 8192 : 12288;
       },
       maxAttempts: 2,
       validate: validateCampaignPlanStage,
       buildPrompt: function (retryState) {
-        if (retryState && retryState.attempt > 0) {
-          return buildCompactCampaignRetryPrompt(workout, brief, dice, layerBible, retryState);
-        }
-        if (compactCampaignFirstPass) {
-          return buildCompactCampaignRetryPrompt(workout, brief, dice, layerBible, { attempt: 0, error: null });
-        }
-        return builders.stage2(workout, brief, dice, layerBible, undefined);
+        return buildCompactCampaignRetryPrompt(workout, brief, dice, layerBible, retryState || { attempt: 0, error: null });
       }
     });
 
@@ -4081,7 +4085,7 @@ window.LiftRPGAPI = (function () {
     if (!Array.isArray(campaignPlan.overflowRegistry)) campaignPlan.overflowRegistry = [];
 
     // Update totalStages with exact fragment count
-    totalStages = 3 + (weekCount * 2) + campaignPlan.fragmentRegistry.length + 1;
+    totalStages = 3 + weekCount + campaignPlan.fragmentRegistry.length + 1;
 
     progress('shell', 'Building booklet setup…');
     var shell = await runJsonStage(settings, {
@@ -4093,6 +4097,7 @@ window.LiftRPGAPI = (function () {
       getTotalStages: function () { return totalStages; },
       schema: STRUCTURED_SCHEMA_SHELL,
       maxTokens: 16384,
+      requestTimeoutMs: 300000, // 5 min — moderate output
       unwrapKey: 'meta',
       maxAttempts: 2,
       normalizeResult: function (result) {
@@ -4108,47 +4113,54 @@ window.LiftRPGAPI = (function () {
     var identityContract = buildIdentityContract(shell, campaignPlan);
     var shellContext = extractShellContext(shell);
 
+    // ── ANTHROPIC PROMPT CACHING ──────────────────────────────────
+    // For Anthropic calls, set a shared system prompt containing the identity
+    // contract and layer codex summary. Marked ephemeral so subsequent calls
+    // in this pipeline session get cache hits (~90% cheaper input tokens).
+    if (settings.format === 'anthropic') {
+      settings._systemPrompt = [
+        'You are generating components of a LiftRPG print-and-play booklet.',
+        'World contract: ' + (shellContext.worldContract || ''),
+        'Identity contract: ' + JSON.stringify(identityContract),
+        'Layer codex summary: ' + JSON.stringify(summarizeLayerBibleForShell(layerBible)),
+        'Return valid JSON only. No markdown fences, no commentary.'
+      ].join('\n');
+    }
+
     // ── TARGETED UNIT GENERATION: WEEKS ──────────────────────────
+    // Single-stage per week: the campaign plan already contains per-week context
+    // (arcBeat, zoneFocus, stateChange, etc.), so we pass it directly as the
+    // weekPlan instead of running a separate planning call. Halves the API calls.
     var finalWeeks = [];
     var allComponentValues = [];
 
     for (var w = 1; w <= weekCount; w++) {
       var isBossWeek = w === weekCount;
       var continuityPacket = buildChunkContinuity(finalWeeks);
-      
-      progress('weeks', 'Planning Week ' + w + '…');
-      var weekPlan = await runJsonStage(settings, {
-        stageKey: 'weeks',
-        stageName: 'Plan Week ' + w,
-        stageIndex: stageNum,
-        completeMessage: 'Week ' + w + ' plan complete.',
-        onProgress: onProgress,
-        getTotalStages: function () { return totalStages; },
-        schema: null, // text-based internal JSON
-        maxTokens: 2048,
-        maxAttempts: 2,
-        buildPrompt: function (retryState) {
-          return builders.weekPlan(workout, brief, layerBible, campaignPlan, w, shellContext, continuityPacket);
-        }
-      });
+
+      // Use the campaign plan's week entry directly as the week plan
+      var campaignWeekPlan = (campaignPlan.weeks || []).filter(function (pw) {
+        return pw.weekNumber === w;
+      })[0] || { weekNumber: w };
 
       progress('weeks', 'Writing Week ' + w + (isBossWeek ? ' (Boss)' : '') + '…');
       var weekObject = await runJsonStage(settings, {
         stageKey: 'weeks',
-        stageName: 'Write Week ' + w,
+        stageName: 'Week ' + w,
         stageIndex: stageNum,
         completeMessage: 'Week ' + w + ' complete.',
         onProgress: onProgress,
         getTotalStages: function () { return totalStages; },
-        schema: null, 
+        schema: null,
         maxTokens: 8192,
-        maxAttempts: 3, // slightly higher retry capability for single units
+        requestTimeoutMs: 180000, // 3 min — single week output
+        maxAttempts: 3,
         validate: function (result) {
           if (!result || !result.title || !result.sessions) return 'Week must contain a title and sessions array.';
           return '';
         },
         buildPrompt: function (retryState) {
-          return builders.singleWeekFinal(workout, brief, layerBible, campaignPlan, weekPlan, shellContext, continuityPacket, allComponentValues);
+          return builders.singleWeekFinal(workout, brief, layerBible, campaignPlan, campaignWeekPlan, shellContext, continuityPacket, allComponentValues);
         }
       });
 
@@ -4166,36 +4178,44 @@ window.LiftRPGAPI = (function () {
     var assembledWeeksOutput = [{ weeks: finalWeeks }];
     var weekSummaries = extractWeekSummaries(assembledWeeksOutput);
 
-    // ── TARGETED UNIT GENERATION: FRAGMENTS ──────────────────────
+    // ── BATCHED FRAGMENT GENERATION ──────────────────────────────
+    // Group fragments into batches of ~6 by week pair to reduce API calls
+    // from N (one per fragment) to ~3 batches. Uses the existing adaptive
+    // runner which splits on failure.
     var finalFragments = [];
     var registry = campaignPlan.fragmentRegistry || [];
+    var fragmentBatches = buildFragmentBatches(registry, weekSummaries);
+    var totalBatches = Math.max(fragmentBatches.length, 1);
 
-    for (var f = 0; f < registry.length; f++) {
-      var regEntry = registry[f];
-      progress('fragments', 'Writing Fragment ' + regEntry.id + '…');
-      var fragmentObj = await runJsonStage(settings, {
-        stageKey: 'fragments',
-        stageName: 'Fragment ' + regEntry.id,
-        stageIndex: stageNum,
-        completeMessage: 'Fragment ' + regEntry.id + ' complete.',
-        onProgress: onProgress,
-        getTotalStages: function () { return totalStages; },
-        schema: null,
-        maxTokens: 4096,
-        maxAttempts: 2,
-        validate: function (result) {
-          if (!result || !result.content || !result.documentType) return 'Fragment must contain content and documentType.';
-          return '';
-        },
-        buildPrompt: function (retryState) {
-          return builders.singleFragment(layerBible, regEntry, weekSummaries, shellContext, finalFragments);
-        }
+    // Update totalStages now that we know batch count instead of individual count
+    totalStages = 3 + weekCount + totalBatches + 1;
+
+    for (var fb = 0; fb < fragmentBatches.length; fb++) {
+      var batch = fragmentBatches[fb];
+      var batchLabel = 'Fragments batch ' + (fb + 1) + '/' + totalBatches;
+      progress('fragments', 'Writing ' + batchLabel + ' (' + batch.length + ' docs)…');
+      var batchWeekNums = {};
+      batch.forEach(function (entry) { if (entry.weekRef) batchWeekNums[entry.weekRef] = true; });
+      var batchWeekSummaries = weekSummaries.filter(function (ws) { return batchWeekNums[ws.weekNumber]; });
+
+      var batchOutput = await generateFragmentBatchAdaptive(settings, builders, {
+        layerBible: layerBible,
+        registry: batch,
+        batchWeekSummaries: batchWeekSummaries.length > 0 ? batchWeekSummaries : weekSummaries,
+        allWeekSummaries: weekSummaries,
+        priorFragments: finalFragments,
+        batchIndex: fb,
+        totalBatches: totalBatches,
+        shellContext: shellContext,
+        label: batchLabel
       });
 
-      fragmentObj.id = regEntry.id; // Force ID alignment
-      finalFragments.push(fragmentObj);
+      (batchOutput.fragments || []).forEach(function (frag, i) {
+        if (batch[i] && batch[i].id) frag.id = batch[i].id; // Force ID alignment
+        finalFragments.push(frag);
+      });
     }
-    
+
     var assembledFragmentsOutput = { fragments: finalFragments };
 
     // ── TARGETED UNIT GENERATION: ENDING ────────────────────────
@@ -4210,6 +4230,7 @@ window.LiftRPGAPI = (function () {
       getTotalStages: function () { return totalStages; },
       schema: null,
       maxTokens: 4096,
+      requestTimeoutMs: 120000, // 2 min — small output
       maxAttempts: 2,
       validate: function (result) {
         if (!result || !result.content || !result.variant) return 'Ending must contain content and variant.';
@@ -4243,301 +4264,17 @@ window.LiftRPGAPI = (function () {
 
     var report = generateQualityReport(booklet);
     var qualityGate = buildQualityGate(report);
+    booklet._qualityReport = report;
+    booklet._qualityGate = qualityGate;
     if (!qualityGate.passed) {
-      throw new Error('Quality gate failed:\n' + qualityGate.blockers.map(function (entry) {
-        return '- ' + entry.message;
-      }).join('\n'));
+      console.warn('[LiftRPG] Quality gate warnings (non-blocking):', qualityGate.blockers.map(function (entry) {
+        return entry.message;
+      }));
     }
 
     return booklet;
   }
 
-  // ── 10-Stage Multi-Stage Generator ──────────────────────────────────────
-  //
-  // Pipeline: Layer Codex → Story Plan → Booklet Setup → Week Chunks → Bonus Pages → Finale → Validate → Patch
-  //
-  // onProgress(stageIndex, totalStages, message) — UI callback
-
-  async function legacyGenerateMultiStageReference(settings, workout, brief, dice, onProgress) {
-    if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
-    // Check required generators
-    if (typeof window.generateStage1Prompt !== 'function' ||
-      typeof window.generateStage2Prompt !== 'function' ||
-      typeof window.generateShellPrompt !== 'function' ||
-      typeof window.generateWeekChunkPrompt !== 'function' ||
-      typeof window.generateFragmentsPrompt !== 'function' ||
-      typeof window.generateFragmentBatchPrompt !== 'function' ||
-      typeof window.generateEndingsPrompt !== 'function') {
-      throw new Error('Pipeline generators not loaded. Please reload the page.');
-    }
-
-    // 0. Plan the pipeline
-    var weekCount = window.parseWeekCount(workout);
-    var chunks = window.planWeekChunks(weekCount);
-    // totalStages updated after campaign plan (once we know batch count)
-    var totalStages = 3 + chunks.length + 2; // initial estimate: planning(2) + shell(1) + weeks(N) + fragments(1) + endings(1)
-    var stageNum = 0;
-
-    function progress(message) {
-      stageNum++;
-      onProgress(stageNum, totalStages, message);
-    }
-
-    // Helper: wrap callProvider to tag errors with stage name
-    async function callStage(prompt, maxTokens, stageName) {
-      try {
-        var response = await callProvider(settings, prompt, maxTokens);
-        return response.text;
-      } catch (err) {
-        throw new Error('[' + stageName + '] ' + err.message);
-      }
-    }
-
-    // Helper: unwrap partial-JSON output when model adds an extra wrapper key.
-    // e.g., { "weekOutput": { "weeks": [...] } } → { "weeks": [...] }
-    function unwrapIfNeeded(result, expectedKey) {
-      if (!result || typeof result !== 'object') return result;
-      if (result[expectedKey]) return result; // already correct shape
-      var keys = Object.keys(result);
-      if (keys.length === 1) {
-        var inner = result[keys[0]];
-        if (inner && typeof inner === 'object' && inner[expectedKey]) {
-          console.warn('[LiftRPG] Stage output wrapped in "' + keys[0] + '" key — unwrapping to get "' + expectedKey + '"');
-          return inner;
-        }
-      }
-      return result;
-    }
-
-    // 1. Layer Codex
-    progress('Building layer codex\u2026');
-    var raw1 = await callStage(window.generateStage1Prompt(workout, brief, dice), 8192, 'Layer Codex');
-    var layerBible = extractJson(raw1);
-
-    if (!layerBible.storyLayer || !layerBible.gameLayer || !layerBible.governingLayer) {
-      throw new Error(
-        'Stage 1 failed: Layer Codex missing required sections (storyLayer, gameLayer, governingLayer).\n' +
-        'The model may not have followed the output schema. Try again.'
-      );
-    }
-
-    // 2. Story Plan + Fragment Registry
-    progress('Planning story\u2026');
-    var raw2 = await callStage(window.generateStage2Prompt(workout, brief, dice, layerBible), 16384, 'Story Plan');
-    var campaignPlan = extractJson(raw2);
-
-    if (!campaignPlan.weeks || !Array.isArray(campaignPlan.weeks) || !campaignPlan.bossPlan) {
-      throw new Error(
-        'Stage 2 failed: campaign plan missing required sections (weeks[], bossPlan).\n' +
-        'The model may not have followed the output schema. Try again.'
-      );
-    }
-
-    if (!campaignPlan.fragmentRegistry || !Array.isArray(campaignPlan.fragmentRegistry)) {
-      console.warn('[LiftRPG] Stage 2 missing fragmentRegistry — fragments will have no pre-assigned IDs');
-      campaignPlan.fragmentRegistry = [];
-    }
-    if (!campaignPlan.overflowRegistry || !Array.isArray(campaignPlan.overflowRegistry)) {
-      console.warn('[LiftRPG] Stage 2 missing overflowRegistry — overflow docs will be unplanned');
-      campaignPlan.overflowRegistry = [];
-    }
-
-    // Recalculate totalStages now that we know fragment batch count
-    var plannedFragBatches = buildFragmentBatches(campaignPlan.fragmentRegistry, null);
-    var fragBatchCount = Math.max(plannedFragBatches.length, 1); // at least 1 for monolithic fallback
-    totalStages = 3 + chunks.length + fragBatchCount + 1; // planning(2) + shell(1) + weeks(N) + fragBatches(B) + endings(1)
-
-    // 3. Booklet Setup
-    progress('Building booklet setup\u2026');
-    var raw3 = await callStage(window.generateShellPrompt(brief, layerBible, campaignPlan), 16384, 'Booklet Setup');
-    var shell = extractJson(raw3);
-    shell = unwrapIfNeeded(shell, 'meta');
-    // If model output full booklet instead of shell, strip week/fragment/endings keys
-    if (shell.meta && Array.isArray(shell.weeks)) {
-      console.warn('[LiftRPG] Shell stage output included weeks/fragments/endings — stripping');
-      delete shell.weeks;
-      delete shell.fragments;
-      delete shell.endings;
-    }
-
-    if (!shell.meta || !shell.cover || !shell.rulesSpread) {
-      throw new Error(
-        'Stage 3 failed: booklet setup missing required keys (meta, cover, rulesSpread).\n' +
-        'The model may not have followed the output schema. Try again.'
-      );
-    }
-
-    // Extract narrative constraints for downstream stages
-    var identityContract = buildIdentityContract(shell, campaignPlan);
-    var shellContext = extractShellContext(shell);
-
-    // 4..N-3. Week Chunks
-    var weekChunkOutputs = [];
-    var allComponentValues = [];
-    var allPriorWeeks = [];
-
-    for (var ci = 0; ci < chunks.length; ci++) {
-      var weekNums = chunks[ci];
-      var isBoss = weekNums.indexOf(weekCount) !== -1;
-      var label = isBoss
-        ? 'Generating boss week\u2026'
-        : weekNums.length === 1
-          ? 'Generating week ' + weekNums[0] + '\u2026'
-          : 'Generating weeks ' + weekNums[0] + '\u2013' + weekNums[weekNums.length - 1] + '\u2026';
-
-      progress(label);
-      var chunkLabel = isBoss ? 'Boss Week' : 'Weeks ' + weekNums.join(',');
-      var continuity = buildChunkContinuity(allPriorWeeks);
-      var rawChunk = await callStage(
-        window.generateWeekChunkPrompt(workout, brief, layerBible, campaignPlan, weekNums, continuity, allComponentValues, shellContext),
-        32000,
-        chunkLabel
-      );
-      var chunkOutput = extractJson(rawChunk);
-      chunkOutput = unwrapIfNeeded(chunkOutput, 'weeks');
-      // If model output full booklet instead of just weeks, extract only weeks
-      if (chunkOutput.meta && Array.isArray(chunkOutput.weeks)) {
-        console.warn('[LiftRPG] Week chunk output a full booklet — extracting weeks only');
-        chunkOutput = { weeks: chunkOutput.weeks };
-      }
-      weekChunkOutputs.push(chunkOutput);
-
-      // Accumulate all prior weeks for continuity + component values for boss
-      (chunkOutput.weeks || []).forEach(function (w) {
-        allPriorWeeks.push(w);
-        if (w.weeklyComponent && w.weeklyComponent.value !== undefined && w.weeklyComponent.value !== null) {
-          allComponentValues.push(w.weeklyComponent.value);
-        }
-      });
-    }
-
-    // N-2. Bonus Pages (batched by week association)
-    var weekSummaries = extractWeekSummaries(weekChunkOutputs);
-    var fragBatches = buildFragmentBatches(campaignPlan.fragmentRegistry, weekSummaries);
-    var fragmentsOutput;
-
-    if (fragBatches.length <= 1) {
-      // Small registry or no weekRef data — single call (monolithic fallback)
-      progress('Generating bonus pages\u2026');
-      var rawFrags = await callStage(
-        window.generateFragmentsPrompt(layerBible, campaignPlan, weekSummaries, shellContext),
-        32000,
-        'Bonus Pages'
-      );
-      fragmentsOutput = extractJson(rawFrags);
-      fragmentsOutput = unwrapIfNeeded(fragmentsOutput, 'fragments');
-    } else {
-      // Batched generation
-      var batchOutputs = [];
-      var priorFragments = [];
-
-      for (var fi = 0; fi < fragBatches.length; fi++) {
-        var batch = fragBatches[fi];
-        var batchLabel = 'Bonus Pages ' + (fi + 1) + '/' + fragBatches.length +
-          ' (weeks ' + batch.weekNumbers.join(',') + ')';
-        progress('Generating ' + batchLabel.toLowerCase() + '\u2026');
-
-        var rawBatch = await callStage(
-          window.generateFragmentBatchPrompt(
-            layerBible,
-            batch.registry,
-            batch.weekSummaries,
-            weekSummaries,
-            priorFragments,
-            fi,
-            fragBatches.length,
-            shellContext
-          ),
-          32000,
-          batchLabel
-        );
-        var batchOutput = extractJson(rawBatch);
-        batchOutput = unwrapIfNeeded(batchOutput, 'fragments');
-        batchOutputs.push(batchOutput);
-
-        // Accumulate for continuity into next batch
-        (batchOutput.fragments || []).forEach(function (f) {
-          priorFragments.push(f);
-        });
-      }
-
-      // Merge + validate
-      var mergeResult = mergeFragmentBatches(batchOutputs, campaignPlan.fragmentRegistry);
-      if (mergeResult.errors.length > 0) {
-        console.warn('[LiftRPG] Fragment batch merge issues:', mergeResult.errors);
-      }
-      fragmentsOutput = { fragments: mergeResult.fragments };
-    }
-
-    // N-1. Finale
-    progress('Generating finale\u2026');
-    var lastChunkWeeks = weekChunkOutputs[weekChunkOutputs.length - 1].weeks || [];
-    var bossWeek = lastChunkWeeks[lastChunkWeeks.length - 1] || {};
-    var binaryChoiceWeek = findBinaryChoiceWeek(weekChunkOutputs);
-    var rawEndings = await callStage(
-      window.generateEndingsPrompt(layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext, weekSummaries),
-      8192,
-      'Finale'
-    );
-    var endingsOutput = extractJson(rawEndings);
-    endingsOutput = unwrapIfNeeded(endingsOutput, 'endings');
-
-    // Assemble
-    console.log('[LiftRPG] Assembling booklet from', weekChunkOutputs.length, 'week chunks,',
-      ((fragmentsOutput || {}).fragments || []).length, 'fragments,',
-      ((endingsOutput || {}).endings || []).length, 'endings');
-    var booklet = assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan);
-    enforceIdentityContract(booklet, identityContract);
-
-    // Validate + single patch attempt (no retry loop)
-    var errors = validateAssembledBooklet(booklet);
-    if (errors.warnings && errors.warnings.length > 0) {
-      console.warn('[LiftRPG] Validation warnings:', errors.warnings);
-    }
-    if (errors.length > 0) {
-      console.warn('[LiftRPG] Assembled booklet has', errors.length, 'validation errors:', errors);
-      totalStages++; // account for patch stage in progress reporting
-      var errLabel = errors.length === 1 ? '1 error' : errors.length + ' errors';
-      progress('Patching ' + errLabel + '\u2026');
-      try {
-        var rawPatched = await callStage(
-          generatePatchPrompt(JSON.stringify(booklet, null, 2), errors, {
-            identityContract: identityContract
-          }),
-          32000,
-          'Patch'
-        );
-        booklet = extractJson(rawPatched);
-        enforceIdentityContract(booklet, identityContract);
-        // Re-enforce derived fields — patch LLM may have clobbered them
-        enforceBookletDerivedFields(booklet);
-        var identityDrift = compareIdentityContract(booklet, identityContract);
-        if (identityDrift.length > 0) {
-          console.warn('[LiftRPG] Patch drifted shell identity; restored approved shell contract:', identityDrift);
-          enforceIdentityContract(booklet, identityContract);
-        }
-        var remaining = validateAssembledBooklet(booklet);
-        if (remaining.length > 0) {
-          console.warn('[LiftRPG] Patch did not fully resolve errors (' + remaining.length + ' remaining):', remaining);
-          // Keep the partially repaired booklet — better than the unpatched version
-        }
-      } catch (patchErr) {
-        // Patch failed — keep the unpatched booklet and warn
-        console.warn('[LiftRPG] Patch stage failed, returning unpatched booklet:', patchErr.message);
-      }
-    }
-
-    // Auto-populate quality report for console inspection
-    var report = generateQualityReport(booklet);
-    var qualityGate = buildQualityGate(report);
-    if (!qualityGate.passed) {
-      throw new Error('Quality gate failed:\n' + qualityGate.blockers.map(function (entry) {
-        return '- ' + entry.message;
-      }).join('\n'));
-    }
-
-    return booklet;
-  }
 
   // ── Structured Output JSON Schemas ──────────────────────────────────────────
   // JSON Schema objects for Gemini native structured output (responseJsonSchema).
@@ -5317,238 +5054,6 @@ window.LiftRPGAPI = (function () {
   //
   // Pipeline: World+Story → Booklet Setup → Weeks → Bonus Pages → Finale
   //
-  // Uses native Gemini API with responseJsonSchema for typed JSON output.
-  // No extractJson/repairJson step. Reuses existing prompt generators from
-  // generator.js unchanged. Exercise override happens during assembly.
-  //
-  // onProgress(stageIndex, totalStages, message) — UI callback
-
-  async function legacyGenerateStructuredReference(settings, workout, brief, dice, onProgress) {
-    if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
-    // Validate required prompt generators
-    if (typeof window.generateStage1Prompt !== 'function' ||
-      typeof window.generateStage2Prompt !== 'function' ||
-      typeof window.generateShellPrompt !== 'function' ||
-      typeof window.generateWeekChunkPrompt !== 'function' ||
-      typeof window.generateFragmentsPrompt !== 'function' ||
-      typeof window.generateFragmentBatchPrompt !== 'function' ||
-      typeof window.generateEndingsPrompt !== 'function') {
-      throw new Error('Pipeline generators not loaded. Please reload the page.');
-    }
-
-    // Resolve Gemini settings
-    var apiKey = settings.geminiApiKey || settings.apiKey;
-    var model = settings.geminiModel || settings.model || 'gemini-2.5-flash';
-    if (!apiKey) {
-      throw new Error('Gemini API key required for structured generation.');
-    }
-    var timeoutMs = settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS;
-
-    // Normalize workout input
-    var nw = normalizeWorkoutParam(workout);
-    var workoutText = nw.weeks.length > 0 ? formatNormalizedForPrompt(nw) : nw.rawText;
-    var weekCount = nw.weekCount || (typeof window.parseWeekCount === 'function' ? window.parseWeekCount(workoutText) : 6);
-
-    // Plan pipeline
-    var chunks = typeof window.planWeekChunks === 'function' ? window.planWeekChunks(weekCount) : [[1, 2, 3], [4, 5, 6]];
-    var totalStages = 5; // initial estimate; updated after campaign plan
-    var stageNum = 0;
-
-    function progress(message) {
-      stageNum++;
-      if (onProgress) onProgress(stageNum, totalStages, message);
-    }
-
-    // Helper: call Gemini via OpenAI-compatible endpoint + extractJson
-    // Native structured output (responseJsonSchema) proved unreliable —
-    // Gemini regularly returns malformed JSON despite schema constraints.
-    // The OpenAI-compatible path + extractJson repair pipeline is robust.
-    var geminiOpenAIBase = 'https://generativelanguage.googleapis.com/v1beta/openai';
-    async function callStage(prompt, _schema, maxTokens, stageName) {
-      try {
-        var rawResponse = await callOpenAICompat(apiKey, geminiOpenAIBase, model, prompt, maxTokens, timeoutMs);
-        return extractJson(rawResponse.text);
-      } catch (err) {
-        throw new Error('[' + stageName + '] ' + err.message);
-      }
-    }
-
-    // Stage 1 — World + Campaign (2 internal API calls, 1 progress step)
-    progress('Building world + campaign\u2026');
-    var layerBible = await callStage(
-      window.generateStage1Prompt(workoutText, brief, dice),
-      STRUCTURED_SCHEMA_BIBLE, 16384, 'Layer Codex'
-    );
-
-    if (!layerBible.storyLayer || !layerBible.gameLayer || !layerBible.governingLayer) {
-      throw new Error(
-        'Stage 1 failed: Layer Codex missing required sections (storyLayer, gameLayer, governingLayer).\n' +
-        'The model may not have followed the output schema. Try again.'
-      );
-    }
-
-    var campaignPlan = await callStage(
-      window.generateStage2Prompt(workoutText, brief, dice, layerBible),
-      STRUCTURED_SCHEMA_CAMPAIGN, 16384, 'Story Plan'
-    );
-
-    if (!campaignPlan.weeks || !Array.isArray(campaignPlan.weeks) || !campaignPlan.bossPlan) {
-      throw new Error(
-        'Stage 2 failed: campaign plan missing required sections (weeks[], bossPlan).\n' +
-        'The model may not have followed the output schema. Try again.'
-      );
-    }
-
-    if (!campaignPlan.fragmentRegistry || !Array.isArray(campaignPlan.fragmentRegistry)) {
-      console.warn('[LiftRPG] Stage 2 missing fragmentRegistry \u2014 fragments will have no pre-assigned IDs');
-      campaignPlan.fragmentRegistry = [];
-    }
-    if (!campaignPlan.overflowRegistry || !Array.isArray(campaignPlan.overflowRegistry)) {
-      console.warn('[LiftRPG] Stage 2 missing overflowRegistry \u2014 overflow docs will be unplanned');
-      campaignPlan.overflowRegistry = [];
-    }
-
-    // Recalculate totalStages now that we know fragment batch count
-    var plannedFragBatches = buildFragmentBatches(campaignPlan.fragmentRegistry, null);
-    var fragBatchCount = Math.max(plannedFragBatches.length, 1);
-    totalStages = 3 + fragBatchCount + 1; // world+campaign(1) + shell(1) + weeks(1) + fragBatches(B) + endings(1)
-
-    // Stage 2 — Booklet Setup
-    progress('Building booklet setup\u2026');
-    var shell = await callStage(
-      window.generateShellPrompt(brief, layerBible, campaignPlan),
-      STRUCTURED_SCHEMA_SHELL, 16384, 'Booklet Setup'
-    );
-
-    if (!shell.meta || !shell.cover || !shell.rulesSpread) {
-      throw new Error(
-        'Stage 3 failed: booklet setup missing required keys (meta, cover, rulesSpread).\n' +
-        'The model may not have followed the output schema. Try again.'
-      );
-    }
-
-    // Extract narrative constraints for downstream stages
-    var identityContract = buildIdentityContract(shell, campaignPlan);
-    var shellContext = extractShellContext(shell);
-
-    // Stage 3 — Weeks (N internal API calls, 1 progress step)
-    progress('Generating weeks\u2026');
-    var weekChunkOutputs = [];
-    var allComponentValues = [];
-    var allPriorWeeks = [];
-
-    for (var ci = 0; ci < chunks.length; ci++) {
-      var weekNums = chunks[ci];
-      var chunkLabel = weekNums.length === 1
-        ? 'Week ' + weekNums[0]
-        : 'Weeks ' + weekNums.join(',');
-
-      var continuity = buildChunkContinuity(allPriorWeeks);
-      var chunkOutput = await callStage(
-        window.generateWeekChunkPrompt(workoutText, brief, layerBible, campaignPlan, weekNums, continuity, allComponentValues, shellContext),
-        STRUCTURED_SCHEMA_WEEKS, 32000, chunkLabel
-      );
-      weekChunkOutputs.push(chunkOutput);
-
-      // Accumulate all prior weeks for continuity + component values for boss
-      (chunkOutput.weeks || []).forEach(function (w) {
-        allPriorWeeks.push(w);
-        if (w.weeklyComponent && w.weeklyComponent.value !== undefined && w.weeklyComponent.value !== null) {
-          allComponentValues.push(w.weeklyComponent.value);
-        }
-      });
-    }
-
-    // Stage 4 — Bonus Pages (batched by week association)
-    var weekSummaries = extractWeekSummaries(weekChunkOutputs);
-    var fragBatches = buildFragmentBatches(campaignPlan.fragmentRegistry, weekSummaries);
-    var fragmentsOutput;
-
-    if (fragBatches.length <= 1) {
-      // Small registry or no weekRef data — single call (monolithic fallback)
-      progress('Generating bonus pages\u2026');
-      fragmentsOutput = await callStage(
-        window.generateFragmentsPrompt(layerBible, campaignPlan, weekSummaries, shellContext),
-        STRUCTURED_SCHEMA_FRAGMENTS, 32000, 'Bonus Pages'
-      );
-    } else {
-      // Batched generation
-      var batchOutputs = [];
-      var priorFragments = [];
-
-      for (var fi = 0; fi < fragBatches.length; fi++) {
-        var batch = fragBatches[fi];
-        var batchLabel = 'Bonus Pages ' + (fi + 1) + '/' + fragBatches.length +
-          ' (weeks ' + batch.weekNumbers.join(',') + ')';
-        progress('Generating ' + batchLabel.toLowerCase() + '\u2026');
-
-        var batchOutput = await callStage(
-          window.generateFragmentBatchPrompt(
-            layerBible,
-            batch.registry,
-            batch.weekSummaries,
-            weekSummaries,
-            priorFragments,
-            fi,
-            fragBatches.length,
-            shellContext
-          ),
-          STRUCTURED_SCHEMA_FRAGMENTS, 32000, batchLabel
-        );
-        batchOutputs.push(batchOutput);
-
-        // Accumulate for continuity into next batch
-        (batchOutput.fragments || []).forEach(function (f) {
-          priorFragments.push(f);
-        });
-      }
-
-      // Merge + validate
-      var mergeResult = mergeFragmentBatches(batchOutputs, campaignPlan.fragmentRegistry);
-      if (mergeResult.errors.length > 0) {
-        console.warn('[LiftRPG] Fragment batch merge issues:', mergeResult.errors);
-      }
-      fragmentsOutput = { fragments: mergeResult.fragments };
-    }
-
-    // Stage 5 — Finale
-    progress('Generating finale\u2026');
-    var lastChunkWeeks = weekChunkOutputs[weekChunkOutputs.length - 1].weeks || [];
-    var bossWeek = lastChunkWeeks[lastChunkWeeks.length - 1] || {};
-    var binaryChoiceWeek = findBinaryChoiceWeek(weekChunkOutputs);
-    var endingsOutput = await callStage(
-      window.generateEndingsPrompt(layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext, weekSummaries),
-      STRUCTURED_SCHEMA_ENDINGS, 8192, 'Finale'
-    );
-
-    // Assemble with exercise override
-    console.log('[LiftRPG] Assembling structured booklet from', weekChunkOutputs.length, 'week chunks,',
-      ((fragmentsOutput || {}).fragments || []).length, 'fragments,',
-      ((endingsOutput || {}).endings || []).length, 'endings');
-    var booklet = assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, nw, campaignPlan);
-    enforceIdentityContract(booklet, identityContract);
-
-    // Validate — log warnings but no LLM patch step
-    // (structured output should prevent malformed JSON; semantic errors are reported)
-    var errors = validateAssembledBooklet(booklet);
-    if (errors.warnings && errors.warnings.length > 0) {
-      console.warn('[LiftRPG] Validation warnings:', errors.warnings);
-    }
-    if (errors.length > 0) {
-      console.warn('[LiftRPG] Assembled structured booklet has', errors.length, 'validation errors:', errors);
-    }
-
-    // Auto-populate quality report for console inspection
-    var report = generateQualityReport(booklet);
-    var qualityGate = buildQualityGate(report);
-    if (!qualityGate.passed) {
-      throw new Error('Quality gate failed:\n' + qualityGate.blockers.map(function (entry) {
-        return '- ' + entry.message;
-      }).join('\n'));
-    }
-
-    return booklet;
-  }
 
   function resolveStructuredPipelineSettings(settings) {
     var resolved = Object.assign({}, settings || {});
@@ -6175,240 +5680,6 @@ window.LiftRPGAPI = (function () {
     return report;
   }
 
-  // ── Golden Comparator ──────────────────────────────────────────────────────
-  //
-  // Compare an assembled booklet against a target artifact and report
-  // structural, continuity, and quality differences.
-
-  function compareToTarget(booklet, target) {
-    var diffs = {
-      timestamp: new Date().toISOString(),
-      missingFields: [],
-      looserStructures: [],
-      continuityMismatches: [],
-      genericityRisks: [],
-      crossRefWeaknesses: []
-    };
-
-    if (!booklet || !target) {
-      diffs.missingFields.push('booklet or target is null/undefined');
-      return diffs;
-    }
-
-    // ── Missing fields: walk target top-level and per-week ─────────────────
-    var TOP_KEYS = ['meta', 'theme', 'cover', 'rulesSpread', 'weeks', 'fragments', 'endings'];
-    TOP_KEYS.forEach(function (key) {
-      if (target[key] !== undefined && booklet[key] === undefined) {
-        diffs.missingFields.push('Missing top-level: ' + key);
-      }
-    });
-
-    // Compare meta keys
-    if (target.meta && booklet.meta) {
-      Object.keys(target.meta).forEach(function (mk) {
-        if (booklet.meta[mk] === undefined) {
-          diffs.missingFields.push('Missing meta.' + mk);
-        }
-      });
-    }
-
-    // Compare theme keys
-    if (target.theme && booklet.theme) {
-      Object.keys(target.theme).forEach(function (tk) {
-        if (booklet.theme[tk] === undefined) {
-          diffs.missingFields.push('Missing theme.' + tk);
-        }
-      });
-    }
-
-    // ── Per-week structural comparison ─────────────────────────────────────
-    var tWeeks = target.weeks || [];
-    var bWeeks = booklet.weeks || [];
-    var minWeeks = Math.min(tWeeks.length, bWeeks.length);
-
-    for (var wi = 0; wi < minWeeks; wi++) {
-      var tw = tWeeks[wi];
-      var bw = bWeeks[wi];
-      var wn = 'Week ' + (wi + 1);
-
-      // fieldOps sub-keys
-      var tfo = tw.fieldOps || {};
-      var bfo = bw.fieldOps || {};
-      ['mapState', 'cipher'].forEach(function (fk) {
-        if (tfo[fk] && !bfo[fk]) {
-          diffs.missingFields.push(wn + ' fieldOps.' + fk + ' missing');
-        }
-      });
-      // Oracle uses either key — check both
-      if ((tfo.oracleTable || tfo.oracle) && !(bfo.oracleTable || bfo.oracle)) {
-        diffs.missingFields.push(wn + ' fieldOps oracle missing');
-      }
-
-      // Session count comparison
-      var tSessions = (tw.sessions || []).length;
-      var bSessions = (bw.sessions || []).length;
-      if (bSessions < tSessions) {
-        diffs.looserStructures.push(wn + ': ' + bSessions + ' sessions vs target ' + tSessions);
-      }
-
-      // Oracle entry count
-      var tOracle = (tfo.oracleTable || tfo.oracle || {}).entries || [];
-      var bOracle = (bfo.oracleTable || bfo.oracle || {}).entries || [];
-      if (bOracle.length < tOracle.length) {
-        diffs.looserStructures.push(wn + ': ' + bOracle.length + ' oracle entries vs target ' + tOracle.length);
-      }
-
-      // Map tile count
-      var tTiles = ((tfo.mapState || {}).tiles || []).length;
-      var bTiles = ((bfo.mapState || {}).tiles || []).length;
-      if (bTiles < tTiles && tTiles > 0) {
-        diffs.looserStructures.push(wn + ': ' + bTiles + ' map tiles vs target ' + tTiles);
-      }
-
-      // Cipher fields present in target but missing in booklet
-      var tCipher = tfo.cipher || {};
-      var bCipher = bfo.cipher || {};
-      ['type', 'body', 'extractionInstruction', 'characterDerivationProof', 'noticeabilityDesign'].forEach(function (cf) {
-        if (tCipher[cf] !== undefined && (bCipher[cf] === undefined || bCipher[cf] === null || bCipher[cf] === '')) {
-          diffs.missingFields.push(wn + ' cipher.' + cf);
-        }
-      });
-
-      // Overflow document comparison
-      if (tw.overflowDocument && !bw.overflowDocument) {
-        diffs.missingFields.push(wn + ' overflowDocument missing (target has one)');
-      }
-    }
-
-    if (bWeeks.length < tWeeks.length) {
-      diffs.looserStructures.push('Fewer weeks: ' + bWeeks.length + ' vs target ' + tWeeks.length);
-    }
-
-    // ── Fragment comparison ────────────────────────────────────────────────
-    var tFrags = target.fragments || [];
-    var bFrags = booklet.fragments || [];
-    if (bFrags.length < tFrags.length) {
-      diffs.looserStructures.push('Fewer fragments: ' + bFrags.length + ' vs target ' + tFrags.length);
-    }
-
-    // Fragment field depth — richness comparison, not schema validation.
-    // Target-only optional fields are genericityRisks (thinner output), not missingFields.
-    var targetFragKeys = {};
-    tFrags.forEach(function (f) {
-      Object.keys(f).forEach(function (k) { targetFragKeys[k] = true; });
-    });
-    var bookletFragKeys = {};
-    bFrags.forEach(function (f) {
-      Object.keys(f).forEach(function (k) { bookletFragKeys[k] = true; });
-    });
-    Object.keys(targetFragKeys).forEach(function (k) {
-      if (!bookletFragKeys[k]) {
-        diffs.genericityRisks.push('Fragment field "' + k + '" present in target but absent in booklet');
-      }
-    });
-
-    // ── Continuity mismatches ──────────────────────────────────────────────
-
-    // Cipher type diversity comparison
-    var tCipherTypes = {};
-    var bCipherTypes = {};
-    (target.weeks || []).forEach(function (w) {
-      if (!w.isBossWeek) {
-        var t = ((w.fieldOps || {}).cipher || {}).type;
-        if (t) tCipherTypes[t] = true;
-      }
-    });
-    (booklet.weeks || []).forEach(function (w) {
-      if (!w.isBossWeek) {
-        var t = ((w.fieldOps || {}).cipher || {}).type;
-        if (t) bCipherTypes[t] = true;
-      }
-    });
-    var tCipherCount = Object.keys(tCipherTypes).length;
-    var bCipherCount = Object.keys(bCipherTypes).length;
-    if (bCipherCount < tCipherCount) {
-      diffs.continuityMismatches.push('Cipher diversity: ' + bCipherCount + ' types vs target ' + tCipherCount);
-    }
-
-    // Document type diversity comparison
-    var tDocTypes = {};
-    var bDocTypes = {};
-    tFrags.forEach(function (f) { if (f.documentType) tDocTypes[f.documentType] = true; });
-    bFrags.forEach(function (f) { if (f.documentType) bDocTypes[f.documentType] = true; });
-    var tDocCount = Object.keys(tDocTypes).length;
-    var bDocCount = Object.keys(bDocTypes).length;
-    if (bDocCount < tDocCount) {
-      diffs.continuityMismatches.push('Document type diversity: ' + bDocCount + ' types vs target ' + tDocCount);
-    }
-
-    // ── Genericity risks ───────────────────────────────────────────────────
-
-    // Fragment content length comparison (thinner = riskier)
-    var tAvgLen = 0;
-    var bAvgLen = 0;
-    tFrags.forEach(function (f) {
-      var c = f.content;
-      if (typeof c === 'object' && c) c = c.body || c.html || '';
-      tAvgLen += (c || '').length;
-    });
-    bFrags.forEach(function (f) {
-      var c = f.content;
-      if (typeof c === 'object' && c) c = c.body || c.html || '';
-      bAvgLen += (c || '').length;
-    });
-    tAvgLen = tFrags.length ? Math.round(tAvgLen / tFrags.length) : 0;
-    bAvgLen = bFrags.length ? Math.round(bAvgLen / bFrags.length) : 0;
-    if (bAvgLen < tAvgLen * 0.6 && tAvgLen > 0) {
-      diffs.genericityRisks.push('Fragment avg content length ' + bAvgLen + ' chars vs target ' + tAvgLen + ' — likely thinner');
-    }
-
-    // Ending count comparison
-    var tEndings = (target.endings || []).length;
-    var bEndings = (booklet.endings || []).length;
-    if (bEndings < tEndings) {
-      diffs.genericityRisks.push('Fewer endings: ' + bEndings + ' vs target ' + tEndings);
-    }
-
-    // Check for authenticityChecks presence (target has it, booklet might not)
-    var targetHasAuthChecks = tFrags.some(function (f) { return f.authenticityChecks; });
-    var bookletHasAuthChecks = bFrags.some(function (f) { return f.authenticityChecks; });
-    if (targetHasAuthChecks && !bookletHasAuthChecks) {
-      diffs.genericityRisks.push('Target fragments have authenticityChecks — booklet fragments lack them');
-    }
-
-    // ── Cross-reference weaknesses ─────────────────────────────────────────
-    var bFragRefCount = 0;
-    (booklet.weeks || []).forEach(function (w) {
-      (w.sessions || []).forEach(function (s) { if (s.fragmentRef) bFragRefCount++; });
-      var o = ((w.fieldOps || {}).oracleTable || (w.fieldOps || {}).oracle || {}).entries || [];
-      o.forEach(function (e) { if (e.fragmentRef) bFragRefCount++; });
-    });
-    var tFragRefCount = 0;
-    (target.weeks || []).forEach(function (w) {
-      (w.sessions || []).forEach(function (s) { if (s.fragmentRef) tFragRefCount++; });
-      var o = ((w.fieldOps || {}).oracleTable || (w.fieldOps || {}).oracle || {}).entries || [];
-      o.forEach(function (e) { if (e.fragmentRef) tFragRefCount++; });
-    });
-    if (bFragRefCount < tFragRefCount) {
-      diffs.crossRefWeaknesses.push('Fewer fragment cross-references: ' + bFragRefCount + ' vs target ' + tFragRefCount);
-    }
-
-    // Characters as fragment authors
-    var bAuthors = {};
-    bFrags.forEach(function (f) { if (f.inWorldAuthor) bAuthors[f.inWorldAuthor] = true; });
-    var tAuthors = {};
-    tFrags.forEach(function (f) { if (f.inWorldAuthor) tAuthors[f.inWorldAuthor] = true; });
-    if (Object.keys(bAuthors).length < Object.keys(tAuthors).length) {
-      diffs.crossRefWeaknesses.push('Fewer distinct fragment authors: ' + Object.keys(bAuthors).length + ' vs target ' + Object.keys(tAuthors).length);
-    }
-
-    // Summary counts
-    diffs.totalIssues = diffs.missingFields.length + diffs.looserStructures.length +
-      diffs.continuityMismatches.length + diffs.genericityRisks.length +
-      diffs.crossRefWeaknesses.length;
-
-    return diffs;
-  }
 
   return {
     PROVIDERS: PROVIDERS,
@@ -6443,7 +5714,6 @@ window.LiftRPGAPI = (function () {
     _compareIdentityContract: compareIdentityContract,
     qualityReport: generateQualityReport,
     qualityGate: buildQualityGate,
-    compareToTarget: compareToTarget,
     lastQualityReport: null,
     lastPricing: null
   };
