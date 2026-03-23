@@ -1725,30 +1725,6 @@
     };
   }
 
-  function buildApiCompactRules(stageName) {
-    var rules = [
-      'Preserve artifact-grade fiction: distinctive voice, document ecology, clue economy, spatial continuity, strong endings.',
-      'Do not genericize the shell, the relationship web, or the governing institution.',
-      'Every output must advance mystery, map state, relationship state, or reveal structure.',
-      'Trust deterministic validators for shape; spend tokens on concrete fiction and continuity instead of re-explaining JSON.',
-      'Return JSON only.'
-    ];
-
-    if (stageName === 'weeks') {
-      rules.push('Write only the requested week slice. Preserve topology family, approved shell identity, and fragment ID discipline.');
-    } else if (stageName === 'fragments') {
-      rules.push('Make each document feel authored, cross-referenceable, and specific to this booklet rather than generic lore delivery.');
-      rules.push('Use document voice, material detail, and contradiction pressure instead of exposition bulk.');
-    } else if (stageName === 'endings') {
-      rules.push('Pay off the protagonist arc, binary choice, and boss convergence without flattening the established register.');
-      rules.push('Aim for a final document that recontextualizes evidence instead of summarizing plot events.');
-    } else if (stageName === 'shell') {
-      rules.push('Lock the renderer-facing shell contract now so later stages can inherit it without renegotiating identity.');
-      rules.push('Make the shell feel authored and singular enough that later stages can imitate it without more doctrine.');
-    }
-
-    return rules;
-  }
 
   function summarizeLayerBibleForShell(layerBible) {
     var story = (layerBible || {}).storyLayer || {};
@@ -2038,48 +2014,6 @@
     });
   }
 
-  var API_STAGE1_FIELD_CONTRACT = [
-    'Return { storyLayer, gameLayer, governingLayer, designPrinciples, designLedger }.',
-    'storyLayer: premise; protagonist{role,want,need,flaw,wound,arc}; antagonistPressure; relationshipWeb[4-6]{name,role,initialStance,secret,arcFunction}; midpointReversal; darkestMoment; resolutionMode; bossTruth; recurringMotifs{object,place,phrase,sensory}.',
-    'gameLayer: coreLoop; persistentTopology; majorZones[]; gatesAndKeys[]; progressionGates[]; persistentPressures[]; companionSurfaces[]; revisitLogic; boardStateArc; bossConvergence; informationLayers.',
-    'governingLayer: institutionName; departments[]; proceduresThatAffectPlay[]; recordsAndForms[]; documentVoiceRules[].',
-    'designLedger: mysteryQuestions[3]; falseAssumptions[3]; motifPayoffs[4-6]; weekTransformations[one per week]; clueEconomy{hardClues,softClues,misdirections,confirmations}; finalRevealRecontextualizes.'
-  ].join('\n');
-
-  var API_STAGE2_FIELD_CONTRACT = [
-    'Return { topology, weeks, bossPlan, fragmentRegistry, overflowRegistry }.',
-    'weeks[]: weekNumber, arcBeat, npcBeat, stateSnapshot, playerGains, zoneFocus, mapReuse, stateChange, newGateOrUnlock, weeklyComponentMeaning, oraclePressure, fragmentFunction, governingProcedure, companionChange, isBossWeek, isBinaryChoiceWeek, sessionBeatTypes.',
-    'fragmentRegistry[]: id, title, documentType, author, revealPurpose, clueFunction, weekRef, sessionRef.',
-    'overflowRegistry[]: id, weekNumber, documentType, author, narrativeFunction, tonalIntent, arcRelationship.',
-    'bossPlan: decodeLogic, whyItFeelsEarned, requiredPriorKnowledge[].'
-  ].join('\n');
-
-  var API_SHELL_FIELD_CONTRACT = [
-    'Return { meta, cover, rulesSpread, theme } only.',
-    'meta must include schemaVersion, generatedAt, blockTitle, blockSubtitle, worldContract, narrativeVoice, literaryRegister, structuralShape, artifactIdentity, weeklyComponentType, passwordLength, weekCount, totalSessions.',
-    'artifactIdentity must keep shellFamily, boardStateMode, openingMode, rulesDeliveryMode, unlockLogic, attachmentStrategy distinct and renderer-ready.',
-    'cover/rules/theme must feel like the same artifact family promised by meta.artifactIdentity.'
-  ].join('\n');
-
-  var API_WEEKS_FIELD_CONTRACT = [
-    'Return { weeks:[...] } only for the requested week numbers.',
-    'Each non-boss week needs weekNumber, title, epigraph, isBossWeek:false, weeklyComponent, sessions, fieldOps{mapState,cipher,oracleTable,companionComponents?}, overflow, overflowDocument? and interlude?/gameplayClocks? when needed.',
-    'Boss week needs weekNumber, title, epigraph, isBossWeek:true, weeklyComponent.value:null, sessions, bossEncounter, overflow, overflowDocument? and optional interlude/gameplayClocks.',
-    'Oracle tables must use 10 d100 bands 00-09..90-99, text field only, and fragment entries must include real fragmentRef IDs.',
-    'Preserve the approved map family instead of flattening everything into a generic grid.'
-  ].join('\n');
-
-  var API_FRAGMENTS_FIELD_CONTRACT = [
-    'Return { fragments:[...] } only.',
-    'Each fragment must match its assigned registry entry and include id, documentType, inWorldAuthor, inWorldRecipient, inWorldPurpose, content, designSpec, authenticityChecks.',
-    'Documents must carry clue function, cross-reference value, and artifact-specific material detail.'
-  ].join('\n');
-
-  var API_ENDINGS_FIELD_CONTRACT = [
-    'Return { endings:[...] } only.',
-    'Each ending must be { variant, content:{ documentType, body, finalLine }, designSpec }.',
-    'Variants must diverge in emotional register and consequence, not just wording.'
-  ].join('\n');
 
   window.generateApiStage1Prompt = function (workout, brief, dice, options) {
     options = options || {};
@@ -2088,10 +2022,10 @@
     return [
       '# API Stage 1 — Layer Codex',
       '',
-      API_STAGE1_FIELD_CONTRACT,
+      '## SCHEMA CONTRACT',
+      window.buildStageSchema('layer-bible'),
       '',
-      '## Compact Rules',
-      buildApiCompactRules('layer-bible').map(function (line) { return '- ' + line; }).join('\n'),
+      '## Stage Rules',
       '- Plan a persistent topology with explicit gates, named keys, revisitation logic, and boss convergence requirements.',
       '- Keep the protagonist arc specific: role, want, need, flaw, wound, arc, darkest moment, and costly transformation.',
       '- Relationship web must use 4-6 named characters with distinct secrets and arc functions.',
@@ -2114,10 +2048,10 @@
     return [
       '# API Stage 2 — Story Plan',
       '',
-      API_STAGE2_FIELD_CONTRACT,
+      '## SCHEMA CONTRACT',
+      window.buildStageSchema('campaign-plan'),
       '',
-      '## Compact Rules',
-      buildApiCompactRules('campaign').map(function (line) { return '- ' + line; }).join('\n'),
+      '## Stage Rules',
       '- Use exactly ' + weekCount + ' weeks; mark the final week as boss and the midpoint week as the binary choice week.',
       '- Map each mystery question, false assumption, motif payoff, and week transformation into the week plan.',
       '- Fragment registry must create clue economy: establish early, complicate mid-block, reveal late; no lore-dump placeholders.',
@@ -2144,10 +2078,10 @@
     return [
       '# API Stage 3 — Booklet Setup',
       '',
-      API_SHELL_FIELD_CONTRACT,
+      '## SCHEMA CONTRACT',
+      window.buildStageSchema('shell'),
       '',
-      '## Compact Rules',
-      buildApiCompactRules('shell').map(function (line) { return '- ' + line; }).join('\n'),
+      '## Stage Rules',
       '- worldContract is the booklet north star. It must read like a testable governing tension, not a summary.',
       '- narrativeVoice, literaryRegister, structuralShape, and artifactIdentity are downstream contracts; make them strong enough that later stages can follow them exactly.',
       '- Cover, rules spread, and theme must all feel like one coherent shell family, not adjacent UI labels.',
@@ -2196,10 +2130,10 @@
     return [
       '# API Week Chunk — ' + weekLabel + (isBossChunk ? ' (Boss)' : ''),
       '',
-      API_WEEKS_FIELD_CONTRACT,
+      '## SCHEMA CONTRACT',
+      window.buildStageSchema('week-final'),
       '',
-      '## Compact Rules',
-      buildApiCompactRules('weeks').map(function (line) { return '- ' + line; }).join('\n'),
+      '## Stage Rules',
       '- Use only the supplied week slice, shell contract, continuity packet, and fragment IDs. Do not regenerate other weeks.',
       '- Story prompts must contain action, sensory specificity, and named places/objects from the approved world.',
       '- Preserve map continuity, progression gates, clue economy, relationship state, and the shell artifact family.',
@@ -2245,10 +2179,10 @@
     return [
       '# API Bonus Pages',
       '',
-      API_FRAGMENTS_FIELD_CONTRACT,
+      '## SCHEMA CONTRACT',
+      window.buildStageSchema('fragment'),
       '',
-      '## Compact Rules',
-      buildApiCompactRules('fragments').map(function (line) { return '- ' + line; }).join('\n'),
+      '## Stage Rules',
       '- Generate exactly one fragment per registry entry.',
       '- Honor revealPurpose and clueFunction so the set escalates from establish to complicate to reveal.',
       '- Include operational or material detail that makes each document feel found rather than narrated.',
@@ -2279,10 +2213,10 @@
     return [
       '# API Fragment Batch ' + (batchIndex + 1) + ' of ' + totalBatches,
       '',
-      API_FRAGMENTS_FIELD_CONTRACT,
+      '## SCHEMA CONTRACT',
+      window.buildStageSchema('fragment'),
       '',
-      '## Compact Rules',
-      buildApiCompactRules('fragments').map(function (line) { return '- ' + line; }).join('\n'),
+      '## Stage Rules',
       '- Generate exactly these fragment IDs; do not invent extras.',
       '- Use the week summaries for cross-reference anchors and the prior fragment signatures to avoid repetition or voice drift.',
       '- Preserve shell identity, document ecology, and contradiction depth across batches.',
@@ -2315,10 +2249,10 @@
     return [
       '# API Finale',
       '',
-      API_ENDINGS_FIELD_CONTRACT,
+      '## SCHEMA CONTRACT',
+      window.buildStageSchema('ending'),
       '',
-      '## Compact Rules',
-      buildApiCompactRules('endings').map(function (line) { return '- ' + line; }).join('\n'),
+      '## Stage Rules',
       '- The ending must sound like the same artifact family promised by the shell contract.',
       '- Pay off the protagonist need, relationship web, motifs, binary choice consequences, and boss convergence anchors already on the page.',
       '- Strong endings reveal or refract prior evidence; they do not summarize the plot.',
@@ -2350,9 +2284,8 @@
       '',
       'Generate a highly compact weekPlan JSON object containing narrative and structural intent.',
       '',
-      '---',
-      window.SCHEMA_WEEK_PLAN.join('\n'),
-      '---',
+      '## SCHEMA CONTRACT',
+      window.buildStageSchema('week-plan'),
       '',
       '## Context',
       '**World Contract:** ' + (shellContext.worldContract || ''),
@@ -2374,9 +2307,8 @@
       'The root object MUST have "title" and "sessions" keys. Do NOT output meta, cover, rulesSpread, or theme.',
       'Do NOT regenerate the booklet shell. Output ONLY the week.',
       '',
-      '---',
-      window.SCHEMA_SINGLE_WEEK.join('\n'),
-      '---',
+      '## SCHEMA CONTRACT',
+      window.buildStageSchema('week-final'),
       '',
       '## The Plan to Execute',
       JSON.stringify(weekPlan),
@@ -2406,9 +2338,8 @@
       '',
       'Generate exactly ONE found document object as valid JSON. Do not over-explain.',
       '',
-      '---',
-      window.SCHEMA_SINGLE_FRAGMENT.join('\n'),
-      '---',
+      '## SCHEMA CONTRACT',
+      window.buildStageSchema('fragment'),
       '',
       '## Fragment Registry Assignment',
       JSON.stringify(registryEntry),
@@ -2438,9 +2369,8 @@
       '',
       'Generate ONE ending object as valid JSON.',
       '',
-      '---',
-      window.SCHEMA_SINGLE_ENDING.join('\n'),
-      '---',
+      '## SCHEMA CONTRACT',
+      window.buildStageSchema('ending'),
       '',
       '## Context',
       '**World Contract:** ' + (shellContext.worldContract || ''),
