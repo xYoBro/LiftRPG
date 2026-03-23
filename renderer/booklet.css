@@ -87,6 +87,9 @@ body[data-review-mode="true"] .reader-unlock{
 body[data-demo-view="true"] .app-chrome{
   display:none !important;
 }
+body[data-demo-view="true"] .renderer-empty-state{
+  display:none !important;
+}
 
 body[data-demo-view="true"] #booklet-container{
   padding-top:92px;
