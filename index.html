@@ -2189,19 +2189,17 @@
           flipper.classList.toggle('is-flipped', flipped);
           main.classList.toggle('is-expanded', flipped);
 
-          // Load preview iframe on first flip to back
-          if (flipped) {
-            var frame = document.getElementById('preview-frame');
-            if (frame && !frame.getAttribute('src')) {
-              frame.src = 'renderer/?demo=liftrpg-eastern-shore&demoView=1&mode=spread';
-            }
-          }
-
           measure();
           // Re-measure after width transition settles
           setTimeout(measure, 520);
         });
       });
+
+      // Preload demo iframe on page load so it's ready before flip
+      var preloadFrame = document.getElementById('preview-frame');
+      if (preloadFrame && !preloadFrame.getAttribute('src')) {
+        preloadFrame.src = 'renderer/?demo=liftrpg-eastern-shore&demoView=1&mode=spread';
+      }
 
       if (details) {
         details.addEventListener('toggle', function () {
