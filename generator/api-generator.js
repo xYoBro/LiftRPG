@@ -3331,6 +3331,11 @@ window.LiftRPGAPI = (function () {
       || lower.indexOf('expected ') !== -1
       || lower.indexOf('returned weeks') !== -1
       || lower.indexOf('returned fragments') !== -1
+      || lower.indexOf('returned empty result') !== -1
+      || lower.indexOf('returned a shell') !== -1
+      || lower.indexOf('missing "title"') !== -1
+      || lower.indexOf('missing "sessions"') !== -1
+      || lower.indexOf('missing "content"') !== -1
       || lower.indexOf('stage validation') !== -1
       || lower.indexOf('missing required sections') !== -1;
   }
