@@ -815,7 +815,7 @@
   // - NEVER put schema or instruction content in generator.js or api-generator.js.
 
   var STAGE_SCHEMA_MAP = {
-    'layer-bible':    { schemas: [],                                            instructions: ['ANTI_PATTERNS'] },
+    'layer-codex':    { schemas: [],                                            instructions: ['ANTI_PATTERNS'] },
     'campaign-plan':  { schemas: [],                                            instructions: ['WORLD_CONTRACT', 'ANTI_PATTERNS'] },
     'shell':          { schemas: ['META', 'THEME', 'TAIL'],                     instructions: ['OUTPUT_RULES', 'CONTRACT_GUARDRAILS', 'RULES_TEACH', 'VISUAL_DIRECTION', 'STRUCTURAL_RULES'] },
     'week-plan':      { schemas: ['WEEK_PLAN'],                                 instructions: [] },
@@ -833,7 +833,7 @@
     var parts = [];
 
     // Planning stages get the mechanic vocabulary brief
-    if (stageName === 'layer-bible' || stageName === 'campaign-plan') {
+    if (stageName === 'layer-codex' || stageName === 'campaign-plan') {
       parts.push(window.MECHANIC_VOCAB_BRIEF);
     }
 
@@ -885,7 +885,7 @@
   // The default manual flow now continues through shell / weeks / fragments / endings.
   //
   // API "Deep" mode (10-stage partial-JSON pipeline):
-  //   Stage 1: Layer Bible
+  //   Stage 1: Layer Codex
   //   Stage 2: Campaign Plan + Fragment Registry
   //   Stage 3: Booklet Shell (meta, cover, rules, theme)
   //   Stages 4..N-3: Week Chunks (dynamic, 2-3 weeks each)
@@ -893,8 +893,8 @@
   //   Stage N-1: Endings
   //   Stage N: Patch (conditional, only if validation fails)
   //
-  // Stage 1: Layer Bible  — compact 3-layer architecture planning JSON
-  // Stage 2: Campaign Plan — per-week structure using the approved layer bible
+  // Stage 1: Layer Codex  — compact 3-layer architecture planning JSON
+  // Stage 2: Campaign Plan — per-week structure using the approved layer codex
   // Stage 3 (legacy chat): Final Compile — full booklet JSON retained only as fallback
 
   window.STAGE1_OUTPUT_SCHEMA = JSON.stringify({

@@ -2023,7 +2023,7 @@
       '# API Stage 1 — Layer Codex',
       '',
       '## SCHEMA CONTRACT',
-      window.buildStageSchema('layer-bible'),
+      window.buildStageSchema('layer-codex'),
       '',
       '## Stage Rules',
       '- Plan a persistent topology with explicit gates, named keys, revisitation logic, and boss convergence requirements.',
