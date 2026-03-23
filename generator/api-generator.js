@@ -25,6 +25,14 @@ window.LiftRPGAPI = (function () {
   var DOCUMENT_TYPE_ENUM = ['memo', 'report', 'inspection', 'fieldNote',
     'correspondence', 'letter', 'transcript', 'form', 'anomaly'];
 
+  var VALID_MAP_TYPES = ['grid', 'point-to-point', 'linear-track', 'player-drawn'];
+  var VALID_COMPANION_TYPES = ['dashboard', 'return-box', 'inventory-grid', 'token-sheet',
+    'overlay-window', 'stress-track', 'memory-slots'];
+  var VALID_CLOCK_TYPES = ['progress-clock', 'danger-clock', 'racing-clock',
+    'tug-of-war-clock', 'linked-clock', 'project-clock'];
+  var VALID_ARCHETYPES = ['government', 'cyberpunk', 'scifi', 'fantasy', 'noir',
+    'steampunk', 'minimalist', 'nautical', 'occult', 'pastoral'];
+
   // ── Provider presets ────────────────────────────────────────────────────────
 
   var PROVIDERS = {
@@ -2903,6 +2911,135 @@ window.LiftRPGAPI = (function () {
   }
 
   // ── Expanded booklet validation ─────────────────────────────────────────
+  /**
+   * Per-week structural validation. Runs after each week is generated
+   * in the pipeline, before proceeding to the next stage.
+   * Returns { valid: boolean, errors: string[] }
+   */
+  function validateWeekSchema(weekObj, isBoss) {
+    var errors = [];
+    if (!weekObj) { return { valid: false, errors: ['Week object is null'] }; }
+    if (!weekObj.title) errors.push('Missing week title');
+    if (!Array.isArray(weekObj.sessions) || weekObj.sessions.length === 0) {
+      errors.push('Missing or empty sessions array');
+    }
+
+    // Non-boss weeks must have fieldOps
+    if (!isBoss && !weekObj.fieldOps) {
+      errors.push('Non-boss week missing fieldOps');
+    }
+    if (!isBoss && weekObj.fieldOps) {
+      var fo = weekObj.fieldOps;
+
+      // Oracle validation
+      if (fo.oracleTable) {
+        var ot = fo.oracleTable;
+        if (!Array.isArray(ot.entries)) {
+          errors.push('oracleTable.entries must be an array');
+        } else {
+          if (ot.entries.length !== 10) {
+            errors.push('Oracle table must have exactly 10 entries (d100 bands), got ' + ot.entries.length);
+          }
+          ot.entries.forEach(function(e, i) {
+            if (e && !e.text && !e.result) {
+              errors.push('Oracle entry ' + i + ' missing text field');
+            } else if (e && e.result && !e.text) {
+              errors.push('Oracle entry ' + i + ' uses "result" instead of "text"');
+            }
+          });
+        }
+      } else {
+        errors.push('Non-boss week missing fieldOps.oracleTable');
+      }
+
+      // Cipher validation
+      if (fo.cipher) {
+        if (fo.cipher.body && typeof fo.cipher.body === 'string') {
+          errors.push('cipher.body must be an object (with displayText, key, workSpace), not a string');
+        }
+      }
+
+      // Map validation
+      if (fo.mapState) {
+        if (!fo.mapState.mapType) {
+          errors.push('mapState missing mapType field');
+        } else if (VALID_MAP_TYPES.indexOf(fo.mapState.mapType) === -1) {
+          errors.push('Unknown mapType: "' + fo.mapState.mapType + '". Must be one of: ' + VALID_MAP_TYPES.join(', '));
+        }
+        if (fo.mapState.mapType === 'grid' && fo.mapState.gridDimensions) {
+          var gd = fo.mapState.gridDimensions;
+          if (gd.columns > 12 || gd.rows > 8) {
+            errors.push('Grid dimensions exceed max (12x8): got ' + gd.columns + 'x' + gd.rows);
+          }
+        }
+      }
+
+      // Companion component validation
+      if (Array.isArray(fo.companionComponents)) {
+        fo.companionComponents.forEach(function(cc) {
+          if (cc && cc.type && VALID_COMPANION_TYPES.indexOf(cc.type) === -1) {
+            errors.push('Unknown companion component type: "' + cc.type + '"');
+          }
+        });
+      }
+    }
+
+    // Boss week validation
+    if (isBoss) {
+      var boss = weekObj.bossEncounter;
+      if (!boss) {
+        errors.push('Boss week missing bossEncounter');
+      } else {
+        if (!boss.decodingKey) {
+          errors.push('Boss encounter missing decodingKey');
+        } else if (!boss.decodingKey.referenceTable) {
+          errors.push('Boss decodingKey missing referenceTable');
+        }
+      }
+    }
+
+    return { valid: errors.length === 0, errors: errors };
+  }
+
+  /**
+   * Shell structural validation. Runs after shell stage (Stage 3).
+   * Returns { valid: boolean, errors: string[] }
+   */
+  function validateShellSchema(shell) {
+    var errors = [];
+    if (!shell) { return { valid: false, errors: ['Shell is null'] }; }
+    if (!shell.meta) errors.push('Missing meta');
+    if (!shell.cover) errors.push('Missing cover');
+    if (!shell.rulesSpread) {
+      errors.push('Missing rulesSpread');
+    } else {
+      if (!shell.rulesSpread.leftPage) errors.push('rulesSpread missing leftPage');
+      if (!shell.rulesSpread.rightPage) errors.push('rulesSpread missing rightPage');
+      if (shell.rulesSpread.leftPage && !Array.isArray(shell.rulesSpread.leftPage.sections)) {
+        errors.push('rulesSpread.leftPage missing sections array');
+      }
+      if (shell.rulesSpread.leftPage && Array.isArray(shell.rulesSpread.leftPage.sections) &&
+          shell.rulesSpread.leftPage.sections.length < 4) {
+        errors.push('rulesSpread.leftPage.sections has fewer than 4 entries (' +
+          shell.rulesSpread.leftPage.sections.length + ')');
+      }
+    }
+    if (shell.meta) {
+      if (!shell.meta.schemaVersion || !String(shell.meta.schemaVersion).match(/^1\.3/)) {
+        errors.push('meta.schemaVersion should start with "1.3", got: ' + shell.meta.schemaVersion);
+      }
+      if (!('passwordEncryptedEnding' in shell.meta)) {
+        errors.push('meta.passwordEncryptedEnding must exist (can be empty string)');
+      }
+    }
+    if (shell.theme && shell.theme.visualArchetype) {
+      if (VALID_ARCHETYPES.indexOf(shell.theme.visualArchetype) === -1) {
+        errors.push('Unknown visualArchetype: "' + shell.theme.visualArchetype + '"');
+      }
+    }
+    return { valid: errors.length === 0, errors: errors };
+  }
+
   // Validates the assembled booklet. Returns array of human-readable errors.
   // Fragment ID matching is soft: "F.01" matches "F-01", "f_01", etc.
 
@@ -4260,7 +4397,17 @@ window.LiftRPGAPI = (function () {
           }
           return result;
         },
-        validate: validateShellStage,
+        validate: function(result) {
+          var v = validateShellSchema(result);
+          if (!v.valid) {
+            throw new Error('Shell schema validation: ' + v.errors.join('; '));
+          }
+          // Also strip weeks/fragments/endings if LLM generated them
+          if (result && result.weeks) { delete result.weeks; }
+          if (result && result.fragments) { delete result.fragments; }
+          if (result && result.endings) { delete result.endings; }
+          return true;
+        },
         buildPrompt: function (retryState) { return builders.shell(brief, layerBible, campaignPlan, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
       });
       checkpoint = saveCheckpoint('shell', shell, checkpoint);
@@ -4358,6 +4505,13 @@ window.LiftRPGAPI = (function () {
       weekObject.weekNumber = w;
       if (isBossWeek) weekObject.isBossWeek = true;
       else weekObject.isBossWeek = false;
+
+      // Schema validation safety net
+      var weekValidation = validateWeekSchema(weekObject, weekObject.isBossWeek);
+      if (!weekValidation.valid) {
+        console.warn('[pipeline] Week ' + w + ' schema issues:', weekValidation.errors);
+        if (options.onStatus) options.onStatus('Week ' + w + ': ' + weekValidation.errors.length + ' schema issue(s)');
+      }
 
       finalWeeks.push(weekObject);
       if (!isBossWeek && weekObject.weeklyComponent && weekObject.weeklyComponent.value) {
