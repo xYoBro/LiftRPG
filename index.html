@@ -2456,6 +2456,10 @@
           caption += ' at ' + formatPricingTimestamp(pricing.fetchedAt);
         }
         caption += ' for ' + (modelLabel || 'the selected model') + '.';
+        if (pricing.live && pricing.sourceKind === 'thirdParty' && fallbackReason) {
+          caption += ' Official provider pricing could not be fetched directly, so LiftRPG used the configured third-party pricing feed.';
+          return caption;
+        }
         if (!pricing.live && fallbackReason) {
           caption += ' Using the local pricing table because the live source could not be refreshed.';
         }
@@ -5040,7 +5044,11 @@
             if (runId !== activeApiRunId) return;
             applyPricingRefreshResult(pricingResult);
             if (pricingResult && pricingResult.pricing && pricingResult.live) {
-              pushApiLog('Live pricing refreshed from ' + pricingResult.pricing.sourceLabel + ' for ' + settings.model + '.');
+              if (pricingResult.sourcePath === 'third-party' && pricingResult.error) {
+                pushApiLog('Official pricing was unavailable. Live pricing refreshed from ' + pricingResult.pricing.sourceLabel + ' for ' + settings.model + '.');
+              } else {
+                pushApiLog('Live pricing refreshed from ' + pricingResult.pricing.sourceLabel + ' for ' + settings.model + '.');
+              }
             } else if (pricingResult && pricingResult.pricing) {
               pushApiLog('Live pricing unavailable. Using the local pricing table for ' + settings.model + (pricingResult.error ? ' (' + pricingResult.error + ').' : '.'));
             } else if (pricingResult && pricingResult.error) {

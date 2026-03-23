@@ -92,6 +92,16 @@ window.LiftRPGAPI = (function () {
     }
   };
 
+  // Centralized third-party pricing fallback configuration.
+  // If this ecosystem shifts again, update this single object first.
+  var THIRD_PARTY_PRICING_FEED = {
+    id: 'pricetoken',
+    enabled: true,
+    label: 'PriceToken pricing API',
+    siteUrl: 'https://pricetoken.ai/',
+    modelEndpointBase: 'https://pricetoken.ai/api/v1/text/'
+  };
+
   var MODEL_PRICING_RULES = [
     {
       provider: 'anthropic',
@@ -391,6 +401,8 @@ window.LiftRPGAPI = (function () {
       verifiedAt: rule.verifiedAt || PRICING_VERIFIED_AT,
       fetchedAt: rule.fetchedAt || '',
       live: !!rule.live,
+      sourceKind: rule.sourceKind || 'official',
+      fallbackReason: rule.fallbackReason || '',
       inputPerMillion: rule.inputPerMillion,
       outputPerMillion: rule.outputPerMillion,
       cachedInputPerMillion: rule.cachedInputPerMillion,
@@ -565,6 +577,15 @@ window.LiftRPGAPI = (function () {
     return text;
   }
 
+  function describePricingFetchError(error, fallbackMessage) {
+    var message = error && error.message ? error.message : String(error || '');
+    if (!message) return fallbackMessage || 'Pricing refresh failed.';
+    if (/failed to fetch|load failed/i.test(message)) {
+      return fallbackMessage || 'Browser could not fetch the pricing source directly.';
+    }
+    return message;
+  }
+
   function buildLivePricingRule(providerId, modelId, fields) {
     fields = fields || {};
     return {
@@ -584,9 +605,35 @@ window.LiftRPGAPI = (function () {
       longContextCacheReadPerMillion: fields.longContextCacheReadPerMillion,
       source: fields.source || { label: '', url: '' },
       live: true,
+      sourceKind: fields.sourceKind || 'official',
+      fallbackReason: fields.fallbackReason || '',
       fetchedAt: fields.fetchedAt || '',
       verifiedAt: fields.verifiedAt || (fields.fetchedAt ? String(fields.fetchedAt).slice(0, 10) : PRICING_VERIFIED_AT)
     };
+  }
+
+  function buildThirdPartyPricingUrl(modelId) {
+    return THIRD_PARTY_PRICING_FEED.modelEndpointBase + encodeURIComponent(normalizeModelFamilyId(modelId) || normalizeModelId(modelId));
+  }
+
+  function parseThirdPartyPricingRule(body, providerId, modelId) {
+    var payload = body && body.data ? body.data : body;
+    if (!payload || (!payload.modelId && !payload.displayName)) return null;
+    var payloadProvider = normalizeModelId(payload.provider || providerId);
+    if (providerId && payloadProvider && providerId !== payloadProvider && providerId !== 'custom' && providerId !== 'ollama') {
+      return null;
+    }
+    return buildLivePricingRule(payloadProvider || providerId || 'openai', modelId, {
+      label: payload.displayName || humanizeModelLabel(payload.modelId || modelId),
+      inputPerMillion: parseMoneyValue(payload.inputPerMTok),
+      outputPerMillion: parseMoneyValue(payload.outputPerMTok),
+      source: {
+        label: THIRD_PARTY_PRICING_FEED.label,
+        url: THIRD_PARTY_PRICING_FEED.siteUrl
+      },
+      sourceKind: 'thirdParty',
+      fetchedAt: payload.lastUpdated || (body && body.meta && body.meta.timestamp) || new Date().toISOString()
+    });
   }
 
   function parseAnthropicPricingRule(pageText, modelId, fetchedAt) {
@@ -724,6 +771,19 @@ window.LiftRPGAPI = (function () {
     return null;
   }
 
+  async function fetchThirdPartyPricingRule(providerId, modelId, timeoutMs) {
+    if (!THIRD_PARTY_PRICING_FEED.enabled || !modelId) return null;
+    var body = await fetchJsonWithTimeout(buildThirdPartyPricingUrl(modelId), {
+      method: 'GET',
+      cache: 'no-store',
+      credentials: 'omit',
+      headers: {
+        'accept': 'application/json'
+      }
+    }, timeoutMs);
+    return parseThirdPartyPricingRule(body, providerId, modelId);
+  }
+
   async function refreshPricing(settings, options) {
     var resolved = Object.assign({}, settings || {});
     var providerId = detectProviderId(resolved);
@@ -731,15 +791,28 @@ window.LiftRPGAPI = (function () {
     var timeoutMs = (options && options.timeoutMs) || Math.min(resolved.requestTimeoutMs || DEFAULT_TIMEOUT_MS, DEFAULT_PRICING_REFRESH_TIMEOUT_MS);
     var fallbackRule = findMatchingPricingRule(MODEL_PRICING_RULES, providerId, modelId);
     var liveRule = null;
+    var thirdPartyRule = null;
+    var officialRefreshError = '';
     var refreshError = '';
 
     try {
       liveRule = await fetchLivePricingRule(providerId, modelId, timeoutMs);
       if (!liveRule) {
-        refreshError = 'Official pricing did not expose a parseable entry for ' + (modelId || 'the selected model') + '.';
+        officialRefreshError = 'Official pricing did not expose a parseable entry for ' + (modelId || 'the selected model') + '.';
       }
     } catch (error) {
-      refreshError = error && error.message ? error.message : String(error || 'Live pricing refresh failed.');
+      officialRefreshError = describePricingFetchError(error, 'Browser could not fetch the official provider pricing page directly.');
+    }
+
+    if (!liveRule && THIRD_PARTY_PRICING_FEED.enabled) {
+      try {
+        thirdPartyRule = await fetchThirdPartyPricingRule(providerId, modelId, timeoutMs);
+        if (thirdPartyRule && officialRefreshError) {
+          thirdPartyRule.fallbackReason = officialRefreshError;
+        }
+      } catch (error) {
+        refreshError = describePricingFetchError(error, 'The configured third-party pricing feed could not be reached.');
+      }
     }
 
     var effectiveRule = null;
@@ -747,8 +820,16 @@ window.LiftRPGAPI = (function () {
     if (liveRule) {
       effectiveRule = mergePricingRule(fallbackRule, liveRule);
       live = true;
+      refreshError = '';
+    } else if (thirdPartyRule) {
+      effectiveRule = mergePricingRule(fallbackRule, thirdPartyRule);
+      live = true;
+      refreshError = officialRefreshError;
     } else if (fallbackRule) {
       effectiveRule = clonePricingRule(fallbackRule);
+      refreshError = officialRefreshError || refreshError;
+    } else {
+      refreshError = officialRefreshError || refreshError;
     }
 
     resolved._pricingRule = effectiveRule || null;
@@ -763,10 +844,14 @@ window.LiftRPGAPI = (function () {
       matched: !!pricing,
       live: live,
       pricing: pricing,
+      sourcePath: liveRule ? 'official' : thirdPartyRule ? 'third-party' : 'local',
       error: refreshError
     };
     if (result.pricing && !live && refreshError) {
       result.pricing.fallbackReason = refreshError;
+    }
+    if (result.pricing && thirdPartyRule && officialRefreshError) {
+      result.pricing.fallbackReason = officialRefreshError;
     }
     if (typeof window !== 'undefined' && window.LiftRPGAPI) {
       window.LiftRPGAPI.lastPricing = result;
@@ -3246,8 +3331,16 @@ window.LiftRPGAPI = (function () {
       || (isLikelyJsonFailure(err) && !isLikelyTruncationError(err));
   }
 
+  function isLikelyTimeoutError(err) {
+    var lower = String((err && err.message) || err || '').toLowerCase();
+    return lower.indexOf('timed out') !== -1
+      || lower.indexOf('timeout') !== -1
+      || lower.indexOf('aborterror') !== -1
+      || lower.indexOf('stalled') !== -1;
+  }
+
   function shouldRetryStageError(err) {
-    return isLikelyTruncationError(err) || isLikelyJsonFailure(err) || isLikelySchemaFailure(err);
+    return isLikelyTimeoutError(err) || isLikelyTruncationError(err) || isLikelyJsonFailure(err) || isLikelySchemaFailure(err);
   }
 
   function shouldSplitWeekChunk(err, weekNumbers) {
@@ -3262,6 +3355,119 @@ window.LiftRPGAPI = (function () {
     var text = String(value || '').replace(/\s+/g, ' ').trim();
     if (!maxLength || text.length <= maxLength) return text;
     return text.slice(0, Math.max(0, maxLength - 3)).replace(/\s+\S*$/, '') + '...';
+  }
+
+  function compactJsonString(value) {
+    try {
+      return JSON.stringify(value);
+    } catch (_error) {
+      return '{}';
+    }
+  }
+
+  function parseWeekCountFromWorkout(workout) {
+    if (typeof window !== 'undefined' && typeof window.parseWeekCount === 'function') {
+      return window.parseWeekCount(workout);
+    }
+    var match = String(workout || '').match(/(\d+)\s*weeks?\b/i);
+    var count = match ? parseInt(match[1], 10) : 6;
+    return Math.max(4, Math.min(12, count || 6));
+  }
+
+  function summarizeLayerBibleForCampaignRetry(layerBible) {
+    var bible = layerBible || {};
+    var story = bible.storyLayer || {};
+    var protagonist = story.protagonist || {};
+    var game = bible.gameLayer || {};
+    var governing = bible.governingLayer || {};
+    var ledger = bible.designLedger || {};
+    return {
+      story: {
+        premise: truncateText(story.premise, 160),
+        protagonist: {
+          role: truncateText(protagonist.role, 60),
+          want: truncateText(protagonist.want, 70),
+          need: truncateText(protagonist.need, 70),
+          flaw: truncateText(protagonist.flaw, 70),
+          wound: truncateText(protagonist.wound, 70),
+          arc: truncateText(protagonist.arc, 90)
+        },
+        antagonistPressure: truncateText(story.antagonistPressure, 120),
+        midpointReversal: truncateText(story.midpointReversal, 120),
+        darkestMoment: truncateText(story.darkestMoment, 120),
+        bossTruth: truncateText(story.bossTruth, 120)
+      },
+      cast: (story.namedCharacters || []).slice(0, 5).map(function (entry) {
+        return {
+          name: entry.name || '',
+          role: truncateText(entry.role, 50),
+          secret: truncateText(entry.secret, 70),
+          arcFunction: truncateText(entry.arcFunction, 70)
+        };
+      }),
+      game: {
+        topology: truncateText(game.persistentTopology, 130),
+        zones: (game.majorZones || []).slice(0, 5),
+        locks: (game.lockedZones || []).slice(0, 5),
+        gates: (game.gatingKeys || []).slice(0, 6).map(function (entry) {
+          return {
+            key: entry.key || '',
+            unlocks: truncateText(entry.unlocks, 70),
+            requires: truncateText(entry.requires, 70)
+          };
+        }),
+        bossConvergence: truncateText(game.bossConvergence, 120)
+      },
+      governing: {
+        institutionName: truncateText(governing.institutionName, 70),
+        departments: (governing.departments || []).slice(0, 4),
+        procedures: (governing.proceduresThatAffectPlay || []).slice(0, 4)
+      },
+      designLedger: {
+        mysteryQuestions: (ledger.mysteryQuestions || []).slice(0, 3),
+        falseAssumptions: (ledger.falseAssumptions || []).slice(0, 3),
+        motifPayoffs: (ledger.motifPayoffs || []).slice(0, 4),
+        weekTransformations: (ledger.weekTransformations || []).slice(0, 8),
+        finalReveal: truncateText(ledger.finalRevealRecontextualizes, 140)
+      }
+    };
+  }
+
+  function buildCompactCampaignRetryPrompt(workout, brief, dice, layerBible, retryState) {
+    var weekCount = parseWeekCountFromWorkout(workout);
+    var midpoint = Math.ceil(weekCount / 2);
+    var lastError = retryState && retryState.error ? truncateText(retryState.error.message || retryState.error, 180) : '';
+    return [
+      '# API Stage 2 — Story Plan (Compact Retry)',
+      '',
+      'Return JSON only.',
+      'Generate a compact but complete campaign plan that matches this exact top-level shape:',
+      '{"topology":{},"weeks":[],"bossPlan":{},"fragmentRegistry":[],"overflowRegistry":[]}',
+      '',
+      '## Hard Requirements',
+      '- Use exactly ' + weekCount + ' weeks.',
+      '- Week ' + midpoint + ' must be the binary choice week.',
+      '- Week ' + weekCount + ' must be the boss week.',
+      '- Every week needs: weekNumber, arcBeat, npcBeat, stateSnapshot, playerGains, zoneFocus, mapReuse, stateChange, newGateOrUnlock, weeklyComponentMeaning, oraclePressure, fragmentFunction, governingProcedure, companionChange, isBossWeek, isBinaryChoiceWeek, sessionBeatTypes.',
+      '- fragmentRegistry must establish clues early, complicate them mid-block, and reveal them late.',
+      '- Keep descriptions concise. Preserve clue economy, progression, and convergence logic.',
+      lastError ? '- Fix the prior failure: ' + lastError : '',
+      '',
+      '## Layer Codex Essentials',
+      compactJsonString(summarizeLayerBibleForCampaignRetry(layerBible)),
+      '',
+      '## Inputs',
+      'Workout: ' + truncateText(workout, 900),
+      'Creative direction: ' + truncateText(brief || '', 420),
+      'Dice: ' + String(dice || 'd100')
+    ].filter(Boolean).join('\n');
+  }
+
+  function isSlowPlanningModel(settings) {
+    var providerId = detectProviderId(settings);
+    var modelId = normalizeModelId(settings && settings.model);
+    return (providerId === 'anthropic' && /^claude-opus/i.test(modelId))
+      || (providerId === 'openai' && /(gpt-5(?:\.4)?-pro|o3-pro)/i.test(modelId));
   }
 
   async function callOpenAICompatStructured(apiKey, baseUrl, model, prompt, schema, maxTokens, timeoutMs, stageName, pricingRule) {
@@ -3557,14 +3763,24 @@ window.LiftRPGAPI = (function () {
     var stageTelemetry = createStageTelemetry(config.stageKey, config.stageName);
 
     for (var attempt = 0; attempt < attemptCount; attempt++) {
-      var prompt = config.buildPrompt({ attempt: attempt, error: lastErr });
+      var retryState = { attempt: attempt, error: lastErr };
+      var prompt = config.buildPrompt(retryState);
       if (attempt > 0) prompt += buildRetryDirective(config.stageName, attempt, lastErr);
+      var resolvedMaxTokens = typeof config.maxTokens === 'function'
+        ? config.maxTokens(retryState)
+        : config.maxTokens;
+      var resolvedTimeoutMs = typeof config.requestTimeoutMs === 'function'
+        ? config.requestTimeoutMs(retryState)
+        : (config.requestTimeoutMs || settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS);
+      var stageSettings = resolvedTimeoutMs === (settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS)
+        ? settings
+        : Object.assign({}, settings, { requestTimeoutMs: resolvedTimeoutMs });
 
       try {
         var response = config.schema
-          ? await callProviderStructured(settings, prompt, config.schema, config.maxTokens, config.stageName)
+          ? await callProviderStructured(stageSettings, prompt, config.schema, resolvedMaxTokens, config.stageName)
           : (function () {
-            return callProvider(settings, prompt, config.maxTokens).then(function (rawResponse) {
+            return callProvider(stageSettings, prompt, resolvedMaxTokens).then(function (rawResponse) {
               return {
                 result: extractJson(rawResponse.text),
                 meta: rawResponse.meta,
@@ -3829,6 +4045,7 @@ window.LiftRPGAPI = (function () {
     });
 
     progress('campaign', 'Planning story…');
+    var compactCampaignFirstPass = isSlowPlanningModel(settings);
     var campaignPlan = await runJsonStage(settings, {
       stageKey: 'campaign',
       stageName: 'Story Plan',
@@ -3837,10 +4054,27 @@ window.LiftRPGAPI = (function () {
       onProgress: onProgress,
       getTotalStages: function () { return totalStages; },
       schema: STRUCTURED_SCHEMA_CAMPAIGN,
-      maxTokens: 16384,
+      requestTimeoutMs: function (retryState) {
+        if (!retryState || retryState.attempt <= 0) {
+          return compactCampaignFirstPass ? Math.max(settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS, 720000) : (settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS);
+        }
+        return Math.max(Math.min(settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS, 540000), 420000);
+      },
+      maxTokens: function (retryState) {
+        if (retryState && retryState.attempt > 0) return 8192;
+        return compactCampaignFirstPass ? 12288 : 14336;
+      },
       maxAttempts: 2,
       validate: validateCampaignPlanStage,
-      buildPrompt: function (retryState) { return builders.stage2(workout, brief, dice, layerBible, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
+      buildPrompt: function (retryState) {
+        if (retryState && retryState.attempt > 0) {
+          return buildCompactCampaignRetryPrompt(workout, brief, dice, layerBible, retryState);
+        }
+        if (compactCampaignFirstPass) {
+          return buildCompactCampaignRetryPrompt(workout, brief, dice, layerBible, { attempt: 0, error: null });
+        }
+        return builders.stage2(workout, brief, dice, layerBible, undefined);
+      }
     });
 
     if (!Array.isArray(campaignPlan.fragmentRegistry)) campaignPlan.fragmentRegistry = [];
