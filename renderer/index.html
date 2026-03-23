@@ -30,22 +30,13 @@
       <a href="../" class="app-back"><span class="back-chevron">&#x2039;</span>Back To Home</a>
       <span class="app-version">Renderer</span>
     </div>
-
-    <div class="app-summary">
-      <div class="app-kicker">Booklet Renderer</div>
-      <div class="app-title">Load, preview, and print.</div>
-      <div class="app-copy">Bring in a LiftRPG JSON file, check the pages, then print when it looks right.</div>
-    </div>
+    <input type="file" id="json-input" accept=".json" hidden />
 
     <div class="app-toolbar">
-      <div class="app-action-group">
+      <div class="app-action-group app-action-group--reader">
         <label class="upload-btn" for="json-input">
           <span class="upload-icon">&#x2B06;</span> Load JSON
-          <input type="file" id="json-input" accept=".json" hidden />
         </label>
-        <a href="?demo=liftrpg-eastern-shore&demoView=1&mode=spread" class="app-link-btn">Open Sample</a>
-      </div>
-      <div class="app-action-group app-action-group--compact">
         <label class="view-toggle" for="layout-mode">
           View
           <select id="layout-mode" class="mode-select">
