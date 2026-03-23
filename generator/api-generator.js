@@ -2154,7 +2154,7 @@ window.LiftRPGAPI = (function () {
     if (meta.literaryRegister) { ctx.literaryRegister = meta.literaryRegister; hasContent = true; }
     if (meta.structuralShape) { ctx.structuralShape = meta.structuralShape; hasContent = true; }
     if (meta.artifactIdentity) { ctx.artifactIdentity = meta.artifactIdentity; hasContent = true; }
-    return hasContent ? ctx : null;
+    return ctx;
   }
 
   // ── Inter-chunk continuity builder ──────────────────────────────────────
@@ -4277,7 +4277,7 @@ window.LiftRPGAPI = (function () {
 
       var continuityPacket = buildChunkContinuity(finalWeeks);
       var campaignWeekPlan = (campaignPlan.weeks || []).filter(function (pw) {
-        return pw.weekNumber === w;
+        return Number(pw.weekNumber) === w;
       })[0] || { weekNumber: w };
 
       progress('weeks', 'Writing Week ' + w + (isBossWeek ? ' (Boss)' : '') + '…');
