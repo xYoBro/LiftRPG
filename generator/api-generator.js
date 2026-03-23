@@ -4014,6 +4014,56 @@ window.LiftRPGAPI = (function () {
     }
   }
 
+  // ── Pipeline Checkpoint (resume after failure) ─────────────────────────
+  // Saves intermediate stage outputs to sessionStorage so a failed pipeline
+  // can resume from the last completed stage instead of starting over.
+  // Cache key is derived from workout + brief + model to prevent cross-run collisions.
+
+  var CHECKPOINT_STORAGE_KEY = 'liftrpg_pipeline_checkpoint';
+
+  function buildCheckpointKey(workout, brief, model) {
+    var raw = String(workout || '').slice(0, 500) + '|' + String(brief || '').slice(0, 200) + '|' + String(model || '');
+    // Simple hash — not cryptographic, just collision-resistant for sessionStorage
+    var hash = 0;
+    for (var i = 0; i < raw.length; i++) {
+      hash = ((hash << 5) - hash + raw.charCodeAt(i)) | 0;
+    }
+    return 'ck_' + (hash >>> 0).toString(36);
+  }
+
+  function loadCheckpoint(cacheKey) {
+    try {
+      var raw = sessionStorage.getItem(CHECKPOINT_STORAGE_KEY);
+      if (!raw) return null;
+      var cp = JSON.parse(raw);
+      if (cp && cp.cacheKey === cacheKey) return cp;
+      // Different run — stale checkpoint
+      return null;
+    } catch (_e) { return null; }
+  }
+
+  function saveCheckpoint(cacheKey, stage, data, checkpoint) {
+    try {
+      var cp = checkpoint || loadCheckpoint(cacheKey) || { cacheKey: cacheKey, stages: {} };
+      cp.stages[stage] = data;
+      cp.updatedAt = new Date().toISOString();
+      sessionStorage.setItem(CHECKPOINT_STORAGE_KEY, JSON.stringify(cp));
+      return cp;
+    } catch (_e) {
+      console.warn('[LiftRPG] Could not save pipeline checkpoint:', _e.message);
+      return checkpoint || { cacheKey: cacheKey, stages: {} };
+    }
+  }
+
+  function clearCheckpoint() {
+    try { sessionStorage.removeItem(CHECKPOINT_STORAGE_KEY); } catch (_e) {}
+  }
+
+  function countResumedStages(checkpoint) {
+    if (!checkpoint || !checkpoint.stages) return 0;
+    return Object.keys(checkpoint.stages).length;
+  }
+
   async function runApiPipeline(options) {
     if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
 
@@ -4025,6 +4075,14 @@ window.LiftRPGAPI = (function () {
     var brief = options.brief || '';
     var dice = options.dice || 'd100';
     var weekCount = options.weekCount || (typeof window.parseWeekCount === 'function' ? window.parseWeekCount(workout) : 6);
+
+    // ── Checkpoint: resume from last completed stage if available ────
+    var ckKey = buildCheckpointKey(workout, brief, settings.model);
+    var checkpoint = loadCheckpoint(ckKey);
+    var resumed = checkpoint ? countResumedStages(checkpoint) : 0;
+    if (resumed > 0) {
+      console.log('[LiftRPG] Resuming pipeline from checkpoint (' + resumed + ' cached stages).');
+    }
 
     // Initial estimation: 3 setup + weekCount (single-stage per week) + endings
     var totalStages = 3 + weekCount + 2;
@@ -4041,45 +4099,63 @@ window.LiftRPGAPI = (function () {
     }
 
     // ── STAGES 1, 2, 3 (Shell Setup) ──────────────────────────
-    progress('layerBible', 'Building layer codex…');
-    var layerBible = await runJsonStage(settings, {
-      stageKey: 'layerBible',
-      stageName: 'Layer Codex',
-      stageIndex: stageNum,
-      completeMessage: 'Layer codex complete.',
-      onProgress: onProgress,
-      getTotalStages: function () { return totalStages; },
-      schema: STRUCTURED_SCHEMA_BIBLE,
-      maxTokens: 8192,
-      requestTimeoutMs: 300000, // 5 min — small planning output
-      maxAttempts: 2,
-      validate: validateLayerBibleStage,
-      buildPrompt: function (retryState) { return builders.stage1(workout, brief, dice, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
-    });
+    // Each stage checks for a cached checkpoint before calling the API.
 
-    progress('campaign', 'Planning story…');
-    // Always use compact prompt — full doctrine is redundant when the layer codex
-    // already captures all planning decisions. Saves ~40% input tokens + faster.
-    var campaignPlan = await runJsonStage(settings, {
-      stageKey: 'campaign',
-      stageName: 'Story Plan',
-      stageIndex: stageNum,
-      completeMessage: 'Story plan complete.',
-      onProgress: onProgress,
-      getTotalStages: function () { return totalStages; },
-      schema: STRUCTURED_SCHEMA_CAMPAIGN,
-      requestTimeoutMs: function (retryState) {
-        return retryState && retryState.attempt > 0 ? 300000 : 420000; // 7 min first, 5 min retry
-      },
-      maxTokens: function (retryState) {
-        return retryState && retryState.attempt > 0 ? 8192 : 12288;
-      },
-      maxAttempts: 2,
-      validate: validateCampaignPlanStage,
-      buildPrompt: function (retryState) {
-        return buildCompactCampaignRetryPrompt(workout, brief, dice, layerBible, retryState || { attempt: 0, error: null });
-      }
-    });
+    var layerBible;
+    if (checkpoint && checkpoint.stages.layerBible) {
+      layerBible = checkpoint.stages.layerBible;
+      stageNum++;
+      console.log('[LiftRPG] Resumed: Layer Codex (cached)');
+      emitPipelineEvent(onProgress, stageNum, totalStages, 'Layer codex restored from checkpoint.', { phase: 'complete', stageKey: 'layerBible', stageName: 'Layer Codex' });
+    } else {
+      progress('layerBible', 'Building layer codex…');
+      layerBible = await runJsonStage(settings, {
+        stageKey: 'layerBible',
+        stageName: 'Layer Codex',
+        stageIndex: stageNum,
+        completeMessage: 'Layer codex complete.',
+        onProgress: onProgress,
+        getTotalStages: function () { return totalStages; },
+        schema: STRUCTURED_SCHEMA_BIBLE,
+        maxTokens: 8192,
+        requestTimeoutMs: 300000,
+        maxAttempts: 2,
+        validate: validateLayerBibleStage,
+        buildPrompt: function (retryState) { return builders.stage1(workout, brief, dice, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
+      });
+      checkpoint = saveCheckpoint(ckKey, 'layerBible', layerBible, checkpoint);
+    }
+
+    var campaignPlan;
+    if (checkpoint && checkpoint.stages.campaignPlan) {
+      campaignPlan = checkpoint.stages.campaignPlan;
+      stageNum++;
+      console.log('[LiftRPG] Resumed: Story Plan (cached)');
+      emitPipelineEvent(onProgress, stageNum, totalStages, 'Story plan restored from checkpoint.', { phase: 'complete', stageKey: 'campaign', stageName: 'Story Plan' });
+    } else {
+      progress('campaign', 'Planning story…');
+      campaignPlan = await runJsonStage(settings, {
+        stageKey: 'campaign',
+        stageName: 'Story Plan',
+        stageIndex: stageNum,
+        completeMessage: 'Story plan complete.',
+        onProgress: onProgress,
+        getTotalStages: function () { return totalStages; },
+        schema: STRUCTURED_SCHEMA_CAMPAIGN,
+        requestTimeoutMs: function (retryState) {
+          return retryState && retryState.attempt > 0 ? 300000 : 420000;
+        },
+        maxTokens: function (retryState) {
+          return retryState && retryState.attempt > 0 ? 8192 : 12288;
+        },
+        maxAttempts: 2,
+        validate: validateCampaignPlanStage,
+        buildPrompt: function (retryState) {
+          return buildCompactCampaignRetryPrompt(workout, brief, dice, layerBible, retryState || { attempt: 0, error: null });
+        }
+      });
+      checkpoint = saveCheckpoint(ckKey, 'campaignPlan', campaignPlan, checkpoint);
+    }
 
     if (!Array.isArray(campaignPlan.fragmentRegistry)) campaignPlan.fragmentRegistry = [];
     if (!Array.isArray(campaignPlan.overflowRegistry)) campaignPlan.overflowRegistry = [];
@@ -4087,28 +4163,37 @@ window.LiftRPGAPI = (function () {
     // Update totalStages with exact fragment count
     totalStages = 3 + weekCount + campaignPlan.fragmentRegistry.length + 1;
 
-    progress('shell', 'Building booklet setup…');
-    var shell = await runJsonStage(settings, {
-      stageKey: 'shell',
-      stageName: 'Booklet Setup',
-      stageIndex: stageNum,
-      completeMessage: 'Booklet setup complete.',
-      onProgress: onProgress,
-      getTotalStages: function () { return totalStages; },
-      schema: STRUCTURED_SCHEMA_SHELL,
-      maxTokens: 16384,
-      requestTimeoutMs: 300000, // 5 min — moderate output
-      unwrapKey: 'meta',
-      maxAttempts: 2,
-      normalizeResult: function (result) {
-        if (result && result.meta && Array.isArray(result.weeks)) {
-          delete result.weeks; delete result.fragments; delete result.endings;
-        }
-        return result;
-      },
-      validate: validateShellStage,
-      buildPrompt: function (retryState) { return builders.shell(brief, layerBible, campaignPlan, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
-    });
+    var shell;
+    if (checkpoint && checkpoint.stages.shell) {
+      shell = checkpoint.stages.shell;
+      stageNum++;
+      console.log('[LiftRPG] Resumed: Booklet Setup (cached)');
+      emitPipelineEvent(onProgress, stageNum, totalStages, 'Booklet setup restored from checkpoint.', { phase: 'complete', stageKey: 'shell', stageName: 'Booklet Setup' });
+    } else {
+      progress('shell', 'Building booklet setup…');
+      shell = await runJsonStage(settings, {
+        stageKey: 'shell',
+        stageName: 'Booklet Setup',
+        stageIndex: stageNum,
+        completeMessage: 'Booklet setup complete.',
+        onProgress: onProgress,
+        getTotalStages: function () { return totalStages; },
+        schema: STRUCTURED_SCHEMA_SHELL,
+        maxTokens: 16384,
+        requestTimeoutMs: 300000,
+        unwrapKey: 'meta',
+        maxAttempts: 2,
+        normalizeResult: function (result) {
+          if (result && result.meta && Array.isArray(result.weeks)) {
+            delete result.weeks; delete result.fragments; delete result.endings;
+          }
+          return result;
+        },
+        validate: validateShellStage,
+        buildPrompt: function (retryState) { return builders.shell(brief, layerBible, campaignPlan, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
+      });
+      checkpoint = saveCheckpoint(ckKey, 'shell', shell, checkpoint);
+    }
 
     var identityContract = buildIdentityContract(shell, campaignPlan);
     var shellContext = extractShellContext(shell);
@@ -4128,17 +4213,28 @@ window.LiftRPGAPI = (function () {
     }
 
     // ── TARGETED UNIT GENERATION: WEEKS ──────────────────────────
-    // Single-stage per week: the campaign plan already contains per-week context
-    // (arcBeat, zoneFocus, stateChange, etc.), so we pass it directly as the
-    // weekPlan instead of running a separate planning call. Halves the API calls.
+    // Single-stage per week. Checkpoint-aware: cached weeks are restored,
+    // then generation continues from the first uncached week.
     var finalWeeks = [];
     var allComponentValues = [];
 
     for (var w = 1; w <= weekCount; w++) {
       var isBossWeek = w === weekCount;
-      var continuityPacket = buildChunkContinuity(finalWeeks);
+      var weekCacheKey = 'week_' + w;
 
-      // Use the campaign plan's week entry directly as the week plan
+      if (checkpoint && checkpoint.stages[weekCacheKey]) {
+        var cachedWeek = checkpoint.stages[weekCacheKey];
+        finalWeeks.push(cachedWeek);
+        if (!cachedWeek.isBossWeek && cachedWeek.weeklyComponent && cachedWeek.weeklyComponent.value) {
+          allComponentValues.push(cachedWeek.weeklyComponent.value);
+        }
+        stageNum++;
+        console.log('[LiftRPG] Resumed: Week ' + w + ' (cached)');
+        emitPipelineEvent(onProgress, stageNum, totalStages, 'Week ' + w + ' restored from checkpoint.', { phase: 'complete', stageKey: 'weeks', stageName: 'Week ' + w });
+        continue;
+      }
+
+      var continuityPacket = buildChunkContinuity(finalWeeks);
       var campaignWeekPlan = (campaignPlan.weeks || []).filter(function (pw) {
         return pw.weekNumber === w;
       })[0] || { weekNumber: w };
@@ -4153,7 +4249,7 @@ window.LiftRPGAPI = (function () {
         getTotalStages: function () { return totalStages; },
         schema: null,
         maxTokens: 8192,
-        requestTimeoutMs: 180000, // 3 min — single week output
+        requestTimeoutMs: 180000,
         maxAttempts: 3,
         validate: function (result) {
           if (!result || !result.title || !result.sessions) return 'Week must contain a title and sessions array.';
@@ -4164,7 +4260,6 @@ window.LiftRPGAPI = (function () {
         }
       });
 
-      // Force enforce weekNumber to prevent model drift
       weekObject.weekNumber = w;
       if (isBossWeek) weekObject.isBossWeek = true;
       else weekObject.isBossWeek = false;
@@ -4173,15 +4268,14 @@ window.LiftRPGAPI = (function () {
       if (!isBossWeek && weekObject.weeklyComponent && weekObject.weeklyComponent.value) {
         allComponentValues.push(weekObject.weeklyComponent.value);
       }
+      checkpoint = saveCheckpoint(ckKey, weekCacheKey, weekObject, checkpoint);
     }
 
     var assembledWeeksOutput = [{ weeks: finalWeeks }];
     var weekSummaries = extractWeekSummaries(assembledWeeksOutput);
 
     // ── BATCHED FRAGMENT GENERATION ──────────────────────────────
-    // Group fragments into batches of ~6 by week pair to reduce API calls
-    // from N (one per fragment) to ~3 batches. Uses the existing adaptive
-    // runner which splits on failure.
+    // Checkpoint-aware: each batch is cached individually.
     var finalFragments = [];
     var registry = campaignPlan.fragmentRegistry || [];
     var fragmentBatches = buildFragmentBatches(registry, weekSummaries);
@@ -4192,7 +4286,18 @@ window.LiftRPGAPI = (function () {
 
     for (var fb = 0; fb < fragmentBatches.length; fb++) {
       var batch = fragmentBatches[fb];
+      var fragCacheKey = 'fragBatch_' + fb;
       var batchLabel = 'Fragments batch ' + (fb + 1) + '/' + totalBatches;
+
+      if (checkpoint && checkpoint.stages[fragCacheKey]) {
+        var cachedFrags = checkpoint.stages[fragCacheKey];
+        (cachedFrags.fragments || []).forEach(function (f) { finalFragments.push(f); });
+        stageNum++;
+        console.log('[LiftRPG] Resumed: ' + batchLabel + ' (cached)');
+        emitPipelineEvent(onProgress, stageNum, totalStages, batchLabel + ' restored from checkpoint.', { phase: 'complete', stageKey: 'fragments', stageName: batchLabel });
+        continue;
+      }
+
       progress('fragments', 'Writing ' + batchLabel + ' (' + batch.length + ' docs)…');
       var batchWeekNums = {};
       batch.forEach(function (entry) { if (entry.weekRef) batchWeekNums[entry.weekRef] = true; });
@@ -4211,36 +4316,45 @@ window.LiftRPGAPI = (function () {
       });
 
       (batchOutput.fragments || []).forEach(function (frag, i) {
-        if (batch[i] && batch[i].id) frag.id = batch[i].id; // Force ID alignment
+        if (batch[i] && batch[i].id) frag.id = batch[i].id;
         finalFragments.push(frag);
       });
+      checkpoint = saveCheckpoint(ckKey, fragCacheKey, batchOutput, checkpoint);
     }
 
     var assembledFragmentsOutput = { fragments: finalFragments };
 
     // ── TARGETED UNIT GENERATION: ENDING ────────────────────────
-    progress('endings', 'Writing finale…');
     var finalEndings = [];
-    var endingObj = await runJsonStage(settings, {
-      stageKey: 'endings',
-      stageName: 'Finale Variant',
-      stageIndex: stageNum,
-      completeMessage: 'Finale complete.',
-      onProgress: onProgress,
-      getTotalStages: function () { return totalStages; },
-      schema: null,
-      maxTokens: 4096,
-      requestTimeoutMs: 120000, // 2 min — small output
-      maxAttempts: 2,
-      validate: function (result) {
-        if (!result || !result.content || !result.variant) return 'Ending must contain content and variant.';
-        return '';
-      },
-      buildPrompt: function (retryState) {
-        return builders.singleEnding(layerBible, campaignPlan, "Primary", shellContext, weekSummaries);
-      }
-    });
-    finalEndings.push(endingObj);
+    if (checkpoint && checkpoint.stages.endings) {
+      finalEndings = checkpoint.stages.endings;
+      stageNum++;
+      console.log('[LiftRPG] Resumed: Finale (cached)');
+      emitPipelineEvent(onProgress, stageNum, totalStages, 'Finale restored from checkpoint.', { phase: 'complete', stageKey: 'endings', stageName: 'Finale' });
+    } else {
+      progress('endings', 'Writing finale…');
+      var endingObj = await runJsonStage(settings, {
+        stageKey: 'endings',
+        stageName: 'Finale Variant',
+        stageIndex: stageNum,
+        completeMessage: 'Finale complete.',
+        onProgress: onProgress,
+        getTotalStages: function () { return totalStages; },
+        schema: null,
+        maxTokens: 4096,
+        requestTimeoutMs: 120000,
+        maxAttempts: 2,
+        validate: function (result) {
+          if (!result || !result.content || !result.variant) return 'Ending must contain content and variant.';
+          return '';
+        },
+        buildPrompt: function (retryState) {
+          return builders.singleEnding(layerBible, campaignPlan, "Primary", shellContext, weekSummaries);
+        }
+      });
+      finalEndings.push(endingObj);
+      checkpoint = saveCheckpoint(ckKey, 'endings', finalEndings, checkpoint);
+    }
     var assembledEndingsOutput = { endings: finalEndings };
 
     // ── DETERMINISTIC ASSEMBLY & QUALITY GATE ───────────────────
@@ -4271,6 +4385,10 @@ window.LiftRPGAPI = (function () {
         return entry.message;
       }));
     }
+
+    // Pipeline succeeded — clear the checkpoint so next run starts fresh
+    clearCheckpoint();
+    console.log('[LiftRPG] Pipeline complete. Checkpoint cleared.');
 
     return booklet;
   }
@@ -5688,6 +5806,7 @@ window.LiftRPGAPI = (function () {
     generate: generate,
     generateMultiStage: generateMultiStage,
     generateStructured: generateStructured,
+    clearCheckpoint: clearCheckpoint,
     manual: {
       ensureArtifactIdentity: ensureArtifactIdentity,
       buildIdentityContract: buildIdentityContract,
