@@ -1086,8 +1086,7 @@
     .wizard-stage-head {
       display: flex;
       align-items: flex-start;
-      justify-content: space-between;
-      gap: 8px;
+      gap: 6px;
       min-width: 0;
     }
 
@@ -1111,8 +1110,10 @@
       letter-spacing: .16em;
       text-transform: uppercase;
       color: var(--ink);
-      overflow-wrap: anywhere;
-      word-break: break-word;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
     }
 
     .wizard-status-chip {
@@ -3005,6 +3006,22 @@
 
       function renderApiActions() {
         if (!apiRunActions) return;
+        // Show retry button on failure
+        if (apiRunState && apiRunState.status === 'error') {
+          apiRunActions.innerHTML = '' +
+            '<button type="button" id="api-retry-checkpoint" style="margin-right:8px">Retry From Checkpoint</button>' +
+            '<button type="button" id="api-start-fresh">Start Fresh</button>';
+          var retryBtn = document.getElementById('api-retry-checkpoint');
+          var freshBtn = document.getElementById('api-start-fresh');
+          if (retryBtn) retryBtn.addEventListener('click', function () {
+            handleApiGenerate();
+          });
+          if (freshBtn) freshBtn.addEventListener('click', function () {
+            if (api() && api().clearCheckpoint) api().clearCheckpoint();
+            handleApiGenerate();
+          });
+          return;
+        }
         if (!apiRunState || !apiRunState.booklet) {
           apiRunActions.innerHTML = '';
           return;
@@ -3076,8 +3093,8 @@
           var currentClass = apiRunState.currentStageKey === stage.key ? ' is-current' : '';
           var metrics = apiRunState.stageMetrics[stage.key] || createApiStageMetrics();
           var detail = stage.key === 'quality'
-            ? 'Validation, patch pass, and quality gate.'
-            : 'Stage state is tracked live while the API pipeline runs.';
+            ? 'Validation and quality gate.'
+            : '';
           if (status === 'valid') detail = metrics.lastDetail || 'Completed in this run.';
           if (status === 'in progress') detail = apiRunState.targetCaption;
           if (status === 'invalidated') detail = apiRunState.error || 'This run stopped on this stage.';
@@ -5169,6 +5186,31 @@
       }
 
       if (apiSubmitBtn) apiSubmitBtn.addEventListener('click', handleApiGenerate);
+
+      // ── Checkpoint resume detection on page load ────────────────────
+      // If a pipeline checkpoint exists with saved inputs, restore them
+      // and show a banner so the user can resume with one click.
+      (function detectCheckpointOnLoad() {
+        if (!api() || !api().getCheckpoint) return;
+        var cp = api().getCheckpoint();
+        if (!cp || !cp.inputs || !cp.stages || Object.keys(cp.stages).length === 0) return;
+        var inputs = cp.inputs;
+        var stageCount = Object.keys(cp.stages).length;
+        console.log('[LiftRPG] Checkpoint detected on load: ' + stageCount + ' stages cached.');
+        // Restore inputs
+        if (inputs.workout && workoutEl) workoutEl.value = inputs.workout;
+        if (inputs.brief && briefEl) briefEl.value = inputs.brief;
+        // Restore provider/model settings
+        if (inputs.provider && apiProviderEl) {
+          apiProviderEl.value = inputs.provider;
+          applyProviderPreset(inputs.provider, { keepModel: false, keepBaseUrl: false });
+        }
+        if (inputs.model && apiModelEl) apiModelEl.value = inputs.model;
+        // Navigate to API setup and show resume prompt
+        setGeneratorSurface('api-setup', { skipFocus: true });
+        pushApiLog('Checkpoint found: ' + stageCount + ' stages from a previous run. Hit "Build Booklet" to resume.');
+        renderApiRunState();
+      })();
 
       document.getElementById('wiz-next-1').addEventListener('click', function () {
         var layerBible = parseStageJson(

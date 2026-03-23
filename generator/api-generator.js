@@ -4030,43 +4030,56 @@ window.LiftRPGAPI = (function () {
   }
 
   // ── Pipeline Checkpoint (resume after failure) ─────────────────────────
-  // Saves intermediate stage outputs to sessionStorage so a failed pipeline
-  // can resume from the last completed stage instead of starting over.
-  // Cache key is derived from workout + brief + model to prevent cross-run collisions.
+  // Saves intermediate stage outputs + original inputs to sessionStorage.
+  // On retry, the pipeline restores completed stages instantly and resumes
+  // from the first uncached stage. The UI can detect a checkpoint on page
+  // load and offer to resume with the original inputs pre-filled.
+  //
+  // One checkpoint per session — a new run overwrites the previous one.
+  // Inputs (workout, brief, dice, model, provider) are stored so the UI
+  // can restore them without the user re-typing anything.
 
   var CHECKPOINT_STORAGE_KEY = 'liftrpg_pipeline_checkpoint';
 
-  function buildCheckpointKey(workout, brief, model) {
-    var raw = String(workout || '').slice(0, 500) + '|' + String(brief || '').slice(0, 200) + '|' + String(model || '');
-    // Simple hash — not cryptographic, just collision-resistant for sessionStorage
-    var hash = 0;
-    for (var i = 0; i < raw.length; i++) {
-      hash = ((hash << 5) - hash + raw.charCodeAt(i)) | 0;
-    }
-    return 'ck_' + (hash >>> 0).toString(36);
-  }
-
-  function loadCheckpoint(cacheKey) {
+  function loadCheckpoint() {
     try {
       var raw = sessionStorage.getItem(CHECKPOINT_STORAGE_KEY);
       if (!raw) return null;
-      var cp = JSON.parse(raw);
-      if (cp && cp.cacheKey === cacheKey) return cp;
-      // Different run — stale checkpoint
-      return null;
+      return JSON.parse(raw);
     } catch (_e) { return null; }
   }
 
-  function saveCheckpoint(cacheKey, stage, data, checkpoint) {
+  function initCheckpoint(inputs) {
+    var cp = {
+      inputs: {
+        workout: inputs.workout || '',
+        brief: inputs.brief || '',
+        dice: inputs.dice || '',
+        model: inputs.model || '',
+        provider: inputs.provider || ''
+      },
+      stages: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
     try {
-      var cp = checkpoint || loadCheckpoint(cacheKey) || { cacheKey: cacheKey, stages: {} };
+      sessionStorage.setItem(CHECKPOINT_STORAGE_KEY, JSON.stringify(cp));
+    } catch (_e) {
+      console.warn('[LiftRPG] Could not init pipeline checkpoint:', _e.message);
+    }
+    return cp;
+  }
+
+  function saveCheckpoint(stage, data, checkpoint) {
+    try {
+      var cp = checkpoint || loadCheckpoint() || { inputs: {}, stages: {} };
       cp.stages[stage] = data;
       cp.updatedAt = new Date().toISOString();
       sessionStorage.setItem(CHECKPOINT_STORAGE_KEY, JSON.stringify(cp));
       return cp;
     } catch (_e) {
       console.warn('[LiftRPG] Could not save pipeline checkpoint:', _e.message);
-      return checkpoint || { cacheKey: cacheKey, stages: {} };
+      return checkpoint || { inputs: {}, stages: {} };
     }
   }
 
@@ -4077,6 +4090,10 @@ window.LiftRPGAPI = (function () {
   function countResumedStages(checkpoint) {
     if (!checkpoint || !checkpoint.stages) return 0;
     return Object.keys(checkpoint.stages).length;
+  }
+
+  function getCheckpoint() {
+    return loadCheckpoint();
   }
 
   async function runApiPipeline(options) {
@@ -4092,11 +4109,19 @@ window.LiftRPGAPI = (function () {
     var weekCount = options.weekCount || (typeof window.parseWeekCount === 'function' ? window.parseWeekCount(workout) : 6);
 
     // ── Checkpoint: resume from last completed stage if available ────
-    var ckKey = buildCheckpointKey(workout, brief, settings.model);
-    var checkpoint = loadCheckpoint(ckKey);
+    var checkpoint = loadCheckpoint();
     var resumed = checkpoint ? countResumedStages(checkpoint) : 0;
     if (resumed > 0) {
       console.log('[LiftRPG] Resuming pipeline from checkpoint (' + resumed + ' cached stages).');
+    } else {
+      // Fresh run — init checkpoint with inputs so UI can restore them on page load
+      checkpoint = initCheckpoint({
+        workout: workout,
+        brief: brief,
+        dice: dice,
+        model: settings.model,
+        provider: detectProviderId(settings)
+      });
     }
 
     // Initial estimation: 3 setup + weekCount (single-stage per week) + endings
@@ -4138,7 +4163,7 @@ window.LiftRPGAPI = (function () {
         validate: validateLayerBibleStage,
         buildPrompt: function (retryState) { return builders.stage1(workout, brief, dice, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
       });
-      checkpoint = saveCheckpoint(ckKey, 'layerBible', layerBible, checkpoint);
+      checkpoint = saveCheckpoint('layerBible', layerBible, checkpoint);
     }
 
     var campaignPlan;
@@ -4169,7 +4194,7 @@ window.LiftRPGAPI = (function () {
           return buildCompactCampaignRetryPrompt(workout, brief, dice, layerBible, retryState || { attempt: 0, error: null });
         }
       });
-      checkpoint = saveCheckpoint(ckKey, 'campaignPlan', campaignPlan, checkpoint);
+      checkpoint = saveCheckpoint('campaignPlan', campaignPlan, checkpoint);
     }
 
     if (!Array.isArray(campaignPlan.fragmentRegistry)) campaignPlan.fragmentRegistry = [];
@@ -4207,7 +4232,7 @@ window.LiftRPGAPI = (function () {
         validate: validateShellStage,
         buildPrompt: function (retryState) { return builders.shell(brief, layerBible, campaignPlan, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
       });
-      checkpoint = saveCheckpoint(ckKey, 'shell', shell, checkpoint);
+      checkpoint = saveCheckpoint('shell', shell, checkpoint);
     }
 
     var identityContract = buildIdentityContract(shell, campaignPlan);
@@ -4297,7 +4322,7 @@ window.LiftRPGAPI = (function () {
       if (!isBossWeek && weekObject.weeklyComponent && weekObject.weeklyComponent.value) {
         allComponentValues.push(weekObject.weeklyComponent.value);
       }
-      checkpoint = saveCheckpoint(ckKey, weekCacheKey, weekObject, checkpoint);
+      checkpoint = saveCheckpoint(weekCacheKey, weekObject, checkpoint);
     }
 
     var assembledWeeksOutput = [{ weeks: finalWeeks }];
@@ -4352,7 +4377,7 @@ window.LiftRPGAPI = (function () {
         if (batch[i] && batch[i].id) frag.id = batch[i].id;
         finalFragments.push(frag);
       });
-      checkpoint = saveCheckpoint(ckKey, fragCacheKey, batchOutput, checkpoint);
+      checkpoint = saveCheckpoint(fragCacheKey, batchOutput, checkpoint);
     }
 
     var assembledFragmentsOutput = { fragments: finalFragments };
@@ -4386,7 +4411,7 @@ window.LiftRPGAPI = (function () {
         }
       });
       finalEndings.push(endingObj);
-      checkpoint = saveCheckpoint(ckKey, 'endings', finalEndings, checkpoint);
+      checkpoint = saveCheckpoint('endings', finalEndings, checkpoint);
     }
     var assembledEndingsOutput = { endings: finalEndings };
 
@@ -5840,6 +5865,7 @@ window.LiftRPGAPI = (function () {
     generateMultiStage: generateMultiStage,
     generateStructured: generateStructured,
     clearCheckpoint: clearCheckpoint,
+    getCheckpoint: getCheckpoint,
     manual: {
       ensureArtifactIdentity: ensureArtifactIdentity,
       buildIdentityContract: buildIdentityContract,
