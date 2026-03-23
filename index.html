@@ -88,6 +88,15 @@
       top: 0;
       left: 0;
       transform: rotateY(180deg);
+      pointer-events: none;
+    }
+
+    .card-flip.is-flipped .card-front {
+      pointer-events: none;
+    }
+
+    .card-flip.is-flipped .card-back {
+      pointer-events: auto;
     }
 
     /* ── Card base ─────────────────── */

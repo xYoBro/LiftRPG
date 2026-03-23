@@ -416,14 +416,8 @@ function loadJsonFile(file) {
 }
 
 function candidateDemoPaths(name) {
-  if (name === 'liftrpg-eastern-shore') {
-    return [
-      '../liftrpg-eastern-shore.json',
-      '../content/liftrpg-eastern-shore.json'
-    ];
-  }
-
   return [
+    '../examples/' + name + '.json',
     '../' + name + '.json',
     '../content/' + name + '.json'
   ];
