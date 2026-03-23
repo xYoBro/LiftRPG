@@ -4266,6 +4266,20 @@ window.LiftRPGAPI = (function () {
         maxTokens: 8192,
         requestTimeoutMs: 180000,
         maxAttempts: 3,
+        normalizeResult: function (result) {
+          // Model sometimes returns a full booklet or a weeks[] wrapper instead
+          // of a bare week object. Unwrap to get the single week.
+          if (result && Array.isArray(result.weeks) && result.weeks.length > 0) {
+            console.warn('[LiftRPG] Week stage returned weeks[] wrapper — unwrapping');
+            return result.weeks[0];
+          }
+          if (result && result.meta && Array.isArray(result.weeks)) {
+            console.warn('[LiftRPG] Week stage returned full booklet — extracting week');
+            var match = (result.weeks || []).filter(function (wk) { return wk.weekNumber === w; })[0];
+            return match || (result.weeks[0] || result);
+          }
+          return result;
+        },
         validate: function (result) {
           if (!result || !result.title || !result.sessions) return 'Week must contain a title and sessions array.';
           return '';
