@@ -1048,12 +1048,15 @@
       border: 1px solid rgba(24, 23, 20, .08);
       background: rgba(255, 255, 255, .36);
       padding: 9px 10px;
+      box-sizing: border-box;
       display: grid;
       gap: 7px;
       min-height: 78px;
+      min-width: 0;
       width: 100%;
       text-align: left;
       color: inherit;
+      overflow: hidden;
     }
 
     .wizard-stage-item.is-current {
@@ -1082,9 +1085,10 @@
 
     .wizard-stage-head {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
       gap: 8px;
+      min-width: 0;
     }
 
     .wizard-stage-head-main {
@@ -1107,6 +1111,8 @@
       letter-spacing: .16em;
       text-transform: uppercase;
       color: var(--ink);
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     .wizard-status-chip {
@@ -1165,6 +1171,9 @@
       font-size: 6.4pt;
       line-height: 1.6;
       color: var(--ink);
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     .wizard-stage-meta {
@@ -1173,6 +1182,10 @@
       letter-spacing: .06em;
       color: var(--muted);
       line-height: 1.6;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      white-space: normal;
     }
 
     .wizard-stage-stats {
