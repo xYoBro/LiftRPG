@@ -528,7 +528,7 @@
     '- No fragment should be transplantable unchanged into a different booklet.',
     '  If you removed the proper nouns, would it still feel specific? If yes, rewrite.',
     '- Later weeks must recontextualize earlier elements. Do not merely intensify',
-    '  atmosphere or add more weirdness. The player&apos;s understanding must change.',
+    '  atmosphere or add more weirdness. The player\'s understanding must change.',
     '- Documents are authored for in-world purpose, not to impress the reader.',
     '  The author of each document does not know they are in a game.',
     '- Final reveals must resolve prior evidence, not introduce new core facts.',
@@ -644,7 +644,7 @@
     '',
     '**Map progression:** Compare map state across weeks. If the topology shows no',
     'evolution (no new unlocks, closed routes, or annotation changes), add visible',
-    'state changes that reflect the campaign plan&apos;s stateChange for each week.',
+    'state changes that reflect the campaign plan\'s stateChange for each week.',
     '',
     '**Clue economy:** Verify every fragment tagged "establishes" is referenced or',
     'contradicted by a later fragment. Verify every "reveals" fragment resolves',
@@ -664,7 +664,7 @@
     '',
     '**Repeated reveal shapes:** Scan endings and boss content. If the emotional shape',
     'of the reveal (dramatic unmasking, quiet realization, institutional cover-up exposed)',
-    'is identical across variants, redesign one variant&apos;s emotional register.',
+    'is identical across variants, redesign one variant\'s emotional register.',
     '',
     'This gate is mandatory. Every content-producing response must pass it silently.'
   ].join('\n');

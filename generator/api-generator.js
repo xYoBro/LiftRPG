@@ -3409,7 +3409,7 @@ window.LiftRPGAPI = (function () {
         darkestMoment: truncateText(story.darkestMoment, 120),
         bossTruth: truncateText(story.bossTruth, 120)
       },
-      cast: (story.namedCharacters || []).slice(0, 5).map(function (entry) {
+      cast: (story.relationshipWeb || []).slice(0, 5).map(function (entry) {
         return {
           name: entry.name || '',
           role: truncateText(entry.role, 50),
@@ -3420,10 +3420,11 @@ window.LiftRPGAPI = (function () {
       game: {
         topology: truncateText(game.persistentTopology, 130),
         zones: (game.majorZones || []).slice(0, 5),
-        locks: (game.lockedZones || []).slice(0, 5),
-        gates: (game.gatingKeys || []).slice(0, 6).map(function (entry) {
+        gatesAndKeys: (game.gatesAndKeys || []).slice(0, 6),
+        progressionGates: (game.progressionGates || []).slice(0, 6).map(function (entry) {
           return {
-            key: entry.key || '',
+            week: entry.week,
+            playerGains: truncateText(entry.playerGains, 70),
             unlocks: truncateText(entry.unlocks, 70),
             requires: truncateText(entry.requires, 70)
           };
@@ -4352,14 +4353,14 @@ window.LiftRPGAPI = (function () {
         continue;
       }
 
-      progress('fragments', 'Writing ' + batchLabel + ' (' + batch.length + ' docs)…');
+      progress('fragments', 'Writing ' + batchLabel + ' (' + batch.registry.length + ' docs)…');
       var batchWeekNums = {};
-      batch.forEach(function (entry) { if (entry.weekRef) batchWeekNums[entry.weekRef] = true; });
+      batch.registry.forEach(function (entry) { if (entry.weekRef) batchWeekNums[entry.weekRef] = true; });
       var batchWeekSummaries = weekSummaries.filter(function (ws) { return batchWeekNums[ws.weekNumber]; });
 
       var batchOutput = await generateFragmentBatchAdaptive(settings, builders, {
         layerBible: layerBible,
-        registry: batch,
+        registry: batch.registry,
         batchWeekSummaries: batchWeekSummaries.length > 0 ? batchWeekSummaries : weekSummaries,
         allWeekSummaries: weekSummaries,
         priorFragments: finalFragments,
@@ -4374,7 +4375,7 @@ window.LiftRPGAPI = (function () {
       });
 
       (batchOutput.fragments || []).forEach(function (frag, i) {
-        if (batch[i] && batch[i].id) frag.id = batch[i].id;
+        if (batch.registry[i] && batch.registry[i].id) frag.id = batch.registry[i].id;
         finalFragments.push(frag);
       });
       checkpoint = saveCheckpoint(fragCacheKey, batchOutput, checkpoint);

@@ -522,14 +522,14 @@
       '  board state change, clock tick, gate effect, or companion reaction.',
       '- Oracle entries that reference fragments must name the fragment ID.',
       '- No oracle table is purely atmospheric — every table advances the mystery or changes the board.',
-      '- Oracle consequences should connect to the week&apos;s zone focus and active pressures.',
+      '- Oracle consequences should connect to the week\'s zone focus and active pressures.',
       '',
       '## Companion & Choice Doctrine',
       '- Each non-boss week must specify which named companion appears and how their stance changes.',
-      '- companionChange must be specific: "X&apos;s trust increases because Y" — not "relationship develops."',
+      '- companionChange must be specific: "X\'s trust increases because Y" — not "relationship develops."',
       '- The binary choice week must name: what the player gains from each option, what they lose,',
       '  and how at least one companion reacts differently based on the choice.',
-      '- At least one companion&apos;s behavior in the final weeks depends on earlier player actions.',
+      '- At least one companion\'s behavior in the final weeks depends on earlier player actions.',
       '',
       '## Arc Beat Assignment',
       '- Week 1: Setup (establish setting, protagonist role, core tension, constrained map — most zones locked)',
@@ -647,6 +647,7 @@
   window.generateShellPrompt = function (brief, layerBible, campaignPlan) {
     var blendContext = buildBlendContextFromPlans(layerBible, campaignPlan);
     var blend = deriveDesignBlend(brief, blendContext);
+    var authorProfile = deriveAuthorBlend(brief);
     var weekCount = (campaignPlan.weeks || []).length || 6;
     var parts = [
       '# Booklet Setup — meta, cover, rulesSpread, theme',
@@ -686,7 +687,7 @@
       '',
       '### Structural',
       '- meta.weekCount must equal ' + weekCount,
-      '- meta.weeklyComponentType should match the layer codex&apos;s game layer',
+      '- meta.weeklyComponentType should match the layer codex\'s game layer',
       '- meta.passwordLength should match the number of non-boss weeks (' + (weekCount - 1) + ')',
       '- meta.passwordEncryptedEnding: omit it or leave it empty; trusted tooling seals the ending later',
       '- meta.artifactIdentity is required. It is a renderer-facing contract, not flavor text.',
@@ -704,7 +705,7 @@
       '### Narrative Voice (meta.narrativeVoice)',
       '- person/tense: choose what creates the right distance for this fiction.',
       '- narratorStance: not "third person limited" — describe how the narrator relates to',
-      '  the protagonist&apos;s perception, vocabulary, and blind spots. Specific enough that',
+      '  the protagonist\'s perception, vocabulary, and blind spots. Specific enough that',
       '  a later stage could write a paragraph matching this stance without other guidance.',
       '- voiceRationale: why this voice serves the world contract (not just "it felt right").',
       '',
@@ -727,14 +728,14 @@
       '- Cover title and designation must feel like a real artifact: a dossier, journal,',
       '  field report, operations manual, maintenance log, or similar in-world object.',
       '- The cover, rules spread, sealed page, and password assembly must all feel like the SAME object family.',
-      '- Rules sections must explain the play cadence diegetically, using the layer codex&apos;s',
+      '- Rules sections must explain the play cadence diegetically, using the layer codex\'s',
       '  governing procedures. A player who reads only the rules spread should understand',
       '  what the institution expects them to do and why the weekly routine matters.',
       '',
       '### Visual Archetype & Theme',
       '- Choose the archetype that serves the fiction — not always "government."',
       '- Palette: 6 hex colors (ink, paper, accent, muted, rule, fog) that feel',
-      '  like the world&apos;s stationery. A government archive, a coastal field office,',
+      '  like the world\'s stationery. A government archive, a coastal field office,',
       '  a corporate clinic, and a maritime station all have different paper.',
       '',
       '---',
@@ -1012,11 +1013,11 @@
     parts.push('- End on unresolved pressure. Never resolve a story beat at session end.');
     parts.push('');
     parts.push('### Map State');
-    parts.push('- The map must reflect this week&apos;s stateChange from the campaign plan.');
+    parts.push('- The map must reflect this week\'s stateChange from the campaign plan.');
     parts.push('- Preserve the established mapType unless the campaign plan explicitly justifies a zoom or overlay shift.');
     parts.push('- Do not silently collapse point-to-point, linear-track, or player-drawn spaces into a grid.');
     parts.push('- Tiles changed from prior weeks: update type (locked→cleared, empty→anomaly, etc.).');
-    parts.push('- New tiles must have labels drawn from the layer codex&apos;s governing layer or topology.');
+    parts.push('- New tiles must have labels drawn from the layer codex\'s governing layer or topology.');
     parts.push('- currentPosition must make spatial sense given the zone focus.');
     parts.push('- mapNote must describe what is observably different this week, not repeat prior notes.');
     parts.push('');
@@ -1034,7 +1035,7 @@
     parts.push('  a specific clock, map node, or companion by label. No vague "something changes."');
     parts.push('- Fragment-type entries must include fragmentRef pointing to a real fragment ID.');
     parts.push('- Consequence-type entries must have paperAction naming a specific target.');
-    parts.push('- Oracle entries should connect to this week&apos;s zone focus and active pressures.');
+    parts.push('- Oracle entries should connect to this week\'s zone focus and active pressures.');
     parts.push('');
     parts.push('### Overflow Document');
     parts.push('- If overflow is true, the overflowDocument is an institutional artifact — a memo,');
@@ -1123,7 +1124,7 @@
     parts.push('');
     parts.push('### Contract');
     parts.push('- Generate exactly one fragment per registry entry, using the assigned IDs.');
-    parts.push('- Honour the registry&apos;s clueFunction tag: "establishes" fragments plant baseline');
+    parts.push('- Honour the registry\'s clueFunction tag: "establishes" fragments plant baseline');
     parts.push('  facts, "complicates" fragments contradict or add nuance, "reveals" fragments');
     parts.push('  answer a question or recontextualize earlier evidence.');
     parts.push('');
@@ -1146,9 +1147,9 @@
     parts.push('  described differently by different authors.');
     parts.push('- Include at least three linked functions across the set: one artifact that changes');
     parts.push('  what the player does (action), one that changes what the player believes');
-    parts.push('  (interpretation), and one that deepens a named character&apos;s stakes.');
+    parts.push('  (interpretation), and one that deepens a named character\'s stakes.');
     parts.push('- Every fragment must support at least one cross-reference: a place named on the map,');
-    parts.push('  a date that aligns with a week&apos;s events, a person mentioned in a storyPrompt,');
+    parts.push('  a date that aligns with a week\'s events, a person mentioned in a storyPrompt,');
     parts.push('  or a value that connects to a cipher output.');
     parts.push('');
     parts.push('### Anti-Generic Test');
@@ -1311,7 +1312,7 @@
     parts.push('');
     parts.push('### Contract');
     parts.push('- Generate exactly one fragment per registry entry, using the assigned IDs.');
-    parts.push('- Honour the registry&apos;s clueFunction tag: "establishes" fragments plant baseline');
+    parts.push('- Honour the registry\'s clueFunction tag: "establishes" fragments plant baseline');
     parts.push('  facts, "complicates" fragments contradict or add nuance, "reveals" fragments');
     parts.push('  answer a question or recontextualize earlier evidence.');
     parts.push('');
@@ -1488,17 +1489,17 @@
     parts.push('## Ending Construction Doctrine');
     parts.push('');
     parts.push('### Document Identity');
-    parts.push('- The ending is a found document that exists in-world — not a narrator&apos;s summary.');
+    parts.push('- The ending is a found document that exists in-world — not a narrator\'s summary.');
     parts.push('- Choose a document type that the story has earned: final report, personal letter,');
     parts.push('  decommission order, recovered journal entry, institutional memo.');
-    parts.push('- The document&apos;s author writes for their own purpose. They do not address the player.');
+    parts.push('- The document\'s author writes for their own purpose. They do not address the player.');
     parts.push('');
     parts.push('### Payoff Density');
     parts.push('- Name at least three specific earlier elements by their exact in-world identifiers:');
     parts.push('  a place, an object, a relationship, a phrase, a procedure, or a motif.');
     parts.push('- The decoded password truth must land — reference the revelation without');
     parts.push('  restating it mechanically. Show its consequence, not its content.');
-    parts.push('- The binary choice and boss outcome must both visibly shape the document&apos;s');
+    parts.push('- The binary choice and boss outcome must both visibly shape the document\'s');
     parts.push('  content, tone, or what the author knows. Not just which ending fires.');
     parts.push('');
     parts.push('### Variant Differentiation');
@@ -1508,7 +1509,7 @@
     parts.push('  in a fundamentally different emotional state.');
     parts.push('');
     parts.push('### Voice & Register');
-    parts.push('- Preserve the booklet&apos;s established literary register while allowing deliberate');
+    parts.push('- Preserve the booklet\'s established literary register while allowing deliberate');
     parts.push('  tonal contrast when the story demands it (grief in a clinical voice, hope in');
     parts.push('  bureaucratic language, rage in measured institutional prose).');
     parts.push('- The final line must feel discrete and earned — a sentence that works as a');
