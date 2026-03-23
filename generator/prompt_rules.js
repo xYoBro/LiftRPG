@@ -152,6 +152,7 @@
     '- Fragment entries (type: "fragment") must include `fragmentRef` pointing to a real fragment ID.',
     '- Consequence entries must include `paperAction` that visibly changes the paper state (mark a clock, shade a node, cross off a route, etc.).',
     '- Oracle entries must be playable game consequences or concrete fiction events, not atmospheric vibes or prose descriptions.',
+    '- If the user&apos;s creative direction specifies a different dice system (e.g. 2d6, d20), adapt oracle entries and roll bands to match.',
     '',
     '### fieldOps.companionComponents',
     'Supported component `type` values only:',
@@ -741,7 +742,7 @@
     'Required sections (minimum 4):',
     '- Play cadence: what the player does each training session (workout -> oracle pull -> execute consequences -> read fragment -> mark board)',
     '- Map/board usage: how to annotate, what marks mean, when to update',
-    '- Oracle access: what triggers a pull, how to read results, how to execute consequence tags',
+    '- Oracle access: what triggers a pull, how to read results, how to execute consequence tags. Include: "All oracle tables use d100. No dice? Google roll d100."',
     '- Clocks/trackers: what they are, when they advance, what happens when they fill or empty',
     'The rightPage contains the password/convergence tracker and unlock instructions.',
     'Both pages must be comprehensible to a player who has never seen the booklet before.'

@@ -5,7 +5,7 @@
  * Supports Anthropic and any OpenAI-compatible provider (OpenAI, Groq,
  * Ollama, custom endpoints).
  *
- * Exposes: window.LiftRPGAPI = { PROVIDERS, generate(settings, workout, brief, dice) }
+ * Exposes: window.LiftRPGAPI = { PROVIDERS, generate(settings, workout, brief) }
  *
  * SECURITY: API keys are stored in localStorage by the caller and sent
  * directly to the provider. They never pass through any LiftRPG server.
@@ -3614,7 +3614,7 @@ window.LiftRPGAPI = (function () {
     };
   }
 
-  function buildCompactCampaignRetryPrompt(workout, brief, dice, layerBible, retryState) {
+  function buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState) {
     var weekCount = parseWeekCountFromWorkout(workout);
     var midpoint = Math.ceil(weekCount / 2);
     var lastError = retryState && retryState.error ? truncateText(retryState.error.message || retryState.error, 180) : '';
@@ -3639,8 +3639,7 @@ window.LiftRPGAPI = (function () {
       '',
       '## Inputs',
       'Workout: ' + truncateText(workout, 900),
-      'Creative direction: ' + truncateText(brief || '', 420),
-      'Dice: ' + String(dice || 'd100')
+      'Creative direction: ' + truncateText(brief || '', 420)
     ].filter(Boolean).join('\n');
   }
 
@@ -4204,7 +4203,7 @@ window.LiftRPGAPI = (function () {
   // load and offer to resume with the original inputs pre-filled.
   //
   // One checkpoint per session — a new run overwrites the previous one.
-  // Inputs (workout, brief, dice, model, provider) are stored so the UI
+  // Inputs (workout, brief, model, provider) are stored so the UI
   // can restore them without the user re-typing anything.
 
   var CHECKPOINT_STORAGE_KEY = 'liftrpg_pipeline_checkpoint';
@@ -4222,7 +4221,6 @@ window.LiftRPGAPI = (function () {
       inputs: {
         workout: inputs.workout || '',
         brief: inputs.brief || '',
-        dice: inputs.dice || '',
         model: inputs.model || '',
         provider: inputs.provider || ''
       },
@@ -4273,7 +4271,6 @@ window.LiftRPGAPI = (function () {
 
     var workout = options.workout || '';
     var brief = options.brief || '';
-    var dice = options.dice || 'd100';
     var weekCount = options.weekCount || (typeof window.parseWeekCount === 'function' ? window.parseWeekCount(workout) : 6);
 
     // ── Checkpoint: resume from last completed stage if available ────
@@ -4286,7 +4283,6 @@ window.LiftRPGAPI = (function () {
       checkpoint = initCheckpoint({
         workout: workout,
         brief: brief,
-        dice: dice,
         model: settings.model,
         provider: detectProviderId(settings)
       });
@@ -4329,7 +4325,7 @@ window.LiftRPGAPI = (function () {
         requestTimeoutMs: 300000,
         maxAttempts: 2,
         validate: validateLayerBibleStage,
-        buildPrompt: function (retryState) { return builders.stage1(workout, brief, dice, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
+        buildPrompt: function (retryState) { return builders.stage1(workout, brief, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
       });
       checkpoint = saveCheckpoint('layerBible', layerBible, checkpoint);
     }
@@ -4359,7 +4355,7 @@ window.LiftRPGAPI = (function () {
         maxAttempts: 2,
         validate: validateCampaignPlanStage,
         buildPrompt: function (retryState) {
-          return buildCompactCampaignRetryPrompt(workout, brief, dice, layerBible, retryState || { attempt: 0, error: null });
+          return buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState || { attempt: 0, error: null });
         }
       });
       checkpoint = saveCheckpoint('campaignPlan', campaignPlan, checkpoint);
@@ -5463,12 +5459,11 @@ window.LiftRPGAPI = (function () {
   // The exported runtime flows are defined here. Older reference flows above
   // are intentionally renamed so they no longer shadow the live entrypoints.
 
-  async function generateMultiStage(settings, workout, brief, dice, onProgress) {
+  async function generateMultiStage(settings, workout, brief, onProgress) {
     return runApiPipeline({
       settings: settings,
       workout: workout,
       brief: brief,
-      dice: dice,
       onProgress: onProgress,
       allowPatch: true,
       assemble: function (shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan) {
@@ -5477,7 +5472,7 @@ window.LiftRPGAPI = (function () {
     });
   }
 
-  async function generateStructured(settings, workout, brief, dice, onProgress) {
+  async function generateStructured(settings, workout, brief, onProgress) {
     var resolvedSettings = resolveStructuredPipelineSettings(settings);
     if (!resolvedSettings.apiKey && resolvedSettings.format !== 'anthropic' && !allowsEmptyApiKey(resolvedSettings)) {
       throw new Error('API key required for structured generation.');
@@ -5491,7 +5486,6 @@ window.LiftRPGAPI = (function () {
       settings: resolvedSettings,
       workout: workoutText,
       brief: brief,
-      dice: dice,
       onProgress: onProgress,
       weekCount: weekCount,
       allowPatch: true,
@@ -5504,7 +5498,7 @@ window.LiftRPGAPI = (function () {
   // ── Public API ──────────────────────────────────────────────────────────────
 
   /**
-   * generate(settings, workout, brief, dice) → Promise<Object>
+   * generate(settings, workout, brief) → Promise<Object>
    *
    * Single-pass generation (Standard mode).
    *
@@ -5516,13 +5510,13 @@ window.LiftRPGAPI = (function () {
    *   requestTimeoutMs: number (optional, default 600000)
    * }
    */
-  async function generate(settings, workout, brief, dice) {
+  async function generate(settings, workout, brief) {
     if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
     if (typeof window.generatePrompt !== 'function') {
       throw new Error('Prompt generator not loaded. Please reload the page.');
     }
 
-    var prompt = window.generatePrompt(workout, brief, dice);
+    var prompt = window.generatePrompt(workout, brief);
     var rawResponse = await callProvider(settings, prompt);
     return extractJson(rawResponse.text);
   }

@@ -510,38 +510,7 @@
       display: block;
     }
 
-    /* ── Dice radio group ─────────── */
-    .dice-fieldset {
-      border: none;
-      padding: 0;
-      margin-top: 16px;
-    }
-
-    .dice-fieldset legend {
-      margin-bottom: 6px;
-    }
-
-    .dice-option {
-      display: block;
-      font-family: var(--mono);
-      font-size: 8pt;
-      color: var(--ink);
-      cursor: pointer;
-      padding: 4px 0;
-    }
-
-    .dice-option input[type="radio"] {
-      accent-color: var(--accent);
-      margin-right: 6px;
-    }
-
-    .dice-note {
-      font-size: 6pt;
-      color: var(--muted);
-      letter-spacing: .04em;
-    }
-
-    .dice-tip {
+    .gen-tip {
       font-size: 6pt;
       color: var(--muted);
       letter-spacing: .04em;
@@ -1859,15 +1828,7 @@
         <label class="field-label" for="gen-brief">Booklet Direction</label>
         <textarea id="gen-brief" class="gen-input" rows="4"
           placeholder="Booklet format, tone, authors/books to echo, mechanic feel, realism vs. genre, emotional stakes — or leave blank for a surprise"></textarea>
-        <div class="dice-tip">Better results: mention the kind of booklet you want, the voice/style, the mechanic feel, and whether you want quiet realism or overt genre. A few words still works.</div>
-
-        <div class="dice-fieldset">
-          <div class="field-label">Randomizer</div>
-          <div class="dice-option">
-            <span>d100 <span class="dice-note">(00-99 percentile bands)</span></span>
-          </div>
-          <div class="dice-tip">No dice? Google &quot;roll d100&quot;.</div>
-        </div>
+        <div class="gen-tip">Better results: mention the kind of booklet you want, the voice/style, the mechanic feel, and whether you want quiet realism or overt genre. A few words still works.</div>
 
         <div class="generator-mode-switch">
           <button class="generator-mode-btn is-active" id="gen-mode-manual" type="button">Guided Build</button>
@@ -3152,9 +3113,6 @@
         }
       }
 
-      function selectDiceValue(_value) {
-        return 'd100';
-      }
 
       function collectWizardDraft() {
         return {
@@ -3169,7 +3127,6 @@
           },
           workout: workoutEl.value,
           brief: briefEl.value,
-          dice: getDiceValue(),
           wizData: wizData,
           wizState: wizState,
           validation: {
@@ -3644,7 +3601,6 @@
         resetWizardState({ keepDraft: true });
         workoutEl.value = draft.workout || '';
         briefEl.value = draft.brief || '';
-        selectDiceValue(draft.dice || 'd100');
 
         wizData = draft.wizData;
         wizState = draft.wizState;
@@ -3845,9 +3801,7 @@
           setGeneratorSurface('intake');
         });
       }
-      document.querySelectorAll('input[name="gen-dice"]').forEach(function (radio) {
-        radio.addEventListener('change', saveWizardDraft);
-      });
+
       Object.keys(wizResults).forEach(function (key) {
         wizResults[key].addEventListener('input', saveWizardDraft);
       });
@@ -3900,9 +3854,7 @@
         });
       }
 
-      function getDiceValue() {
-        return 'd100';
-      }
+
 
       function wizSetStep(idx) {
         wizStep = idx;
@@ -4987,7 +4939,7 @@
         resetWizardState();
         if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
         setGeneratorSurface('manual');
-        wizPrompts[1].value = window.generateStage1Prompt(workout, briefEl.value.trim(), getDiceValue());
+        wizPrompts[1].value = window.generateStage1Prompt(workout, briefEl.value.trim());
         wizSetStep(0);
       }
 
@@ -5104,7 +5056,7 @@
           var methodName = apiMethodEl && apiMethodEl.value === 'generateStructured'
             ? 'generateStructured'
             : 'generateMultiStage';
-          var booklet = await api()[methodName](settings, workout, briefEl.value.trim(), getDiceValue(), function (stageIndex, totalStages, message, meta) {
+          var booklet = await api()[methodName](settings, workout, briefEl.value.trim(), function (stageIndex, totalStages, message, meta) {
             if (runId !== activeApiRunId) return;
             meta = meta || {};
             var stageKey = meta.stageKey || inferApiStageKey(message);
@@ -5241,7 +5193,7 @@
         }
         wizData.layerBible = layerBible;
         clearStageFlag('layerBible');
-        wizPrompts[2].value = window.generateStage2Prompt(workoutEl.value.trim(), briefEl.value.trim(), getDiceValue(), layerBible);
+        wizPrompts[2].value = window.generateStage2Prompt(workoutEl.value.trim(), briefEl.value.trim(), layerBible);
         wizSetStep(1);
       });
 

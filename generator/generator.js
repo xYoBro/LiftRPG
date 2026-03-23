@@ -238,7 +238,7 @@
   var STAGE1_OUTPUT_SCHEMA = window.STAGE1_OUTPUT_SCHEMA;
   var STAGE2_OUTPUT_SCHEMA = window.STAGE2_OUTPUT_SCHEMA;
 
-  window.generatePrompt = function (workout, brief, dice) {
+  window.generatePrompt = function (workout, brief) {
     window.blend = deriveDesignBlend(brief, workout);
     window.authorProfile = deriveAuthorBlend(brief);
     window.parts = [
@@ -258,11 +258,6 @@
       '',
       formatDesignBias(blend),
       formatAuthorBias(authorProfile || window.authorProfile),
-      '',
-      '## Randomizer',
-      '',
-      dice || 'd100',
-      'If the player has no dice, use this note: No dice? Google "roll d100".',
       '',
       '---',
       '',
@@ -335,7 +330,7 @@
   // ── Multi-stage prompt generators ───────────────────────────────────────────
   //
 
-  window.generateStage1Prompt = function (workout, brief, dice) {
+  window.generateStage1Prompt = function (workout, brief) {
     var blend = deriveDesignBlend(brief, workout);
     var authorProfile = deriveAuthorBlend(brief);
     var parts = [
@@ -463,10 +458,6 @@
       formatDesignBias(blend),
       formatAuthorBias(authorProfile || window.authorProfile),
       '',
-      '## Randomizer',
-      '',
-      dice || 'd100',
-      '',
       '---',
       '',
       '## Output Schema',
@@ -476,7 +467,7 @@
     return parts.join('\n');
   };
 
-  window.generateStage2Prompt = function (workout, brief, dice, layerBible) {
+  window.generateStage2Prompt = function (workout, brief, layerBible) {
     var weekCount = window.parseWeekCount(workout);
     var midpoint = Math.ceil(weekCount / 2);
     var minReuse = Math.max(weekCount - 2, 3);
@@ -2015,7 +2006,7 @@
   }
 
 
-  window.generateApiStage1Prompt = function (workout, brief, dice, options) {
+  window.generateApiStage1Prompt = function (workout, brief, options) {
     options = options || {};
     var blend = deriveDesignBlend(brief, workout);
     var authorProfile = deriveAuthorBlend(brief);
@@ -2035,14 +2026,13 @@
       'Workout: ' + truncateText(workout, 3200),
       'Creative direction: ' + truncateText(formatUserBrief(brief, buildDefaultBrief(workout, blend)), 1800),
       'Design bias: ' + compactJson(summarizeDesignBiasForApi(blend)),
-      'Dice: ' + String(dice || 'd100'),
       options.retryMode ? 'Retry mode: keep prose concrete and compact so the full JSON finishes cleanly.' : '',
       '',
       'JSON only.'
     ].filter(Boolean).join('\n');
   };
 
-  window.generateApiStage2Prompt = function (workout, brief, dice, layerBible, options) {
+  window.generateApiStage2Prompt = function (workout, brief, layerBible, options) {
     options = options || {};
     var weekCount = window.parseWeekCount(workout);
     return [
@@ -2063,7 +2053,6 @@
       '## Inputs',
       'Workout: ' + truncateText(workout, 2200),
       'Creative direction: ' + truncateText(brief || '', 900),
-      'Dice: ' + String(dice || 'd100'),
       options.retryMode ? 'Retry mode: shorten descriptions where needed, but keep clue economy and week transformations intact.' : '',
       '',
       'JSON only.'
