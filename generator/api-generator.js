@@ -4391,6 +4391,9 @@ window.LiftRPGAPI = (function () {
           if (result && result.meta && Array.isArray(result.weeks)) {
             delete result.weeks; delete result.fragments; delete result.endings;
           }
+          if (result && result.meta && !('passwordEncryptedEnding' in result.meta)) {
+            result.meta.passwordEncryptedEnding = '';
+          }
           return result;
         },
         validate: function(result) {

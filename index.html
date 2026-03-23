@@ -517,6 +517,36 @@
       margin-top: 6px;
     }
 
+    .field-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-top: 16px;
+      margin-bottom: 6px;
+    }
+
+    .field-label-row .field-label {
+      margin-top: 0;
+      margin-bottom: 0;
+    }
+
+    .brief-randomize {
+      font-family: var(--mono);
+      font-size: 6pt;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      transition: color .15s;
+    }
+
+    .brief-randomize:hover {
+      color: var(--accent);
+    }
+
     /* ── Generate button (inverted) ── */
     .gen-submit {
       display: block;
@@ -1825,7 +1855,10 @@
           placeholder="Paste your Liftosaur Liftoscript export, or describe your program in plain text"></textarea>
         <div class="field-error" id="workout-error">A workout program is required</div>
 
-        <label class="field-label" for="gen-brief">Booklet Direction</label>
+        <div class="field-label-row">
+          <label class="field-label" for="gen-brief">Booklet Direction</label>
+          <button type="button" class="brief-randomize" id="brief-randomize">Randomize</button>
+        </div>
         <textarea id="gen-brief" class="gen-input" rows="4"
           placeholder="Booklet format, tone, authors/books to echo, mechanic feel, realism vs. genre, emotional stakes — or leave blank for a surprise"></textarea>
         <div class="gen-tip">Better results: mention the kind of booklet you want, the voice/style, the mechanic feel, and whether you want quiet realism or overt genre. A few words still works.</div>
@@ -2120,6 +2153,7 @@
 
     </div>
   </div>
+  <script src="generator/story-tables.js"></script>
   <script src="generator/author_profiles.js"></script>
   <script src="generator/design_profiles.js"></script>
   <script src="generator/mechanics_pool.js"></script>
@@ -2214,6 +2248,7 @@
       var apiRunActions = document.getElementById('api-run-actions');
       var workoutEl = document.getElementById('gen-workout');
       var briefEl = document.getElementById('gen-brief');
+      var briefRandomizeBtn = document.getElementById('brief-randomize');
       var workoutError = document.getElementById('workout-error');
       var chatWizard = document.getElementById('chat-wizard');
 
@@ -3087,6 +3122,9 @@
           apiStatusBackBtn.disabled = apiRunState.status === 'running';
           apiStatusBackBtn.hidden = apiRunState.status === 'running';
         }
+        if (apiStatusBriefBtn) {
+          apiStatusBriefBtn.disabled = apiRunState.status === 'running';
+        }
         renderApiActions();
       }
 
@@ -3728,6 +3766,13 @@
         saveWizardDraft();
       });
       briefEl.addEventListener('input', saveWizardDraft);
+      if (briefRandomizeBtn) {
+        briefRandomizeBtn.addEventListener('click', function () {
+          if (typeof window.randomizeBrief === 'function') {
+            briefEl.value = window.randomizeBrief();
+          }
+        });
+      }
       if (manualModeBtn) {
         manualModeBtn.addEventListener('click', function () {
           setGenerationMode('manual');
