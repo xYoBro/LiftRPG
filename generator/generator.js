@@ -256,7 +256,8 @@
       '',
       formatUserBrief(brief, buildDefaultBrief(workout, blend)),
       '',
-      formatDesignBias(blend),\n      formatAuthorBias(authorProfile || window.authorProfile),
+      formatDesignBias(blend),
+      formatAuthorBias(authorProfile || window.authorProfile),
       '',
       '## Randomizer',
       '',
@@ -459,7 +460,8 @@
       '',
       formatUserBrief(brief, buildDefaultBrief(workout, blend)),
       '',
-      formatDesignBias(blend),\n      formatAuthorBias(authorProfile || window.authorProfile),
+      formatDesignBias(blend),
+      formatAuthorBias(authorProfile || window.authorProfile),
       '',
       '## Randomizer',
       '',
@@ -686,7 +688,8 @@
       '',
       formatUserBrief(brief, buildDefaultBrief(workout, blend)),
       '',
-      formatDesignBias(blend),\n      formatAuthorBias(authorProfile || window.authorProfile),
+      formatDesignBias(blend),
+      formatAuthorBias(authorProfile || window.authorProfile),
       '',
       '## Randomizer',
       '',
@@ -778,7 +781,8 @@
       '',
       formatUserBrief(brief, buildDefaultBrief(blendContext, blend)),
       '',
-      formatDesignBias(blend),\n      formatAuthorBias(authorProfile || window.authorProfile),
+      formatDesignBias(blend),
+      formatAuthorBias(authorProfile || window.authorProfile),
       '',
       '## Booklet Setup Requirements',
       '',
@@ -2432,6 +2436,153 @@
       '',
       'JSON only.'
     ].filter(Boolean).join('\n');
+  };
+
+  // ── NEW SINGLE-UNIT PROMPT BUILDERS (Unit-Level Engine Refactor) ───────
+
+  window.generateSingleWeekPlanPrompt = function (workout, brief, layerBible, campaignPlan, weekNumber, shellContext, continuity) {
+    var weekWorkout = window.extractWeekWorkout(workout, [weekNumber]);
+    var isBossWeek = campaignPlan && campaignPlan.weeks && weekNumber === campaignPlan.weeks.length;
+    var weekLabel = isBossWeek ? 'Week ' + weekNumber + ' (Boss Week)' : 'Week ' + weekNumber;
+    var planData = campaignPlan && campaignPlan.weeks ? campaignPlan.weeks.filter(function(w) { return w.weekNumber === weekNumber; })[0] : {};
+
+    var parts = [
+      '# Plan ' + weekLabel,
+      '',
+      'Generate a highly compact weekPlan JSON object containing narrative and structural intent.',
+      '',
+      '---',
+      window.SCHEMA_WEEK_PLAN.join('\n'),
+      '---',
+      '',
+      '## Context',
+      '**World Contract:** ' + (shellContext.worldContract || ''),
+      '**Week Workout:** ' + weekWorkout,
+      '**Campaign Plan for ' + weekLabel + ':** ' + JSON.stringify(planData || {}),
+      continuity ? '**Story So Far (abstract):** ' + JSON.stringify(continuity) : ''
+    ];
+
+    return parts.filter(Boolean).join('\n');
+  };
+
+  window.generateSingleWeekFinalPrompt = function (workout, brief, layerBible, campaignPlan, weekPlan, shellContext, continuity, allComponentValues) {
+    var isBossWeek = campaignPlan && campaignPlan.weeks && weekPlan.weekNumber === campaignPlan.weeks.length;
+    var weekWorkout = window.extractWeekWorkout(workout, [weekPlan.weekNumber]);
+    var parts = [
+      '# Write Week ' + weekPlan.weekNumber,
+      '',
+      'Generate exactly ONE week object as valid JSON. Do not over-explain or add outer wrappers.',
+      '',
+      '---',
+      window.SCHEMA_SINGLE_WEEK.join('\n'),
+      '---',
+      '',
+      '## The Plan to Execute',
+      JSON.stringify(weekPlan, null, 2),
+      '',
+      '## Required Context',
+      '**World Contract:** ' + (shellContext.worldContract || ''),
+      '**Narrative Voice:** ' + JSON.stringify(shellContext.narrativeVoice || {}),
+      '**Literary Register:** ' + JSON.stringify(shellContext.literaryRegister || {}),
+      '',
+      '**Week Workout:** ' + weekWorkout,
+      '',
+      continuity ? '**Continuity Rules:** ' + JSON.stringify(continuity) : '',
+      isBossWeek && allComponentValues ? '**Prior Values for Boss Decode:** ' + JSON.stringify(allComponentValues) : '',
+      '',
+      '## Constraints',
+      '- Preserve Specificity: storyPrompts must contain physical action and named places.',
+      '- Do not flatten the style. Execute the exact Literary Register specified.',
+      '- JSON only.'
+    ];
+
+    return parts.filter(Boolean).join('\n');
+  };
+
+  window.generateSingleFragmentPrompt = function (layerBible, registryEntry, weekSummaries, shellContext, pastFragments) {
+    var parts = [
+      '# Write Fragment ' + registryEntry.id,
+      '',
+      'Generate exactly ONE found document object as valid JSON. Do not over-explain.',
+      '',
+      '---',
+      window.SCHEMA_SINGLE_FRAGMENT.join('\n'),
+      '---',
+      '',
+      '## Fragment Registry Assignment',
+      JSON.stringify(registryEntry, null, 2),
+      '',
+      '## Context',
+      '**World Contract:** ' + (shellContext.worldContract || ''),
+      '**Artifact Identity:** ' + JSON.stringify(shellContext.artifactIdentity || {}),
+      '',
+      '**Current Timeline (Cross-Reference Support):**',
+      JSON.stringify(weekSummaries || []),
+      '',
+      pastFragments && pastFragments.length ? '**Prior Fragments (Prevent Repetition):** ' + JSON.stringify(pastFragments) : '',
+      '',
+      '## Constraints',
+      '- The fragment MUST feel like an authentic, found document (memo, letter, dispatch).',
+      '- Do not summarize lore. Include trivial details (routing codes, times) to heighten realism.',
+      '- Cross-link to at least one entity, location, or finding from the Timeline above.',
+      '- JSON only.'
+    ];
+
+    return parts.filter(Boolean).join('\n');
+  };
+
+  window.generateSingleEndingPrompt = function (layerBible, campaignPlan, variantId, shellContext, weekSummaries) {
+    var parts = [
+      '# Write Ending Variant: ' + variantId,
+      '',
+      'Generate ONE ending object as valid JSON.',
+      '',
+      '---',
+      window.SCHEMA_SINGLE_ENDING.join('\n'),
+      '---',
+      '',
+      '## Context',
+      '**World Contract:** ' + (shellContext.worldContract || ''),
+      '**Narrative Voice:** ' + JSON.stringify(shellContext.narrativeVoice || {}),
+      '',
+      '**Journey So Far:**',
+      JSON.stringify(weekSummaries || []),
+      '',
+      '## Constraints',
+      '- The ending must meaningfully resolve the pressures established in the weeks.',
+      '- Do not flatten the payoff into a cliché victory. Honour the cost of the journey.',
+      '- JSON only.'
+    ];
+
+    return parts.filter(Boolean).join('\n');
+  };
+
+  window.generateTargetedRepairPrompt = function (unitName, badJsonStr, errorMessages, targetSchemaStr) {
+    var msgs = errorMessages.length > 0 ? errorMessages.map(function(m) { return '- ' + m; }).join('\n') : '- Undefined structural error.';
+    var parts = [
+      '# Critical Repair Required for ' + unitName,
+      '',
+      'The previous generation produced structural or quality errors.',
+      'You are a precise JSON repair utility. You must return EXACTLY the corrected JSON for "' + unitName + '".',
+      '',
+      '## Errors Detected (Fix these strictly)',
+      msgs,
+      '',
+      '## Target Schema',
+      targetSchemaStr,
+      '',
+      '## Broken JSON Input',
+      '```json',
+      badJsonStr,
+      '```',
+      '',
+      '## Instructions',
+      '- Ensure the response is COMPLETELY valid JSON.',
+      '- Do not change valid creative choices or prose, ONLY fix the errors.',
+      '- Output ONLY the JSON object. Do not wrap it in markdown.'
+    ];
+
+    return parts.filter(Boolean).join('\n');
   };
 
 })();

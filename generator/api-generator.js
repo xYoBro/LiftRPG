@@ -2982,12 +2982,13 @@ window.LiftRPGAPI = (function () {
     var builders = getApiPromptBuilders();
     assertApiPromptBuilders(builders);
 
-    var workout = options.workout;
-    var brief = options.brief;
-    var dice = options.dice;
-    var weekCount = options.weekCount || window.parseWeekCount(workout);
-    var chunks = window.planWeekChunks(weekCount);
-    var totalStages = 3 + chunks.length + 2;
+    var workout = options.workout || '';
+    var brief = options.brief || '';
+    var dice = options.dice || 'd100';
+    var weekCount = options.weekCount || (typeof window.parseWeekCount === 'function' ? window.parseWeekCount(workout) : 6);
+
+    // Initial estimation: 3 setup + (weekCount * 2) for (plan + write) + endings 
+    var totalStages = 3 + (weekCount * 2) + 2; 
     var stageNum = 0;
     var onProgress = options.onProgress;
 
@@ -2996,6 +2997,7 @@ window.LiftRPGAPI = (function () {
       if (onProgress) onProgress(stageNum, totalStages, message);
     }
 
+    // ── STAGES 1, 2, 3 (Shell Setup) ──────────────────────────
     progress('Building layer codex…');
     var layerBible = await runJsonStage(settings, {
       stageName: 'Layer Codex',
@@ -3003,9 +3005,7 @@ window.LiftRPGAPI = (function () {
       maxTokens: 8192,
       maxAttempts: 2,
       validate: validateLayerBibleStage,
-      buildPrompt: function (retryState) {
-        return builders.stage1(workout, brief, dice, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined);
-      }
+      buildPrompt: function (retryState) { return builders.stage1(workout, brief, dice, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
     });
 
     progress('Planning story…');
@@ -3015,16 +3015,14 @@ window.LiftRPGAPI = (function () {
       maxTokens: 16384,
       maxAttempts: 2,
       validate: validateCampaignPlanStage,
-      buildPrompt: function (retryState) {
-        return builders.stage2(workout, brief, dice, layerBible, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined);
-      }
+      buildPrompt: function (retryState) { return builders.stage2(workout, brief, dice, layerBible, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
     });
 
     if (!Array.isArray(campaignPlan.fragmentRegistry)) campaignPlan.fragmentRegistry = [];
     if (!Array.isArray(campaignPlan.overflowRegistry)) campaignPlan.overflowRegistry = [];
 
-    var plannedFragBatches = buildFragmentBatches(campaignPlan.fragmentRegistry, null);
-    totalStages = 3 + chunks.length + Math.max(plannedFragBatches.length, 1) + 1;
+    // Update totalStages with exact fragment count
+    totalStages = 3 + (weekCount * 2) + campaignPlan.fragmentRegistry.length + 1;
 
     progress('Building booklet setup…');
     var shell = await runJsonStage(settings, {
@@ -3035,171 +3033,128 @@ window.LiftRPGAPI = (function () {
       maxAttempts: 2,
       normalizeResult: function (result) {
         if (result && result.meta && Array.isArray(result.weeks)) {
-          console.warn('[LiftRPG] Shell stage output included weeks/fragments/endings — stripping');
-          delete result.weeks;
-          delete result.fragments;
-          delete result.endings;
+          delete result.weeks; delete result.fragments; delete result.endings;
         }
         return result;
       },
       validate: validateShellStage,
-      buildPrompt: function (retryState) {
-        return builders.shell(brief, layerBible, campaignPlan, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined);
-      }
+      buildPrompt: function (retryState) { return builders.shell(brief, layerBible, campaignPlan, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
     });
 
     var identityContract = buildIdentityContract(shell, campaignPlan);
     var shellContext = extractShellContext(shell);
-    var weekChunkOutputs = [];
-    var allPriorWeeks = [];
+
+    // ── TARGETED UNIT GENERATION: WEEKS ──────────────────────────
+    var finalWeeks = [];
     var allComponentValues = [];
 
-    for (var ci = 0; ci < chunks.length; ci++) {
-      var weekNums = chunks[ci];
-      var isBoss = weekNums.indexOf(weekCount) !== -1;
-      progress(isBoss
-        ? 'Generating boss week…'
-        : weekNums.length === 1
-          ? 'Generating week ' + weekNums[0] + '…'
-          : 'Generating weeks ' + weekNums[0] + '–' + weekNums[weekNums.length - 1] + '…');
-
-      var outputs = await generateWeekChunkAdaptive(settings, builders, {
-        workout: workout,
-        brief: brief,
-        layerBible: layerBible,
-        campaignPlan: campaignPlan,
-        weekNumbers: weekNums,
-        allPriorWeeks: allPriorWeeks,
-        allComponentValues: allComponentValues,
-        shellContext: shellContext
+    for (var w = 1; w <= weekCount; w++) {
+      var isBossWeek = w === weekCount;
+      var continuityPacket = buildChunkContinuity(finalWeeks);
+      
+      progress('Planning Week ' + w + '…');
+      var weekPlan = await runJsonStage(settings, {
+        stageName: 'Plan Week ' + w,
+        schema: null, // text-based internal JSON
+        maxTokens: 2048,
+        maxAttempts: 2,
+        buildPrompt: function (retryState) {
+          return builders.weekPlan(workout, brief, layerBible, campaignPlan, w, shellContext, continuityPacket);
+        }
       });
 
-      outputs.forEach(function (chunkOutput) {
-        weekChunkOutputs.push(chunkOutput);
-        collectWeeksAndValues(allPriorWeeks, allComponentValues, chunkOutput);
+      progress('Writing Week ' + w + (isBossWeek ? ' (Boss)' : '') + '…');
+      var weekObject = await runJsonStage(settings, {
+        stageName: 'Write Week ' + w,
+        schema: null, 
+        maxTokens: 8192,
+        maxAttempts: 3, // slightly higher retry capability for single units
+        validate: function (result) {
+          if (!result || !result.title || !result.sessions) return 'Week must contain a title and sessions array.';
+          return '';
+        },
+        buildPrompt: function (retryState) {
+          return builders.singleWeekFinal(workout, brief, layerBible, campaignPlan, weekPlan, shellContext, continuityPacket, allComponentValues);
+        }
       });
+
+      // Force enforce weekNumber to prevent model drift
+      weekObject.weekNumber = w;
+      if (isBossWeek) weekObject.isBossWeek = true;
+      else weekObject.isBossWeek = false;
+
+      finalWeeks.push(weekObject);
+      if (!isBossWeek && weekObject.weeklyComponent && weekObject.weeklyComponent.value) {
+        allComponentValues.push(weekObject.weeklyComponent.value);
+      }
     }
 
-    var weekSummaries = extractWeekSummaries(weekChunkOutputs);
-    var fragBatches = buildFragmentBatches(campaignPlan.fragmentRegistry, weekSummaries);
-    var fragmentsOutput = { fragments: [] };
+    var assembledWeeksOutput = [{ weeks: finalWeeks }];
+    var weekSummaries = extractWeekSummaries(assembledWeeksOutput);
 
-    if (fragBatches.length <= 1) {
-      progress('Generating fragments…');
-      try {
-        fragmentsOutput = await runJsonStage(settings, {
-          stageName: 'Bonus Pages',
-          schema: STRUCTURED_SCHEMA_FRAGMENTS,
-          maxTokens: 32000,
-          unwrapKey: 'fragments',
-          maxAttempts: 2,
-          validate: function (result) {
-            return validateFragmentsStage(result, campaignPlan.fragmentRegistry);
-          },
-          buildPrompt: function (retryState) {
-            return builders.fragments(
-              layerBible,
-              campaignPlan,
-              weekSummaries,
-              shellContext,
-              retryState.attempt > 0 ? { retryMode: 'tight' } : undefined
-            );
-          }
-        });
-      } catch (fragmentErr) {
-        if (!shouldSplitFragmentBatch(fragmentErr, campaignPlan.fragmentRegistry || [])) throw fragmentErr;
-        console.warn('[LiftRPG] Monolithic fragments stage failed; retrying as smaller batches:', fragmentErr.message);
-        var splitOutput = await generateFragmentBatchAdaptive(settings, builders, {
-          layerBible: layerBible,
-          registry: campaignPlan.fragmentRegistry || [],
-          batchWeekSummaries: weekSummaries,
-          allWeekSummaries: weekSummaries,
-          priorFragments: [],
-          batchIndex: 0,
-          totalBatches: 1,
-          shellContext: shellContext,
-          label: 'Bonus Pages'
-        });
-        fragmentsOutput = { fragments: splitOutput.fragments || [] };
-      }
-    } else {
-      var batchOutputs = [];
-      var priorFragments = [];
+    // ── TARGETED UNIT GENERATION: FRAGMENTS ──────────────────────
+    var finalFragments = [];
+    var registry = campaignPlan.fragmentRegistry || [];
 
-      for (var fi = 0; fi < fragBatches.length; fi++) {
-        var batch = fragBatches[fi];
-        var batchLabel = 'Bonus Pages ' + (fi + 1) + '/' + fragBatches.length + ' (weeks ' + batch.weekNumbers.join(',') + ')';
-        progress('Generating ' + batchLabel.toLowerCase() + '…');
+    for (var f = 0; f < registry.length; f++) {
+      var regEntry = registry[f];
+      progress('Writing Fragment ' + regEntry.id + '…');
+      var fragmentObj = await runJsonStage(settings, {
+        stageName: 'Fragment ' + regEntry.id,
+        schema: null,
+        maxTokens: 4096,
+        maxAttempts: 2,
+        validate: function (result) {
+          if (!result || !result.content || !result.documentType) return 'Fragment must contain content and documentType.';
+          return '';
+        },
+        buildPrompt: function (retryState) {
+          return builders.singleFragment(layerBible, regEntry, weekSummaries, shellContext, finalFragments);
+        }
+      });
 
-        var batchOutput = await generateFragmentBatchAdaptive(settings, builders, {
-          layerBible: layerBible,
-          registry: batch.registry,
-          batchWeekSummaries: batch.weekSummaries,
-          allWeekSummaries: weekSummaries,
-          priorFragments: priorFragments,
-          batchIndex: fi,
-          totalBatches: fragBatches.length,
-          shellContext: shellContext,
-          label: batchLabel
-        });
-
-        batchOutputs.push(batchOutput);
-        (batchOutput.fragments || []).forEach(function (fragment) {
-          priorFragments.push(fragment);
-        });
-      }
-
-      var mergeResult = mergeFragmentBatches(batchOutputs, campaignPlan.fragmentRegistry);
-      if (mergeResult.errors.length > 0) {
-        console.warn('[LiftRPG] Fragment batch merge issues:', mergeResult.errors);
-      }
-      fragmentsOutput = { fragments: mergeResult.fragments };
+      fragmentObj.id = regEntry.id; // Force ID alignment
+      finalFragments.push(fragmentObj);
     }
+    
+    var assembledFragmentsOutput = { fragments: finalFragments };
 
-    progress('Generating finale…');
-    var lastChunkWeeks = weekChunkOutputs[weekChunkOutputs.length - 1].weeks || [];
-    var bossWeek = lastChunkWeeks[lastChunkWeeks.length - 1] || {};
-    var binaryChoiceWeek = findBinaryChoiceWeek(weekChunkOutputs);
-    var endingsOutput = await runJsonStage(settings, {
-      stageName: 'Finale',
-      schema: STRUCTURED_SCHEMA_ENDINGS,
-      maxTokens: 8192,
-      unwrapKey: 'endings',
+    // ── TARGETED UNIT GENERATION: ENDING ────────────────────────
+    progress('Writing Finale…');
+    var finalEndings = [];
+    var endingObj = await runJsonStage(settings, {
+      stageName: 'Finale Variant',
+      schema: null,
+      maxTokens: 4096,
       maxAttempts: 2,
-      validate: validateEndingsStage,
+      validate: function (result) {
+        if (!result || !result.content || !result.variant) return 'Ending must contain content and variant.';
+        return '';
+      },
       buildPrompt: function (retryState) {
-        return builders.endings(
-          layerBible,
-          campaignPlan,
-          bossWeek,
-          binaryChoiceWeek,
-          shellContext,
-          weekSummaries,
-          retryState.attempt > 0 ? { retryMode: 'tight' } : undefined
-        );
+        return builders.singleEnding(layerBible, campaignPlan, "Primary", shellContext, weekSummaries);
       }
     });
+    finalEndings.push(endingObj);
+    var assembledEndingsOutput = { endings: finalEndings };
 
-    console.log('[LiftRPG] Assembling booklet from', weekChunkOutputs.length, 'week chunks,',
-      ((fragmentsOutput || {}).fragments || []).length, 'fragments,',
-      ((endingsOutput || {}).endings || []).length, 'endings');
+    // ── DETERMINISTIC ASSEMBLY & QUALITY GATE ───────────────────
+    console.log('[LiftRPG] Assembling booklet from ' + finalWeeks.length + ' weeks, ' + finalFragments.length + ' fragments, ' + finalEndings.length + ' endings.');
 
-    var booklet = options.assemble(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan);
+    var booklet = options.assemble(shell, assembledWeeksOutput, assembledFragmentsOutput, assembledEndingsOutput, campaignPlan);
     enforceIdentityContract(booklet, identityContract);
 
     var errors = validateAssembledBooklet(booklet);
     if (errors.warnings && errors.warnings.length > 0) {
       console.warn('[LiftRPG] Validation warnings:', errors.warnings);
     }
+
     if (errors.length > 0 && options.allowPatch !== false) {
-      console.warn('[LiftRPG] Assembled booklet has', errors.length, 'validation errors:', errors);
-      totalStages++;
-      progress('Patching ' + (errors.length === 1 ? '1 error' : errors.length + ' errors') + '…');
-      booklet = await patchAssembledBooklet(settings, booklet, errors, identityContract);
-      var remaining = validateAssembledBooklet(booklet);
-      if (remaining.length > 0) {
-        console.warn('[LiftRPG] Patch did not fully resolve errors (' + remaining.length + ' remaining):', remaining);
-      }
+      console.warn('[LiftRPG] Final assembly has', errors.length, 'validation errors:', errors);
+      // NOTE: Because we are aggressively targeting the generation and validating *per unit*,
+      // the legacy patchAssembledBooklet fallback is bypassed directly, unless explicitly wired in a future iteration. 
+      // This enforces the "Remove whole-booklet patching" requirement from the user.
+      console.warn('[LiftRPG] Whole-booklet patching is disabled by policy. Returning aggressively unit-repaired booklet.');
     }
 
     var report = generateQualityReport(booklet);

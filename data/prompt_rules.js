@@ -236,6 +236,54 @@
     '- These are authored now; encryption happens later in trusted tooling'
   ];
 
+  window.SCHEMA_WEEK_PLAN = [
+    '## weekPlan (object)',
+    '- `weekNumber` (integer)',
+    '- `title` (string)',
+    '- `narrativeIntent` (string): 1-sentence summary of the focus',
+    '- `mechanicSurfaces` (string[]): which diegetic mechanics apply',
+    '- `requiredFragmentMentions` (string[]): fragment IDs to tease',
+    '- `mapProgressionState` (string): brief note on how map shifts'
+  ];
+
+  window.SCHEMA_SINGLE_WEEK = [
+    '## week (object)',
+    'Generate exactly ONE week object.',
+    '- `weekNumber` (integer): 1-indexed',
+    '- `title` (string): chapter title inside the world',
+    '- `epigraph` (object): { text, attribution }',
+    '- `isBossWeek` (boolean)',
+    '- `weeklyComponent` (object): { type, value, extractionInstruction }',
+    '- `sessions` (array, 3-6 items): { sessionNumber, label, exercises: [...], storyPrompt, fragmentRef?, binaryChoice? }',
+    '- `fieldOps` (object): mapState, cipher, oracleTable, companionComponents',
+    '- `bossEncounter` (object): replaces fieldOps if boss week',
+    '- `overflow` (boolean) and `overflowDocument` (foundDocument object)',
+    '- `interlude` (object, optional)',
+    '- `gameplayClocks` (array, optional)',
+    '- `isDeload` (boolean, optional)'
+  ];
+
+  window.SCHEMA_SINGLE_FRAGMENT = [
+    '## fragment (object)',
+    'Generate exactly ONE found document.',
+    '- `id` (string): pattern "F.N"',
+    '- `documentType` (supported value)',
+    '- `inWorldAuthor` (string)',
+    '- `inWorldRecipient` (string)',
+    '- `inWorldPurpose` (string)',
+    '- `content` (string)',
+    '- `designSpec` (object): { paperTone, primaryTypeface, headerStyle, hasRedactions, hasAnnotations }',
+    '- `authenticityChecks` (object): { hasIrrelevantDetail, couldExistInDifferentStory, redactionDoesNarrativeWork }'
+  ];
+
+  window.SCHEMA_SINGLE_ENDING = [
+    '## ending (object)',
+    'Generate exactly ONE ending variant.',
+    '- `variant` (string)',
+    '- `content`: { documentType, body, finalLine }',
+    '- `designSpec` (object): { paperTone, primaryTypeface }'
+  ];
+
   window.SCHEMA_SPEC = [].concat(
     SCHEMA_HEADER, [''],
     SCHEMA_META, [''],
