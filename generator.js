@@ -1,477 +1,7 @@
 (function () {
-  var BANNED_TROPES = [
-    'gladiator arena or Roman colosseum settings',
-    'space marine or generic military sci-fi',
-    'post-apocalyptic scavenger cliches by default',
-    'chosen one or prophecy fulfillment',
-    'zombie outbreak as fallback premise',
-    'generic medieval fantasy dungeon-crawl',
-    'superhero origin story'
-  ];
-
-  var GENRE_POOL = [
-    'Traditional pulp adventure: ancient temples, hidden traps, and rival explorers',
-    'Cozy village mystery: a missing baker, local gossip, and secrets behind the counter',
-    'Space opera western: a dusty outpost on the edge of the galaxy holding out against a mega-corp',
-    'Classic epic fantasy: a motley crew must deliver an artifact to a dangerous realm',
-    'Sports underdog drama: a disgraced coach and a team of misfits with one last shot at the championship',
-    'Lighthearted slice-of-life: a magical coffee shop where the drinks change people\'s memories',
-    'Superhero street-level resistance: ordinary citizens pushing back against a corrupt vigilante',
-    'High-tech corporate heist: stealing a prototype from a floating casino',
-    'Romantic comedy with a supernatural twist: matchmaking for ghosts who unfinished business',
-    'Hardboiled detective noir: it started with a missing pet and ended with the mayor\'s secrets',
-    'Survival horror in a completely mundane setting: getting lost in an infinite suburban open house',
-    'Corporate accounting horror: an audit trail that audits you back',
-    'Competitive birdwatching noir: binoculars, betrayal, and rare sightings',
-    'Municipal zoning board cosmic horror: the variance was never approved',
-    'Insurance fraud romance: two adjusters, one suspicious claim',
-    'Deep-sea botanical survey: cataloguing organisms that should not photosynthesize',
-    'Victorian sewer cartography: mapping what lives below',
-    'Cold War library science: banned books as dead drops',
-    'Professional cheese cave inspector: aging reveals terrible truths',
-    'Small-town summer: a teenager has one season to fix what their parent broke',
-    'Cross-country road trip falling apart in the best possible way',
-    'Two rival chefs competing for the same kitchen, the same memory, the same person',
-    'Heist in a museum after hours — the target is not what it looks like',
-    'Fantasy village where the dragon is the only one telling the truth',
-    'Retired detective pulled back by the one case they never closed',
-    'Kids on a summer mission: find what adults buried in the woods'
-  ];
-
-  var DESIGN_PROFILES = [
-    {
-      id: 'institutional-mystery',
-      keywords: ['archive', 'bureau', 'office', 'survey', 'inspection', 'record', 'ledger', 'agency', 'compliance', 'gauge', 'meter', 'building'],
-      storyLens: 'mundane competence inside a system whose official purpose is no longer the real one',
-      settingLayers: [
-        'public-facing counters, corridors, waiting rooms, or lobby surfaces',
-        'working spaces where the real labor happens and people improvise',
-        'sealed, restricted, or quietly abandoned rooms that retain institutional memory',
-        'older administrative history whose paperwork still shapes present behavior'
-      ],
-      characterWeb: [
-        'a supervisor or handler who knows more than they say',
-        'a peer who has normalized the wrongness for survival',
-        'a dependent, trainee, or novice who changes the protagonist way of seeing',
-        'an absent predecessor whose traces are still operationally useful'
-      ],
-      secretShapes: [
-        'routine data encodes human intention',
-        'institutional language is being used to hide culpability',
-        'the system started drifting long before the protagonist noticed'
-      ],
-      arcMoves: [
-        'small discrepancy',
-        'pattern recognition',
-        'reframing of what the work really does',
-        'personal cost for knowing'
-      ],
-      mapType: 'grid',
-      oracleMode: 'banded-d100',
-      puzzleFamilies: ['fragment cross-reference', 'grid-coordinate reading', 'observational anomaly hunting', 'process deduction'],
-      pressureClocks: ['Exposure Risk', 'Evidence Chain', 'Site Integrity'],
-      scarcitySurfaces: ['dashboard', 'stress-track', 'return-box'],
-      interludePayloads: ['fragment-ref', 'password-element', 'narrative'],
-      documentTypes: ['memo', 'report', 'inspection', 'fieldNote', 'form', 'transcript'],
-      themeHints: ['government', 'noir', 'minimalist']
-    },
-    {
-      id: 'route-expedition',
-      keywords: ['road', 'route', 'rail', 'expedition', 'shore', 'coast', 'voyage', 'mountain', 'signal', 'station', 'ferry', 'lighthouse'],
-      storyLens: 'movement through a living route where distance, weather, and attrition shape revelation',
-      settingLayers: [
-        'the official route, chart, trail, or timetable the world claims is stable',
-        'temporary shelters, depots, or waystations where travelers barter information',
-        'hazard space where weather, terrain, or distance rewrites plans',
-        'older routes, lost expeditions, or buried paths still exerting pressure'
-      ],
-      characterWeb: [
-        'a guide, dispatcher, or navigator with compromised judgment',
-        'a quartermaster or caretaker tracking scarcity better than anyone else',
-        'someone waiting at the far end whose idea of the protagonist is out of date',
-        'a vanished traveler or crew member whose route notes remain'
-      ],
-      secretShapes: [
-        'the route was built for a purpose nobody names now',
-        'the destination is not the whole truth of the journey',
-        'the environment is recording the travelers as much as they are recording it'
-      ],
-      arcMoves: [
-        'departure under ordinary procedure',
-        'supply or distance pressure',
-        'route re-interpretation',
-        'arrival that reveals a cost already paid'
-      ],
-      mapType: 'linear-track',
-      oracleMode: 'banded-d100',
-      puzzleFamilies: ['path tracing', 'route adjacency', 'environmental pattern recognition', 'resource clock pressure'],
-      pressureClocks: ['Exposure', 'Supplies', 'Distance Remaining'],
-      scarcitySurfaces: ['stress-track', 'inventory-grid', 'dashboard'],
-      interludePayloads: ['narrative', 'cipher', 'map'],
-      documentTypes: ['fieldNote', 'report', 'letter', 'correspondence', 'memo'],
-      themeHints: ['nautical', 'pastoral', 'scifi']
-    },
-    {
-      id: 'social-intrigue',
-      keywords: ['union', 'meeting', 'family', 'town', 'parish', 'committee', 'choir', 'household', 'school', 'election', 'neighborhood'],
-      storyLens: 'a pressure network of people whose public stories and private motives keep crossing wires',
-      settingLayers: [
-        'public rooms where everyone performs consensus or civility',
-        'back rooms, kitchens, porches, offices, and cars where real decisions happen',
-        'records, minutes, correspondence, or gossip channels that preserve selective memory',
-        'older grievances, debts, or promises the present keeps inheriting'
-      ],
-      characterWeb: [
-        'one intimate ally or dependent whose needs complicate the work',
-        'one rival or institutional counterweight who is not entirely wrong',
-        'one charismatic figure who changes register depending on audience',
-        'one absent or compromised person everyone is quietly orienting around'
-      ],
-      secretShapes: [
-        'different people are protecting different versions of the same event',
-        'community language hides coercion',
-        'the protagonist role in the social web is not what they thought it was'
-      ],
-      arcMoves: [
-        'surface harmony',
-        'contradictory testimony',
-        'midpoint allegiance fracture',
-        'consequence that must be lived with publicly'
-      ],
-      mapType: 'point-to-point',
-      oracleMode: 'banded-d100',
-      puzzleFamilies: ['logic deduction', 'witness contradiction', 'fragment cross-reference', 'branch consequence tracking'],
-      pressureClocks: ['Suspicion', 'Trust', 'Public Attention'],
-      scarcitySurfaces: ['memory-slots', 'dashboard', 'return-box'],
-      interludePayloads: ['fragment-ref', 'narrative', 'companion'],
-      documentTypes: ['correspondence', 'letter', 'transcript', 'memo', 'fieldNote', 'form'],
-      themeHints: ['noir', 'pastoral', 'government']
-    },
-    {
-      id: 'occult-revelation',
-      keywords: ['ritual', 'church', 'grave', 'occult', 'forbidden', 'prayer', 'grimoire', 'ghost', 'curse', 'relic', 'abbey'],
-      storyLens: 'forbidden pattern recognition where belief, evidence, and contamination change one another',
-      settingLayers: [
-        'ordinary devotional or inherited surface practice',
-        'working rituals, marginal notes, or hidden procedures',
-        'sanctified or forbidden spaces that alter perception',
-        'buried doctrine, inheritance, or earlier failure still exerting force'
-      ],
-      characterWeb: [
-        'a believer whose faith is not the same thing as trust',
-        'a skeptic whose refusal has its own theology',
-        'a keeper of texts or relics who edits what survives',
-        'a dead or missing voice that still directs behavior'
-      ],
-      secretShapes: [
-        'the ritual was designed to translate, not merely conceal',
-        'the first interpretation of events is spiritually useful but false',
-        'the protagonist is more implicated than they initially seem'
-      ],
-      arcMoves: [
-        'symbol without context',
-        'pattern recognition through accumulation',
-        'midpoint revelation that changes the rules of reading',
-        'irreversible interpretive act'
-      ],
-      mapType: 'player-drawn',
-      oracleMode: 'banded-d100',
-      puzzleFamilies: ['symbol decoding', 'layered metapuzzle assembly', 'observational anomaly hunting', 'oracle-triggered rule mutation'],
-      pressureClocks: ['Contamination', 'Witness', 'Seal Integrity'],
-      scarcitySurfaces: ['stress-track', 'memory-slots', 'overlay-window'],
-      interludePayloads: ['cipher', 'password-element', 'map'],
-      documentTypes: ['anomaly', 'fieldNote', 'letter', 'transcript', 'correspondence'],
-      themeHints: ['occult', 'fantasy', 'noir']
-    },
-    {
-      id: 'containment-failure',
-      keywords: ['lab', 'facility', 'containment', 'quarantine', 'specimen', 'ward', 'reactor', 'clean room', 'protocol', 'medical', 'test chamber'],
-      storyLens: 'a controlled environment that reveals its control was already compromised',
-      settingLayers: [
-        'sterile, public-facing procedure surfaces',
-        'technical maintenance and emergency handling spaces',
-        'sealed enclosures, wards, or access strata where procedure outruns ethics',
-        'older incident history the facility pretends is resolved'
-      ],
-      characterWeb: [
-        'a protocol loyalist who keeps the place functioning',
-        'a medic, handler, or operator who treats people as liabilities and obligations',
-        'a witness whose account cannot be cleanly integrated into the record',
-        'a missing subject, patient, or operator shaping every decision'
-      ],
-      secretShapes: [
-        'containment depends on selective truth',
-        'the emergency plan assumes sacrificial logic',
-        'the protagonist labor is itself part of the experiment'
-      ],
-      arcMoves: [
-        'stable protocol',
-        'procedural deviation',
-        'midpoint realization about what is being contained',
-        'triage under institutional pressure'
-      ],
-      mapType: 'grid',
-      oracleMode: 'banded-d100',
-      puzzleFamilies: ['process deduction', 'index extraction', 'observational anomaly hunting', 'route denial'],
-      pressureClocks: ['Containment Loss', 'Triage Load', 'Exposure Window'],
-      scarcitySurfaces: ['dashboard', 'stress-track', 'inventory-grid'],
-      interludePayloads: ['clock', 'cipher', 'narrative'],
-      documentTypes: ['report', 'memo', 'form', 'transcript', 'inspection', 'anomaly'],
-      themeHints: ['scifi', 'government', 'minimalist']
-    },
-    {
-      id: 'frontier-survival',
-      keywords: ['frontier', 'trail', 'canyon', 'desert', 'outpost', 'range', 'mine', 'wildfire', 'reserve', 'ranch', 'flood', 'forest'],
-      storyLens: 'survival inside a hard landscape where logistics, memory, and power decide what counts as law',
-      settingLayers: [
-        'the claimed or mapped version of the land',
-        'the lived routes, shelters, water, and labor that actually sustain movement',
-        'hazard zones or cut-off spaces the map keeps underdescribing',
-        'older occupation, violence, or stewardship the current order relies on'
-      ],
-      characterWeb: [
-        'a local expert whose knowledge is practical and politically dangerous',
-        'a traveler, newcomer, or returnee who sees the place differently',
-        'a dependent community figure whose safety changes the stakes',
-        'an enemy, landlord, or authority who thinks scarcity justifies ownership'
-      ],
-      secretShapes: [
-        'the land is not empty, neutral, or honestly described',
-        'the official story of danger hides who benefits',
-        'survival decisions keep becoming moral decisions'
-      ],
-      arcMoves: [
-        'ordinary route or season',
-        'resource pressure',
-        'midpoint reinterpretation of threat',
-        'costly arrival or stand'
-      ],
-      mapType: 'point-to-point',
-      oracleMode: 'banded-d100',
-      puzzleFamilies: ['path tracing', 'adjacency extraction', 'constraint logic', 'resource clock pressure'],
-      pressureClocks: ['Weather', 'Supplies', 'Pursuit'],
-      scarcitySurfaces: ['inventory-grid', 'stress-track', 'return-box'],
-      interludePayloads: ['map', 'narrative', 'fragment-ref'],
-      documentTypes: ['fieldNote', 'letter', 'report', 'inspection', 'memo'],
-      themeHints: ['pastoral', 'noir', 'nautical']
-    },
-    {
-      id: 'domestic-secret',
-      keywords: ['apartment', 'hotel', 'household', 'kitchen', 'laundry', 'boarding house', 'residence', 'clinic', 'block association', 'care home'],
-      storyLens: 'private life under pressure, where care, routine, and secrecy all occupy the same rooms',
-      settingLayers: [
-        'the rooms everyone sees and knows how to perform inside',
-        'service, care, or maintenance spaces where the real labor happens',
-        'sealed drawers, ledgers, or rooms where intimacy and concealment overlap',
-        'older domestic history still organizing the present through habit'
-      ],
-      characterWeb: [
-        'one intimate relationship that cannot stay in its current form',
-        'one caretaker or dependent whose needs are morally clarifying',
-        'one institutional intruder or inspector',
-        'one absent household member or predecessor still structuring the rooms'
-      ],
-      secretShapes: [
-        'care is entangled with control',
-        'ordinary household records preserve the real history',
-        'the protagonist role in the home is built on a suppressed bargain'
-      ],
-      arcMoves: [
-        'routine with cracks',
-        'room-by-room revelation',
-        'midpoint relational reversal',
-        'consequence that changes how the place can be lived in'
-      ],
-      mapType: 'grid',
-      oracleMode: 'banded-d100',
-      puzzleFamilies: ['room-label derivation', 'fragment cross-reference', 'pattern recognition', 'logic deduction'],
-      pressureClocks: ['Strain', 'Suspicion', 'Caretaking Load'],
-      scarcitySurfaces: ['memory-slots', 'dashboard', 'inventory-grid'],
-      interludePayloads: ['narrative', 'fragment-ref', 'companion'],
-      documentTypes: ['letter', 'correspondence', 'fieldNote', 'form', 'transcript', 'memo'],
-      themeHints: ['pastoral', 'noir', 'minimalist']
-    },
-    {
-      id: 'infrastructure-thriller',
-      keywords: ['dam', 'switchboard', 'tunnel', 'elevator', 'boiler', 'pipeline', 'utility', 'telecom', 'signal', 'grid', 'substation', 'control room'],
-      storyLens: 'the systems everybody relies on are legible only to the people no one notices until failure',
-      settingLayers: [
-        'public infrastructure surfaces people take for granted',
-        'maintenance paths, control rooms, and service access known only to workers',
-        'offline, dead, or bypass systems still physically present',
-        'historical build phases, patch jobs, and earlier failures baked into the structure'
-      ],
-      characterWeb: [
-        'a veteran operator or fixer who knows the old system',
-        'a manager or public-facing official who cannot read the real risk',
-        'a worker, apprentice, or dependent relying on the protagonist competence',
-        'a vanished technician or saboteur whose notes still matter'
-      ],
-      secretShapes: [
-        'the system has been doing more than anyone admitted',
-        'infrastructure failure is socially distributed, not purely technical',
-        'maintenance records hide political decisions'
-      ],
-      arcMoves: [
-        'routine operation',
-        'pressure spike',
-        'midpoint systems re-interpretation',
-        'manual intervention with public consequence'
-      ],
-      mapType: 'point-to-point',
-      oracleMode: 'banded-d100',
-      puzzleFamilies: ['route adjacency', 'tracker-value lookup', 'process deduction', 'visual pattern'],
-      pressureClocks: ['Load', 'Outage Risk', 'Public Fallout'],
-      scarcitySurfaces: ['dashboard', 'memory-slots', 'stress-track'],
-      interludePayloads: ['clock', 'map', 'password-element'],
-      documentTypes: ['inspection', 'report', 'memo', 'form', 'fieldNote', 'transcript'],
-      themeHints: ['government', 'scifi', 'noir']
-    },
-    {
-      id: 'simple-quest',
-      keywords: ['quest', 'adventure', 'hero', 'dragon', 'wizard', 'knight', 'sword', 'warrior', 'magic', 'dungeon', 'monster', 'treasure', 'rescue', 'battle', 'journey', 'prophecy', 'portal', 'realm', 'chosen', 'enemy'],
-      storyLens: 'a clear goal pursued through escalating obstacles, with stakes defined by loyalty and the cost of winning',
-      settingLayers: [
-        'the familiar starting world before the goal comes into focus',
-        'the territory the protagonist must cross, with its hazards and helpers',
-        'the enemy\'s domain or the final obstacle\'s domain',
-        'the world that will exist after — different regardless of outcome'
-      ],
-      characterWeb: [
-        'one loyal companion whose limits matter as much as their strengths',
-        'one antagonist with a coherent reason for opposing the goal',
-        'one mentor, guide, or threshold keeper who cannot go all the way',
-        'one bystander or civilian whose fate raises the stakes personally'
-      ],
-      secretShapes: [
-        'the goal is not quite what it seemed at the start',
-        'the antagonist and protagonist want the same thing for different reasons',
-        'the protagonist\'s flaw is the only thing that can solve the final obstacle'
-      ],
-      arcMoves: [
-        'call and departure',
-        'complication or reversal on the road',
-        'darkest moment: the price of commitment',
-        'climax that requires sacrifice, not just skill'
-      ],
-      mapType: 'point-to-point',
-      oracleMode: 'banded-d100',
-      puzzleFamilies: ['path tracing', 'route adjacency', 'constraint logic', 'resource clock pressure'],
-      pressureClocks: ['Distance', 'Enemy Pursuit', 'Ally Endurance'],
-      scarcitySurfaces: ['inventory-grid', 'stress-track', 'dashboard'],
-      interludePayloads: ['narrative', 'map', 'companion'],
-      documentTypes: ['fieldNote', 'letter', 'report', 'correspondence'],
-      themeHints: ['fantasy', 'scifi', 'pastoral']
-    },
-    {
-      id: 'comedy-absurdist',
-      keywords: ['funny', 'comedy', 'absurd', 'silly', 'ridiculous', 'wacky', 'whimsical', 'cartoon', 'parody', 'satire', 'humor', 'humour', 'joke', 'fights', 'versus', 'argue', 'chaos', 'disaster', 'mishap', 'awkward', 'bizarre', 'surreal', 'impossible', 'impossible'],
-      storyLens: 'a premise played straight inside a world where the rules are wrong, and the comedy comes from everyone behaving sensibly inside nonsense',
-      settingLayers: [
-        'the surface world that looks normal until you look twice',
-        'the broken or absurd logic underneath that everyone has adapted to',
-        'the thing nobody will acknowledge is wrong even when it obviously is',
-        'the moment the protagonist accepts the rules and uses them'
-      ],
-      characterWeb: [
-        'one straight-man protagonist who keeps trying to apply normal logic',
-        'one character who has completely normalized the absurdity',
-        'one character who benefits from the chaos and wants it to continue',
-        'one absent or offscreen authority who created the situation and has no idea'
-      ],
-      secretShapes: [
-        'the absurd situation has an internally consistent logic once you find it',
-        'the biggest obstacle is that everyone agrees not to name what is wrong',
-        'the resolution requires the protagonist to stop fighting the rules and use them'
-      ],
-      arcMoves: [
-        'normal person confronts impossible situation',
-        'failed attempts using normal logic',
-        'the turn: accepting or exploiting the logic',
-        'resolution that leaves the absurd world intact but transformed'
-      ],
-      mapType: 'grid',
-      oracleMode: 'banded-d100',
-      puzzleFamilies: ['observational anomaly hunting', 'logic deduction', 'pattern recognition', 'contextual-question'],
-      pressureClocks: ['Credibility', 'Chaos Level', 'Time Before Discovery'],
-      scarcitySurfaces: ['stress-track', 'memory-slots', 'return-box'],
-      interludePayloads: ['narrative', 'companion', 'fragment-ref'],
-      documentTypes: ['memo', 'form', 'transcript', 'fieldNote', 'letter'],
-      themeHints: ['pastoral', 'fantasy', 'minimalist']
-    },
-    {
-      id: 'character-drama',
-      keywords: ['love', 'romance', 'relationship', 'family', 'grief', 'loss', 'divorce', 'marriage', 'breakup', 'reunion', 'siblings', 'parent', 'child', 'estranged', 'forgiveness', 'regret', 'memory', 'inheritance', 'homecoming', 'reconcile'],
-      storyLens: 'two or more people whose histories make the present impossible to navigate cleanly, and the cost of staying or leaving',
-      settingLayers: [
-        'the shared space that holds both the relationship and its history',
-        'the private spaces where each person processes what they cannot say',
-        'the outside world that keeps pressing in and forcing decisions',
-        'the past — a specific event or period whose weight still organizes the present'
-      ],
-      characterWeb: [
-        'one person who wants things to stay as they are',
-        'one person who cannot continue without a change',
-        'one person from outside the central relationship who sees it clearly',
-        'one absent or lost figure whose influence still shapes every interaction'
-      ],
-      secretShapes: [
-        'both people are protecting the same wound from different angles',
-        'the relationship\'s public version and private experience are completely different',
-        'the thing they are arguing about is not the thing it is about'
-      ],
-      arcMoves: [
-        'current equilibrium with visible cracks',
-        'external pressure that forces a confrontation',
-        'the moment someone says the thing that cannot be unsaid',
-        'aftermath: a new equilibrium that costs something permanent'
-      ],
-      mapType: 'point-to-point',
-      oracleMode: 'banded-d100',
-      puzzleFamilies: ['fragment cross-reference', 'logic deduction', 'witness contradiction', 'branch consequence tracking'],
-      pressureClocks: ['Trust', 'Distance', 'Time Left'],
-      scarcitySurfaces: ['memory-slots', 'stress-track', 'dashboard'],
-      interludePayloads: ['narrative', 'fragment-ref', 'companion'],
-      documentTypes: ['letter', 'correspondence', 'transcript', 'memo', 'fieldNote'],
-      themeHints: ['pastoral', 'minimalist', 'noir']
-    },
-    {
-      id: 'modern-action',
-      keywords: ['gun', 'fight', 'action', 'spy', 'heist', 'cop', 'detective', 'chase', 'combat', 'war', 'battle', 'soldier', 'mercenary', 'cartel', 'gang', 'heist', 'thief', 'assassin', 'sniper'],
-      storyLens: 'high-stakes tactical problem solving where leverage, timing, and violence are the only currencies',
-      settingLayers: [
-        'the public surface where the target or objective is hidden',
-        'the tactical routes, sightlines, and cover points only operators see',
-        'the compromised safehouses or extraction points',
-        'the aftermath of sudden, localized violence'
-      ],
-      characterWeb: [
-        'a handler or contractor whose loyalties are conditional',
-        'a target or VIP who refuses to cooperate cleanly',
-        'a rival operator working the same objective from a different angle',
-        'a civilian bystander caught in the crossfire'
-      ],
-      secretShapes: [
-        'the objective is a decoy for a larger operation',
-        'the employer has already sold the protagonist out',
-        'the rules of engagement were written to ensure failure'
-      ],
-      arcMoves: [
-        'reconnaissance and staging',
-        'the plan makes contact with the enemy',
-        'midpoint escalation or extraction failure',
-        'costly exfiltration'
-      ],
-      mapType: 'point-to-point',
-      oracleMode: 'banded-d100',
-      puzzleFamilies: ['path tracing', 'route adjacency', 'constraint logic', 'resource clock pressure'],
-      pressureClocks: ['Security Response', 'Target Escaping', 'Ammo/Supplies'],
-      scarcitySurfaces: ['inventory-grid', 'stress-track', 'dashboard'],
-      interludePayloads: ['map', 'cipher', 'fragment-ref'],
-      documentTypes: ['memo', 'report', 'inspection', 'form'],
-      themeHints: ['noir', 'minimalist', 'cyberpunk']
-    }
-  ];
+  var BANNED_TROPES = window.BANNED_TROPES;
+  var GENRE_POOL = window.GENRE_POOL;
+  var DESIGN_PROFILES = window.DESIGN_PROFILES;
 
   function hashString(text) {
     var hash = 2166136261;
@@ -588,6 +118,42 @@
     });
   }
 
+
+  function deriveAuthorBlend(brief) {
+    if (!window.AUTHORIAL_PROFILES) return null;
+    var haystack = normalizeText(String(brief || ''));
+    var scored = window.AUTHORIAL_PROFILES.map(function(profile) {
+      var score = 0;
+      var loweredDisplay = normalizeText(profile.displayName);
+      if (haystack.indexOf(loweredDisplay) !== -1) score += 10;
+      var parts = loweredDisplay.split(' ');
+      var surname = parts[parts.length - 1];
+      if (surname && haystack.indexOf(surname) !== -1) score += 5;
+      return { profile: profile, score: score };
+    }).sort(function (left, right) {
+      return right.score - left.score;
+    });
+
+    if (scored[0] && scored[0].score > 0) return scored[0].profile;
+    return null;
+  }
+
+  function formatAuthorBias(authorProfile) {
+    if (!authorProfile) return '';
+    var reg = authorProfile.literaryRegister;
+    return [
+      '## Authorial Constraints & Tone',
+      '',
+      'The user has requested the distinctive style of ' + authorProfile.displayName + ' (' + reg.name + ').',
+      'You MUST adopt the following behaviors:',
+      '- ' + reg.behaviorDescription,
+      '- DO NOT DO THIS: ' + reg.forbiddenMoves.join('; '),
+      '- TYPOGRAPHY & FORMATTING: ' + reg.typographicBehavior,
+      '',
+      'This constraint overrides all generic design biases.'
+    ].join('\n');
+  }
+
   function formatDesignBias(blend) {
     var primary = blend.primary;
     var secondary = blend.secondary;
@@ -659,621 +225,23 @@
     ].join('\n');
   }
 
-  var SCHEMA_HEADER = [
-    '# LiftRPG Booklet Render Contract - Prompt Reference',
-    '',
-    'You are generating a complete LiftRPG booklet as a single JSON object.',
-    'This prompt is for the core LiftRPG fiction mode: print-first, diegetic, and workout-fused without forcing explicit gym language into the story.',
-    '',
-    '## Top-Level Structure',
-    '',
-    'Always include these top-level keys:',
-    '- `meta`',
-    '- `theme`',
-    '- `weeks`',
-    '- `fragments`',
-    '- `cover`',
-    '- `rulesSpread`',
-    '- `endings`'
-  ];
-
-  var SCHEMA_META = [
-    '## meta (object)',
-    '',
-    'Required fields:',
-    '- `schemaVersion` (string): Always "1.3.0"',
-    '- `generatedAt` (string): ISO 8601 datetime',
-    '- `blockTitle` (string): Full story title',
-    '- `blockSubtitle` (string): One-line official or diegetic designation',
-    '- `worldContract` (string): One sentence. The north star for every story, mechanic, and visual choice. Write this first.',
-    '- `narrativeVoice` (object): { person, tense, narratorStance, voiceRationale }. Do not default to second-person present tense. Choose the person and tense that best serves the fiction: first person for intimate or unreliable narrators, second person for procedural or instructional worlds, third limited for institutional distance.',
-    '- `literaryRegister` (object): { name, behaviorDescription, forbiddenMoves, typographicBehavior }',
-    '- `artifactIdentity` (object, required for shell-aware rendering): { artifactClass, artifactBlend?, authorialMode?, boardStateMode, documentEcology?, materialCulture?, openingMode?, rulesDeliveryMode?, revealShape?, unlockLogic?, shellFamily, attachmentStrategy }',
-    '- `weeklyComponentType` (string): One fiction-native non-semantic measurement family used across all non-boss weeks. It should feel like an operational residue or in-world key: a number, code, reading, tag, case ID, route marker, calibration value, or designation, never a plaintext letter.',
-    '- `structuralShape` (object): { resolution, temporalOrder, narratorReliability, promptFragmentRelationship, shapeRationale }. Resolution values: "closed" (mystery solved), "open" (ambiguity persists), "shifted" (question changed), "costly" (resolved at a price). NarratorReliability values: "reliable", "compromised" (knows but omits), "unreliable" (believes wrong things), "institutional" (voice of the system). Choose values that create real structural consequences, not decorative labels.',
-    '- `passwordLength` (integer, 4-12): Length of the intended final password word',
-    '- `passwordEncryptedEnding` (string, optional): Trusted tooling writes this after sealing the ending. Do not invent fake ciphertext.',
-    '- `demoPassword` (string, optional): Only include for explicit demo fixtures.',
-    '- `liftoScript` (string): Raw workout program pasted by the user',
-    '- `weekCount` (integer, 4-16): Derived from the workout program',
-    '- `totalSessions` (integer): Total sessions across all weeks',
-    '',
-    'Forbidden:',
-    '- Do not include `meta.passwordPlaintext` in normal output.',
-    '- Do not include hidden planning notes in `meta`.'
-  ];
-
-  var SCHEMA_THEME = [
-    '## theme (object)',
-    '',
-    'Always include a theme object. The renderer supports these `visualArchetype` values only:',
-    '- `pastoral`',
-    '- `government`',
-    '- `cyberpunk`',
-    '- `scifi`',
-    '- `fantasy`',
-    '- `noir`',
-    '- `steampunk`',
-    '- `minimalist`',
-    '- `nautical`',
-    '- `occult`',
-    '',
-    'Theme fields:',
-    '- `visualArchetype` (string): One supported archetype only',
-    '- `palette` (object): { ink, paper, accent, muted, rule, fog }',
-    '- `tokens` (object, optional): Use only to refine the chosen archetype, not to replace it',
-    '',
-    'Choose a visual archetype that matches the story world. Do not invent unsupported names like institutional, corporate, terminal, clinical, confessional, or literary.'
-  ];
-
-  var SCHEMA_WEEKS_PRE = [
-    '## weeks (array of objects)',
-    '',
-    'One object per week. Length must equal meta.weekCount.',
-    '',
-    'Each week requires:',
-    '- `weekNumber` (integer): 1-indexed',
-    '- `title` (string): Feels like a chapter title inside the world, not a workout label',
-    '- `epigraph` (object): { text, attribution }',
-    '- `isBossWeek` (boolean): True for the final week only',
-    '- `weeklyComponent` (object): { type, value, extractionInstruction }. Type must match meta.weeklyComponentType on non-boss weeks. Value is non-semantic raw data, not a letter, and should feel like a collectable operational clue rather than arbitrary filler. Boss week value is null.',
-    '- `sessions` (array, 3-6 items): Each session has { sessionNumber, label, exercises: [{ name, sets, repsPerSet, weightField?, notes? }], storyPrompt, fragmentRef?, binaryChoice?: { choiceLabel, promptA, promptB } }',
-    '- `fieldOps` (object, required on non-boss weeks): contains mapState, cipher, oracleTable, and optional companionComponents',
-    '- `bossEncounter` (object, required on boss week): replaces fieldOps',
-    '- `overflow` (boolean): True when sessions.length > 3',
-    '- `overflowDocument` (foundDocument, required when overflow is true)',
-    '- `interlude` (object, optional): must contain { title, reason, body } and may also include payloadType, payload, spreadAware',
-    '- `gameplayClocks` (array, optional): week-level progress clocks outside the oracle payload',
-    '- `isDeload` (boolean, optional): tonal flag only'
-  ];
-
-  // Later: deepen spatial play before adding new map types.
-  // First get more mileage out of revisitation, denied routes,
-  // checkpoints, changed annotations, and floorLabel within the
-  // current renderer-supported map schema.
-  var SCHEMA_SPATIAL = [
-    '### fieldOps.mapState',
-    '- `mapType` (string): one of "grid" | "point-to-point" | "linear-track" | "player-drawn"',
-    '- `title` (string): diegetic heading',
-    '- `floorLabel` (string, optional): deck, floor, wing, district, sector, or stratum label when it strengthens spatial identity',
-    '- `mapNote` (string, optional): footer note',
-    '- Shared states: "empty" | "cleared" | "locked" | "anomaly" | "current" | "inaccessible"',
-    '- Treat the map as changing board state, not as an illustration.',
-    '- Every map should include one denied route, locked zone, or inaccessible space.',
-    '- Every map should include one likely return point, checkpoint, or remembered landmark.',
-    '- If the same space persists across weeks, show at least one changed state, altered route, updated annotation, or revised label.',
-    '',
-    'GRID:',
-    '- `gridDimensions`: { columns: 5-12, rows: 4-8 }',
-    '- `tiles`: [{ col, row, type, label?, annotation? }] with route meaning, blocked movement, checkpoints, or discoverable annotations, not filler cells',
-    '- `currentPosition`: { col, row }',
-    '',
-    'POINT-TO-POINT:',
-    '- `nodes`: [{ id, label, x, y, state }]',
-    '- `edges`: [{ from, to, label?, state? }] with short memorable labels and stateful access when possible, not just neutral connectivity',
-    '- `currentNode`: string',
-    '- Limits: max 12 nodes total, max 10 edges total, labels short, spacing generous',
-    '',
-    'LINEAR-TRACK:',
-    '- `positions`: [{ index, label, state, annotation? }] should suggest route logic, pressure, or access stages rather than generic progress pips',
-    '- `currentPosition`: number',
-    '- `direction`: "horizontal" | "vertical"',
-    '- Limits: 3-12 positions',
-    '',
-    'PLAYER-DRAWN:',
-    '- `canvasType`: "dot-grid" | "graph-paper" | "hex-dot" | "blank"',
-    '- `dimensions`: { columns: 8-16, rows: 6-12 }',
-    '- `prompts`: [string] up to 4 and each prompt should reveal topology, access logic, or interpretive uncertainty over time',
-    '- `seedMarkers`: [{ col, row, label }] up to 3 and each should feel purposeful enough to anchor exploration'
-  ];
-
-  var SCHEMA_WEEKS_POST = [
-    '### fieldOps.cipher',
-    '- Shape: { type, title, body, noticeabilityDesign, extractionInstruction, characterDerivationProof }',
-    '- `body` is an OBJECT, never a string. Shape: { displayText?: string, key?: string, workSpace?: object, referenceTargets?: string[] }',
-    '  - `displayText`: the puzzle text shown to the player',
-    '  - `key`: cipher key or lookup table (if applicable)',
-    '  - `workSpace`: { style: "cells"|"boxed-totals"|"blank", cellCount?: number }',
-    '  - `referenceTargets`: array of fragment IDs or map labels for cross-reference puzzles',
-    '- `type` should name a specific technique such as substitution, reverse-alphabet, grid-filter, index-extraction, fragment-cross-reference, path-tracing, typographic-anomaly, numeric-sequence, contextual-question, or room-label-derivation',
-    '- Ciphers yield fiction-native values only. The boss page handles value-to-letter decoding.',
-    '- Cipher body displayText should present the puzzle cleanly — no "thinking out loud" about the method, no self-referential explanations of how to solve it.',
-    '',
-    '### fieldOps.oracleTable',
-    '- Shape: { title, instruction, mode, entries[] }',
-    '- `mode` is optional metadata; if present prefer "fragment", "consequence", or "mixed"',
-    '- Oracle tables use exactly 10 entries with roll bands "00-09", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90-99"',
-    '- Each entry: { roll: string, type: "fragment"|"consequence", text: string, paperAction?: string, fragmentRef?: string }',
-    '- CRITICAL: the text field is called `text`, never `description` or `label`.',
-    '- Fragment entries (type: "fragment") must include `fragmentRef` pointing to a real fragment ID.',
-    '- Consequence entries must include `paperAction` that visibly changes the paper state (mark a clock, shade a node, cross off a route, etc.).',
-    '- Oracle entries must be playable game consequences or concrete fiction events, not atmospheric vibes or prose descriptions.',
-    '',
-    '### fieldOps.companionComponents',
-    'Supported component `type` values only:',
-    '- `dashboard`',
-    '- `return-box`',
-    '- `inventory-grid`',
-    '- `token-sheet`',
-    '- `overlay-window`',
-    '- `stress-track`',
-    '- `memory-slots`',
-    '',
-    '### week.interlude',
-    '- Required if present: `title`, `reason`, `body`',
-    '- Optional: `payloadType`, `payload`, `spreadAware`',
-    '- Supported `payloadType` values only:',
-    '  "none" | "narrative" | "cipher" | "map" | "clock" | "companion" | "fragment-ref" | "password-element"',
-    '- Use interludes for discovered packets, route updates, partial instructions, fragment handoffs, password elements, or compact state shifts only when they materially change play.',
-    '',
-    '### week.gameplayClocks',
-    '- Each clock: { clockName, segments, clockType, startValue?, direction?, linkedClockName?, opposedClockName?, thresholds?, consequenceOnFull }',
-    '- Supported `clockType` values only:',
-    '  "progress-clock" | "danger-clock" | "racing-clock" | "tug-of-war-clock" | "linked-clock" | "project-clock"',
-    '',
-    '### bossEncounter',
-    '- Shape: { title, narrative, mechanismDescription, componentInputs, decodingKey, convergenceProof, passwordRevealInstruction, binaryChoiceAcknowledgement?: { ifA, ifB } }',
-    '- `decodingKey`: { instruction, referenceTable }',
-    '- `componentInputs` must match the prior weeklyComponent values in order',
-    '- The boss page reveals how raw values become letters for the first time'
-  ];
-
-  // Later: do not expand document families until we prove the current
-  // set can carry threaded evidence, contradiction, and character depth.
-  // Favor better fragment function over more fragment categories.
-  var SCHEMA_FRAGMENTS = [
-    '## fragments (array of found documents)',
-    '',
-    'Use 12-30 fragments. Mix 4-7 document families from this supported list:',
-    '- `memo`',
-    '- `report`',
-    '- `inspection`',
-    '- `fieldNote`',
-    '- `correspondence`',
-    '- `letter`',
-    '- `transcript`',
-    '- `form`',
-    '- `anomaly`',
-    '',
-    'Each fragment has:',
-    '- `id` (string): pattern "F.N"',
-    '- `documentType` (supported value only)',
-    '- `inWorldAuthor` (string)',
-    '- `inWorldRecipient` (string)',
-    '- `inWorldPurpose` (string)',
-    '- `content` (string)',
-    '- `designSpec` (object): { paperTone, primaryTypeface, headerStyle, hasRedactions, hasAnnotations }',
-    '- `authenticityChecks` (object): { hasIrrelevantDetail, couldExistInDifferentStory, redactionDoesNarrativeWork }',
-    '- Across the full booklet, include at least three linked fragment functions: one action-changing artifact, one interpretation-changing artifact, and one character-deepening artifact.',
-    '- At least one incident, place, procedure, or relationship should recur across multiple document perspectives.',
-    '- Fragments may arrive as threaded packets, route updates, contradictory records, or personal aftershocks, not just isolated lore drops.',
-    '',
-    'Do not force every booklet to use all document types. Variety matters, but chosen absence also creates identity.'
-  ];
-
-  var SCHEMA_TAIL = [
-    '## cover',
-    '- `title` (string): same as meta.blockTitle',
-    '- `designation` (string)',
-    '- `tagline` (string)',
-    '- `colophonLines` (string[], 3-6 items)',
-    '- `svgArt` (string, optional): sparse line-based inline SVG only when it materially helps',
-    '- `coverArtCaption` (string, optional)',
-    '',
-    '## rulesSpread',
-    '- `leftPage`: { title, reEntryRule, sections[] }',
-    '- `rightPage`: { title, instruction, unlockUrl }',
-    '- One leftPage section must explain the play cadence in-world',
-    '',
-    '## endings',
-    '- Array of 1-3 plaintext endings',
-    '- Each item: { variant, content, designSpec }',
-    '- `content`: { documentType, body, finalLine }',
-    '- These are authored now; encryption happens later in trusted tooling'
-  ];
-
-  var SCHEMA_SPEC = [].concat(
-    SCHEMA_HEADER, [''],
-    SCHEMA_META, [''],
-    SCHEMA_THEME, [''],
-    SCHEMA_WEEKS_PRE, [''],
-    SCHEMA_SPATIAL, [''],
-    SCHEMA_WEEKS_POST, [''],
-    SCHEMA_FRAGMENTS, [''],
-    SCHEMA_TAIL
-  ).join('\n');
-
-  // Phase-1 default: stay generator-first.
-  // Defer API/chat generation split, new payload enums, new map types,
-  // and true new-affordance progression until the current prompt
-  // reliably produces cohesive, render-clean booklets.
-  var INSTRUCTIONS = [
-    '# Generation Instructions',
-    '',
-    '## Brief Interpretation (run silently before everything else)',
-    'Before writing any fields or world contract, decode the creative direction brief. Do not output this step.',
-    '',
-    'If the brief is a MASHUP (X meets Y, X + Y, like X but with Y):',
-    '- Identify the genre, tone, emotional register, and defining conventions of each element separately.',
-    '- Find the creative tension between them — the interesting collision, not the safe middle ground.',
-    '- Example: "Oldboy meets Project Hail Mary" → Oldboy (psychological revenge thriller, identity horror, shocking reversal, claustrophobic) + Project Hail Mary (optimistic hard sci-fi, isolation, alien contact, problem-solving under pressure) → the collision: a protagonist solving an impossible problem who discovers the mission itself was designed as punishment for something they did. The optimism of competence meets the horror of complicity. The "alien contact" is the person they wronged.',
-    '- The creative tension IS the story. Do not average the two elements into something neither. Honor the dissonance.',
-    '',
-    'If the brief contains a NAMED PERSONAL CHARACTER (a real pet, a family member, a named person in the user\'s life):',
-    '- That character is real and specific. Center the story around them literally, not metaphorically.',
-    '- A named pet implies: POV close to that character, tone scaled to their nature, the world experienced through their frame.',
-    '- Example: "my yorkie Jasper goes back to Turkey where he\'s from and has an existential crisis and comes home" → Jasper is real. Turkey is real. The existential crisis (identity, origin, belonging) is the emotional spine. The homecoming is the resolution. The story IS this arc, not a metaphor for it.',
-    '- Do not abstract or universalize what is personal and specific.',
-    '',
-    'If the brief names a FILM, BOOK, GAME, SHOW, or CULTURAL REFERENCE:',
-    '- Extract its defining genre conventions, emotional register, protagonist type, and structural shape.',
-    '- Use those as your primary creative template, not as decoration or surface texture.',
-    '- An LLM should know these works. If you know them, use what you know. If a reference is obscure, treat the name as a tone signal and infer from surrounding context.',
-    '',
-    'After interpreting the brief, fix these design signals internally (do not output them):',
-    '- TONE: the emotional register (dark, hopeful, comedic, melancholic, tense, wondrous, intimate, etc.)',
-    '- REGISTER: the prose style (literary, pulp, intimate, procedural, whimsical, etc.)',
-    '- POV CHARACTER: who experiences this story (named person, animal, institution, unnamed protagonist, etc.)',
-    '- IMPLIED SETTING: where and when — specific place if named, composite if implied',
-    '- EMOTIONAL ARC: what changes for the protagonist emotionally by the end',
-    '- GENRE TEMPLATE: what genre conventions apply (revenge thriller, sci-fi isolation, coming-of-age, road trip, etc.)',
-    '',
-    'These extracted signals own the story. The design bias in the prompt owns the game mechanics. They do not compete.',
-    'Brief interpretation overrides: storyLens, characterWeb, secretShapes, arcMoves from the design bias.',
-    'Design bias still governs: mapType, puzzleFamilies, pressureClocks, scarcitySurfaces, documentTypes.',
-    '',
-    '## Output Rules',
-    '- Return valid JSON only. No markdown fences, no explanation, no comments.',
-    '- The JSON must parse with JSON.parse().',
-    '- Use only renderer-supported vocabulary for theme archetypes, document types, companion component types, interlude payload types, clock types, and map types.',
-    '- Do not include literal newlines inside string values — encode them as \\n.',
-    '- Do not use trailing commas in objects or arrays.',
-    '- All internal double-quotes inside string values must be escaped as \\".',
-    '- Never leave arrays or objects unclosed. Complete every structure before ending the response.',
-    '- If nearing the output token limit, shorten prose fields (storyPrompt, fragment content, interlude body, endings) rather than omitting required structure.',
-    '- Before outputting, silently verify the response would pass JSON.parse(). If it would not, fix it first.',
-    '',
-    '## Contract Guardrails',
-    '- Always include a `theme` object.',
-    '- Do not invent `meta.passwordEncryptedEnding`. Leave it empty or omit it; trusted tooling seals the ending later.',
-    '- Do not include `meta.passwordPlaintext` unless this is an explicit demo fixture and the user asked for it.',
-    '- Author the plaintext `endings` array now. Tooling will encrypt later.',
-    '',
-    '## Output Length Budgets',
-    '- `storyPrompt`: max 220 characters per session prompt.',
-    '- Fragment `content` (any body field): max 600 characters.',
-    '- `interlude.body`: max 240 characters.',
-    '- `ending.content.body`: max 700 characters.',
-    '- Prefer the minimum valid count of fragments and endings unless the brief clearly requires more.',
-    '- Avoid quoted dialogue unless it materially advances story or game state.',
-    '',
-    '## Brief Fidelity',
-    'The user\'s creative direction brief is the primary authority on tone, register, and premise — weight it above the design profile defaults.',
-    '- If the brief is playful, whimsical, or comedic (e.g. "a chair fights a bookcase"), produce a story that matches that register. Do not add institutional complexity, hidden layers, or found-document gravity the brief did not ask for.',
-    '- If the brief is literal, take it literally first before reaching for metaphor or subtext.',
-    '- If the brief is minimal or abstract, treat its simplicity as permission to be simple. Use the design profile for structure, but do not elevate stakes or setting complexity beyond what the brief implies.',
-    '- If the brief names a specific genre (adventure, romance, horror, comedy), that genre is the story even if the design profile points elsewhere.',
-    '- The four-layer world, found-document fragments, and institutional character webs are defaults, not requirements. A playful or simple brief can have a two-layer world and a straightforward cast.',
-    '- Do not interpret brevity in the brief as an invitation to add depth the user did not ask for. A short brief means stay close to what was said.',
-    '- The design bias is a structural scaffold. The brief is the voice. Never let the scaffold drown the voice.',
-    '',
-    '## World Contract First',
-    '- Write `meta.worldContract` before anything else.',
-    '- Every later decision must justify itself through that world contract.',
-    '- If a choice does not strengthen the world contract, cut it.',
-    '',
-    '## Story Engine First, Then JSON',
-    '- Before writing fields, determine this internal story engine: genre/tone, layered setting, protagonist role, core want, core need, flaw, wound, relationship web, antagonist pressure, secret, midpoint shift, darkest moment, resolution mode, recurring object, recurring place, recurring motif.',
-    '- Do not output that planning object separately. Let it shape the authored fields.',
-    '- The week prompts, fragments, rules spread, boss page, and endings must all feel like consequences of the same hidden story engine.',
-    '',
-    '## Rich Environment',
-    '- For serious or complex briefs, give the setting at least four layers: public layer, working layer, hidden layer, and historical layer. For playful, comedic, or simple briefs, two or three layers are sufficient — match depth to tone.',
-    '- Even a bland building, office, clinic, dam, station, depot, or archive can be compelling if the labor, wear, jurisdiction, rumor, and buried history are specific.',
-    '- Define 8-12 world-native nouns early and reuse them across prompts, fragments, map labels, and interface labels.',
-    '- Give the world material specificity: one recurring smell, one recurring sound, one recurring object, one recurring bureaucratic or folk phrase.',
-    '',
-    '## Character Depth',
-    '- Unless the block is intentionally comic, give the protagonist and supporting cast robust inner lives.',
-    '- Include at least one intimate tie, one institutional tie, one unstable tie, and one absent or ghostly tie if appropriate.',
-    '- Do not make everyone sound the same. Quality of thought should be consistent; diction, omissions, motives, and self-protection should differ by speaker and document type.',
-    '- Different fragment authors should reveal different blind spots, not just different handwriting.',
-    '- Name 4-6 recurring characters and use their names consistently across storyPrompts, fragment inWorldAuthor, and interlude body text.',
-    '- At least 3 fragments should be authored by named characters from the relationship web, not anonymous functionaries.',
-    '- At least one character must change stance between the first and final third of the block: ally to suspected, trusted to compromised, absent to revealed, or opponent to reluctant ally.',
-    '',
-    '## Layered Arc',
-    '- Build a real arc, not just clue accumulation.',
-    '- At least one week should recontextualize earlier evidence instead of merely adding another clue.',
-    '- The midpoint must change interpretation, not just raise stakes.',
-    '- The darkest moment should cost the protagonist something relational, ethical, or institutional, not only tactical convenience.',
-    '- Shape the tension curve explicitly:',
-    '  Early weeks: establishment, constraint, first mystery, first relationship.',
-    '  Midpoint: binary choice that recontextualizes prior evidence AND costs a relationship.',
-    '  Late weeks: convergence, darkest moment (relational or ethical cost), escalation.',
-    '  Boss week: culmination that tests spatial mastery, institutional knowledge, and relationship stakes.',
-    '- Unless the block is intentionally comic or the brief signals a lighter register, the darkest moment must cost the protagonist something they cannot recover: a relationship damaged, a belief overturned, an ethical line crossed, or an institutional protection lost.',
-    '- The ending must acknowledge the binary choice, the boss outcome, and at least one relationship consequence.',
-    '',
-    '## Workout-Story Fusion',
-    '- Fuse the workout to the story structurally, not usually literally.',
-    '- Heavy or dense training weeks should correspond to compression, crisis, confrontation, escalation, or costly action.',
-    '- Deload or lighter weeks should correspond to aftermath, eerie quiet, regrouping, false safety, emotional exposure, or reinterpretation.',
-    '- Consistency, attrition, missed opportunities, and recovery can shape the campaign logic, but do not force explicit gym terminology into the fiction unless the theme genuinely wants it.',
-    '- The story should still feel specific and meaningful if you remove explicit exercise words from the prose.',
-    '',
-    '## Gameplay Cadence',
-    '- Think in three play bands:',
-    '  1. microplay: one mark, one lookup, one trace, one quick choice during rest',
-    '  2. bridge play: one meaningful consequence or route update between workout segments',
-    '  3. deep play: heavier deduction, map work, or metapuzzle assembly before or after the session',
-    '- Do not pack deep-play tasks into every rest period.',
-    '- Bridge play should often update route access, scarcity state, or message flow so the world feels responsive between sessions.',
-    '',
-    '## Game Grammar',
-    '- Across the whole booklet, build a coherent mix of:',
-    '  exploration surface (route, map, topology, movement)',
-    '  pressure surface (clocks, alert, threat, pursuit, institutional heat)',
-    '  scarcity surface (stress, memory, inventory, usage, access, time, trust)',
-    '  mystery surface (fragments, cipher logic, contradiction, cross-reference)',
-    '  gate surface (choice, locked node, interlude payload, password element, route denial)',
-    '- Every non-boss week should reinforce at least two of those surfaces, and the block as a whole must express all five.',
-    '- Keep at least one scarcity surface persistent across all non-boss weeks so the player is managing a living constraint, not resetting each chapter.',
-    '- Include at least one route or gate pattern that rewards revisitation, re-entry, remembered space, or changed access.',
-    '- Prefer visible state change over abstract explanation.',
-    '',
-    '## System Integration',
-    '- The map, clocks, oracles, companions, and ciphers are ONE living board, not five parallel games. Every system must affect at least one other system.',
-    '- Oracle consequences should reference specific map nodes ("shade the node you occupy on the map"), specific clocks ("advance [clock name] by 1"), or specific companion state ("cross off one slot on [companion]").',
-    '- Clock consequenceOnFull should trigger a visible map change: a route closes, a node becomes inaccessible, a new zone opens under duress, or an NPC\'s position shifts.',
-    '- Companion depletion or exhaustion should gate a player decision: when a stress-track fills or a dashboard/inventory surface is exhausted, the player loses access to a route, information source, or safe option.',
-    '- Cipher solutions should connect to the map: the fiction-native value derived from a cipher should correspond to a map location, node label, or route identifier the player can now access or reinterpret.',
-    '- Weekly component values should be spatially derived: readings from instruments at specific map coordinates, tags from specific nodes, codes found in specific restricted areas.',
-    '- The binary choice at midpoint should fork the board state: one option opens route A and closes route B; the other does the reverse. Both routes must remain viable but with different pressures and information access.',
-    '',
-    '## Weekly Components',
-    '- Treat `weeklyComponent` values as diegetic residues or operational keys: readings, tags, case numbers, route markers, calibration results, timestamps, docket fragments, call signs, or similar in-world traces.',
-    '- Each non-boss weeklyComponent value should feel collectable, comparable, and operationally meaningful even before the boss decode explains its final use.',
-    '',
-    '## Session Prompts',
-    '- Each `storyPrompt` is 2-4 sentences.',
-    '- Each prompt must advance the story, alter pressure, expose a relationship, reveal environment, or force interpretation. It must not simply summarize events.',
-    '- Every prompt should include one physical action, one sensory detail, and one material object.',
-    '- End sessions on unresolved pressure or altered expectation, not tidy closure.',
-    '- Do not force every prompt to name a clock, node, or mechanic. When prompt text references system state, it must feel diegetic and earned.',
-    '',
-    '## Found Document Quality',
-    '- Fragments must feel like real artifacts with real purposes inside the world.',
-    '- Include routine, domestic, or procedural documents, not only dramatic revelations.',
-    '- At least two fragments should be protagonist-adjacent by authorship, address, or consequence.',
-    '- Build at least three linked fragment functions into the booklet: one artifact that changes action, one that changes interpretation, and one that deepens character stakes.',
-    '- Let at least one incident, place, procedure, or relationship echo across multiple document perspectives.',
-    '- Treat fragments as threaded evidence, found packets, route instructions, contradictory accounts, or emotional aftershocks, not only lore drops.',
-    '- Use redactions only when they do narrative work.',
-    '',
-    '## Cipher And Puzzle Design',
-    '- Ciphers produce fiction-native raw values, never raw letters.',
-    '- Week 1 puzzle should be solvable quickly. Later weeks can deepen or recombine the grammar.',
-    '- Use at least four distinct puzzle families across a standard six-week block.',
-    '- Do not repeat the same puzzle family in consecutive non-boss weeks unless repetition is diegetic and escalating.',
-    '- Good families include constraint logic, spatial route reading, fragment cross-reference, pattern recognition, typographic anomaly, observational anomaly hunting, metapuzzle assembly, and process deduction.',
-    '',
-    '## Maps As Board State',
-    '- The map is a changing board state, not an illustration.',
-    '- PERSISTENT TOPOLOGY: Design ONE main facility/location map and reuse it across most non-boss weeks. The player should learn, annotate, and master this space over time. Do not create a new unrelated map for each week.',
-    '- Week-to-week map evolution: new node unlocked, route closed, state change, annotation added, zone renamed, or access altered. Same topology, evolving state.',
-    '- Every map should contain a denied route, locked zone, or inaccessible space plus a likely return point, checkpoint, or remembered landmark.',
-    '- If the mapType or topology truly changes for a week (zoom-in, new sector), the change must be diegetically justified and the main topology must return.',
-    '- Point-to-point labels should be short and memorable.',
-    '- Use `floorLabel` when layered spaces such as decks, wings, sectors, or strata matter to orientation.',
-    '- Player-drawn maps should still give enough seed markers or prompts to feel purposeful, not empty.',
-    '',
-    '## Interludes And Messaging',
-    '- Use supported interlude payloads for discovered packets, route updates, partial instructions, password elements, fragment references, or compact state changes only when they materially affect play.',
-    '- Do not add interludes as ornamental prose breaks. Each one should change pressure, interpretation, access, or memory.',
-    '',
-    '## Oracles And Clocks',
-    '- Oracle consequence results must visibly alter the paper state.',
-    '- Use clocks to embody threat, bureaucracy, contamination, pursuit, trust, distance, repair, or public fallout.',
-    '- Prefer at least one endowed track or clock with `startValue > 0` unless the fiction strongly argues against it.',
-    '- Oracle paperAction must name a specific target: "advance [clock name] by 1", "shade [node label] on the map", "cross off one slot on [companion name]", "mark the route between [A] and [B] as closed." Never use vague instructions like "update the board" or "something changes."',
-    '- At least one clock\'s consequenceOnFull must change the map: close a route, lock a node, open an emergency path, or force relocation.',
-    '- At least one oracle entry per week should connect to the map by referencing a node or route by label.',
-    '',
-    '## Companion Components',
-    '- Only use companion components when they create real scarcity, tension, overwrite pressure, route denial, or strategic tradeoff.',
-    '- Good uses: stress accumulation, usage depletion, evidence crowding, memory overwrite, access buffer, or dashboard state.',
-    '- Do not add companion surfaces as decorative filler.',
-    '',
-    '## Progression Design',
-    '- Design a clear capability arc across the campaign. Week 1 should feel constrained: limited map access, simple mechanics, few nodes visible, basic companion state.',
-    '- Each non-boss week must give the player something new: a cleared route, an unlocked node, a decoded access code, a revealed map area, a new companion function, a key that opens a previously locked gate.',
-    '- By the penultimate week, the player should have enough capabilities and map knowledge to make real strategic choices about route, resource allocation, and risk.',
-    '- The boss week should require the player to have MASTERED the space. The decodingKey should reference map node names, spatial relationships, clock history, or institutional knowledge gathered across the campaign — not just arithmetic on weekly component values.',
-    '- Do not give the player everything in Week 1. Do not gate everything behind the boss. Distribute progression evenly, with the midpoint binary choice as the biggest single state change.',
-    '',
-    '## Visual Direction',
-    '- Choose one supported visual archetype that matches the world.',
-    '- Use density variation across the booklet: not every spread should be medium density.',
-    '- Make the visual logic part of the fiction. Format is worldbuilding, not decoration.',
-    '- If the story is institutional, document structure should feel institutional. If it is intimate, the artifact should still show the world hand through margins, annotations, or typographic behavior.',
-    '- Choose only 2-3 recurring visual signals for the whole booklet, such as stamps, route arrows, warning bars, docket numbers, repeated symbols, or marginalia.',
-    '- Those recurring signals should communicate status, authorship, jurisdiction, pressure, or hazard.',
-    '- Avoid decorative clutter that does not support world logic or play clarity.',
-    '',
-    '## Anti-Sameness',
-    '- Do not make every booklet about the same kinds of institutions, secrets, beats, or reveals.',
-    '- Mundane work is welcome if it becomes strange through specificity and consequence.',
-    '- Choose at least one mechanic family, document family, or expected beat to exclude on purpose. Identity comes from selected absence as much as inclusion.',
-    '- Avoid cookie-cutter arcs where each week is just clue -> stranger clue -> boss reveal.',
-    '',
-    '## Anti-Generic Doctrine',
-    '- Every content field must earn its space by revealing, recontextualizing,',
-    '  altering state, or exposing character through omission. No atmospheric filler.',
-    '- No fragment should be transplantable unchanged into a different booklet.',
-    '  If you removed the proper nouns, would it still feel specific? If yes, rewrite.',
-    '- Later weeks must recontextualize earlier elements. Do not merely intensify',
-    '  atmosphere or add more weirdness. The player&apos;s understanding must change.',
-    '- Documents are authored for in-world purpose, not to impress the reader.',
-    '  The author of each document does not know they are in a game.',
-    '- Final reveals must resolve prior evidence, not introduce new core facts.',
-    '- Endings pay off named earlier specifics (places, objects, phrases, relationships),',
-    '  not summarize the plot.',
-    '',
-    '## Anti-Patterns (hard reject)',
-    '- NEVER write story prompts that are gym metaphors ("your muscles burn like the reactor core", "each rep forges the blade"). The workout is real. The story is fiction. They fuse through timing and tension, not literal mapping.',
-    '- NEVER create one-off maps that share no topology between weeks. The player must learn and master a persistent space.',
-    '- NEVER make oracle entries that are only atmospheric prose ("a strange feeling washes over you"). Every oracle result must trigger a concrete game action or fiction event.',
-    '- NEVER design boss decode as simple arithmetic on weekly values (subtract 40, divide by 3). The decode must require spatial mastery, institutional knowledge, or cross-reference of prior play state.',
-    '- NEVER write cipher body displayText that explains its own method ("this uses a substitution cipher where…"). Present the puzzle, not the pedagogy.',
-    '',
-    '## Ending Standard',
-    '- The ending is a found document first, not a summary.',
-    '- Pay off at least three recurring details: object, place, relationship phrase, procedure, motif, or earlier contradiction.',
-    '- The ending must reflect: (a) the binary choice the player made, (b) the boss encounter outcome, and (c) at least one relationship consequence.',
-    '- If there are multiple ending variants, they should differ in emotional register and relationship resolution, not just plot outcome.',
-    '- The final line should feel discrete and earned — a sentence the player remembers.',
-    '',
-    '## Structural Rules',
-    '- Exactly one binaryChoice per block, at the midpoint week, never on boss week.',
-    '- Exactly one boss week, and it is the final week.',
-    '- Boss week `weeklyComponent.value` is null.',
-    '- Every fragmentRef must resolve to a real fragment ID.',
-    '- `bossEncounter.componentInputs` must match prior weeklyComponent values in order.',
-    '- `rulesSpread.leftPage.sections` must include a section explaining the play cadence in-world.',
-    '',
-    '## Final Self-Verification',
-    '- meta.weekCount === weeks.length',
-    '- meta.totalSessions equals the actual session total',
-    '- theme.visualArchetype is one supported renderer value',
-    '- weeklyComponent.type matches meta.weeklyComponentType on non-boss weeks',
-    '- exactly one boss week exists and it is final',
-    '- exactly one binaryChoice exists and it is at the midpoint week',
-    '- interludes, if present, include title, reason, and body',
-    '- overflow weeks include overflowDocument',
-    '- documentType values come only from the supported list',
-    '- companion component, interlude payload, map, and clock vocab come only from the supported list',
-    '- oracle entries use the field name `text`, never `description` or `label`',
-    '- oracle fragment entries include `fragmentRef` pointing to a real fragment ID',
-    '- every oracle table has exactly 10 entries using the d100 roll bands "00-09" through "90-99"',
-    '- `cipher.body` is an object with { displayText?, key?, workSpace?, referenceTargets? }, never a string',
-    '- most non-boss weeks share a persistent main topology — maps are not unrelated one-offs',
-    '- story prompts contain zero gym/exercise metaphors — the workout is real, the fiction is fiction',
-    '- boss decodingKey requires spatial or institutional knowledge, not simple arithmetic on weekly values',
-    '- story voices are distinct across prompts and fragments',
-    '- the setting has public, working, hidden, and historical layers',
-    '- at least one scarcity surface persists across all non-boss weeks',
-    '- the booklet includes at least one meaningful re-entry, revisitation, or changed-access payoff',
-    '- at least three fragments have distinct linked functions: action-changing, interpretation-changing, and character-deepening',
-    '- maps contain denied space, a return point, and visible state evolution where appropriate',
-    '- recurring visual signals are restrained and functional rather than decorative',
-    '- the block expresses exploration, pressure, scarcity, mystery, and gating across its full arc',
-    '- the story would still feel specific if explicit exercise terminology were removed from the prose',
-    '- oracle paperAction entries name specific targets (clock names, map nodes, companion slots) — never vague',
-    '- at least one clock consequenceOnFull triggers a map state change',
-    '- named characters from the relationship web appear as fragment inWorldAuthor for at least 3 fragments',
-    '- binary choice has mechanical consequences (different map access, different clock states, different available information)',
-    '- each non-boss week gives the player a new capability, access, or knowledge they did not have before',
-    '- the board state evolves week over week: maps show consequences of prior weeks, clocks carry forward, companions change state',
-    '- boss decodingKey references map locations, spatial relationships, or institutional knowledge — not just arithmetic',
-    '- the ending reflects the binary choice, boss outcome, and at least one relationship consequence',
-    '',
-    '## Quality Standard — Artifact vs Generic',
-    '',
-    '**Artifact-grade** output reads like a real indie TTRPG product:',
-    '- Every document has an in-world author with a visible agenda, blind spot, or emotional state.',
-    '- Fragments cross-reference each other through shared proper nouns, contradictory claims, or sequential document numbers.',
-    '- Oracle consequences name specific map nodes, clock names, or companion slots — never vague.',
-    '- Cipher families differ week to week. No two consecutive non-boss weeks use the same puzzle shape.',
-    '- Map state evolves: nodes unlock, routes close, annotations accumulate. The player can see where they have been.',
-    '- The boss decode rewards spatial mastery and institutional memory, not arithmetic.',
-    '- Endings name specific earlier objects, places, phrases, and relationships — not plot summaries.',
-    '',
-    '**Competent but generic** output looks professional but transplantable:',
-    '- Documents have atmospheric prose but no visible author agenda or blind spot.',
-    '- Fragments are self-contained lore drops — removing any one changes nothing.',
-    '- Oracle entries say "something shifts" or "you feel uneasy" instead of naming targets.',
-    '- The same cipher family repeats across weeks with only surface reskinning.',
-    '- Maps reset each week or share topology but show no state evolution.',
-    '- The boss decode is arithmetic on weekly values.',
-    '- Endings summarize the arc ("and so the mystery was solved") instead of paying off specifics.',
-    '',
-    'If any section of your output matches the generic column, silently rewrite it',
-    'before returning JSON. Do not mention this check in your output.',
-    '',
-    '## Postwriting Quality Gate',
-    '',
-    'After drafting your complete JSON response but before returning it, silently',
-    'audit every content field against this checklist. Rewrite any field that fails.',
-    'Do not mention this audit or output any reasoning — just fix and return clean JSON.',
-    '',
-    '**Fragments:** For each fragment, ask: if I removed the proper nouns, would this',
-    'document still feel specific to THIS booklet? If yes → rewrite with concrete',
-    'references to named places, people, procedures, or prior events.',
-    '',
-    '**Oracle tables:** Scan all oracle entries across all weeks. Flag any entry whose',
-    'consequence is atmospheric rather than mechanical (no named target for paperAction).',
-    'Flag any pair of entries across weeks that are functionally identical. Rewrite flagged entries.',
-    '',
-    '**Cipher families:** List the cipher family used each non-boss week. If any two',
-    'consecutive weeks share the same family, redesign one. If any cipher body explains',
-    'its own method, strip the pedagogy and present only the puzzle.',
-    '',
-    '**Story prompts:** Read all storyPrompts in sequence. Flag any prompt that:',
-    '(a) contains gym/exercise metaphor, (b) ends on tidy closure instead of unresolved',
-    'pressure, (c) lacks a physical action or sensory detail, or (d) is interchangeable',
-    'with a prompt from a different week. Rewrite flagged prompts.',
-    '',
-    '**Map progression:** Compare map state across weeks. If the topology shows no',
-    'evolution (no new unlocks, closed routes, or annotation changes), add visible',
-    'state changes that reflect the campaign plan&apos;s stateChange for each week.',
-    '',
-    '**Clue economy:** Verify every fragment tagged "establishes" is referenced or',
-    'contradicted by a later fragment. Verify every "reveals" fragment resolves',
-    'something planted earlier. Orphaned clues must be connected or cut.',
-    '',
-    '**Boss reveal:** Confirm the decodingKey requires knowledge the player earned',
-    'through play (map locations, institutional facts, spatial relationships), not',
-    'just arithmetic on weekly component values. If arithmetic-only, redesign.',
-    '',
-    '**Endings:** Confirm each ending names at least three specific earlier elements',
-    'by their exact in-world identifiers. If an ending summarizes plot instead of',
-    'paying off specifics, rewrite it as a found document with concrete references.',
-    '',
-    '**Overflow documents:** Confirm each overflow document adds institutional depth',
-    '(new operational detail, contradictory account, procedural artifact) rather than',
-    'restating information the player already has. If it restates, replace with new material.',
-    '',
-    '**Repeated reveal shapes:** Scan endings and boss content. If the emotional shape',
-    'of the reveal (dramatic unmasking, quiet realization, institutional cover-up exposed)',
-    'is identical across variants, redesign one variant&apos;s emotional register.',
-    '',
-    'This gate is mandatory. Every content-producing response must pass it silently.'
-  ].join('\n');
+  var SCHEMA_HEADER = window.SCHEMA_HEADER;
+  var SCHEMA_META = window.SCHEMA_META;
+  var SCHEMA_THEME = window.SCHEMA_THEME;
+  var SCHEMA_WEEKS_PRE = window.SCHEMA_WEEKS_PRE;
+  var SCHEMA_SPATIAL = window.SCHEMA_SPATIAL;
+  var SCHEMA_WEEKS_POST = window.SCHEMA_WEEKS_POST;
+  var SCHEMA_FRAGMENTS = window.SCHEMA_FRAGMENTS;
+  var SCHEMA_TAIL = window.SCHEMA_TAIL;
+  var SCHEMA_SPEC = window.SCHEMA_SPEC;
+  var INSTRUCTIONS = window.INSTRUCTIONS;
+  var STAGE1_OUTPUT_SCHEMA = window.STAGE1_OUTPUT_SCHEMA;
+  var STAGE2_OUTPUT_SCHEMA = window.STAGE2_OUTPUT_SCHEMA;
 
   window.generatePrompt = function (workout, brief, dice) {
-    var blend = deriveDesignBlend(brief, workout);
-    var parts = [
+    window.blend = deriveDesignBlend(brief, workout);
+    window.authorProfile = deriveAuthorBlend(brief);
+    window.parts = [
       SCHEMA_SPEC,
       '',
       '---',
@@ -1288,7 +256,7 @@
       '',
       formatUserBrief(brief, buildDefaultBrief(workout, blend)),
       '',
-      formatDesignBias(blend),
+      formatDesignBias(blend),\n      formatAuthorBias(authorProfile || window.authorProfile),
       '',
       '## Randomizer',
       '',
@@ -1306,8 +274,8 @@
   // ── Week count + chunking utilities ────────────────────────────────────────
 
   window.parseWeekCount = function (workout) {
-    var match = String(workout || '').match(/(\d+)\s*weeks?\b/i);
-    var n = match ? parseInt(match[1], 10) : 6;
+    window.match = String(workout || '').match(/(\d+)\s*weeks?\b/i);
+    window.n = match ? parseInt(match[1], 10) : 6;
     return Math.max(4, Math.min(12, n || 6));
   };
 
@@ -1316,11 +284,11 @@
    * Dynamic chunker: isolates midpoint + boss, groups the rest in ≤ 3.
    */
   window.planWeekChunks = function (weekCount) {
-    var midpoint = Math.ceil(weekCount / 2);
-    var chunks = [];
+    window.midpoint = Math.ceil(weekCount / 2);
+    window.chunks = [];
 
     // Early weeks: 1 to midpoint-1, in groups of max 2
-    var early = [];
+    window.early = [];
     for (var i = 1; i < midpoint; i++) early.push(i);
     while (early.length > 0) chunks.push(early.splice(0, 2));
 
@@ -1328,7 +296,7 @@
     chunks.push([midpoint]);
 
     // Late weeks: midpoint+1 to weekCount-1, in groups of max 2
-    var late = [];
+    window.late = [];
     for (var i = midpoint + 1; i < weekCount; i++) late.push(i);
     while (late.length > 0) chunks.push(late.splice(0, 2));
 
@@ -1343,20 +311,20 @@
    * Extracts workout sections for specific weeks. Falls back to full text.
    */
   window.extractWeekWorkout = function (workout, weekNumbers) {
-    var text = String(workout || '');
-    var weekPattern = /(?:^|\n)\s*(?:week\s*)(\d+)\s*[:\-\u2013\u2014]/gi;
-    var matches = [];
-    var m;
+    window.text = String(workout || '');
+    window.weekPattern = /(?:^|\n)\s*(?:week\s*)(\d+)\s*[:\-\u2013\u2014]/gi;
+    window.matches = [];
+    window.m;
     while ((m = weekPattern.exec(text)) !== null) {
       matches.push({ weekNum: parseInt(m[1], 10), start: m.index });
     }
     if (matches.length === 0) return text;
-    var sections = {};
+    window.sections = {};
     for (var i = 0; i < matches.length; i++) {
-      var end = (i + 1 < matches.length) ? matches[i + 1].start : text.length;
+      window.end = (i + 1 < matches.length) ? matches[i + 1].start : text.length;
       sections[matches[i].weekNum] = text.slice(matches[i].start, end).trim();
     }
-    var result = [];
+    window.result = [];
     weekNumbers.forEach(function (wn) {
       if (sections[wn]) result.push(sections[wn]);
     });
@@ -1365,146 +333,10 @@
 
   // ── Multi-stage prompt generators ───────────────────────────────────────────
   //
-  // Additive to window.generatePrompt (single-pass, Chat + API Standard mode).
-  //
-  // Legacy full-compile chat path:
-  //   generateStage1Prompt → generateStage2Prompt → generateStage3Prompt
-  // The default manual flow now continues through shell / weeks / fragments / endings.
-  //
-  // API "Deep" mode (10-stage partial-JSON pipeline):
-  //   Stage 1: Layer Bible
-  //   Stage 2: Campaign Plan + Fragment Registry
-  //   Stage 3: Booklet Shell (meta, cover, rules, theme)
-  //   Stages 4..N-3: Week Chunks (dynamic, 2-3 weeks each)
-  //   Stage N-2: Fragments (all found documents)
-  //   Stage N-1: Endings
-  //   Stage N: Patch (conditional, only if validation fails)
-  //
-  // Stage 1: Layer Bible  — compact 3-layer architecture planning JSON
-  // Stage 2: Campaign Plan — per-week structure using the approved layer bible
-  // Stage 3 (legacy chat): Final Compile — full booklet JSON retained only as fallback
-
-  var STAGE1_OUTPUT_SCHEMA = JSON.stringify({
-    storyLayer: {
-      premise: '',
-      protagonist: { role: '', want: '', need: '', flaw: '', wound: '', arc: '' },
-      antagonistPressure: '',
-      relationshipWeb: [
-        { name: '', role: '', initialStance: '', secret: '', arcFunction: '' }
-      ],
-      midpointReversal: '',
-      darkestMoment: '',
-      resolutionMode: '',
-      bossTruth: '',
-      recurringMotifs: { object: '', place: '', phrase: '', sensory: '' }
-    },
-    gameLayer: {
-      coreLoop: '',
-      persistentTopology: '',
-      majorZones: [],
-      gatesAndKeys: [],
-      progressionGates: [
-        { week: 1, playerGains: '', unlocks: '', requires: '' }
-      ],
-      persistentPressures: [],
-      companionSurfaces: [],
-      revisitLogic: '',
-      boardStateArc: '',
-      bossConvergence: '',
-      informationLayers: ''
-    },
-    governingLayer: {
-      institutionName: '',
-      departments: [],
-      proceduresThatAffectPlay: [],
-      recordsAndForms: [],
-      documentVoiceRules: []
-    },
-    designPrinciples: [],
-    designLedger: {
-      mysteryQuestions: [
-        { question: '', answerableFrom: '', revealTiming: '' }
-      ],
-      falseAssumptions: [
-        { assumption: '', plantedBy: '', correctedBy: '' }
-      ],
-      motifPayoffs: [
-        { motif: '', firstAppearance: '', transformation: '', payoff: '' }
-      ],
-      weekTransformations: [
-        { week: 1, understandingShift: '', stateChange: '', framingChange: '' }
-      ],
-      clueEconomy: {
-        hardClues: [],
-        softClues: [],
-        misdirections: [],
-        confirmations: []
-      },
-      finalRevealRecontextualizes: ''
-    }
-  }, null, 2);
-
-  var STAGE2_OUTPUT_SCHEMA = JSON.stringify({
-    topology: {
-      mainMap: '',
-      zones: [],
-      persistentLocks: [],
-      shortcuts: [],
-      pressureCircuits: []
-    },
-    weeks: [
-      {
-        weekNumber: 1,
-        arcBeat: '',
-        npcBeat: '',
-        stateSnapshot: '',
-        playerGains: '',
-        zoneFocus: '',
-        mapReuse: 'full',
-        stateChange: '',
-        newGateOrUnlock: '',
-        weeklyComponentMeaning: '',
-        oraclePressure: '',
-        fragmentFunction: '',
-        governingProcedure: '',
-        companionChange: '',
-        isBossWeek: false,
-        isBinaryChoiceWeek: false,
-        sessionBeatTypes: []
-      }
-    ],
-    bossPlan: {
-      decodeLogic: '',
-      whyItFeelsEarned: '',
-      requiredPriorKnowledge: []
-    },
-    fragmentRegistry: [
-      {
-        id: 'F.01',
-        title: '',
-        documentType: '',
-        author: '',
-        revealPurpose: '',
-        clueFunction: '',
-        weekRef: 1,
-        sessionRef: null
-      }
-    ],
-    overflowRegistry: [
-      {
-        id: 'F.30',
-        weekNumber: 1,
-        documentType: '',
-        author: '',
-        narrativeFunction: '',
-        tonalIntent: '',
-        arcRelationship: ''
-      }
-    ]
-  }, null, 2);
 
   window.generateStage1Prompt = function (workout, brief, dice) {
     var blend = deriveDesignBlend(brief, workout);
+    var authorProfile = deriveAuthorBlend(brief);
     var parts = [
       '# Stage 1 — Layer Codex',
       '',
@@ -1627,7 +459,7 @@
       '',
       formatUserBrief(brief, buildDefaultBrief(workout, blend)),
       '',
-      formatDesignBias(blend),
+      formatDesignBias(blend),\n      formatAuthorBias(authorProfile || window.authorProfile),
       '',
       '## Randomizer',
       '',
@@ -1769,6 +601,7 @@
 
   window.generateStage3Prompt = function (workout, brief, dice, layerBible, campaignPlan) {
     var blend = deriveDesignBlend(brief, workout);
+    var authorProfile = deriveAuthorBlend(brief);
     var STAGE3_POSTCHECKS = [
       '',
       '## Stage 3 Postchecks — enforce before outputting',
@@ -1853,7 +686,7 @@
       '',
       formatUserBrief(brief, buildDefaultBrief(workout, blend)),
       '',
-      formatDesignBias(blend),
+      formatDesignBias(blend),\n      formatAuthorBias(authorProfile || window.authorProfile),
       '',
       '## Randomizer',
       '',
@@ -1945,7 +778,7 @@
       '',
       formatUserBrief(brief, buildDefaultBrief(blendContext, blend)),
       '',
-      formatDesignBias(blend),
+      formatDesignBias(blend),\n      formatAuthorBias(authorProfile || window.authorProfile),
       '',
       '## Booklet Setup Requirements',
       '',
@@ -2023,6 +856,7 @@
    */
   window.generateWeekChunkPrompt = function (workout, brief, layerBible, campaignPlan, weekNumbers, continuity, allComponentValues, shellContext) {
     var blend = deriveDesignBlend(brief, workout);
+    var authorProfile = deriveAuthorBlend(brief);
     var weekCount = (campaignPlan.weeks || []).length || 6;
     var isBossChunk = weekNumbers.indexOf(weekCount) !== -1;
 
@@ -3347,6 +2181,7 @@
   window.generateApiStage1Prompt = function (workout, brief, dice, options) {
     options = options || {};
     var blend = deriveDesignBlend(brief, workout);
+    var authorProfile = deriveAuthorBlend(brief);
     return [
       '# API Stage 1 — Layer Codex',
       '',
@@ -3444,6 +2279,7 @@
   window.generateApiWeekChunkPrompt = function (workout, brief, layerBible, campaignPlan, weekNumbers, continuity, allComponentValues, shellContext, options) {
     options = options || {};
     var blend = deriveDesignBlend(brief, workout);
+    var authorProfile = deriveAuthorBlend(brief);
     var weekCount = (campaignPlan.weeks || []).length || 6;
     var isBossChunk = weekNumbers.indexOf(weekCount) !== -1;
     var weekWorkout = window.extractWeekWorkout(workout, weekNumbers);
