@@ -299,9 +299,8 @@
   // Defer API/chat generation split, new payload enums, new map types,
   // and true new-affordance progression until the current prompt
   // reliably produces cohesive, render-clean booklets.
-  window.INSTRUCTIONS = [
-    '# Generation Instructions',
-    '',
+
+  window.INST_BRIEF_INTERPRETATION = [
     '## Brief Interpretation (run silently before everything else)',
     'Before writing any fields or world contract, decode the creative direction brief. Do not output this step.',
     '',
@@ -332,8 +331,10 @@
     '',
     'These extracted signals own the story. The design bias in the prompt owns the game mechanics. They do not compete.',
     'Brief interpretation overrides: storyLens, characterWeb, secretShapes, arcMoves from the design bias.',
-    'Design bias still governs: mapType, puzzleFamilies, pressureClocks, scarcitySurfaces, documentTypes.',
-    '',
+    'Design bias still governs: mapType, puzzleFamilies, pressureClocks, scarcitySurfaces, documentTypes.'
+  ];
+
+  window.INST_OUTPUT_RULES = [
     '## Output Rules',
     '- Return valid JSON only. No markdown fences, no explanation, no comments.',
     '- The JSON must parse with JSON.parse().',
@@ -343,22 +344,28 @@
     '- All internal double-quotes inside string values must be escaped as \\".',
     '- Never leave arrays or objects unclosed. Complete every structure before ending the response.',
     '- If nearing the output token limit, shorten prose fields (storyPrompt, fragment content, interlude body, endings) rather than omitting required structure.',
-    '- Before outputting, silently verify the response would pass JSON.parse(). If it would not, fix it first.',
-    '',
+    '- Before outputting, silently verify the response would pass JSON.parse(). If it would not, fix it first.'
+  ];
+
+  window.INST_CONTRACT_GUARDRAILS = [
     '## Contract Guardrails',
     '- Always include a `theme` object.',
     '- Do not invent `meta.passwordEncryptedEnding`. Leave it empty or omit it; trusted tooling seals the ending later.',
     '- Do not include `meta.passwordPlaintext` unless this is an explicit demo fixture and the user asked for it.',
-    '- Author the plaintext `endings` array now. Tooling will encrypt later.',
-    '',
+    '- Author the plaintext `endings` array now. Tooling will encrypt later.'
+  ];
+
+  window.INST_OUTPUT_BUDGETS = [
     '## Output Length Budgets',
     '- `storyPrompt`: max 220 characters per session prompt.',
     '- Fragment `content` (any body field): max 600 characters.',
     '- `interlude.body`: max 240 characters.',
     '- `ending.content.body`: max 700 characters.',
     '- Prefer the minimum valid count of fragments and endings unless the brief clearly requires more.',
-    '- Avoid quoted dialogue unless it materially advances story or game state.',
-    '',
+    '- Avoid quoted dialogue unless it materially advances story or game state.'
+  ];
+
+  window.INST_BRIEF_FIDELITY = [
     '## Brief Fidelity',
     'The user\'s creative direction brief is the primary authority on tone, register, and premise — weight it above the design profile defaults.',
     '- If the brief is playful, whimsical, or comedic (e.g. "a chair fights a bookcase"), produce a story that matches that register. Do not add institutional complexity, hidden layers, or found-document gravity the brief did not ask for.',
@@ -367,34 +374,44 @@
     '- If the brief names a specific genre (adventure, romance, horror, comedy), that genre is the story even if the design profile points elsewhere.',
     '- The four-layer world, found-document fragments, and institutional character webs are defaults, not requirements. A playful or simple brief can have a two-layer world and a straightforward cast.',
     '- Do not interpret brevity in the brief as an invitation to add depth the user did not ask for. A short brief means stay close to what was said.',
-    '- The design bias is a structural scaffold. The brief is the voice. Never let the scaffold drown the voice.',
-    '',
+    '- The design bias is a structural scaffold. The brief is the voice. Never let the scaffold drown the voice.'
+  ];
+
+  window.INST_WORLD_CONTRACT = [
     '## World Contract & Core Noun Roster',
     '- Write `meta.worldContract` before anything else. This is your bible.',
     '- Inside the `worldContract` string, you MUST define a **Core Noun Roster**: a list of 8-12 fiercely specific people, places, departments, and objects.',
     '- EVERY single cipher, map node, fragment, boss mechanism, and oracle entry MUST explicitly reference at least one item from the Core Noun Roster.',
     '- Do not invent stray lore later. If a noun is important enough to be a puzzle solution or a map endpoint, it must be established in the roster.',
-    '- This creates extreme holistic continuity. The world must feel airtight and relentlessly cross-referenced.',
-    '',
+    '- This creates extreme holistic continuity. The world must feel airtight and relentlessly cross-referenced.'
+  ];
+
+  window.INST_STORY_ENGINE = [
     '## Story Engine First, Then JSON',
     '- Before writing fields, determine this internal story engine: genre/tone, layered setting, protagonist role, core want, core need, flaw, wound, relationship web, antagonist pressure, secret, midpoint shift, darkest moment, resolution mode, recurring object, recurring place, recurring motif.',
     '- Do not output that planning object separately. Let it shape the authored fields.',
-    '- The week prompts, fragments, rules spread, boss page, and endings must all feel like consequences of the same hidden story engine.',
-    '',
+    '- The week prompts, fragments, rules spread, boss page, and endings must all feel like consequences of the same hidden story engine.'
+  ];
+
+  window.INST_ENVIRONMENT = [
     '## Rich Environment',
     '- For serious or complex briefs, give the setting at least four layers: public layer, working layer, hidden layer, and historical layer. For playful, comedic, or simple briefs, two or three layers are sufficient — match depth to tone.',
     '- Even a bland building, office, clinic, dam, station, depot, or archive can be compelling if the labor, wear, jurisdiction, rumor, and buried history are specific.',
     '- Define 8-12 world-native nouns early and reuse them across prompts, fragments, map labels, and interface labels.',
-    '- Give the world material specificity: one recurring smell, one recurring sound, one recurring object, one recurring bureaucratic or folk phrase.',
-    '',
+    '- Give the world material specificity: one recurring smell, one recurring sound, one recurring object, one recurring bureaucratic or folk phrase.'
+  ];
+
+  window.INST_CHARACTER_WEB = [
     '## Character Web & Ideological Contradictions',
     '- Do not define characters by functional tropes (e.g., "the hacker", "the mentor"). Define them by their emotional dependencies and ideological contradictions.',
     '- Every major NPC must have a worldview that structurally challenges or opposes the protagonist, but remains utterly sympathetic or unavoidable.',
     '- Include at least one intimate dependency, one structural/institutional betrayal, one unstable alliance, and one absent/ghostly shadow over the cast.',
     '- Name 4-6 recurring characters in the Core Noun Roster and use them consistently across storyPrompts, fragments, and interludes.',
     '- At least 3 fragments should be authored by these named ideological rivals, exposing their blind spots and conflicting worldviews.',
-    '- At least one character must radically change stance or be tragically recontextualized by the final third of the block.',
-    '',
+    '- At least one character must radically change stance or be tragically recontextualized by the final third of the block.'
+  ];
+
+  window.INST_LAYERED_ARC = [
     '## Layered Arc',
     '- Build a real arc, not just clue accumulation.',
     '- At least one week should recontextualize earlier evidence instead of merely adding another clue.',
@@ -406,8 +423,10 @@
     '  Late weeks: convergence, darkest moment (relational or ethical cost), escalation.',
     '  Boss week: culmination that tests spatial mastery, institutional knowledge, and relationship stakes.',
     '- Unless the block is intentionally comic or the brief signals a lighter register, the darkest moment must cost the protagonist something they cannot recover: a relationship damaged, a belief overturned, an ethical line crossed, or an institutional protection lost.',
-    '- The ending must acknowledge the binary choice, the boss outcome, and at least one relationship consequence.',
-    '',
+    '- The ending must acknowledge the binary choice, the boss outcome, and at least one relationship consequence.'
+  ];
+
+  window.INST_WORKOUT_FUSION = [
     '## Workout-Story Fusion (Metaphoric Translation)',
     '- Fuse the workout to the story structurally and emotionally by mapping the physical exertion type onto narrative hardship.',
     '- Use this exact translation matrix to interpret the physical effort over the week or session:',
@@ -416,16 +435,20 @@
     '  * **Sprints / High Heart Rate:** Frantic evasion, racing against an immediate running clock, dwindling oxygen, panic, unstable footing.',
     '  * **Long Zone 2 / Steady State:** Paranoia, vast distances, slow depletion of resources, eerie quiet before a storm, tracking or being tracked.',
     '  * **Deload / Recovery:** False safety, painful memory surfacing, treating wounds, studying the map, discovering a horrifying truth in the quiet.',
-    '- Identify the dominant physical modality in the raw workout and apply its metaphor translation strictly to the `storyPrompts`. Only use literal gym terminology if the theme demands it.',
-    '',
+    '- Identify the dominant physical modality in the raw workout and apply its metaphor translation strictly to the `storyPrompts`. Only use literal gym terminology if the theme demands it.'
+  ];
+
+  window.INST_PERVASIVE_PLAY = [
     '## Pervasive Play (The Rest Interval)',
     '- Think in three play bands:',
     '  1. microplay: one mark, one lookup, one trace during mid-workout rest.',
     '  2. bridge play: one meaningful cross-reference or route update that persists across sessions.',
     '  3. pervasive/deep play (The Rest Interval): The time *between* workouts MUST be filled with diegetic anticipation.',
     '- Use `interlude` payloads to assign "off-session contemplation" tasks: a cipher that requires staring at the map at night, a moral dilemma to weigh before the next session, or a cliffhanger code to crack.',
-    '- Do not let the fiction sleep when the player rests. The interlude must demand mental engagement even when they are not lifting.',
-    '',
+    '- Do not let the fiction sleep when the player rests. The interlude must demand mental engagement even when they are not lifting.'
+  ];
+
+  window.INST_DIEGETIC_MECHANICS = [
     '## Diegetic Mechanics Selection',
     '- Do not blindly paste game mechanics into every week. Smartly select mechanics ONLY when they make diegetic sense.',
     '- **Clocks:** Use only when the story implies countdowns, rising institutional heat, structural failure, or approaching pursuers.',
@@ -435,8 +458,10 @@
     '- **Player Reflection (Logging):** At least twice per booklet, prompt the player to document a diegetic thought, sketch an observation, or log an answer directly onto the paper.',
     '- **Legacy Mutability:** When narrative shifts are permanent, demand permanent physical actions from the player ("cross out this paragraph permanently", "black out this node", "tear off this corner").',
     '- If a mechanic does not logically stem from the world fiction, discard it. Identity comes from chosen absence as much as inclusion.',
-    '- Every non-boss week should logically trigger at least one of these surfaces based strictly on the narrative context.',
-    '',
+    '- Every non-boss week should logically trigger at least one of these surfaces based strictly on the narrative context.'
+  ];
+
+  window.INST_SYSTEM_INTEGRATION = [
     '## System Integration',
     '- The map, clocks, oracles, companions, and ciphers are ONE living board, not five parallel games. Every system must affect at least one other system.',
     '- Oracle consequences should reference specific map nodes ("shade the node you occupy on the map"), specific clocks ("advance [clock name] by 1"), or specific companion state ("cross off one slot on [companion]").',
@@ -444,19 +469,29 @@
     '- Companion depletion or exhaustion should gate a player decision: when a stress-track fills or a dashboard/inventory surface is exhausted, the player loses access to a route, information source, or safe option.',
     '- Cipher solutions should connect to the map: the fiction-native value derived from a cipher should correspond to a map location, node label, or route identifier the player can now access or reinterpret.',
     '- Weekly component values should be spatially derived: readings from instruments at specific map coordinates, tags from specific nodes, codes found in specific restricted areas.',
-    '- The binary choice at midpoint should fork the board state: one option opens route A and closes route B; the other does the reverse. Both routes must remain viable but with different pressures and information access.',
-    '',
+    '- The binary choice at midpoint should fork the board state: one option opens route A and closes route B; the other does the reverse. Both routes must remain viable but with different pressures and information access.'
+  ];
+
+  window.INST_WEEKLY_COMPONENTS = [
     '## Weekly Components',
     '- Treat `weeklyComponent` values as diegetic residues or operational keys: readings, tags, case numbers, route markers, calibration results, timestamps, docket fragments, call signs, or similar in-world traces.',
-    '- Each non-boss weeklyComponent value should feel collectable, comparable, and operationally meaningful even before the boss decode explains its final use.',
-    '',
+    '- Each non-boss weeklyComponent value should feel collectable, comparable, and operationally meaningful even before the boss decode explains its final use.'
+  ];
+
+  window.INST_SESSION_PROMPTS = [
     '## Session Prompts',
     '- Each `storyPrompt` is 2-4 sentences.',
     '- Each prompt must advance the story, alter pressure, expose a relationship, reveal environment, or force interpretation. It must not simply summarize events.',
     '- Every prompt should include one physical action, one sensory detail, and one material object.',
     '- End sessions on unresolved pressure or altered expectation, not tidy closure.',
     '- Do not force every prompt to name a clock, node, or mechanic. When prompt text references system state, it must feel diegetic and earned.',
-    '',
+    '- Every session prompt must end with unresolved narrative tension. The player should close the booklet wanting to know what happens next.',
+    '- Session prompts must advance the story. No atmospheric filler that could be removed without changing the plot.',
+    '- Prompts must reference concrete physical detail from the world (nodes, objects, documents), not abstract emotions.',
+    '- Heavy training weeks must parallel crisis narrative phases. Deload weeks are breathing room, not dead space.'
+  ];
+
+  window.INST_FOUND_DOCUMENTS = [
     '## Found Document Quality',
     '- Fragments must feel like real artifacts with real purposes inside the world.',
     '- Include routine, domestic, or procedural documents, not only dramatic revelations.',
@@ -464,15 +499,19 @@
     '- Build at least three linked fragment functions into the booklet: one artifact that changes action, one that changes interpretation, and one that deepens character stakes.',
     '- Let at least one incident, place, procedure, or relationship echo across multiple document perspectives.',
     '- Treat fragments as threaded evidence, found packets, route instructions, contradictory accounts, or emotional aftershocks, not only lore drops.',
-    '- Use redactions only when they do narrative work.',
-    '',
+    '- Use redactions only when they do narrative work.'
+  ];
+
+  window.INST_CIPHER_DESIGN = [
     '## Cipher And Puzzle Design',
     '- Ciphers produce fiction-native raw values, never raw letters.',
     '- Week 1 puzzle should be solvable quickly. Later weeks can deepen or recombine the grammar.',
     '- Use at least four distinct puzzle families across a standard six-week block.',
     '- Do not repeat the same puzzle family in consecutive non-boss weeks unless repetition is diegetic and escalating.',
-    '- Good families include constraint logic, spatial route reading, fragment cross-reference, pattern recognition, typographic anomaly, observational anomaly hunting, metapuzzle assembly, and process deduction.',
-    '',
+    '- Good families include constraint logic, spatial route reading, fragment cross-reference, pattern recognition, typographic anomaly, observational anomaly hunting, metapuzzle assembly, and process deduction.'
+  ];
+
+  window.INST_MAPS_BOARD = [
     '## Maps As Board State',
     '- The map is a changing board state, not an illustration.',
     '- PERSISTENT TOPOLOGY: Design ONE main facility/location map and reuse it across most non-boss weeks. The player should learn, annotate, and master this space over time. Do not create a new unrelated map for each week.',
@@ -481,32 +520,42 @@
     '- If the mapType or topology truly changes for a week (zoom-in, new sector), the change must be diegetically justified and the main topology must return.',
     '- Point-to-point labels should be short and memorable.',
     '- Use `floorLabel` when layered spaces such as decks, wings, sectors, or strata matter to orientation.',
-    '- Player-drawn maps should still give enough seed markers or prompts to feel purposeful, not empty.',
-    '',
+    '- Player-drawn maps should still give enough seed markers or prompts to feel purposeful, not empty.'
+  ];
+
+  window.INST_INTERLUDES = [
     '## Interludes And Messaging',
     '- Use supported interlude payloads for discovered packets, route updates, partial instructions, password elements, fragment references, or compact state changes only when they materially affect play.',
-    '- Do not add interludes as ornamental prose breaks. Each one should change pressure, interpretation, access, or memory.',
-    '',
+    '- Do not add interludes as ornamental prose breaks. Each one should change pressure, interpretation, access, or memory.'
+  ];
+
+  window.INST_ORACLES_CLOCKS = [
     '## Oracles And Clocks',
     '- Oracle consequence results must visibly alter the paper state.',
     '- Use clocks to embody threat, bureaucracy, contamination, pursuit, trust, distance, repair, or public fallout.',
     '- Prefer at least one endowed track or clock with `startValue > 0` unless the fiction strongly argues against it.',
     '- Oracle paperAction must name a specific target: "advance [clock name] by 1", "shade [node label] on the map", "cross off one slot on [companion name]", "mark the route between [A] and [B] as closed." Never use vague instructions like "update the board" or "something changes."',
     '- At least one clock\'s consequenceOnFull must change the map: close a route, lock a node, open an emergency path, or force relocation.',
-    '- At least one oracle entry per week should connect to the map by referencing a node or route by label.',
-    '',
+    '- At least one oracle entry per week should connect to the map by referencing a node or route by label.'
+  ];
+
+  window.INST_COMPANIONS = [
     '## Companion Components',
     '- Only use companion components when they create real scarcity, tension, overwrite pressure, route denial, or strategic tradeoff.',
     '- Good uses: stress accumulation, usage depletion, evidence crowding, memory overwrite, access buffer, or dashboard state.',
-    '- Do not add companion surfaces as decorative filler.',
-    '',
+    '- Do not add companion surfaces as decorative filler.'
+  ];
+
+  window.INST_PROGRESSION = [
     '## Progression Design',
     '- Design a clear capability arc across the campaign. Week 1 should feel constrained: limited map access, simple mechanics, few nodes visible, basic companion state.',
     '- Each non-boss week must give the player something new: a cleared route, an unlocked node, a decoded access code, a revealed map area, a new companion function, a key that opens a previously locked gate.',
     '- By the penultimate week, the player should have enough capabilities and map knowledge to make real strategic choices about route, resource allocation, and risk.',
     '- The boss week should require the player to have MASTERED the space. The decodingKey should reference map node names, spatial relationships, clock history, or institutional knowledge gathered across the campaign — not just arithmetic on weekly component values.',
-    '- Do not give the player everything in Week 1. Do not gate everything behind the boss. Distribute progression evenly, with the midpoint binary choice as the biggest single state change.',
-    '',
+    '- Do not give the player everything in Week 1. Do not gate everything behind the boss. Distribute progression evenly, with the midpoint binary choice as the biggest single state change.'
+  ];
+
+  window.INST_VISUAL_DIRECTION = [
     '## Visual Direction',
     '- Choose one supported visual archetype that matches the world.',
     '- Use density variation across the booklet: not every spread should be medium density.',
@@ -514,14 +563,18 @@
     '- If the story is institutional, document structure should feel institutional. If it is intimate, the artifact should still show the world hand through margins, annotations, or typographic behavior.',
     '- Choose only 2-3 recurring visual signals for the whole booklet, such as stamps, route arrows, warning bars, docket numbers, repeated symbols, or marginalia.',
     '- Those recurring signals should communicate status, authorship, jurisdiction, pressure, or hazard.',
-    '- Avoid decorative clutter that does not support world logic or play clarity.',
-    '',
+    '- Avoid decorative clutter that does not support world logic or play clarity.'
+  ];
+
+  window.INST_ANTI_SAMENESS = [
     '## Anti-Sameness',
     '- Do not make every booklet about the same kinds of institutions, secrets, beats, or reveals.',
     '- Mundane work is welcome if it becomes strange through specificity and consequence.',
     '- Choose at least one mechanic family, document family, or expected beat to exclude on purpose. Identity comes from selected absence as much as inclusion.',
-    '- Avoid cookie-cutter arcs where each week is just clue -> stranger clue -> boss reveal.',
-    '',
+    '- Avoid cookie-cutter arcs where each week is just clue -> stranger clue -> boss reveal.'
+  ];
+
+  window.INST_ANTI_GENERIC = [
     '## Anti-Generic Doctrine',
     '- Every content field must earn its space by revealing, recontextualizing,',
     '  altering state, or exposing character through omission. No atmospheric filler.',
@@ -533,8 +586,10 @@
     '  The author of each document does not know they are in a game.',
     '- Final reveals must resolve prior evidence, not introduce new core facts.',
     '- Endings pay off named earlier specifics (places, objects, phrases, relationships),',
-    '  not summarize the plot.',
-    '',
+    '  not summarize the plot.'
+  ];
+
+  window.INST_ANTI_PATTERNS = [
     '## Anti-Patterns (hard reject)',
     '- NEVER write story prompts that are gym metaphors ("your muscles burn like the reactor core", "each rep forges the blade"). The workout is real. The story is fiction. They fuse through timing and tension, not literal mapping.',
     '- NEVER create one-off maps that share no topology between weeks. The player must learn and master a persistent space.',
@@ -543,23 +598,29 @@
     '- NEVER write cipher body displayText that explains its own method ("this uses a substitution cipher where…"). Present the puzzle, not the pedagogy.',
     '- NEVER use LLM cliché phrases: "A testament to...", "A stark reminder of...", "A symphony of...", "A tapestry of...".',
     '- NEVER summarize emotion ("He felt profound sadness"). Describe physical posture, omissions, and action instead.',
-    '- PROSE STRIPPING: Do not use the words "delve", "echoes", "cacophony", "visceral", "smirk", or "shudder" unless medically necessary.',
-    '',
+    '- PROSE STRIPPING: Do not use the words "delve", "echoes", "cacophony", "visceral", "smirk", or "shudder" unless medically necessary.'
+  ];
+
+  window.INST_ENDING_STANDARD = [
     '## Ending Standard',
     '- The ending is a found document first, not a summary.',
     '- Pay off at least three recurring details: object, place, relationship phrase, procedure, motif, or earlier contradiction.',
     '- The ending must reflect: (a) the binary choice the player made, (b) the boss encounter outcome, and (c) at least one relationship consequence.',
     '- If there are multiple ending variants, they should differ in emotional register and relationship resolution, not just plot outcome.',
-    '- The final line should feel discrete and earned — a sentence the player remembers.',
-    '',
+    '- The final line should feel discrete and earned — a sentence the player remembers.'
+  ];
+
+  window.INST_STRUCTURAL_RULES = [
     '## Structural Rules',
     '- Exactly one binaryChoice per block, at the midpoint week, never on boss week.',
     '- Exactly one boss week, and it is the final week.',
     '- Boss week `weeklyComponent.value` is null.',
     '- Every fragmentRef must resolve to a real fragment ID.',
     '- `bossEncounter.componentInputs` must match prior weeklyComponent values in order.',
-    '- `rulesSpread.leftPage.sections` must include a section explaining the play cadence in-world.',
-    '',
+    '- `rulesSpread.leftPage.sections` must include a section explaining the play cadence in-world.'
+  ];
+
+  window.INST_SELF_VERIFICATION = [
     '## Final Self-Verification',
     '- meta.weekCount === weeks.length',
     '- meta.totalSessions equals the actual session total',
@@ -594,8 +655,10 @@
     '- each non-boss week gives the player a new capability, access, or knowledge they did not have before',
     '- the board state evolves week over week: maps show consequences of prior weeks, clocks carry forward, companions change state',
     '- boss decodingKey references map locations, spatial relationships, or institutional knowledge — not just arithmetic',
-    '- the ending reflects the binary choice, boss outcome, and at least one relationship consequence',
-    '',
+    '- the ending reflects the binary choice, boss outcome, and at least one relationship consequence'
+  ];
+
+  window.INST_QUALITY_STANDARD = [
     '## Quality Standard — Artifact vs Generic',
     '',
     '**Artifact-grade** output reads like a real indie TTRPG product:',
@@ -617,8 +680,10 @@
     '- Endings summarize the arc ("and so the mystery was solved") instead of paying off specifics.',
     '',
     'If any section of your output matches the generic column, silently rewrite it',
-    'before returning JSON. Do not mention this check in your output.',
-    '',
+    'before returning JSON. Do not mention this check in your output.'
+  ];
+
+  window.INST_POSTWRITING_GATE = [
     '## Postwriting Quality Gate',
     '',
     'After drafting your complete JSON response but before returning it, silently',
@@ -667,7 +732,57 @@
     'is identical across variants, redesign one variant\'s emotional register.',
     '',
     'This gate is mandatory. Every content-producing response must pass it silently.'
-  ].join('\n');
+  ];
+
+  window.INST_RULES_TEACH = [
+    '## Rules Page Requirements',
+    'The rulesSpread leftPage MUST teach the player how to play the game.',
+    'It is NOT diegetic flavor or institutional worldbuilding — it is procedural instruction.',
+    'Required sections (minimum 4):',
+    '- Play cadence: what the player does each training session (workout -> oracle pull -> execute consequences -> read fragment -> mark board)',
+    '- Map/board usage: how to annotate, what marks mean, when to update',
+    '- Oracle access: what triggers a pull, how to read results, how to execute consequence tags',
+    '- Clocks/trackers: what they are, when they advance, what happens when they fill or empty',
+    'The rightPage contains the password/convergence tracker and unlock instructions.',
+    'Both pages must be comprehensible to a player who has never seen the booklet before.'
+  ];
+
+  window.INSTRUCTIONS = [].concat(
+    ['# Generation Instructions', ''],
+    INST_BRIEF_INTERPRETATION, [''],
+    INST_OUTPUT_RULES, [''],
+    INST_CONTRACT_GUARDRAILS, [''],
+    INST_OUTPUT_BUDGETS, [''],
+    INST_BRIEF_FIDELITY, [''],
+    INST_WORLD_CONTRACT, [''],
+    INST_STORY_ENGINE, [''],
+    INST_ENVIRONMENT, [''],
+    INST_CHARACTER_WEB, [''],
+    INST_LAYERED_ARC, [''],
+    INST_WORKOUT_FUSION, [''],
+    INST_PERVASIVE_PLAY, [''],
+    INST_DIEGETIC_MECHANICS, [''],
+    INST_SYSTEM_INTEGRATION, [''],
+    INST_WEEKLY_COMPONENTS, [''],
+    INST_SESSION_PROMPTS, [''],
+    INST_FOUND_DOCUMENTS, [''],
+    INST_CIPHER_DESIGN, [''],
+    INST_MAPS_BOARD, [''],
+    INST_INTERLUDES, [''],
+    INST_ORACLES_CLOCKS, [''],
+    INST_COMPANIONS, [''],
+    INST_PROGRESSION, [''],
+    INST_VISUAL_DIRECTION, [''],
+    INST_ANTI_SAMENESS, [''],
+    INST_ANTI_GENERIC, [''],
+    INST_ANTI_PATTERNS, [''],
+    INST_ENDING_STANDARD, [''],
+    INST_STRUCTURAL_RULES, [''],
+    INST_SELF_VERIFICATION, [''],
+    INST_QUALITY_STANDARD, [''],
+    INST_POSTWRITING_GATE, [''],
+    INST_RULES_TEACH
+  ).join('\n');
 
   // Additive to window.generatePrompt (single-pass, Chat + API Standard mode).
   //
