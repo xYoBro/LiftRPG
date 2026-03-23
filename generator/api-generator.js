@@ -3633,8 +3633,10 @@ window.LiftRPGAPI = (function () {
   }
 
   function assertApiPromptBuilders(builders) {
+    // weekPlan is optional — the live pipeline uses campaignPlan weeks directly.
+    // It's only used by the manual wizard path.
     if (!builders.stage1 || !builders.stage2 || !builders.shell || !builders.weeks ||
-      !builders.weekPlan || !builders.singleWeekFinal ||
+      !builders.singleWeekFinal ||
       !builders.fragments || !builders.singleFragment ||
       !builders.fragmentBatch || !builders.endings || !builders.singleEnding) {
       throw new Error('Pipeline generators not loaded. Please reload the page.');
@@ -3929,7 +3931,12 @@ window.LiftRPGAPI = (function () {
   async function generateFragmentBatchAdaptive(settings, builders, config) {
     try {
       return await runJsonStage(settings, {
+        stageKey: config.stageKey || 'fragments',
         stageName: config.label,
+        stageIndex: config.stageIndex || 0,
+        completeMessage: config.label + ' complete.',
+        onProgress: config.onProgress || null,
+        getTotalStages: config.getTotalStages || null,
         schema: STRUCTURED_SCHEMA_FRAGMENTS,
         maxTokens: 32000,
         unwrapKey: 'fragments',
@@ -3970,7 +3977,11 @@ window.LiftRPGAPI = (function () {
         batchIndex: config.batchIndex,
         totalBatches: config.totalBatches,
         shellContext: config.shellContext,
-        label: config.label + 'A'
+        label: config.label + 'A',
+        stageKey: config.stageKey,
+        stageIndex: config.stageIndex,
+        onProgress: config.onProgress,
+        getTotalStages: config.getTotalStages
       });
 
       var priorForRight = config.priorFragments.concat(leftOutput.fragments || []);
@@ -3983,7 +3994,11 @@ window.LiftRPGAPI = (function () {
         batchIndex: config.batchIndex,
         totalBatches: config.totalBatches,
         shellContext: config.shellContext,
-        label: config.label + 'B'
+        label: config.label + 'B',
+        stageKey: config.stageKey,
+        stageIndex: config.stageIndex,
+        onProgress: config.onProgress,
+        getTotalStages: config.getTotalStages
       });
 
       return { fragments: (leftOutput.fragments || []).concat(rightOutput.fragments || []) };
@@ -4160,8 +4175,8 @@ window.LiftRPGAPI = (function () {
     if (!Array.isArray(campaignPlan.fragmentRegistry)) campaignPlan.fragmentRegistry = [];
     if (!Array.isArray(campaignPlan.overflowRegistry)) campaignPlan.overflowRegistry = [];
 
-    // Update totalStages with exact fragment count
-    totalStages = 3 + weekCount + campaignPlan.fragmentRegistry.length + 1;
+    // totalStages will be recalculated after weeks complete, once we know
+    // the actual fragment batch count (not individual fragment count).
 
     var shell;
     if (checkpoint && checkpoint.stages.shell) {
@@ -4279,7 +4294,7 @@ window.LiftRPGAPI = (function () {
     var finalFragments = [];
     var registry = campaignPlan.fragmentRegistry || [];
     var fragmentBatches = buildFragmentBatches(registry, weekSummaries);
-    var totalBatches = Math.max(fragmentBatches.length, 1);
+    var totalBatches = fragmentBatches.length;
 
     // Update totalStages now that we know batch count instead of individual count
     totalStages = 3 + weekCount + totalBatches + 1;
@@ -4312,7 +4327,11 @@ window.LiftRPGAPI = (function () {
         batchIndex: fb,
         totalBatches: totalBatches,
         shellContext: shellContext,
-        label: batchLabel
+        label: batchLabel,
+        stageKey: 'fragments',
+        stageIndex: stageNum,
+        onProgress: onProgress,
+        getTotalStages: function () { return totalStages; }
       });
 
       (batchOutput.fragments || []).forEach(function (frag, i) {
