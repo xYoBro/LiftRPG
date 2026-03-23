@@ -784,6 +784,100 @@
     INST_RULES_TEACH
   ).join('\n');
 
+  // ── Mechanic Vocabulary Brief ───────────────────────────────────────────
+  // Compact summary of renderer mechanical constraints for planning stages.
+  // Must match the vocabularies defined in SCHEMA_SPATIAL, SCHEMA_WEEKS_POST,
+  // SCHEMA_FRAGMENTS, and SCHEMA_THEME above. If those change, update this.
+  window.MECHANIC_VOCAB_BRIEF = [
+    'RENDERER MECHANICAL CONSTRAINTS (plan within these boundaries):',
+    '- Map types (exactly 4): grid, point-to-point, linear-track, player-drawn.',
+    '  Grid: max 12 cols x 8 rows. PTP: max 15 nodes, 20 edges. Linear: max 12 positions. Player-drawn: canvas instructions only.',
+    '- Ciphers: DELAYED INTERPRETATION. Weekly values are fiction-native (numbers, codes, instrument readings), NEVER raw letters.',
+    '  The boss decodingKey at Week 6 converts accumulated values to letters. This is non-negotiable.',
+    '- Oracle tables: d100 with exactly 10 bands (00-09, 10-19, ... 90-99). Each entry has a `text` field.',
+    '  Entry types: "fragment" (includes fragmentRef) or "consequence" (includes paperAction).',
+    '- Companion component types (7): dashboard, return-box, inventory-grid, token-sheet, overlay-window, stress-track, memory-slots.',
+    '- Clock types (6): progress-clock, danger-clock, racing-clock, tug-of-war-clock, linked-clock, project-clock.',
+    '- Fragment documentTypes (9): memo, report, inspection, fieldNote, correspondence, letter, transcript, form, anomaly.',
+    '- Boss encounter MUST include decodingKey with referenceTable (e.g., "1=A 2=B ... 26=Z").',
+    '- Visual archetypes (10): government, cyberpunk, scifi, fantasy, noir, steampunk, minimalist, nautical, occult, pastoral.',
+    'Do NOT invent mechanics, map types, component types, or document types outside these lists.'
+  ].join('\n');
+
+  // ── Stage Schema Assembler ──────────────────────────────────────────────
+  // Routes the right SCHEMA + INST slices to each API pipeline stage.
+  // Single source of truth: modify SCHEMA_* or INST_* above, and both
+  // the single-prompt path AND the API pipeline automatically pick up changes.
+  //
+  // COUPLING CONTRACT:
+  // - If you add a new SCHEMA section, add it here for relevant stages.
+  // - If you add a new INST section, add it here AND to the INSTRUCTIONS reassembly.
+  // - NEVER put schema or instruction content in generator.js or api-generator.js.
+
+  var STAGE_SCHEMA_MAP = {
+    'layer-bible':    { schemas: [],                                            instructions: ['ANTI_PATTERNS'] },
+    'campaign-plan':  { schemas: [],                                            instructions: ['WORLD_CONTRACT', 'ANTI_PATTERNS'] },
+    'shell':          { schemas: ['META', 'THEME', 'TAIL'],                     instructions: ['OUTPUT_RULES', 'CONTRACT_GUARDRAILS', 'RULES_TEACH', 'VISUAL_DIRECTION', 'STRUCTURAL_RULES'] },
+    'week-plan':      { schemas: ['WEEK_PLAN'],                                 instructions: [] },
+    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'CIPHER_DESIGN', 'MAPS_BOARD', 'ORACLES_CLOCKS', 'COMPANIONS', 'LAYERED_ARC', 'SELF_VERIFICATION'] },
+    'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'SELF_VERIFICATION'] },
+    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'LAYERED_ARC'] }
+  };
+
+  window.buildStageSchema = function(stageName) {
+    var entry = STAGE_SCHEMA_MAP[stageName];
+    if (!entry) {
+      console.error('[prompt_rules] Unknown stage: ' + stageName);
+      return '';
+    }
+    var parts = [];
+
+    // Planning stages get the mechanic vocabulary brief
+    if (stageName === 'layer-bible' || stageName === 'campaign-plan') {
+      parts.push(window.MECHANIC_VOCAB_BRIEF);
+    }
+
+    // Add relevant SCHEMA sections
+    entry.schemas.forEach(function(key) {
+      var schemaArr = window['SCHEMA_' + key];
+      if (schemaArr) {
+        parts.push(schemaArr.join('\n'));
+      } else {
+        console.error('[prompt_rules] STAGE_SCHEMA_MAP references missing SCHEMA_' + key + ' (stage: ' + stageName + ')');
+      }
+    });
+
+    // Add relevant INSTRUCTIONS sections
+    entry.instructions.forEach(function(key) {
+      var instArr = window['INST_' + key];
+      if (instArr) {
+        parts.push(instArr.join('\n'));
+      } else {
+        console.error('[prompt_rules] STAGE_SCHEMA_MAP references missing INST_' + key + ' (stage: ' + stageName + ')');
+      }
+    });
+
+    return parts.join('\n\n');
+  };
+
+  // Load-time validation: catch STAGE_SCHEMA_MAP key typos immediately
+  (function validateStageSchemaMap() {
+    var stageNames = Object.keys(STAGE_SCHEMA_MAP);
+    stageNames.forEach(function(stage) {
+      var entry = STAGE_SCHEMA_MAP[stage];
+      entry.schemas.forEach(function(key) {
+        if (!window['SCHEMA_' + key]) {
+          console.error('[prompt_rules] STAGE_SCHEMA_MAP references missing SCHEMA_' + key + ' (stage: ' + stage + ')');
+        }
+      });
+      entry.instructions.forEach(function(key) {
+        if (!window['INST_' + key]) {
+          console.error('[prompt_rules] STAGE_SCHEMA_MAP references missing INST_' + key + ' (stage: ' + stage + ')');
+        }
+      });
+    });
+  })();
+
   // Additive to window.generatePrompt (single-pass, Chat + API Standard mode).
   //
   // Legacy full-compile chat path:
