@@ -3153,15 +3153,16 @@ window.LiftRPGAPI = (function () {
         errors.push('Unknown visualArchetype: "' + shell.theme.visualArchetype + '"');
       }
     }
-    // Advisory warnings: new sub-field checks (logged, not blocking)
+    // Advisory warnings: schema-aligned sub-field checks (logged, not blocking)
+    // NOTE: gaugeLog and assembly are renderer derivations from shellFamily, NOT LLM output.
+    // cover uses "title" in schema (not titleLine1). meta uses "blockTitle" (not title).
     if (shell.meta) {
-      if (!shell.meta.title) warnings.push('Shell → meta: missing title');
-      if (!shell.meta.system) warnings.push('Shell → meta: missing system');
+      if (!shell.meta.blockTitle) warnings.push('Shell → meta: missing blockTitle');
+      if (!shell.meta.worldContract) warnings.push('Shell → meta: missing worldContract');
+      if (!shell.meta.artifactIdentity) warnings.push('Shell → meta: missing artifactIdentity');
     }
-    if (shell.cover && !shell.cover.titleLine1) warnings.push('Shell → cover: missing titleLine1');
+    if (shell.cover && !shell.cover.title) warnings.push('Shell → cover: missing title');
     if (!shell.theme) warnings.push('Shell → theme: missing entirely');
-    if (!shell.gaugeLog) warnings.push('Shell → gaugeLog: missing entirely');
-    if (!shell.assembly) warnings.push('Shell → assembly: missing entirely');
     if (warnings.length > 0) {
       console.warn('[LiftRPG] Shell advisory:', warnings.join('; '));
     }
@@ -3965,7 +3966,7 @@ window.LiftRPGAPI = (function () {
     if (result.gameLayer) {
       if (!result.gameLayer.coreLoop) warnings.push('Layer Codex → gameLayer: missing coreLoop');
       if (!result.gameLayer.persistentTopology) warnings.push('Layer Codex → gameLayer: missing persistentTopology');
-      if (!result.gameLayer.zones) warnings.push('Layer Codex → gameLayer: missing zones');
+      if (!result.gameLayer.majorZones) warnings.push('Layer Codex → gameLayer: missing majorZones');
     }
     if (result.governingLayer) {
       if (!result.governingLayer.institutionName) warnings.push('Layer Codex → governingLayer: missing institutionName');
