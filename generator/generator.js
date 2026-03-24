@@ -603,7 +603,7 @@
     SCHEMA_HEADER, [''],
     SCHEMA_META, [''],
     SCHEMA_THEME, [''],
-    SCHEMA_TAIL
+    SCHEMA_COVER_RULES
   ).join('\n');
 
   var SCHEMA_WEEKS = [].concat(
@@ -624,12 +624,12 @@
     SCHEMA_FRAGMENTS
   ).join('\n');
 
-  var SCHEMA_ENDINGS = [].concat(
+  var SCHEMA_ENDINGS_PARTIAL = [].concat(
     ['# LiftRPG Endings Schema — Partial Output'],
     [''],
     ['Output a JSON object with a single `endings` array.'],
     [''],
-    SCHEMA_TAIL
+    window.SCHEMA_ENDINGS
   ).join('\n');
 
   /**
@@ -1373,7 +1373,7 @@
       '',
       '---',
       '',
-      SCHEMA_ENDINGS,
+      SCHEMA_ENDINGS_PARTIAL,
       '',
       '---',
       '',

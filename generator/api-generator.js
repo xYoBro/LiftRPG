@@ -3055,10 +3055,16 @@ window.LiftRPGAPI = (function () {
             errors.push('Oracle table must have exactly 10 entries (d100 bands), got ' + ot.entries.length);
           }
           ot.entries.forEach(function(e, i) {
-            if (e && !e.text && !e.result) {
-              errors.push('Oracle entry ' + i + ' missing text field');
-            } else if (e && e.result && !e.text) {
-              errors.push('Oracle entry ' + i + ' uses "result" instead of "text"');
+            if (e && !e.text) {
+              if (e.result) {
+                errors.push('Oracle entry ' + i + ' uses "result" instead of "text"');
+              } else if (e.description) {
+                errors.push('Oracle entry ' + i + ' uses "description" instead of "text"');
+              } else if (e.label) {
+                errors.push('Oracle entry ' + i + ' uses "label" instead of "text"');
+              } else {
+                errors.push('Oracle entry ' + i + ' missing text field');
+              }
             }
           });
         }
@@ -3106,10 +3112,23 @@ window.LiftRPGAPI = (function () {
       } else {
         if (!boss.decodingKey) {
           errors.push('Boss encounter missing decodingKey');
-        } else if (!boss.decodingKey.referenceTable) {
-          errors.push('Boss decodingKey missing referenceTable');
+        } else {
+          if (!boss.decodingKey.referenceTable) {
+            errors.push('Boss decodingKey missing referenceTable');
+          }
+          if (!boss.decodingKey.instruction) {
+            errors.push('Boss decodingKey missing instruction');
+          }
         }
       }
+    }
+
+    // Overflow consistency: overflow must be true when sessions > 3
+    if (Array.isArray(weekObj.sessions) && weekObj.sessions.length > 3 && !weekObj.overflow) {
+      errors.push('Week has ' + weekObj.sessions.length + ' sessions but overflow is not true');
+    }
+    if (weekObj.overflow && Array.isArray(weekObj.sessions) && weekObj.sessions.length <= 3) {
+      errors.push('Week has overflow=true but only ' + weekObj.sessions.length + ' sessions');
     }
 
     return { valid: errors.length === 0, errors: errors };
@@ -4978,11 +4997,13 @@ window.LiftRPGAPI = (function () {
           revisitLogic: { type: 'string' },
           boardStateArc: { type: 'string' },
           bossConvergence: { type: 'string' },
-          informationLayers: { type: 'string' }
+          informationLayers: { type: 'string' },
+          weeklyComponentType: { type: 'string' }
         },
         required: ['coreLoop', 'persistentTopology', 'majorZones', 'gatesAndKeys',
           'progressionGates', 'persistentPressures', 'companionSurfaces',
-          'revisitLogic', 'boardStateArc', 'bossConvergence', 'informationLayers']
+          'revisitLogic', 'boardStateArc', 'bossConvergence', 'informationLayers',
+          'weeklyComponentType']
       },
       governingLayer: {
         type: 'object',
@@ -4996,7 +5017,6 @@ window.LiftRPGAPI = (function () {
         required: ['institutionName', 'departments', 'proceduresThatAffectPlay',
           'recordsAndForms', 'documentVoiceRules']
       },
-      designPrinciples: { type: 'array', items: { type: 'string' } },
       designLedger: {
         type: 'object',
         properties: {
@@ -5066,7 +5086,7 @@ window.LiftRPGAPI = (function () {
           'weekTransformations', 'clueEconomy', 'finalRevealRecontextualizes']
       }
     },
-    required: ['storyLayer', 'gameLayer', 'governingLayer', 'designPrinciples', 'designLedger']
+    required: ['storyLayer', 'gameLayer', 'governingLayer', 'designLedger']
   };
 
   var STRUCTURED_SCHEMA_CAMPAIGN = {
@@ -5075,6 +5095,8 @@ window.LiftRPGAPI = (function () {
       topology: {
         type: 'object',
         properties: {
+          type: { type: 'string' },
+          identity: { type: 'string' },
           mainMap: { type: 'string' },
           zones: { type: 'array', items: { type: 'string' } },
           persistentLocks: { type: 'array', items: { type: 'string' } },
@@ -5114,9 +5136,10 @@ window.LiftRPGAPI = (function () {
         properties: {
           decodeLogic: { type: 'string' },
           whyItFeelsEarned: { type: 'string' },
-          requiredPriorKnowledge: { type: 'array', items: { type: 'string' } }
+          requiredPriorKnowledge: { type: 'array', items: { type: 'string' } },
+          weeklyComponentType: { type: 'string' }
         },
-        required: ['decodeLogic', 'whyItFeelsEarned', 'requiredPriorKnowledge']
+        required: ['decodeLogic', 'whyItFeelsEarned', 'requiredPriorKnowledge', 'weeklyComponentType']
       },
       fragmentRegistry: {
         type: 'array',
@@ -5131,7 +5154,7 @@ window.LiftRPGAPI = (function () {
             clueFunction: { type: 'string', enum: ['establishes', 'complicates', 'reveals'] },
             weekRef: { type: 'integer' }
           },
-          required: ['id', 'title', 'documentType', 'revealPurpose', 'clueFunction']
+          required: ['id', 'title', 'documentType', 'revealPurpose', 'clueFunction', 'weekRef']
         }
       },
       overflowRegistry: {

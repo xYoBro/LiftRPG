@@ -36,7 +36,7 @@
     '  * LegacyEvolution: "none", "timed-unlock" (some fragments officially sealed until week X), "permanent-alteration" (requires destroying or permanently marking the booklet).',
     '  Choose values that create real structural consequences, not decorative labels.',
     '- `passwordLength` (integer, 4-12): Length of the intended final password word',
-    '- `passwordEncryptedEnding` (string, optional): Trusted tooling writes this after sealing the ending. Do not invent fake ciphertext.',
+    '- `passwordEncryptedEnding` (string): Set to empty string `""`. Trusted tooling writes this after sealing the ending. Do not invent fake ciphertext. Always include this key.',
     '- `demoPassword` (string, optional): Only include for explicit demo fixtures.',
     '- `liftoScript` (string): Raw workout program pasted by the user',
     '- `weekCount` (integer, 4-16): Derived from the workout program',
@@ -137,7 +137,7 @@
     '- `body` is an OBJECT, never a string. Shape: { displayText?: string, key?: string, workSpace?: object, referenceTargets?: string[] }',
     '  - `displayText`: the puzzle text shown to the player',
     '  - `key`: cipher key or lookup table (if applicable)',
-    '  - `workSpace`: { style: "cells"|"boxed-totals"|"blank", cellCount?: number }',
+    '  - `workSpace`: { style: "cells"|"boxed-totals"|"blank", rows?: number, cols?: number }',
     '  - `referenceTargets`: array of fragment IDs or map labels for cross-reference puzzles',
     '- `type` should name a specific technique such as substitution, reverse-alphabet, grid-filter, index-extraction, fragment-cross-reference, path-tracing, typographic-anomaly, numeric-sequence, contextual-question, or room-label-derivation',
     '- Ciphers yield fiction-native values only. The boss page handles value-to-letter decoding.',
@@ -155,14 +155,22 @@
     '- If the user&apos;s creative direction specifies a different dice system (e.g. 2d6, d20), adapt oracle entries and roll bands to match.',
     '',
     '### fieldOps.companionComponents',
+    'Array of 0-3 companion components per week. Each is an object with `type` plus type-specific fields.',
     'Supported component `type` values only:',
-    '- `dashboard`',
-    '- `return-box`',
-    '- `inventory-grid`',
-    '- `token-sheet`',
-    '- `overlay-window`',
-    '- `stress-track`',
-    '- `memory-slots`',
+    '- `dashboard`: { type, label, body, rows?, cols?, subtitle?, footprint? }',
+    '- `return-box`: { type, label, body, reminder? }',
+    '- `inventory-grid`: { type, label, body, rows?, cols?, tokens? }',
+    '- `token-sheet`: { type, label, body, tokens?, usageDie? }',
+    '- `overlay-window`: { type, label, body, windows?, playWindow? }',
+    '- `stress-track`: { type, label, body, tracks?, conditions? }',
+    '- `memory-slots`: { type, label, body, slots? }',
+    '',
+    'Common fields across all types:',
+    '- `label` (string, required): diegetic title for the component',
+    '- `body` (string, required): instruction or flavour text',
+    '- `footprint` (string, optional): "half-page" (default) or "full-page"',
+    '- `subtitle` (string, optional): secondary label',
+    '- `reminder` (string, optional): short reminder note shown at bottom',
     '',
     '### week.interlude',
     '- Required if present: `title`, `reason`, `body`',
@@ -202,6 +210,8 @@
     '',
     'Each fragment has:',
     '- `id` (string): pattern "F.N"',
+    '- `title` (string): diegetic document title or subject line',
+    '- `date` (string, optional): in-world date stamp',
     '- `documentType` (supported value only)',
     '- `inWorldAuthor` (string)',
     '- `inWorldRecipient` (string)',
@@ -216,7 +226,7 @@
     'Do not force every booklet to use all document types. Variety matters, but chosen absence also creates identity.'
   ];
 
-  window.SCHEMA_TAIL = [
+  window.SCHEMA_COVER_RULES = [
     '## cover',
     '- `title` (string): same as meta.blockTitle',
     '- `designation` (string)',
@@ -226,16 +236,22 @@
     '- `coverArtCaption` (string, optional)',
     '',
     '## rulesSpread',
-    '- `leftPage`: { title, reEntryRule, sections[] }',
-    '- `rightPage`: { title, instruction, unlockUrl }',
-    '- One leftPage section must explain the play cadence in-world',
-    '',
+    '- `leftPage`: { title, reEntryRule, sections: [{ heading, body }] }. Each section is an object with a `heading` string and a `body` string.',
+    '- `rightPage`: { title, instruction }',
+    '- One leftPage section must explain the play cadence in-world'
+  ];
+
+  window.SCHEMA_ENDINGS = [
     '## endings',
     '- Array of 1-3 plaintext endings',
     '- Each item: { variant, content, designSpec }',
     '- `content`: { documentType, body, finalLine }',
     '- These are authored now; encryption happens later in trusted tooling'
   ];
+
+  // Legacy alias: SCHEMA_TAIL = SCHEMA_COVER_RULES + SCHEMA_ENDINGS
+  // Used by the single-prompt path (SCHEMA_SPEC) which needs all sections
+  window.SCHEMA_TAIL = [].concat(SCHEMA_COVER_RULES, [''], SCHEMA_ENDINGS);
 
   window.SCHEMA_WEEK_PLAN = [
     '## weekPlan (object)',
@@ -268,6 +284,8 @@
     '## fragment (object)',
     'Generate exactly ONE found document.',
     '- `id` (string): pattern "F.N"',
+    '- `title` (string): diegetic document title or subject line',
+    '- `date` (string, optional): in-world date stamp',
     '- `documentType` (supported value)',
     '- `inWorldAuthor` (string)',
     '- `inWorldRecipient` (string)',
@@ -925,7 +943,8 @@
       revisitLogic: '',
       boardStateArc: '',
       bossConvergence: '',
-      informationLayers: ''
+      informationLayers: '',
+      weeklyComponentType: ''
     },
     governingLayer: {
       institutionName: '',
@@ -934,7 +953,6 @@
       recordsAndForms: [],
       documentVoiceRules: []
     },
-    designPrinciples: [],
     designLedger: {
       mysteryQuestions: [
         { question: '', answerableFrom: '', revealTiming: '' }
@@ -960,6 +978,8 @@
 
   window.STAGE2_OUTPUT_SCHEMA = JSON.stringify({
     topology: {
+      type: '',
+      identity: '',
       mainMap: '',
       zones: [],
       persistentLocks: [],
@@ -990,7 +1010,8 @@
     bossPlan: {
       decodeLogic: '',
       whyItFeelsEarned: '',
-      requiredPriorKnowledge: []
+      requiredPriorKnowledge: [],
+      weeklyComponentType: ''
     },
     fragmentRegistry: [
       {
@@ -1000,8 +1021,7 @@
         author: '',
         revealPurpose: '',
         clueFunction: '',
-        weekRef: 1,
-        sessionRef: null
+        weekRef: 1
       }
     ],
     overflowRegistry: [
