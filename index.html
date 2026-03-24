@@ -689,6 +689,16 @@
       color: var(--paper);
     }
 
+    .api-stop-btn {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .api-stop-btn:hover {
+      background: var(--accent);
+      color: var(--paper);
+    }
+
     .api-panel {
       display: grid;
       gap: 12px;
@@ -1946,6 +1956,7 @@
         <div class="generator-flow-actions">
           <button class="generator-flow-back" id="api-status-brief" type="button">Back To Brief</button>
           <button class="generator-flow-back" id="api-status-back" type="button">Back To API Setup</button>
+          <button class="generator-flow-back api-stop-btn" id="api-stop-btn" type="button" hidden>Stop Build</button>
         </div>
         <div class="wizard-state-board api-run-board">
           <div class="wizard-state-grid">
@@ -2225,6 +2236,7 @@
       var apiConfigBackBtn = document.getElementById('api-config-back');
       var apiStatusBackBtn = document.getElementById('api-status-back');
       var apiStatusBriefBtn = document.getElementById('api-status-brief');
+      var apiStopBtn = document.getElementById('api-stop-btn');
       var apiProviderEl = document.getElementById('api-provider');
       var apiMethodEl = document.getElementById('api-method');
       var apiModelEl = document.getElementById('api-model');
@@ -2797,13 +2809,6 @@
             currentGenerationMode !== 'manual' ||
             !wizResumeBanner.classList.contains('is-visible');
         }
-      if (apiStatusBackBtn) {
-        apiStatusBackBtn.disabled = !!apiRunState && apiRunState.status === 'running';
-        apiStatusBackBtn.hidden = !!apiRunState && apiRunState.status === 'running';
-      }
-      if (apiStatusBriefBtn) {
-        apiStatusBriefBtn.disabled = !!apiRunState && apiRunState.status === 'running';
-      }
         if (currentGeneratorSurface === 'api-config') {
           scheduleApiModelDiscovery({ immediate: true });
         }
@@ -3120,12 +3125,8 @@
         apiRunLog.innerHTML = apiRunState.log.map(function (line) {
           return escapeForHtml(line);
         }).join('<br>');
-        if (apiStatusBackBtn) {
-          apiStatusBackBtn.disabled = apiRunState.status === 'running';
-          apiStatusBackBtn.hidden = apiRunState.status === 'running';
-        }
-        if (apiStatusBriefBtn) {
-          apiStatusBriefBtn.disabled = apiRunState.status === 'running';
+        if (apiStopBtn) {
+          apiStopBtn.hidden = apiRunState.status !== 'running';
         }
         renderApiActions();
       }
@@ -3833,14 +3834,29 @@
       }
       if (apiStatusBriefBtn) {
         apiStatusBriefBtn.addEventListener('click', function () {
-          if (apiRunState && apiRunState.status === 'running') return;
           setGeneratorSurface('intake');
         });
       }
       if (apiStatusBackBtn) {
         apiStatusBackBtn.addEventListener('click', function () {
-          if (apiRunState && apiRunState.status === 'running') return;
           setGeneratorSurface('api-config');
+        });
+      }
+      if (apiStopBtn) {
+        apiStopBtn.addEventListener('click', function () {
+          if (!apiRunState || apiRunState.status !== 'running') return;
+          // Invalidate the current run — pipeline checks runId at each stage boundary
+          activeApiRunId++;
+          apiRunState.status = 'error';
+          apiRunState.summary = 'Build Stopped';
+          apiRunState.summaryCaption = 'You stopped the build. Completed stages are cached — restarting will resume from where it left off.';
+          apiRunState.target = 'Restart Or Reconfigure';
+          apiRunState.targetCaption = 'Change settings or hit the build button again to resume.';
+          apiRunState.error = 'Build stopped by user.';
+          pushApiLog('Build stopped by user.');
+          renderApiRunState();
+          _apiGenerateRunning = false;
+          setApiControlsDisabled(false);
         });
       }
       if (wizBackToBriefBtn) {
