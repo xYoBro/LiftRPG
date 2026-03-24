@@ -3121,51 +3121,50 @@ window.LiftRPGAPI = (function () {
    */
   function validateShellSchema(shell) {
     var errors = [];
+    var warnings = [];
     if (!shell) { return { valid: false, errors: ['Shell is null'] }; }
-    // meta section
-    if (!shell.meta) {
-      errors.push('Shell → meta: missing entirely');
-    } else {
-      if (!shell.meta.title) errors.push('Shell → meta: missing title');
-      if (!shell.meta.system) errors.push('Shell → meta: missing system');
-      if (!shell.meta.schemaVersion || !String(shell.meta.schemaVersion).match(/^1\.3/)) {
-        errors.push('Shell → meta: schemaVersion should start with "1.3", got: ' + shell.meta.schemaVersion);
-      }
-      if (!('passwordEncryptedEnding' in shell.meta)) {
-        errors.push('Shell → meta: passwordEncryptedEnding must exist (can be empty string)');
-      }
-    }
-    // cover section
-    if (!shell.cover) {
-      errors.push('Shell → cover: missing entirely');
-    } else {
-      if (!shell.cover.titleLine1) errors.push('Shell → cover: missing titleLine1');
-    }
-    // rulesSpread section
+    // Hard failures: match pre-restructure checks exactly
+    if (!shell.meta) errors.push('Missing meta');
+    if (!shell.cover) errors.push('Missing cover');
     if (!shell.rulesSpread) {
-      errors.push('Shell → rulesSpread: missing entirely');
+      errors.push('Missing rulesSpread');
     } else {
-      if (!shell.rulesSpread.leftPage) errors.push('Shell → rulesSpread: missing leftPage');
-      if (!shell.rulesSpread.rightPage) errors.push('Shell → rulesSpread: missing rightPage');
+      if (!shell.rulesSpread.leftPage) errors.push('rulesSpread missing leftPage');
+      if (!shell.rulesSpread.rightPage) errors.push('rulesSpread missing rightPage');
       if (shell.rulesSpread.leftPage && !Array.isArray(shell.rulesSpread.leftPage.sections)) {
-        errors.push('Shell → rulesSpread: leftPage missing sections array');
+        errors.push('rulesSpread.leftPage missing sections array');
       }
       if (shell.rulesSpread.leftPage && Array.isArray(shell.rulesSpread.leftPage.sections) &&
           shell.rulesSpread.leftPage.sections.length < 4) {
-        errors.push('Shell → rulesSpread: leftPage.sections has fewer than 4 entries (' +
+        errors.push('rulesSpread.leftPage.sections has fewer than 4 entries (' +
           shell.rulesSpread.leftPage.sections.length + ')');
       }
     }
-    // theme section
-    if (!shell.theme) {
-      errors.push('Shell → theme: missing entirely');
-    } else if (shell.theme.visualArchetype && VALID_ARCHETYPES.indexOf(shell.theme.visualArchetype) === -1) {
-      errors.push('Shell → theme: unknown archetype "' + shell.theme.visualArchetype + '"');
+    if (shell.meta) {
+      if (!shell.meta.schemaVersion || !String(shell.meta.schemaVersion).match(/^1\.3/)) {
+        errors.push('meta.schemaVersion should start with "1.3", got: ' + shell.meta.schemaVersion);
+      }
+      if (!('passwordEncryptedEnding' in shell.meta)) {
+        errors.push('meta.passwordEncryptedEnding must exist (can be empty string)');
+      }
     }
-    // gaugeLog section
-    if (!shell.gaugeLog) errors.push('Shell → gaugeLog: missing entirely');
-    // assembly section
-    if (!shell.assembly) errors.push('Shell → assembly: missing entirely');
+    if (shell.theme && shell.theme.visualArchetype) {
+      if (VALID_ARCHETYPES.indexOf(shell.theme.visualArchetype) === -1) {
+        errors.push('Unknown visualArchetype: "' + shell.theme.visualArchetype + '"');
+      }
+    }
+    // Advisory warnings: new sub-field checks (logged, not blocking)
+    if (shell.meta) {
+      if (!shell.meta.title) warnings.push('Shell → meta: missing title');
+      if (!shell.meta.system) warnings.push('Shell → meta: missing system');
+    }
+    if (shell.cover && !shell.cover.titleLine1) warnings.push('Shell → cover: missing titleLine1');
+    if (!shell.theme) warnings.push('Shell → theme: missing entirely');
+    if (!shell.gaugeLog) warnings.push('Shell → gaugeLog: missing entirely');
+    if (!shell.assembly) warnings.push('Shell → assembly: missing entirely');
+    if (warnings.length > 0) {
+      console.warn('[LiftRPG] Shell advisory:', warnings.join('; '));
+    }
     return { valid: errors.length === 0, errors: errors };
   }
 
