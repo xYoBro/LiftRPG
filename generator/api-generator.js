@@ -3944,37 +3944,39 @@ window.LiftRPGAPI = (function () {
   function validateLayerBibleStage(result) {
     if (!result) return 'Layer Codex → missing required sections (null result).';
     var errors = [];
-    // storyLayer
-    if (!result.storyLayer) {
-      errors.push('Layer Codex → storyLayer: missing entirely');
-    } else {
-      if (!result.storyLayer.premise) errors.push('Layer Codex → storyLayer: missing premise');
-      if (!result.storyLayer.protagonist) errors.push('Layer Codex → storyLayer: missing protagonist');
-      if (!result.storyLayer.antagonistPressure) errors.push('Layer Codex → storyLayer: missing antagonistPressure');
-      if (!result.storyLayer.recurringMotifs) errors.push('Layer Codex → storyLayer: missing recurringMotifs');
-    }
-    // gameLayer
-    if (!result.gameLayer) {
-      errors.push('Layer Codex → gameLayer: missing entirely');
-    } else {
-      if (!result.gameLayer.coreLoop) errors.push('Layer Codex → gameLayer: missing coreLoop');
-      if (!result.gameLayer.persistentTopology) errors.push('Layer Codex → gameLayer: missing persistentTopology');
-      if (!result.gameLayer.zones) errors.push('Layer Codex → gameLayer: missing zones');
-    }
-    // governingLayer
-    if (!result.governingLayer) {
-      errors.push('Layer Codex → governingLayer: missing entirely');
-    } else {
-      if (!result.governingLayer.institutionName) errors.push('Layer Codex → governingLayer: missing institutionName');
-      if (!result.governingLayer.departments) errors.push('Layer Codex → governingLayer: missing departments');
-    }
-    // designLedger
+    var warnings = [];
+    // Hard failures: top-level sections must exist (matches pre-restructure behavior)
+    if (!result.storyLayer) errors.push('Layer Codex → storyLayer: missing entirely');
+    if (!result.gameLayer) errors.push('Layer Codex → gameLayer: missing entirely');
+    if (!result.governingLayer) errors.push('Layer Codex → governingLayer: missing entirely');
     if (!result.designLedger) {
       errors.push('Layer Codex → designLedger: missing entirely');
     } else {
+      // designLedger sub-fields are hard requirements (were checked before restructure)
       if (!result.designLedger.mysteryQuestions) errors.push('Layer Codex → designLedger: missing mysteryQuestions');
       if (!result.designLedger.weekTransformations) errors.push('Layer Codex → designLedger: missing weekTransformations');
-      if (!result.designLedger.clueEconomy) errors.push('Layer Codex → designLedger: missing clueEconomy');
+    }
+    // Advisory warnings: sub-field checks for debugging (logged, not blocking)
+    if (result.storyLayer) {
+      if (!result.storyLayer.premise) warnings.push('Layer Codex → storyLayer: missing premise');
+      if (!result.storyLayer.protagonist) warnings.push('Layer Codex → storyLayer: missing protagonist');
+      if (!result.storyLayer.antagonistPressure) warnings.push('Layer Codex → storyLayer: missing antagonistPressure');
+      if (!result.storyLayer.recurringMotifs) warnings.push('Layer Codex → storyLayer: missing recurringMotifs');
+    }
+    if (result.gameLayer) {
+      if (!result.gameLayer.coreLoop) warnings.push('Layer Codex → gameLayer: missing coreLoop');
+      if (!result.gameLayer.persistentTopology) warnings.push('Layer Codex → gameLayer: missing persistentTopology');
+      if (!result.gameLayer.zones) warnings.push('Layer Codex → gameLayer: missing zones');
+    }
+    if (result.governingLayer) {
+      if (!result.governingLayer.institutionName) warnings.push('Layer Codex → governingLayer: missing institutionName');
+      if (!result.governingLayer.departments) warnings.push('Layer Codex → governingLayer: missing departments');
+    }
+    if (result.designLedger && !result.designLedger.clueEconomy) {
+      warnings.push('Layer Codex → designLedger: missing clueEconomy');
+    }
+    if (warnings.length > 0) {
+      console.warn('[LiftRPG] Layer Codex advisory:', warnings.join('; '));
     }
     if (errors.length > 0) return errors.join('; ');
     return '';
@@ -3983,37 +3985,35 @@ window.LiftRPGAPI = (function () {
   function validateCampaignPlanStage(result) {
     if (!result) return 'Campaign Plan → missing required sections (null result).';
     var errors = [];
-    // topology
-    if (!result.topology) {
-      errors.push('Campaign Plan → topology: missing entirely');
-    } else {
-      if (!result.topology.zones) errors.push('Campaign Plan → topology: missing zones');
-    }
-    // weeks
+    var warnings = [];
+    // Hard failures: weeks[] and bossPlan must exist (matches pre-restructure behavior)
     if (!Array.isArray(result.weeks)) {
       errors.push('Campaign Plan → weeks: missing or not an array');
-    } else {
-      if (result.weeks.length === 0) errors.push('Campaign Plan → weeks: empty array');
-      result.weeks.forEach(function (w, i) {
-        if (!w.weekNumber) errors.push('Campaign Plan → weeks[' + i + ']: missing weekNumber');
-      });
+    } else if (result.weeks.length === 0) {
+      errors.push('Campaign Plan → weeks: empty array');
     }
-    // fragmentRegistry
+    if (!result.bossPlan) errors.push('Campaign Plan → bossPlan: missing');
+    // Advisory warnings: sub-field checks for debugging
+    if (!result.topology) {
+      warnings.push('Campaign Plan → topology: missing entirely');
+    } else if (!result.topology.zones) {
+      warnings.push('Campaign Plan → topology: missing zones');
+    }
     if (!Array.isArray(result.fragmentRegistry)) {
-      errors.push('Campaign Plan → fragmentRegistry: missing or not an array');
+      warnings.push('Campaign Plan → fragmentRegistry: missing or not an array');
     } else {
       result.fragmentRegistry.forEach(function (f, i) {
-        if (!f.id) errors.push('Campaign Plan → fragmentRegistry[' + i + ']: missing id');
-        if (!f.weekRef) errors.push('Campaign Plan → fragmentRegistry[' + i + ']: missing weekRef');
+        if (!f.id) warnings.push('Campaign Plan → fragmentRegistry[' + i + ']: missing id');
+        if (!f.weekRef) warnings.push('Campaign Plan → fragmentRegistry[' + i + ']: missing weekRef');
       });
     }
-    // bossPlan
-    if (!result.bossPlan) {
-      var lastWeek = Array.isArray(result.weeks) && result.weeks.length > 0
-        ? result.weeks[result.weeks.length - 1] : null;
-      if (lastWeek && lastWeek.isBossWeek !== false) {
-        errors.push('Campaign Plan → bossPlan: missing (last week is boss)');
-      }
+    if (Array.isArray(result.weeks)) {
+      result.weeks.forEach(function (w, i) {
+        if (!w.weekNumber) warnings.push('Campaign Plan → weeks[' + i + ']: missing weekNumber');
+      });
+    }
+    if (warnings.length > 0) {
+      console.warn('[LiftRPG] Campaign Plan advisory:', warnings.join('; '));
     }
     if (errors.length > 0) return errors.join('; ');
     return '';
