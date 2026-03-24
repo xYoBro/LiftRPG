@@ -33,6 +33,104 @@ window.LiftRPGAPI = (function () {
   var VALID_ARCHETYPES = ['government', 'cyberpunk', 'scifi', 'fantasy', 'noir',
     'steampunk', 'minimalist', 'nautical', 'occult', 'pastoral'];
 
+  // ── Rate Limiter + Daily Budget ─────────────────────────────────────────────
+
+  var BUDGET_KEY = 'liftrpg_api_daily_budget';
+  var RATE_WINDOW_MS = 60000;  // 1 minute
+  var RATE_MAX_CALLS = 5;      // 5 calls per minute (Gemini free tier)
+  var DAILY_CALL_LIMIT = 20;   // Gemini free tier: 20 API calls/day
+
+  function getDailyBudget() {
+    var raw = null;
+    try { raw = localStorage.getItem(BUDGET_KEY); } catch (_e) { /* private browsing */ }
+    var budget = raw ? JSON.parse(raw) : null;
+    var today = new Date().toISOString().slice(0, 10);
+    if (!budget || budget.date !== today) {
+      return { date: today, calls: 0, tokens: 0, timestamps: [] };
+    }
+    // Clean stale timestamps (older than RATE_WINDOW_MS)
+    var now = Date.now();
+    if (Array.isArray(budget.timestamps)) {
+      budget.timestamps = budget.timestamps.filter(function (t) { return t > now - RATE_WINDOW_MS; });
+    } else {
+      budget.timestamps = [];
+    }
+    return budget;
+  }
+
+  function saveDailyBudget(budget) {
+    try { localStorage.setItem(BUDGET_KEY, JSON.stringify(budget)); } catch (_e) { /* quota */ }
+  }
+
+  function recordApiCall(tokenCount) {
+    var budget = getDailyBudget();
+    budget.calls++;
+    budget.tokens += (tokenCount || 0);
+    budget.timestamps.push(Date.now());
+    saveDailyBudget(budget);
+  }
+
+  function isGeminiProvider(settings) {
+    var providerId = detectProviderId(settings);
+    return providerId === 'gemini' || providerId === 'google' || providerId === 'google-free';
+  }
+
+  function createRateLimiter(maxCalls, windowMs) {
+    // Load persisted timestamps from localStorage
+    var budget = getDailyBudget();
+    var timestamps = (budget.timestamps || []).slice();
+
+    return {
+      async waitForSlot() {
+        var now = Date.now();
+        timestamps = timestamps.filter(function (t) { return t > now - windowMs; });
+        if (timestamps.length >= maxCalls) {
+          var waitUntil = timestamps[0] + windowMs;
+          var delay = waitUntil - now;
+          if (delay > 0) {
+            emitRateLimitWait(delay);
+            await sleep(delay);
+          }
+        }
+        timestamps.push(Date.now());
+        // Persist for cross-run collision prevention
+        var b = getDailyBudget();
+        b.timestamps = timestamps.slice();
+        saveDailyBudget(b);
+      }
+    };
+  }
+
+  function emitRateLimitWait(delayMs) {
+    console.log('[LiftRPG] Rate limit: waiting ' + Math.ceil(delayMs / 1000) + 's for next slot.');
+  }
+
+  function sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  function estimatePipelineCalls(weekCount) {
+    // 3 setup + weekCount weeks + ceil(weekCount/2) fragment batches (max 3) + 1 ending
+    var fragBatches = Math.min(3, Math.ceil(weekCount / 2));
+    return 3 + weekCount + fragBatches + 1;
+  }
+
+  function checkDailyBudget(settings, weekCount) {
+    if (!isGeminiProvider(settings)) return null;
+    var budget = getDailyBudget();
+    var remaining = Math.max(0, DAILY_CALL_LIMIT - budget.calls);
+    var estimated = estimatePipelineCalls(weekCount);
+    if (remaining < estimated) {
+      return {
+        remaining: remaining,
+        estimated: estimated,
+        used: budget.calls,
+        limit: DAILY_CALL_LIMIT
+      };
+    }
+    return null;
+  }
+
   // ── Provider presets ────────────────────────────────────────────────────────
 
   var PROVIDERS = {
@@ -2172,7 +2270,8 @@ window.LiftRPGAPI = (function () {
   // fragment, and narrative coherence without seeing full prior JSON.
 
   function buildChunkContinuity(allPriorWeeks) {
-    if (!allPriorWeeks || allPriorWeeks.length === 0) return null;
+    allPriorWeeks = (allPriorWeeks || []).filter(Boolean);
+    if (allPriorWeeks.length === 0) return null;
 
     var weekSummaries = [];
     var usedFragmentRefs = [];
@@ -2869,6 +2968,21 @@ window.LiftRPGAPI = (function () {
       });
     }
 
+    // Cap at 3 batches: merge smallest batches until count ≤ 3
+    while (batches.length > 3) {
+      // Find the two smallest batches by registry length
+      var minIdx = 0;
+      for (var mi = 1; mi < batches.length; mi++) {
+        if (batches[mi].registry.length < batches[minIdx].registry.length) minIdx = mi;
+      }
+      // Merge smallest into its neighbor (prefer the adjacent batch)
+      var mergeTarget = minIdx > 0 ? minIdx - 1 : 1;
+      batches[mergeTarget].weekNumbers = batches[mergeTarget].weekNumbers.concat(batches[minIdx].weekNumbers);
+      batches[mergeTarget].registry = batches[mergeTarget].registry.concat(batches[minIdx].registry);
+      batches[mergeTarget].weekSummaries = batches[mergeTarget].weekSummaries.concat(batches[minIdx].weekSummaries);
+      batches.splice(minIdx, 1);
+    }
+
     return batches;
   }
 
@@ -3008,35 +3122,50 @@ window.LiftRPGAPI = (function () {
   function validateShellSchema(shell) {
     var errors = [];
     if (!shell) { return { valid: false, errors: ['Shell is null'] }; }
-    if (!shell.meta) errors.push('Missing meta');
-    if (!shell.cover) errors.push('Missing cover');
-    if (!shell.rulesSpread) {
-      errors.push('Missing rulesSpread');
+    // meta section
+    if (!shell.meta) {
+      errors.push('Shell → meta: missing entirely');
     } else {
-      if (!shell.rulesSpread.leftPage) errors.push('rulesSpread missing leftPage');
-      if (!shell.rulesSpread.rightPage) errors.push('rulesSpread missing rightPage');
+      if (!shell.meta.title) errors.push('Shell → meta: missing title');
+      if (!shell.meta.system) errors.push('Shell → meta: missing system');
+      if (!shell.meta.schemaVersion || !String(shell.meta.schemaVersion).match(/^1\.3/)) {
+        errors.push('Shell → meta: schemaVersion should start with "1.3", got: ' + shell.meta.schemaVersion);
+      }
+      if (!('passwordEncryptedEnding' in shell.meta)) {
+        errors.push('Shell → meta: passwordEncryptedEnding must exist (can be empty string)');
+      }
+    }
+    // cover section
+    if (!shell.cover) {
+      errors.push('Shell → cover: missing entirely');
+    } else {
+      if (!shell.cover.titleLine1) errors.push('Shell → cover: missing titleLine1');
+    }
+    // rulesSpread section
+    if (!shell.rulesSpread) {
+      errors.push('Shell → rulesSpread: missing entirely');
+    } else {
+      if (!shell.rulesSpread.leftPage) errors.push('Shell → rulesSpread: missing leftPage');
+      if (!shell.rulesSpread.rightPage) errors.push('Shell → rulesSpread: missing rightPage');
       if (shell.rulesSpread.leftPage && !Array.isArray(shell.rulesSpread.leftPage.sections)) {
-        errors.push('rulesSpread.leftPage missing sections array');
+        errors.push('Shell → rulesSpread: leftPage missing sections array');
       }
       if (shell.rulesSpread.leftPage && Array.isArray(shell.rulesSpread.leftPage.sections) &&
           shell.rulesSpread.leftPage.sections.length < 4) {
-        errors.push('rulesSpread.leftPage.sections has fewer than 4 entries (' +
+        errors.push('Shell → rulesSpread: leftPage.sections has fewer than 4 entries (' +
           shell.rulesSpread.leftPage.sections.length + ')');
       }
     }
-    if (shell.meta) {
-      if (!shell.meta.schemaVersion || !String(shell.meta.schemaVersion).match(/^1\.3/)) {
-        errors.push('meta.schemaVersion should start with "1.3", got: ' + shell.meta.schemaVersion);
-      }
-      if (!('passwordEncryptedEnding' in shell.meta)) {
-        errors.push('meta.passwordEncryptedEnding must exist (can be empty string)');
-      }
+    // theme section
+    if (!shell.theme) {
+      errors.push('Shell → theme: missing entirely');
+    } else if (shell.theme.visualArchetype && VALID_ARCHETYPES.indexOf(shell.theme.visualArchetype) === -1) {
+      errors.push('Shell → theme: unknown archetype "' + shell.theme.visualArchetype + '"');
     }
-    if (shell.theme && shell.theme.visualArchetype) {
-      if (VALID_ARCHETYPES.indexOf(shell.theme.visualArchetype) === -1) {
-        errors.push('Unknown visualArchetype: "' + shell.theme.visualArchetype + '"');
-      }
-    }
+    // gaugeLog section
+    if (!shell.gaugeLog) errors.push('Shell → gaugeLog: missing entirely');
+    // assembly section
+    if (!shell.assembly) errors.push('Shell → assembly: missing entirely');
     return { valid: errors.length === 0, errors: errors };
   }
 
@@ -3813,26 +3942,80 @@ window.LiftRPGAPI = (function () {
   }
 
   function validateLayerBibleStage(result) {
-    if (!result || !result.storyLayer || !result.gameLayer || !result.governingLayer) {
-      return 'Stage 1 failed: Layer Codex missing required sections (storyLayer, gameLayer, governingLayer).';
+    if (!result) return 'Layer Codex → missing required sections (null result).';
+    var errors = [];
+    // storyLayer
+    if (!result.storyLayer) {
+      errors.push('Layer Codex → storyLayer: missing entirely');
+    } else {
+      if (!result.storyLayer.premise) errors.push('Layer Codex → storyLayer: missing premise');
+      if (!result.storyLayer.protagonist) errors.push('Layer Codex → storyLayer: missing protagonist');
+      if (!result.storyLayer.antagonistPressure) errors.push('Layer Codex → storyLayer: missing antagonistPressure');
+      if (!result.storyLayer.recurringMotifs) errors.push('Layer Codex → storyLayer: missing recurringMotifs');
     }
-    if (!result.designLedger || !result.designLedger.mysteryQuestions || !result.designLedger.weekTransformations) {
-      return 'Stage 1 failed: designLedger is missing mysteryQuestions or weekTransformations.';
+    // gameLayer
+    if (!result.gameLayer) {
+      errors.push('Layer Codex → gameLayer: missing entirely');
+    } else {
+      if (!result.gameLayer.coreLoop) errors.push('Layer Codex → gameLayer: missing coreLoop');
+      if (!result.gameLayer.persistentTopology) errors.push('Layer Codex → gameLayer: missing persistentTopology');
+      if (!result.gameLayer.zones) errors.push('Layer Codex → gameLayer: missing zones');
     }
+    // governingLayer
+    if (!result.governingLayer) {
+      errors.push('Layer Codex → governingLayer: missing entirely');
+    } else {
+      if (!result.governingLayer.institutionName) errors.push('Layer Codex → governingLayer: missing institutionName');
+      if (!result.governingLayer.departments) errors.push('Layer Codex → governingLayer: missing departments');
+    }
+    // designLedger
+    if (!result.designLedger) {
+      errors.push('Layer Codex → designLedger: missing entirely');
+    } else {
+      if (!result.designLedger.mysteryQuestions) errors.push('Layer Codex → designLedger: missing mysteryQuestions');
+      if (!result.designLedger.weekTransformations) errors.push('Layer Codex → designLedger: missing weekTransformations');
+      if (!result.designLedger.clueEconomy) errors.push('Layer Codex → designLedger: missing clueEconomy');
+    }
+    if (errors.length > 0) return errors.join('; ');
     return '';
   }
 
   function validateCampaignPlanStage(result) {
-    if (!result || !Array.isArray(result.weeks) || !result.bossPlan) {
-      return 'Stage 2 failed: campaign plan missing required sections (weeks[], bossPlan).';
+    if (!result) return 'Campaign Plan → missing required sections (null result).';
+    var errors = [];
+    // topology
+    if (!result.topology) {
+      errors.push('Campaign Plan → topology: missing entirely');
+    } else {
+      if (!result.topology.zones) errors.push('Campaign Plan → topology: missing zones');
     }
-    return '';
-  }
-
-  function validateShellStage(result) {
-    if (!result || !result.meta || !result.cover || !result.rulesSpread) {
-      return 'Stage 3 failed: booklet setup missing required keys (meta, cover, rulesSpread).';
+    // weeks
+    if (!Array.isArray(result.weeks)) {
+      errors.push('Campaign Plan → weeks: missing or not an array');
+    } else {
+      if (result.weeks.length === 0) errors.push('Campaign Plan → weeks: empty array');
+      result.weeks.forEach(function (w, i) {
+        if (!w.weekNumber) errors.push('Campaign Plan → weeks[' + i + ']: missing weekNumber');
+      });
     }
+    // fragmentRegistry
+    if (!Array.isArray(result.fragmentRegistry)) {
+      errors.push('Campaign Plan → fragmentRegistry: missing or not an array');
+    } else {
+      result.fragmentRegistry.forEach(function (f, i) {
+        if (!f.id) errors.push('Campaign Plan → fragmentRegistry[' + i + ']: missing id');
+        if (!f.weekRef) errors.push('Campaign Plan → fragmentRegistry[' + i + ']: missing weekRef');
+      });
+    }
+    // bossPlan
+    if (!result.bossPlan) {
+      var lastWeek = Array.isArray(result.weeks) && result.weeks.length > 0
+        ? result.weeks[result.weeks.length - 1] : null;
+      if (lastWeek && lastWeek.isBossWeek !== false) {
+        errors.push('Campaign Plan → bossPlan: missing (last week is boss)');
+      }
+    }
+    if (errors.length > 0) return errors.join('; ');
     return '';
   }
 
@@ -3946,6 +4129,18 @@ window.LiftRPGAPI = (function () {
     var stageTelemetry = createStageTelemetry(config.stageKey, config.stageName);
 
     for (var attempt = 0; attempt < attemptCount; attempt++) {
+      // Rate limiter: wait for slot before each API call (including retries)
+      if (config.rateLimiter) await config.rateLimiter.waitForSlot();
+
+      // Daily budget check: abort if Gemini free-tier limit reached
+      if (config.budgetEnforce && isGeminiProvider(settings)) {
+        var budget = getDailyBudget();
+        if (budget.calls >= DAILY_CALL_LIMIT) {
+          throw new Error('Daily API budget reached (' + budget.calls + '/' + DAILY_CALL_LIMIT +
+            ' calls). Your progress is saved. Resume tomorrow or switch to a paid API key.');
+        }
+      }
+
       var retryState = { attempt: attempt, error: lastErr };
       var prompt = config.buildPrompt(retryState);
       if (attempt > 0) prompt += buildRetryDirective(config.stageName, attempt, lastErr);
@@ -3972,6 +4167,12 @@ window.LiftRPGAPI = (function () {
           })();
         var result = response.result;
         recordStageUsage(stageTelemetry, response);
+
+        // Record API call for daily budget tracking
+        if (config.budgetEnforce) {
+          var totalTokens = (response.usage && response.usage.totalTokens) || 0;
+          recordApiCall(totalTokens);
+        }
 
         if (config.unwrapKey) result = unwrapIfNeeded(result, config.unwrapKey);
         if (config.normalizeResult) result = config.normalizeResult(result);
@@ -4113,6 +4314,8 @@ window.LiftRPGAPI = (function () {
         maxTokens: 32000,
         unwrapKey: 'fragments',
         maxAttempts: 2,
+        rateLimiter: config.rateLimiter || null,
+        budgetEnforce: config.budgetEnforce || false,
         validate: function (result) {
           return validateFragmentsStage(result, config.registry);
         },
@@ -4153,7 +4356,9 @@ window.LiftRPGAPI = (function () {
         stageKey: config.stageKey,
         stageIndex: config.stageIndex,
         onProgress: config.onProgress,
-        getTotalStages: config.getTotalStages
+        getTotalStages: config.getTotalStages,
+        rateLimiter: config.rateLimiter,
+        budgetEnforce: config.budgetEnforce
       });
 
       var priorForRight = config.priorFragments.concat(leftOutput.fragments || []);
@@ -4170,7 +4375,9 @@ window.LiftRPGAPI = (function () {
         stageKey: config.stageKey,
         stageIndex: config.stageIndex,
         onProgress: config.onProgress,
-        getTotalStages: config.getTotalStages
+        getTotalStages: config.getTotalStages,
+        rateLimiter: config.rateLimiter,
+        budgetEnforce: config.budgetEnforce
       });
 
       return { fragments: (leftOutput.fragments || []).concat(rightOutput.fragments || []) };
@@ -4293,6 +4500,24 @@ window.LiftRPGAPI = (function () {
       });
     }
 
+    // ── Rate limiter + daily budget ──────────────────────────────────────
+    var useGeminiBudget = isGeminiProvider(settings);
+    var rateLimiter = useGeminiBudget ? createRateLimiter(RATE_MAX_CALLS, RATE_WINDOW_MS) : null;
+
+    // Pre-flight budget check
+    if (useGeminiBudget) {
+      var budgetWarning = checkDailyBudget(settings, weekCount);
+      if (budgetWarning) {
+        var msg = 'This booklet needs ~' + budgetWarning.estimated + ' API calls. ' +
+          'You have ' + budgetWarning.remaining + ' remaining today (Gemini free tier: ' +
+          budgetWarning.limit + '/day). You can start now and resume from checkpoint tomorrow, ' +
+          'or switch to a paid API key.';
+        if (options.onStatus) options.onStatus(msg);
+        console.warn('[LiftRPG] ' + msg);
+        // Don't block — checkpoint resume makes partial runs viable
+      }
+    }
+
     // Initial estimation: 3 setup + weekCount (single-stage per week) + endings
     var totalStages = 3 + weekCount + 2;
     var stageNum = 0;
@@ -4326,9 +4551,11 @@ window.LiftRPGAPI = (function () {
         onProgress: onProgress,
         getTotalStages: function () { return totalStages; },
         schema: STRUCTURED_SCHEMA_BIBLE,
-        maxTokens: 12288,
+        maxTokens: 20480,
         requestTimeoutMs: 300000,
         maxAttempts: 2,
+        rateLimiter: rateLimiter,
+        budgetEnforce: useGeminiBudget,
         validate: validateLayerBibleStage,
         buildPrompt: function (retryState) { return builders.stage1(workout, brief, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
       });
@@ -4358,6 +4585,8 @@ window.LiftRPGAPI = (function () {
           return retryState && retryState.attempt > 0 ? 8192 : 12288;
         },
         maxAttempts: 2,
+        rateLimiter: rateLimiter,
+        budgetEnforce: useGeminiBudget,
         validate: validateCampaignPlanStage,
         buildPrompt: function (retryState) {
           return buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState || { attempt: 0, error: null });
@@ -4392,6 +4621,8 @@ window.LiftRPGAPI = (function () {
         requestTimeoutMs: 300000,
         unwrapKey: 'meta',
         maxAttempts: 2,
+        rateLimiter: rateLimiter,
+        budgetEnforce: useGeminiBudget,
         normalizeResult: function (result) {
           if (result && result.meta && Array.isArray(result.weeks)) {
             delete result.weeks; delete result.fragments; delete result.endings;
@@ -4474,6 +4705,8 @@ window.LiftRPGAPI = (function () {
         maxTokens: isBossWeek ? 12288 : 8192,
         requestTimeoutMs: 180000,
         maxAttempts: 3,
+        rateLimiter: rateLimiter,
+        budgetEnforce: useGeminiBudget,
         normalizeResult: function (result) {
           // Model sometimes returns a full booklet or a weeks[] wrapper instead
           // of a bare week object. Unwrap to get the single week.
@@ -4570,7 +4803,9 @@ window.LiftRPGAPI = (function () {
         stageKey: 'fragments',
         stageIndex: stageNum,
         onProgress: onProgress,
-        getTotalStages: function () { return totalStages; }
+        getTotalStages: function () { return totalStages; },
+        rateLimiter: rateLimiter,
+        budgetEnforce: useGeminiBudget
       });
 
       // Match returned fragments to registry entries by normalised ID first,
@@ -4617,6 +4852,8 @@ window.LiftRPGAPI = (function () {
         maxTokens: 4096,
         requestTimeoutMs: 120000,
         maxAttempts: 2,
+        rateLimiter: rateLimiter,
+        budgetEnforce: useGeminiBudget,
         validate: function (result) {
           if (!result || !result.content || !result.variant) return 'Ending must contain content and variant.';
           return '';
@@ -6105,6 +6342,9 @@ window.LiftRPGAPI = (function () {
     _compareIdentityContract: compareIdentityContract,
     qualityReport: generateQualityReport,
     qualityGate: buildQualityGate,
+    getDailyBudget: getDailyBudget,
+    checkDailyBudget: checkDailyBudget,
+    DAILY_CALL_LIMIT: DAILY_CALL_LIMIT,
     lastQualityReport: null,
     lastPricing: null
   };

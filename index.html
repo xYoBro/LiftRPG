@@ -1054,7 +1054,7 @@
 
     .wizard-state-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
     }
 
@@ -1974,6 +1974,7 @@
             </div>
           </div>
           <div class="api-note">Your key is sent directly from this browser to the provider you choose. LiftRPG does not proxy or store it on a server. Provider, model, base URL, and pipeline preference are saved locally on this device for convenience.</div>
+          <div class="api-note" id="api-daily-budget-display" hidden></div>
           <div id="validated-models-section" hidden>
             <label class="field-label">Validated Models</label>
             <div class="api-note" style="margin-bottom:6px">Not every model can complete the full build pipeline. The models below have successfully generated a complete booklet on this device and are validated for use.</div>
@@ -2000,24 +2001,9 @@
         <div class="wizard-state-board api-run-board">
           <div class="wizard-state-grid">
             <div class="wizard-state-card">
-              <div class="wizard-state-label">API State</div>
-              <div class="wizard-state-value" id="api-state-summary">Waiting For Settings</div>
-              <div class="wizard-state-caption" id="api-state-summary-caption">Choose a provider and build method to begin.</div>
-            </div>
-            <div class="wizard-state-card">
-              <div class="wizard-state-label">Next Step</div>
-              <div class="wizard-state-value" id="api-state-target">Provider Setup</div>
-              <div class="wizard-state-caption" id="api-state-target-caption">No request has been sent yet.</div>
-            </div>
-            <div class="wizard-state-card">
               <div class="wizard-state-label">Run Progress</div>
               <div class="wizard-state-value" id="api-state-progress">0 / 0 stages</div>
               <div class="wizard-state-caption" id="api-state-progress-caption">The API pipeline will report each stage here as it runs.</div>
-            </div>
-            <div class="wizard-state-card">
-              <div class="wizard-state-label">Token Usage</div>
-              <div class="wizard-state-value" id="api-state-tokens">0 tokens</div>
-              <div class="wizard-state-caption" id="api-state-tokens-caption">Prompt and completion totals appear here as each stage finishes.</div>
             </div>
             <div class="wizard-state-card">
               <div class="wizard-state-label">Estimated Cost</div>
@@ -2286,14 +2272,8 @@
       var apiTimeoutEl = document.getElementById('api-timeout');
       var apiKeyEl = document.getElementById('api-key');
       var apiSubmitBtn = document.getElementById('api-submit');
-      var apiStateSummary = document.getElementById('api-state-summary');
-      var apiStateSummaryCaption = document.getElementById('api-state-summary-caption');
-      var apiStateTarget = document.getElementById('api-state-target');
-      var apiStateTargetCaption = document.getElementById('api-state-target-caption');
       var apiStateProgress = document.getElementById('api-state-progress');
       var apiStateProgressCaption = document.getElementById('api-state-progress-caption');
-      var apiStateTokens = document.getElementById('api-state-tokens');
-      var apiStateTokensCaption = document.getElementById('api-state-tokens-caption');
       var apiStateCost = document.getElementById('api-state-cost');
       var apiStateCostCaption = document.getElementById('api-state-cost-caption');
       var apiStageLedger = document.getElementById('api-stage-ledger');
@@ -3172,23 +3152,16 @@
       }
 
       function renderApiRunState() {
-        if (!apiStateSummary || !apiStageLedger || !apiRunLog) return;
+        if (!apiStateProgress || !apiStateProgressCaption || !apiStageLedger || !apiRunLog) return;
         if (!apiRunState) apiRunState = createApiRunState();
         var selectedPreset = getProviderPreset(apiProviderEl ? apiProviderEl.value : '');
         var providerDisplay = apiRunState.providerLabel || (selectedPreset && selectedPreset.label ? selectedPreset.label : '');
         var modelDisplay = apiRunState.model || getApiModelValue();
         if (apiRunState.status === 'idle' && providerDisplay) {
-          apiRunState.summaryCaption = 'Configured for ' + providerDisplay + (modelDisplay ? ' · ' + modelDisplay : '') + '.';
-          apiRunState.progressCaption = 'Ready to start the in-browser API pipeline. ' + formatTimeoutLabel(apiTimeoutEl ? Number(apiTimeoutEl.value || 600000) : apiRunState.requestTimeoutMs || 600000) + '.';
+          apiRunState.progressCaption = 'Ready — ' + providerDisplay + (modelDisplay ? ' · ' + modelDisplay : '') + '. ' + formatTimeoutLabel(apiTimeoutEl ? Number(apiTimeoutEl.value || 600000) : apiRunState.requestTimeoutMs || 600000) + '.';
         }
-        apiStateSummary.textContent = apiRunState.summary;
-        apiStateSummaryCaption.textContent = apiRunState.summaryCaption;
-        apiStateTarget.textContent = apiRunState.target;
-        apiStateTargetCaption.textContent = apiRunState.targetCaption;
         apiStateProgress.textContent = apiRunState.progress;
         apiStateProgressCaption.textContent = apiRunState.progressCaption;
-        if (apiStateTokens) apiStateTokens.textContent = apiRunState.tokens || '0 tokens';
-        if (apiStateTokensCaption) apiStateTokensCaption.textContent = apiRunState.tokensCaption || 'Prompt and completion totals appear here as each stage finishes.';
         if (apiStateCost) apiStateCost.textContent = apiRunState.cost || '$0.00';
         if (apiStateCostCaption) apiStateCostCaption.textContent = apiRunState.costCaption || 'LiftRPG refreshes pricing from official docs before each run, then falls back locally if the source is unavailable.';
         apiStageLedger.innerHTML = API_STAGE_ORDER.map(function (stage) {
@@ -3224,6 +3197,19 @@
           apiStopBtn.hidden = apiRunState.status !== 'running';
         }
         renderApiActions();
+        updateDailyBudgetDisplay();
+      }
+
+      function updateDailyBudgetDisplay() {
+        var el = document.getElementById('api-daily-budget-display');
+        if (!el || !window.LiftRPGAPI) { if (el) el.hidden = true; return; }
+        var providerId = apiProviderEl ? apiProviderEl.value : '';
+        var isGemini = providerId === 'gemini' || providerId === 'google' || providerId === 'google-free';
+        if (!isGemini) { el.hidden = true; return; }
+        var budget = window.LiftRPGAPI.getDailyBudget();
+        var remaining = Math.max(0, window.LiftRPGAPI.DAILY_CALL_LIMIT - budget.calls);
+        el.textContent = 'Gemini daily budget: ' + budget.calls + ' / ' + window.LiftRPGAPI.DAILY_CALL_LIMIT + ' calls used today (' + remaining + ' remaining).';
+        el.hidden = false;
       }
 
       function setDraftStatus(message) {
@@ -3889,6 +3875,7 @@
           resetApiRunStateForConfigChange('Provider changed. Previous run state cleared for a fresh API pass.');
           scheduleApiModelDiscovery({ immediate: true });
           renderApiRunState();
+          updateDailyBudgetDisplay();
         });
       }
       [apiMethodEl, apiModelEl, apiModelCustomEl, apiBaseUrlEl, apiTimeoutEl].forEach(function (el) {
