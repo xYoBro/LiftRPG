@@ -699,6 +699,40 @@
       color: var(--paper);
     }
 
+    .validated-models-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--mono);
+      font-size: 6.5pt;
+      letter-spacing: .04em;
+      margin-top: 4px;
+    }
+
+    .validated-models-table th {
+      text-align: left;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      font-size: 5.5pt;
+      font-weight: normal;
+      color: var(--muted);
+      padding: 4px 8px 4px 0;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .validated-models-table td {
+      padding: 5px 8px 5px 0;
+      color: var(--ink);
+      border-bottom: 1px solid rgba(0,0,0,.06);
+    }
+
+    .validated-models-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    #validated-models-section {
+      margin-top: 14px;
+    }
+
     .api-panel {
       display: grid;
       gap: 12px;
@@ -1940,6 +1974,11 @@
             </div>
           </div>
           <div class="api-note">Your key is sent directly from this browser to the provider you choose. LiftRPG does not proxy or store it on a server. Provider, model, base URL, and pipeline preference are saved locally on this device for convenience.</div>
+          <div id="validated-models-section" hidden>
+            <label class="field-label">Validated Models</label>
+            <div class="api-note" style="margin-bottom:6px">Not every model can complete the full build pipeline. The models below have successfully generated a complete booklet on this device and are validated for use.</div>
+            <table class="validated-models-table" id="validated-models-table"></table>
+          </div>
           <div class="generator-flow-actions">
           <button class="generator-flow-back" id="api-config-back" type="button">Back To Brief</button>
           <button class="gen-submit" id="api-submit" type="button" style="margin-top:0; flex:1">Build Booklet With My API &rarr;</button>
@@ -2585,6 +2624,62 @@
           try { sessionStorage.removeItem(key); } catch (error) {}
         });
       }
+
+      // ── Validated models (localStorage) ─────────────────────────────
+      var VALIDATED_MODELS_KEY = 'liftrpg_validated_models';
+      var validatedModelsSection = document.getElementById('validated-models-section');
+      var validatedModelsTable = document.getElementById('validated-models-table');
+
+      function loadValidatedModels() {
+        try {
+          var raw = localStorage.getItem(VALIDATED_MODELS_KEY);
+          return raw ? JSON.parse(raw) : [];
+        } catch (e) { return []; }
+      }
+
+      function saveValidatedModel(entry) {
+        var models = loadValidatedModels();
+        // Update existing entry for same model or add new
+        var existing = -1;
+        for (var i = 0; i < models.length; i++) {
+          if (models[i].model === entry.model) { existing = i; break; }
+        }
+        if (existing >= 0) {
+          models[existing] = entry; // overwrite with latest run
+        } else {
+          models.push(entry);
+        }
+        try { localStorage.setItem(VALIDATED_MODELS_KEY, JSON.stringify(models)); } catch (e) {}
+        renderValidatedModels();
+      }
+
+      function renderValidatedModels() {
+        var models = loadValidatedModels();
+        if (!validatedModelsSection || !validatedModelsTable) return;
+        if (models.length === 0) {
+          validatedModelsSection.hidden = true;
+          return;
+        }
+        validatedModelsSection.hidden = false;
+        var html = '<thead><tr>' +
+          '<th>Model</th><th>Provider</th><th>Cost</th><th>Last Run</th>' +
+          '</tr></thead><tbody>';
+        models.sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
+        models.forEach(function (m) {
+          var dateStr = m.date ? new Date(m.date).toLocaleDateString() : '—';
+          html += '<tr>' +
+            '<td>' + escapeForHtml(m.model || '—') + '</td>' +
+            '<td>' + escapeForHtml(m.provider || '—') + '</td>' +
+            '<td>' + escapeForHtml(m.cost || '—') + '</td>' +
+            '<td>' + escapeForHtml(dateStr) + '</td>' +
+            '</tr>';
+        });
+        html += '</tbody>';
+        validatedModelsTable.innerHTML = html;
+      }
+
+      // Render on load
+      renderValidatedModels();
 
       function providerAllowsEmptyApiKey(providerId, baseUrl) {
         var preset = getProviderPreset(providerId);
@@ -5174,6 +5269,12 @@
           apiRunState.costCaption = (apiRunState.pricingLabel ? 'Estimated from ' + apiRunState.pricingLabel + '. ' : '') +
             'Run total: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + '.';
           pushApiLog('Generation complete. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.');
+          saveValidatedModel({
+            model: settings.model,
+            provider: settings._providerLabel,
+            cost: apiRunState.cost || '—',
+            date: new Date().toISOString()
+          });
           renderApiRunState();
           setGeneratorSurface('api-status', { skipFocus: true });
         } catch (error) {
