@@ -1176,7 +1176,7 @@ window.LiftRPGAPI = (function () {
     };
     window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
     window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = meta);
-    if (body.choices[0].finish_reason === 'length') {
+    if (body.choices[0].finish_reason === 'length' || body.choices[0].finish_reason === 'MAX_TOKENS') {
       throw new Error(
         'Response truncated: the model hit the output token limit before completing the JSON.\n\n' +
         'The booklet JSON requires more output tokens than this model provided. ' +
@@ -2285,7 +2285,7 @@ window.LiftRPGAPI = (function () {
       recentOracles: recentOracles.slice(-2),
       mapProgression: mapSummary,
       binaryChoice: binaryChoiceState,
-      clocks: allPriorWeeks[allPriorWeeks.length - 1].gameplayClocks || []
+      clocks: (allPriorWeeks[allPriorWeeks.length - 1] || {}).gameplayClocks || []
     };
   }
 
@@ -2931,9 +2931,9 @@ window.LiftRPGAPI = (function () {
     if (!isBoss && weekObj.fieldOps) {
       var fo = weekObj.fieldOps;
 
-      // Oracle validation
-      if (fo.oracleTable) {
-        var ot = fo.oracleTable;
+      // Oracle validation — LLMs use both "oracleTable" and "oracle" keys
+      var ot = fo.oracleTable || fo.oracle;
+      if (ot) {
         if (!Array.isArray(ot.entries)) {
           errors.push('oracleTable.entries must be an array');
         } else {
@@ -3409,6 +3409,7 @@ window.LiftRPGAPI = (function () {
 
   function unwrapIfNeeded(result, expectedKey) {
     if (!result || typeof result !== 'object') return result;
+    if (Array.isArray(result)) return result; // arrays are not wrapper objects
     if (result[expectedKey]) return result;
     var keys = Object.keys(result);
     if (keys.length === 1) {
@@ -3710,7 +3711,7 @@ window.LiftRPGAPI = (function () {
     window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
     window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = meta);
 
-    if (body.choices[0].finish_reason === 'length') {
+    if (body.choices[0].finish_reason === 'length' || body.choices[0].finish_reason === 'MAX_TOKENS') {
       throw new Error(
         'Response truncated: the model hit the output token limit before completing the JSON.\n\n' +
         'The stage output requires more output tokens than this model provided.'
@@ -3975,8 +3976,12 @@ window.LiftRPGAPI = (function () {
         if (config.unwrapKey) result = unwrapIfNeeded(result, config.unwrapKey);
         if (config.normalizeResult) result = config.normalizeResult(result);
         if (config.validate) {
+          // Convention: validate() returns '' on success, non-empty string on failure.
+          // Guard against accidental boolean/object returns (e.g. `return true`).
           var validationMessage = config.validate(result);
-          if (validationMessage) throw new Error(validationMessage);
+          if (typeof validationMessage === 'string' && validationMessage) {
+            throw new Error(validationMessage);
+          }
         }
         emitPipelineEvent(config.onProgress, config.stageIndex || 0, config.getTotalStages ? config.getTotalStages() : 0, config.completeMessage || config.stageName, {
           phase: 'complete',
@@ -4399,13 +4404,14 @@ window.LiftRPGAPI = (function () {
         validate: function(result) {
           var v = validateShellSchema(result);
           if (!v.valid) {
-            throw new Error('Shell schema validation: ' + v.errors.join('; '));
+            return 'Shell schema validation: ' + v.errors.join('; ');
           }
-          // Also strip weeks/fragments/endings if LLM generated them
+          // Strip weeks/fragments/endings if LLM generated them (normalizer
+          // handles the common case; this catches anything it missed)
           if (result && result.weeks) { delete result.weeks; }
           if (result && result.fragments) { delete result.fragments; }
           if (result && result.endings) { delete result.endings; }
-          return true;
+          return '';
         },
         buildPrompt: function (retryState) { return builders.shell(brief, layerBible, campaignPlan, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
       });
@@ -4567,8 +4573,23 @@ window.LiftRPGAPI = (function () {
         getTotalStages: function () { return totalStages; }
       });
 
+      // Match returned fragments to registry entries by normalised ID first,
+      // falling back to array index if IDs don't match (LLMs may reorder).
       (batchOutput.fragments || []).forEach(function (frag, i) {
-        if (batch.registry[i] && batch.registry[i].id) frag.id = batch.registry[i].id;
+        var fragNorm = normalizeId(frag && frag.id);
+        var matched = false;
+        if (fragNorm) {
+          for (var ri = 0; ri < batch.registry.length; ri++) {
+            if (normalizeId(batch.registry[ri].id) === fragNorm) {
+              frag.id = batch.registry[ri].id; // use canonical ID casing
+              matched = true;
+              break;
+            }
+          }
+        }
+        if (!matched && batch.registry[i] && batch.registry[i].id) {
+          frag.id = batch.registry[i].id; // positional fallback
+        }
         finalFragments.push(frag);
       });
       checkpoint = saveCheckpoint(fragCacheKey, batchOutput, checkpoint);
