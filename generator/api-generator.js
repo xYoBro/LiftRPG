@@ -4731,7 +4731,8 @@ window.LiftRPGAPI = (function () {
         workout: inputs.workout || '',
         brief: inputs.brief || '',
         model: inputs.model || '',
-        provider: inputs.provider || ''
+        provider: inputs.provider || '',
+        pipeline: inputs.pipeline || ''
       },
       stages: {},
       createdAt: new Date().toISOString(),
@@ -6083,6 +6084,739 @@ window.LiftRPGAPI = (function () {
     });
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // SKELETON + FLESH PIPELINE
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Validates the skeleton output shape.
+   * Convention: returns '' on pass, non-empty string on hard failure.
+   */
+  function validateSkeletonStage(result, weekCount) {
+    if (!result || typeof result !== 'object') return 'Skeleton: not an object';
+
+    // ── meta ──
+    var meta = result.meta;
+    if (!meta) return 'Skeleton → meta: missing';
+    if (!meta.blockTitle) return 'Skeleton → meta.blockTitle: missing';
+    if (!meta.worldContract) return 'Skeleton → meta.worldContract: missing';
+    if (!meta.weeklyComponentType) return 'Skeleton → meta.weeklyComponentType: missing';
+    if (!meta.narrativeVoice || !meta.narrativeVoice.person) {
+      console.warn('Skeleton → meta.narrativeVoice: missing or incomplete (advisory)');
+    }
+    if (!meta.literaryRegister || !meta.literaryRegister.name) {
+      console.warn('Skeleton → meta.literaryRegister: missing or incomplete (advisory)');
+    }
+    if (!meta.structuralShape || !meta.structuralShape.resolution) {
+      console.warn('Skeleton → meta.structuralShape: missing or incomplete (advisory)');
+    }
+    if (!meta.artifactIdentity || !meta.artifactIdentity.artifactClass) {
+      console.warn('Skeleton → meta.artifactIdentity: missing or incomplete (advisory)');
+    }
+
+    // ── theme ──
+    var theme = result.theme;
+    if (!theme) return 'Skeleton → theme: missing';
+    if (!theme.visualArchetype) return 'Skeleton → theme.visualArchetype: missing';
+    var normalizedArchetype = normalizeThemeArchetype(theme.visualArchetype);
+    if (normalizedArchetype !== theme.visualArchetype) {
+      console.warn('Skeleton → theme.visualArchetype: "' + theme.visualArchetype + '" normalized to "' + normalizedArchetype + '"');
+      theme.visualArchetype = normalizedArchetype;
+    }
+    if (!theme.palette || !theme.palette.ink || !theme.palette.paper) {
+      return 'Skeleton → theme.palette: missing or incomplete (need at least ink + paper)';
+    }
+
+    // ── cover ──
+    if (!result.cover || !result.cover.title) return 'Skeleton → cover.title: missing';
+
+    // ── weekPlan ──
+    var wp = result.weekPlan;
+    if (!Array.isArray(wp) || wp.length === 0) return 'Skeleton → weekPlan: missing or empty';
+    if (wp.length !== weekCount) {
+      console.warn('Skeleton → weekPlan.length (' + wp.length + ') !== expected weekCount (' + weekCount + ') — using skeleton length');
+    }
+    var lastWeek = wp[wp.length - 1];
+    if (!lastWeek.isBossWeek) return 'Skeleton → weekPlan: final week must have isBossWeek: true';
+
+    // Check each week entry has required fields
+    for (var i = 0; i < wp.length; i++) {
+      var w = wp[i];
+      if (!w.weekNumber) return 'Skeleton → weekPlan[' + i + '].weekNumber: missing';
+      if (!w.title) return 'Skeleton → weekPlan[' + i + '].title: missing';
+      if (!w.mapType) return 'Skeleton → weekPlan[' + i + '].mapType: missing';
+      if (!w.sessionCount || w.sessionCount < 1) return 'Skeleton → weekPlan[' + i + '].sessionCount: missing or invalid';
+    }
+
+    // ── fragmentRegistry ──
+    var fr = result.fragmentRegistry;
+    if (!Array.isArray(fr) || fr.length === 0) return 'Skeleton → fragmentRegistry: missing or empty';
+
+    // Cross-ref: every fragmentId in weekPlan must exist in registry
+    var registryIds = {};
+    for (var j = 0; j < fr.length; j++) {
+      if (!fr[j].id) return 'Skeleton → fragmentRegistry[' + j + ']: missing id';
+      registryIds[fr[j].id] = true;
+    }
+    for (var k = 0; k < wp.length; k++) {
+      var fids = wp[k].fragmentIds || [];
+      for (var m = 0; m < fids.length; m++) {
+        if (!registryIds[fids[m]]) {
+          console.warn('Skeleton → weekPlan[' + k + '].fragmentIds references "' + fids[m] + '" not in fragmentRegistry (advisory)');
+        }
+      }
+      if (wp[k].overflowFragmentId && !registryIds[wp[k].overflowFragmentId]) {
+        console.warn('Skeleton → weekPlan[' + k + '].overflowFragmentId "' + wp[k].overflowFragmentId + '" not in fragmentRegistry (advisory)');
+      }
+    }
+
+    // ── bossPlan ──
+    if (!result.bossPlan) return 'Skeleton → bossPlan: missing';
+    if (!result.bossPlan.passwordWord) return 'Skeleton → bossPlan.passwordWord: missing';
+
+    // ── endingVariants ──
+    if (!Array.isArray(result.endingVariants) || result.endingVariants.length === 0) {
+      return 'Skeleton → endingVariants: missing or empty';
+    }
+
+    return '';
+  }
+
+  /**
+   * Resolves Skeleton+Flesh prompt builders from window.* globals.
+   * Returns { skeleton, fleshRules, fleshWeek, fleshFragmentBatch, fleshEnding }.
+   */
+  function getSkeletonFleshBuilders() {
+    return {
+      skeleton:           window.generateSkeletonPrompt           || null,
+      fleshRules:         window.generateFleshRulesPrompt         || null,
+      fleshWeek:          window.generateFleshWeekPrompt          || null,
+      fleshFragmentBatch: window.generateFleshFragmentBatchPrompt || null,
+      fleshEnding:        window.generateFleshEndingPrompt        || null
+    };
+  }
+
+  /**
+   * Throws if any required Skeleton+Flesh builder is missing.
+   */
+  function assertSkeletonFleshBuilders(builders) {
+    var required = ['skeleton', 'fleshRules', 'fleshWeek', 'fleshFragmentBatch', 'fleshEnding'];
+    for (var i = 0; i < required.length; i++) {
+      if (typeof builders[required[i]] !== 'function') {
+        throw new Error('Skeleton+Flesh pipeline: missing prompt builder "' + required[i] + '". Reload the page.');
+      }
+    }
+  }
+
+  /**
+   * Builds fragment batches from skeleton data.
+   * The skeleton's fragmentRegistry lacks weekRef — we derive it from
+   * weekPlan[].fragmentIds and weekPlan[].overflowFragmentId.
+   * Delegates to the existing buildFragmentBatches() for actual grouping.
+   */
+  function buildSkeletonFragmentBatches(skeleton) {
+    var wp = skeleton.weekPlan || [];
+    var registry = skeleton.fragmentRegistry || [];
+
+    // Build reverse mapping: fragmentId → first week that references it
+    var fragToWeek = {};
+    for (var i = 0; i < wp.length; i++) {
+      var fids = wp[i].fragmentIds || [];
+      for (var j = 0; j < fids.length; j++) {
+        if (!fragToWeek[fids[j]]) fragToWeek[fids[j]] = wp[i].weekNumber;
+      }
+      if (wp[i].overflowFragmentId && !fragToWeek[wp[i].overflowFragmentId]) {
+        fragToWeek[wp[i].overflowFragmentId] = wp[i].weekNumber;
+      }
+    }
+
+    // Enrich registry entries with weekRef for buildFragmentBatches()
+    var enriched = registry.map(function (entry) {
+      return Object.assign({}, entry, { weekRef: fragToWeek[entry.id] || 1 });
+    });
+
+    // Build minimal weekSummaries (just weekNumbers — enough for batching)
+    var weekSummaries = wp.map(function (w) {
+      return { weekNumber: w.weekNumber };
+    });
+
+    return buildFragmentBatches(enriched, weekSummaries);
+  }
+
+  /**
+   * Assembles the final booklet JSON from skeleton + flesh outputs.
+   *
+   * @param {object} skeleton       — full skeleton object (meta, theme, cover, weekPlan, bossPlan, etc.)
+   * @param {object} rulesOutput    — { rulesSpread: { leftPage, rightPage } }
+   * @param {object[]} weekOutputs  — array of week objects (one per weekPlan entry), in order
+   * @param {object[]} fragmentOutputs — flat array of fragment objects from all batches
+   * @param {object[]} endingsOutputs  — array of ending objects (one per endingVariant)
+   * @param {object} nw             — NormalizedWorkout (for exercise overlay)
+   * @returns {object} final booklet JSON
+   */
+  function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs, fragmentOutputs, endingsOutputs, nw) {
+    var meta = skeleton.meta || {};
+
+    // ── Base booklet structure ──
+    var booklet = {
+      meta: {
+        blockTitle:               meta.blockTitle || '',
+        blockSubtitle:            meta.blockSubtitle || '',
+        schemaVersion:            '1.3',
+        weekCount:                weekOutputs.length,
+        totalSessions:            0,
+        generatedAt:              new Date().toISOString(),
+        passwordEncryptedEnding:  '',
+        worldContract:            meta.worldContract || '',
+        weeklyComponentType:      meta.weeklyComponentType || '',
+        narrativeVoice:           meta.narrativeVoice || {},
+        literaryRegister:         meta.literaryRegister || {},
+        structuralShape:          meta.structuralShape || {},
+        artifactIdentity:         meta.artifactIdentity || {}
+      },
+      cover: skeleton.cover || {},
+      rulesSpread: (rulesOutput && rulesOutput.rulesSpread) ? rulesOutput.rulesSpread : {},
+      theme: skeleton.theme || {},
+      weeks: [],
+      fragments: fragmentOutputs || [],
+      endings: endingsOutputs || []
+    };
+
+    // ── Weeks: merge skeleton structural fields + flesh content ──
+    for (var i = 0; i < weekOutputs.length; i++) {
+      var week = weekOutputs[i];
+      var plan = (skeleton.weekPlan && skeleton.weekPlan[i]) || {};
+
+      // Ensure structural fields from skeleton are present
+      week.weekNumber = plan.weekNumber || (i + 1);
+      week.isBossWeek = !!plan.isBossWeek;
+      week.isDeload = !!plan.isDeload;
+
+      // Normalize companion components (array, not object)
+      normalizeCompanionComponents(week);
+
+      // Overflow flag: deterministic from session count
+      if (week.sessions && week.sessions.length > 3) {
+        week.overflow = true;
+      }
+
+      booklet.weeks.push(week);
+    }
+
+    // ── Exercise overlay from NormalizedWorkout ──
+    if (nw && nw.weeks && nw.weeks.length > 0) {
+      for (var wi = 0; wi < booklet.weeks.length && wi < nw.weeks.length; wi++) {
+        var nwWeek = nw.weeks[wi];
+        var bWeek = booklet.weeks[wi];
+        if (!bWeek.sessions || !nwWeek.sessions) continue;
+        for (var si = 0; si < bWeek.sessions.length && si < nwWeek.sessions.length; si++) {
+          var nwSession = nwWeek.sessions[si];
+          if (nwSession.exercises && nwSession.exercises.length > 0) {
+            bWeek.sessions[si].exercises = nwSession.exercises.map(function (ex) {
+              return {
+                name:        ex.name || 'Lift',
+                sets:        ex.sets || 3,
+                repsPerSet:  ex.repsPerSet || '5',
+                weightField: ex.weightField !== undefined ? ex.weightField : true,
+                notes:       ex.notes || ''
+              };
+            });
+          }
+          if (nwSession.dayLabel) {
+            bWeek.sessions[si].label = 'Session ' + (si + 1) + ' \u00b7 ' + nwSession.dayLabel;
+          }
+        }
+      }
+    }
+
+    // ── Normalize document types (alias resolution) ──
+    normalizeDocumentTypes(booklet);
+
+    // ── Compute totalSessions ──
+    var totalSessions = 0;
+    for (var ti = 0; ti < booklet.weeks.length; ti++) {
+      totalSessions += (booklet.weeks[ti].sessions || []).length;
+    }
+    booklet.meta.totalSessions = totalSessions;
+
+    // ── Enforce derived fields (boss componentInputs, password, theme normalization) ──
+    var enforcement = enforceBookletDerivedFields(booklet);
+    if (enforcement.warnings && enforcement.warnings.length > 0) {
+      enforcement.warnings.forEach(function (w) { console.warn('[S+F assembly] ' + w); });
+    }
+
+    return booklet;
+  }
+
+  /**
+   * Skeleton+Flesh pipeline orchestrator.
+   *
+   * @param {object} options
+   * @param {object} options.settings       — resolved provider settings
+   * @param {string} options.workout        — formatted workout text
+   * @param {string} options.brief          — creative direction brief
+   * @param {function} options.onProgress   — progress callback
+   * @param {number} options.weekCount      — expected week count
+   * @param {number} options.totalSessions  — total session count
+   * @param {object} options.nw             — NormalizedWorkout for exercise overlay
+   * @returns {Promise<object>} final booklet JSON
+   */
+  async function runSkeletonFleshPipeline(options) {
+    var settings      = options.settings;
+    var workout       = options.workout;
+    var brief         = options.brief;
+    var onProgress    = options.onProgress;
+    var weekCount     = options.weekCount;
+    var nw            = options.nw;
+
+    // ── Setup ──
+    if (typeof window.beginLiftRpgPromptRun === 'function') {
+      window.beginLiftRpgPromptRun();
+    }
+
+    var builders = getSkeletonFleshBuilders();
+    assertSkeletonFleshBuilders(builders);
+
+    var useGeminiBudget = isGeminiProvider(settings);
+    var rateLimiter = useGeminiBudget ? createRateLimiter(RATE_MAX_CALLS, RATE_WINDOW_MS) : null;
+
+    // Estimate total stages (updated after skeleton provides fragment/ending counts)
+    var totalStages = 1 + 1 + weekCount + 2 + 1; // skeleton + rules + weeks + ~2 frag batches + 1 ending
+    var stageNum = 0;
+
+    function progress(stageKey, message) {
+      stageNum++;
+      emitPipelineEvent(onProgress, stageNum, totalStages, message, {
+        phase: 'start', stageKey: stageKey, stageName: message
+      });
+    }
+
+    // Checkpoint support
+    var checkpoint = loadCheckpoint();
+    var isResume = checkpoint && checkpoint.stages;
+
+    // Don't resume from a different pipeline type
+    if (isResume && (!checkpoint.inputs || checkpoint.inputs.pipeline !== 'skeleton-flesh')) {
+      console.warn('[S+F] Found checkpoint from different pipeline — starting fresh');
+      clearCheckpoint();
+      checkpoint = null;
+      isResume = false;
+    }
+
+    if (!isResume) {
+      checkpoint = null;
+      initCheckpoint({
+        workout: workout.substring(0, 200),
+        brief: (brief || '').substring(0, 200),
+        model: settings.model || '',
+        provider: detectProviderId ? detectProviderId(settings) : '',
+        pipeline: 'skeleton-flesh'
+      });
+    }
+
+    function cached(key) {
+      return isResume && checkpoint.stages && checkpoint.stages[key];
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // STAGE 1: SKELETON
+    // ════════════════════════════════════════════════════════════════════
+
+    var skeleton;
+    if (cached('skeleton')) {
+      skeleton = checkpoint.stages.skeleton;
+      console.log('[S+F] Resuming — skeleton loaded from checkpoint');
+      progress('skeleton', 'Skeleton (cached)');
+      // Emit a synthetic complete event for cached stage
+      emitPipelineEvent(onProgress, stageNum, totalStages, 'Skeleton (cached)', {
+        phase: 'complete', stageKey: 'skeleton', stageName: 'Skeleton'
+      });
+    } else {
+      progress('skeleton', 'Building structural skeleton\u2026');
+      skeleton = await runJsonStage(settings, {
+        stageKey:        'skeleton',
+        stageName:        'Skeleton',
+        stageIndex:       stageNum,
+        getTotalStages:   function () { return totalStages; },
+        completeMessage:  'Skeleton complete',
+        onProgress:       onProgress,
+        schema:           window.STRUCTURED_SCHEMA_SKELETON || null,
+        maxTokens:        20480,
+        requestTimeoutMs: 360000,
+        maxAttempts:      2,
+        rateLimiter:      rateLimiter,
+        budgetEnforce:    useGeminiBudget,
+        buildPrompt: function (retryState) {
+          return builders.skeleton(workout, brief, {
+            retryMode: retryState.attempt > 0
+          });
+        },
+        validate: function (result) {
+          return validateSkeletonStage(result, weekCount);
+        }
+      });
+      saveCheckpoint('skeleton', skeleton, checkpoint);
+    }
+
+    // Update stage estimate now that we know fragment + ending counts
+    var fragBatches = buildSkeletonFragmentBatches(skeleton);
+    var endingVariants = skeleton.endingVariants || ['canonical'];
+    totalStages = 1 + 1 + (skeleton.weekPlan || []).length + fragBatches.length + endingVariants.length;
+
+    // Anthropic prompt caching: set system prompt from skeleton identity
+    if (settings.format === 'anthropic' && skeleton.meta) {
+      settings._systemPrompt = [
+        'You are writing content for a LiftRPG booklet.',
+        'World contract: ' + (skeleton.meta.worldContract || ''),
+        'Title: ' + (skeleton.meta.blockTitle || ''),
+        'Voice: ' + JSON.stringify(skeleton.meta.narrativeVoice || {}),
+        'Register: ' + JSON.stringify(skeleton.meta.literaryRegister || {}),
+        'Always return valid JSON. No markdown fences.'
+      ].join('\n');
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // STAGE 2: FLESH — RULES SPREAD
+    // ════════════════════════════════════════════════════════════════════
+
+    var rulesOutput;
+    if (cached('rules')) {
+      rulesOutput = checkpoint.stages.rules;
+      console.log('[S+F] Resuming — rules loaded from checkpoint');
+      progress('rules', 'Rules spread (cached)');
+      emitPipelineEvent(onProgress, stageNum, totalStages, 'Rules spread (cached)', {
+        phase: 'complete', stageKey: 'rules', stageName: 'Rules Spread'
+      });
+    } else {
+      progress('rules', 'Writing rules spread\u2026');
+      rulesOutput = await runJsonStage(settings, {
+        stageKey:        'rules',
+        stageName:        'Rules Spread',
+        stageIndex:       stageNum,
+        getTotalStages:   function () { return totalStages; },
+        completeMessage:  'Rules spread complete',
+        onProgress:       onProgress,
+        schema:           null,
+        maxTokens:        4096,
+        requestTimeoutMs: 120000,
+        maxAttempts:      2,
+        rateLimiter:      rateLimiter,
+        budgetEnforce:    useGeminiBudget,
+        buildPrompt: function () {
+          return builders.fleshRules(skeleton);
+        },
+        validate: function (result) {
+          if (!result || !result.rulesSpread) return 'Rules: missing rulesSpread';
+          if (!result.rulesSpread.leftPage) return 'Rules: missing rulesSpread.leftPage';
+          return '';
+        }
+      });
+      saveCheckpoint('rules', rulesOutput, checkpoint);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // STAGES 3–N: FLESH — PER-WEEK CONTENT
+    // ════════════════════════════════════════════════════════════════════
+
+    var weekOutputs = [];
+    var weekSummaries = [];
+    var allComponentValues = [];
+    var actualWeekCount = (skeleton.weekPlan || []).length;
+
+    for (var w = 0; w < actualWeekCount; w++) {
+      var weekPlan = skeleton.weekPlan[w];
+      var weekNum = weekPlan.weekNumber || (w + 1);
+      var isBoss = !!weekPlan.isBossWeek;
+      var ckKey = 'week_' + weekNum;
+
+      if (cached(ckKey)) {
+        var cachedWeek = checkpoint.stages[ckKey];
+        weekOutputs.push(cachedWeek);
+        console.log('[S+F] Resuming — week ' + weekNum + ' loaded from checkpoint');
+        progress(ckKey, 'Week ' + weekNum + ' (cached)');
+        emitPipelineEvent(onProgress, stageNum, totalStages, 'Week ' + weekNum + ' (cached)', {
+          phase: 'complete', stageKey: ckKey, stageName: 'Week ' + weekNum
+        });
+        // Collect component value and summary from cached week
+        if (!isBoss && cachedWeek.weeklyComponent && cachedWeek.weeklyComponent.value != null) {
+          allComponentValues.push(cachedWeek.weeklyComponent.value);
+        }
+        weekSummaries.push({
+          weekNumber: weekNum,
+          title: cachedWeek.title || '',
+          arcBeat: weekPlan.arcBeat || '',
+          sessionCount: (cachedWeek.sessions || []).length
+        });
+        continue;
+      }
+
+      // Extract this week's workout text
+      var weekWorkout = null;
+      if (typeof window.extractWeekWorkout === 'function') {
+        weekWorkout = window.extractWeekWorkout(workout, [weekNum]);
+      }
+
+      progress(ckKey, 'Writing week ' + weekNum + (isBoss ? ' (boss)\u2026' : '\u2026'));
+
+      var weekResult = await runJsonStage(settings, {
+        stageKey:        ckKey,
+        stageName:        'Week ' + weekNum + (isBoss ? ' (Boss)' : ''),
+        stageIndex:       stageNum,
+        getTotalStages:   function () { return totalStages; },
+        completeMessage:  'Week ' + weekNum + ' complete',
+        onProgress:       onProgress,
+        schema:           null,
+        maxTokens:        isBoss ? 12288 : 8192,
+        requestTimeoutMs: 180000,
+        maxAttempts:      3,
+        rateLimiter:      rateLimiter,
+        budgetEnforce:    useGeminiBudget,
+        buildPrompt: function (retryState) {
+          return builders.fleshWeek(skeleton, weekPlan, weekWorkout, weekSummaries, allComponentValues, {
+            retryMode: retryState.attempt > 0
+          });
+        },
+        normalizeResult: function (result) {
+          // Unwrap if model returned { weeks: [week] } wrapper
+          if (result && Array.isArray(result.weeks) && result.weeks.length === 1) {
+            result = result.weeks[0];
+          }
+          normalizeCompanionComponents(result);
+          return result;
+        },
+        validate: function (result) {
+          if (!result || !result.title) return 'Week ' + weekNum + ': missing title';
+          if (!Array.isArray(result.sessions) || result.sessions.length === 0) {
+            return 'Week ' + weekNum + ': missing or empty sessions';
+          }
+          // Use existing week validator if available
+          var vResult = validateWeekSchema(result, isBoss, {
+            componentInputs: isBoss ? allComponentValues.map(String) : undefined
+          });
+          if (vResult && typeof vResult === 'object' && !vResult.valid) {
+            return (vResult.errors || []).join('; ');
+          }
+          return '';
+        }
+      });
+
+      // Set structural fields
+      weekResult.weekNumber = weekNum;
+      weekResult.isBossWeek = isBoss;
+      weekResult.isDeload = !!weekPlan.isDeload;
+
+      weekOutputs.push(weekResult);
+      saveCheckpoint(ckKey, weekResult, checkpoint);
+
+      // Collect component value for boss convergence
+      if (!isBoss && weekResult.weeklyComponent && weekResult.weeklyComponent.value != null) {
+        allComponentValues.push(weekResult.weeklyComponent.value);
+      }
+
+      // Build summary for subsequent weeks and fragments
+      weekSummaries.push({
+        weekNumber: weekNum,
+        title: weekResult.title || '',
+        arcBeat: weekPlan.arcBeat || '',
+        sessionCount: (weekResult.sessions || []).length
+      });
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // STAGES N+1 to N+3: FLESH — FRAGMENT BATCHES
+    // ════════════════════════════════════════════════════════════════════
+
+    var allFragments = [];
+    var priorFragments = [];
+
+    // NOTE: Loop uses `var` — closures capture by reference.
+    // Safe with sequential await. Must refactor to IIFE or let if parallelized.
+    for (var b = 0; b < fragBatches.length; b++) {
+      var batch = fragBatches[b];
+      var batchKey = 'fragBatch_' + b;
+
+      if (cached(batchKey)) {
+        var cachedFrags = checkpoint.stages[batchKey];
+        allFragments = allFragments.concat(cachedFrags);
+        priorFragments = priorFragments.concat(cachedFrags);
+        console.log('[S+F] Resuming — fragment batch ' + b + ' loaded from checkpoint');
+        progress(batchKey, 'Fragment batch ' + (b + 1) + ' (cached)');
+        emitPipelineEvent(onProgress, stageNum, totalStages, 'Fragment batch ' + (b + 1) + ' (cached)', {
+          phase: 'complete', stageKey: batchKey, stageName: 'Fragments ' + (b + 1)
+        });
+        continue;
+      }
+
+      progress(batchKey, 'Writing fragments batch ' + (b + 1) + '/' + fragBatches.length + '\u2026');
+
+      var fragResult = await runJsonStage(settings, {
+        stageKey:        batchKey,
+        stageName:        'Fragments ' + (b + 1) + '/' + fragBatches.length,
+        stageIndex:       stageNum,
+        getTotalStages:   function () { return totalStages; },
+        completeMessage:  'Fragment batch ' + (b + 1) + ' complete',
+        onProgress:       onProgress,
+        schema:           null,
+        maxTokens:        8192,
+        requestTimeoutMs: 180000,
+        maxAttempts:      2,
+        rateLimiter:      rateLimiter,
+        budgetEnforce:    useGeminiBudget,
+        unwrapKey:        'fragments',
+        buildPrompt: function () {
+          return builders.fleshFragmentBatch(
+            skeleton,
+            batch.registry,
+            batch.weekSummaries.length > 0 ? batch.weekSummaries : weekSummaries,
+            priorFragments,
+            b,
+            fragBatches.length
+          );
+        },
+        validate: function (result) {
+          // After unwrapKey, result is the fragments array
+          if (!Array.isArray(result) || result.length === 0) {
+            return 'Fragments batch ' + (b + 1) + ': missing or empty fragments array';
+          }
+          return '';
+        }
+      });
+
+      // fragResult is the unwrapped array (due to unwrapKey: 'fragments')
+      var batchFragments = Array.isArray(fragResult) ? fragResult : [fragResult];
+      allFragments = allFragments.concat(batchFragments);
+      priorFragments = priorFragments.concat(batchFragments);
+      saveCheckpoint(batchKey, batchFragments, checkpoint);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // FINAL STAGES: FLESH — ENDINGS
+    // ════════════════════════════════════════════════════════════════════
+
+    var allEndings = [];
+    var finalWeekSummary = weekSummaries.length > 0 ? weekSummaries[weekSummaries.length - 1] : null;
+
+    for (var e = 0; e < endingVariants.length; e++) {
+      var variant = endingVariants[e];
+      var endingKey = 'ending_' + e;
+
+      if (cached(endingKey)) {
+        allEndings.push(checkpoint.stages[endingKey]);
+        console.log('[S+F] Resuming — ending "' + variant + '" loaded from checkpoint');
+        progress(endingKey, 'Ending "' + variant + '" (cached)');
+        emitPipelineEvent(onProgress, stageNum, totalStages, 'Ending "' + variant + '" (cached)', {
+          phase: 'complete', stageKey: endingKey, stageName: 'Ending "' + variant + '"'
+        });
+        continue;
+      }
+
+      progress(endingKey, 'Writing ending "' + variant + '"\u2026');
+
+      var endingResult = await runJsonStage(settings, {
+        stageKey:        endingKey,
+        stageName:        'Ending "' + variant + '"',
+        stageIndex:       stageNum,
+        getTotalStages:   function () { return totalStages; },
+        completeMessage:  'Ending "' + variant + '" complete',
+        onProgress:       onProgress,
+        schema:           null,
+        maxTokens:        4096,
+        requestTimeoutMs: 120000,
+        maxAttempts:      2,
+        rateLimiter:      rateLimiter,
+        budgetEnforce:    useGeminiBudget,
+        buildPrompt: function () {
+          return builders.fleshEnding(skeleton, variant, finalWeekSummary, weekSummaries);
+        },
+        validate: function (result) {
+          if (!result) return 'Ending "' + variant + '": empty result';
+          if (!result.content && !result.body) return 'Ending "' + variant + '": missing content';
+          return '';
+        }
+      });
+
+      allEndings.push(endingResult);
+      saveCheckpoint(endingKey, endingResult, checkpoint);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // ASSEMBLY + QUALITY GATE
+    // ════════════════════════════════════════════════════════════════════
+
+    var booklet = assembleSkeletonFleshBooklet(
+      skeleton, rulesOutput, weekOutputs, allFragments, allEndings, options.nw
+    );
+
+    // Identity contract enforcement (reuse existing)
+    // buildIdentityContract expects (shell, campaignPlan) where shell.meta exists
+    // skeleton already has .meta, so pass it as the shell argument
+    var identityContract = typeof buildIdentityContract === 'function'
+      ? buildIdentityContract(skeleton, null)
+      : null;
+    if (identityContract) {
+      enforceIdentityContract(booklet, identityContract);
+    }
+
+    // Assembled booklet validation
+    var assemblyErrors = validateAssembledBooklet(booklet);
+    if (assemblyErrors && assemblyErrors.length > 0) {
+      console.warn('[S+F] Assembly validation warnings:', assemblyErrors);
+    }
+
+    // Quality report + gate
+    var report = generateQualityReport(booklet);
+    var qualityGate = buildQualityGate(report);
+    booklet._qualityReport = report;
+    booklet._qualityGate = qualityGate;
+    booklet._pipeline = 'skeleton-flesh';
+
+    clearCheckpoint();
+    return booklet;
+  }
+
+  /**
+   * Public entry point for the Skeleton+Flesh pipeline.
+   * Same interface as generateStructured() — drop-in alternative.
+   *
+   * @param {object} settings     — provider settings (apiKey, model, format, etc.)
+   * @param {string} workout      — raw workout text
+   * @param {string} brief        — creative direction brief
+   * @param {function} onProgress — progress callback
+   * @returns {Promise<object>} final booklet JSON
+   */
+  async function generateSkeletonFlesh(settings, workout, brief, onProgress) {
+    var resolvedSettings = resolveStructuredPipelineSettings(settings);
+
+    // Guard: API key required (same check as generateStructured)
+    if (!resolvedSettings.apiKey && resolvedSettings.format !== 'anthropic') {
+      var baseUrl = resolvedSettings.baseUrl || '';
+      if (!baseUrl.includes('localhost') && !baseUrl.includes('127.0.0.1') && !baseUrl.includes('ollama')) {
+        throw new Error('API key required for Skeleton+Flesh pipeline');
+      }
+    }
+
+    // Normalize workout
+    var nw = normalizeWorkoutParam(workout);
+    var workoutText = nw.weeks.length > 0 ? formatNormalizedForPrompt(nw) : nw.rawText;
+    var weekCount = nw.weekCount || (typeof window.parseWeekCount === 'function' ? window.parseWeekCount(workoutText) : 6);
+    var totalSessions = 0;
+    if (nw.weeks.length > 0) {
+      for (var i = 0; i < nw.weeks.length; i++) {
+        totalSessions += (nw.weeks[i].sessions || []).length;
+      }
+    }
+
+    return runSkeletonFleshPipeline({
+      settings:      resolvedSettings,
+      workout:       workoutText,
+      brief:         brief,
+      onProgress:    onProgress,
+      weekCount:     weekCount,
+      totalSessions: totalSessions,
+      nw:            nw
+    });
+  }
+
   // ── Public API ──────────────────────────────────────────────────────────────
 
   /**
@@ -6641,6 +7375,7 @@ window.LiftRPGAPI = (function () {
     generate: generate,
     generateMultiStage: generateMultiStage,
     generateStructured: generateStructured,
+    generateSkeletonFlesh: generateSkeletonFlesh,
     clearCheckpoint: clearCheckpoint,
     getCheckpoint: getCheckpoint,
     manual: {
@@ -6659,7 +7394,10 @@ window.LiftRPGAPI = (function () {
       extractWeekSummaries: extractWeekSummaries,
       findBinaryChoiceWeek: findBinaryChoiceWeek,
       buildFragmentBatches: buildFragmentBatches,
-      mergeFragmentBatches: mergeFragmentBatches
+      mergeFragmentBatches: mergeFragmentBatches,
+      assembleSkeletonFleshBooklet: assembleSkeletonFleshBooklet,
+      validateSkeletonStage: validateSkeletonStage,
+      buildSkeletonFragmentBatches: buildSkeletonFragmentBatches
     },
     _extractJson: extractJson,
     _validateSchema: validateBookletSchema,
