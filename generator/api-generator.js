@@ -1204,6 +1204,7 @@ window.LiftRPGAPI = (function () {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
+        'anthropic-beta': 'output-128k-2025-02-19',
         'content-type': 'application/json'
       },
       body: JSON.stringify(payload)
@@ -5004,7 +5005,7 @@ window.LiftRPGAPI = (function () {
         onProgress: onProgress,
         getTotalStages: function () { return totalStages; },
         schema: null,
-        maxTokens: isBossWeek ? 12288 : 8192,
+        maxTokens: isBossWeek ? 16384 : 12288,
         requestTimeoutMs: 180000,
         maxAttempts: 3,
         rateLimiter: rateLimiter,
@@ -6566,7 +6567,7 @@ window.LiftRPGAPI = (function () {
         completeMessage:  'Week ' + weekNum + ' complete',
         onProgress:       onProgress,
         schema:           null,
-        maxTokens:        isBoss ? 12288 : 8192,
+        maxTokens:        isBoss ? 16384 : 12288,
         requestTimeoutMs: 300000,
         maxAttempts:      3,
         rateLimiter:      rateLimiter,
