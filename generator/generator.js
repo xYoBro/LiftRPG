@@ -2006,6 +2006,300 @@
   }
 
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // SKELETON + FLESH PIPELINE PROMPT BUILDERS
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // Skeleton: one call produces the complete structural scaffold (no prose).
+  // Flesh: individual calls fill each content unit with actual writing.
+  // Assembly: deterministic merge of skeleton + flesh outputs.
+
+  /**
+   * Skeleton prompt — produces the complete structural scaffold.
+   * Replaces Layer Codex + Campaign Plan (2 fragile stages → 1 robust stage).
+   */
+  window.generateSkeletonPrompt = function (workout, brief, options) {
+    options = options || {};
+    var weekCount = window.parseWeekCount(workout);
+    var blend = deriveDesignBlend(brief, workout);
+    return [
+      '# LiftRPG Booklet Skeleton',
+      '',
+      'You are planning the STRUCTURAL SKELETON of a LiftRPG print-and-play booklet.',
+      'This booklet fuses a real workout program with a branching narrative TTRPG.',
+      'The workout IS the story clock. The story IS the workout meaning-making system.',
+      '',
+      '## Your Task',
+      'Return a single JSON object containing ONLY structural decisions — no long prose,',
+      'no session content, no fragment bodies, no exercise details. Just the scaffold that',
+      'later stages will fill with writing.',
+      '',
+      window.MECHANIC_VOCAB_BRIEF,
+      '',
+      window.SCHEMA_SKELETON,
+      '',
+      '## Output Example',
+      window.SKELETON_OUTPUT_EXAMPLE,
+      '',
+      '## Hard Constraints',
+      '- Exactly ' + weekCount + ' weeks. Final week MUST be boss week (isBossWeek: true).',
+      '- Password word length = ' + (weekCount - 1) + ' letters (one componentValue per non-boss week).',
+      '- Each non-boss componentValue must be an integer 1-26 (A1Z26 encoding).',
+      '- The boss week\'s componentValue is null.',
+      '- Fragment IDs: use pattern F.01, F.02, etc. Create 12-30 fragments.',
+      '- Every fragmentId referenced in weekPlan must exist in fragmentRegistry.',
+      '- Overflow weeks (sessionCount > 3) must have an overflowFragmentId.',
+      '- Exactly one binary choice week (isBinaryChoiceWeek: true), typically at the midpoint.',
+      '- Cipher values are FICTION-NATIVE (numbers, codes, readings), NEVER raw letters.',
+      '- palette colors must be valid 6-digit hex (#rrggbb) and form a cohesive visual identity.',
+      '',
+      '## Quality Targets',
+      '- worldContract: a testable governing tension, not a summary. It drives the whole booklet.',
+      '- arcBeats: each week\'s beat should show PROGRESSION. Avoid "investigation continues" repetition.',
+      '- fragmentRegistry: create a clue economy (plant early, complicate middle, reveal late).',
+      '- Map type variety: don\'t use "grid" for every week. Mix map types across the booklet.',
+      '- Companion variety: use at least 2 different companion types across the booklet.',
+      '',
+      '## Inputs',
+      '### Workout Program',
+      truncateText(workout, 3200),
+      '',
+      '### Creative Direction',
+      truncateText(formatUserBrief(brief, buildDefaultBrief(workout, blend)), 2000),
+      '',
+      '### Design Bias',
+      compactJson(summarizeDesignBiasForApi(blend)),
+      options.retryMode ? '\nRetry mode: keep all field values concrete and within constraints. Ensure JSON completes cleanly.' : '',
+      '',
+      'Return ONLY the JSON object matching the skeleton schema. No markdown fences, no commentary.'
+    ].filter(Boolean).join('\n');
+  };
+
+  /**
+   * Flesh prompt: rules spread.
+   * Input: skeleton meta + cover + artifactIdentity
+   * Output: { rulesSpread: { leftPage, rightPage } }
+   */
+  window.generateFleshRulesPrompt = function (skeleton, options) {
+    options = options || {};
+    var meta = skeleton.meta || {};
+    var cover = skeleton.cover || {};
+    return [
+      '# LiftRPG Flesh Stage — Rules Spread',
+      '',
+      'You are writing the RULES SPREAD for a LiftRPG booklet.',
+      'This is two pages: leftPage teaches the game rules in-world, rightPage provides tracking instructions.',
+      '',
+      '## Booklet Identity',
+      '- Title: ' + (meta.blockTitle || ''),
+      '- World Contract: ' + (meta.worldContract || ''),
+      '- Artifact: ' + JSON.stringify(meta.artifactIdentity || {}),
+      '- Literary Register: ' + JSON.stringify(meta.literaryRegister || {}),
+      '- Voice: ' + JSON.stringify(meta.narrativeVoice || {}),
+      '',
+      '## Output Schema',
+      'Return a single JSON object:',
+      '```',
+      '{',
+      '  "rulesSpread": {',
+      '    "leftPage": {',
+      '      "title": "string — diegetic heading for the rules page",',
+      '      "reEntryRule": "string — what happens when a player misses a session",',
+      '      "sections": [',
+      '        { "heading": "string", "body": "string — 2-4 sentences explaining this rule in-world" }',
+      '      ]',
+      '    },',
+      '    "rightPage": {',
+      '      "title": "string — diegetic heading for the tracking page",',
+      '      "instruction": "string — 1-2 sentences explaining how to use the tracking page"',
+      '    }',
+      '  }',
+      '}',
+      '```',
+      '',
+      '## Requirements',
+      '- leftPage.sections: at least 4 sections, each with heading + body.',
+      '- One section must explain the play cadence in-world (workout → dice → story → mark).',
+      '- All text must be diegetic — it should feel like part of the fictional world.',
+      '- Match the literary register and narrative voice from the identity above.',
+      '',
+      'Return ONLY the JSON. No markdown fences, no commentary.'
+    ].filter(Boolean).join('\n');
+  };
+
+  /**
+   * Flesh prompt: single week.
+   * Input: skeleton weekPlan entry + workout for that week + prior week summaries
+   * Output: complete week object matching renderer schema
+   */
+  window.generateFleshWeekPrompt = function (skeleton, weekPlan, weekWorkout, priorSummaries, allComponentValues, options) {
+    options = options || {};
+    var meta = skeleton.meta || {};
+    var isBoss = weekPlan.isBossWeek;
+    var weekNum = weekPlan.weekNumber;
+
+    var contextLines = [
+      '# LiftRPG Flesh Stage — Week ' + weekNum + (isBoss ? ' (BOSS WEEK)' : ''),
+      '',
+      'You are writing the COMPLETE CONTENT for Week ' + weekNum + ' of a LiftRPG booklet.',
+      '',
+      '## Booklet Identity',
+      '- Title: ' + (meta.blockTitle || ''),
+      '- World Contract: ' + (meta.worldContract || ''),
+      '- Voice: ' + JSON.stringify(meta.narrativeVoice || {}),
+      '- Register: ' + JSON.stringify(meta.literaryRegister || {}),
+      '- Weekly Component Type: ' + (meta.weeklyComponentType || ''),
+      '',
+      '## This Week\'s Skeleton',
+      JSON.stringify(weekPlan, null, 2),
+      '',
+      '## Week Schema',
+      window.buildStageSchema('week-final'),
+      ''
+    ];
+
+    if (weekWorkout) {
+      contextLines.push('## Workout for This Week');
+      contextLines.push(truncateText(weekWorkout, 1500));
+      contextLines.push('');
+    }
+
+    if (priorSummaries && priorSummaries.length > 0) {
+      contextLines.push('## Prior Week Summaries (for continuity)');
+      contextLines.push(compactJson(priorSummaries));
+      contextLines.push('');
+    }
+
+    // Structural decisions are GIVEN — the LLM fills content within them
+    contextLines.push('## Structural Decisions (already decided — do not change)');
+    contextLines.push('- Map type: ' + weekPlan.mapType);
+    contextLines.push('- Cipher type: ' + weekPlan.cipherType);
+    contextLines.push('- Sessions: ' + weekPlan.sessionCount);
+    contextLines.push('- Fragment refs: ' + JSON.stringify(weekPlan.fragmentIds));
+    if (weekPlan.componentValue !== null && weekPlan.componentValue !== undefined) {
+      contextLines.push('- Component value: ' + weekPlan.componentValue + ' (fiction-native, NOT a letter)');
+    }
+    if (weekPlan.overflowFragmentId) {
+      contextLines.push('- Overflow document ID: ' + weekPlan.overflowFragmentId);
+    }
+    contextLines.push('- Oracle mode: ' + (weekPlan.oracleMode || 'mixed'));
+    if (weekPlan.companionTypes && weekPlan.companionTypes.length > 0) {
+      contextLines.push('- Companion types: ' + JSON.stringify(weekPlan.companionTypes));
+    }
+    contextLines.push('- Epigraph: "' + (weekPlan.epigraphText || '') + '" — ' + (weekPlan.epigraphAttribution || ''));
+    contextLines.push('');
+
+    if (isBoss) {
+      contextLines.push('## Boss Week Requirements');
+      contextLines.push('- This week replaces fieldOps with bossEncounter.');
+      contextLines.push('- componentInputs must be: ' + JSON.stringify(allComponentValues));
+      contextLines.push('- decodingKey.referenceTable maps these values to letters.');
+      contextLines.push('- Must include: title, narrative, mechanismDescription, convergenceProof, passwordRevealInstruction.');
+      if (weekPlan.isBinaryChoiceWeek || (skeleton.bossPlan && skeleton.bossPlan.binaryChoiceSetup)) {
+        contextLines.push('- Include binaryChoiceAcknowledgement: { ifA, ifB }');
+      }
+      contextLines.push('');
+    }
+
+    contextLines.push('Return a single JSON week object. No markdown fences, no commentary.');
+
+    return contextLines.filter(Boolean).join('\n');
+  };
+
+  /**
+   * Flesh prompt: fragment batch.
+   * Input: skeleton fragmentRegistry entries for this batch + week context
+   * Output: { fragments: [...] }
+   */
+  window.generateFleshFragmentBatchPrompt = function (skeleton, batchEntries, weekSummaries, priorFragments, batchIndex, totalBatches, options) {
+    options = options || {};
+    var meta = skeleton.meta || {};
+
+    return [
+      '# LiftRPG Flesh Stage — Fragment Batch ' + (batchIndex + 1) + '/' + totalBatches,
+      '',
+      'You are writing FOUND DOCUMENTS for a LiftRPG booklet.',
+      'These are in-world documents discovered during play — memos, reports, field notes, etc.',
+      '',
+      '## Booklet Identity',
+      '- Title: ' + (meta.blockTitle || ''),
+      '- World Contract: ' + (meta.worldContract || ''),
+      '- Voice: ' + JSON.stringify(meta.narrativeVoice || {}),
+      '- Register: ' + JSON.stringify(meta.literaryRegister || {}),
+      '',
+      '## Fragment Schema',
+      window.buildStageSchema('fragment'),
+      '',
+      '## Fragments to Generate',
+      'Generate exactly these fragments (IDs, types, authors, and purposes are pre-assigned):',
+      JSON.stringify(batchEntries, null, 2),
+      '',
+      weekSummaries ? '## Week Context\n' + compactJson(weekSummaries) + '\n' : '',
+      priorFragments && priorFragments.length > 0
+        ? '## Previously Generated Fragments (for tonal consistency)\n' + compactJson(priorFragments.map(function (f) { return { id: f.id, title: f.title, openingLine: truncateText(f.content || f.body || '', 80) }; })) + '\n'
+        : '',
+      '## Quality Requirements',
+      '- Each fragment must feel like a real document that could exist independently.',
+      '- Include [██████] redactions where they serve narrative purpose.',
+      '- Include {annotations} where a reader would scribble notes.',
+      '- hasIrrelevantDetail: at least some fragments should include mundane details that build verisimilitude.',
+      '- Match designSpec to the document type and world identity.',
+      '',
+      'Return { "fragments": [...] } with one complete fragment per registry entry. No markdown fences.'
+    ].filter(Boolean).join('\n');
+  };
+
+  /**
+   * Flesh prompt: ending.
+   * Input: skeleton bossPlan + final week summary + variant
+   * Output: single ending object
+   */
+  window.generateFleshEndingPrompt = function (skeleton, variant, finalWeekSummary, weekSummaries, options) {
+    options = options || {};
+    var meta = skeleton.meta || {};
+    var boss = skeleton.bossPlan || {};
+
+    return [
+      '# LiftRPG Flesh Stage — Ending ("' + variant + '")',
+      '',
+      'You are writing a BOOKLET ENDING for a LiftRPG zine.',
+      'This is the payoff document the player unlocks after solving the password.',
+      '',
+      '## Booklet Identity',
+      '- Title: ' + (meta.blockTitle || ''),
+      '- World Contract: ' + (meta.worldContract || ''),
+      '- Voice: ' + JSON.stringify(meta.narrativeVoice || {}),
+      '- Register: ' + JSON.stringify(meta.literaryRegister || {}),
+      '- Resolution: ' + ((meta.structuralShape || {}).resolution || ''),
+      '',
+      '## Boss Context',
+      '- Password: ' + (boss.passwordWord || ''),
+      '- Convergence: ' + (boss.convergenceRequirements || ''),
+      '- Binary choice: ' + (boss.binaryChoiceSetup || 'none'),
+      '',
+      finalWeekSummary ? '## Final Week Summary\n' + compactJson(finalWeekSummary) + '\n' : '',
+      weekSummaries ? '## All Week Summaries\n' + compactJson(weekSummaries) + '\n' : '',
+      '',
+      '## Output Schema',
+      'Return a single JSON object:',
+      '{ "variant": "' + variant + '",',
+      '  "content": { "documentType": "string", "body": "string (the ending prose)", "finalLine": "string (closing line)" },',
+      '  "designSpec": { "paperTone": "string", "primaryTypeface": "string" } }',
+      '',
+      '## Quality Requirements',
+      '- The ending must feel EARNED — reference specific events, characters, and discoveries from the weeks.',
+      '- finalLine should land emotionally. It is the last thing the player reads.',
+      '- The body should be a substantial in-world document (letter, report, final log entry).',
+      '- designSpec should match the document type and world identity.',
+      '',
+      'Return ONLY the JSON object. No markdown fences, no commentary.'
+    ].filter(Boolean).join('\n');
+  };
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CLASSIC API PIPELINE PROMPT BUILDERS (existing, preserved as fallback)
+  // ══════════════════════════════════════════════════════════════════════════
+
   window.generateApiStage1Prompt = function (workout, brief, options) {
     options = options || {};
     var blend = deriveDesignBlend(brief, workout);

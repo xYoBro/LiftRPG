@@ -303,6 +303,204 @@
     '- `designSpec` (object): { paperTone, primaryTypeface }'
   ];
 
+  // ── Skeleton Schema (Skeleton+Flesh pipeline) ──────────────────────────
+  // Compact structural scaffold — no prose, just decisions and cross-refs.
+  // One API call produces the entire planning layer; flesh calls fill content.
+  window.SCHEMA_SKELETON = [
+    '# Booklet Skeleton Schema',
+    '',
+    'Return a single JSON object with exactly this structure. Fill every field.',
+    'This is the STRUCTURAL SKELETON only — no long prose, just decisions.',
+    '',
+    '## meta (object)',
+    '- `blockTitle` (string): full story title',
+    '- `blockSubtitle` (string): one-line diegetic designation',
+    '- `worldContract` (string): one sentence — the governing tension that drives the entire booklet',
+    '- `weeklyComponentType` (string): fiction-native measurement family (e.g., "gauge reading", "signal frequency")',
+    '- `narrativeVoice` (object): { person, tense, narratorStance, voiceRationale }',
+    '- `literaryRegister` (object): { name, behaviorDescription, forbiddenMoves, typographicBehavior }',
+    '- `structuralShape` (object): { resolution, temporalOrder, narratorReliability, promptFragmentRelationship, shapeRationale }',
+    '  resolution: "closed"|"open"|"shifted"|"costly"|"full"|"partial"|"ambiguous"',
+    '  temporalOrder: "chronological"|"in-medias-res"|"rashomon"|"fragmented"|"linear"|"reverse"|"parallel"',
+    '  narratorReliability: "reliable"|"compromised"|"unreliable"|"institutional"|"multiple"|"shifting"',
+    '  promptFragmentRelationship: "fragments-deepen"|"fragments-contradict"|"fragments-parallel"|"fragments-precede"',
+    '- `artifactIdentity` (object): { artifactClass, shellFamily, boardStateMode, attachmentStrategy }',
+    '  Plus optional: artifactBlend?, authorialMode?, documentEcology?, materialCulture?, openingMode?, rulesDeliveryMode?, revealShape?, unlockLogic?',
+    '',
+    '## theme (object)',
+    '- `visualArchetype` (string): one of government|cyberpunk|scifi|fantasy|noir|steampunk|minimalist|nautical|occult|pastoral',
+    '- `palette` (object): { ink, paper, accent, muted, rule, fog } — all valid 6-digit hex (#rrggbb)',
+    '',
+    '## cover (object)',
+    '- `title` (string): same as meta.blockTitle',
+    '- `designation` (string): diegetic file/project/case number',
+    '- `tagline` (string): one-line hook',
+    '- `subtitle` (string, optional)',
+    '- `colophonLines` (string[]): 3-6 in-world provenance lines',
+    '',
+    '## weekPlan (array, length = weekCount)',
+    'One entry per week. The final week MUST be the boss week.',
+    '- `weekNumber` (integer, 1-indexed)',
+    '- `title` (string): chapter title',
+    '- `arcBeat` (string): 1-sentence narrative focus for this week',
+    '- `epigraphText` (string): epigraph quote for this week',
+    '- `epigraphAttribution` (string): attribution for the epigraph',
+    '- `mapType` (string): grid|point-to-point|linear-track|player-drawn',
+    '- `cipherType` (string): the cipher technique name',
+    '- `componentValue` (number|null): fiction-native value for password system (null for boss week)',
+    '- `isBossWeek` (boolean): true ONLY for final week',
+    '- `isDeload` (boolean): tonal flag for deload weeks',
+    '- `isBinaryChoiceWeek` (boolean): true for the week containing the binary choice',
+    '- `sessionCount` (integer): 3-6 sessions for this week',
+    '- `fragmentIds` (string[]): IDs of fragments referenced in this week\'s sessions/oracles',
+    '- `overflowFragmentId` (string|null): ID of overflow document if sessionCount > 3',
+    '- `oracleMode` (string): "fragment"|"consequence"|"mixed"',
+    '- `companionTypes` (string[]): companion component types for this week (0-3 items)',
+    '- `clockNames` (string[]): gameplay clock names introduced or active this week',
+    '- `hasInterlude` (boolean): whether this week has an interlude page',
+    '',
+    '## fragmentRegistry (array)',
+    'One entry per found document. 12-30 fragments total.',
+    '- `id` (string): pattern "F.N" (F.01, F.02, etc.)',
+    '- `documentType` (string): memo|report|inspection|fieldNote|correspondence|transcript|form|anomaly',
+    '- `inWorldAuthor` (string): who wrote this document in-world',
+    '- `inWorldRecipient` (string): who received it',
+    '- `title` (string): diegetic document title or subject line',
+    '- `narrativePurpose` (string): 1-sentence description of what this fragment reveals or conceals',
+    '',
+    '## bossPlan (object)',
+    '- `passwordWord` (string): the target password (all-caps, e.g., "HERON")',
+    '- `decodingLogic` (string): how componentValues map to letters (e.g., "A1Z26: 1=A, 2=B, ..., 26=Z")',
+    '- `convergenceRequirements` (string): what the boss encounter must reference from prior weeks',
+    '- `binaryChoiceSetup` (string): what choice was offered and how the boss acknowledges both paths',
+    '',
+    '## endingVariants (string[])',
+    'Array of 1-3 variant labels (e.g., ["canonical", "bittersweet"])'
+  ].join('\n');
+
+  // JSON example for the skeleton (used in prompt text for freeform providers)
+  window.SKELETON_OUTPUT_EXAMPLE = JSON.stringify({
+    meta: {
+      blockTitle: '', blockSubtitle: '', worldContract: '',
+      weeklyComponentType: '',
+      narrativeVoice: { person: '', tense: '', narratorStance: '', voiceRationale: '' },
+      literaryRegister: { name: '', behaviorDescription: '', forbiddenMoves: '', typographicBehavior: '' },
+      structuralShape: { resolution: '', temporalOrder: '', narratorReliability: '', promptFragmentRelationship: '', shapeRationale: '' },
+      artifactIdentity: { artifactClass: '', shellFamily: '', boardStateMode: '', attachmentStrategy: '' }
+    },
+    theme: { visualArchetype: '', palette: { ink: '#000000', paper: '#ffffff', accent: '#000000', muted: '#888888', rule: '#cccccc', fog: '#eeeeee' } },
+    cover: { title: '', designation: '', tagline: '', colophonLines: ['', '', ''] },
+    weekPlan: [
+      { weekNumber: 1, title: '', arcBeat: '', epigraphText: '', epigraphAttribution: '',
+        mapType: 'grid', cipherType: '', componentValue: 1, isBossWeek: false, isDeload: false,
+        isBinaryChoiceWeek: false, sessionCount: 5, fragmentIds: ['F.01'],
+        overflowFragmentId: null, oracleMode: 'mixed', companionTypes: [], clockNames: [], hasInterlude: false }
+    ],
+    fragmentRegistry: [
+      { id: 'F.01', documentType: 'memo', inWorldAuthor: '', inWorldRecipient: '', title: '', narrativePurpose: '' }
+    ],
+    bossPlan: { passwordWord: '', decodingLogic: '', convergenceRequirements: '', binaryChoiceSetup: '' },
+    endingVariants: ['canonical']
+  }, null, 2);
+
+  // Structured output schema for the skeleton (OpenAI json_schema format)
+  window.STRUCTURED_SCHEMA_SKELETON = {
+    type: 'object',
+    properties: {
+      meta: {
+        type: 'object',
+        properties: {
+          blockTitle: { type: 'string' }, blockSubtitle: { type: 'string' },
+          worldContract: { type: 'string' }, weeklyComponentType: { type: 'string' },
+          narrativeVoice: {
+            type: 'object',
+            properties: { person: { type: 'string' }, tense: { type: 'string' }, narratorStance: { type: 'string' }, voiceRationale: { type: 'string' } },
+            required: ['person', 'tense', 'narratorStance']
+          },
+          literaryRegister: {
+            type: 'object',
+            properties: { name: { type: 'string' }, behaviorDescription: { type: 'string' }, forbiddenMoves: { type: 'string' }, typographicBehavior: { type: 'string' } },
+            required: ['name', 'behaviorDescription']
+          },
+          structuralShape: {
+            type: 'object',
+            properties: { resolution: { type: 'string' }, temporalOrder: { type: 'string' }, narratorReliability: { type: 'string' }, promptFragmentRelationship: { type: 'string' }, shapeRationale: { type: 'string' } },
+            required: ['resolution', 'temporalOrder']
+          },
+          artifactIdentity: {
+            type: 'object',
+            properties: { artifactClass: { type: 'string' }, shellFamily: { type: 'string' }, boardStateMode: { type: 'string' }, attachmentStrategy: { type: 'string' } },
+            required: ['artifactClass', 'shellFamily', 'boardStateMode', 'attachmentStrategy']
+          }
+        },
+        required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'artifactIdentity']
+      },
+      theme: {
+        type: 'object',
+        properties: {
+          visualArchetype: { type: 'string', enum: ['government', 'cyberpunk', 'scifi', 'fantasy', 'noir', 'steampunk', 'minimalist', 'nautical', 'occult', 'pastoral'] },
+          palette: {
+            type: 'object',
+            properties: { ink: { type: 'string' }, paper: { type: 'string' }, accent: { type: 'string' }, muted: { type: 'string' }, rule: { type: 'string' }, fog: { type: 'string' } },
+            required: ['ink', 'paper', 'accent', 'muted', 'rule', 'fog']
+          }
+        },
+        required: ['visualArchetype', 'palette']
+      },
+      cover: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' }, designation: { type: 'string' }, tagline: { type: 'string' },
+          subtitle: { type: 'string' },
+          colophonLines: { type: 'array', items: { type: 'string' } }
+        },
+        required: ['title', 'designation', 'tagline', 'colophonLines']
+      },
+      weekPlan: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            weekNumber: { type: 'integer' }, title: { type: 'string' }, arcBeat: { type: 'string' },
+            epigraphText: { type: 'string' }, epigraphAttribution: { type: 'string' },
+            mapType: { type: 'string', enum: ['grid', 'point-to-point', 'linear-track', 'player-drawn'] },
+            cipherType: { type: 'string' },
+            componentValue: {}, isBossWeek: { type: 'boolean' }, isDeload: { type: 'boolean' },
+            isBinaryChoiceWeek: { type: 'boolean' }, sessionCount: { type: 'integer' },
+            fragmentIds: { type: 'array', items: { type: 'string' } },
+            overflowFragmentId: {}, oracleMode: { type: 'string', enum: ['fragment', 'consequence', 'mixed'] },
+            companionTypes: { type: 'array', items: { type: 'string' } },
+            clockNames: { type: 'array', items: { type: 'string' } },
+            hasInterlude: { type: 'boolean' }
+          },
+          required: ['weekNumber', 'title', 'arcBeat', 'mapType', 'cipherType', 'isBossWeek', 'sessionCount', 'fragmentIds']
+        }
+      },
+      fragmentRegistry: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' }, documentType: { type: 'string' },
+            inWorldAuthor: { type: 'string' }, inWorldRecipient: { type: 'string' },
+            title: { type: 'string' }, narrativePurpose: { type: 'string' }
+          },
+          required: ['id', 'documentType', 'inWorldAuthor', 'title', 'narrativePurpose']
+        }
+      },
+      bossPlan: {
+        type: 'object',
+        properties: {
+          passwordWord: { type: 'string' }, decodingLogic: { type: 'string' },
+          convergenceRequirements: { type: 'string' }, binaryChoiceSetup: { type: 'string' }
+        },
+        required: ['passwordWord', 'decodingLogic', 'convergenceRequirements']
+      },
+      endingVariants: { type: 'array', items: { type: 'string' } }
+    },
+    required: ['meta', 'theme', 'cover', 'weekPlan', 'fragmentRegistry', 'bossPlan', 'endingVariants']
+  };
+
   window.SCHEMA_SPEC = [].concat(
     SCHEMA_HEADER, [''],
     SCHEMA_META, [''],
