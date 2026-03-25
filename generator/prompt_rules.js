@@ -29,11 +29,11 @@
     '- `literaryRegister` (object): { name, behaviorDescription, forbiddenMoves, typographicBehavior }',
     '- `artifactIdentity` (object, required for shell-aware rendering): { artifactClass, artifactBlend?, authorialMode?, boardStateMode, documentEcology?, materialCulture?, openingMode?, rulesDeliveryMode?, revealShape?, unlockLogic?, shellFamily, attachmentStrategy }',
     '- `weeklyComponentType` (string): One fiction-native non-semantic measurement family used across all non-boss weeks. It should feel like an operational residue or in-world key: a number, code, reading, tag, case ID, route marker, calibration value, or designation, never a plaintext letter.',
-    '- `structuralShape` (object): { resolution, temporalOrder, narratorReliability, promptFragmentRelationship, legacyEvolution, shapeRationale }.',
-    '  * Resolution: "closed" (mystery solved), "open" (ambiguity persists), "shifted" (question changed), "costly" (resolved at a price).',
-    '  * TemporalOrder: "chronological", "in-medias-res" (starts at crisis, flashes back), "rashomon" (contradictory overlapping timelines), "fragmented" (acausal memory).',
-    '  * NarratorReliability: "reliable", "compromised" (knows but omits), "unreliable" (believes wrong things), "institutional" (voice of the system).',
-    '  * LegacyEvolution: "none", "timed-unlock" (some fragments officially sealed until week X), "permanent-alteration" (requires destroying or permanently marking the booklet).',
+    '- `structuralShape` (object): { resolution, temporalOrder, narratorReliability, promptFragmentRelationship, shapeRationale }.',
+    '  * Resolution: "closed" (mystery solved), "open" (ambiguity persists), "shifted" (question changed), "costly" (resolved at a price), "full" (complete resolution), "partial" (some threads resolved), "ambiguous" (deliberately unclear).',
+    '  * TemporalOrder: "chronological", "in-medias-res" (starts at crisis, flashes back), "rashomon" (contradictory overlapping timelines), "fragmented" (acausal memory), "linear" (strict forward), "reverse" (end-to-beginning), "parallel" (simultaneous threads).',
+    '  * NarratorReliability: "reliable", "compromised" (knows but omits), "unreliable" (believes wrong things), "institutional" (voice of the system), "multiple" (several narrators), "shifting" (reliability changes over time).',
+    '  * PromptFragmentRelationship: "fragments-deepen" (fragments add depth to prompts), "fragments-contradict" (fragments undermine prompt claims), "fragments-parallel" (fragments tell a parallel story), "fragments-precede" (fragments are chronologically earlier).',
     '  Choose values that create real structural consequences, not decorative labels.',
     '- `passwordLength` (integer, 4-12): Length of the intended final password word',
     '- `passwordEncryptedEnding` (string): Set to empty string `""`. Trusted tooling writes this after sealing the ending. Do not invent fake ciphertext. Always include this key.',
@@ -203,7 +203,6 @@
     '- `inspection`',
     '- `fieldNote`',
     '- `correspondence`',
-    '- `letter`',
     '- `transcript`',
     '- `form`',
     '- `anomaly`',
@@ -272,7 +271,7 @@
     '- `epigraph` (object): { text, attribution }',
     '- `isBossWeek` (boolean)',
     '- `weeklyComponent` (object): { type, value, extractionInstruction }',
-    '- `sessions` (array, 3-6 items): { sessionNumber, label, exercises: [...], storyPrompt, fragmentRef?, binaryChoice? }',
+    '- `sessions` (array, 3-6 items): { sessionNumber, label, exercises: [{ name, sets, repsPerSet, weightField?, notes? }], storyPrompt, fragmentRef?, binaryChoice?: { choiceLabel, promptA, promptB } }',
     '- `fieldOps` (object): mapState, cipher, oracleTable, companionComponents',
     '- `bossEncounter` (object): replaces fieldOps if boss week',
     '- `overflow` (boolean) and `overflowDocument` (foundDocument object)',
@@ -818,7 +817,7 @@
     '  Entry types: "fragment" (includes fragmentRef) or "consequence" (includes paperAction).',
     '- Companion component types (7): dashboard, return-box, inventory-grid, token-sheet, overlay-window, stress-track, memory-slots.',
     '- Clock types (6): progress-clock, danger-clock, racing-clock, tug-of-war-clock, linked-clock, project-clock.',
-    '- Fragment documentTypes (9): memo, report, inspection, fieldNote, correspondence, letter, transcript, form, anomaly.',
+    '- Fragment documentTypes (8): memo, report, inspection, fieldNote, correspondence, transcript, form, anomaly.',
     '- Boss encounter MUST include decodingKey with referenceTable (e.g., "1=A 2=B ... 26=Z").',
     '- Visual archetypes (10): government, cyberpunk, scifi, fantasy, noir, steampunk, minimalist, nautical, occult, pastoral.',
     'Do NOT invent mechanics, map types, component types, or document types outside these lists.'
@@ -837,11 +836,11 @@
   var STAGE_SCHEMA_MAP = {
     'layer-codex':    { schemas: [],                                            instructions: ['ANTI_PATTERNS'] },
     'campaign-plan':  { schemas: [],                                            instructions: ['WORLD_CONTRACT', 'ANTI_PATTERNS'] },
-    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'OUTPUT_RULES', 'CONTRACT_GUARDRAILS', 'BRIEF_FIDELITY', 'WORLD_CONTRACT', 'RULES_TEACH', 'VISUAL_DIRECTION', 'STRUCTURAL_RULES'] },
+    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'BRIEF_FIDELITY', 'WORLD_CONTRACT', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'RULES_TEACH', 'VISUAL_DIRECTION', 'STRUCTURAL_RULES'] },
     'week-plan':      { schemas: ['WEEK_PLAN'],                                 instructions: [] },
-    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['WORKOUT_FUSION', 'PERVASIVE_PLAY', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'SESSION_PROMPTS', 'CIPHER_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'LAYERED_ARC', 'SELF_VERIFICATION'] },
-    'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'ANTI_GENERIC', 'SELF_VERIFICATION'] },
-    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'LAYERED_ARC', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] }
+    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'WORKOUT_FUSION', 'PERVASIVE_PLAY', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'SESSION_PROMPTS', 'CIPHER_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'LAYERED_ARC', 'SELF_VERIFICATION'] },
+    'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['OUTPUT_RULES', 'OUTPUT_BUDGETS', 'FOUND_DOCUMENTS', 'ANTI_GENERIC', 'SELF_VERIFICATION'] },
+    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['OUTPUT_RULES', 'OUTPUT_BUDGETS', 'ENDING_STANDARD', 'LAYERED_ARC', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] }
   };
 
   window.buildStageSchema = function(stageName) {

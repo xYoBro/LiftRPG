@@ -649,7 +649,7 @@
       '',
       '---',
       '',
-      SCHEMA_SHELL,
+      window.buildStageSchema('shell'),
       '',
       '---',
       '',

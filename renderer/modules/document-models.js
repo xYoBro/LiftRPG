@@ -27,7 +27,9 @@ function splitBody(fragment) {
 
 export function buildFragmentModel(fragment) {
   const documentType = fragment.documentType || 'Document';
-  const documentClass = String(documentType)
+  // Normalize 'letter' to 'correspondence' for CSS class — no .letter treatment exists
+  const cssType = documentType === 'letter' ? 'correspondence' : documentType;
+  const documentClass = String(cssType)
     .replace(/([a-z])([A-Z])/g, '$1-$2')
     .replace(/\s+/g, '-')
     .toLowerCase();

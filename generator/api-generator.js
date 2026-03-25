@@ -23,7 +23,9 @@ window.LiftRPGAPI = (function () {
 
   // Canonical document type list — single source of truth for schema enums + validator
   var DOCUMENT_TYPE_ENUM = ['memo', 'report', 'inspection', 'fieldNote',
-    'correspondence', 'letter', 'transcript', 'form', 'anomaly'];
+    'correspondence', 'transcript', 'form', 'anomaly'];
+  // Legacy alias: 'letter' has no CSS treatment — normalize to 'correspondence'
+  var DOCUMENT_TYPE_ALIASES = { 'letter': 'correspondence' };
 
   var VALID_MAP_TYPES = ['grid', 'point-to-point', 'linear-track', 'player-drawn'];
   var VALID_COMPANION_TYPES = ['dashboard', 'return-box', 'inventory-grid', 'token-sheet',
@@ -2483,6 +2485,7 @@ window.LiftRPGAPI = (function () {
 
     // Normalize data shapes that models commonly get wrong
     booklet.weeks.forEach(normalizeCompanionComponents);
+    normalizeDocumentTypes(booklet);
 
     // Enforce deterministic derived fields (meta counts, componentInputs, password)
     var result = enforceBookletDerivedFields(booklet);
@@ -2517,6 +2520,7 @@ window.LiftRPGAPI = (function () {
 
     // Normalize data shapes that models commonly get wrong
     booklet.weeks.forEach(normalizeCompanionComponents);
+    normalizeDocumentTypes(booklet);
 
     // Override exercises with normalized data when available
     var nw = normalizedWorkout || {};
@@ -3056,6 +3060,14 @@ window.LiftRPGAPI = (function () {
       });
     }
 
+    // Non-boss weeks must have weeklyComponent.extractionInstruction
+    if (!isBoss) {
+      var wc = weekObj.weeklyComponent || {};
+      if (!wc.extractionInstruction) {
+        errors.push('Non-boss week missing weeklyComponent.extractionInstruction');
+      }
+    }
+
     // Non-boss weeks must have fieldOps
     if (!isBoss && !weekObj.fieldOps) {
       errors.push('Non-boss week missing fieldOps');
@@ -3311,6 +3323,9 @@ window.LiftRPGAPI = (function () {
       if (f.documentType && !validDocLookup[f.documentType]) {
         errors.push('Fragment "' + (f.id || '?') + '": documentType "' + f.documentType + '" not in supported list');
       }
+      if (!f.designSpec || typeof f.designSpec !== 'object') {
+        warnings.push('Fragment "' + (f.id || '?') + '": missing designSpec (renderer falls back to neutral defaults)');
+      }
     });
 
     // ── Fragment + overflow document ID uniqueness ───────────────────────────
@@ -3355,6 +3370,9 @@ window.LiftRPGAPI = (function () {
         }
         if (!od.content && !od.body) {
           errors.push(wn + ' overflowDocument missing content');
+        }
+        if (!od.designSpec || typeof od.designSpec !== 'object') {
+          warnings.push(wn + ' overflowDocument missing designSpec (renderer falls back to neutral defaults)');
         }
 
         // ID collision check
@@ -3657,6 +3675,27 @@ window.LiftRPGAPI = (function () {
       });
       console.warn('[LiftRPG] Normalized companionComponents from object to array (' + fo.companionComponents.length + ' items)');
     }
+  }
+
+  // Normalize documentType aliases (e.g. 'letter' → 'correspondence') on
+  // fragments, overflow documents, and endings in place.
+  function normalizeDocumentTypes(booklet) {
+    (booklet.fragments || []).forEach(function (f) {
+      if (f.documentType && DOCUMENT_TYPE_ALIASES[f.documentType]) {
+        f.documentType = DOCUMENT_TYPE_ALIASES[f.documentType];
+      }
+    });
+    (booklet.weeks || []).forEach(function (week) {
+      if (week.overflowDocument && week.overflowDocument.documentType && DOCUMENT_TYPE_ALIASES[week.overflowDocument.documentType]) {
+        week.overflowDocument.documentType = DOCUMENT_TYPE_ALIASES[week.overflowDocument.documentType];
+      }
+    });
+    (booklet.endings || []).forEach(function (ending) {
+      var content = ending.content;
+      if (content && content.documentType && DOCUMENT_TYPE_ALIASES[content.documentType]) {
+        content.documentType = DOCUMENT_TYPE_ALIASES[content.documentType];
+      }
+    });
   }
 
   function buildOpenAICompatUrl(baseUrl) {
@@ -4140,15 +4179,22 @@ window.LiftRPGAPI = (function () {
     var seen = {};
     var extras = [];
     var invalid = [];
+    var missingDesignSpec = [];
     result.fragments.forEach(function (fragment) {
       var id = normalizeId(fragment && fragment.id);
       if (!id) return;
       if (!fragment.content && !fragment.bodyParagraphs && !fragment.bodyText && !fragment.body) {
         invalid.push(fragment.id);
       }
+      if (!fragment.designSpec || typeof fragment.designSpec !== 'object') {
+        missingDesignSpec.push(fragment.id);
+      }
       seen[id] = true;
       if (expected.indexOf(id) === -1) extras.push(fragment.id);
     });
+    if (missingDesignSpec.length > 0) {
+      console.warn('[LiftRPG] Fragments missing designSpec: ' + missingDesignSpec.join(', '));
+    }
     if (invalid.length > 0) {
       return 'Fragment stage validation failed: missing content/body in IDs ' + invalid.slice(0, 8).join(', ') + '.';
     }
@@ -4166,7 +4212,21 @@ window.LiftRPGAPI = (function () {
     if (!result || !Array.isArray(result.endings) || result.endings.length === 0) {
       return 'Finale stage validation failed: expected a non-empty endings array.';
     }
-    return '';
+    var issues = [];
+    result.endings.forEach(function (ending, i) {
+      var label = 'Ending ' + (i + 1);
+      if (!ending.variant) issues.push(label + ' missing variant');
+      if (!ending.content || typeof ending.content !== 'object') {
+        issues.push(label + ' missing content object');
+      } else {
+        if (!ending.content.body) issues.push(label + ' missing content.body');
+        if (!ending.content.documentType) issues.push(label + ' missing content.documentType');
+      }
+      if (!ending.designSpec || typeof ending.designSpec !== 'object') {
+        issues.push(label + ' missing designSpec');
+      }
+    });
+    return issues.length > 0 ? 'Finale stage: ' + issues.join('; ') : '';
   }
 
   function createStageTelemetry(stageKey, stageName) {
@@ -4969,7 +5029,13 @@ window.LiftRPGAPI = (function () {
         rateLimiter: rateLimiter,
         budgetEnforce: useGeminiBudget,
         validate: function (result) {
-          if (!result || !result.content || !result.variant) return 'Ending must contain content and variant.';
+          if (!result) return 'Ending object is null.';
+          if (!result.variant) return 'Ending missing variant.';
+          var content = result.content;
+          if (!content || typeof content !== 'object') return 'Ending missing content object.';
+          if (!content.body) return 'Ending missing content.body.';
+          if (!content.documentType) return 'Ending missing content.documentType.';
+          if (!result.designSpec || typeof result.designSpec !== 'object') return 'Ending missing designSpec object.';
           return '';
         },
         buildPrompt: function (retryState) {
@@ -5335,9 +5401,9 @@ window.LiftRPGAPI = (function () {
           structuralShape: {
             type: 'object',
             properties: {
-              resolution: { type: 'string', enum: ['full', 'partial', 'ambiguous', 'open', 'closed', 'shifted', 'costly'] },
-              temporalOrder: { type: 'string', enum: ['linear', 'fragmented', 'reverse', 'parallel'] },
-              narratorReliability: { type: 'string', enum: ['reliable', 'unreliable', 'multiple', 'shifting', 'compromised', 'institutional'] },
+              resolution: { type: 'string', enum: ['closed', 'open', 'shifted', 'costly', 'full', 'partial', 'ambiguous'] },
+              temporalOrder: { type: 'string', enum: ['chronological', 'in-medias-res', 'rashomon', 'fragmented', 'linear', 'reverse', 'parallel'] },
+              narratorReliability: { type: 'string', enum: ['reliable', 'compromised', 'unreliable', 'institutional', 'multiple', 'shifting'] },
               promptFragmentRelationship: { type: 'string', enum: ['fragments-deepen', 'fragments-contradict', 'fragments-parallel', 'fragments-precede'] },
               shapeRationale: { type: 'string' }
             },
