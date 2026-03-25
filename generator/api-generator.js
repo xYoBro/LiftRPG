@@ -3188,7 +3188,6 @@ window.LiftRPGAPI = (function () {
         // enforcement (enforceDeterministicFields) overwrites it with the correct
         // collected weeklyComponent values. Don't validate what we're going to
         // overwrite anyway; it just burns retries for nothing.
-        }
       }
     }
 
