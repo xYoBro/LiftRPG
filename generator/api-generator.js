@@ -6567,7 +6567,7 @@ window.LiftRPGAPI = (function () {
         onProgress:       onProgress,
         schema:           null,
         maxTokens:        isBoss ? 12288 : 8192,
-        requestTimeoutMs: 180000,
+        requestTimeoutMs: 300000,
         maxAttempts:      3,
         rateLimiter:      rateLimiter,
         budgetEnforce:    useGeminiBudget,
@@ -6582,6 +6582,10 @@ window.LiftRPGAPI = (function () {
             result = result.weeks[0];
           }
           normalizeCompanionComponents(result);
+          // Set overflow deterministically — derived from session count, not LLM
+          if (result && Array.isArray(result.sessions) && result.sessions.length > 3) {
+            result.overflow = true;
+          }
           return result;
         },
         validate: function (result) {
