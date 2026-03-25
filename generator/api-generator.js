@@ -3184,34 +3184,10 @@ window.LiftRPGAPI = (function () {
           }
         }
 
-        if (expectedOptions && expectedOptions.componentInputs && expectedOptions.componentInputs.length > 0) {
-          var existingInputs = boss.componentInputs || [];
-          var computed = expectedOptions.componentInputs.map(function(v) { return String(v); });
-          // Check that expected values appear in order as a prefix.
-          // LLM may append extras — trim them silently rather than failing.
-          var prefixMatch = true;
-          for (var ci = 0; ci < computed.length; ci++) {
-            if (ci >= existingInputs.length || String(existingInputs[ci]) !== computed[ci]) {
-              prefixMatch = false;
-              break;
-            }
-          }
-          if (!prefixMatch) {
-            errors.push('bossEncounter.componentInputs does not accurately reflect prior weeks. Expected: [' + computed.join(', ') + '], got: [' + existingInputs.join(', ') + ']');
-          } else if (existingInputs.length > computed.length) {
-            // Trim extras — keep only the values matching prior weeks
-            boss.componentInputs = existingInputs.slice(0, computed.length);
-            console.warn('[LiftRPG] Trimmed ' + (existingInputs.length - computed.length) + ' extra componentInput(s) from boss encounter');
-          }
-
-          var dk = boss.decodingKey;
-          if (dk && dk.referenceTable && isStandardAlphaTable(dk.referenceTable)) {
-            var numericValues = existingInputs.map(function (v) { return Number(v); });
-            var password = decodeA1Z26(numericValues);
-            if (!password) {
-               errors.push('Boss decodingKey A1Z26 decode failed — componentInputs contain non-integer or out-of-range values');
-            }
-          }
+        // componentInputs is deterministic derived data — the post-processing
+        // enforcement (enforceDeterministicFields) overwrites it with the correct
+        // collected weeklyComponent values. Don't validate what we're going to
+        // overwrite anyway; it just burns retries for nothing.
         }
       }
     }

@@ -2192,7 +2192,8 @@
     if (isBoss) {
       contextLines.push('## Boss Week Requirements');
       contextLines.push('- This week replaces fieldOps with bossEncounter.');
-      contextLines.push('- componentInputs must be: ' + JSON.stringify(allComponentValues));
+      contextLines.push('- componentInputs must be EXACTLY this array (no additions, no removals, no reordering): ' + JSON.stringify(allComponentValues));
+      contextLines.push('- There are exactly ' + allComponentValues.length + ' non-boss weeks, so componentInputs MUST have exactly ' + allComponentValues.length + ' entries.');
       contextLines.push('- decodingKey.referenceTable maps these values to letters.');
       contextLines.push('- Must include: title, narrative, mechanismDescription, convergenceProof, passwordRevealInstruction.');
       if (weekPlan.isBinaryChoiceWeek || (skeleton.bossPlan && skeleton.bossPlan.binaryChoiceSetup)) {
@@ -2615,7 +2616,7 @@
       '**Week Workout:** ' + weekWorkout,
       '',
       continuity ? '**Continuity Rules:** ' + JSON.stringify(continuity) : '',
-      isBossWeek && allComponentValues ? '**Prior Values for Boss Decode:** ' + JSON.stringify(allComponentValues) : '',
+      isBossWeek && allComponentValues ? '**Prior Values for Boss Decode (EXACTLY ' + allComponentValues.length + ' values — do not add, remove, or reorder):** ' + JSON.stringify(allComponentValues) + '\nSet bossEncounter.componentInputs to EXACTLY this array. There are ' + allComponentValues.length + ' non-boss weeks, so there must be EXACTLY ' + allComponentValues.length + ' componentInputs.' : '',
       '',
       '## Constraints',
       '- Preserve Specificity: storyPrompts must contain physical action and named places.',
