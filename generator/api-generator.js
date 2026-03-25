@@ -3045,7 +3045,14 @@ window.LiftRPGAPI = (function () {
     var warnings = [];
     if (!weekObj) { return { valid: false, errors: ['Week object is null'] }; }
     if (!weekObj.title) errors.push('Missing week title');
-    if (!weekObj.epigraph) warnings.push('Week missing epigraph');
+
+    // Epigraph — renderer reads .text and .attribution for every week page
+    if (!weekObj.epigraph || typeof weekObj.epigraph !== 'object') {
+      errors.push('Week missing epigraph');
+    } else {
+      if (!weekObj.epigraph.text) errors.push('Week epigraph missing text');
+      if (!weekObj.epigraph.attribution) errors.push('Week epigraph missing attribution');
+    }
 
     if (!Array.isArray(weekObj.sessions) || weekObj.sessions.length === 0) {
       errors.push('Missing or empty sessions array');
@@ -3081,6 +3088,8 @@ window.LiftRPGAPI = (function () {
       // Oracle validation — LLMs use both "oracleTable" and "oracle" keys
       var ot = fo.oracleTable || fo.oracle;
       if (ot) {
+        if (!ot.title) errors.push('oracleTable.title missing');
+        if (!ot.instruction) errors.push('oracleTable.instruction missing');
         if (!Array.isArray(ot.entries)) {
           errors.push('oracleTable.entries must be an array');
         } else {
@@ -3107,6 +3116,7 @@ window.LiftRPGAPI = (function () {
 
       // Cipher validation
       if (fo.cipher) {
+        if (!fo.cipher.title) errors.push('cipher.title missing');
         if (fo.cipher.body && typeof fo.cipher.body === 'string') {
           errors.push('cipher.body must be an object (with displayText, key, workSpace), not a string');
         }
@@ -3150,6 +3160,7 @@ window.LiftRPGAPI = (function () {
         if (!boss.narrative) errors.push('Boss encounter missing narrative');
         if (!boss.mechanismDescription) errors.push('Boss encounter missing mechanismDescription');
         if (!boss.convergenceProof) errors.push('Boss encounter missing convergenceProof');
+        if (!boss.passwordRevealInstruction) errors.push('Boss encounter missing passwordRevealInstruction');
 
         if (!boss.decodingKey) {
           errors.push('Boss encounter missing decodingKey');
@@ -3193,6 +3204,30 @@ window.LiftRPGAPI = (function () {
     }
     if (weekObj.overflow && Array.isArray(weekObj.sessions) && weekObj.sessions.length <= 3) {
       errors.push('Week has overflow=true but only ' + weekObj.sessions.length + ' sessions');
+    }
+
+    // Gameplay clocks — renderer builds clock widgets from these fields
+    if (Array.isArray(weekObj.gameplayClocks) && weekObj.gameplayClocks.length > 0) {
+      weekObj.gameplayClocks.forEach(function (clock, ci) {
+        if (!clock) return;
+        var label = 'gameplayClocks[' + ci + ']';
+        if (!clock.clockName) errors.push(label + ' missing clockName');
+        if (clock.segments === undefined || typeof clock.segments !== 'number') {
+          errors.push(label + ' missing or non-numeric segments');
+        }
+        if (!clock.clockType) {
+          errors.push(label + ' missing clockType');
+        } else if (VALID_CLOCK_TYPES.indexOf(clock.clockType) === -1) {
+          errors.push(label + ' unknown clockType: "' + clock.clockType + '"');
+        }
+        if (!clock.consequenceOnFull) errors.push(label + ' missing consequenceOnFull');
+      });
+    }
+
+    // Interlude validation — renderer reads title and body when interlude exists
+    if (weekObj.interlude && typeof weekObj.interlude === 'object') {
+      if (!weekObj.interlude.title) errors.push('Interlude missing title');
+      if (!weekObj.interlude.body) errors.push('Interlude missing body');
     }
 
     if (warnings.length > 0) {
@@ -3253,15 +3288,64 @@ window.LiftRPGAPI = (function () {
         errors.push('Unknown visualArchetype: "' + shell.theme.visualArchetype + '"');
       }
     }
-    // Advisory warnings: schema-aligned sub-field checks (logged, not blocking)
-    // NOTE: gaugeLog and assembly are renderer derivations from shellFamily, NOT LLM output.
-    // cover uses "title" in schema (not titleLine1). meta uses "blockTitle" (not title).
+    // ── Theme palette validation (renderer reads all 6 for 27 CSS vars) ──────
+    if (shell.theme) {
+      if (!shell.theme.palette || typeof shell.theme.palette !== 'object') {
+        errors.push('theme.palette missing — renderer cannot set CSS variables');
+      } else {
+        var HEX_RE = /^#[0-9a-fA-F]{6}$/;
+        ['ink', 'paper', 'accent', 'muted', 'rule', 'fog'].forEach(function (key) {
+          var val = shell.theme.palette[key];
+          if (!val) {
+            errors.push('theme.palette.' + key + ' missing');
+          } else if (!HEX_RE.test(val)) {
+            errors.push('theme.palette.' + key + ' is not valid hex: "' + val + '"');
+          }
+        });
+      }
+    }
+
+    // ── Meta sub-fields consumed by renderer ──────────────────────────────────
     if (shell.meta) {
-      if (!shell.meta.blockTitle) warnings.push('Shell → meta: missing blockTitle');
+      if (!shell.meta.blockTitle) errors.push('meta.blockTitle missing');
       if (!shell.meta.worldContract) warnings.push('Shell → meta: missing worldContract');
       if (!shell.meta.artifactIdentity) warnings.push('Shell → meta: missing artifactIdentity');
+
+      // narrativeVoice — render.js reads .person and .tense
+      var nv = shell.meta.narrativeVoice;
+      if (!nv || typeof nv !== 'object') {
+        errors.push('meta.narrativeVoice missing');
+      } else {
+        if (!nv.person) errors.push('meta.narrativeVoice.person missing');
+        if (!nv.tense) errors.push('meta.narrativeVoice.tense missing');
+      }
+
+      // structuralShape — cover page reads .resolution
+      var ss = shell.meta.structuralShape;
+      if (!ss || typeof ss !== 'object') {
+        errors.push('meta.structuralShape missing');
+      } else {
+        if (!ss.resolution) errors.push('meta.structuralShape.resolution missing');
+      }
     }
-    if (shell.cover && !shell.cover.title) warnings.push('Shell → cover: missing title');
+
+    // ── Cover required fields (renderer reads all three) ──────────────────────
+    if (shell.cover) {
+      if (!shell.cover.title) errors.push('cover.title missing');
+      if (!shell.cover.designation) errors.push('cover.designation missing');
+      if (!shell.cover.tagline) errors.push('cover.tagline missing');
+      if (!Array.isArray(shell.cover.colophonLines) || shell.cover.colophonLines.length < 3) {
+        errors.push('cover.colophonLines must be an array with at least 3 items');
+      }
+    }
+
+    // ── Rules spread right page instruction ───────────────────────────────────
+    if (shell.rulesSpread && shell.rulesSpread.rightPage) {
+      if (!shell.rulesSpread.rightPage.instruction) {
+        errors.push('rulesSpread.rightPage.instruction missing');
+      }
+    }
+
     if (!shell.theme) warnings.push('Shell → theme: missing entirely');
     if (warnings.length > 0) {
       console.warn('[LiftRPG] Shell advisory:', warnings.join('; '));
@@ -3415,6 +3499,10 @@ window.LiftRPGAPI = (function () {
 
       // -- Oracle validation --
       var oracle = fo.oracleTable || fo.oracle || {};
+      if (!week.isBossWeek) {
+        if (!oracle.title) errors.push(wn + ' oracle: missing title');
+        if (!oracle.instruction) errors.push(wn + ' oracle: missing instruction');
+      }
       var entries = oracle.entries || [];
       entries.forEach(function (entry, ei) {
         if (Object.prototype.hasOwnProperty.call(entry, 'description')) {
@@ -3436,7 +3524,7 @@ window.LiftRPGAPI = (function () {
       var cipher = fo.cipher || {};
       if (!week.isBossWeek) {
         // Required cipher fields
-        var REQUIRED_CIPHER_FIELDS = ['type', 'body', 'extractionInstruction', 'characterDerivationProof', 'noticeabilityDesign'];
+        var REQUIRED_CIPHER_FIELDS = ['type', 'title', 'body', 'extractionInstruction', 'characterDerivationProof', 'noticeabilityDesign'];
         REQUIRED_CIPHER_FIELDS.forEach(function (field) {
           if (cipher[field] === undefined || cipher[field] === null || cipher[field] === '') {
             errors.push(wn + ' cipher: missing required field "' + field + '"');
@@ -4180,6 +4268,12 @@ window.LiftRPGAPI = (function () {
     var extras = [];
     var invalid = [];
     var missingDesignSpec = [];
+    var missingTitle = [];
+    var missingDocType = [];
+    var missingAuthor = [];
+    var validDocLookup = {};
+    DOCUMENT_TYPE_ENUM.forEach(function (t) { validDocLookup[t] = true; });
+
     result.fragments.forEach(function (fragment) {
       var id = normalizeId(fragment && fragment.id);
       if (!id) return;
@@ -4189,6 +4283,17 @@ window.LiftRPGAPI = (function () {
       if (!fragment.designSpec || typeof fragment.designSpec !== 'object') {
         missingDesignSpec.push(fragment.id);
       }
+      if (!fragment.title) {
+        missingTitle.push(fragment.id);
+      }
+      if (!fragment.documentType) {
+        missingDocType.push(fragment.id);
+      } else if (!validDocLookup[fragment.documentType] && !DOCUMENT_TYPE_ALIASES[fragment.documentType]) {
+        missingDocType.push(fragment.id + ' (invalid: "' + fragment.documentType + '")');
+      }
+      if (!fragment.inWorldAuthor) {
+        missingAuthor.push(fragment.id);
+      }
       seen[id] = true;
       if (expected.indexOf(id) === -1) extras.push(fragment.id);
     });
@@ -4197,6 +4302,15 @@ window.LiftRPGAPI = (function () {
     }
     if (invalid.length > 0) {
       return 'Fragment stage validation failed: missing content/body in IDs ' + invalid.slice(0, 8).join(', ') + '.';
+    }
+    if (missingTitle.length > 0) {
+      console.warn('[LiftRPG] Fragments missing title: ' + missingTitle.join(', '));
+    }
+    if (missingDocType.length > 0) {
+      return 'Fragment stage validation failed: missing/invalid documentType in IDs ' + missingDocType.slice(0, 8).join(', ') + '.';
+    }
+    if (missingAuthor.length > 0) {
+      return 'Fragment stage validation failed: missing inWorldAuthor in IDs ' + missingAuthor.slice(0, 8).join(', ') + '.';
     }
     var missing = expected.filter(function (id) { return !seen[id]; });
     if (missing.length > 0) {
@@ -4221,10 +4335,14 @@ window.LiftRPGAPI = (function () {
       } else {
         if (!ending.content.body) issues.push(label + ' missing content.body');
         if (!ending.content.documentType) issues.push(label + ' missing content.documentType');
+        if (!ending.content.finalLine) issues.push(label + ' missing content.finalLine');
       }
-      if (!ending.designSpec || typeof ending.designSpec !== 'object') {
+      if (!ending.designSpec) {
         issues.push(label + ' missing designSpec');
+      } else if (typeof ending.designSpec === 'object') {
+        if (!ending.designSpec.paperTone) issues.push(label + ' designSpec missing paperTone');
       }
+      // String designSpec is accepted for backward compatibility (renderer normalizes it)
     });
     return issues.length > 0 ? 'Finale stage: ' + issues.join('; ') : '';
   }
@@ -5786,9 +5904,16 @@ window.LiftRPGAPI = (function () {
               },
               required: ['body', 'finalLine']
             },
-            designSpec: { type: 'string' }
+            designSpec: {
+              type: 'object',
+              properties: {
+                paperTone: { type: 'string' },
+                primaryTypeface: { type: 'string' }
+              },
+              required: ['paperTone']
+            }
           },
-          required: ['variant', 'content']
+          required: ['variant', 'content', 'designSpec']
         }
       }
     },
