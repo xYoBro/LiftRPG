@@ -3187,14 +3187,21 @@ window.LiftRPGAPI = (function () {
         if (expectedOptions && expectedOptions.componentInputs && expectedOptions.componentInputs.length > 0) {
           var existingInputs = boss.componentInputs || [];
           var computed = expectedOptions.componentInputs.map(function(v) { return String(v); });
-          var mismatch = existingInputs.length !== computed.length;
-          if (!mismatch) {
-            for (var ci = 0; ci < computed.length; ci++) {
-              if (String(existingInputs[ci]) !== computed[ci]) { mismatch = true; break; }
+          // Check that expected values appear in order as a prefix.
+          // LLM may append extras — trim them silently rather than failing.
+          var prefixMatch = true;
+          for (var ci = 0; ci < computed.length; ci++) {
+            if (ci >= existingInputs.length || String(existingInputs[ci]) !== computed[ci]) {
+              prefixMatch = false;
+              break;
             }
           }
-          if (mismatch) {
+          if (!prefixMatch) {
             errors.push('bossEncounter.componentInputs does not accurately reflect prior weeks. Expected: [' + computed.join(', ') + '], got: [' + existingInputs.join(', ') + ']');
+          } else if (existingInputs.length > computed.length) {
+            // Trim extras — keep only the values matching prior weeks
+            boss.componentInputs = existingInputs.slice(0, computed.length);
+            console.warn('[LiftRPG] Trimmed ' + (existingInputs.length - computed.length) + ' extra componentInput(s) from boss encounter');
           }
 
           var dk = boss.decodingKey;
