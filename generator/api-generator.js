@@ -2812,11 +2812,18 @@ window.LiftRPGAPI = (function () {
     }
     booklet.theme.visualArchetype = normalizedArchetype;
 
-    // ── Meta counts (always override) ──────────────────────────────────────
-    meta.weekCount = weeks.length;
-    meta.totalSessions = weeks.reduce(function (sum, w) {
+    // ── Meta counts (warn on mismatch, then enforce deterministic truth) ──
+    var actualTotalSessions = weeks.reduce(function (sum, w) {
       return sum + (w.sessions ? w.sessions.length : 0);
     }, 0);
+    if (meta.weekCount !== weeks.length) {
+      warnings.push('Booklet meta.weekCount (' + meta.weekCount + ') corrected to ' + weeks.length);
+    }
+    if (meta.totalSessions !== actualTotalSessions) {
+      warnings.push('Booklet meta.totalSessions (' + meta.totalSessions + ') corrected to ' + actualTotalSessions);
+    }
+    meta.weekCount = weeks.length;
+    meta.totalSessions = actualTotalSessions;
 
     // ── Collect non-boss weeklyComponent values ────────────────────────────
     var nonBossValues = [];
@@ -2829,7 +2836,7 @@ window.LiftRPGAPI = (function () {
       }
     });
 
-    // ── Boss encounter: enforce componentInputs ────────────────────────────
+    // ── Boss encounter: verify componentInputs ─────────────────────────────
     var bossWeek = null;
     for (var i = weeks.length - 1; i >= 0; i--) {
       if (weeks[i].isBossWeek) { bossWeek = weeks[i]; break; }
@@ -2839,23 +2846,19 @@ window.LiftRPGAPI = (function () {
       var boss = bossWeek.bossEncounter;
       var existingInputs = boss.componentInputs || [];
 
-      // Only override when we have values for every non-boss week
+      // Only enforce when we have values for every non-boss week
       var nonBossCount = weeks.filter(function (w) { return !w.isBossWeek; }).length;
       if (nonBossValues.length === nonBossCount) {
-        // Convert to strings for consistency
         var computed = nonBossValues.map(function (v) { return String(v); });
-
-        // Check if model's values match — if not, override with computed truth
         var mismatch = existingInputs.length !== computed.length;
         if (!mismatch) {
           for (var ci = 0; ci < computed.length; ci++) {
             if (String(existingInputs[ci]) !== computed[ci]) { mismatch = true; break; }
           }
         }
-
         if (mismatch) {
           if (existingInputs.length > 0) {
-            warnings.push('componentInputs overridden: model had [' + existingInputs.join(', ') + '], computed [' + computed.join(', ') + ']');
+            warnings.push('componentInputs corrected: model had [' + existingInputs.join(', ') + '], computed [' + computed.join(', ') + ']');
           }
           boss.componentInputs = computed;
         }
@@ -2868,6 +2871,9 @@ window.LiftRPGAPI = (function () {
           var numericValues = (boss.componentInputs || []).map(function (v) { return Number(v); });
           var password = decodeA1Z26(numericValues);
           if (password) {
+            if (meta.passwordLength !== password.length) {
+              warnings.push('meta.passwordLength corrected from ' + meta.passwordLength + ' to ' + password.length);
+            }
             meta.passwordLength = password.length;
           } else {
             warnings.push('A1Z26 decode failed — componentInputs contain non-integer or out-of-range values');
@@ -3030,7 +3036,7 @@ window.LiftRPGAPI = (function () {
    * in the pipeline, before proceeding to the next stage.
    * Returns { valid: boolean, errors: string[] }
    */
-  function validateWeekSchema(weekObj, isBoss) {
+  function validateWeekSchema(weekObj, isBoss, expectedOptions) {
     var errors = [];
     var warnings = [];
     if (!weekObj) { return { valid: false, errors: ['Week object is null'] }; }
@@ -3143,6 +3149,29 @@ window.LiftRPGAPI = (function () {
             errors.push('Boss decodingKey missing instruction');
           }
         }
+
+        if (expectedOptions && expectedOptions.componentInputs && expectedOptions.componentInputs.length > 0) {
+          var existingInputs = boss.componentInputs || [];
+          var computed = expectedOptions.componentInputs.map(function(v) { return String(v); });
+          var mismatch = existingInputs.length !== computed.length;
+          if (!mismatch) {
+            for (var ci = 0; ci < computed.length; ci++) {
+              if (String(existingInputs[ci]) !== computed[ci]) { mismatch = true; break; }
+            }
+          }
+          if (mismatch) {
+            errors.push('bossEncounter.componentInputs does not accurately reflect prior weeks. Expected: [' + computed.join(', ') + '], got: [' + existingInputs.join(', ') + ']');
+          }
+
+          var dk = boss.decodingKey;
+          if (dk && dk.referenceTable && isStandardAlphaTable(dk.referenceTable)) {
+            var numericValues = existingInputs.map(function (v) { return Number(v); });
+            var password = decodeA1Z26(numericValues);
+            if (!password) {
+               errors.push('Boss decodingKey A1Z26 decode failed — componentInputs contain non-integer or out-of-range values');
+            }
+          }
+        }
       }
     }
 
@@ -3164,7 +3193,7 @@ window.LiftRPGAPI = (function () {
    * Shell structural validation. Runs after shell stage (Stage 3).
    * Returns { valid: boolean, errors: string[] }
    */
-  function validateShellSchema(shell) {
+  function validateShellSchema(shell, expectedOptions) {
     var errors = [];
     var warnings = [];
     if (!shell) { return { valid: false, errors: ['Shell is null'] }; }
@@ -3196,6 +3225,15 @@ window.LiftRPGAPI = (function () {
       }
       if (!('passwordEncryptedEnding' in shell.meta)) {
         errors.push('meta.passwordEncryptedEnding must exist (can be empty string)');
+      }
+      if (expectedOptions && expectedOptions.weekCount !== undefined && shell.meta.weekCount !== expectedOptions.weekCount) {
+        errors.push('meta.weekCount must be exactly ' + expectedOptions.weekCount + ', got: ' + shell.meta.weekCount);
+      }
+      if (expectedOptions && expectedOptions.totalSessions > 0 && shell.meta.totalSessions !== expectedOptions.totalSessions) {
+        errors.push('meta.totalSessions must be exactly ' + expectedOptions.totalSessions + ', got: ' + shell.meta.totalSessions);
+      }
+      if (expectedOptions && expectedOptions.weekCount !== undefined && shell.meta.passwordLength !== (expectedOptions.weekCount - 1)) {
+        errors.push('meta.passwordLength must be exactly ' + (expectedOptions.weekCount - 1) + ', got: ' + shell.meta.passwordLength);
       }
     }
     if (shell.theme && shell.theme.visualArchetype) {
@@ -4556,6 +4594,7 @@ window.LiftRPGAPI = (function () {
     var workout = options.workout || '';
     var brief = options.brief || '';
     var weekCount = options.weekCount || (typeof window.parseWeekCount === 'function' ? window.parseWeekCount(workout) : 6);
+    var totalSessions = options.totalSessions || 0;
 
     // ── Checkpoint: resume from last completed stage if available ────
     var checkpoint = loadCheckpoint();
@@ -4708,7 +4747,7 @@ window.LiftRPGAPI = (function () {
           return result;
         },
         validate: function(result) {
-          var v = validateShellSchema(result);
+          var v = validateShellSchema(result, { weekCount: weekCount, totalSessions: totalSessions });
           if (!v.valid) {
             return 'Shell schema validation: ' + v.errors.join('; ');
           }
@@ -4808,7 +4847,7 @@ window.LiftRPGAPI = (function () {
           if (!result) return 'Week generation returned empty result. Model may have returned a shell instead of a week object.';
           if (!result.title) return 'Week object missing "title" field. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
           if (!result.sessions) return 'Week object missing "sessions" array. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
-          return validateWeekSchema(result, isBossWeek);
+          return validateWeekSchema(result, isBossWeek, isBossWeek ? { componentInputs: allComponentValues } : undefined);
         },
         buildPrompt: function (retryState) {
           return builders.singleWeekFinal(workout, brief, layerBible, campaignPlan, campaignWeekPlan, shellContext, continuityPacket, allComponentValues);
@@ -4820,7 +4859,7 @@ window.LiftRPGAPI = (function () {
       else weekObject.isBossWeek = false;
 
       // Schema validation safety net
-      var weekValidation = validateWeekSchema(weekObject, weekObject.isBossWeek);
+      var weekValidation = validateWeekSchema(weekObject, weekObject.isBossWeek, weekObject.isBossWeek ? { componentInputs: allComponentValues } : undefined);
       if (!weekValidation.valid) {
         console.warn('[pipeline] Week ' + w + ' schema issues:', weekValidation.errors);
         if (options.onStatus) options.onStatus('Week ' + w + ': ' + weekValidation.errors.length + ' schema issue(s)');
@@ -5800,10 +5839,16 @@ window.LiftRPGAPI = (function () {
   // are intentionally renamed so they no longer shadow the live entrypoints.
 
   async function generateMultiStage(settings, workout, brief, onProgress) {
+    var nw = normalizeWorkoutParam(workout);
+    var totalSessions = 0;
+    (nw.weeks || []).forEach(function(w) { totalSessions += (w.sessions ? w.sessions.length : 0); });
+
     return runApiPipeline({
       settings: settings,
       workout: workout,
       brief: brief,
+      weekCount: nw.weekCount,
+      totalSessions: totalSessions,
       onProgress: onProgress,
       allowPatch: true,
       assemble: function (shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan) {
@@ -5821,6 +5866,8 @@ window.LiftRPGAPI = (function () {
     var nw = normalizeWorkoutParam(workout);
     var workoutText = nw.weeks.length > 0 ? formatNormalizedForPrompt(nw) : nw.rawText;
     var weekCount = nw.weekCount || (typeof window.parseWeekCount === 'function' ? window.parseWeekCount(workoutText) : 6);
+    var totalSessions = 0;
+    (nw.weeks || []).forEach(function(w) { totalSessions += (w.sessions ? w.sessions.length : 0); });
 
     return runApiPipeline({
       settings: resolvedSettings,
@@ -5828,6 +5875,7 @@ window.LiftRPGAPI = (function () {
       brief: brief,
       onProgress: onProgress,
       weekCount: weekCount,
+      totalSessions: totalSessions,
       allowPatch: true,
       assemble: function (shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan) {
         return assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, nw, campaignPlan);
