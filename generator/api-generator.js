@@ -18,6 +18,7 @@ window.LiftRPGAPI = (function () {
   // ── Constants ─────────────────────────────────────────────────────────────
 
   var DEFAULT_TIMEOUT_MS = 600000; // 10 minutes — long frontier-model stages often exceed 5m
+  var MAX_OUTPUT_TOKENS = 65536;  // generous ceiling — you only pay for tokens generated, not reserved
   var DEFAULT_PRICING_REFRESH_TIMEOUT_MS = 20000;
   var PRICING_VERIFIED_AT = '2026-03-23';
 
@@ -996,7 +997,7 @@ window.LiftRPGAPI = (function () {
       // Keep the chat-completions contract conservative across OpenAI-style
       // providers. Some providers reject requests that include both legacy and
       // newer token-limit fields in the same payload.
-      max_tokens: maxTokens || 65536,
+      max_tokens: maxTokens || MAX_OUTPUT_TOKENS,
       messages: [{ role: 'user', content: prompt }]
     }, extra || {});
     return payload;
@@ -1184,7 +1185,7 @@ window.LiftRPGAPI = (function () {
   async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs, pricingRule, systemPrompt) {
     var payload = {
       model: model,
-      max_tokens: maxTokens || 32000,
+      max_tokens: maxTokens || MAX_OUTPUT_TOKENS,
       messages: [{ role: 'user', content: prompt }]
     };
 
@@ -4527,7 +4528,7 @@ window.LiftRPGAPI = (function () {
       return [await runJsonStage(settings, {
         stageName: stageName,
         schema: STRUCTURED_SCHEMA_WEEKS,
-        maxTokens: 32000,
+        maxTokens: MAX_OUTPUT_TOKENS,
         unwrapKey: 'weeks',
         maxAttempts: 2,
         normalizeResult: function (result) {
@@ -4609,7 +4610,7 @@ window.LiftRPGAPI = (function () {
         onProgress: config.onProgress || null,
         getTotalStages: config.getTotalStages || null,
         schema: STRUCTURED_SCHEMA_FRAGMENTS,
-        maxTokens: 32000,
+        maxTokens: MAX_OUTPUT_TOKENS,
         unwrapKey: 'fragments',
         maxAttempts: 2,
         rateLimiter: config.rateLimiter || null,
@@ -4851,7 +4852,7 @@ window.LiftRPGAPI = (function () {
         onProgress: onProgress,
         getTotalStages: function () { return totalStages; },
         schema: STRUCTURED_SCHEMA_BIBLE,
-        maxTokens: 20480,
+        maxTokens: MAX_OUTPUT_TOKENS,
         requestTimeoutMs: 300000,
         maxAttempts: 2,
         rateLimiter: rateLimiter,
@@ -4881,9 +4882,7 @@ window.LiftRPGAPI = (function () {
         requestTimeoutMs: function (retryState) {
           return retryState && retryState.attempt > 0 ? 300000 : 420000;
         },
-        maxTokens: function (retryState) {
-          return retryState && retryState.attempt > 0 ? 8192 : 12288;
-        },
+        maxTokens: MAX_OUTPUT_TOKENS,
         maxAttempts: 2,
         rateLimiter: rateLimiter,
         budgetEnforce: useGeminiBudget,
@@ -4920,7 +4919,7 @@ window.LiftRPGAPI = (function () {
         onProgress: onProgress,
         getTotalStages: function () { return totalStages; },
         schema: STRUCTURED_SCHEMA_SHELL,
-        maxTokens: 16384,
+        maxTokens: MAX_OUTPUT_TOKENS,
         requestTimeoutMs: 300000,
         unwrapKey: 'meta',
         maxAttempts: 2,
@@ -5005,7 +5004,7 @@ window.LiftRPGAPI = (function () {
         onProgress: onProgress,
         getTotalStages: function () { return totalStages; },
         schema: null,
-        maxTokens: isBossWeek ? 16384 : 12288,
+        maxTokens: MAX_OUTPUT_TOKENS,
         requestTimeoutMs: 180000,
         maxAttempts: 3,
         rateLimiter: rateLimiter,
@@ -5152,7 +5151,7 @@ window.LiftRPGAPI = (function () {
         onProgress: onProgress,
         getTotalStages: function () { return totalStages; },
         schema: null,
-        maxTokens: 4096,
+        maxTokens: MAX_OUTPUT_TOKENS,
         requestTimeoutMs: 120000,
         maxAttempts: 2,
         rateLimiter: rateLimiter,
@@ -6442,7 +6441,7 @@ window.LiftRPGAPI = (function () {
         completeMessage:  'Skeleton complete',
         onProgress:       onProgress,
         schema:           window.STRUCTURED_SCHEMA_SKELETON || null,
-        maxTokens:        20480,
+        maxTokens:        MAX_OUTPUT_TOKENS,
         requestTimeoutMs: 360000,
         maxAttempts:      2,
         rateLimiter:      rateLimiter,
@@ -6498,7 +6497,7 @@ window.LiftRPGAPI = (function () {
         completeMessage:  'Rules spread complete',
         onProgress:       onProgress,
         schema:           null,
-        maxTokens:        4096,
+        maxTokens:        MAX_OUTPUT_TOKENS,
         requestTimeoutMs: 120000,
         maxAttempts:      2,
         rateLimiter:      rateLimiter,
@@ -6567,7 +6566,7 @@ window.LiftRPGAPI = (function () {
         completeMessage:  'Week ' + weekNum + ' complete',
         onProgress:       onProgress,
         schema:           null,
-        maxTokens:        isBoss ? 16384 : 12288,
+        maxTokens:        MAX_OUTPUT_TOKENS,
         requestTimeoutMs: 300000,
         maxAttempts:      3,
         rateLimiter:      rateLimiter,
@@ -6662,7 +6661,7 @@ window.LiftRPGAPI = (function () {
         completeMessage:  'Fragment batch ' + (b + 1) + ' complete',
         onProgress:       onProgress,
         schema:           null,
-        maxTokens:        8192,
+        maxTokens:        MAX_OUTPUT_TOKENS,
         requestTimeoutMs: 180000,
         maxAttempts:      2,
         rateLimiter:      rateLimiter,
@@ -6725,7 +6724,7 @@ window.LiftRPGAPI = (function () {
         completeMessage:  'Ending "' + variant + '" complete',
         onProgress:       onProgress,
         schema:           null,
-        maxTokens:        4096,
+        maxTokens:        MAX_OUTPUT_TOKENS,
         requestTimeoutMs: 120000,
         maxAttempts:      2,
         rateLimiter:      rateLimiter,
