@@ -2016,6 +2016,10 @@
       '## SCHEMA CONTRACT',
       window.buildStageSchema('layer-codex'),
       '',
+      '## Output Schema',
+      'Return a single JSON object with exactly this structure (fill every field):',
+      window.STAGE1_OUTPUT_SCHEMA,
+      '',
       '## Stage Rules',
       '- Plan a persistent topology with explicit gates, named keys, revisitation logic, and boss convergence requirements.',
       '- Keep the protagonist arc specific: role, want, need, flaw, wound, arc, darkest moment, and costly transformation.',
@@ -2028,7 +2032,7 @@
       'Design bias: ' + compactJson(summarizeDesignBiasForApi(blend)),
       options.retryMode ? 'Retry mode: keep prose concrete and compact so the full JSON finishes cleanly.' : '',
       '',
-      'JSON only.'
+      'Return ONLY the JSON object matching the schema above. No markdown fences, no commentary.'
     ].filter(Boolean).join('\n');
   };
 
@@ -2040,6 +2044,10 @@
       '',
       '## SCHEMA CONTRACT',
       window.buildStageSchema('campaign-plan'),
+      '',
+      '## Output Schema',
+      'Return a single JSON object with exactly this structure (fill every field, ' + weekCount + ' entries in weeks[]):',
+      window.STAGE2_OUTPUT_SCHEMA,
       '',
       '## Stage Rules',
       '- Use exactly ' + weekCount + ' weeks; mark the final week as boss and the midpoint week as the binary choice week.',
@@ -2055,7 +2063,7 @@
       'Creative direction: ' + truncateText(brief || '', 900),
       options.retryMode ? 'Retry mode: shorten descriptions where needed, but keep clue economy and week transformations intact.' : '',
       '',
-      'JSON only.'
+      'Return ONLY the JSON object matching the schema above. No markdown fences, no commentary.'
     ].filter(Boolean).join('\n');
   };
 
