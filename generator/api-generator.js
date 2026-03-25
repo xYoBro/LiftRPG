@@ -3032,10 +3032,22 @@ window.LiftRPGAPI = (function () {
    */
   function validateWeekSchema(weekObj, isBoss) {
     var errors = [];
+    var warnings = [];
     if (!weekObj) { return { valid: false, errors: ['Week object is null'] }; }
     if (!weekObj.title) errors.push('Missing week title');
+    if (!weekObj.epigraph) warnings.push('Week missing epigraph');
+
     if (!Array.isArray(weekObj.sessions) || weekObj.sessions.length === 0) {
       errors.push('Missing or empty sessions array');
+    } else {
+      weekObj.sessions.forEach(function(s, si) {
+        if (!s.storyPrompt) errors.push('Session ' + (si+1) + ' missing storyPrompt');
+        if (!s.label) errors.push('Session ' + (si+1) + ' missing label');
+        if (s.sessionNumber === undefined) errors.push('Session ' + (si+1) + ' missing sessionNumber');
+        if (!Array.isArray(s.exercises) || s.exercises.length === 0) {
+          errors.push('Session ' + (si+1) + ' missing exercises');
+        }
+      });
     }
 
     // Non-boss weeks must have fieldOps
@@ -3044,6 +3056,9 @@ window.LiftRPGAPI = (function () {
     }
     if (!isBoss && weekObj.fieldOps) {
       var fo = weekObj.fieldOps;
+
+      if (!fo.cipher) errors.push('Non-boss week missing fieldOps.cipher');
+      if (!fo.mapState) errors.push('Non-boss week missing fieldOps.mapState');
 
       // Oracle validation — LLMs use both "oracleTable" and "oracle" keys
       var ot = fo.oracleTable || fo.oracle;
@@ -3097,9 +3112,12 @@ window.LiftRPGAPI = (function () {
       // Companion component validation
       if (Array.isArray(fo.companionComponents)) {
         fo.companionComponents.forEach(function(cc) {
-          if (cc && cc.type && VALID_COMPANION_TYPES.indexOf(cc.type) === -1) {
+          if (!cc) return;
+          if (cc.type && VALID_COMPANION_TYPES.indexOf(cc.type) === -1) {
             errors.push('Unknown companion component type: "' + cc.type + '"');
           }
+          if (!cc.label) errors.push('Companion component missing label');
+          if (!cc.body) errors.push('Companion component missing body');
         });
       }
     }
@@ -3110,6 +3128,11 @@ window.LiftRPGAPI = (function () {
       if (!boss) {
         errors.push('Boss week missing bossEncounter');
       } else {
+        if (!boss.title) errors.push('Boss encounter missing title');
+        if (!boss.narrative) errors.push('Boss encounter missing narrative');
+        if (!boss.mechanismDescription) errors.push('Boss encounter missing mechanismDescription');
+        if (!boss.convergenceProof) errors.push('Boss encounter missing convergenceProof');
+
         if (!boss.decodingKey) {
           errors.push('Boss encounter missing decodingKey');
         } else {
@@ -3131,6 +3154,9 @@ window.LiftRPGAPI = (function () {
       errors.push('Week has overflow=true but only ' + weekObj.sessions.length + ' sessions');
     }
 
+    if (warnings.length > 0) {
+      console.warn('[LiftRPG] Week advisory:', warnings.join('; '));
+    }
     return { valid: errors.length === 0, errors: errors };
   }
 
@@ -3153,10 +3179,15 @@ window.LiftRPGAPI = (function () {
       if (shell.rulesSpread.leftPage && !Array.isArray(shell.rulesSpread.leftPage.sections)) {
         errors.push('rulesSpread.leftPage missing sections array');
       }
-      if (shell.rulesSpread.leftPage && Array.isArray(shell.rulesSpread.leftPage.sections) &&
-          shell.rulesSpread.leftPage.sections.length < 4) {
-        errors.push('rulesSpread.leftPage.sections has fewer than 4 entries (' +
-          shell.rulesSpread.leftPage.sections.length + ')');
+      if (shell.rulesSpread.leftPage && Array.isArray(shell.rulesSpread.leftPage.sections)) {
+        if (shell.rulesSpread.leftPage.sections.length < 4) {
+          errors.push('rulesSpread.leftPage.sections has fewer than 4 entries (' +
+            shell.rulesSpread.leftPage.sections.length + ')');
+        }
+        shell.rulesSpread.leftPage.sections.forEach(function(s, i) {
+          if (!s.heading) errors.push('leftPage.sections[' + i + '] missing heading');
+          if (!s.body && !s.text) errors.push('leftPage.sections[' + i + '] missing body');
+        });
       }
     }
     if (shell.meta) {
@@ -3638,6 +3669,7 @@ window.LiftRPGAPI = (function () {
   }
 
   function isLikelySchemaFailure(err) {
+    if (err && err.errorType === 'schema') return true;
     var lower = String((err && err.message) || err || '').toLowerCase();
     return lower.indexOf('missing required') !== -1
       || lower.indexOf('expected ') !== -1
@@ -3974,6 +4006,9 @@ window.LiftRPGAPI = (function () {
       // designLedger sub-fields are hard requirements (were checked before restructure)
       if (!result.designLedger.mysteryQuestions) errors.push('Layer Codex → designLedger: missing mysteryQuestions');
       if (!result.designLedger.weekTransformations) errors.push('Layer Codex → designLedger: missing weekTransformations');
+      if (!result.designLedger.falseAssumptions) warnings.push('Layer Codex → designLedger: missing falseAssumptions');
+      if (!result.designLedger.motifPayoffs) warnings.push('Layer Codex → designLedger: missing motifPayoffs');
+      if (!result.designLedger.finalRevealRecontextualizes) warnings.push('Layer Codex → designLedger: missing finalRevealRecontextualizes');
     }
     // Advisory warnings: sub-field checks for debugging (logged, not blocking)
     if (result.storyLayer) {
@@ -4017,6 +4052,9 @@ window.LiftRPGAPI = (function () {
       warnings.push('Campaign Plan → topology: missing entirely');
     } else if (!result.topology.zones) {
       warnings.push('Campaign Plan → topology: missing zones');
+    }
+    if (!Array.isArray(result.overflowRegistry)) {
+      warnings.push('Campaign Plan → overflowRegistry: missing or not an array');
     }
     if (!Array.isArray(result.fragmentRegistry)) {
       warnings.push('Campaign Plan → fragmentRegistry: missing or not an array');
@@ -4063,12 +4101,19 @@ window.LiftRPGAPI = (function () {
     if (!expected.length) return '';
     var seen = {};
     var extras = [];
+    var invalid = [];
     result.fragments.forEach(function (fragment) {
       var id = normalizeId(fragment && fragment.id);
       if (!id) return;
+      if (!fragment.content && !fragment.bodyParagraphs && !fragment.bodyText && !fragment.body) {
+        invalid.push(fragment.id);
+      }
       seen[id] = true;
       if (expected.indexOf(id) === -1) extras.push(fragment.id);
     });
+    if (invalid.length > 0) {
+      return 'Fragment stage validation failed: missing content/body in IDs ' + invalid.slice(0, 8).join(', ') + '.';
+    }
     var missing = expected.filter(function (id) { return !seen[id]; });
     if (missing.length > 0) {
       return 'Fragment stage validation failed: missing IDs ' + missing.slice(0, 8).join(', ') + '.';
@@ -4196,11 +4241,19 @@ window.LiftRPGAPI = (function () {
         if (config.unwrapKey) result = unwrapIfNeeded(result, config.unwrapKey);
         if (config.normalizeResult) result = config.normalizeResult(result);
         if (config.validate) {
-          // Convention: validate() returns '' on success, non-empty string on failure.
-          // Guard against accidental boolean/object returns (e.g. `return true`).
-          var validationMessage = config.validate(result);
-          if (typeof validationMessage === 'string' && validationMessage) {
-            throw new Error(validationMessage);
+          // Convention: validate() returns '' or {valid: true} on success, non-empty string or {valid: false, errors: [...]} on failure.
+          var validationResult = config.validate(result);
+          if (typeof validationResult === 'string' && validationResult) {
+            var err = new Error(validationResult);
+            err.errorType = 'schema';
+            err.retryable = true;
+            throw err;
+          } else if (validationResult && typeof validationResult === 'object' && validationResult.valid === false) {
+            var errMsg = (validationResult.errors && validationResult.errors.length) ? validationResult.errors.join('; ') : 'Schema validation failed';
+            var errObj = new Error(errMsg);
+            errObj.errorType = validationResult.errorType || 'schema';
+            errObj.retryable = validationResult.retryable !== false;
+            throw errObj;
           }
         }
         emitPipelineEvent(config.onProgress, config.stageIndex || 0, config.getTotalStages ? config.getTotalStages() : 0, config.completeMessage || config.stageName, {
@@ -4608,7 +4661,10 @@ window.LiftRPGAPI = (function () {
         budgetEnforce: useGeminiBudget,
         validate: validateCampaignPlanStage,
         buildPrompt: function (retryState) {
-          return buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState || { attempt: 0, error: null });
+          if (!retryState || !retryState.attempt) {
+            return builders.stage2(workout, brief, layerBible);
+          }
+          return buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState);
         }
       });
       checkpoint = saveCheckpoint('campaignPlan', campaignPlan, checkpoint);
@@ -4752,7 +4808,7 @@ window.LiftRPGAPI = (function () {
           if (!result) return 'Week generation returned empty result. Model may have returned a shell instead of a week object.';
           if (!result.title) return 'Week object missing "title" field. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
           if (!result.sessions) return 'Week object missing "sessions" array. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
-          return '';
+          return validateWeekSchema(result, isBossWeek);
         },
         buildPrompt: function (retryState) {
           return builders.singleWeekFinal(workout, brief, layerBible, campaignPlan, campaignWeekPlan, shellContext, continuityPacket, allComponentValues);

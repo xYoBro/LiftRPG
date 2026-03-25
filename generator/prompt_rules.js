@@ -231,6 +231,7 @@
     '- `title` (string): same as meta.blockTitle',
     '- `designation` (string)',
     '- `tagline` (string)',
+    '- `subtitle` (string, optional): one-line diegetic subtitle',
     '- `colophonLines` (string[], 3-6 items)',
     '- `svgArt` (string, optional): sparse line-based inline SVG only when it materially helps',
     '- `coverArtCaption` (string, optional)',
@@ -836,11 +837,11 @@
   var STAGE_SCHEMA_MAP = {
     'layer-codex':    { schemas: [],                                            instructions: ['ANTI_PATTERNS'] },
     'campaign-plan':  { schemas: [],                                            instructions: ['WORLD_CONTRACT', 'ANTI_PATTERNS'] },
-    'shell':          { schemas: ['META', 'THEME', 'TAIL'],                     instructions: ['OUTPUT_RULES', 'CONTRACT_GUARDRAILS', 'RULES_TEACH', 'VISUAL_DIRECTION', 'STRUCTURAL_RULES'] },
+    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'OUTPUT_RULES', 'CONTRACT_GUARDRAILS', 'BRIEF_FIDELITY', 'WORLD_CONTRACT', 'RULES_TEACH', 'VISUAL_DIRECTION', 'STRUCTURAL_RULES'] },
     'week-plan':      { schemas: ['WEEK_PLAN'],                                 instructions: [] },
-    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'CIPHER_DESIGN', 'MAPS_BOARD', 'ORACLES_CLOCKS', 'COMPANIONS', 'LAYERED_ARC', 'SELF_VERIFICATION'] },
-    'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'SELF_VERIFICATION'] },
-    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'LAYERED_ARC'] }
+    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['WORKOUT_FUSION', 'PERVASIVE_PLAY', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'SESSION_PROMPTS', 'CIPHER_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'LAYERED_ARC', 'SELF_VERIFICATION'] },
+    'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'ANTI_GENERIC', 'SELF_VERIFICATION'] },
+    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'LAYERED_ARC', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] }
   };
 
   window.buildStageSchema = function(stageName) {
