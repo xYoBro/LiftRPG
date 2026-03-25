@@ -360,10 +360,19 @@ window.LiftRPGAPI = (function () {
     var merged = Object.assign({}, options, { signal: controller.signal });
     return fetch(url, merged)
       .catch(function (err) {
-        if (err.name === 'AbortError') {
+        var msg = String(err.message || err || '').toLowerCase();
+        // Catch both Chrome AbortError and Safari's "Fetch is aborted" TypeError
+        if (err.name === 'AbortError' || msg.indexOf('abort') !== -1) {
           throw new Error(
-            'Request timed out after ' + Math.round(ms / 1000) + 's. ' +
+            'Request timed out or was aborted after ' + Math.round(ms / 1000) + 's. ' +
             'The model may need more time, or the request may have stalled. Try again.'
+          );
+        }
+        // Network failures (CORS, DNS, connection refused) — add context
+        if (err.name === 'TypeError' && (msg.indexOf('fetch') !== -1 || msg.indexOf('network') !== -1)) {
+          throw new Error(
+            'Network error reaching API: ' + err.message + '. ' +
+            'Check your API key, internet connection, and that the provider URL is correct.'
           );
         }
         throw err;
