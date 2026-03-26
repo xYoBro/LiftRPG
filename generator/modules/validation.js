@@ -474,15 +474,8 @@ export function validateShellSchema(shell, expectedOptions) {
     if (!('passwordEncryptedEnding' in shell.meta)) {
       errors.push('meta.passwordEncryptedEnding must exist (can be empty string)');
     }
-    if (expectedOptions && expectedOptions.weekCount !== undefined && shell.meta.weekCount !== expectedOptions.weekCount) {
-      errors.push('meta.weekCount must be exactly ' + expectedOptions.weekCount + ', got: ' + shell.meta.weekCount);
-    }
-    if (expectedOptions && expectedOptions.totalSessions > 0 && shell.meta.totalSessions !== expectedOptions.totalSessions) {
-      errors.push('meta.totalSessions must be exactly ' + expectedOptions.totalSessions + ', got: ' + shell.meta.totalSessions);
-    }
-    if (expectedOptions && expectedOptions.weekCount !== undefined && shell.meta.passwordLength !== (expectedOptions.weekCount - 1)) {
-      errors.push('meta.passwordLength must be exactly ' + (expectedOptions.weekCount - 1) + ', got: ' + shell.meta.passwordLength);
-    }
+    // weekCount, totalSessions, passwordLength are injected by JS post-generation
+    // (enforceBookletDerivedFields in assembly.js). Not validated against LLM output.
   }
   if (shell.theme && shell.theme.visualArchetype) {
     if (VALID_ARCHETYPES.indexOf(shell.theme.visualArchetype) === -1) {

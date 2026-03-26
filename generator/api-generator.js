@@ -458,15 +458,11 @@ var STRUCTURED_SCHEMA_SHELL = {
           required: ['artifactClass', 'boardStateMode', 'shellFamily', 'attachmentStrategy']
         },
         weeklyComponentType: { type: 'string' },
-        passwordLength: { type: 'integer' },
         passwordEncryptedEnding: { type: 'string' },
-        liftoScript: { type: 'string' },
-        weekCount: { type: 'integer' },
-        totalSessions: { type: 'integer' }
+        liftoScript: { type: 'string' }
       },
       required: ['schemaVersion', 'blockTitle', 'worldContract', 'narrativeVoice',
-        'literaryRegister', 'structuralShape', 'artifactIdentity', 'weeklyComponentType',
-        'passwordLength', 'weekCount', 'totalSessions']
+        'literaryRegister', 'structuralShape', 'artifactIdentity', 'weeklyComponentType']
     },
     cover: {
       type: 'object',
