@@ -1018,13 +1018,19 @@
   // - NEVER put schema or instruction content in generator.js or api-generator.js.
 
   var STAGE_SCHEMA_MAP = {
-    'layer-codex':    { schemas: [],                                            instructions: ['ANTI_PATTERNS'] },
-    'campaign-plan':  { schemas: [],                                            instructions: ['WORLD_CONTRACT', 'ANTI_PATTERNS'] },
-    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'BRIEF_FIDELITY', 'WORLD_CONTRACT', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'RULES_TEACH', 'VISUAL_DIRECTION', 'STRUCTURAL_RULES'] },
+    // Planning stages: story-first
+    'layer-codex':    { schemas: [],                                            instructions: ['STORY_ENGINE', 'CHARACTER_WEB', 'LAYERED_ARC', 'ANTI_PATTERNS'] },
+    'campaign-plan':  { schemas: [],                                            instructions: ['WORLD_CONTRACT', 'PROGRESSION', 'SYSTEM_INTEGRATION', 'ANTI_PATTERNS', 'ANTI_SAMENESS'] },
+    // Shell: story + world + structural
+    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'WORLD_CONTRACT', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'RULES_TEACH', 'VISUAL_DIRECTION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
+    // Week plan: lean
     'week-plan':      { schemas: ['WEEK_PLAN'],                                 instructions: [] },
-    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'WORKOUT_FUSION', 'PERVASIVE_PLAY', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'SESSION_PROMPTS', 'CIPHER_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'LAYERED_ARC', 'SELF_VERIFICATION'] },
-    'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['OUTPUT_RULES', 'OUTPUT_BUDGETS', 'FOUND_DOCUMENTS', 'ANTI_GENERIC', 'SELF_VERIFICATION'] },
-    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['OUTPUT_RULES', 'OUTPUT_BUDGETS', 'ENDING_STANDARD', 'LAYERED_ARC', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] }
+    // Week flesh: full game design + story
+    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'LAYERED_ARC', 'WORKOUT_FUSION', 'PERVASIVE_PLAY', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] },
+    // Fragment: story quality first
+    'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'ANTI_GENERIC', 'CHARACTER_WEB', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
+    // Ending: story quality first
+    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'LAYERED_ARC', 'ANTI_GENERIC', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] }
   };
 
   window.buildStageSchema = function(stageName) {
