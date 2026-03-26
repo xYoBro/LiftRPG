@@ -617,7 +617,10 @@
 
   window.INST_ENVIRONMENT = [
     '## Rich Environment',
-    '- For serious or complex briefs, give the setting at least four layers: public layer, working layer, hidden layer, and historical layer. For playful, comedic, or simple briefs, two or three layers are sufficient — match depth to tone.',
+    '- Match environmental depth to the brief:',
+    '  * Complex/serious brief: four layers (public, working, hidden, historical).',
+    '  * Medium brief: three layers (public, working, hidden OR historical).',
+    '  * Light/comedic/simple brief: two layers (surface and one surprise underneath). Do not force institutional complexity the brief did not ask for.',
     '- Even a bland building, office, clinic, dam, station, depot, or archive can be compelling if the labor, wear, jurisdiction, rumor, and buried history are specific.',
     '- Define 8-12 world-native nouns early and reuse them across prompts, fragments, map labels, and interface labels.',
     '- Give the world material specificity: one recurring smell, one recurring sound, one recurring object, one recurring bureaucratic or folk phrase.'
