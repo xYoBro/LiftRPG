@@ -5569,6 +5569,11 @@
       updateBuildMeta();
       updateStageHealth();
       initializeApiSettings();
+      // api-generator.js is type="module" (deferred) — re-initialize when it loads
+      window.addEventListener('liftrpg-api-ready', function () {
+        initializeApiSettings();
+        updateDailyBudgetDisplay();
+      }, { once: true });
       apiRunState = createApiRunState();
       setGenerationMode('manual');
       setGeneratorSurface('intake', { skipFocus: true });

@@ -2411,3 +2411,8 @@ window.LiftRPGAPI = {
   lastQualityReport: null,
   lastPricing: null
 };
+
+// Notify inline scripts that the API module has loaded.
+// Because this file is type="module" (deferred), inline scripts run first
+// and may need to re-initialize once window.LiftRPGAPI is available.
+window.dispatchEvent(new Event('liftrpg-api-ready'));
