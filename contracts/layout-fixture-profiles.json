@@ -17,9 +17,22 @@
       "notes": 3,
       "back-cover": 1
     },
-    "prefix": ["cover", "rules-left", "rules-right"],
-    "suffix": ["ending-locked", "notes", "notes", "notes", "back-cover"],
-    "mustNotContain": ["interlude", "blank-filler"]
+    "prefix": [
+      "cover",
+      "rules-left",
+      "rules-right"
+    ],
+    "suffix": [
+      "ending-locked",
+      "notes",
+      "notes",
+      "notes",
+      "back-cover"
+    ],
+    "mustNotContain": [
+      "interlude",
+      "blank-filler"
+    ]
   },
   "content/The-Air-Gapped-Choir.json": {
     "normalizedPageCount": 28,
@@ -38,9 +51,21 @@
       "ending-locked": 1,
       "back-cover": 1
     },
-    "prefix": ["cover", "rules-left", "rules-right"],
-    "suffix": ["fragment-page", "assembly", "gauge-log", "ending-locked", "back-cover"],
-    "mustContain": ["interlude"]
+    "prefix": [
+      "cover",
+      "rules-left",
+      "rules-right"
+    ],
+    "suffix": [
+      "fragment-page",
+      "assembly",
+      "gauge-log",
+      "ending-locked",
+      "back-cover"
+    ],
+    "mustContain": [
+      "interlude"
+    ]
   },
   "content/The-Hinge.json": {
     "normalizedPageCount": 48,
@@ -61,9 +86,21 @@
       "notes": 2,
       "back-cover": 1
     },
-    "prefix": ["cover", "rules-left", "rules-right"],
-    "suffix": ["gauge-log", "ending-locked", "notes", "notes", "back-cover"],
-    "mustContain": ["interlude"]
+    "prefix": [
+      "cover",
+      "rules-left",
+      "rules-right"
+    ],
+    "suffix": [
+      "gauge-log",
+      "ending-locked",
+      "notes",
+      "notes",
+      "back-cover"
+    ],
+    "mustContain": [
+      "interlude"
+    ]
   },
   "content/cartographer-full.json": {
     "normalizedPageCount": 28,
@@ -82,8 +119,18 @@
       "notes": 2,
       "back-cover": 1
     },
-    "prefix": ["cover", "rules-left", "rules-right"],
-    "suffix": ["gauge-log", "ending-locked", "notes", "notes", "back-cover"]
+    "prefix": [
+      "cover",
+      "rules-left",
+      "rules-right"
+    ],
+    "suffix": [
+      "gauge-log",
+      "ending-locked",
+      "notes",
+      "notes",
+      "back-cover"
+    ]
   },
   "content/The-Pressure-Field.json": {
     "normalizedPageCount": 28,
@@ -102,9 +149,21 @@
       "ending-locked": 1,
       "back-cover": 1
     },
-    "prefix": ["cover", "rules-left", "rules-right"],
-    "suffix": ["fragment-page", "assembly", "gauge-log", "ending-locked", "back-cover"],
-    "mustContain": ["interlude"]
+    "prefix": [
+      "cover",
+      "rules-left",
+      "rules-right"
+    ],
+    "suffix": [
+      "fragment-page",
+      "assembly",
+      "gauge-log",
+      "ending-locked",
+      "back-cover"
+    ],
+    "mustContain": [
+      "interlude"
+    ]
   },
   "content/Supply-Line-Breach.json": {
     "normalizedPageCount": 48,
@@ -125,9 +184,21 @@
       "notes": 2,
       "back-cover": 1
     },
-    "prefix": ["cover", "rules-left", "rules-right"],
-    "suffix": ["gauge-log", "ending-locked", "notes", "notes", "back-cover"],
-    "mustContain": ["interlude"]
+    "prefix": [
+      "cover",
+      "rules-left",
+      "rules-right"
+    ],
+    "suffix": [
+      "gauge-log",
+      "ending-locked",
+      "notes",
+      "notes",
+      "back-cover"
+    ],
+    "mustContain": [
+      "interlude"
+    ]
   },
   "content/Palimpsest-House.json": {
     "normalizedPageCount": 28,
@@ -147,8 +218,96 @@
       "notes": 1,
       "back-cover": 1
     },
-    "prefix": ["cover", "rules-left", "rules-right"],
-    "suffix": ["assembly", "gauge-log", "ending-locked", "notes", "back-cover"],
-    "mustContain": ["interlude"]
+    "prefix": [
+      "cover",
+      "rules-left",
+      "rules-right"
+    ],
+    "suffix": [
+      "assembly",
+      "gauge-log",
+      "ending-locked",
+      "notes",
+      "back-cover"
+    ],
+    "mustContain": [
+      "interlude"
+    ]
+  },
+  "content/the-conclave-s-legacy.json": {
+    "normalizedPageCount": 32,
+    "sheetCount": 16,
+    "counts": {
+      "cover": 1,
+      "rules-left": 1,
+      "rules-right": 1,
+      "workout-left": 7,
+      "field-ops": 5,
+      "interlude": 5,
+      "overflow-doc": 1,
+      "boss": 1,
+      "fragment-page": 6,
+      "assembly": 1,
+      "gauge-log": 1,
+      "ending-locked": 1,
+      "back-cover": 1
+    },
+    "prefix": [
+      "cover",
+      "rules-left",
+      "rules-right"
+    ],
+    "suffix": [
+      "fragment-page",
+      "assembly",
+      "gauge-log",
+      "ending-locked",
+      "back-cover"
+    ],
+    "mustContain": [
+      "workout-left",
+      "field-ops",
+      "boss",
+      "fragment-page",
+      "interlude"
+    ]
+  },
+  "content/vale-a-record-of-orcus.json": {
+    "normalizedPageCount": 40,
+    "sheetCount": 20,
+    "counts": {
+      "cover": 1,
+      "rules-left": 1,
+      "rules-right": 1,
+      "workout-left": 6,
+      "field-ops": 5,
+      "interlude": 6,
+      "boss": 1,
+      "fragment-page": 12,
+      "assembly": 1,
+      "gauge-log": 1,
+      "ending-locked": 1,
+      "notes": 3,
+      "back-cover": 1
+    },
+    "prefix": [
+      "cover",
+      "rules-left",
+      "rules-right"
+    ],
+    "suffix": [
+      "ending-locked",
+      "notes",
+      "notes",
+      "notes",
+      "back-cover"
+    ],
+    "mustContain": [
+      "workout-left",
+      "field-ops",
+      "boss",
+      "fragment-page",
+      "interlude"
+    ]
   }
 }
