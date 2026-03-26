@@ -674,12 +674,19 @@
     '  2. bridge play: one meaningful cross-reference or route update that persists across sessions.',
     '  3. pervasive/deep play (The Rest Interval): The time *between* workouts MUST be filled with diegetic anticipation.',
     '- Use `interlude` payloads to assign "off-session contemplation" tasks: a cipher that requires staring at the map at night, a moral dilemma to weigh before the next session, or a cliffhanger code to crack.',
-    '- Do not let the fiction sleep when the player rests. The interlude must demand mental engagement even when they are not lifting.'
+    '- Do not let the fiction sleep when the player rests. The interlude must demand mental engagement even when they are not lifting.',
+    '',
+    '**Macro involvement hooks (between-session pressure):**',
+    '- End at least half of all sessions with an unresolved question the player will think about away from the gym.',
+    '- Clocks that imply off-screen consequences create urgency even when the booklet is closed.',
+    '- Binary choices should be presented at session end so the player deliberates before the next session.',
+    '- At least one fragment per block should plant a mystery that requires combining information from two different weeks to resolve.'
   ];
 
   window.INST_DIEGETIC_MECHANICS = [
     '## Diegetic Mechanics Selection',
     '- Do not blindly paste game mechanics into every week. Smartly select mechanics ONLY when they make diegetic sense.',
+    '- **Session Phase Loop:** Design and name a specific play cadence for this booklet (e.g., "Workout → Oracle Pull → Execute Consequence → Read Fragment → Mark Board → Record Component"). Commit to this loop in the rulesSpread and follow it consistently. The loop is what makes this feel like a board game, not a journal.',
     '- **Clocks:** Use only when the story implies countdowns, rising institutional heat, structural failure, or approaching pursuers.',
     '- **Ciphers / Puzzles:** Use only when the player intersects hidden communications, corrupted data, or encrypted journals. Do not bury a door code in an abstract puzzle unless someone in-world hid it that way.',
     '- **Maps:** If exploring or tracking, use hex/point-to-point. If breaching a facility, use strict grid.',
@@ -737,7 +744,9 @@
     '- Week 1 puzzle should be solvable quickly. Later weeks can deepen or recombine the grammar.',
     '- Use at least four distinct puzzle families across a standard six-week block.',
     '- Do not repeat the same puzzle family in consecutive non-boss weeks unless repetition is diegetic and escalating.',
-    '- Good families include constraint logic, spatial route reading, fragment cross-reference, pattern recognition, typographic anomaly, observational anomaly hunting, metapuzzle assembly, and process deduction.'
+    '- Good families include constraint logic, spatial route reading, fragment cross-reference, pattern recognition, typographic anomaly, observational anomaly hunting, metapuzzle assembly, and process deduction.',
+    '- **Gating logic:** Design ciphers as lock-and-key systems. Week 1 cipher output should be usable as an input or key for a later puzzle. At least one cipher should require information the player can only obtain from a specific map node or fragment — this is found/not-found gating.',
+    '- The solved cipher should open access (to a route, a fragment, a map zone, or a companion function) — not just produce a number for the boss decode.'
   ];
 
   window.INST_MAPS_BOARD = [
@@ -778,6 +787,7 @@
   window.INST_PROGRESSION = [
     '## Progression Design',
     '- Design a clear capability arc across the campaign. Week 1 should feel constrained: limited map access, simple mechanics, few nodes visible, basic companion state.',
+    '- **Mechanical Rule Ramp:** Week 1 should introduce only the core loop (map + oracle + session prompts). Add companion components starting Week 2-3. Introduce gameplay clocks by Week 3-4. Week 5+ can layer multiple mechanical surfaces simultaneously. Do not give the player every mechanical surface in Week 1 — complexity is a reward, not a starting condition.',
     '- Each non-boss week must give the player something new: a cleared route, an unlocked node, a decoded access code, a revealed map area, a new companion function, a key that opens a previously locked gate.',
     '- By the penultimate week, the player should have enough capabilities and map knowledge to make real strategic choices about route, resource allocation, and risk.',
     '- The boss week should require the player to have MASTERED the space. The decodingKey should reference map node names, spatial relationships, clock history, or institutional knowledge gathered across the campaign — not just arithmetic on weekly component values.',
