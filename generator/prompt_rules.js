@@ -627,10 +627,13 @@
     '## Character Web & Ideological Contradictions',
     '- Do not define characters by functional tropes (e.g., "the hacker", "the mentor"). Define them by their emotional dependencies and ideological contradictions.',
     '- Every major NPC must have a worldview that structurally challenges or opposes the protagonist, but remains utterly sympathetic or unavoidable.',
-    '- Include at least one intimate dependency, one structural/institutional betrayal, one unstable alliance, and one absent/ghostly shadow over the cast.',
-    '- Name 4-6 recurring characters in the Core Noun Roster and use them consistently across storyPrompts, fragments, and interludes.',
-    '- At least 3 fragments should be authored by these named ideological rivals, exposing their blind spots and conflicting worldviews.',
-    '- At least one character must radically change stance or be tragically recontextualized by the final third of the block.'
+    '',
+    'Scale character depth to match the brief:',
+    '- **Complex/serious brief:** Name 4-6 recurring characters in the Core Noun Roster. Include at least one intimate dependency, one structural/institutional betrayal, one unstable alliance, and one absent/ghostly shadow over the cast. At least 3 fragments should be authored by named ideological rivals. At least one character must radically change stance or be tragically recontextualized by the final third.',
+    '- **Medium brief:** Name 2-3 recurring characters with opposing worldviews. Include at least one dependency and one betrayal or alliance. At least 2 fragments authored by named characters.',
+    '- **Light/comedic/simple brief:** 1-2 characters with clear motivation and one relationship that changes. No mandatory betrayal or institutional complexity. At least 1 fragment authored by a named character.',
+    '',
+    '- Use named characters consistently across storyPrompts, fragments, and interludes at whatever depth the brief demands.'
   ];
 
   window.INST_LAYERED_ARC = [
