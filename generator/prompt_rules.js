@@ -83,8 +83,8 @@
     '- `sessions` (array, 3-6 items): Each session has { sessionNumber, label, exercises: [{ name, sets, repsPerSet, weightField?, notes? }], storyPrompt, fragmentRef?, binaryChoice?: { choiceLabel, promptA, promptB } }',
     '- `fieldOps` (object, required on non-boss weeks): contains mapState, cipher, oracleTable, and optional companionComponents',
     '- `bossEncounter` (object, required on boss week): replaces fieldOps',
-    '- `overflow` (boolean): True when sessions.length > 3',
-    '- `overflowDocument` (foundDocument, required when overflow is true)',
+    '- `overflow` (boolean): MUST be true when sessions.length > 3. This is a hard contract — the renderer uses it to build a Part 2 spread. Omitting it when sessions exceed 3 breaks page layout.',
+    '- `overflowDocument` (foundDocument, REQUIRED when overflow is true): The Part 2 right-hand page. Must be a complete found document with all standard fragment fields.',
     '- `interlude` (object, optional): must contain { title, reason, body } and may also include payloadType, payload, spreadAware',
     '- `gameplayClocks` (array, optional): week-level progress clocks outside the oracle payload',
     '- `isDeload` (boolean, optional): tonal flag only'
@@ -678,7 +678,8 @@
     '  * **Sprints / High Heart Rate:** Frantic evasion, racing against an immediate running clock, dwindling oxygen, panic, unstable footing.',
     '  * **Long Zone 2 / Steady State:** Paranoia, vast distances, slow depletion of resources, eerie quiet before a storm, tracking or being tracked.',
     '  * **Deload / Recovery:** False safety, painful memory surfacing, treating wounds, studying the map, discovering a horrifying truth in the quiet.',
-    '- Identify the dominant physical modality in the raw workout and apply its metaphor translation strictly to the `storyPrompts`. Only use literal gym terminology if the theme demands it.'
+    '- Identify the dominant physical modality in the raw workout and apply its metaphor translation strictly to the `storyPrompts`. Only use literal gym terminology if the theme demands it.',
+    '- **CRITICAL: Every session MUST have a non-empty exercises array.** Transcribe the user&apos;s workout exactly — name, sets, repsPerSet, weightField. Never omit exercises on any session, even the last session in a high-session-count week. If the user provides 6 sessions of exercises, all 6 must appear with complete exercise data.'
   ];
 
   window.INST_PERVASIVE_PLAY = [
