@@ -1066,10 +1066,27 @@ export function buildOpenAICompatHeaders(apiKey) {
 
 // ── Request handlers ──────────────────────────────────────────────────────────
 
+// Anthropic model output token limits — models reject requests above their cap.
+var ANTHROPIC_MAX_OUTPUT = {
+  'haiku': 64000
+  // Sonnet/Opus default to MAX_OUTPUT_TOKENS (65536+)
+};
+
+function clampAnthropicMaxTokens(model, requested) {
+  var modelLower = String(model || '').toLowerCase();
+  for (var key in ANTHROPIC_MAX_OUTPUT) {
+    if (modelLower.indexOf(key) !== -1) {
+      return Math.min(requested, ANTHROPIC_MAX_OUTPUT[key]);
+    }
+  }
+  return requested;
+}
+
 export async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs, pricingRule, systemPrompt) {
+  var resolvedMax = clampAnthropicMaxTokens(model, maxTokens || MAX_OUTPUT_TOKENS);
   var payload = {
     model: model,
-    max_tokens: maxTokens || MAX_OUTPUT_TOKENS,
+    max_tokens: resolvedMax,
     messages: [{ role: 'user', content: prompt }]
   };
 
