@@ -202,7 +202,7 @@
   window.SCHEMA_FRAGMENTS = [
     '## fragments (array of found documents)',
     '',
-    'Use 12-30 fragments. Mix 4-7 document families from this supported list:',
+    'Use weekCount*2 to weekCount*3 fragments (e.g. 12-18 for a 6-week block). Prefer fewer, higher-quality fragments over volume. Mix 3-5 document families from this supported list:',
     '- `memo`',
     '- `report`',
     '- `inspection`',
@@ -226,6 +226,7 @@
     '- Across the full booklet, include at least three linked fragment functions: one action-changing artifact, one interpretation-changing artifact, and one character-deepening artifact.',
     '- At least one incident, place, procedure, or relationship should recur across multiple document perspectives.',
     '- Fragments may arrive as threaded packets, route updates, contradictory records, or personal aftershocks, not just isolated lore drops.',
+    '- Every fragment MUST be referenced by at least one oracle entry (via fragmentRef), session prompt (via fragmentRef or by name), or cipher (via referenceTargets). If a fragment is never referenced, it should not exist.',
     '',
     'Do not force every booklet to use all document types. Variety matters, but chosen absence also creates identity.'
   ];
