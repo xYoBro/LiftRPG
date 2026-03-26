@@ -733,8 +733,8 @@ var STRUCTURED_SCHEMA_WEEKS = {
               title: { type: 'string' },
               reason: { type: 'string' },
               body: { type: 'string' },
-              payloadType: { type: 'string' },
-              payload: { type: 'object' },
+              payloadType: { type: 'string', enum: ['none', 'narrative', 'cipher', 'map', 'clock', 'companion', 'fragment-ref', 'password-element'] },
+              payload: {},
               spreadAware: { type: 'boolean' }
             },
             required: ['title', 'reason', 'body']

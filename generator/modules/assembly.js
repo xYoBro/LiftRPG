@@ -719,6 +719,62 @@ export function normalizeDocumentTypes(booklet) {
   });
 }
 
+// ── Interlude normalization ──────────────────────────────────────────────────
+// Repairs common LLM errors in interlude objects:
+//  1. "fragment" payloadType → "fragment-ref" (common LLM confusion)
+//  2. String payload for "companion" → wrapped in { companionComponents: [] }
+//  3. Unknown payloadType → downgraded to "narrative" with console warning
+
+var VALID_INTERLUDE_PAYLOAD_TYPES = {
+  none: 1, narrative: 1, cipher: 1, map: 1, clock: 1,
+  companion: 1, 'fragment-ref': 1, 'password-element': 1
+};
+
+export function normalizeInterludes(booklet) {
+  (booklet.weeks || []).forEach(function (week) {
+    var interlude = week.interlude;
+    if (!interlude) return;
+
+    var pt = String(interlude.payloadType || '').trim().toLowerCase();
+
+    // Fix 1: "fragment" → "fragment-ref"
+    if (pt === 'fragment') {
+      console.warn('[assembly] week ' + (week.weekNumber || '?') + ' interlude payloadType "fragment" → "fragment-ref"');
+      interlude.payloadType = 'fragment-ref';
+      pt = 'fragment-ref';
+    }
+
+    // Fix 2: unknown payloadType → "narrative"
+    if (pt && !VALID_INTERLUDE_PAYLOAD_TYPES[pt]) {
+      console.warn('[assembly] week ' + (week.weekNumber || '?') + ' interlude payloadType "' + pt + '" unsupported → downgraded to "narrative"');
+      interlude.payloadType = 'narrative';
+      pt = 'narrative';
+    }
+
+    // Fix 3: companion payload must be object with companionComponents
+    if (pt === 'companion' && interlude.payload) {
+      if (typeof interlude.payload === 'string') {
+        console.warn('[assembly] week ' + (week.weekNumber || '?') + ' interlude companion payload was string → wrapped in companionComponents');
+        interlude.payload = {
+          companionComponents: [{
+            type: 'overlay-window',
+            title: interlude.payload,
+            body: interlude.payload
+          }]
+        };
+      } else if (interlude.payload && !Array.isArray(interlude.payload.companionComponents)) {
+        console.warn('[assembly] week ' + (week.weekNumber || '?') + ' interlude companion payload missing companionComponents → wrapped');
+        interlude.payload = { companionComponents: [interlude.payload] };
+      }
+    }
+
+    // Fix 4: fragment-ref payload should be object with fragmentRef
+    if (pt === 'fragment-ref' && typeof interlude.payload === 'string') {
+      interlude.payload = { fragmentRef: interlude.payload, action: '' };
+    }
+  });
+}
+
 // ── Booklet assemblers ──────────────────────────────────────────────────────
 // Merges partial JSON chunks from the 10-stage pipeline into a complete booklet.
 
@@ -743,6 +799,7 @@ export function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, ending
   booklet.weeks.forEach(normalizeCompanionComponents);
   booklet.weeks.forEach(normalizeOracleKey);
   normalizeDocumentTypes(booklet);
+  normalizeInterludes(booklet);
 
   // Set overflow deterministically (fix C1 — was missing in this assembler)
   booklet.weeks.forEach(function (week) {
@@ -786,6 +843,7 @@ export function assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutp
   booklet.weeks.forEach(normalizeCompanionComponents);
   booklet.weeks.forEach(normalizeOracleKey);
   normalizeDocumentTypes(booklet);
+  normalizeInterludes(booklet);
 
   // Override exercises with normalized data when available
   var nw = normalizedWorkout || {};
@@ -1410,6 +1468,7 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
 
   // -- Normalize document types (alias resolution) --
   normalizeDocumentTypes(booklet);
+  normalizeInterludes(booklet);
 
   // -- Compute totalSessions --
   var totalSessions = 0;
