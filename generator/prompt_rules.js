@@ -971,39 +971,50 @@
 
   window.INSTRUCTIONS = [].concat(
     ['# Generation Instructions', ''],
+    ['## Priority Tiers',
+     'These instructions are organized by priority. Tier 1 quality CANNOT be sacrificed to satisfy Tier 3 checkboxes.',
+     'If running low on output tokens, shorten Tier 3 verification and structural detail — never Tier 1 prose or Tier 2 game design.',
+     ''],
+
+    // ── TIER 1: Story Quality (the soul of the booklet) ──────────────
+    ['## ── TIER 1: STORY QUALITY ──', ''],
     INST_BRIEF_INTERPRETATION, [''],
-    INST_OUTPUT_RULES, [''],
-    INST_CONTRACT_GUARDRAILS, [''],
-    INST_OUTPUT_BUDGETS, [''],
     INST_BRIEF_FIDELITY, [''],
-    INST_WORLD_CONTRACT, [''],
     INST_STORY_ENGINE, [''],
-    INST_ENVIRONMENT, [''],
-    INST_CHARACTER_WEB, [''],
     INST_LAYERED_ARC, [''],
+    INST_CHARACTER_WEB, [''],
+    INST_SESSION_PROMPTS, [''],
+    INST_FOUND_DOCUMENTS, [''],
+    INST_ENDING_STANDARD, [''],
+    INST_ANTI_GENERIC, [''],
+    INST_ANTI_PATTERNS, [''],
+
+    // ── TIER 2: Game Design (the play experience) ─────────────────────
+    ['## ── TIER 2: GAME DESIGN ──', ''],
+    INST_WORLD_CONTRACT, [''],
+    INST_ENVIRONMENT, [''],
     INST_WORKOUT_FUSION, [''],
     INST_PERVASIVE_PLAY, [''],
     INST_DIEGETIC_MECHANICS, [''],
     INST_SYSTEM_INTEGRATION, [''],
     INST_WEEKLY_COMPONENTS, [''],
-    INST_SESSION_PROMPTS, [''],
-    INST_FOUND_DOCUMENTS, [''],
     INST_CIPHER_DESIGN, [''],
     INST_MAPS_BOARD, [''],
-    INST_INTERLUDES, [''],
     INST_ORACLES_CLOCKS, [''],
     INST_COMPANIONS, [''],
     INST_PROGRESSION, [''],
-    INST_VISUAL_DIRECTION, [''],
+    INST_INTERLUDES, [''],
     INST_ANTI_SAMENESS, [''],
-    INST_ANTI_GENERIC, [''],
-    INST_ANTI_PATTERNS, [''],
-    INST_ENDING_STANDARD, [''],
+
+    // ── TIER 3: Structural Compliance (guardrails) ────────────────────
+    ['## ── TIER 3: STRUCTURAL COMPLIANCE ──', ''],
+    INST_OUTPUT_RULES, [''],
+    INST_CONTRACT_GUARDRAILS, [''],
+    INST_OUTPUT_BUDGETS, [''],
+    INST_VISUAL_DIRECTION, [''],
     INST_STRUCTURAL_RULES, [''],
-    INST_SELF_VERIFICATION, [''],
-    INST_QUALITY_STANDARD, [''],
-    INST_POSTWRITING_GATE, [''],
-    INST_RULES_TEACH
+    INST_RULES_TEACH, [''],
+    INST_SELF_VERIFICATION
   ).join('\n');
 
   // ── Mechanic Vocabulary Brief ───────────────────────────────────────────
