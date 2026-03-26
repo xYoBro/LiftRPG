@@ -360,6 +360,7 @@ function loadBooklet(data, sourceLabel) {
   }
 
   state.data = data;
+  window.__bookletData = data; // expose for diagnostics tests
   state.unlockedEnding = null;
   state.demoPasswordRevealed = false;
   refs.layoutMode.value = state.layoutMode;
