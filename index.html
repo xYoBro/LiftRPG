@@ -432,8 +432,9 @@
     }
 
     .modal-overlay.is-open {
-      display: grid;
-      place-items: center;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
     }
 
     .modal-panel {
@@ -441,13 +442,14 @@
       padding: 36px 44px;
       width: 100%;
       max-width: 920px;
+      margin: auto 0;
       position: relative;
       border-radius: 16px;
       box-shadow:
         0 2px 4px rgba(0, 0, 0, .04),
         0 8px 24px rgba(0, 0, 0, .08),
         0 24px 48px rgba(0, 0, 0, .12);
-      overflow: hidden;
+      overflow: visible;
     }
 
     .modal-panel::before {
