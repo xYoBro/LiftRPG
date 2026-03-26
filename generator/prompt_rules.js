@@ -35,6 +35,7 @@
     '  * NarratorReliability: "reliable", "compromised" (knows but omits), "unreliable" (believes wrong things), "institutional" (voice of the system), "multiple" (several narrators), "shifting" (reliability changes over time).',
     '  * PromptFragmentRelationship: "fragments-deepen" (fragments add depth to prompts), "fragments-contradict" (fragments undermine prompt claims), "fragments-parallel" (fragments tell a parallel story), "fragments-precede" (fragments are chronologically earlier).',
     '  Choose values that create real structural consequences, not decorative labels.',
+    '- `storySpine` (object, optional but strongly recommended): { premise, protagonistDrive, centralTension, midpointShift, finalCost }. Five sentences maximum total. This is your story anchor — refer back to it when writing every session prompt, fragment, and ending. It is not rendered but keeps the story coherent across a long generation.',
     '- `passwordEncryptedEnding` (string): Set to empty string `""`. Trusted tooling writes this after sealing the ending. Do not invent fake ciphertext. Always include this key.',
     '- `demoPassword` (string, optional): Only include for explicit demo fixtures.',
     '- `liftoScript` (string): Raw workout program pasted by the user',
@@ -330,6 +331,7 @@
     '  temporalOrder: "chronological"|"in-medias-res"|"rashomon"|"fragmented"|"linear"|"reverse"|"parallel"',
     '  narratorReliability: "reliable"|"compromised"|"unreliable"|"institutional"|"multiple"|"shifting"',
     '  promptFragmentRelationship: "fragments-deepen"|"fragments-contradict"|"fragments-parallel"|"fragments-precede"',
+    '- `storySpine` (object): { premise, protagonistDrive, centralTension, midpointShift, finalCost } — 5 sentences total',
     '- `artifactIdentity` (object): { artifactClass, shellFamily, boardStateMode, attachmentStrategy }',
     '  Plus optional: artifactBlend?, authorialMode?, documentEcology?, materialCulture?, openingMode?, rulesDeliveryMode?, revealShape?, unlockLogic?',
     '',
@@ -392,6 +394,7 @@
       narrativeVoice: { person: '', tense: '', narratorStance: '', voiceRationale: '' },
       literaryRegister: { name: '', behaviorDescription: '', forbiddenMoves: '', typographicBehavior: '' },
       structuralShape: { resolution: '', temporalOrder: '', narratorReliability: '', promptFragmentRelationship: '', shapeRationale: '' },
+      storySpine: { premise: '', protagonistDrive: '', centralTension: '', midpointShift: '', finalCost: '' },
       artifactIdentity: { artifactClass: '', shellFamily: '', boardStateMode: '', attachmentStrategy: '' }
     },
     theme: { visualArchetype: '', palette: { ink: '#000000', paper: '#ffffff', accent: '#000000', muted: '#888888', rule: '#cccccc', fog: '#eeeeee' } },
@@ -433,13 +436,24 @@
             properties: { resolution: { type: 'string' }, temporalOrder: { type: 'string' }, narratorReliability: { type: 'string' }, promptFragmentRelationship: { type: 'string' }, shapeRationale: { type: 'string' } },
             required: ['resolution', 'temporalOrder']
           },
+          storySpine: {
+            type: 'object',
+            properties: {
+              premise: { type: 'string' },
+              protagonistDrive: { type: 'string' },
+              centralTension: { type: 'string' },
+              midpointShift: { type: 'string' },
+              finalCost: { type: 'string' }
+            },
+            required: ['premise', 'protagonistDrive', 'centralTension', 'midpointShift', 'finalCost']
+          },
           artifactIdentity: {
             type: 'object',
             properties: { artifactClass: { type: 'string' }, shellFamily: { type: 'string' }, boardStateMode: { type: 'string' }, attachmentStrategy: { type: 'string' } },
             required: ['artifactClass', 'shellFamily', 'boardStateMode', 'attachmentStrategy']
           }
         },
-        required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'artifactIdentity']
+        required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'storySpine', 'artifactIdentity']
       },
       theme: {
         type: 'object',
@@ -611,9 +625,9 @@
 
   window.INST_STORY_ENGINE = [
     '## Story Engine First, Then JSON',
-    '- Before writing fields, determine this internal story engine: genre/tone, layered setting, protagonist role, core want, core need, flaw, wound, relationship web, antagonist pressure, secret, midpoint shift, darkest moment, resolution mode, recurring object, recurring place, recurring motif.',
-    '- Do not output that planning object separately. Let it shape the authored fields.',
-    '- The week prompts, fragments, rules spread, boss page, and endings must all feel like consequences of the same hidden story engine.'
+    '- Before writing fields, determine your story engine: genre/tone, layered setting, protagonist role, core want, core need, flaw, wound, relationship web, antagonist pressure, secret, midpoint shift, darkest moment, resolution mode, recurring object, recurring place, recurring motif.',
+    '- Capture the essential arc in `meta.storySpine` (5 sentences max: premise, protagonist drive, central tension, midpoint shift, final cost). This is your anchor — refer back to it when writing every session prompt, fragment, and ending.',
+    '- The week prompts, fragments, rules spread, boss page, and endings must all feel like consequences of the same story engine.'
   ];
 
   window.INST_ENVIRONMENT = [
