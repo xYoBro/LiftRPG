@@ -94,6 +94,23 @@ export function resolvePageOverflow(pageAtoms, overflowPx, pageBudgetPx) {
   // Sort by most shrinkable first
   potentials.sort((a, b) => b.shrinkPotentialPx - a.shrinkPotentialPx);
 
+  // Early exit: if combined shrink potential cannot cover the overflow,
+  // density strategies 1 & 2 will never resolve it regardless of how many
+  // revision passes we spend.  Jump straight to Strategy 3 (split) rather
+  // than burning MAX_REVISIONS on futile incremental adjustments.
+  const totalShrinkPotential = potentials.reduce((sum, a) => sum + a.shrinkPotentialPx, 0);
+  if (totalShrinkPotential < overflowPx) {
+    if (pageAtoms.length > 1) {
+      for (let index = pageAtoms.length - 1; index >= 0; index -= 1) {
+        const candidate = pageAtoms[index];
+        const definition = getAtomDefinition(candidate.type);
+        if (definition && definition.canSplitAway === false) continue;
+        return { resolved: false, adjustments: [], splitAtomId: candidate.atomId };
+      }
+    }
+    return { resolved: false, adjustments: [], splitAtomId: null };
+  }
+
   // ── Strategy 1: Shrink the single largest atom ──────────────────────
   if (potentials.length > 0) {
     const target = potentials[0];
