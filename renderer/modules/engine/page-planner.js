@@ -22,7 +22,7 @@ import {
   recordUnresolvedOverflow, recordSpreadUsage, recordAtomMetrics,
   formatStatus, summarize,
 } from './diagnostics.js';
-import { getMechanicSlotWidthPx } from '../mechanic-layout.js';
+import { getMechanicSlotWidthPx, getHalfWidthTypes } from '../mechanic-layout.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -86,16 +86,21 @@ export function orderAtoms(atoms, sectionOrder = DEFAULT_SECTION_ORDER) {
  *  The measurement harness refines actual sizing post-plan. */
 const ESTIMATE_DENSITY = 0.6;
 
-function estimateAtomHeight(atom, density = ESTIMATE_DENSITY) {
+function estimateAtomHeight(atom, density = ESTIMATE_DENSITY, halfWidthTypes = null) {
   const def = getAtomDefinition(atom.type);
   if (def) {
     const est = def.estimate(atom.data, density);
     // Use minHeight for packing — lets more atoms fit per page.
     // The measurement harness refines actual height post-plan.
-    const cols = (def.footprint && def.footprint.cols) || 2;
-    // cols:1 atoms render at ~232px instead of 470px. Text wraps more.
-    // Scale factor 1.4 approximates the height increase from narrower width.
-    const widthScaleFactor = cols === 1 ? 1.4 : 1.0;
+    //
+    // Width scale factor: half-width atoms (232px vs 470px) wrap text
+    // more, increasing height by ~40%. Use the shared mechanic layout
+    // contract (halfWidthTypes) when page context is available;
+    // otherwise fall back to footprint.cols for non-mechanic atoms.
+    const isHalfWidth = halfWidthTypes
+      ? halfWidthTypes.has(atom.type)
+      : ((def.footprint && def.footprint.cols) || 2) === 1;
+    const widthScaleFactor = isHalfWidth ? 1.4 : 1.0;
     return Math.round(est.minHeight * widthScaleFactor);
   }
   return SIZE_HINT_PX[atom.sizeHint] || SIZE_HINT_PX['flex'];
@@ -142,12 +147,12 @@ function createSpread(spreadIndex, spreadType, weekIndex = null) {
 /**
  * Create an atom placement entry for a spread's left or right page.
  */
-function createPlacement(atom, density = ESTIMATE_DENSITY) {
+function createPlacement(atom, density = ESTIMATE_DENSITY, halfWidthTypes = null) {
   return {
     atomId:          atom.id,
     type:            atom.type,
     density,
-    estimatedHeight: estimateAtomHeight(atom, density),
+    estimatedHeight: estimateAtomHeight(atom, density, halfWidthTypes),
     measuredHeight:  null,
     data:            atom.data,
     sizeHint:        atom.sizeHint,
@@ -313,14 +318,20 @@ function binGroupIntoSpreads(groupAtoms, startSpreadIndex, spreadType, weekIndex
     else                           eitherAtoms.push(atom);
   }
 
+  // ── Pre-compute half-width types per side ────────────────────
+  // Uses the shared mechanic layout contract so estimate-phase width
+  // scaling matches actual render width (balanced → half, dominant → full).
+  const leftHalfWidthTypes  = getHalfWidthTypes(leftAtoms);
+  const rightHalfWidthTypes = getHalfWidthTypes(rightAtoms);
+
   // ── Bin atoms into pages (shared helper) ────────────────────
   // Non-shareable atoms (full-page, canShare:false) get their own
   // page via forced breaks before and after.
-  function binToPages(atoms) {
+  function binToPages(atoms, halfWidthTypes) {
     const pages = [];
     let current = [];
     for (const atom of atoms) {
-      const placement = createPlacement(atom);
+      const placement = createPlacement(atom, ESTIMATE_DENSITY, halfWidthTypes);
       const ownPage = atom.mustOwnPage || atom.sizeHint === 'full-page' || !getAtomDefinition(atom.type)?.canShare;
 
       if (ownPage) {
@@ -341,12 +352,12 @@ function binGroupIntoSpreads(groupAtoms, startSpreadIndex, spreadType, weekIndex
     return pages;
   }
 
-  const leftPages  = binToPages(leftAtoms);
-  const rightPages = binToPages(rightAtoms);
+  const leftPages  = binToPages(leftAtoms, leftHalfWidthTypes);
+  const rightPages = binToPages(rightAtoms, rightHalfWidthTypes);
 
   // ── Distribute 'either' atoms into pages with room ─────────
   for (const atom of eitherAtoms) {
-    const placement = createPlacement(atom);
+    const placement = createPlacement(atom, ESTIMATE_DENSITY, rightHalfWidthTypes);
     const ownPage = atom.mustOwnPage || atom.sizeHint === 'full-page' || !getAtomDefinition(atom.type)?.canShare;
     let placed = false;
 

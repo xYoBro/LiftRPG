@@ -178,3 +178,40 @@ export function getMechanicSlotWidthPx(placement, allPagePlacements) {
   // Not found in any row — full-width fallback
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// Batch helper for estimate phase
+// ---------------------------------------------------------------------------
+
+/**
+ * Determine which mechanic surface types will render at half-width
+ * given a set of co-located items (atoms or placements).
+ *
+ * Used by the estimate-phase planner before page assignment is final.
+ * Items must have `.type` and either `.data` or `.atom.data` for map
+ * type / artifact identity resolution.
+ *
+ * Works with both raw AtomDescriptors and placement objects — the
+ * resolvers read `.atom?.data || .data` which covers both shapes.
+ *
+ * @param {Array} items — atoms or placements on the same page side
+ * @returns {Set<string>} atom types that will render in a halves row
+ */
+export function getHalfWidthTypes(items) {
+  const surfaceItems = items.filter(function (p) {
+    return p.type !== 'tracker' && p.type !== 'week-footer';
+  });
+  if (surfaceItems.length === 0) return new Set();
+
+  const artifactIdentity = resolveArtifactIdentityFromPlacements(items);
+  const variant = resolveLayoutVariant(artifactIdentity, surfaceItems);
+  const rows = buildMechanicSurfaceRows(surfaceItems, variant);
+
+  const types = new Set();
+  for (const row of rows) {
+    if (row.type === 'halves') {
+      row.placements.forEach(function (p) { types.add(p.type); });
+    }
+  }
+  return types;
+}
