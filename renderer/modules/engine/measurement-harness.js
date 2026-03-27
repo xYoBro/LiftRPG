@@ -170,6 +170,9 @@ export function measureAtom(stack, atom, density, slotWidthPx = null) {
     return {
       measuredHeight: rect.height + internalOverflow,
       measuredWidth:  rect.width,
+      // NOTE: overflowHeight here means internal scroll overflow within the atom,
+      // NOT overflow against the page boundary. The planner must not treat this
+      // as a page-budget violation — it is an atom-level content overflow signal.
       overflowHeight: internalOverflow,
     };
   }
