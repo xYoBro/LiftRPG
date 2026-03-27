@@ -117,16 +117,40 @@ export function createMeasurementRoot(container) {
 // ---------------------------------------------------------------------------
 
 /**
- * Returns the slot width (px) for an atom based on its footprint.cols.
- * Returns null for full-width atoms (cols:2 or unspecified).
+ * Mechanic atom types that can share a half-width row, keyed to their partner type.
+ * Mirrors the MECHANIC_HALF_PAIR map in page-planner.js — must stay in sync.
+ */
+const MECHANIC_HALF_PAIR = new Map([
+  ['cipher-panel', 'map-panel'],
+  ['map-panel',    'cipher-panel'],
+]);
+
+/**
+ * Returns the slot width (px) for an atom, accounting for actual row pairing.
+ *
+ * For mechanic cols:1 atoms (cipher-panel, map-panel): only returns
+ * HALF_SLOT_WIDTH_PX when the partner type is also present on the page.
+ * Otherwise returns null (full-width measurement).
  *
  * @param {object} atom
+ * @param {Array} [pagePlacements] — all placements on the same page side
  * @returns {number|null}
  */
-function getAtomSlotWidthPx(atom) {
+function getAtomSlotWidthPx(atom, pagePlacements) {
   const def = getAtomDefinition(atom.type);
   const cols = (def && def.footprint && def.footprint.cols) || 2;
-  return cols === 1 ? HALF_SLOT_WIDTH_PX : null;
+  if (cols !== 1) return null;
+
+  const partnerType = MECHANIC_HALF_PAIR.get(atom.type);
+  if (partnerType && pagePlacements) {
+    const hasPair = pagePlacements.some(function (p) {
+      const a = p.atom || p;
+      return a.type === partnerType;
+    });
+    return hasPair ? HALF_SLOT_WIDTH_PX : null;
+  }
+
+  return HALF_SLOT_WIDTH_PX;
 }
 
 /**
@@ -255,7 +279,7 @@ export function measureAtom(stack, atom, density, slotWidthPx = null) {
  */
 export function measurePageAtoms(stack, pageAtoms) {
   return pageAtoms.map(placement => {
-    const slotWidthPx = getAtomSlotWidthPx(placement.atom);
+    const slotWidthPx = getAtomSlotWidthPx(placement.atom, pageAtoms);
     const result = measureAtom(stack, placement.atom, placement.density, slotWidthPx);
     return {
       atomId:         placement.atomId,
