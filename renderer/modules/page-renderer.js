@@ -199,34 +199,86 @@ function resolveSoloSurfaceWorksheet(surfacePlacements) {
 }
 
 /**
- * Group a flat placement list into rows based on footprint.cols.
- * Two consecutive cols:1 atoms → one 'halves' row.
- * Everything else → 'full' row.
+ * Group a flat placement list into rows based on footprint.cols and rowGroup.
+ *
+ * When atoms declare a `rowGroup` on their atom descriptor, atoms with the
+ * same rowGroup and `footprint.cols === 1` are paired into halves rows
+ * regardless of adjacency. Atoms without rowGroup fall back to the legacy
+ * adjacency-based pairing (two consecutive cols:1 → halves row). Atoms with
+ * rowGroup never pair with atoms without rowGroup, and atoms with different
+ * rowGroup values never pair with each other.
  *
  * @param {Array} placements
  * @returns {Array<{ type: 'halves'|'full', placements: Array }>}
  */
 function groupPlacementsIntoRows(placements) {
   const rows = [];
+  const consumed = new Set();
+
+  // Phase 1: Pre-compute rowGroup-based pairs.
+  // For each rowGroup, collect cols:1 members and pair them in list order.
+  const paired = new Map(); // index → partner index
+  const byRowGroup = new Map();
+  for (let idx = 0; idx < placements.length; idx++) {
+    const rg = placements[idx].atom && placements[idx].atom.rowGroup;
+    if (!rg) continue;
+    if (!byRowGroup.has(rg)) byRowGroup.set(rg, []);
+    byRowGroup.get(rg).push(idx);
+  }
+  for (const indices of byRowGroup.values()) {
+    const halfIndices = indices.filter(function (idx) {
+      const def = getAtomDefinition(placements[idx].type);
+      return ((def && def.footprint && def.footprint.cols) || 2) === 1;
+    });
+    for (let k = 0; k + 1 < halfIndices.length; k += 2) {
+      paired.set(halfIndices[k], halfIndices[k + 1]);
+      paired.set(halfIndices[k + 1], halfIndices[k]);
+    }
+  }
+
+  // Phase 2: Walk placements in order, forming rows.
   let i = 0;
   while (i < placements.length) {
+    if (consumed.has(i)) { i++; continue; }
+
     const p = placements[i];
     const def = getAtomDefinition(p.type);
     const cols = (def && def.footprint && def.footprint.cols) || 2;
+    const partner = paired.get(i);
 
-    if (cols === 1 && i + 1 < placements.length) {
-      const nextDef = getAtomDefinition(placements[i + 1].type);
-      const nextCols = (nextDef && nextDef.footprint && nextDef.footprint.cols) || 2;
-      if (nextCols === 1) {
-        rows.push({ type: 'halves', placements: [placements[i], placements[i + 1]] });
-        i += 2;
-        continue;
+    // rowGroup-based halves row
+    if (partner !== undefined && !consumed.has(partner)) {
+      rows.push({ type: 'halves', placements: [p, placements[partner]] });
+      consumed.add(i);
+      consumed.add(partner);
+      i++;
+      continue;
+    }
+
+    // Legacy adjacency fallback — only for atoms WITHOUT rowGroup
+    const hasRowGroup = !!(p.atom && p.atom.rowGroup);
+    if (!hasRowGroup && cols === 1 && i + 1 < placements.length && !consumed.has(i + 1)) {
+      const next = placements[i + 1];
+      const nextHasRowGroup = !!(next.atom && next.atom.rowGroup);
+      if (!nextHasRowGroup) {
+        const nextDef = getAtomDefinition(next.type);
+        const nextCols = (nextDef && nextDef.footprint && nextDef.footprint.cols) || 2;
+        if (nextCols === 1) {
+          rows.push({ type: 'halves', placements: [p, next] });
+          consumed.add(i);
+          consumed.add(i + 1);
+          i += 2;
+          continue;
+        }
       }
     }
 
-    rows.push({ type: 'full', placements: [placements[i]] });
+    // Full-width row
+    consumed.add(i);
+    rows.push({ type: 'full', placements: [p] });
     i++;
   }
+
   return rows;
 }
 

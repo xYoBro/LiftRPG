@@ -203,6 +203,7 @@ export function createAtom(partial) {
     id:           partial.id ?? null,
     group:        partial.group ?? null,
     groupPolicy:  partial.groupPolicy ?? null,
+    rowGroup:     partial.rowGroup ?? null,
     mustOwnPage:  !!partial.mustOwnPage,
     section:      partial.section ?? null,
     sequence:     partial.sequence ?? 0,

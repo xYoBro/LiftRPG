@@ -77,6 +77,39 @@ function resolveTrackerSizeHint(artifactIdentity, component) {
   return footprint || 'half-page';
 }
 
+/**
+ * Determine the rowGroup key for balanced cipher + map pairing.
+ * Returns a shared rowGroup string when both cipher and map are present
+ * and the layout variant will be `balanced` (halves row). Returns null
+ * when a dominant variant is expected (each surface full-width).
+ *
+ * This mirrors the logic in resolveLayoutVariant() from mechanic-layout.js
+ * so the adapter's rowGroup annotation matches actual render behavior.
+ *
+ * @param {object} artifactIdentity
+ * @param {object} week
+ * @param {number} weekIndex
+ * @returns {string|null}
+ */
+function resolveBalancedRowGroup(artifactIdentity, week, weekIndex) {
+  const boardStateMode = String((artifactIdentity && artifactIdentity.boardStateMode) || 'survey-grid');
+  const mapState = week.fieldOps && week.fieldOps.mapState;
+  const mapType = mapState ? String(mapState.mapType || '').toLowerCase() : '';
+
+  // Dominant layouts — surfaces render full-width, no pairing
+  if (boardStateMode === 'timeline-reconstruction') return null;
+  if (boardStateMode === 'testimony-matrix') return null;
+  if (boardStateMode === 'node-graph') return null;
+  if (mapType === 'player-drawn') return null;
+
+  // Balanced only when both cipher and map are present
+  const hasCipher = !!(week.weeklyComponent || (week.fieldOps && week.fieldOps.cipher));
+  const hasMap = !!mapState;
+  if (hasCipher && hasMap) return `week-${weekIndex}-surfaces`;
+
+  return null;
+}
+
 function resolveTrackerGroup(primaryGroup, weekIndex, attachmentStrategy, artifactIdentity, component) {
   const shellFamily = String((artifactIdentity && artifactIdentity.shellFamily) || '').trim().toLowerCase();
   const boardStateMode = String((artifactIdentity && artifactIdentity.boardStateMode) || '').trim().toLowerCase();
@@ -157,6 +190,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
     const sessionChunks = chunkWeekSessions(week.sessions || []);
     const primaryGroup = `week-${wi}-chunk-0`;
     const attachmentStrategy = resolveWeekAttachmentStrategy(artifactIdentity, week, profile);
+    const balancedRowGroup = isBoss ? null : resolveBalancedRowGroup(artifactIdentity, week, wi);
 
     // Week header (kicker, title, epigraph) — before session cards
     atoms.push(createAtom({
@@ -259,6 +293,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
           id: `w${wi}-cipher`,
           group: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'cipher', artifactIdentity),
           groupPolicy: singlePageGroupPolicy(),
+          rowGroup: balancedRowGroup,
           section: 'body',
           sequence: wi * 1000 + 100,
           sizeHint: 'quarter-page',
@@ -299,6 +334,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
           id: `w${wi}-map`,
           group: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'map', artifactIdentity),
           groupPolicy: singlePageGroupPolicy(),
+          rowGroup: balancedRowGroup,
           section: 'body',
           sequence: wi * 1000 + 102,
           sizeHint: resolveMapSizeHint(artifactIdentity, week.fieldOps.mapState),
