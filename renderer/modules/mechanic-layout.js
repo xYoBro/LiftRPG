@@ -85,9 +85,26 @@ export function resolveLayoutVariant(artifactIdentity, surfacePlacements) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Extract rowGroup from an item that may be a raw AtomDescriptor (.rowGroup)
+ * or a placement object (.atom.rowGroup). Returns null when absent.
+ */
+function extractRowGroup(item) {
+  if (item.atom && item.atom.rowGroup) return item.atom.rowGroup;
+  return item.rowGroup || null;
+}
+
+/**
  * Build mechanic surface rows from an explicit layout template keyed by
  * layoutVariant. This is role-based (not adjacency-based), so cipher and
  * map are always paired correctly regardless of sequence order.
+ *
+ * For the `balanced` variant, rowGroup is the authoritative pairing signal
+ * when present. If both cipher and map carry the same non-null rowGroup,
+ * they pair explicitly. If neither carries rowGroup, they pair by legacy
+ * role-based logic. If only one carries rowGroup, or they carry different
+ * values, they render full-width (defensive — adapter inconsistency).
+ *
+ * Dominant variants ignore rowGroup — full-width layout is unconditional.
  *
  * Oracle is always full-width (below the paired surfaces).
  * Other surfaces follow oracle, each full-width.
@@ -107,14 +124,27 @@ export function buildMechanicSurfaceRows(surfacePlacements, layoutVariant) {
   const rows = [];
 
   switch (layoutVariant) {
-    case 'balanced':
+    case 'balanced': {
       if (cipher && map) {
-        rows.push({ type: 'halves', placements: [cipher, map] });
+        // rowGroup-aware pairing: explicit adapter intent takes precedence.
+        const cipherRG = extractRowGroup(cipher);
+        const mapRG    = extractRowGroup(map);
+        const explicitPair = cipherRG && mapRG && cipherRG === mapRG;
+        const legacyPair   = !cipherRG && !mapRG;
+
+        if (explicitPair || legacyPair) {
+          rows.push({ type: 'halves', placements: [cipher, map] });
+        } else {
+          // Mismatched or partial rowGroup — render full-width (safe fallback)
+          if (cipher) rows.push({ type: 'full', placements: [cipher] });
+          if (map)    rows.push({ type: 'full', placements: [map] });
+        }
       } else {
         if (cipher) rows.push({ type: 'full', placements: [cipher] });
         if (map)    rows.push({ type: 'full', placements: [map] });
       }
       break;
+    }
     case 'timeline-dominant':
       if (map)    rows.push({ type: 'full', placements: [map] });
       if (cipher) rows.push({ type: 'full', placements: [cipher] });
