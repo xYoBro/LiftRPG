@@ -1694,6 +1694,7 @@ async function runApiPipeline(options) {
       if (options.onStatus) options.onStatus('Week ' + w + ': ' + weekValidation.errors.length + ' schema issue(s)');
     }
 
+    stageNum++;
     finalWeeks.push(weekObject);
     if (!isBossWeek && weekObject.weeklyComponent && weekObject.weeklyComponent.value) {
       allComponentValues.push(weekObject.weeklyComponent.value);
@@ -1767,6 +1768,7 @@ async function runApiPipeline(options) {
       }
       finalFragments.push(frag);
     });
+    stageNum++;
     checkpoint = saveCheckpoint(fragCacheKey, batchOutput, checkpoint);
   }
 
