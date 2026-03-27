@@ -51,10 +51,24 @@ registerAtom('map-panel', {
       ...map,
       artifactIdentity,
     }, null);
+    // renderMapSection now returns .map-zone (peer of .cipher-zone/.oracle-zone).
+    // Set identity attributes on the zone for zone-level CSS rules, and mirror
+    // them onto the inner .map-content so CSS selectors targeting
+    // .map-content[data-shell-family] (solo-surface contexts) still match.
     const el = renderMapSection(mapModel);
-    el.setAttribute('data-shell-family', artifactIdentity.shellFamily || 'field-survey');
-    el.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || 'survey-grid');
-    el.setAttribute('data-attachment-strategy', artifactIdentity.attachmentStrategy || 'split-technical');
+    const shellFamily   = artifactIdentity.shellFamily   || 'field-survey';
+    const boardState    = artifactIdentity.boardStateMode || 'survey-grid';
+    const attachStrat   = artifactIdentity.attachmentStrategy || 'split-technical';
+    el.setAttribute('data-shell-family',        shellFamily);
+    el.setAttribute('data-board-state-mode',    boardState);
+    el.setAttribute('data-attachment-strategy', attachStrat);
+
+    const mapContent = el.querySelector('.map-content');
+    if (mapContent) {
+      mapContent.setAttribute('data-shell-family',        shellFamily);
+      mapContent.setAttribute('data-board-state-mode',    boardState);
+      mapContent.setAttribute('data-attachment-strategy', attachStrat);
+    }
 
     const variant = densityVariant(density);
     if (variant) el.setAttribute('data-density-variant', variant);

@@ -236,6 +236,20 @@ function renderPointMap(mapState) {
     nodesById[node.id] = node;
   });
 
+  // Offset nodes that share identical computed coordinates after clamping
+  // (can happen when out-of-bounds coords like 0 or -1 are clamped to the same boundary)
+  var positionCounts = {};
+  nodes.forEach((node) => {
+    var key = node._x.toFixed(1) + ',' + node._y.toFixed(1);
+    if (positionCounts[key] === undefined) {
+      positionCounts[key] = 0;
+    } else {
+      positionCounts[key]++;
+      node._x = Math.min(84, node._x + positionCounts[key] * 7);
+      node._y = Math.min(82, node._y + positionCounts[key] * 5);
+    }
+  });
+
   (mapState.edges || []).forEach((edge, edgeIndex) => {
     const from = nodesById[edge.from];
     const to = nodesById[edge.to];
@@ -250,7 +264,8 @@ function renderPointMap(mapState) {
     line.setAttribute('data-state', edge.state || 'open');
     svg.appendChild(line);
 
-    if (edge.label) {
+    var edgeDensityThreshold = 8;
+    if (edge.label && (shellFamily !== 'classified-packet' || (mapState.edges || []).length <= edgeDensityThreshold)) {
       const dx = (to._x || 0) - (from._x || 0);
       const dy = (to._y || 0) - (from._y || 0);
       const distance = Math.max(1, Math.hypot(dx, dy));
@@ -364,6 +379,10 @@ function renderPlayerMap(mapState) {
 }
 
 export function renderMapSection(mapState) {
+  // .map-zone is the peer of .cipher-zone and .oracle-zone in the zone contract.
+  // All zone-level CSS (classified-packet, boardStateMode variants, data-layout-variant
+  // rules) targets .map-zone.  The inner .map-content holds the map type content.
+  const zone = make('div', 'map-zone');
   const section = make('div', 'map-content');
   section.setAttribute('data-map-family', mapState.family || 'none');
   section.setAttribute('data-map-type', mapState.mapType || 'grid');
@@ -383,7 +402,8 @@ export function renderMapSection(mapState) {
 
   if (mapState.floorLabel) section.appendChild(make('div', 'map-annotation', mapState.floorLabel));
   if (mapState.mapNote) section.appendChild(make('div', 'map-note', mapState.mapNote));
-  return section;
+  zone.appendChild(section);
+  return zone;
 }
 
 function renderCellWorkspace(workSpace) {
