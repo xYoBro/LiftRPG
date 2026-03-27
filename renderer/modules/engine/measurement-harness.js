@@ -143,10 +143,7 @@ function getAtomSlotWidthPx(atom, pagePlacements) {
 
   const partnerType = MECHANIC_HALF_PAIR.get(atom.type);
   if (partnerType && pagePlacements) {
-    const hasPair = pagePlacements.some(function (p) {
-      const a = p.atom || p;
-      return a.type === partnerType;
-    });
+    const hasPair = pagePlacements.some(function (p) { return p.type === partnerType; });
     return hasPair ? HALF_SLOT_WIDTH_PX : null;
   }
 

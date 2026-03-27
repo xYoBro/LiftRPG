@@ -26,9 +26,22 @@ function splitBody(fragment) {
 }
 
 export function buildFragmentModel(fragment) {
-  const documentType = fragment.documentType || 'Document';
-  // Normalize 'letter' to 'correspondence' for CSS class — no .letter treatment exists
-  const cssType = documentType === 'letter' ? 'correspondence' : documentType;
+  const rawDocumentType = fragment.documentType || 'Document';
+  // Normalize LLM-generated type variants to the 8 supported renderer types
+  var TYPE_ALIASES = {
+    'letter': 'correspondence',
+    'personal-letter': 'correspondence',
+    'technical-report': 'report',
+    'internal-memo': 'memo',
+    'legal-filing': 'memo',
+    'financial-record': 'form',
+    'contract': 'memo',
+    'field-report': 'report',
+    'incident-report': 'report',
+    'press-release': 'memo',
+  };
+  var documentType = TYPE_ALIASES[rawDocumentType.toLowerCase()] || rawDocumentType;
+  const cssType = documentType;
   const documentClass = String(cssType)
     .replace(/([a-z])([A-Z])/g, '$1-$2')
     .replace(/\s+/g, '-')

@@ -165,6 +165,17 @@ export function buildFieldOpsPageModels(data, week, layoutPlan = {}) {
   ];
 }
 
+function normalizeDecodingTable(raw) {
+  if (!raw) return '';
+  if (typeof raw === 'string') return raw;
+  if (Array.isArray(raw)) {
+    return raw.map(function (r) {
+      return (r.input || '?') + '  \u2192  ' + (r.nodeLabel || r.decodedNode || '?') + '  [' + (r.fenceEra || '') + ']';
+    }).join('\n');
+  }
+  return String(raw);
+}
+
 export function buildBossPageModel(data, week, options = 'standard') {
   const boss = week.bossEncounter || {};
   const decodingKey = boss.decodingKey || {};
@@ -208,7 +219,7 @@ export function buildBossPageModel(data, week, options = 'standard') {
     narrativeParagraphs: isContinuation ? [] : (hasConvergenceAppendix ? splitNarrative.head : narrativeParagraphs),
     mechanismParagraphs: isContinuation ? [] : (hasConvergenceAppendix ? mechanismParagraphs.slice(0, 1) : mechanismParagraphs),
     decodingInstruction: isContinuation ? '' : (hasConvergenceAppendix ? splitInstruction.head : (decodingKey.instruction || '')),
-    decodingTable: isContinuation ? '' : (decodingKey.referenceTable || ''),
+    decodingTable: isContinuation ? '' : normalizeDecodingTable(decodingKey.referenceTable),
     componentInputs: isContinuation ? [] : (boss.componentInputs || []).map((item, index) => ({
       weekLabel: 'W' + pad2(index + 1),
       value: item
