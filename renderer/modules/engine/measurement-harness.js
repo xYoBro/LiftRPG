@@ -141,6 +141,11 @@ function getAtomSlotWidthPx(atom) {
  * @param {number} density — density level (0.0–1.0)
  * @param {number|null} slotWidthPx — optional slot width for cols:1 atoms
  * @returns {{ measuredHeight: number, measuredWidth: number, overflowHeight: number }}
+ * @note When `slotWidthPx` is provided (the slot-width fast path), the atom renderer
+ *   must return a raw content element — NOT a full `booklet-page` element. The slot
+ *   path does not unwrap `booklet-page` containers (only the bounded-page path does).
+ *   Only atoms with `footprint.cols: 1` use this path; do not add `cols: 1` to any
+ *   atom whose renderer returns a `booklet-page` element.
  */
 export function measureAtom(stack, atom, density, slotWidthPx = null) {
   const def = getAtomDefinition(atom.type);
