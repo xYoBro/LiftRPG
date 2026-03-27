@@ -1964,121 +1964,51 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   min-height:18px;
 }
 
-/* Right Page Content Grid */
-.rp-content{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  grid-template-rows:min-content 1fr;
-  grid-template-areas:
-    "cipher map"
-    "oracle oracle";
-  gap:5px 6px;
-  flex:1;
-  min-height:0;
+/* ── rp-content: flex-column row container ──────────────────────────── */
+.rp-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  gap: 5px;
 }
-.rp-content[data-has-companion="true"]{
-  grid-template-rows:min-content auto 1fr;
-  grid-template-areas:
-    "cipher map"
-    "oracle oracle"
-    "companion companion";
+
+.rp-row {
+  min-height: 0;
 }
-.field-ops-right[data-layout-variant="map-dominant"] .rp-content{
-  grid-template-columns:1.2fr .8fr;
-  grid-template-areas:
-    "map cipher"
-    "map oracle";
+
+.rp-row--full {
+  display: block;
+  min-height: 0;
 }
-.field-ops-right[data-layout-variant="map-dominant"] .rp-content[data-has-companion="true"]{
-  grid-template-rows:min-content auto 1fr;
-  grid-template-areas:
-    "map cipher"
-    "map oracle"
-    "companion companion";
+
+.rp-row--halves {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  align-items: flex-start;
+  min-height: 0;
 }
-.field-ops-right[data-layout-variant="cipher-dominant"] .rp-content{
-  grid-template-columns:.95fr 1.05fr;
-  grid-template-areas:
-    "cipher map"
-    "cipher oracle";
+
+.rp-row--halves > .rp-row-cell {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
-.field-ops-right[data-layout-variant="cipher-dominant"] .rp-content[data-has-companion="true"]{
-  grid-template-rows:min-content auto 1fr;
-  grid-template-areas:
-    "cipher map"
-    "cipher oracle"
-    "companion companion";
-}
-.field-ops-right[data-layout-variant="oracle-dominant"] .rp-content{
-  grid-template-columns:1fr 1fr;
-  grid-template-rows:min-content auto 1fr;
-  grid-template-areas:
-    "cipher map"
-    "oracle oracle"
-    "companion companion";
-}
-.field-ops-right[data-layout-variant="timeline-dominant"] .rp-content{
-  grid-template-columns:1fr 1fr;
-  grid-template-rows:minmax(0, 1.05fr) auto;
-  grid-template-areas:
-    "map map"
-    "oracle cipher";
-}
-.field-ops-right[data-layout-variant="timeline-dominant"] .rp-content[data-has-companion="true"]{
-  grid-template-rows:minmax(0, 1.05fr) auto 1fr;
-  grid-template-areas:
-    "map map"
-    "oracle cipher"
-    "companion companion";
-}
-.field-ops-right[data-layout-variant="matrix-dominant"] .rp-content{
-  grid-template-columns:.9fr 1.1fr;
-  grid-template-rows:auto minmax(0, 1fr);
-  grid-template-areas:
-    "oracle oracle"
-    "map cipher";
-}
-.field-ops-right[data-layout-variant="matrix-dominant"] .rp-content[data-has-companion="true"]{
-  grid-template-rows:auto minmax(0, 1fr) 1fr;
-  grid-template-areas:
-    "oracle oracle"
-    "map cipher"
-    "companion companion";
-}
-.rp-content[data-solo-surface="map-panel"]{
-  grid-template-columns:1fr;
-  grid-template-rows:minmax(0, 1fr);
-  grid-template-areas:"map";
-}
-.rp-content[data-solo-surface="oracle-table"]{
-  grid-template-columns:1fr;
-  grid-template-rows:minmax(0, 1fr) auto;
-  grid-template-areas:
-    "oracle"
-    "worksheet";
-}
-.rp-content[data-solo-surface="cipher-panel"]{
-  grid-template-columns:1fr;
-  grid-template-rows:minmax(0, 1fr) auto;
-  grid-template-areas:
-    "cipher"
-    "worksheet";
-}
-.rp-content[data-solo-surface="tracker"]{
-  grid-template-columns:1fr;
-  grid-template-rows:minmax(0, 1fr) auto;
-  grid-template-areas:
-    "companion"
-    "worksheet";
+
+/* Solo-surface map gets remaining vertical space */
+.rp-content[data-solo-surface="map-panel"] .rp-row--full {
+  flex: 1 1 0;
 }
 
 /* Zone containers */
-.cipher-zone{grid-area:cipher;}
-.map-zone{grid-area:map;}
-.oracle-zone{grid-area:oracle;border-top:1px solid var(--rule);padding-top:3px;}
+.cipher-zone{}
+.map-zone{}
+.oracle-zone{border-top:1px solid var(--rule);padding-top:3px;}
 .oracle-zone{border-top-color:var(--theme-field-rule,var(--rule));}
 .companion-zone{
-  grid-area:companion;
   border-top:1px solid var(--rule);
   padding-top:6px;
   display:flex;
@@ -2613,6 +2543,8 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   margin-bottom:3px;
   word-break:normal;
   overflow-wrap:break-word;
+  max-height:200px;
+  overflow:hidden;
 }
 .cipher-key{
   margin-bottom:6px;
