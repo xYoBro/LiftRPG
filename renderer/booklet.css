@@ -2184,7 +2184,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
     color-mix(in srgb, var(--paper) 92%, white 8%);
 }
 .field-ops-right[data-board-state-mode="node-graph"] .map-node{
-  min-width:68px;
+  min-width:44px;
   max-width:84px;
   box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent 90%);
 }
@@ -2870,7 +2870,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .map-node{
   position:absolute;
   transform:translate(-50%, -50%);
-  min-width:50px;
+  min-width:32px;
   max-width:66px;
   padding:5px 4px 4px;
   border:1px solid var(--theme-panel-border,var(--rule));

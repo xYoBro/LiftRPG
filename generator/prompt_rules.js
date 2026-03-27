@@ -112,7 +112,7 @@
     '- `currentPosition`: { col, row }',
     '',
     'POINT-TO-POINT:',
-    '- `nodes`: [{ id, label, x, y, state }]',
+    '- `nodes`: [{ id, label, x, y, state }] — x and y MUST be integers in the range 1-12. Use the full 1-12 range to spread nodes across the map. Do NOT use pixel values (100, 300, 650, etc.) — only small integers.',
     '- `edges`: [{ from, to, label?, state? }] with short memorable labels and stateful access when possible, not just neutral connectivity',
     '- `currentNode`: string',
     '- Limits: max 12 nodes total, max 10 edges total, labels short, spacing generous',
