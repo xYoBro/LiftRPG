@@ -12,7 +12,7 @@
  */
 
 import { getAtomDefinition } from './atom-registry.js';
-import { PAGE_BUDGET, DEFAULT_PAGE_SPEC } from './page-spec.js';
+import { PAGE_BUDGET, DEFAULT_PAGE_SPEC, HALF_SLOT_WIDTH_PX } from './page-spec.js';
 import { resolvePageOverflow, MAX_REVISIONS } from './density-solver.js';
 import {
   createMeasurementRoot, measureAtom, measurePlacementsPage,
@@ -22,6 +22,24 @@ import {
   recordUnresolvedOverflow, recordSpreadUsage, recordAtomMetrics,
   formatStatus, summarize,
 } from './diagnostics.js';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the slot width (px) for an atom based on its footprint.cols.
+ * Returns null for full-width atoms (cols:2 or unspecified).
+ * cols:1 atoms are measured at HALF_SLOT_WIDTH_PX (232px).
+ *
+ * @param {object} atom
+ * @returns {number|null}
+ */
+function getAtomSlotWidthPx(atom) {
+  const def = getAtomDefinition(atom.type);
+  const cols = (def && def.footprint && def.footprint.cols) || 2;
+  return cols === 1 ? HALF_SLOT_WIDTH_PX : null;
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -91,7 +109,11 @@ function estimateAtomHeight(atom, density = ESTIMATE_DENSITY) {
     const est = def.estimate(atom.data, density);
     // Use minHeight for packing — lets more atoms fit per page.
     // The measurement harness refines actual height post-plan.
-    return est.minHeight;
+    const cols = (def.footprint && def.footprint.cols) || 2;
+    // cols:1 atoms render at ~232px instead of 470px. Text wraps more.
+    // Scale factor 1.4 approximates the height increase from narrower width.
+    const widthScaleFactor = cols === 1 ? 1.4 : 1.0;
+    return Math.round(est.minHeight * widthScaleFactor);
   }
   return SIZE_HINT_PX[atom.sizeHint] || SIZE_HINT_PX['flex'];
 }
@@ -514,7 +536,10 @@ export function planAndMeasure(atoms, container, options = {}) {
     for (const spread of spreadPlan) {
       for (const side of ['left', 'right']) {
         for (const placement of spread[side]) {
-          const result = measureAtom(stack, placement.atom, placement.density);
+          const result = measureAtom(
+            stack, placement.atom, placement.density,
+            getAtomSlotWidthPx(placement.atom),
+          );
           placement.measuredHeight = result.measuredHeight;
 
           recordAtomMetrics(
@@ -575,7 +600,10 @@ export function planAndMeasure(atoms, container, options = {}) {
                 placement.density = adj.newDensity;
 
                 // Re-measure adjusted atom
-                const remeasure = measureAtom(stack, placement.atom, placement.density);
+                const remeasure = measureAtom(
+                  stack, placement.atom, placement.density,
+                  getAtomSlotWidthPx(placement.atom),
+                );
                 placement.measuredHeight = remeasure.measuredHeight;
               }
             }
