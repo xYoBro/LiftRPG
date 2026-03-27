@@ -16,7 +16,7 @@ import { make } from '../dom.js';
 import { createBoundedPage } from '../page-shell.js';
 import { renderPageFromPlacements } from '../page-renderer.js';
 import { getAtomDefinition } from './atom-registry.js';
-import { PAGE_BUDGET } from './page-spec.js';
+import { PAGE_BUDGET, HALF_SLOT_WIDTH_PX } from './page-spec.js';
 
 function clipsVerticalOverflow(style) {
   const overflowY = style.overflowY || '';
@@ -117,6 +117,19 @@ export function createMeasurementRoot(container) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Returns the slot width (px) for an atom based on its footprint.cols.
+ * Returns null for full-width atoms (cols:2 or unspecified).
+ *
+ * @param {object} atom
+ * @returns {number|null}
+ */
+function getAtomSlotWidthPx(atom) {
+  const def = getAtomDefinition(atom.type);
+  const cols = (def && def.footprint && def.footprint.cols) || 2;
+  return cols === 1 ? HALF_SLOT_WIDTH_PX : null;
+}
+
+/**
  * Measure a single atom's rendered height inside a bounded page context.
  *
  * Creates a temporary bounded page, renders the atom into the frame,
@@ -126,13 +139,39 @@ export function createMeasurementRoot(container) {
  * @param {HTMLElement} stack — the measurement stack element
  * @param {object} atom — atom descriptor (must have `.type`, `.data`)
  * @param {number} density — density level (0.0–1.0)
+ * @param {number|null} slotWidthPx — optional slot width for cols:1 atoms
  * @returns {{ measuredHeight: number, measuredWidth: number, overflowHeight: number }}
  */
-export function measureAtom(stack, atom, density) {
+export function measureAtom(stack, atom, density, slotWidthPx = null) {
   const def = getAtomDefinition(atom.type);
   if (!def) {
     console.warn(`[measurement-harness] No definition for atom type: ${atom.type}`);
     return { measuredHeight: 0, measuredWidth: 0, overflowHeight: 0 };
+  }
+
+  // Slot-width path: measure cols:1 atoms at their actual render width.
+  if (slotWidthPx !== null) {
+    const slot = make('div', 'layout-engine-slot-measure');
+    Object.assign(slot.style, {
+      width:         slotWidthPx + 'px',
+      height:        'auto',
+      overflow:      'visible',
+      display:       'flex',
+      flexDirection: 'column',
+      position:      'relative',
+    });
+    const rendered = def.render(atom, density);
+    if (rendered.style && rendered.style.flex) rendered.style.flex = '';
+    slot.appendChild(rendered);
+    stack.appendChild(slot);
+    const rect = slot.getBoundingClientRect();
+    const internalOverflow = measureInternalOverflowPx(slot);
+    slot.remove();
+    return {
+      measuredHeight: rect.height + internalOverflow,
+      measuredWidth:  rect.width,
+      overflowHeight: internalOverflow,
+    };
   }
 
   // Create a bounded page context for accurate measurement.
@@ -205,7 +244,8 @@ export function measureAtom(stack, atom, density) {
  */
 export function measurePageAtoms(stack, pageAtoms) {
   return pageAtoms.map(placement => {
-    const result = measureAtom(stack, placement.atom, placement.density);
+    const slotWidthPx = getAtomSlotWidthPx(placement.atom);
+    const result = measureAtom(stack, placement.atom, placement.density, slotWidthPx);
     return {
       atomId:         placement.atomId,
       measuredHeight: result.measuredHeight,
