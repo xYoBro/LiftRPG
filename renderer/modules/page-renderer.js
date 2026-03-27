@@ -9,13 +9,6 @@ const DEFAULT_ARTIFACT_IDENTITY = {
   boardStateMode: 'survey-grid',
   attachmentStrategy: 'split-technical',
 };
-const BOARD_STATE_LAYOUTS = {
-  'survey-grid': 'balanced',
-  'node-graph': 'map-dominant',
-  'ledger-board': 'cipher-dominant',
-  'timeline-reconstruction': 'timeline-dominant',
-  'testimony-matrix': 'matrix-dominant',
-};
 const BOARD_STATE_COPY = {
   'survey-grid': {
     pageTitle: 'Field Operations',
@@ -89,17 +82,6 @@ function resolveArtifactIdentity(placements) {
     }
   }
   return DEFAULT_ARTIFACT_IDENTITY;
-}
-
-function resolveMechanicLayoutVariant(placements, artifactIdentity) {
-  const explicit = placements.find((placement) => {
-    const data = placement.atom?.data || placement.data || {};
-    return data.layoutVariant;
-  });
-  if (explicit) {
-    return explicit.atom?.data?.layoutVariant || explicit.data?.layoutVariant;
-  }
-  return BOARD_STATE_LAYOUTS[artifactIdentity.boardStateMode] || 'balanced';
 }
 
 function resolveMechanicCopy(artifactIdentity) {
@@ -450,13 +432,12 @@ function renderWorkoutPage(placements, planIndex) {
 function renderMechanicPage(placements, planIndex) {
   const artifactIdentity = resolveArtifactIdentity(placements);
   const copy = resolveMechanicCopy(artifactIdentity);
-  const layoutVariant = resolveMechanicLayoutVariant(placements, artifactIdentity);
   const surfacePlacements = placements.filter((placement) => placement.type !== 'tracker' && placement.type !== 'week-footer');
   const surfaceTypes = new Set(surfacePlacements.map((placement) => placement.type));
   const { page, frame } = createBoundedPage(
     'field-ops',
     'field-ops-right',
-    { boundaryRole: 'field-ops', pageClass: 'page-field-ops', layoutVariant },
+    { boundaryRole: 'field-ops', pageClass: 'page-field-ops' },
   );
 
   page.setAttribute('data-plan-index', String(planIndex));

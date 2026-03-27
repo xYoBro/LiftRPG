@@ -249,6 +249,9 @@ export function measureAtom(stack, atom, density, slotWidthPx = null) {
  * @param {HTMLElement} stack — the measurement stack element
  * @param {Array<{atomId: string, type: string, density: number, data: object, atom: object}>} pageAtoms
  * @returns {Array<{ atomId: string, measuredHeight: number, overflowHeight: number }>}
+ *   Note: for `cols:1` atoms (measured at slot width), `overflowHeight` represents
+ *   internal scroll overflow within the atom, NOT overflow against the page boundary.
+ *   Use `measurePlacementsPage()` for page-boundary overflow checks.
  */
 export function measurePageAtoms(stack, pageAtoms) {
   return pageAtoms.map(placement => {
