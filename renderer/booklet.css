@@ -2001,11 +2001,16 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 /* Solo-surface map gets remaining vertical space */
 .rp-content[data-solo-surface="map-panel"] .rp-row--full {
   flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Zone containers */
 .cipher-zone{}
-.map-zone{}
+.map-zone{
+  display:flex;
+  flex-direction:column;
+}
 .oracle-zone{border-top:1px solid var(--rule);padding-top:3px;}
 .oracle-zone{border-top-color:var(--theme-field-rule,var(--rule));}
 .companion-zone{
@@ -2285,6 +2290,8 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .rp-content[data-solo-surface="tracker"] .companion-zone{
   border-top:none;
   padding-top:0;
+}
+.rp-content[data-solo-surface="tracker"] .companion-zone:only-child{
   min-height:100%;
 }
 .rp-content[data-solo-surface="tracker"] .companion-component{
