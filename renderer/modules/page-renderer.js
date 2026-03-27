@@ -252,15 +252,15 @@ function groupPlacementsIntoRows(placements) {
  */
 function renderRowInto(container, row) {
   if (row.type === 'halves') {
-    const rowEl = make('div', 'rp-row', 'rp-row--halves');
-    row.placements.forEach(function (p) {
+    const rowEl = make('div', 'rp-row rp-row--halves');
+    row.placements.forEach(function (placement) {
       const cell = make('div', 'rp-row-cell');
-      renderPlacementInto(cell, p);
+      renderPlacementInto(cell, placement);
       rowEl.appendChild(cell);
     });
     container.appendChild(rowEl);
   } else {
-    const rowEl = make('div', 'rp-row', 'rp-row--full');
+    const rowEl = make('div', 'rp-row rp-row--full');
     renderPlacementInto(rowEl, row.placements[0]);
     container.appendChild(rowEl);
   }
