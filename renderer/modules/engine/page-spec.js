@@ -73,6 +73,20 @@ function computeBudget(spec) {
 export const PAGE_BUDGET = computeBudget(DEFAULT_PAGE_SPEC);
 
 // ---------------------------------------------------------------------------
+// Column layout constants
+// ---------------------------------------------------------------------------
+
+/** Gap between half-width columns (px). */
+export const COLUMN_GAP_PX = 6;
+
+/**
+ * Width of a single half-width slot (px).
+ * Two slots + gap = PAGE_BUDGET.widthPx.
+ * floor((470 - 6) / 2) = 232
+ */
+export const HALF_SLOT_WIDTH_PX = Math.floor((PAGE_BUDGET.widthPx - COLUMN_GAP_PX) / 2);
+
+// ---------------------------------------------------------------------------
 // Custom spec factory
 // ---------------------------------------------------------------------------
 

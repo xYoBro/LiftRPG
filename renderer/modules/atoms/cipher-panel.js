@@ -22,6 +22,7 @@ registerAtom('cipher-panel', {
   defaultSizeHint: 'quarter-page',
   canShare: true,
   pageAffinity: 'right',
+  footprint: { cols: 1 },
 
   estimate(data, density) {
     const cipher = data.cipher || {};
