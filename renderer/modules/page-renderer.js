@@ -1,6 +1,10 @@
 import { make } from './dom.js';
 import { createBoundedPage } from './page-shell.js';
 import { getAtomDefinition } from './engine/atom-registry.js';
+import {
+  resolveLayoutVariant,
+  buildMechanicSurfaceRows,
+} from './mechanic-layout.js';
 
 const WORKOUT_PAGE_TYPES = new Set(['week-header', 'session-card', 'week-footer']);
 const MECHANIC_PAGE_TYPES = new Set(['cipher-panel', 'oracle-table', 'map-panel', 'tracker']);
@@ -429,84 +433,8 @@ function renderWorkoutPage(placements, planIndex) {
   return page;
 }
 
-/**
- * Resolve the layout variant for a mechanic page.
- *
- * Keyed on boardStateMode and map type. The variant controls which surfaces
- * share a half-width row and which are full-width.
- *
- * @param {object} artifactIdentity
- * @param {Array} surfacePlacements — cipher/oracle/map placements only
- * @returns {string} layoutVariant
- */
-function resolveLayoutVariant(artifactIdentity, surfacePlacements) {
-  const boardStateMode = String((artifactIdentity && artifactIdentity.boardStateMode) || 'survey-grid');
-  const mapPlacement = surfacePlacements.find(function (p) { return p.type === 'map-panel'; });
-  const mapData = mapPlacement && (mapPlacement.atom && mapPlacement.atom.data || mapPlacement.data || {});
-  const mapType = mapData && mapData.map && String(mapData.map.mapType || '').toLowerCase();
-
-  if (boardStateMode === 'timeline-reconstruction') return 'timeline-dominant';
-  if (boardStateMode === 'testimony-matrix')        return 'matrix-dominant';
-  if (mapType === 'player-drawn')                   return 'map-dominant';
-  if (boardStateMode === 'node-graph')              return 'map-dominant';
-
-  const hasCipher = surfacePlacements.some(function (p) { return p.type === 'cipher-panel'; });
-  const hasMap    = surfacePlacements.some(function (p) { return p.type === 'map-panel'; });
-  if (hasCipher && hasMap) return 'balanced';
-  if (hasCipher) return 'cipher-dominant';
-  if (hasMap) return 'map-dominant';
-  return 'balanced';
-}
-
-/**
- * Build mechanic surface rows from an explicit layout template keyed by
- * layoutVariant. This is role-based (not adjacency-based), so cipher and
- * map are always paired correctly regardless of sequence order.
- *
- * Oracle is always full-width (below the paired surfaces).
- * Other surfaces follow oracle, each full-width.
- *
- * @param {Array} surfacePlacements — cipher/oracle/map placements only
- * @param {string} layoutVariant
- * @returns {Array<{ type: 'halves'|'full', placements: Array }>}
- */
-function buildMechanicSurfaceRows(surfacePlacements, layoutVariant) {
-  const cipher = surfacePlacements.find(function (p) { return p.type === 'cipher-panel'; });
-  const oracle = surfacePlacements.find(function (p) { return p.type === 'oracle-table'; });
-  const map    = surfacePlacements.find(function (p) { return p.type === 'map-panel'; });
-  const other  = surfacePlacements.filter(function (p) {
-    return p.type !== 'cipher-panel' && p.type !== 'oracle-table' && p.type !== 'map-panel';
-  });
-
-  const rows = [];
-
-  switch (layoutVariant) {
-    case 'balanced':
-      if (cipher && map) {
-        rows.push({ type: 'halves', placements: [cipher, map] });
-      } else {
-        if (cipher) rows.push({ type: 'full', placements: [cipher] });
-        if (map)    rows.push({ type: 'full', placements: [map] });
-      }
-      break;
-    case 'timeline-dominant':
-      if (map)    rows.push({ type: 'full', placements: [map] });
-      if (cipher) rows.push({ type: 'full', placements: [cipher] });
-      break;
-    case 'map-dominant':
-    case 'matrix-dominant':
-    case 'cipher-dominant':
-    default:
-      if (map)    rows.push({ type: 'full', placements: [map] });
-      if (cipher) rows.push({ type: 'full', placements: [cipher] });
-      break;
-  }
-
-  if (oracle) rows.push({ type: 'full', placements: [oracle] });
-  other.forEach(function (p) { rows.push({ type: 'full', placements: [p] }); });
-
-  return rows;
-}
+// resolveLayoutVariant and buildMechanicSurfaceRows are imported from
+// mechanic-layout.js — the single source of truth for mechanic row templates.
 
 function renderMechanicPage(placements, planIndex) {
   const artifactIdentity = resolveArtifactIdentity(placements);

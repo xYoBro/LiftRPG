@@ -16,7 +16,8 @@ import { make } from '../dom.js';
 import { createBoundedPage } from '../page-shell.js';
 import { renderPageFromPlacements } from '../page-renderer.js';
 import { getAtomDefinition } from './atom-registry.js';
-import { PAGE_BUDGET, HALF_SLOT_WIDTH_PX } from './page-spec.js';
+import { PAGE_BUDGET } from './page-spec.js';
+import { getMechanicSlotWidthPx } from '../mechanic-layout.js';
 
 function clipsVerticalOverflow(style) {
   const overflowY = style.overflowY || '';
@@ -116,39 +117,10 @@ export function createMeasurementRoot(container) {
 // Single-atom measurement
 // ---------------------------------------------------------------------------
 
-/**
- * Mechanic atom types that can share a half-width row, keyed to their partner type.
- * Mirrors the MECHANIC_HALF_PAIR map in page-planner.js — must stay in sync.
- */
-const MECHANIC_HALF_PAIR = new Map([
-  ['cipher-panel', 'map-panel'],
-  ['map-panel',    'cipher-panel'],
-]);
-
-/**
- * Returns the slot width (px) for an atom, accounting for actual row pairing.
- *
- * For mechanic cols:1 atoms (cipher-panel, map-panel): only returns
- * HALF_SLOT_WIDTH_PX when the partner type is also present on the page.
- * Otherwise returns null (full-width measurement).
- *
- * @param {object} atom
- * @param {Array} [pagePlacements] — all placements on the same page side
- * @returns {number|null}
- */
-function getAtomSlotWidthPx(atom, pagePlacements) {
-  const def = getAtomDefinition(atom.type);
-  const cols = (def && def.footprint && def.footprint.cols) || 2;
-  if (cols !== 1) return null;
-
-  const partnerType = MECHANIC_HALF_PAIR.get(atom.type);
-  if (partnerType && pagePlacements) {
-    const hasPair = pagePlacements.some(function (p) { return p.type === partnerType; });
-    return hasPair ? HALF_SLOT_WIDTH_PX : null;
-  }
-
-  return HALF_SLOT_WIDTH_PX;
-}
+// Slot-width resolution is delegated to mechanic-layout.js — the single
+// source of truth for mechanic row templates. getMechanicSlotWidthPx()
+// resolves the actual layout variant and returns HALF_SLOT_WIDTH_PX only
+// when the renderer will place the atom in a halves row.
 
 /**
  * Measure a single atom's rendered height inside a bounded page context.
@@ -276,7 +248,7 @@ export function measureAtom(stack, atom, density, slotWidthPx = null) {
  */
 export function measurePageAtoms(stack, pageAtoms) {
   return pageAtoms.map(placement => {
-    const slotWidthPx = getAtomSlotWidthPx(placement.atom, pageAtoms);
+    const slotWidthPx = getMechanicSlotWidthPx(placement, pageAtoms);
     const result = measureAtom(stack, placement.atom, placement.density, slotWidthPx);
     return {
       atomId:         placement.atomId,

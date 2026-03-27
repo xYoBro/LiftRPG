@@ -12,7 +12,7 @@
  */
 
 import { getAtomDefinition } from './atom-registry.js';
-import { PAGE_BUDGET, DEFAULT_PAGE_SPEC, HALF_SLOT_WIDTH_PX } from './page-spec.js';
+import { PAGE_BUDGET, DEFAULT_PAGE_SPEC } from './page-spec.js';
 import { resolvePageOverflow, MAX_REVISIONS } from './density-solver.js';
 import {
   createMeasurementRoot, measureAtom, measurePlacementsPage,
@@ -22,49 +22,7 @@ import {
   recordUnresolvedOverflow, recordSpreadUsage, recordAtomMetrics,
   formatStatus, summarize,
 } from './diagnostics.js';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Mechanic atom types that can share a half-width row, keyed to their partner type.
- * A cols:1 atom is only measured at half-slot width when its pair partner is also
- * present on the same page — otherwise it renders full-width.
- */
-const MECHANIC_HALF_PAIR = new Map([
-  ['cipher-panel', 'map-panel'],
-  ['map-panel',    'cipher-panel'],
-]);
-
-/**
- * Returns the slot width (px) for an atom, accounting for actual row pairing.
- *
- * For mechanic cols:1 atoms (cipher-panel, map-panel): only returns
- * HALF_SLOT_WIDTH_PX when the partner type is also present on the page
- * (i.e., the layout contract will pair them in a 'halves' row). Otherwise
- * returns null so the atom is measured at full width.
- *
- * For all other atoms: returns null (full-width measurement).
- *
- * @param {object} atom
- * @param {Array} [pagePlacements] — all placements on the same page side
- * @returns {number|null}
- */
-function getMechanicAwareSlotWidthPx(atom, pagePlacements) {
-  const def = getAtomDefinition(atom.type);
-  const cols = (def && def.footprint && def.footprint.cols) || 2;
-  if (cols !== 1) return null;
-
-  const partnerType = MECHANIC_HALF_PAIR.get(atom.type);
-  if (partnerType && pagePlacements) {
-    const hasPair = pagePlacements.some(function (p) { return p.type === partnerType; });
-    return hasPair ? HALF_SLOT_WIDTH_PX : null;
-  }
-
-  // No pair map for this cols:1 type — measure at half slot
-  return HALF_SLOT_WIDTH_PX;
-}
+import { getMechanicSlotWidthPx } from '../mechanic-layout.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -563,7 +521,7 @@ export function planAndMeasure(atoms, container, options = {}) {
         for (const placement of spread[side]) {
           const result = measureAtom(
             stack, placement.atom, placement.density,
-            getMechanicAwareSlotWidthPx(placement.atom, spread[side]),
+            getMechanicSlotWidthPx(placement, spread[side]),
           );
           placement.measuredHeight = result.measuredHeight;
 
@@ -627,7 +585,7 @@ export function planAndMeasure(atoms, container, options = {}) {
                 // Re-measure adjusted atom
                 const remeasure = measureAtom(
                   stack, placement.atom, placement.density,
-                  getMechanicAwareSlotWidthPx(placement.atom, placements),
+                  getMechanicSlotWidthPx(placement, placements),
                 );
                 placement.measuredHeight = remeasure.measuredHeight;
               }
