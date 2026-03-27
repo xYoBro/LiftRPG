@@ -2847,6 +2847,47 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   font-size:4.35pt;
   color:color-mix(in srgb, var(--ink) 58%, var(--muted) 42%);
 }
+
+/* --- PTP density-aware node scaling --- */
+.map-network[data-ptp-density="dense"] .map-node{
+  min-width:26px;
+  max-width:54px;
+  padding:3px 3px 2px;
+  gap:1px;
+}
+.map-network[data-ptp-density="dense"] .map-node-name{
+  font-size:4.5pt;
+}
+.map-network[data-ptp-density="dense"] .map-node-meta{
+  font-size:3.8pt;
+}
+.map-network[data-ptp-density="packed"] .map-node{
+  min-width:22px;
+  max-width:46px;
+  padding:2px 2px 1px;
+  gap:0;
+}
+.map-network[data-ptp-density="packed"] .map-node-name{
+  font-size:4pt;
+  line-height:1;
+}
+.map-network[data-ptp-density="packed"] .map-node-meta{
+  font-size:3.4pt;
+}
+/* Tone down anomaly hatching in dense/packed maps */
+.map-network[data-ptp-density="dense"] .map-node[data-state="anomaly"],
+.map-network[data-ptp-density="packed"] .map-node[data-state="anomaly"]{
+  border-width:1px;
+  background:
+    repeating-linear-gradient(45deg, transparent, transparent 4px, color-mix(in srgb, var(--ink) 22%, transparent 78%) 4px, color-mix(in srgb, var(--ink) 22%, transparent 78%) 5px),
+    color-mix(in srgb, var(--paper) 92%, white 8%);
+}
+/* Reduce edge label size in dense maps */
+.map-network[data-ptp-density="dense"] .map-edge-label,
+.map-network[data-ptp-density="packed"] .map-edge-label{
+  font-size:1.8px;
+}
+
 .map-track{
   display:flex;
   gap:4px;

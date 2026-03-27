@@ -440,8 +440,12 @@ registerAtom('tracker', {
       const baseHeight = heightFn ? heightFn(slots, data) : 100;
       const instructionHeight = data?.instruction ? 20 : 0;
       const total = baseHeight + instructionHeight;
+      // Companion render ignores density — report honest zero shrink
+      // potential so the density solver doesn't waste revision passes
+      // on adjustments that have no effect. It will go straight to
+      // Strategy 3 (split) when overflow is detected.
       return {
-        minHeight: Math.round(total * 0.78),
+        minHeight: total,
         preferredHeight: total,
       };
     }
@@ -450,8 +454,11 @@ registerAtom('tracker', {
     const labelHeight = data?.label ? 24 : 0;
     const consequenceHeight = data?.consequence ? 20 : 0;
     const total = baseHeight + labelHeight + consequenceHeight;
+    // Generic tracker render only responds to density marginally
+    // (consequence font size at d>0.6). Report minimal shrink (~5%)
+    // rather than the previous 25% which overpromised.
     return {
-      minHeight: Math.round(total * 0.75),
+      minHeight: Math.round(total * 0.95),
       preferredHeight: total,
     };
   },

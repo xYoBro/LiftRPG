@@ -190,6 +190,85 @@ function buildRouteCode(index) {
   return 'R' + String(index + 1);
 }
 
+// ---------------------------------------------------------------------------
+// PTP density tiers — deterministic thresholds for node count
+// ---------------------------------------------------------------------------
+const PTP_DENSITY = {
+  STANDARD_MAX: 8,   // ≤8 nodes: standard sizing + insets
+  DENSE_MAX: 12,     // 9–12 nodes: tighter boxes, wider coord range
+  // >12: packed — smallest boxes, widest coord range
+};
+
+// Insets per density tier (SVG-unit percentages within 0–100 viewBox)
+const PTP_INSETS = {
+  standard: { xStart: 16, xEnd: 84, yStart: 14, yEnd: 82 },
+  dense:    { xStart: 11, xEnd: 89, yStart: 10, yEnd: 86 },
+  packed:   { xStart:  8, xEnd: 92, yStart:  7, yEnd: 88 },
+};
+
+function ptpDensityTier(nodeCount) {
+  if (nodeCount <= PTP_DENSITY.STANDARD_MAX) return 'standard';
+  if (nodeCount <= PTP_DENSITY.DENSE_MAX) return 'dense';
+  return 'packed';
+}
+
+// ---------------------------------------------------------------------------
+// Deterministic collision-avoidance relaxation
+// Pushes overlapping nodes apart in bounded passes. Same input → same output.
+// ---------------------------------------------------------------------------
+function relaxNodePositions(nodes, insets, passes) {
+  const minSep = 9;  // minimum separation in SVG units (≈ node box footprint)
+  for (let pass = 0; pass < passes; pass++) {
+    let moved = false;
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const dx = nodes[j]._x - nodes[i]._x;
+        const dy = nodes[j]._y - nodes[i]._y;
+        const dist = Math.hypot(dx, dy);
+        if (dist >= minSep || dist === 0) continue;
+        // Deterministic push: half the deficit to each node along the connecting axis
+        const overlap = (minSep - dist) / 2;
+        const ux = dx / dist;
+        const uy = dy / dist;
+        nodes[i]._x -= ux * overlap;
+        nodes[i]._y -= uy * overlap;
+        nodes[j]._x += ux * overlap;
+        nodes[j]._y += uy * overlap;
+        moved = true;
+      }
+    }
+    // Clamp back to bounds after each pass
+    nodes.forEach((node) => {
+      node._x = Math.max(insets.xStart, Math.min(insets.xEnd, node._x));
+      node._y = Math.max(insets.yStart, Math.min(insets.yEnd, node._y));
+    });
+    if (!moved) break;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Check if a candidate label position is too close to any node center
+// ---------------------------------------------------------------------------
+function labelCollidesWithNode(lx, ly, nodes, threshold) {
+  for (let i = 0; i < nodes.length; i++) {
+    if (Math.hypot(lx - nodes[i]._x, ly - nodes[i]._y) < threshold) return true;
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Truncate long node labels deterministically for dense maps
+// ---------------------------------------------------------------------------
+function compactNodeLabel(label, maxLen) {
+  const raw = String(label || '').trim();
+  if (raw.length <= maxLen) return raw;
+  // Try dropping parenthesised suffixes first
+  const stripped = raw.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  if (stripped.length <= maxLen && stripped.length > 0) return stripped;
+  // Hard truncate
+  return raw.slice(0, maxLen - 1).trim() + '\u2026';
+}
+
 function renderPointMap(mapState) {
   const wrap = make('div', 'map-network');
   const shellFamily = ((mapState.artifactIdentity || {}).shellFamily || '').toLowerCase();
@@ -216,39 +295,51 @@ function renderPointMap(mapState) {
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
   const nodes = (mapState.nodes || []).map((node) => ({ ...node }));
-  const maxX = nodes.reduce((max, node) => Math.max(max, Number(node.x) || 0), 0);
-  const maxY = nodes.reduce((max, node) => Math.max(max, Number(node.y) || 0), 0);
-  const usesGridCoords = maxX <= 12 && maxY <= 12;
+  const nodeCount = nodes.length;
+  const tier = ptpDensityTier(nodeCount);
+  const insets = PTP_INSETS[tier];
 
-  function normalizeCoord(value, maxValue, insetStart, insetEnd) {
-    const numeric = Number(value) || 0;
-    if (usesGridCoords) {
-      const span = Math.max(1, maxValue - 1);
-      return insetStart + ((Math.max(1, numeric) - 1) / span) * (insetEnd - insetStart);
-    }
-    return Math.max(insetStart, Math.min(insetEnd, numeric));
-  }
+  // Set density tier as CSS custom property for node sizing
+  wrap.setAttribute('data-ptp-density', tier);
+
+  // Compute actual coordinate bounding box (handles negative + zero coords)
+  let rawMinX = Infinity, rawMaxX = -Infinity;
+  let rawMinY = Infinity, rawMaxY = -Infinity;
+  nodes.forEach((node) => {
+    const nx = Number(node.x) || 0;
+    const ny = Number(node.y) || 0;
+    if (nx < rawMinX) rawMinX = nx;
+    if (nx > rawMaxX) rawMaxX = nx;
+    if (ny < rawMinY) rawMinY = ny;
+    if (ny > rawMaxY) rawMaxY = ny;
+  });
+  if (!isFinite(rawMinX)) { rawMinX = 0; rawMaxX = 1; }
+  if (!isFinite(rawMinY)) { rawMinY = 0; rawMaxY = 1; }
+
+  // Normalize coordinates using actual min/max range → inset range
+  const spanX = Math.max(1, rawMaxX - rawMinX);
+  const spanY = Math.max(1, rawMaxY - rawMinY);
 
   const nodesById = {};
   nodes.forEach((node) => {
-    node._x = normalizeCoord(node.x, maxX, 16, 84);
-    node._y = normalizeCoord(node.y, maxY, 14, 82);
+    const nx = Number(node.x) || 0;
+    const ny = Number(node.y) || 0;
+    node._x = insets.xStart + ((nx - rawMinX) / spanX) * (insets.xEnd - insets.xStart);
+    node._y = insets.yStart + ((ny - rawMinY) / spanY) * (insets.yEnd - insets.yStart);
     nodesById[node.id] = node;
   });
 
-  // Offset nodes that share identical computed coordinates after clamping
-  // (can happen when out-of-bounds coords like 0 or -1 are clamped to the same boundary)
-  var positionCounts = {};
-  nodes.forEach((node) => {
-    var key = node._x.toFixed(1) + ',' + node._y.toFixed(1);
-    if (positionCounts[key] === undefined) {
-      positionCounts[key] = 0;
-    } else {
-      positionCounts[key]++;
-      node._x = Math.min(84, node._x + positionCounts[key] * 7);
-      node._y = Math.min(82, node._y + positionCounts[key] * 5);
-    }
-  });
+  // Deterministic collision-avoidance relaxation (3 passes for standard, 5 for dense/packed)
+  const relaxPasses = tier === 'standard' ? 3 : 5;
+  relaxNodePositions(nodes, insets, relaxPasses);
+
+  // Maximum label length per tier
+  const nodeLabelMax = tier === 'packed' ? 18 : tier === 'dense' ? 24 : 40;
+
+  // Edge label density threshold — suppress inline labels in dense maps
+  // (classified-packet always uses route codes + route key)
+  const edgeLabelThreshold = tier === 'packed' ? 6 : tier === 'dense' ? 10 : 999;
+  const nodeCollisionRadius = tier === 'packed' ? 6 : 8;
 
   (mapState.edges || []).forEach((edge, edgeIndex) => {
     const from = nodesById[edge.from];
@@ -264,8 +355,15 @@ function renderPointMap(mapState) {
     line.setAttribute('data-state', edge.state || 'open');
     svg.appendChild(line);
 
-    var edgeDensityThreshold = 8;
-    if (edge.label && (shellFamily !== 'classified-packet' || (mapState.edges || []).length <= edgeDensityThreshold)) {
+    // Determine whether to show inline edge label
+    const edgeCount = (mapState.edges || []).length;
+    const showInlineLabel = edge.label && (
+      shellFamily === 'classified-packet'
+        ? edgeCount <= edgeLabelThreshold
+        : edgeCount <= edgeLabelThreshold
+    );
+
+    if (showInlineLabel) {
       const dx = (to._x || 0) - (from._x || 0);
       const dy = (to._y || 0) - (from._y || 0);
       const distance = Math.max(1, Math.hypot(dx, dy));
@@ -276,25 +374,46 @@ function renderPointMap(mapState) {
       const labelOffset = shellFamily === 'classified-packet'
         ? (isDeferredRoute ? 6.4 : 4.8)
         : 3.2;
-      const labelProgress = shellFamily === 'classified-packet'
-        ? (isDeferredRoute
-          ? (edgeIndex % 2 === 0 ? 0.24 : 0.78)
-          : (edgeIndex % 2 === 0 ? 0.36 : 0.6))
-        : 0.5;
+
+      // Try multiple positions along the edge to avoid node overlap
+      const candidateProgressions = shellFamily === 'classified-packet'
+        ? [isDeferredRoute
+            ? (edgeIndex % 2 === 0 ? 0.24 : 0.78)
+            : (edgeIndex % 2 === 0 ? 0.36 : 0.6)]
+        : [0.5, 0.35, 0.65, 0.25, 0.75];
+
       const labelText = shellFamily === 'classified-packet'
         ? buildRouteCode(edgeIndex)
         : compactRouteLabel(edge.label, distance < 22 ? 12 : 16);
       const textLength = Math.max(10, Math.min(distance * 0.9, labelText.length * 3.6));
-      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      label.setAttribute('x', String((from._x || 0) + (dx * labelProgress) + (normalX * labelOffset * offsetSign)));
-      label.setAttribute('y', String((from._y || 0) + (dy * labelProgress) + (normalY * labelOffset * offsetSign)));
-      label.setAttribute('text-anchor', 'middle');
-      label.setAttribute('dominant-baseline', 'middle');
-      label.setAttribute('class', 'map-edge-label');
-      label.setAttribute('textLength', String(textLength));
-      label.setAttribute('lengthAdjust', 'spacingAndGlyphs');
-      label.textContent = labelText;
-      svg.appendChild(label);
+
+      let bestX = 0, bestY = 0, placed = false;
+      for (let ci = 0; ci < candidateProgressions.length; ci++) {
+        const progress = candidateProgressions[ci];
+        const cx = (from._x || 0) + (dx * progress) + (normalX * labelOffset * offsetSign);
+        const cy = (from._y || 0) + (dy * progress) + (normalY * labelOffset * offsetSign);
+        if (!labelCollidesWithNode(cx, cy, nodes, nodeCollisionRadius)) {
+          bestX = cx;
+          bestY = cy;
+          placed = true;
+          break;
+        }
+        if (ci === 0) { bestX = cx; bestY = cy; } // fallback to first candidate
+      }
+
+      // Only suppress label entirely if all candidates collide AND we're in packed mode
+      if (placed || tier !== 'packed') {
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', String(bestX));
+        label.setAttribute('y', String(bestY));
+        label.setAttribute('text-anchor', 'middle');
+        label.setAttribute('dominant-baseline', 'middle');
+        label.setAttribute('class', 'map-edge-label');
+        label.setAttribute('textLength', String(textLength));
+        label.setAttribute('lengthAdjust', 'spacingAndGlyphs');
+        label.textContent = labelText;
+        svg.appendChild(label);
+      }
     }
   });
   wrap.appendChild(svg);
@@ -308,14 +427,14 @@ function renderPointMap(mapState) {
     }
     card.style.left = String(node._x || 0) + '%';
     card.style.top = String(node._y || 0) + '%';
-    card.appendChild(make('div', 'map-node-name', node.label || node.id));
+    card.appendChild(make('div', 'map-node-name', compactNodeLabel(node.label || node.id, nodeLabelMax)));
     card.appendChild(make('div', 'map-node-meta', node.id || ''));
     nodeLayer.appendChild(card);
   });
   wrap.appendChild(nodeLayer);
 
   const legend = make('div', 'map-network-legend');
-  legend.appendChild(make('div', 'map-network-chip', ((mapState.nodes || []).length || 0) + ' nodes'));
+  legend.appendChild(make('div', 'map-network-chip', (nodeCount || 0) + ' nodes'));
   legend.appendChild(make('div', 'map-network-chip', ((mapState.edges || []).length || 0) + ' routes'));
   if (mapState.currentNode) {
     legend.appendChild(make('div', 'map-network-chip', 'Current ' + mapState.currentNode));
