@@ -1207,3 +1207,45 @@ export function validateSkeletonStage(result, weekCount) {
 
   return '';
 }
+
+// ── Error severity classification ───────────────────────────────────────────
+// Categorizes validation error strings by severity so runJsonStage can decide
+// whether to retry (blocking), accept (degraded), or skip (repairable by
+// assembly.js auto-repair).
+
+var REPAIRABLE_PATTERNS = [
+  /overflow is not true/,
+  /overflow=true but only/,
+  /uses "(?:result|description|label)" instead of "text"/,
+  /meta\.weekCount.*does not match/i,
+  /meta\.totalSessions.*does not match/i,
+  /Unknown visualArchetype/i,
+  /interlude\.payloadType.*not supported/i
+];
+
+var DEGRADED_PATTERNS = [
+  /missing designSpec/i,
+  /missing epigraph/i,
+  /missing consequenceOnFull/i,
+  /missing falseAssumptions/i,
+  /missing motifPayoffs/i,
+  /missing finalRevealRecontextualizes/i
+];
+
+export function classifyValidationErrors(errors) {
+  var blocking = [];
+  var repairable = [];
+  var degraded = [];
+
+  (errors || []).forEach(function (err) {
+    if (REPAIRABLE_PATTERNS.some(function (p) { return p.test(err); })) {
+      repairable.push(err);
+    } else if (DEGRADED_PATTERNS.some(function (p) { return p.test(err); })) {
+      degraded.push(err);
+    } else {
+      blocking.push(err);
+    }
+  });
+
+  return { blocking: blocking, repairable: repairable, degraded: degraded };
+}

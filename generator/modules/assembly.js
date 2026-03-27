@@ -676,6 +676,35 @@ export function normalizeOracleKey(week) {
   }
 }
 
+// ── Oracle entry key normalization ──────────────────────────────────────────
+// Models sometimes use "result", "description", or "label" instead of "text"
+// for oracle entry content. Rename in place.
+
+export function normalizeOracleEntryKeys(week) {
+  var ot = week && week.fieldOps && week.fieldOps.oracleTable;
+  if (!ot || !Array.isArray(ot.entries)) return;
+  ot.entries.forEach(function (e) {
+    if (!e.text && e.result) { e.text = e.result; delete e.result; }
+    if (!e.text && e.description) { e.text = e.description; delete e.description; }
+    if (!e.text && e.label) { e.text = e.label; delete e.label; }
+  });
+}
+
+// ── Stage-level auto-repair for week objects ────────────────────────────────
+// Called by runJsonStage BEFORE retry decision. Applies deterministic fixes
+// that cost zero API calls. Idempotent — safe to call multiple times.
+
+export function autoRepairWeek(result) {
+  if (!result) return result;
+  normalizeCompanionComponents(result);
+  normalizeOracleKey(result);
+  normalizeOracleEntryKeys(result);
+  if (Array.isArray(result.sessions)) {
+    result.overflow = result.sessions.length > 3;
+  }
+  return result;
+}
+
 // ── Normalization helpers ───────────────────────────────────────────────────
 
 // Normalize companionComponents: model sometimes returns an object keyed by

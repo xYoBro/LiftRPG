@@ -43,6 +43,8 @@ import {
   extractShellContext,
   buildChunkContinuity,
   normalizeCompanionComponents,
+  normalizeThemeArchetype,
+  autoRepairWeek,
   assembleBooklet,
   assembleStructuredBooklet,
   extractWeekSummaries,
@@ -67,7 +69,8 @@ import {
   validateCampaignPlanStage,
   validateWeeksStage,
   validateFragmentsStage,
-  validateSkeletonStage
+  validateSkeletonStage,
+  classifyValidationErrors
 } from './modules/validation.js';
 
 import {
@@ -946,15 +949,40 @@ function isSlowPlanningModel(settings) {
     || (providerId === 'openai' && /(gpt-5(?:\.4)?-pro|o3-pro)/i.test(modelId));
 }
 
-function buildRetryDirective(stageName, attempt, err) {
-  return [
+function buildSmartRetryDirective(stageName, attempt, err) {
+  var errors = err._blockingErrors || [truncateText((err && err.message) || 'unknown', 500)];
+  var failedOutput = err._failedOutput || null;
+
+  var lines = [
     '',
-    '## Retry Directive',
-    '- This is retry ' + (attempt + 1) + ' for ' + stageName + '.',
-    '- Keep prose concrete and high-signal, but slightly tighter so the full JSON completes cleanly.',
-    '- Preserve named characters, shell identity, clue economy, and map continuity.',
-    '- Fix the failure that caused the retry: ' + truncateText(((err && err.message) || 'unknown issue'), 240)
-  ].join('\n');
+    '## Correction Directive (Retry ' + (attempt + 1) + ')',
+    '',
+    'Your previous output for ' + stageName + ' had ' + errors.length + ' validation error(s).',
+    ''
+  ];
+
+  if (failedOutput) {
+    var compact = compactJsonString(failedOutput);
+    if (compact.length > 6000) compact = compact.slice(0, 6000) + '... [truncated]';
+    lines.push('### Your Previous Output');
+    lines.push('```json');
+    lines.push(compact);
+    lines.push('```');
+    lines.push('');
+  }
+
+  lines.push('### Validation Errors (fix ALL of these)');
+  errors.forEach(function (e, i) {
+    lines.push((i + 1) + '. ' + e);
+  });
+  lines.push('');
+  lines.push('### Instructions');
+  lines.push('Return the CORRECTED JSON with these issues fixed.');
+  lines.push('- Preserve all working content (names, prose, mechanical values).');
+  lines.push('- Do NOT regenerate from scratch. Fix only the listed errors.');
+  lines.push('- Return valid JSON only. No markdown fences, no commentary.');
+
+  return lines.join('\n');
 }
 
 function prefixStageError(stageName, err) {
@@ -1047,6 +1075,18 @@ function emitPipelineEvent(handler, stageIndex, totalStages, message, meta) {
 }
 
 
+// ── Validation helpers for smart retry ───────────────────────────────────────
+
+function validationFailed(vr) {
+  return (typeof vr === 'string' && vr) || (vr && typeof vr === 'object' && vr.valid === false);
+}
+
+function extractErrorList(vr) {
+  if (typeof vr === 'string') return [vr];
+  if (vr && vr.errors && vr.errors.length) return vr.errors;
+  return ['Schema validation failed'];
+}
+
 // ── Core stage runner ─────────────────────────────────────────────────────────
 
 async function runJsonStage(settings, config) {
@@ -1069,7 +1109,7 @@ async function runJsonStage(settings, config) {
 
     var retryState = { attempt: attempt, error: lastErr };
     var prompt = config.buildPrompt(retryState);
-    if (attempt > 0) prompt += buildRetryDirective(config.stageName, attempt, lastErr);
+    if (attempt > 0) prompt += buildSmartRetryDirective(config.stageName, attempt, lastErr);
     var resolvedMaxTokens = typeof config.maxTokens === 'function'
       ? config.maxTokens(retryState)
       : config.maxTokens;
@@ -1105,17 +1145,39 @@ async function runJsonStage(settings, config) {
       if (config.validate) {
         // Convention: validate() returns '' or {valid: true} on success, non-empty string or {valid: false, errors: [...]} on failure.
         var validationResult = config.validate(result);
-        if (typeof validationResult === 'string' && validationResult) {
-          var err = new Error(validationResult);
-          err.errorType = 'schema';
-          err.retryable = true;
-          throw err;
-        } else if (validationResult && typeof validationResult === 'object' && validationResult.valid === false) {
-          var errMsg = (validationResult.errors && validationResult.errors.length) ? validationResult.errors.join('; ') : 'Schema validation failed';
-          var errObj = new Error(errMsg);
-          errObj.errorType = validationResult.errorType || 'schema';
-          errObj.retryable = validationResult.retryable !== false;
-          throw errObj;
+
+        // Layer 1: attempt auto-repair before considering retry
+        if (validationFailed(validationResult) && config.autoRepair) {
+          result = config.autoRepair(result);
+          validationResult = config.validate(result);
+          if (!validationFailed(validationResult)) {
+            console.info('[LiftRPG] ' + config.stageName + ' auto-repaired — no retry needed.');
+          }
+        }
+
+        // Layer 3: classify remaining errors by severity
+        if (validationFailed(validationResult)) {
+          var errorList = extractErrorList(validationResult);
+          var classified = classifyValidationErrors(errorList);
+
+          if (classified.blocking.length === 0) {
+            // All remaining issues are repairable (assembly will fix) or degraded (acceptable)
+            if (classified.degraded.length > 0) {
+              console.warn('[LiftRPG] ' + config.stageName + ' accepted with degraded fields:', classified.degraded);
+            }
+            if (classified.repairable.length > 0) {
+              console.info('[LiftRPG] ' + config.stageName + ' has ' + classified.repairable.length + ' repairable issue(s) — assembly will fix.');
+            }
+            // fall through to success
+          } else {
+            // Blocking errors remain — throw for smart retry
+            var err = new Error(classified.blocking.join('; '));
+            err.errorType = 'schema';
+            err.retryable = true;
+            err._failedOutput = result;
+            err._blockingErrors = classified.blocking;
+            throw err;
+          }
         }
       }
       emitPipelineEvent(config.onProgress, config.stageIndex || 0, config.getTotalStages ? config.getTotalStages() : 0, config.completeMessage || config.stageName, {
@@ -1517,6 +1579,12 @@ async function runApiPipeline(options) {
         }
         return result;
       },
+      autoRepair: function (result) {
+        if (result && result.theme && result.theme.visualArchetype) {
+          result.theme.visualArchetype = normalizeThemeArchetype(result.theme.visualArchetype);
+        }
+        return result;
+      },
       validate: function(result) {
         var v = validateShellSchema(result, { weekCount: weekCount, totalSessions: totalSessions });
         if (!v.valid) {
@@ -1603,6 +1671,7 @@ async function runApiPipeline(options) {
         if (result) normalizeCompanionComponents(result);
         return result;
       },
+      autoRepair: autoRepairWeek,
       validate: function (result) {
         if (!result) return 'Week generation returned empty result. Model may have returned a shell instead of a week object.';
         if (!result.title) return 'Week object missing "title" field. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
@@ -2131,6 +2200,7 @@ async function runSkeletonFleshPipeline(options) {
         }
         return result;
       },
+      autoRepair: autoRepairWeek,
       validate: function (result) {
         if (!result || !result.title) return 'Week ' + weekNum + ': missing title';
         if (!Array.isArray(result.sessions) || result.sessions.length === 0) {
