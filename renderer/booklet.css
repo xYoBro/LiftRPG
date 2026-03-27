@@ -2292,7 +2292,6 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   flex:1;
 }
 .board-worksheet{
-  grid-area:worksheet;
   display:flex;
   flex-direction:column;
   gap:5px;
@@ -2543,8 +2542,6 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   margin-bottom:3px;
   word-break:normal;
   overflow-wrap:break-word;
-  max-height:200px;
-  overflow:hidden;
 }
 .cipher-key{
   margin-bottom:6px;
