@@ -212,6 +212,60 @@ function resolveSoloSurfaceWorksheet(surfacePlacements) {
   return null;
 }
 
+/**
+ * Group a flat placement list into rows based on footprint.cols.
+ * Two consecutive cols:1 atoms → one 'halves' row.
+ * Everything else → 'full' row.
+ *
+ * @param {Array} placements
+ * @returns {Array<{ type: 'halves'|'full', placements: Array }>}
+ */
+function groupPlacementsIntoRows(placements) {
+  const rows = [];
+  let i = 0;
+  while (i < placements.length) {
+    const p = placements[i];
+    const def = getAtomDefinition(p.type);
+    const cols = (def && def.footprint && def.footprint.cols) || 2;
+
+    if (cols === 1 && i + 1 < placements.length) {
+      const nextDef = getAtomDefinition(placements[i + 1].type);
+      const nextCols = (nextDef && nextDef.footprint && nextDef.footprint.cols) || 2;
+      if (nextCols === 1) {
+        rows.push({ type: 'halves', placements: [placements[i], placements[i + 1]] });
+        i += 2;
+        continue;
+      }
+    }
+
+    rows.push({ type: 'full', placements: [placements[i]] });
+    i++;
+  }
+  return rows;
+}
+
+/**
+ * Render a row (from groupPlacementsIntoRows) into a container element.
+ *
+ * @param {HTMLElement} container
+ * @param {{ type: string, placements: Array }} row
+ */
+function renderRowInto(container, row) {
+  if (row.type === 'halves') {
+    const rowEl = make('div', 'rp-row', 'rp-row--halves');
+    row.placements.forEach(function (p) {
+      const cell = make('div', 'rp-row-cell');
+      renderPlacementInto(cell, p);
+      rowEl.appendChild(cell);
+    });
+    container.appendChild(rowEl);
+  } else {
+    const rowEl = make('div', 'rp-row', 'rp-row--full');
+    renderPlacementInto(rowEl, row.placements[0]);
+    container.appendChild(rowEl);
+  }
+}
+
 function buildBoardWorksheet(label, worksheetType = 'notes', rowCount = 4) {
   const wrap = make('section', 'board-worksheet');
   wrap.setAttribute('data-worksheet-type', worksheetType);
@@ -445,7 +499,7 @@ function renderMechanicPage(placements, planIndex) {
     content.setAttribute('data-solo-surface', 'tracker');
   }
 
-  surfacePlacements.forEach((placement) => renderPlacementInto(content, placement));
+  groupPlacementsIntoRows(surfacePlacements).forEach((row) => renderRowInto(content, row));
 
   if (artifactIdentity.shellFamily === 'classified-packet' && isSoloSurfacePage) {
     const worksheet = resolveSoloSurfaceWorksheet(surfacePlacements);
@@ -458,7 +512,7 @@ function renderMechanicPage(placements, planIndex) {
     content.setAttribute('data-has-companion', 'true');
     const companionZone = make('section', 'companion-zone');
     companionZone.appendChild(make('div', 'doc-label', copy.companionLabel || 'Companion Surface'));
-    companionPlacements.forEach((placement) => renderPlacementInto(companionZone, placement));
+    groupPlacementsIntoRows(companionPlacements).forEach((row) => renderRowInto(companionZone, row));
     content.appendChild(companionZone);
 
     if (artifactIdentity.shellFamily === 'classified-packet' && surfacePlacements.length === 0 && companionPlacements.length === 1) {
