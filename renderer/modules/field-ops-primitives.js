@@ -336,9 +336,13 @@ function renderPointMap(mapState) {
   // Maximum label length per tier
   const nodeLabelMax = tier === 'packed' ? 18 : tier === 'dense' ? 24 : 40;
 
-  // Edge label density threshold — suppress inline labels in dense maps
-  // (classified-packet always uses route codes + route key)
-  const edgeLabelThreshold = tier === 'packed' ? 6 : tier === 'dense' ? 10 : 999;
+  // Edge label suppression: aggressive suppression is only safe when an
+  // alternate route-label surface (the route key panel) will be rendered.
+  // renderRouteKey() is gated on classified-packet, so that's our signal.
+  const hasRouteKey = shellFamily === 'classified-packet';
+  const edgeLabelThreshold = hasRouteKey
+    ? (tier === 'packed' ? 6 : tier === 'dense' ? 10 : 999)
+    : 999; // no route key → always attempt inline labels
   const nodeCollisionRadius = tier === 'packed' ? 6 : 8;
 
   (mapState.edges || []).forEach((edge, edgeIndex) => {
@@ -357,11 +361,7 @@ function renderPointMap(mapState) {
 
     // Determine whether to show inline edge label
     const edgeCount = (mapState.edges || []).length;
-    const showInlineLabel = edge.label && (
-      shellFamily === 'classified-packet'
-        ? edgeCount <= edgeLabelThreshold
-        : edgeCount <= edgeLabelThreshold
-    );
+    const showInlineLabel = edge.label && edgeCount <= edgeLabelThreshold;
 
     if (showInlineLabel) {
       const dx = (to._x || 0) - (from._x || 0);
@@ -401,8 +401,10 @@ function renderPointMap(mapState) {
         if (ci === 0) { bestX = cx; bestY = cy; } // fallback to first candidate
       }
 
-      // Only suppress label entirely if all candidates collide AND we're in packed mode
-      if (placed || tier !== 'packed') {
+      // Only suppress an individual label if all candidates collide AND
+      // an alternate route key surface exists to carry the information.
+      // Without a route key, always render the label (best-effort position).
+      if (placed || !hasRouteKey) {
         const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         label.setAttribute('x', String(bestX));
         label.setAttribute('y', String(bestY));
