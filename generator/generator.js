@@ -193,6 +193,48 @@
     ].join('\n');
   }
 
+  // ── Brief classification (Layer 3 planning) ──────────────────────────────
+  // Classifies the user brief into a briefMode for the artifact intent compiler.
+  // This is a heuristic — the model refines in-context, but this gives it a
+  // starting signal and makes the classification visible in the prompt.
+
+  function classifyBrief(brief) {
+    var raw = String(brief || '').trim();
+    if (!raw) return { briefMode: 'empty', fidelityMode: 'compositional' };
+
+    var lower = raw.toLowerCase();
+    var wordCount = raw.split(/\s+/).length;
+
+    // Personal-subject detection: named pets, real people, possessive pronouns + proper nouns
+    if (/\bmy\s+(dog|cat|yorkie|pup|puppy|kitten|partner|dad|mom|brother|sister|friend|grandma|grandpa)\b/i.test(raw)) {
+      return { briefMode: 'personal-subject', fidelityMode: 'literal' };
+    }
+
+    // Reference-led detection: named works, authors, films
+    if (/\b(meets|like|inspired by|in the style of|a la)\b/i.test(raw) && /\b[A-Z][a-z]+\s+[A-Z]/m.test(raw)) {
+      return { briefMode: 'mashup', fidelityMode: 'interpretive' };
+    }
+    if (/\b(steinbeck|lovecraft|borges|kafka|hemingway|cormac mccarthy|ursula le guin|octavia butler)\b/i.test(lower)) {
+      return { briefMode: 'reference-led', fidelityMode: 'interpretive' };
+    }
+    // Generic cultural reference patterns
+    if (/\b(like the (movie|film|book|show|game|series)|inspired by|reminiscent of|homage to)\b/i.test(raw)) {
+      return { briefMode: 'reference-led', fidelityMode: 'interpretive' };
+    }
+
+    // Mashup detection: X meets Y, X + Y, X but with Y
+    if (/\b(meets|crossed with|mixed with|plus|but with|mashed with)\b/i.test(raw) && wordCount > 4) {
+      return { briefMode: 'mashup', fidelityMode: 'interpretive' };
+    }
+
+    // Sparse vs explicit by word count
+    if (wordCount < 15) {
+      return { briefMode: 'sparse', fidelityMode: 'interpretive' };
+    }
+
+    return { briefMode: 'explicit', fidelityMode: 'literal' };
+  }
+
   function formatUserBrief(brief, fallbackText) {
     var raw = String(brief || '').trim();
     if (!raw) return fallbackText;
@@ -2029,6 +2071,7 @@
     options = options || {};
     var weekCount = window.parseWeekCount(workout);
     var blend = deriveDesignBlend(brief, workout);
+    var briefClass = classifyBrief(brief);
     return [
       '# LiftRPG Booklet Skeleton',
       '',
@@ -2040,6 +2083,15 @@
       'Return a single JSON object containing ONLY structural decisions — no long prose,',
       'no session content, no fragment bodies, no exercise details. Just the scaffold that',
       'later stages will fill with writing.',
+      '',
+      '## Brief Classification (pre-computed)',
+      'The system has classified this brief as:',
+      '- briefMode: ' + briefClass.briefMode,
+      '- fidelityMode: ' + briefClass.fidelityMode,
+      'Use these as your starting point for meta.artifactIntent. You may refine them',
+      'based on your interpretation, but do not ignore them.',
+      '',
+      window.INST_ARTIFACT_COMPILER.join('\n'),
       '',
       window.MECHANIC_VOCAB_BRIEF,
       '',

@@ -344,6 +344,15 @@
     '- `storySpine` (object): { premise, protagonistDrive, centralTension, midpointShift, finalCost } — 5 sentences total',
     '- `artifactIdentity` (object): { artifactClass, shellFamily, boardStateMode, attachmentStrategy }',
     '  Plus optional: artifactBlend?, authorialMode?, documentEcology?, materialCulture?, openingMode?, rulesDeliveryMode?, revealShape?, unlockLogic?',
+    '- `artifactIntent` (object, required): The compiled planning contract from the Artifact Intent Compiler.',
+    '  Required fields:',
+    '  - `briefMode` (string): how the brief was classified',
+    '  - `fidelityMode` (string): literal | interpretive | compositional',
+    '  - `arcFamily` (string): chosen arc family from the menu',
+    '  - `mechanicGrammarFamily` (string): chosen mechanic grammar family from the menu',
+    '  - `documentEcology` (object): { dominant: string[], forbidden: string[] }',
+    '  - `exclusions` (object): { mechanicExclusions: string[], documentExclusions: string[], arcExclusions: string[] }',
+    '  - `homePull` (string): story | game | investigation | mixed',
     '',
     '## theme (object)',
     '- `visualArchetype` (string): one of government|cyberpunk|scifi|fantasy|noir|steampunk|minimalist|nautical|occult|pastoral',
@@ -405,7 +414,14 @@
       literaryRegister: { name: '', behaviorDescription: '', forbiddenMoves: '', typographicBehavior: '' },
       structuralShape: { resolution: '', temporalOrder: '', narratorReliability: '', promptFragmentRelationship: '', shapeRationale: '' },
       storySpine: { premise: '', protagonistDrive: '', centralTension: '', midpointShift: '', finalCost: '' },
-      artifactIdentity: { artifactClass: '', shellFamily: '', boardStateMode: '', attachmentStrategy: '' }
+      artifactIdentity: { artifactClass: '', shellFamily: '', boardStateMode: '', attachmentStrategy: '' },
+      artifactIntent: {
+        briefMode: 'sparse', fidelityMode: 'interpretive',
+        arcFamily: 'slow-burn-investigation', mechanicGrammarFamily: 'survey-grid',
+        documentEcology: { dominant: ['fieldNote', 'report'], forbidden: ['transcript'] },
+        exclusions: { mechanicExclusions: ['testimony-matrix'], documentExclusions: ['transcript'], arcExclusions: ['institutional-collapse'] },
+        homePull: 'investigation'
+      }
     },
     theme: { visualArchetype: '', palette: { ink: '#000000', paper: '#ffffff', accent: '#000000', muted: '#888888', rule: '#cccccc', fog: '#eeeeee' } },
     cover: { title: '', designation: '', tagline: '', colophonLines: ['', '', ''] },
@@ -461,9 +477,37 @@
             type: 'object',
             properties: { artifactClass: { type: 'string' }, shellFamily: { type: 'string' }, boardStateMode: { type: 'string' }, attachmentStrategy: { type: 'string' } },
             required: ['artifactClass', 'shellFamily', 'boardStateMode', 'attachmentStrategy']
+          },
+          artifactIntent: {
+            type: 'object',
+            properties: {
+              briefMode: { type: 'string', enum: ['explicit', 'sparse', 'empty', 'mashup', 'reference-led', 'personal-subject'] },
+              fidelityMode: { type: 'string', enum: ['literal', 'interpretive', 'compositional'] },
+              arcFamily: { type: 'string', enum: ['slow-burn-investigation', 'institutional-collapse', 'witness-accumulation', 'contamination-spiral', 'procedural-deepening', 'pilgrimage-approach', 'false-order-to-rupture'] },
+              mechanicGrammarFamily: { type: 'string', enum: ['survey-grid', 'node-graph', 'timeline-reconstruction', 'testimony-matrix', 'ledger-board', 'route-tracker', 'profile-assembly'] },
+              documentEcology: {
+                type: 'object',
+                properties: {
+                  dominant: { type: 'array', items: { type: 'string' } },
+                  forbidden: { type: 'array', items: { type: 'string' } }
+                },
+                required: ['dominant', 'forbidden']
+              },
+              exclusions: {
+                type: 'object',
+                properties: {
+                  mechanicExclusions: { type: 'array', items: { type: 'string' } },
+                  documentExclusions: { type: 'array', items: { type: 'string' } },
+                  arcExclusions: { type: 'array', items: { type: 'string' } }
+                },
+                required: ['mechanicExclusions', 'documentExclusions', 'arcExclusions']
+              },
+              homePull: { type: 'string', enum: ['story', 'game', 'investigation', 'mixed'] }
+            },
+            required: ['briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily', 'documentEcology', 'exclusions', 'homePull']
           }
         },
-        required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'storySpine', 'artifactIdentity']
+        required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'storySpine', 'artifactIdentity', 'artifactIntent']
       },
       theme: {
         type: 'object',
@@ -839,6 +883,98 @@
     '- Avoid cookie-cutter arcs where each week is just clue -> stranger clue -> boss reveal.'
   ];
 
+  // ── Artifact Intent Compiler ────────────────────────────────────────────
+  // Layer 3 planning contract: compiles the user brief into a binding
+  // artifact-level planning bundle. The model must choose from explicit
+  // families rather than drifting into the default LiftRPG booklet grammar.
+  // See docs/plans/2026-03-28-brief-to-artifact-compiler.md
+
+  window.INST_ARTIFACT_COMPILER = [
+    '## Artifact Intent Compiler (run after Brief Interpretation)',
+    '',
+    'After interpreting the brief, you MUST compile it into a concrete artifact planning',
+    'bundle (`meta.artifactIntent`). This is a binding planning contract — later stages',
+    'must preserve these commitments. Do not leave them implicit.',
+    '',
+    '### Step 1: Classify the brief',
+    'Set `briefMode` to one of:',
+    '- `explicit`: rich direction with clear genre, tone, and object cues',
+    '- `sparse`: short premise that still implies an object and emotional engine',
+    '- `empty`: no creative direction provided',
+    '- `mashup`: combines multiple references or domains (X meets Y)',
+    '- `reference-led`: names a specific author, film, book, game, or cultural work',
+    '- `personal-subject`: includes a real person, pet, or intimate real-world referent',
+    '',
+    '### Step 2: Choose fidelity mode',
+    'Set `fidelityMode` to one of:',
+    '- `literal`: the brief names a specific scenario, person, or place — build around it exactly',
+    '- `interpretive`: the brief gives a theme or mood — preserve the emotional engine while specifying the object',
+    '- `compositional`: the brief is empty or minimal — infer aggressively through explicit contract choices',
+    '',
+    'KEY RULE: a sparser brief does not mean "make it more generic."',
+    'It means make STRONGER object choices on the user\'s behalf.',
+    '',
+    '### Step 3: Choose one arc family',
+    'Set `arcFamily` to one of these families. Each shapes the entire booklet\'s tension curve:',
+    '',
+    '| Arc Family | Opening | Midpoint Shift | Endgame Pressure | Fragment Function |',
+    '|-----------|---------|---------------|-----------------|------------------|',
+    '| `slow-burn-investigation` | Anomaly: something is wrong but not yet named | Recontextualization: evidence means something different | Scope: the problem is bigger than assumed | Exhibits: evidence to assemble |',
+    '| `institutional-collapse` | Normalcy: the institution appears to function | Fracture: internal contradiction becomes visible | Cascade: each failure triggers the next | Records: artifacts from before and during collapse |',
+    '| `witness-accumulation` | Testimony: a single account from one perspective | Contradiction: testimonies conflict on a specific point | Convergence: the player must weigh whose account to trust | Depositions: different voices on the same events |',
+    '| `contamination-spiral` | Contact: a substance, idea, or force enters the system | Spread: contamination reaches a second domain | Irreversibility: the original state cannot be restored | Samples: measurements, readings, specimens |',
+    '| `procedural-deepening` | Surface: the procedure appears routine | Layer: a hidden procedure exists beneath the visible one | Recursion: the deeper procedure applies to the protagonist | Manuals: instructions that change meaning with context |',
+    '| `pilgrimage-approach` | Departure: the protagonist leaves known ground | Threshold: the landscape changes character | Arrival: the destination is not what was expected | Waypoints: markers on the route that change the journey\'s meaning |',
+    '| `false-order-to-rupture` | Order: the world appears stable and coherent | Crack: one element does not fit the declared order | Rupture: the order was constructed to conceal something | Facades: the order\'s own documentation, which contradicts itself |',
+    '',
+    'The arc family constrains how weekly arcBeats develop. Do not choose one family and then',
+    'write beats that follow a different one.',
+    '',
+    '### Step 4: Choose one mechanic grammar family',
+    'Set `mechanicGrammarFamily` to one of these. Each changes what the player DOES each week:',
+    '',
+    '| Family | Board-State Mode | Primary Player Action | Oracle Role | Convergence Shape |',
+    '|--------|-----------------|----------------------|-------------|------------------|',
+    '| `survey-grid` | survey-grid | Mark, clear, annotate grid positions | Discovery: reveals what is at a location | Sequential assembly of surveyed values |',
+    '| `node-graph` | node-graph | Connect, traverse, sever nodes | Routing: determines which connections are traversable | Route confirmation: correct traversal yields the key |',
+    '| `timeline-reconstruction` | timeline-reconstruction | Sequence events, identify gaps | Dating: assigns events to time slots | Chronological assembly: correct order yields the key |',
+    '| `testimony-matrix` | testimony-matrix | Compare accounts, mark contradictions | Interrogation: surfaces claims that may be true or false | Reconciliation: resolving contradictions yields the key |',
+    '| `ledger-board` | ledger-board | Track quantities, debits, credits | Auditing: reveals discrepancies | Balance: correct ledger state yields the key |',
+    '| `route-tracker` | route-tracker | Advance position, choose direction | Scouting: reveals conditions ahead | Arrival: correct waypoint sequence yields the key |',
+    '| `profile-assembly` | profile-assembly | Collect attributes, compare profiles | Profiling: surfaces traits of several subjects | Identification: assembling the correct profile yields the key |',
+    '',
+    'The mechanic grammar family determines `meta.artifactIdentity.boardStateMode` and shapes',
+    'the oracle, cipher, and companion surface choices. Do not choose one family and then',
+    'design mechanics from a different one.',
+    '',
+    '### Step 5: Declare document ecology',
+    'Set `documentEcology`:',
+    '- `dominant` (string[], 2-3 types): document types that make up 50%+ of fragments',
+    '- `forbidden` (string[], 1-3 types): document types that must NOT appear in this booklet',
+    '',
+    'Valid types: memo, report, inspection, fieldNote, correspondence, transcript, form, anomaly.',
+    '',
+    'The ecology must feel native to the artifact. A court packet is mostly transcript and',
+    'correspondence. A ship log is mostly fieldNote and inspection. Do not use all 8 types.',
+    '',
+    '### Step 6: Declare exclusions',
+    'Set `exclusions`:',
+    '- `mechanicExclusions` (string[], at least 1): board-state modes this booklet will NOT use',
+    '- `documentExclusions` (string[], at least 1): same as forbidden in ecology — reinforced here',
+    '- `arcExclusions` (string[], at least 1): arc families this booklet is NOT following',
+    '',
+    'Exclusions are identity. Every booklet must refuse something.',
+    '',
+    '### Step 7: Name the home pull',
+    'Set `homePull` to one of: `story` | `game` | `investigation` | `mixed`',
+    '',
+    'This is: what kind of evening object is this when the lifter opens it at home?',
+    '- `story`: the player returns for narrative curiosity',
+    '- `game`: the player returns for mechanical progression',
+    '- `investigation`: the player returns to assemble evidence and solve',
+    '- `mixed`: balanced pull across dimensions'
+  ];
+
   window.INST_ANTI_GENERIC = [
     '## Anti-Generic Doctrine',
     '- Every content field must earn its space by revealing, recontextualizing,',
@@ -962,6 +1098,7 @@
     ['## ── TIER 1: STORY QUALITY ──', ''],
     INST_BRIEF_INTERPRETATION, [''],
     INST_BRIEF_FIDELITY, [''],
+    INST_ARTIFACT_COMPILER, [''],
     INST_STORY_ENGINE, [''],
     INST_LAYERED_ARC, [''],
     INST_CHARACTER_WEB, [''],
@@ -1034,7 +1171,7 @@
     'layer-codex':    { schemas: [],                                            instructions: ['STORY_ENGINE', 'CHARACTER_WEB', 'LAYERED_ARC', 'ANTI_PATTERNS'] },
     'campaign-plan':  { schemas: [],                                            instructions: ['WORLD_CONTRACT', 'PROGRESSION', 'SYSTEM_INTEGRATION', 'ANTI_PATTERNS', 'ANTI_SAMENESS'] },
     // Shell: story + world + structural
-    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'WORLD_CONTRACT', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'RULES_TEACH', 'VISUAL_DIRECTION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
+    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'WORLD_CONTRACT', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'RULES_TEACH', 'VISUAL_DIRECTION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
     // Week plan: lean
     'week-plan':      { schemas: ['WEEK_PLAN'],                                 instructions: [] },
     // Week flesh: full game design + story
