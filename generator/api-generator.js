@@ -1180,12 +1180,16 @@ async function runJsonStage(settings, config) {
           }
         }
       }
+      var summary = summarizeStageTelemetry(stageTelemetry);
       emitPipelineEvent(config.onProgress, config.stageIndex || 0, config.getTotalStages ? config.getTotalStages() : 0, config.completeMessage || config.stageName, {
         phase: 'complete',
         stageKey: config.stageKey || '',
         stageName: config.stageName,
-        telemetry: summarizeStageTelemetry(stageTelemetry)
+        telemetry: summary
       });
+      if (Array.isArray(config.telemetryCollector)) {
+        config.telemetryCollector.push(summary);
+      }
       return result;
     } catch (err) {
       lastErr = err;
@@ -2040,6 +2044,10 @@ async function runSkeletonFleshPipeline(options) {
     return isResume && checkpoint.stages && checkpoint.stages[key];
   }
 
+  // ── Telemetry + continuity accumulators ──
+  var sfTelemetry = [];
+  var sfContinuityWarnings = [];
+
   // ════════════════════════════════════════════════════════════════════
   // STAGE 1: SKELETON
   // ════════════════════════════════════════════════════════════════════
@@ -2067,6 +2075,7 @@ async function runSkeletonFleshPipeline(options) {
       maxAttempts:      2,
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
+      telemetryCollector: sfTelemetry,
       buildPrompt: function (retryState) {
         return builders.skeleton(workout, brief, {
           retryMode: retryState.attempt > 0
@@ -2123,6 +2132,7 @@ async function runSkeletonFleshPipeline(options) {
       maxAttempts:      2,
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
+      telemetryCollector: sfTelemetry,
       buildPrompt: function () {
         return builders.fleshRules(skeleton);
       },
@@ -2191,6 +2201,7 @@ async function runSkeletonFleshPipeline(options) {
       maxAttempts:      3,
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
+      telemetryCollector: sfTelemetry,
       buildPrompt: function (retryState) {
         return builders.fleshWeek(skeleton, weekPlan, weekWorkout, weekSummariesSF, allComponentValuesSF, {
           retryMode: retryState.attempt > 0
@@ -2250,6 +2261,23 @@ async function runSkeletonFleshPipeline(options) {
     });
   }
 
+  // ── Cross-stage continuity: weeks ──
+  var weekContinuityCtx = {
+    shell: skeleton,
+    campaignPlan: skeleton,
+    priorWeekChunkOutputs: []
+  };
+  var weekContinuityErrors = validateWeekChunkContinuity(
+    { weeks: weekOutputs },
+    weekContinuityCtx
+  );
+  if (weekContinuityErrors.length > 0) {
+    console.warn('[S+F] Week continuity warnings:', weekContinuityErrors);
+    for (var cwi = 0; cwi < weekContinuityErrors.length; cwi++) {
+      sfContinuityWarnings.push({ stage: 'weeks', message: weekContinuityErrors[cwi] });
+    }
+  }
+
   // ════════════════════════════════════════════════════════════════════
   // STAGES N+1 to N+3: FLESH — FRAGMENT BATCHES
   // ════════════════════════════════════════════════════════════════════
@@ -2288,6 +2316,7 @@ async function runSkeletonFleshPipeline(options) {
       maxAttempts:      2,
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
+      telemetryCollector: sfTelemetry,
       unwrapKey:        'fragments',
       buildPrompt: function () {
         return builders.fleshFragmentBatch(
@@ -2317,6 +2346,24 @@ async function runSkeletonFleshPipeline(options) {
     allFragments = allFragments.concat(batchFragmentsSF);
     priorFragments = priorFragments.concat(batchFragmentsSF);
     saveCheckpoint(batchKey, batchFragmentsSF, checkpoint);
+  }
+
+  // ── Cross-stage continuity: fragments ──
+  var fragContinuityCtx = {
+    shell: skeleton,
+    campaignPlan: skeleton,
+    weekChunkOutputs: [{ weeks: weekOutputs }],
+    expectedRegistry: skeleton.fragmentRegistry || []
+  };
+  var fragContinuityErrors = validateFragmentBatchContinuity(
+    { fragments: allFragments },
+    fragContinuityCtx
+  );
+  if (fragContinuityErrors.length > 0) {
+    console.warn('[S+F] Fragment continuity warnings:', fragContinuityErrors);
+    for (var cfi = 0; cfi < fragContinuityErrors.length; cfi++) {
+      sfContinuityWarnings.push({ stage: 'fragments', message: fragContinuityErrors[cfi] });
+    }
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -2355,6 +2402,7 @@ async function runSkeletonFleshPipeline(options) {
       maxAttempts:      2,
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
+      telemetryCollector: sfTelemetry,
       buildPrompt: function () {
         return builders.fleshEnding(skeleton, variant, finalWeekSummary, weekSummariesSF);
       },
@@ -2367,6 +2415,24 @@ async function runSkeletonFleshPipeline(options) {
 
     allEndings.push(endingResult);
     saveCheckpoint(endingKey, endingResult, checkpoint);
+  }
+
+  // ── Cross-stage continuity: endings ──
+  var endingContinuityCtx = {
+    shell: skeleton,
+    campaignPlan: skeleton,
+    weekChunkOutputs: [{ weeks: weekOutputs }],
+    fragmentsOutput: { fragments: allFragments }
+  };
+  var endingContinuityErrors = validateEndingsContinuity(
+    { endings: allEndings },
+    endingContinuityCtx
+  );
+  if (endingContinuityErrors.length > 0) {
+    console.warn('[S+F] Ending continuity warnings:', endingContinuityErrors);
+    for (var cei = 0; cei < endingContinuityErrors.length; cei++) {
+      sfContinuityWarnings.push({ stage: 'endings', message: endingContinuityErrors[cei] });
+    }
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -2389,11 +2455,35 @@ async function runSkeletonFleshPipeline(options) {
     console.warn('[S+F] Assembly validation warnings:', assemblyErrors);
   }
 
+  // ── Persist telemetry, continuity, and assembly diagnostics ──
   var report = generateQualityReport(booklet);
   var qualityGate = buildQualityGate(report);
   booklet._qualityReport = report;
   booklet._qualityGate = qualityGate;
   booklet._pipeline = 'skeleton-flesh';
+  booklet._assemblyWarnings = assemblyErrors || [];
+  booklet._continuityWarnings = sfContinuityWarnings;
+
+  // Build stage telemetry summary
+  var totalLatencyMs = 0;
+  var totalRetries = 0;
+  var totalTokens = 0;
+  var totalCostUsd = 0;
+  for (var ti = 0; ti < sfTelemetry.length; ti++) {
+    totalRetries += (sfTelemetry[ti].attempts || 0);
+    var stUsage = sfTelemetry[ti].usage || {};
+    totalTokens += safeNumber(stUsage.totalTokens);
+    totalCostUsd += safeNumber(sfTelemetry[ti].estimatedCostUsd);
+  }
+  booklet._stageTelemetry = {
+    stages: sfTelemetry,
+    summary: {
+      totalStages: sfTelemetry.length,
+      totalRetries: totalRetries,
+      totalTokens: totalTokens,
+      totalCostUsd: totalCostUsd
+    }
+  };
 
   clearCheckpoint();
   return booklet;
