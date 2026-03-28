@@ -8,6 +8,11 @@ import {
 } from './mechanic-layout.js';
 import { getShellDecorator } from './shell-decorator-registry.js';
 
+// Decorator registration — import barrel for side effects.
+// This ensures any code path that reaches renderPageFromPlacements()
+// (including the measurement harness) also gets decorator registration.
+import './decorators/index.js';
+
 const WORKOUT_PAGE_TYPES = new Set(['week-header', 'session-card', 'week-footer']);
 const MECHANIC_PAGE_TYPES = new Set(['cipher-panel', 'oracle-table', 'map-panel', 'tracker']);
 const BOARD_STATE_COPY = {
@@ -190,47 +195,6 @@ function renderRowInto(container, row) {
     renderPlacementInto(rowEl, row.placements[0]);
     container.appendChild(rowEl);
   }
-}
-
-function buildArchiveFooter(placements) {
-  const footer = make('section', 'archive-footer');
-  footer.appendChild(make('div', 'doc-label', 'Packet Ledger'));
-
-  const grid = make('div', 'archive-footer-grid');
-  const header = make('div', 'archive-footer-row archive-footer-row-header');
-  ['Ref', 'Type', 'Checked'].forEach((text) => {
-    header.appendChild(make('div', 'archive-footer-cell', text));
-  });
-  grid.appendChild(header);
-
-  placements.slice(0, 3).forEach((placement) => {
-    const data = placement.atom?.data || placement.data || {};
-    const row = make('div', 'archive-footer-row');
-    row.appendChild(make('div', 'archive-footer-cell', data.id || placement.id || 'F.--'));
-    row.appendChild(make('div', 'archive-footer-cell', String(data.documentType || 'Document')));
-    const mark = make('div', 'archive-footer-cell archive-footer-cell-mark');
-    mark.appendChild(make('div', 'archive-footer-checkbox'));
-    row.appendChild(mark);
-    grid.appendChild(row);
-  });
-
-  footer.appendChild(grid);
-  return footer;
-}
-
-function shouldUsePacketEvidenceLayout(placements) {
-  if (placements.length !== 2) return false;
-
-  return placements.every((placement) => {
-    const data = placement.atom?.data || placement.data || {};
-    const documentType = String(data.documentType || '').trim().toLowerCase();
-    const denseTypes = new Set(['form', 'inspection', 'report', 'transcript', 'anomaly']);
-    if (denseTypes.has(documentType)) return false;
-
-    const body = String(data.bodyText || data.body || data.content || '').trim();
-    const paragraphCount = body ? body.split(/\n\s*\n|\n/).filter(Boolean).length : 0;
-    return body.length <= 420 && paragraphCount <= 4;
-  });
 }
 
 export function renderPlacementInto(target, placement) {
@@ -454,23 +418,31 @@ export function renderPageFromPlacements(placements, spreadType, planIndex) {
 
   page.setAttribute('data-plan-index', String(planIndex));
   page.setAttribute('data-engine', 'v2');
-  if (primaryType === 'fragment-doc') {
+
+  // Fragment-doc: resolve shell attrs and decorator once for both hooks
+  const isFragment = primaryType === 'fragment-doc';
+  let fragmentDecorator = null;
+  let fragmentFacts = null;
+
+  if (isFragment) {
     const shellAttrs = resolveShellAttrs(placements);
     const shellFamily = shellAttrs['shell-family'] || 'field-survey';
     frame.setAttribute('data-fragment-count', String(placements.length));
     applyShellAttrs(frame, shellAttrs);
 
-    if (shellFamily === 'classified-packet' && shouldUsePacketEvidenceLayout(placements)) {
-      const evidenceLayout = make('div', 'fragment-evidence-layout');
-      evidenceLayout.setAttribute('data-fragment-count', String(placements.length));
-      placements.forEach((placement, index) => {
-        const cell = make('div', index === 0 ? 'fragment-evidence-primary' : 'fragment-evidence-sidebar');
-        renderPlacementInto(cell, placement);
-        evidenceLayout.appendChild(cell);
-      });
+    fragmentDecorator = getShellDecorator(shellFamily);
+    fragmentFacts = {
+      shellAttrs,
+      placements,
+      fragmentCount: placements.length,
+      renderPlacementInto,
+    };
 
-      frame.appendChild(evidenceLayout);
-      frame.appendChild(buildArchiveFooter(placements));
+    // Decorator: override fragment layout (evidence layout, etc.)
+    const customLayout = fragmentDecorator.buildFragmentLayout
+      && fragmentDecorator.buildFragmentLayout(fragmentFacts);
+    if (customLayout) {
+      frame.appendChild(customLayout);
       return page;
     }
   }
@@ -479,10 +451,12 @@ export function renderPageFromPlacements(placements, spreadType, planIndex) {
     renderPlacementInto(frame, placement);
   }
 
-  if (primaryType === 'fragment-doc') {
-    const fragShellAttrs = resolveShellAttrs(placements);
-    if ((fragShellAttrs['shell-family'] || '') === 'classified-packet' && placements.length <= 2) {
-      frame.appendChild(buildArchiveFooter(placements));
+  // Decorator: fragment footer (archive footer, etc.)
+  if (isFragment && fragmentDecorator) {
+    const footer = fragmentDecorator.buildFragmentFooter
+      && fragmentDecorator.buildFragmentFooter(fragmentFacts);
+    if (footer) {
+      frame.appendChild(footer);
     }
   }
 

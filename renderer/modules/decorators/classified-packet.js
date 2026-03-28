@@ -1,9 +1,9 @@
 /**
  * decorators/classified-packet.js — Shell decorator for classified-packet pages
  *
- * Implements the mechanic-page decoration hooks for the 'classified-packet'
- * shell family. This is LiftRPG domain code — it knows about cipher families,
- * tracker types, and board-state modes.
+ * Implements mechanic-page and fragment-page decoration hooks for the
+ * 'classified-packet' shell family. This is LiftRPG domain code — it knows
+ * about cipher families, tracker types, document types, and board-state modes.
  *
  * Self-registers at import via registerShellDecorator().
  *
@@ -198,6 +198,51 @@ function buildMechanicStrip(pageFacts) {
 }
 
 // ---------------------------------------------------------------------------
+// Fragment helpers (moved from page-renderer.js)
+// ---------------------------------------------------------------------------
+
+function shouldUsePacketEvidenceLayout(placements) {
+  if (placements.length !== 2) return false;
+
+  return placements.every((placement) => {
+    const data = placement.atom?.data || placement.data || {};
+    const documentType = String(data.documentType || '').trim().toLowerCase();
+    const denseTypes = new Set(['form', 'inspection', 'report', 'transcript', 'anomaly']);
+    if (denseTypes.has(documentType)) return false;
+
+    const body = String(data.bodyText || data.body || data.content || '').trim();
+    const paragraphCount = body ? body.split(/\n\s*\n|\n/).filter(Boolean).length : 0;
+    return body.length <= 420 && paragraphCount <= 4;
+  });
+}
+
+function buildArchiveFooter(placements) {
+  const footer = make('section', 'archive-footer');
+  footer.appendChild(make('div', 'doc-label', 'Packet Ledger'));
+
+  const grid = make('div', 'archive-footer-grid');
+  const header = make('div', 'archive-footer-row archive-footer-row-header');
+  ['Ref', 'Type', 'Checked'].forEach((text) => {
+    header.appendChild(make('div', 'archive-footer-cell', text));
+  });
+  grid.appendChild(header);
+
+  placements.slice(0, 3).forEach((placement) => {
+    const data = placement.atom?.data || placement.data || {};
+    const row = make('div', 'archive-footer-row');
+    row.appendChild(make('div', 'archive-footer-cell', data.id || placement.id || 'F.--'));
+    row.appendChild(make('div', 'archive-footer-cell', String(data.documentType || 'Document')));
+    const mark = make('div', 'archive-footer-cell archive-footer-cell-mark');
+    mark.appendChild(make('div', 'archive-footer-checkbox'));
+    row.appendChild(mark);
+    grid.appendChild(row);
+  });
+
+  footer.appendChild(grid);
+  return footer;
+}
+
+// ---------------------------------------------------------------------------
 // Decorator hooks
 // ---------------------------------------------------------------------------
 
@@ -249,6 +294,47 @@ const classifiedPacketDecorator = {
       resolveWorksheetType(pageFacts.companionPlacements),
       4
     );
+  },
+
+  // --- Fragment page hooks ---
+
+  /**
+   * Override fragment page layout with evidence layout when eligible.
+   * Returns a DocumentFragment containing the evidence layout + archive footer,
+   * or null to fall through to the default sequential rendering path.
+   *
+   * @param {object} fragmentFacts
+   * @returns {DocumentFragment|null}
+   */
+  buildFragmentLayout(fragmentFacts) {
+    if (!shouldUsePacketEvidenceLayout(fragmentFacts.placements)) return null;
+
+    const { placements, renderPlacementInto } = fragmentFacts;
+    const frag = document.createDocumentFragment();
+
+    const evidenceLayout = make('div', 'fragment-evidence-layout');
+    evidenceLayout.setAttribute('data-fragment-count', String(placements.length));
+    placements.forEach((placement, index) => {
+      const cell = make('div', index === 0 ? 'fragment-evidence-primary' : 'fragment-evidence-sidebar');
+      renderPlacementInto(cell, placement);
+      evidenceLayout.appendChild(cell);
+    });
+
+    frag.appendChild(evidenceLayout);
+    frag.appendChild(buildArchiveFooter(placements));
+    return frag;
+  },
+
+  /**
+   * Return an archive footer for fragment pages with ≤ 2 fragments.
+   * Called after the default sequential rendering path.
+   *
+   * @param {object} fragmentFacts
+   * @returns {HTMLElement|null}
+   */
+  buildFragmentFooter(fragmentFacts) {
+    if (fragmentFacts.fragmentCount > 2) return null;
+    return buildArchiveFooter(fragmentFacts.placements);
   },
 };
 

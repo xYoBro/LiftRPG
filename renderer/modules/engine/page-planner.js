@@ -577,6 +577,121 @@ function scanRowGroupDiagnostics(spreadPlan, diagnostics) {
 }
 
 // ---------------------------------------------------------------------------
+// Continuation chain diagnostics (post-measurement, no layout changes)
+// ---------------------------------------------------------------------------
+
+/**
+ * Scan the final spread plan for continuation chain issues.
+ *
+ * Emits warnings for:
+ * - `continuation-orphan`: atom declares continuationOf but the
+ *   predecessor atom id does not exist in the plan.
+ * - `continuation-non-consecutive`: atom and its predecessor both
+ *   exist but do not land on consecutive printed pages.
+ * - `engine-move-continuation-break`: a continuation chain that was
+ *   initially consecutive became non-consecutive because the engine
+ *   moved an atom (recorded in diagnostics.atomsSplit).
+ *
+ * @param {object[]} spreadPlan — finalized spread plan
+ * @param {object}   diagnostics — diagnostics collector
+ */
+function scanContinuationDiagnostics(spreadPlan, diagnostics) {
+  // Build a map from atomId → { printedPage, spreadIndex, side }
+  // Printed page order: iterate spreads in order, left then right.
+  const atomPageMap = new Map();
+  let printedPage = 0;
+  for (const spread of spreadPlan) {
+    for (const side of ['left', 'right']) {
+      const placements = spread[side];
+      if (!placements || placements.length === 0) continue;
+      for (const p of placements) {
+        atomPageMap.set(p.atomId, {
+          printedPage,
+          spreadIndex: spread.spreadIndex,
+          side,
+        });
+      }
+      printedPage++;
+    }
+  }
+
+  // Collect atoms that declare continuationOf
+  const continuationAtoms = [];
+  for (const spread of spreadPlan) {
+    for (const side of ['left', 'right']) {
+      for (const p of spread[side]) {
+        const contOf = p.atom && p.atom.continuationOf;
+        if (contOf) {
+          continuationAtoms.push({
+            atomId: p.atomId,
+            type: p.type,
+            continuationOf: contOf,
+          });
+        }
+      }
+    }
+  }
+
+  if (continuationAtoms.length === 0) return;
+
+  // Build set of atom ids that were moved by the engine (split-to-new-spread)
+  const movedAtomIds = new Set(
+    (diagnostics.atomsSplit || []).map(s => s.atomId)
+  );
+
+  // Check each continuation atom
+  for (const cont of continuationAtoms) {
+    const predecessorLoc = atomPageMap.get(cont.continuationOf);
+    const continuationLoc = atomPageMap.get(cont.atomId);
+
+    // Orphan: predecessor not in the plan
+    if (!predecessorLoc) {
+      recordWarning(diagnostics, 'continuation-orphan',
+        `${cont.atomId} declares continuationOf "${cont.continuationOf}" but predecessor not found in plan`,
+        {
+          atomId: cont.atomId,
+          type: cont.type,
+          continuationOf: cont.continuationOf,
+        },
+      );
+      continue;
+    }
+
+    // Both exist — check consecutiveness
+    if (!continuationLoc) continue; // shouldn't happen, but guard
+
+    const gap = continuationLoc.printedPage - predecessorLoc.printedPage;
+    if (gap !== 1) {
+      // Determine if this was caused by an engine move
+      const isEngineMove = movedAtomIds.has(cont.atomId)
+        || movedAtomIds.has(cont.continuationOf);
+
+      const category = isEngineMove
+        ? 'engine-move-continuation-break'
+        : 'continuation-non-consecutive';
+      const verb = isEngineMove ? 'engine move broke chain' : 'not on consecutive pages';
+
+      recordWarning(diagnostics, category,
+        `${cont.atomId} → ${cont.continuationOf}: ${verb} (page ${predecessorLoc.printedPage} → ${continuationLoc.printedPage}, gap ${gap})`,
+        {
+          atomId: cont.atomId,
+          type: cont.type,
+          continuationOf: cont.continuationOf,
+          predecessorPage: predecessorLoc.printedPage,
+          continuationPage: continuationLoc.printedPage,
+          gap,
+          predecessorSpreadIndex: predecessorLoc.spreadIndex,
+          predecessorSide: predecessorLoc.side,
+          continuationSpreadIndex: continuationLoc.spreadIndex,
+          continuationSide: continuationLoc.side,
+          causedByEngineMove: isEngineMove,
+        },
+      );
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Full pipeline: plan → measure → revise
 // ---------------------------------------------------------------------------
 
@@ -872,6 +987,9 @@ export function planAndMeasure(atoms, container, options = {}) {
 
   // Step 5: Scan for rowGroup inconsistencies (post-measurement, no layout changes)
   scanRowGroupDiagnostics(spreadPlan, diagnostics);
+
+  // Step 6: Scan for continuation chain issues (post-measurement, no layout changes)
+  scanContinuationDiagnostics(spreadPlan, diagnostics);
 
   return { spreadPlan, diagnostics };
 }
