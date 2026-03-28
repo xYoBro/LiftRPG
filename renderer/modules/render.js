@@ -10,6 +10,9 @@ import { applyTheme, resolveTheme } from './theme.js?v=47';
 import { planAndMeasure } from './engine/page-planner.js';
 import { liftrpgAdapter, MAX_BOOKLET_PAGES } from './adapters/liftrpg-adapter.js';
 
+// Shell decorator registration — import for side effects only
+import './decorators/classified-packet.js';
+
 // Atom self-registration — import for side effects only
 import './atoms/cover.js';
 import './atoms/rules-block.js';

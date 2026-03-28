@@ -6,6 +6,7 @@ import {
   buildMechanicSurfaceRows,
   resolveShellAttrs,
 } from './mechanic-layout.js';
+import { getShellDecorator } from './shell-decorator-registry.js';
 
 const WORKOUT_PAGE_TYPES = new Set(['week-header', 'session-card', 'week-footer']);
 const MECHANIC_PAGE_TYPES = new Set(['cipher-panel', 'oracle-table', 'map-panel', 'tracker']);
@@ -83,112 +84,6 @@ function applyShellAttrs(element, attrs) {
 
 function resolveMechanicCopy(shellAttrs) {
   return BOARD_STATE_COPY[shellAttrs['board-state-mode']] || BOARD_STATE_COPY['survey-grid'];
-}
-
-function extractPlacementLabel(placement) {
-  const data = placement.atom?.data || placement.data || {};
-  if (placement.type === 'cipher-panel') {
-    return ((data.cipher || {}).title || data.label || 'Cipher').trim();
-  }
-  if (placement.type === 'oracle-table') {
-    return ((data.oracle || {}).title || data.label || 'Oracle').trim();
-  }
-  if (placement.type === 'map-panel') {
-    return ((data.map || {}).title || (data.map || {}).floorLabel || data.label || 'Topology').trim();
-  }
-  if (placement.type === 'tracker') {
-    return (data.label || data.trackType || 'Companion').trim();
-  }
-  return '';
-}
-
-function buildMechanicBriefing(shellAttrs, placements) {
-  if (shellAttrs['shell-family'] !== 'classified-packet') return null;
-
-  const labels = placements
-    .map((placement) => extractPlacementLabel(placement))
-    .filter(Boolean)
-    .slice(0, 4);
-  const weekContext = weekContextFromPlacements(placements);
-  const boardMode = String(shellAttrs['board-state-mode'] || 'survey-grid').replace(/-/g, ' ');
-
-  const box = make('section', 'ops-directive-board');
-  box.appendChild(make('div', 'doc-label', 'Current Board'));
-  const meta = make('div', 'ops-directive-meta');
-  meta.appendChild(make('div', 'ops-directive-chip', weekContext ? ('Week ' + (weekContext.weekIndex + 1)) : 'Weekly Board'));
-  meta.appendChild(make('div', 'ops-directive-chip', boardMode));
-  meta.appendChild(make('div', 'ops-directive-chip', labels.length ? (labels.length + ' active surfaces') : 'Companion surface'));
-  box.appendChild(meta);
-
-  if (labels.length) {
-    const list = make('div', 'ops-directive-list');
-    labels.forEach((label) => {
-      list.appendChild(make('div', 'ops-directive-item', label));
-    });
-    box.appendChild(list);
-  }
-
-  return box;
-}
-
-function renderMechanicStrip(shellAttrs, placements) {
-  if (shellAttrs['shell-family'] !== 'classified-packet') return null;
-
-  const strip = make('div', 'ops-incident-strip');
-  const placementTypes = new Set(placements.map((placement) => placement.type));
-  const surfaceLabels = [];
-  if (placementTypes.has('cipher-panel')) surfaceLabels.push('Cipher');
-  if (placementTypes.has('map-panel')) surfaceLabels.push('Topology');
-  if (placementTypes.has('oracle-table')) surfaceLabels.push('Oracle');
-  if (placementTypes.has('tracker')) surfaceLabels.push('Companion');
-
-  [
-    'Packet',
-    String(shellAttrs['board-state-mode'] || 'survey-grid').replace(/-/g, ' '),
-    surfaceLabels.join(' / ') || 'Evidence Surface',
-  ].forEach((value) => {
-    strip.appendChild(make('div', 'ops-incident-chip', value));
-  });
-
-  return strip;
-}
-
-function resolveWorksheetLabel(companionPlacements) {
-  const trackType = String((companionPlacements[0]?.atom?.data?.trackType) || '').trim().toLowerCase();
-  if (trackType === 'stress-track') return 'Incident Log';
-  if (trackType === 'token-sheet') return 'Clearance Notes';
-  if (trackType === 'overlay-window') return 'Alignment Notes';
-  if (trackType === 'usage-die') return 'Legibility Notes';
-  return 'Board Notes';
-}
-
-function resolveWorksheetType(companionPlacements) {
-  const trackType = String((companionPlacements[0]?.atom?.data?.trackType) || '').trim().toLowerCase();
-  if (trackType === 'stress-track') return 'incident-log';
-  if (trackType === 'token-sheet') return 'clearance-ledger';
-  if (trackType === 'overlay-window') return 'alignment-ledger';
-  return 'notes';
-}
-
-function resolveSoloSurfaceWorksheet(surfacePlacements) {
-  const placement = surfacePlacements[0];
-  if (!placement) return null;
-
-  const data = placement.atom?.data || placement.data || {};
-  if (placement.type === 'cipher-panel') {
-    const cipher = data.cipher || {};
-    const family = String(cipher.family || '').trim().toLowerCase();
-    if (family === 'cross-reference' || family === 'route-tracing') {
-      return { label: 'Decode Ledger', type: 'alignment-ledger', rows: 4 };
-    }
-    return { label: 'Decode Surface', type: 'decode-grid', rows: 5 };
-  }
-
-  if (placement.type === 'oracle-table') {
-    return { label: 'Resolution Notes', type: 'notes', rows: 5 };
-  }
-
-  return null;
 }
 
 /**
@@ -295,69 +190,6 @@ function renderRowInto(container, row) {
     renderPlacementInto(rowEl, row.placements[0]);
     container.appendChild(rowEl);
   }
-}
-
-function buildBoardWorksheet(label, worksheetType = 'notes', rowCount = 4) {
-  const wrap = make('section', 'board-worksheet');
-  wrap.setAttribute('data-worksheet-type', worksheetType);
-  wrap.appendChild(make('div', 'doc-label', label));
-
-  if (worksheetType === 'incident-log') {
-    const ledger = make('div', 'board-worksheet-ledger');
-    const header = make('div', 'board-ledger-row board-ledger-header');
-    ['Trigger', 'Shift', 'Record'].forEach((text) => header.appendChild(make('div', 'board-ledger-cell', text)));
-    ledger.appendChild(header);
-    for (let index = 0; index < Math.max(3, rowCount - 1); index += 1) {
-      const row = make('div', 'board-ledger-row');
-      row.appendChild(make('div', 'board-ledger-cell board-ledger-cell-mark'));
-      row.appendChild(make('div', 'board-ledger-cell board-ledger-cell-short'));
-      row.appendChild(make('div', 'board-ledger-cell board-ledger-cell-wide'));
-      ledger.appendChild(row);
-    }
-    wrap.appendChild(ledger);
-    return wrap;
-  }
-
-  if (worksheetType === 'clearance-ledger' || worksheetType === 'alignment-ledger') {
-    const ledger = make('div', 'board-worksheet-ledger');
-    const header = make('div', 'board-ledger-row board-ledger-header');
-    const headings = worksheetType === 'clearance-ledger'
-      ? ['Tier', 'Finding', 'Filed']
-      : ['Window', 'Offset', 'Result'];
-    headings.forEach((text) => header.appendChild(make('div', 'board-ledger-cell', text)));
-    ledger.appendChild(header);
-    for (let index = 0; index < Math.max(3, rowCount - 1); index += 1) {
-      const row = make('div', 'board-ledger-row');
-      row.appendChild(make('div', 'board-ledger-cell board-ledger-cell-short'));
-      row.appendChild(make('div', 'board-ledger-cell board-ledger-cell-wide'));
-      row.appendChild(make('div', 'board-ledger-cell board-ledger-cell-mark'));
-      ledger.appendChild(row);
-    }
-    wrap.appendChild(ledger);
-    return wrap;
-  }
-
-  if (worksheetType === 'decode-grid') {
-    const grid = make('div', 'board-decode-grid');
-    for (let index = 0; index < 10; index += 1) {
-      grid.appendChild(make('div', 'board-decode-cell'));
-    }
-    wrap.appendChild(grid);
-
-    const lines = make('div', 'board-worksheet-lines');
-    for (let index = 0; index < Math.max(3, rowCount - 1); index += 1) {
-      lines.appendChild(make('div', 'board-worksheet-line'));
-    }
-    wrap.appendChild(lines);
-    return wrap;
-  }
-
-  const lines = make('div', 'board-worksheet-lines');
-  for (let index = 0; index < rowCount; index += 1) {
-    lines.appendChild(make('div', 'board-worksheet-line'));
-  }
-  wrap.appendChild(lines);
-  return wrap;
 }
 
 function buildArchiveFooter(placements) {
@@ -493,7 +325,27 @@ function renderMechanicPage(placements, planIndex) {
   const shellFamily = shellAttrs['shell-family'] || 'field-survey';
   const copy = resolveMechanicCopy(shellAttrs);
   const surfacePlacements = placements.filter((placement) => !isCompanionPlacement(placement) && placement.type !== 'week-footer');
+  const companionPlacements = placements.filter(isCompanionPlacement);
   const surfaceTypes = new Set(surfacePlacements.map((placement) => placement.type));
+  const isSoloSurface = surfacePlacements.length === 1 && companionPlacements.length === 0;
+  const isSoloCompanion = surfacePlacements.length === 0 && companionPlacements.length === 1;
+  const layoutVariant = resolveLayoutVariant(shellAttrs, surfacePlacements);
+
+  // Build page facts once — passed to decorator hooks.
+  const pageFacts = {
+    shellAttrs,
+    placements,
+    surfacePlacements,
+    companionPlacements,
+    surfaceTypes,
+    layoutVariant,
+    isSoloSurface,
+    isSoloCompanion,
+    weekContext: weekContextFromPlacements(placements),
+  };
+
+  const decorator = getShellDecorator(shellFamily);
+
   const { page, frame } = createBoundedPage(
     'field-ops',
     'field-ops-right',
@@ -510,18 +362,10 @@ function renderMechanicPage(placements, planIndex) {
   header.appendChild(make('span', 'page-num', ''));
   frame.appendChild(header);
 
-  const strip = renderMechanicStrip(shellAttrs, placements);
-  if (strip) {
-    frame.appendChild(strip);
-  }
-
-  const companionPlacements = placements.filter(isCompanionPlacement);
-  const briefing = buildMechanicBriefing(shellAttrs, placements);
-  const isSoloCompanionPage = surfacePlacements.length === 0 && companionPlacements.length === 1;
-  const isSoloMapPage = surfacePlacements.length === 1 && surfacePlacements[0].type === 'map-panel' && companionPlacements.length === 0;
-  const isSoloSurfacePage = surfacePlacements.length === 1 && companionPlacements.length === 0;
-  if (briefing && !isSoloCompanionPage && !isSoloSurfacePage && (surfacePlacements.length <= 1 || companionPlacements.length > 0)) {
-    frame.appendChild(briefing);
+  // Decorator: header chrome (strip, briefing, etc.)
+  const headerChrome = decorator.buildHeaderChrome && decorator.buildHeaderChrome(pageFacts);
+  if (headerChrome) {
+    frame.appendChild(headerChrome);
   }
 
   const content = make('div', 'rp-content');
@@ -533,14 +377,14 @@ function renderMechanicPage(placements, planIndex) {
     content.setAttribute('data-solo-surface', 'tracker');
   }
 
-  const layoutVariant = resolveLayoutVariant(shellAttrs, surfacePlacements);
   frame.setAttribute('data-layout-variant', layoutVariant);
   buildMechanicSurfaceRows(surfacePlacements, layoutVariant).forEach((row) => renderRowInto(content, row));
 
-  if (shellFamily === 'classified-packet' && isSoloSurfacePage) {
-    const worksheet = resolveSoloSurfaceWorksheet(surfacePlacements);
-    if (worksheet) {
-      content.appendChild(buildBoardWorksheet(worksheet.label, worksheet.type, worksheet.rows));
+  // Decorator: solo-surface supplement (worksheet, etc.)
+  if (isSoloSurface) {
+    const supplement = decorator.buildSoloSurfaceSupplement && decorator.buildSoloSurfaceSupplement(pageFacts);
+    if (supplement) {
+      content.appendChild(supplement);
     }
   }
 
@@ -551,12 +395,12 @@ function renderMechanicPage(placements, planIndex) {
     groupPlacementsIntoRows(companionPlacements).forEach((row) => renderRowInto(companionZone, row));
     content.appendChild(companionZone);
 
-    if (shellFamily === 'classified-packet' && surfacePlacements.length === 0 && companionPlacements.length === 1) {
-      content.appendChild(buildBoardWorksheet(
-        resolveWorksheetLabel(companionPlacements),
-        resolveWorksheetType(companionPlacements),
-        4
-      ));
+    // Decorator: companion-only supplement (worksheet, etc.)
+    if (isSoloCompanion) {
+      const supplement = decorator.buildCompanionOnlySupplement && decorator.buildCompanionOnlySupplement(pageFacts);
+      if (supplement) {
+        content.appendChild(supplement);
+      }
     }
   }
 
