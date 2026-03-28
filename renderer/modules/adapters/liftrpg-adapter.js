@@ -284,6 +284,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
           id: `w${wi}-boss-appendix`,
           continuationOf: `w${wi}-boss`,
           continuationOrigin: 'adapter',
+          continuationAdjacency: 'ordered',
           group: `week-${wi}-boss-appendix`,
           section: 'body',
           sequence: wi * 1000 + 101,
@@ -435,6 +436,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
           id: `w${wi}-overflow-doc-${overflowIndex}`,
           continuationOf: overflowIndex > 0 ? `w${wi}-overflow-doc-${overflowIndex - 1}` : null,
           continuationOrigin: overflowIndex > 0 ? 'adapter' : null,
+          continuationAdjacency: overflowIndex > 0 ? 'ordered' : null,
           group: chunkGroup,
           groupPolicy: singlePageGroupPolicy(),
           section: 'body',
@@ -527,6 +529,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         type: 'ending', id: `ending-unlocked-${ei}`, group: 'endings',
         continuationOf: isFirst ? null : `ending-unlocked-${ei - 1}`,
         continuationOrigin: isFirst ? null : 'adapter',
+        continuationAdjacency: isFirst ? null : 'required',
         section: 'endings', sequence: 1 + ei,
         sizeHint: 'full-page', pageAffinity: 'either',
         data: {

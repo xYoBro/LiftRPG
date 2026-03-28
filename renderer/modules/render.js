@@ -7,7 +7,7 @@ import { renderPageFromPlacements } from './page-renderer.js?v=47';
 import { applyTheme, resolveTheme } from './theme.js?v=47';
 
 // ── V2 Engine imports ───────────────────────────────────────────────
-import { planAndMeasure } from './engine/page-planner.js';
+import { planAndMeasure, scanContinuationDiagnostics } from './engine/page-planner.js';
 import { liftrpgAdapter, MAX_BOOKLET_PAGES } from './adapters/liftrpg-adapter.js';
 
 // Atom self-registration — import for side effects only
@@ -184,6 +184,7 @@ export function renderBooklet(refs, layoutMode, data, unlockedEnding, setStatus)
   window.__v2Diagnostics = diagnostics;
   window.__v2AtomCount = atoms.length;
   window.__v2PageCount = pages.length;
+  window.__v2ScanContinuation = scanContinuationDiagnostics;
 
   // Step 6: Report status
   if (pages.length > MAX_BOOKLET_PAGES) {

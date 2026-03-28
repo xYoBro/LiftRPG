@@ -595,7 +595,8 @@ function scanRowGroupDiagnostics(spreadPlan, diagnostics) {
  * @param {object[]} spreadPlan — finalized spread plan
  * @param {object}   diagnostics — diagnostics collector
  */
-function scanContinuationDiagnostics(spreadPlan, diagnostics) {
+// Exported for test harness use (window.__v2ScanContinuation).
+export function scanContinuationDiagnostics(spreadPlan, diagnostics) {
   // Build a map from atomId → { printedPage, spreadIndex, side }
   // Printed page order: iterate spreads in order, left then right.
   const atomPageMap = new Map();
@@ -626,6 +627,7 @@ function scanContinuationDiagnostics(spreadPlan, diagnostics) {
             atomId: p.atomId,
             type: p.type,
             continuationOf: contOf,
+            adjacency: (p.atom && p.atom.continuationAdjacency) || null,
           });
         }
       }
@@ -644,7 +646,7 @@ function scanContinuationDiagnostics(spreadPlan, diagnostics) {
     const predecessorLoc = atomPageMap.get(cont.continuationOf);
     const continuationLoc = atomPageMap.get(cont.atomId);
 
-    // Orphan: predecessor not in the plan
+    // Orphan: predecessor not in the plan (applies regardless of adjacency policy)
     if (!predecessorLoc) {
       recordWarning(diagnostics, 'continuation-orphan',
         `${cont.atomId} declares continuationOf "${cont.continuationOf}" but predecessor not found in plan`,
@@ -652,17 +654,19 @@ function scanContinuationDiagnostics(spreadPlan, diagnostics) {
           atomId: cont.atomId,
           type: cont.type,
           continuationOf: cont.continuationOf,
+          adjacency: cont.adjacency,
         },
       );
       continue;
     }
 
-    // Both exist — check consecutiveness
+    // Both exist — check adjacency/ordering based on declared policy
     if (!continuationLoc) continue; // shouldn't happen, but guard
 
     const gap = continuationLoc.printedPage - predecessorLoc.printedPage;
-    if (gap !== 1) {
-      // Determine if this was caused by an engine move
+
+    // 'required': must be on the immediately next printed page
+    if (cont.adjacency === 'required' && gap !== 1) {
       const isEngineMove = movedAtomIds.has(cont.atomId)
         || movedAtomIds.has(cont.continuationOf);
 
@@ -677,6 +681,7 @@ function scanContinuationDiagnostics(spreadPlan, diagnostics) {
           atomId: cont.atomId,
           type: cont.type,
           continuationOf: cont.continuationOf,
+          adjacency: cont.adjacency,
           predecessorPage: predecessorLoc.printedPage,
           continuationPage: continuationLoc.printedPage,
           gap,
@@ -687,7 +692,31 @@ function scanContinuationDiagnostics(spreadPlan, diagnostics) {
           causedByEngineMove: isEngineMove,
         },
       );
+      continue;
     }
+
+    // 'ordered': must print after predecessor (gap > 0), but gaps are fine
+    if (cont.adjacency === 'ordered' && gap <= 0) {
+      recordWarning(diagnostics, 'continuation-order-violation',
+        `${cont.atomId} → ${cont.continuationOf}: prints before or on same page as predecessor (page ${predecessorLoc.printedPage} → ${continuationLoc.printedPage})`,
+        {
+          atomId: cont.atomId,
+          type: cont.type,
+          continuationOf: cont.continuationOf,
+          adjacency: cont.adjacency,
+          predecessorPage: predecessorLoc.printedPage,
+          continuationPage: continuationLoc.printedPage,
+          gap,
+          predecessorSpreadIndex: predecessorLoc.spreadIndex,
+          predecessorSide: predecessorLoc.side,
+          continuationSpreadIndex: continuationLoc.spreadIndex,
+          continuationSide: continuationLoc.side,
+        },
+      );
+      continue;
+    }
+
+    // null adjacency: no adjacency/order warning (orphan check above still applies)
   }
 }
 
