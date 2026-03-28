@@ -1224,6 +1224,23 @@ export function validateSkeletonStage(result, weekCount) {
   var fr = result.fragmentRegistry;
   if (!Array.isArray(fr) || fr.length === 0) return 'Skeleton → fragmentRegistry: missing or empty';
 
+  // Cap fragment registry at 12 — more than this exceeds single-call generation capacity
+  var MAX_FRAGMENTS = 12;
+  if (fr.length > MAX_FRAGMENTS) {
+    var originalCount = fr.length;
+    // Keep fragments referenced by weekPlan first, then trim to cap
+    var referencedIds = {};
+    for (var ri = 0; ri < wp.length; ri++) {
+      (wp[ri].fragmentIds || []).forEach(function (fid) { referencedIds[fid] = true; });
+      if (wp[ri].overflowFragmentId) referencedIds[wp[ri].overflowFragmentId] = true;
+    }
+    var kept = fr.filter(function (f) { return referencedIds[f.id]; });
+    var unreferenced = fr.filter(function (f) { return !referencedIds[f.id]; });
+    fr = kept.concat(unreferenced).slice(0, MAX_FRAGMENTS);
+    result.fragmentRegistry = fr;
+    console.warn('Skeleton → fragmentRegistry trimmed from ' + originalCount + ' to ' + fr.length + ' (cap: ' + MAX_FRAGMENTS + ')');
+  }
+
   // Cross-ref: every fragmentId in weekPlan must exist in registry
   var registryIds = {};
   for (var j = 0; j < fr.length; j++) {

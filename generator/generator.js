@@ -270,7 +270,14 @@
   // ── Week count + chunking utilities ────────────────────────────────────────
 
   window.parseWeekCount = function (workout) {
-    var match = String(workout || '').match(/(\d+)\s*weeks?\b/i);
+    var text = String(workout || '');
+    // Primary: count distinct "Week N" headers (most reliable for structured input)
+    var headers = text.match(/^Week\s+\d+/gim);
+    if (headers && headers.length >= 2) {
+      return Math.max(4, Math.min(12, headers.length));
+    }
+    // Fallback: look for "N weeks" phrase (unstructured text)
+    var match = text.match(/\b(\d+)\s+weeks?\b/i);
     var n = match ? parseInt(match[1], 10) : 6;
     return Math.max(4, Math.min(12, n || 6));
   };

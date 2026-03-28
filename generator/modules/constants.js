@@ -3,7 +3,7 @@
 // Every module in the pipeline imports from here — never duplicate these.
 
 export var DEFAULT_TIMEOUT_MS = 600000; // 10 minutes — long frontier-model stages often exceed 5m
-export var MAX_OUTPUT_TOKENS = 65536;   // generous ceiling — you only pay for tokens generated, not reserved
+export var MAX_OUTPUT_TOKENS = 64000;   // max supported by Claude Sonnet 4.6 — generous ceiling, only pay for generated
 
 // ── Provider presets ─────────────────────────────────────────────────────────
 
