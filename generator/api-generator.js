@@ -1844,13 +1844,13 @@ async function runApiPipeline(options) {
   var booklet = options.assemble(shell, assembledWeeksOutput, assembledFragmentsOutput, assembledEndingsOutput, campaignPlan);
   enforceIdentityContract(booklet, identityContract);
 
-  var errors = validateAssembledBooklet(booklet);
-  if (errors.warnings && errors.warnings.length > 0) {
-    console.warn('[LiftRPG] Validation warnings:', errors.warnings);
+  var validationResult = validateAssembledBooklet(booklet);
+  if (validationResult.warnings && validationResult.warnings.length > 0) {
+    console.warn('[LiftRPG] Validation warnings:', validationResult.warnings);
   }
 
-  if (errors.length > 0 && options.allowPatch !== false) {
-    console.warn('[LiftRPG] Final assembly has', errors.length, 'validation errors:', errors);
+  if (validationResult.errors.length > 0 && options.allowPatch !== false) {
+    console.warn('[LiftRPG] Final assembly has', validationResult.errors.length, 'validation errors:', validationResult.errors);
     console.warn('[LiftRPG] Whole-booklet patching is disabled by policy. Returning aggressively unit-repaired booklet.');
   }
 
@@ -1858,6 +1858,16 @@ async function runApiPipeline(options) {
   var qualityGate = buildQualityGate(report);
   booklet._qualityReport = report;
   booklet._qualityGate = qualityGate;
+  booklet._pipeline = booklet._pipeline || 'standard';
+
+  // Persist Layer 2 assembly diagnostics (serialization-safe)
+  booklet._assemblyWarnings = {
+    diagnostics: booklet._assemblyDiagnostics || [],
+    validationErrors: validationResult.errors,
+    validationWarnings: validationResult.warnings
+  };
+  delete booklet._assemblyDiagnostics;
+
   if (!qualityGate.passed) {
     console.warn('[LiftRPG] Quality gate warnings (non-blocking):', qualityGate.blockers.map(function (entry) {
       return entry.message;
@@ -2473,9 +2483,12 @@ async function runSkeletonFleshPipeline(options) {
     enforceIdentityContract(booklet, identityContract);
   }
 
-  var assemblyErrors = validateAssembledBooklet(booklet);
-  if (assemblyErrors && assemblyErrors.length > 0) {
-    console.warn('[S+F] Assembly validation warnings:', assemblyErrors);
+  var validationResult = validateAssembledBooklet(booklet);
+  if (validationResult.errors && validationResult.errors.length > 0) {
+    console.warn('[S+F] Assembly validation errors:', validationResult.errors);
+  }
+  if (validationResult.warnings && validationResult.warnings.length > 0) {
+    console.warn('[S+F] Assembly validation warnings:', validationResult.warnings);
   }
 
   // ── Persist telemetry, continuity, and assembly diagnostics ──
@@ -2485,7 +2498,15 @@ async function runSkeletonFleshPipeline(options) {
   booklet._qualityGate = qualityGate;
   booklet._pipeline = 'skeleton-flesh';
   booklet._trialMode = trialMode;
-  booklet._assemblyWarnings = assemblyErrors || [];
+
+  // Persist Layer 2 assembly diagnostics (serialization-safe, same shape as standard pipeline)
+  booklet._assemblyWarnings = {
+    diagnostics: booklet._assemblyDiagnostics || [],
+    validationErrors: validationResult.errors,
+    validationWarnings: validationResult.warnings
+  };
+  delete booklet._assemblyDiagnostics;
+
   booklet._continuityWarnings = sfContinuityWarnings;
 
   // Build stage telemetry summary

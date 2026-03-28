@@ -4,6 +4,33 @@
 
 import { DOCUMENT_TYPE_ALIASES, SUPPORTED_THEME_ARCHETYPES, THEME_ARCHETYPE_ALIASES } from './constants.js';
 
+// ── Structured Layer 2 diagnostics ──────────────────────────────────────────
+// Machine-readable diagnostic entries for assembly/normalization repairs.
+// Satisfies docs/layer2/ADAPTER-CONTRACT.md §9 (Diagnostics Contract).
+
+/**
+ * createDiagnostic(code, severity, phase, message, opts?) -> DiagnosticEntry
+ *
+ * @param {string} code        - Stable machine-readable category (e.g. 'companion-normalized')
+ * @param {string} severity    - 'warning' | 'error'
+ * @param {string} phase       - 'normalize' | 'reconcile' | 'validate' | 'synthesize'
+ * @param {string} message     - Human-readable explanation
+ * @param {object} [opts]      - Optional fields: { path, repairable, correction }
+ * @returns {object} plain diagnostic entry (JSON-serialization-safe)
+ */
+export function createDiagnostic(code, severity, phase, message, opts) {
+  var d = {
+    code: code,
+    severity: severity,
+    phase: phase,
+    message: message,
+    repairable: !!(opts && opts.repairable)
+  };
+  if (opts && opts.path) d.path = opts.path;
+  if (opts && opts.correction) d.correction = opts.correction;
+  return d;
+}
+
 // ── ID normalisation ────────────────────────────────────────────────────────
 // Soft matching for fragment IDs: "F.01" vs "F-01" vs "f_01" all match.
 // Used in validation only — never rewrites IDs in the booklet.
@@ -709,13 +736,14 @@ export function autoRepairWeek(result) {
 
 // Normalize companionComponents: model sometimes returns an object keyed by
 // component name instead of the expected array. Convert in place.
-export function normalizeCompanionComponents(week) {
+export function normalizeCompanionComponents(week, diag) {
   var fo = week.fieldOps || week.bossEncounter;
   if (!fo || !fo.companionComponents) return;
   if (Array.isArray(fo.companionComponents)) return;
   if (typeof fo.companionComponents === 'object' && fo.companionComponents !== null) {
     var cc = fo.companionComponents;
-    fo.companionComponents = Object.keys(cc).map(function (key) {
+    var keys = Object.keys(cc);
+    fo.companionComponents = keys.map(function (key) {
       var val = cc[key];
       if (typeof val === 'object' && val !== null) {
         if (!val.type) val.type = key;
@@ -723,27 +751,53 @@ export function normalizeCompanionComponents(week) {
       }
       return { type: key, value: val };
     });
-    console.warn('[LiftRPG] Normalized companionComponents from object to array (' + fo.companionComponents.length + ' items)');
+    var msg = 'Normalized companionComponents from object to array (' + fo.companionComponents.length + ' items)';
+    console.warn('[LiftRPG] ' + msg);
+    if (diag) {
+      diag.push(createDiagnostic('companion-object-to-array', 'warning', 'normalize', msg, {
+        path: 'week ' + (week.weekNumber || '?') + '.fieldOps.companionComponents',
+        repairable: true,
+        correction: 'Converted object {' + keys.join(', ') + '} to array'
+      }));
+    }
   }
 }
 
 // Normalize documentType aliases (e.g. 'letter' -> 'correspondence') on
 // fragments, overflow documents, and endings in place.
-export function normalizeDocumentTypes(booklet) {
+export function normalizeDocumentTypes(booklet, diag) {
   (booklet.fragments || []).forEach(function (f) {
     if (f.documentType && DOCUMENT_TYPE_ALIASES[f.documentType]) {
+      var from = f.documentType;
       f.documentType = DOCUMENT_TYPE_ALIASES[f.documentType];
+      if (diag) {
+        diag.push(createDiagnostic('document-type-alias', 'warning', 'normalize',
+          'Fragment "' + (f.id || '?') + '" documentType "' + from + '" resolved to "' + f.documentType + '"',
+          { path: 'fragments[' + (f.id || '?') + '].documentType', repairable: true, correction: from + ' → ' + f.documentType }));
+      }
     }
   });
-  (booklet.weeks || []).forEach(function (week) {
+  (booklet.weeks || []).forEach(function (week, wi) {
     if (week.overflowDocument && week.overflowDocument.documentType && DOCUMENT_TYPE_ALIASES[week.overflowDocument.documentType]) {
+      var from = week.overflowDocument.documentType;
       week.overflowDocument.documentType = DOCUMENT_TYPE_ALIASES[week.overflowDocument.documentType];
+      if (diag) {
+        diag.push(createDiagnostic('document-type-alias', 'warning', 'normalize',
+          'Week ' + (wi + 1) + ' overflowDocument documentType "' + from + '" resolved to "' + week.overflowDocument.documentType + '"',
+          { path: 'weeks[' + wi + '].overflowDocument.documentType', repairable: true, correction: from + ' → ' + week.overflowDocument.documentType }));
+      }
     }
   });
-  (booklet.endings || []).forEach(function (ending) {
+  (booklet.endings || []).forEach(function (ending, ei) {
     var content = ending.content;
     if (content && content.documentType && DOCUMENT_TYPE_ALIASES[content.documentType]) {
+      var from = content.documentType;
       content.documentType = DOCUMENT_TYPE_ALIASES[content.documentType];
+      if (diag) {
+        diag.push(createDiagnostic('document-type-alias', 'warning', 'normalize',
+          'Ending ' + (ei + 1) + ' documentType "' + from + '" resolved to "' + content.documentType + '"',
+          { path: 'endings[' + ei + '].content.documentType', repairable: true, correction: from + ' → ' + content.documentType }));
+      }
     }
   });
 }
@@ -751,7 +805,7 @@ export function normalizeDocumentTypes(booklet) {
 // ── Overflow document normalization (RC-2 mechanical cleanup) ────────────────
 // Auto-assigns missing IDs, deduplicates collisions with fragment IDs.
 
-export function normalizeOverflowDocuments(booklet) {
+export function normalizeOverflowDocuments(booklet, diag) {
   var fragmentIds = {};
   (booklet.fragments || []).forEach(function (f) {
     if (f.id) fragmentIds[normalizeId(f.id)] = true;
@@ -765,13 +819,24 @@ export function normalizeOverflowDocuments(booklet) {
     // Auto-assign missing ID
     if (!od.id) {
       od.id = 'overflow-w' + (wi + 1);
+      if (diag) {
+        diag.push(createDiagnostic('overflow-id-synthesized', 'warning', 'reconcile',
+          'Week ' + (wi + 1) + ' overflowDocument missing id — assigned "' + od.id + '"',
+          { path: 'weeks[' + wi + '].overflowDocument.id', repairable: true, correction: 'Assigned "' + od.id + '"' }));
+      }
     }
 
     // Dedup collision with fragment IDs
     var nid = normalizeId(od.id);
     if (fragmentIds[nid] || usedOverflowIds[nid]) {
+      var originalId = od.id;
       od.id = od.id + '-overflow';
       nid = normalizeId(od.id);
+      if (diag) {
+        diag.push(createDiagnostic('overflow-id-collision', 'warning', 'reconcile',
+          'Week ' + (wi + 1) + ' overflowDocument id "' + originalId + '" collided — renamed to "' + od.id + '"',
+          { path: 'weeks[' + wi + '].overflowDocument.id', repairable: true, correction: originalId + ' → ' + od.id }));
+      }
     }
     usedOverflowIds[nid] = true;
   });
@@ -788,31 +853,45 @@ var VALID_INTERLUDE_PAYLOAD_TYPES = {
   companion: 1, 'fragment-ref': 1, 'password-element': 1
 };
 
-export function normalizeInterludes(booklet) {
-  (booklet.weeks || []).forEach(function (week) {
+export function normalizeInterludes(booklet, diag) {
+  (booklet.weeks || []).forEach(function (week, wi) {
     var interlude = week.interlude;
     if (!interlude) return;
 
     var pt = String(interlude.payloadType || '').trim().toLowerCase();
+    var weekLabel = 'week ' + (week.weekNumber || (wi + 1));
+    var basePath = 'weeks[' + wi + '].interlude';
 
     // Fix 1: "fragment" → "fragment-ref"
     if (pt === 'fragment') {
-      console.warn('[assembly] week ' + (week.weekNumber || '?') + ' interlude payloadType "fragment" → "fragment-ref"');
+      var msg1 = weekLabel + ' interlude payloadType "fragment" → "fragment-ref"';
+      console.warn('[assembly] ' + msg1);
       interlude.payloadType = 'fragment-ref';
       pt = 'fragment-ref';
+      if (diag) {
+        diag.push(createDiagnostic('interlude-payload-type-alias', 'warning', 'normalize', msg1,
+          { path: basePath + '.payloadType', repairable: true, correction: 'fragment → fragment-ref' }));
+      }
     }
 
     // Fix 2: unknown payloadType → "narrative"
     if (pt && !VALID_INTERLUDE_PAYLOAD_TYPES[pt]) {
-      console.warn('[assembly] week ' + (week.weekNumber || '?') + ' interlude payloadType "' + pt + '" unsupported → downgraded to "narrative"');
+      var msg2 = weekLabel + ' interlude payloadType "' + pt + '" unsupported → downgraded to "narrative"';
+      console.warn('[assembly] ' + msg2);
+      var oldPt = pt;
       interlude.payloadType = 'narrative';
       pt = 'narrative';
+      if (diag) {
+        diag.push(createDiagnostic('interlude-payload-type-unknown', 'warning', 'normalize', msg2,
+          { path: basePath + '.payloadType', repairable: true, correction: oldPt + ' → narrative' }));
+      }
     }
 
     // Fix 3: companion payload must be object with companionComponents
     if (pt === 'companion' && interlude.payload) {
       if (typeof interlude.payload === 'string') {
-        console.warn('[assembly] week ' + (week.weekNumber || '?') + ' interlude companion payload was string → wrapped in companionComponents');
+        var msg3 = weekLabel + ' interlude companion payload was string → wrapped in companionComponents';
+        console.warn('[assembly] ' + msg3);
         interlude.payload = {
           companionComponents: [{
             type: 'overlay-window',
@@ -820,15 +899,29 @@ export function normalizeInterludes(booklet) {
             body: interlude.payload
           }]
         };
+        if (diag) {
+          diag.push(createDiagnostic('interlude-companion-shape', 'warning', 'normalize', msg3,
+            { path: basePath + '.payload', repairable: true, correction: 'Wrapped string payload in companionComponents array' }));
+        }
       } else if (interlude.payload && !Array.isArray(interlude.payload.companionComponents)) {
-        console.warn('[assembly] week ' + (week.weekNumber || '?') + ' interlude companion payload missing companionComponents → wrapped');
+        var msg4 = weekLabel + ' interlude companion payload missing companionComponents → wrapped';
+        console.warn('[assembly] ' + msg4);
         interlude.payload = { companionComponents: [interlude.payload] };
+        if (diag) {
+          diag.push(createDiagnostic('interlude-companion-shape', 'warning', 'normalize', msg4,
+            { path: basePath + '.payload', repairable: true, correction: 'Wrapped object payload in companionComponents array' }));
+        }
       }
     }
 
     // Fix 4: fragment-ref payload should be object with fragmentRef
     if (pt === 'fragment-ref' && typeof interlude.payload === 'string') {
       interlude.payload = { fragmentRef: interlude.payload, action: '' };
+      if (diag) {
+        diag.push(createDiagnostic('interlude-fragment-ref-shape', 'warning', 'normalize',
+          weekLabel + ' interlude fragment-ref payload was string → wrapped in {fragmentRef, action}',
+          { path: basePath + '.payload', repairable: true, correction: 'Wrapped string in {fragmentRef, action}' }));
+      }
     }
   });
 }
@@ -838,6 +931,7 @@ export function normalizeInterludes(booklet) {
 
 export function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan) {
   ensureArtifactIdentity(shell, campaignPlan || null);
+  var diag = [];
   var booklet = {
     meta: shell.meta || {},
     cover: shell.cover || {},
@@ -854,10 +948,10 @@ export function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, ending
   });
 
   // Normalize data shapes that models commonly get wrong
-  booklet.weeks.forEach(normalizeCompanionComponents);
+  booklet.weeks.forEach(function (week) { normalizeCompanionComponents(week, diag); });
   booklet.weeks.forEach(normalizeOracleKey);
-  normalizeDocumentTypes(booklet);
-  normalizeInterludes(booklet);
+  normalizeDocumentTypes(booklet, diag);
+  normalizeInterludes(booklet, diag);
 
   // Set overflow deterministically (fix C1 — was missing in this assembler)
   booklet.weeks.forEach(function (week) {
@@ -866,11 +960,17 @@ export function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, ending
     }
   });
 
+  // Normalize overflow documents (auto-assign missing IDs, dedup collisions)
+  normalizeOverflowDocuments(booklet, diag);
+
   // Enforce deterministic derived fields (meta counts, componentInputs, password)
-  var result = enforceBookletDerivedFields(booklet);
+  var result = enforceBookletDerivedFields(booklet, diag);
   if (result.warnings.length > 0) {
     console.warn('[LiftRPG] Assembly derivation warnings:', result.warnings);
   }
+
+  // Attach structured diagnostics (survives JSON serialization)
+  booklet._assemblyDiagnostics = diag;
 
   return booklet;
 }
@@ -882,6 +982,7 @@ export function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, ending
 
 export function assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, normalizedWorkout, campaignPlan) {
   ensureArtifactIdentity(shell, campaignPlan || null);
+  var diag = [];
   var booklet = {
     meta: shell.meta || {},
     cover: shell.cover || {},
@@ -898,10 +999,10 @@ export function assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutp
   });
 
   // Normalize data shapes that models commonly get wrong
-  booklet.weeks.forEach(normalizeCompanionComponents);
+  booklet.weeks.forEach(function (week) { normalizeCompanionComponents(week, diag); });
   booklet.weeks.forEach(normalizeOracleKey);
-  normalizeDocumentTypes(booklet);
-  normalizeInterludes(booklet);
+  normalizeDocumentTypes(booklet, diag);
+  normalizeInterludes(booklet, diag);
 
   // Override exercises with normalized data when available
   var nw = normalizedWorkout || {};
@@ -936,11 +1037,17 @@ export function assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutp
     }
   });
 
+  // Normalize overflow documents (auto-assign missing IDs, dedup collisions)
+  normalizeOverflowDocuments(booklet, diag);
+
   // Enforce deterministic derived fields (meta counts, componentInputs, password)
-  var result = enforceBookletDerivedFields(booklet);
+  var result = enforceBookletDerivedFields(booklet, diag);
   if (result.warnings.length > 0) {
     console.warn('[LiftRPG] Structured assembly derivation warnings:', result.warnings);
   }
+
+  // Attach structured diagnostics (survives JSON serialization)
+  booklet._assemblyDiagnostics = diag;
 
   return booklet;
 }
@@ -1161,7 +1268,7 @@ export function normalizeThemeArchetype(value) {
  *
  * Returns warnings array for non-critical issues (e.g. non-standard decode table).
  */
-export function enforceBookletDerivedFields(booklet) {
+export function enforceBookletDerivedFields(booklet, diag) {
   var warnings = [];
   var weeks = booklet.weeks || [];
   var meta = booklet.meta || {};
@@ -1171,7 +1278,12 @@ export function enforceBookletDerivedFields(booklet) {
   var requestedArchetype = String(booklet.theme.visualArchetype || '').trim().toLowerCase();
   var normalizedArchetype = normalizeThemeArchetype(booklet.theme.visualArchetype);
   if (requestedArchetype && requestedArchetype !== normalizedArchetype) {
-    warnings.push('theme.visualArchetype normalized from "' + requestedArchetype + '" to "' + normalizedArchetype + '"');
+    var arcMsg = 'theme.visualArchetype normalized from "' + requestedArchetype + '" to "' + normalizedArchetype + '"';
+    warnings.push(arcMsg);
+    if (diag) {
+      diag.push(createDiagnostic('theme-archetype-normalized', 'warning', 'normalize', arcMsg,
+        { path: 'theme.visualArchetype', repairable: true, correction: requestedArchetype + ' → ' + normalizedArchetype }));
+    }
   }
   booklet.theme.visualArchetype = normalizedArchetype;
 
@@ -1180,10 +1292,20 @@ export function enforceBookletDerivedFields(booklet) {
     return sum + (w.sessions ? w.sessions.length : 0);
   }, 0);
   if (meta.weekCount !== weeks.length) {
-    warnings.push('Booklet meta.weekCount (' + meta.weekCount + ') corrected to ' + weeks.length);
+    var wcMsg = 'meta.weekCount (' + meta.weekCount + ') corrected to ' + weeks.length;
+    warnings.push(wcMsg);
+    if (diag) {
+      diag.push(createDiagnostic('meta-weekcount-corrected', 'warning', 'synthesize', wcMsg,
+        { path: 'meta.weekCount', repairable: true, correction: meta.weekCount + ' → ' + weeks.length }));
+    }
   }
   if (meta.totalSessions !== actualTotalSessions) {
-    warnings.push('Booklet meta.totalSessions (' + meta.totalSessions + ') corrected to ' + actualTotalSessions);
+    var tsMsg = 'meta.totalSessions (' + meta.totalSessions + ') corrected to ' + actualTotalSessions;
+    warnings.push(tsMsg);
+    if (diag) {
+      diag.push(createDiagnostic('meta-total-sessions-corrected', 'warning', 'synthesize', tsMsg,
+        { path: 'meta.totalSessions', repairable: true, correction: meta.totalSessions + ' → ' + actualTotalSessions }));
+    }
   }
   meta.weekCount = weeks.length;
   meta.totalSessions = actualTotalSessions;
@@ -1220,8 +1342,13 @@ export function enforceBookletDerivedFields(booklet) {
         }
       }
       if (mismatch) {
+        var ciMsg = 'componentInputs corrected: model had [' + existingInputs.join(', ') + '], computed [' + computed.join(', ') + ']';
         if (existingInputs.length > 0) {
-          warnings.push('componentInputs corrected: model had [' + existingInputs.join(', ') + '], computed [' + computed.join(', ') + ']');
+          warnings.push(ciMsg);
+        }
+        if (diag) {
+          diag.push(createDiagnostic('component-inputs-corrected', 'warning', 'synthesize', ciMsg,
+            { path: 'bossEncounter.componentInputs', repairable: true, correction: '[' + existingInputs.join(', ') + '] → [' + computed.join(', ') + ']' }));
         }
         boss.componentInputs = computed;
       }
@@ -1235,14 +1362,29 @@ export function enforceBookletDerivedFields(booklet) {
         var password = decodeA1Z26(numericValues);
         if (password) {
           if (meta.passwordLength !== password.length) {
-            warnings.push('meta.passwordLength corrected from ' + meta.passwordLength + ' to ' + password.length);
+            var plMsg = 'meta.passwordLength corrected from ' + meta.passwordLength + ' to ' + password.length;
+            warnings.push(plMsg);
+            if (diag) {
+              diag.push(createDiagnostic('password-length-corrected', 'warning', 'synthesize', plMsg,
+                { path: 'meta.passwordLength', repairable: true, correction: meta.passwordLength + ' → ' + password.length }));
+            }
           }
           meta.passwordLength = password.length;
         } else {
-          warnings.push('A1Z26 decode failed — componentInputs contain non-integer or out-of-range values');
+          var failMsg = 'A1Z26 decode failed — componentInputs contain non-integer or out-of-range values';
+          warnings.push(failMsg);
+          if (diag) {
+            diag.push(createDiagnostic('password-decode-failed', 'warning', 'synthesize', failMsg,
+              { path: 'bossEncounter.componentInputs', repairable: false }));
+          }
         }
       } else {
-        warnings.push('Boss decodingKey.referenceTable is not standard A1Z26 — password not derived deterministically');
+        var nonStdMsg = 'Boss decodingKey.referenceTable is not standard A1Z26 — password not derived deterministically';
+        warnings.push(nonStdMsg);
+        if (diag) {
+          diag.push(createDiagnostic('password-non-standard-table', 'warning', 'synthesize', nonStdMsg,
+            { path: 'bossEncounter.decodingKey.referenceTable', repairable: false }));
+        }
       }
     }
   }
@@ -1562,6 +1704,7 @@ function flattenSkeletonEndings(endingsOutputs) {
  */
 export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs, fragmentOutputs, endingsOutputs, nw) {
   var meta = skeleton.meta || {};
+  var diag = [];
 
   // -- Base booklet structure --
   var booklet = {
@@ -1600,7 +1743,7 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
     week.isDeload = !!plan.isDeload;
 
     // Normalize companion components (array, not object)
-    normalizeCompanionComponents(week);
+    normalizeCompanionComponents(week, diag);
     normalizeOracleKey(week);
 
     // Overflow flag: deterministic from session count
@@ -1638,12 +1781,12 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
   }
 
   // -- Normalize document types (alias resolution) --
-  normalizeDocumentTypes(booklet);
+  normalizeDocumentTypes(booklet, diag);
 
   // -- Normalize overflow documents (auto-assign missing IDs, dedup collisions) --
-  normalizeOverflowDocuments(booklet);
+  normalizeOverflowDocuments(booklet, diag);
 
-  normalizeInterludes(booklet);
+  normalizeInterludes(booklet, diag);
 
   // -- Compute totalSessions --
   var totalSessions = 0;
@@ -1653,10 +1796,13 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
   booklet.meta.totalSessions = totalSessions;
 
   // -- Enforce derived fields (boss componentInputs, password, theme normalization) --
-  var enforcement = enforceBookletDerivedFields(booklet);
+  var enforcement = enforceBookletDerivedFields(booklet, diag);
   if (enforcement.warnings && enforcement.warnings.length > 0) {
     enforcement.warnings.forEach(function (w) { console.warn('[S+F assembly] ' + w); });
   }
+
+  // Attach structured diagnostics (survives JSON serialization)
+  booklet._assemblyDiagnostics = diag;
 
   return booklet;
 }

@@ -161,9 +161,10 @@ export function generateQualityReport(booklet) {
   }
 
   // ── Schema completeness (delegate to existing validator) ───────────────
-  report.schemaErrors = validateAssembledBooklet(booklet);
+  var validationResult = validateAssembledBooklet(booklet);
+  report.schemaErrors = validationResult.errors;
   // Surface validator warnings (soft issues) alongside hard errors
-  var validatorWarnings = report.schemaErrors.warnings || [];
+  var validatorWarnings = validationResult.warnings || [];
   if (validatorWarnings.length > 0) {
     report.warnings = report.warnings.concat(validatorWarnings);
   }

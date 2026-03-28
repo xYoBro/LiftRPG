@@ -971,9 +971,8 @@ export function validateAssembledBooklet(booklet) {
     }
   }
 
-  // Attach warnings as a property on the errors array (preserves API contract)
-  errors.warnings = warnings;
-  return errors;
+  // Return serialization-safe shape (plain object, not array-with-custom-properties)
+  return { errors: errors, warnings: warnings };
 }
 
 // ── Part 4: Pipeline stage validators ─────────────────────────────────────────
