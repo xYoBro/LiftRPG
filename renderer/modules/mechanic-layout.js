@@ -94,6 +94,17 @@ function extractRowGroup(item) {
 }
 
 /**
+ * Test whether an item is a companion-zone atom.
+ * Primary signal: explicit `zone: 'companion'` on the atom descriptor.
+ * Fallback: `type === 'tracker'` for atoms emitted before zone adoption.
+ * Works with both raw AtomDescriptors and placement objects.
+ */
+function isCompanionItem(item) {
+  const zone = (item.atom && item.atom.zone) || item.zone || null;
+  return zone === 'companion' || (zone == null && item.type === 'tracker');
+}
+
+/**
  * Build mechanic surface rows from an explicit layout template keyed by
  * layoutVariant. This is role-based (not adjacency-based), so cipher and
  * map are always paired correctly regardless of sequence order.
@@ -189,7 +200,7 @@ export function getMechanicSlotWidthPx(placement, allPagePlacements) {
 
   // Filter to surface placements (same filter as renderMechanicPage uses)
   const surfacePlacements = allPagePlacements.filter(function (p) {
-    return p.type !== 'tracker' && p.type !== 'week-footer';
+    return !isCompanionItem(p) && p.type !== 'week-footer';
   });
 
   // Resolve layout variant using the same logic as the renderer
@@ -229,7 +240,7 @@ export function getMechanicSlotWidthPx(placement, allPagePlacements) {
  */
 export function getHalfWidthTypes(items) {
   const surfaceItems = items.filter(function (p) {
-    return p.type !== 'tracker' && p.type !== 'week-footer';
+    return !isCompanionItem(p) && p.type !== 'week-footer';
   });
   if (surfaceItems.length === 0) return new Set();
 

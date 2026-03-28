@@ -488,10 +488,17 @@ function renderWorkoutPage(placements, planIndex) {
 // resolveLayoutVariant and buildMechanicSurfaceRows are imported from
 // mechanic-layout.js — the single source of truth for mechanic row templates.
 
+function isCompanionPlacement(placement) {
+  // Primary signal: explicit zone declaration from the adapter.
+  // Fallback: type === 'tracker' for atoms emitted before zone adoption.
+  const zone = placement.atom?.zone ?? null;
+  return zone === 'companion' || (zone == null && placement.type === 'tracker');
+}
+
 function renderMechanicPage(placements, planIndex) {
   const artifactIdentity = resolveArtifactIdentity(placements);
   const copy = resolveMechanicCopy(artifactIdentity);
-  const surfacePlacements = placements.filter((placement) => placement.type !== 'tracker' && placement.type !== 'week-footer');
+  const surfacePlacements = placements.filter((placement) => !isCompanionPlacement(placement) && placement.type !== 'week-footer');
   const surfaceTypes = new Set(surfacePlacements.map((placement) => placement.type));
   const { page, frame } = createBoundedPage(
     'field-ops',
@@ -519,7 +526,7 @@ function renderMechanicPage(placements, planIndex) {
     frame.appendChild(strip);
   }
 
-  const companionPlacements = placements.filter((placement) => placement.type === 'tracker');
+  const companionPlacements = placements.filter(isCompanionPlacement);
   const briefing = buildMechanicBriefing(artifactIdentity, placements);
   const isSoloCompanionPage = surfacePlacements.length === 0 && companionPlacements.length === 1;
   const isSoloMapPage = surfacePlacements.length === 1 && surfacePlacements[0].type === 'map-panel' && companionPlacements.length === 0;

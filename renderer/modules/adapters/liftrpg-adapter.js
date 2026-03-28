@@ -381,6 +381,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
           atoms.push(createAtom({
             type: 'tracker',
             id: `w${wi}-companion-${ci}`,
+            zone: 'companion',
             group: resolveTrackerGroup(primaryGroup, wi, attachmentStrategy, artifactIdentity, comp),
             section: 'body',
             sequence: wi * 1000 + 200 + ci,
