@@ -1834,3 +1834,219 @@ export function generatePatchPrompt(rawJson, errors, options) {
     rawJson
   ].filter(Boolean).join('\n');
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Post-assembly artifact-intent drift diagnostics
+// ══════════════════════════════════════════════════════════════════════════════
+// Compares an assembled booklet against meta.artifactIntent to detect where
+// downstream generation drifted from the Layer 3 planning contract.
+// Returns a serialization-safe diagnostics object suitable for persisting as
+// booklet._artifactIntentDrift.
+
+/**
+ * collectObservedDocumentTypes(booklet) -> string[]
+ * Gathers all document types actually used across fragments, overflow docs,
+ * and endings. Normalizes via DOCUMENT_TYPE_ALIASES for consistency.
+ */
+function collectObservedDocumentTypes(booklet) {
+  var types = {};
+
+  (booklet.fragments || []).forEach(function (f) {
+    var dt = String(f.documentType || '').trim().toLowerCase();
+    if (dt) {
+      var canonical = DOCUMENT_TYPE_ALIASES[dt] || dt;
+      types[canonical] = (types[canonical] || 0) + 1;
+    }
+  });
+
+  (booklet.weeks || []).forEach(function (week) {
+    if (week.overflowDocument) {
+      var dt = String(week.overflowDocument.documentType || '').trim().toLowerCase();
+      if (dt) {
+        var canonical = DOCUMENT_TYPE_ALIASES[dt] || dt;
+        types[canonical] = (types[canonical] || 0) + 1;
+      }
+    }
+  });
+
+  (booklet.endings || []).forEach(function (e) {
+    var content = e.content || {};
+    var dt = String(content.documentType || '').trim().toLowerCase();
+    if (dt) {
+      var canonical = DOCUMENT_TYPE_ALIASES[dt] || dt;
+      types[canonical] = (types[canonical] || 0) + 1;
+    }
+  });
+
+  return types;
+}
+
+/**
+ * collectObservedMapTypes(booklet) -> { [mapType]: count }
+ * Gathers map types actually used across weeks.
+ */
+function collectObservedMapTypes(booklet) {
+  var types = {};
+  (booklet.weeks || []).forEach(function (week) {
+    var fo = week.fieldOps || {};
+    var map = fo.map || fo.mapState || {};
+    var mt = String(map.mapType || '').trim().toLowerCase();
+    if (mt) types[mt] = (types[mt] || 0) + 1;
+  });
+  return types;
+}
+
+/**
+ * collectObservedCipherTypes(booklet) -> { [cipherType]: count }
+ * Gathers cipher types actually used across weeks.
+ */
+function collectObservedCipherTypes(booklet) {
+  var types = {};
+  (booklet.weeks || []).forEach(function (week) {
+    var fo = week.fieldOps || {};
+    var cipher = fo.cipher || {};
+    var ct = String(cipher.type || '').trim().toLowerCase();
+    if (ct) types[ct] = (types[ct] || 0) + 1;
+  });
+  return types;
+}
+
+// Mechanic grammar → expected board-state proxies mapping.
+// Not exhaustive; covers the strongest observable correlations.
+var MECHANIC_GRAMMAR_PROXIES = {
+  'survey-grid':              { expectedMapTypes: ['grid'], expectedCipherTypes: [] },
+  'node-graph':               { expectedMapTypes: ['point-to-point'], expectedCipherTypes: [] },
+  'timeline-reconstruction':  { expectedMapTypes: ['linear-track'], expectedCipherTypes: [] },
+  'route-tracker':            { expectedMapTypes: ['linear-track', 'point-to-point'], expectedCipherTypes: [] },
+  'testimony-matrix':         { expectedMapTypes: [], expectedCipherTypes: [] },
+  'ledger-board':             { expectedMapTypes: ['grid'], expectedCipherTypes: [] },
+  'profile-assembly':         { expectedMapTypes: [], expectedCipherTypes: [] }
+};
+
+/**
+ * compareArtifactIntentDrift(booklet) -> { diagnostics: DiagnosticEntry[] }
+ *
+ * Main post-assembly comparison. Returns a serialization-safe object.
+ * Only emits diagnostics for checks with concrete, defensible signals.
+ */
+export function compareArtifactIntentDrift(booklet) {
+  var diagnostics = [];
+  var intent = ((booklet.meta || {}).artifactIntent) || null;
+
+  if (!intent) {
+    // No intent declared — nothing to compare against. This is expected for
+    // booklets generated before the artifact-intent compiler existed.
+    return { diagnostics: diagnostics };
+  }
+
+  var ecology = intent.documentEcology || {};
+  var exclusions = intent.exclusions || {};
+
+  // ── Document ecology: forbidden types ─────────────────────────────────
+  var observedDocTypes = collectObservedDocumentTypes(booklet);
+  var forbidden = (ecology.forbidden || []).map(function (t) { return t.toLowerCase(); });
+  var dominant = (ecology.dominant || []).map(function (t) { return t.toLowerCase(); });
+
+  forbidden.forEach(function (ft) {
+    if (observedDocTypes[ft]) {
+      diagnostics.push(createDiagnostic(
+        'forbidden-document-type',
+        'warning',
+        'post-assembly-compare',
+        'Forbidden document type "' + ft + '" appears ' + observedDocTypes[ft] + ' time(s) in assembled booklet.',
+        { repairable: false, path: 'documentEcology.forbidden vs assembled fragments/overflow/endings' }
+      ));
+    }
+  });
+
+  // ── Document ecology: dominant underrepresentation ────────────────────
+  if (dominant.length > 0) {
+    var totalDocs = 0;
+    var dominantCount = 0;
+    Object.keys(observedDocTypes).forEach(function (dt) {
+      totalDocs += observedDocTypes[dt];
+      if (dominant.indexOf(dt) >= 0) dominantCount += observedDocTypes[dt];
+    });
+
+    if (totalDocs > 0) {
+      var dominantRatio = dominantCount / totalDocs;
+      // If declared dominant families account for less than 40% of actual documents,
+      // flag ecology underrepresentation. Threshold is intentionally generous.
+      if (dominantRatio < 0.4) {
+        diagnostics.push(createDiagnostic(
+          'dominant-ecology-underrepresented',
+          'warning',
+          'post-assembly-compare',
+          'Declared dominant document families (' + dominant.join(', ') + ') account for only ' +
+            Math.round(dominantRatio * 100) + '% of ' + totalDocs + ' assembled documents (threshold: 40%).',
+          { repairable: false, path: 'documentEcology.dominant vs assembled document types' }
+        ));
+      }
+    }
+  }
+
+  // ── Exclusions: document exclusions ───────────────────────────────────
+  (exclusions.documentExclusions || []).forEach(function (excluded) {
+    var normalized = excluded.toLowerCase();
+    if (observedDocTypes[normalized]) {
+      diagnostics.push(createDiagnostic(
+        'excluded-document-type-present',
+        'warning',
+        'post-assembly-compare',
+        'Excluded document type "' + excluded + '" appears ' + observedDocTypes[normalized] + ' time(s) in assembled booklet.',
+        { repairable: false, path: 'exclusions.documentExclusions vs assembled fragments' }
+      ));
+    }
+  });
+
+  // ── Mechanic grammar drift: board-state proxy comparison ──────────────
+  var declaredGrammar = String(intent.mechanicGrammarFamily || '').toLowerCase();
+  var proxy = MECHANIC_GRAMMAR_PROXIES[declaredGrammar];
+
+  if (proxy && proxy.expectedMapTypes.length > 0) {
+    var observedMaps = collectObservedMapTypes(booklet);
+    var observedMapList = Object.keys(observedMaps);
+
+    // Check if ANY expected map type is present. If the declared grammar
+    // expects point-to-point but the booklet only uses grid, that's drift.
+    var hasExpected = proxy.expectedMapTypes.some(function (emt) {
+      return observedMaps[emt] > 0;
+    });
+
+    if (observedMapList.length > 0 && !hasExpected) {
+      diagnostics.push(createDiagnostic(
+        'mechanic-grammar-map-mismatch',
+        'warning',
+        'post-assembly-compare',
+        'Declared mechanic grammar "' + declaredGrammar + '" expects map types [' +
+          proxy.expectedMapTypes.join(', ') + '] but assembled booklet uses [' +
+          observedMapList.join(', ') + '].',
+        { repairable: false, path: 'mechanicGrammarFamily vs assembled weeks[].fieldOps.map.mapType' }
+      ));
+    }
+  }
+
+  // ── Exclusions: mechanic exclusions (map type proxy) ──────────────────
+  // Mechanic exclusions reference grammar families, not raw map types.
+  // We can only detect drift when the excluded grammar has a strong proxy.
+  (exclusions.mechanicExclusions || []).forEach(function (excluded) {
+    var exProxy = MECHANIC_GRAMMAR_PROXIES[excluded.toLowerCase()];
+    if (exProxy && exProxy.expectedMapTypes.length > 0) {
+      var observedMaps = collectObservedMapTypes(booklet);
+      exProxy.expectedMapTypes.forEach(function (emt) {
+        if (observedMaps[emt] && observedMaps[emt] > 0) {
+          diagnostics.push(createDiagnostic(
+            'excluded-mechanic-proxy-present',
+            'warning',
+            'post-assembly-compare',
+            'Excluded mechanic grammar "' + excluded + '" has map type proxy "' + emt +
+              '" which appears ' + observedMaps[emt] + ' time(s) in assembled booklet.',
+            { repairable: false, path: 'exclusions.mechanicExclusions vs assembled map types' }
+          ));
+        }
+      });
+    }
+  });
+
+  return { diagnostics: diagnostics };
+}

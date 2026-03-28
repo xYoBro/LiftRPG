@@ -54,7 +54,8 @@ import {
   mergeFragmentBatches,
   buildSkeletonFragmentBatches,
   assembleSkeletonFleshBooklet,
-  generatePatchPrompt
+  generatePatchPrompt,
+  compareArtifactIntentDrift
 } from './modules/assembly.js';
 
 import {
@@ -1868,6 +1869,13 @@ async function runApiPipeline(options) {
   };
   delete booklet._assemblyDiagnostics;
 
+  // Post-assembly artifact-intent drift diagnostics (Layer 3 planning contract)
+  var driftResult = compareArtifactIntentDrift(booklet);
+  booklet._artifactIntentDrift = driftResult;
+  if (driftResult.diagnostics.length > 0) {
+    console.warn('[LiftRPG] Artifact intent drift:', driftResult.diagnostics.length, 'issue(s)');
+  }
+
   if (!qualityGate.passed) {
     console.warn('[LiftRPG] Quality gate warnings (non-blocking):', qualityGate.blockers.map(function (entry) {
       return entry.message;
@@ -2506,6 +2514,13 @@ async function runSkeletonFleshPipeline(options) {
     validationWarnings: validationResult.warnings
   };
   delete booklet._assemblyDiagnostics;
+
+  // Post-assembly artifact-intent drift diagnostics (Layer 3 planning contract)
+  var driftResult = compareArtifactIntentDrift(booklet);
+  booklet._artifactIntentDrift = driftResult;
+  if (driftResult.diagnostics.length > 0) {
+    console.warn('[S+F] Artifact intent drift:', driftResult.diagnostics.length, 'issue(s)');
+  }
 
   booklet._continuityWarnings = sfContinuityWarnings;
 

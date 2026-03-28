@@ -235,6 +235,53 @@
     return { briefMode: 'explicit', fidelityMode: 'literal' };
   }
 
+  // ── Artifact intent contract formatter (Layer 3 planning) ──────────────
+  // Produces compact binding contract text from meta.artifactIntent for
+  // downstream flesh prompts. Reused across week, fragment, and ending
+  // prompt builders to avoid duplicating contract language.
+
+  function formatArtifactIntentContract(meta) {
+    var intent = (meta || {}).artifactIntent;
+    if (!intent) return '';
+
+    var ecology = intent.documentEcology || {};
+    var exclusions = intent.exclusions || {};
+
+    var lines = [
+      '## Artifact Intent Contract (BINDING — do not drift)',
+      '',
+      'The skeleton stage committed to these planning decisions. You MUST preserve them.',
+      'Do not collapse back to generic LiftRPG defaults.',
+      '',
+      '- Arc family: ' + (intent.arcFamily || 'unspecified'),
+      '- Mechanic grammar: ' + (intent.mechanicGrammarFamily || 'unspecified'),
+      '- Home pull: ' + (intent.homePull || 'mixed'),
+      '- Fidelity mode: ' + (intent.fidelityMode || 'interpretive')
+    ];
+
+    if (ecology.dominant && ecology.dominant.length > 0) {
+      lines.push('- Document ecology dominant: ' + ecology.dominant.join(', '));
+    }
+    if (ecology.forbidden && ecology.forbidden.length > 0) {
+      lines.push('- Document ecology FORBIDDEN: ' + ecology.forbidden.join(', ') + ' — do NOT use these types');
+    }
+    if (exclusions.mechanicExclusions && exclusions.mechanicExclusions.length > 0) {
+      lines.push('- Mechanic exclusions: ' + exclusions.mechanicExclusions.join(', ') + ' — do NOT use these board-state modes');
+    }
+    if (exclusions.arcExclusions && exclusions.arcExclusions.length > 0) {
+      lines.push('- Arc exclusions: ' + exclusions.arcExclusions.join(', ') + ' — do NOT follow these arc patterns');
+    }
+
+    lines.push('');
+    lines.push('Obligations:');
+    lines.push('- Session prompts must follow the ' + (intent.arcFamily || '') + ' tension curve, not a generic escalation');
+    lines.push('- Mechanics must match the ' + (intent.mechanicGrammarFamily || '') + ' grammar, not default survey-grid');
+    lines.push('- Documents must use dominant types (' + (ecology.dominant || []).join(', ') + '), never forbidden types');
+    lines.push('- If content drifts toward a different arc or mechanic family, rewrite it');
+
+    return lines.join('\n');
+  }
+
   function formatUserBrief(brief, fallbackText) {
     var raw = String(brief || '').trim();
     if (!raw) return fallbackText;
@@ -2156,6 +2203,8 @@
       '- Literary Register: ' + JSON.stringify(meta.literaryRegister || {}),
       '- Voice: ' + JSON.stringify(meta.narrativeVoice || {}),
       '',
+      formatArtifactIntentContract(meta),
+      '',
       '## Output Schema',
       'Return a single JSON object:',
       '```',
@@ -2208,6 +2257,8 @@
       '- Voice: ' + JSON.stringify(meta.narrativeVoice || {}),
       '- Register: ' + JSON.stringify(meta.literaryRegister || {}),
       '- Weekly Component Type: ' + (meta.weeklyComponentType || ''),
+      '',
+      formatArtifactIntentContract(meta),
       '',
       '## This Week\'s Skeleton',
       JSON.stringify(weekPlan, null, 2),
@@ -2287,6 +2338,8 @@
       '- Voice: ' + JSON.stringify(meta.narrativeVoice || {}),
       '- Register: ' + JSON.stringify(meta.literaryRegister || {}),
       '',
+      formatArtifactIntentContract(meta),
+      '',
       '## Fragment Schema',
       window.buildStageSchema('fragment'),
       '',
@@ -2331,6 +2384,8 @@
       '- Voice: ' + JSON.stringify(meta.narrativeVoice || {}),
       '- Register: ' + JSON.stringify(meta.literaryRegister || {}),
       '- Resolution: ' + ((meta.structuralShape || {}).resolution || ''),
+      '',
+      formatArtifactIntentContract(meta),
       '',
       '## Boss Context',
       '- Password: ' + (boss.passwordWord || ''),
@@ -2381,6 +2436,8 @@
       '- Voice: ' + JSON.stringify(meta.narrativeVoice || {}),
       '- Register: ' + JSON.stringify(meta.literaryRegister || {}),
       '- Resolution: ' + ((meta.structuralShape || {}).resolution || ''),
+      '',
+      formatArtifactIntentContract(meta),
       '',
       '## Boss Context',
       '- Password: ' + (boss.passwordWord || ''),

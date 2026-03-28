@@ -1193,6 +1193,65 @@ export function validateSkeletonStage(result, weekCount) {
     console.warn('Skeleton → meta.artifactIdentity: missing or incomplete (advisory)');
   }
 
+  // ── artifactIntent (Layer 3 planning contract) ──
+  var VALID_BRIEF_MODES = { explicit: 1, sparse: 1, empty: 1, mashup: 1, 'reference-led': 1, 'personal-subject': 1 };
+  var VALID_FIDELITY_MODES = { literal: 1, interpretive: 1, compositional: 1 };
+  var VALID_ARC_FAMILIES = {
+    'slow-burn-investigation': 1, 'institutional-collapse': 1, 'witness-accumulation': 1,
+    'contamination-spiral': 1, 'procedural-deepening': 1, 'pilgrimage-approach': 1, 'false-order-to-rupture': 1
+  };
+  var VALID_MECHANIC_FAMILIES = {
+    'survey-grid': 1, 'node-graph': 1, 'timeline-reconstruction': 1,
+    'testimony-matrix': 1, 'ledger-board': 1, 'route-tracker': 1, 'profile-assembly': 1
+  };
+  var VALID_HOME_PULLS = { story: 1, game: 1, investigation: 1, mixed: 1 };
+
+  var intent = meta.artifactIntent;
+  if (!intent || typeof intent !== 'object') {
+    console.warn('Skeleton → meta.artifactIntent: missing (advisory — skeleton should produce this)');
+  } else {
+    if (!intent.briefMode || !VALID_BRIEF_MODES[intent.briefMode]) {
+      console.warn('Skeleton → artifactIntent.briefMode: "' + (intent.briefMode || '') + '" not in known values (advisory)');
+    }
+    if (!intent.fidelityMode || !VALID_FIDELITY_MODES[intent.fidelityMode]) {
+      console.warn('Skeleton → artifactIntent.fidelityMode: "' + (intent.fidelityMode || '') + '" not in known values (advisory)');
+    }
+    if (!intent.arcFamily || !VALID_ARC_FAMILIES[intent.arcFamily]) {
+      console.warn('Skeleton → artifactIntent.arcFamily: "' + (intent.arcFamily || '') + '" not in known families (advisory)');
+    }
+    if (!intent.mechanicGrammarFamily || !VALID_MECHANIC_FAMILIES[intent.mechanicGrammarFamily]) {
+      console.warn('Skeleton → artifactIntent.mechanicGrammarFamily: "' + (intent.mechanicGrammarFamily || '') + '" not in known families (advisory)');
+    }
+    if (!intent.homePull || !VALID_HOME_PULLS[intent.homePull]) {
+      console.warn('Skeleton → artifactIntent.homePull: "' + (intent.homePull || '') + '" not in known values (advisory)');
+    }
+    var ecology = intent.documentEcology;
+    if (!ecology || typeof ecology !== 'object') {
+      console.warn('Skeleton → artifactIntent.documentEcology: missing (advisory)');
+    } else {
+      if (!Array.isArray(ecology.dominant) || ecology.dominant.length === 0) {
+        console.warn('Skeleton → artifactIntent.documentEcology.dominant: empty or missing (advisory)');
+      }
+      if (!Array.isArray(ecology.forbidden) || ecology.forbidden.length === 0) {
+        console.warn('Skeleton → artifactIntent.documentEcology.forbidden: empty or missing (advisory)');
+      }
+    }
+    var excl = intent.exclusions;
+    if (!excl || typeof excl !== 'object') {
+      console.warn('Skeleton → artifactIntent.exclusions: missing (advisory)');
+    } else {
+      if (!Array.isArray(excl.mechanicExclusions) || excl.mechanicExclusions.length === 0) {
+        console.warn('Skeleton → artifactIntent.exclusions.mechanicExclusions: empty or missing (advisory)');
+      }
+      if (!Array.isArray(excl.documentExclusions) || excl.documentExclusions.length === 0) {
+        console.warn('Skeleton → artifactIntent.exclusions.documentExclusions: empty or missing (advisory)');
+      }
+      if (!Array.isArray(excl.arcExclusions) || excl.arcExclusions.length === 0) {
+        console.warn('Skeleton → artifactIntent.exclusions.arcExclusions: empty or missing (advisory)');
+      }
+    }
+  }
+
   // ── theme ──
   var theme = result.theme;
   if (!theme) return 'Skeleton → theme: missing';
