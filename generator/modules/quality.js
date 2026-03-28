@@ -102,7 +102,11 @@ export var QUALITY_BLOCKING_AREAS = {
   'oracle-vagueness': { target: 'weeks' },
   'identity-drift-risk': { target: 'shell', alwaysBlock: true },
   'thin-ending': { target: 'endings' },
-  'unsupported-reveal': { target: 'endings' }
+  'unsupported-reveal': { target: 'endings' },
+  'intent-forbidden-content': { target: 'shell', alwaysBlock: true },
+  'intent-excluded-content': { target: 'shell' },
+  'intent-ecology-drift': { target: 'fragments' },
+  'intent-mechanic-drift': { target: 'weeks' }
 };
 
 export function formatQualityGateMessage(target, detail) {
@@ -514,6 +518,45 @@ export function generateQualityReport(booklet) {
         severity: 'high'
       });
     }
+  }
+
+  // ── Artifact intent coherence (Layer 3 variety contract drift) ────────
+  var intentDrift = (booklet._artifactIntentDrift || {}).diagnostics || [];
+  var intentIssueCount = 0;
+
+  if (intentDrift.length > 0) {
+    // Severity mapping: forbidden/excluded → high, underrepresentation/proxy → medium
+    var DRIFT_SEVERITY_MAP = {
+      'forbidden-document-type': { area: 'intent-forbidden-content', severity: 'high' },
+      'excluded-document-type-present': { area: 'intent-excluded-content', severity: 'high' },
+      'excluded-mechanic-proxy-present': { area: 'intent-excluded-content', severity: 'medium' },
+      'dominant-ecology-underrepresented': { area: 'intent-ecology-drift', severity: 'medium' },
+      'mechanic-grammar-map-mismatch': { area: 'intent-mechanic-drift', severity: 'medium' }
+    };
+
+    intentDrift.forEach(function (d) {
+      var mapping = DRIFT_SEVERITY_MAP[d.code] || { area: 'intent-ecology-drift', severity: 'medium' };
+      report.weakSpots.push({
+        area: mapping.area,
+        detail: d.message,
+        severity: mapping.severity
+      });
+      intentIssueCount++;
+    });
+  }
+
+  // Score: clean if no drift, degrade per issue (forbidden counts more)
+  if (((booklet.meta || {}).artifactIntent)) {
+    var forbiddenCount = intentDrift.filter(function (d) {
+      return d.code === 'forbidden-document-type' || d.code === 'excluded-document-type-present';
+    }).length;
+    var softCount = intentIssueCount - forbiddenCount;
+    // Forbidden/excluded violations cost 0.25 each, soft drift costs 0.15 each
+    var intentScore = Math.max(0, 1 - (forbiddenCount * 0.25) - (softCount * 0.15));
+    report.scores.artifactIntentCoherence = {
+      score: Math.round(intentScore * 100) / 100,
+      label: intentIssueCount === 0 ? 'clean' : intentIssueCount + ' drift issue(s)'
+    };
   }
 
   // ── S+F cross-stage continuity (surfaced from pipeline instrumentation) ──
