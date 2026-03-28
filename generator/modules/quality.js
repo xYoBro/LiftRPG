@@ -504,6 +504,18 @@ export function generateQualityReport(booklet) {
     }
   }
 
+  // ── S+F cross-stage continuity (surfaced from pipeline instrumentation) ──
+  var sfContinuity = booklet._continuityWarnings || [];
+  if (sfContinuity.length > 0) {
+    sfContinuity.forEach(function (cw) {
+      report.warnings.push('[S+F continuity/' + (cw.stage || '?') + '] ' + (cw.message || ''));
+    });
+    report.scores.sfContinuity = {
+      score: Math.max(0, 1 - sfContinuity.length * 0.15),
+      label: sfContinuity.length + ' cross-stage issue(s)'
+    };
+  }
+
   // ── Aggregate score ────────────────────────────────────────────────────
   var scoreKeys = Object.keys(report.scores);
   var totalScore = 0;

@@ -1022,7 +1022,12 @@ function createStageTelemetry(stageKey, stageName) {
   return {
     stageKey: stageKey || '',
     stageName: stageName || '',
-    attempts: 0,
+    attempts: 0,       // total API calls (success + failed)
+    retries: 0,        // failed attempts only (attempts - 1 on success, attempts on total failure)
+    startMs: Date.now(),
+    latencyMs: 0,
+    hadRepair: false,
+    errorClass: null,   // last error classification seen (e.g. 'schema', 'timeout')
     provider: '',
     model: '',
     usage: blankUsageTotals(),
@@ -1033,10 +1038,15 @@ function createStageTelemetry(stageKey, stageName) {
 
 function summarizeStageTelemetry(telemetry) {
   var usage = telemetry && telemetry.usage ? telemetry.usage : blankUsageTotals();
+  var latencyMs = telemetry && telemetry.startMs ? (Date.now() - telemetry.startMs) : 0;
   return {
     stageKey: telemetry && telemetry.stageKey ? telemetry.stageKey : '',
     stageName: telemetry && telemetry.stageName ? telemetry.stageName : '',
-    attempts: telemetry && telemetry.attempts ? telemetry.attempts : 0,
+    attempts: telemetry ? telemetry.attempts : 0,
+    retries: telemetry ? telemetry.retries : 0,
+    latencyMs: latencyMs,
+    hadRepair: telemetry ? !!telemetry.hadRepair : false,
+    errorClass: telemetry ? (telemetry.errorClass || null) : null,
     provider: telemetry && telemetry.provider ? telemetry.provider : '',
     model: telemetry && telemetry.model ? telemetry.model : '',
     usage: {
@@ -1055,7 +1065,7 @@ function summarizeStageTelemetry(telemetry) {
 
 function recordStageUsage(telemetry, response) {
   if (!telemetry || !response || !response.usage) return;
-  telemetry.attempts += 1;
+  // Note: attempts is now incremented at loop top in runJsonStage, not here.
   telemetry.provider = response.usage.provider || telemetry.provider;
   telemetry.model = response.usage.model || telemetry.model;
   addUsageTotals(telemetry.usage, response.usage);
@@ -1120,6 +1130,8 @@ async function runJsonStage(settings, config) {
       ? settings
       : Object.assign({}, settings, { requestTimeoutMs: resolvedTimeoutMs });
 
+    stageTelemetry.attempts += 1;
+
     try {
       var response = config.schema
         ? await callProviderStructured(stageSettings, prompt, config.schema, resolvedMaxTokens, config.stageName)
@@ -1152,6 +1164,7 @@ async function runJsonStage(settings, config) {
           validationResult = config.validate(result);
           if (!validationFailed(validationResult)) {
             console.info('[LiftRPG] ' + config.stageName + ' auto-repaired — no retry needed.');
+            stageTelemetry.hadRepair = true;
           }
         }
 
@@ -1193,6 +1206,8 @@ async function runJsonStage(settings, config) {
       return result;
     } catch (err) {
       lastErr = err;
+      stageTelemetry.retries += 1;
+      stageTelemetry.errorClass = err.errorType || (err.code === 'ECONNABORTED' ? 'timeout' : 'unknown');
       console.warn('[LiftRPG] ' + config.stageName + ' attempt ' + (attempt + 1) + '/' + attemptCount + ' failed:', err.message);
       if (attempt === attemptCount - 1 || !shouldRetryStageError(err)) {
         emitPipelineEvent(config.onProgress, config.stageIndex || 0, config.getTotalStages ? config.getTotalStages() : 0, config.stageName + ' failed', {
@@ -1970,11 +1985,12 @@ async function generateStructured(settings, workout, brief, onProgress) {
 
 function getSkeletonFleshBuilders() {
   return {
-    skeleton:           window.generateSkeletonPrompt           || null,
-    fleshRules:         window.generateFleshRulesPrompt         || null,
-    fleshWeek:          window.generateFleshWeekPrompt          || null,
-    fleshFragmentBatch: window.generateFleshFragmentBatchPrompt || null,
-    fleshEnding:        window.generateFleshEndingPrompt        || null
+    skeleton:              window.generateSkeletonPrompt              || null,
+    fleshRules:            window.generateFleshRulesPrompt            || null,
+    fleshWeek:             window.generateFleshWeekPrompt             || null,
+    fleshFragmentBatch:    window.generateFleshFragmentBatchPrompt    || null,
+    fleshEnding:           window.generateFleshEndingPrompt           || null,
+    fleshEndingsBundled:   window.generateFleshEndingsBundledPrompt   || null
   };
 }
 
@@ -2088,10 +2104,10 @@ async function runSkeletonFleshPipeline(options) {
     saveCheckpoint('skeleton', skeleton, checkpoint);
   }
 
-  // Update stage estimate now that we know fragment + ending counts
-  var fragBatches = buildSkeletonFragmentBatches(skeleton);
+  // Update stage estimate: skeleton + rules + weeks + 1 fragment call + 1 ending call
   var endingVariants = skeleton.endingVariants || ['canonical'];
-  totalStages = 1 + 1 + (skeleton.weekPlan || []).length + fragBatches.length + endingVariants.length;
+  var fullFragRegistry = skeleton.fragmentRegistry || [];
+  totalStages = 1 + 1 + (skeleton.weekPlan || []).length + 1 + 1;
 
   // Anthropic prompt caching: set system prompt from skeleton identity
   if (settings.format === 'anthropic' && skeleton.meta) {
@@ -2279,36 +2295,27 @@ async function runSkeletonFleshPipeline(options) {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // STAGES N+1 to N+3: FLESH — FRAGMENT BATCHES
+  // STAGE N+1: FLESH — ALL FRAGMENTS (single call)
   // ════════════════════════════════════════════════════════════════════
 
   var allFragments = [];
-  var priorFragments = [];
 
-  for (var b = 0; b < fragBatches.length; b++) {
-    var batchSF = fragBatches[b];
-    var batchKey = 'fragBatch_' + b;
+  if (cached('fragments')) {
+    allFragments = checkpoint.stages.fragments || [];
+    console.log('[S+F] Resuming — fragments loaded from checkpoint');
+    progress('fragments', 'Fragments (cached)');
+    emitPipelineEvent(onProgress, stageNum, totalStages, 'Fragments (cached)', {
+      phase: 'complete', stageKey: 'fragments', stageName: 'Fragments'
+    });
+  } else {
+    progress('fragments', 'Writing all fragments\u2026');
 
-    if (cached(batchKey)) {
-      var cachedFragsSF = checkpoint.stages[batchKey];
-      allFragments = allFragments.concat(cachedFragsSF);
-      priorFragments = priorFragments.concat(cachedFragsSF);
-      console.log('[S+F] Resuming — fragment batch ' + b + ' loaded from checkpoint');
-      progress(batchKey, 'Fragment batch ' + (b + 1) + ' (cached)');
-      emitPipelineEvent(onProgress, stageNum, totalStages, 'Fragment batch ' + (b + 1) + ' (cached)', {
-        phase: 'complete', stageKey: batchKey, stageName: 'Fragments ' + (b + 1)
-      });
-      continue;
-    }
-
-    progress(batchKey, 'Writing fragments batch ' + (b + 1) + '/' + fragBatches.length + '\u2026');
-
-    var fragResult = await runJsonStage(settings, {
-      stageKey:        batchKey,
-      stageName:        'Fragments ' + (b + 1) + '/' + fragBatches.length,
+    var fragResultSF = await runJsonStage(settings, {
+      stageKey:        'fragments',
+      stageName:        'Fragments',
       stageIndex:       stageNum,
       getTotalStages:   function () { return totalStages; },
-      completeMessage:  'Fragment batch ' + (b + 1) + ' complete',
+      completeMessage:  'Fragments complete',
       onProgress:       onProgress,
       schema:           null,
       maxTokens:        MAX_OUTPUT_TOKENS,
@@ -2321,31 +2328,28 @@ async function runSkeletonFleshPipeline(options) {
       buildPrompt: function () {
         return builders.fleshFragmentBatch(
           skeleton,
-          batchSF.registry,
-          batchSF.weekSummaries.length > 0 ? batchSF.weekSummaries : weekSummariesSF,
-          priorFragments,
-          b,
-          fragBatches.length
+          fullFragRegistry,
+          weekSummariesSF,
+          [],   // no prior fragments (single call)
+          0,    // batch index
+          1     // total batches
         );
       },
       validate: function (result) {
-        // After unwrapKey, result should be a { fragments: [...] } object or the unwrapped array.
-        // unwrapIfNeeded returns the object containing the key, so check both shapes.
         var fragsArray = Array.isArray(result) ? result : (result && result.fragments ? result.fragments : null);
         if (!fragsArray || fragsArray.length === 0) {
-          return 'Fragments batch ' + (b + 1) + ': missing or empty fragments array';
+          return 'Fragments: missing or empty fragments array';
         }
-        // Wrap back into expected shape for validateFragmentsStage
         var wrapped = Array.isArray(result) ? { fragments: result } : result;
-        return validateFragmentsStage(wrapped, batchSF.registry);
+        return validateFragmentsStage(wrapped, fullFragRegistry);
       }
     });
 
-    // fragResult is the unwrapped array (due to unwrapKey: 'fragments')
-    var batchFragmentsSF = Array.isArray(fragResult) ? fragResult : [fragResult];
-    allFragments = allFragments.concat(batchFragmentsSF);
-    priorFragments = priorFragments.concat(batchFragmentsSF);
-    saveCheckpoint(batchKey, batchFragmentsSF, checkpoint);
+    // Normalize: fragResult may be array (from unwrapKey) or wrapper object
+    allFragments = Array.isArray(fragResultSF)
+      ? fragResultSF
+      : (fragResultSF && fragResultSF.fragments ? fragResultSF.fragments : [fragResultSF]);
+    saveCheckpoint('fragments', allFragments, checkpoint);
   }
 
   // ── Cross-stage continuity: fragments ──
@@ -2367,54 +2371,69 @@ async function runSkeletonFleshPipeline(options) {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // FINAL STAGES: FLESH — ENDINGS
+  // FINAL STAGE: FLESH — ALL ENDINGS (single call)
   // ════════════════════════════════════════════════════════════════════
 
   var allEndings = [];
   var finalWeekSummary = weekSummariesSF.length > 0 ? weekSummariesSF[weekSummariesSF.length - 1] : null;
 
-  for (var e = 0; e < endingVariants.length; e++) {
-    var variant = endingVariants[e];
-    var endingKey = 'ending_' + e;
+  if (cached('endings')) {
+    allEndings = checkpoint.stages.endings || [];
+    console.log('[S+F] Resuming — endings loaded from checkpoint');
+    progress('endings', 'Endings (cached)');
+    emitPipelineEvent(onProgress, stageNum, totalStages, 'Endings (cached)', {
+      phase: 'complete', stageKey: 'endings', stageName: 'Endings'
+    });
+  } else {
+    progress('endings', 'Writing all endings\u2026');
 
-    if (cached(endingKey)) {
-      allEndings.push(checkpoint.stages[endingKey]);
-      console.log('[S+F] Resuming — ending "' + variant + '" loaded from checkpoint');
-      progress(endingKey, 'Ending "' + variant + '" (cached)');
-      emitPipelineEvent(onProgress, stageNum, totalStages, 'Ending "' + variant + '" (cached)', {
-        phase: 'complete', stageKey: endingKey, stageName: 'Ending "' + variant + '"'
-      });
-      continue;
-    }
-
-    progress(endingKey, 'Writing ending "' + variant + '"\u2026');
-
-    var endingResult = await runJsonStage(settings, {
-      stageKey:        endingKey,
-      stageName:        'Ending "' + variant + '"',
+    var endingsResultSF = await runJsonStage(settings, {
+      stageKey:        'endings',
+      stageName:        'Endings',
       stageIndex:       stageNum,
       getTotalStages:   function () { return totalStages; },
-      completeMessage:  'Ending "' + variant + '" complete',
+      completeMessage:  'Endings complete',
       onProgress:       onProgress,
       schema:           null,
       maxTokens:        MAX_OUTPUT_TOKENS,
-      requestTimeoutMs: 120000,
+      requestTimeoutMs: 180000,
       maxAttempts:      2,
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
       telemetryCollector: sfTelemetry,
+      unwrapKey:        'endings',
       buildPrompt: function () {
-        return builders.fleshEnding(skeleton, variant, finalWeekSummary, weekSummariesSF);
+        if (builders.fleshEndingsBundled) {
+          return builders.fleshEndingsBundled(skeleton, endingVariants, finalWeekSummary, weekSummariesSF);
+        }
+        // Fallback: use single-ending builder for first variant (shouldn't reach here)
+        return builders.fleshEnding(skeleton, endingVariants[0], finalWeekSummary, weekSummariesSF);
       },
       validate: function (result) {
-        if (!result) return 'Ending "' + variant + '": empty result';
-        if (!result.content && !result.body) return 'Ending "' + variant + '": missing content';
-        return '';
+        var endingsArray = Array.isArray(result) ? result : (result && result.endings ? result.endings : null);
+        if (!endingsArray || endingsArray.length === 0) {
+          return 'Endings: missing or empty endings array';
+        }
+        var errors = [];
+        for (var ei = 0; ei < endingsArray.length; ei++) {
+          var ending = endingsArray[ei];
+          if (!ending) { errors.push('Ending [' + ei + ']: null'); continue; }
+          if (!ending.content && !ending.body) {
+            errors.push('Ending "' + (ending.variant || ei) + '": missing content');
+          }
+        }
+        if (endingsArray.length < endingVariants.length) {
+          errors.push('Endings: expected ' + endingVariants.length + ' variants but got ' + endingsArray.length);
+        }
+        return errors.length > 0 ? errors.join('; ') : '';
       }
     });
 
-    allEndings.push(endingResult);
-    saveCheckpoint(endingKey, endingResult, checkpoint);
+    // Normalize: endingsResultSF may be array (from unwrapKey) or wrapper
+    allEndings = Array.isArray(endingsResultSF)
+      ? endingsResultSF
+      : (endingsResultSF && endingsResultSF.endings ? endingsResultSF.endings : [endingsResultSF]);
+    saveCheckpoint('endings', allEndings, checkpoint);
   }
 
   // ── Cross-stage continuity: endings ──
@@ -2467,10 +2486,13 @@ async function runSkeletonFleshPipeline(options) {
   // Build stage telemetry summary
   var totalLatencyMs = 0;
   var totalRetries = 0;
+  var totalAttempts = 0;
   var totalTokens = 0;
   var totalCostUsd = 0;
   for (var ti = 0; ti < sfTelemetry.length; ti++) {
-    totalRetries += (sfTelemetry[ti].attempts || 0);
+    totalLatencyMs += safeNumber(sfTelemetry[ti].latencyMs);
+    totalRetries += safeNumber(sfTelemetry[ti].retries);
+    totalAttempts += safeNumber(sfTelemetry[ti].attempts);
     var stUsage = sfTelemetry[ti].usage || {};
     totalTokens += safeNumber(stUsage.totalTokens);
     totalCostUsd += safeNumber(sfTelemetry[ti].estimatedCostUsd);
@@ -2479,7 +2501,9 @@ async function runSkeletonFleshPipeline(options) {
     stages: sfTelemetry,
     summary: {
       totalStages: sfTelemetry.length,
+      totalAttempts: totalAttempts,
       totalRetries: totalRetries,
+      totalLatencyMs: totalLatencyMs,
       totalTokens: totalTokens,
       totalCostUsd: totalCostUsd
     }

@@ -1206,7 +1206,7 @@ export function validateSkeletonStage(result, weekCount) {
   var wp = result.weekPlan;
   if (!Array.isArray(wp) || wp.length === 0) return 'Skeleton → weekPlan: missing or empty';
   if (wp.length !== weekCount) {
-    console.warn('Skeleton → weekPlan.length (' + wp.length + ') !== expected weekCount (' + weekCount + ') — using skeleton length');
+    return 'Skeleton → weekPlan has ' + wp.length + ' weeks but workout specifies ' + weekCount + ' weeks — must match exactly';
   }
   var lastWeek = wp[wp.length - 1];
   if (!lastWeek.isBossWeek) return 'Skeleton → weekPlan: final week must have isBossWeek: true';

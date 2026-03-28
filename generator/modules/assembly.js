@@ -1406,6 +1406,118 @@ export function buildSkeletonFragmentBatches(skeleton) {
   return buildFragmentBatches(enriched, weekSummaries);
 }
 
+// ── Skeleton+Flesh assembly helpers ──────────────────────────────────────────
+
+/**
+ * Flattens fragment outputs from S+F batches into a clean fragment array.
+ *
+ * Fragment batches may arrive as:
+ *   - Array of wrapper objects: [{ fragments: [...] }, { fragments: [...] }]
+ *   - Flat array of fragment objects: [{ id, documentType, ... }, ...]
+ *   - Mixed: some wrappers, some bare objects
+ *
+ * After flattening, each fragment is aligned to the skeleton fragmentRegistry
+ * to ensure `id` and `documentType` are preserved from the skeleton's plan.
+ */
+function flattenSkeletonFragments(fragmentOutputs, fragmentRegistry) {
+  if (!fragmentOutputs || !Array.isArray(fragmentOutputs)) return [];
+
+  // Step 1: flatten any wrapper objects
+  var flat = [];
+  for (var i = 0; i < fragmentOutputs.length; i++) {
+    var item = fragmentOutputs[i];
+    if (!item) continue;
+    if (Array.isArray(item)) {
+      // Already an array of fragments (direct concat from unwrapKey)
+      for (var j = 0; j < item.length; j++) {
+        if (item[j]) flat.push(item[j]);
+      }
+    } else if (item.fragments && Array.isArray(item.fragments)) {
+      // Wrapper object: { fragments: [...] }
+      for (var k = 0; k < item.fragments.length; k++) {
+        if (item.fragments[k]) flat.push(item.fragments[k]);
+      }
+    } else if (item.id || item.title || item.content || item.body || item.documentType) {
+      // Bare fragment object
+      flat.push(item);
+    }
+    // else: skip unrecognized shape
+  }
+
+  // Step 2: align to skeleton registry — ensure id + documentType match
+  var registry = Array.isArray(fragmentRegistry) ? fragmentRegistry : [];
+  var registryById = {};
+  for (var r = 0; r < registry.length; r++) {
+    if (registry[r] && registry[r].id) {
+      registryById[normalizeId(registry[r].id)] = registry[r];
+    }
+  }
+
+  for (var f = 0; f < flat.length; f++) {
+    var frag = flat[f];
+    var nid = frag.id ? normalizeId(frag.id) : '';
+    var regEntry = nid ? registryById[nid] : null;
+
+    // Backfill id from registry if missing
+    if (!frag.id && f < registry.length) {
+      frag.id = registry[f].id;
+      regEntry = registry[f];
+    }
+
+    // Backfill documentType from registry
+    if (regEntry) {
+      if (!frag.documentType && regEntry.documentType) {
+        frag.documentType = regEntry.documentType;
+      }
+      // Ensure id exactly matches registry (case/format normalization)
+      frag.id = regEntry.id;
+    }
+
+    // Ensure body text is at the top level for the renderer
+    if (!frag.body && frag.content && typeof frag.content === 'string') {
+      frag.body = frag.content;
+    }
+  }
+
+  return flat;
+}
+
+/**
+ * Flattens ending outputs from S+F into a clean endings array.
+ *
+ * Endings may arrive as:
+ *   - Array of individual ending objects: [{ variant, content, ... }, ...]
+ *   - Wrapper object: { endings: [...] }
+ *   - Mixed shapes
+ */
+function flattenSkeletonEndings(endingsOutputs) {
+  if (!endingsOutputs || !Array.isArray(endingsOutputs)) {
+    // Might be a wrapper: { endings: [...] }
+    if (endingsOutputs && endingsOutputs.endings && Array.isArray(endingsOutputs.endings)) {
+      return endingsOutputs.endings;
+    }
+    return [];
+  }
+
+  // Check if the array contains a single wrapper object
+  var flat = [];
+  for (var i = 0; i < endingsOutputs.length; i++) {
+    var item = endingsOutputs[i];
+    if (!item) continue;
+    if (item.endings && Array.isArray(item.endings)) {
+      // Wrapper: { endings: [...] }
+      for (var j = 0; j < item.endings.length; j++) {
+        if (item.endings[j]) flat.push(item.endings[j]);
+      }
+    } else if (item.variant || item.content || item.body) {
+      // Direct ending object
+      flat.push(item);
+    }
+  }
+
+  return flat;
+}
+
 // ── Skeleton+Flesh booklet assembler ────────────────────────────────────────
 
 /**
@@ -1414,8 +1526,8 @@ export function buildSkeletonFragmentBatches(skeleton) {
  * @param {object} skeleton       — full skeleton object (meta, theme, cover, weekPlan, bossPlan, etc.)
  * @param {object} rulesOutput    — { rulesSpread: { leftPage, rightPage } }
  * @param {object[]} weekOutputs  — array of week objects (one per weekPlan entry), in order
- * @param {object[]} fragmentOutputs — flat array of fragment objects from all batches
- * @param {object[]} endingsOutputs  — array of ending objects (one per endingVariant)
+ * @param {object[]} fragmentOutputs — fragment data from batches (may be wrappers or flat)
+ * @param {object[]} endingsOutputs  — ending data (may be wrappers or individual objects)
  * @param {object} nw             — NormalizedWorkout (for exercise overlay)
  * @returns {object} final booklet JSON
  */
@@ -1444,8 +1556,8 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
     rulesSpread: (rulesOutput && rulesOutput.rulesSpread) ? rulesOutput.rulesSpread : {},
     theme: skeleton.theme || {},
     weeks: [],
-    fragments: fragmentOutputs || [],
-    endings: endingsOutputs || []
+    fragments: flattenSkeletonFragments(fragmentOutputs, skeleton.fragmentRegistry),
+    endings: flattenSkeletonEndings(endingsOutputs || [])
   };
 
   // -- Weeks: merge skeleton structural fields + flesh content --

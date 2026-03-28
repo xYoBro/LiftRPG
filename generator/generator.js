@@ -2297,6 +2297,58 @@
     ].filter(Boolean).join('\n');
   };
 
+  /**
+   * Flesh prompt: all endings in one call (bundled).
+   * Input: skeleton bossPlan + week summaries + all ending variants
+   * Output: { endings: [{ variant, content, designSpec }, ...] }
+   */
+  window.generateFleshEndingsBundledPrompt = function (skeleton, endingVariants, finalWeekSummary, weekSummaries, options) {
+    options = options || {};
+    var meta = skeleton.meta || {};
+    var boss = skeleton.bossPlan || {};
+
+    var variantList = endingVariants.map(function (v) { return '"' + v + '"'; }).join(', ');
+
+    return [
+      '# LiftRPG Flesh Stage — All Endings',
+      '',
+      'You are writing ALL BOOKLET ENDINGS for a LiftRPG zine.',
+      'Each ending is a payoff document the player unlocks after solving the password.',
+      'Generate one ending per variant: ' + variantList,
+      '',
+      '## Booklet Identity',
+      '- Title: ' + (meta.blockTitle || ''),
+      '- World Contract: ' + (meta.worldContract || ''),
+      '- Voice: ' + JSON.stringify(meta.narrativeVoice || {}),
+      '- Register: ' + JSON.stringify(meta.literaryRegister || {}),
+      '- Resolution: ' + ((meta.structuralShape || {}).resolution || ''),
+      '',
+      '## Boss Context',
+      '- Password: ' + (boss.passwordWord || ''),
+      '- Convergence: ' + (boss.convergenceRequirements || ''),
+      '- Binary choice: ' + (boss.binaryChoiceSetup || 'none'),
+      '',
+      finalWeekSummary ? '## Final Week Summary\n' + compactJson(finalWeekSummary) + '\n' : '',
+      weekSummaries ? '## All Week Summaries\n' + compactJson(weekSummaries) + '\n' : '',
+      '',
+      '## Output Schema',
+      'Return { "endings": [ ... ] } with one object per variant.',
+      'Each ending object:',
+      '{ "variant": "string",',
+      '  "content": { "documentType": "string", "body": "string (the ending prose)", "finalLine": "string (closing line)" },',
+      '  "designSpec": { "paperTone": "string", "primaryTypeface": "string" } }',
+      '',
+      '## Quality Requirements',
+      '- Each ending must feel EARNED — reference specific events, characters, and discoveries from the weeks.',
+      '- Each variant must be GENUINELY DIFFERENT — different emotional register, different implications, different narrative stance.',
+      '- finalLine should land emotionally. It is the last thing the player reads.',
+      '- The body should be a substantial in-world document (letter, report, final log entry).',
+      '- designSpec should match the document type and world identity.',
+      '',
+      'Return ONLY the JSON object. No markdown fences, no commentary.'
+    ].filter(Boolean).join('\n');
+  };
+
   // ══════════════════════════════════════════════════════════════════════════
   // CLASSIC API PIPELINE PROMPT BUILDERS (existing, preserved as fallback)
   // ══════════════════════════════════════════════════════════════════════════
