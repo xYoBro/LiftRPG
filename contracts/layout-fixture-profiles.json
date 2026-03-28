@@ -273,19 +273,20 @@
     ]
   },
   "content/vale-a-record-of-orcus.json": {
+    "_purpose": "Companion-heavy (3/week) + noir archetype (non-classified-packet shell). Stresses shellAttrs genericity, companion zone density, and non-government visual paths.",
     "normalizedPageCount": 40,
     "sheetCount": 20,
     "counts": {
       "cover": 1,
       "rules-left": 1,
       "rules-right": 1,
+      "gauge-log": 1,
       "workout-left": 6,
       "field-ops": 5,
       "interlude": 6,
       "boss": 1,
       "fragment-page": 12,
       "assembly": 1,
-      "gauge-log": 1,
       "ending-locked": 1,
       "notes": 3,
       "back-cover": 1
@@ -308,6 +309,49 @@
       "boss",
       "fragment-page",
       "interlude"
-    ]
+    ],
+    "browserPageCount": 48
+  },
+  "content/what-the-soil-remembers.json": {
+    "_purpose": "Companion-heavy + overflow + dense PTP maps (8-15 nodes/week). Stresses zone routing, continuation chains, and half-width map legibility.",
+    "normalizedPageCount": 48,
+    "sheetCount": 24,
+    "counts": {
+      "cover": 1,
+      "rules-left": 1,
+      "rules-right": 1,
+      "gauge-log": 1,
+      "workout-left": 11,
+      "field-ops": 5,
+      "overflow-doc": 5,
+      "interlude": 6,
+      "boss": 1,
+      "fragment-page": 11,
+      "assembly": 1,
+      "ending-locked": 1,
+      "notes": 2,
+      "back-cover": 1
+    },
+    "prefix": [
+      "cover",
+      "rules-left",
+      "rules-right"
+    ],
+    "suffix": [
+      "gauge-log",
+      "ending-locked",
+      "notes",
+      "notes",
+      "back-cover"
+    ],
+    "mustContain": [
+      "workout-left",
+      "field-ops",
+      "overflow-doc",
+      "boss",
+      "fragment-page",
+      "interlude"
+    ],
+    "browserPageCount": 60
   }
 }

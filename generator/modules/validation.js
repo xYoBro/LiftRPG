@@ -806,6 +806,25 @@ export function validateAssembledBooklet(booklet) {
       }
     }
 
+    // -- PTP map integrity --
+    if (mapState && mapState.mapType === 'point-to-point') {
+      var ptpN = mapState.nodes || [];
+      var ptpE = mapState.edges || [];
+      if (ptpN.length > 12) errors.push(wn + ' PTP map: ' + ptpN.length + ' nodes exceeds max 12');
+      if (ptpE.length > 10) errors.push(wn + ' PTP map: ' + ptpE.length + ' edges exceeds max 10');
+      ptpN.forEach(function (node, ni) {
+        var nx = Number(node.x), ny = Number(node.y);
+        if (!Number.isInteger(nx) || nx < 1 || nx > 12) errors.push(wn + ' PTP node[' + ni + '] x=' + node.x + ' out of range 1\u201312');
+        if (!Number.isInteger(ny) || ny < 1 || ny > 12) errors.push(wn + ' PTP node[' + ni + '] y=' + node.y + ' out of range 1\u201312');
+      });
+      ptpN.forEach(function (node) {
+        var label = String(node.label || '').trim();
+        if (label.length > 24) {
+          warnings.push(wn + ' PTP node "' + label.substring(0, 20) + '...": ' + label.length + ' chars (recommend \u226420 for print legibility)');
+        }
+      });
+    }
+
     // Collect map snapshot for cross-week progression check (non-boss only)
     if (!week.isBossWeek && mapState && mapState.tiles && mapState.tiles.length > 0) {
       var tileByCoord = {};

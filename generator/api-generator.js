@@ -1693,6 +1693,10 @@ async function runApiPipeline(options) {
       console.warn('[pipeline] Week ' + w + ' schema issues:', weekValidation.errors);
       if (options.onStatus) options.onStatus('Week ' + w + ': ' + weekValidation.errors.length + ' schema issue(s)');
     }
+    if (weekValidation.warnings && weekValidation.warnings.length > 0) {
+      console.warn('[pipeline] Week ' + w + ' advisory:', weekValidation.warnings);
+      if (options.onStatus) options.onStatus('Week ' + w + ': ' + weekValidation.warnings.length + ' advisory warning(s)');
+    }
 
     stageNum++;
     finalWeeks.push(weekObject);
@@ -2221,6 +2225,15 @@ async function runSkeletonFleshPipeline(options) {
     weekResult.weekNumber = weekNum;
     weekResult.isBossWeek = isBoss;
     weekResult.isDeload = !!weekPlan.isDeload;
+
+    // Surface advisory warnings from schema validation
+    var sfWeekValidation = validateWeekSchema(weekResult, isBoss, {
+      componentInputs: isBoss ? allComponentValuesSF.map(String) : undefined
+    });
+    if (sfWeekValidation.warnings && sfWeekValidation.warnings.length > 0) {
+      console.warn('[pipeline] Week ' + weekNum + ' advisory:', sfWeekValidation.warnings);
+      if (options.onStatus) options.onStatus('Week ' + weekNum + ': ' + sfWeekValidation.warnings.length + ' advisory warning(s)');
+    }
 
     weekOutputs.push(weekResult);
     saveCheckpoint(ckKey, weekResult, checkpoint);
