@@ -2848,6 +2848,10 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   color:color-mix(in srgb, var(--ink) 58%, var(--muted) 42%);
 }
 
+/* Half-width context: tighter node sizing to prevent collision in narrow containers */
+.rp-row-cell .map-node{
+  max-width:54px;
+}
 /* --- PTP density-aware node scaling --- */
 .map-network[data-ptp-density="dense"] .map-node{
   min-width:26px;
