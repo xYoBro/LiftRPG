@@ -354,6 +354,33 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
           errors.push('Grid dimensions exceed max (12x8): got ' + gd.columns + 'x' + gd.rows);
         }
       }
+      if (fo.mapState.mapType === 'point-to-point') {
+        var ptpNodes = fo.mapState.nodes || [];
+        var ptpEdges = fo.mapState.edges || [];
+        if (ptpNodes.length > 12) {
+          errors.push('PTP map: ' + ptpNodes.length + ' nodes exceeds max 12');
+        }
+        if (ptpEdges.length > 10) {
+          errors.push('PTP map: ' + ptpEdges.length + ' edges exceeds max 10');
+        }
+        ptpNodes.forEach(function(node, ni) {
+          var nx = Number(node.x);
+          var ny = Number(node.y);
+          if (!Number.isInteger(nx) || nx < 1 || nx > 12) {
+            errors.push('PTP node[' + ni + '] x=' + node.x + ' out of range 1-12');
+          }
+          if (!Number.isInteger(ny) || ny < 1 || ny > 12) {
+            errors.push('PTP node[' + ni + '] y=' + node.y + ' out of range 1-12');
+          }
+        });
+        // Warn on long node labels (legibility at print size)
+        ptpNodes.forEach(function(node, ni) {
+          var label = String(node.label || '').trim();
+          if (label.length > 24) {
+            warnings.push('PTP node "' + label.substring(0, 20) + '...": label is ' + label.length + ' chars (recommend \u226420 for print legibility)');
+          }
+        });
+      }
     }
 
     // Companion component validation
@@ -434,7 +461,7 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
   if (warnings.length > 0) {
     console.warn('[LiftRPG] Week advisory:', warnings.join('; '));
   }
-  return { valid: errors.length === 0, errors: errors };
+  return { valid: errors.length === 0, errors: errors, warnings: warnings };
 }
 
 /**

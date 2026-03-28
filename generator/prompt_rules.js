@@ -84,7 +84,7 @@
     '- `fieldOps` (object, required on non-boss weeks): contains mapState, cipher, oracleTable, and optional companionComponents',
     '- `bossEncounter` (object, required on boss week): replaces fieldOps',
     '- `overflow` (boolean): MUST be true when sessions.length > 3. This is a hard contract — the renderer uses it to build a Part 2 spread. Omitting it when sessions exceed 3 breaks page layout.',
-    '- `overflowDocument` (foundDocument, REQUIRED when overflow is true): The Part 2 right-hand page. Must be a complete found document with all standard fragment fields.',
+    '- `overflowDocument` (foundDocument, REQUIRED when overflow is true): The Part 2 right-hand page. Must be a self-contained found document with all standard fragment fields (id, title, documentType, content, designSpec, etc.). This is a standalone document that appears alongside the overflow sessions — it is NOT a continuation of the session content. Treat it as another fragment, placed here for pacing.',
     '- `interlude` (object, optional): must contain { title, reason, body } and may also include payloadType, payload, spreadAware',
     '- `gameplayClocks` (array, optional): week-level progress clocks outside the oracle payload',
     '- `isDeload` (boolean, optional): tonal flag only'
@@ -113,10 +113,12 @@
     '',
     'POINT-TO-POINT:',
     '- `nodes`: [{ id, label, x, y, state }] — x and y MUST be integers in range 1–12 INCLUSIVE. Zero (0) and negative values are ILLEGAL and cause nodes to stack. Use the full 1–12 range.',
-    '- `edges`: [{ from, to, label?, state? }] with short memorable labels and stateful access when possible, not just neutral connectivity',
+    '- `edges`: [{ from, to, label?, state? }]',
     '- `currentNode`: string',
     '- **HARD LIMITS: max 12 nodes, max 10 edges.** These are rendering limits — exceeding them causes layout overflow that cannot be resolved. Do NOT exceed them under any circumstances.',
+    '- **Preferred node count: 5–7 per week.** This is the sweet spot for a half-letter page. 8+ nodes are dense; use only when the narrative demands a complex network. Fewer nodes with richer state changes are better than many nodes with simple labels.',
     '- **Coordinate spread requirement:** For maps with 6+ nodes, max(x) MUST be ≥ 9 and max(y) MUST be ≥ 7. No more than 2 nodes may share the same x value. No more than 2 nodes may share the same y value. Do NOT pack all nodes into a sub-range like 1–5.',
+    '- **Label discipline:** Node labels are rendered in ~5pt monospace on a small page. Keep labels to 2–3 words (≤20 characters). Prefer short location names over full descriptive phrases. BAD: "Conclave Records Office West Annex". GOOD: "Records West". Edge labels (route names) should be even shorter: 1–2 words, ≤12 characters.',
     '- **Network growth across weeks:** Show progression via node `state` changes ("locked"→"empty"→"active"→"visited"), not by adding nodes beyond the 12 limit. Start with most nodes locked; open them as the story progresses.',
     '',
     'LINEAR-TRACK:',
@@ -259,6 +261,8 @@
     '- Array of 1-3 plaintext endings',
     '- Each item: { variant, content, designSpec }',
     '- `content`: { documentType, body, finalLine }',
+    '- `body` length: aim for 400–700 characters. The renderer splits long endings across pages automatically; extremely long endings (1500+ chars) may produce awkward page breaks. Prefer concise, emotionally dense prose.',
+    '- `finalLine`: a single closing sentence or phrase that lands on the last page. Keep it short and resonant.',
     '- These are authored now; encryption happens later in trusted tooling'
   ];
 
@@ -603,7 +607,7 @@
     '- `storyPrompt`: max 220 characters per session prompt.',
     '- Fragment `content` (any body field): max 600 characters.',
     '- `interlude.body`: max 240 characters.',
-    '- `ending.content.body`: max 700 characters.',
+    '- `ending.content.body`: 400–700 characters preferred. The renderer auto-splits long endings across pages, but extremely long bodies (1500+ chars) produce awkward breaks. Prioritize density over length.',
     '- Prefer the minimum valid count of fragments and endings unless the brief clearly requires more.',
     '- Avoid quoted dialogue unless it materially advances story or game state.'
   ];
@@ -778,7 +782,7 @@
     '- Week-to-week map evolution: new node unlocked, route closed, state change, annotation added, zone renamed, or access altered. Same topology, evolving state.',
     '- Every map should contain a denied route, locked zone, or inaccessible space plus a likely return point, checkpoint, or remembered landmark.',
     '- If the mapType or topology truly changes for a week (zoom-in, new sector), the change must be diegetically justified and the main topology must return.',
-    '- Point-to-point labels should be short and memorable.',
+    '- **Point-to-point print legibility:** Node and edge labels print at ~5pt on a half-letter page. Keep node labels to 2–3 words. Edge labels to 1–2 words. If a location has a long institutional name, abbreviate it for the map label and use the full name in prose. The map is a board, not a paragraph.',
     '- Use `floorLabel` when layered spaces such as decks, wings, sectors, or strata matter to orientation.',
     '- Player-drawn maps should still give enough seed markers or prompts to feel purposeful, not empty.'
   ];
