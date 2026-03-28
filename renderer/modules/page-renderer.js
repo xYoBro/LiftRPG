@@ -4,15 +4,11 @@ import { getAtomDefinition } from './engine/atom-registry.js';
 import {
   resolveLayoutVariant,
   buildMechanicSurfaceRows,
+  resolveShellAttrs,
 } from './mechanic-layout.js';
 
 const WORKOUT_PAGE_TYPES = new Set(['week-header', 'session-card', 'week-footer']);
 const MECHANIC_PAGE_TYPES = new Set(['cipher-panel', 'oracle-table', 'map-panel', 'tracker']);
-const DEFAULT_ARTIFACT_IDENTITY = {
-  shellFamily: 'field-survey',
-  boardStateMode: 'survey-grid',
-  attachmentStrategy: 'split-technical',
-};
 const BOARD_STATE_COPY = {
   'survey-grid': {
     pageTitle: 'Field Operations',
@@ -75,21 +71,18 @@ function weekContextFromPlacements(placements) {
   return { weekIndex, totalWeeks };
 }
 
-function resolveArtifactIdentity(placements) {
-  for (const placement of placements) {
-    const data = placement.atom?.data || placement.data || {};
-    if (data.artifactIdentity && typeof data.artifactIdentity === 'object') {
-      return {
-        ...DEFAULT_ARTIFACT_IDENTITY,
-        ...data.artifactIdentity,
-      };
-    }
-  }
-  return DEFAULT_ARTIFACT_IDENTITY;
+/**
+ * Apply resolved shell attributes as data-* attributes on a DOM element.
+ */
+function applyShellAttrs(element, attrs) {
+  if (!attrs || typeof attrs !== 'object') return;
+  Object.keys(attrs).forEach(function (key) {
+    element.setAttribute('data-' + key, attrs[key]);
+  });
 }
 
-function resolveMechanicCopy(artifactIdentity) {
-  return BOARD_STATE_COPY[artifactIdentity.boardStateMode] || BOARD_STATE_COPY['survey-grid'];
+function resolveMechanicCopy(shellAttrs) {
+  return BOARD_STATE_COPY[shellAttrs['board-state-mode']] || BOARD_STATE_COPY['survey-grid'];
 }
 
 function extractPlacementLabel(placement) {
@@ -109,15 +102,15 @@ function extractPlacementLabel(placement) {
   return '';
 }
 
-function buildMechanicBriefing(artifactIdentity, placements) {
-  if (artifactIdentity.shellFamily !== 'classified-packet') return null;
+function buildMechanicBriefing(shellAttrs, placements) {
+  if (shellAttrs['shell-family'] !== 'classified-packet') return null;
 
   const labels = placements
     .map((placement) => extractPlacementLabel(placement))
     .filter(Boolean)
     .slice(0, 4);
   const weekContext = weekContextFromPlacements(placements);
-  const boardMode = String(artifactIdentity.boardStateMode || 'survey-grid').replace(/-/g, ' ');
+  const boardMode = String(shellAttrs['board-state-mode'] || 'survey-grid').replace(/-/g, ' ');
 
   const box = make('section', 'ops-directive-board');
   box.appendChild(make('div', 'doc-label', 'Current Board'));
@@ -138,8 +131,8 @@ function buildMechanicBriefing(artifactIdentity, placements) {
   return box;
 }
 
-function renderMechanicStrip(artifactIdentity, placements) {
-  if (artifactIdentity.shellFamily !== 'classified-packet') return null;
+function renderMechanicStrip(shellAttrs, placements) {
+  if (shellAttrs['shell-family'] !== 'classified-packet') return null;
 
   const strip = make('div', 'ops-incident-strip');
   const placementTypes = new Set(placements.map((placement) => placement.type));
@@ -151,7 +144,7 @@ function renderMechanicStrip(artifactIdentity, placements) {
 
   [
     'Packet',
-    String(artifactIdentity.boardStateMode || 'survey-grid').replace(/-/g, ' '),
+    String(shellAttrs['board-state-mode'] || 'survey-grid').replace(/-/g, ' '),
     surfaceLabels.join(' / ') || 'Evidence Surface',
   ].forEach((value) => {
     strip.appendChild(make('div', 'ops-incident-chip', value));
@@ -496,8 +489,9 @@ function isCompanionPlacement(placement) {
 }
 
 function renderMechanicPage(placements, planIndex) {
-  const artifactIdentity = resolveArtifactIdentity(placements);
-  const copy = resolveMechanicCopy(artifactIdentity);
+  const shellAttrs = resolveShellAttrs(placements);
+  const shellFamily = shellAttrs['shell-family'] || 'field-survey';
+  const copy = resolveMechanicCopy(shellAttrs);
   const surfacePlacements = placements.filter((placement) => !isCompanionPlacement(placement) && placement.type !== 'week-footer');
   const surfaceTypes = new Set(surfacePlacements.map((placement) => placement.type));
   const { page, frame } = createBoundedPage(
@@ -508,26 +502,21 @@ function renderMechanicPage(placements, planIndex) {
 
   page.setAttribute('data-plan-index', String(planIndex));
   page.setAttribute('data-engine', 'v2');
-  page.setAttribute('data-shell-family', artifactIdentity.shellFamily || DEFAULT_ARTIFACT_IDENTITY.shellFamily);
-  page.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || DEFAULT_ARTIFACT_IDENTITY.boardStateMode);
-  page.setAttribute('data-attachment-strategy', artifactIdentity.attachmentStrategy || DEFAULT_ARTIFACT_IDENTITY.attachmentStrategy);
-
-  frame.setAttribute('data-shell-family', artifactIdentity.shellFamily || DEFAULT_ARTIFACT_IDENTITY.shellFamily);
-  frame.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || DEFAULT_ARTIFACT_IDENTITY.boardStateMode);
-  frame.setAttribute('data-attachment-strategy', artifactIdentity.attachmentStrategy || DEFAULT_ARTIFACT_IDENTITY.attachmentStrategy);
+  applyShellAttrs(page, shellAttrs);
+  applyShellAttrs(frame, shellAttrs);
 
   const header = make('header', 'rp-header');
   header.appendChild(make('span', '', copy.pageTitle || 'Field Operations'));
   header.appendChild(make('span', 'page-num', ''));
   frame.appendChild(header);
 
-  const strip = renderMechanicStrip(artifactIdentity, placements);
+  const strip = renderMechanicStrip(shellAttrs, placements);
   if (strip) {
     frame.appendChild(strip);
   }
 
   const companionPlacements = placements.filter(isCompanionPlacement);
-  const briefing = buildMechanicBriefing(artifactIdentity, placements);
+  const briefing = buildMechanicBriefing(shellAttrs, placements);
   const isSoloCompanionPage = surfacePlacements.length === 0 && companionPlacements.length === 1;
   const isSoloMapPage = surfacePlacements.length === 1 && surfacePlacements[0].type === 'map-panel' && companionPlacements.length === 0;
   const isSoloSurfacePage = surfacePlacements.length === 1 && companionPlacements.length === 0;
@@ -536,9 +525,7 @@ function renderMechanicPage(placements, planIndex) {
   }
 
   const content = make('div', 'rp-content');
-  content.setAttribute('data-shell-family', artifactIdentity.shellFamily || DEFAULT_ARTIFACT_IDENTITY.shellFamily);
-  content.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || DEFAULT_ARTIFACT_IDENTITY.boardStateMode);
-  content.setAttribute('data-attachment-strategy', artifactIdentity.attachmentStrategy || DEFAULT_ARTIFACT_IDENTITY.attachmentStrategy);
+  applyShellAttrs(content, shellAttrs);
   if (surfaceTypes.size === 1) {
     const soloType = surfacePlacements[0] ? surfacePlacements[0].type : '';
     content.setAttribute('data-solo-surface', soloType);
@@ -546,11 +533,11 @@ function renderMechanicPage(placements, planIndex) {
     content.setAttribute('data-solo-surface', 'tracker');
   }
 
-  const layoutVariant = resolveLayoutVariant(artifactIdentity, surfacePlacements);
+  const layoutVariant = resolveLayoutVariant(shellAttrs, surfacePlacements);
   frame.setAttribute('data-layout-variant', layoutVariant);
   buildMechanicSurfaceRows(surfacePlacements, layoutVariant).forEach((row) => renderRowInto(content, row));
 
-  if (artifactIdentity.shellFamily === 'classified-packet' && isSoloSurfacePage) {
+  if (shellFamily === 'classified-packet' && isSoloSurfacePage) {
     const worksheet = resolveSoloSurfaceWorksheet(surfacePlacements);
     if (worksheet) {
       content.appendChild(buildBoardWorksheet(worksheet.label, worksheet.type, worksheet.rows));
@@ -564,7 +551,7 @@ function renderMechanicPage(placements, planIndex) {
     groupPlacementsIntoRows(companionPlacements).forEach((row) => renderRowInto(companionZone, row));
     content.appendChild(companionZone);
 
-    if (artifactIdentity.shellFamily === 'classified-packet' && surfacePlacements.length === 0 && companionPlacements.length === 1) {
+    if (shellFamily === 'classified-packet' && surfacePlacements.length === 0 && companionPlacements.length === 1) {
       content.appendChild(buildBoardWorksheet(
         resolveWorksheetLabel(companionPlacements),
         resolveWorksheetType(companionPlacements),
@@ -624,12 +611,12 @@ export function renderPageFromPlacements(placements, spreadType, planIndex) {
   page.setAttribute('data-plan-index', String(planIndex));
   page.setAttribute('data-engine', 'v2');
   if (primaryType === 'fragment-doc') {
-    const artifactIdentity = resolveArtifactIdentity(placements);
+    const shellAttrs = resolveShellAttrs(placements);
+    const shellFamily = shellAttrs['shell-family'] || 'field-survey';
     frame.setAttribute('data-fragment-count', String(placements.length));
-    frame.setAttribute('data-shell-family', artifactIdentity.shellFamily || DEFAULT_ARTIFACT_IDENTITY.shellFamily);
-    frame.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || DEFAULT_ARTIFACT_IDENTITY.boardStateMode);
+    applyShellAttrs(frame, shellAttrs);
 
-    if ((artifactIdentity.shellFamily || '') === 'classified-packet' && shouldUsePacketEvidenceLayout(placements)) {
+    if (shellFamily === 'classified-packet' && shouldUsePacketEvidenceLayout(placements)) {
       const evidenceLayout = make('div', 'fragment-evidence-layout');
       evidenceLayout.setAttribute('data-fragment-count', String(placements.length));
       placements.forEach((placement, index) => {
@@ -649,8 +636,8 @@ export function renderPageFromPlacements(placements, spreadType, planIndex) {
   }
 
   if (primaryType === 'fragment-doc') {
-    const artifactIdentity = resolveArtifactIdentity(placements);
-    if ((artifactIdentity.shellFamily || '') === 'classified-packet' && placements.length <= 2) {
+    const fragShellAttrs = resolveShellAttrs(placements);
+    if ((fragShellAttrs['shell-family'] || '') === 'classified-packet' && placements.length <= 2) {
       frame.appendChild(buildArchiveFooter(placements));
     }
   }

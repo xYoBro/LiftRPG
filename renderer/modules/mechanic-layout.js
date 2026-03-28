@@ -19,32 +19,51 @@ const MECHANIC_SURFACE_TYPES = new Set([
   'cipher-panel', 'oracle-table', 'map-panel',
 ]);
 
-const DEFAULT_ARTIFACT_IDENTITY = {
-  shellFamily: 'field-survey',
-  boardStateMode: 'survey-grid',
-  attachmentStrategy: 'split-technical',
+const DEFAULT_SHELL_ATTRS = {
+  'shell-family': 'field-survey',
+  'board-state-mode': 'survey-grid',
+  'attachment-strategy': 'split-technical',
 };
 
 // ---------------------------------------------------------------------------
-// Artifact identity resolution
+// Shell attribute resolution
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve the artifactIdentity from a list of placements.
- * Scans placement data for an explicit `artifactIdentity` object;
- * falls back to defaults.
+ * Resolve shell attributes from a list of items (placements or atoms).
  *
- * @param {Array} placements
- * @returns {object} artifactIdentity
+ * Resolution order:
+ *   1. Explicit `shellAttrs` on the atom descriptor (contract-level channel)
+ *   2. Legacy `data.artifactIdentity` scan (migration fallback)
+ *   3. Defaults
+ *
+ * Returns a flat string→string map suitable for `data-*` attributes.
+ *
+ * @param {Array} items — placements or atoms
+ * @returns {object} shell attributes
  */
-export function resolveArtifactIdentityFromPlacements(placements) {
-  for (const placement of placements) {
-    const data = placement.atom?.data || placement.data || {};
-    if (data.artifactIdentity && typeof data.artifactIdentity === 'object') {
-      return { ...DEFAULT_ARTIFACT_IDENTITY, ...data.artifactIdentity };
+export function resolveShellAttrs(items) {
+  // Primary: explicit shellAttrs on the atom descriptor
+  for (const item of items) {
+    const attrs = (item.atom && item.atom.shellAttrs) || item.shellAttrs;
+    if (attrs && typeof attrs === 'object') {
+      return { ...DEFAULT_SHELL_ATTRS, ...attrs };
     }
   }
-  return DEFAULT_ARTIFACT_IDENTITY;
+  // Legacy fallback: data.artifactIdentity
+  for (const item of items) {
+    const data = item.atom?.data || item.data || {};
+    if (data.artifactIdentity && typeof data.artifactIdentity === 'object') {
+      const ai = data.artifactIdentity;
+      return {
+        ...DEFAULT_SHELL_ATTRS,
+        ...(ai.shellFamily ? { 'shell-family': ai.shellFamily } : {}),
+        ...(ai.boardStateMode ? { 'board-state-mode': ai.boardStateMode } : {}),
+        ...(ai.attachmentStrategy ? { 'attachment-strategy': ai.attachmentStrategy } : {}),
+      };
+    }
+  }
+  return DEFAULT_SHELL_ATTRS;
 }
 
 // ---------------------------------------------------------------------------
@@ -54,15 +73,15 @@ export function resolveArtifactIdentityFromPlacements(placements) {
 /**
  * Resolve the layout variant for a mechanic page.
  *
- * Keyed on boardStateMode and map type. The variant controls which surfaces
+ * Keyed on board-state-mode and map type. The variant controls which surfaces
  * share a half-width row and which are full-width.
  *
- * @param {object} artifactIdentity
+ * @param {object} shellAttrs — resolved shell attributes (string→string map)
  * @param {Array} surfacePlacements — cipher/oracle/map placements only
  * @returns {string} layoutVariant
  */
-export function resolveLayoutVariant(artifactIdentity, surfacePlacements) {
-  const boardStateMode = String((artifactIdentity && artifactIdentity.boardStateMode) || 'survey-grid');
+export function resolveLayoutVariant(shellAttrs, surfacePlacements) {
+  const boardStateMode = String((shellAttrs && shellAttrs['board-state-mode']) || 'survey-grid');
   const mapPlacement = surfacePlacements.find(function (p) { return p.type === 'map-panel'; });
   const mapData = mapPlacement && (mapPlacement.atom && mapPlacement.atom.data || mapPlacement.data || {});
   const mapType = mapData && mapData.map && String(mapData.map.mapType || '').toLowerCase();
@@ -204,8 +223,8 @@ export function getMechanicSlotWidthPx(placement, allPagePlacements) {
   });
 
   // Resolve layout variant using the same logic as the renderer
-  const artifactIdentity = resolveArtifactIdentityFromPlacements(allPagePlacements);
-  const variant = resolveLayoutVariant(artifactIdentity, surfacePlacements);
+  const shellAttrs = resolveShellAttrs(allPagePlacements);
+  const variant = resolveLayoutVariant(shellAttrs, surfacePlacements);
 
   // Build the row template and find which row contains this placement's type
   const rows = buildMechanicSurfaceRows(surfacePlacements, variant);
@@ -244,8 +263,8 @@ export function getHalfWidthTypes(items) {
   });
   if (surfaceItems.length === 0) return new Set();
 
-  const artifactIdentity = resolveArtifactIdentityFromPlacements(items);
-  const variant = resolveLayoutVariant(artifactIdentity, surfaceItems);
+  const shellAttrs = resolveShellAttrs(items);
+  const variant = resolveLayoutVariant(shellAttrs, surfaceItems);
   const rows = buildMechanicSurfaceRows(surfaceItems, variant);
 
   const types = new Set();

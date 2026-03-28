@@ -151,6 +151,11 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
   const atoms = [];
   const artifactIdentity = resolveArtifactIdentity(data);
   const shellFamily = artifactIdentity.shellFamily || 'field-survey';
+  const shellAttrs = {
+    'shell-family': artifactIdentity.shellFamily || 'field-survey',
+    'board-state-mode': artifactIdentity.boardStateMode || 'survey-grid',
+    'attachment-strategy': artifactIdentity.attachmentStrategy || 'split-technical',
+  };
 
   // ── Cover ───────────────────────────────────────────────────
   atoms.push(createAtom({
@@ -298,6 +303,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         atoms.push(createAtom({
           type: 'cipher-panel',
           id: `w${wi}-cipher`,
+          shellAttrs,
           group: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'cipher', artifactIdentity),
           groupPolicy: singlePageGroupPolicy(),
           rowGroup: balancedRowGroup,
@@ -319,6 +325,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         atoms.push(createAtom({
           type: 'oracle-table',
           id: `w${wi}-oracle`,
+          shellAttrs,
           group: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'oracle', artifactIdentity),
           groupPolicy: singlePageGroupPolicy(),
           section: 'body',
@@ -339,6 +346,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         atoms.push(createAtom({
           type: 'map-panel',
           id: `w${wi}-map`,
+          shellAttrs,
           group: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'map', artifactIdentity),
           groupPolicy: singlePageGroupPolicy(),
           rowGroup: balancedRowGroup,
@@ -382,6 +390,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
             type: 'tracker',
             id: `w${wi}-companion-${ci}`,
             zone: 'companion',
+            shellAttrs,
             group: resolveTrackerGroup(primaryGroup, wi, attachmentStrategy, artifactIdentity, comp),
             section: 'body',
             sequence: wi * 1000 + 200 + ci,
@@ -470,6 +479,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
     atoms.push(createAtom({
       type: 'fragment-doc',
       id: `frag-${fi}`,
+      shellAttrs,
       group: 'fragments',
       mustOwnPage: standalone,
       section: 'supplements',
