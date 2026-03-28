@@ -91,7 +91,14 @@ function resolveTrackerSizeHint(artifactIdentity, component) {
  * @param {number} weekIndex
  * @returns {string|null}
  */
-function resolveBalancedRowGroup(artifactIdentity, week, weekIndex) {
+function resolveBalancedRowGroup(artifactIdentity, week, weekIndex, attachmentStrategy) {
+  // Split strategies place cipher and map on separate pages — rowGroup
+  // pairing intent cannot be fulfilled, so don't emit it.
+  if (attachmentStrategy === 'split-technical' || attachmentStrategy === 'appendix-split'
+      || attachmentStrategy === 'fragments-as-filed-documents') {
+    return null;
+  }
+
   const boardStateMode = String((artifactIdentity && artifactIdentity.boardStateMode) || 'survey-grid');
   const mapState = week.fieldOps && week.fieldOps.mapState;
   const mapType = mapState ? String(mapState.mapType || '').toLowerCase() : '';
@@ -190,7 +197,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
     const sessionChunks = chunkWeekSessions(week.sessions || []);
     const primaryGroup = `week-${wi}-chunk-0`;
     const attachmentStrategy = resolveWeekAttachmentStrategy(artifactIdentity, week, profile);
-    const balancedRowGroup = isBoss ? null : resolveBalancedRowGroup(artifactIdentity, week, wi);
+    const balancedRowGroup = isBoss ? null : resolveBalancedRowGroup(artifactIdentity, week, wi, attachmentStrategy);
 
     // Week header (kicker, title, epigraph) — before session cards
     atoms.push(createAtom({

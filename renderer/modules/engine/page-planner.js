@@ -20,7 +20,7 @@ import {
 import {
   createDiagnostics, recordAdjustment, recordSplit,
   recordUnresolvedOverflow, recordSpreadUsage, recordAtomMetrics,
-  formatStatus, summarize,
+  recordWarning, formatStatus, summarize,
 } from './diagnostics.js';
 import { getMechanicSlotWidthPx, getHalfWidthTypes } from '../mechanic-layout.js';
 
@@ -498,6 +498,85 @@ export function planSpreads(atoms, options = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// rowGroup diagnostics — post-measurement scan
+// ---------------------------------------------------------------------------
+
+/**
+ * Scan a finalised spread plan for orphaned or inconsistent rowGroup usage.
+ *
+ * Emits warnings (not errors) into the diagnostics collector. Does not change
+ * layout behaviour — orphaned atoms still render full-width as designed.
+ *
+ * Detected conditions:
+ * - **orphan**: a cols:1 atom declares rowGroup but no same-page partner
+ *   shares that rowGroup value (the atom renders full-width silently).
+ * - **mismatch**: on a page with both cipher-panel and map-panel, the two
+ *   carry different non-null rowGroup values (balanced pairing is suppressed).
+ *
+ * @param {object[]} spreadPlan
+ * @param {object} diagnostics — DiagnosticsCollector
+ */
+function scanRowGroupDiagnostics(spreadPlan, diagnostics) {
+  for (const spread of spreadPlan) {
+    for (const side of ['left', 'right']) {
+      const placements = spread[side];
+      if (!placements || placements.length === 0) continue;
+
+      // Collect rowGroup membership per page side
+      const byRowGroup = new Map();
+      for (const p of placements) {
+        const rg = p.atom && p.atom.rowGroup;
+        if (!rg) continue;
+        if (!byRowGroup.has(rg)) byRowGroup.set(rg, []);
+        byRowGroup.get(rg).push(p);
+      }
+
+      // Check for orphans: a rowGroup with only one cols:1 member
+      for (const [rg, members] of byRowGroup) {
+        const halfMembers = members.filter(function (p) {
+          const def = getAtomDefinition(p.type);
+          return ((def && def.footprint && def.footprint.cols) || 2) === 1;
+        });
+        if (halfMembers.length === 1) {
+          const orphan = halfMembers[0];
+          recordWarning(diagnostics, 'rowGroup-orphan',
+            `${orphan.type} (${orphan.atomId}) has rowGroup "${rg}" but no partner on spread ${spread.spreadIndex} ${side}`,
+            {
+              atomId: orphan.atomId,
+              type: orphan.type,
+              rowGroup: rg,
+              spreadIndex: spread.spreadIndex,
+              side,
+            },
+          );
+        }
+      }
+
+      // Check for mismatch: cipher-panel and map-panel with different non-null rowGroups
+      const cipher = placements.find(function (p) { return p.type === 'cipher-panel'; });
+      const map    = placements.find(function (p) { return p.type === 'map-panel'; });
+      if (cipher && map) {
+        const cipherRG = cipher.atom && cipher.atom.rowGroup;
+        const mapRG    = map.atom && map.atom.rowGroup;
+        if (cipherRG && mapRG && cipherRG !== mapRG) {
+          recordWarning(diagnostics, 'rowGroup-mismatch',
+            `cipher-panel and map-panel on spread ${spread.spreadIndex} ${side} have different rowGroups ("${cipherRG}" vs "${mapRG}") — balanced pairing suppressed`,
+            {
+              cipherAtomId: cipher.atomId,
+              mapAtomId: map.atomId,
+              cipherRowGroup: cipherRG,
+              mapRowGroup: mapRG,
+              spreadIndex: spread.spreadIndex,
+              side,
+            },
+          );
+        }
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Full pipeline: plan → measure → revise
 // ---------------------------------------------------------------------------
 
@@ -790,6 +869,9 @@ export function planAndMeasure(atoms, container, options = {}) {
   } finally {
     destroy();
   }
+
+  // Step 5: Scan for rowGroup inconsistencies (post-measurement, no layout changes)
+  scanRowGroupDiagnostics(spreadPlan, diagnostics);
 
   return { spreadPlan, diagnostics };
 }

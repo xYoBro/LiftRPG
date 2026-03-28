@@ -28,6 +28,7 @@
  * @property {UnresolvedOverflow[]}      unresolvedOverflow
  * @property {SpreadUsageRecord[]}       perSpread
  * @property {AtomMetricsRecord[]}       perAtom
+ * @property {WarningRecord[]}           warnings
  */
 export function createDiagnostics() {
   return {
@@ -50,6 +51,8 @@ export function createDiagnostics() {
     perSpread:           [],
     /** @type {AtomMetricsRecord[]} */
     perAtom:             [],
+    /** @type {WarningRecord[]} */
+    warnings:            [],
   };
 }
 
@@ -132,6 +135,23 @@ export function recordSpreadUsage(diag, spreadIndex, leftUsed, rightUsed, leftAt
 }
 
 /**
+ * Record a non-fatal warning (e.g., orphaned rowGroup, adapter inconsistency).
+ *
+ * @param {DiagnosticsCollector} diag
+ * @param {string} category — warning category (e.g., 'rowGroup-orphan')
+ * @param {string} message  — human-readable description
+ * @param {object} [details] — structured context (atom ids, page, values)
+ *
+ * @typedef {object} WarningRecord
+ * @property {string} category
+ * @property {string} message
+ * @property {object} [details]
+ */
+export function recordWarning(diag, category, message, details = null) {
+  diag.warnings.push({ category, message, ...(details ? { details } : {}) });
+}
+
+/**
  * Record measurement metrics for a single atom.
  *
  * @param {DiagnosticsCollector} diag
@@ -205,6 +225,11 @@ export function formatStatus(diag) {
     parts.push(`UNRESOLVED OVERFLOW: ${overflowDetails}.`);
   }
 
+  // Warnings (rowGroup orphans, adapter inconsistencies, etc.)
+  if (diag.warnings.length > 0) {
+    parts.push(`${diag.warnings.length} warning${diag.warnings.length === 1 ? '' : 's'}: ${diag.warnings.map(w => w.message).join('; ')}.`);
+  }
+
   // Padding pages
   if (diag.paddingPages > 0) {
     parts.push(`${diag.paddingPages} padding page${diag.paddingPages === 1 ? '' : 's'} added for imposition.`);
@@ -217,7 +242,7 @@ export function formatStatus(diag) {
   let level = 'info';
   if (diag.unresolvedOverflow.length > 0) {
     level = 'error';
-  } else if (diag.atomsSplit.length > 0) {
+  } else if (diag.atomsSplit.length > 0 || diag.warnings.length > 0) {
     level = 'warn';
   }
 
@@ -245,6 +270,7 @@ export function summarize(diag) {
     adjusted:    diag.atomsAdjusted.length,
     split:       diag.atomsSplit.length,
     unresolved:  diag.unresolvedOverflow.length,
+    warnings:    diag.warnings.length,
     spreadModel: diag.spreadModel,
     overridden:  diag.spreadModelOverridden,
   };
