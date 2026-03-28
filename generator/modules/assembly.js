@@ -748,6 +748,35 @@ export function normalizeDocumentTypes(booklet) {
   });
 }
 
+// ── Overflow document normalization (RC-2 mechanical cleanup) ────────────────
+// Auto-assigns missing IDs, deduplicates collisions with fragment IDs.
+
+export function normalizeOverflowDocuments(booklet) {
+  var fragmentIds = {};
+  (booklet.fragments || []).forEach(function (f) {
+    if (f.id) fragmentIds[normalizeId(f.id)] = true;
+  });
+  var usedOverflowIds = {};
+
+  (booklet.weeks || []).forEach(function (week, wi) {
+    var od = week.overflowDocument;
+    if (!od) return;
+
+    // Auto-assign missing ID
+    if (!od.id) {
+      od.id = 'overflow-w' + (wi + 1);
+    }
+
+    // Dedup collision with fragment IDs
+    var nid = normalizeId(od.id);
+    if (fragmentIds[nid] || usedOverflowIds[nid]) {
+      od.id = od.id + '-overflow';
+      nid = normalizeId(od.id);
+    }
+    usedOverflowIds[nid] = true;
+  });
+}
+
 // ── Interlude normalization ──────────────────────────────────────────────────
 // Repairs common LLM errors in interlude objects:
 //  1. "fragment" payloadType → "fragment-ref" (common LLM confusion)
@@ -1610,6 +1639,10 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
 
   // -- Normalize document types (alias resolution) --
   normalizeDocumentTypes(booklet);
+
+  // -- Normalize overflow documents (auto-assign missing IDs, dedup collisions) --
+  normalizeOverflowDocuments(booklet);
+
   normalizeInterludes(booklet);
 
   // -- Compute totalSessions --

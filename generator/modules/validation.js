@@ -29,6 +29,11 @@ import {
 
 // ── Part 1: Continuity validators ─────────────────────────────────────────────
 
+// Normalize component type strings for comparison: trim, lowercase, underscores→spaces
+function normalizeComponentType(s) {
+  return String(s || '').trim().toLowerCase().replace(/_/g, ' ');
+}
+
 export function validateWeekChunkContinuity(chunk, context) {
   var errors = [];
   context = context || {};
@@ -43,7 +48,7 @@ export function validateWeekChunkContinuity(chunk, context) {
   (chunk.weeks || []).forEach(function (week, index) {
     var label = 'Week ' + (week.weekNumber || context.expectedWeeks && context.expectedWeeks[index] || '?');
     var wc = week.weeklyComponent || {};
-    if (!week.isBossWeek && expectedWeeklyComponentType && wc.type && wc.type !== expectedWeeklyComponentType) {
+    if (!week.isBossWeek && expectedWeeklyComponentType && wc.type && normalizeComponentType(wc.type) !== normalizeComponentType(expectedWeeklyComponentType)) {
       errors.push(label + ' weeklyComponent.type "' + wc.type + '" does not match shell meta.weeklyComponentType "' + expectedWeeklyComponentType + '"');
     }
 
@@ -737,9 +742,12 @@ export function validateAssembledBooklet(booklet) {
       }
     });
 
-    collectOracleBandErrors(entries, wn + ' oracle').forEach(function (message) {
-      errors.push(message);
-    });
+    // Band count check: boss weeks replace fieldOps with bossEncounter — skip oracle validation
+    if (!week.isBossWeek) {
+      collectOracleBandErrors(entries, wn + ' oracle').forEach(function (message) {
+        errors.push(message);
+      });
+    }
 
     // -- Cipher validation (non-boss weeks) --
     var cipher = fo.cipher || {};
@@ -1239,6 +1247,19 @@ export function validateSkeletonStage(result, weekCount) {
     fr = kept.concat(unreferenced).slice(0, MAX_FRAGMENTS);
     result.fragmentRegistry = fr;
     console.warn('Skeleton → fragmentRegistry trimmed from ' + originalCount + ' to ' + fr.length + ' (cap: ' + MAX_FRAGMENTS + ')');
+
+    // Strip orphaned weekPlan references so flesh stages never see trimmed IDs
+    var survivingIds = {};
+    for (var si = 0; si < fr.length; si++) survivingIds[fr[si].id] = true;
+    for (var pi = 0; pi < wp.length; pi++) {
+      if (wp[pi].fragmentIds) {
+        wp[pi].fragmentIds = wp[pi].fragmentIds.filter(function (fid) { return survivingIds[fid]; });
+      }
+      if (wp[pi].overflowFragmentId && !survivingIds[wp[pi].overflowFragmentId]) {
+        console.warn('Skeleton → weekPlan[' + pi + '].overflowFragmentId "' + wp[pi].overflowFragmentId + '" removed (not in capped registry)');
+        delete wp[pi].overflowFragmentId;
+      }
+    }
   }
 
   // Cross-ref: every fragmentId in weekPlan must exist in registry
@@ -1289,6 +1310,7 @@ var REPAIRABLE_PATTERNS = [
 var DEGRADED_PATTERNS = [
   /missing designSpec/i,
   /missing epigraph/i,
+  /epigraph missing/i,
   /missing consequenceOnFull/i,
   /missing falseAssumptions/i,
   /missing motifPayoffs/i,

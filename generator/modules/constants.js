@@ -73,7 +73,33 @@ export var DOCUMENT_TYPE_ENUM = [
   'correspondence', 'transcript', 'form', 'anomaly'
 ];
 
-export var DOCUMENT_TYPE_ALIASES = { 'letter': 'correspondence' };
+export var DOCUMENT_TYPE_ALIASES = {
+  'letter': 'correspondence',
+  // Observed S+F compact-pass variants (RC-2 mechanical cleanup)
+  'maintenance_log': 'fieldNote', 'maintenance-log': 'fieldNote',
+  'intercepted-transmission': 'transcript', 'intercepted_transmission': 'transcript',
+  'incident_report': 'report', 'incident-report': 'report',
+  'technical-drawing': 'inspection', 'technical_drawing': 'inspection',
+  'internal-memo': 'memo', 'internal_memo': 'memo', 'internal memo': 'memo',
+  'personnel-directive': 'memo', 'personnel_directive': 'memo',
+  'internal directive': 'memo', 'internal-directive': 'memo',
+  'operational directive': 'memo', 'operational-directive': 'memo',
+  'personnel-file': 'report', 'personnel_file': 'report',
+  'personal note': 'fieldNote', 'personal-note': 'fieldNote', 'personal_note': 'fieldNote',
+  'technical-log': 'fieldNote', 'technical_log': 'fieldNote',
+  'technical report': 'report', 'technical-report': 'report', 'technical_report': 'report',
+  'field-note': 'fieldNote', 'field_note': 'fieldNote', 'field note': 'fieldNote',
+  'log-entry': 'fieldNote', 'log_entry': 'fieldNote', 'log entry': 'fieldNote',
+  'signal-log': 'fieldNote', 'signal_log': 'fieldNote',
+  'dispatch': 'correspondence', 'communique': 'correspondence',
+  'bulletin': 'memo', 'notice': 'memo',
+  'dossier': 'report', 'briefing': 'report', 'case-file': 'report', 'case_file': 'report',
+  'manifest': 'form', 'ledger': 'form', 'inventory': 'form',
+  'testimony': 'transcript', 'deposition': 'transcript', 'interview': 'transcript', 'recording': 'transcript',
+  'journal': 'fieldNote', 'diary': 'fieldNote', 'observation': 'fieldNote',
+  'assessment': 'inspection', 'survey': 'inspection', 'audit': 'inspection',
+  'incident': 'anomaly', 'warning': 'anomaly', 'alert': 'anomaly', 'deviation': 'anomaly'
+};
 
 export var VALID_MAP_TYPES = ['grid', 'point-to-point', 'linear-track', 'player-drawn'];
 

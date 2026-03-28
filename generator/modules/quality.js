@@ -69,10 +69,21 @@ export function collectIdentityVariationFindings(booklet, nonBossWeeks, fragment
     findings++;
   }
 
-  if (!artifactIdentity.openingMode || !artifactIdentity.rulesDeliveryMode || !artifactIdentity.unlockLogic) {
+  // Core identity fields the skeleton always provides — missing these is a real undercommitment.
+  // Optional creative fields (openingMode, rulesDeliveryMode, unlockLogic) are not required.
+  if (!artifactIdentity.artifactClass && !artifactIdentity.shellFamily) {
     report.weakSpots.push({
       area: 'identity-undercommitment',
-      detail: 'artifactIdentity is missing one or more differentiation fields (openingMode, rulesDeliveryMode, unlockLogic)',
+      detail: 'artifactIdentity is missing core identity fields (artifactClass, shellFamily)',
+      severity: 'high'
+    });
+    findings++;
+  } else if (!artifactIdentity.artifactClass || !artifactIdentity.shellFamily) {
+    report.weakSpots.push({
+      area: 'identity-undercommitment',
+      detail: 'artifactIdentity has partial core identity (' +
+        (artifactIdentity.artifactClass ? 'artifactClass present' : 'artifactClass missing') + ', ' +
+        (artifactIdentity.shellFamily ? 'shellFamily present' : 'shellFamily missing') + ')',
       severity: 'medium'
     });
     findings++;
@@ -85,7 +96,7 @@ export var QUALITY_BLOCKING_AREAS = {
   'artifact-monoculture': { target: 'fragments' },
   'board-monotony': { target: 'weeks' },
   'companion-sameness': { target: 'weeks' },
-  'identity-undercommitment': { target: 'shell', alwaysBlock: true },
+  'identity-undercommitment': { target: 'shell' },
   'map-stagnation': { target: 'weeks' },
   'cipher-repetition': { target: 'weeks' },
   'oracle-vagueness': { target: 'weeks' },

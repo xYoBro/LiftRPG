@@ -2010,6 +2010,10 @@ async function runSkeletonFleshPipeline(options) {
   var onProgress    = options.onProgress;
   var weekCount     = options.weekCount;
   var nw            = options.nw;
+  var trialMode     = !!(options.trialMode || settings.trialMode);
+
+  // Trial mode: one attempt per stage, no retries — preserves diagnostics and fail-fast
+  var TRIAL_ATTEMPTS = 1;
 
   // ── Setup ──
   if (typeof window.beginLiftRpgPromptRun === 'function') {
@@ -2088,7 +2092,7 @@ async function runSkeletonFleshPipeline(options) {
       schema:           window.STRUCTURED_SCHEMA_SKELETON || null,
       maxTokens:        MAX_OUTPUT_TOKENS,
       requestTimeoutMs: 360000,
-      maxAttempts:      2,
+      maxAttempts:      trialMode ? TRIAL_ATTEMPTS : 2,
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
       telemetryCollector: sfTelemetry,
@@ -2145,7 +2149,7 @@ async function runSkeletonFleshPipeline(options) {
       schema:           null,
       maxTokens:        MAX_OUTPUT_TOKENS,
       requestTimeoutMs: 120000,
-      maxAttempts:      2,
+      maxAttempts:      trialMode ? TRIAL_ATTEMPTS : 2,
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
       telemetryCollector: sfTelemetry,
@@ -2214,7 +2218,7 @@ async function runSkeletonFleshPipeline(options) {
       schema:           null,
       maxTokens:        MAX_OUTPUT_TOKENS,
       requestTimeoutMs: 300000,
-      maxAttempts:      3,
+      maxAttempts:      trialMode ? TRIAL_ATTEMPTS : 3,
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
       telemetryCollector: sfTelemetry,
@@ -2320,7 +2324,7 @@ async function runSkeletonFleshPipeline(options) {
       schema:           null,
       maxTokens:        MAX_OUTPUT_TOKENS,
       requestTimeoutMs: DEFAULT_TIMEOUT_MS,
-      maxAttempts:      2,
+      maxAttempts:      trialMode ? TRIAL_ATTEMPTS : 2,
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
       telemetryCollector: sfTelemetry,
@@ -2397,7 +2401,7 @@ async function runSkeletonFleshPipeline(options) {
       schema:           null,
       maxTokens:        MAX_OUTPUT_TOKENS,
       requestTimeoutMs: 180000,
-      maxAttempts:      2,
+      maxAttempts:      trialMode ? TRIAL_ATTEMPTS : 2,
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
       telemetryCollector: sfTelemetry,
@@ -2480,6 +2484,7 @@ async function runSkeletonFleshPipeline(options) {
   booklet._qualityReport = report;
   booklet._qualityGate = qualityGate;
   booklet._pipeline = 'skeleton-flesh';
+  booklet._trialMode = trialMode;
   booklet._assemblyWarnings = assemblyErrors || [];
   booklet._continuityWarnings = sfContinuityWarnings;
 
@@ -2540,7 +2545,8 @@ async function generateSkeletonFlesh(settings, workout, brief, onProgress) {
     onProgress:    onProgress,
     weekCount:     weekCount,
     totalSessions: totalSessions,
-    nw:            nw
+    nw:            nw,
+    trialMode:     !!(settings.trialMode)
   });
 }
 
@@ -2590,7 +2596,8 @@ window.LiftRPGAPI = {
     mergeFragmentBatches: mergeFragmentBatches,
     assembleSkeletonFleshBooklet: assembleSkeletonFleshBooklet,
     validateSkeletonStage: validateSkeletonStage,
-    buildSkeletonFragmentBatches: buildSkeletonFragmentBatches
+    buildSkeletonFragmentBatches: buildSkeletonFragmentBatches,
+    classifyValidationErrors: classifyValidationErrors
   },
   _extractJson: extractJson,
   _validateSchema: validateBookletSchema,
