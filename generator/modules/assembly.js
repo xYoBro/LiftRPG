@@ -773,6 +773,30 @@ export function autoRepairWeek(result, context) {
     }
   }
 
+  // Canonicalize overflow document type aliases regardless of whether a
+  // planned registry entry exists. This brings week-level ingestion into
+  // parity with full-booklet assembly normalization (normalizeDocumentTypes)
+  // so guided-build week validation sees canonical types before checking enums.
+  if (result.overflowDocument && result.overflowDocument.documentType) {
+    var rawDt = result.overflowDocument.documentType;
+    var canonical = DOCUMENT_TYPE_ALIASES[rawDt];
+    if (canonical) {
+      result.overflowDocument.documentType = canonical;
+      console.warn('[autoRepairWeek] Overflow documentType "' + rawDt + '" → "' + canonical + '"');
+      if (!result._overflowRepairs) result._overflowRepairs = [];
+      result._overflowRepairs.push({
+        code: 'overflow-document-type-alias',
+        severity: 'warning',
+        phase: 'normalize',
+        message: 'Week ' + (result.weekNumber || '?') + ' overflowDocument.documentType "' + rawDt +
+          '" canonicalized to "' + canonical + '"',
+        repairable: true,
+        path: 'weeks[' + (result.weekNumber || '?') + '].overflowDocument.documentType',
+        correction: rawDt + ' → ' + canonical
+      });
+    }
+  }
+
   return result;
 }
 
