@@ -186,6 +186,141 @@ export function ensureArtifactIdentity(shell, campaignPlan) {
   return normalized;
 }
 
+// ── Board-state mode truthing ─────────────────────────────────────────────
+// After assembly, the booklet's weeks contain actual mapState.mapType values.
+// If the declared boardStateMode disagrees with the dominant observed map type,
+// correct it to reflect truth.  This is a narrow, defensible truthing rule:
+// we only override when the current value is a generic fallback AND the weeks
+// clearly use something else.
+
+var MAP_TYPE_TO_BOARD_STATE = {
+  'grid':            'survey-grid',
+  'point-to-point':  'node-graph',
+  'linear-track':    'route-tracker',
+  'player-drawn':    'player-drawn'
+};
+
+/**
+ * truthBoardStateMode(booklet, diag?) -> void
+ *
+ * Inspects assembled weeks for actual mapState.mapType values and corrects
+ * meta.artifactIdentity.boardStateMode when the declared value is clearly
+ * wrong.  Only fires when:
+ *   1. The booklet has assembled weeks with mapType data
+ *   2. The current boardStateMode does not match the dominant observed type
+ *
+ * Mutates booklet.meta.artifactIdentity in place.
+ */
+export function truthBoardStateMode(booklet, diag) {
+  if (!booklet || !booklet.weeks || booklet.weeks.length === 0) return;
+
+  var identity = ((booklet.meta || {}).artifactIdentity) || {};
+  var current = String(identity.boardStateMode || '').toLowerCase();
+
+  // Collect map types from non-boss weeks
+  var typeCounts = {};
+  var total = 0;
+  booklet.weeks.forEach(function (week) {
+    if (week.isBossWeek) return;
+    var fo = week.fieldOps || {};
+    var map = fo.map || fo.mapState || {};
+    var mt = String(map.mapType || '').trim().toLowerCase();
+    if (mt) {
+      typeCounts[mt] = (typeCounts[mt] || 0) + 1;
+      total++;
+    }
+  });
+
+  if (total === 0) return; // no map data to truth against
+
+  // Find dominant map type (highest count)
+  var dominant = '';
+  var dominantCount = 0;
+  for (var mt in typeCounts) {
+    if (typeCounts[mt] > dominantCount) {
+      dominant = mt;
+      dominantCount = typeCounts[mt];
+    }
+  }
+
+  if (!dominant) return;
+
+  var expectedBoardState = MAP_TYPE_TO_BOARD_STATE[dominant] || '';
+  if (!expectedBoardState) return;
+
+  // Only correct if current value disagrees with observed truth
+  if (current === expectedBoardState) return;
+
+  var oldVal = current || '(empty)';
+  if (!booklet.meta) booklet.meta = {};
+  if (!booklet.meta.artifactIdentity) booklet.meta.artifactIdentity = {};
+  booklet.meta.artifactIdentity.boardStateMode = expectedBoardState;
+
+  var msg = 'boardStateMode truthed from "' + oldVal + '" to "' + expectedBoardState +
+    '" based on dominant mapType "' + dominant + '" (' + dominantCount + '/' + total + ' weeks)';
+  console.warn('[LiftRPG] ' + msg);
+  if (diag) {
+    diag.push(createDiagnostic('boardstate-mode-truthed', 'warning', 'post-assembly-truth', msg,
+      { path: 'meta.artifactIdentity.boardStateMode', repairable: true,
+        correction: oldVal + ' → ' + expectedBoardState }));
+  }
+}
+
+// ── Artifact intent preservation ──────────────────────────────────────────
+// Ensures meta.artifactIntent survives assembly when it existed upstream.
+// Does not invent intent — only preserves what was already declared.
+
+function preserveArtifactIntent(booklet, upstreamMeta) {
+  if (!upstreamMeta || !upstreamMeta.artifactIntent) return;
+  if (!booklet.meta) booklet.meta = {};
+  if (!booklet.meta.artifactIntent) {
+    booklet.meta.artifactIntent = cloneSimple(upstreamMeta.artifactIntent);
+  }
+}
+
+// ── Identity preservation diagnostics ─────────────────────────────────────
+// Detects silent regressions in artifact metadata preservation.
+
+/**
+ * diagnoseIdentityPreservation(booklet, upstreamMeta, diag) -> void
+ *
+ * Checks for:
+ *   1. artifactIntent existed upstream but vanished in the final booklet
+ *   2. boardStateMode clearly disagrees with the assembled booklet's map mode
+ *   3. artifactIdentity fields that are blank when upstream had values
+ *
+ * Appends diagnostics to diag array. Does not mutate the booklet.
+ */
+export function diagnoseIdentityPreservation(booklet, upstreamMeta, diag) {
+  if (!diag) return;
+  var bMeta = booklet.meta || {};
+  var uMeta = upstreamMeta || {};
+
+  // 1. artifactIntent loss
+  if (uMeta.artifactIntent && !bMeta.artifactIntent) {
+    diag.push(createDiagnostic('artifact-intent-lost', 'warning', 'post-assembly-truth',
+      'meta.artifactIntent existed in upstream shell but is missing in final booklet',
+      { path: 'meta.artifactIntent', repairable: false }));
+  }
+
+  // 2. artifactIdentity field blanking
+  var uIdentity = uMeta.artifactIdentity || {};
+  var bIdentity = bMeta.artifactIdentity || {};
+  var identityFields = ['artifactClass', 'shellFamily', 'boardStateMode', 'openingMode',
+    'rulesDeliveryMode', 'unlockLogic', 'attachmentStrategy', 'materialCulture',
+    'annotationCulture', 'documentEcology', 'revealShape', 'authorialMode'];
+
+  identityFields.forEach(function (field) {
+    var uVal = uIdentity[field];
+    var bVal = bIdentity[field];
+    if (uVal && typeof uVal === 'string' && uVal.trim() && (!bVal || !String(bVal).trim())) {
+      diag.push(createDiagnostic('identity-field-blanked', 'warning', 'post-assembly-truth',
+        'artifactIdentity.' + field + ' was "' + uVal + '" upstream but is blank in final booklet',
+        { path: 'meta.artifactIdentity.' + field, repairable: false }));
+    }
+  });
+}
+
 export function buildIdentityContract(shell, campaignPlan) {
   shell = shell || {};
   ensureArtifactIdentity(shell, campaignPlan || null);
@@ -1141,6 +1276,15 @@ export function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, ending
     console.warn('[LiftRPG] Assembly derivation warnings:', result.warnings);
   }
 
+  // Preserve upstream artifactIntent (Layer 3 planning contract)
+  preserveArtifactIntent(booklet, shell.meta);
+
+  // Truth boardStateMode against actual assembled week data
+  truthBoardStateMode(booklet, diag);
+
+  // Diagnose identity preservation regressions
+  diagnoseIdentityPreservation(booklet, shell.meta, diag);
+
   // Attach structured diagnostics (survives JSON serialization)
   booklet._assemblyDiagnostics = diag;
 
@@ -1220,6 +1364,15 @@ export function assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutp
   if (result.warnings.length > 0) {
     console.warn('[LiftRPG] Structured assembly derivation warnings:', result.warnings);
   }
+
+  // Preserve upstream artifactIntent (Layer 3 planning contract)
+  preserveArtifactIntent(booklet, shell.meta);
+
+  // Truth boardStateMode against actual assembled week data
+  truthBoardStateMode(booklet, diag);
+
+  // Diagnose identity preservation regressions
+  diagnoseIdentityPreservation(booklet, shell.meta, diag);
 
   // Attach structured diagnostics (survives JSON serialization)
   booklet._assemblyDiagnostics = diag;
@@ -1908,7 +2061,8 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
       narrativeVoice:           meta.narrativeVoice || {},
       literaryRegister:         meta.literaryRegister || {},
       structuralShape:          meta.structuralShape || {},
-      artifactIdentity:         meta.artifactIdentity || {}
+      artifactIdentity:         meta.artifactIdentity || {},
+      storyAnchor:              meta.storyAnchor || ''
     },
     cover: skeleton.cover || {},
     rulesSpread: (rulesOutput && rulesOutput.rulesSpread) ? rulesOutput.rulesSpread : {},
@@ -1989,6 +2143,15 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
   if (enforcement.warnings && enforcement.warnings.length > 0) {
     enforcement.warnings.forEach(function (w) { console.warn('[S+F assembly] ' + w); });
   }
+
+  // Preserve upstream artifactIntent (Layer 3 planning contract)
+  preserveArtifactIntent(booklet, meta);
+
+  // Truth boardStateMode against actual assembled week data
+  truthBoardStateMode(booklet, diag);
+
+  // Diagnose identity preservation regressions
+  diagnoseIdentityPreservation(booklet, meta, diag);
 
   // Attach structured diagnostics (survives JSON serialization)
   booklet._assemblyDiagnostics = diag;

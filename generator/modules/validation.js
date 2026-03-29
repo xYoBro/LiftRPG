@@ -549,7 +549,7 @@ export function validateShellSchema(shell, expectedOptions) {
     // structuralShape — cover page reads .resolution
     var ss = shell.meta.structuralShape;
     if (!ss || typeof ss !== 'object') {
-      errors.push('meta.structuralShape missing');
+      errors.push('meta.structuralShape missing or not an object');
     } else {
       if (!ss.resolution) errors.push('meta.structuralShape.resolution missing');
     }

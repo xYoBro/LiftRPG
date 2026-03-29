@@ -5881,15 +5881,16 @@
 
       document.getElementById('wiz-assemble-submit').addEventListener('click', function () {
         assemblyResultEl.innerHTML = '';
-        var api = manualApi();
+        var manual = manualApi();
+        var apiModule = api();
         var ingested = ingestStageResult(wizResults[6].value, {
           stageNumber: 6,
           stageLabel: 'endings',
           contract: 'Return only `{ "endings": [...] }`. Preserve the established boss inputs, provenance, and sealed-state rules.',
           shallowValidator: validateEndings,
-          continuityValidator: api && api.validateEndingsContinuity
+          continuityValidator: manual && manual.validateEndingsContinuity
             ? function (d) {
-                return api.validateEndingsContinuity(d, {
+                return manual.validateEndingsContinuity(d, {
                   campaignPlan: wizData.campaignPlan,
                   shell: wizData.shell,
                   weekChunkOutputs: wizData.weekChunkOutputs,
@@ -5904,7 +5905,7 @@
         wizData.endingsOutput = endingsOutput;
         clearStageFlag('endings');
         updateWizardOverview(5);
-        var booklet = manualApi().assembleBooklet(
+        var booklet = manual.assembleBooklet(
           wizData.shell,
           wizData.weekChunkOutputs,
           wizData.fragmentsOutput || { fragments: [] },
@@ -5912,21 +5913,24 @@
           wizData.campaignPlan
         );
 
-        var errors = api() && typeof api()._validateAssembled === 'function'
-          ? api()._validateAssembled(booklet)
+        var validationResult = apiModule && typeof apiModule._validateAssembled === 'function'
+          ? apiModule._validateAssembled(booklet)
+          : { errors: [], warnings: [] };
+        var assembledErrors = validationResult && Array.isArray(validationResult.errors)
+          ? validationResult.errors
           : [];
 
-        if (errors.length > 0) {
-          renderAssemblyErrors(errors);
+        if (assembledErrors.length > 0) {
+          renderAssemblyErrors(assembledErrors);
           saveWizardDraft();
           return;
         }
 
-        var qualityReport = api() && typeof api().qualityReport === 'function'
-          ? api().qualityReport(booklet)
+        var qualityReport = apiModule && typeof apiModule.qualityReport === 'function'
+          ? apiModule.qualityReport(booklet)
           : null;
-        var qualityGate = qualityReport && api() && typeof api().qualityGate === 'function'
-          ? api().qualityGate(qualityReport)
+        var qualityGate = qualityReport && apiModule && typeof apiModule.qualityGate === 'function'
+          ? apiModule.qualityGate(qualityReport)
           : { passed: true, blockers: [] };
 
         if (!qualityGate.passed) {
