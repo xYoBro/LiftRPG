@@ -4888,20 +4888,87 @@
           }
           try {
             var chunk = extractJson(raw);
-            var errors = validateWeekChunk(chunk, weekNumbers);
-            if (errors.length === 0 && manualApi() && typeof manualApi().validateWeekChunkContinuity === 'function') {
-              errors = manualApi().validateWeekChunkContinuity(chunk, {
+            // Phase 1: shallow structure check (week count + presence)
+            var structErrors = validateWeekChunk(chunk, weekNumbers);
+            if (structErrors.length > 0) {
+              errorEl.textContent = structErrors[0];
+              errorEl.classList.add('is-visible');
+              renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, structErrors);
+              return;
+            }
+
+            // Phase 2: deterministic auto-repair per week (API-grade)
+            var api = manualApi();
+            var repairWarnings = [];
+            if (api && typeof api.autoRepairWeek === 'function') {
+              var overflowRegistry = ((wizData.campaignPlan || {}).overflowRegistry) || [];
+              (chunk.weeks || []).forEach(function (week) {
+                api.autoRepairWeek(week, {
+                  weekNumber: week.weekNumber,
+                  overflowRegistry: overflowRegistry
+                });
+                if (week._overflowRepairs) {
+                  repairWarnings = repairWarnings.concat(week._overflowRepairs);
+                }
+              });
+            }
+
+            // Phase 3: deep per-week schema validation (API-grade)
+            var deepErrors = [];
+            if (api && typeof api.validateWeekSchema === 'function') {
+              (chunk.weeks || []).forEach(function (week) {
+                var isBoss = !!week.isBossWeek;
+                var weekErrors = api.validateWeekSchema(week, isBoss, {});
+                weekErrors.forEach(function (e) {
+                  deepErrors.push('Week ' + (week.weekNumber || '?') + ': ' + e);
+                });
+              });
+            }
+
+            // Phase 4: continuity validation
+            var continuityErrors = [];
+            if (api && typeof api.validateWeekChunkContinuity === 'function') {
+              continuityErrors = api.validateWeekChunkContinuity(chunk, {
                 expectedWeeks: weekNumbers,
                 campaignPlan: wizData.campaignPlan,
                 shell: wizData.shell,
                 priorWeekChunkOutputs: wizData.weekChunkOutputs
               });
             }
-            if (errors.length > 0) {
-              errorEl.textContent = errors[0];
+
+            // Phase 5: classify all errors
+            var allErrors = deepErrors.concat(continuityErrors);
+            if (allErrors.length > 0 && api && typeof api.classifyValidationErrors === 'function') {
+              var classified = api.classifyValidationErrors(allErrors);
+              // Only block on true blocking errors
+              if (classified.blocking.length > 0) {
+                var blockMsg = 'Blocking: ' + classified.blocking[0];
+                if (classified.repairable.length > 0) {
+                  blockMsg += ' (+ ' + classified.repairable.length + ' repairable, ' + classified.degraded.length + ' degraded — will be auto-fixed)';
+                }
+                errorEl.textContent = blockMsg;
+                errorEl.classList.add('is-visible');
+                renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, classified.blocking);
+                return;
+              }
+              // Accept with warnings for repairable/degraded
+              if (classified.repairable.length > 0 || classified.degraded.length > 0) {
+                var warnParts = [];
+                if (classified.repairable.length > 0) warnParts.push(classified.repairable.length + ' repairable');
+                if (classified.degraded.length > 0) warnParts.push(classified.degraded.length + ' degraded');
+                console.warn('[guided-build] Week chunk accepted with ' + warnParts.join(', ') + ' issues:',
+                  classified.repairable.concat(classified.degraded));
+              }
+            } else if (allErrors.length > 0) {
+              // Fallback: no classifier available — block on all errors
+              errorEl.textContent = allErrors[0];
               errorEl.classList.add('is-visible');
-              renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, errors);
+              renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, allErrors);
               return;
+            }
+
+            if (repairWarnings.length > 0) {
+              console.warn('[guided-build] Auto-repair applied:', repairWarnings.length, 'fix(es)');
             }
             renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, []);
             var priorChunk = wizData.weekChunkOutputs[chunkIndex];
@@ -5009,19 +5076,45 @@
           try {
             var batchOutput = extractJson(raw);
             var errors = validateFragmentBatch(batchOutput, batch.registry);
-            if (errors.length === 0 && manualApi() && typeof manualApi().validateFragmentBatchContinuity === 'function') {
-              errors = manualApi().validateFragmentBatchContinuity(batchOutput, {
+            if (errors.length > 0) {
+              errorEl.textContent = errors[0];
+              errorEl.classList.add('is-visible');
+              renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, errors);
+              return;
+            }
+            // Normalize document types on fragments before continuity check
+            var fragApi = manualApi();
+            if (fragApi && typeof fragApi.normalizeDocumentTypes === 'function') {
+              fragApi.normalizeDocumentTypes(batchOutput, []);
+            }
+            // Continuity validation + classification
+            var contErrors = [];
+            if (fragApi && typeof fragApi.validateFragmentBatchContinuity === 'function') {
+              contErrors = fragApi.validateFragmentBatchContinuity(batchOutput, {
                 expectedRegistry: batch.registry,
                 campaignPlan: wizData.campaignPlan,
                 shell: wizData.shell,
                 weekChunkOutputs: wizData.weekChunkOutputs
               });
             }
-            if (errors.length > 0) {
-              errorEl.textContent = errors[0];
-              errorEl.classList.add('is-visible');
-              renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, errors);
-              return;
+            if (contErrors.length > 0) {
+              if (fragApi && typeof fragApi.classifyValidationErrors === 'function') {
+                var classified = fragApi.classifyValidationErrors(contErrors);
+                if (classified.blocking.length > 0) {
+                  errorEl.textContent = 'Blocking: ' + classified.blocking[0];
+                  errorEl.classList.add('is-visible');
+                  renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, classified.blocking);
+                  return;
+                }
+                if (classified.repairable.length > 0 || classified.degraded.length > 0) {
+                  console.warn('[guided-build] Fragment batch accepted with', classified.repairable.length, 'repairable,', classified.degraded.length, 'degraded issues');
+                }
+              } else {
+                errorEl.textContent = contErrors[0];
+                errorEl.classList.add('is-visible');
+                renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, contErrors);
+                return;
+              }
             }
             renderRepairPrompt(repairEl, 'fragment batch', 'Return only `{ "fragments": [...] }` for the assigned registry IDs.', raw, []);
             var priorBatch = wizState.fragmentBatchOutputs[batchIndex];
@@ -5465,6 +5558,26 @@
           'Return only the foundation JSON with storyLayer, gameLayer, governingLayer, designPrinciples, and designLedger.'
         );
         if (!layerBible) return;
+        // Deep validation via API validator when available
+        var deepApi = manualApi();
+        if (deepApi && typeof deepApi.validateLayerBibleStage === 'function') {
+          var deepError = deepApi.validateLayerBibleStage(layerBible);
+          if (deepError) {
+            if (deepApi.classifyValidationErrors) {
+              var classified = deepApi.classifyValidationErrors([deepError]);
+              if (classified.blocking.length > 0) {
+                setStageError(1, deepError);
+                renderRepairPrompt(wizRepair[1], 'foundation', 'Return only the foundation JSON.', wizResults[1].value, [deepError]);
+                return;
+              }
+              if (classified.repairable.length > 0 || classified.degraded.length > 0) {
+                console.warn('[guided-build] Layer bible accepted with advisory:', deepError);
+              }
+            } else {
+              console.warn('[guided-build] Layer bible deep validation advisory:', deepError);
+            }
+          }
+        }
         if (wizData.layerBible && stableJson(wizData.layerBible) !== stableJson(layerBible)) {
           invalidateAfterLayerBible('Foundation changed. Everything after it needs a refresh.');
         }
@@ -5483,6 +5596,26 @@
           'Return only campaign plan JSON with topology, weeks, bossPlan, fragmentRegistry, and overflowRegistry.'
         );
         if (!campaignPlan) return;
+        // Deep validation via API validator when available
+        var deepApi = manualApi();
+        if (deepApi && typeof deepApi.validateCampaignPlanStage === 'function') {
+          var deepError = deepApi.validateCampaignPlanStage(campaignPlan, wizData.layerBible);
+          if (deepError) {
+            if (deepApi.classifyValidationErrors) {
+              var classified = deepApi.classifyValidationErrors([deepError]);
+              if (classified.blocking.length > 0) {
+                setStageError(2, deepError);
+                renderRepairPrompt(wizRepair[2], 'campaign plan', 'Return only campaign plan JSON.', wizResults[2].value, [deepError]);
+                return;
+              }
+              if (classified.repairable.length > 0 || classified.degraded.length > 0) {
+                console.warn('[guided-build] Campaign plan accepted with advisory:', deepError);
+              }
+            } else {
+              console.warn('[guided-build] Campaign plan deep validation advisory:', deepError);
+            }
+          }
+        }
         var campaignChanged = !!wizData.campaignPlan && stableJson(buildCampaignSignature(wizData.campaignPlan)) !== stableJson(buildCampaignSignature(campaignPlan));
         if (campaignChanged) {
           invalidateAfterCampaign('Booklet plan changed. Weeks, extras, and the ending need attention.', true);
@@ -5502,9 +5635,29 @@
           'Return only the booklet identity JSON with meta, cover, rulesSpread, and theme.'
         );
         if (!shell) return;
+        // Deep validation via API validator when available
+        var deepApi = manualApi();
+        if (deepApi && typeof deepApi.validateShellSchema === 'function') {
+          var deepError = deepApi.validateShellSchema(shell);
+          if (deepError) {
+            if (deepApi.classifyValidationErrors) {
+              var classified = deepApi.classifyValidationErrors([deepError]);
+              if (classified.blocking.length > 0) {
+                setStageError(3, deepError);
+                renderRepairPrompt(wizRepair[3], 'booklet identity', 'Return only the booklet identity JSON.', wizResults[3].value, [deepError]);
+                return;
+              }
+              if (classified.repairable.length > 0 || classified.degraded.length > 0) {
+                console.warn('[guided-build] Shell accepted with advisory:', deepError);
+              }
+            } else {
+              console.warn('[guided-build] Shell deep validation advisory:', deepError);
+            }
+          }
+        }
         var shellChanged = !!wizData.shell && stableJson(buildShellSignature(wizData.shell)) !== stableJson(buildShellSignature(shell));
-        if (manualApi() && typeof manualApi().ensureArtifactIdentity === 'function') {
-          manualApi().ensureArtifactIdentity(shell, wizData.campaignPlan);
+        if (deepApi && typeof deepApi.ensureArtifactIdentity === 'function') {
+          deepApi.ensureArtifactIdentity(shell, wizData.campaignPlan);
         }
         if (shellChanged) {
           invalidateAfterShell('Booklet identity changed. Ending and final assembly need attention.');
@@ -5540,9 +5693,23 @@
             fragmentsOutput: wizData.fragmentsOutput
           });
           if (endingContinuityErrors.length > 0) {
-            setStageError(6, endingContinuityErrors[0]);
-            renderRepairPrompt(wizRepair[6], 'endings', 'Return only `{ "endings": [...] }`. Preserve the established boss inputs, provenance, and sealed-state rules.', wizResults[6].value, endingContinuityErrors);
-            return;
+            // Classify: only block on true blocking errors
+            if (manualApi().classifyValidationErrors) {
+              var classified = manualApi().classifyValidationErrors(endingContinuityErrors);
+              if (classified.blocking.length > 0) {
+                setStageError(6, classified.blocking[0]);
+                renderRepairPrompt(wizRepair[6], 'endings', 'Return only `{ "endings": [...] }`. Preserve the established boss inputs, provenance, and sealed-state rules.', wizResults[6].value, classified.blocking);
+                return;
+              }
+              if (classified.repairable.length > 0 || classified.degraded.length > 0) {
+                console.warn('[guided-build] Endings accepted with', classified.repairable.length, 'repairable,', classified.degraded.length, 'degraded issues');
+              }
+            } else {
+              // Fallback: block on all
+              setStageError(6, endingContinuityErrors[0]);
+              renderRepairPrompt(wizRepair[6], 'endings', 'Return only `{ "endings": [...] }`. Preserve the established boss inputs, provenance, and sealed-state rules.', wizResults[6].value, endingContinuityErrors);
+              return;
+            }
           }
         }
 

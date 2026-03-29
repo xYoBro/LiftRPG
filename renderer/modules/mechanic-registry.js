@@ -25,6 +25,8 @@ const MAP_FAMILY_BY_TYPE = Object.keys(MAP_FAMILY_REGISTRY).reduce((lookup, fami
   lookup[MAP_FAMILY_REGISTRY[family].sourceType] = family;
   return lookup;
 }, {});
+// Alias: LLMs sometimes generate "node-graph" instead of "point-to-point"
+MAP_FAMILY_BY_TYPE['node-graph'] = 'network-trace';
 
 export const CIPHER_FAMILY_REGISTRY = {
   'text-extraction': {

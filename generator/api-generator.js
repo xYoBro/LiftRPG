@@ -55,7 +55,8 @@ import {
   buildSkeletonFragmentBatches,
   assembleSkeletonFleshBooklet,
   generatePatchPrompt,
-  compareArtifactIntentDrift
+  compareArtifactIntentDrift,
+  normalizeDocumentTypes
 } from './modules/assembly.js';
 
 import {
@@ -2908,6 +2909,12 @@ window.LiftRPGAPI = {
     validateSkeletonStage: validateSkeletonStage,
     buildSkeletonFragmentBatches: buildSkeletonFragmentBatches,
     classifyValidationErrors: classifyValidationErrors,
+    autoRepairWeek: autoRepairWeek,
+    validateWeekSchema: validateWeekSchema,
+    validateShellSchema: validateShellSchema,
+    validateLayerBibleStage: validateLayerBibleStage,
+    validateCampaignPlanStage: validateCampaignPlanStage,
+    normalizeDocumentTypes: normalizeDocumentTypes,
     auditGuidedBuild: auditGuidedBuild
   },
   _extractJson: extractJson,

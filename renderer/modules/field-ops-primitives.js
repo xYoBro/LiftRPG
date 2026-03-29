@@ -111,17 +111,18 @@ export function renderGameplayClocks(clocks) {
 
 function renderGridMap(mapState) {
   const wrap = make('div', 'map-grid');
-  const cols = mapState.gridDimensions.columns;
+  const dims = mapState.gridDimensions || { columns: 6, rows: 5 };
+  const cols = dims.columns || 6;
   wrap.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
   wrap.style.setProperty('--grid-columns', String(cols));
-  wrap.style.setProperty('--grid-rows', String(mapState.gridDimensions.rows || 1));
+  wrap.style.setProperty('--grid-rows', String(dims.rows || 1));
 
   const tilesByPosition = {};
   (mapState.tiles || []).forEach((tile) => {
     tilesByPosition[tile.col + ':' + tile.row] = tile;
   });
 
-  for (let row = 1; row <= mapState.gridDimensions.rows; row += 1) {
+  for (let row = 1; row <= dims.rows; row += 1) {
     for (let col = 1; col <= cols; col += 1) {
       const tile = tilesByPosition[col + ':' + row] || {};
       let cellClass = 'map-cell ' + (tile.type || 'empty');
@@ -509,7 +510,7 @@ export function renderMapSection(mapState) {
   section.setAttribute('data-map-type', mapState.mapType || 'grid');
   section.appendChild(make('div', 'map-title', mapState.title || 'Map'));
 
-  if (mapState.mapType === 'point-to-point') {
+  if (mapState.mapType === 'point-to-point' || mapState.mapType === 'node-graph') {
     section.appendChild(renderPointMap(mapState));
     const routeKey = renderRouteKey(mapState);
     if (routeKey) section.appendChild(routeKey);
