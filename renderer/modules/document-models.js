@@ -22,7 +22,25 @@ function normalizeAuthenticityChecks(fragment) {
 }
 
 function splitBody(fragment) {
-  return splitParagraphs(fragment.bodyText || fragment.body || fragment.content || '');
+  var raw = fragment.bodyText || fragment.body || fragment.content || '';
+  // content may be {html: "..."} object from guided-build — extract the string
+  if (raw && typeof raw === 'object') {
+    raw = raw.html || raw.text || '';
+  }
+  return splitParagraphs(raw);
+}
+
+/**
+ * extractContentHtml(fragment) -> string | null
+ * Returns the raw HTML string when fragment.content is an {html: "..."} object,
+ * or null if content is plain text / absent.
+ */
+function extractContentHtml(fragment) {
+  var c = fragment.content;
+  if (c && typeof c === 'object' && typeof c.html === 'string' && c.html.trim()) {
+    return c.html;
+  }
+  return null;
 }
 
 export function buildFragmentModel(fragment) {
@@ -50,6 +68,10 @@ export function buildFragmentModel(fragment) {
     ? fragment.bodyParagraphs
     : splitBody(fragment);
 
+  // Rich HTML content from guided-build: {html: "..."} objects should render
+  // as sanitized HTML, not as escaped paragraph text.
+  const richHtml = extractContentHtml(fragment);
+
   return {
     id: fragment.id || '',
     numberText: fragment.id ? fragment.id.replace('F.', '') : '',
@@ -62,6 +84,7 @@ export function buildFragmentModel(fragment) {
     date: fragment.date || '',
     purpose: fragment.inWorldPurpose || 'END FILE',
     bodyParagraphs,
+    richHtml: richHtml,
     designSpec: normalizeDesignSpec(fragment),
     authenticityChecks: normalizeAuthenticityChecks(fragment),
     continuationLabel: fragment.continuationLabel || '',

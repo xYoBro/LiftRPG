@@ -1756,6 +1756,11 @@
       letter-spacing: .04em;
       margin-bottom: 10px;
     }
+    .assembly-success .result-next {
+      font-size: 6.5pt;
+      color: var(--ink);
+      margin-bottom: 10px;
+    }
     .assembly-success .result-actions {
       display: flex;
       gap: 8px;
@@ -5423,11 +5428,13 @@
           '<div class="assembly-success">' +
             '<div class="result-title">' + escapeForHtml(title) + '</div>' +
             '<div class="result-meta">' + escapeForHtml(qualityMeta) + '</div>' +
+            '<div class="result-next">Your booklet is ready. Open it in the renderer to preview and print.</div>' +
             '<div class="result-actions">' +
               '<button type="button" class="result-btn-primary assembly-open-btn">Open in Renderer</button>' +
               '<button type="button" class="result-btn-secondary assembly-dl-btn">Download JSON</button>' +
             '</div>' +
           '</div>';
+        assemblyResultEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
         assemblyResultEl.querySelector('.assembly-open-btn').addEventListener('click', function (event) {
           var button = event.currentTarget;

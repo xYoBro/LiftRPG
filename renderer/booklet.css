@@ -689,20 +689,144 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   justify-content:space-between;
   border-bottom:1px dashed var(--rule);
 }
+/* ── witness-binder: hand-labeled feel ── */
 .cover-page[data-shell-family="witness-binder"] .cover-designation,
 .rules-left[data-shell-family="witness-binder"] .doc-label,
 .endings-page[data-shell-family="witness-binder"] .doc-label{
   transform:rotate(-1.5deg);
 }
+.cover-page[data-shell-family="witness-binder"] .cover-designation{
+  display:inline-flex;
+  padding:2px 10px;
+  border:2px solid var(--ink);
+  border-radius:0;
+  letter-spacing:.08em;
+}
+.cover-page[data-shell-family="witness-binder"] .cover-hero{
+  text-align:left;
+  max-width:none;
+}
+.cover-page[data-shell-family="witness-binder"] .cover-tagline{
+  font-style:normal;
+  border-top:1px solid color-mix(in srgb, var(--rule) 60%, transparent 40%);
+  padding-top:6px;
+  margin-top:6px;
+}
+.cover-page[data-shell-family="witness-binder"] .cover-colophon{
+  border-top:2px solid var(--ink);
+  padding-top:8px;
+  margin-top:auto;
+}
+.rules-left[data-shell-family="witness-binder"] .rules-header{
+  text-transform:uppercase;
+  letter-spacing:.14em;
+  font-weight:700;
+}
+/* ── ship-logbook: center-anchored nautical register ── */
+.cover-page[data-shell-family="ship-logbook"]{
+  border-radius:0;
+}
+.cover-page[data-shell-family="ship-logbook"] .cover-designation{
+  text-align:center;
+  width:100%;
+  letter-spacing:.22em;
+  font-size:6pt;
+}
+.cover-page[data-shell-family="ship-logbook"] .cover-hero{
+  text-align:center;
+  align-items:center;
+}
+.cover-page[data-shell-family="ship-logbook"] .cover-title{
+  letter-spacing:.06em;
+}
+.cover-page[data-shell-family="ship-logbook"] .cover-rule{
+  width:100%;
+  max-width:none;
+  border-top-style:double;
+  border-top-width:3px;
+}
+.cover-page[data-shell-family="ship-logbook"] .cover-tagline{
+  text-transform:uppercase;
+  letter-spacing:.18em;
+  font-size:6pt;
+  font-style:normal;
+}
+.cover-page[data-shell-family="ship-logbook"] .cover-colophon{
+  text-align:center;
+  border-top:1px dashed var(--rule);
+  padding-top:6px;
+  margin-top:auto;
+}
+.rules-left[data-shell-family="ship-logbook"] .rules-header,
+.gauge-log-page[data-shell-family="ship-logbook"] .rules-header{
+  justify-content:space-between;
+  border-bottom:1px dashed var(--rule);
+}
+/* ── household-archive: intimate domestic register ── */
+.cover-page[data-shell-family="household-archive"] .cover-hero{
+  text-align:center;
+  align-items:center;
+}
+.cover-page[data-shell-family="household-archive"] .cover-title{
+  font-style:italic;
+}
+.cover-page[data-shell-family="household-archive"] .cover-designation{
+  text-align:center;
+  width:100%;
+  font-size:5.5pt;
+  letter-spacing:.2em;
+  text-transform:uppercase;
+  opacity:.6;
+}
+.cover-page[data-shell-family="household-archive"] .cover-rule{
+  width:40%;
+  margin:6px auto 0;
+}
+.cover-page[data-shell-family="household-archive"] .cover-tagline{
+  font-style:italic;
+  text-align:center;
+}
+.cover-page[data-shell-family="household-archive"] .cover-colophon{
+  text-align:center;
+  font-style:italic;
+  opacity:.7;
+  margin-top:auto;
+}
+.rules-left[data-shell-family="household-archive"] .rules-title{
+  font-style:italic;
+}
+/* ── devotional-manual: centered liturgical register ── */
 .cover-page[data-shell-family="devotional-manual"] .cover-title,
 .endings-page[data-shell-family="devotional-manual"] .endings-title{
   text-align:center;
   font-style:italic;
 }
+.cover-page[data-shell-family="devotional-manual"] .cover-hero{
+  text-align:center;
+  align-items:center;
+}
+.cover-page[data-shell-family="devotional-manual"] .cover-designation{
+  text-align:center;
+  width:100%;
+  font-size:5pt;
+  letter-spacing:.28em;
+  text-transform:uppercase;
+}
+.cover-page[data-shell-family="devotional-manual"] .cover-rule{
+  width:30%;
+  margin:4px auto 0;
+  border-top-style:dotted;
+}
+.cover-page[data-shell-family="devotional-manual"] .cover-colophon{
+  text-align:center;
+  font-style:italic;
+  margin-top:auto;
+}
 .sealed-page[data-shell-family="devotional-manual"],
 .endings-page[data-shell-family="devotional-manual"]{
   background:linear-gradient(180deg, rgba(246,240,227,.98) 0%, rgba(235,226,208,.98) 100%);
 }
+/* ── technical-manual: mono procedural register ── */
 .cover-page[data-shell-family="technical-manual"] .cover-title,
 .rules-left[data-shell-family="technical-manual"] .rules-title,
 .password-assembly-page[data-shell-family="technical-manual"] .password-assembly-title{
@@ -712,6 +836,22 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .gauge-log-page[data-shell-family="technical-manual"] .password-log-grid,
 .password-assembly-page[data-shell-family="technical-manual"] .password-assembly-grid{
   gap:6px;
+}
+/* ── field-survey (default): left-aligned field report register ── */
+.cover-page[data-shell-family="field-survey"] .cover-designation{
+  display:inline-flex;
+  padding:1px 6px;
+  border-bottom:1.5px solid color-mix(in srgb, var(--ink) 40%, transparent 60%);
+  font-size:5.5pt;
+  letter-spacing:.14em;
+}
+.cover-page[data-shell-family="field-survey"] .cover-hero{
+  text-align:left;
+}
+.cover-page[data-shell-family="field-survey"] .cover-colophon{
+  border-top:1px solid color-mix(in srgb, var(--rule) 50%, transparent 50%);
+  padding-top:6px;
+  margin-top:auto;
 }
 .cover-hero{
   display:flex;
@@ -4709,6 +4849,10 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   color:color-mix(in srgb, var(--ink) 32%, var(--paper) 68%);
 }
 
+@keyframes unlock-slide-in{
+  from{transform:translateX(-50%) translateY(100%);opacity:0;}
+  to{transform:translateX(-50%) translateY(0);opacity:1;}
+}
 .reader-unlock{
   position:fixed;
   left:50%;
@@ -4716,6 +4860,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   transform:translateX(-50%);
   width:min(calc(100vw - 96px), 5.8in);
   z-index:1200;
+  animation:unlock-slide-in .4s ease-out;
 }
 #booklet-container[data-layout-mode="spread"] + .reader-unlock,
 #booklet-container[data-layout-mode="booklet"] + .reader-unlock{

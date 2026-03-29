@@ -393,14 +393,18 @@ function loadBooklet(data, sourceLabel) {
     refs.encryptRow.style.display = 'none';
   }
   if (sourceLabel === 'Booklet From Generator') {
-    setStatus('Booklet opened from the generator. Review the pages, then switch to Print Booklet Layout when you are ready.', 'success');
+    var genMsg = 'Booklet opened from the generator. Review the pages, then switch to Print Booklet Layout when you are ready.';
+    if (hasEncryptedEnding) genMsg += ' The ending is sealed — scroll down to the unlock bar to enter your password after completing the booklet.';
+    setStatus(genMsg, 'success');
     return;
   }
   if (state.demoMode) {
     setStatus('Sample booklet loaded. Review the pages or test the ending below.', 'neutral');
     return;
   }
-  setStatus('Loaded ' + sourceLabel + '.', 'success');
+  var loadMsg = 'Loaded ' + sourceLabel + '.';
+  if (hasEncryptedEnding) loadMsg += ' The ending is sealed — use the unlock bar below the booklet to enter the password.';
+  setStatus(loadMsg, 'success');
 }
 
 function loadJsonFile(file) {

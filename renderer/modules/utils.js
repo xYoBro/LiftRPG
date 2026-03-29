@@ -376,7 +376,7 @@ export function formatExerciseTargetLoad(exercise) {
   const poundsMatch = normalized.match(/\d+\s*(?:lb|lbs)/i);
   if (poundsMatch) return poundsMatch[0].toLowerCase();
 
-  return normalized.split(/[.;,(]/)[0].trim().slice(0, 12);
+  return normalized.split(/[.;,(]/)[0].trim().slice(0, 32);
 }
 
 export function getLoadGuide(exercise) {

@@ -1,5 +1,6 @@
 import { make } from './dom.js?v=47';
 import { createBoundedPage } from './page-shell.js?v=47';
+import { sanitizeHtml } from './utils.js?v=47';
 
 function buildMetaLines(fragmentModel) {
   const lines = [];
@@ -44,9 +45,14 @@ export function renderFoundDocument(fragmentModel) {
   }
 
   const body = make('div', 'fragment-doc-body');
-  fragmentModel.bodyParagraphs.forEach((para) => {
-    body.appendChild(make('p', '', para));
-  });
+  if (fragmentModel.richHtml) {
+    // Rich HTML from guided-build {html: "..."} content — render as sanitized HTML
+    body.innerHTML = sanitizeHtml(fragmentModel.richHtml);
+  } else {
+    fragmentModel.bodyParagraphs.forEach((para) => {
+      body.appendChild(make('p', '', para));
+    });
+  }
   doc.appendChild(body);
   doc.appendChild(make('div', 'fragment-doc-sig', fragmentModel.purpose));
   block.appendChild(doc);
