@@ -894,9 +894,12 @@
       return weekNumbers.indexOf(entry.weekNumber) !== -1;
     });
     if (relevantOverflows.length > 0) {
-      parts.push('### Planned Overflow Documents (generate these exactly when overflow is true)');
+      parts.push('### Planned Overflow Documents (BINDING — do not invent new IDs)');
       parts.push('When a week has > 3 sessions, it gets overflow: true and needs an overflowDocument.');
-      parts.push('Use the planned document below instead of inventing one:');
+      parts.push('Each overflow week below has a pre-assigned overflow document. You MUST use it:');
+      parts.push('- overflowDocument.id MUST exactly match the planned entry id below');
+      parts.push('- overflowDocument.documentType MUST match the planned entry documentType');
+      parts.push('- Do NOT invent a new overflow ID or document type for any week that has a planned entry');
       parts.push(JSON.stringify(relevantOverflows));
       parts.push('');
     }
@@ -1082,8 +1085,9 @@
       }
       var plannedOF = relevantOverflows.filter(function (o) { return o.weekNumber === pw.weekNumber; })[0];
       if (plannedOF) {
-        parts.push('- Planned overflow: ' + plannedOF.id + ' (' + plannedOF.documentType +
-          ' by ' + (plannedOF.author || 'unknown') + ').');
+        parts.push('- **OVERFLOW CONTRACT (BINDING):** overflowDocument.id MUST be "' + plannedOF.id +
+          '", documentType MUST be "' + plannedOF.documentType +
+          '", author: ' + (plannedOF.author || 'unknown'));
         if (plannedOF.narrativeFunction) parts.push('  Function: ' + plannedOF.narrativeFunction);
       }
     });
@@ -2290,7 +2294,7 @@
       contextLines.push('- Component value: ' + weekPlan.componentValue + ' (fiction-native, NOT a letter)');
     }
     if (weekPlan.overflowFragmentId) {
-      contextLines.push('- Overflow document ID: ' + weekPlan.overflowFragmentId);
+      contextLines.push('- **OVERFLOW CONTRACT (BINDING):** overflowDocument.id MUST be exactly "' + weekPlan.overflowFragmentId + '" — do NOT invent a different ID');
     }
     contextLines.push('- Oracle mode: ' + (weekPlan.oracleMode || 'mixed'));
     if (weekPlan.companionTypes && weekPlan.companionTypes.length > 0) {

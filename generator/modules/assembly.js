@@ -721,7 +721,7 @@ export function normalizeOracleEntryKeys(week) {
 // Called by runJsonStage BEFORE retry decision. Applies deterministic fixes
 // that cost zero API calls. Idempotent — safe to call multiple times.
 
-export function autoRepairWeek(result) {
+export function autoRepairWeek(result, context) {
   if (!result) return result;
   normalizeCompanionComponents(result);
   normalizeOracleKey(result);
@@ -729,6 +729,50 @@ export function autoRepairWeek(result) {
   if (Array.isArray(result.sessions)) {
     result.overflow = result.sessions.length > 3;
   }
+
+  // Overflow-registry reconciliation: if this week has an overflow document
+  // and there is exactly one planned overflow entry for this week number,
+  // deterministically align the ID (and optionally documentType) to the
+  // authoritative registry entry. This prevents retry loops over a purely
+  // mechanical ID mismatch.
+  if (context && result.overflowDocument && result.overflow) {
+    var weekNum = result.weekNumber || (context.weekNumber);
+    var overflowRegistry = (context.overflowRegistry || []);
+    var plannedEntries = overflowRegistry.filter(function (entry) {
+      return entry.weekNumber === weekNum;
+    });
+    if (plannedEntries.length === 1) {
+      var planned = plannedEntries[0];
+      var currentId = result.overflowDocument.id || '';
+      if (normalizeId(currentId) !== normalizeId(planned.id)) {
+        console.warn('[autoRepairWeek] Overflow ID "' + currentId + '" → "' + planned.id +
+          '" (aligned to overflowRegistry for week ' + weekNum + ')');
+        result.overflowDocument.id = planned.id;
+        // Track the repair for diagnostics
+        if (!result._overflowRepairs) result._overflowRepairs = [];
+        result._overflowRepairs.push({
+          code: 'overflow-registry-aligned',
+          severity: 'warning',
+          phase: 'reconcile',
+          message: 'Week ' + weekNum + ' overflowDocument.id "' + currentId +
+            '" aligned to planned registry entry "' + planned.id + '"',
+          repairable: true,
+          path: 'weeks[' + weekNum + '].overflowDocument.id',
+          correction: currentId + ' → ' + planned.id
+        });
+      }
+      // Also align documentType if it's missing or is a known alias
+      if (planned.documentType) {
+        var currentDt = result.overflowDocument.documentType || '';
+        var canonicalDt = DOCUMENT_TYPE_ALIASES[currentDt] || currentDt;
+        var plannedDt = DOCUMENT_TYPE_ALIASES[planned.documentType] || planned.documentType;
+        if (!currentDt || (canonicalDt !== plannedDt)) {
+          result.overflowDocument.documentType = planned.documentType;
+        }
+      }
+    }
+  }
+
   return result;
 }
 
@@ -798,6 +842,19 @@ export function normalizeDocumentTypes(booklet, diag) {
           'Ending ' + (ei + 1) + ' documentType "' + from + '" resolved to "' + content.documentType + '"',
           { path: 'endings[' + ei + '].content.documentType', repairable: true, correction: from + ' → ' + content.documentType }));
       }
+    }
+  });
+}
+
+// ── Overflow repair collection ───────────────────────────────────────────────
+// Collects _overflowRepairs diagnostics from individual weeks into the
+// assembly-level diagnostics array, then cleans up the per-week temp field.
+
+function collectOverflowRepairs(booklet, diag) {
+  (booklet.weeks || []).forEach(function (week) {
+    if (Array.isArray(week._overflowRepairs)) {
+      week._overflowRepairs.forEach(function (repair) { diag.push(repair); });
+      delete week._overflowRepairs;
     }
   });
 }
@@ -960,6 +1017,9 @@ export function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, ending
     }
   });
 
+  // Collect overflow-registry alignment repairs from individual weeks
+  collectOverflowRepairs(booklet, diag);
+
   // Normalize overflow documents (auto-assign missing IDs, dedup collisions)
   normalizeOverflowDocuments(booklet, diag);
 
@@ -1036,6 +1096,9 @@ export function assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutp
       week.overflow = true;
     }
   });
+
+  // Collect overflow-registry alignment repairs from individual weeks
+  collectOverflowRepairs(booklet, diag);
 
   // Normalize overflow documents (auto-assign missing IDs, dedup collisions)
   normalizeOverflowDocuments(booklet, diag);
@@ -1783,6 +1846,9 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
   // -- Normalize document types (alias resolution) --
   normalizeDocumentTypes(booklet, diag);
 
+  // -- Collect overflow-registry alignment repairs from individual weeks --
+  collectOverflowRepairs(booklet, diag);
+
   // -- Normalize overflow documents (auto-assign missing IDs, dedup collisions) --
   normalizeOverflowDocuments(booklet, diag);
 
@@ -1812,6 +1878,26 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
 export function generatePatchPrompt(rawJson, errors, options) {
   options = options || {};
   var contractLines = formatIdentityContractLines(options.identityContract || null);
+
+  // Overflow-registry context: when errors include overflow ID mismatches,
+  // include the authoritative registry entries so the repair model can align
+  // IDs without guessing.
+  var overflowLines = [];
+  var overflowRegistry = options.overflowRegistry || [];
+  if (overflowRegistry.length > 0) {
+    var hasOverflowError = errors.some(function (e) {
+      return /overflowDocument\.id.*not present in overflowRegistry/i.test(e) ||
+             /overflow/i.test(e);
+    });
+    if (hasOverflowError) {
+      overflowLines.push('');
+      overflowLines.push('## Authoritative Overflow Registry');
+      overflowLines.push('These are the planned overflow documents. Each week\'s overflowDocument.id MUST exactly match the entry for its weekNumber:');
+      overflowLines.push(JSON.stringify(overflowRegistry));
+      overflowLines.push('Align any mismatched overflowDocument.id to the registry entry for that week. Preserve all content — only fix the ID and optionally documentType.');
+    }
+  }
+
   return [
     'You are a JSON repair specialist.',
     '',
@@ -1825,6 +1911,7 @@ export function generatePatchPrompt(rawJson, errors, options) {
     contractLines.length ? '' : null,
     contractLines.length ? '## Identity Contract' : null,
     contractLines.length ? contractLines.join('\n') : null,
+    overflowLines.length ? overflowLines.join('\n') : null,
     '',
     '## Errors to Fix',
     errors.map(function (e) { return '- ' + e; }).join('\n'),

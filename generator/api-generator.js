@@ -1691,7 +1691,12 @@ async function runApiPipeline(options) {
         if (result) normalizeCompanionComponents(result);
         return result;
       },
-      autoRepair: autoRepairWeek,
+      autoRepair: function (result) {
+        return autoRepairWeek(result, {
+          weekNumber: w,
+          overflowRegistry: campaignPlan.overflowRegistry || []
+        });
+      },
       validate: function (result) {
         if (!result) return 'Week generation returned empty result. Model may have returned a shell instead of a week object.';
         if (!result.title) return 'Week object missing "title" field. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
@@ -2255,7 +2260,21 @@ async function runSkeletonFleshPipeline(options) {
         }
         return result;
       },
-      autoRepair: autoRepairWeek,
+      autoRepair: function (result) {
+        // Build overflow registry context from skeleton weekPlan for S+F path
+        var sfOverflowRegistry = [];
+        if (weekPlan.overflowFragmentId) {
+          sfOverflowRegistry.push({
+            weekNumber: weekNum,
+            id: weekPlan.overflowFragmentId,
+            documentType: '' // S+F skeleton doesn't always specify type
+          });
+        }
+        return autoRepairWeek(result, {
+          weekNumber: weekNum,
+          overflowRegistry: sfOverflowRegistry
+        });
+      },
       validate: function (result) {
         if (!result || !result.title) return 'Week ' + weekNum + ': missing title';
         if (!Array.isArray(result.sessions) || result.sessions.length === 0) {
