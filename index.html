@@ -4448,6 +4448,32 @@
         return message;
       }
 
+      // Normalize deep validator results into a flat string array.
+      // Deep validators return different shapes:
+      //   - string (e.g. validateLayerBibleStage)
+      //   - { valid, errors, warnings } (e.g. validateShellSchema, validateWeekSchema)
+      //   - array of strings (e.g. validateWeekChunkContinuity)
+      //   - null/undefined (valid)
+      // This helper always returns { errors: string[], warnings: string[] }.
+      function unwrapValidatorResult(result) {
+        if (!result) return { errors: [], warnings: [] };
+        if (typeof result === 'string') {
+          return result ? { errors: [result], warnings: [] } : { errors: [], warnings: [] };
+        }
+        if (Array.isArray(result)) {
+          return { errors: result.filter(Boolean), warnings: [] };
+        }
+        if (typeof result === 'object') {
+          // { valid, errors, warnings } shape
+          var errors = Array.isArray(result.errors) ? result.errors.filter(Boolean) : [];
+          var warnings = Array.isArray(result.warnings) ? result.warnings.filter(Boolean) : [];
+          // If valid is explicitly true and no errors, treat as clean
+          if (result.valid === true && errors.length === 0) return { errors: [], warnings: warnings };
+          return { errors: errors, warnings: warnings };
+        }
+        return { errors: [String(result)], warnings: [] };
+      }
+
       function setActionBusy(button, busyText, callback) {
         var original = button.textContent;
         button.disabled = true;
@@ -4918,10 +4944,13 @@
             if (api && typeof api.validateWeekSchema === 'function') {
               (chunk.weeks || []).forEach(function (week) {
                 var isBoss = !!week.isBossWeek;
-                var weekErrors = api.validateWeekSchema(week, isBoss, {});
-                weekErrors.forEach(function (e) {
+                var weekResult = unwrapValidatorResult(api.validateWeekSchema(week, isBoss, {}));
+                weekResult.errors.forEach(function (e) {
                   deepErrors.push('Week ' + (week.weekNumber || '?') + ': ' + e);
                 });
+                if (weekResult.warnings.length > 0) {
+                  console.warn('[guided-build] Week ' + (week.weekNumber || '?') + ' validation warnings:', weekResult.warnings);
+                }
               });
             }
 
@@ -5561,20 +5590,20 @@
         // Deep validation via API validator when available
         var deepApi = manualApi();
         if (deepApi && typeof deepApi.validateLayerBibleStage === 'function') {
-          var deepError = deepApi.validateLayerBibleStage(layerBible);
-          if (deepError) {
+          var lbResult = unwrapValidatorResult(deepApi.validateLayerBibleStage(layerBible));
+          if (lbResult.errors.length > 0) {
             if (deepApi.classifyValidationErrors) {
-              var classified = deepApi.classifyValidationErrors([deepError]);
+              var classified = deepApi.classifyValidationErrors(lbResult.errors);
               if (classified.blocking.length > 0) {
-                setStageError(1, deepError);
-                renderRepairPrompt(wizRepair[1], 'foundation', 'Return only the foundation JSON.', wizResults[1].value, [deepError]);
+                setStageError(1, classified.blocking[0]);
+                renderRepairPrompt(wizRepair[1], 'foundation', 'Return only the foundation JSON.', wizResults[1].value, classified.blocking);
                 return;
               }
               if (classified.repairable.length > 0 || classified.degraded.length > 0) {
-                console.warn('[guided-build] Layer bible accepted with advisory:', deepError);
+                console.warn('[guided-build] Layer bible accepted with advisory:', classified.repairable.concat(classified.degraded));
               }
             } else {
-              console.warn('[guided-build] Layer bible deep validation advisory:', deepError);
+              console.warn('[guided-build] Layer bible deep validation advisory:', lbResult.errors);
             }
           }
         }
@@ -5599,20 +5628,20 @@
         // Deep validation via API validator when available
         var deepApi = manualApi();
         if (deepApi && typeof deepApi.validateCampaignPlanStage === 'function') {
-          var deepError = deepApi.validateCampaignPlanStage(campaignPlan, wizData.layerBible);
-          if (deepError) {
+          var cpResult = unwrapValidatorResult(deepApi.validateCampaignPlanStage(campaignPlan, wizData.layerBible));
+          if (cpResult.errors.length > 0) {
             if (deepApi.classifyValidationErrors) {
-              var classified = deepApi.classifyValidationErrors([deepError]);
+              var classified = deepApi.classifyValidationErrors(cpResult.errors);
               if (classified.blocking.length > 0) {
-                setStageError(2, deepError);
-                renderRepairPrompt(wizRepair[2], 'campaign plan', 'Return only campaign plan JSON.', wizResults[2].value, [deepError]);
+                setStageError(2, classified.blocking[0]);
+                renderRepairPrompt(wizRepair[2], 'campaign plan', 'Return only campaign plan JSON.', wizResults[2].value, classified.blocking);
                 return;
               }
               if (classified.repairable.length > 0 || classified.degraded.length > 0) {
-                console.warn('[guided-build] Campaign plan accepted with advisory:', deepError);
+                console.warn('[guided-build] Campaign plan accepted with advisory:', classified.repairable.concat(classified.degraded));
               }
             } else {
-              console.warn('[guided-build] Campaign plan deep validation advisory:', deepError);
+              console.warn('[guided-build] Campaign plan deep validation advisory:', cpResult.errors);
             }
           }
         }
@@ -5638,20 +5667,25 @@
         // Deep validation via API validator when available
         var deepApi = manualApi();
         if (deepApi && typeof deepApi.validateShellSchema === 'function') {
-          var deepError = deepApi.validateShellSchema(shell);
-          if (deepError) {
+          var shellResult = unwrapValidatorResult(deepApi.validateShellSchema(shell));
+          if (shellResult.warnings.length > 0) {
+            console.warn('[guided-build] Shell validation warnings (advisory):', shellResult.warnings);
+          }
+          if (shellResult.errors.length > 0) {
             if (deepApi.classifyValidationErrors) {
-              var classified = deepApi.classifyValidationErrors([deepError]);
+              var classified = deepApi.classifyValidationErrors(shellResult.errors);
               if (classified.blocking.length > 0) {
-                setStageError(3, deepError);
-                renderRepairPrompt(wizRepair[3], 'booklet identity', 'Return only the booklet identity JSON.', wizResults[3].value, [deepError]);
+                setStageError(3, classified.blocking[0]);
+                renderRepairPrompt(wizRepair[3], 'booklet identity', 'Return only the booklet identity JSON.', wizResults[3].value, classified.blocking);
                 return;
               }
               if (classified.repairable.length > 0 || classified.degraded.length > 0) {
-                console.warn('[guided-build] Shell accepted with advisory:', deepError);
+                console.warn('[guided-build] Shell accepted with advisory:', classified.repairable.concat(classified.degraded));
               }
             } else {
-              console.warn('[guided-build] Shell deep validation advisory:', deepError);
+              setStageError(3, shellResult.errors[0]);
+              renderRepairPrompt(wizRepair[3], 'booklet identity', 'Return only the booklet identity JSON.', wizResults[3].value, shellResult.errors);
+              return;
             }
           }
         }
