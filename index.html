@@ -3813,7 +3813,7 @@
               ? manualApi().extractWeekSummaries(wizData.weekChunkOutputs || [])
               : [];
             wizState.fragmentBatches = manualApi() && typeof manualApi().buildFragmentBatches === 'function'
-              ? manualApi().buildFragmentBatches((wizData.campaignPlan || {}).fragmentRegistry || [], wizData.weekSummaries)
+              ? manualApi().buildFragmentBatches((wizData.campaignPlan || {}).fragmentRegistry || [], wizData.weekSummaries, { singleBatch: true })
               : [];
           }
           renderFragmentBatchStage();
@@ -5066,7 +5066,7 @@
         wizState.fragmentBatchOutputs = [];
         wizState.fragmentBatchIndex = 0;
         wizState.fragmentBatches = manualApi() && typeof manualApi().buildFragmentBatches === 'function'
-          ? manualApi().buildFragmentBatches(wizData.campaignPlan.fragmentRegistry || [], wizData.weekSummaries)
+          ? manualApi().buildFragmentBatches(wizData.campaignPlan.fragmentRegistry || [], wizData.weekSummaries, { singleBatch: true })
           : [];
 
         if (!wizState.fragmentBatches.length) {

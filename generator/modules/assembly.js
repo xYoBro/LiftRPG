@@ -1470,8 +1470,9 @@ export function enforceBookletDerivedFields(booklet, diag) {
  *   registry: object[]            — registry entries for this batch
  *   weekSummaries: object[]       — week summaries scoped to this batch
  */
-export function buildFragmentBatches(fragmentRegistry, weekSummaries) {
+export function buildFragmentBatches(fragmentRegistry, weekSummaries, options) {
   if (!fragmentRegistry || fragmentRegistry.length === 0) return [];
+  options = options || {};
 
   // Determine week numbers from summaries; fall back to weekRefs in registry
   var allWeekNums = (weekSummaries || []).map(function (ws) { return ws.weekNumber; });
@@ -1484,6 +1485,16 @@ export function buildFragmentBatches(fragmentRegistry, weekSummaries) {
     allWeekNums = Object.keys(weekSet).map(Number).sort(function (a, b) { return a - b; });
   }
   if (allWeekNums.length === 0) allWeekNums = [1]; // absolute fallback — at least one batch
+
+  // Single-batch mode: put all fragments in one batch. Used by guided build
+  // where operator friction matters more than token-limit splitting.
+  if (options.singleBatch) {
+    return [{
+      weekNumbers: allWeekNums,
+      registry: fragmentRegistry.slice(),
+      weekSummaries: (weekSummaries || []).slice()
+    }];
+  }
 
   // Build pairs: [1,2], [3,4], [5,6] for 6-week; [1,2], [3] for 3-week, etc.
   var pairs = [];
