@@ -4633,6 +4633,22 @@
         ['storyLayer', 'gameLayer', 'governingLayer'].forEach(function (key) {
           if (!data[key]) errors.push('Missing required key: ' + key);
         });
+
+        // Normalize designPrinciples shape before validation:
+        // string -> [string], object -> array of values, missing -> empty array
+        if (data.designPrinciples !== undefined && data.designPrinciples !== null) {
+          if (typeof data.designPrinciples === 'string') {
+            data.designPrinciples = [data.designPrinciples];
+            console.warn('[guided-build] designPrinciples normalized from string to array');
+          } else if (!Array.isArray(data.designPrinciples) && typeof data.designPrinciples === 'object') {
+            data.designPrinciples = Object.values(data.designPrinciples).map(function (v) { return String(v); });
+            console.warn('[guided-build] designPrinciples normalized from object to array');
+          }
+        } else {
+          data.designPrinciples = [];
+          console.warn('[guided-build] designPrinciples was missing — initialized to empty array');
+        }
+
         if (!Array.isArray(data.designPrinciples)) errors.push('designPrinciples must be an array.');
         if (!data.designLedger) errors.push('Missing required key: designLedger');
         return errors;

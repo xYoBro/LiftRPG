@@ -1292,6 +1292,10 @@
       recordsAndForms: [],
       documentVoiceRules: []
     },
+    designPrinciples: [
+      "short design principle string — one per entry",
+      "another principle (array of strings, NOT a single string or object)"
+    ],
     designLedger: {
       mysteryQuestions: [
         { question: '', answerableFrom: '', revealTiming: '' }

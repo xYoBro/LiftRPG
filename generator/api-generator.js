@@ -2620,6 +2620,261 @@ async function generate(settings, workout, brief) {
 }
 
 
+// ══════════════════════════════════════════════════════════════════════════════
+// Guided-build audit helper
+// ══════════════════════════════════════════════════════════════════════════════
+// Runs all relevant validators/normalizers across guided-build stage outputs
+// and returns a structured operator-facing report. Designed for the manual
+// wizard workflow where retries are expensive.
+
+function auditGuidedBuild(data) {
+  data = data || {};
+  var stages = [];
+  var allIssues = [];
+
+  // Helper: run a validator and produce a stage report
+  function auditStage(stageName, fn) {
+    var entry = { stage: stageName, status: 'ok', blocking: [], repairable: [], degraded: [], warnings: [] };
+    try {
+      fn(entry);
+    } catch (err) {
+      entry.blocking.push('Audit error: ' + err.message);
+    }
+    if (entry.blocking.length > 0) entry.status = 'blocking';
+    else if (entry.repairable.length > 0) entry.status = 'repairable';
+    else if (entry.degraded.length > 0) entry.status = 'degraded';
+    else if (entry.warnings.length > 0) entry.status = 'ok'; // warnings don't change status
+    stages.push(entry);
+
+    // Collect all issues for recurrence analysis
+    entry.blocking.forEach(function (m) { allIssues.push({ msg: m, severity: 'blocking', stage: stageName }); });
+    entry.repairable.forEach(function (m) { allIssues.push({ msg: m, severity: 'repairable', stage: stageName }); });
+    entry.degraded.forEach(function (m) { allIssues.push({ msg: m, severity: 'degraded', stage: stageName }); });
+    return entry;
+  }
+
+  // Helper: classify error strings using existing classifier
+  function classifyInto(entry, errors) {
+    if (!errors || errors.length === 0) return;
+    var classified = classifyValidationErrors(errors);
+    classified.blocking.forEach(function (e) { entry.blocking.push(e); });
+    classified.repairable.forEach(function (e) { entry.repairable.push(e); });
+    classified.degraded.forEach(function (e) { entry.degraded.push(e); });
+  }
+
+  // ── Stage 1: Layer Bible / Foundation ──
+  if (data.layerBible) {
+    auditStage('layer-bible', function (entry) {
+      // Normalize designPrinciples shape before validation
+      var lb = data.layerBible;
+      if (lb.designPrinciples !== undefined && lb.designPrinciples !== null) {
+        if (typeof lb.designPrinciples === 'string') {
+          lb.designPrinciples = [lb.designPrinciples];
+          entry.repairable.push('designPrinciples was a string — normalized to array');
+        } else if (!Array.isArray(lb.designPrinciples) && typeof lb.designPrinciples === 'object') {
+          lb.designPrinciples = Object.values(lb.designPrinciples).map(function (v) { return String(v); });
+          entry.repairable.push('designPrinciples was an object — normalized to array');
+        }
+      } else {
+        lb.designPrinciples = [];
+        entry.warnings.push('designPrinciples was missing — initialized to empty array');
+      }
+
+      var result = validateLayerBibleStage(lb);
+      if (result) {
+        classifyInto(entry, result.split('; '));
+      }
+    });
+  }
+
+  // ── Stage 2: Campaign Plan ──
+  if (data.campaignPlan) {
+    auditStage('campaign-plan', function (entry) {
+      var result = validateCampaignPlanStage(data.campaignPlan);
+      if (result) {
+        classifyInto(entry, result.split('; '));
+      }
+      // Additional guided-build-specific checks
+      var cp = data.campaignPlan;
+      if (!Array.isArray(cp.overflowRegistry) || cp.overflowRegistry.length === 0) {
+        entry.warnings.push('No overflow registry entries — overflow weeks will lack planned docs');
+      }
+      if (Array.isArray(cp.weeks) && Array.isArray(cp.overflowRegistry)) {
+        var overflowWeeks = cp.weeks.filter(function (w) { return w.sessionCount > 3; });
+        var registeredWeeks = {};
+        cp.overflowRegistry.forEach(function (o) { registeredWeeks[o.weekNumber] = true; });
+        overflowWeeks.forEach(function (w) {
+          if (!registeredWeeks[w.weekNumber]) {
+            entry.warnings.push('Week ' + w.weekNumber + ' has > 3 sessions but no overflow registry entry');
+          }
+        });
+      }
+    });
+  }
+
+  // ── Stage 3: Skeleton (S+F path) ──
+  if (data.skeleton) {
+    auditStage('skeleton', function (entry) {
+      var weekCount = data.weekCount || (data.skeleton.weekPlan || []).length;
+      var result = validateSkeletonStage(data.skeleton, weekCount);
+      if (result) {
+        classifyInto(entry, [result]);
+      }
+    });
+  }
+
+  // ── Stage 4: Week chunks ──
+  if (data.weekChunks && data.weekChunks.length > 0) {
+    data.weekChunks.forEach(function (chunk, ci) {
+      var chunkLabel = 'week-chunk-' + (ci + 1);
+      auditStage(chunkLabel, function (entry) {
+        var context = {
+          shell: data.shell || {},
+          campaignPlan: data.campaignPlan || {},
+          priorWeekChunkOutputs: data.weekChunks.slice(0, ci)
+        };
+        var errors = validateWeekChunkContinuity(chunk, context);
+        classifyInto(entry, errors);
+
+        // Per-week schema validation
+        (chunk.weeks || []).forEach(function (week) {
+          var isBoss = !!week.isBossWeek;
+          var schemaResult = validateWeekSchema(week, isBoss);
+          if (schemaResult && !schemaResult.valid) {
+            classifyInto(entry, schemaResult.errors || []);
+          }
+          if (schemaResult && schemaResult.warnings) {
+            schemaResult.warnings.forEach(function (w) { entry.warnings.push(w); });
+          }
+        });
+      });
+    });
+  }
+
+  // ── Stage 5: Fragment batches ──
+  if (data.fragmentBatches && data.fragmentBatches.length > 0) {
+    data.fragmentBatches.forEach(function (batch, bi) {
+      auditStage('fragment-batch-' + (bi + 1), function (entry) {
+        var context = {
+          shell: data.shell || {},
+          campaignPlan: data.campaignPlan || {},
+          weekChunkOutputs: data.weekChunks || []
+        };
+        var errors = validateFragmentBatchContinuity(batch, context);
+        classifyInto(entry, errors);
+      });
+    });
+  }
+
+  // ── Stage 6: Endings ──
+  if (data.endings) {
+    auditStage('endings', function (entry) {
+      var context = {
+        shell: data.shell || {},
+        campaignPlan: data.campaignPlan || {},
+        weekChunkOutputs: data.weekChunks || []
+      };
+      var errors = validateEndingsContinuity(data.endings, context);
+      classifyInto(entry, errors);
+    });
+  }
+
+  // ── Stage 7: Assembled booklet ──
+  if (data.assembledBooklet) {
+    auditStage('assembled-booklet', function (entry) {
+      var vResult = validateAssembledBooklet(data.assembledBooklet);
+      classifyInto(entry, vResult.errors || []);
+      if (vResult.warnings) {
+        vResult.warnings.forEach(function (w) { entry.warnings.push(w); });
+      }
+    });
+
+    // Quality report + gate
+    auditStage('quality-gate', function (entry) {
+      var report = generateQualityReport(data.assembledBooklet);
+      var gate = buildQualityGate(report);
+      if (!gate.passed) {
+        gate.blockers.forEach(function (b) { entry.degraded.push(b.message); });
+      }
+      // Artifact intent drift
+      var drift = data.assembledBooklet._artifactIntentDrift || compareArtifactIntentDrift(data.assembledBooklet);
+      if (drift.diagnostics && drift.diagnostics.length > 0) {
+        drift.diagnostics.forEach(function (d) {
+          if (d.severity === 'error') entry.blocking.push('[drift] ' + d.message);
+          else entry.degraded.push('[drift] ' + d.message);
+        });
+      }
+    });
+  }
+
+  // ── Recurrence analysis ──
+  // Group issues by pattern code to surface systemic problems
+  var patternMap = {};
+  var PATTERN_RULES = [
+    { pattern: /designPrinciples/i, code: 'design-principles-shape' },
+    { pattern: /overflowDocument\.id.*not present in overflowRegistry/i, code: 'overflow-registry-mismatch' },
+    { pattern: /overflowRegistry/i, code: 'overflow-registry-issue' },
+    { pattern: /fragmentRef.*not present/i, code: 'fragment-ref-missing' },
+    { pattern: /missing designSpec/i, code: 'missing-designspec' },
+    { pattern: /missing epigraph/i, code: 'missing-epigraph' },
+    { pattern: /componentInputs/i, code: 'component-inputs-mismatch' },
+    { pattern: /weeklyComponent\.type.*does not match/i, code: 'weekly-component-type-mismatch' },
+    { pattern: /visualArchetype/i, code: 'visual-archetype-issue' },
+    { pattern: /interlude.*payloadType/i, code: 'interlude-payload-type' },
+    { pattern: /companionComponent/i, code: 'companion-component-shape' },
+    { pattern: /forbidden.*document/i, code: 'forbidden-document-drift' },
+    { pattern: /dominant.*ecology/i, code: 'dominant-ecology-drift' },
+    { pattern: /mechanic.*grammar.*mismatch/i, code: 'mechanic-grammar-drift' }
+  ];
+
+  allIssues.forEach(function (issue) {
+    var matched = false;
+    for (var pi = 0; pi < PATTERN_RULES.length; pi++) {
+      if (PATTERN_RULES[pi].pattern.test(issue.msg)) {
+        var code = PATTERN_RULES[pi].code;
+        if (!patternMap[code]) patternMap[code] = { code: code, count: 0, severity: issue.severity, stages: [] };
+        patternMap[code].count++;
+        if (patternMap[code].stages.indexOf(issue.stage) === -1) patternMap[code].stages.push(issue.stage);
+        // Escalate severity if any instance is blocking
+        if (issue.severity === 'blocking') patternMap[code].severity = 'blocking';
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      var genericCode = 'unclassified-' + issue.severity;
+      if (!patternMap[genericCode]) patternMap[genericCode] = { code: genericCode, count: 0, severity: issue.severity, stages: [] };
+      patternMap[genericCode].count++;
+      if (patternMap[genericCode].stages.indexOf(issue.stage) === -1) patternMap[genericCode].stages.push(issue.stage);
+    }
+  });
+
+  var recurrentPatterns = Object.keys(patternMap).map(function (k) { return patternMap[k]; })
+    .sort(function (a, b) {
+      var sevOrder = { blocking: 0, repairable: 1, degraded: 2 };
+      return (sevOrder[a.severity] || 3) - (sevOrder[b.severity] || 3) || b.count - a.count;
+    });
+
+  // ── Readiness flags ──
+  var hasBlocking = stages.some(function (s) { return s.status === 'blocking'; });
+  var preAssemblyStages = stages.filter(function (s) {
+    return s.stage !== 'assembled-booklet' && s.stage !== 'quality-gate';
+  });
+  var preAssemblyBlocking = preAssemblyStages.some(function (s) { return s.status === 'blocking'; });
+  var assemblyStage = stages.filter(function (s) { return s.stage === 'assembled-booklet'; })[0];
+  var gateStage = stages.filter(function (s) { return s.stage === 'quality-gate'; })[0];
+
+  return {
+    stages: stages,
+    recurrentPatterns: recurrentPatterns,
+    readyForAssembly: !preAssemblyBlocking,
+    readyForRenderer: !hasBlocking && assemblyStage && assemblyStage.status !== 'blocking',
+    qualityGatePassed: gateStage ? gateStage.status !== 'blocking' && gateStage.status !== 'degraded' : null,
+    summary: stages.map(function (s) { return s.stage + ': ' + s.status; }).join(', ')
+  };
+}
+
+
 // ── Public API surface ──────────────────────────────────────────────────────
 
 window.LiftRPGAPI = {
@@ -2652,7 +2907,8 @@ window.LiftRPGAPI = {
     assembleSkeletonFleshBooklet: assembleSkeletonFleshBooklet,
     validateSkeletonStage: validateSkeletonStage,
     buildSkeletonFragmentBatches: buildSkeletonFragmentBatches,
-    classifyValidationErrors: classifyValidationErrors
+    classifyValidationErrors: classifyValidationErrors,
+    auditGuidedBuild: auditGuidedBuild
   },
   _extractJson: extractJson,
   _validateSchema: validateBookletSchema,
