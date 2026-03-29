@@ -47,12 +47,35 @@ export function collectIdentityVariationFindings(booklet, nonBossWeeks, fragment
     mapTypes[mapType] = true;
   });
   if (nonBossWeeks.length >= 4 && Object.keys(mapTypes).length < 2) {
-    report.weakSpots.push({
-      area: 'board-monotony',
-      detail: 'All non-boss weeks use the same mapState.mapType "' + Object.keys(mapTypes)[0] + '"',
-      severity: 'high'
-    });
-    findings++;
+    // Check whether the declared planning contract expects a stable map grammar.
+    // If so, repeated map type is correct, not a failure.
+    var intent = meta.artifactIntent || {};
+    var declaredGrammar = String(intent.mechanicGrammarFamily || '').toLowerCase();
+    var declaredBoard = String(artifactIdentity.boardStateMode || '').toLowerCase();
+    var soleMapType = Object.keys(mapTypes)[0];
+
+    // Grammars/board-state modes that inherently use a single map type
+    var STABLE_MAP_GRAMMARS = {
+      'survey-grid': 'grid',
+      'ledger-board': 'grid',
+      'timeline-reconstruction': 'linear-track',
+      'route-tracker': 'linear-track',
+      'node-graph': 'point-to-point'
+    };
+
+    var expectedByGrammar = STABLE_MAP_GRAMMARS[declaredGrammar];
+    var expectedByBoard = STABLE_MAP_GRAMMARS[declaredBoard];
+    var suppressed = (expectedByGrammar && expectedByGrammar === soleMapType) ||
+                     (expectedByBoard && expectedByBoard === soleMapType);
+
+    if (!suppressed) {
+      report.weakSpots.push({
+        area: 'board-monotony',
+        detail: 'All non-boss weeks use the same mapState.mapType "' + soleMapType + '"',
+        severity: 'high'
+      });
+      findings++;
+    }
   }
 
   var companionSignatures = {};
