@@ -4493,6 +4493,9 @@
       }
 
       // ── Shared guided-build stage ingestion ──────────────────────────────
+      // This is the authoritative guided-build acceptance path. If a stage is
+      // accepted in the manual wizard, it should come through here unless the
+      // stage truly requires custom multi-item iteration (weeks/fragments).
       // Unified helper for all wizard stage acceptance. Provides API-grade
       // discipline: parse → normalize → deep validate → classify → decide.
       //

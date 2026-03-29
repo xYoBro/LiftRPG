@@ -1,3 +1,5 @@
+import { describeExerciseLoad } from './utils.js?v=47';
+
 const NOTES_LINE_HEIGHT = 22;
 const CARD_HEADER_HEIGHT = 38;
 const CARD_META_HEIGHT = 11;
@@ -21,6 +23,8 @@ const CHOICE_CHROME_MIN = 12;
 const CHOICE_CHROME_MAX = 18;
 const NOTE_CHROME_MIN = 6;
 const NOTE_CHROME_MAX = 10;
+const EXERCISE_INSTRUCTION_LINE_HEIGHT = 8.4;
+const EXERCISE_INSTRUCTION_CHARS_PER_LINE = 18;
 
 function lerp(min, max, density) {
   return min + (max - min) * (1 - density);
@@ -70,6 +74,12 @@ export function estimateSessionCardHeight(session, density) {
   const normalizedDensity = Number.isFinite(density) ? density : 0.6;
   const exercises = Array.isArray((session || {}).exercises) ? session.exercises : [];
   const exerciseCount = Math.max(exercises.length, MIN_EXERCISES);
+  const instructionHeight = exercises.reduce((sum, exercise) => {
+    const instruction = describeExerciseLoad(exercise).instructionHint;
+    if (!instruction) return sum;
+    const lines = Math.max(1, Math.min(2, countWrappedLines(instruction, EXERCISE_INSTRUCTION_CHARS_PER_LINE)));
+    return sum + lines * EXERCISE_INSTRUCTION_LINE_HEIGHT + 3;
+  }, 0);
   const notesLines = Math.max(3, Math.round(8 - normalizedDensity * 6));
   const notesHeight = notesLines * NOTES_LINE_HEIGHT;
 
@@ -78,6 +88,7 @@ export function estimateSessionCardHeight(session, density) {
     + CARD_PADDING
     + EXERCISE_TABLE_CHROME
     + exerciseCount * EXERCISE_ROW_HEIGHT
+    + instructionHeight
     + estimatePromptHeight(session, normalizedDensity)
     + estimateBinaryChoiceHeight(session, normalizedDensity)
     + notesHeight

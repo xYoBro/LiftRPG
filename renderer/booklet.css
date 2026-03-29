@@ -1574,7 +1574,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .exercise-table{
   --exercise-row-gap-block:5px;
   --exercise-row-padding-y:2px;
-  --exercise-name-gap:2ch;
+  --exercise-name-gap:1.2ch;
   --exercise-track-gap:4px;
   --exercise-load-width:44px;
   --rep-box-size:calc(16px * 1.07);
@@ -1596,8 +1596,12 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 }
 .exercise-name-cell{
   min-width:0;
-  align-self:end;
+  align-self:stretch;
   padding-right:var(--exercise-name-gap);
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-end;
+  gap:2px;
 }
 .exercise-name {
   font-family: var(--serif);
@@ -1605,6 +1609,15 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   font-size: 8pt;
   color: var(--ink);
   white-space: nowrap;
+}
+.exercise-instruction{
+  font-family:var(--mono);
+  font-size:5.15pt;
+  line-height:1.24;
+  color:rgba(24,23,20,.54);
+  white-space:normal;
+  overflow-wrap:anywhere;
+  max-width:100%;
 }
 .exercise-weight-cell {
   width:var(--exercise-load-width);
@@ -1631,34 +1644,26 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   min-height:0;
 }
 .exercise-load-line{
-  position:relative;
   width:100%;
   height:14px;
   border-bottom:1px solid var(--theme-field-rule,rgba(24,23,20,.42));
   display:flex;
   align-items:flex-end;
   justify-content:flex-end;
-  padding-right:13px;
+  gap:3px;
+  padding-right:0;
 }
-.exercise-load-hint{
-  position:absolute;
-  left:0;
-  right:14px;
-  bottom:1px;
-  overflow:hidden;
-  text-overflow:ellipsis;
+.exercise-load-value{
+  font-size:6.15pt;
+  color:rgba(24,23,20,.68);
+  letter-spacing:.02em;
   white-space:nowrap;
-  font-size:5.1pt;
-  color:rgba(24,23,20,.2);
-  letter-spacing:.04em;
 }
 .exercise-load-unit{
-  position:absolute;
-  right:0;
-  bottom:1px;
   font-size:6.1pt;
   color:rgba(24,23,20,.66);
   text-transform:lowercase;
+  white-space:nowrap;
 }
 .exercise-dots-cell{
   min-width:18px;
@@ -1756,6 +1761,9 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .session-card[data-density-variant="compact"] .exercise-name{
   font-size:7.6pt;
 }
+.session-card[data-density-variant="compact"] .exercise-instruction{
+  font-size:4.95pt;
+}
 .session-card[data-density-variant="compact"] .rep-box-target{
   font-size:5.1pt;
 }
@@ -1793,6 +1801,10 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 }
 .session-card[data-density-variant="dense"] .exercise-name{
   font-size:7.2pt;
+}
+.session-card[data-density-variant="dense"] .exercise-instruction{
+  font-size:4.8pt;
+  line-height:1.18;
 }
 .session-card[data-density-variant="dense"] .exercise-load-entry{
   font-size:6.6pt;
@@ -1837,6 +1849,10 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 }
 .session-card[data-density-variant="tight"] .exercise-name{
   font-size:6.9pt;
+}
+.session-card[data-density-variant="tight"] .exercise-instruction{
+  font-size:4.65pt;
+  line-height:1.16;
 }
 .session-card[data-density-variant="tight"] .exercise-load-entry{
   font-size:6.2pt;

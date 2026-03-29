@@ -1101,6 +1101,8 @@ function extractErrorList(vr) {
 
 // ── Core stage runner ─────────────────────────────────────────────────────────
 
+// Authoritative API-stage discipline helper. Guided build should mirror this
+// behavior at paste-time rather than inventing parallel acceptance rules.
 async function runJsonStage(settings, config) {
   var attemptCount = config.maxAttempts || 2;
   var lastErr = null;

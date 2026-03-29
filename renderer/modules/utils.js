@@ -319,6 +319,42 @@ export function getDemoPassword(meta) {
   return '';
 }
 
+function derivePasswordFromBossRevealText(boss) {
+  const revealText = String((boss && boss.passwordRevealInstruction) || '').trim();
+  if (!revealText) return '';
+
+  const directMatch = revealText.match(/\bpassword\s+is\s+([A-Z0-9-]{3,})\b/i);
+  if (directMatch) {
+    return normalisePassword(directMatch[1]);
+  }
+
+  const sequenceMatch = revealText.match(/order:\s*([A-Z](?:\s*-\s*[A-Z]){2,})/i);
+  if (sequenceMatch) {
+    return normalisePassword(sequenceMatch[1].replace(/\s*-\s*/g, ''));
+  }
+
+  return '';
+}
+
+function derivePasswordFromReferenceTable(boss) {
+  const inputs = Array.isArray(boss && boss.componentInputs) ? boss.componentInputs : [];
+  const table = boss && boss.decodingKey && Array.isArray(boss.decodingKey.referenceTable)
+    ? boss.decodingKey.referenceTable
+    : [];
+  if (!inputs.length || !table.length) return '';
+
+  const letters = [];
+  for (let index = 0; index < inputs.length; index += 1) {
+    const input = String(inputs[index]).trim();
+    const match = table.find((entry) => String(entry && entry.value).trim() === input);
+    const letter = match && typeof match.letter === 'string' ? match.letter.trim() : '';
+    if (!letter) return '';
+    letters.push(letter);
+  }
+
+  return normalisePassword(letters.join(''));
+}
+
 export function deriveBookletPassword(data) {
   const meta = data && data.meta ? data.meta : {};
   if (typeof meta.demoPassword === 'string' && meta.demoPassword.trim()) {
@@ -331,7 +367,15 @@ export function deriveBookletPassword(data) {
   const weeks = Array.isArray(data && data.weeks) ? data.weeks : [];
   const bossWeek = weeks.find((week) => week && week.isBossWeek && week.bossEncounter);
   const boss = bossWeek && bossWeek.bossEncounter ? bossWeek.bossEncounter : null;
-  if (!boss || !boss.decodingKey || !isStandardAlphaTable(boss.decodingKey.referenceTable)) return '';
+  if (!boss) return '';
+
+  const explicit = derivePasswordFromBossRevealText(boss);
+  if (explicit) return explicit;
+
+  const customTable = derivePasswordFromReferenceTable(boss);
+  if (customTable) return customTable;
+
+  if (!boss.decodingKey || !isStandardAlphaTable(boss.decodingKey.referenceTable)) return '';
 
   return normalisePassword(decodeA1Z26(boss.componentInputs || []));
 }
@@ -358,6 +402,85 @@ export function getExerciseTargetLoad(exercise) {
     return exercise.weightField.trim();
   }
   return '';
+}
+
+function normalizeExerciseCue(raw) {
+  return String(raw || '').replace(/\s+/g, ' ').trim();
+}
+
+function compactExerciseCue(raw) {
+  const normalized = normalizeExerciseCue(raw);
+  if (!normalized) return '';
+
+  return normalized
+    .replace(/^warm\s+up\s+with\s+bodyweight$/i, 'Warm-up: BW')
+    .replace(/^assisted\s+if\s+needed$/i, 'Assisted as needed')
+    .replace(/^weighted\s+if\s+possible$/i, 'Add weight if possible')
+    .replace(/^add\s+weight\s+if\s+possible$/i, 'Add weight if possible')
+    .replace(/^add\s+(\d+)\s+reps?\s+from\s+week\s+(\d+)$/i, '+$1 reps from W$2')
+    .replace(/^add\s+(\d+)\s+rep\s+from\s+w(\d+)$/i, '+$1 rep from W$2')
+    .replace(/^(\d+)\s+min(?:ute)?s?\s+steady\s+state$/i, '$1 min steady')
+    .replace(/^(\d+)\s+min(?:ute)?s?\s+final\s+session$/i, '$1 min final')
+    .replace(/^final\s+session$/i, 'Final session')
+    .replace(/^final\s+pr\s+attempt$/i, 'Final PR')
+    .replace(/^max\s+effort$/i, 'Max effort');
+}
+
+function parseLoadValue(rawGuide) {
+  const guide = normalizeExerciseCue(rawGuide);
+  if (!guide || guide.toLowerCase() === 'done') {
+    return { value: '', unit: '', isWeightLike: false };
+  }
+
+  var match = guide.match(/^(\d+(?:\.\d+)?)\s*(lb|lbs)$/i);
+  if (match) {
+    return { value: match[1], unit: 'lbs', isWeightLike: true };
+  }
+
+  match = guide.match(/^(\d+(?:\.\d+)?)\s*(kg|kgs)$/i);
+  if (match) {
+    return { value: match[1], unit: 'kg', isWeightLike: true };
+  }
+
+  match = guide.match(/^(\d+(?:\.\d+)?)\s*%\s*(?:of\s*)?(1rm)$/i);
+  if (match) {
+    return { value: match[1] + '%', unit: '1RM', isWeightLike: true };
+  }
+
+  match = guide.match(/^(\d+(?:\.\d+)?)\s*%$/i);
+  if (match) {
+    return { value: match[1] + '%', unit: '', isWeightLike: true };
+  }
+
+  if (/^body\s*weight$/i.test(guide)) {
+    return { value: 'BW', unit: '', isWeightLike: true };
+  }
+
+  return { value: '', unit: '', isWeightLike: false };
+}
+
+export function describeExerciseLoad(exercise) {
+  const rawGuide = typeof exercise.weightField === 'string' ? exercise.weightField.trim() : '';
+  const rawInstruction = getExerciseTargetLoad(exercise);
+  const load = parseLoadValue(rawGuide);
+  let instruction = compactExerciseCue(rawInstruction);
+
+  if (!instruction && rawGuide && !load.isWeightLike) {
+    instruction = compactExerciseCue(rawGuide);
+  }
+
+  if (instruction && /^0+\s*(lb|lbs)$/i.test(rawGuide)) {
+    load.value = '';
+    load.unit = '';
+    load.isWeightLike = false;
+  }
+
+  return {
+    hasLoadValue: !!load.value,
+    loadValue: load.value,
+    loadUnit: load.unit,
+    instructionHint: instruction
+  };
 }
 
 export function formatExerciseTargetLoad(exercise) {

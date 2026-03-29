@@ -3,9 +3,13 @@ import { make } from './dom.js?v=47';
 function renderExerciseRow(rowModel) {
   const row = make('div', 'exercise-row');
   row.setAttribute('data-has-load', rowModel.hasLoad ? 'true' : 'false');
+  row.setAttribute('data-has-instruction', rowModel.instructionHint ? 'true' : 'false');
 
   const nameCell = make('div', 'exercise-name-cell');
   nameCell.appendChild(make('div', 'exercise-name', rowModel.name));
+  if (rowModel.instructionHint) {
+    nameCell.appendChild(make('div', 'exercise-instruction', rowModel.instructionHint));
+  }
   row.appendChild(nameCell);
 
   const weightCell = make('div', 'exercise-weight-cell');
@@ -14,8 +18,10 @@ function renderExerciseRow(rowModel) {
   if (rowModel.hasLoad) {
     loadEntry.classList.add('is-weighted');
     const loadLine = make('span', 'exercise-load-line');
-    loadLine.appendChild(make('span', 'exercise-load-hint', rowModel.loadHint));
-    loadLine.appendChild(make('span', 'exercise-load-unit', 'lbs'));
+    loadLine.appendChild(make('span', 'exercise-load-value', rowModel.loadValue));
+    if (rowModel.loadUnit) {
+      loadLine.appendChild(make('span', 'exercise-load-unit', rowModel.loadUnit));
+    }
     loadEntry.appendChild(loadLine);
   } else {
     loadEntry.classList.add('is-empty');

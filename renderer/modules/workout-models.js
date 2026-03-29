@@ -1,5 +1,5 @@
 import {
-  formatExerciseTargetLoad,
+  describeExerciseLoad,
   getExerciseSetCount,
   getRepTargets,
   showLoadSuffix
@@ -30,18 +30,21 @@ function resolveExerciseNameWidthPx(exercises) {
     54,
     ...(exercises || []).map((exercise) => measureExerciseNameWidthPx(exercise && exercise.name))
   );
-  return Math.min(longestWidth + 2, 132);
+  return Math.min(longestWidth + 16, 168);
 }
 
 function buildExerciseRowModel(exercise) {
   const repTargets = getRepTargets(exercise);
   const repCount = getExerciseSetCount(exercise);
-  const hasLoad = showLoadSuffix(exercise);
+  const loadDisplay = describeExerciseLoad(exercise);
+  const hasLoad = showLoadSuffix(exercise) && loadDisplay.hasLoadValue;
 
   return {
     hasLoad,
     name: exercise && exercise.name || 'Lift',
-    loadHint: hasLoad ? formatExerciseTargetLoad(exercise) : '',
+    loadValue: hasLoad ? loadDisplay.loadValue : '',
+    loadUnit: hasLoad ? loadDisplay.loadUnit : '',
+    instructionHint: loadDisplay.instructionHint || '',
     repTargets: repTargets.slice(0, repCount)
   };
 }
