@@ -1427,6 +1427,10 @@
     }
 
     .wizard-error.is-visible { display: block; }
+    .wizard-error.is-outcome { font-weight: 600; }
+    .wizard-error.is-outcome.is-ok { color: #2d8a4e; }
+    .wizard-error.is-outcome.is-warning { color: #8a6d2d; }
+    .wizard-error.is-outcome.is-info { color: #5a7a9a; }
 
     .wizard-stage-card {
       margin-top: 0;
@@ -2226,7 +2230,16 @@
               <div id="wiz-repair-6"></div>
             </div>
           </div>
-          <button class="gen-submit" id="wiz-assemble-submit" type="button" style="margin-top:12px">Assemble &amp; Validate Booklet</button>
+          <div class="wizard-audit-panel" id="wiz-audit-panel" style="display:none; margin-top:12px;">
+            <div class="wizard-stage-card">
+              <div class="wizard-stage-kicker">Draft Health Check</div>
+              <div id="wiz-audit-summary" class="wizard-stage-copy" style="font-family:var(--mono); font-size:6pt; white-space:pre-wrap;"></div>
+            </div>
+          </div>
+          <div style="margin-top:12px; display:flex; gap:8px;">
+            <button class="gen-submit" id="wiz-audit-btn" type="button" style="flex:0 0 auto; background:var(--fog); color:var(--ink);">Check Draft Health</button>
+            <button class="gen-submit" id="wiz-assemble-submit" type="button" style="flex:1;">Assemble &amp; Validate Booklet</button>
+          </div>
           <div id="wiz-assembly-result"></div>
         </div>
 
@@ -4474,6 +4487,142 @@
         return { errors: [String(result)], warnings: [] };
       }
 
+      // ── Shared guided-build stage ingestion ──────────────────────────────
+      // Unified helper for all wizard stage acceptance. Provides API-grade
+      // discipline: parse → normalize → deep validate → classify → decide.
+      //
+      // options: {
+      //   stageNumber: number,        — wizard pane index for error display
+      //   stageLabel: string,         — human-readable label for repair prompts
+      //   contract: string,           — repair contract text
+      //   shallowValidator: fn,       — local shallow validator (returns string[])
+      //   deepValidator: fn|null,     — deep API validator (returns any shape)
+      //   normalizer: fn|null,        — pre-validation normalization (mutates data)
+      //   autoRepair: fn|null,        — per-item deterministic repair (mutates data)
+      //   continuityValidator: fn|null — cross-reference/continuity check (returns string[])
+      // }
+      // Returns: { data, accepted, status, blocking, warnings, repairWarnings }
+      //   status: 'ok' | 'accepted-with-warnings' | 'blocked'
+      function ingestStageResult(rawText, options) {
+        var stageNum = options.stageNumber;
+        var stageLabel = options.stageLabel || 'stage';
+        var contract = options.contract || '';
+        var result = { data: null, accepted: false, status: 'blocked', blocking: [], warnings: [], repairWarnings: [] };
+
+        if (!rawText || !rawText.trim()) {
+          var emptyMsg = 'Paste the AI response for this step.';
+          setStageError(stageNum, emptyMsg);
+          renderRepairPrompt(wizRepair[stageNum], stageLabel, contract, rawText || '', [emptyMsg]);
+          return result;
+        }
+
+        clearStageError(stageNum);
+
+        // Phase 1: parse/extract JSON
+        var data;
+        try {
+          data = extractJson(rawText);
+        } catch (err) {
+          var parseMsg = formatFriendlyParseError(err);
+          setStageError(stageNum, parseMsg);
+          renderRepairPrompt(wizRepair[stageNum], stageLabel, contract, rawText, [parseMsg]);
+          return result;
+        }
+
+        // Phase 2: shallow validation
+        if (options.shallowValidator) {
+          var shallowErrors = options.shallowValidator(data);
+          if (shallowErrors && shallowErrors.length > 0) {
+            setStageError(stageNum, shallowErrors[0]);
+            renderRepairPrompt(wizRepair[stageNum], stageLabel, contract, rawText, shallowErrors);
+            return result;
+          }
+        }
+
+        // Phase 3: normalization (mutates data in place)
+        if (options.normalizer) {
+          options.normalizer(data);
+        }
+
+        // Phase 4: auto-repair (mutates data, may collect diagnostics)
+        if (options.autoRepair) {
+          var repairInfo = options.autoRepair(data);
+          if (repairInfo && Array.isArray(repairInfo)) {
+            result.repairWarnings = repairInfo;
+          }
+        }
+
+        // Phase 5: deep validation
+        var deepErrors = [];
+        if (options.deepValidator) {
+          var deepResult = unwrapValidatorResult(options.deepValidator(data));
+          deepErrors = deepResult.errors;
+          if (deepResult.warnings.length > 0) {
+            result.warnings = result.warnings.concat(deepResult.warnings);
+            console.warn('[guided-build] ' + stageLabel + ' deep validation warnings:', deepResult.warnings);
+          }
+        }
+
+        // Phase 6: continuity validation
+        var contErrors = [];
+        if (options.continuityValidator) {
+          contErrors = options.continuityValidator(data) || [];
+        }
+
+        // Phase 7: classify all errors
+        var allErrors = deepErrors.concat(contErrors);
+        var api = manualApi();
+        if (allErrors.length > 0 && api && typeof api.classifyValidationErrors === 'function') {
+          var classified = api.classifyValidationErrors(allErrors);
+          if (classified.blocking.length > 0) {
+            result.blocking = classified.blocking;
+            result.status = 'blocked';
+            setStageError(stageNum, classified.blocking[0]);
+            renderRepairPrompt(wizRepair[stageNum], stageLabel, contract, rawText, classified.blocking);
+            return result;
+          }
+          // Repairable + degraded → accept with warnings
+          var advisory = classified.repairable.concat(classified.degraded);
+          if (advisory.length > 0) {
+            result.warnings = result.warnings.concat(advisory);
+            result.status = 'accepted-with-warnings';
+            console.warn('[guided-build] ' + stageLabel + ' accepted with', advisory.length, 'advisory issue(s)');
+          }
+        } else if (allErrors.length > 0) {
+          // No classifier available — block on all errors
+          result.blocking = allErrors;
+          result.status = 'blocked';
+          setStageError(stageNum, allErrors[0]);
+          renderRepairPrompt(wizRepair[stageNum], stageLabel, contract, rawText, allErrors);
+          return result;
+        }
+
+        // Success path
+        if (result.status !== 'accepted-with-warnings') result.status = 'ok';
+        result.data = data;
+        result.accepted = true;
+
+        // Show outcome feedback
+        if (result.status === 'accepted-with-warnings') {
+          showStageOutcome(stageNum, 'warning', result.warnings.length + ' minor issue' + (result.warnings.length === 1 ? '' : 's') + ' auto-fixed. Ready to continue.');
+        } else if (result.repairWarnings.length > 0) {
+          showStageOutcome(stageNum, 'info', result.repairWarnings.length + ' shape fix' + (result.repairWarnings.length === 1 ? '' : 'es') + ' applied. Ready to continue.');
+        } else {
+          showStageOutcome(stageNum, 'ok', 'Step validated. Ready to continue.');
+        }
+
+        renderRepairPrompt(wizRepair[stageNum], stageLabel, contract, rawText, []);
+        return result;
+      }
+
+      // Show stage outcome feedback in the error slot with appropriate tone
+      function showStageOutcome(stageNumber, tone, message) {
+        var el = wizErrors[stageNumber];
+        if (!el) return;
+        el.textContent = message;
+        el.className = 'wizard-error is-visible is-outcome is-' + tone;
+      }
+
       function setActionBusy(button, busyText, callback) {
         var original = button.textContent;
         button.disabled = true;
@@ -5579,34 +5728,16 @@
       })();
 
       document.getElementById('wiz-next-1').addEventListener('click', function () {
-        var layerBible = parseStageJson(
-          wizResults[1].value,
-          validateLayerBible,
-          1,
-          'foundation',
-          'Return only the foundation JSON with storyLayer, gameLayer, governingLayer, designPrinciples, and designLedger.'
-        );
-        if (!layerBible) return;
-        // Deep validation via API validator when available
-        var deepApi = manualApi();
-        if (deepApi && typeof deepApi.validateLayerBibleStage === 'function') {
-          var lbResult = unwrapValidatorResult(deepApi.validateLayerBibleStage(layerBible));
-          if (lbResult.errors.length > 0) {
-            if (deepApi.classifyValidationErrors) {
-              var classified = deepApi.classifyValidationErrors(lbResult.errors);
-              if (classified.blocking.length > 0) {
-                setStageError(1, classified.blocking[0]);
-                renderRepairPrompt(wizRepair[1], 'foundation', 'Return only the foundation JSON.', wizResults[1].value, classified.blocking);
-                return;
-              }
-              if (classified.repairable.length > 0 || classified.degraded.length > 0) {
-                console.warn('[guided-build] Layer bible accepted with advisory:', classified.repairable.concat(classified.degraded));
-              }
-            } else {
-              console.warn('[guided-build] Layer bible deep validation advisory:', lbResult.errors);
-            }
-          }
-        }
+        var api = manualApi();
+        var ingested = ingestStageResult(wizResults[1].value, {
+          stageNumber: 1,
+          stageLabel: 'foundation',
+          contract: 'Return only the foundation JSON with storyLayer, gameLayer, governingLayer, designPrinciples, and designLedger.',
+          shallowValidator: validateLayerBible,
+          deepValidator: api && api.validateLayerBibleStage ? function (d) { return api.validateLayerBibleStage(d); } : null
+        });
+        if (!ingested.accepted) return;
+        var layerBible = ingested.data;
         if (wizData.layerBible && stableJson(wizData.layerBible) !== stableJson(layerBible)) {
           invalidateAfterLayerBible('Foundation changed. Everything after it needs a refresh.');
         }
@@ -5617,34 +5748,18 @@
       });
 
       document.getElementById('wiz-next-2').addEventListener('click', function () {
-        var campaignPlan = parseStageJson(
-          wizResults[2].value,
-          validateCampaignPlan,
-          2,
-          'campaign plan',
-          'Return only campaign plan JSON with topology, weeks, bossPlan, fragmentRegistry, and overflowRegistry.'
-        );
-        if (!campaignPlan) return;
-        // Deep validation via API validator when available
-        var deepApi = manualApi();
-        if (deepApi && typeof deepApi.validateCampaignPlanStage === 'function') {
-          var cpResult = unwrapValidatorResult(deepApi.validateCampaignPlanStage(campaignPlan, wizData.layerBible));
-          if (cpResult.errors.length > 0) {
-            if (deepApi.classifyValidationErrors) {
-              var classified = deepApi.classifyValidationErrors(cpResult.errors);
-              if (classified.blocking.length > 0) {
-                setStageError(2, classified.blocking[0]);
-                renderRepairPrompt(wizRepair[2], 'campaign plan', 'Return only campaign plan JSON.', wizResults[2].value, classified.blocking);
-                return;
-              }
-              if (classified.repairable.length > 0 || classified.degraded.length > 0) {
-                console.warn('[guided-build] Campaign plan accepted with advisory:', classified.repairable.concat(classified.degraded));
-              }
-            } else {
-              console.warn('[guided-build] Campaign plan deep validation advisory:', cpResult.errors);
-            }
-          }
-        }
+        var api = manualApi();
+        var ingested = ingestStageResult(wizResults[2].value, {
+          stageNumber: 2,
+          stageLabel: 'campaign plan',
+          contract: 'Return only campaign plan JSON with topology, weeks, bossPlan, fragmentRegistry, and overflowRegistry.',
+          shallowValidator: validateCampaignPlan,
+          deepValidator: api && api.validateCampaignPlanStage
+            ? function (d) { return api.validateCampaignPlanStage(d, wizData.layerBible); }
+            : null
+        });
+        if (!ingested.accepted) return;
+        var campaignPlan = ingested.data;
         var campaignChanged = !!wizData.campaignPlan && stableJson(buildCampaignSignature(wizData.campaignPlan)) !== stableJson(buildCampaignSignature(campaignPlan));
         if (campaignChanged) {
           invalidateAfterCampaign('Booklet plan changed. Weeks, extras, and the ending need attention.', true);
@@ -5656,48 +5771,28 @@
       });
 
       document.getElementById('wiz-next-3').addEventListener('click', function () {
-        var shell = parseStageJson(
-          wizResults[3].value,
-          validateShell,
-          3,
-          'booklet identity',
-          'Return only the booklet identity JSON with meta, cover, rulesSpread, and theme.'
-        );
-        if (!shell) return;
-        // Deep validation via API validator when available
-        var deepApi = manualApi();
-        if (deepApi && typeof deepApi.validateShellSchema === 'function') {
-          var shellResult = unwrapValidatorResult(deepApi.validateShellSchema(shell));
-          if (shellResult.warnings.length > 0) {
-            console.warn('[guided-build] Shell validation warnings (advisory):', shellResult.warnings);
-          }
-          if (shellResult.errors.length > 0) {
-            if (deepApi.classifyValidationErrors) {
-              var classified = deepApi.classifyValidationErrors(shellResult.errors);
-              if (classified.blocking.length > 0) {
-                setStageError(3, classified.blocking[0]);
-                renderRepairPrompt(wizRepair[3], 'booklet identity', 'Return only the booklet identity JSON.', wizResults[3].value, classified.blocking);
-                return;
-              }
-              if (classified.repairable.length > 0 || classified.degraded.length > 0) {
-                console.warn('[guided-build] Shell accepted with advisory:', classified.repairable.concat(classified.degraded));
-              }
-            } else {
-              setStageError(3, shellResult.errors[0]);
-              renderRepairPrompt(wizRepair[3], 'booklet identity', 'Return only the booklet identity JSON.', wizResults[3].value, shellResult.errors);
-              return;
+        var api = manualApi();
+        var ingested = ingestStageResult(wizResults[3].value, {
+          stageNumber: 3,
+          stageLabel: 'booklet identity',
+          contract: 'Return only the booklet identity JSON with meta, cover, rulesSpread, and theme.',
+          shallowValidator: validateShell,
+          deepValidator: api && api.validateShellSchema ? function (d) { return api.validateShellSchema(d); } : null,
+          normalizer: function (d) {
+            // Ensure artifact identity before deep validation
+            if (api && typeof api.ensureArtifactIdentity === 'function') {
+              api.ensureArtifactIdentity(d, wizData.campaignPlan);
             }
           }
-        }
+        });
+        if (!ingested.accepted) return;
+        var shell = ingested.data;
         var shellChanged = !!wizData.shell && stableJson(buildShellSignature(wizData.shell)) !== stableJson(buildShellSignature(shell));
-        if (deepApi && typeof deepApi.ensureArtifactIdentity === 'function') {
-          deepApi.ensureArtifactIdentity(shell, wizData.campaignPlan);
-        }
         if (shellChanged) {
           invalidateAfterShell('Booklet identity changed. Ending and final assembly need attention.');
         }
         wizData.shell = shell;
-        wizData.shellContext = manualApi().extractShellContext ? manualApi().extractShellContext(shell) : null;
+        wizData.shellContext = api && api.extractShellContext ? api.extractShellContext(shell) : null;
         clearStageFlag('shell');
         var plannedWeeks = Array.isArray(wizData.campaignPlan.weeks) ? wizData.campaignPlan.weeks.length : 0;
         wizState.weekChunks = typeof window.planWeekChunks === 'function'
@@ -5709,43 +5804,72 @@
         wizSetStep(3);
       });
 
+      document.getElementById('wiz-audit-btn').addEventListener('click', function () {
+        var api = manualApi();
+        var panel = document.getElementById('wiz-audit-panel');
+        var summary = document.getElementById('wiz-audit-summary');
+        if (!api || typeof api.auditGuidedBuild !== 'function') {
+          panel.style.display = 'block';
+          summary.textContent = 'Audit not available — API module not loaded.';
+          return;
+        }
+        var report = api.auditGuidedBuild({
+          shell: wizData.shell,
+          campaignPlan: wizData.campaignPlan,
+          weekChunkOutputs: wizData.weekChunkOutputs,
+          fragmentsOutput: wizData.fragmentsOutput,
+          endingsOutput: wizData.endingsOutput
+        });
+
+        var lines = [];
+        lines.push('─── Draft Health ───');
+        lines.push('');
+        (report.stages || []).forEach(function (s) {
+          var icon = s.status === 'ok' ? '✓' : s.status === 'blocking' ? '✗' : s.status === 'repairable' ? '⚠' : '○';
+          lines.push(icon + ' ' + s.stage + ': ' + s.status);
+          (s.blocking || []).forEach(function (b) { lines.push('  ✗ ' + b); });
+          (s.repairable || []).forEach(function (r) { lines.push('  ⚠ ' + r); });
+          (s.degraded || []).forEach(function (d) { lines.push('  ○ ' + d); });
+        });
+        lines.push('');
+        lines.push('Ready for assembly: ' + (report.readyForAssembly ? 'Yes' : 'No'));
+        lines.push('Ready for renderer: ' + (report.readyForRenderer ? 'Yes' : 'No'));
+        if (report.qualityGatePassed !== undefined) {
+          lines.push('Quality gate: ' + (report.qualityGatePassed ? 'Passed' : 'Issues found'));
+        }
+        if (report.recurrentPatterns && report.recurrentPatterns.length > 0) {
+          lines.push('');
+          lines.push('Recurring issues:');
+          report.recurrentPatterns.forEach(function (p) {
+            lines.push('  ' + p.code + ' ×' + p.count + ' (' + p.severity + ')');
+          });
+        }
+
+        summary.textContent = lines.join('\n');
+        panel.style.display = 'block';
+      });
+
       document.getElementById('wiz-assemble-submit').addEventListener('click', function () {
         assemblyResultEl.innerHTML = '';
-        var endingsOutput = parseStageJson(
-          wizResults[6].value,
-          validateEndings,
-          6,
-          'endings',
-          'Return only `{ "endings": [...] }`. Do not invent encrypted ending ciphertext.'
-        );
-        if (!endingsOutput) return;
-        if (manualApi() && typeof manualApi().validateEndingsContinuity === 'function') {
-          var endingContinuityErrors = manualApi().validateEndingsContinuity(endingsOutput, {
-            campaignPlan: wizData.campaignPlan,
-            shell: wizData.shell,
-            weekChunkOutputs: wizData.weekChunkOutputs,
-            fragmentsOutput: wizData.fragmentsOutput
-          });
-          if (endingContinuityErrors.length > 0) {
-            // Classify: only block on true blocking errors
-            if (manualApi().classifyValidationErrors) {
-              var classified = manualApi().classifyValidationErrors(endingContinuityErrors);
-              if (classified.blocking.length > 0) {
-                setStageError(6, classified.blocking[0]);
-                renderRepairPrompt(wizRepair[6], 'endings', 'Return only `{ "endings": [...] }`. Preserve the established boss inputs, provenance, and sealed-state rules.', wizResults[6].value, classified.blocking);
-                return;
+        var api = manualApi();
+        var ingested = ingestStageResult(wizResults[6].value, {
+          stageNumber: 6,
+          stageLabel: 'endings',
+          contract: 'Return only `{ "endings": [...] }`. Preserve the established boss inputs, provenance, and sealed-state rules.',
+          shallowValidator: validateEndings,
+          continuityValidator: api && api.validateEndingsContinuity
+            ? function (d) {
+                return api.validateEndingsContinuity(d, {
+                  campaignPlan: wizData.campaignPlan,
+                  shell: wizData.shell,
+                  weekChunkOutputs: wizData.weekChunkOutputs,
+                  fragmentsOutput: wizData.fragmentsOutput
+                });
               }
-              if (classified.repairable.length > 0 || classified.degraded.length > 0) {
-                console.warn('[guided-build] Endings accepted with', classified.repairable.length, 'repairable,', classified.degraded.length, 'degraded issues');
-              }
-            } else {
-              // Fallback: block on all
-              setStageError(6, endingContinuityErrors[0]);
-              renderRepairPrompt(wizRepair[6], 'endings', 'Return only `{ "endings": [...] }`. Preserve the established boss inputs, provenance, and sealed-state rules.', wizResults[6].value, endingContinuityErrors);
-              return;
-            }
-          }
-        }
+            : null
+        });
+        if (!ingested.accepted) return;
+        var endingsOutput = ingested.data;
 
         wizData.endingsOutput = endingsOutput;
         clearStageFlag('endings');
