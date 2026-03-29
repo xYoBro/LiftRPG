@@ -72,8 +72,25 @@ export function isLikelyTimeoutError(err) {
     || lower.indexOf('stalled') !== -1;
 }
 
+export function isLikelyNetworkTransportError(err) {
+  if (err && err.errorType === 'network') return true;
+  var lower = String((err && err.message) || err || '').toLowerCase();
+  return lower.indexOf('network error reaching api') !== -1
+    || lower.indexOf('failed to fetch') !== -1
+    || lower.indexOf('load failed') !== -1
+    || lower.indexOf('connection was lost') !== -1
+    || lower.indexOf('network changed') !== -1
+    || lower.indexOf('err_network_changed') !== -1
+    || lower.indexOf('offline') !== -1;
+}
+
 export function shouldRetryStageError(err) {
-  return isLikelyTimeoutError(err) || isLikelyTruncationError(err) || isLikelyJsonFailure(err) || isLikelySchemaFailure(err);
+  if (err && err.retryable) return true;
+  return isLikelyTimeoutError(err)
+    || isLikelyNetworkTransportError(err)
+    || isLikelyTruncationError(err)
+    || isLikelyJsonFailure(err)
+    || isLikelySchemaFailure(err);
 }
 
 export function shouldSplitWeekChunk(err, weekNumbers) {

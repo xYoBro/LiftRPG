@@ -319,20 +319,49 @@ export function getDemoPassword(meta) {
   return '';
 }
 
+export function sanitizeBossTextForDisplay(text, password) {
+  const raw = String(text || '');
+  const upper = normalisePassword(password || '');
+  if (!raw || !upper) return raw;
+
+  const escaped = upper.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const quoted = new RegExp('([\'"])' + escaped + '\\1', 'g');
+  const bare = new RegExp('\\b' + escaped + '\\b', 'g');
+
+  return raw
+    .replace(/enter this password,\s*(['"])?[A-Z0-9-]{3,16}\1?/gi, 'enter the reconstructed password')
+    .replace(/the resultant name is your final password/gi, 'the resultant name is the final designation')
+    .replace(/to expose\s+(['"])?[A-Z0-9-]{3,16}\1?/gi, 'to expose the hidden author')
+    .replace(quoted, "'[REDACTED]'")
+    .replace(bare, '[REDACTED]');
+}
+
 function derivePasswordFromBossRevealText(boss) {
-  const revealText = String((boss && boss.passwordRevealInstruction) || '').trim();
-  if (!revealText) return '';
+  const candidates = [
+    boss && boss.passwordRevealInstruction,
+    boss && boss.narrative,
+    boss && boss.convergenceProof
+  ].filter(Boolean).map((value) => String(value).trim());
 
-  const directMatch = revealText.match(/\bpassword\s+is\s+([A-Z0-9-]{3,})\b/i);
-  if (directMatch) {
-    return normalisePassword(directMatch[1]);
+  for (let i = 0; i < candidates.length; i += 1) {
+    const revealText = candidates[i];
+    if (!revealText) continue;
+
+    const directMatch = revealText.match(/\bpassword\s+is\s+([A-Z0-9-]{3,})\b/i);
+    if (directMatch) {
+      return normalisePassword(directMatch[1]);
+    }
+
+    const enterMatch = revealText.match(/\benter\s+this\s+password,\s*['"]?([A-Z0-9-]{3,})['"]?/i);
+    if (enterMatch) {
+      return normalisePassword(enterMatch[1]);
+    }
+
+    const sequenceMatch = revealText.match(/order:\s*([A-Z](?:\s*-\s*[A-Z]){2,})/i);
+    if (sequenceMatch) {
+      return normalisePassword(sequenceMatch[1].replace(/\s*-\s*/g, ''));
+    }
   }
-
-  const sequenceMatch = revealText.match(/order:\s*([A-Z](?:\s*-\s*[A-Z]){2,})/i);
-  if (sequenceMatch) {
-    return normalisePassword(sequenceMatch[1].replace(/\s*-\s*/g, ''));
-  }
-
   return '';
 }
 
@@ -412,8 +441,33 @@ function compactExerciseCue(raw) {
   const normalized = normalizeExerciseCue(raw);
   if (!normalized) return '';
 
-  return normalized
+  const stripped = normalized
+    .replace(/\/?\s*update:\s*custom\([^]*$/i, '')
+    .replace(/\s*weights\s*=\s*bodyweight[^]*$/i, '')
+    .trim();
+
+  if (!stripped) return '';
+
+  const warmupSeconds = stripped.match(/^warmup:\s*1x(\d+)\s*0lb$/i);
+  if (warmupSeconds) {
+    const totalSeconds = Number(warmupSeconds[1] || 0);
+    if (Number.isFinite(totalSeconds) && totalSeconds > 0) {
+      if (totalSeconds % 60 === 0) return (totalSeconds / 60) + ' min easy warm-up';
+      return totalSeconds + 's easy warm-up';
+    }
+  }
+
+  if (/^warmup:\s*none/i.test(stripped) && /bodyweight/i.test(normalized)) {
+    return 'Warm-up: BW';
+  }
+
+  if (/^\d+\s*s$/i.test(stripped)) {
+    return '';
+  }
+
+  return stripped
     .replace(/^warm\s+up\s+with\s+bodyweight$/i, 'Warm-up: BW')
+    .replace(/^warmup:\s*none$/i, 'Warm-up: none')
     .replace(/^assisted\s+if\s+needed$/i, 'Assisted as needed')
     .replace(/^weighted\s+if\s+possible$/i, 'Add weight if possible')
     .replace(/^add\s+weight\s+if\s+possible$/i, 'Add weight if possible')
@@ -423,6 +477,9 @@ function compactExerciseCue(raw) {
     .replace(/^(\d+)\s+min(?:ute)?s?\s+final\s+session$/i, '$1 min final')
     .replace(/^final\s+session$/i, 'Final session')
     .replace(/^final\s+pr\s+attempt$/i, 'Final PR')
+    .replace(/^\(?amrap\)?,\s*\d+x\d+\s*0lb\s*\/\s*\d+s$/i, 'AMRAP + back-off')
+    .replace(/^\(?amrap\)?$/i, 'AMRAP')
+    .replace(/^\(?test\)?$/i, 'Test set')
     .replace(/^max\s+effort$/i, 'Max effort');
 }
 

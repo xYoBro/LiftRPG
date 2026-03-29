@@ -37,19 +37,23 @@ var PRICING_VERIFIED_AT = '2026-03-23';
 export var PRICING_SOURCES = {
   anthropic: {
     label: 'Anthropic pricing',
-    url: 'https://docs.anthropic.com/en/docs/about-claude/pricing'
+    url: 'https://docs.anthropic.com/en/docs/about-claude/pricing',
+    browserDirectFetch: false
   },
   openai: {
     label: 'OpenAI pricing',
-    url: 'https://platform.openai.com/pricing'
+    url: 'https://platform.openai.com/pricing',
+    browserDirectFetch: false
   },
   groq: {
     label: 'Groq model pricing',
-    url: 'https://console.groq.com/docs/models'
+    url: 'https://console.groq.com/docs/models',
+    browserDirectFetch: false
   },
   gemini: {
     label: 'Gemini Developer API pricing',
-    url: 'https://ai.google.dev/pricing'
+    url: 'https://ai.google.dev/pricing',
+    browserDirectFetch: false
   }
 };
 
@@ -92,6 +96,16 @@ export var MODEL_PRICING_RULES = [
     outputPerMillion: 4,
     cacheWritePerMillion: 1,
     cacheReadPerMillion: 0.08,
+    source: PRICING_SOURCES.anthropic
+  },
+  {
+    provider: 'anthropic',
+    match: /^claude-(?:haiku-4(?:[-_.]5)?|4(?:[-_.]5)?-haiku)/i,
+    label: 'Claude Haiku 4.5',
+    inputPerMillion: 1,
+    outputPerMillion: 5,
+    cacheWritePerMillion: 1.25,
+    cacheReadPerMillion: 0.10,
     source: PRICING_SOURCES.anthropic
   },
   {
@@ -232,17 +246,29 @@ export function fetchWithTimeout(url, options, timeoutMs) {
       var msg = String(err.message || err || '').toLowerCase();
       // Catch both Chrome AbortError and Safari's "Fetch is aborted" TypeError
       if (err.name === 'AbortError' || msg.indexOf('abort') !== -1) {
-        throw new Error(
+        var timeoutError = new Error(
           'Request timed out or was aborted after ' + Math.round(ms / 1000) + 's. ' +
           'The model may need more time, or the request may have stalled. Try again.'
         );
+        timeoutError.errorType = 'timeout';
+        timeoutError.retryable = true;
+        throw timeoutError;
       }
-      // Network failures (CORS, DNS, connection refused) — add context
-      if (err.name === 'TypeError' && (msg.indexOf('fetch') !== -1 || msg.indexOf('network') !== -1)) {
-        throw new Error(
+      // Network failures (CORS, DNS, connection refused, Safari "Load failed") — add context
+      if (err.name === 'TypeError' && (
+        msg.indexOf('fetch') !== -1 ||
+        msg.indexOf('network') !== -1 ||
+        msg.indexOf('load failed') !== -1 ||
+        msg.indexOf('connection was lost') !== -1 ||
+        msg.indexOf('network changed') !== -1
+      )) {
+        var networkError = new Error(
           'Network error reaching API: ' + err.message + '. ' +
           'Check your API key, internet connection, and that the provider URL is correct.'
         );
+        networkError.errorType = 'network';
+        networkError.retryable = true;
+        throw networkError;
       }
       throw err;
     })
@@ -772,6 +798,12 @@ async function fetchThirdPartyPricingRule(providerId, modelId, timeoutMs) {
   return parseThirdPartyPricingRule(body, providerId, modelId);
 }
 
+function shouldSkipOfficialPricingFetch(providerId) {
+  if (typeof window === 'undefined') return false;
+  var source = providerId && PRICING_SOURCES[providerId] ? PRICING_SOURCES[providerId] : null;
+  return !!(source && source.browserDirectFetch === false);
+}
+
 export async function refreshPricing(settings, options) {
   var resolved = Object.assign({}, settings || {});
   var providerId = detectProviderId(resolved);
@@ -783,16 +815,20 @@ export async function refreshPricing(settings, options) {
   var officialRefreshError = '';
   var refreshError = '';
 
-  try {
-    liveRule = await fetchLivePricingRule(providerId, modelId, timeoutMs);
-    if (!liveRule) {
-      officialRefreshError = 'Official pricing did not expose a parseable entry for ' + (modelId || 'the selected model') + '.';
+  if (shouldSkipOfficialPricingFetch(providerId)) {
+    officialRefreshError = 'Official provider pricing pages cannot be fetched directly from this browser.';
+  } else {
+    try {
+      liveRule = await fetchLivePricingRule(providerId, modelId, timeoutMs);
+      if (!liveRule) {
+        officialRefreshError = 'Official pricing did not expose a parseable entry for ' + (modelId || 'the selected model') + '.';
+      }
+    } catch (error) {
+      officialRefreshError = describePricingFetchError(error, 'Browser could not fetch the official provider pricing page directly.');
     }
-  } catch (error) {
-    officialRefreshError = describePricingFetchError(error, 'Browser could not fetch the official provider pricing page directly.');
   }
 
-  if (!liveRule && THIRD_PARTY_PRICING_FEED.enabled) {
+  if (!liveRule && THIRD_PARTY_PRICING_FEED.enabled && !fallbackRule) {
     try {
       thirdPartyRule = await fetchThirdPartyPricingRule(providerId, modelId, timeoutMs);
       if (thirdPartyRule && officialRefreshError) {

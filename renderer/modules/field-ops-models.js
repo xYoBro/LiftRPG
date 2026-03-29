@@ -1,6 +1,8 @@
 import {
+  deriveBookletPassword,
   getPasswordLength,
   pad2,
+  sanitizeBossTextForDisplay,
   splitParagraphs
 } from './utils.js?v=47';
 import {
@@ -178,6 +180,7 @@ function normalizeDecodingTable(raw) {
 
 export function buildBossPageModel(data, week, options = 'standard') {
   const boss = week.bossEncounter || {};
+  const derivedPassword = deriveBookletPassword(data || {});
   const decodingKey = boss.decodingKey || {};
   const entry = options && typeof options === 'object' ? options : {};
   const requestedLayoutVariant = typeof options === 'string' ? options : (entry.layoutVariant || 'standard');
@@ -192,18 +195,18 @@ export function buildBossPageModel(data, week, options = 'standard') {
   const layoutVariant = shellFamily === 'classified-packet' && hasConvergenceAppendix
     ? 'tight'
     : requestedLayoutVariant;
-  const narrativeParagraphs = splitParagraphs(boss.narrative || '');
+  const narrativeParagraphs = splitParagraphs(sanitizeBossTextForDisplay(boss.narrative || '', derivedPassword));
   const splitNarrative = splitLongNarrativeParagraphs(narrativeParagraphs);
-  const mechanismParagraphs = splitParagraphs(boss.mechanismDescription || '');
-  const splitInstruction = splitLongInstruction(decodingKey.instruction || '', 170);
+  const mechanismParagraphs = splitParagraphs(sanitizeBossTextForDisplay(boss.mechanismDescription || '', derivedPassword));
+  const splitInstruction = splitLongInstruction(sanitizeBossTextForDisplay(decodingKey.instruction || '', derivedPassword), 170);
   const continuationAppendixParagraphs = hasConvergenceAppendix
     ? []
-    : splitParagraphs(boss.convergenceProof || '');
+    : splitParagraphs(sanitizeBossTextForDisplay(boss.convergenceProof || '', derivedPassword));
   if (hasConvergenceAppendix) {
     continuationAppendixParagraphs.push.apply(continuationAppendixParagraphs, splitNarrative.tail);
     if (splitInstruction.tail) continuationAppendixParagraphs.push(splitInstruction.tail);
     continuationAppendixParagraphs.push.apply(continuationAppendixParagraphs, mechanismParagraphs.slice(1));
-    continuationAppendixParagraphs.push.apply(continuationAppendixParagraphs, splitParagraphs(boss.convergenceProof || ''));
+    continuationAppendixParagraphs.push.apply(continuationAppendixParagraphs, splitParagraphs(sanitizeBossTextForDisplay(boss.convergenceProof || '', derivedPassword)));
   }
 
   return {
@@ -226,9 +229,12 @@ export function buildBossPageModel(data, week, options = 'standard') {
     })),
     componentLabel: shellFamily === 'classified-packet' ? 'Recovered Inputs' : 'Recorded Inputs',
     convergenceLabel: shellFamily === 'classified-packet' ? 'Incident Name' : 'Final Word',
-    passwordRevealInstruction: boss.passwordRevealInstruction || 'When the final word is assembled, enter it at liftrpg.co to unlock the ending.',
+    passwordRevealInstruction: sanitizeBossTextForDisplay(
+      boss.passwordRevealInstruction || 'When the final word is assembled, enter it at liftrpg.co to unlock the ending.',
+      derivedPassword
+    ),
     passwordLength: getPasswordLength(data, (boss.componentInputs || []).length || 6),
-    convergenceProof: (!isContinuation && hasConvergenceAppendix) ? '' : (boss.convergenceProof || ''),
+    convergenceProof: (!isContinuation && hasConvergenceAppendix) ? '' : sanitizeBossTextForDisplay(boss.convergenceProof || '', derivedPassword),
     convergenceProofParagraphs: isContinuation ? continuationAppendixParagraphs : [],
     binaryChoiceAcknowledgement: isContinuation ? (boss.binaryChoiceAcknowledgement || null) : null
   };

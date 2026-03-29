@@ -38,6 +38,7 @@ import {
   buildIdentityContract,
   compareIdentityContract,
   enforceIdentityContract,
+  truthBoardStateMode,
   formatIdentityContractLines,
   buildContinuityLedger,
   extractShellContext,
@@ -1417,16 +1418,46 @@ async function patchAssembledBooklet(settings, booklet, errors, identityContract
     );
     var patched = extractJson(patchedResponse.text);
     enforceIdentityContract(patched, identityContract);
+    truthBoardStateMode(patched, patched._assemblyDiagnostics || []);
     enforceBookletDerivedFields(patched);
     var identityDrift = compareIdentityContract(patched, identityContract);
     if (identityDrift.length > 0) {
       console.warn('[LiftRPG] Patch drifted shell identity; restoring approved shell contract:', identityDrift);
       enforceIdentityContract(patched, identityContract);
+      truthBoardStateMode(patched, patched._assemblyDiagnostics || []);
     }
     return patched;
   } catch (patchErr) {
     console.warn('[LiftRPG] Patch stage failed, returning unpatched booklet:', patchErr.message);
     return booklet;
+  }
+}
+
+var LAST_API_BOOKLET_STORAGE_KEY = 'liftrpg_last_api_booklet';
+var LAST_API_BOOKLET_META_STORAGE_KEY = 'liftrpg_last_api_booklet_meta';
+
+function persistLastBooklet(booklet, meta) {
+  if (!booklet || typeof booklet !== 'object') return;
+
+  var savedAt = new Date().toISOString();
+  var source = meta && meta.source ? String(meta.source) : '';
+  var apiSurface = (typeof window !== 'undefined' && window.LiftRPGAPI) ? window.LiftRPGAPI : null;
+
+  if (apiSurface) {
+    apiSurface.lastBooklet = booklet;
+    apiSurface.lastBookletSavedAt = savedAt;
+    apiSurface.lastBookletSource = source;
+  }
+
+  try {
+    sessionStorage.setItem(LAST_API_BOOKLET_STORAGE_KEY, JSON.stringify(booklet));
+    sessionStorage.setItem(LAST_API_BOOKLET_META_STORAGE_KEY, JSON.stringify({
+      savedAt: savedAt,
+      source: source,
+      title: (((booklet || {}).cover || {}).title || '')
+    }));
+  } catch (error) {
+    console.warn('[LiftRPG] Could not persist recoverable API booklet:', error && error.message ? error.message : error);
   }
 }
 
@@ -1512,7 +1543,12 @@ async function runApiPipeline(options) {
     layerBible = checkpoint.stages.layerBible;
     stageNum++;
     console.log('[LiftRPG] Resumed: Layer Codex (cached)');
-    emitPipelineEvent(onProgress, stageNum, totalStages, 'Layer codex restored from checkpoint.', { phase: 'complete', stageKey: 'layerBible', stageName: 'Layer Codex' });
+    emitPipelineEvent(onProgress, stageNum, totalStages, 'Layer codex restored from checkpoint.', {
+      phase: 'complete',
+      stageKey: 'layerBible',
+      stageName: 'Layer Codex',
+      completionSource: 'checkpoint'
+    });
   } else {
     progress('layerBible', 'Building layer codex\u2026');
     layerBible = await runJsonStage(settings, {
@@ -1539,7 +1575,12 @@ async function runApiPipeline(options) {
     campaignPlan = checkpoint.stages.campaignPlan;
     stageNum++;
     console.log('[LiftRPG] Resumed: Story Plan (cached)');
-    emitPipelineEvent(onProgress, stageNum, totalStages, 'Story plan restored from checkpoint.', { phase: 'complete', stageKey: 'campaign', stageName: 'Story Plan' });
+    emitPipelineEvent(onProgress, stageNum, totalStages, 'Story plan restored from checkpoint.', {
+      phase: 'complete',
+      stageKey: 'campaign',
+      stageName: 'Story Plan',
+      completionSource: 'checkpoint'
+    });
   } else {
     progress('campaign', 'Planning story\u2026');
     campaignPlan = await runJsonStage(settings, {
@@ -1576,7 +1617,12 @@ async function runApiPipeline(options) {
     shell = checkpoint.stages.shell;
     stageNum++;
     console.log('[LiftRPG] Resumed: Booklet Setup (cached)');
-    emitPipelineEvent(onProgress, stageNum, totalStages, 'Booklet setup restored from checkpoint.', { phase: 'complete', stageKey: 'shell', stageName: 'Booklet Setup' });
+    emitPipelineEvent(onProgress, stageNum, totalStages, 'Booklet setup restored from checkpoint.', {
+      phase: 'complete',
+      stageKey: 'shell',
+      stageName: 'Booklet Setup',
+      completionSource: 'checkpoint'
+    });
   } else {
     progress('shell', 'Building booklet setup\u2026');
     shell = await runJsonStage(settings, {
@@ -1653,7 +1699,12 @@ async function runApiPipeline(options) {
       }
       stageNum++;
       console.log('[LiftRPG] Resumed: Week ' + w + ' (cached)');
-      emitPipelineEvent(onProgress, stageNum, totalStages, 'Week ' + w + ' restored from checkpoint.', { phase: 'complete', stageKey: 'weeks', stageName: 'Week ' + w });
+      emitPipelineEvent(onProgress, stageNum, totalStages, 'Week ' + w + ' restored from checkpoint.', {
+        phase: 'complete',
+        stageKey: 'weeks',
+        stageName: 'Week ' + w,
+        completionSource: 'checkpoint'
+      });
       continue;
     }
 
@@ -1730,7 +1781,6 @@ async function runApiPipeline(options) {
       if (options.onStatus) options.onStatus('Week ' + w + ': ' + weekValidation.warnings.length + ' advisory warning(s)');
     }
 
-    stageNum++;
     finalWeeks.push(weekObject);
     if (!isBossWeek && weekObject.weeklyComponent && weekObject.weeklyComponent.value) {
       allComponentValues.push(weekObject.weeklyComponent.value);
@@ -1760,7 +1810,12 @@ async function runApiPipeline(options) {
       (cachedFrags.fragments || []).forEach(function (f) { finalFragments.push(f); });
       stageNum++;
       console.log('[LiftRPG] Resumed: ' + batchLabel + ' (cached)');
-      emitPipelineEvent(onProgress, stageNum, totalStages, batchLabel + ' restored from checkpoint.', { phase: 'complete', stageKey: 'fragments', stageName: batchLabel });
+      emitPipelineEvent(onProgress, stageNum, totalStages, batchLabel + ' restored from checkpoint.', {
+        phase: 'complete',
+        stageKey: 'fragments',
+        stageName: batchLabel,
+        completionSource: 'checkpoint'
+      });
       continue;
     }
 
@@ -1804,7 +1859,6 @@ async function runApiPipeline(options) {
       }
       finalFragments.push(frag);
     });
-    stageNum++;
     checkpoint = saveCheckpoint(fragCacheKey, batchOutput, checkpoint);
   }
 
@@ -1816,7 +1870,12 @@ async function runApiPipeline(options) {
     finalEndings = checkpoint.stages.endings;
     stageNum++;
     console.log('[LiftRPG] Resumed: Finale (cached)');
-    emitPipelineEvent(onProgress, stageNum, totalStages, 'Finale restored from checkpoint.', { phase: 'complete', stageKey: 'endings', stageName: 'Finale' });
+    emitPipelineEvent(onProgress, stageNum, totalStages, 'Finale restored from checkpoint.', {
+      phase: 'complete',
+      stageKey: 'endings',
+      stageName: 'Finale',
+      completionSource: 'checkpoint'
+    });
   } else {
     progress('endings', 'Writing finale\u2026');
     var endingObj = await runJsonStage(settings, {
@@ -1852,10 +1911,17 @@ async function runApiPipeline(options) {
   var assembledEndingsOutput = { endings: finalEndings };
 
   // ── DETERMINISTIC ASSEMBLY & QUALITY GATE ───────────────────
+  emitPipelineEvent(onProgress, totalStages, totalStages, 'Assembling booklet locally…', {
+    phase: 'start',
+    stageKey: 'quality',
+    stageName: 'Quality Check',
+    completionSource: 'local'
+  });
   console.log('[LiftRPG] Assembling booklet from ' + finalWeeks.length + ' weeks, ' + finalFragments.length + ' fragments, ' + finalEndings.length + ' endings.');
 
   var booklet = options.assemble(shell, assembledWeeksOutput, assembledFragmentsOutput, assembledEndingsOutput, campaignPlan);
   enforceIdentityContract(booklet, identityContract);
+  truthBoardStateMode(booklet, booklet._assemblyDiagnostics || []);
 
   var validationResult = validateAssembledBooklet(booklet);
   if (validationResult.warnings && validationResult.warnings.length > 0) {
@@ -1893,6 +1959,19 @@ async function runApiPipeline(options) {
       return entry.message;
     }));
   }
+
+  emitPipelineEvent(onProgress, totalStages, totalStages, qualityGate.passed
+    ? 'Assembled and validated locally on this device.'
+    : 'Assembled locally. Quality warnings were found.', {
+    phase: 'complete',
+    stageKey: 'quality',
+    stageName: 'Quality Check',
+    completionSource: 'local'
+  });
+
+  persistLastBooklet(booklet, {
+    source: options && options.pipelineLabel ? options.pipelineLabel : 'structured'
+  });
 
   // Pipeline succeeded — clear the checkpoint so next run starts fresh
   clearCheckpoint();
@@ -1972,6 +2051,7 @@ async function generateMultiStage(settings, workout, brief, onProgress) {
     settings: settings,
     workout: workout,
     brief: brief,
+    pipelineLabel: 'multi-stage',
     weekCount: nw.weekCount,
     totalSessions: totalSessions,
     onProgress: onProgress,
@@ -1998,6 +2078,7 @@ async function generateStructured(settings, workout, brief, onProgress) {
     settings: resolvedSettings,
     workout: workoutText,
     brief: brief,
+    pipelineLabel: 'structured',
     onProgress: onProgress,
     weekCount: weekCount,
     totalSessions: totalSessions,
@@ -2518,6 +2599,7 @@ async function runSkeletonFleshPipeline(options) {
     : null;
   if (identityContract) {
     enforceIdentityContract(booklet, identityContract);
+    truthBoardStateMode(booklet, booklet._assemblyDiagnostics || []);
   }
 
   var validationResult = validateAssembledBooklet(booklet);
@@ -2579,6 +2661,7 @@ async function runSkeletonFleshPipeline(options) {
     }
   };
 
+  persistLastBooklet(booklet, { source: 'skeleton-flesh' });
   clearCheckpoint();
   return booklet;
 }
@@ -2937,6 +3020,9 @@ window.LiftRPGAPI = {
   getDailyBudget: getDailyBudget,
   checkDailyBudget: checkDailyBudget,
   DAILY_CALL_LIMIT: DAILY_CALL_LIMIT,
+  lastBooklet: null,
+  lastBookletSavedAt: '',
+  lastBookletSource: '',
   lastQualityReport: null,
   lastPricing: null
 };

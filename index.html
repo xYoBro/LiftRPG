@@ -857,10 +857,277 @@
       color: var(--muted);
     }
 
+    .pipeline-rail {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+      gap: 10px;
+      margin-bottom: 10px;
+      padding: 12px;
+      border: 1px solid rgba(24, 23, 20, .07);
+      background: rgba(255, 255, 255, .24);
+    }
+
+    .pipeline-stage-node {
+      position: relative;
+      border: 1px solid rgba(24, 23, 20, .08);
+      background: rgba(255, 255, 255, .46);
+      padding: 11px 11px 12px;
+      display: grid;
+      gap: 7px;
+      min-height: 86px;
+      align-content: start;
+    }
+
+    .pipeline-stage-node::before {
+      content: '';
+      position: absolute;
+      top: 20px;
+      left: -10px;
+      right: calc(100% - 10px);
+      height: 1px;
+      background: rgba(24, 23, 20, .12);
+    }
+
+    .pipeline-stage-node:first-child::before {
+      display: none;
+    }
+
+    .pipeline-stage-node-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .pipeline-stage-node-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      border: 1px solid rgba(24, 23, 20, .18);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 5.5pt;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: rgba(24, 23, 20, .04);
+      flex-shrink: 0;
+    }
+
+    .pipeline-stage-node-status {
+      font-family: var(--mono);
+      font-size: 5.1pt;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    .pipeline-stage-node-title {
+      font-family: var(--display);
+      font-size: 9.1pt;
+      line-height: 1.08;
+      color: var(--ink);
+    }
+
+    .pipeline-stage-node-meta {
+      font-size: 5.8pt;
+      line-height: 1.55;
+      letter-spacing: .03em;
+      color: var(--muted);
+    }
+
+    .pipeline-stage-node.is-complete {
+      border-color: rgba(24, 23, 20, .12);
+      background: linear-gradient(180deg, rgba(255, 252, 247, .92), rgba(252, 247, 238, .72));
+    }
+
+    .pipeline-stage-node.is-complete .pipeline-stage-node-dot {
+      background: rgba(24, 23, 20, .92);
+      color: var(--paper);
+      border-color: rgba(24, 23, 20, .92);
+    }
+
+    .pipeline-stage-node.is-current {
+      border-color: rgba(191, 106, 79, .28);
+      background: rgba(255, 250, 246, .74);
+      box-shadow: inset 0 0 0 1px rgba(191, 106, 79, .1);
+    }
+
+    .pipeline-stage-node.is-current .pipeline-stage-node-dot {
+      background: rgba(191, 106, 79, .12);
+      border-color: rgba(191, 106, 79, .28);
+      color: var(--accent);
+    }
+
+    .pipeline-stage-node.is-alert {
+      border-color: rgba(156, 64, 51, .26);
+      background: rgba(255, 246, 244, .76);
+    }
+
+    .pipeline-stage-node.is-alert .pipeline-stage-node-dot {
+      background: rgba(156, 64, 51, .12);
+      border-color: rgba(156, 64, 51, .26);
+      color: #9c4033;
+    }
+
+    .pipeline-stage-node.is-upcoming .pipeline-stage-node-dot {
+      background: rgba(24, 23, 20, .04);
+      color: var(--muted);
+    }
+
+    .pipeline-stage-node.is-current .pipeline-stage-node-status,
+    .pipeline-stage-node.is-alert .pipeline-stage-node-status {
+      color: var(--accent);
+    }
+
+    .pipeline-stage-node.is-complete .pipeline-stage-node-status {
+      color: var(--ink);
+    }
+
     .api-run-board {
       margin-top: 0;
       padding-top: 0;
       border-top: none;
+    }
+
+    .api-run-overview {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(260px, .9fr);
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .api-run-focus {
+      border: 1px solid rgba(24, 23, 20, .08);
+      background: linear-gradient(180deg, rgba(255, 252, 247, .92), rgba(252, 247, 238, .72));
+      padding: 14px 15px;
+      display: grid;
+      gap: 9px;
+    }
+
+    .api-run-focus-kicker {
+      font-family: var(--mono);
+      font-size: 5.8pt;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .api-run-focus-title {
+      font-family: var(--display);
+      font-size: 14pt;
+      line-height: 1.08;
+      color: var(--ink);
+    }
+
+    .api-run-focus-copy {
+      font-size: 6.3pt;
+      line-height: 1.7;
+      letter-spacing: .03em;
+      color: var(--ink);
+      max-width: 58ch;
+    }
+
+    .api-run-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .api-run-metric {
+      border-top: 1px solid rgba(24, 23, 20, .08);
+      padding-top: 8px;
+      min-width: 0;
+    }
+
+    .api-run-metric-value {
+      font-family: var(--display);
+      font-size: 9.5pt;
+      line-height: 1.12;
+      color: var(--ink);
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .api-run-metric-value--compact {
+      font-size: 7.2pt;
+      line-height: 1.35;
+      font-family: var(--mono);
+      letter-spacing: .03em;
+    }
+
+    .api-run-sidecar {
+      display: grid;
+      gap: 10px;
+    }
+
+    .api-run-sidecard {
+      min-height: 0;
+      background: rgba(255, 255, 255, .48);
+    }
+
+    .api-run-side-value {
+      font-size: 10pt;
+      margin-bottom: 6px;
+    }
+
+    .api-run-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding: 9px 10px;
+      border: 1px solid rgba(24, 23, 20, .07);
+      background: rgba(255, 255, 255, .24);
+    }
+
+    .api-run-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 5.9pt;
+      line-height: 1.55;
+      letter-spacing: .03em;
+    }
+
+    .api-run-legend-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 18px;
+      padding: 0 7px;
+      border-radius: 999px;
+      font-family: var(--mono);
+      font-size: 5.2pt;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      border: 1px solid rgba(24, 23, 20, .12);
+      background: rgba(24, 23, 20, .06);
+      color: var(--ink);
+      white-space: nowrap;
+    }
+
+    .api-run-legend-chip.is-complete {
+      background: rgba(24, 23, 20, .92);
+      color: var(--paper);
+    }
+
+    .api-run-legend-chip.is-restored {
+      background: rgba(140, 116, 94, .12);
+      border-color: rgba(140, 116, 94, .18);
+    }
+
+    .api-run-legend-chip.is-local {
+      background: rgba(191, 106, 79, .12);
+      border-color: rgba(191, 106, 79, .24);
+      color: var(--accent);
     }
 
     .api-run-log {
@@ -892,6 +1159,11 @@
       transition: background .15s, color .15s;
       background: none;
       color: var(--ink);
+    }
+
+    .api-run-actions button:first-child {
+      background: var(--ink);
+      color: var(--paper);
     }
 
     .api-run-actions button:hover:not(:disabled) {
@@ -1139,22 +1411,79 @@
 
     .wizard-stage-ledger {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 8px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
       margin-bottom: 4px;
-      padding: 10px;
+      padding: 12px;
       border: 1px solid rgba(24, 23, 20, .07);
       background: rgba(255, 255, 255, .22);
+    }
+
+    .pipeline-stage-board {
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding: 0;
+      border: none;
+      background: none;
+    }
+
+    .pipeline-stage-group {
+      border: 1px solid rgba(24, 23, 20, .07);
+      background: rgba(255, 255, 255, .24);
+      padding: 10px;
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .pipeline-stage-group-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .pipeline-stage-group-title {
+      font-family: var(--display);
+      font-size: 11pt;
+      line-height: 1.05;
+      color: var(--ink);
+    }
+
+    .pipeline-stage-group-meta {
+      font-family: var(--mono);
+      font-size: 5.4pt;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .pipeline-stage-group-copy {
+      font-size: 5.9pt;
+      line-height: 1.55;
+      letter-spacing: .03em;
+      color: var(--muted);
+      margin-top: -4px;
+    }
+
+    .pipeline-stage-group-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .pipeline-stage-group .wizard-stage-item {
+      min-height: 104px;
     }
 
     .wizard-stage-item {
       border: 1px solid rgba(24, 23, 20, .08);
       background: rgba(255, 255, 255, .36);
-      padding: 9px 10px;
+      padding: 11px 12px;
       box-sizing: border-box;
       display: grid;
-      gap: 7px;
-      min-height: 78px;
+      gap: 8px;
+      min-height: 112px;
       min-width: 0;
       width: 100%;
       text-align: left;
@@ -1206,6 +1535,7 @@
       letter-spacing: .18em;
       text-transform: uppercase;
       color: var(--muted);
+      margin-bottom: 1px;
     }
 
     .wizard-stage-name {
@@ -1257,7 +1587,8 @@
     }
 
     .wizard-status-chip.is-needs-review,
-    .wizard-status-chip.is-invalidated {
+    .wizard-status-chip.is-invalidated,
+    .wizard-status-chip.is-blocked {
       background: rgba(191, 106, 79, .1);
       border-color: rgba(191, 106, 79, .3);
       color: var(--accent);
@@ -1290,6 +1621,11 @@
       white-space: normal;
     }
 
+    .wizard-stage-meta strong {
+      color: var(--ink);
+      font-weight: 600;
+    }
+
     .wizard-stage-stats {
       display: flex;
       flex-wrap: wrap;
@@ -1310,6 +1646,22 @@
       letter-spacing: .08em;
       text-transform: uppercase;
       white-space: nowrap;
+    }
+
+    .api-run-log-shell {
+      display: grid;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 900px) {
+      .api-run-overview {
+        grid-template-columns: 1fr;
+      }
+
+      .api-run-metrics {
+        grid-template-columns: 1fr;
+      }
     }
 
     .wizard-draft-row {
@@ -1811,6 +2163,10 @@
         grid-template-columns: repeat(6, minmax(0, 1fr));
       }
 
+      .pipeline-stage-board {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
       .wizard-overview {
         grid-template-columns: 1fr;
         gap: 5px;
@@ -1840,7 +2196,9 @@
     @media (max-width:520px) {
       .api-config-grid,
       .wizard-state-grid,
-      .wizard-stage-ledger {
+      .wizard-stage-ledger,
+      .pipeline-rail,
+      .pipeline-stage-board {
         grid-template-columns: 1fr;
       }
 
@@ -1979,6 +2337,10 @@
             <button class="wizard-action-btn" id="wiz-start-fresh-btn" type="button">Start New Project</button>
           </div>
         </div>
+
+        <div class="generator-flow-actions">
+          <button class="gen-submit" id="gen-submit" type="button" style="margin-top:0; flex:1">Start Guided Build &rarr;</button>
+        </div>
       </div>
 
       <div class="generator-flow-panel" id="api-config-panel">
@@ -2048,7 +2410,7 @@
         <div class="generator-flow-head">
           <div class="generator-flow-kicker">Live Run</div>
           <div class="generator-flow-title">Track the booklet build</div>
-          <div class="generator-flow-copy">This is the live API build view. Stay here to see what LiftRPG is building, where it stops, and when the booklet is ready for the renderer.</div>
+          <div class="generator-flow-copy">Follow the live API run from staged generation to local validation. Completed API work, restored checkpoints, and local finish steps are labeled separately so you can tell what really happened in this run.</div>
         </div>
         <div class="generator-flow-actions">
           <button class="generator-flow-back" id="api-status-brief" type="button">Back To Brief</button>
@@ -2056,20 +2418,49 @@
           <button class="generator-flow-back api-stop-btn" id="api-stop-btn" type="button" hidden>Stop Build</button>
         </div>
         <div class="wizard-state-board api-run-board">
-          <div class="wizard-state-grid">
-            <div class="wizard-state-card">
-              <div class="wizard-state-label">Run Progress</div>
-              <div class="wizard-state-value" id="api-state-progress">0 / 0 stages</div>
-              <div class="wizard-state-caption" id="api-state-progress-caption">The API pipeline will report each stage here as it runs.</div>
+          <div class="pipeline-rail" id="api-pipeline-rail"></div>
+          <div class="api-run-overview">
+            <div class="api-run-focus">
+              <div class="api-run-focus-kicker" id="api-state-summary">Waiting For Settings</div>
+              <div class="api-run-focus-title" id="api-state-target">Provider Setup</div>
+              <div class="api-run-focus-copy" id="api-state-target-caption">No request has been sent yet.</div>
+              <div class="api-run-metrics">
+                <div class="api-run-metric">
+                  <div class="wizard-state-label">Run Progress</div>
+                  <div class="api-run-metric-value" id="api-state-progress">0 / 0 stages</div>
+                </div>
+                <div class="api-run-metric">
+                  <div class="wizard-state-label">Provider</div>
+                  <div class="api-run-metric-value api-run-metric-value--compact" id="api-state-model">No provider active yet.</div>
+                </div>
+                <div class="api-run-metric">
+                  <div class="wizard-state-label">Run Total</div>
+                  <div class="api-run-metric-value" id="api-state-cost">$0.00</div>
+                </div>
+              </div>
             </div>
-            <div class="wizard-state-card">
-              <div class="wizard-state-label">Estimated Cost</div>
-              <div class="wizard-state-value" id="api-state-cost">$0.00</div>
-              <div class="wizard-state-caption" id="api-state-cost-caption">LiftRPG refreshes pricing from official docs before each run, then falls back locally if the source is unavailable.</div>
+            <div class="api-run-sidecar">
+              <div class="wizard-state-card api-run-sidecard">
+                <div class="wizard-state-label">What Happens Now</div>
+                <div class="wizard-state-caption" id="api-state-progress-caption">The API pipeline will report each stage here as it runs.</div>
+              </div>
+              <div class="wizard-state-card api-run-sidecard">
+                <div class="wizard-state-label">Pricing And Tokens</div>
+                <div class="wizard-state-value api-run-side-value" id="api-state-cost-side">$0.00</div>
+                <div class="wizard-state-caption" id="api-state-cost-caption">LiftRPG starts with the local pricing table, then refreshes live pricing in the background when the provider allows browser access.</div>
+              </div>
             </div>
           </div>
-          <div class="wizard-stage-ledger" id="api-stage-ledger"></div>
-          <div class="api-run-log" id="api-run-log">API build is ready. Add your provider settings, then start the booklet build.</div>
+          <div class="api-run-legend" aria-label="Run state legend">
+            <div class="api-run-legend-item"><span class="api-run-legend-chip is-complete">Complete</span><span>finished with a live API call in this run</span></div>
+            <div class="api-run-legend-item"><span class="api-run-legend-chip is-restored">Restored</span><span>reused from checkpoint instead of calling the model again</span></div>
+            <div class="api-run-legend-item"><span class="api-run-legend-chip is-local">Local</span><span>assembled or validated on this device after generation</span></div>
+          </div>
+          <div class="wizard-stage-ledger pipeline-stage-board" id="api-stage-ledger"></div>
+          <div class="api-run-log-shell">
+            <div class="wizard-state-label">Recent Run Notes</div>
+            <div class="api-run-log" id="api-run-log">API build is ready. Add your provider settings, then start the booklet build.</div>
+          </div>
           <div class="api-checkpoint-actions" id="api-checkpoint-actions">
             <button type="button" id="api-save-checkpoint" class="checkpoint-btn" title="Download current build progress as a file">Save Progress</button>
             <label class="checkpoint-btn checkpoint-upload-label" title="Upload a previously saved checkpoint file to resume">
@@ -2092,6 +2483,8 @@
           </div>
         </div>
 
+          <div class="pipeline-rail" id="wiz-pipeline-rail"></div>
+
           <div class="wizard-step-row">
             <div class="wizard-num active" id="wiz-num-1">1</div>
           <span class="wizard-step-label active" id="wiz-label-1">Foundation</span>
@@ -2112,7 +2505,7 @@
           <span class="wizard-step-label" id="wiz-label-6">Ending</span>
         </div>
 
-        <div class="wizard-stage-ledger" id="wiz-stage-ledger"></div>
+        <div class="wizard-stage-ledger pipeline-stage-board" id="wiz-stage-ledger"></div>
 
         <div class="wizard-overview">
           <div class="wizard-current-kicker" id="wiz-current-kicker">Current Step</div>
@@ -2345,10 +2738,16 @@
       var apiTimeoutEl = document.getElementById('api-timeout');
       var apiKeyEl = document.getElementById('api-key');
       var apiSubmitBtn = document.getElementById('api-submit');
+      var apiStateSummary = document.getElementById('api-state-summary');
+      var apiStateTarget = document.getElementById('api-state-target');
+      var apiStateTargetCaption = document.getElementById('api-state-target-caption');
       var apiStateProgress = document.getElementById('api-state-progress');
       var apiStateProgressCaption = document.getElementById('api-state-progress-caption');
+      var apiStateModel = document.getElementById('api-state-model');
       var apiStateCost = document.getElementById('api-state-cost');
+      var apiStateCostSide = document.getElementById('api-state-cost-side');
       var apiStateCostCaption = document.getElementById('api-state-cost-caption');
+      var apiPipelineRail = document.getElementById('api-pipeline-rail');
       var apiStageLedger = document.getElementById('api-stage-ledger');
       var apiRunLog = document.getElementById('api-run-log');
       var apiRunActions = document.getElementById('api-run-actions');
@@ -2410,6 +2809,7 @@
       var wizCurrentTitle = document.getElementById('wiz-current-title');
       var wizCurrentHelp = document.getElementById('wiz-current-help');
       var wizBackToBriefBtn = document.getElementById('wiz-back-to-brief');
+      var wizPipelineRail = document.getElementById('wiz-pipeline-rail');
       var wizStageLedger = document.getElementById('wiz-stage-ledger');
       var wizStageHealth = document.getElementById('wiz-stage-health');
       var wizBuildMeta = document.getElementById('wiz-build-meta');
@@ -2457,10 +2857,13 @@
       var currentGenerationMode = 'manual';
       var currentGeneratorSurface = 'intake';
       var activeApiRunId = 0;
+      var apiRunTicker = 0;
       var apiModelDiscoveryRunId = 0;
       var apiModelDiscoveryTimer = 0;
       var apiModelChoices = [];
       var apiRunState = null;
+      var LAST_API_BOOKLET_STORAGE_KEY = 'liftrpg_last_api_booklet';
+      var LAST_API_BOOKLET_META_STORAGE_KEY = 'liftrpg_last_api_booklet_meta';
       var stepText = [
         {
           title: 'Foundation',
@@ -2493,6 +2896,26 @@
           recovery: 'If final validation fails, return only to the flagged step instead of redoing everything.'
         }
       ];
+
+      function persistRecoverableApiBooklet(booklet, source) {
+        if (!booklet || typeof booklet !== 'object') return;
+        var savedAt = new Date().toISOString();
+        if (api()) {
+          api().lastBooklet = booklet;
+          api().lastBookletSavedAt = savedAt;
+          api().lastBookletSource = source || '';
+        }
+        try {
+          sessionStorage.setItem(LAST_API_BOOKLET_STORAGE_KEY, JSON.stringify(booklet));
+          sessionStorage.setItem(LAST_API_BOOKLET_META_STORAGE_KEY, JSON.stringify({
+            savedAt: savedAt,
+            source: source || '',
+            title: (((booklet || {}).cover || {}).title || '')
+          }));
+        } catch (error) {
+          console.warn('[LiftRPG] Could not persist recoverable API booklet in UI state:', error && error.message ? error.message : error);
+        }
+      }
 
       function getStageLabel(stageKey) {
         return STAGE_LABELS[stageKey] || stageKey;
@@ -2556,7 +2979,7 @@
 
       function buildPricingCostCaption(pricing, modelLabel, fallbackReason) {
         if (!pricing || !pricing.sourceLabel) {
-          return 'LiftRPG refreshes pricing from official docs before each run, then falls back locally if the source is unavailable.';
+          return 'LiftRPG starts with the local pricing table, then refreshes live pricing in the background when the provider allows browser access.';
         }
         var caption = pricing.live
           ? 'Live pricing refreshed from ' + pricing.sourceLabel
@@ -2570,7 +2993,7 @@
           return caption;
         }
         if (!pricing.live && fallbackReason) {
-          caption += ' Using the local pricing table because the live source could not be refreshed.';
+          caption += ' Staying on the local pricing table because live pricing could not be refreshed from this browser.';
         }
         return caption;
       }
@@ -2594,11 +3017,15 @@
           usage: usage,
           estimatedCostUsd: 0,
           attempts: 0,
+          retries: 0,
           provider: '',
           model: '',
           pricing: null,
           lastStageName: '',
-          lastDetail: ''
+          lastDetail: '',
+          completionSource: '',
+          completedLocally: false,
+          restoredFromCheckpoint: false
         };
       }
 
@@ -2627,13 +3054,15 @@
           progressCaption: 'The API pipeline will report each stage here as it runs.',
           providerLabel: '',
           model: '',
+          runStartedAt: 0,
+          currentStageStartedAt: 0,
           totalStages: 0,
           stageIndex: 0,
           currentStageKey: '',
           tokens: '0 tokens',
           tokensCaption: 'Prompt and completion totals appear here as each stage finishes.',
           cost: '$0.00',
-          costCaption: 'LiftRPG refreshes pricing from official docs before each run, then falls back locally if the source is unavailable.',
+          costCaption: 'LiftRPG starts with the local pricing table, then refreshes live pricing in the background when the provider allows browser access.',
           usageTotals: createApiUsageTotals(),
           stageMetrics: stageMetrics,
           pricingLabel: '',
@@ -2646,8 +3075,39 @@
           ledger: ledger,
           booklet: null,
           error: '',
-          qualityReport: null
+          qualityReport: null,
+          qualityGate: null
         };
+      }
+
+      function formatApiElapsed(ms) {
+        var totalSeconds = Math.max(0, Math.floor(Number(ms || 0) / 1000));
+        var minutes = Math.floor(totalSeconds / 60);
+        var seconds = totalSeconds % 60;
+        if (minutes <= 0) return seconds + 's';
+        if (minutes < 60) return minutes + 'm ' + String(seconds).padStart(2, '0') + 's';
+        var hours = Math.floor(minutes / 60);
+        var remainingMinutes = minutes % 60;
+        return hours + 'h ' + String(remainingMinutes).padStart(2, '0') + 'm';
+      }
+
+      function syncApiRunTicker() {
+        if (apiRunState && apiRunState.status === 'running') {
+          if (!apiRunTicker) {
+            apiRunTicker = window.setInterval(function () {
+              if (!apiRunState || apiRunState.status !== 'running') {
+                syncApiRunTicker();
+                return;
+              }
+              renderApiRunState();
+            }, 1000);
+          }
+          return;
+        }
+        if (apiRunTicker) {
+          window.clearInterval(apiRunTicker);
+          apiRunTicker = 0;
+        }
       }
 
       function loadApiPrefs() {
@@ -2703,6 +3163,16 @@
           models.push(entry);
         }
         try { localStorage.setItem(VALIDATED_MODELS_KEY, JSON.stringify(models)); } catch (e) {}
+        renderValidatedModels();
+      }
+
+      function removeValidatedModel(model, provider) {
+        var models = loadValidatedModels();
+        var filtered = models.filter(function (entry) {
+          if (provider && entry.provider && entry.provider !== provider) return true;
+          return entry.model !== model;
+        });
+        try { localStorage.setItem(VALIDATED_MODELS_KEY, JSON.stringify(filtered)); } catch (e) {}
         renderValidatedModels();
       }
 
@@ -2920,6 +3390,13 @@
         scheduleApiModelDiscovery({ immediate: true });
       }
 
+      function updatePrimaryContinueLabel() {
+        if (!submitBtn) return;
+        submitBtn.textContent = currentGenerationMode === 'api'
+          ? 'Continue To API Setup →'
+          : 'Start Guided Build →';
+      }
+
       function setGenerationMode(mode) {
         currentGenerationMode = mode === 'api' ? 'api' : 'manual';
         if (manualModeBtn) manualModeBtn.classList.toggle('is-active', currentGenerationMode === 'manual');
@@ -2929,6 +3406,7 @@
             ? 'Guided Build keeps the flow step by step and checks each part locally before you move on.'
             : 'Use My API runs the full booklet build in the browser and shows exactly what LiftRPG is doing.';
         }
+        updatePrimaryContinueLabel();
         if (currentGenerationMode === 'api' && apiRunState === null) {
           apiRunState = createApiRunState();
         }
@@ -2987,6 +3465,7 @@
           apiRunState.ledger[apiRunState.currentStageKey] = 'valid';
         }
         apiRunState.currentStageKey = stageKey;
+        apiRunState.currentStageStartedAt = Date.now();
         apiRunState.ledger[stageKey] = 'in progress';
       }
 
@@ -2997,7 +3476,13 @@
         });
       }
 
-      function applyApiStageTelemetry(stageKey, telemetry, detail) {
+      function resolveApiCompletionSource(detail, meta) {
+        if (meta && meta.completionSource) return meta.completionSource;
+        if (/restored from checkpoint/i.test(String(detail || ''))) return 'checkpoint';
+        return 'api';
+      }
+
+      function applyApiStageTelemetry(stageKey, telemetry, detail, meta) {
         if (!apiRunState || !stageKey || !telemetry) return;
         var metrics = apiRunState.stageMetrics[stageKey] || createApiStageMetrics();
         apiRunState.stageMetrics[stageKey] = metrics;
@@ -3011,11 +3496,15 @@
         metrics.usage.totalTokens += Number(usage.totalTokens || 0);
         metrics.estimatedCostUsd += Number(telemetry.estimatedCostUsd || 0);
         metrics.attempts += Number(telemetry.attempts || 0);
+        metrics.retries += Number(telemetry.retries || 0);
         metrics.provider = telemetry.provider || metrics.provider;
         metrics.model = telemetry.model || metrics.model;
         metrics.pricing = telemetry.pricing || metrics.pricing;
         metrics.lastStageName = telemetry.stageName || metrics.lastStageName;
         metrics.lastDetail = detail || metrics.lastDetail;
+        metrics.completionSource = resolveApiCompletionSource(detail, meta);
+        metrics.restoredFromCheckpoint = metrics.completionSource === 'checkpoint';
+        metrics.completedLocally = metrics.completionSource === 'local';
 
         apiRunState.usageTotals.inputTokens += Number(usage.inputTokens || 0);
         apiRunState.usageTotals.outputTokens += Number(usage.outputTokens || 0);
@@ -3041,14 +3530,33 @@
         }
       }
 
-      function markApiStageComplete(stageKey, detail) {
+      function markApiStageComplete(stageKey, detail, meta) {
         if (!apiRunState || !stageKey) return;
+        var metrics = apiRunState.stageMetrics[stageKey] || createApiStageMetrics();
+        apiRunState.stageMetrics[stageKey] = metrics;
         apiRunState.ledger[stageKey] = 'valid';
-        if (detail && apiRunState.stageMetrics[stageKey]) {
-          apiRunState.stageMetrics[stageKey].lastDetail = detail;
-        }
+        metrics.lastDetail = detail || metrics.lastDetail;
+        metrics.completionSource = resolveApiCompletionSource(detail, meta);
+        metrics.restoredFromCheckpoint = metrics.completionSource === 'checkpoint';
+        metrics.completedLocally = metrics.completionSource === 'local';
         if (apiRunState.currentStageKey === stageKey) {
           apiRunState.currentStageKey = '';
+          apiRunState.currentStageStartedAt = 0;
+        }
+      }
+
+      function markApiStageBlocked(stageKey, detail, meta) {
+        if (!apiRunState || !stageKey) return;
+        var metrics = apiRunState.stageMetrics[stageKey] || createApiStageMetrics();
+        apiRunState.stageMetrics[stageKey] = metrics;
+        apiRunState.ledger[stageKey] = 'blocked';
+        metrics.lastDetail = detail || metrics.lastDetail;
+        metrics.completionSource = resolveApiCompletionSource(detail, meta);
+        metrics.restoredFromCheckpoint = false;
+        metrics.completedLocally = metrics.completionSource === 'local';
+        if (apiRunState.currentStageKey === stageKey) {
+          apiRunState.currentStageKey = '';
+          apiRunState.currentStageStartedAt = 0;
         }
       }
 
@@ -3154,11 +3662,107 @@
         if (Number(metrics.estimatedCostUsd || 0) > 0) {
           stats.push('<span class="wizard-stage-stat">' + escapeForHtml(formatUsd(metrics.estimatedCostUsd)) + ' est</span>');
         }
-        if (Number(metrics.attempts || 0) > 1) {
-          stats.push('<span class="wizard-stage-stat">' + escapeForHtml(String(metrics.attempts)) + ' attempts</span>');
+        if (Number(metrics.retries || 0) > 0) {
+          stats.push('<span class="wizard-stage-stat">' + escapeForHtml(String(metrics.retries)) + ' retries</span>');
+        } else if (Number(metrics.attempts || 0) > 1 && metrics.completionSource === 'api') {
+          stats.push('<span class="wizard-stage-stat">' + escapeForHtml(String(metrics.attempts)) + ' api calls</span>');
         }
         if (!stats.length) return '';
         return '<div class="wizard-stage-stats">' + stats.join('') + '</div>';
+      }
+
+      function formatApiStageMeta(status, metrics, providerDisplay, modelDisplay) {
+        metrics = metrics || createApiStageMetrics();
+        if (metrics.restoredFromCheckpoint) {
+          return '<strong>Checkpoint</strong> Reused saved output for this stage.';
+        }
+        if (metrics.completedLocally) {
+          if (status === 'blocked') {
+            return '<strong>Local quality gate</strong> Export is blocked until these issues are resolved.';
+          }
+          return '<strong>On this device</strong> LiftRPG finished this step locally after generation.';
+        }
+        if (status === 'valid') {
+          return '<strong>Completed</strong> Finished in this run.';
+        }
+        if (status === 'blocked') {
+          return '<strong>Blocked</strong> This stage finished locally, but export is still blocked.';
+        }
+        if (status === 'in progress') {
+          return '<strong>Live API</strong> ' + escapeForHtml(providerDisplay || 'Provider') + (modelDisplay ? ' · ' + escapeForHtml(modelDisplay) : '');
+        }
+        if (status === 'invalidated') {
+          return '<strong>Stopped</strong> Review the run notes below for the failure point.';
+        }
+        if (metrics.completionSource === 'api' || Number((metrics.usage || {}).totalTokens || 0) > 0) {
+          return '<strong>Live API</strong> ' + escapeForHtml(providerDisplay || 'Provider') + (modelDisplay ? ' · ' + escapeForHtml(modelDisplay) : '');
+        }
+        return '<strong>Pending</strong> This stage has not run yet.';
+      }
+
+      function formatApiStageStatusLabel(status, metrics) {
+        if (String(status || '') === 'valid' && metrics && metrics.restoredFromCheckpoint) return 'Restored';
+        if (String(status || '') === 'valid' && metrics && metrics.completedLocally) return 'Local';
+        if (String(status || '') === 'valid') return 'Complete';
+        return formatStatusLabel(status);
+      }
+
+      function formatApiStageDetail(stageKey, status, metrics) {
+        metrics = metrics || createApiStageMetrics();
+        if (status === 'in progress') {
+          var baseDetail = stageKey === 'quality'
+            ? 'Assembling and checking the booklet locally on this device.'
+            : (apiRunState.targetCaption || 'Working…');
+          if (apiRunState && apiRunState.currentStageKey === stageKey && apiRunState.currentStageStartedAt) {
+            return baseDetail.replace(/\.$/, '') + ' · ' + formatApiElapsed(Date.now() - apiRunState.currentStageStartedAt) + ' elapsed.';
+          }
+          return baseDetail;
+        }
+        if (status === 'invalidated') {
+          return apiRunState.error || 'This run stopped on this stage.';
+        }
+        if (status === 'blocked') {
+          return metrics.lastDetail || 'Local quality checks blocked export for this booklet.';
+        }
+        if (status === 'valid') {
+          if (metrics.lastDetail) return metrics.lastDetail;
+          if (metrics.restoredFromCheckpoint) return 'Restored from checkpoint.';
+          if (metrics.completedLocally) return 'Completed locally on this device.';
+          return 'Completed in this run.';
+        }
+        if (stageKey === 'quality') return 'Validation and quality gate happen locally after generation.';
+        return '';
+      }
+
+      function buildApiStageItems() {
+        return API_STAGE_ORDER.map(function (stage) {
+          var metrics = apiRunState.stageMetrics[stage.key] || createApiStageMetrics();
+          return {
+            key: stage.key,
+            label: stage.label,
+            status: apiRunState.ledger[stage.key] || 'empty',
+            metrics: metrics
+          };
+        });
+      }
+
+      function renderApiStageCard(item, stageIndex, providerDisplay, modelDisplay) {
+        var tone = getStatusTone(item.status);
+        var currentClass = apiRunState.currentStageKey === item.key ? ' is-current' : '';
+        var detail = formatApiStageDetail(item.key, item.status, item.metrics);
+        return '' +
+          '<div class="wizard-stage-item ' + tone + currentClass + '">' +
+            '<div class="wizard-stage-head">' +
+              '<div class="wizard-stage-head-main">' +
+                '<div class="wizard-stage-step">Step ' + escapeForHtml(String(stageIndex + 1)) + '</div>' +
+                '<div class="wizard-stage-name">' + escapeForHtml(item.label) + '</div>' +
+              '</div>' +
+              '<div class="wizard-status-chip ' + tone + '">' + escapeForHtml(formatApiStageStatusLabel(item.status, item.metrics)) + '</div>' +
+            '</div>' +
+            '<div class="wizard-stage-detail">' + escapeForHtml(detail) + '</div>' +
+            renderApiStageStatsHtml(item.metrics) +
+            '<div class="wizard-stage-meta">' + formatApiStageMeta(item.status, item.metrics, providerDisplay, modelDisplay) + '</div>' +
+          '</div>';
       }
 
       function renderApiActions() {
@@ -3183,17 +3787,18 @@
           apiRunActions.innerHTML = '';
           return;
         }
+        var blockedForQuality = apiRunState.status === 'blocked';
         apiRunActions.innerHTML = '' +
-          '<button type="button" id="api-open-renderer">Open Booklet In Renderer</button>' +
-          '<button type="button" id="api-download-json">Download JSON</button>';
+          '<button type="button" id="api-open-renderer">' + (blockedForQuality ? 'Open Booklet For Review' : 'Open Booklet In Renderer') + '</button>' +
+          '<button type="button" id="api-download-json">' + (blockedForQuality ? 'Download Review JSON' : 'Download JSON') + '</button>';
 
         var openRendererBtn = document.getElementById('api-open-renderer');
         var downloadBtn = document.getElementById('api-download-json');
 
         if (openRendererBtn) {
-          openRendererBtn.addEventListener('click', function () {
+          openRendererBtn.addEventListener('click', async function () {
             try {
-              var cleanBooklet = Object.assign({}, apiRunState.booklet);
+              var cleanBooklet = await prepareAssemblyExport(apiRunState.booklet, { allowBlockedQualityGate: true });
               delete cleanBooklet._qualityReport;
               delete cleanBooklet._qualityGate;
               sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(cleanBooklet));
@@ -3206,12 +3811,22 @@
         }
 
         if (downloadBtn) {
-          downloadBtn.addEventListener('click', function () {
+          downloadBtn.addEventListener('click', async function () {
+            var exportBooklet;
+            try {
+              exportBooklet = await prepareAssemblyExport(apiRunState.booklet, {
+                allowBlockedQualityGate: blockedForQuality
+              });
+            } catch (error) {
+              pushApiLog(error && error.message ? error.message : String(error || 'Could not prepare export.'));
+              renderApiRunState();
+              return;
+            }
             var title = (((apiRunState.booklet || {}).cover || {}).title || 'liftrpg-booklet')
               .toLowerCase()
               .replace(/[^a-z0-9]+/g, '-')
               .replace(/^-+|-+$/g, '') || 'liftrpg-booklet';
-            var blob = new Blob([JSON.stringify(apiRunState.booklet, null, 2)], { type: 'application/json' });
+            var blob = new Blob([JSON.stringify(exportBooklet, null, 2)], { type: 'application/json' });
             var url = URL.createObjectURL(blob);
             var link = document.createElement('a');
             link.href = url;
@@ -3233,36 +3848,49 @@
         if (apiRunState.status === 'idle' && providerDisplay) {
           apiRunState.progressCaption = 'Ready — ' + providerDisplay + (modelDisplay ? ' · ' + modelDisplay : '') + '. ' + formatTimeoutLabel(apiTimeoutEl ? Number(apiTimeoutEl.value || 600000) : apiRunState.requestTimeoutMs || 600000) + '.';
         }
+        if (apiRunState.status === 'running' && apiRunState.currentStageKey && apiRunState.currentStageStartedAt) {
+          var activeStageLabel = getStageLabel(apiRunState.currentStageKey) || 'current stage';
+          var elapsed = formatApiElapsed(Date.now() - apiRunState.currentStageStartedAt);
+          var timeoutLabel = formatTimeoutLabel(apiRunState.requestTimeoutMs || (apiTimeoutEl ? Number(apiTimeoutEl.value || 600000) : 600000));
+          apiRunState.progressCaption = 'Waiting on ' + activeStageLabel + ' for ' + elapsed + '. ' + timeoutLabel + '.';
+          if ((Date.now() - apiRunState.currentStageStartedAt) >= 90000) {
+            apiRunState.progressCaption += ' Still waiting on provider response.';
+          }
+        }
+        if (apiStateSummary) apiStateSummary.textContent = apiRunState.summary || 'Waiting For Settings';
+        if (apiStateTarget) apiStateTarget.textContent = apiRunState.target || 'Provider Setup';
+        if (apiStateTargetCaption) apiStateTargetCaption.textContent = apiRunState.targetCaption || 'No request has been sent yet.';
         apiStateProgress.textContent = apiRunState.progress;
         apiStateProgressCaption.textContent = apiRunState.progressCaption;
+        if (apiStateModel) {
+          apiStateModel.textContent = providerDisplay
+            ? (providerDisplay + (modelDisplay ? ' · ' + modelDisplay : ''))
+            : 'No provider active yet.';
+        }
         if (apiStateCost) apiStateCost.textContent = apiRunState.cost || '$0.00';
-        if (apiStateCostCaption) apiStateCostCaption.textContent = apiRunState.costCaption || 'LiftRPG refreshes pricing from official docs before each run, then falls back locally if the source is unavailable.';
-        apiStageLedger.innerHTML = API_STAGE_ORDER.map(function (stage) {
-          var status = apiRunState.ledger[stage.key] || 'empty';
-          var tone = getStatusTone(status);
-          var currentClass = apiRunState.currentStageKey === stage.key ? ' is-current' : '';
-          var metrics = apiRunState.stageMetrics[stage.key] || createApiStageMetrics();
-          var detail = stage.key === 'quality'
-            ? 'Validation and quality gate.'
-            : '';
-          if (status === 'valid') detail = metrics.lastDetail || 'Completed in this run.';
-          if (status === 'in progress') detail = apiRunState.targetCaption;
-          if (status === 'invalidated') detail = apiRunState.error || 'This run stopped on this stage.';
-          var meta = providerDisplay ? (providerDisplay + (modelDisplay ? ' · ' + modelDisplay : '')) : 'No provider active yet.';
-          if (metrics.pricing && metrics.pricing.sourceLabel) {
-            meta += ' · ' + describePricingSource(metrics.pricing);
-          }
-          return '' +
-            '<div class="wizard-stage-item ' + tone + currentClass + '">' +
-              '<div class="wizard-stage-head">' +
-                '<div class="wizard-stage-name">' + escapeForHtml(stage.label) + '</div>' +
-                '<div class="wizard-status-chip ' + tone + '">' + escapeForHtml(formatStatusLabel(status)) + '</div>' +
-              '</div>' +
-              '<div class="wizard-stage-detail">' + escapeForHtml(detail) + '</div>' +
-              renderApiStageStatsHtml(metrics) +
-              '<div class="wizard-stage-meta">' + escapeForHtml(meta) + '</div>' +
-            '</div>';
-        }).join('');
+        if (apiStateCostSide) apiStateCostSide.textContent = apiRunState.cost || '$0.00';
+        if (apiStateCostCaption) apiStateCostCaption.textContent = apiRunState.costCaption || 'LiftRPG starts with the local pricing table, then refreshes live pricing in the background when the provider allows browser access.';
+        var apiStageItems = buildApiStageItems();
+        renderPipelineRail(apiPipelineRail, apiStageItems.map(function (item) {
+          return {
+            key: item.key,
+            label: item.label,
+            status: item.status,
+            meta: formatApiStageStatusLabel(item.status, item.metrics)
+          };
+        }), {
+          currentKey: apiRunState.currentStageKey || (apiRunState.status === 'blocked' ? 'quality' : '')
+        });
+        var groupedApiStages = buildStageGroups(apiStageItems, function (item) {
+          if (item.status === 'blocked' || item.status === 'invalidated') return 'attention';
+          if (item.status === 'in progress') return 'current';
+          if (item.status === 'valid') return 'complete';
+          return 'open';
+        });
+        renderStageGroups(apiStageLedger, groupedApiStages, function (item) {
+          var stageIndex = API_STAGE_ORDER.findIndex(function (stage) { return stage.key === item.key; });
+          return renderApiStageCard(item, stageIndex, providerDisplay, modelDisplay);
+        });
         apiRunLog.innerHTML = apiRunState.log.map(function (line) {
           return escapeForHtml(line);
         }).join('<br>');
@@ -3271,6 +3899,7 @@
         }
         renderApiActions();
         updateDailyBudgetDisplay();
+        syncApiRunTicker();
       }
 
       function updateDailyBudgetDisplay() {
@@ -3426,6 +4055,7 @@
       function formatStatusLabel(status) {
         var value = String(status || 'empty');
         if (value === 'in progress') return 'In Progress';
+        if (value === 'blocked') return 'Blocked';
         if (value === 'needs review') return 'Review Needed';
         if (value === 'not needed') return 'Not Needed';
         if (value === 'drafted') return 'Needs Check';
@@ -3438,6 +4068,7 @@
         var value = String(status || 'empty').toLowerCase().replace(/\s+/g, '-');
         if (value === 'valid') return 'is-valid';
         if (value === 'in-progress') return 'is-in-progress';
+        if (value === 'blocked') return 'is-blocked';
         if (value === 'drafted') return 'is-drafted';
         if (value === 'needs-review') return 'is-needs-review';
         if (value === 'invalidated') return 'is-invalidated';
@@ -3688,10 +4319,106 @@
         };
       }
 
+      function getPipelineNodeState(status, isCurrent) {
+        if (status === 'blocked' || status === 'invalidated' || status === 'needs review') return 'is-alert';
+        if (isCurrent || status === 'in progress' || status === 'drafted') return 'is-current';
+        if (status === 'valid' || status === 'not needed') return 'is-complete';
+        return 'is-upcoming';
+      }
+
+      function renderPipelineRail(targetEl, items, options) {
+        if (!targetEl) return;
+        items = Array.isArray(items) ? items : [];
+        options = options || {};
+        var currentKey = options.currentKey || '';
+        targetEl.innerHTML = items.map(function (item, index) {
+          var isCurrent = item.key === currentKey;
+          var nodeState = getPipelineNodeState(item.status, isCurrent);
+          var statusText = isCurrent
+            ? 'Current'
+            : (item.status === 'valid' || item.status === 'not needed')
+              ? 'Complete'
+              : (item.status === 'blocked' || item.status === 'invalidated' || item.status === 'needs review')
+                ? 'Attention'
+                : 'Open';
+          var meta = item.meta || item.reason || '';
+          return '' +
+            '<div class="pipeline-stage-node ' + nodeState + '">' +
+              '<div class="pipeline-stage-node-top">' +
+                '<div class="pipeline-stage-node-dot">' + escapeForHtml(String(index + 1)) + '</div>' +
+                '<div class="pipeline-stage-node-status">' + escapeForHtml(statusText) + '</div>' +
+              '</div>' +
+              '<div class="pipeline-stage-node-title">' + escapeForHtml(item.label) + '</div>' +
+              '<div class="pipeline-stage-node-meta">' + escapeForHtml(meta) + '</div>' +
+            '</div>';
+        }).join('');
+      }
+
+      function buildStageGroups(items, resolveGroupKey) {
+        var groups = {
+          attention: [],
+          current: [],
+          open: [],
+          complete: []
+        };
+        (items || []).forEach(function (item) {
+          var key = resolveGroupKey(item);
+          if (!groups[key]) key = 'open';
+          groups[key].push(item);
+        });
+        return groups;
+      }
+
+      function getStageGroupDefinitions() {
+        return [
+          { key: 'attention', title: 'Needs Attention', emptyCopy: 'Nothing is blocked right now.' },
+          { key: 'current', title: 'In Progress', emptyCopy: 'No stage is actively being worked right now.' },
+          { key: 'open', title: 'Open', emptyCopy: 'Everything queued here is waiting on earlier stages.' },
+          { key: 'complete', title: 'Complete', emptyCopy: 'Completed stages move here.' }
+        ];
+      }
+
+      function renderStageGroups(targetEl, grouped, renderCard) {
+        if (!targetEl) return;
+        var definitions = getStageGroupDefinitions().filter(function (group) {
+          return group.key === 'complete' || (grouped[group.key] && grouped[group.key].length > 0);
+        });
+        targetEl.innerHTML = definitions.map(function (group) {
+          var items = grouped[group.key] || [];
+          return '' +
+            '<section class="pipeline-stage-group">' +
+              '<div class="pipeline-stage-group-head">' +
+                '<div class="pipeline-stage-group-title">' + escapeForHtml(group.title) + '</div>' +
+                '<div class="pipeline-stage-group-meta">' + escapeForHtml(String(items.length)) + '</div>' +
+              '</div>' +
+              '<div class="pipeline-stage-group-copy">' + escapeForHtml(items.length ? '' : group.emptyCopy) + '</div>' +
+              '<div class="pipeline-stage-group-list">' +
+                (items.length ? items.map(renderCard).join('') : '') +
+              '</div>' +
+            '</section>';
+        }).join('');
+      }
+
       function renderStageLedger(items, nextAction) {
         if (!wizStageLedger) return;
         var activeKey = nextAction && nextAction.stageKey ? nextAction.stageKey : '';
-        wizStageLedger.innerHTML = items.map(function (item) {
+        var grouped = buildStageGroups(items, function (item) {
+          if (item.status === 'blocked' || item.status === 'invalidated' || item.status === 'needs review') return 'attention';
+          if (item.key === activeKey || item.status === 'drafted' || item.status === 'in progress') return 'current';
+          if (item.status === 'valid' || item.status === 'not needed') return 'complete';
+          return 'open';
+        });
+
+        renderPipelineRail(wizPipelineRail, items.map(function (item) {
+          return {
+            key: item.key,
+            label: item.label,
+            status: item.key === activeKey ? 'in progress' : item.status,
+            meta: getStageMeta(item)
+          };
+        }), { currentKey: activeKey });
+
+        renderStageGroups(wizStageLedger, grouped, function (item) {
           var tone = getStatusTone(item.status);
           var stageIndex = WIZARD_STAGE_KEYS.indexOf(item.key);
           var currentClass = stageIndex === wizStep ? ' is-current' : '';
@@ -3708,7 +4435,7 @@
               '<div class="wizard-stage-detail">' + escapeForHtml(getStageDetail(item)) + '</div>' +
               '<div class="wizard-stage-meta">' + escapeForHtml(getStageMeta(item)) + '</div>' +
             '</button>';
-        }).join('');
+        });
         Array.prototype.forEach.call(wizStageLedger.querySelectorAll('[data-stage-index]'), function (button) {
           button.addEventListener('click', function () {
             jumpToStep(Number(button.getAttribute('data-stage-index')));
@@ -4002,12 +4729,16 @@
           if (!apiRunState || apiRunState.status !== 'running') return;
           // Invalidate the current run — pipeline checks runId at each stage boundary
           activeApiRunId++;
+          if (apiRunState.currentStageKey && apiRunState.ledger[apiRunState.currentStageKey] === 'in progress') {
+            apiRunState.ledger[apiRunState.currentStageKey] = 'invalidated';
+          }
           apiRunState.status = 'error';
           apiRunState.summary = 'Build Stopped';
           apiRunState.summaryCaption = 'You stopped the build. Completed stages are cached — restarting will resume from where it left off.';
           apiRunState.target = 'Restart Or Reconfigure';
           apiRunState.targetCaption = 'Change settings or hit the build button again to resume.';
           apiRunState.error = 'Build stopped by user.';
+          apiRunState.currentStageStartedAt = 0;
           pushApiLog('Build stopped by user.');
           renderApiRunState();
           _apiGenerateRunning = false;
@@ -4647,14 +5378,44 @@
           });
       }
 
-      async function prepareAssemblyExport(data) {
+      function redactBossPasswordSpoilers(cloned, password) {
+        if (!cloned || !password || !Array.isArray(cloned.weeks)) return;
+        var upper = String(password || '').trim().toUpperCase();
+        if (!upper) return;
+        var escaped = upper.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        var quoted = new RegExp('([\'"])' + escaped + '\\1', 'g');
+        var bare = new RegExp('\\b' + escaped + '\\b', 'g');
+
+        function sanitize(text) {
+          var raw = String(text || '');
+          if (!raw) return raw;
+          return raw
+            .replace(/enter this password,\s*(['"])?[A-Z0-9-]{3,16}\1?/gi, 'enter the reconstructed password')
+            .replace(/the resultant name is your final password/gi, 'the resultant name is the final designation')
+            .replace(/to expose\s+(['"])?[A-Z0-9-]{3,16}\1?/gi, 'to expose the hidden author')
+            .replace(quoted, "'[REDACTED]'")
+            .replace(bare, '[REDACTED]');
+        }
+
+        cloned.weeks.forEach(function (week) {
+          if (!week || !week.isBossWeek || !week.bossEncounter) return;
+          var boss = week.bossEncounter;
+          if (boss.narrative) boss.narrative = sanitize(boss.narrative);
+          if (boss.mechanismDescription) boss.mechanismDescription = sanitize(boss.mechanismDescription);
+          if (boss.convergenceProof) boss.convergenceProof = sanitize(boss.convergenceProof);
+          if (boss.passwordRevealInstruction) boss.passwordRevealInstruction = sanitize(boss.passwordRevealInstruction);
+        });
+      }
+
+      async function prepareAssemblyExport(data, options) {
+        options = options || {};
         var cloned = JSON.parse(JSON.stringify(data || {}));
         if (!cloned || typeof cloned !== 'object') return cloned;
 
         if (api() && typeof api().qualityReport === 'function' && typeof api().qualityGate === 'function') {
           var report = api().qualityReport(cloned);
           var gate = api().qualityGate(report);
-          if (!gate.passed) {
+          if (!gate.passed && !options.allowBlockedQualityGate) {
             throw new Error('Booklet is still blocked by the quality gate:\n' + gate.blockers.map(function (entry) {
               return '- ' + entry.message;
             }).join('\n'));
@@ -4673,6 +5434,7 @@
           ]);
           var password = modules[0].deriveBookletPassword(cloned);
           if (password) {
+            redactBossPasswordSpoilers(cloned, password);
             var payload = cloned.endings[0].content || cloned.endings[0];
             cloned.meta.passwordEncryptedEnding = await modules[1].encryptEnding(payload, password);
             cloned.endings = [];
@@ -5537,6 +6299,15 @@
 
       if (submitBtn) submitBtn.addEventListener('click', handlePrimaryContinue);
 
+      function summarizeQualityGateBlockers(blockers, options) {
+        blockers = Array.isArray(blockers) ? blockers : [];
+        options = options || {};
+        var limit = typeof options.limit === 'number' ? options.limit : blockers.length;
+        return blockers.slice(0, limit).map(function (entry) {
+          return entry && entry.message ? entry.message : String(entry || '');
+        }).filter(Boolean);
+      }
+
       var _apiGenerateRunning = false;
       async function handleApiGenerate() {
         if (_apiGenerateRunning) {
@@ -5585,19 +6356,21 @@
         saveApiPrefs();
         apiRunState = createApiRunState();
         apiRunState.status = 'running';
-        apiRunState.summary = 'Refreshing Live Pricing';
-        apiRunState.summaryCaption = 'LiftRPG checks the latest official pricing for the selected model before the first stage starts.';
-        apiRunState.target = 'Pricing Preflight';
-        apiRunState.targetCaption = 'Fetching current pricing for ' + settings.model + '.';
+        apiRunState.summary = 'Connecting To Provider';
+        apiRunState.summaryCaption = 'Requests are sent directly from this browser to ' + settings._providerLabel + '.';
+        apiRunState.target = 'Initialize Pipeline';
+        apiRunState.targetCaption = 'Preparing the staged generation run.';
         apiRunState.progress = '0 / 0 stages';
         apiRunState.progressCaption = settings._providerLabel + (settings.model ? ' · ' + settings.model : '') + ' · ' + formatTimeoutLabel(settings.requestTimeoutMs);
         apiRunState.providerLabel = settings._providerLabel;
         apiRunState.model = settings.model;
+        apiRunState.runStartedAt = Date.now();
+        apiRunState.currentStageStartedAt = 0;
         apiRunState.requestTimeoutMs = settings.requestTimeoutMs;
         apiRunState.tokens = '0 tokens';
         apiRunState.tokensCaption = 'Prompt and completion totals appear here as each stage finishes.';
         apiRunState.cost = '$0.00';
-        apiRunState.costCaption = 'Using local pricing table. Live refresh runs in the background.';
+        apiRunState.costCaption = 'Using the local pricing table until live pricing refresh completes.';
         apiRunState.log = [];
         renderApiRunState();
         setGeneratorSurface('api-status', { skipFocus: true });
@@ -5657,13 +6430,13 @@
               pushApiLog(stageIndex + '/' + totalStages + ' ' + message);
             } else if (phase === 'complete') {
               if (meta.telemetry) {
-                applyApiStageTelemetry(stageKey, meta.telemetry, message);
+                applyApiStageTelemetry(stageKey, meta.telemetry, message, meta);
               }
-              markApiStageComplete(stageKey, message);
+              markApiStageComplete(stageKey, message, meta);
               pushApiLog((stageKey ? getStageLabel(stageKey) : 'Stage') + ' complete · ' + (meta.telemetry ? formatTokenSummary(meta.telemetry.usage) : 'No token data') + (meta.telemetry && meta.telemetry.estimatedCostUsd ? ' · ' + formatUsd(meta.telemetry.estimatedCostUsd) + ' est' : ''));
             } else if (phase === 'failed') {
               if (meta.telemetry) {
-                applyApiStageTelemetry(stageKey, meta.telemetry, meta.error || message);
+                applyApiStageTelemetry(stageKey, meta.telemetry, meta.error || message, meta);
               }
             }
             renderApiRunState();
@@ -5672,33 +6445,64 @@
           if (runId !== activeApiRunId) return;
 
           markAllApiStages('valid');
-          apiRunState.currentStageKey = 'quality';
           var qualityGate = booklet._qualityGate || { passed: true, blockers: [] };
-          var hasQualityWarnings = !qualityGate.passed && qualityGate.blockers && qualityGate.blockers.length > 0;
-          apiRunState.status = 'success';
-          apiRunState.summary = hasQualityWarnings ? 'Booklet Ready (with warnings)' : 'Booklet Ready';
-          apiRunState.summaryCaption = hasQualityWarnings
-            ? 'The API pipeline completed but the booklet has quality warnings: ' + qualityGate.blockers.map(function (b) { return b.message; }).join('; ')
-            : 'The API pipeline completed and the booklet passed local validation.';
-          apiRunState.target = 'Open Or Download';
-          apiRunState.targetCaption = 'Send the generated booklet to the renderer or download the JSON.';
+          var isQualityBlocked = !qualityGate.passed && qualityGate.blockers && qualityGate.blockers.length > 0;
+          var blockerMessages = summarizeQualityGateBlockers(qualityGate.blockers, { limit: 2 });
+          apiRunState.qualityGate = qualityGate;
+          if (isQualityBlocked) {
+            markApiStageBlocked(
+              'quality',
+              'Local quality gate blocked export for this booklet.',
+              { completionSource: 'local' }
+            );
+            apiRunState.status = 'blocked';
+            apiRunState.summary = 'Quality Gate Blocked';
+            apiRunState.summaryCaption = 'Generation finished, but the booklet needs another pass before export.';
+            apiRunState.target = 'Review Quality Blockers';
+            apiRunState.targetCaption = blockerMessages.join(' · ') || 'Open the review artifact and fix the blockers before export.';
+            removeValidatedModel(settings.model, settings._providerLabel);
+          } else {
+            markApiStageComplete(
+              'quality',
+              'Assembled and validated locally on this device.',
+              { completionSource: 'local' }
+            );
+            apiRunState.status = 'success';
+            apiRunState.summary = 'Booklet Ready';
+            apiRunState.summaryCaption = 'The API pipeline completed and the booklet passed local validation.';
+            apiRunState.target = 'Open Or Download';
+            apiRunState.targetCaption = 'Send the generated booklet to the renderer or download the JSON.';
+          }
           apiRunState.progress = apiRunState.totalStages + ' / ' + apiRunState.totalStages + ' stages';
           var report = api().lastQualityReport || null;
           apiRunState.qualityReport = report;
           apiRunState.runSignature = getApiConfigSignature();
-          apiRunState.progressCaption = report && report.scores && report.scores.aggregate
-            ? 'Quality score ' + report.scores.aggregate.score + ' · ' + settings._providerLabel
-            : settings._providerLabel + (settings.model ? ' · ' + settings.model : '');
+          apiRunState.currentStageStartedAt = 0;
+          var aggregateScore = report && report.scores && report.scores.aggregate ? report.scores.aggregate.score : '';
+          apiRunState.progressCaption = isQualityBlocked
+            ? (blockerMessages.length ? blockerMessages.length + ' blockers' : 'Quality blocked') + (aggregateScore ? ' · score ' + aggregateScore : '') + ' · ' + settings._providerLabel
+            : aggregateScore
+              ? 'Quality score ' + aggregateScore + ' · ' + settings._providerLabel
+              : settings._providerLabel + (settings.model ? ' · ' + settings.model : '');
           apiRunState.booklet = booklet;
+          persistRecoverableApiBooklet(booklet, methodName);
           apiRunState.costCaption = (apiRunState.pricingLabel ? 'Estimated from ' + apiRunState.pricingLabel + '. ' : '') +
             'Run total: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + '.';
-          pushApiLog('Generation complete. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.');
-          saveValidatedModel({
-            model: settings.model,
-            provider: settings._providerLabel,
-            cost: apiRunState.cost || '—',
-            date: new Date().toISOString()
-          });
+          pushApiLog(
+            isQualityBlocked
+              ? 'Generation finished, but export is blocked by the quality gate. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.'
+              : 'Generation complete. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.'
+          );
+          if (isQualityBlocked) {
+            pushApiLog('Quality blockers: ' + summarizeQualityGateBlockers(qualityGate.blockers).join(' · '));
+          } else {
+            saveValidatedModel({
+              model: settings.model,
+              provider: settings._providerLabel,
+              cost: apiRunState.cost || '—',
+              date: new Date().toISOString()
+            });
+          }
           renderApiRunState();
           setGeneratorSurface('api-status', { skipFocus: true });
         } catch (error) {
@@ -5722,6 +6526,7 @@
           apiRunState.progress = apiRunState.stageIndex + ' / ' + apiRunState.totalStages + ' stages';
           apiRunState.progressCaption = 'No booklet was committed to the renderer.';
           apiRunState.error = failureMessage;
+          apiRunState.currentStageStartedAt = 0;
           if (apiRunState.usageTotals && apiRunState.usageTotals.totalTokens > 0) {
             apiRunState.costCaption = 'Usage before failure: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.';
           }
@@ -5745,10 +6550,13 @@
       // ── Checkpoint resume detection on page load ────────────────────
       // If a pipeline checkpoint exists with saved inputs, restore them
       // and show a banner so the user can resume with one click.
-      (function detectCheckpointOnLoad() {
-        if (!api() || !api().getCheckpoint) return;
+      var apiCheckpointRestoreAttempted = false;
+      function restoreApiCheckpointIfAvailable() {
+        if (apiCheckpointRestoreAttempted) return true;
+        if (!api() || !api().getCheckpoint) return false;
+        apiCheckpointRestoreAttempted = true;
         var cp = api().getCheckpoint();
-        if (!cp || !cp.inputs || !cp.stages || Object.keys(cp.stages).length === 0) return;
+        if (!cp || !cp.inputs || !cp.stages || Object.keys(cp.stages).length === 0) return true;
         var inputs = cp.inputs;
         var stageCount = Object.keys(cp.stages).length;
         console.log('[LiftRPG] Checkpoint detected on load: ' + stageCount + ' stages cached.');
@@ -5761,11 +6569,25 @@
           applyProviderPreset(inputs.provider, { keepModel: false, keepBaseUrl: false });
         }
         if (inputs.model && apiModelEl) apiModelEl.value = inputs.model;
-        // Navigate to API setup and show resume prompt
-        setGeneratorSurface('api-setup', { skipFocus: true });
-        pushApiLog('Checkpoint found: ' + stageCount + ' stages from a previous run. Hit "Build Booklet" to resume.');
+        if (!apiRunState) apiRunState = createApiRunState();
+        var stageLabel = stageCount + ' cached stage' + (stageCount === 1 ? '' : 's');
+        apiRunState.summary = 'Resume Available';
+        apiRunState.summaryCaption = 'A previous API build left ' + stageLabel + ' on this device.';
+        apiRunState.target = 'Resume Build';
+        apiRunState.targetCaption = 'Review the settings, then build again to continue from the checkpoint.';
+        apiRunState.progress = stageLabel;
+        apiRunState.progressCaption = 'Checkpoint resume is available for this booklet.';
+        setGenerationMode('api');
+        setGeneratorSurface('api-config', { skipFocus: true });
+        pushApiLog('Checkpoint found: ' + stageLabel + ' from a previous run. Hit "Build Booklet" to resume.');
+        if (modal && !modal.classList.contains('is-open')) openModal();
         renderApiRunState();
-      })();
+        return true;
+      }
+
+      if (!restoreApiCheckpointIfAvailable()) {
+        window.addEventListener('liftrpg-api-ready', restoreApiCheckpointIfAvailable, { once: true });
+      }
 
       document.getElementById('wiz-next-1').addEventListener('click', function () {
         var api = manualApi();

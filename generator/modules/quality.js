@@ -13,6 +13,59 @@ export function extractWeekCompanionTypes(week) {
     .sort();
 }
 
+function buildMapEvolutionFingerprint(mapState) {
+  var ms = mapState || {};
+  var mapType = String(ms.mapType || 'grid').trim().toLowerCase();
+
+  if (mapType === 'point-to-point' || mapType === 'node-graph') {
+    var nodes = (ms.nodes || []).map(function (node) {
+      return [node.id || '', node.label || '', node.state || '', node.x || '', node.y || ''].join(':');
+    }).sort().join('|');
+    var edges = (ms.edges || []).map(function (edge) {
+      return [edge.from || '', edge.to || '', edge.label || ''].join(':');
+    }).sort().join('|');
+    return 'network::' + nodes + '::' + edges + '::' + String(ms.currentNode || '');
+  }
+
+  if (mapType === 'linear-track') {
+    var stops = (ms.stops || ms.nodes || []).map(function (stop) {
+      return [stop.id || '', stop.label || '', stop.state || '', stop.position || ''].join(':');
+    }).sort().join('|');
+    return 'track::' + stops + '::' + String(ms.currentPosition || ms.currentNode || '');
+  }
+
+  if (mapType === 'player-drawn') {
+    return 'player::' + String(ms.mapNote || '') + '::' + String(ms.currentPosition || '');
+  }
+
+  var tiles = (ms.tiles || []).map(function (tile) {
+    return [tile.label || '', tile.type || '', tile.x || '', tile.y || ''].join(':');
+  }).sort().join('|');
+  return 'grid::' + tiles + '::' + String(ms.currentPosition || '');
+}
+
+function findBossPasswordSpoiler(boss) {
+  if (!boss || typeof boss !== 'object') return '';
+  var texts = [
+    boss.narrative,
+    boss.mechanismDescription,
+    boss.convergenceProof,
+    boss.passwordRevealInstruction
+  ].filter(Boolean).map(function (value) { return String(value); });
+
+  for (var i = 0; i < texts.length; i++) {
+    var text = texts[i];
+    var explicit = text.match(/enter this password,\s*['"]?([A-Z0-9-]{3,16})['"]?/i);
+    if (explicit && explicit[1]) return explicit[1].toUpperCase();
+  }
+
+  if (boss.passwordRevealInstruction) {
+    var quoted = String(boss.passwordRevealInstruction).match(/['"]([A-Z0-9-]{3,16})['"]/);
+    if (quoted && quoted[1]) return quoted[1].toUpperCase();
+  }
+  return '';
+}
+
 export function collectIdentityVariationFindings(booklet, nonBossWeeks, fragments, report) {
   var findings = 0;
   var meta = (booklet || {}).meta || {};
@@ -120,6 +173,7 @@ export var QUALITY_BLOCKING_AREAS = {
   'board-monotony': { target: 'weeks' },
   'companion-sameness': { target: 'weeks' },
   'identity-undercommitment': { target: 'shell' },
+  'boss-password-spoiler': { target: 'endings', alwaysBlock: true },
   'map-stagnation': { target: 'weeks' },
   'cipher-repetition': { target: 'weeks' },
   'oracle-vagueness': { target: 'weeks' },
@@ -281,6 +335,14 @@ export function generateQualityReport(booklet) {
     if (!bossObj.decodingKey) {
       bossQualityWarnings.push('Boss missing decodingKey — no reveal mechanic');
     }
+    var leakedPassword = findBossPasswordSpoiler(bossObj);
+    if (leakedPassword) {
+      report.weakSpots.push({
+        area: 'boss-password-spoiler',
+        detail: 'Boss convergence text explicitly reveals the final password "' + leakedPassword + '"',
+        severity: 'high'
+      });
+    }
     // Count boss-related hard errors from validator for scoring only
     var bossErrorCount = report.schemaErrors.filter(function (e) {
       return e.indexOf('Boss ') === 0 || e.indexOf('componentInputs') !== -1 ||
@@ -332,9 +394,7 @@ export function generateQualityReport(booklet) {
       mapIssues.push('Week ' + actualWeekNum + ' missing mapState');
       return;
     }
-    var tiles = ms.tiles || [];
-    // Fingerprint includes label + type so persistent topology with evolving state is not flagged
-    var labels = tiles.map(function (t) { return (t.label || '') + ':' + (t.type || ''); }).sort().join('|');
+    var labels = buildMapEvolutionFingerprint(ms);
 
     // Check for state evolution (tile labels AND types should differ between weeks)
     if (prevMapLabels !== null && labels === prevMapLabels) {

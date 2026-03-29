@@ -340,7 +340,12 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
 
     // Cipher validation
     if (fo.cipher) {
-      if (!fo.cipher.title) errors.push('cipher.title missing');
+      var REQUIRED_CIPHER_FIELDS = ['type', 'title', 'body', 'extractionInstruction', 'characterDerivationProof', 'noticeabilityDesign'];
+      REQUIRED_CIPHER_FIELDS.forEach(function (field) {
+        if (fo.cipher[field] === undefined || fo.cipher[field] === null || fo.cipher[field] === '') {
+          errors.push('cipher.' + field + ' missing');
+        }
+      });
       if (fo.cipher.body && typeof fo.cipher.body === 'string') {
         errors.push('cipher.body must be an object (with displayText, key, workSpace), not a string');
       }
@@ -437,6 +442,19 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
   }
   if (weekObj.overflow && Array.isArray(weekObj.sessions) && weekObj.sessions.length <= 3) {
     errors.push('Week has overflow=true but only ' + weekObj.sessions.length + ' sessions');
+  }
+  if (Array.isArray(weekObj.sessions) && weekObj.sessions.length > 3) {
+    var overflowDocument = weekObj.overflowDocument;
+    if (!overflowDocument || typeof overflowDocument !== 'object') {
+      errors.push('Overflow week missing overflowDocument');
+    } else {
+      if (!overflowDocument.id) errors.push('overflowDocument.id missing');
+      if (!overflowDocument.documentType) errors.push('overflowDocument.documentType missing');
+      if (!overflowDocument.content && !overflowDocument.body) errors.push('overflowDocument missing content');
+      if (!overflowDocument.designSpec || typeof overflowDocument.designSpec !== 'object') {
+        warnings.push('overflowDocument missing designSpec (renderer falls back to neutral defaults)');
+      }
+    }
   }
 
   // Gameplay clocks — renderer builds clock widgets from these fields

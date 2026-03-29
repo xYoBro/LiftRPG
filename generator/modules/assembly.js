@@ -32,11 +32,19 @@ export function createDiagnostic(code, severity, phase, message, opts) {
 }
 
 // ── ID normalisation ────────────────────────────────────────────────────────
-// Soft matching for fragment IDs: "F.01" vs "F-01" vs "f_01" all match.
-// Used in validation only — never rewrites IDs in the booklet.
+// Soft matching for fragment IDs: punctuation and zero-padding differences are
+// treated as the same identity. "F.01" vs "F-01" vs "F.001" all match.
+// Used in validation and continuity alignment only — never rewrites IDs in the
+// booklet unless a later repair step explicitly chooses to do so.
 
 export function normalizeId(id) {
-  return String(id || '').toLowerCase().replace(/[-_.\s]/g, '');
+  return String(id || '')
+    .toLowerCase()
+    .replace(/[-_.\s]/g, '')
+    .replace(/\d+/g, function (digits) {
+      var value = parseInt(digits, 10);
+      return Number.isFinite(value) ? String(value) : digits;
+    });
 }
 
 export function firstNonEmpty() {
@@ -54,6 +62,13 @@ export function toSlugWords(value) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+}
+
+export function toSlugToken(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 export function cloneSimple(value) {
@@ -124,9 +139,56 @@ export function inferShellFamily(artifactClass, themeArchetype) {
   return 'field-survey';
 }
 
-export function inferBoardStateMode(shell, campaignPlan) {
-  var metaIdentity = (((shell || {}).meta || {}).artifactIdentity || {});
-  if (metaIdentity.boardStateMode) return String(metaIdentity.boardStateMode);
+var SUPPORTED_SHELL_FAMILIES = {
+  'field-survey': true,
+  'classified-packet': true,
+  'ship-logbook': true,
+  'witness-binder': true,
+  'court-packet': true,
+  'devotional-manual': true,
+  'household-archive': true,
+  'technical-manual': true
+};
+
+var SUPPORTED_BOARD_STATE_MODES = {
+  'survey-grid': true,
+  'node-graph': true,
+  'timeline-reconstruction': true,
+  'testimony-matrix': true,
+  'ledger-board': true,
+  'route-tracker': true,
+  'profile-assembly': true,
+  'player-drawn': true
+};
+
+var SUPPORTED_ATTACHMENT_STRATEGIES = {
+  'split-technical': true,
+  'single-dominant': true,
+  'narrative-support': true
+};
+
+function normalizeShellFamilyValue(value, artifactClass, themeArchetype) {
+  var token = toSlugToken(value);
+  if (SUPPORTED_SHELL_FAMILIES[token]) return token;
+  return inferShellFamily(firstNonEmpty(value, artifactClass), themeArchetype);
+}
+
+function normalizeBoardStateModeToken(value) {
+  var token = toSlugToken(value);
+  if (!token) return '';
+  if (SUPPORTED_BOARD_STATE_MODES[token]) return token;
+  if (token === 'grid' || token === 'survey' || token === 'field-survey') return 'survey-grid';
+  if (token === 'point-to-point') return 'node-graph';
+  if (token === 'linear-track' || token === 'route' || token === 'route-board') return 'route-tracker';
+  if (token === 'timeline' || token === 'chronological' || token === 'chronology') return 'timeline-reconstruction';
+  if (token === 'testimony' || token === 'witness-matrix' || token === 'evidence-matrix') return 'testimony-matrix';
+  if (token === 'ledger' || token === 'audit-ledger') return 'ledger-board';
+  if (token === 'profile' || token === 'profile-board') return 'profile-assembly';
+  if (token === 'player' || token === 'sketch-map') return 'player-drawn';
+  return '';
+}
+
+function inferBoardStateModeFromContext(shell, campaignPlan) {
 
   var topology = (((campaignPlan || {}).topology || {}).type || '').toLowerCase();
   if (topology) {
@@ -139,6 +201,13 @@ export function inferBoardStateMode(shell, campaignPlan) {
   if (componentType.indexOf('station') !== -1 || componentType.indexOf('gauge') !== -1) return 'survey-grid';
   if (componentType.indexOf('ledger') !== -1) return 'ledger-board';
   return 'survey-grid';
+}
+
+export function inferBoardStateMode(shell, campaignPlan) {
+  var metaIdentity = (((shell || {}).meta || {}).artifactIdentity || {});
+  var normalized = normalizeBoardStateModeToken(metaIdentity.boardStateMode);
+  if (normalized) return normalized;
+  return inferBoardStateModeFromContext(shell, campaignPlan);
 }
 
 export function inferAttachmentStrategy(shellFamily, boardStateMode) {
@@ -154,13 +223,33 @@ export function inferAttachmentStrategy(shellFamily, boardStateMode) {
   return 'split-technical';
 }
 
+function normalizeAttachmentStrategyValue(value, shellFamily, boardStateMode) {
+  var token = toSlugToken(value);
+  if (SUPPORTED_ATTACHMENT_STRATEGIES[token]) return token;
+  if (token.indexOf('narrative') !== -1 || token.indexOf('story') !== -1) return 'narrative-support';
+  if (token.indexOf('single') !== -1 || token.indexOf('dominant') !== -1 || token.indexOf('binder') !== -1) {
+    return 'single-dominant';
+  }
+  if (
+    token.indexOf('split') !== -1
+    || token.indexOf('technical') !== -1
+    || token.indexOf('loose') !== -1
+    || token.indexOf('insert') !== -1
+    || token.indexOf('append') !== -1
+    || token.indexOf('packet') !== -1
+  ) {
+    return 'split-technical';
+  }
+  return inferAttachmentStrategy(shellFamily, boardStateMode);
+}
+
 export function normalizeArtifactIdentity(rawIdentity, shell, campaignPlan) {
   var identity = rawIdentity && typeof rawIdentity === 'object' ? rawIdentity : {};
   var themeArchetype = String((((shell || {}).theme || {}).visualArchetype) || '').toLowerCase();
   var artifactClass = firstNonEmpty(identity.artifactClass, inferArtifactClassFromShell(shell));
-  var shellFamily = firstNonEmpty(identity.shellFamily, inferShellFamily(artifactClass, themeArchetype));
-  var boardStateMode = firstNonEmpty(identity.boardStateMode, inferBoardStateMode(shell, campaignPlan));
-  var attachmentStrategy = firstNonEmpty(identity.attachmentStrategy, inferAttachmentStrategy(shellFamily, boardStateMode));
+  var shellFamily = normalizeShellFamilyValue(identity.shellFamily, artifactClass, themeArchetype);
+  var boardStateMode = normalizeBoardStateModeToken(identity.boardStateMode) || inferBoardStateModeFromContext(shell, campaignPlan);
+  var attachmentStrategy = normalizeAttachmentStrategyValue(identity.attachmentStrategy, shellFamily, boardStateMode);
 
   return {
     artifactClass: artifactClass,
@@ -2044,6 +2133,11 @@ function flattenSkeletonEndings(endingsOutputs) {
 export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs, fragmentOutputs, endingsOutputs, nw) {
   var meta = skeleton.meta || {};
   var diag = [];
+  var normalizedArtifactIdentity = normalizeArtifactIdentity(
+    meta.artifactIdentity,
+    { meta: meta, theme: skeleton.theme || {}, cover: skeleton.cover || {} },
+    null
+  );
 
   // -- Base booklet structure --
   var booklet = {
@@ -2061,7 +2155,7 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
       narrativeVoice:           meta.narrativeVoice || {},
       literaryRegister:         meta.literaryRegister || {},
       structuralShape:          meta.structuralShape || {},
-      artifactIdentity:         meta.artifactIdentity || {},
+      artifactIdentity:         normalizedArtifactIdentity,
       storyAnchor:              meta.storyAnchor || ''
     },
     cover: skeleton.cover || {},
