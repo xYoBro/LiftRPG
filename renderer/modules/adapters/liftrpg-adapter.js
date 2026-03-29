@@ -821,7 +821,8 @@ function resolveAttachmentGroup(primaryGroup, weekIndex, attachmentStrategy, cha
  * pacing matches the page plan used in layout checks.
  */
 function fragmentWeight(fragment) {
-  const body = (fragment.bodyText || fragment.body || fragment.content || '')
+  const rawContent = fragment.bodyText || fragment.body || fragment.content || '';
+  const body = (typeof rawContent === 'string' ? rawContent : (rawContent.html || ''))
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -841,7 +842,8 @@ function fragmentWeight(fragment) {
 }
 
 function fragmentMustStandAlone(fragment, weight = fragmentWeight(fragment)) {
-  const body = (fragment.bodyText || fragment.body || fragment.content || '')
+  const rawContent = fragment.bodyText || fragment.body || fragment.content || '';
+  const body = (typeof rawContent === 'string' ? rawContent : (rawContent.html || ''))
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
