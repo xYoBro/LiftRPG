@@ -1363,7 +1363,8 @@ var REPAIRABLE_PATTERNS = [
   /meta\.totalSessions.*does not match/i,
   /Unknown visualArchetype/i,
   /interlude\.payloadType.*not supported/i,
-  /overflowDocument\.id.*not present in overflowRegistry/i
+  /overflowDocument\.id.*not present in overflowRegistry/i,
+  /weeklyComponent\.type.*does not match.*weeklyComponentType/i
 ];
 
 var DEGRADED_PATTERNS = [

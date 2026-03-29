@@ -730,6 +730,94 @@ export function autoRepairWeek(result, context) {
     result.overflow = result.sessions.length > 3;
   }
 
+  // weeklyComponent.type alignment: if shell declares weeklyComponentType and
+  // this week's weeklyComponent.type drifted, align to the authoritative value.
+  // Preserves value and extractionInstruction — only corrects the type label.
+  if (context && context.weeklyComponentType && result.weeklyComponent && !result.isBossWeek) {
+    var wcType = result.weeklyComponent.type || '';
+    var expectedType = context.weeklyComponentType;
+    var normalizedWc = wcType.trim().toLowerCase().replace(/_/g, ' ');
+    var normalizedExpected = expectedType.trim().toLowerCase().replace(/_/g, ' ');
+    if (wcType && normalizedWc !== normalizedExpected) {
+      var oldType = result.weeklyComponent.type;
+      result.weeklyComponent.type = expectedType;
+      console.warn('[autoRepairWeek] weeklyComponent.type "' + oldType + '" → "' + expectedType +
+        '" (aligned to shell authority for week ' + (result.weekNumber || '?') + ')');
+      if (!result._overflowRepairs) result._overflowRepairs = [];
+      result._overflowRepairs.push({
+        code: 'weekly-component-type-aligned',
+        severity: 'warning',
+        phase: 'reconcile',
+        message: 'Week ' + (result.weekNumber || '?') + ' weeklyComponent.type "' + oldType +
+          '" aligned to shell weeklyComponentType "' + expectedType + '"',
+        repairable: true,
+        path: 'weeks[' + (result.weekNumber || '?') + '].weeklyComponent.type',
+        correction: oldType + ' → ' + expectedType
+      });
+    }
+  }
+
+  // fragmentRef alignment: repair invalid session/oracle fragmentRefs when
+  // the week plan declares exactly one approved fragment for the position.
+  if (context && context.approvedFragmentIds) {
+    var approvedSet = {};
+    (context.approvedFragmentIds || []).forEach(function (id) {
+      approvedSet[normalizeId(id)] = id;
+    });
+    var overflowId = context.overflowFragmentId
+      ? normalizeId(context.overflowFragmentId)
+      : null;
+    if (overflowId && context.overflowFragmentId) {
+      approvedSet[overflowId] = context.overflowFragmentId;
+    }
+
+    // Repair session fragmentRefs
+    (result.sessions || []).forEach(function (session, si) {
+      if (session.fragmentRef && !approvedSet[normalizeId(session.fragmentRef)]) {
+        // Try to find an unambiguous match by normalized similarity
+        var candidates = Object.keys(approvedSet);
+        if (candidates.length === 1) {
+          var oldRef = session.fragmentRef;
+          session.fragmentRef = approvedSet[candidates[0]];
+          if (!result._overflowRepairs) result._overflowRepairs = [];
+          result._overflowRepairs.push({
+            code: 'fragment-ref-aligned',
+            severity: 'warning',
+            phase: 'reconcile',
+            message: 'Week ' + (result.weekNumber || '?') + ' session ' + (si + 1) +
+              ' fragmentRef "' + oldRef + '" aligned to sole approved ID "' + session.fragmentRef + '"',
+            repairable: true,
+            path: 'weeks[' + (result.weekNumber || '?') + '].sessions[' + si + '].fragmentRef',
+            correction: oldRef + ' → ' + session.fragmentRef
+          });
+        }
+      }
+    });
+
+    // Repair oracle fragmentRefs
+    var oracle = (result.fieldOps || {}).oracleTable || (result.fieldOps || {}).oracle || {};
+    (oracle.entries || []).forEach(function (entry, ei) {
+      if (entry.fragmentRef && !approvedSet[normalizeId(entry.fragmentRef)]) {
+        var candidates = Object.keys(approvedSet);
+        if (candidates.length === 1) {
+          var oldRef = entry.fragmentRef;
+          entry.fragmentRef = approvedSet[candidates[0]];
+          if (!result._overflowRepairs) result._overflowRepairs = [];
+          result._overflowRepairs.push({
+            code: 'fragment-ref-aligned',
+            severity: 'warning',
+            phase: 'reconcile',
+            message: 'Week ' + (result.weekNumber || '?') + ' oracle[' + ei +
+              '] fragmentRef "' + oldRef + '" aligned to sole approved ID "' + entry.fragmentRef + '"',
+            repairable: true,
+            path: 'weeks[' + (result.weekNumber || '?') + '].fieldOps.oracle.entries[' + ei + '].fragmentRef',
+            correction: oldRef + ' → ' + entry.fragmentRef
+          });
+        }
+      }
+    });
+  }
+
   // Overflow-registry reconciliation: if this week has an overflow document
   // and there is exactly one planned overflow entry for this week number,
   // deterministically align the ID (and optionally documentType) to the

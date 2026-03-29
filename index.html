@@ -5077,10 +5077,20 @@
             var repairWarnings = [];
             if (api && typeof api.autoRepairWeek === 'function') {
               var overflowRegistry = ((wizData.campaignPlan || {}).overflowRegistry) || [];
+              var campaignWeeks = ((wizData.campaignPlan || {}).weeks) || [];
+              var shellMeta = ((wizData.shell || {}).meta) || {};
               (chunk.weeks || []).forEach(function (week) {
+                // Build approved fragment IDs from the campaign plan for this week
+                var weekNum = week.weekNumber;
+                var planEntry = campaignWeeks.find(function (pw) { return pw.weekNumber === weekNum; });
+                var approvedFragmentIds = planEntry ? (planEntry.fragmentIds || []) : [];
+                var overflowFragmentId = planEntry ? planEntry.overflowFragmentId : null;
                 api.autoRepairWeek(week, {
-                  weekNumber: week.weekNumber,
-                  overflowRegistry: overflowRegistry
+                  weekNumber: weekNum,
+                  overflowRegistry: overflowRegistry,
+                  weeklyComponentType: shellMeta.weeklyComponentType || '',
+                  approvedFragmentIds: approvedFragmentIds,
+                  overflowFragmentId: overflowFragmentId || ''
                 });
                 if (week._overflowRepairs) {
                   repairWarnings = repairWarnings.concat(week._overflowRepairs);
@@ -5126,7 +5136,27 @@
                 }
                 errorEl.textContent = blockMsg;
                 errorEl.classList.add('is-visible');
-                renderRepairPrompt(repairEl, 'week chunk', 'Return only `{ "weeks": [...] }` for ' + label + '.', raw, classified.blocking);
+
+                // Enrich repair contract with approved fragment IDs when fragmentRef errors are present
+                var repairContract = 'Return only `{ "weeks": [...] }` for ' + label + '.';
+                var hasFragRefError = classified.blocking.some(function (e) { return e.indexOf('fragmentRef') >= 0; });
+                if (hasFragRefError) {
+                  var campaignWeeks = ((wizData.campaignPlan || {}).weeks) || [];
+                  var approvedIds = [];
+                  weekNumbers.forEach(function (wn) {
+                    var pw = campaignWeeks.find(function (cw) { return cw.weekNumber === wn; });
+                    if (pw) {
+                      (pw.fragmentIds || []).forEach(function (fid) { if (approvedIds.indexOf(fid) < 0) approvedIds.push(fid); });
+                      if (pw.overflowFragmentId && approvedIds.indexOf(pw.overflowFragmentId) < 0) approvedIds.push(pw.overflowFragmentId);
+                    }
+                  });
+                  if (approvedIds.length > 0) {
+                    repairContract += '\n\nAPPROVED FRAGMENT IDS for these weeks: ' + JSON.stringify(approvedIds) +
+                      '\nAny session.fragmentRef or oracle entry.fragmentRef MUST use ONLY IDs from this list. Do NOT invent new fragment IDs.';
+                  }
+                }
+
+                renderRepairPrompt(repairEl, 'week chunk', repairContract, raw, classified.blocking);
                 return;
               }
               // Accept with warnings for repairable/degraded

@@ -1693,9 +1693,13 @@ async function runApiPipeline(options) {
         return result;
       },
       autoRepair: function (result) {
+        var planEntry = (campaignPlan.weeks || []).find(function (pw) { return pw.weekNumber === w; });
         return autoRepairWeek(result, {
           weekNumber: w,
-          overflowRegistry: campaignPlan.overflowRegistry || []
+          overflowRegistry: campaignPlan.overflowRegistry || [],
+          weeklyComponentType: (shell.meta || {}).weeklyComponentType || '',
+          approvedFragmentIds: planEntry ? (planEntry.fragmentIds || []) : [],
+          overflowFragmentId: planEntry ? (planEntry.overflowFragmentId || '') : ''
         });
       },
       validate: function (result) {
@@ -2273,7 +2277,10 @@ async function runSkeletonFleshPipeline(options) {
         }
         return autoRepairWeek(result, {
           weekNumber: weekNum,
-          overflowRegistry: sfOverflowRegistry
+          overflowRegistry: sfOverflowRegistry,
+          weeklyComponentType: (skeleton.meta || {}).weeklyComponentType || '',
+          approvedFragmentIds: weekPlan.fragmentIds || [],
+          overflowFragmentId: weekPlan.overflowFragmentId || ''
         });
       },
       validate: function (result) {

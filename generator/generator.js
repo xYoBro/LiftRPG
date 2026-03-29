@@ -2290,6 +2290,7 @@
     contextLines.push('- Cipher type: ' + weekPlan.cipherType);
     contextLines.push('- Sessions: ' + weekPlan.sessionCount);
     contextLines.push('- Fragment refs: ' + JSON.stringify(weekPlan.fragmentIds));
+    contextLines.push('- **FRAGMENT REF CONTRACT (BINDING):** Any session.fragmentRef or oracle entry.fragmentRef MUST use ONLY IDs from this approved list: ' + JSON.stringify((weekPlan.fragmentIds || []).concat(weekPlan.overflowFragmentId ? [weekPlan.overflowFragmentId] : [])) + '. Do NOT invent new fragment IDs. Do NOT reference fragments not in this list.');
     if (weekPlan.componentValue !== null && weekPlan.componentValue !== undefined) {
       contextLines.push('- Component value: ' + weekPlan.componentValue + ' (fiction-native, NOT a letter)');
     }
