@@ -1115,7 +1115,7 @@ export function validateAssembledBooklet(booklet) {
     return fragment && fragment.id && !referencedArtifactFragments[normalizeId(fragment.id)];
   });
   if (unreferencedArtifactFragments.length > 0) {
-    warnings.push(unreferencedArtifactFragments.length + ' fragment(s) never referenced by sessions, oracle entries, or cipher referenceTargets: ' +
+    errors.push(unreferencedArtifactFragments.length + ' fragment(s) never referenced by sessions, oracle entries, or cipher referenceTargets: ' +
       unreferencedArtifactFragments.map(function (fragment) { return fragment.id; }).join(', '));
   }
 

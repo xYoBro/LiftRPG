@@ -207,6 +207,10 @@ export function buildQualityGate(report) {
     blockers.push({ target: target || '', message: message });
   }
 
+  (report.schemaErrors || []).forEach(function (error) {
+    pushBlocker('', 'schema validation failed: ' + error);
+  });
+
   (report.weakSpots || []).forEach(function (spot) {
     var policy = QUALITY_BLOCKING_AREAS[spot.area];
     if (!policy) return;
