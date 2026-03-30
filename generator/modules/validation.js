@@ -1241,6 +1241,7 @@ export function validateCampaignPlanStage(result) {
   var weekByNumber = {};
   var fragmentRegistryById = {};
   var weekFragmentOwners = {};
+  var orderedWeeks = [];
   // Hard failures: weeks[] and bossPlan must exist (matches pre-restructure behavior)
   if (!Array.isArray(result.weeks)) {
     errors.push('Campaign Plan → weeks: missing or not an array');
@@ -1288,9 +1289,13 @@ export function validateCampaignPlanStage(result) {
         errors.push(label + ': duplicate weekNumber ' + w.weekNumber);
       } else {
         weekByNumber[w.weekNumber] = w;
+        orderedWeeks.push(w);
       }
       if (!w.sessionCount || w.sessionCount < 1) {
         errors.push(label + ': missing sessionCount');
+      }
+      if (!w.isBossWeek && !String(w.cipherType || '').trim()) {
+        errors.push(label + ': cipherType missing for non-boss week');
       }
       if (!Array.isArray(w.fragmentIds)) {
         errors.push(label + ': fragmentIds missing or not an array');
@@ -1316,6 +1321,18 @@ export function validateCampaignPlanStage(result) {
       }
     });
   }
+  orderedWeeks
+    .slice()
+    .sort(function (left, right) { return Number(left.weekNumber || 0) - Number(right.weekNumber || 0); })
+    .reduce(function (prevCipherType, week) {
+      if (!week || week.isBossWeek) return prevCipherType;
+      var label = 'Campaign Plan → week ' + week.weekNumber;
+      var currentCipherType = String(week.cipherType || '').trim();
+      if (prevCipherType && currentCipherType && prevCipherType === currentCipherType) {
+        errors.push(label + ': cipherType "' + currentCipherType + '" repeats the prior non-boss week');
+      }
+      return currentCipherType || prevCipherType;
+    }, '');
   if (Array.isArray(result.weeks)) {
     var overflowRegistry = Array.isArray(result.overflowRegistry) ? result.overflowRegistry : [];
     var overflowByWeek = {};

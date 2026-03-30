@@ -1337,6 +1337,7 @@
         stateSnapshot: '',
         playerGains: '',
         zoneFocus: '',
+        cipherType: '',
         mapReuse: 'full',
         stateChange: '',
         newGateOrUnlock: '',

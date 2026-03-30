@@ -2857,6 +2857,9 @@
       plannedOverflow
         ? '- Minimum overflowDocument keys: id, documentType, title, content or body, and designSpec.'
         : '',
+      !isBossWeek && weekPlan && weekPlan.cipherType
+        ? '- Planned cipher family for this week is "' + weekPlan.cipherType + '". Keep that family; do not substitute a different cipher type.'
+        : '',
       approvedFragmentRefs.length
         ? '- Approved fragmentRef IDs for this week: ' + JSON.stringify(approvedFragmentRefs) + '. Sessions and oracle entries may only reference IDs from this list. Do not invent new fragment IDs.'
         : '- This week has no approved fragmentRef IDs. Do not invent or reference fragment IDs.',

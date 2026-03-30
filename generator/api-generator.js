@@ -338,6 +338,7 @@ var STRUCTURED_SCHEMA_CAMPAIGN = {
           stateSnapshot: { type: 'string' },
           playerGains: { type: 'string' },
           zoneFocus: { type: 'string' },
+          cipherType: { type: 'string' },
           mapReuse: { type: 'string' },
           stateChange: { type: 'string' },
           newGateOrUnlock: { type: 'string' },
@@ -353,7 +354,7 @@ var STRUCTURED_SCHEMA_CAMPAIGN = {
           overflowFragmentId: { type: 'string' },
           sessionBeatTypes: { type: 'array', items: { type: 'string' } }
         },
-        required: ['weekNumber', 'arcBeat', 'isBossWeek', 'isBinaryChoiceWeek', 'sessionCount', 'fragmentIds', 'sessionBeatTypes']
+        required: ['weekNumber', 'arcBeat', 'cipherType', 'isBossWeek', 'isBinaryChoiceWeek', 'sessionCount', 'fragmentIds', 'sessionBeatTypes']
       }
     },
     bossPlan: {
