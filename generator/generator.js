@@ -2804,6 +2804,9 @@
       '## Structural Obligations',
       !isBossWeek ? '- Non-boss weeks MUST include fieldOps.oracleTable, fieldOps.cipher, and fieldOps.mapState.' : '- Boss week MUST include bossEncounter and MUST omit fieldOps.',
       !isBossWeek ? '- fieldOps.cipher.characterDerivationProof is REQUIRED and cannot be blank.' : '- bossEncounter.componentInputs must exactly match the prior component values list.',
+      isBossWeek && Number(weekPlan.sessionCount) > 3
+        ? '- This is a boss week with overflow. bossEncounter and overflowDocument MUST both be present. Do not omit overflowDocument just because this is the boss week.'
+        : '',
       Number(weekPlan.sessionCount) > 3
         ? '- This week has ' + weekPlan.sessionCount + ' sessions. Therefore overflow MUST be true and overflowDocument MUST be present.'
         : '- This week has ' + weekPlan.sessionCount + ' sessions. Therefore overflow must be false and overflowDocument must be omitted.',

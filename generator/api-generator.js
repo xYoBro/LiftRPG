@@ -1343,6 +1343,47 @@ function normalizeSingleFragmentResult(result, registryEntry) {
   return normalized;
 }
 
+function planFragmentBatchRecovery(result, registry) {
+  var batchResult = result;
+  if (batchResult && Array.isArray(batchResult.fragments)) batchResult = batchResult.fragments;
+  var fragments = Array.isArray(batchResult) ? batchResult : [];
+  var registryEntries = Array.isArray(registry) ? registry : [];
+  var registryByNorm = {};
+  var registryOrder = {};
+  var recoveredByNorm = {};
+
+  registryEntries.forEach(function (entry, index) {
+    var norm = normalizeId(entry && entry.id);
+    if (!norm) return;
+    registryByNorm[norm] = entry;
+    registryOrder[norm] = index;
+  });
+
+  fragments.forEach(function (fragment) {
+    var norm = normalizeId(fragment && fragment.id);
+    var registryEntry = registryByNorm[norm];
+    if (!registryEntry || recoveredByNorm[norm]) return;
+    var normalized = normalizeSingleFragmentResult(fragment, registryEntry);
+    var validation = validateFragmentsStage({ fragments: normalized ? [normalized] : [] }, [registryEntry]);
+    if (!validation) {
+      recoveredByNorm[norm] = normalized;
+    }
+  });
+
+  var recoveredFragments = Object.keys(recoveredByNorm)
+    .sort(function (a, b) { return registryOrder[a] - registryOrder[b]; })
+    .map(function (norm) { return recoveredByNorm[norm]; });
+
+  var missingRegistry = registryEntries.filter(function (entry) {
+    return !recoveredByNorm[normalizeId(entry && entry.id)];
+  });
+
+  return {
+    fragments: recoveredFragments,
+    missingRegistry: missingRegistry
+  };
+}
+
 async function generateSingleFragmentAdaptive(settings, builders, config) {
   var registryEntry = (config.registry || [])[0] || null;
   var fragment = await runJsonStage(settings, {
@@ -1350,7 +1391,7 @@ async function generateSingleFragmentAdaptive(settings, builders, config) {
     stageName: config.label,
     stageIndex: config.stageIndex || 0,
     completeMessage: config.label + ' complete.',
-    onProgress: config.onProgress || null,
+    onProgress: config.silent ? null : (config.onProgress || null),
     getTotalStages: config.getTotalStages || null,
     schema: null,
     maxTokens: MAX_OUTPUT_TOKENS,
@@ -1375,6 +1416,47 @@ async function generateSingleFragmentAdaptive(settings, builders, config) {
     }
   });
   return { fragments: fragment ? [fragment] : [] };
+}
+
+async function recoverFragmentBatchDeterministically(settings, builders, config, err) {
+  var recoveryPlan = planFragmentBatchRecovery(err && err._failedOutput, config.registry);
+  var recoveredFragments = (recoveryPlan.fragments || []).slice();
+  var pendingRegistry = recoveryPlan.missingRegistry || [];
+  var stagedFragments = config.priorFragments.concat(recoveredFragments);
+
+  if (recoveredFragments.length > 0) {
+    console.warn('[LiftRPG] Salvaged ' + recoveredFragments.length + '/' + config.registry.length +
+      ' fragments from failed batch output:', config.label);
+  } else {
+    console.warn('[LiftRPG] No valid fragments salvaged from failed batch output:', config.label);
+  }
+
+  for (var i = 0; i < pendingRegistry.length; i++) {
+    var entry = pendingRegistry[i];
+    var recovered = await generateSingleFragmentAdaptive(settings, builders, {
+      layerBible: config.layerBible,
+      registry: [entry],
+      batchWeekSummaries: weekSummariesForRegistry([entry], config.allWeekSummaries, config.batchWeekSummaries),
+      shellContext: config.shellContext,
+      priorFragments: stagedFragments,
+      label: config.label + ' recovery ' + entry.id,
+      stageKey: config.stageKey,
+      stageIndex: config.stageIndex,
+      onProgress: config.onProgress,
+      getTotalStages: config.getTotalStages,
+      rateLimiter: config.rateLimiter,
+      budgetEnforce: config.budgetEnforce,
+      silent: true
+    });
+    (recovered.fragments || []).forEach(function (fragment) {
+      recoveredFragments.push(fragment);
+      stagedFragments.push(fragment);
+    });
+  }
+
+  return {
+    fragments: recoveredFragments
+  };
 }
 
 async function generateFragmentBatchAdaptive(settings, builders, config) {
@@ -1413,6 +1495,14 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
     if (config.registry.length === 1 && shouldRetryStageError(err)) {
       console.warn('[LiftRPG] Falling back to single-fragment recovery after batch failure:', config.label, err.message);
       return await generateSingleFragmentAdaptive(settings, builders, config);
+    }
+    if (config.registry.length > 1 && shouldRetryStageError(err)) {
+      try {
+        console.warn('[LiftRPG] Recovering fragment batch deterministically after failure:', config.label, err.message);
+        return await recoverFragmentBatchDeterministically(settings, builders, config, err);
+      } catch (recoveryErr) {
+        err = recoveryErr;
+      }
     }
     if (!shouldSplitFragmentBatch(err, config.registry)) throw err;
     console.warn('[LiftRPG] Splitting fragment batch after failure:', config.label, err.message);
@@ -3079,6 +3169,7 @@ window.LiftRPGAPI = {
     findBinaryChoiceWeek: findBinaryChoiceWeek,
     buildFragmentBatches: buildFragmentBatches,
     mergeFragmentBatches: mergeFragmentBatches,
+    planFragmentBatchRecovery: planFragmentBatchRecovery,
     assembleSkeletonFleshBooklet: assembleSkeletonFleshBooklet,
     validateSkeletonStage: validateSkeletonStage,
     buildSkeletonFragmentBatches: buildSkeletonFragmentBatches,
