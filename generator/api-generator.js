@@ -936,6 +936,9 @@ function buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState)
   if (/fragmentregistry|fragmentids|weekref|documenttype/.test(lastErrorLower)) {
     retryHints.push('- Recheck fragment ownership: every fragmentRegistry entry must match its owning week fragmentIds, and the registry must keep at least 3 document types with no dominant type above 45% once it has 8+ entries.');
   }
+  if (/weeklycomponent|a1z26|not an integer|out of a1z26 range/.test(lastErrorLower)) {
+    retryHints.push('- Recheck weekly component planning: every non-boss week must resolve to exactly one integer 1-26 for standard A1Z26 decode. weeklyComponentMeaning explains the number; it does not contain the value prose itself.');
+  }
   if (/overflowregistry|overflowfragmentid/.test(lastErrorLower)) {
     retryHints.push('- Recheck overflow ownership: every week with sessionCount > 3 needs overflowFragmentId plus a matching overflowRegistry entry with weekNumber and canonical F.30+ IDs.');
   }
@@ -954,6 +957,7 @@ function buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState)
     '- Week ' + midpoint + ' must be the binary choice week.',
     '- Week ' + weekCount + ' must be the boss week.',
     '- Every week needs: weekNumber, arcBeat, npcBeat, stateSnapshot, playerGains, zoneFocus, mapReuse, stateChange, newGateOrUnlock, weeklyComponentMeaning, oraclePressure, fragmentFunction, governingProcedure, companionChange, isBossWeek, isBinaryChoiceWeek, sessionCount, fragmentIds, sessionBeatTypes.',
+    '- weeklyComponentMeaning must describe one derivable integer 1-26 for each non-boss week. Do not treat it as a composite reading bundle, paragraph, or ledger excerpt.',
     '- Include a concrete cipherType for every non-boss week and do not repeat cipherType in consecutive non-boss weeks.',
     '- mapReuse cannot mean "no change": every non-boss week must declare a visibly new stateChange or unlock relative to the prior week.',
     '- Fragment IDs MUST use canonical LiftRPG format only: F.01, F.02, F.03 ... Never use placeholders like F-1A or F_01.',
@@ -961,6 +965,7 @@ function buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState)
     '- fragmentRegistry entries must be full objects with id, title, documentType, author, revealPurpose, clueFunction, weekRef.',
     '- overflowRegistry entries must use weekNumber and canonical IDs starting at F.30. Do not omit weekNumber.',
     '- Overflow weeks (sessionCount > 3) must set overflowFragmentId and match overflowRegistry for that same week.',
+    '- Boss weeks can only consume planned fragmentIds through session.fragmentRef coverage. Do not assign more boss-week fragmentIds than boss-week sessions.',
     '- fragmentRegistry must establish clues early, complicate them mid-block, and reveal them late.',
     '- Use at least 3 fragment document types when the registry has 8+ entries, and do not let one documentType exceed 45% of the registry.',
     '- Keep descriptions concise. Preserve clue economy, progression, and convergence logic.',
@@ -2018,7 +2023,12 @@ async function runApiPipeline(options) {
         if (!result) return 'Week generation returned empty result. Model may have returned a shell instead of a week object.';
         if (!result.title) return 'Week object missing "title" field. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
         if (!result.sessions) return 'Week object missing "sessions" array. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
-        var schemaValidation = validateWeekSchema(result, isBossWeek, isBossWeek ? { componentInputs: allComponentValues } : undefined);
+        var schemaValidation = validateWeekSchema(result, isBossWeek, {
+          componentInputs: isBossWeek ? allComponentValues : undefined,
+          approvedFragmentIds: planEntry ? (planEntry.fragmentIds || []) : [],
+          currentWeekNumber: w,
+          previousWeek: !isBossWeek && finalWeeks.length ? finalWeeks[finalWeeks.length - 1] : null
+        });
         if (schemaValidation && schemaValidation.valid === false) {
           return schemaValidation;
         }
@@ -2055,7 +2065,12 @@ async function runApiPipeline(options) {
     else weekObject.isBossWeek = false;
 
     // Schema validation safety net
-    var weekValidation = validateWeekSchema(weekObject, weekObject.isBossWeek, weekObject.isBossWeek ? { componentInputs: allComponentValues } : undefined);
+    var weekValidation = validateWeekSchema(weekObject, weekObject.isBossWeek, {
+      componentInputs: weekObject.isBossWeek ? allComponentValues : undefined,
+      approvedFragmentIds: planEntry ? (planEntry.fragmentIds || []) : [],
+      currentWeekNumber: w,
+      previousWeek: !weekObject.isBossWeek && finalWeeks.length ? finalWeeks[finalWeeks.length - 1] : null
+    });
     if (!weekValidation.valid) {
       console.warn('[pipeline] Week ' + w + ' schema issues:', weekValidation.errors);
       if (options.onStatus) options.onStatus('Week ' + w + ': ' + weekValidation.errors.length + ' schema issue(s)');
@@ -2656,7 +2671,10 @@ async function runSkeletonFleshPipeline(options) {
           return 'Week ' + weekNum + ': missing or empty sessions';
         }
         var vResult = validateWeekSchema(result, isBoss, {
-          componentInputs: isBoss ? allComponentValuesSF.map(String) : undefined
+          componentInputs: isBoss ? allComponentValuesSF.map(String) : undefined,
+          approvedFragmentIds: weekPlan.fragmentIds || [],
+          currentWeekNumber: weekNum,
+          previousWeek: !isBoss && weekOutputs.length ? weekOutputs[weekOutputs.length - 1] : null
         });
         if (vResult && typeof vResult === 'object' && !vResult.valid) {
           return (vResult.errors || []).join('; ');
@@ -2671,7 +2689,10 @@ async function runSkeletonFleshPipeline(options) {
 
     // Surface advisory warnings from schema validation
     var sfWeekValidation = validateWeekSchema(weekResult, isBoss, {
-      componentInputs: isBoss ? allComponentValuesSF.map(String) : undefined
+      componentInputs: isBoss ? allComponentValuesSF.map(String) : undefined,
+      approvedFragmentIds: weekPlan.fragmentIds || [],
+      currentWeekNumber: weekNum,
+      previousWeek: !isBoss && weekOutputs.length ? weekOutputs[weekOutputs.length - 1] : null
     });
     if (sfWeekValidation.warnings && sfWeekValidation.warnings.length > 0) {
       console.warn('[pipeline] Week ' + weekNum + ' advisory:', sfWeekValidation.warnings);

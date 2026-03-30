@@ -503,6 +503,7 @@ export function validateBookletSchema(booklet) {
 export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
   var errors = [];
   var warnings = [];
+  expectedOptions = expectedOptions || {};
   if (!weekObj) { return { valid: false, errors: ['Week object is null'] }; }
   if (!weekObj.title) errors.push('Missing week title');
 
@@ -532,6 +533,16 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
     var wc = weekObj.weeklyComponent || {};
     if (!wc.extractionInstruction) {
       errors.push('Non-boss week missing weeklyComponent.extractionInstruction');
+    }
+    if (wc.value === undefined || wc.value === null || wc.value === '') {
+      errors.push('Non-boss week missing weeklyComponent.value');
+    } else {
+      var numericValue = Number(wc.value);
+      if (isNaN(numericValue) || numericValue !== Math.floor(numericValue)) {
+        errors.push('Non-boss week weeklyComponent.value "' + wc.value + '" is not an integer (required for A1Z26 decode)');
+      } else if (numericValue < 1 || numericValue > 26) {
+        errors.push('Non-boss week weeklyComponent.value ' + numericValue + ' out of A1Z26 range (1–26)');
+      }
     }
   }
 
@@ -629,6 +640,18 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
       }
     }
 
+    if (expectedOptions.previousWeek && expectedOptions.previousWeek.fieldOps && expectedOptions.previousWeek.fieldOps.mapState) {
+      var currentMap = fo.mapState || {};
+      var previousMap = (expectedOptions.previousWeek.fieldOps || {}).mapState || {};
+      if (hasComparableMapState(currentMap) && hasComparableMapState(previousMap)) {
+        var currentFingerprint = buildMapEvolutionFingerprint(currentMap);
+        var previousFingerprint = buildMapEvolutionFingerprint(previousMap);
+        if (currentFingerprint && previousFingerprint && currentFingerprint === previousFingerprint) {
+          errors.push('Week ' + (expectedOptions.currentWeekNumber || weekObj.weekNumber || '?') + ' map tiles identical to previous week — no visible evolution');
+        }
+      }
+    }
+
     // Companion component validation
     if (Array.isArray(fo.companionComponents)) {
       fo.companionComponents.forEach(function(cc) {
@@ -671,6 +694,25 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
       // enforcement (enforceDeterministicFields) overwrites it with the correct
       // collected weeklyComponent values. Don't validate what we're going to
       // overwrite anyway; it just burns retries for nothing.
+    }
+
+    var approvedBossFragmentIds = Array.isArray(expectedOptions.approvedFragmentIds)
+      ? expectedOptions.approvedFragmentIds.map(function (id) { return String(id || ''); }).filter(Boolean)
+      : [];
+    if (approvedBossFragmentIds.length > 0) {
+      var sessionRefsById = {};
+      (weekObj.sessions || []).forEach(function (session) {
+        if (!session || !session.fragmentRef) return;
+        sessionRefsById[normalizeId(session.fragmentRef)] = true;
+      });
+      if (approvedBossFragmentIds.length > (weekObj.sessions || []).length) {
+        errors.push('Boss week has ' + approvedBossFragmentIds.length + ' planned fragmentIds but only ' + (weekObj.sessions || []).length + ' sessions to reference them');
+      }
+      approvedBossFragmentIds.forEach(function (fragmentId) {
+        if (!sessionRefsById[normalizeId(fragmentId)]) {
+          errors.push('Boss week sessions do not reference planned fragment "' + fragmentId + '"');
+        }
+      });
     }
   }
 
@@ -1389,6 +1431,9 @@ export function validateCampaignPlanStage(result) {
             weekFragmentOwners[normalizedId] = w.weekNumber;
           }
         });
+        if (w.isBossWeek && w.fragmentIds.length > Number(w.sessionCount || 0)) {
+          errors.push(label + ': boss week has ' + w.fragmentIds.length + ' fragmentIds but only ' + w.sessionCount + ' sessions to reference them');
+        }
       }
     });
   }

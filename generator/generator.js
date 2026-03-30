@@ -648,6 +648,7 @@
       '  `companionChange` — which companion, what they do, how their trackable state changes.',
       '  `governingProcedure` — what institutional procedure is active and how it affects access.',
       '  `weeklyComponentMeaning` — what the cipher value represents in-fiction and how it connects to the decode.',
+      '- `weeklyComponentMeaning` must describe a single derivable integer (1-26), never a composite sensor panel, paragraph, or bundle of readings.',
       '- `arcBeat`: narrative function (setup, complication, reversal, darkest moment, escalation, culmination).',
       '- `npcBeat`: which named character appears, what they reveal or conceal, and why it matters.',
       '- `stateSnapshot`: one-line board state entering this week (open nodes, clock levels, companion states).',
@@ -666,6 +667,7 @@
       '- No single documentType may account for more than 45% of the fragmentRegistry once the booklet has 8+ fragments.',
       '- Favor the artifact intent\'s dominant document ecology, but do not collapse into one memo-like default.',
       '- Aim for 15-22 fragments total, distributed across all non-boss weeks.',
+      '- Do not over-allocate boss-week fragments: boss sessions must be able to directly reference every boss-week fragmentId.',
       '',
       '## Overflow Document Registry — Institutional Ecology',
       '- Overflow documents appear on weeks where sessions > 3 (the right-side page becomes a found document).',
@@ -2308,7 +2310,7 @@
     contextLines.push('- Fragment refs: ' + JSON.stringify(weekPlan.fragmentIds));
     contextLines.push('- **FRAGMENT REF CONTRACT (BINDING):** Any session.fragmentRef or oracle entry.fragmentRef MUST use ONLY IDs from this approved list: ' + JSON.stringify((weekPlan.fragmentIds || []).concat(weekPlan.overflowFragmentId ? [weekPlan.overflowFragmentId] : [])) + '. Do NOT invent new fragment IDs. Do NOT reference fragments not in this list.');
     if (weekPlan.componentValue !== null && weekPlan.componentValue !== undefined) {
-      contextLines.push('- Component value: ' + weekPlan.componentValue + ' (fiction-native, NOT a letter)');
+      contextLines.push('- Component value: ' + weekPlan.componentValue + ' (fiction-native integer 1-26, NOT a letter and NOT a prose bundle)');
     }
     if (weekPlan.overflowFragmentId) {
       contextLines.push('- **OVERFLOW CONTRACT (BINDING):** overflowDocument.id MUST be exactly "' + weekPlan.overflowFragmentId + '" — do NOT invent a different ID');
@@ -2325,11 +2327,17 @@
       contextLines.push('- This week replaces fieldOps with bossEncounter.');
       contextLines.push('- componentInputs must be EXACTLY this array (no additions, no removals, no reordering): ' + JSON.stringify(allComponentValues));
       contextLines.push('- There are exactly ' + allComponentValues.length + ' non-boss weeks, so componentInputs MUST have exactly ' + allComponentValues.length + ' entries.');
+      contextLines.push('- Every approved boss-week fragmentRef must appear directly in session.fragmentRef at least once.');
       contextLines.push('- decodingKey.referenceTable maps these values to letters.');
       contextLines.push('- Must include: title, narrative, mechanismDescription, convergenceProof, passwordRevealInstruction.');
       if (weekPlan.isBinaryChoiceWeek || (skeleton.bossPlan && skeleton.bossPlan.binaryChoiceSetup)) {
         contextLines.push('- Include binaryChoiceAcknowledgement: { ifA, ifB }');
       }
+      contextLines.push('');
+    } else {
+      contextLines.push('## Weekly Component Requirements');
+      contextLines.push('- weeklyComponent.value must be a single integer 1-26 (or numeric string) for deterministic A1Z26 decode.');
+      contextLines.push('- Put explanation in weeklyComponent.extractionInstruction, not inside weeklyComponent.value.');
       contextLines.push('');
     }
 
@@ -2536,6 +2544,7 @@
       '## Stage Rules',
       '- Use exactly ' + weekCount + ' weeks; mark the final week as boss and the midpoint week as the binary choice week.',
       '- Every week must include sessionCount and fragmentIds. fragmentIds are the exact document IDs that week sessions/oracles will reference.',
+      '- Every non-boss week must ultimately yield exactly one weekly component value: a single integer 1-26 for standard A1Z26 decode. weeklyComponentMeaning explains that number in-fiction; it must not turn into a composite reading list or prose excerpt.',
       '- Every non-boss week must declare a concrete cipherType, and no two consecutive non-boss weeks may use the same cipherType.',
       '- Use at least ' + Math.min(Math.max(weekCount - 2, 3), Math.max(weekCount - 1, 1)) + ' distinct cipher types across the non-boss weeks.',
       '- Fragment IDs MUST use canonical LiftRPG format only: F.01, F.02, F.03 ... Never use placeholders like F-1A or F_01.',
@@ -2543,6 +2552,7 @@
       '- fragmentRegistry entries must be full objects with id, title, documentType, author, revealPurpose, clueFunction, weekRef.',
       '- overflowRegistry entries must use weekNumber and canonical IDs starting at F.30. Do not omit weekNumber.',
       '- Overflow weeks (sessionCount > 3) must set overflowFragmentId and match overflowRegistry for that same week.',
+      '- Boss weeks can only consume planned fragmentIds through session.fragmentRef coverage. Do not assign more boss-week fragmentIds than the boss week has sessions.',
       '- Map each mystery question, false assumption, motif payoff, and week transformation into the week plan.',
       '- mapReuse may keep the same topology, but it may never mean "no visible change." Every non-boss week needs a visibly new stateChange or unlock relative to the prior week.',
       '- Fragment registry must create clue economy: establish early, complicate mid-block, reveal late; no lore-dump placeholders.',
@@ -2835,6 +2845,9 @@
       if (/characterderivationproof|noticeabilitydesign|extractioninstruction|fieldops\.cipher|cipher\./.test(retryErrorLower) && !isBossWeek) {
         retryScaffolds.push('- If the blocking error is cipher-field-related, keep the puzzle body but ensure fieldOps.cipher includes exactly: type, title, body, extractionInstruction, characterDerivationProof, noticeabilityDesign.');
       }
+      if (/weeklycomponent|a1z26|not an integer|out of a1z26 range/.test(retryErrorLower) && !isBossWeek) {
+        retryScaffolds.push('- If the blocking error is weekly-component-related, set weeklyComponent.value to exactly one bare integer from 1 to 26 and explain that number in weeklyComponent.extractionInstruction instead of embedding prose inside value.');
+      }
       if (/fragmentref|approved for this week|planned fragment/.test(retryErrorLower) && approvedFragmentRefs.length) {
         retryScaffolds.push('- If the blocking error is fragment-ref-related, only use these approved refs: ' + JSON.stringify(approvedFragmentRefs) + '.');
       }
@@ -2877,6 +2890,8 @@
       !isBossWeek ? '- Non-boss weeks MUST include fieldOps.oracleTable, fieldOps.cipher, and fieldOps.mapState.' : '- Boss week MUST include bossEncounter and MUST omit fieldOps.',
       !isBossWeek ? '- fieldOps.cipher.characterDerivationProof is REQUIRED and cannot be blank.' : '- bossEncounter.componentInputs must exactly match the prior component values list.',
       !isBossWeek ? '- fieldOps.cipher MUST include type, title, body, extractionInstruction, characterDerivationProof, and noticeabilityDesign.' : '',
+      !isBossWeek ? '- weeklyComponent.value MUST be exactly one integer from 1 to 26 (or a numeric string such as "8"). Never put prose, composite readings, timelines, or ledger excerpts in weeklyComponent.value.' : '',
+      !isBossWeek ? '- weeklyComponent.extractionInstruction must explain how that single integer is extracted from the week\'s fiction-native evidence.' : '',
       isBossWeek ? '- bossEncounter.decodingKey.referenceTable MUST be a plain string containing the full standard A1Z26 table (1=A through 26=Z). Do not use object maps, calibration ranges, custom lookup systems, or thematic substitution tables.' : '',
       isBossWeek ? '- bossEncounter.decodingKey.instruction may explain how to use the weekly component values, but the actual referenceTable must stay standard A1Z26 so the ending remains deterministic.' : '',
       isBossWeek && Number(weekPlan.sessionCount) > 3
@@ -2905,6 +2920,9 @@
         : '- This week has no approved fragmentRef IDs. Do not invent or reference fragment IDs.',
       approvedFragmentRefs.length
         ? '- Every approved fragmentRef ID for this week must be used at least once in a session, oracle entry, or fieldOps.cipher.body.referenceTargets before the week is complete.'
+        : '',
+      isBossWeek && approvedFragmentRefs.length
+        ? '- Boss-week fragment coverage is stricter: every approved fragmentRef ID must appear directly in session.fragmentRef at least once before any repeats.'
         : '',
       plannedOverflow
         ? '- If you are unsure, copy this scaffold and then fill the prose fields instead of omitting overflowDocument: ' + JSON.stringify({
