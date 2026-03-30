@@ -618,6 +618,14 @@
       '  and how at least one companion reacts differently based on the choice.',
       '- At least one companion\'s behavior in the final weeks depends on earlier player actions.',
       '',
+      '## Cipher & Map Evolution Doctrine',
+      '- Every non-boss week must declare a `cipherType` that names the actual puzzle family for that week.',
+      '- No two consecutive non-boss weeks may use the same cipherType.',
+      '- Use at least ' + Math.min(Math.max(weekCount - 2, 3), Math.max(weekCount - 1, 1)) + ' distinct cipher types across the non-boss weeks.',
+      '- `mapReuse` may keep the same topology, but it may never mean "no visible change."',
+      '- Every non-boss week must produce a visibly different `stateChange`: a cleared node, opened gate, rerouted path, new annotation layer, locked return, or revealed shortcut.',
+      '- `stateSnapshot`, `stateChange`, and `newGateOrUnlock` cannot all describe the same board state as the prior week.',
+      '',
       '## Arc Beat Assignment',
       '- Week 1: Setup (establish setting, protagonist role, core tension, constrained map — most zones locked)',
       '- Week 2: Complication (new pressure, first gate opened, companion introduces tension)',
@@ -654,6 +662,9 @@
       '- At least 3 fragments must be verifiable — their claims can be checked against map state,',
       '  cipher outputs, or other fragments.',
       '- No fragment dumps lore. If it contains world-building, it must also contain a clue.',
+      '- Use at least 3 documentType values across the full fragmentRegistry once the booklet has 8+ fragments.',
+      '- No single documentType may account for more than 45% of the fragmentRegistry once the booklet has 8+ fragments.',
+      '- Favor the artifact intent\'s dominant document ecology, but do not collapse into one memo-like default.',
       '- Aim for 15-22 fragments total, distributed across all non-boss weeks.',
       '',
       '## Overflow Document Registry — Institutional Ecology',
@@ -1414,6 +1425,8 @@
     parts.push('  a date stamp, a cc: line, a weather note, a reference to an unrelated procedure.');
     parts.push('- designSpec must match the document type and its in-world origin.');
     parts.push('- Redactions must do narrative work — concealing something partially reconstructable.');
+    parts.push('- Do not flatten different document types into the same memo-like texture. A transcript, inspection,');
+    parts.push('  correspondence, and field note must look and read like different document species.');
     parts.push('');
     parts.push('### Narrative Function');
     parts.push('- Authors reveal blind spots, not just knowledge. Different characters noticing');
@@ -2523,13 +2536,18 @@
       '## Stage Rules',
       '- Use exactly ' + weekCount + ' weeks; mark the final week as boss and the midpoint week as the binary choice week.',
       '- Every week must include sessionCount and fragmentIds. fragmentIds are the exact document IDs that week sessions/oracles will reference.',
+      '- Every non-boss week must declare a concrete cipherType, and no two consecutive non-boss weeks may use the same cipherType.',
+      '- Use at least ' + Math.min(Math.max(weekCount - 2, 3), Math.max(weekCount - 1, 1)) + ' distinct cipher types across the non-boss weeks.',
       '- Fragment IDs MUST use canonical LiftRPG format only: F.01, F.02, F.03 ... Never use placeholders like F-1A or F_01.',
       '- Every fragmentRegistry entry must have a real weekRef and must also appear in that owning week\'s fragmentIds array.',
       '- fragmentRegistry entries must be full objects with id, title, documentType, author, revealPurpose, clueFunction, weekRef.',
       '- overflowRegistry entries must use weekNumber and canonical IDs starting at F.30. Do not omit weekNumber.',
       '- Overflow weeks (sessionCount > 3) must set overflowFragmentId and match overflowRegistry for that same week.',
       '- Map each mystery question, false assumption, motif payoff, and week transformation into the week plan.',
+      '- mapReuse may keep the same topology, but it may never mean "no visible change." Every non-boss week needs a visibly new stateChange or unlock relative to the prior week.',
       '- Fragment registry must create clue economy: establish early, complicate mid-block, reveal late; no lore-dump placeholders.',
+      '- Use at least 3 documentType values across the full fragmentRegistry once the booklet has 8+ fragments.',
+      '- No single documentType may account for more than 45% of the fragmentRegistry once the booklet has 8+ fragments.',
       '- Boss convergence must require outputs from map progression, institutional procedure, and relationship state.',
       '',
       '## Layer Codex Summary',
