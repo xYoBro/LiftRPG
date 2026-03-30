@@ -2812,6 +2812,39 @@
     var retryError = retryState && retryState.error && retryState.error.message
       ? String(retryState.error.message)
       : '';
+    var retryErrorLower = retryError.toLowerCase();
+    var planAnchors = [];
+    if (weekPlan.arcBeat) planAnchors.push('- Planned arcBeat: ' + weekPlan.arcBeat + '.');
+    if (weekPlan.npcBeat) planAnchors.push('- Planned npcBeat: ' + weekPlan.npcBeat + '.');
+    if (weekPlan.zoneFocus) planAnchors.push('- Planned zoneFocus: ' + weekPlan.zoneFocus + '.');
+    if (weekPlan.playerGains) planAnchors.push('- Planned playerGains: ' + weekPlan.playerGains + '.');
+    if (weekPlan.mapReuse) planAnchors.push('- Planned mapReuse: "' + weekPlan.mapReuse + '". Preserve this map progression mode unless the plan explicitly changes it.');
+    if (weekPlan.stateSnapshot) planAnchors.push('- Planned stateSnapshot: ' + weekPlan.stateSnapshot + '.');
+    if (weekPlan.stateChange) planAnchors.push('- Planned stateChange: ' + weekPlan.stateChange + '. Reflect this visibly in fieldOps.mapState.');
+    if (weekPlan.newGateOrUnlock) planAnchors.push('- Planned newGateOrUnlock: ' + weekPlan.newGateOrUnlock + '.');
+    if (weekPlan.oraclePressure) planAnchors.push('- Planned oraclePressure: ' + weekPlan.oraclePressure + '.');
+    if (weekPlan.fragmentFunction) planAnchors.push('- Planned fragmentFunction: ' + weekPlan.fragmentFunction + '.');
+    if (weekPlan.governingProcedure) planAnchors.push('- Planned governingProcedure: ' + weekPlan.governingProcedure + '.');
+    if (weekPlan.companionChange) planAnchors.push('- Planned companionChange: ' + weekPlan.companionChange + '.');
+    if (weekPlan.weeklyComponentMeaning) planAnchors.push('- Planned weeklyComponentMeaning: ' + weekPlan.weeklyComponentMeaning + '.');
+    var retryScaffolds = [];
+    if (retryErrorLower) {
+      if (/overflowdocument/.test(retryErrorLower) && plannedOverflow) {
+        retryScaffolds.push('- If the blocking error is overflowDocument-related, copy the planned overflow scaffold exactly for id/documentType before revising prose.');
+      }
+      if (/characterderivationproof|noticeabilitydesign|extractioninstruction|fieldops\.cipher|cipher\./.test(retryErrorLower) && !isBossWeek) {
+        retryScaffolds.push('- If the blocking error is cipher-field-related, keep the puzzle body but ensure fieldOps.cipher includes exactly: type, title, body, extractionInstruction, characterDerivationProof, noticeabilityDesign.');
+      }
+      if (/fragmentref|approved for this week|planned fragment/.test(retryErrorLower) && approvedFragmentRefs.length) {
+        retryScaffolds.push('- If the blocking error is fragment-ref-related, only use these approved refs: ' + JSON.stringify(approvedFragmentRefs) + '.');
+      }
+      if (/oracle/.test(retryErrorLower) && !isBossWeek) {
+        retryScaffolds.push('- If the blocking error is oracle-related, return exactly 10 oracle entries with roll bands "00-09" through "90-99" and concrete paperAction text.');
+      }
+      if (/mapstate|currentposition|no visible evolution|map /.test(retryErrorLower) && !isBossWeek) {
+        retryScaffolds.push('- If the blocking error is map-related, make fieldOps.mapState visibly reflect the planned stateChange/newGateOrUnlock and include a concrete currentPosition.');
+      }
+    }
     var parts = [
       '# Write Week ' + weekPlan.weekNumber,
       '',
@@ -2831,6 +2864,8 @@
       '**Literary Register:** ' + JSON.stringify(shellContext.literaryRegister || {}),
       '',
       '**Week Workout:** ' + weekWorkout,
+      '',
+      planAnchors.length ? '## Planned Week Anchors\n' + planAnchors.join('\n') : '',
       '',
       continuity ? '**Continuity Rules:** ' + JSON.stringify(continuity) : '',
       isBossWeek && allComponentValues ? '**Prior Values for Boss Decode (EXACTLY ' + allComponentValues.length + ' values — do not add, remove, or reorder):** ' + JSON.stringify(allComponentValues) + '\nSet bossEncounter.componentInputs to EXACTLY this array. There are ' + allComponentValues.length + ' non-boss weeks, so there must be EXACTLY ' + allComponentValues.length + ' componentInputs.' : '',
@@ -2894,6 +2929,7 @@
         : '',
       '',
       retryError ? '## Retry Focus\nThe previous attempt failed with this blocking error: ' + retryError + '\nFix that exact contract violation in this response.' : '',
+      retryScaffolds.length ? '## Retry Scaffolds\n' + retryScaffolds.join('\n') : '',
       '',
       '## Constraints',
       '- Preserve Specificity: storyPrompts must contain physical action and named places.',
