@@ -48,6 +48,56 @@ function looksLikeFragmentRef(ref) {
   return /^f\d+$/i.test(normalizeId(ref || ''));
 }
 
+function buildMapEvolutionFingerprint(mapState) {
+  var ms = mapState || {};
+  var mapType = String(ms.mapType || 'grid').trim().toLowerCase();
+
+  if (mapType === 'point-to-point' || mapType === 'node-graph') {
+    var nodes = (ms.nodes || []).map(function (node) {
+      return [node.id || '', node.label || '', node.state || '', node.x || '', node.y || ''].join(':');
+    }).sort().join('|');
+    var edges = (ms.edges || []).map(function (edge) {
+      return [edge.from || '', edge.to || '', edge.label || ''].join(':');
+    }).sort().join('|');
+    return 'network::' + nodes + '::' + edges + '::' + String(ms.currentNode || '');
+  }
+
+  if (mapType === 'linear-track') {
+    var stops = (ms.stops || ms.nodes || []).map(function (stop) {
+      return [stop.id || '', stop.label || '', stop.state || '', stop.position || ''].join(':');
+    }).sort().join('|');
+    return 'track::' + stops + '::' + String(ms.currentPosition || ms.currentNode || '');
+  }
+
+  if (mapType === 'player-drawn') {
+    return 'player::' + String(ms.mapNote || '') + '::' + String(ms.currentPosition || '');
+  }
+
+  var tiles = (ms.tiles || []).map(function (tile) {
+    return [tile.label || '', tile.type || '', tile.x || tile.col || '', tile.y || tile.row || ''].join(':');
+  }).sort().join('|');
+  return 'grid::' + tiles + '::' + String(ms.currentPosition ? [ms.currentPosition.row || '', ms.currentPosition.col || ''].join(',') : '');
+}
+
+function hasComparableMapState(mapState) {
+  var ms = mapState || {};
+  var mapType = String(ms.mapType || 'grid').trim().toLowerCase();
+
+  if (mapType === 'point-to-point' || mapType === 'node-graph') {
+    return !!(((ms.nodes || []).length > 0) || ((ms.edges || []).length > 0) || ms.currentNode);
+  }
+
+  if (mapType === 'linear-track') {
+    return !!((((ms.stops || ms.nodes || []).length > 0) || ms.currentPosition || ms.currentNode));
+  }
+
+  if (mapType === 'player-drawn') {
+    return !!(ms.mapNote || ms.currentPosition);
+  }
+
+  return !!(((ms.tiles || []).length > 0) || ms.currentPosition);
+}
+
 export function normalizeCampaignPlanOwnership(result) {
   if (!result || typeof result !== 'object') return result;
 
@@ -1051,7 +1101,7 @@ export function validateAssembledBooklet(booklet) {
     }
 
     // Collect map snapshot for cross-week progression check (non-boss only)
-    if (!week.isBossWeek && mapState && mapState.tiles && mapState.tiles.length > 0) {
+    if (!week.isBossWeek && mapState) {
       var tileByCoord = {};
       (mapState.tiles || []).forEach(function (t) {
         if (t.row !== undefined && t.col !== undefined) {
@@ -1061,7 +1111,9 @@ export function validateAssembledBooklet(booklet) {
       weekMapSnapshots.push({
         weekIndex: wi,
         dims: mapState.gridDimensions || {},
-        tileByCoord: tileByCoord
+        tileByCoord: tileByCoord,
+        fingerprint: hasComparableMapState(mapState) ? buildMapEvolutionFingerprint(mapState) : '',
+        hasComparableState: hasComparableMapState(mapState)
       });
     }
 
@@ -1107,6 +1159,10 @@ export function validateAssembledBooklet(booklet) {
             errors.push(prevWn + '\u2192' + currWn + ' tile (' + coord + '): impossible regression ' + transition);
           }
         }
+      }
+
+      if (prev.hasComparableState && curr.hasComparableState && prev.fingerprint && curr.fingerprint && prev.fingerprint === curr.fingerprint) {
+        errors.push(currWn + ' map tiles identical to previous week — no visible evolution');
       }
     }
   }

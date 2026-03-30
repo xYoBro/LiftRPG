@@ -414,7 +414,10 @@ export function generateQualityReport(booklet) {
     var labels = buildMapEvolutionFingerprint(ms);
 
     // Check for state evolution (tile labels AND types should differ between weeks)
-    if (prevMapLabels !== null && labels === prevMapLabels) {
+    var validatorAlreadyFlaggedStagnation = report.schemaErrors.some(function (entry) {
+      return entry.indexOf('Week ' + actualWeekNum + ' map tiles identical to previous week') !== -1;
+    });
+    if (prevMapLabels !== null && labels === prevMapLabels && !validatorAlreadyFlaggedStagnation) {
       report.weakSpots.push({
         area: 'map-stagnation',
         detail: 'Week ' + actualWeekNum + ' map tiles identical to previous week — no visible evolution',
@@ -430,7 +433,7 @@ export function generateQualityReport(booklet) {
 
   // Count map regression errors from validator for scoring (already in schemaErrors)
   var mapRegressionCount = report.schemaErrors.filter(function (e) {
-    return e.indexOf('impossible regression') !== -1;
+    return e.indexOf('impossible regression') !== -1 || e.indexOf('map tiles identical to previous week') !== -1;
   }).length;
 
   var mapTotalIssues = mapIssues.length + mapRegressionCount;
