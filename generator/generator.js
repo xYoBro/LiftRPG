@@ -2765,9 +2765,16 @@
     return parts.filter(Boolean).join('\n');
   };
 
-  window.generateSingleWeekFinalPrompt = function (workout, brief, layerBible, campaignPlan, weekPlan, shellContext, continuity, allComponentValues) {
+  window.generateSingleWeekFinalPrompt = function (workout, brief, layerBible, campaignPlan, weekPlan, shellContext, continuity, allComponentValues, retryState) {
     var isBossWeek = campaignPlan && campaignPlan.weeks && weekPlan.weekNumber === campaignPlan.weeks.length;
     var weekWorkout = window.extractWeekWorkout(workout, [weekPlan.weekNumber]);
+    var overflowRegistry = (campaignPlan && campaignPlan.overflowRegistry) || [];
+    var plannedOverflow = overflowRegistry.filter(function (entry) {
+      return Number(entry.weekNumber) === Number(weekPlan.weekNumber);
+    })[0] || null;
+    var retryError = retryState && retryState.error && retryState.error.message
+      ? String(retryState.error.message)
+      : '';
     var parts = [
       '# Write Week ' + weekPlan.weekNumber,
       '',
@@ -2791,6 +2798,39 @@
       continuity ? '**Continuity Rules:** ' + JSON.stringify(continuity) : '',
       isBossWeek && allComponentValues ? '**Prior Values for Boss Decode (EXACTLY ' + allComponentValues.length + ' values — do not add, remove, or reorder):** ' + JSON.stringify(allComponentValues) + '\nSet bossEncounter.componentInputs to EXACTLY this array. There are ' + allComponentValues.length + ' non-boss weeks, so there must be EXACTLY ' + allComponentValues.length + ' componentInputs.' : '',
       '',
+      '## Structural Obligations',
+      !isBossWeek ? '- Non-boss weeks MUST include fieldOps.oracleTable, fieldOps.cipher, and fieldOps.mapState.' : '- Boss week MUST include bossEncounter and MUST omit fieldOps.',
+      !isBossWeek ? '- fieldOps.cipher.characterDerivationProof is REQUIRED and cannot be blank.' : '- bossEncounter.componentInputs must exactly match the prior component values list.',
+      Number(weekPlan.sessionCount) > 3
+        ? '- This week has ' + weekPlan.sessionCount + ' sessions. Therefore overflow MUST be true and overflowDocument MUST be present.'
+        : '- This week has ' + weekPlan.sessionCount + ' sessions. Therefore overflow must be false and overflowDocument must be omitted.',
+      plannedOverflow
+        ? '- Planned overflow document (BINDING): overflowDocument.id MUST be exactly "' + plannedOverflow.id + '" and overflowDocument.documentType MUST be exactly "' + plannedOverflow.documentType + '".'
+        : '',
+      plannedOverflow && plannedOverflow.author
+        ? '- Planned overflow document author: ' + plannedOverflow.author + '.'
+        : '',
+      plannedOverflow && plannedOverflow.narrativeFunction
+        ? '- Planned overflow document function: ' + plannedOverflow.narrativeFunction + '.'
+        : '',
+      plannedOverflow
+        ? '- Minimum overflowDocument keys: id, documentType, title, content or body, and designSpec.'
+        : '',
+      plannedOverflow
+        ? '- If you are unsure, copy this scaffold and then fill the prose fields instead of omitting overflowDocument: ' + JSON.stringify({
+            overflow: true,
+            overflowDocument: {
+              id: plannedOverflow.id,
+              documentType: plannedOverflow.documentType,
+              title: 'Short institutional title',
+              content: 'In-world document prose that does real narrative work.',
+              designSpec: {}
+            }
+          })
+        : '',
+      '',
+      retryError ? '## Retry Focus\nThe previous attempt failed with this blocking error: ' + retryError + '\nFix that exact contract violation in this response.' : '',
+      '',
       '## Constraints',
       '- Preserve Specificity: storyPrompts must contain physical action and named places.',
       '- Do not flatten the style. Execute the exact Literary Register specified.',
@@ -2800,17 +2840,39 @@
     return parts.filter(Boolean).join('\n');
   };
 
-  window.generateSingleFragmentPrompt = function (layerBible, registryEntry, weekSummaries, shellContext, pastFragments) {
+  window.generateSingleFragmentPrompt = function (layerBible, registryEntry, weekSummaries, shellContext, pastFragments, retryState) {
+    var retryError = retryState && retryState.error && retryState.error.message
+      ? String(retryState.error.message)
+      : '';
     var parts = [
       '# Write Fragment ' + registryEntry.id,
       '',
       'Generate exactly ONE found document object as valid JSON. Do not over-explain.',
+      'Return exactly one fragment object. Do NOT wrap it in { "fragments": [...] }.',
       '',
       '## SCHEMA CONTRACT',
       window.buildStageSchema('fragment'),
       '',
       '## Fragment Registry Assignment',
       JSON.stringify(registryEntry),
+      '',
+      '## Structural Obligations',
+      '- id MUST be exactly "' + (registryEntry.id || '') + '".',
+      registryEntry && registryEntry.documentType
+        ? '- documentType MUST be exactly "' + registryEntry.documentType + '".'
+        : '',
+      registryEntry && registryEntry.author
+        ? '- inWorldAuthor MUST be exactly "' + registryEntry.author + '".'
+        : '',
+      '- The root object MUST include id, title, documentType, inWorldAuthor, content or body, and designSpec.',
+      '- If you are unsure, copy this scaffold and fill the prose fields instead of omitting required keys: ' + JSON.stringify({
+          id: registryEntry.id || 'F.01',
+          title: 'Short document title',
+          documentType: registryEntry.documentType || 'memo',
+          inWorldAuthor: registryEntry.author || 'Records Clerk',
+          content: 'In-world document prose with concrete operational detail.',
+          designSpec: {}
+        }),
       '',
       '## Context',
       '**World Contract:** ' + (shellContext.worldContract || ''),
@@ -2820,6 +2882,8 @@
       JSON.stringify(weekSummaries || []),
       '',
       pastFragments && pastFragments.length ? '**Prior Fragments (Prevent Repetition):** ' + JSON.stringify(pastFragments) : '',
+      '',
+      retryError ? '## Retry Focus\nThe previous attempt failed with this blocking error: ' + retryError + '\nFix that exact contract violation in this response.' : '',
       '',
       '## Constraints',
       '- The fragment MUST feel like an authentic, found document (memo, letter, dispatch).',

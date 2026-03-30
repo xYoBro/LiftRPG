@@ -1324,6 +1324,59 @@ function weekSummariesForRegistry(registry, allWeekSummaries, fallbackSummaries)
   return scoped.length ? scoped : (fallbackSummaries || []);
 }
 
+function normalizeSingleFragmentResult(result, registryEntry) {
+  var fragment = result;
+  if (fragment && Array.isArray(fragment.fragments) && fragment.fragments.length === 1) {
+    fragment = fragment.fragments[0];
+  }
+  if (!fragment || typeof fragment !== 'object') return fragment;
+  var normalized = Object.assign({}, fragment);
+  if (!normalized.id && registryEntry && registryEntry.id) {
+    normalized.id = registryEntry.id;
+  }
+  if (!normalized.documentType && registryEntry && registryEntry.documentType) {
+    normalized.documentType = registryEntry.documentType;
+  }
+  if (!normalized.inWorldAuthor && registryEntry && registryEntry.author) {
+    normalized.inWorldAuthor = registryEntry.author;
+  }
+  return normalized;
+}
+
+async function generateSingleFragmentAdaptive(settings, builders, config) {
+  var registryEntry = (config.registry || [])[0] || null;
+  var fragment = await runJsonStage(settings, {
+    stageKey: config.stageKey || 'fragments',
+    stageName: config.label,
+    stageIndex: config.stageIndex || 0,
+    completeMessage: config.label + ' complete.',
+    onProgress: config.onProgress || null,
+    getTotalStages: config.getTotalStages || null,
+    schema: null,
+    maxTokens: MAX_OUTPUT_TOKENS,
+    maxAttempts: 2,
+    rateLimiter: config.rateLimiter || null,
+    budgetEnforce: config.budgetEnforce || false,
+    normalizeResult: function (result) {
+      return normalizeSingleFragmentResult(result, registryEntry);
+    },
+    validate: function (result) {
+      return validateFragmentsStage({ fragments: result ? [result] : [] }, registryEntry ? [registryEntry] : []);
+    },
+    buildPrompt: function (retryState) {
+      return builders.singleFragment(
+        config.layerBible,
+        registryEntry,
+        config.batchWeekSummaries,
+        config.shellContext,
+        config.priorFragments,
+        retryState
+      );
+    }
+  });
+  return { fragments: fragment ? [fragment] : [] };
+}
+
 async function generateFragmentBatchAdaptive(settings, builders, config) {
   try {
     return await runJsonStage(settings, {
@@ -1357,6 +1410,10 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
       }
     });
   } catch (err) {
+    if (config.registry.length === 1 && shouldRetryStageError(err)) {
+      console.warn('[LiftRPG] Falling back to single-fragment recovery after batch failure:', config.label, err.message);
+      return await generateSingleFragmentAdaptive(settings, builders, config);
+    }
     if (!shouldSplitFragmentBatch(err, config.registry)) throw err;
     console.warn('[LiftRPG] Splitting fragment batch after failure:', config.label, err.message);
 
@@ -1762,7 +1819,17 @@ async function runApiPipeline(options) {
         return validateWeekSchema(result, isBossWeek, isBossWeek ? { componentInputs: allComponentValues } : undefined);
       },
       buildPrompt: function (retryState) {
-        return builders.singleWeekFinal(workout, brief, layerBible, campaignPlan, campaignWeekPlan, shellContext, continuityPacket, allComponentValues);
+        return builders.singleWeekFinal(
+          workout,
+          brief,
+          layerBible,
+          campaignPlan,
+          campaignWeekPlan,
+          shellContext,
+          continuityPacket,
+          allComponentValues,
+          retryState
+        );
       }
     });
 

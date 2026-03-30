@@ -1072,6 +1072,38 @@ export function validateCampaignPlanStage(result) {
       if (!w.weekNumber) warnings.push('Campaign Plan → weeks[' + i + ']: missing weekNumber');
     });
   }
+  if (Array.isArray(result.weeks)) {
+    var overflowRegistry = Array.isArray(result.overflowRegistry) ? result.overflowRegistry : [];
+    var overflowByWeek = {};
+    overflowRegistry.forEach(function (entry, index) {
+      if (!entry || !entry.weekNumber) {
+        warnings.push('Campaign Plan → overflowRegistry[' + index + ']: missing weekNumber');
+        return;
+      }
+      overflowByWeek[entry.weekNumber] = entry;
+    });
+    result.weeks.forEach(function (week, index) {
+      if (!week || !week.sessionCount || week.sessionCount <= 3) return;
+      var label = 'Campaign Plan → weeks[' + index + ']';
+      if (!week.overflowFragmentId) {
+        errors.push(label + ': sessionCount > 3 but overflowFragmentId is missing');
+      }
+      var planned = overflowByWeek[week.weekNumber];
+      if (!planned) {
+        errors.push(label + ': sessionCount > 3 but overflowRegistry has no entry for week ' + week.weekNumber);
+        return;
+      }
+      if (!planned.id) {
+        errors.push('Campaign Plan → overflowRegistry week ' + week.weekNumber + ': missing id');
+      }
+      if (!planned.documentType) {
+        errors.push('Campaign Plan → overflowRegistry week ' + week.weekNumber + ': missing documentType');
+      }
+      if (week.overflowFragmentId && planned.id && week.overflowFragmentId !== planned.id) {
+        errors.push(label + ': overflowFragmentId "' + week.overflowFragmentId + '" does not match overflowRegistry id "' + planned.id + '"');
+      }
+    });
+  }
   if (warnings.length > 0) {
     console.warn('[LiftRPG] Campaign Plan advisory:', warnings.join('; '));
   }
