@@ -2025,7 +2025,7 @@ async function runApiPipeline(options) {
         if (!result.sessions) return 'Week object missing "sessions" array. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
         var schemaValidation = validateWeekSchema(result, isBossWeek, {
           componentInputs: isBossWeek ? allComponentValues : undefined,
-          approvedFragmentIds: planEntry ? (planEntry.fragmentIds || []) : [],
+          approvedFragmentIds: campaignWeekPlan ? (campaignWeekPlan.fragmentIds || []) : [],
           currentWeekNumber: w,
           previousWeek: !isBossWeek && finalWeeks.length ? finalWeeks[finalWeeks.length - 1] : null
         });
@@ -2067,7 +2067,7 @@ async function runApiPipeline(options) {
     // Schema validation safety net
     var weekValidation = validateWeekSchema(weekObject, weekObject.isBossWeek, {
       componentInputs: weekObject.isBossWeek ? allComponentValues : undefined,
-      approvedFragmentIds: planEntry ? (planEntry.fragmentIds || []) : [],
+      approvedFragmentIds: campaignWeekPlan ? (campaignWeekPlan.fragmentIds || []) : [],
       currentWeekNumber: w,
       previousWeek: !weekObject.isBossWeek && finalWeeks.length ? finalWeeks[finalWeeks.length - 1] : null
     });
