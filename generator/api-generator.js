@@ -925,12 +925,29 @@ function buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState)
   var weekCount = parseWeekCountFromWorkout(workout);
   var midpoint = Math.ceil(weekCount / 2);
   var lastError = retryState && retryState.error ? truncateText(retryState.error.message || retryState.error, 180) : '';
+  var lastErrorLower = lastError.toLowerCase();
+  var retryHints = [];
+  if (/ciphertype/.test(lastErrorLower)) {
+    retryHints.push('- Recheck every non-boss week for a concrete cipherType and ensure consecutive non-boss weeks do not repeat it.');
+  }
+  if (/statechange|newgateorunlock|mapsnapshot|statesnapshot|no-change|no change|map progression|repeat the prior non-boss week/.test(lastErrorLower)) {
+    retryHints.push('- Recheck every non-boss week for real map progression: stateSnapshot, mapReuse, stateChange, and newGateOrUnlock must all be present and may not repeat the prior non-boss week.');
+  }
+  if (/fragmentregistry|fragmentids|weekref|documenttype/.test(lastErrorLower)) {
+    retryHints.push('- Recheck fragment ownership: every fragmentRegistry entry must match its owning week fragmentIds, and the registry must keep at least 3 document types with no dominant type above 45% once it has 8+ entries.');
+  }
+  if (/overflowregistry|overflowfragmentid/.test(lastErrorLower)) {
+    retryHints.push('- Recheck overflow ownership: every week with sessionCount > 3 needs overflowFragmentId plus a matching overflowRegistry entry with weekNumber and canonical F.30+ IDs.');
+  }
   return [
     '# API Stage 2 — Story Plan (Compact Retry)',
     '',
     'Return JSON only.',
     'Generate a compact but complete campaign plan that matches this exact top-level shape:',
     '{"topology":{},"weeks":[],"bossPlan":{},"fragmentRegistry":[],"overflowRegistry":[]}',
+    '',
+    'Compact week template (repeat for each week, filling every field):',
+    '{"weekNumber":1,"arcBeat":"","npcBeat":"","stateSnapshot":"","playerGains":"","zoneFocus":"","cipherType":"","mapReuse":"full","stateChange":"","newGateOrUnlock":"","weeklyComponentMeaning":"","oraclePressure":"","fragmentFunction":"","governingProcedure":"","companionChange":"","isBossWeek":false,"isBinaryChoiceWeek":false,"sessionCount":3,"fragmentIds":["F.01"],"overflowFragmentId":"F.30","sessionBeatTypes":[]}',
     '',
     '## Hard Requirements',
     '- Use exactly ' + weekCount + ' weeks.',
@@ -947,6 +964,8 @@ function buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState)
     '- fragmentRegistry must establish clues early, complicate them mid-block, and reveal them late.',
     '- Use at least 3 fragment document types when the registry has 8+ entries, and do not let one documentType exceed 45% of the registry.',
     '- Keep descriptions concise. Preserve clue economy, progression, and convergence logic.',
+    retryHints.length ? '## Retry Hints' : '',
+    retryHints.length ? retryHints.join('\n') : '',
     lastError ? '- Fix the prior failure: ' + lastError : '',
     '',
     '## Layer Codex Essentials',
@@ -3217,6 +3236,7 @@ window.LiftRPGAPI = {
     mergeFragmentBatches: mergeFragmentBatches,
     planFragmentBatchRecovery: planFragmentBatchRecovery,
     buildSmartRetryDirective: buildSmartRetryDirective,
+    buildCompactCampaignRetryPrompt: buildCompactCampaignRetryPrompt,
     assembleSkeletonFleshBooklet: assembleSkeletonFleshBooklet,
     validateSkeletonStage: validateSkeletonStage,
     buildSkeletonFragmentBatches: buildSkeletonFragmentBatches,
