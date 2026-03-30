@@ -2844,6 +2844,9 @@
       if (/mapstate|currentposition|no visible evolution|map /.test(retryErrorLower) && !isBossWeek) {
         retryScaffolds.push('- If the blocking error is map-related, make fieldOps.mapState visibly reflect the planned stateChange/newGateOrUnlock and include a concrete currentPosition.');
       }
+      if (/referencetable|a1z26|password not derived deterministically|decodingkey/.test(retryErrorLower) && isBossWeek) {
+        retryScaffolds.push('- If the blocking error is boss-decode-related, set bossEncounter.decodingKey.referenceTable to a plain A1Z26 string such as "1=A 2=B 3=C ... 26=Z". Do not use objects or custom codebooks.');
+      }
     }
     var parts = [
       '# Write Week ' + weekPlan.weekNumber,
@@ -2874,6 +2877,8 @@
       !isBossWeek ? '- Non-boss weeks MUST include fieldOps.oracleTable, fieldOps.cipher, and fieldOps.mapState.' : '- Boss week MUST include bossEncounter and MUST omit fieldOps.',
       !isBossWeek ? '- fieldOps.cipher.characterDerivationProof is REQUIRED and cannot be blank.' : '- bossEncounter.componentInputs must exactly match the prior component values list.',
       !isBossWeek ? '- fieldOps.cipher MUST include type, title, body, extractionInstruction, characterDerivationProof, and noticeabilityDesign.' : '',
+      isBossWeek ? '- bossEncounter.decodingKey.referenceTable MUST be a plain string containing the full standard A1Z26 table (1=A through 26=Z). Do not use object maps, calibration ranges, custom lookup systems, or thematic substitution tables.' : '',
+      isBossWeek ? '- bossEncounter.decodingKey.instruction may explain how to use the weekly component values, but the actual referenceTable must stay standard A1Z26 so the ending remains deterministic.' : '',
       isBossWeek && Number(weekPlan.sessionCount) > 3
         ? '- This is a boss week with overflow. bossEncounter and overflowDocument MUST both be present. Do not omit overflowDocument just because this is the boss week.'
         : '',
@@ -2923,6 +2928,16 @@
                 extractionInstruction: 'How the player derives the weekly component.',
                 characterDerivationProof: 'Explain exactly why the extracted character/value is correct.',
                 noticeabilityDesign: 'Describe how the clue is noticeable but still feels in-world.'
+              }
+            }
+          })
+        : '',
+      isBossWeek
+        ? '- Minimum boss decoding scaffold if you are unsure: ' + JSON.stringify({
+            bossEncounter: {
+              decodingKey: {
+                instruction: 'Convert each prior component value with the standard A1Z26 table, then read the resulting letters in order.',
+                referenceTable: '1=A 2=B 3=C 4=D 5=E 6=F 7=G 8=H 9=I 10=J 11=K 12=L 13=M 14=N 15=O 16=P 17=Q 18=R 19=S 20=T 21=U 22=V 23=W 24=X 25=Y 26=Z'
               }
             }
           })

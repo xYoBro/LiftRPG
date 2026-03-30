@@ -609,6 +609,8 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
       } else {
         if (!boss.decodingKey.referenceTable) {
           errors.push('Boss decodingKey missing referenceTable');
+        } else if (!isStandardAlphaTable(boss.decodingKey.referenceTable)) {
+          errors.push('Boss decodingKey.referenceTable must be a standard A1Z26 string (1=A ... 26=Z)');
         }
         if (!boss.decodingKey.instruction) {
           errors.push('Boss decodingKey missing instruction');
@@ -1139,6 +1141,9 @@ export function validateAssembledBooklet(booklet) {
 
     // ── A1Z26 numeric validity (when boss decode is standard alphabetic) ────
     var dk = boss.decodingKey;
+    if (dk && dk.referenceTable && !isStandardAlphaTable(dk.referenceTable)) {
+      errors.push('Boss decodingKey.referenceTable must be a standard A1Z26 string (1=A ... 26=Z)');
+    }
     var isA1Z26Boss = dk && dk.referenceTable && isStandardAlphaTable(dk.referenceTable);
 
     if (isA1Z26Boss) {
