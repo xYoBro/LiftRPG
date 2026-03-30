@@ -2921,6 +2921,14 @@
         return STAGE_LABELS[stageKey] || stageKey;
       }
 
+      function getApiCompletionLabel(stageKey, meta) {
+        var stageName = meta && typeof meta.stageName === 'string' ? meta.stageName.trim() : '';
+        if (stageName && (stageKey === 'weeks' || stageKey === 'fragments' || stageKey === 'endings')) {
+          return stageName;
+        }
+        return stageKey ? getStageLabel(stageKey) : 'Stage';
+      }
+
       function formatCompactTokens(value) {
         var num = Number(value || 0);
         if (!Number.isFinite(num) || num <= 0) return '0';
@@ -6433,7 +6441,7 @@
                 applyApiStageTelemetry(stageKey, meta.telemetry, message, meta);
               }
               markApiStageComplete(stageKey, message, meta);
-              pushApiLog((stageKey ? getStageLabel(stageKey) : 'Stage') + ' complete · ' + (meta.telemetry ? formatTokenSummary(meta.telemetry.usage) : 'No token data') + (meta.telemetry && meta.telemetry.estimatedCostUsd ? ' · ' + formatUsd(meta.telemetry.estimatedCostUsd) + ' est' : ''));
+              pushApiLog(getApiCompletionLabel(stageKey, meta) + ' complete · ' + (meta.telemetry ? formatTokenSummary(meta.telemetry.usage) : 'No token data') + (meta.telemetry && meta.telemetry.estimatedCostUsd ? ' · ' + formatUsd(meta.telemetry.estimatedCostUsd) + ' est' : ''));
             } else if (phase === 'failed') {
               if (meta.telemetry) {
                 applyApiStageTelemetry(stageKey, meta.telemetry, meta.error || message, meta);

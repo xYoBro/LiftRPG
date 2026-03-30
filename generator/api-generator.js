@@ -1396,6 +1396,50 @@ function normalizeSingleFragmentResult(result, registryEntry) {
   return normalized;
 }
 
+function normalizeFragmentBatchResult(result, registry) {
+  var batch = result;
+  var fragments = [];
+
+  if (Array.isArray(batch)) {
+    fragments = batch;
+    batch = { fragments: batch };
+  } else if (batch && typeof batch === 'object' && Array.isArray(batch.fragments)) {
+    fragments = batch.fragments;
+  } else if (batch && typeof batch === 'object') {
+    var wrapperKeys = ['documents', 'docs', 'items', 'records', 'entries'];
+    for (var i = 0; i < wrapperKeys.length; i++) {
+      if (Array.isArray(batch[wrapperKeys[i]])) {
+        fragments = batch[wrapperKeys[i]];
+        batch = { fragments: batch[wrapperKeys[i]] };
+        break;
+      }
+    }
+    if (!fragments.length && batch.id) {
+      fragments = [batch];
+      batch = { fragments: fragments };
+    }
+  }
+
+  if (!Array.isArray(fragments)) return batch;
+
+  var registryEntries = Array.isArray(registry) ? registry : [];
+  var registryByNorm = {};
+  registryEntries.forEach(function (entry) {
+    var norm = normalizeId(entry && entry.id);
+    if (norm) registryByNorm[norm] = entry;
+  });
+
+  var normalizedFragments = fragments.map(function (fragment, index) {
+    var norm = normalizeId(fragment && fragment.id);
+    var registryEntry = (norm && registryByNorm[norm]) || registryEntries[index] || null;
+    return normalizeSingleFragmentResult(fragment, registryEntry);
+  }).filter(Boolean);
+
+  return Object.assign({}, (batch && typeof batch === 'object' && !Array.isArray(batch)) ? batch : {}, {
+    fragments: normalizedFragments
+  });
+}
+
 function planFragmentBatchRecovery(result, registry) {
   var batchResult = result;
   if (batchResult && Array.isArray(batchResult.fragments)) batchResult = batchResult.fragments;
@@ -1538,6 +1582,9 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
       maxAttempts: 2,
       rateLimiter: config.rateLimiter || null,
       budgetEnforce: config.budgetEnforce || false,
+      normalizeResult: function (result) {
+        return normalizeFragmentBatchResult(result, config.registry);
+      },
       validate: function (result) {
         return validateFragmentsStage(result, config.registry);
       },
@@ -3235,6 +3282,7 @@ window.LiftRPGAPI = {
     buildFragmentBatches: buildFragmentBatches,
     mergeFragmentBatches: mergeFragmentBatches,
     planFragmentBatchRecovery: planFragmentBatchRecovery,
+    normalizeFragmentBatchResult: normalizeFragmentBatchResult,
     buildSmartRetryDirective: buildSmartRetryDirective,
     buildCompactCampaignRetryPrompt: buildCompactCampaignRetryPrompt,
     assembleSkeletonFleshBooklet: assembleSkeletonFleshBooklet,
