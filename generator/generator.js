@@ -2822,6 +2822,9 @@
       approvedFragmentRefs.length
         ? '- Approved fragmentRef IDs for this week: ' + JSON.stringify(approvedFragmentRefs) + '. Sessions and oracle entries may only reference IDs from this list. Do not invent new fragment IDs.'
         : '- This week has no approved fragmentRef IDs. Do not invent or reference fragment IDs.',
+      approvedFragmentRefs.length
+        ? '- Every approved fragmentRef ID for this week must be used at least once in a session or oracle entry before the week is complete.'
+        : '',
       plannedOverflow
         ? '- If you are unsure, copy this scaffold and then fill the prose fields instead of omitting overflowDocument: ' + JSON.stringify({
             overflow: true,

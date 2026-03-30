@@ -44,9 +44,12 @@ export function validateWeekChunkContinuity(chunk, context) {
   });
   var expectedWeeklyComponentType = ledger.weeklyComponentType;
   var combinedComponentValues = ledger.componentValues.slice();
+  var referencedFragmentIds = {};
+  var chunkWeekNumbers = {};
 
   (chunk.weeks || []).forEach(function (week, index) {
     var label = 'Week ' + (week.weekNumber || context.expectedWeeks && context.expectedWeeks[index] || '?');
+    if (week && week.weekNumber) chunkWeekNumbers[week.weekNumber] = true;
     var wc = week.weeklyComponent || {};
     if (!week.isBossWeek && expectedWeeklyComponentType && wc.type && normalizeComponentType(wc.type) !== normalizeComponentType(expectedWeeklyComponentType)) {
       errors.push(label + ' weeklyComponent.type "' + wc.type + '" does not match shell meta.weeklyComponentType "' + expectedWeeklyComponentType + '"');
@@ -56,6 +59,7 @@ export function validateWeekChunkContinuity(chunk, context) {
       if (session.fragmentRef && !continuityRefExists(ledger, session.fragmentRef)) {
         errors.push(label + ' session ' + (sessionIndex + 1) + ': fragmentRef "' + session.fragmentRef + '" is not present in fragmentRegistry or overflowRegistry');
       }
+      if (session.fragmentRef) referencedFragmentIds[normalizeId(session.fragmentRef)] = true;
     });
 
     var oracle = (week.fieldOps || {}).oracleTable || (week.fieldOps || {}).oracle || {};
@@ -63,6 +67,7 @@ export function validateWeekChunkContinuity(chunk, context) {
       if (entry.fragmentRef && !continuityRefExists(ledger, entry.fragmentRef)) {
         errors.push(label + ' oracle[' + entryIndex + ']: fragmentRef "' + entry.fragmentRef + '" is not present in fragmentRegistry or overflowRegistry');
       }
+      if (entry.fragmentRef) referencedFragmentIds[normalizeId(entry.fragmentRef)] = true;
     });
 
     if (week.overflowDocument && week.overflowDocument.id) {
@@ -75,6 +80,13 @@ export function validateWeekChunkContinuity(chunk, context) {
 
     if (!week.isBossWeek && wc.value !== undefined && wc.value !== null && wc.value !== '') {
       combinedComponentValues.push(String(wc.value));
+    }
+  });
+
+  ((context.campaignPlan || {}).fragmentRegistry || []).forEach(function (entry) {
+    if (!entry || !entry.id || !entry.weekRef || !chunkWeekNumbers[entry.weekRef]) return;
+    if (!referencedFragmentIds[normalizeId(entry.id)]) {
+      errors.push('Week ' + entry.weekRef + ' does not reference planned fragment "' + entry.id + '" in sessions or oracle entries');
     }
   });
 
