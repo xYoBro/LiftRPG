@@ -2772,6 +2772,9 @@
     var plannedOverflow = overflowRegistry.filter(function (entry) {
       return Number(entry.weekNumber) === Number(weekPlan.weekNumber);
     })[0] || null;
+    var approvedFragmentRefs = []
+      .concat((weekPlan && weekPlan.fragmentIds) || [])
+      .concat(plannedOverflow && plannedOverflow.id ? [plannedOverflow.id] : []);
     var retryError = retryState && retryState.error && retryState.error.message
       ? String(retryState.error.message)
       : '';
@@ -2816,6 +2819,9 @@
       plannedOverflow
         ? '- Minimum overflowDocument keys: id, documentType, title, content or body, and designSpec.'
         : '',
+      approvedFragmentRefs.length
+        ? '- Approved fragmentRef IDs for this week: ' + JSON.stringify(approvedFragmentRefs) + '. Sessions and oracle entries may only reference IDs from this list. Do not invent new fragment IDs.'
+        : '- This week has no approved fragmentRef IDs. Do not invent or reference fragment IDs.',
       plannedOverflow
         ? '- If you are unsure, copy this scaffold and then fill the prose fields instead of omitting overflowDocument: ' + JSON.stringify({
             overflow: true,

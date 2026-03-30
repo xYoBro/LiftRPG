@@ -1816,7 +1816,22 @@ async function runApiPipeline(options) {
         if (!result) return 'Week generation returned empty result. Model may have returned a shell instead of a week object.';
         if (!result.title) return 'Week object missing "title" field. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
         if (!result.sessions) return 'Week object missing "sessions" array. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
-        return validateWeekSchema(result, isBossWeek, isBossWeek ? { componentInputs: allComponentValues } : undefined);
+        var schemaValidation = validateWeekSchema(result, isBossWeek, isBossWeek ? { componentInputs: allComponentValues } : undefined);
+        if (schemaValidation && schemaValidation.valid === false) {
+          return schemaValidation;
+        }
+        var continuityErrors = validateWeekChunkContinuity(
+          { weeks: [Object.assign({}, result, { weekNumber: w, isBossWeek: isBossWeek })] },
+          {
+            shell: shell,
+            campaignPlan: campaignPlan,
+            priorWeekChunkOutputs: finalWeeks.length ? [{ weeks: finalWeeks }] : []
+          }
+        );
+        if (continuityErrors.length > 0) {
+          return continuityErrors;
+        }
+        return schemaValidation;
       },
       buildPrompt: function (retryState) {
         return builders.singleWeekFinal(
