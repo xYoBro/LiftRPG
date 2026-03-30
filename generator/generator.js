@@ -2587,6 +2587,9 @@
       '- worldContract is the booklet north star. It must read like a testable governing tension, not a summary.',
       '- narrativeVoice, literaryRegister, structuralShape, and artifactIdentity are downstream contracts; make them strong enough that later stages can follow them exactly.',
       '- Cover, rules spread, and theme must all feel like one coherent shell family, not adjacent UI labels.',
+      '- rulesSpread.leftPage MUST include title, reEntryRule, and a sections array of objects. Never return bare strings or unlabeled prose blocks in sections.',
+      '- Every rulesSpread.leftPage.sections entry MUST be exactly { heading, body } with both fields present and non-empty.',
+      '- rulesSpread.rightPage MUST include title and instruction; do not rename them to heading/body/text.',
       '- passwordEncryptedEnding stays blank; trusted tooling seals it later.',
       '- meta.weekCount MUST exactly equal ' + weekCount + '.',
       '- meta.passwordLength MUST exactly equal ' + Math.max(0, weekCount - 1) + '.',
@@ -2612,7 +2615,7 @@
       '',
       '## Design Bias',
       compactJson(summarizeDesignBiasForApi(blend)),
-      options.retryMode ? 'Retry mode: keep shells concise, specific, renderer-safe, and distinctive in diction before adding more labels.' : '',
+      options.retryMode ? 'Retry mode: keep shells concise, specific, renderer-safe, and distinctive in diction before adding more labels. Preserve valid shell identity, but rewrite any malformed rules sections into explicit { heading, body } objects.' : '',
       '',
       'JSON only.'
     ].filter(Boolean).join('\n');

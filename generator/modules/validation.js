@@ -98,6 +98,173 @@ function hasComparableMapState(mapState) {
   return !!(((ms.tiles || []).length > 0) || ms.currentPosition);
 }
 
+function firstNonEmptyShellText() {
+  for (var i = 0; i < arguments.length; i++) {
+    var value = arguments[i];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return '';
+}
+
+function coerceShellText(value) {
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value)) {
+    return value.map(coerceShellText).filter(Boolean).join(' ').trim();
+  }
+  if (!value || typeof value !== 'object') return '';
+  return firstNonEmptyShellText(
+    value.body,
+    value.text,
+    value.displayText,
+    value.content,
+    value.copy,
+    value.description,
+    value.instruction,
+    value.summary,
+    value.finalLine
+  );
+}
+
+function titleCaseShellLabel(value) {
+  var text = String(value || '').trim();
+  if (!text) return '';
+  return text.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').replace(/\b[a-z]/g, function (match) {
+    return match.toUpperCase();
+  });
+}
+
+function splitShellSectionText(text, index) {
+  var normalized = String(text || '').trim();
+  if (!normalized) return { heading: '', body: '' };
+
+  var punctuated = normalized.match(/^([^:]{2,60}?)\s*:\s+(.+)$/);
+  if (punctuated) {
+    return { heading: titleCaseShellLabel(punctuated[1]), body: punctuated[2].trim() };
+  }
+
+  var dashed = normalized.match(/^([^-\u2013\u2014]{2,60}?)\s*[-\u2013\u2014]\s+(.+)$/);
+  if (dashed) {
+    return { heading: titleCaseShellLabel(dashed[1]), body: dashed[2].trim() };
+  }
+
+  return { heading: 'Procedure ' + (index + 1), body: normalized };
+}
+
+function normalizeShellSection(section, index) {
+  if (section && typeof section === 'object' && !Array.isArray(section) && section.heading && (section.body || section.text)) {
+    if (!section.body && section.text) section.body = String(section.text).trim();
+    section.heading = String(section.heading).trim();
+    section.body = String(section.body || '').trim();
+    return section;
+  }
+
+  if (typeof section === 'string' || Array.isArray(section)) {
+    var fromText = splitShellSectionText(coerceShellText(section), index);
+    return { heading: fromText.heading, body: fromText.body };
+  }
+
+  if (!section || typeof section !== 'object') {
+    return { heading: 'Procedure ' + (index + 1), body: '' };
+  }
+
+  var objectKeys = Object.keys(section);
+  if (!section.heading && !section.body && !section.text && objectKeys.length === 1) {
+    var onlyKey = objectKeys[0];
+    var onlyValue = coerceShellText(section[onlyKey]);
+    if (onlyValue) {
+      return { heading: titleCaseShellLabel(onlyKey), body: onlyValue };
+    }
+  }
+
+  var heading = firstNonEmptyShellText(
+    section.heading,
+    section.title,
+    section.label,
+    section.name,
+    section.header,
+    section.topic
+  );
+  var body = firstNonEmptyShellText(
+    coerceShellText(section.body),
+    coerceShellText(section.text),
+    coerceShellText(section.content),
+    coerceShellText(section.copy),
+    coerceShellText(section.description),
+    coerceShellText(section.instruction),
+    coerceShellText(section.summary)
+  );
+
+  if (!heading && body) {
+    var split = splitShellSectionText(body, index);
+    heading = split.heading;
+    body = split.body;
+  }
+
+  return {
+    heading: heading || ('Procedure ' + (index + 1)),
+    body: body || ''
+  };
+}
+
+export function normalizeShellShape(shell) {
+  if (!shell || typeof shell !== 'object') return shell;
+
+  var rulesSpread = shell.rulesSpread || {};
+  var leftPage = rulesSpread.leftPage || {};
+  var rightPage = rulesSpread.rightPage || {};
+
+  if (!Array.isArray(leftPage.sections)) {
+    if (Array.isArray(leftPage.entries)) {
+      leftPage.sections = leftPage.entries.slice();
+    } else if (Array.isArray(leftPage.rules)) {
+      leftPage.sections = leftPage.rules.slice();
+    } else if (leftPage.sections && typeof leftPage.sections === 'object') {
+      leftPage.sections = Object.keys(leftPage.sections).map(function (key) {
+        var entry = {};
+        entry[key] = leftPage.sections[key];
+        return entry;
+      });
+    }
+  }
+
+  if (Array.isArray(leftPage.sections)) {
+    leftPage.sections = leftPage.sections.map(function (section, index) {
+      return normalizeShellSection(section, index);
+    });
+  }
+
+  if (!leftPage.title) {
+    leftPage.title = firstNonEmptyShellText(leftPage.heading, leftPage.header, leftPage.name);
+  }
+  if (!leftPage.reEntryRule) {
+    leftPage.reEntryRule = firstNonEmptyShellText(
+      leftPage.reentryRule,
+      leftPage.reEntry,
+      leftPage.missedSessionRule,
+      leftPage.catchUpRule
+    );
+  }
+
+  if (!rightPage.title) {
+    rightPage.title = firstNonEmptyShellText(rightPage.heading, rightPage.header, rightPage.name);
+  }
+  if (!rightPage.instruction) {
+    rightPage.instruction = firstNonEmptyShellText(
+      rightPage.instruction,
+      rightPage.body,
+      rightPage.text,
+      rightPage.description,
+      rightPage.copy,
+      rightPage.guide
+    );
+  }
+
+  rulesSpread.leftPage = leftPage;
+  rulesSpread.rightPage = rightPage;
+  shell.rulesSpread = rulesSpread;
+  return shell;
+}
+
 export function normalizeCampaignPlanOwnership(result) {
   if (!result || typeof result !== 'object') return result;
 
@@ -775,6 +942,7 @@ export function validateShellSchema(shell, expectedOptions) {
   var errors = [];
   var warnings = [];
   if (!shell) { return { valid: false, errors: ['Shell is null'] }; }
+  normalizeShellShape(shell);
   // Hard failures: match pre-restructure checks exactly
   if (!shell.meta) errors.push('Missing meta');
   if (!shell.cover) errors.push('Missing cover');

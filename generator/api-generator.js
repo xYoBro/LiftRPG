@@ -66,6 +66,7 @@ import {
   validateEndingsContinuity,
   validateBookletSchema,
   validateWeekSchema,
+  normalizeShellShape,
   validateShellSchema,
   validateAssembledBooklet,
   validateLayerBibleStage,
@@ -496,9 +497,19 @@ var STRUCTURED_SCHEMA_SHELL = {
           properties: {
             title: { type: 'string' },
             reEntryRule: { type: 'string' },
-            sections: { type: 'array', items: { type: 'object' } }
+            sections: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  heading: { type: 'string' },
+                  body: { type: 'string' }
+                },
+                required: ['heading', 'body']
+              }
+            }
           },
-          required: ['title', 'sections']
+          required: ['title', 'reEntryRule', 'sections']
         },
         rightPage: {
           type: 'object',
@@ -1910,9 +1921,11 @@ async function runApiPipeline(options) {
         if (result && result.meta && !('passwordEncryptedEnding' in result.meta)) {
           result.meta.passwordEncryptedEnding = '';
         }
+        normalizeShellShape(result);
         return result;
       },
       autoRepair: function (result) {
+        normalizeShellShape(result);
         if (result && result.theme && result.theme.visualArchetype) {
           result.theme.visualArchetype = normalizeThemeArchetype(result.theme.visualArchetype);
         }
@@ -3286,6 +3299,9 @@ window.LiftRPGAPI = {
   clearCheckpoint: clearCheckpoint,
   getCheckpoint: getCheckpoint,
   manual: {
+    structuredSchemas: {
+      shell: STRUCTURED_SCHEMA_SHELL
+    },
     ensureArtifactIdentity: ensureArtifactIdentity,
     buildIdentityContract: buildIdentityContract,
     compareIdentityContract: compareIdentityContract,
@@ -3312,6 +3328,7 @@ window.LiftRPGAPI = {
     classifyValidationErrors: classifyValidationErrors,
     autoRepairWeek: autoRepairWeek,
     validateWeekSchema: validateWeekSchema,
+    normalizeShellShape: normalizeShellShape,
     validateShellSchema: validateShellSchema,
     validateLayerBibleStage: validateLayerBibleStage,
     normalizeCampaignPlanOwnership: normalizeCampaignPlanOwnership,
