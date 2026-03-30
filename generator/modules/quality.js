@@ -6,6 +6,10 @@ import { VALID_MAP_TYPES, VALID_COMPANION_TYPES } from './constants.js';
 import { normalizeId, normalizeThemeArchetype, decodeA1Z26, isStandardAlphaTable } from './assembly.js';
 import { validateAssembledBooklet } from './validation.js';
 
+function looksLikeFragmentRef(ref) {
+  return /^f\d+$/i.test(normalizeId(ref || ''));
+}
+
 export function extractWeekCompanionTypes(week) {
   return ((((week || {}).fieldOps || {}).companionComponents) || [])
     .map(function (component) { return String((component || {}).type || '').trim(); })
@@ -303,9 +307,18 @@ export function generateQualityReport(booklet) {
         }
       }
     });
+    var cipherTargets = ((((week.fieldOps || {}).cipher || {}).body || {}).referenceTargets || []);
+    cipherTargets.forEach(function (target, targetIndex) {
+      if (!looksLikeFragmentRef(target)) return;
+      referencedFragmentIdsNorm[normalizeId(target)] = true;
+      if (!fragmentExistsQR(target)) {
+        continuityIssues.push('Week ' + (wi + 1) + ' cipher.referenceTargets[' + targetIndex + '] "' + target + '" unresolved');
+      }
+    });
   });
 
-  // Unreferenced fragments (never pointed to by any session or oracle, soft-matched)
+  // Unreferenced fragments (never pointed to by any session, oracle, or
+  // fragment-like cipher reference target, soft-matched)
   var unreferencedFragments = fragments.filter(function (f) {
     return f.id && !referencedFragmentIdsNorm[normalizeId(f.id)];
   });
@@ -551,7 +564,7 @@ export function generateQualityReport(booklet) {
   if (unreferencedFragments.length > fragments.length * 0.3 && fragments.length > 3) {
     report.weakSpots.push({
       area: 'underused-fragments',
-      detail: unreferencedFragments.length + ' of ' + fragments.length + ' fragments never referenced by sessions or oracles',
+      detail: unreferencedFragments.length + ' of ' + fragments.length + ' fragments never referenced by sessions, oracle entries, or cipher referenceTargets',
       severity: 'medium'
     });
   }

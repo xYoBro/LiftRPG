@@ -34,15 +34,62 @@ function normalizeComponentType(s) {
   return String(s || '').trim().toLowerCase().replace(/_/g, ' ');
 }
 
+function looksLikeFragmentRef(ref) {
+  return /^f\d+$/i.test(normalizeId(ref || ''));
+}
+
 export function normalizeCampaignPlanOwnership(result) {
   if (!result || typeof result !== 'object') return result;
 
+  var weekByNumber = {};
   var overflowIdByWeek = {};
+  var overflowEntryByWeek = {};
+  var normalizedFragmentRegistry = [];
+
+  (result.weeks || []).forEach(function (week) {
+    if (week && week.weekNumber) weekByNumber[week.weekNumber] = week;
+  });
+
   (result.overflowRegistry || []).forEach(function (entry) {
     if (!entry || typeof entry !== 'object') return;
     if (!entry.weekNumber && entry.weekRef) entry.weekNumber = entry.weekRef;
-    if (entry.weekNumber && entry.id) overflowIdByWeek[entry.weekNumber] = entry.id;
+    if (entry.weekNumber && entry.id) {
+      overflowIdByWeek[entry.weekNumber] = entry.id;
+      overflowEntryByWeek[entry.weekNumber] = entry;
+    }
   });
+
+  (result.fragmentRegistry || []).forEach(function (entry) {
+    if (!entry || typeof entry !== 'object') return;
+    var normalizedId = normalizeId(entry.id);
+    var weekNumber = entry.weekRef || entry.weekNumber || null;
+    var numericMatch = normalizedId && normalizedId.match(/^f(\d+)$/);
+    var numericPortion = numericMatch ? Number(numericMatch[1]) : null;
+    var looksLikeOverflow = !!(numericPortion && numericPortion >= 30);
+
+    if (looksLikeOverflow && weekNumber) {
+      if (!overflowEntryByWeek[weekNumber]) {
+        overflowEntryByWeek[weekNumber] = {
+          id: entry.id,
+          weekNumber: weekNumber,
+          documentType: entry.documentType || '',
+          author: entry.author || '',
+          narrativeFunction: entry.revealPurpose || entry.narrativeFunction || '',
+          tonalIntent: entry.tonalIntent || '',
+          arcRelationship: entry.arcRelationship || entry.clueFunction || ''
+        };
+        overflowIdByWeek[weekNumber] = entry.id;
+      }
+      return;
+    }
+
+    normalizedFragmentRegistry.push(entry);
+  });
+
+  result.fragmentRegistry = normalizedFragmentRegistry;
+  result.overflowRegistry = Object.keys(overflowEntryByWeek)
+    .map(function (weekKey) { return overflowEntryByWeek[weekKey]; })
+    .sort(function (left, right) { return Number(left.weekNumber || 0) - Number(right.weekNumber || 0); });
 
   (result.weeks || []).forEach(function (week) {
     if (!week || typeof week !== 'object') return;
@@ -56,6 +103,23 @@ export function normalizeCampaignPlanOwnership(result) {
       return normalizeId(fragmentId) !== overflowId;
     });
   });
+
+  (result.weeks || []).forEach(function (week) {
+    if (!week || typeof week !== 'object') return;
+    if (week.sessionCount > 3) {
+      if (!week.overflowFragmentId && overflowIdByWeek[week.weekNumber]) {
+        week.overflowFragmentId = overflowIdByWeek[week.weekNumber];
+      }
+      return;
+    }
+    if (week.overflowFragmentId) delete week.overflowFragmentId;
+    delete overflowIdByWeek[week.weekNumber];
+    delete overflowEntryByWeek[week.weekNumber];
+  });
+
+  result.overflowRegistry = Object.keys(overflowEntryByWeek)
+    .map(function (weekKey) { return overflowEntryByWeek[weekKey]; })
+    .sort(function (left, right) { return Number(left.weekNumber || 0) - Number(right.weekNumber || 0); });
 
   return result;
 }
@@ -152,6 +216,19 @@ export function validateWeekChunkContinuity(chunk, context) {
       if (entry.fragmentRef) referencedFragmentIds[normalizeId(entry.fragmentRef)] = true;
     });
 
+    var cipherTargets = ((((week.fieldOps || {}).cipher || {}).body || {}).referenceTargets) || [];
+    cipherTargets.forEach(function (target, targetIndex) {
+      if (!looksLikeFragmentRef(target)) return;
+      if (!continuityRefExists(ledger, target)) {
+        errors.push(label + ' cipher.referenceTargets[' + targetIndex + '] "' + target + '" is not present in fragmentRegistry or overflowRegistry');
+      }
+      var approvedCipherRefs = approvedRefsByWeek[week.weekNumber];
+      if (approvedCipherRefs && !approvedCipherRefs.lookup[normalizeId(target)]) {
+        errors.push(label + ' cipher.referenceTargets[' + targetIndex + '] "' + target + '" is not approved for this week (allowed: ' + approvedCipherRefs.ordered.join(', ') + ')');
+      }
+      referencedFragmentIds[normalizeId(target)] = true;
+    });
+
     if (week.overflowDocument && week.overflowDocument.id) {
       var overflowId = normalizeId(week.overflowDocument.id);
       if (!ledger.overflowIds[overflowId] && Array.isArray((context.campaignPlan || {}).overflowRegistry) && (context.campaignPlan || {}).overflowRegistry.length) {
@@ -172,7 +249,7 @@ export function validateWeekChunkContinuity(chunk, context) {
       if (!referencedFragmentIds[fragmentId]) {
         var approved = approvedRefsByWeek[weekNumber];
         var displayId = approved && approved.lookup[fragmentId] ? approved.lookup[fragmentId] : fragmentId;
-        errors.push('Week ' + weekNumber + ' does not reference planned fragment "' + displayId + '" in sessions or oracle entries');
+        errors.push('Week ' + weekNumber + ' does not reference planned fragment "' + displayId + '" in sessions, oracle entries, or cipher referenceTargets');
       }
     });
   });
@@ -759,6 +836,7 @@ export function validateAssembledBooklet(booklet) {
   var fragmentIds = {};
   var fragmentIdsNorm = {};
   var allDocIds = {};  // fragments + overflow docs combined
+  var referencedArtifactFragments = {};
   fragments.forEach(function (f) {
     if (f.id) {
       var nid = normalizeId(f.id);
@@ -834,6 +912,7 @@ export function validateAssembledBooklet(booklet) {
       if (s.fragmentRef && !fragmentExists(s.fragmentRef)) {
         errors.push(wn + ' session ' + (si + 1) + ': fragmentRef "' + s.fragmentRef + '" not found in fragments[] or overflowDocument IDs');
       }
+      if (s.fragmentRef) referencedArtifactFragments[normalizeId(s.fragmentRef)] = true;
       if (s.binaryChoice) {
         hasBinaryChoice = true;
         binaryChoiceWeek = wn;
@@ -857,6 +936,7 @@ export function validateAssembledBooklet(booklet) {
       if (entry.fragmentRef && !fragmentExists(entry.fragmentRef)) {
         errors.push(wn + ' oracle[' + ei + ']: fragmentRef "' + entry.fragmentRef + '" not found in fragments[] or overflowDocument IDs');
       }
+      if (entry.fragmentRef) referencedArtifactFragments[normalizeId(entry.fragmentRef)] = true;
     });
 
     // Band count check: boss weeks replace fieldOps with bossEncounter — skip oracle validation
@@ -879,6 +959,14 @@ export function validateAssembledBooklet(booklet) {
       if (cipher.body !== undefined && typeof cipher.body !== 'object') {
         errors.push(wn + ' cipher.body: must be an object, got ' + (typeof cipher.body));
       }
+      var cipherTargets = (((cipher || {}).body || {}).referenceTargets) || [];
+      cipherTargets.forEach(function (target, targetIndex) {
+        if (!looksLikeFragmentRef(target)) return;
+        if (!fragmentExists(target)) {
+          errors.push(wn + ' cipher.referenceTargets[' + targetIndex + ']: "' + target + '" not found in fragments[] or overflowDocument IDs');
+        }
+        referencedArtifactFragments[normalizeId(target)] = true;
+      });
     }
 
     // -- Map grid integrity --
@@ -1009,6 +1097,14 @@ export function validateAssembledBooklet(booklet) {
         }
       }
     }
+  }
+
+  var unreferencedArtifactFragments = fragments.filter(function (fragment) {
+    return fragment && fragment.id && !referencedArtifactFragments[normalizeId(fragment.id)];
+  });
+  if (unreferencedArtifactFragments.length > 0) {
+    warnings.push(unreferencedArtifactFragments.length + ' fragment(s) never referenced by sessions, oracle entries, or cipher referenceTargets: ' +
+      unreferencedArtifactFragments.map(function (fragment) { return fragment.id; }).join(', '));
   }
 
   // ── Boss encounter validation ────────────────────────────────────────────
