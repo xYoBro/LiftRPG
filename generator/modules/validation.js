@@ -34,6 +34,16 @@ function normalizeComponentType(s) {
   return String(s || '').trim().toLowerCase().replace(/_/g, ' ');
 }
 
+function normalizePlanningText(value) {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function isMapNoChangePlaceholder(value) {
+  var normalized = normalizePlanningText(value);
+  if (!normalized) return false;
+  return /^(?:none|n\/a|na|same|same state|same map|unchanged|static|no change|no visible change|nothing new|no new unlock|no unlock)$/i.test(normalized);
+}
+
 function looksLikeFragmentRef(ref) {
   return /^f\d+$/i.test(normalizeId(ref || ''));
 }
@@ -1333,6 +1343,43 @@ export function validateCampaignPlanStage(result) {
       }
       return currentCipherType || prevCipherType;
     }, '');
+  var hasDetailedMapPlanning = orderedWeeks.some(function (week) {
+    if (!week || week.isBossWeek) return false;
+    return Object.prototype.hasOwnProperty.call(week, 'stateSnapshot')
+      || Object.prototype.hasOwnProperty.call(week, 'mapReuse')
+      || Object.prototype.hasOwnProperty.call(week, 'stateChange')
+      || Object.prototype.hasOwnProperty.call(week, 'newGateOrUnlock');
+  });
+  if (hasDetailedMapPlanning) {
+    orderedWeeks
+      .slice()
+      .sort(function (left, right) { return Number(left.weekNumber || 0) - Number(right.weekNumber || 0); })
+      .reduce(function (prevFingerprint, week) {
+        if (!week || week.isBossWeek) return prevFingerprint;
+        var label = 'Campaign Plan → week ' + week.weekNumber;
+        var stateSnapshot = normalizePlanningText(week.stateSnapshot);
+        var mapReuse = normalizePlanningText(week.mapReuse);
+        var stateChange = normalizePlanningText(week.stateChange);
+        var newGateOrUnlock = normalizePlanningText(week.newGateOrUnlock);
+        if (!stateSnapshot) errors.push(label + ': stateSnapshot missing');
+        if (!mapReuse) errors.push(label + ': mapReuse missing');
+        if (!stateChange) {
+          errors.push(label + ': stateChange missing');
+        } else if (isMapNoChangePlaceholder(stateChange)) {
+          errors.push(label + ': stateChange cannot be a no-change placeholder');
+        }
+        if (!newGateOrUnlock) {
+          errors.push(label + ': newGateOrUnlock missing');
+        } else if (isMapNoChangePlaceholder(newGateOrUnlock)) {
+          errors.push(label + ': newGateOrUnlock cannot be a no-change placeholder');
+        }
+        var fingerprint = [stateSnapshot, stateChange, newGateOrUnlock].join('::');
+        if (prevFingerprint && stateSnapshot && stateChange && newGateOrUnlock && fingerprint === prevFingerprint) {
+          errors.push(label + ': stateSnapshot/stateChange/newGateOrUnlock repeat the prior non-boss week');
+        }
+        return fingerprint || prevFingerprint;
+      }, '');
+  }
   if (Array.isArray(result.weeks)) {
     var overflowRegistry = Array.isArray(result.overflowRegistry) ? result.overflowRegistry : [];
     var overflowByWeek = {};

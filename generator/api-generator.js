@@ -354,7 +354,7 @@ var STRUCTURED_SCHEMA_CAMPAIGN = {
           overflowFragmentId: { type: 'string' },
           sessionBeatTypes: { type: 'array', items: { type: 'string' } }
         },
-        required: ['weekNumber', 'arcBeat', 'cipherType', 'isBossWeek', 'isBinaryChoiceWeek', 'sessionCount', 'fragmentIds', 'sessionBeatTypes']
+        required: ['weekNumber', 'arcBeat', 'stateSnapshot', 'cipherType', 'mapReuse', 'stateChange', 'newGateOrUnlock', 'isBossWeek', 'isBinaryChoiceWeek', 'sessionCount', 'fragmentIds', 'sessionBeatTypes']
       }
     },
     bossPlan: {
