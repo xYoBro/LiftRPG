@@ -69,6 +69,7 @@ import {
   validateShellSchema,
   validateAssembledBooklet,
   validateLayerBibleStage,
+  normalizeCampaignPlanOwnership,
   validateCampaignPlanStage,
   validateWeeksStage,
   validateFragmentsStage,
@@ -347,9 +348,12 @@ var STRUCTURED_SCHEMA_CAMPAIGN = {
           companionChange: { type: 'string' },
           isBossWeek: { type: 'boolean' },
           isBinaryChoiceWeek: { type: 'boolean' },
+          sessionCount: { type: 'integer' },
+          fragmentIds: { type: 'array', items: { type: 'string' } },
+          overflowFragmentId: { type: 'string' },
           sessionBeatTypes: { type: 'array', items: { type: 'string' } }
         },
-        required: ['weekNumber', 'arcBeat', 'isBossWeek', 'isBinaryChoiceWeek', 'sessionBeatTypes']
+        required: ['weekNumber', 'arcBeat', 'isBossWeek', 'isBinaryChoiceWeek', 'sessionCount', 'fragmentIds', 'sessionBeatTypes']
       }
     },
     bossPlan: {
@@ -931,7 +935,12 @@ function buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState)
     '- Use exactly ' + weekCount + ' weeks.',
     '- Week ' + midpoint + ' must be the binary choice week.',
     '- Week ' + weekCount + ' must be the boss week.',
-    '- Every week needs: weekNumber, arcBeat, npcBeat, stateSnapshot, playerGains, zoneFocus, mapReuse, stateChange, newGateOrUnlock, weeklyComponentMeaning, oraclePressure, fragmentFunction, governingProcedure, companionChange, isBossWeek, isBinaryChoiceWeek, sessionBeatTypes.',
+    '- Every week needs: weekNumber, arcBeat, npcBeat, stateSnapshot, playerGains, zoneFocus, mapReuse, stateChange, newGateOrUnlock, weeklyComponentMeaning, oraclePressure, fragmentFunction, governingProcedure, companionChange, isBossWeek, isBinaryChoiceWeek, sessionCount, fragmentIds, sessionBeatTypes.',
+    '- Fragment IDs MUST use canonical LiftRPG format only: F.01, F.02, F.03 ... Never use placeholders like F-1A or F_01.',
+    '- Every fragmentRegistry entry must have a real weekRef and must also appear in that week\'s fragmentIds array.',
+    '- fragmentRegistry entries must be full objects with id, title, documentType, author, revealPurpose, clueFunction, weekRef.',
+    '- overflowRegistry entries must use weekNumber and canonical IDs starting at F.30. Do not omit weekNumber.',
+    '- Overflow weeks (sessionCount > 3) must set overflowFragmentId and match overflowRegistry for that same week.',
     '- fragmentRegistry must establish clues early, complicate them mid-block, and reveal them late.',
     '- Keep descriptions concise. Preserve clue economy, progression, and convergence logic.',
     lastError ? '- Fix the prior failure: ' + lastError : '',
@@ -952,9 +961,21 @@ function isSlowPlanningModel(settings) {
     || (providerId === 'openai' && /(gpt-5(?:\.4)?-pro|o3-pro)/i.test(modelId));
 }
 
+function shouldEchoFailedOutputForRetry(stageName) {
+  var label = String(stageName || '');
+  if (/^Layer Codex$/i.test(label)) return false;
+  if (/^Story Plan$/i.test(label)) return false;
+  if (/^Booklet Setup$/i.test(label)) return false;
+  if (/^Week\s+\d+/i.test(label)) return false;
+  if (/^Fragments batch/i.test(label)) return false;
+  if (/^Fragment\s+/i.test(label)) return false;
+  return true;
+}
+
 function buildSmartRetryDirective(stageName, attempt, err) {
   var errors = err._blockingErrors || [truncateText((err && err.message) || 'unknown', 500)];
   var failedOutput = err._failedOutput || null;
+  var echoFailedOutput = failedOutput && shouldEchoFailedOutputForRetry(stageName);
 
   var lines = [
     '',
@@ -964,7 +985,7 @@ function buildSmartRetryDirective(stageName, attempt, err) {
     ''
   ];
 
-  if (failedOutput) {
+  if (echoFailedOutput) {
     var compact = compactJsonString(failedOutput);
     if (compact.length > 6000) compact = compact.slice(0, 6000) + '... [truncated]';
     lines.push('### Your Previous Output');
@@ -983,6 +1004,15 @@ function buildSmartRetryDirective(stageName, attempt, err) {
   lines.push('Return the CORRECTED JSON with these issues fixed.');
   lines.push('- Preserve all working content (names, prose, mechanical values).');
   lines.push('- Do NOT regenerate from scratch. Fix only the listed errors.');
+  if (!echoFailedOutput) {
+    lines.push('- Keep the retry compact. Only rewrite the exact fields needed to satisfy the failed contract.');
+  }
+  if (/^Week\s+\d+/i.test(String(stageName || ''))) {
+    lines.push('- Preserve valid sessions, exercises, and working prose; only fix broken refs, overflow data, oracle actions, or missing required fields.');
+  }
+  if (/^Fragments batch/i.test(String(stageName || '')) || /^Fragment\s+/i.test(String(stageName || ''))) {
+    lines.push('- Keep every fragment on its assigned id/documentType/author contract and only repair missing or invalid fragment bodies.');
+  }
   lines.push('- Return valid JSON only. No markdown fences, no commentary.');
 
   return lines.join('\n');
@@ -1423,6 +1453,7 @@ async function recoverFragmentBatchDeterministically(settings, builders, config,
   var recoveredFragments = (recoveryPlan.fragments || []).slice();
   var pendingRegistry = recoveryPlan.missingRegistry || [];
   var stagedFragments = config.priorFragments.concat(recoveredFragments);
+  var salvagedCount = recoveredFragments.length;
 
   if (recoveredFragments.length > 0) {
     console.warn('[LiftRPG] Salvaged ' + recoveredFragments.length + '/' + config.registry.length +
@@ -1453,6 +1484,16 @@ async function recoverFragmentBatchDeterministically(settings, builders, config,
       stagedFragments.push(fragment);
     });
   }
+
+  emitPipelineEvent(config.onProgress, config.stageIndex || 0, config.getTotalStages ? config.getTotalStages() : 0, config.label + ' recovered deterministically.', {
+    phase: 'complete',
+    stageKey: config.stageKey || 'fragments',
+    stageName: config.label,
+    completionSource: 'recovery',
+    recoveredCount: recoveredFragments.length,
+    salvagedCount: salvagedCount,
+    generatedCount: pendingRegistry.length
+  });
 
   return {
     fragments: recoveredFragments
@@ -1738,6 +1779,7 @@ async function runApiPipeline(options) {
       onProgress: onProgress,
       getTotalStages: function () { return totalStages; },
       schema: STRUCTURED_SCHEMA_CAMPAIGN,
+      normalizeResult: normalizeCampaignPlanOwnership,
       requestTimeoutMs: function (retryState) {
         return retryState && retryState.attempt > 0 ? 300000 : 420000;
       },
@@ -3170,6 +3212,7 @@ window.LiftRPGAPI = {
     buildFragmentBatches: buildFragmentBatches,
     mergeFragmentBatches: mergeFragmentBatches,
     planFragmentBatchRecovery: planFragmentBatchRecovery,
+    buildSmartRetryDirective: buildSmartRetryDirective,
     assembleSkeletonFleshBooklet: assembleSkeletonFleshBooklet,
     validateSkeletonStage: validateSkeletonStage,
     buildSkeletonFragmentBatches: buildSkeletonFragmentBatches,
@@ -3178,6 +3221,7 @@ window.LiftRPGAPI = {
     validateWeekSchema: validateWeekSchema,
     validateShellSchema: validateShellSchema,
     validateLayerBibleStage: validateLayerBibleStage,
+    normalizeCampaignPlanOwnership: normalizeCampaignPlanOwnership,
     validateCampaignPlanStage: validateCampaignPlanStage,
     normalizeDocumentTypes: normalizeDocumentTypes,
     auditGuidedBuild: auditGuidedBuild

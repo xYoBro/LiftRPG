@@ -1347,6 +1347,9 @@
         companionChange: '',
         isBossWeek: false,
         isBinaryChoiceWeek: false,
+        sessionCount: 3,
+        fragmentIds: ['F.01'],
+        overflowFragmentId: null,
         sessionBeatTypes: []
       }
     ],

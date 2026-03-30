@@ -1943,6 +1943,9 @@
           companionChange: truncateText(week.companionChange, 120),
           isBossWeek: !!week.isBossWeek,
           isBinaryChoiceWeek: !!week.isBinaryChoiceWeek,
+          sessionCount: week.sessionCount || 0,
+          fragmentIds: (week.fragmentIds || []).slice(0, 8),
+          overflowFragmentId: week.overflowFragmentId || '',
           sessionBeatTypes: (week.sessionBeatTypes || []).slice(0, 6)
         };
       }),
@@ -2519,6 +2522,12 @@
       '',
       '## Stage Rules',
       '- Use exactly ' + weekCount + ' weeks; mark the final week as boss and the midpoint week as the binary choice week.',
+      '- Every week must include sessionCount and fragmentIds. fragmentIds are the exact document IDs that week sessions/oracles will reference.',
+      '- Fragment IDs MUST use canonical LiftRPG format only: F.01, F.02, F.03 ... Never use placeholders like F-1A or F_01.',
+      '- Every fragmentRegistry entry must have a real weekRef and must also appear in that owning week\'s fragmentIds array.',
+      '- fragmentRegistry entries must be full objects with id, title, documentType, author, revealPurpose, clueFunction, weekRef.',
+      '- overflowRegistry entries must use weekNumber and canonical IDs starting at F.30. Do not omit weekNumber.',
+      '- Overflow weeks (sessionCount > 3) must set overflowFragmentId and match overflowRegistry for that same week.',
       '- Map each mystery question, false assumption, motif payoff, and week transformation into the week plan.',
       '- Fragment registry must create clue economy: establish early, complicate mid-block, reveal late; no lore-dump placeholders.',
       '- Boss convergence must require outputs from map progression, institutional procedure, and relationship state.',
@@ -2772,8 +2781,15 @@
     var plannedOverflow = overflowRegistry.filter(function (entry) {
       return Number(entry.weekNumber) === Number(weekPlan.weekNumber);
     })[0] || null;
+    var plannedWeekFragmentIds = Array.isArray(weekPlan && weekPlan.fragmentIds) && weekPlan.fragmentIds.length
+      ? weekPlan.fragmentIds
+      : ((campaignPlan && campaignPlan.fragmentRegistry) || []).filter(function (entry) {
+          return Number(entry && entry.weekRef) === Number(weekPlan && weekPlan.weekNumber);
+        }).map(function (entry) {
+          return entry.id;
+        });
     var approvedFragmentRefs = []
-      .concat((weekPlan && weekPlan.fragmentIds) || [])
+      .concat(plannedWeekFragmentIds)
       .concat(plannedOverflow && plannedOverflow.id ? [plannedOverflow.id] : []);
     var retryError = retryState && retryState.error && retryState.error.message
       ? String(retryState.error.message)
@@ -2804,6 +2820,7 @@
       '## Structural Obligations',
       !isBossWeek ? '- Non-boss weeks MUST include fieldOps.oracleTable, fieldOps.cipher, and fieldOps.mapState.' : '- Boss week MUST include bossEncounter and MUST omit fieldOps.',
       !isBossWeek ? '- fieldOps.cipher.characterDerivationProof is REQUIRED and cannot be blank.' : '- bossEncounter.componentInputs must exactly match the prior component values list.',
+      !isBossWeek ? '- fieldOps.cipher MUST include type, title, body, extractionInstruction, characterDerivationProof, and noticeabilityDesign.' : '',
       isBossWeek && Number(weekPlan.sessionCount) > 3
         ? '- This is a boss week with overflow. bossEncounter and overflowDocument MUST both be present. Do not omit overflowDocument just because this is the boss week.'
         : '',
@@ -2840,11 +2857,26 @@
             }
           })
         : '',
+      !isBossWeek
+        ? '- Minimum cipher scaffold if you are unsure: ' + JSON.stringify({
+            fieldOps: {
+              cipher: {
+                type: 'contextual-question',
+                title: 'Cipher title',
+                body: { displayText: 'Cipher body text', key: 'Support key' },
+                extractionInstruction: 'How the player derives the weekly component.',
+                characterDerivationProof: 'Explain exactly why the extracted character/value is correct.',
+                noticeabilityDesign: 'Describe how the clue is noticeable but still feels in-world.'
+              }
+            }
+          })
+        : '',
       '',
       retryError ? '## Retry Focus\nThe previous attempt failed with this blocking error: ' + retryError + '\nFix that exact contract violation in this response.' : '',
       '',
       '## Constraints',
       '- Preserve Specificity: storyPrompts must contain physical action and named places.',
+      '- Oracle paperAction text must be concrete and singular: name the exact clock, map node, gate, companion slot, or document state being changed. Avoid vague bundled edits.',
       '- Do not flatten the style. Execute the exact Literary Register specified.',
       '- JSON only.'
     ];

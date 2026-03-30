@@ -34,6 +34,32 @@ function normalizeComponentType(s) {
   return String(s || '').trim().toLowerCase().replace(/_/g, ' ');
 }
 
+export function normalizeCampaignPlanOwnership(result) {
+  if (!result || typeof result !== 'object') return result;
+
+  var overflowIdByWeek = {};
+  (result.overflowRegistry || []).forEach(function (entry) {
+    if (!entry || typeof entry !== 'object') return;
+    if (!entry.weekNumber && entry.weekRef) entry.weekNumber = entry.weekRef;
+    if (entry.weekNumber && entry.id) overflowIdByWeek[entry.weekNumber] = entry.id;
+  });
+
+  (result.weeks || []).forEach(function (week) {
+    if (!week || typeof week !== 'object') return;
+    if (!week.overflowFragmentId && overflowIdByWeek[week.weekNumber]) {
+      week.overflowFragmentId = overflowIdByWeek[week.weekNumber];
+    }
+    if (!Array.isArray(week.fragmentIds)) return;
+    var overflowId = normalizeId(week.overflowFragmentId || overflowIdByWeek[week.weekNumber] || '');
+    if (!overflowId) return;
+    week.fragmentIds = week.fragmentIds.filter(function (fragmentId) {
+      return normalizeId(fragmentId) !== overflowId;
+    });
+  });
+
+  return result;
+}
+
 export function validateWeekChunkContinuity(chunk, context) {
   var errors = [];
   context = context || {};
@@ -46,6 +72,54 @@ export function validateWeekChunkContinuity(chunk, context) {
   var combinedComponentValues = ledger.componentValues.slice();
   var referencedFragmentIds = {};
   var chunkWeekNumbers = {};
+  var explicitWeekFragmentPlan = {};
+  var plannedFragmentsByWeek = {};
+  var approvedRefsByWeek = {};
+
+  function registerApprovedRef(weekNumber, ref) {
+    var normalized = normalizeId(ref);
+    if (!weekNumber || !normalized) return;
+    if (!approvedRefsByWeek[weekNumber]) {
+      approvedRefsByWeek[weekNumber] = { lookup: {}, ordered: [] };
+    }
+    if (!approvedRefsByWeek[weekNumber].lookup[normalized]) {
+      approvedRefsByWeek[weekNumber].lookup[normalized] = String(ref);
+      approvedRefsByWeek[weekNumber].ordered.push(String(ref));
+    }
+  }
+
+  function registerPlannedFragment(weekNumber, ref) {
+    var normalized = normalizeId(ref);
+    if (!weekNumber || !normalized) return;
+    if (!plannedFragmentsByWeek[weekNumber]) plannedFragmentsByWeek[weekNumber] = [];
+    if (plannedFragmentsByWeek[weekNumber].indexOf(normalized) === -1) {
+      plannedFragmentsByWeek[weekNumber].push(normalized);
+    }
+    registerApprovedRef(weekNumber, ref);
+  }
+
+  ((context.campaignPlan || {}).weeks || []).forEach(function (plannedWeek) {
+    var weekNumber = Number(plannedWeek && plannedWeek.weekNumber);
+    if (!weekNumber) return;
+    var fragmentIds = Array.isArray(plannedWeek.fragmentIds) ? plannedWeek.fragmentIds : [];
+    if (fragmentIds.length > 0) explicitWeekFragmentPlan[weekNumber] = true;
+    fragmentIds.forEach(function (fragmentId) {
+      registerPlannedFragment(weekNumber, fragmentId);
+    });
+    if (plannedWeek && plannedWeek.overflowFragmentId) {
+      registerApprovedRef(weekNumber, plannedWeek.overflowFragmentId);
+    }
+  });
+
+  ((context.campaignPlan || {}).fragmentRegistry || []).forEach(function (entry) {
+    if (!entry || !entry.weekRef || explicitWeekFragmentPlan[entry.weekRef]) return;
+    registerPlannedFragment(entry.weekRef, entry.id);
+  });
+
+  ((context.campaignPlan || {}).overflowRegistry || []).forEach(function (entry) {
+    if (!entry || !entry.weekNumber) return;
+    registerApprovedRef(entry.weekNumber, entry.id);
+  });
 
   (chunk.weeks || []).forEach(function (week, index) {
     var label = 'Week ' + (week.weekNumber || context.expectedWeeks && context.expectedWeeks[index] || '?');
@@ -59,6 +133,10 @@ export function validateWeekChunkContinuity(chunk, context) {
       if (session.fragmentRef && !continuityRefExists(ledger, session.fragmentRef)) {
         errors.push(label + ' session ' + (sessionIndex + 1) + ': fragmentRef "' + session.fragmentRef + '" is not present in fragmentRegistry or overflowRegistry');
       }
+      var approvedSessionRefs = approvedRefsByWeek[week.weekNumber];
+      if (session.fragmentRef && approvedSessionRefs && !approvedSessionRefs.lookup[normalizeId(session.fragmentRef)]) {
+        errors.push(label + ' session ' + (sessionIndex + 1) + ': fragmentRef "' + session.fragmentRef + '" is not approved for this week (allowed: ' + approvedSessionRefs.ordered.join(', ') + ')');
+      }
       if (session.fragmentRef) referencedFragmentIds[normalizeId(session.fragmentRef)] = true;
     });
 
@@ -66,6 +144,10 @@ export function validateWeekChunkContinuity(chunk, context) {
     (oracle.entries || []).forEach(function (entry, entryIndex) {
       if (entry.fragmentRef && !continuityRefExists(ledger, entry.fragmentRef)) {
         errors.push(label + ' oracle[' + entryIndex + ']: fragmentRef "' + entry.fragmentRef + '" is not present in fragmentRegistry or overflowRegistry');
+      }
+      var approvedOracleRefs = approvedRefsByWeek[week.weekNumber];
+      if (entry.fragmentRef && approvedOracleRefs && !approvedOracleRefs.lookup[normalizeId(entry.fragmentRef)]) {
+        errors.push(label + ' oracle[' + entryIndex + ']: fragmentRef "' + entry.fragmentRef + '" is not approved for this week (allowed: ' + approvedOracleRefs.ordered.join(', ') + ')');
       }
       if (entry.fragmentRef) referencedFragmentIds[normalizeId(entry.fragmentRef)] = true;
     });
@@ -83,11 +165,16 @@ export function validateWeekChunkContinuity(chunk, context) {
     }
   });
 
-  ((context.campaignPlan || {}).fragmentRegistry || []).forEach(function (entry) {
-    if (!entry || !entry.id || !entry.weekRef || !chunkWeekNumbers[entry.weekRef]) return;
-    if (!referencedFragmentIds[normalizeId(entry.id)]) {
-      errors.push('Week ' + entry.weekRef + ' does not reference planned fragment "' + entry.id + '" in sessions or oracle entries');
-    }
+  Object.keys(plannedFragmentsByWeek).forEach(function (weekKey) {
+    var weekNumber = Number(weekKey);
+    if (!chunkWeekNumbers[weekNumber]) return;
+    (plannedFragmentsByWeek[weekNumber] || []).forEach(function (fragmentId) {
+      if (!referencedFragmentIds[fragmentId]) {
+        var approved = approvedRefsByWeek[weekNumber];
+        var displayId = approved && approved.lookup[fragmentId] ? approved.lookup[fragmentId] : fragmentId;
+        errors.push('Week ' + weekNumber + ' does not reference planned fragment "' + displayId + '" in sessions or oracle entries');
+      }
+    });
   });
 
   var bossWeek = (chunk.weeks || []).find(function (week) { return week && week.isBossWeek; });
@@ -1055,6 +1142,9 @@ export function validateCampaignPlanStage(result) {
   if (!result) return 'Campaign Plan → missing required sections (null result).';
   var errors = [];
   var warnings = [];
+  var weekByNumber = {};
+  var fragmentRegistryById = {};
+  var weekFragmentOwners = {};
   // Hard failures: weeks[] and bossPlan must exist (matches pre-restructure behavior)
   if (!Array.isArray(result.weeks)) {
     errors.push('Campaign Plan → weeks: missing or not an array');
@@ -1069,19 +1159,65 @@ export function validateCampaignPlanStage(result) {
     warnings.push('Campaign Plan → topology: missing zones');
   }
   if (!Array.isArray(result.overflowRegistry)) {
-    warnings.push('Campaign Plan → overflowRegistry: missing or not an array');
+    errors.push('Campaign Plan → overflowRegistry: missing or not an array');
   }
   if (!Array.isArray(result.fragmentRegistry)) {
-    warnings.push('Campaign Plan → fragmentRegistry: missing or not an array');
+    errors.push('Campaign Plan → fragmentRegistry: missing or not an array');
   } else {
     result.fragmentRegistry.forEach(function (f, i) {
-      if (!f.id) warnings.push('Campaign Plan → fragmentRegistry[' + i + ']: missing id');
-      if (!f.weekRef) warnings.push('Campaign Plan → fragmentRegistry[' + i + ']: missing weekRef');
+      var label = 'Campaign Plan → fragmentRegistry[' + i + ']';
+      var normalizedId = normalizeId(f && f.id);
+      if (!normalizedId) {
+        errors.push(label + ': missing id');
+        return;
+      }
+      if (fragmentRegistryById[normalizedId]) {
+        errors.push(label + ': duplicate id "' + f.id + '"');
+      } else {
+        fragmentRegistryById[normalizedId] = f;
+      }
+      if (!f.weekRef) {
+        errors.push(label + ': missing weekRef');
+      }
     });
   }
   if (Array.isArray(result.weeks)) {
     result.weeks.forEach(function (w, i) {
-      if (!w.weekNumber) warnings.push('Campaign Plan → weeks[' + i + ']: missing weekNumber');
+      var label = 'Campaign Plan → weeks[' + i + ']';
+      if (!w.weekNumber) {
+        errors.push(label + ': missing weekNumber');
+        return;
+      }
+      if (weekByNumber[w.weekNumber]) {
+        errors.push(label + ': duplicate weekNumber ' + w.weekNumber);
+      } else {
+        weekByNumber[w.weekNumber] = w;
+      }
+      if (!w.sessionCount || w.sessionCount < 1) {
+        errors.push(label + ': missing sessionCount');
+      }
+      if (!Array.isArray(w.fragmentIds)) {
+        errors.push(label + ': fragmentIds missing or not an array');
+      } else {
+        var seenWeekFragmentIds = {};
+        w.fragmentIds.forEach(function (fragmentId, fragmentIndex) {
+          var normalizedId = normalizeId(fragmentId);
+          if (!normalizedId) {
+            errors.push(label + ': fragmentIds[' + fragmentIndex + '] is empty');
+            return;
+          }
+          if (seenWeekFragmentIds[normalizedId]) {
+            errors.push(label + ': duplicate fragmentIds entry "' + fragmentId + '"');
+            return;
+          }
+          seenWeekFragmentIds[normalizedId] = true;
+          if (weekFragmentOwners[normalizedId] && weekFragmentOwners[normalizedId] !== w.weekNumber) {
+            errors.push(label + ': fragmentIds[' + fragmentIndex + '] "' + fragmentId + '" is also assigned to week ' + weekFragmentOwners[normalizedId]);
+          } else {
+            weekFragmentOwners[normalizedId] = w.weekNumber;
+          }
+        });
+      }
     });
   }
   if (Array.isArray(result.weeks)) {
@@ -1089,10 +1225,21 @@ export function validateCampaignPlanStage(result) {
     var overflowByWeek = {};
     overflowRegistry.forEach(function (entry, index) {
       if (!entry || !entry.weekNumber) {
-        warnings.push('Campaign Plan → overflowRegistry[' + index + ']: missing weekNumber');
+        errors.push('Campaign Plan → overflowRegistry[' + index + ']: missing weekNumber');
         return;
       }
+      if (overflowByWeek[entry.weekNumber]) {
+        errors.push('Campaign Plan → overflowRegistry has duplicate entry for week ' + entry.weekNumber);
+      }
       overflowByWeek[entry.weekNumber] = entry;
+    });
+    result.weeks.forEach(function (week, index) {
+      if (!week || !week.weekNumber) return;
+      var label = 'Campaign Plan → weeks[' + index + ']';
+      if (week.sessionCount > 3) return;
+      if (week.overflowFragmentId) {
+        errors.push(label + ': sessionCount <= 3 but overflowFragmentId should be omitted');
+      }
     });
     result.weeks.forEach(function (week, index) {
       if (!week || !week.sessionCount || week.sessionCount <= 3) return;
@@ -1114,6 +1261,43 @@ export function validateCampaignPlanStage(result) {
       if (week.overflowFragmentId && planned.id && week.overflowFragmentId !== planned.id) {
         errors.push(label + ': overflowFragmentId "' + week.overflowFragmentId + '" does not match overflowRegistry id "' + planned.id + '"');
       }
+    });
+  }
+  if (Array.isArray(result.fragmentRegistry)) {
+    result.fragmentRegistry.forEach(function (entry, index) {
+      var label = 'Campaign Plan → fragmentRegistry[' + index + ']';
+      var normalizedId = normalizeId(entry && entry.id);
+      if (!normalizedId || !entry.weekRef || !weekByNumber[entry.weekRef]) {
+        if (entry && entry.weekRef && !weekByNumber[entry.weekRef]) {
+          errors.push(label + ': weekRef "' + entry.weekRef + '" does not match any planned week');
+        }
+        return;
+      }
+      var owningWeek = weekByNumber[entry.weekRef];
+      var fragmentIds = Array.isArray(owningWeek.fragmentIds) ? owningWeek.fragmentIds : [];
+      var listed = fragmentIds.some(function (fragmentId) {
+        return normalizeId(fragmentId) === normalizedId;
+      });
+      if (!listed) {
+        errors.push(label + ': id "' + entry.id + '" is not listed in the owning week\'s fragmentIds array (week ' + entry.weekRef + ')');
+      }
+    });
+  }
+  if (Array.isArray(result.weeks)) {
+    result.weeks.forEach(function (week, index) {
+      if (!week || !Array.isArray(week.fragmentIds)) return;
+      var label = 'Campaign Plan → weeks[' + index + ']';
+      week.fragmentIds.forEach(function (fragmentId, fragmentIndex) {
+        var normalizedId = normalizeId(fragmentId);
+        var registryEntry = fragmentRegistryById[normalizedId];
+        if (!registryEntry) {
+          errors.push(label + ': fragmentIds[' + fragmentIndex + '] "' + fragmentId + '" is not present in fragmentRegistry');
+          return;
+        }
+        if (registryEntry.weekRef && registryEntry.weekRef !== week.weekNumber) {
+          errors.push(label + ': fragmentIds[' + fragmentIndex + '] "' + fragmentId + '" belongs to week ' + registryEntry.weekRef + ' in fragmentRegistry');
+        }
+      });
     });
   }
   if (warnings.length > 0) {
