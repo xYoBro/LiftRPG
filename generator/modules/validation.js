@@ -1377,9 +1377,14 @@ export function validateCampaignPlanStage(result) {
     });
   }
   if (Array.isArray(result.fragmentRegistry)) {
+    var fragmentDocTypeCounts = {};
     result.fragmentRegistry.forEach(function (entry, index) {
       var label = 'Campaign Plan → fragmentRegistry[' + index + ']';
       var normalizedId = normalizeId(entry && entry.id);
+      var rawDocumentType = String((entry && entry.documentType) || '').trim();
+      var canonicalDocumentType = rawDocumentType
+        ? (DOCUMENT_TYPE_ALIASES[rawDocumentType] || rawDocumentType).toLowerCase()
+        : '';
       if (!normalizedId || !entry.weekRef || !weekByNumber[entry.weekRef]) {
         if (entry && entry.weekRef && !weekByNumber[entry.weekRef]) {
           errors.push(label + ': weekRef "' + entry.weekRef + '" does not match any planned week');
@@ -1394,7 +1399,22 @@ export function validateCampaignPlanStage(result) {
       if (!listed) {
         errors.push(label + ': id "' + entry.id + '" is not listed in the owning week\'s fragmentIds array (week ' + entry.weekRef + ')');
       }
+      if (canonicalDocumentType && DOCUMENT_TYPE_ENUM.indexOf(canonicalDocumentType) !== -1) {
+        fragmentDocTypeCounts[canonicalDocumentType] = (fragmentDocTypeCounts[canonicalDocumentType] || 0) + 1;
+      }
     });
+    if (result.fragmentRegistry.length >= 8) {
+      var documentTypes = Object.keys(fragmentDocTypeCounts);
+      if (documentTypes.length < 3) {
+        errors.push('Campaign Plan → fragmentRegistry: uses only ' + documentTypes.length + ' documentType values across ' + result.fragmentRegistry.length + ' planned fragments');
+      }
+      documentTypes.forEach(function (documentType) {
+        var count = fragmentDocTypeCounts[documentType] || 0;
+        if ((count / result.fragmentRegistry.length) > 0.45) {
+          errors.push('Campaign Plan → fragmentRegistry: documentType "' + documentType + '" accounts for ' + count + ' of ' + result.fragmentRegistry.length + ' planned fragments');
+        }
+      });
+    }
   }
   if (Array.isArray(result.weeks)) {
     result.weeks.forEach(function (week, index) {
