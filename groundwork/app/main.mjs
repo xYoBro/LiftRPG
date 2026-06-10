@@ -71,12 +71,25 @@ const dispatchDue = () => {
 const BIAS_LABEL = { intel: 'DOCUMENTS LIKELY', loot: 'SALVAGE LIKELY', encounter: 'SOMETHING MOVES HERE', story: 'OLD GROUND' };
 const KIND_LABEL = { crit: 'CRITICAL', strong: 'CLEAN CLEAR', success: 'CLEARED', fail: 'SCOUTED', complication: 'COMPLICATION' };
 
+function bottomNav(active) {
+  const items = [
+    ['home', 'Station'], ['map', 'Map'], ['archive', 'Records'], ['more', 'More']
+  ];
+  return `<nav class="gw-tabbar">${items.map(([id, label]) =>
+    `<button class="gw-tab ${active === id ? 'gw-tab-active' : ''}" data-act="nav-${id}">${label}</button>`).join('')}</nav>`;
+}
+function wireNav() {
+  root().querySelectorAll('[data-act^="nav-"]').forEach((el) => {
+    el.addEventListener('click', () => nav(el.getAttribute('data-act').slice(4)));
+  });
+}
+
 function render() {
   stopTimer();
   const screens = {
     home: renderHome, assess: renderAssess, session: renderSession,
-    map: renderMap, log: renderLog, archive: renderArchive, kit: renderKit, settings: renderSettings,
-    storm: renderStorm, dispatch: renderDispatch
+    map: renderMap, log: renderLog, archive: renderArchive, kit: renderArchive, settings: renderSettings,
+    storm: renderStorm, dispatch: renderDispatch, more: renderMore
   };
   (screens[state.screen] || renderHome)();
   window.scrollTo(0, 0);
@@ -106,67 +119,73 @@ function renderHome() {
   const p = state.profile;
   const hasAssessment = p && p.assessments[TREE.id];
   const recal = p && needsRecalibration(p);
-  const unread = p ? (p.archive || []).length : 0;
   const preview = hasAssessment ? sessionPreview() : null;
+  const missDays = hasAssessment ? daysSinceLastSession() : null;
+  const showStormCue = missDays !== null && missDays >= 2 && missDays <= 6;
   root().innerHTML = `
     <header class="gw-header"><h1>GROUNDWORK</h1>
       <div class="gw-worldline">${esc(SKIN.worldLine)}</div></header>
-    <main class="gw-panel">
+    <main class="gw-panel gw-home">
       ${!p ? `
-        <p>No operative on file. The station needs an intake survey before work can begin.</p>
-        <button class="gw-primary" data-act="new-profile">Begin Intake (Assessment)</button>
+        <p class="gw-bigcue">The station needs a keeper.</p>
+        <p class="gw-dim">One intake survey. You cannot fail it — it only maps what is true.</p>
+        <button class="gw-primary gw-big" data-act="new-profile">Begin Intake</button>
       ` : !hasAssessment ? `
-        <p>Operative on file. Intake survey incomplete.</p>
-        <button class="gw-primary" data-act="start-assess">Run Intake Survey</button>
+        <p class="gw-bigcue">Intake survey incomplete.</p>
+        <button class="gw-primary gw-big" data-act="start-assess">Resume Intake</button>
       ` : `
-        ${p.lastHook ? `<div class="gw-hook">${esc(p.lastHook)}</div>` : ''}
-        ${p.intention ? `<div class="gw-dim gw-duty">${esc(fill(SKIN.sessionFrame.intention.display, p.intention))}</div>` : ''}
-        ${p.microGoal ? `<div class="gw-dim gw-duty">MICRO-GOAL: ${esc(p.microGoal)}</div>` : ''}
-        ${(() => { const d = daysSinceLastSession(); return d !== null && d >= 2 && d <= 6
-          ? `<div class="gw-callout">${esc(SKIN.sessionFrame.storm.missCue)}</div>` : ''; })()}
-        ${recal ? `<div class="gw-callout">Layoff detected (&gt;2 weeks since the last AAR). A re-survey is recommended — the map should match the body that shows up. <button data-act="start-assess">Re-run Intake</button></div>` : ''}
-        <div class="gw-stat-row">
-          <div class="gw-stat"><div class="gw-stat-num">${treeStat()}<span class="gw-pct">%</span></div><div class="gw-stat-label">${esc(TREE.name)}</div></div>
-          <div class="gw-stat"><div class="gw-stat-num">${(p.cleared[TREE.id] || []).length}</div><div class="gw-stat-label">sectors</div></div>
-          <div class="gw-stat"><div class="gw-stat-num">${unread}</div><div class="gw-stat-label">archive</div></div>
-          <div class="gw-stat"><div class="gw-stat-num">${p.xp}</div><div class="gw-stat-label">XP</div></div>
-        </div>
-        <div class="gw-preview">
-          <div class="gw-preview-title">TODAY’S WORK ORDER</div>
-          <div>${esc(preview.branch)} focus — ${esc(preview.room)} · ${preview.rooms} rooms${preview.boss ? ' · <strong>SEALED DOOR ELIGIBLE</strong>' : ''}${preview.learn ? ' · new room type (learn mode)' : ''}</div>
+        <div class="gw-hero">
+          <div class="gw-preview-title">TODAY</div>
+          <div class="gw-hero-line">${esc(preview.room)} · ${preview.rooms} rooms${preview.boss ? ' · <strong>SEALED DOOR</strong>' : ''}${preview.learn ? ' · new ground' : ''}</div>
+          ${p.lastHook ? `<div class="gw-hero-hook">${esc(p.lastHook)}</div>` : ''}
         </div>
         <button class="gw-primary gw-big" data-act="start-session">Start Session</button>
-        <button data-act="storm">${esc(SKIN.sessionFrame.storm.button)}</button>
-        ${dispatchDue() ? `<button data-act="dispatch"><strong>Weekly Dispatch due</strong></button>` : ''}
-        <div class="gw-row">
-          <button data-act="map">Map</button>
-          <button data-act="archive">Archive${unread ? ` (${unread})` : ''}</button>
-          <button data-act="kit">Kit${p.kit && p.kit.length ? ` (${p.kit.length})` : ''}</button>
-          <button data-act="log">Log</button>
-          <button data-act="settings">Settings</button>
-        </div>
+        ${showStormCue ? `
+          <div class="gw-callout">${esc(SKIN.sessionFrame.storm.missCue)}
+            <button data-act="storm">${esc(SKIN.sessionFrame.storm.button)}</button></div>` : ''}
+        ${dispatchDue() ? `<button data-act="dispatch">Weekly Dispatch is due</button>` : ''}
+        ${recal ? `<div class="gw-callout">Over two weeks away. The map should match the body that shows up. <button data-act="start-assess">Re-run Intake</button></div>` : ''}
+        <div class="gw-identity gw-dim">${esc(TREE.name)} ${treeStat()}% · ${(p.cleared[TREE.id] || []).length} sectors · ${(p.archive || []).length} documents${p.intention ? ` · ${esc(fill(SKIN.sessionFrame.intention.display, p.intention))}` : ''}${p.microGoal ? ` · goal: ${esc(p.microGoal)}` : ''}</div>
       `}
-      <div class="gw-row gw-save-row">
-        ${p ? `<button data-act="export">Export Save</button>` : ''}
-        <button data-act="import">Import Save</button>
-        ${p ? `<button class="gw-danger" data-act="reset">Reset</button>` : ''}
-      </div>
-      <input type="file" id="import-file" accept="application/json" hidden>
-    </main>`;
+    </main>
+    ${p && hasAssessment ? bottomNav('home') : ''}`;
   wire({
     'new-profile': () => { unlockAudio(); state.profile = createEmptyProfile(); saveProfile(state.profile); startAssess(); },
     'start-assess': () => { unlockAudio(); startAssess(); },
     'start-session': () => { unlockAudio(); startSession(); },
-    map: () => nav('map'), archive: () => nav('archive'), kit: () => nav('kit'),
-    log: () => nav('log'), settings: () => nav('settings'),
     storm: () => { unlockAudio(); nav('storm'); },
-    dispatch: () => nav('dispatch'),
+    dispatch: () => nav('dispatch')
+  });
+  wireNav();
+}
+
+// ── More: everything that is not play (log, settings, save, extras) ─────────
+function renderMore() {
+  root().innerHTML = `
+    <header class="gw-header"><h1>MORE</h1></header>
+    <main class="gw-panel">
+      <button class="gw-row-btn" data-act="log">AAR Log</button>
+      <button class="gw-row-btn" data-act="dispatch">Weekly Dispatch</button>
+      <button class="gw-row-btn" data-act="storm">${esc(SKIN.sessionFrame.storm.button)}</button>
+      <button class="gw-row-btn" data-act="settings">Settings</button>
+      <div class="gw-save-row gw-row">
+        <button data-act="export">Export Save</button>
+        <button data-act="import">Import Save</button>
+        <button class="gw-danger" data-act="reset">Reset</button>
+      </div>
+      <input type="file" id="import-file" accept="application/json" hidden>
+    </main>
+    ${bottomNav('more')}`;
+  wire({
+    log: () => nav('log'), settings: () => nav('settings'),
+    dispatch: () => nav('dispatch'), storm: () => { unlockAudio(); nav('storm'); },
     export: doExport,
     import: () => document.getElementById('import-file').click(),
-    reset: () => { if (confirm('Erase the local save? Export first if you want to keep it.')) { clearProfile(); state.profile = null; render(); } }
+    reset: () => { if (confirm('Erase the local save? Export first if you want to keep it.')) { clearProfile(); state.profile = null; nav('home'); } }
   });
   const fileInput = document.getElementById('import-file');
   if (fileInput) fileInput.addEventListener('change', doImport);
+  wireNav();
 }
 
 // ── Assessment ───────────────────────────────────────────────────────────────
@@ -215,20 +234,20 @@ function renderAssess() {
   const rung = currentRung(run, TREE);
   const tier = getTier(TREE, rung.tier);
   const std = rung.standard;
-  const stdText = std.kind === 'hold' ? `hold ${std.value}s` : `${std.value} reps${std.perSide ? ' per side' : ''}`;
+  const stdText = std.kind === 'hold' ? `Hold for ${std.value} seconds` : `Do ${std.value} reps${std.perSide ? ' per side' : ''}`;
   root().innerHTML = `
-    <header class="gw-header"><h1>INTAKE SURVEY</h1>
-      <div class="gw-dim">rung ${run.index + 1} of ${run.ladder.length} · first miss per branch ends that branch · rest as needed</div></header>
-    <main class="gw-panel">
-      <p class="gw-dim">${esc(SKIN.sessionFrame.assessment.intro)}</p>
-      <h2>${esc(flavorName(tier))} <span class="gw-dim">(${esc(tier.name)} · ${esc(TREE.branches[tier.branch].name)})</span></h2>
-      <p><strong>Standard:</strong> ${esc(stdText)} at form standard.</p>
-      <p>${esc(tier.setup)}</p>
-      <ul class="gw-list">${tier.formStandard.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
-      <div class="gw-row">
-        <button class="gw-primary" data-act="pass">Met the standard</button>
-        <button data-act="miss">Not today — stop this branch</button>
-      </div>
+    <header class="gw-header"><h1>INTAKE</h1>
+      <div class="gw-dim">${run.index + 1} of ${run.ladder.length} · rest as long as you like between tests</div></header>
+    <main class="gw-panel gw-center">
+      <div class="gw-dim">${esc(TREE.branches[tier.branch].name)} corridor</div>
+      <h2 class="gw-test-name">${esc(tier.name)}</h2>
+      <p class="gw-test-standard">${esc(stdText)}</p>
+      <details class="gw-form"><summary>How to do it</summary>
+        <p>${esc(tier.setup)}</p>
+        <ul class="gw-list">${tier.formStandard.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
+      </details>
+      <button class="gw-primary gw-big" data-act="pass">Did it</button>
+      <button class="gw-big" data-act="miss">Stop here — this corridor is mapped</button>
     </main>`;
   wire({
     pass: () => { recordRungResult(run, TREE, true); render(); },
@@ -350,49 +369,51 @@ function renderRoom(s) {
   const entry = state.resolutions[idx];
   const tier = room.tier;
   const target = tier.scheme.kind === 'reps' ? tier.scheme.repWindow : tier.scheme.holdWindow;
-  const unit = tier.scheme.kind === 'reps' ? 'reps' : 'seconds';
+  const unit = tier.scheme.kind === 'reps' ? 'reps' : 'sec';
+  const phase = !result ? (state._logging === key ? 'log' : 'set') : !entry ? 'roll' : 'rest';
 
   root().innerHTML = `
     <header class="gw-header">
       <h1>${esc(door ? door.name : flavorName(tier))}</h1>
-      <div class="gw-dim" id="prescription">${esc(tier.name)} · set ${room.setNumber} · target ${target[0]}–${target[1]} ${unit} · ${esc(TREE.name)} ${treeStat()}%</div>
+      <div class="gw-dim" id="prescription">${esc(tier.name)} · set ${room.setNumber} · ${target[0]}–${target[1]} ${unit}</div>
     </header>
-    <main class="gw-panel">
-      ${room.learnCue ? `<div class="gw-callout">Cue this set: <strong>${esc(room.learnCue)}</strong></div>` : `
-      <details class="gw-form"><summary>Form standard</summary>
-        <ul class="gw-list">${tier.formStandard.map((f) => `<li>${esc(f)}</li>`).join('')}</ul></details>`}
-      ${!result ? `
-        <p class="gw-bigcue">Do the set. The room resolves when you rest.</p>
+    <main class="gw-panel gw-center">
+      ${phase === 'set' ? `
+        ${room.learnCue ? `<div class="gw-callout">This set, one thing: <strong>${esc(room.learnCue)}</strong></div>` : `
+        <details class="gw-form"><summary>Form standard</summary>
+          <ul class="gw-list">${tier.formStandard.map((f) => `<li>${esc(f)}</li>`).join('')}</ul></details>`}
+        <p class="gw-bigcue">Do the set.</p>
+        <p class="gw-dim">Aim for ${target[1]} ${unit}. The room resolves while you rest.</p>
+        <button class="gw-primary gw-big" data-act="log">Set done</button>
+      ` : phase === 'log' ? `
+        <p class="gw-bigcue">How did it go?</p>
         <div class="gw-stepper">
           <button class="gw-step" data-step="-1">−</button>
           <div class="gw-step-num" id="amount">${target[1]}</div>
           <button class="gw-step" data-step="1">+</button>
           <div class="gw-step-unit">${unit}</div>
         </div>
-        <div class="gw-row">
-          <button class="gw-primary gw-big" data-act="hit">Hit — form standard</button>
-        </div>
-        <div class="gw-row">
+        <button class="gw-primary gw-big" data-act="hit">Hit — clean form</button>
+        <div class="gw-row gw-even">
           <button data-act="partial">Partial</button>
           <button data-act="missed">Missed</button>
         </div>
-      ` : !entry ? `
+      ` : phase === 'roll' ? `
         <div id="dice-stage" class="gw-dice-stage"><div class="gw-die" id="die">--</div></div>
-        <p class="gw-dim">Set logged (${esc(result.outcome)}, ${result.amount} ${unit}). RIGGING — [${treeStat()}%, ${result.outcome === 'hit' ? 'advantage' : result.outcome === 'partial' ? 'flat' : 'disadvantage'}]: resolve the room.</p>
+        <p class="gw-dim">${esc(TREE.name)} ${treeStat()}% · ${result.outcome === 'hit' ? 'advantage' : result.outcome === 'partial' ? 'flat' : 'disadvantage'}</p>
         <button class="gw-primary gw-big" data-act="roll">Roll d100</button>
       ` : state.encounterPending && state.encounterPending.roomIndex === idx ? `
         ${renderEncounterHtml(state.encounterPending.encounter)}
       ` : `
         ${renderResolutionHtml(entry, idx)}
         ${renderTimerHtml(room.restSeconds)}
-        <div class="gw-note-row">
-          <input id="field-note" placeholder="field note (optional)" maxlength="120">
-        </div>
+        <details class="gw-form"><summary>+ field note</summary>
+          <div class="gw-note-row"><input id="field-note" class="gw-text" placeholder="one line" maxlength="120"></div>
+        </details>
         <button class="gw-primary gw-big" data-act="next">${idx + 1 < s.rooms.length ? 'Next room' : s.boss ? 'To the sealed door' : 'File the AAR'}</button>
       `}
     </main>`;
 
-  // steppers
   root().querySelectorAll('[data-step]').forEach((el) => {
     el.addEventListener('click', () => {
       const num = document.getElementById('amount');
@@ -400,6 +421,7 @@ function renderRoom(s) {
     });
   });
   wire({
+    log: () => { state._logging = key; render(); },
     hit: () => logSet(key, 'hit'),
     partial: () => logSet(key, 'partial'),
     missed: () => logSet(key, 'missed'),
@@ -410,6 +432,7 @@ function renderRoom(s) {
         state.profile.notes.push({ at: new Date().toISOString(), room: door ? door.name : flavorName(tier), text: note.value.trim() });
         saveProfile(state.profile);
       }
+      state._logging = null;
       state.sessionStep = { phase: 'door', roomIndex: idx + 1 };
       render();
     }
@@ -417,12 +440,13 @@ function renderRoom(s) {
   root().querySelectorAll('[data-enc-choice]').forEach((el) => {
     el.addEventListener('click', () => resolveEncounter(idx, Number(el.getAttribute('data-enc-choice'))));
   });
-  if (entry && !(state.encounterPending && state.encounterPending.roomIndex === idx)) startTimer(room.restSeconds);
+  if (phase === 'rest') startTimer(room.restSeconds);
 }
 
 function logSet(key, outcome) {
   const amount = Number((document.getElementById('amount') || {}).textContent || 0);
   state.setResults[key] = { outcome, amount };
+  state._logging = null;
   render();
 }
 
@@ -698,17 +722,12 @@ function renderDebrief(s) {
   });
   root().innerHTML = `
     <header class="gw-header"><h1>${esc(SKIN.sessionFrame.debrief.title)}</h1></header>
-    <main class="gw-panel">
+    <main class="gw-panel gw-center">
       <p class="gw-script">${esc(debrief)}</p>
-      ${aar.unlockHit ? `<div class="gw-callout">Top of the window across all sets. <strong>The sealed door is eligible next session.</strong></div>` : ''}
+      ${aar.unlockHit ? `<div class="gw-callout"><strong>The sealed door is eligible next session.</strong></div>` : ''}
       ${s.learnMode ? `<div class="gw-callout">${esc(SKIN.sessionFrame.tutorial.aarPrompt)}</div>` : ''}
-      <div class="gw-stat-row">
-        <div class="gw-stat"><div class="gw-stat-num">+${aar.setsHit}</div><div class="gw-stat-label">XP</div></div>
-        <div class="gw-stat"><div class="gw-stat-num">${intel}</div><div class="gw-stat-label">archive</div></div>
-        <div class="gw-stat"><div class="gw-stat-num">${treeStat()}<span class="gw-pct">%</span></div><div class="gw-stat-label">${esc(TREE.name)} now</div></div>
-      </div>
       <div class="gw-note-row">
-        <label class="gw-dim">Minutes you lost track of time (the real meter):</label>
+        <label class="gw-dim">Minutes you lost track of time:</label>
         <div class="gw-stepper">
           <button class="gw-step" data-fstep="-5">−</button>
           <div class="gw-step-num" id="flow-min">0</div>
@@ -849,12 +868,21 @@ function renderArchive() {
               <div class="gw-doc-hook">${esc(f.hook)}</div>
             </div>
           </details>`).join('')}`).join('') : '<p>No documents yet. The rooms hold them; the work recovers them.</p>'}
+      ${(() => {
+        const items = (state.profile.kit || []).map((k) => kitItemById(SKIN, k.id)).filter(Boolean);
+        return items.length ? `<h2>THE KIT (${items.length} of ${SKIN.kitItems.length})</h2>` + items.map((k) => `
+          <div class="gw-item">
+            <div class="gw-item-kind">${esc(k.kind.toUpperCase())}${k.kind === 'key' ? ' · OPENS A ROUTE' : ''}</div>
+            <div class="gw-item-name">${esc(k.name)}</div>
+            <p>${esc(k.body)}</p>
+          </div>`).join('') : '';
+      })()}
       ${state.profile.notes.length ? `
         <h2>FIELD NOTES (yours)</h2>
         <ul class="gw-list">${state.profile.notes.slice(-15).map((n) => `<li><span class="gw-dim">${esc(n.room)}:</span> ${esc(n.text)}</li>`).join('')}</ul>` : ''}
-      <button class="gw-primary" data-act="home">Back</button>
-    </main>`;
-  wire({ home: () => nav('home') });
+    </main>
+    ${bottomNav('archive')}`;
+  wireNav();
 }
 
 function renderKit() {
@@ -871,6 +899,7 @@ function renderKit() {
         </div>`).join('') : '<p>Empty kit. Salvage lives behind doors marked for it.</p>'}
       <button class="gw-primary" data-act="home">Back</button>
     </main>`;
+  wireNav();
   wire({ home: () => nav('home') });
 }
 
@@ -971,9 +1000,9 @@ function renderMap() {
     <main class="gw-panel gw-map">
       ${buildWingMapSvg(wing)}
       <div id="map-detail" class="gw-callout" hidden></div>
-      <div class="gw-dim gw-map-legend">✓ cleared · ● working tier · 🔒 locked (always visible) · dashed = key-item shortcut · dots = rooms you explored</div>
-      <button class="gw-primary" data-act="home">Back</button>
-    </main>`;
+      <div class="gw-dim gw-map-legend">✓ cleared · ● working · 🔒 locked · dashed = shortcut · dots = explored rooms</div>
+    </main>
+    ${bottomNav('map')}`;
   // tap a room → detail
   root().querySelectorAll('.gwm-room[data-tier]').forEach((el) => {
     el.addEventListener('click', () => {
@@ -986,7 +1015,7 @@ function renderMap() {
         ${esc(schemeText(tier.scheme))}${tier.boss ? ` · gate standard: ${esc(tier.boss.label)}` : ''}`;
     });
   });
-  wire({ home: () => nav('home') });
+  wireNav();
 }
 
 function renderLog() {
@@ -998,9 +1027,9 @@ function renderLog() {
         <li><strong>${esc(h.date.slice(0, 10))}</strong> — ${esc(h.focusBranch)} · sets ${h.setsHit}/${h.setsTotal}
         ${h.boss ? (h.boss.passed ? ' · <strong>door opened</strong>' : ' · door held (intel filed)') : ''}
         ${h.learnMode ? ' · tutorial' : ''}</li>`).join('')}</ul>` : '<p>No entries yet.</p>'}
-      <button class="gw-primary" data-act="home">Back</button>
-    </main>`;
-  wire({ home: () => nav('home') });
+    </main>
+    ${bottomNav('more')}`;
+  wireNav();
 }
 
 function renderSettings() {
@@ -1017,8 +1046,8 @@ function renderSettings() {
       <div class="gw-row">
         <button data-act="mute" class="${s.muted ? '' : 'gw-primary'}">${s.muted ? 'Unmute chimes' : 'Sound on'}</button>
       </div>
-      <button class="gw-primary" data-act="home">Back</button>
-    </main>`;
+    </main>
+    ${bottomNav('more')}`;
   root().querySelectorAll('[data-budget]').forEach((el) => {
     el.addEventListener('click', () => {
       state.profile.settings.sessionBudgetMinutes = Number(el.getAttribute('data-budget'));
@@ -1026,9 +1055,9 @@ function renderSettings() {
     });
   });
   wire({
-    mute: () => { state.profile.settings.muted = !state.profile.settings.muted; saveProfile(state.profile); render(); },
-    home: () => nav('home')
+    mute: () => { state.profile.settings.muted = !state.profile.settings.muted; saveProfile(state.profile); render(); }
   });
+  wireNav();
 }
 
 // ── Dice, timer, wake lock, save plumbing ────────────────────────────────────

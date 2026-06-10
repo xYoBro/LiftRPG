@@ -148,3 +148,19 @@ button:active { transform: translateY(1px); }
 .gwm-shortcut-label { font-family: var(--gw-mono); font-size: 7px; fill: var(--gw-accent); }
 .gwm-sealed { font-family: var(--gw-mono); font-size: 8px; fill: var(--gw-muted); }
 .gw-map-legend { margin: 8px 0; }
+
+/* Clarity pass: hero, tab bar, centered flows */
+.gw-home { text-align: left; }
+.gw-hero { border: 1px solid var(--gw-rule); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
+.gw-hero-line { font-size: 1.05rem; font-weight: 600; margin: 4px 0; }
+.gw-hero-hook { font-family: var(--gw-mono); font-size: 0.82rem; color: var(--gw-muted); border-top: 1px dashed var(--gw-rule); padding-top: 8px; margin-top: 8px; }
+.gw-identity { margin-top: 14px; font-size: 0.78rem; line-height: 1.5; }
+.gw-center { text-align: center; }
+.gw-center .gw-form, .gw-center .gw-list, .gw-center .gw-callout, .gw-center .gw-document, .gw-center .gw-item, .gw-center .gw-resolution, .gw-center .gw-script { text-align: left; }
+.gw-test-name { font-size: 1.4rem; margin: 6px 0 2px; }
+.gw-test-standard { font-size: 1.1rem; font-weight: 600; color: var(--gw-accent); margin: 4px 0 12px; }
+.gw-even { justify-content: center; }
+.gw-row-btn { display: block; width: 100%; text-align: left; padding: 14px; margin: 6px 0; }
+.gw-tabbar { position: sticky; bottom: 0; display: flex; gap: 6px; padding: 8px 0 4px; background: var(--gw-paper); border-top: 1px solid var(--gw-rule); margin-top: 10px; }
+.gw-tab { flex: 1; min-height: 48px; font-size: 0.85rem; margin: 0; }
+.gw-tab-active { border-color: var(--gw-accent); color: var(--gw-accent); font-weight: 700; }
