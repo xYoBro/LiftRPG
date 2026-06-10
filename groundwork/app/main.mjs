@@ -112,6 +112,11 @@ function render() {
     storm: renderStorm, dispatch: renderDispatch, more: renderMore
   };
   (screens[state.screen] || renderHome)();
+  // Re-deal animation on every state change (reduced-motion handled in CSS)
+  const app = root();
+  app.classList.remove('gw-screen');
+  void app.offsetWidth;
+  app.classList.add('gw-screen');
   window.scrollTo(0, 0);
 }
 function nav(screen) { state.screen = screen; render(); }
@@ -361,16 +366,19 @@ function renderDoor(s) {
   const doors = room.doorOptions || [];
   if (doors.length < 2 || state.doorPicks[idx]) { state.sessionStep = { phase: 'room', roomIndex: idx }; render(); return; }
   root().innerHTML = `
-    <header class="gw-header"><h1>ROUTE — ROOM ${idx + 1} OF ${s.rooms.length}</h1>
+    ${hudHtml(s, idx)}
+    <header class="gw-header"><h1>PICK THE ROUTE</h1>
       <div class="gw-dim">${esc(flavorName(room.tier))} sector · the set is the same behind either door</div></header>
     <main class="gw-panel">
-      <p class="gw-bigcue">Two doors. Pick the route.</p>
+      <p class="gw-bigcue">Two doors.</p>
+      <div class="gw-doors">
       ${doors.map((d, i) => `
         <button class="gw-door" data-door="${i}">
           <div class="gw-door-name">${esc(d.name)}</div>
           <div class="gw-door-bias">${esc(BIAS_LABEL[d.bias] || '')}</div>
           <div class="gw-door-desc">${esc(d.desc)}</div>
         </button>`).join('')}
+      </div>
     </main>`;
   root().querySelectorAll('[data-door]').forEach((el) => {
     el.addEventListener('click', () => {
@@ -379,6 +387,14 @@ function renderDoor(s) {
       render();
     });
   });
+}
+
+function hudHtml(s, idx) {
+  return `<div class="gw-hud">
+    <span>DAY ${s.dayNumber}</span>
+    <span>ROOM ${Math.min(idx + 1, s.rooms.length)}/${s.rooms.length}${s.boss ? ' +GATE' : ''}</span>
+    <span class="gw-hud-stat">${esc(TREE.name.toUpperCase())} ${treeStat()}%</span>
+  </div>`;
 }
 
 function renderRoom(s) {
@@ -395,6 +411,7 @@ function renderRoom(s) {
   const phase = !result ? (state._logging === key ? 'log' : 'set') : !entry ? 'roll' : 'rest';
 
   root().innerHTML = `
+    ${hudHtml(s, idx)}
     <header class="gw-header">
       <h1>${esc(door ? door.name : flavorName(tier))}</h1>
       <div class="gw-dim" id="prescription">${esc(tier.name)} · set ${room.setNumber} · ${target[0]}–${target[1]} ${unit}</div>
@@ -934,82 +951,76 @@ function renderKit() {
 // connectors, explored narrative rooms budding off fog-of-war style, key-item
 // shortcuts as dashed cross-links, sealed wings at the edges. Plain SVG,
 // theme-var colors only.
+
+const ROOM_GLYPHS = { cleared: '', active: '', locked: '' };
 function buildWingMapSvg(wing) {
   const W = 360;
-  const COL_X = { lever: 96, bar: 264 };
-  const ROOM_W = 116, ROOM_H = 34, GAP = 26;
-  const TOP_PAD = 78, BOTTOM_PAD = 96;
+  const COL_X = { lever: 100, bar: 260 };
+  const CH_W = 96, CH_H = 44, GAP = 30;
+  const TOP_PAD = 84, BOTTOM_PAD = 96;
   const maxSectors = Math.max(...wing.branches.map((b) => b.sectors.length));
-  const H = TOP_PAD + maxSectors * (ROOM_H + GAP) + BOTTOM_PAD;
-  const yFor = (i) => H - BOTTOM_PAD - (i + 1) * (ROOM_H + GAP) + GAP; // climb upward
+  const H = TOP_PAD + maxSectors * (CH_H + GAP) + BOTTOM_PAD;
+  const yFor = (i) => H - BOTTOM_PAD - (i + 1) * (CH_H + GAP) + GAP;
   const parts = [];
-  const activeIdx = {};
 
-  // Entry hall connecting both corridors at the bottom
-  parts.push(`<line x1="${COL_X.lever}" y1="${H - 58}" x2="${COL_X.bar}" y2="${H - 58}" class="gwm-corridor"/>`);
-  parts.push(`<text x="${W / 2}" y="${H - 42}" class="gwm-wing-label" text-anchor="middle">WING ENTRANCE</text>`);
+  // Entry hall
+  parts.push(`<line x1="${COL_X.lever}" y1="${H - 60}" x2="${COL_X.bar}" y2="${H - 60}" class="gwm-corridor"/>`);
+  parts.push(`<text x="${W / 2}" y="${H - 44}" class="gwm-corridor-label" text-anchor="middle">WING ENTRANCE</text>`);
 
   for (const b of wing.branches) {
     const x = COL_X[b.branch];
-    parts.push(`<text x="${x}" y="${H - 70}" class="gwm-corridor-label" text-anchor="middle">${esc(b.name.toUpperCase())} CORRIDOR</text>`);
+    parts.push(`<g class="gwm-${esc(b.branch)}">`);
+    parts.push(`<text x="${x}" y="${H - 72}" class="gwm-corridor-label" text-anchor="middle">${esc(b.name.toUpperCase())}</text>`);
     b.sectors.forEach((sec, i) => {
       const y = yFor(i);
-      // corridor segment up to this room (drawn only once both ends are known)
-      const yPrev = i === 0 ? H - 58 : yFor(i - 1);
-      const segmentKnown = i === 0 || b.sectors[i - 1].state !== 'locked';
-      parts.push(`<line x1="${x}" y1="${yPrev - (i === 0 ? 0 : ROOM_H / 2)}" x2="${x}" y2="${y + ROOM_H / 2}" class="gwm-corridor ${segmentKnown ? '' : 'gwm-corridor-unknown'}"/>`);
-      // boss gate glyph on the connector above the ACTIVE room
+      const yPrev = i === 0 ? H - 60 : yFor(i - 1) - CH_H / 2;
+      const known = i === 0 || b.sectors[i - 1].state !== 'locked';
+      parts.push(`<line x1="${x}" y1="${yPrev}" x2="${x}" y2="${y + CH_H / 2}" class="${known ? 'gwm-corridor' : 'gwm-corridor-unknown'}"/>`);
+      // gate on the connector above the working chamber
       if (sec.state === 'active' && sec.tier.boss) {
-        const gy = y - ROOM_H / 2 - GAP / 2; // on the connector ABOVE the room
-        parts.push(`<rect x="${x - 9}" y="${gy - 5}" width="18" height="10" class="gwm-gate"/>`);
-        parts.push(`<text x="${x + 14}" y="${gy + 4}" class="gwm-gate-label">SEALED</text>`);
+        const gy = y - CH_H / 2 - GAP / 2;
+        parts.push(`<g class="gwm-gate"><rect x="${x - 12}" y="${gy - 7}" width="24" height="14" rx="3"/>`
+          + `<text x="${x}" y="${gy + 4}" text-anchor="middle">✕</text></g>`);
       }
-      if (sec.state === 'active') activeIdx[b.branch] = i;
-      // the room
-      const cls = 'gwm-room gw-room-' + sec.state;
-      const label = sec.state === 'locked' && i > (activeIdx[b.branch] !== undefined ? activeIdx[b.branch] + 1 : 1)
-        ? '?????' : sec.flavorName;
-      parts.push(`<g class="${cls}" data-tier="${esc(sec.tier.id)}">`
-        + `<rect x="${x - ROOM_W / 2}" y="${y - ROOM_H / 2}" width="${ROOM_W}" height="${ROOM_H}" rx="5"/>`
-        + `<text x="${x}" y="${y + 1}" text-anchor="middle" class="gwm-room-name">${esc(label)}</text>`
-        + `<text x="${x}" y="${y + 12}" text-anchor="middle" class="gwm-room-state">${sec.state === 'cleared' ? '✓ cleared' : sec.state === 'active' ? '● working' : '🔒'}</text>`
+      // chamber: glyph-first, name on tap
+      const stateGlyph = sec.state === 'cleared' ? '✓' : sec.state === 'active' ? '' : '🔒';
+      const nextDoor = sec.state === 'locked' && i > 0 && b.sectors[i - 1].state === 'active';
+      parts.push(`<g class="gwm-chamber gwm-chamber-${sec.state}" data-tier="${esc(sec.tier.id)}">`
+        + `<rect x="${x - CH_W / 2}" y="${y - CH_H / 2}" width="${CH_W}" height="${CH_H}" rx="8"/>`
+        + (sec.state === 'active'
+          ? `<circle class="gwm-you" cx="${x}" cy="${y}" r="7" fill="${b.branch === 'lever' ? 'var(--gw-accent)' : 'var(--gw-amber)'}"/>`
+          : `<text x="${x}" y="${y + 5}" text-anchor="middle" class="gwm-glyph">${stateGlyph}</text>`)
+        + (nextDoor ? `<text x="${x}" y="${y + CH_H / 2 + 12}" text-anchor="middle" class="gwm-sealed">${esc(sec.flavorName)}</text>` : '')
         + `</g>`);
-      // explored narrative rooms bud off the corridor (fog-of-war: only found ones)
     });
-    // explored stubs along the corridor's outer side
+    // explored rooms: small attached cells budding off the corridor
     const outer = b.branch === 'lever' ? -1 : 1;
-    b.explored.slice(0, 8).forEach((room, i) => {
-      const y = yFor(Math.min(i, b.sectors.length - 1)) + 6;
-      const sx = x + outer * (ROOM_W / 2 + 6);
-      parts.push(`<g class="gwm-stub"><circle cx="${sx + outer * 5}" cy="${y}" r="4"/>`
-        + `<text x="${sx + outer * 13}" y="${y + 3}" class="gwm-stub-label" text-anchor="${outer < 0 ? 'end' : 'start'}">${esc(room.name)}</text></g>`);
+    b.explored.slice(0, 10).forEach((room, i) => {
+      const baseY = yFor(Math.floor(i / 2)) + (i % 2 === 0 ? -8 : 12);
+      const sx = x + outer * (CH_W / 2 + 10);
+      parts.push(`<rect class="gwm-stub" x="${sx + (outer < 0 ? -10 : 0)}" y="${baseY - 5}" width="10" height="10" rx="2"><title>${esc(room.name)}</title></rect>`);
     });
+    parts.push('</g>');
   }
 
-  // Key-item shortcut cross-links
+  // shortcuts as amber cross-links
   const routes = (SKIN.map.shortcutRoutes) || {};
   for (const id of wing.shortcuts) {
     const r = routes[id];
     if (!r) continue;
-    const [bA, iA] = r.from, [bB, iB] = r.to;
-    parts.push(`<line x1="${COL_X[bA] + ROOM_W / 2}" y1="${yFor(iA)}" x2="${COL_X[bB] - ROOM_W / 2}" y2="${yFor(iB)}" class="gwm-shortcut"/>`);
-    parts.push(`<text x="${W / 2}" y="${(yFor(iA) + yFor(iB)) / 2 - 4}" class="gwm-shortcut-label" text-anchor="middle">${esc(r.label)}</text>`);
+    parts.push(`<line x1="${COL_X[r.from[0]] + CH_W / 2}" y1="${yFor(r.from[1])}" x2="${COL_X[r.to[0]] - CH_W / 2}" y2="${yFor(r.to[1])}" class="gwm-shortcut"><title>${esc(r.label)}</title></line>`);
   }
 
-  // Sealed wings at the edges (the metroidvania promise)
-  const sealed = wing.lockedDoors;
+  // sealed wings at the edges; the Mast continues up past the Bar capstone
   const sealedPos = [
-    { x: 16, y: H / 2, anchor: 'start' },                 // Pressure (left)
-    { x: 16, y: H - 14, anchor: 'start' },                // Foundation (bottom-left)
-    { x: W - 16, y: H - 14, anchor: 'end' },              // Keel (bottom-right)
-    { x: COL_X.bar, y: 26, anchor: 'middle' }             // Mast (top, past Bar)
+    { x: 14, y: H / 2, anchor: 'start' },
+    { x: 14, y: H - 14, anchor: 'start' },
+    { x: W - 14, y: H - 14, anchor: 'end' },
+    { x: COL_X.bar, y: 24, anchor: 'middle' }
   ];
-  sealed.forEach((d, i) => {
+  (wing.lockedDoors || []).forEach((d, i) => {
     const pos = sealedPos[i % sealedPos.length];
-    if (i === 3) {
-      // The Mast: corridor stub continuing up from the Bar capstone
-      parts.push(`<line x1="${COL_X.bar}" y1="${yFor(maxSectors - 1) - ROOM_H / 2}" x2="${COL_X.bar}" y2="40" class="gwm-corridor gwm-corridor-unknown"/>`);
-    }
+    if (i === 3) parts.push(`<line x1="${COL_X.bar}" y1="${yFor(maxSectors - 1) - CH_H / 2}" x2="${COL_X.bar}" y2="38" class="gwm-corridor-unknown"/>`);
     parts.push(`<text x="${pos.x}" y="${pos.y}" class="gwm-sealed" text-anchor="${pos.anchor}">🔒 ${esc(d.name)}</text>`);
   });
 
@@ -1024,11 +1035,11 @@ function renderMap() {
     <main class="gw-panel gw-map">
       ${buildWingMapSvg(wing)}
       <div id="map-detail" class="gw-callout" hidden></div>
-      <div class="gw-dim gw-map-legend">✓ cleared · ● working · 🔒 locked · dashed = shortcut · dots = explored rooms</div>
+      <div class="gw-dim gw-map-legend">pulse = you · ✓ cleared · 🔒 locked · ✕ sealed gate · amber dash = shortcut · small cells = explored rooms · tap any chamber</div>
     </main>
     ${bottomNav('map')}`;
   // tap a room → detail
-  root().querySelectorAll('.gwm-room[data-tier]').forEach((el) => {
+  root().querySelectorAll('.gwm-chamber[data-tier]').forEach((el) => {
     el.addEventListener('click', () => {
       const tier = getTier(TREE, el.getAttribute('data-tier'));
       if (!tier) return;
@@ -1106,10 +1117,18 @@ function animateDie(finalRoll, done) {
   }, 70);
 }
 
+const RING_R = 58;
+const RING_C = 2 * Math.PI * RING_R;
 function renderTimerHtml(seconds) {
   return `<div class="gw-timer" id="timer" data-total="${seconds}">
-    <div class="gw-timer-num" id="timer-num">${fmtTime(seconds)}</div>
-    <div class="gw-timer-bar"><div class="gw-timer-fill" id="timer-fill" style="width:100%"></div></div>
+    <div class="gw-ring-wrap">
+      <svg class="gw-ring" viewBox="0 0 132 132">
+        <circle class="gw-ring-bg" cx="66" cy="66" r="${RING_R}"/>
+        <circle class="gw-ring-fg" id="timer-ring" cx="66" cy="66" r="${RING_R}"
+          stroke-dasharray="${RING_C}" stroke-dashoffset="0"/>
+      </svg>
+      <div class="gw-timer-num" id="timer-num">${fmtTime(seconds)}</div>
+    </div>
     <div class="gw-dim">rest — read, decide, breathe</div>
   </div>`;
 }
@@ -1120,10 +1139,10 @@ function startTimer(total) {
   state.timer = { intervalId: setInterval(() => {
     remaining -= 1;
     const num = document.getElementById('timer-num');
-    const fillEl = document.getElementById('timer-fill');
-    if (!num || !fillEl) { stopTimer(); return; }
+    const ring = document.getElementById('timer-ring');
+    if (!num || !ring) { stopTimer(); return; }
     num.textContent = fmtTime(Math.max(0, remaining));
-    fillEl.style.width = Math.max(0, (remaining / total) * 100) + '%';
+    ring.style.strokeDashoffset = String(RING_C * (1 - Math.max(0, remaining) / total));
     if (remaining <= 0) {
       num.textContent = 'GO';
       chimeRestEnd(muted());
