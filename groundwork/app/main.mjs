@@ -462,19 +462,55 @@ function renderSession() {
   phases[state.sessionStep.phase](state.session);
 }
 
+// First matching pool wins; the line cycles on a deterministic seed (never
+// the session rng — a re-render must not advance the dice stream).
+function pickBriefLine(pools, ctx, seed) {
+  for (const pool of pools || []) {
+    const w = pool.when || {};
+    if (w.firstSession && !ctx.firstSession) continue;
+    if (w.learnMode && !ctx.learnMode) continue;
+    if (w.bossDay && !ctx.bossDay) continue;
+    if (w.postBossFail && !ctx.postBossFail) continue;
+    return pool.lines[seed % pool.lines.length];
+  }
+  return null;
+}
+
 function renderBrief(s) {
-  const brief = fill(SKIN.sessionFrame.brief.script, {
-    dayNumber: s.dayNumber,
+  const brief = SKIN.sessionFrame.brief || {};
+  const focusTier = s.focusTierId ? getTier(TREE, s.focusTierId) : null;
+  const vars = {
+    orderNumber: s.dayNumber,
     wingName: SKIN.map.wings[TREE.id] || TREE.name,
+    sectorName: focusTier ? flavorName(focusTier) : TREE.name,
     roomCount: s.rooms.length,
-    bossClause: s.boss ? SKIN.sessionFrame.brief.bossClause : ''
-  });
+    gateLabel: s.boss ? s.boss.definition.label : ''
+  };
+  const ctx = {
+    firstSession: state.profile.history.length === 0,
+    learnMode: s.learnMode,
+    bossDay: !!s.boss,
+    postBossFail: state.profile.history.some((h) => h.boss && !h.boss.passed && h.focusTierId === s.focusTierId)
+  };
+  const scene = pickBriefLine(brief.sceneLines, ctx, s.dayNumber);
+  const voice = pickBriefLine(brief.riggingLines, ctx, s.dayNumber);
+  const order = brief.order;
   root().innerHTML = `
-    <header class="gw-header"><h1>${esc(SKIN.sessionFrame.brief.title)}</h1></header>
+    <header class="gw-header"><h1>${esc(brief.title || 'WORK ORDER')}</h1></header>
     <main class="gw-panel">
-      <p class="gw-script">${esc(brief)}</p>
+      ${scene ? `<p class="gw-script">${esc(fill(scene, vars))}</p>` : ''}
+      <div class="gw-document gw-workorder">
+        ${order && order.sub ? `<div class="gw-doc-type">${esc(fill(order.sub, vars))}</div>` : ''}
+        <div class="gw-doc-title">${esc(order ? fill(order.heading, vars) : 'WORK ORDER №' + s.dayNumber)}</div>
+        <div class="gw-order-rows">
+          ${(order ? order.rows : [['ROUTE', '{{sectorName}}'], ['ROOMS', '{{roomCount}}']]).map(([k, v]) =>
+            `<div class="gw-order-row"><span>${esc(k)}</span><span>${esc(fill(v, vars))}</span></div>`).join('')}
+          ${s.boss && order && order.gateRow ? `<div class="gw-order-row gw-order-gate"><span>${esc(order.gateRow[0])}</span><span>${esc(fill(order.gateRow[1], vars))}</span></div>` : ''}
+        </div>
+        ${order && order.foot ? `<div class="gw-doc-hook">${esc(order.foot)}</div>` : ''}
+      </div>
+      ${voice ? `<p class="gw-beat">${esc(fill(voice, vars))}</p>` : ''}
       ${state.profile.history.length === 6 ? `<div class="gw-callout">${esc(SKIN.sessionFrame.troughForecast)}</div>` : ''}
-      ${s.learnMode ? `<div class="gw-callout">${esc(SKIN.sessionFrame.tutorial.intro)}</div>` : ''}
       <button class="gw-primary gw-big" data-act="go">Begin</button>
       <button data-act="abort">Back</button>
     </main>`;

@@ -213,6 +213,15 @@ button:active { transform: translateY(2px) scale(0.99); }
 .gw-cold .gw-script { font-size: 0.98rem; }
 .gw-intake-voice { margin: 6px 0 12px; border-top: none; padding-top: 0; }
 
+/* ── Work order as a form on Eight's pad ── */
+.gw-workorder { margin: 14px 0; }
+.gw-order-rows { margin: 10px 0 4px; }
+.gw-order-row { display: flex; gap: 12px; padding: 7px 0; border-top: 1px dashed #cdc5b2; font-size: 0.92rem; align-items: baseline; }
+.gw-order-row:first-child { border-top: none; }
+.gw-order-row > span:first-child { font-family: var(--gw-mono); font-size: 0.66rem; letter-spacing: 0.15em; color: #6e6a5e; min-width: 62px; }
+.gw-order-row > span:last-child { font-weight: 650; }
+.gw-order-gate > span:last-child { color: #7a4a22; font-weight: 750; }
+
 /* ── Sprint 2: Band 7 live event ── */
 .gw-live-dim { color: var(--gw-accent); animation: gw-live-blink 1.4s steps(2) infinite; }
 @keyframes gw-live-blink { 50% { opacity: 0.35; } }

@@ -365,14 +365,61 @@ export const SKIN = {
 
   // ── Session frame ──────────────────────────────────────────────────────────
   sessionFrame: {
+    // The brief is a SCENE, not a status line (author feedback, Sprint 2.1
+    // follow-up): one breath of second person, the order itself as a paper
+    // form on Eight's pad, and RIGGING talking — nobody narrates this game.
+    // Pools are first-match-wins; line choice cycles on the order number.
     brief: {
       title: 'WORK ORDER',
-      script: 'Station log, day {{dayNumber}}. Grid still dark. Today’s order: {{wingName}}, {{roomCount}} rooms on the route{{bossClause}}. RIGGING has the manifest. Begin when ready.',
-      bossClause: ' — and the sealed door at the end of it'
+      sceneLines: [
+        { when: { firstSession: true }, lines: [
+          'The wing door swings heavier than it looks. Everything in here is. Your light crosses a chalk arrow on the floor — Eight’s hand, gone soft with four months of dust, still pointing the way it always pointed.'
+        ] },
+        { when: { bossDay: true }, lines: [
+          'You can see it from the entrance: the sealed door at the end of the route, and the steel plate beside it with its standard posted. The wing feels arranged around that door today. It probably always was.'
+        ] },
+        { when: { postBossFail: true }, lines: [
+          'The wing makes no remark about last time. Buildings don’t. The pad by the door has today’s order on it, same as every working morning.'
+        ] },
+        { when: {}, lines: [
+          'Cold in the wing this morning. Somewhere overhead the long cables tick, the building counting something under its breath.',
+          'Dust hangs in the beam of your light. Rooms stop being rooms when nobody walks them. Most of this job is refusing to let that happen.',
+          'The duty clock says work. The wing says nothing, as usual — it just stands there, being a route.'
+        ] }
+      ],
+      order: {
+        heading: 'WORK ORDER №{{orderNumber}}',
+        sub: 'K-9 issue · the pad by the wing door, Eight’s stock',
+        rows: [
+          ['ROUTE', '{{wingName}} — {{sectorName}}'],
+          ['ROOMS', '{{roomCount}} on the manifest']
+        ],
+        gateRow: ['GATE', '{{gateLabel}} — standard posted at the door'],
+        foot: 'THE COUNT IS THE COUNT.'
+      },
+      riggingLines: [
+        { when: { firstSession: true, learnMode: true }, lines: [
+          'RIGGING: “Four months I kept this wing climbable for whoever they sent. This morning the manifest finally carries a name. We start the way Eight started — light, two passes, one thing in your head at a time. {{sectorName}}. Walk in like you own it. As of today, you do.”'
+        ] },
+        { when: { firstSession: true }, lines: [
+          'RIGGING: “Four months I kept this wing climbable for whoever they sent. This morning the manifest finally carries a name. {{sectorName}} first. Walk in like you own it — as of today, you do.”'
+        ] },
+        { when: { learnMode: true }, lines: [
+          'RIGGING: “New rig on the order, so we go the way Eight went: light passes, one thing in your head per pass. Nothing heroic — heroics are for stations that are on fire. File the AAR after, and I count the rig as yours.”'
+        ] },
+        { when: { bossDay: true }, lines: [
+          'RIGGING: “The standard is bolted where Eight bolted it. The door doesn’t grade effort. Rest the full count when you reach it, then take it or scout it — both are work, both go in the log.”'
+        ] },
+        { when: {}, lines: [
+          'RIGGING: “Route’s posted. The wing settles different under a working keeper — it knows your weight on the line now. Go give it something to hold.”',
+          'RIGGING: “{{roomCount}} rooms on the order. The count is the count. Closest thing to scripture this station keeps.”',
+          'RIGGING: “Manifest says {{sectorName}}. I’ll be on the wire. Talk less. Hold more.”'
+        ] }
+      ]
     },
     debrief: {
       title: 'AFTER-ACTION REPORT',
-      script: 'AAR, day {{dayNumber}}. Rooms cleared: {{roomsCleared}}. Recovered: {{lootSummary}}. Archive: {{intelCount}} new document{{intelPlural}}. {{bossLine}} Station integrity improved by exactly one session. Log closed.',
+      script: 'AAR — work order №{{dayNumber}}, closed out. Rooms cleared: {{roomsCleared}}. Recovered: {{lootSummary}}. Archive: {{intelCount}} new document{{intelPlural}}. {{bossLine}} The station is one session better held. Filed.',
       bossPassLine: 'The sealed door is sealed no longer.',
       bossFailLine: 'The sealed door held — and told us everything about its hinges.'
     },
@@ -441,7 +488,8 @@ export const SKIN = {
     ],
 
     tutorial: {
-      intro: 'NEW ROOM TYPE. RIGGING walks it first: reduced volume, one cue per set. The manual page unlocks when the AAR is filed.',
+      // intro retired: learn-mode framing now rides the brief's RIGGING line
+      // (a voice explains the light day; a system banner never does).
       aarPrompt: 'Field-manual protocol: record one set on your phone. Check it against the form standard — every point, honestly. File the AAR. The manual entry for this room is yours after that.'
     },
 
