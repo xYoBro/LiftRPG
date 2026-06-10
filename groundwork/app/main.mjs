@@ -129,6 +129,7 @@ function render() {
   window.scrollTo(0, 0);
 }
 function nav(screen) {
+  if (state._pendingReload && screen === 'home') { window.location.reload(); return; }
   if (screen === 'archive') { state.deskPile = null; state.deskIndex = 0; }
   state.screen = screen;
   render();
@@ -1499,7 +1500,19 @@ function wire(handlers) {
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
+// Self-updating: when a deployed service worker takes control, reload to the
+// new build — immediately on stateless screens, deferred to the next return
+// home when a session is live (a mid-session reload would eat the run).
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => { /* dev */ });
+  let hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) { hadController = true; return; } // first install: page is already current
+    if (state.screen === 'home' || state.screen === 'more' || state.screen === 'archive') {
+      window.location.reload();
+    } else {
+      state._pendingReload = true;
+    }
+  });
 }
 render();

@@ -77,16 +77,21 @@ export function buildWingMapSvg(wing, opts = {}) {
       }
 
       // Chamber: silhouette-first landmark; state badges at the edges.
+      // Lock economy: only the NEXT sealed door announces itself (lock + name).
+      // Deeper locked sectors are fog — a dim silhouette, no icon spam; the
+      // unknown should read as unknown, not as a wall of padlocks.
       const sil = silhouettes[sec.tier.hookSlot];
       const nextDoor = sec.state === 'locked' && i > 0 && b.sectors[i - 1].state === 'active';
-      parts.push(`<g class="gwm-chamber gwm-chamber-${sec.state}" data-tier="${esc(sec.tier.id)}">`
+      parts.push(`<g class="gwm-chamber gwm-chamber-${sec.state} ${sec.state === 'locked' && !nextDoor ? 'gwm-chamber-fog' : ''}" data-tier="${esc(sec.tier.id)}">`
         + `<rect x="${x - CH_W / 2}" y="${y - CH_H / 2}" width="${CH_W}" height="${CH_H}" rx="8"/>`
         + (sil ? `<path class="gwm-sil" d="${sil}" transform="translate(${x},${y})"/>` : '')
         + (sec.state === 'active'
           ? `<circle class="gwm-you" cx="${x - CH_W / 2 + 13}" cy="${y}" r="6" fill="${b.branch === 'lever' ? 'var(--gw-accent)' : 'var(--gw-amber)'}"/>`
           : sec.state === 'cleared'
             ? `<text x="${x + CH_W / 2 - 12}" y="${y + 4}" text-anchor="middle" class="gwm-glyph">✓</text>`
-            : `<text x="${x + CH_W / 2 - 12}" y="${y + 4}" text-anchor="middle" class="gwm-glyph">🔒</text>`)
+            : nextDoor
+              ? `<text x="${x + CH_W / 2 - 12}" y="${y + 4}" text-anchor="middle" class="gwm-glyph">🔒</text>`
+              : '')
         + (nextDoor ? `<text x="${x}" y="${y + CH_H / 2 - 6}" text-anchor="middle" class="gwm-sealed gwm-nextdoor">${esc(sec.flavorName)}</text>` : '')
         + `</g>`);
 

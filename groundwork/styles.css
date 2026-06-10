@@ -267,6 +267,9 @@ button:active { transform: translateY(2px) scale(0.99); }
 .gwm-meter-fg { fill: var(--gw-accent); opacity: 0.85; }
 .gwm-nextdoor { opacity: 1; fill: var(--gw-ink); }
 .gwm-chamber-locked .gwm-nextdoor { opacity: 0.8; }
+/* Deep-locked fog: fainter than the named next door, no icons */
+.gwm-chamber-fog rect { opacity: 0.22; stroke-dasharray: 4 4; }
+.gwm-chamber-fog .gwm-sil { opacity: 0.16; }
 
 /* ── Sprint 2: archive-as-desk ── */
 .gw-desk { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 12px 0; }
