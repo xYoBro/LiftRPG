@@ -20,7 +20,7 @@ import {
 import {
   createDiagnostics, recordAdjustment, recordSplit,
   recordUnresolvedOverflow, recordSpreadUsage, recordAtomMetrics,
-  recordWarning, formatStatus, summarize,
+  recordWarning,
 } from './diagnostics.js';
 import { getMechanicSlotWidthPx, getHalfWidthTypes } from '../mechanic-layout.js';
 
@@ -32,7 +32,7 @@ import { getMechanicSlotWidthPx, getHalfWidthTypes } from '../mechanic-layout.js
  * Default section ordering. Adapters can override this to change
  * the top-level structure of the booklet.
  */
-export const DEFAULT_SECTION_ORDER = [
+const DEFAULT_SECTION_ORDER = [
   'cover', 'front-matter', 'body', 'supplements',
   'end-matter', 'endings', 'back-matter', 'padding',
 ];

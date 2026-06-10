@@ -61,55 +61,6 @@ const CIPHER_FAMILY_BY_TYPE = Object.keys(CIPHER_FAMILY_REGISTRY).reduce((lookup
   return lookup;
 }, {});
 
-export const ORACLE_FAMILY_REGISTRY = {
-  'fragment-oracle': {
-    label: 'Fragment Oracle',
-    description: 'Oracle table primarily routes the player to narrative fragments.'
-  },
-  'consequence-oracle': {
-    label: 'Consequence Oracle',
-    description: 'Oracle table primarily produces state changes or gameplay consequences.'
-  },
-  'mixed-oracle': {
-    label: 'Mixed Oracle',
-    description: 'Oracle table blends fragment routing and direct gameplay consequences.'
-  }
-};
-
-export const CLOCK_FAMILY_REGISTRY = {
-  'progress-clock': {
-    label: 'Progress Clock',
-    description: 'Circular progress or threat clock surface.'
-  },
-  'danger-clock': {
-    label: 'Danger Clock',
-    description: 'Escalating threat clock that fills toward a complication.'
-  },
-  'racing-clock': {
-    label: 'Racing Clock',
-    description: 'One of two opposed clocks that compete toward resolution.'
-  },
-  'tug-of-war-clock': {
-    label: 'Tug Of War Clock',
-    description: 'Clock whose filled state can rise or fall as control shifts.'
-  },
-  'linked-clock': {
-    label: 'Linked Clock',
-    description: 'Clock that unlocks or advances another clock when filled.'
-  },
-  'project-clock': {
-    label: 'Project Clock',
-    description: 'Long-term project or investigation clock that accumulates progress across weeks.'
-  }
-};
-
-export const ROUTE_FAMILY_REGISTRY = {
-  'binary-route': {
-    label: 'Binary Route',
-    description: 'Week contains A/B or route-branch decision logic.'
-  }
-};
-
 export const COMPANION_COMPONENT_REGISTRY = {
   dashboard: {
     family: 'dashboard',

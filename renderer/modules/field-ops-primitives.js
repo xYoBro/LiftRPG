@@ -834,57 +834,6 @@ export function renderCompanionComponent(component) {
   return card;
 }
 
-export function renderFieldOpsPage(model) {
-  const scaffold = createBoundedPage(model.pageType, 'field-ops-right', {
-    boundaryRole: 'field-ops',
-    layoutVariant: model.layoutVariant || 'balanced'
-  });
-  const page = scaffold.page;
-  const frame = scaffold.frame;
-  frame.setAttribute('data-map-family', (model.mechanicProfile || {}).mapFamily || 'none');
-  frame.setAttribute('data-cipher-family', (model.mechanicProfile || {}).cipherFamily || 'none');
-  frame.setAttribute('data-oracle-family', (model.mechanicProfile || {}).oracleFamily || 'none');
-  frame.setAttribute('data-clock-family', (model.mechanicProfile || {}).clockFamily || 'none');
-
-  const header = make('header', 'rp-header');
-  header.appendChild(make('span', '', model.headerTitle || 'Field Operations'));
-  header.appendChild(make('span', 'page-num', ''));
-  frame.appendChild(header);
-
-  const content = make('div', 'rp-content');
-  if (model.layout === 'oracle-only') {
-    content.style.gridTemplateAreas = '"oracle oracle"';
-  }
-
-  if (model.cipher) content.appendChild(renderCipherSection(model.cipher));
-
-  if (model.mapState || (model.gameplayClocks || []).length > 0) {
-    const mapZone = make('section', 'map-zone');
-    if (model.mapState) mapZone.appendChild(renderMapSection(model.mapState));
-    if ((model.gameplayClocks || []).length > 0) {
-      mapZone.appendChild(renderGameplayClocks(model.gameplayClocks));
-    }
-    content.appendChild(mapZone);
-  }
-
-  if (model.oracle) {
-    content.appendChild(renderOracleSection(model.oracle));
-  }
-
-  if ((model.companionComponents || []).length > 0) {
-    content.setAttribute('data-has-companion', 'true');
-    const companionZone = make('section', 'companion-zone');
-    companionZone.appendChild(make('div', 'doc-label', 'Companion Surface'));
-    model.companionComponents.forEach((component) => {
-      companionZone.appendChild(renderCompanionComponent(component));
-    });
-    content.appendChild(companionZone);
-  }
-
-  frame.appendChild(content);
-  return page;
-}
-
 export function renderBossPage(model) {
   const scaffold = createBoundedPage('boss', 'boss-right', {
     boundaryRole: 'boss',

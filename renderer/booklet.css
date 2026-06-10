@@ -975,29 +975,6 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   color:var(--muted);
 }
 
-.chip-row{
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px;
-}
-
-.chip{
-  font-family:var(--mono);
-  font-size:6pt;
-  letter-spacing:.12em;
-  text-transform:uppercase;
-  padding:4px 8px;
-  border:1px solid var(--rule);
-  border-radius:999px;
-  color:var(--ink);
-}
-
-.chip-muted{
-  color:var(--muted);
-  border-color:rgba(24,23,20,.18);
-  background:rgba(255,255,255,.38);
-}
-
 /* ══════════════════════════════════════════════════════════════
    RULES SPREAD (LEFT: BRIEFING · RIGHT: PASSWORD LOG)
    ══════════════════════════════════════════════════════════════ */
@@ -1259,14 +1236,6 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .gauge-log-page[data-layout-variant="tight"] .rules-header{
   margin-bottom:8px;
 }
-.password-log-title{
-  font-family:var(--mono);
-  font-size:7pt;
-  letter-spacing:.22em;
-  text-transform:uppercase;
-  color:var(--ink);
-  margin-bottom:4px;
-}
 .password-log-subtitle{
   font-family:var(--serif);
   font-style:italic;
@@ -1367,14 +1336,6 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .page-header .page-num{
   font-size:7.5pt;
   color:var(--ink);
-}
-.running-title{
-  overflow-wrap:anywhere;
-}
-
-/* Week ID */
-.week-id{
-  margin-bottom:4px;
 }
 .week-kicker{
   font-family:var(--mono);
@@ -2615,79 +2576,6 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   border-top-style:dashed;
 }
 
-.companion-page{
-  padding:0;
-  display:flex;
-  flex-direction:column;
-  min-height:0;
-}
-
-.companion-page-body{
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  flex:1;
-  min-height:0;
-}
-
-.companion-intro{
-  font-family:var(--mono);
-  font-size:6pt;
-  line-height:1.32;
-  color:color-mix(in srgb, var(--ink) 76%, var(--muted) 24%);
-  border-left:2px solid var(--accent);
-  padding-left:6px;
-  margin:0 0 2px;
-}
-
-.companion-clock-zone{
-  border-top:1px solid color-mix(in srgb, var(--theme-field-rule,var(--rule)) 82%, transparent 18%);
-  border-bottom:1px solid color-mix(in srgb, var(--theme-field-rule,var(--rule)) 82%, transparent 18%);
-  padding:6px 0;
-}
-
-.companion-stack{
-  display:flex;
-  flex-direction:column;
-  gap:7px;
-  flex:1;
-  min-height:0;
-}
-
-.companion-empty-note{
-  font-family:var(--mono);
-  font-size:5.6pt;
-  line-height:1.35;
-  color:color-mix(in srgb, var(--ink) 68%, var(--muted) 32%);
-  border:1px dashed color-mix(in srgb, var(--theme-panel-border,var(--rule)) 68%, transparent 32%);
-  padding:6px 8px;
-}
-
-.companion-page[data-layout-variant="clock-dominant"] .companion-page-body{
-  gap:6px;
-}
-
-.companion-page[data-layout-variant="clock-dominant"] .companion-clock-zone{
-  padding-top:4px;
-  padding-bottom:7px;
-}
-
-.companion-page[data-layout-variant="companion-dominant"] .companion-clock-zone .clock-grid{
-  grid-template-columns:repeat(auto-fit, minmax(108px, 1fr));
-}
-
-.companion-page[data-layout-variant="dense"] .companion-page-body{
-  gap:5px;
-}
-
-.companion-page[data-layout-variant="dense"] .companion-stack{
-  gap:5px;
-}
-
-.companion-page[data-layout-variant="dense"] .companion-component{
-  padding-bottom:5px;
-}
-
 /* ── Cipher ──────────────────────────────────────────── */
 .puzzle-title{
   font-family:var(--display);
@@ -2762,24 +2650,6 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   gap:4px;
   margin-top:4px;
 }
-.position-sequence{
-  margin-bottom:6px;
-}
-.pos-numbers{
-  font-family:var(--mono);
-  font-size:8pt;
-  line-height:1.5;
-  color:var(--ink);
-  letter-spacing:.08em;
-}
-.cipher-instruction{
-  font-family:var(--mono);
-  font-size:6.1pt;
-  line-height:1.32;
-  color:var(--muted);
-  margin-bottom:4px;
-}
-
 /* Plaintext workspace */
 .plaintext-grid{
   display:flex;
@@ -3322,12 +3192,6 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   color:var(--ink);
   flex:1;
   overflow-wrap: anywhere;
-}
-.oracle-case .frag-ref{
-  font-size:6.5pt;
-  text-align:right;
-  margin:0;
-  white-space:nowrap;
 }
 .oracle-zone[data-density-variant="dense"] .oracle-entries{
   gap:1px 6px;
@@ -4176,48 +4040,6 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 /* ══════════════════════════════════════════════════════════════
    OVERFLOW PAGES
    ══════════════════════════════════════════════════════════════ */
-/* Overflow left: same as workout-left but with continuation header */
-.overflow-header-note{
-  font-family:var(--mono);
-  font-size:6pt;
-  color:var(--muted);
-  letter-spacing:.08em;
-  margin-bottom:4px;
-}
-
-/* Overflow right: found document */
-.overflow-doc-right{
-  padding:24px 30px 20px 30px;
-  display:flex;
-  flex-direction:column;
-  height:100%;
-  overflow:hidden;
-}
-/* Tighter found-doc styles within overflow pages */
-.overflow-doc-right .found-doc{
-  padding:16px 20px;
-  flex:1;
-  overflow:hidden;
-}
-.overflow-doc-right .found-doc-title{
-  font-size:11pt;
-  margin-bottom:6px;
-}
-.overflow-doc-right .found-doc-body{
-  font-size:6.5pt;
-  line-height:1.4;
-}
-.overflow-doc-right .found-doc-body p{
-  margin-bottom:2px;
-}
-.overflow-doc-right .found-doc-from,
-.overflow-doc-right .found-doc-to{
-  font-size:6pt;
-  margin-bottom:1px;
-}
-.overflow-doc-right .found-doc-sig{
-  font-size:5.5pt;
-}
 .fragment-page[data-page-type="overflow-doc"] .fragment-doc,
 .fragment-page[data-layout-variant="compact"] .fragment-doc{
   padding:7px 12px;
@@ -4550,15 +4372,6 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   padding-bottom:6px;
 }
 
-/* Letter variant */
-.fragment-doc.letter{
-  border-style:none;
-  background:white;
-  padding:16px 20px;
-}
-.fragment-doc.letter .fragment-doc-body{
-  font-style:italic;
-}
 .fragment-doc.correspondence{
   border-style:none;
   background:white;
@@ -4658,12 +4471,6 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   flex-direction:column;
   gap:10px;
   margin-bottom:20px;
-}
-.password-assembly-hint{
-  font-family:var(--mono);
-  font-size:6pt;
-  color:var(--muted);
-  letter-spacing:.08em;
 }
 .password-assembly-row{
   display:flex;
@@ -4787,20 +4594,6 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   padding-top:8px;
   border-top:1px solid var(--rule);
 }
-.endings-url{
-  font-family:var(--mono);
-  font-size:8pt;
-  letter-spacing:.08em;
-  color:var(--ink);
-  font-weight:700;
-  text-align:center;
-  margin-top:8px;
-  padding:6px 12px;
-  border:2px solid var(--ink);
-  border-radius:3px;
-  overflow-wrap: anywhere;
-}
-
 .interlude-page{
   padding:6px 8px 0 8px;
   display:flex;
@@ -5062,45 +4855,6 @@ body[data-demo-view="true"] .reader-unlock{
   margin-top:20px;
 }
 
-/* ══════════════════════════════════════════════════════════════
-   FOUND DOCUMENT (shared — overflow right + fragment)
-   ══════════════════════════════════════════════════════════════ */
-.found-doc{
-  padding:10px 12px;
-  display:flex;
-  flex-direction:column;
-  flex:1;
-}
-.found-doc-type{
-  font-family:var(--mono);
-  font-size:5.5pt;
-  letter-spacing:.22em;
-  text-transform:uppercase;
-  color:var(--accent);
-  margin-bottom:6px;
-  overflow-wrap: anywhere;
-}
-.found-doc-from{
-  font-family:var(--mono);
-  font-size:7pt;
-  color:var(--muted);
-  margin-bottom:4px;
-}
-.found-doc-to{
-  font-family:var(--mono);
-  font-size:7pt;
-  color:var(--muted);
-  margin-bottom:12px;
-}
-.found-doc-title{
-  font-family:var(--display);
-  font-style:italic;
-  font-size:14pt;
-  color:var(--ink);
-  margin-bottom:10px;
-  line-height:1.15;
-}
-
 #booklet-container[data-archetype="pastoral"]{
   --accent:#8b2a2a;
 }
@@ -5221,29 +4975,6 @@ body[data-demo-view="true"] .reader-unlock{
   border-left-width:2px;
 }
 
-#booklet-container[data-archetype="pastoral"] .found-doc{
-  padding:8px 10px;
-}
-.found-doc-body{
-  font-family:var(--serif);
-  font-size:8.5pt;
-  line-height:1.6;
-  color:var(--ink);
-  flex:1;
-  overflow-wrap: anywhere;
-}
-.found-doc-body p{
-  margin-bottom:8px;
-}
-.found-doc-sig{
-  font-family:var(--mono);
-  font-size:6.5pt;
-  color:var(--muted);
-  margin-top:auto;
-  padding-top:10px;
-  border-top:1px solid var(--rule);
-}
-
 /* ══════════════════════════════════════════════════════════════
    BINARY CHOICE (one per block, on a session card)
    ══════════════════════════════════════════════════════════════ */
@@ -5356,40 +5087,6 @@ body[data-demo-view="true"] .reader-unlock{
 }
 .booklet-page.page-left > .page-folio{
   right:0.18in;
-}
-
-/* ══════════════════════════════════════════════════════════════
-   SURVEY FOOTER (progress pips)
-   ══════════════════════════════════════════════════════════════ */
-.survey-footer{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding-top:6px;
-  margin-top:auto;
-}
-.survey-pips{
-  display:flex;
-  gap:4px;
-}
-.survey-pip{
-  width:8px;
-  height:8px;
-  border-radius:50%;
-  border:1.5px solid var(--ink);
-}
-.survey-pip.filled{
-  background:var(--ink);
-}
-.survey-pip.current{
-  border-color:var(--accent);
-  background:var(--accent);
-}
-.survey-footer-note{
-  font-family:var(--mono);
-  font-size:5.5pt;
-  color:var(--muted);
-  letter-spacing:.06em;
 }
 
 /* ══════════════════════════════════════════════════════════════

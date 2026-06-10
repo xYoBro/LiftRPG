@@ -6,9 +6,6 @@
  * getBoundingClientRect(). Used by the page planner to verify estimates
  * and detect overflow.
  *
- * Generalises the approach from layout-preflight.js to work with
- * individual atoms rather than whole pages.
- *
  * @module engine/measurement-harness
  */
 
@@ -16,8 +13,6 @@ import { make } from '../dom.js';
 import { createBoundedPage } from '../page-shell.js';
 import { renderPageFromPlacements } from '../page-renderer.js';
 import { getAtomDefinition } from './atom-registry.js';
-import { PAGE_BUDGET } from './page-spec.js';
-import { getMechanicSlotWidthPx } from '../mechanic-layout.js';
 
 function clipsVerticalOverflow(style) {
   const overflowY = style.overflowY || '';
@@ -236,28 +231,6 @@ export function measureAtom(stack, atom, density, slotWidthPx = null) {
 // Batch measurement
 // ---------------------------------------------------------------------------
 
-/**
- * Measure all atoms assigned to one page (left or right side of a spread).
- *
- * @param {HTMLElement} stack — the measurement stack element
- * @param {Array<{atomId: string, type: string, density: number, data: object, atom: object}>} pageAtoms
- * @returns {Array<{ atomId: string, measuredHeight: number, overflowHeight: number }>}
- *   Note: for `cols:1` atoms (measured at slot width), `overflowHeight` represents
- *   internal scroll overflow within the atom, NOT overflow against the page boundary.
- *   Use `measurePlacementsPage()` for page-boundary overflow checks.
- */
-export function measurePageAtoms(stack, pageAtoms) {
-  return pageAtoms.map(placement => {
-    const slotWidthPx = getMechanicSlotWidthPx(placement, pageAtoms);
-    const result = measureAtom(stack, placement.atom, placement.density, slotWidthPx);
-    return {
-      atomId:         placement.atomId,
-      measuredHeight: result.measuredHeight,
-      overflowHeight: result.overflowHeight,
-    };
-  });
-}
-
 export function measurePlacementsPage(stack, placements, spreadType = 'body') {
   if (!Array.isArray(placements) || placements.length === 0) {
     return {
@@ -306,29 +279,5 @@ export function measurePlacementsPage(stack, placements, spreadType = 'body') {
     overflowHeight,
     boundaryHeight: boundaryRect.height,
     frameHeight: frameRect.height,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Fit checking
-// ---------------------------------------------------------------------------
-
-/**
- * Check whether a page's atoms exceed the page budget.
- *
- * @param {Array<{ measuredHeight: number }>} measurements
- * @param {number} [budgetPx] — override page budget (defaults to PAGE_BUDGET.heightPx)
- * @returns {{ totalHeight: number, budgetPx: number, overflowPx: number, fits: boolean }}
- */
-export function checkPageFit(measurements, budgetPx) {
-  const budget      = budgetPx ?? PAGE_BUDGET.heightPx;
-  const totalHeight = measurements.reduce((sum, m) => sum + m.measuredHeight, 0);
-  const overflowPx  = Math.max(0, totalHeight - budget);
-
-  return {
-    totalHeight,
-    budgetPx: budget,
-    overflowPx,
-    fits: overflowPx <= 2,   // 2px tolerance (matches current OVERFLOW_TOLERANCE_PX)
   };
 }

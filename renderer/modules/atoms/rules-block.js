@@ -6,7 +6,7 @@
  *
  * Data shape: { side, rules, meta }
  *   - side: 'left' or 'right'
- *   - For 'left': the full booklet data object (for buildRulesLeftPageModel)
+ *   - For 'left': the full booklet data object (for buildRulesLeftPageModelWithVariant)
  *   - For 'right': the full booklet data object (for buildSealedPageModel)
  *
  * These are full-page atoms. render() returns the full page element.

@@ -7,8 +7,7 @@ import {
 } from './utils.js?v=47';
 import {
   inferCipherFamily,
-  inferMapFamily,
-  resolveWeekMechanicProfile
+  inferMapFamily
 } from './mechanic-registry.js?v=47';
 import { normalizeD100Language, resolveArtifactIdentity } from './booklet-models.js?v=47';
 
@@ -112,59 +111,6 @@ function splitLongInstruction(text, maxLength) {
     head: head || value,
     tail: tail.join(' ')
   };
-}
-
-export function buildFieldOpsPageModels(data, week, layoutPlan = {}) {
-  const fieldOps = week.fieldOps || {};
-  const oracleTable = fieldOps.oracleTable || null;
-  const oracleEntries = normalizeEntries((oracleTable || {}).entries || []);
-  const mechanicProfile = layoutPlan.mechanicProfile || resolveWeekMechanicProfile(week);
-  const useCompanionSpread = layoutPlan.companionPlacement === 'spread';
-  const splitOracle = layoutPlan.layout === 'split-oracle' || layoutPlan.layout === 'oracle-only';
-  const primaryOracleCount = splitOracle
-    ? Math.max(0, Math.min(parseInt(layoutPlan.primaryOracleCount, 10) || 0, oracleEntries.length))
-    : oracleEntries.length;
-  const primaryOracleEntries = splitOracle ? oracleEntries.slice(0, primaryOracleCount) : oracleEntries;
-  const overflowOracleEntries = splitOracle ? oracleEntries.slice(primaryOracleCount) : [];
-
-  const firstPage = {
-    pageType: 'field-ops',
-    layoutVariant: layoutPlan.layoutVariant || 'balanced',
-    headerTitle: 'Field Operations',
-    cipher: fieldOps.cipher ? buildCipherModel(fieldOps.cipher, week.weeklyComponent, mechanicProfile) : null,
-    mapState: fieldOps.mapState ? buildMapModel(fieldOps.mapState, mechanicProfile) : null,
-    gameplayClocks: useCompanionSpread ? [] : buildClockModels(week.gameplayClocks),
-    companionComponents: useCompanionSpread ? [] : buildCompanionModels(mechanicProfile.companionComponents),
-    mechanicProfile,
-    oracle: primaryOracleEntries.length
-      ? buildOracleModel({
-        ...(oracleTable || {}),
-        entries: primaryOracleEntries
-      })
-      : null,
-    layout: splitOracle ? 'split-oracle' : 'standard'
-  };
-
-  if (!splitOracle || !oracleTable || !overflowOracleEntries.length) return [firstPage];
-
-  return [
-    firstPage,
-    {
-      pageType: 'oracle-overflow',
-      layoutVariant: layoutPlan.layoutVariant || 'standard',
-      headerTitle: 'Field Operations',
-      cipher: null,
-      mapState: null,
-      gameplayClocks: [],
-      companionComponents: [],
-      mechanicProfile,
-      oracle: buildOracleModel({
-        ...oracleTable,
-        entries: overflowOracleEntries
-      }),
-      layout: 'oracle-only'
-    }
-  ];
 }
 
 function normalizeDecodingTable(raw) {

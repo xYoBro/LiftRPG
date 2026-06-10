@@ -20,22 +20,10 @@ import { getAtomDefinition } from './atom-registry.js';
 export const MAX_DENSITY = 1.0;
 
 /** Minimum density step per adjustment. Prevents infinite tiny adjustments. */
-export const MIN_DENSITY_STEP = 0.05;
+const MIN_DENSITY_STEP = 0.05;
 
 /** Maximum revision iterations per page. */
 export const MAX_REVISIONS = 5;
-
-/**
- * Named density presets for backward compatibility with discrete tiers.
- * Maps legacy tier names to continuous density values.
- */
-export const DENSITY_PRESETS = Object.freeze({
-  standard: 0.0,
-  compact:  0.4,
-  dense:    0.7,
-  critical: 0.85,
-  maximum:  1.0,
-});
 
 // ---------------------------------------------------------------------------
 // Shrink potential
@@ -172,29 +160,3 @@ export function resolvePageOverflow(pageAtoms, overflowPx, pageBudgetPx) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Legacy tier conversions
-// ---------------------------------------------------------------------------
-
-/**
- * Convert a legacy density tier name to a continuous value.
- *
- * @param {string} tier — 'standard' | 'compact' | 'dense' | 'critical'
- * @returns {number} continuous density (0.0–1.0)
- */
-export function tierToDensity(tier) {
-  return DENSITY_PRESETS[tier] ?? 0.0;
-}
-
-/**
- * Convert a continuous density value to the nearest legacy tier name.
- *
- * @param {number} density — continuous density (0.0–1.0)
- * @returns {string} 'standard' | 'compact' | 'dense' | 'critical'
- */
-export function densityToTier(density) {
-  if (density >= 0.85) return 'critical';
-  if (density >= 0.7)  return 'dense';
-  if (density >= 0.4)  return 'compact';
-  return 'standard';
-}

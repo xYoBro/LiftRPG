@@ -2,10 +2,10 @@
  * gauge-log.js — Gauge log page atom
  *
  * Wraps booklet-primitives.js renderGaugeLogPage() and
- * booklet-models.js buildGaugeLogPageModel() into the atom interface.
+ * booklet-models.js buildGaugeLogPageModelWithVariant() into the atom interface.
  *
  * Data shape: { meta, weeks } — the full booklet data object is needed
- * for buildGaugeLogPageModel.
+ * for buildGaugeLogPageModelWithVariant.
  *
  * Full-page atom. render() returns the full page element.
  */

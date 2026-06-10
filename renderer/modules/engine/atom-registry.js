@@ -98,25 +98,6 @@ export function getAtomDefinition(type) {
   return registry.get(type) ?? null;
 }
 
-/**
- * Check whether a type has been registered.
- *
- * @param {string} type
- * @returns {boolean}
- */
-export function hasAtomType(type) {
-  return registry.has(type);
-}
-
-/**
- * Return all registered type names.
- *
- * @returns {string[]}
- */
-export function getRegisteredTypes() {
-  return Array.from(registry.keys());
-}
-
 // ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
@@ -216,16 +197,4 @@ export function createAtom(partial) {
     pageAffinity: partial.pageAffinity ?? definition.pageAffinity,
     data:         partial.data ?? null,
   };
-}
-
-// ---------------------------------------------------------------------------
-// Testing support
-// ---------------------------------------------------------------------------
-
-/**
- * Clear all registered atom types. Intended for test harnesses only.
- * Not part of the public API for production use.
- */
-export function _resetRegistry() {
-  registry.clear();
 }

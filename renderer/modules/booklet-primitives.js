@@ -472,24 +472,6 @@ export function renderBackCover(model) {
   return page;
 }
 
-export function renderNotesPage(model) {
-  const scaffold = createBoundedPage('notes', 'notes-page', { boundaryRole: 'notes' });
-  const page = scaffold.page;
-  const frame = scaffold.frame;
-
-  const header = make('header', 'page-header');
-  header.appendChild(make('span', '', 'Notes'));
-  header.appendChild(make('span', 'page-num', ''));
-  frame.appendChild(header);
-
-  const notes = make('div', 'notes-grid');
-  for (let i = 0; i < model.cellCount; i += 1) {
-    notes.appendChild(make('div', 'notes-cell'));
-  }
-  frame.appendChild(notes);
-  return page;
-}
-
 export function renderInterludePage(model) {
   const scaffold = createBoundedPage('interlude', 'interlude-page', {
     boundaryRole: 'interlude',

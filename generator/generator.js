@@ -328,9 +328,9 @@
   var STAGE2_OUTPUT_SCHEMA = window.STAGE2_OUTPUT_SCHEMA;
 
   window.generatePrompt = function (workout, brief) {
-    window.blend = deriveDesignBlend(brief, workout);
+    var blend = deriveDesignBlend(brief, workout);
     window.authorProfile = deriveAuthorBlend(brief);
-    window.parts = [
+    var parts = [
       SCHEMA_SPEC,
       '',
       '---',
@@ -1173,114 +1173,8 @@
   };
 
   /**
-   * Stage N-2 (API pipeline): Fragments — all found documents
-   *
-   * @param {object} layerBible - Stage 1 output
-   * @param {object} campaignPlan - Stage 2 output (with fragmentRegistry)
-   * @param {object[]} weekSummaries - Compact summaries extracted from generated weeks
-   */
-  window.generateFragmentsPrompt = function (layerBible, campaignPlan, weekSummaries, shellContext) {
-    var parts = [
-      '# Generate Bonus Pages',
-      '',
-      'Generate a partial JSON object with a single `fragments` array.',
-      'This array contains ALL found documents for the entire booklet.',
-      'Output ONLY the fragments array. Do not output weeks, meta, or endings.',
-      '',
-      '---',
-      '',
-      SCHEMA_FRAGS,
-      '',
-      '---',
-      '',
-      '## Fragment Registry (your contract — generate one fragment per entry)',
-      '',
-      JSON.stringify(campaignPlan.fragmentRegistry || []),
-      '',
-      '## Reference Context',
-      '',
-      '### Approved Layer Codex',
-      JSON.stringify(layerBible),
-      ''
-    ];
-
-    // Voice/register constraints from the shell
-    if (shellContext) {
-      parts.push('### Narrative Constraints (from booklet shell — fragments must honour these)');
-      if (shellContext.worldContract) parts.push('**World Contract:** ' + shellContext.worldContract);
-      if (shellContext.narrativeVoice) parts.push('**Narrative Voice:** ' + JSON.stringify(shellContext.narrativeVoice));
-      if (shellContext.literaryRegister) parts.push('**Literary Register:** ' + JSON.stringify(shellContext.literaryRegister));
-      if (shellContext.artifactIdentity) {
-        parts.push('**Artifact Identity Contract:** ' + JSON.stringify(shellContext.artifactIdentity));
-        parts.push('Fragments must read like documents from this artifact family, not generic clue memos.');
-      }
-      parts.push('');
-    }
-
-    parts.push('### Campaign Narrative (what happened in the weeks — use for cross-references)');
-    parts.push('');
-
-    renderWeekSummaryLines(parts, weekSummaries);
-
-    parts.push('---');
-    parts.push('');
-    parts.push('## Fragment Construction Doctrine');
-    parts.push('');
-    parts.push('### Contract');
-    parts.push('- Generate exactly one fragment per registry entry, using the assigned IDs.');
-    parts.push('- Honour the registry\'s clueFunction tag: "establishes" fragments plant baseline');
-    parts.push('  facts, "complicates" fragments contradict or add nuance, "reveals" fragments');
-    parts.push('  answer a question or recontextualize earlier evidence.');
-    parts.push('');
-    parts.push('### Document Authenticity');
-    parts.push('- Each fragment is a real document that someone wrote for an in-world reason.');
-    parts.push('  The author does not know they are in a game.');
-    parts.push('- Include at least one irrelevant operational detail per fragment: a routing number,');
-    parts.push('  a date stamp, a cc: line, a weather note, a reference to an unrelated procedure.');
-    parts.push('  This detail makes the document feel found, not composed.');
-    parts.push('- designSpec must match the document type: a memo from maintenance has different paper,');
-    parts.push('  typeface, and header style than a personal letter or an inspection form.');
-    parts.push('- If the document has redactions, every redaction must do narrative work — it conceals');
-    parts.push('  something the player can partially reconstruct from other evidence.');
-    parts.push('');
-    parts.push('### Narrative Function');
-    parts.push('- Authors from the relationship web reveal their blind spots, not just their knowledge.');
-    parts.push('  Different characters noticing different things about the same event is more powerful');
-    parts.push('  than different characters knowing different facts.');
-    parts.push('- At least one incident, place, or procedure must recur across multiple fragments,');
-    parts.push('  described differently by different authors.');
-    parts.push('- Include at least three linked functions across the set: one artifact that changes');
-    parts.push('  what the player does (action), one that changes what the player believes');
-    parts.push('  (interpretation), and one that deepens a named character\'s stakes.');
-    parts.push('- Every fragment must support at least one cross-reference: a place named on the map,');
-    parts.push('  a date that aligns with a week\'s events, a person mentioned in a storyPrompt,');
-    parts.push('  or a value that connects to a cipher output.');
-    parts.push('');
-    parts.push('### Anti-Generic Test');
-    parts.push('- If you removed the proper nouns from a fragment, would it still feel specific');
-    parts.push('  to THIS booklet? If no, the voice and detail are too generic. Rewrite.');
-    parts.push('- Fragments that merely summarize lore fail. Every fragment must contain either');
-    parts.push('  a clue, a contradiction, evidence of omission, or a procedural detail that');
-    parts.push('  the player can cross-reference against other material.');
-    parts.push('');
-    parts.push('---');
-    parts.push('');
-    parts.push(INSTRUCTIONS);
-
-    parts.push('');
-    parts.push('## Output Postchecks — verify before outputting');
-    parts.push('- Your output MUST be exactly `{ "fragments": [...] }` — do not wrap it in any other key.');
-    parts.push('- Do NOT output weeks, meta, cover, endings, or any other top-level key.');
-    parts.push('- Generate exactly one fragment object per registry entry, using the assigned ID.');
-    parts.push('- `documentType` must be one of: memo, report, inspection, fieldNote, correspondence, letter, transcript, form, anomaly.');
-    parts.push('- Escape all double-quote characters inside string values as \\". Use em-dashes instead of quoted speech where possible.');
-
-    return parts.join('\n');
-  };
-
-  /**
    * Internal: render week summary lines into a parts array.
-   * Shared between monolithic and batch fragment prompts.
+   * Used by the batch fragment prompt builders.
    */
   function renderWeekSummaryLines(parts, weekSummaries) {
     (weekSummaries || []).forEach(function (ws) {
@@ -2781,30 +2675,6 @@
 
   // ── NEW SINGLE-UNIT PROMPT BUILDERS (Unit-Level Engine Refactor) ───────
 
-  window.generateSingleWeekPlanPrompt = function (workout, brief, layerBible, campaignPlan, weekNumber, shellContext, continuity) {
-    var weekWorkout = window.extractWeekWorkout(workout, [weekNumber]);
-    var isBossWeek = campaignPlan && campaignPlan.weeks && weekNumber === campaignPlan.weeks.length;
-    var weekLabel = isBossWeek ? 'Week ' + weekNumber + ' (Boss Week)' : 'Week ' + weekNumber;
-    var planData = campaignPlan && campaignPlan.weeks ? campaignPlan.weeks.filter(function(w) { return w.weekNumber === weekNumber; })[0] : {};
-
-    var parts = [
-      '# Plan ' + weekLabel,
-      '',
-      'Generate a highly compact weekPlan JSON object containing narrative and structural intent.',
-      '',
-      '## SCHEMA CONTRACT',
-      window.buildStageSchema('week-plan'),
-      '',
-      '## Context',
-      '**World Contract:** ' + (shellContext.worldContract || ''),
-      '**Week Workout:** ' + weekWorkout,
-      '**Campaign Plan for ' + weekLabel + ':** ' + JSON.stringify(planData || {}),
-      continuity ? '**Story So Far (abstract):** ' + JSON.stringify(continuity) : ''
-    ];
-
-    return parts.filter(Boolean).join('\n');
-  };
-
   window.generateSingleWeekFinalPrompt = function (workout, brief, layerBible, campaignPlan, weekPlan, shellContext, continuity, allComponentValues, retryState) {
     var isBossWeek = campaignPlan && campaignPlan.weeks && weekPlan.weekNumber === campaignPlan.weeks.length;
     var weekWorkout = window.extractWeekWorkout(workout, [weekPlan.weekNumber]);
@@ -3052,34 +2922,6 @@
       '- The ending must meaningfully resolve the pressures established in the weeks.',
       '- Do not flatten the payoff into a cliché victory. Honour the cost of the journey.',
       '- JSON only.'
-    ];
-
-    return parts.filter(Boolean).join('\n');
-  };
-
-  window.generateTargetedRepairPrompt = function (unitName, badJsonStr, errorMessages, targetSchemaStr) {
-    var msgs = errorMessages.length > 0 ? errorMessages.map(function(m) { return '- ' + m; }).join('\n') : '- Undefined structural error.';
-    var parts = [
-      '# Critical Repair Required for ' + unitName,
-      '',
-      'The previous generation produced structural or quality errors.',
-      'You are a precise JSON repair utility. You must return EXACTLY the corrected JSON for "' + unitName + '".',
-      '',
-      '## Errors Detected (Fix these strictly)',
-      msgs,
-      '',
-      '## Target Schema',
-      targetSchemaStr,
-      '',
-      '## Broken JSON Input',
-      '```json',
-      badJsonStr,
-      '```',
-      '',
-      '## Instructions',
-      '- Ensure the response is COMPLETELY valid JSON.',
-      '- Do not change valid creative choices or prose, ONLY fix the errors.',
-      '- Output ONLY the JSON object. Do not wrap it in markdown.'
     ];
 
     return parts.filter(Boolean).join('\n');

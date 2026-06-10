@@ -55,7 +55,6 @@ import {
   mergeFragmentBatches,
   buildSkeletonFragmentBatches,
   assembleSkeletonFleshBooklet,
-  generatePatchPrompt,
   compareArtifactIntentDrift,
   normalizeDocumentTypes
 } from './modules/assembly.js';
@@ -72,7 +71,6 @@ import {
   validateLayerBibleStage,
   normalizeCampaignPlanOwnership,
   validateCampaignPlanStage,
-  validateWeeksStage,
   validateFragmentsStage,
   validateSkeletonStage,
   classifyValidationErrors
@@ -102,14 +100,12 @@ import {
 
 import {
   shouldRetryStageError,
-  shouldSplitWeekChunk,
   shouldSplitFragmentBatch
 } from './modules/error-classify.js';
 
 import {
   detectProviderId,
   safeNumber,
-  normalizeModelId,
   blankUsageTotals,
   addUsageTotals,
   refreshPricing,
@@ -543,250 +539,6 @@ var STRUCTURED_SCHEMA_SHELL = {
   required: ['meta', 'cover', 'rulesSpread', 'theme']
 };
 
-var STRUCTURED_SCHEMA_WEEKS = {
-  type: 'object',
-  properties: {
-    weeks: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          weekNumber: { type: 'integer' },
-          title: { type: 'string' },
-          epigraph: {
-            type: 'object',
-            properties: {
-              text: { type: 'string' },
-              attribution: { type: 'string' }
-            },
-            required: ['text', 'attribution']
-          },
-          isBossWeek: { type: 'boolean' },
-          isDeload: { type: 'boolean' },
-          overflow: { type: 'boolean' },
-          weeklyComponent: {
-            type: 'object',
-            properties: {
-              type: { type: 'string' },
-              value: { type: 'string', nullable: true },
-              extractionInstruction: { type: 'string' }
-            },
-            required: ['type', 'value', 'extractionInstruction']
-          },
-          sessions: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                sessionNumber: { type: 'integer' },
-                label: { type: 'string' },
-                storyPrompt: { type: 'string' },
-                fragmentRef: { type: 'string' },
-                exercises: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      name: { type: 'string' },
-                      sets: { type: 'integer' },
-                      repsPerSet: { type: 'string' },
-                      weightField: { type: 'boolean' },
-                      notes: { type: 'string' }
-                    },
-                    required: ['name']
-                  }
-                },
-                binaryChoice: {
-                  type: 'object',
-                  properties: {
-                    choiceLabel: { type: 'string' },
-                    promptA: { type: 'string' },
-                    promptB: { type: 'string' }
-                  }
-                }
-              },
-              required: ['sessionNumber', 'label', 'storyPrompt', 'exercises']
-            }
-          },
-          fieldOps: {
-            type: 'object',
-            properties: {
-              mapState: {
-                type: 'object',
-                properties: {
-                  title: { type: 'string' },
-                  mapType: { type: 'string', enum: MAP_TYPE_ENUM },
-                  gridDimensions: {
-                    type: 'object',
-                    properties: {
-                      columns: { type: 'integer' },
-                      rows: { type: 'integer' }
-                    },
-                    required: ['columns', 'rows']
-                  },
-                  floorLabel: { type: 'string' },
-                  currentPosition: {
-                    type: 'object',
-                    properties: {
-                      col: { type: 'integer' },
-                      row: { type: 'integer' }
-                    },
-                    required: ['col', 'row']
-                  },
-                  mapNote: { type: 'string' },
-                  tiles: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        col: { type: 'integer' },
-                        row: { type: 'integer' },
-                        type: { type: 'string', enum: TILE_TYPE_ENUM },
-                        label: { type: 'string' },
-                        annotation: { type: 'string' }
-                      },
-                      required: ['col', 'row', 'type', 'label']
-                    }
-                  }
-                },
-                required: ['gridDimensions', 'currentPosition', 'tiles']
-              },
-              cipher: {
-                type: 'object',
-                properties: {
-                  type: { type: 'string' },
-                  title: { type: 'string' },
-                  body: {
-                    type: 'object',
-                    properties: {
-                      displayText: { type: 'string' },
-                      key: { type: 'string' },
-                      workSpace: {
-                        type: 'object',
-                        properties: {
-                          rows: { type: 'integer' },
-                          cellCount: { type: 'integer' },
-                          style: { type: 'string' }
-                        }
-                      },
-                      referenceTargets: { type: 'array', items: { type: 'string' } }
-                    },
-                    required: ['displayText', 'key']
-                  },
-                  extractionInstruction: { type: 'string' },
-                  characterDerivationProof: { type: 'string' },
-                  noticeabilityDesign: { type: 'string' }
-                },
-                required: ['type', 'title', 'body', 'extractionInstruction',
-                  'characterDerivationProof', 'noticeabilityDesign']
-              },
-              oracleTable: {
-                type: 'object',
-                properties: {
-                  title: { type: 'string' },
-                  instruction: { type: 'string' },
-                  mode: { type: 'string' },
-                  entries: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        roll: { type: 'string' },
-                        text: { type: 'string' },
-                        type: { type: 'string', enum: ['fragment', 'consequence'] },
-                        fragmentRef: { type: 'string' },
-                        paperAction: { type: 'string' }
-                      },
-                      required: ['roll', 'text', 'type']
-                    }
-                  }
-                },
-                required: ['title', 'instruction', 'mode', 'entries']
-              },
-              companionComponents: { type: 'array', items: { type: 'object' } }
-            }
-          },
-          bossEncounter: {
-            type: 'object',
-            properties: {
-              title: { type: 'string' },
-              narrative: { type: 'string' },
-              mechanismDescription: { type: 'string' },
-              componentInputs: { type: 'array', items: { type: 'string' } },
-              decodingKey: {
-                type: 'object',
-                properties: {
-                  instruction: { type: 'string' },
-                  referenceTable: { type: 'string' }
-                },
-                required: ['instruction', 'referenceTable']
-              },
-              convergenceProof: { type: 'string' },
-              passwordRevealInstruction: { type: 'string' },
-              binaryChoiceAcknowledgement: {
-                type: 'object',
-                properties: {
-                  ifA: { type: 'string' },
-                  ifB: { type: 'string' }
-                },
-                required: ['ifA', 'ifB']
-              }
-            },
-            required: ['title', 'narrative', 'mechanismDescription', 'componentInputs',
-              'decodingKey', 'passwordRevealInstruction']
-          },
-          overflowDocument: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              documentType: { type: 'string', enum: DOCUMENT_TYPE_ENUM },
-              inWorldAuthor: { type: 'string' },
-              inWorldRecipient: { type: 'string' },
-              inWorldPurpose: { type: 'string' },
-              content: { type: 'string' },
-              designSpec: DESIGN_SPEC_SCHEMA,
-              authenticityChecks: AUTHENTICITY_CHECKS_SCHEMA
-            },
-            required: ['id', 'documentType', 'content']
-          },
-          interlude: {
-            type: 'object',
-            properties: {
-              title: { type: 'string' },
-              reason: { type: 'string' },
-              body: { type: 'string' },
-              payloadType: { type: 'string', enum: ['none', 'narrative', 'cipher', 'map', 'clock', 'companion', 'fragment-ref', 'password-element'] },
-              payload: {},
-              spreadAware: { type: 'boolean' }
-            },
-            required: ['title', 'reason', 'body']
-          },
-          gameplayClocks: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                clockName: { type: 'string' },
-                clockType: { type: 'string' },
-                segments: { type: 'integer' },
-                startValue: { type: 'integer' },
-                direction: { type: 'string', enum: ['fill', 'drain'] },
-                linkedClockName: { type: 'string' },
-                opposedClockName: { type: 'string' },
-                thresholds: { type: 'array', items: { type: 'object' } },
-                consequenceOnFull: { type: 'string' }
-              },
-              required: ['name', 'segments']
-            }
-          }
-        },
-        required: ['weekNumber', 'title', 'isBossWeek', 'sessions', 'weeklyComponent']
-      }
-    }
-  },
-  required: ['weeks']
-};
-
 var STRUCTURED_SCHEMA_FRAGMENTS = {
   type: 'object',
   properties: {
@@ -993,13 +745,6 @@ function buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState)
   ].filter(Boolean).join('\n');
 }
 
-function isSlowPlanningModel(settings) {
-  var providerId = detectProviderId(settings);
-  var modelId = normalizeModelId(settings && settings.model);
-  return (providerId === 'anthropic' && /^claude-opus/i.test(modelId))
-    || (providerId === 'openai' && /(gpt-5(?:\.4)?-pro|o3-pro)/i.test(modelId));
-}
-
 function shouldEchoFailedOutputForRetry(stageName) {
   var label = String(stageName || '');
   if (/^Layer Codex$/i.test(label)) return false;
@@ -1069,9 +814,8 @@ function getApiPromptBuilders() {
     stage2: window.generateApiStage2Prompt || window.generateStage2Prompt,
     shell: window.generateApiShellPrompt || window.generateShellPrompt,
     weeks: window.generateApiWeekChunkPrompt || window.generateWeekChunkPrompt,
-    weekPlan: window.generateSingleWeekPlanPrompt,
     singleWeekFinal: window.generateSingleWeekFinalPrompt,
-    fragments: window.generateApiFragmentsPrompt || window.generateFragmentsPrompt,
+    fragments: window.generateApiFragmentsPrompt,
     singleFragment: window.generateSingleFragmentPrompt,
     fragmentBatch: window.generateApiFragmentBatchPrompt || window.generateFragmentBatchPrompt,
     endings: window.generateApiEndingsPrompt || window.generateEndingsPrompt,
@@ -1080,8 +824,6 @@ function getApiPromptBuilders() {
 }
 
 function assertApiPromptBuilders(builders) {
-  // weekPlan is optional — the live pipeline uses campaignPlan weeks directly.
-  // It's only used by the manual wizard path.
   if (!builders.stage1 || !builders.stage2 || !builders.shell || !builders.weeks ||
     !builders.singleWeekFinal ||
     !builders.fragments || !builders.singleFragment ||
@@ -1301,81 +1043,6 @@ async function runJsonStage(settings, config) {
 
 
 // ── Week chunk + Fragment batch adaptive runners ──────────────────────────────
-
-function collectWeeksAndValues(targetWeeks, targetValues, chunkOutput) {
-  (chunkOutput.weeks || []).forEach(function (week) {
-    targetWeeks.push(week);
-    if (!week.isBossWeek && week.weeklyComponent &&
-      week.weeklyComponent.value !== undefined && week.weeklyComponent.value !== null && week.weeklyComponent.value !== '') {
-      targetValues.push(week.weeklyComponent.value);
-    }
-  });
-}
-
-async function generateWeekChunkAdaptive(settings, builders, config) {
-  var stageName = config.weekNumbers.length === 1
-    ? 'Week ' + config.weekNumbers[0]
-    : 'Weeks ' + config.weekNumbers.join(',');
-
-  try {
-    return [await runJsonStage(settings, {
-      stageName: stageName,
-      schema: STRUCTURED_SCHEMA_WEEKS,
-      maxTokens: MAX_OUTPUT_TOKENS,
-      unwrapKey: 'weeks',
-      maxAttempts: 2,
-      normalizeResult: function (result) {
-        if (result && result.meta && Array.isArray(result.weeks)) {
-          console.warn('[LiftRPG] Week chunk output a full booklet — extracting weeks only');
-          return { weeks: result.weeks };
-        }
-        return result;
-      },
-      validate: function (result) {
-        return validateWeeksStage(result, config.weekNumbers);
-      },
-      buildPrompt: function (retryState) {
-        return builders.weeks(
-          config.workout,
-          config.brief,
-          config.layerBible,
-          config.campaignPlan,
-          config.weekNumbers,
-          buildChunkContinuity(config.allPriorWeeks),
-          config.allComponentValues,
-          config.shellContext,
-          retryState.attempt > 0 ? { retryMode: 'tight' } : undefined
-        );
-      }
-    })];
-  } catch (err) {
-    if (!shouldSplitWeekChunk(err, config.weekNumbers)) throw err;
-    console.warn('[LiftRPG] Splitting week chunk [' + config.weekNumbers.join(', ') + '] after failure:', err.message);
-
-    var outputs = [];
-    var stagedWeeks = config.allPriorWeeks.slice();
-    var stagedValues = config.allComponentValues.slice();
-
-    for (var i = 0; i < config.weekNumbers.length; i++) {
-      var splitOutputs = await generateWeekChunkAdaptive(settings, builders, {
-        workout: config.workout,
-        brief: config.brief,
-        layerBible: config.layerBible,
-        campaignPlan: config.campaignPlan,
-        weekNumbers: [config.weekNumbers[i]],
-        allPriorWeeks: stagedWeeks,
-        allComponentValues: stagedValues,
-        shellContext: config.shellContext
-      });
-      splitOutputs.forEach(function (chunkOutput) {
-        outputs.push(chunkOutput);
-        collectWeeksAndValues(stagedWeeks, stagedValues, chunkOutput);
-      });
-    }
-
-    return outputs;
-  }
-}
 
 function splitRegistryForRetry(registry) {
   var midpoint = Math.ceil(registry.length / 2);
@@ -1678,32 +1345,6 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
     });
 
     return { fragments: (leftOutput.fragments || []).concat(rightOutput.fragments || []) };
-  }
-}
-
-async function patchAssembledBooklet(settings, booklet, errors, identityContract) {
-  try {
-    var patchedResponse = await callProvider(
-      settings,
-      generatePatchPrompt(JSON.stringify(booklet, null, 2), errors, {
-        identityContract: identityContract
-      }),
-      32000
-    );
-    var patched = extractJson(patchedResponse.text);
-    enforceIdentityContract(patched, identityContract);
-    truthBoardStateMode(patched, patched._assemblyDiagnostics || []);
-    enforceBookletDerivedFields(patched);
-    var identityDrift = compareIdentityContract(patched, identityContract);
-    if (identityDrift.length > 0) {
-      console.warn('[LiftRPG] Patch drifted shell identity; restoring approved shell contract:', identityDrift);
-      enforceIdentityContract(patched, identityContract);
-      truthBoardStateMode(patched, patched._assemblyDiagnostics || []);
-    }
-    return patched;
-  } catch (patchErr) {
-    console.warn('[LiftRPG] Patch stage failed, returning unpatched booklet:', patchErr.message);
-    return booklet;
   }
 }
 
@@ -2240,7 +1881,7 @@ async function runApiPipeline(options) {
     console.warn('[LiftRPG] Validation warnings:', validationResult.warnings);
   }
 
-  if (validationResult.errors.length > 0 && options.allowPatch !== false) {
+  if (validationResult.errors.length > 0) {
     console.warn('[LiftRPG] Final assembly has', validationResult.errors.length, 'validation errors:', validationResult.errors);
     console.warn('[LiftRPG] Whole-booklet patching is disabled by policy. Returning aggressively unit-repaired booklet.');
   }
@@ -2367,7 +2008,6 @@ async function generateMultiStage(settings, workout, brief, onProgress) {
     weekCount: nw.weekCount,
     totalSessions: totalSessions,
     onProgress: onProgress,
-    allowPatch: true,
     assemble: function (shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan) {
       return assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan);
     }
@@ -2394,7 +2034,6 @@ async function generateStructured(settings, workout, brief, onProgress) {
     onProgress: onProgress,
     weekCount: weekCount,
     totalSessions: totalSessions,
-    allowPatch: true,
     assemble: function (shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan) {
       return assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, nw, campaignPlan);
     }

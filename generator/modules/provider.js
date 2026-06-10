@@ -2,7 +2,7 @@
 // Extracted from api-generator.js IIFE.
 //
 // Exports:
-//   Transport:  escalatingTimeout, fetchWithTimeout, normalizeUrl
+//   Transport:  fetchWithTimeout, normalizeUrl
 //   Payload:    buildOpenAICompatChatPayload, buildOpenAICompatUrl,
 //               buildOpenAICompatHeaders
 //   Content:    extractTextContent
@@ -25,7 +25,6 @@ import {
   isStructuredOutputUnsupportedMessage,
   isLikelyTruncationError,
   isLikelyJsonFailure,
-  isLikelyTimeoutError,
   shouldFallbackFromStructured
 } from './error-classify.js';
 
@@ -217,22 +216,6 @@ export var MODEL_PRICING_RULES = [
 ];
 
 // ── Core transport ────────────────────────────────────────────────────────────
-
-// Timeout escalation for retries — if a request timed out, give the next
-// attempt more room instead of failing identically. Returns the base timeout
-// on attempt 0, then scales up by 50% per subsequent attempt (capped at
-// DEFAULT_TIMEOUT_MS so we never exceed the global ceiling).
-export function escalatingTimeout(baseMs) {
-  var base = baseMs || DEFAULT_TIMEOUT_MS;
-  return function (retryState) {
-    var attempt = (retryState && retryState.attempt) || 0;
-    if (attempt === 0) return base;
-    var wasTimeout = retryState.error && isLikelyTimeoutError(retryState.error);
-    if (!wasTimeout) return base; // non-timeout failure — same timeout is fine
-    var escalated = Math.round(base * (1 + 0.5 * attempt));
-    return Math.min(escalated, DEFAULT_TIMEOUT_MS);
-  };
-}
 
 // Wraps fetch() with an AbortController so long-running requests don't hang
 // silently. Default 10 minutes; override via settings.requestTimeoutMs.
@@ -1172,8 +1155,7 @@ export async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs,
     throw new Error(
       'Response truncated: the model hit the output token limit before completing the JSON.\n\n' +
       'The booklet JSON requires more output tokens than this model provided. ' +
-      'Switch to a model with a larger output window, or use Chat mode.\n' +
-      'Tip: open generator/test-repair.html and click \'Load lastRaw\' to inspect the partial output.'
+      'Retry with a higher max output token limit, switch to a model with a larger output window, or use Chat mode.'
     );
   }
   return {
@@ -1228,8 +1210,7 @@ export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens
     throw new Error(
       'Response truncated: the model hit the output token limit before completing the JSON.\n\n' +
       'The booklet JSON requires more output tokens than this model provided. ' +
-      'Switch to a model with a larger output window, or use Chat mode.\n' +
-      'Tip: open generator/test-repair.html and click \'Load lastRaw\' to inspect the partial output.'
+      'Retry with a higher max output token limit, switch to a model with a larger output window, or use Chat mode.'
     );
   }
   return {

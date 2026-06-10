@@ -32,12 +32,3 @@ export function createBoundedPage(pageType, frameClass, options = {}) {
     frame
   };
 }
-
-export function getPageBoundary(page) {
-  return page ? page.querySelector(':scope > .page-boundary') : null;
-}
-
-export function getPageFrame(page) {
-  const boundary = getPageBoundary(page);
-  return boundary ? boundary.firstElementChild : null;
-}

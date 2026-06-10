@@ -1851,31 +1851,6 @@ export function validateFragmentsStage(result, expectedRegistry) {
   return '';
 }
 
-export function validateEndingsStage(result) {
-  if (!result || !Array.isArray(result.endings) || result.endings.length === 0) {
-    return 'Finale stage validation failed: expected a non-empty endings array.';
-  }
-  var issues = [];
-  result.endings.forEach(function (ending, i) {
-    var label = 'Ending ' + (i + 1);
-    if (!ending.variant) issues.push(label + ' missing variant');
-    if (!ending.content || typeof ending.content !== 'object') {
-      issues.push(label + ' missing content object');
-    } else {
-      if (!ending.content.body) issues.push(label + ' missing content.body');
-      if (!ending.content.documentType) issues.push(label + ' missing content.documentType');
-      if (!ending.content.finalLine) issues.push(label + ' missing content.finalLine');
-    }
-    if (!ending.designSpec) {
-      issues.push(label + ' missing designSpec');
-    } else if (typeof ending.designSpec === 'object') {
-      if (!ending.designSpec.paperTone) issues.push(label + ' designSpec missing paperTone');
-    }
-    // String designSpec is accepted for backward compatibility (renderer normalizes it)
-  });
-  return issues.length > 0 ? 'Finale stage: ' + issues.join('; ') : '';
-}
-
 /**
  * Validates the skeleton output shape.
  * Convention: returns '' on pass, non-empty string on hard failure.

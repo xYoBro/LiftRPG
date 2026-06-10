@@ -85,36 +85,3 @@ export const COLUMN_GAP_PX = 6;
  * floor((470 - 6) / 2) = 232
  */
 export const HALF_SLOT_WIDTH_PX = Math.floor((PAGE_BUDGET.widthPx - COLUMN_GAP_PX) / 2);
-
-// ---------------------------------------------------------------------------
-// Custom spec factory
-// ---------------------------------------------------------------------------
-
-/**
- * Create a custom page spec by merging overrides onto the defaults.
- * Margins are shallow-merged (you can override individual sides).
- * The returned object and its margins are frozen.
- *
- * @param {object} [overrides]         — partial page spec
- * @param {number} [overrides.width]
- * @param {number} [overrides.height]
- * @param {object} [overrides.margins] — partial margins (top/bottom/left/right)
- * @param {string} [overrides.planningUnit]
- * @param {number} [overrides.padToMultipleOf]
- * @returns {Readonly<typeof DEFAULT_PAGE_SPEC>}
- */
-export function createPageSpec(overrides = {}) {
-  const mergedMargins = Object.freeze({
-    ...DEFAULT_PAGE_SPEC.margins,
-    ...(overrides.margins || {}),
-  });
-
-  // Spread defaults, then overrides, then the merged margins on top
-  const spec = Object.freeze({
-    ...DEFAULT_PAGE_SPEC,
-    ...overrides,
-    margins: mergedMargins,
-  });
-
-  return spec;
-}

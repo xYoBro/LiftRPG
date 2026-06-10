@@ -257,10 +257,6 @@ function hasRealEncryptedEnding(data) {
   return !!blob && blob.indexOf('PLACEHOLDER_') !== 0;
 }
 
-function resolveAutoSealPassword(data) {
-  return deriveBookletPassword(data);
-}
-
 function unlockWithPayload(payload, password) {
   state.unlockedEnding = payload;
   renderCurrentBooklet();
@@ -516,7 +512,7 @@ function attemptUnlock() {
 
 function autoEncryptAndLoad(data, sourceLabel = 'Generated Booklet') {
   const hasEndings = Array.isArray(data.endings) && data.endings.length > 0;
-  const password = resolveAutoSealPassword(data);
+  const password = deriveBookletPassword(data);
   const alreadyEncrypted = hasRealEncryptedEnding(data);
 
   if (!hasEndings || !password || alreadyEncrypted) {
@@ -641,8 +637,7 @@ function captureRefs() {
     encryptPassword: qs('encrypt-password'),
     encryptBtn: qs('encrypt-btn'),
     encryptDownload: qs('encrypt-download'),
-    encryptStatus: qs('encrypt-status'),
-    emptyState: qs('renderer-empty-state')
+    encryptStatus: qs('encrypt-status')
   };
 }
 

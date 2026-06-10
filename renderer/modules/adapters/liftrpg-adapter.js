@@ -201,7 +201,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
     const profile = resolveWeekMechanicProfile(week);
     const sessionChunks = chunkWeekSessions(week.sessions || []);
     const primaryGroup = `week-${wi}-chunk-0`;
-    const attachmentStrategy = resolveWeekAttachmentStrategy(artifactIdentity, week, profile);
+    const attachmentStrategy = resolveWeekAttachmentStrategy(artifactIdentity);
     const balancedRowGroup = isBoss ? null : resolveBalancedRowGroup(artifactIdentity, week, wi, attachmentStrategy);
 
     // Week header (kicker, title, epigraph) — before session cards
@@ -768,14 +768,13 @@ function chunkWeekSessions(sessions, maxSessionsPerPage = 3) {
   return chunks;
 }
 
-function resolveWeekAttachmentStrategy(artifactIdentity, week, profile) {
+function resolveWeekAttachmentStrategy(artifactIdentity) {
+  // The default always comes from booklet-models: resolveArtifactIdentity()
+  // sets attachmentStrategy to raw.attachmentStrategy || 'split-technical',
+  // so `explicit` is always non-empty here. A content-based fallback that
+  // counted fieldOps attachments used to follow but was unreachable.
   const explicit = String((artifactIdentity && artifactIdentity.attachmentStrategy) || '').trim().toLowerCase();
-  if (explicit) return explicit;
-
-  const fieldOps = (week && week.fieldOps) || {};
-  const attachmentCount = Number(!!fieldOps.cipher) + Number(!!fieldOps.oracleTable || !!fieldOps.oracle) + Number(!!fieldOps.mapState);
-  if (attachmentCount >= 3 || (profile && profile.needsCompanionSpread)) return 'split-technical';
-  return 'single-dominant';
+  return explicit || 'split-technical';
 }
 
 function resolveAttachmentGroup(primaryGroup, weekIndex, attachmentStrategy, channel, artifactIdentity = null) {
@@ -855,47 +854,10 @@ function fragmentMustStandAlone(fragment, weight = fragmentWeight(fragment)) {
 }
 
 // ---------------------------------------------------------------------------
-// Spread model resolution
-// ---------------------------------------------------------------------------
-
-/**
- * Resolve spread model from data + governor logic.
- * LLM suggests, governor overrides based on content density.
- *
- * @param {object} data — full booklet JSON
- * @returns {{ model: string, overridden: boolean, reason: string }}
- */
-export function resolveSpreadModel(data) {
-  const requested = (data.meta || {}).spreadModel || null;
-  const weeks = data.weeks || [];
-  if (weeks.length === 0) {
-    return { model: 'grouped', overridden: false, reason: 'no-weeks' };
-  }
-
-  const avgSessions = weeks.reduce((s, w) => s + (w.sessions || []).length, 0) / weeks.length;
-
-  // Override: too many sessions for per-session
-  if (requested === 'per-session' && avgSessions >= 4) {
-    return { model: 'grouped', overridden: true, reason: 'density-override' };
-  }
-  // Override: too few sessions for grouped
-  if (requested === 'grouped' && avgSessions <= 1) {
-    return { model: 'per-session', overridden: true, reason: 'sparsity-promotion' };
-  }
-  // Auto-select
-  if (!requested) {
-    const model = avgSessions <= 2 ? 'per-session' : 'grouped';
-    return { model, overridden: false, reason: 'auto-selected' };
-  }
-  return { model: requested, overridden: false, reason: 'schema-requested' };
-}
-
-// ---------------------------------------------------------------------------
 // Public adapter interface
 // ---------------------------------------------------------------------------
 
 export const liftrpgAdapter = {
   extractAtoms: extractLiftRPGAtoms,
   sectionOrder: LIFTRPG_SECTIONS,
-  resolveSpreadModel,
 };

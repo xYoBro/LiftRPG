@@ -250,10 +250,6 @@ export function buildCoverPageModel(data) {
   };
 }
 
-export function buildRulesLeftPageModel(data) {
-  return buildRulesLeftPageModelWithVariant(data, 'standard');
-}
-
 export function buildRulesLeftPageModelWithVariant(data, layoutVariant) {
   const meta = buildBookletMetaModel(data);
   const artifactIdentity = meta.artifactIdentity || resolveArtifactIdentity(data);
@@ -297,10 +293,6 @@ export function buildSealedPageModel(data, layoutVariant = 'standard') {
     title: artifactIdentity.copy.sealedTitle,
     body: artifactIdentity.copy.sealedBody
   };
-}
-
-export function buildGaugeLogPageModel(data) {
-  return buildGaugeLogPageModelWithVariant(data, 'standard');
 }
 
 export function buildGaugeLogPageModelWithVariant(data, layoutVariant) {
@@ -393,12 +385,6 @@ export function buildUnlockedEndingPageModel(data, payload, layoutVariant = 'doc
     designSpec: ending.designSpec || '',
     treatment: inferEndingTreatment(ending.designSpec),
     continuationLabel: entry && entry.continuationLabel || ''
-  };
-}
-
-export function buildNotesPageModel() {
-  return {
-    cellCount: 36
   };
 }
 

@@ -77,10 +77,3 @@ export function buildWorkoutCardModel(session, layoutPlan) {
   };
 }
 
-export function buildWorkoutPageModel(sessions, pagePlan) {
-  return {
-    cardCount: pagePlan.cardCount,
-    pageDensity: pagePlan.pageDensity,
-    cards: (sessions || []).map((session, index) => buildWorkoutCardModel(session, pagePlan.cards[index]))
-  };
-}
