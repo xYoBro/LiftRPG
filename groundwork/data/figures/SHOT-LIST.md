@@ -17,7 +17,19 @@ is *correct*. Convert: `cwebp -q 80 in.jpg -o out.webp` (or any converter, or
 export WebP from Photos/Preview). Aim under 60KB each.
 
 **Option B — image-generation model.** Use the style block once, then one prompt
-per frame below. Regenerate any frame whose anatomy drifts.
+per frame below. **Verification rule (you are learning these movements, so the
+image must not teach a fault): after generating each frame, check it against
+the tier's ▶ video link in the app before keeping it.** The frame descriptions
+below encode the correct positions in words — if the image disagrees with the
+description or the video, regenerate. Common model mistakes to reject: sagging
+hips on any lever frame (the body must be a flat line), bent elbows on
+straight-arm work, chin poking forward at the top of pulls.
+
+**Option C — progressive self-documentation (the long game).** Once you CLEAR
+a tier you know its form (learn mode + the AAR phone-video self-check teach
+it). Photograph yourself then, replacing any generated frame. Over months the
+manual fills with your own documentation — which is also exactly what the
+fiction says it is.
 
 > STYLE BLOCK (prepend to every prompt): "Instructional fitness photograph,
 > exercise reference book style, the same athletic adult in a plain grey
