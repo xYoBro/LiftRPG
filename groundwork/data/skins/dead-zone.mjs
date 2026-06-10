@@ -215,6 +215,13 @@ export const SKIN = {
       { when: { streak: 3 }, lines: [
         'RIGGING: “Three clean in a row. You know what that is? Boring. Boring is the sound rigging makes when it’s done right. Stay boring.”'
       ] },
+      // Trough inoculation (Papercut doctrine): sessions ~7-18 are the
+      // documented flat zone. Forecasting the flatness IS the intervention.
+      { when: { troughWindow: true, isFirstRoom: true }, lines: [
+        'RIGGING: “Heads up. We’re in the flat weeks — the stretch where every program feels like nothing’s happening. That’s the forecast holding, not the work failing. Tendon and wire thicken in silence. Walk the room.”',
+        'RIGGING: “Day-in-the-trough report: it will feel pointless today. It felt pointless to Eight too — there’s a journal page about it. The numbers kept moving anyway. Yours are moving. You just can’t hear it yet.”',
+        'RIGGING: “Boredom check. Good. Boredom is the sound load-bearing work makes. Fireworks are for stations that are on fire.”'
+      ] },
       { when: { isFirstRoom: true }, lines: [
         'RIGGING: “First room of the day. Cold building, warm hands by the end — that’s the whole trade. Manifest says move.”'
       ] },
@@ -243,6 +250,36 @@ export const SKIN = {
     },
 
     intelDrop: 'INTEL DROP — {{faultName}}: {{sideQuestName}}. {{sideQuestNote}} Added to the route.',
+
+    // First session of the trough window: the WORK ORDER carries the forecast.
+    troughForecast: 'FORECAST, posted by the previous keeper and left up on purpose: “Weeks three through six feel like nothing. That is the program working at the depth where you cannot watch it. Attendance is the whole job until the feeling comes back. It comes back.”',
+
+    // Implementation intention (intake closing — Gollwitzer, d≈0.65)
+    intention: {
+      prompt: 'Last line of the intake. Post the duty schedule — the station runs on schedules, not motivation:',
+      afterLabel: 'After (an event that already happens daily)',
+      afterPlaceholder: 'morning coffee / dropping the kids / logging off work',
+      whereLabel: 'At (the place the bar lives)',
+      wherePlaceholder: 'the hallway doorframe / the garage',
+      display: 'DUTY SCHEDULE — after {{after}}, at {{where}}.'
+    },
+
+    // Storm protocol (minimum dose — protects the identity rep)
+    storm: {
+      button: 'Storm Protocol (two-minute day)',
+      intro: 'STORM PROTOCOL. Bad day. The station does not need a session from you — it needs proof the keeper still exists. One easy set in a cleared room. Log it. Done is the whole standard today.',
+      done: 'Anchor checked. Log entry filed. That was not a small thing: the chain is the asset, and the chain holds. Full work resumes when the weather does.',
+      missCue: 'One missed day is an accident. Two is the start of a new habit. The station will take two minutes today over zero — Storm Protocol is on the board.'
+    },
+
+    // Weekly dispatch (review trends, not feelings)
+    dispatch: {
+      title: 'WEEKLY DISPATCH',
+      intro: 'Trend review. Three-week windows, no feelings, no verdicts on single days — the log judges in trends or not at all.',
+      frictionPrompt: 'One thing that pulled you off course this week (one line):',
+      goalPrompt: 'One micro-goal for next week (specific enough to fail at):',
+      close: 'Dispatch filed. Same time next week. The trend is the truth.'
+    },
 
     // Zeigarnik: the AAR closes on a forward hook; the home screen repeats it.
     nextTeasers: {

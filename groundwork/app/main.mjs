@@ -51,6 +51,23 @@ const flavorName = (tier) => (SKIN.tierNames && SKIN.tierNames[tier.hookSlot]) |
 const fill = (t, vars) => String(t).replace(/\{\{(\w+)\}\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : ''));
 const muted = () => !!(state.profile && state.profile.settings.muted);
 
+// Papercut adoptions: trough window = sessions 7-18 (~weeks 3-6 at 3/wk)
+const inTroughWindow = () => {
+  const n = state.profile ? state.profile.history.length : 0;
+  return n >= 6 && n <= 17;
+};
+const daysSinceLastSession = () => {
+  const last = state.profile && state.profile.history[state.profile.history.length - 1];
+  if (!last) return null;
+  return Math.floor((Date.now() - new Date(last.date).getTime()) / 86400000);
+};
+const dispatchDue = () => {
+  const prof = state.profile;
+  if (!prof || prof.history.length < 3) return false;
+  if (!prof.lastDispatchAt) return true;
+  return (Date.now() - new Date(prof.lastDispatchAt).getTime()) / 86400000 >= 7;
+};
+
 const BIAS_LABEL = { intel: 'DOCUMENTS LIKELY', loot: 'SALVAGE LIKELY', encounter: 'SOMETHING MOVES HERE', story: 'OLD GROUND' };
 const KIND_LABEL = { crit: 'CRITICAL', strong: 'CLEAN CLEAR', success: 'CLEARED', fail: 'SCOUTED', complication: 'COMPLICATION' };
 
@@ -58,7 +75,8 @@ function render() {
   stopTimer();
   const screens = {
     home: renderHome, assess: renderAssess, session: renderSession,
-    map: renderMap, log: renderLog, archive: renderArchive, kit: renderKit, settings: renderSettings
+    map: renderMap, log: renderLog, archive: renderArchive, kit: renderKit, settings: renderSettings,
+    storm: renderStorm, dispatch: renderDispatch
   };
   (screens[state.screen] || renderHome)();
   window.scrollTo(0, 0);
@@ -102,6 +120,10 @@ function renderHome() {
         <button class="gw-primary" data-act="start-assess">Run Intake Survey</button>
       ` : `
         ${p.lastHook ? `<div class="gw-hook">${esc(p.lastHook)}</div>` : ''}
+        ${p.intention ? `<div class="gw-dim gw-duty">${esc(fill(SKIN.sessionFrame.intention.display, p.intention))}</div>` : ''}
+        ${p.microGoal ? `<div class="gw-dim gw-duty">MICRO-GOAL: ${esc(p.microGoal)}</div>` : ''}
+        ${(() => { const d = daysSinceLastSession(); return d !== null && d >= 2 && d <= 6
+          ? `<div class="gw-callout">${esc(SKIN.sessionFrame.storm.missCue)}</div>` : ''; })()}
         ${recal ? `<div class="gw-callout">Layoff detected (&gt;2 weeks since the last AAR). A re-survey is recommended — the map should match the body that shows up. <button data-act="start-assess">Re-run Intake</button></div>` : ''}
         <div class="gw-stat-row">
           <div class="gw-stat"><div class="gw-stat-num">${treeStat()}<span class="gw-pct">%</span></div><div class="gw-stat-label">${esc(TREE.name)}</div></div>
@@ -114,6 +136,8 @@ function renderHome() {
           <div>${esc(preview.branch)} focus — ${esc(preview.room)} · ${preview.rooms} rooms${preview.boss ? ' · <strong>SEALED DOOR ELIGIBLE</strong>' : ''}${preview.learn ? ' · new room type (learn mode)' : ''}</div>
         </div>
         <button class="gw-primary gw-big" data-act="start-session">Start Session</button>
+        <button data-act="storm">${esc(SKIN.sessionFrame.storm.button)}</button>
+        ${dispatchDue() ? `<button data-act="dispatch"><strong>Weekly Dispatch due</strong></button>` : ''}
         <div class="gw-row">
           <button data-act="map">Map</button>
           <button data-act="archive">Archive${unread ? ` (${unread})` : ''}</button>
@@ -135,6 +159,8 @@ function renderHome() {
     'start-session': () => { unlockAudio(); startSession(); },
     map: () => nav('map'), archive: () => nav('archive'), kit: () => nav('kit'),
     log: () => nav('log'), settings: () => nav('settings'),
+    storm: () => { unlockAudio(); nav('storm'); },
+    dispatch: () => nav('dispatch'),
     export: doExport,
     import: () => document.getElementById('import-file').click(),
     reset: () => { if (confirm('Erase the local save? Export first if you want to keep it.')) { clearProfile(); state.profile = null; render(); } }
@@ -166,9 +192,24 @@ function renderAssess() {
             return `<li><strong>${esc(TREE.branches[branch].name)}:</strong> ${esc(flavorName(tier))} <span class="gw-dim">(${esc(tier.name)})</span></li>`;
           }).join('')}
         </ul>
+        <div class="gw-callout">
+          <p>${esc(SKIN.sessionFrame.intention.prompt)}</p>
+          <label class="gw-dim">${esc(SKIN.sessionFrame.intention.afterLabel)}</label>
+          <input id="int-after" class="gw-text" placeholder="${esc(SKIN.sessionFrame.intention.afterPlaceholder)}" maxlength="60">
+          <label class="gw-dim">${esc(SKIN.sessionFrame.intention.whereLabel)}</label>
+          <input id="int-where" class="gw-text" placeholder="${esc(SKIN.sessionFrame.intention.wherePlaceholder)}" maxlength="60">
+        </div>
         <button class="gw-primary" data-act="home">To the Station</button>
       </main>`;
-    wire({ home: () => nav('home') });
+    wire({ home: () => {
+      const after = (document.getElementById('int-after') || {}).value || '';
+      const where = (document.getElementById('int-where') || {}).value || '';
+      if (after.trim() && where.trim()) {
+        state.profile.intention = { after: after.trim(), where: where.trim() };
+        saveProfile(state.profile);
+      }
+      nav('home');
+    } });
     return;
   }
   const rung = currentRung(run, TREE);
@@ -235,6 +276,7 @@ function renderBrief(s) {
     <header class="gw-header"><h1>${esc(SKIN.sessionFrame.brief.title)}</h1></header>
     <main class="gw-panel">
       <p class="gw-script">${esc(brief)}</p>
+      ${state.profile.history.length === 6 ? `<div class="gw-callout">${esc(SKIN.sessionFrame.troughForecast)}</div>` : ''}
       ${s.learnMode ? `<div class="gw-callout">${esc(SKIN.sessionFrame.tutorial.intro)}</div>` : ''}
       <button class="gw-primary gw-big" data-act="go">Begin</button>
       <button data-act="abort">Back</button>
@@ -426,6 +468,7 @@ function stateAwareBeat(entry) {
     outcome: entry.outcome,
     branch: entry.branch,
     isFirstRoom: entry.roomIndex === 0,
+    troughWindow: inTroughWindow(),
     streak: streakAt(entry.roomIndex),
     postBossFail: state.profile.history.some((h) => h.boss && !h.boss.passed && h.focusTierId === state.session.focusTierId)
   };
@@ -435,6 +478,7 @@ function stateAwareBeat(entry) {
     if (w.outcome && w.outcome !== ctx.outcome) continue;
     if (w.branch && w.branch !== ctx.branch) continue;
     if (w.isFirstRoom && !ctx.isFirstRoom) continue;
+    if (w.troughWindow && !ctx.troughWindow) continue;
     if (w.streak && ctx.streak < w.streak) continue;
     if (w.postBossFail && !ctx.postBossFail) continue;
     return beat.lines[entry.roll % beat.lines.length];
@@ -663,10 +707,122 @@ function renderDebrief(s) {
         <div class="gw-stat"><div class="gw-stat-num">${intel}</div><div class="gw-stat-label">archive</div></div>
         <div class="gw-stat"><div class="gw-stat-num">${treeStat()}<span class="gw-pct">%</span></div><div class="gw-stat-label">${esc(TREE.name)} now</div></div>
       </div>
+      <div class="gw-note-row">
+        <label class="gw-dim">Minutes you lost track of time (the real meter):</label>
+        <div class="gw-stepper">
+          <button class="gw-step" data-fstep="-5">−</button>
+          <div class="gw-step-num" id="flow-min">0</div>
+          <button class="gw-step" data-fstep="5">+</button>
+          <div class="gw-step-unit">min</div>
+        </div>
+      </div>
       ${state.profile.lastHook ? `<div class="gw-hook">${esc(state.profile.lastHook)}</div>` : ''}
       <button class="gw-primary gw-big" data-act="home">Close the log</button>
     </main>`;
-  wire({ home: () => { state._aarFiled = null; nav('home'); } });
+  root().querySelectorAll('[data-fstep]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const num = document.getElementById('flow-min');
+      num.textContent = String(Math.max(0, Number(num.textContent) + Number(el.getAttribute('data-fstep'))));
+    });
+  });
+  wire({ home: () => {
+    const flow = Number((document.getElementById('flow-min') || {}).textContent || 0);
+    if (flow > 0 && state.profile.history.length) {
+      state.profile.history[state.profile.history.length - 1].flowMinutes = flow;
+      saveProfile(state.profile);
+    }
+    state._aarFiled = null;
+    nav('home');
+  } });
+}
+
+// ── Storm Protocol (minimum dose — the identity rep) ─────────────────────────
+function renderStorm() {
+  const cleared = state.profile.cleared[TREE.id] || [];
+  const tierId = cleared[cleared.length - 1] || Object.values(state.profile.active[TREE.id] || {})[0];
+  const tier = getTier(TREE, tierId);
+  if (!tier) { nav('home'); return; }
+  root().innerHTML = `
+    <header class="gw-header"><h1>STORM PROTOCOL</h1></header>
+    <main class="gw-panel">
+      <p class="gw-script">${esc(SKIN.sessionFrame.storm.intro)}</p>
+      <h2>${esc(flavorName(tier))} <span class="gw-dim">(${esc(tier.name)})</span></h2>
+      <p>One easy set, well inside the ${esc(schemeText(tier.scheme))} range. Nothing else.</p>
+      <button class="gw-primary gw-big" data-act="done">Set done — file it</button>
+      <button data-act="home">Back</button>
+    </main>`;
+  wire({
+    done: () => {
+      state.profile.history.push({
+        date: new Date().toISOString(),
+        treeId: TREE.id,
+        focusTierId: tier.id,
+        focusBranch: tier.branch,
+        learnMode: false,
+        stormProtocol: true,
+        setsTotal: 1, setsHit: 1, unlockHit: false,
+        rooms: [], boss: null, intelDrop: null
+      });
+      state.profile.xp += 1;
+      saveProfile(state.profile);
+      root().innerHTML = `
+        <header class="gw-header"><h1>ANCHOR CHECKED</h1></header>
+        <main class="gw-panel">
+          <p class="gw-script">${esc(SKIN.sessionFrame.storm.done)}</p>
+          <button class="gw-primary gw-big" data-act="home">Close the log</button>
+        </main>`;
+      wire({ home: () => nav('home') });
+    },
+    home: () => nav('home')
+  });
+}
+
+// ── Weekly Dispatch (trend review — judge in trends or not at all) ──────────
+function renderDispatch() {
+  const h = state.profile.history;
+  const window1 = h.slice(-3), window0 = h.slice(-6, -3);
+  const rate = (w) => {
+    const total = w.reduce((n, x) => n + (x.setsTotal || 0), 0);
+    return total ? Math.round(100 * w.reduce((n, x) => n + (x.setsHit || 0), 0) / total) : null;
+  };
+  const flow = (w) => w.reduce((n, x) => n + (x.flowMinutes || 0), 0);
+  const r1 = rate(window1), r0 = rate(window0);
+  const trendArrow = r0 === null ? '' : r1 > r0 ? ' ↑' : r1 < r0 ? ' ↓' : ' →';
+  root().innerHTML = `
+    <header class="gw-header"><h1>${esc(SKIN.sessionFrame.dispatch.title)}</h1></header>
+    <main class="gw-panel">
+      <p class="gw-dim">${esc(SKIN.sessionFrame.dispatch.intro)}</p>
+      <div class="gw-stat-row">
+        <div class="gw-stat"><div class="gw-stat-num">${h.length}</div><div class="gw-stat-label">sessions total</div></div>
+        <div class="gw-stat"><div class="gw-stat-num">${r1 === null ? '—' : r1 + '%' + trendArrow}</div><div class="gw-stat-label">hit rate (last 3)</div></div>
+        <div class="gw-stat"><div class="gw-stat-num">${flow(window1)}</div><div class="gw-stat-label">flow min (last 3)</div></div>
+        <div class="gw-stat"><div class="gw-stat-num">${treeStat()}<span class="gw-pct">%</span></div><div class="gw-stat-label">${esc(TREE.name)}</div></div>
+      </div>
+      <label class="gw-dim">${esc(SKIN.sessionFrame.dispatch.frictionPrompt)}</label>
+      <div class="gw-note-row"><input id="disp-friction" class="gw-text" maxlength="120"></div>
+      <label class="gw-dim">${esc(SKIN.sessionFrame.dispatch.goalPrompt)}</label>
+      <div class="gw-note-row"><input id="disp-goal" class="gw-text" maxlength="120"></div>
+      <button class="gw-primary gw-big" data-act="file">File the dispatch</button>
+      <button data-act="home">Back</button>
+    </main>`;
+  wire({
+    file: () => {
+      const friction = (document.getElementById('disp-friction') || {}).value || '';
+      const goal = (document.getElementById('disp-goal') || {}).value || '';
+      if (friction.trim()) state.profile.notes.push({ at: new Date().toISOString(), room: 'Weekly Dispatch', text: 'Friction: ' + friction.trim() });
+      if (goal.trim()) state.profile.microGoal = goal.trim();
+      state.profile.lastDispatchAt = new Date().toISOString();
+      saveProfile(state.profile);
+      root().innerHTML = `
+        <header class="gw-header"><h1>DISPATCH FILED</h1></header>
+        <main class="gw-panel">
+          <p class="gw-script">${esc(SKIN.sessionFrame.dispatch.close)}</p>
+          <button class="gw-primary gw-big" data-act="home">Back to the station</button>
+        </main>`;
+      wire({ home: () => nav('home') });
+    },
+    home: () => nav('home')
+  });
 }
 
 // ── Archive / Kit / Map / Log / Settings ─────────────────────────────────────

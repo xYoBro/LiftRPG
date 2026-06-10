@@ -37,7 +37,10 @@ export function createEmptyProfile(seed) {
     choices: [],                   // encounter decisions, referenced by AARs
     notes: [],                     // player field notes [{at, room, text}]
     shortcuts: [],                 // unlocked map connections (key items)
-    lastHook: null                 // Zeigarnik teaser carried to the home screen
+    lastHook: null,                // Zeigarnik teaser carried to the home screen
+    intention: null,               // implementation intention {after, where}
+    microGoal: null,               // weekly dispatch micro-goal
+    lastDispatchAt: null           // ISO date of last weekly dispatch
   };
 }
 
@@ -46,7 +49,8 @@ function migrateProfile(profile) {
   if (!profile) return profile;
   const defaults = {
     archive: [], kit: [], explored: {}, encountersSeen: [],
-    choices: [], notes: [], shortcuts: [], lastHook: null
+    choices: [], notes: [], shortcuts: [], lastHook: null,
+    intention: null, microGoal: null, lastDispatchAt: null
   };
   for (const key of Object.keys(defaults)) {
     if (profile[key] === undefined) profile[key] = defaults[key];

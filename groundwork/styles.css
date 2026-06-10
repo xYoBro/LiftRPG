@@ -123,3 +123,7 @@ button:active { transform: translateY(1px); }
 .gw-note-row { margin: 8px 0; }
 .gw-note-row input { width: 100%; font: inherit; padding: 10px; border: 1px solid var(--gw-rule); border-radius: 6px; }
 .gw-explored { margin-top: 4px; font-size: 0.8rem; }
+
+/* Papercut adoptions */
+.gw-duty { font-family: var(--gw-mono); font-size: 0.78rem; margin: 4px 0; letter-spacing: 0.04em; }
+.gw-text { width: 100%; font: inherit; padding: 10px; border: 1px solid var(--gw-rule); border-radius: 6px; margin: 4px 0 8px; }

@@ -86,7 +86,7 @@ export const PULL_TREE = {
       faultSideQuests: {
         'back-arch': { id: 'sq.glute-set', name: 'Glutes-on Y raises, 2×8', note: 'Squeeze the glutes first; the back stops volunteering.' },
         'no-pause': { id: 'sq.iso-letters', name: '5s holds at the top of each letter, 3 each', note: 'The pause is where the scap learns.' },
-        'neck-crane': { id: 'sq.forehead-down', name: 'Towel under forehead, full set watching nothing', note: 'The blades do not need supervision.' }
+        'neck-crane': { id: 'sq.forehead-down', name: 'Forehead on the folded mat edge, full set watching nothing', note: 'The blades do not need supervision.' }
       },
       rig: ['ytw.y', 'ytw.t', 'ytw.w'],
       videoRef: { creator: 'GMB or Darebee', search: 'prone YTW raises shoulder blade tutorial' },
