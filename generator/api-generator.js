@@ -766,7 +766,7 @@ var STRUCTURED_SCHEMA_WEEKS = {
             items: {
               type: 'object',
               properties: {
-                name: { type: 'string' },
+                clockName: { type: 'string' },
                 clockType: { type: 'string' },
                 segments: { type: 'integer' },
                 startValue: { type: 'integer' },

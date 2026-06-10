@@ -102,104 +102,6 @@
       "interlude"
     ]
   },
-  "content/cartographer-full.json": {
-    "normalizedPageCount": 28,
-    "sheetCount": 14,
-    "counts": {
-      "cover": 1,
-      "rules-left": 1,
-      "rules-right": 1,
-      "workout-left": 6,
-      "field-ops": 5,
-      "boss": 1,
-      "fragment-page": 7,
-      "assembly": 1,
-      "gauge-log": 1,
-      "ending-locked": 1,
-      "notes": 2,
-      "back-cover": 1
-    },
-    "prefix": [
-      "cover",
-      "rules-left",
-      "rules-right"
-    ],
-    "suffix": [
-      "gauge-log",
-      "ending-locked",
-      "notes",
-      "notes",
-      "back-cover"
-    ]
-  },
-  "content/The-Pressure-Field.json": {
-    "normalizedPageCount": 28,
-    "sheetCount": 14,
-    "counts": {
-      "cover": 1,
-      "rules-left": 1,
-      "rules-right": 1,
-      "workout-left": 5,
-      "field-ops": 4,
-      "interlude": 1,
-      "boss": 1,
-      "fragment-page": 10,
-      "assembly": 1,
-      "gauge-log": 1,
-      "ending-locked": 1,
-      "back-cover": 1
-    },
-    "prefix": [
-      "cover",
-      "rules-left",
-      "rules-right"
-    ],
-    "suffix": [
-      "fragment-page",
-      "assembly",
-      "gauge-log",
-      "ending-locked",
-      "back-cover"
-    ],
-    "mustContain": [
-      "interlude"
-    ]
-  },
-  "content/Supply-Line-Breach.json": {
-    "normalizedPageCount": 48,
-    "sheetCount": 24,
-    "counts": {
-      "cover": 1,
-      "rules-left": 1,
-      "rules-right": 1,
-      "workout-left": 12,
-      "field-ops": 5,
-      "overflow-doc": 6,
-      "interlude": 1,
-      "boss": 1,
-      "fragment-page": 14,
-      "assembly": 1,
-      "gauge-log": 1,
-      "ending-locked": 1,
-      "notes": 2,
-      "back-cover": 1
-    },
-    "prefix": [
-      "cover",
-      "rules-left",
-      "rules-right"
-    ],
-    "suffix": [
-      "gauge-log",
-      "ending-locked",
-      "notes",
-      "notes",
-      "back-cover"
-    ],
-    "mustContain": [
-      "interlude"
-    ]
-  },
   "content/Palimpsest-House.json": {
     "normalizedPageCount": 28,
     "sheetCount": 14,
@@ -270,7 +172,8 @@
       "boss",
       "fragment-page",
       "interlude"
-    ]
+    ],
+    "browserPageCount": 44
   },
   "content/vale-a-record-of-orcus.json": {
     "_purpose": "Companion-heavy (3/week) + noir archetype (non-classified-packet shell). Stresses shellAttrs genericity, companion zone density, and non-government visual paths.",
@@ -310,7 +213,7 @@
       "fragment-page",
       "interlude"
     ],
-    "browserPageCount": 48
+    "browserPageCount": 64
   },
   "content/what-the-soil-remembers.json": {
     "_purpose": "Companion-heavy + overflow + dense PTP maps (8-15 nodes/week). Stresses zone routing, continuation chains, and half-width map legibility.",
@@ -326,10 +229,10 @@
       "overflow-doc": 5,
       "interlude": 6,
       "boss": 1,
-      "fragment-page": 11,
+      "fragment-page": 12,
       "assembly": 1,
       "ending-locked": 1,
-      "notes": 2,
+      "notes": 1,
       "back-cover": 1
     },
     "prefix": [
@@ -338,9 +241,9 @@
       "rules-right"
     ],
     "suffix": [
+      "assembly",
       "gauge-log",
       "ending-locked",
-      "notes",
       "notes",
       "back-cover"
     ],
@@ -352,6 +255,6 @@
       "fragment-page",
       "interlude"
     ],
-    "browserPageCount": 60
+    "browserPageCount": 64
   }
 }

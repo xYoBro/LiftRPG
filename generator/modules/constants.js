@@ -65,80 +65,50 @@ export var DAILY_CALL_LIMIT = 20;    // Gemini free tier: 20 API calls/day
 export var CHECKPOINT_STORAGE_KEY = 'liftrpg_pipeline_checkpoint';
 
 // ── Schema enums ─────────────────────────────────────────────────────────────
-// These must stay in sync with prompt_rules.js SCHEMA_* sections and the
-// renderer's mechanic-registry / document-primitives.
+// Single source of truth: contracts/contract-constants.mjs (synced to
+// public/contracts/ by build:gold-disk). These re-exports keep existing import
+// sites stable. NEVER define enum values here.
 
-export var DOCUMENT_TYPE_ENUM = [
-  'memo', 'report', 'inspection', 'fieldNote',
-  'correspondence', 'transcript', 'form', 'anomaly'
-];
+import {
+  SCHEMA_VERSION,
+  ACCEPTED_SCHEMA_VERSIONS,
+  DOCUMENT_TYPE_ENUM,
+  DOCUMENT_TYPE_ALIASES,
+  VALID_MAP_TYPES,
+  VALID_COMPANION_TYPES,
+  VALID_CLOCK_TYPES,
+  VALID_ARCHETYPES,
+  THEME_ARCHETYPE_ALIASES,
+  ORACLE_ROLL_BANDS,
+  VALID_PAYLOAD_TYPES as PAYLOAD_TYPE_LIST,
+  VALID_SHELL_FAMILIES,
+  VALID_BOARD_STATE_MODES,
+  VALID_ATTACHMENT_STRATEGIES
+} from '../../contracts/contract-constants.mjs';
 
-export var DOCUMENT_TYPE_ALIASES = {
-  'letter': 'correspondence',
-  // Observed S+F compact-pass variants (RC-2 mechanical cleanup)
-  'maintenance_log': 'fieldNote', 'maintenance-log': 'fieldNote',
-  'intercepted-transmission': 'transcript', 'intercepted_transmission': 'transcript',
-  'incident_report': 'report', 'incident-report': 'report',
-  'technical-drawing': 'inspection', 'technical_drawing': 'inspection',
-  'internal-memo': 'memo', 'internal_memo': 'memo', 'internal memo': 'memo',
-  'personnel-directive': 'memo', 'personnel_directive': 'memo',
-  'internal directive': 'memo', 'internal-directive': 'memo',
-  'operational directive': 'memo', 'operational-directive': 'memo',
-  'personnel-file': 'report', 'personnel_file': 'report',
-  'personal note': 'fieldNote', 'personal-note': 'fieldNote', 'personal_note': 'fieldNote',
-  'technical-log': 'fieldNote', 'technical_log': 'fieldNote',
-  'technical report': 'report', 'technical-report': 'report', 'technical_report': 'report',
-  'field-note': 'fieldNote', 'field_note': 'fieldNote', 'field note': 'fieldNote',
-  'log-entry': 'fieldNote', 'log_entry': 'fieldNote', 'log entry': 'fieldNote',
-  'signal-log': 'fieldNote', 'signal_log': 'fieldNote',
-  'dispatch': 'correspondence', 'communique': 'correspondence',
-  'bulletin': 'memo', 'notice': 'memo',
-  'dossier': 'report', 'briefing': 'report', 'case-file': 'report', 'case_file': 'report',
-  'manifest': 'form', 'ledger': 'form', 'inventory': 'form',
-  'testimony': 'transcript', 'deposition': 'transcript', 'interview': 'transcript', 'recording': 'transcript',
-  'journal': 'fieldNote', 'diary': 'fieldNote', 'observation': 'fieldNote',
-  'assessment': 'inspection', 'survey': 'inspection', 'audit': 'inspection',
-  'incident': 'anomaly', 'warning': 'anomaly', 'alert': 'anomaly', 'deviation': 'anomaly'
+export {
+  SCHEMA_VERSION,
+  ACCEPTED_SCHEMA_VERSIONS,
+  DOCUMENT_TYPE_ENUM,
+  DOCUMENT_TYPE_ALIASES,
+  VALID_MAP_TYPES,
+  VALID_COMPANION_TYPES,
+  VALID_CLOCK_TYPES,
+  VALID_ARCHETYPES,
+  THEME_ARCHETYPE_ALIASES,
+  ORACLE_ROLL_BANDS,
+  VALID_SHELL_FAMILIES,
+  VALID_BOARD_STATE_MODES,
+  VALID_ATTACHMENT_STRATEGIES
 };
 
-export var VALID_MAP_TYPES = ['grid', 'point-to-point', 'linear-track', 'player-drawn'];
+export var SUPPORTED_THEME_ARCHETYPES = VALID_ARCHETYPES.reduce(function (acc, name) {
+  acc[name] = true;
+  return acc;
+}, {});
 
-export var VALID_COMPANION_TYPES = [
-  'dashboard', 'return-box', 'inventory-grid', 'token-sheet',
-  'overlay-window', 'stress-track', 'memory-slots'
-];
-
-export var VALID_CLOCK_TYPES = [
-  'progress-clock', 'danger-clock', 'racing-clock',
-  'tug-of-war-clock', 'linked-clock', 'project-clock'
-];
-
-export var VALID_ARCHETYPES = [
-  'government', 'cyberpunk', 'scifi', 'fantasy', 'noir',
-  'steampunk', 'minimalist', 'nautical', 'occult', 'pastoral'
-];
-
-export var SUPPORTED_THEME_ARCHETYPES = {
-  pastoral: true, government: true, cyberpunk: true, scifi: true,
-  fantasy: true, noir: true, steampunk: true, minimalist: true,
-  nautical: true, occult: true
-};
-
-export var THEME_ARCHETYPE_ALIASES = {
-  institutional: 'government',
-  terminal: 'scifi',
-  clinical: 'minimalist',
-  corporate: 'government',
-  confessional: 'pastoral',
-  literary: 'pastoral'
-};
-
-export var ORACLE_ROLL_BANDS = [
-  '00-09', '10-19', '20-29', '30-39', '40-49',
-  '50-59', '60-69', '70-79', '80-89', '90-99'
-];
-
-export var VALID_PAYLOAD_TYPES = {
-  none: 1, narrative: 1, cipher: 1, map: 1, clock: 1,
-  companion: 1, 'fragment-ref': 1, 'password-element': 1
-};
+// Legacy object-map shape retained for existing call sites.
+export var VALID_PAYLOAD_TYPES = PAYLOAD_TYPE_LIST.reduce(function (acc, name) {
+  acc[name] = 1;
+  return acc;
+}, {});

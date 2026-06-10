@@ -1,5 +1,8 @@
-`public/renderer/` is the source of truth for the V2 renderer in this workspace.
+# Renderer
 
-- Edit renderer files directly here while developing in `LiftRPG-dev`
-- `npm run build:gold-disk` now keeps demo fixtures in sync and removes stale renderer residue
-- For the full current authority map, read [`docs/architecture/TRUSTED-SURFACE.md`](/Users/adknott/Library/Mobile%20Documents/com~apple~CloudDocs/Code/LiftRPG-dev/docs/architecture/TRUSTED-SURFACE.md)
+The deployable LiftRPG booklet renderer. `public/renderer/` is the renderer
+source of truth — edit here directly (there is no separate build step; see the
+private repo's CLAUDE.md "Deploy Workflow").
+
+Architecture, contracts, and invariants are documented in the private
+development repo (`docs/architecture/`, `docs/layer1/CHARTER.md`).

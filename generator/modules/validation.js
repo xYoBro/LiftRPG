@@ -11,7 +11,8 @@ import {
   VALID_MAP_TYPES,
   VALID_COMPANION_TYPES,
   VALID_CLOCK_TYPES,
-  VALID_ARCHETYPES
+  VALID_ARCHETYPES,
+  ACCEPTED_SCHEMA_VERSIONS
 } from './constants.js';
 
 import {
@@ -208,6 +209,14 @@ function normalizeShellSection(section, index) {
 
 export function normalizeShellShape(shell) {
   if (!shell || typeof shell !== 'object') return shell;
+
+  // schemaVersion is tooling-owned. LLMs replaying stale prompts emit old
+  // versions; that is local drift, auto-fixed here (guided-build doctrine),
+  // never a blocker.
+  if (shell.meta && typeof shell.meta === 'object' &&
+      ACCEPTED_SCHEMA_VERSIONS.indexOf(String(shell.meta.schemaVersion)) === -1) {
+    shell.meta.schemaVersion = ACCEPTED_SCHEMA_VERSIONS[0];
+  }
 
   var rulesSpread = shell.rulesSpread || {};
   var leftPage = rulesSpread.leftPage || {};
@@ -966,8 +975,8 @@ export function validateShellSchema(shell, expectedOptions) {
     }
   }
   if (shell.meta) {
-    if (!shell.meta.schemaVersion || !String(shell.meta.schemaVersion).match(/^1\.3/)) {
-      errors.push('meta.schemaVersion should start with "1.3", got: ' + shell.meta.schemaVersion);
+    if (ACCEPTED_SCHEMA_VERSIONS.indexOf(String(shell.meta.schemaVersion)) === -1) {
+      errors.push('meta.schemaVersion must be one of ' + ACCEPTED_SCHEMA_VERSIONS.join(', ') + ', got: ' + shell.meta.schemaVersion);
     }
     if (!('passwordEncryptedEnding' in shell.meta)) {
       errors.push('meta.passwordEncryptedEnding must exist (can be empty string)');

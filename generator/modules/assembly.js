@@ -2,7 +2,9 @@
 // Extracted from api-generator.js IIFE — booklet assembly, identity contracts,
 // continuity ledger, fragment batching, and derivation helpers.
 
-import { DOCUMENT_TYPE_ALIASES, SUPPORTED_THEME_ARCHETYPES, THEME_ARCHETYPE_ALIASES } from './constants.js';
+import { DOCUMENT_TYPE_ALIASES, SUPPORTED_THEME_ARCHETYPES, THEME_ARCHETYPE_ALIASES,
+  SCHEMA_VERSION
+} from './constants.js';
 
 // ── Structured Layer 2 diagnostics ──────────────────────────────────────────
 // Machine-readable diagnostic entries for assembly/normalization repairs.
@@ -2144,7 +2146,7 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
     meta: {
       blockTitle:               meta.blockTitle || '',
       blockSubtitle:            meta.blockSubtitle || '',
-      schemaVersion:            '1.3',
+      schemaVersion:            SCHEMA_VERSION,
       weekCount:                weekOutputs.length,
       totalSessions:            0,
       generatedAt:              new Date().toISOString(),
