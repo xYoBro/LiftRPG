@@ -154,7 +154,12 @@ export const PULL_TREE = {
       },
       rig: ['tuck-fl.hold'],
       videoRef: { creator: 'FitnessFAQs', search: 'tuck front lever hold tutorial' },
-      tutorial: ['Hips to shoulder height — flat beam', 'Lock the elbows; the lats carry it']
+      tutorial: [
+        'Hips to shoulder height — flat beam',
+        'Lock the elbows; the lats carry it',
+        'Work holds at about two-thirds of your best — max attempts are for gate days',
+        'Straight-arm work loads the elbows: sharp pain anywhere is a full stop, not a note'
+      ]
     },
     {
       id: 'pull.lever.tuck-pull',
@@ -330,8 +335,10 @@ export const PULL_TREE = {
         'Body still — no swing',
         'Breathe; do not hold breath'
       ],
-      scheme: { kind: 'hold', sets: 3, holdWindow: [20, 45] },
-      unlock: '3 holds of 45s',
+      // 40s cap keeps holds in the productive zone; past that the set drifts
+      // to pure endurance. Grip/tendon tolerance is the goal, not records.
+      scheme: { kind: 'hold', sets: 3, holdWindow: [20, 40] },
+      unlock: '3 holds of 40s',
       boss: { tier: 'pull.bar.scap-pulls', standard: { kind: 'reps', value: 5 }, label: '5 clean scap pulls' },
       regression: null,
       commonFaults: [
@@ -420,8 +427,10 @@ export const PULL_TREE = {
         'Finish at a full dead hang every rep',
         'Drop and reset — no kipping back up'
       ],
-      scheme: { kind: 'reps', sets: 3, repWindow: [3, 6] },
-      unlock: '3 sets of 6 five-second negatives',
+      // Eccentric clusters stay small (2-4); progress by SLOWING the lower
+      // toward 8-10s before adding reps — density, not volume (OG audit D41).
+      scheme: { kind: 'reps', sets: 3, repWindow: [2, 4] },
+      unlock: '3 sets of 4 five-second negatives',
       boss: { tier: 'pull.bar.partial-rom', standard: { kind: 'reps', value: 3 }, label: '3 half-range pull-ups from dead hang' },
       regression: 'pull.bar.flexed-hang',
       commonFaults: [
@@ -434,7 +443,12 @@ export const PULL_TREE = {
       },
       rig: ['negative.top', 'negative.mid', 'negative.bottom'],
       videoRef: { creator: 'FitnessFAQs', search: 'pull up negatives 5 seconds' },
-      tutorial: ['Count out loud — five honest seconds', 'The middle third is the test']
+      tutorial: [
+        'Count out loud — five honest seconds',
+        'The middle third is the test',
+        'When 3×4 feels controlled, slow toward 8 seconds before adding reps',
+        'Three slow ones back-to-back with no rest usually means the first full pull-up is already in you'
+      ]
     },
     {
       id: 'pull.bar.partial-rom',

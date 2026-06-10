@@ -12,10 +12,15 @@ import { frontierDoors } from './map.mjs';
 import { nextCache } from './discovery.mjs';
 import { liveEventDue } from './keystones.mjs';
 
+// Rest doctrine (OG audit, D41): 120s wall-clock between rooms is compliant
+// BECAUSE rooms alternate movements (paired sets) — each movement recovers
+// ~4-5 minutes between its own sets. Boss rest is a full 180s (single max
+// effort follows). Never compress prep or boss rest.
 export const REST_SECONDS = { working: 120, warmup: 60, boss: 180 };
 const PREP_DRILLS = [
   { name: 'Wrist circles + rocks', detail: '30s each direction' },
   { name: 'Scap pulls or scap push-ups', detail: '2×6 easy' },
+  { name: 'Hollow hold', detail: '2×20s — the lever line lives here' },
   { name: 'Dead hang', detail: '2×15s, relaxed' }
 ];
 
@@ -77,7 +82,17 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
     && (profile.bossElect === focusTier.id
       || (lastOnTier && lastOnTier.unlockHit)));
 
-  const allRooms = [...rooms, ...offRooms];
+  // Paired-set interleave (OG audit, D41): rooms alternate corridors —
+  // F O F O F — so each movement gets ~4+ minutes between ITS OWN sets while
+  // the wall-clock rest stays at the 120s play-window cadence. Strength work
+  // wants ≥3min/movement recovery; sequential same-movement sets at 120s
+  // under-recovered. The dungeon reading improves too: the route crosses
+  // between corridors room by room.
+  const allRooms = [];
+  for (let i = 0; i < Math.max(rooms.length, offRooms.length); i++) {
+    if (rooms[i]) allRooms.push(rooms[i]);
+    if (offRooms[i]) allRooms.push(offRooms[i]);
+  }
   if (skin && rng) {
     for (const room of allRooms) {
       room.doorOptions = frontierDoors(skin, profile, room.tier.branch, rng, 2);
