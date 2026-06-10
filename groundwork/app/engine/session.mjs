@@ -8,6 +8,7 @@
 // duration budgets with the cut-order law, deload scheduling, travel mode.
 
 import { getTier, branchOfTier } from './profile.mjs';
+import { frontierDoors } from './map.mjs';
 
 export const REST_SECONDS = { working: 120, warmup: 60, boss: 180 };
 const PREP_DRILLS = [
@@ -18,7 +19,7 @@ const PREP_DRILLS = [
 
 // Slice session: alternate branch focus per session (rows ↔ bar), 3 working
 // sets of the focused branch's active tier + 2 of the other branch.
-export function generateSession(profile, tree, { dayNumber } = {}) {
+export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
   const active = profile.active[tree.id] || {};
   const cleared = profile.cleared[tree.id] || [];
   const sessionIndex = profile.history.filter((h) => h.treeId === tree.id).length;
@@ -39,6 +40,10 @@ export function generateSession(profile, tree, { dayNumber } = {}) {
   const branchCleared = cleared.filter((id) => branchOfTier(tree, id) === focusBranch);
   const warmupTier = branchCleared.length ? getTier(tree, branchCleared[branchCleared.length - 1]) : null;
 
+  // Session budget shapes optional volume only (never main progression or
+  // prep — the cut-order law): 25min → 1 off-branch set, 40 → 2, 60 → 3.
+  const budget = (profile.settings && profile.settings.sessionBudgetMinutes) || 40;
+  const offSets = budget <= 25 ? 1 : budget >= 60 ? 3 : 2;
   const workingSets = learnMode ? 2 : 3;
   const rooms = [];
   for (let i = 0; i < workingSets; i++) {
@@ -51,7 +56,7 @@ export function generateSession(profile, tree, { dayNumber } = {}) {
       learnCue: learnMode ? focusTier.tutorial[i % focusTier.tutorial.length] : null
     });
   }
-  const offRooms = offTier ? [1, 2].map((n) => ({
+  const offRooms = offTier ? Array.from({ length: offSets }, (_, i) => i + 1).map((n) => ({
     kind: 'working',
     setNumber: n,
     tier: offTier,
@@ -70,6 +75,13 @@ export function generateSession(profile, tree, { dayNumber } = {}) {
     && (profile.bossElect === focusTier.id
       || (lastOnTier && lastOnTier.unlockHit)));
 
+  const allRooms = [...rooms, ...offRooms];
+  if (skin && rng) {
+    for (const room of allRooms) {
+      room.doorOptions = frontierDoors(skin, profile, room.tier.branch, rng, 2);
+    }
+  }
+
   return {
     treeId: tree.id,
     dayNumber: dayNumber || sessionIndex + 1,
@@ -83,7 +95,7 @@ export function generateSession(profile, tree, { dayNumber } = {}) {
       sets: 1,
       restSeconds: REST_SECONDS.warmup
     } : null,
-    rooms: [...rooms, ...offRooms],
+    rooms: allRooms,
     boss: bossEligible ? {
       tier: focusTier,
       definition: focusTier.boss,

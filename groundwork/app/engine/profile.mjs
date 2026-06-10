@@ -17,18 +17,43 @@ export function createEmptyProfile(seed) {
     seed: seed || String(Date.now()),
     settings: {
       daysPerWeek: 3,
-      sessionBudgetMinutes: 40,
+      sessionBudgetMinutes: 40,    // 25 | 40 | 60 (volume shaping, never MED)
       equipment: ['bar'],          // bodyweight implied; 'trx' optional
       injuryFlags: [],
-      concurrentTraining: []       // modifier table inputs (full build)
+      concurrentTraining: [],      // modifier table inputs (full build)
+      muted: false
     },
     assessments: {},               // treeId → { placedTiers: {branch: tierId|null}, ladder: [...], completedAt }
     cleared: {},                   // treeId → [tierId, ...] (cleared = warm-up/farmable)
     active: {},                    // treeId → { branch → tierId } (working tiers)
     tutorialSeen: {},              // tierId → true (learn-mode fired)
     history: [],                   // session AAR records
-    xp: 0                          // derived display of the access economy
+    xp: 0,                         // derived display of the access economy
+    // Narrative state (the game remembers):
+    archive: [],                   // found fragments [{id, chain, foundAt}]
+    kit: [],                       // found items [{id, foundAt}]
+    explored: {},                  // branch → [roomId] (cleared narrative rooms)
+    encountersSeen: [],
+    choices: [],                   // encounter decisions, referenced by AARs
+    notes: [],                     // player field notes [{at, room, text}]
+    shortcuts: [],                 // unlocked map connections (key items)
+    lastHook: null                 // Zeigarnik teaser carried to the home screen
   };
+}
+
+// Old saves predate the narrative-state fields — backfill on load.
+function migrateProfile(profile) {
+  if (!profile) return profile;
+  const defaults = {
+    archive: [], kit: [], explored: {}, encountersSeen: [],
+    choices: [], notes: [], shortcuts: [], lastHook: null
+  };
+  for (const key of Object.keys(defaults)) {
+    if (profile[key] === undefined) profile[key] = defaults[key];
+  }
+  if (profile.settings && profile.settings.muted === undefined) profile.settings.muted = false;
+  if (profile.settings && profile.settings.sessionBudgetMinutes === undefined) profile.settings.sessionBudgetMinutes = 40;
+  return profile;
 }
 
 // ── Assessment ladder runner ─────────────────────────────────────────────────
@@ -169,7 +194,7 @@ export function saveProfile(profile) {
 export function loadProfile() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    return raw ? migrateProfile(JSON.parse(raw)) : null;
   } catch { return null; }
 }
 
@@ -186,5 +211,5 @@ export function importProfile(json) {
   if (!data || typeof data !== 'object' || !data.version || !data.settings) {
     throw new Error('Not a Groundwork profile file.');
   }
-  return data;
+  return migrateProfile(data);
 }
