@@ -55,6 +55,11 @@ function figureFrames(tier) {
     .filter((name) => FIGURES.includes(name))
     .map((name) => 'data/figures/' + name);
 }
+function videoRefHtml(tier) {
+  if (!tier.videoRef) return '';
+  const q = encodeURIComponent(tier.videoRef.creator.split(' or ')[0] + ' ' + tier.videoRef.search);
+  return `<a class="gw-video-link" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">▶ Watch the form: ${esc(tier.videoRef.creator)} — “${esc(tier.videoRef.search)}”</a>`;
+}
 function figuresHtml(tier) {
   const frames = figureFrames(tier);
   if (!frames.length) return '';
@@ -258,6 +263,7 @@ function renderAssess() {
       <h2 class="gw-test-name">${esc(tier.name)}</h2>
       <p class="gw-test-standard">${esc(stdText)}</p>
       <details class="gw-form"><summary>How to do it</summary>
+        ${videoRefHtml(tier)}
         ${figuresHtml(tier)}
         <p>${esc(tier.setup)}</p>
         <ul class="gw-list">${tier.formStandard.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
@@ -395,8 +401,9 @@ function renderRoom(s) {
     </header>
     <main class="gw-panel gw-center">
       ${phase === 'set' ? `
-        ${room.learnCue ? `<div class="gw-callout">This set, one thing: <strong>${esc(room.learnCue)}</strong></div>${figuresHtml(tier)}` : `
+        ${room.learnCue ? `<div class="gw-callout">This set, one thing: <strong>${esc(room.learnCue)}</strong></div>${videoRefHtml(tier)}${figuresHtml(tier)}` : `
         <details class="gw-form"><summary>Form standard</summary>
+          ${videoRefHtml(tier)}
           ${figuresHtml(tier)}
           <ul class="gw-list">${tier.formStandard.map((f) => `<li>${esc(f)}</li>`).join('')}</ul></details>`}
         <p class="gw-bigcue">Do the set.</p>

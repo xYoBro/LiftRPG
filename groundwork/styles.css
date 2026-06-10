@@ -168,3 +168,7 @@ button:active { transform: translateY(1px); }
 /* Exercise-book figure photos */
 .gw-figures { display: flex; gap: 6px; margin: 8px 0; }
 .gw-figures img { flex: 1; min-width: 0; max-width: 33%; border: 1px solid var(--gw-rule); border-radius: 6px; background: var(--gw-panel); object-fit: cover; aspect-ratio: 3/4; }
+
+/* Video form references */
+.gw-video-link { display: block; font-size: 0.88rem; color: var(--gw-accent); text-decoration: none; border: 1px solid var(--gw-rule); border-radius: 6px; padding: 10px 12px; margin: 6px 0; }
+.gw-video-link:active { background: color-mix(in srgb, var(--gw-accent) 8%, transparent); }
