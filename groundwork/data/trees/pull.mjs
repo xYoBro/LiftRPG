@@ -1,340 +1,321 @@
-// ── Groundwork skill tree: PULL ──────────────────────────────────────────────
+// ── Groundwork skill tree: PULL (v2 — bar + mat ONLY) ───────────────────────
 // Original tier chart authored for Groundwork on Overcoming Gravity-style
 // methodology (strength-endurance rep windows, paired push/pull balance,
 // conservative connective-tissue pacing). No book text or chart reproduced.
 //
-// Two branches: ROWS (horizontal pull) and BAR (vertical pull). Both train
-// every session the tree is scheduled; horizontal/vertical balance is a
-// structural-balance requirement, not a choice.
+// EQUIPMENT CONTRACT (author directive, checkpoint 2): a pull-up bar and a
+// yoga mat. Nothing else — no tables, no chairs, no straps, no furniture.
+// Hotel-room-proof by construction; travel mode is the default mode.
 //
-// Field contract (every tier):
-//   id, name           — engine identity + plain name (narrative skins rename
-//                        via hookSlot, never here)
-//   hookSlot           — stable key a campaign skin binds flavor to
-//   branch             — 'rows' | 'bar'
-//   prereqs            — tier ids that must be cleared (ability gates)
-//   equipment          — tags from EQUIPMENT_TAGS; every TRX tag has a
-//                        noTrxFallback; bar-only completability is validated
-//   setup              — how to set up the movement (plain text)
-//   formStandard       — 3-5 checkable points; the canonical truth (L1 of the
-//                        instruction block)
-//   scheme             — working scheme: { kind:'reps', sets, repWindow:[lo,hi] }
-//                        or { kind:'hold', sets, holdWindow:[lo,hi] (seconds) }
-//   unlock             — top of window across ALL sets at form standard
-//   boss               — the gate test: clean reps/hold OF THE NEXT TIER
-//   regression         — tier id to fall back to when the floor is missed
-//   commonFaults       — observable faults (used by AAR self-check)
-//   faultSideQuests    — fault id → side-quest accessory (intel-drop payload)
-//   rig                — keyframe ids in data/rig (slice: pull tiers only)
-//   videoRef           — creator + search terms, never a bare URL
-//   tutorial           — one form point emphasized per learn-mode set
+// Horizontal pulling without furniture: the FRONT-LEVER LINEAGE. Hanging tuck
+// rows ARE horizontal rowing done from a high bar, scalable from floor scap
+// work to straddle-lever rows — and as a prestige skill line, a better
+// metroidvania corridor than furniture rows ever were. Structural balance:
+// vertical pull (Bar branch) pairs with the lever line's horizontal vector;
+// floor scap work covers the beginner horizontal dose.
+//
+// Two branches: LEVER (horizontal pull / front-lever line) and BAR (vertical
+// pull). Both train every session the tree is scheduled.
+//
+// Field contract per tier: id, name, hookSlot, branch, prereqs, equipment,
+// setup, formStandard[3-5], scheme, unlock, boss (next-tier standard),
+// regression, commonFaults, faultSideQuests, rig, videoRef, tutorial.
 
 export const PULL_TREE = {
   id: 'pull',
   name: 'Pull',
-  voiceSlot: 'pull-voice',          // campaign skins cast this (tree voice)
-  statBase: 20,                      // d100 roll-under stat = statBase +
-  statPerTier: 6,                    //   clearedTiers*statPerTier + recent
-  statRecentMax: 15,                 //   performance bonus (capped), cap 85
+  voiceSlot: 'pull-voice',
+  statBase: 20,
+  statPerTier: 6,
+  statRecentMax: 15,
   statCap: 85,
   branches: {
-    rows: { name: 'Rows', note: 'Horizontal pull. Scapular retraction under load.' },
+    lever: { name: 'Lever', note: 'Horizontal pull, hanging. The front-lever road: body as the beam, bar as the pivot.' },
     bar: { name: 'Bar', note: 'Vertical pull. Hang tolerance before pulling strength — tendons first.' }
   },
 
   // ── Assessment ladder (Session Zero) ──────────────────────────────────────
-  // Ordered easy → hard. Perform each until the standard is missed; placement
-  // = last tier passed per branch. Impossible to fail: every outcome is a
-  // valid starting stat. Fatigue cap: stop a branch after the first miss;
-  // never test both branches to failure back-to-back (engine inserts 3 min
-  // rest and alternates branches).
+  // Ordered easy → hard, alternating branches (fatigue cap). First miss per
+  // branch ends that branch. Placement = last tier passed. Impossible to fail.
   assessmentLadder: [
-    { tier: 'pull.rows.incline-high', standard: { kind: 'reps', value: 8 } },
+    { tier: 'pull.lever.floor-scap', standard: { kind: 'reps', value: 8 } },
     { tier: 'pull.bar.dead-hang', standard: { kind: 'hold', value: 20 } },
-    { tier: 'pull.rows.incline-low', standard: { kind: 'reps', value: 8 } },
+    { tier: 'pull.lever.hollow-hang', standard: { kind: 'hold', value: 10 } },
     { tier: 'pull.bar.scap-pulls', standard: { kind: 'reps', value: 6 } },
-    { tier: 'pull.rows.horizontal', standard: { kind: 'reps', value: 6 } },
+    { tier: 'pull.lever.tuck-hold', standard: { kind: 'hold', value: 6 } },
     { tier: 'pull.bar.flexed-hang', standard: { kind: 'hold', value: 15 } },
-    { tier: 'pull.rows.feet-elevated', standard: { kind: 'reps', value: 6 } },
+    { tier: 'pull.lever.tuck-pull', standard: { kind: 'reps', value: 4 } },
     { tier: 'pull.bar.negatives', standard: { kind: 'reps', value: 3 } },
-    { tier: 'pull.rows.wide', standard: { kind: 'reps', value: 6 } },
+    { tier: 'pull.lever.tuck-row', standard: { kind: 'reps', value: 4 } },
     { tier: 'pull.bar.partial-rom', standard: { kind: 'reps', value: 3 } },
-    { tier: 'pull.rows.archer', standard: { kind: 'reps', value: 4, perSide: true } },
+    { tier: 'pull.lever.adv-tuck-row', standard: { kind: 'reps', value: 3 } },
     { tier: 'pull.bar.full', standard: { kind: 'reps', value: 5 } },
     { tier: 'pull.bar.chest-to-bar', standard: { kind: 'reps', value: 3 } },
-    { tier: 'pull.rows.one-arm-assisted', standard: { kind: 'reps', value: 3, perSide: true } },
+    { tier: 'pull.lever.single-leg-row', standard: { kind: 'reps', value: 2, perSide: true } },
     { tier: 'pull.bar.archer', standard: { kind: 'reps', value: 2, perSide: true } },
     { tier: 'pull.bar.typewriter', standard: { kind: 'reps', value: 2, perSide: true } },
-    { tier: 'pull.rows.one-arm', standard: { kind: 'reps', value: 2, perSide: true } },
+    { tier: 'pull.lever.straddle-row', standard: { kind: 'reps', value: 2 } },
     { tier: 'pull.bar.uneven', standard: { kind: 'reps', value: 3, perSide: true } }
   ],
 
   tiers: [
-    // ════════════════════════ ROWS BRANCH ════════════════════════
+    // ════════════════════════ LEVER BRANCH (bar + mat) ════════════════════════
     {
-      id: 'pull.rows.incline-high',
-      name: 'High Incline Row',
-      hookSlot: 'pull-rows-t1',
-      branch: 'rows',
+      id: 'pull.lever.floor-scap',
+      name: 'Prone Y-T-W Raises',
+      hookSlot: 'pull-lever-t1',
+      branch: 'lever',
       prereqs: [],
-      equipment: ['table-edge', 'trx-optional'],
-      noTrxFallback: 'Sturdy table edge, desk lip, or two chairs with a broomstick across.',
-      setup: 'Grip a sturdy table edge (or straps set long), walk feet forward until your body is at roughly 45 degrees. Body in one line, heels on the floor.',
+      equipment: ['mat'],
+      setup: 'Lie face-down on the mat, arms overhead in a Y. Raise both arms off the floor by squeezing the shoulder blades down and together; lower; repeat in a T (arms sideways) and a W (elbows bent). One rep = one raise in the current letter.',
       formStandard: [
-        'Body rigid from heels to head — no hip sag or pike',
-        'Shoulder blades pull down and together before the arms bend',
-        'Chest touches (or nearly touches) the edge at the top',
-        'Two seconds down, no dropping'
+        'Arms lift from the blades, not by arching the lower back',
+        'Thumbs rotate toward the ceiling at the top',
+        'Forehead stays down — neck long',
+        'One-second pause at the top of every raise'
       ],
       scheme: { kind: 'reps', sets: 3, repWindow: [8, 12] },
-      unlock: '3 sets of 12 at form standard',
-      boss: { tier: 'pull.rows.incline-low', standard: { kind: 'reps', value: 5 }, label: '5 clean reps at the lower angle' },
+      unlock: '3 sets of 12 per letter with a 1s pause',
+      boss: { tier: 'pull.lever.hollow-hang', standard: { kind: 'hold', value: 6 }, label: 'a 6-second hollow tuck hang' },
       regression: null,
       commonFaults: [
-        { id: 'hip-sag', text: 'Hips sag — body bends at the waist' },
-        { id: 'shrug', text: 'Shoulders shrug toward ears instead of pulling blades together' },
-        { id: 'partial-top', text: 'Chest stops short of the edge' }
+        { id: 'back-arch', text: 'Lower back arches to fake the lift' },
+        { id: 'no-pause', text: 'Arms bounce instead of pausing' },
+        { id: 'neck-crane', text: 'Head lifts to watch the hands' }
       ],
       faultSideQuests: {
-        'hip-sag': { id: 'sq.plank-rkc', name: 'Hard-style plank, 3×20s', note: 'A rigid row is a moving plank. Earn the line.' },
-        'shrug': { id: 'sq.scap-retraction', name: 'Scap retraction holds, 3×10×2s', note: 'Blades down and back; pause where they meet.' },
-        'partial-top': { id: 'sq.row-iso-top', name: 'Top-position hold, 3×10s', note: 'Own the inch you keep skipping.' }
+        'back-arch': { id: 'sq.glute-set', name: 'Glutes-on Y raises, 2×8', note: 'Squeeze the glutes first; the back stops volunteering.' },
+        'no-pause': { id: 'sq.iso-letters', name: '5s holds at the top of each letter, 3 each', note: 'The pause is where the scap learns.' },
+        'neck-crane': { id: 'sq.forehead-down', name: 'Towel under forehead, full set watching nothing', note: 'The blades do not need supervision.' }
       },
-      rig: ['row-incline.start', 'row-incline.top'],
-      videoRef: { creator: 'Darebee or FitnessFAQs', search: 'incline bodyweight row table tutorial' },
-      tutorial: ['Set the blades before the arms', 'Body is one plank, hips locked']
+      rig: ['ytw.y', 'ytw.t', 'ytw.w'],
+      videoRef: { creator: 'GMB or Darebee', search: 'prone YTW raises shoulder blade tutorial' },
+      tutorial: ['Blades move the arms, back stays quiet', 'Pause at the top — own it']
     },
     {
-      id: 'pull.rows.incline-low',
-      name: 'Low Incline Row',
-      hookSlot: 'pull-rows-t2',
-      branch: 'rows',
-      prereqs: ['pull.rows.incline-high'],
-      equipment: ['table-edge', 'trx-optional'],
-      noTrxFallback: 'Lower table, or bar of a sturdy chair-bridge at hip height.',
-      setup: 'Same as high incline but the anchor is near hip height; body approaches 30 degrees.',
+      id: 'pull.lever.hollow-hang',
+      name: 'Hollow Tuck Hang',
+      hookSlot: 'pull-lever-t2',
+      branch: 'lever',
+      prereqs: ['pull.lever.floor-scap'],
+      equipment: ['bar'],
+      setup: 'Hang from the bar, pull the blades down, tuck the knees toward the chest, and round the lower back into a hollow. The body becomes a loaded spring, not a dangling weight.',
       formStandard: [
-        'Body rigid, heels planted',
-        'Blades set first, elbows track 45 degrees from ribs',
-        'Full touch at top, full hang at bottom',
-        'Controlled two-second negative'
+        'Knees tucked at or above hip height',
+        'Lower back rounded — tail tucked under',
+        'Blades pulled down (not a dead-weight shrug hang)',
+        'Still: no swing, steady breathing'
       ],
-      scheme: { kind: 'reps', sets: 3, repWindow: [8, 12] },
-      unlock: '3 sets of 12 at form standard',
-      boss: { tier: 'pull.rows.horizontal', standard: { kind: 'reps', value: 5 }, label: '5 clean horizontal rows' },
-      regression: 'pull.rows.incline-high',
+      scheme: { kind: 'hold', sets: 3, holdWindow: [10, 25] },
+      unlock: '3 holds of 25s',
+      boss: { tier: 'pull.lever.tuck-hold', standard: { kind: 'hold', value: 4 }, label: 'a 4-second horizontal tuck hold' },
+      regression: 'pull.lever.floor-scap',
       commonFaults: [
-        { id: 'hip-sag', text: 'Hips sag at the lower angle' },
-        { id: 'elbow-flare', text: 'Elbows flare to 90 degrees' },
-        { id: 'speed-drop', text: 'Negative becomes a drop as sets get heavy' }
-      ],
-      faultSideQuests: {
-        'hip-sag': { id: 'sq.plank-rkc', name: 'Hard-style plank, 3×20s', note: 'The angle got lower. The plank has to get harder.' },
-        'elbow-flare': { id: 'sq.row-elbow-path', name: 'Slow rows at the easier angle, 2×8, watching elbow path', note: 'Forty-five degrees. Film it.' },
-        'speed-drop': { id: 'sq.row-negatives', name: '3×5 three-second negatives at this angle', note: 'The way down is half the rep.' }
-      },
-      rig: ['row-low.start', 'row-low.top'],
-      videoRef: { creator: 'FitnessFAQs', search: 'bodyweight row progression low angle' },
-      tutorial: ['Angle changes, the plank does not', 'Elbows at 45, never 90']
-    },
-    {
-      id: 'pull.rows.horizontal',
-      name: 'Horizontal Row',
-      hookSlot: 'pull-rows-t3',
-      branch: 'rows',
-      prereqs: ['pull.rows.incline-low'],
-      equipment: ['low-bar', 'trx-optional'],
-      noTrxFallback: 'Broomstick across two chairs; low pull-up bar; sturdy table you can lie under.',
-      setup: 'Anchor at roughly knee height. Body horizontal, heels on the floor, arms start fully extended.',
-      formStandard: [
-        'Body one straight line, hips never touch down between reps',
-        'Chest to the bar/edge every rep',
-        'Blades lead, arms finish',
-        'Two-second negative, dead-stop hang at the bottom'
-      ],
-      scheme: { kind: 'reps', sets: 3, repWindow: [6, 10] },
-      unlock: '3 sets of 10 at form standard',
-      boss: { tier: 'pull.rows.feet-elevated', standard: { kind: 'reps', value: 5 }, label: '5 clean feet-elevated rows' },
-      regression: 'pull.rows.incline-low',
-      commonFaults: [
-        { id: 'hip-sag', text: 'Hips drop on later reps' },
-        { id: 'partial-top', text: 'Chest stops a fist short of the bar' },
-        { id: 'kip', text: 'Hips bounce to start the pull' }
-      ],
-      faultSideQuests: {
-        'hip-sag': { id: 'sq.hollow-hold', name: 'Hollow-body hold, 3×20s', note: 'The line breaks where the core gives.' },
-        'partial-top': { id: 'sq.row-iso-top', name: 'Top hold at chest, 3×8s', note: 'Touch it. Hold it. Then talk.' },
-        'kip': { id: 'sq.row-deadstop', name: 'Dead-stop rows, 2×6 with 1s hang', note: 'Kill the bounce at the bottom.' }
-      },
-      rig: ['row-horizontal.start', 'row-horizontal.top'],
-      videoRef: { creator: 'FitnessFAQs', search: 'inverted row form chest to bar' },
-      tutorial: ['Dead hang between reps — no bounce', 'Chest to bar or it does not count']
-    },
-    {
-      id: 'pull.rows.feet-elevated',
-      name: 'Feet-Elevated Row',
-      hookSlot: 'pull-rows-t4',
-      branch: 'rows',
-      prereqs: ['pull.rows.horizontal'],
-      equipment: ['low-bar', 'chair'],
-      noTrxFallback: 'Feet on a chair, hands on broomstick-across-chairs or low bar.',
-      setup: 'As horizontal row, feet elevated to anchor height or above. Bodyweight share on the arms rises past half.',
-      formStandard: [
-        'Hips level with the body line even with feet up',
-        'Chest to bar every rep',
-        'No neck poke — head stays in line',
-        'Two-second negative'
-      ],
-      scheme: { kind: 'reps', sets: 3, repWindow: [6, 10] },
-      unlock: '3 sets of 10 at form standard',
-      boss: { tier: 'pull.rows.wide', standard: { kind: 'reps', value: 5 }, label: '5 clean wide rows' },
-      regression: 'pull.rows.horizontal',
-      commonFaults: [
-        { id: 'hip-sag', text: 'Hips hang below the line' },
-        { id: 'neck-poke', text: 'Chin juts to fake the last inch' },
-        { id: 'partial-top', text: 'Range shrinks as sets accumulate' }
-      ],
-      faultSideQuests: {
-        'hip-sag': { id: 'sq.hollow-hold', name: 'Hollow-body hold, 3×25s', note: 'Feet up moved the lever. Pay the core its tax.' },
-        'neck-poke': { id: 'sq.chin-pack', name: 'Chin-packed rows at horizontal, 2×8', note: 'The chin is not a pulling muscle.' },
-        'partial-top': { id: 'sq.row-iso-top', name: 'Top hold, 3×8s, feet elevated', note: 'Prove the top exists before you visit it.' }
-      },
-      rig: ['row-elevated.start', 'row-elevated.top'],
-      videoRef: { creator: 'FitnessFAQs', search: 'feet elevated inverted row' },
-      tutorial: ['The line tilts; it must not bend', 'Watch the chin']
-    },
-    {
-      id: 'pull.rows.wide',
-      name: 'Wide Row',
-      hookSlot: 'pull-rows-t5',
-      branch: 'rows',
-      prereqs: ['pull.rows.feet-elevated'],
-      equipment: ['low-bar'],
-      noTrxFallback: 'Wide grip on any fixed bar; with rings/TRX use a high elbow path instead.',
-      setup: 'Feet-elevated row with hands half again shoulder width, elbows tracking wide. Shifts load to rear delts and mid-back.',
-      formStandard: [
-        'Elbows track wide and high (about 70 degrees)',
-        'Bar to upper chest, not sternum',
-        'No shrug at the top',
-        'Body line holds through every rep'
-      ],
-      scheme: { kind: 'reps', sets: 3, repWindow: [6, 10] },
-      unlock: '3 sets of 10 at form standard',
-      boss: { tier: 'pull.rows.archer', standard: { kind: 'reps', value: 3, perSide: true }, label: '3 clean archer rows per side' },
-      regression: 'pull.rows.feet-elevated',
-      commonFaults: [
-        { id: 'shrug', text: 'Traps take over at the top' },
-        { id: 'narrow-drift', text: 'Hands drift narrow as fatigue builds' },
-        { id: 'partial-top', text: 'Bar touches lower each set' }
+        { id: 'shrug', text: 'Hanging off the traps — ears swallow the shoulders' },
+        { id: 'knee-drop', text: 'Knees sink below hip height as the hold goes on' },
+        { id: 'swing', text: 'Body swings instead of holding the spring' }
       ],
       faultSideQuests: {
         'shrug': { id: 'sq.scap-depression', name: 'Scap depression holds on bar, 3×8s', note: 'Blades down. The shrug is the body lying about strength.' },
-        'narrow-drift': { id: 'sq.wide-row-light', name: 'Wide rows at horizontal angle, 2×10', note: 'Groove the width where it is cheap.' },
-        'partial-top': { id: 'sq.row-iso-top', name: 'Wide top hold, 3×6s', note: 'Upper chest. Every time.' }
+        'knee-drop': { id: 'sq.knee-raise-iso', name: 'Hanging knee-raise holds, 3×8s', note: 'The tuck is hip flexor work. Pay it.' },
+        'swing': { id: 'sq.quiet-hang', name: 'Dead-still hollow hang, 3×10s', note: 'Still first. Strong second.' }
       },
-      rig: ['row-wide.start', 'row-wide.top'],
-      videoRef: { creator: 'FitnessFAQs', search: 'wide grip inverted row rear delt' },
-      tutorial: ['Elbows wide and high', 'Touch the upper chest']
+      rig: ['hollow-hang.hold'],
+      videoRef: { creator: 'FitnessFAQs', search: 'hollow body hang tuck front lever prep' },
+      tutorial: ['Tail tucked under — round the low back', 'Blades down even while hanging']
     },
     {
-      id: 'pull.rows.archer',
-      name: 'Archer Row',
-      hookSlot: 'pull-rows-t6',
-      branch: 'rows',
-      prereqs: ['pull.rows.wide'],
-      equipment: ['low-bar'],
-      noTrxFallback: 'Fixed bar works; slide the assisting hand along the bar.',
-      setup: 'Row position; pull to one side while the other arm stays straight, assisting along the bar. The straight arm gives less every week.',
+      id: 'pull.lever.tuck-hold',
+      name: 'Tuck Front-Lever Hold',
+      hookSlot: 'pull-lever-t3',
+      branch: 'lever',
+      prereqs: ['pull.lever.hollow-hang'],
+      equipment: ['bar'],
+      setup: 'From a hollow tuck hang, pull down hard through straight arms until the back is parallel to the floor, knees tucked tight. The body is now a horizontal beam held by the lats.',
       formStandard: [
-        'Working-side shoulder stays square — no body twist past 15 degrees',
-        'Straight arm assists, never bends',
-        'Chest to bar on the working side',
-        'Same rep count both sides'
+        'Hips at shoulder height — back parallel to the floor',
+        'Arms straight: elbows locked, pulling from the lats',
+        'Knees tight to chest, tail tucked',
+        'Head neutral — look at the ceiling, not the bar'
       ],
-      scheme: { kind: 'reps', sets: 3, repWindow: [4, 8], perSide: true },
-      unlock: '3 sets of 8 per side at form standard',
-      boss: { tier: 'pull.rows.one-arm-assisted', standard: { kind: 'reps', value: 3, perSide: true }, label: '3 assisted one-arm rows per side' },
-      regression: 'pull.rows.wide',
+      scheme: { kind: 'hold', sets: 3, holdWindow: [5, 12] },
+      unlock: '3 holds of 12s',
+      boss: { tier: 'pull.lever.tuck-pull', standard: { kind: 'reps', value: 3 }, label: '3 tuck-lever pulls from hang to horizontal' },
+      regression: 'pull.lever.hollow-hang',
       commonFaults: [
-        { id: 'twist', text: 'Torso rotates to cheat the working side' },
-        { id: 'assist-bend', text: 'The straight arm bends and becomes a second rower' },
-        { id: 'side-gap', text: 'One side is 2+ reps behind the other' }
+        { id: 'hip-sag', text: 'Hips drop below shoulder line — the beam bends' },
+        { id: 'elbow-bend', text: 'Elbows bend to cheat the leverage' },
+        { id: 'short-hold', text: 'Touches horizontal, cannot stay there' }
       ],
       faultSideQuests: {
-        'twist': { id: 'sq.antirotation-hold', name: 'One-arm plank touches, 3×6 per side', note: 'Anti-rotation is a skill. Train it on the floor first.' },
-        'assist-bend': { id: 'sq.archer-tempo', name: 'Archer rows, 2×5, 3s negatives, watching the straight arm', note: 'Film the off arm. It is lying to you.' },
-        'side-gap': { id: 'sq.weak-side-first', name: 'Start every row set on the weak side until even', note: 'The weak side goes first and sets the count.' }
+        'hip-sag': { id: 'sq.tuck-negatives', name: 'Slow tuck-lever negatives, 3×3 (5s down)', note: 'Visit horizontal slowly until it knows you.' },
+        'elbow-bend': { id: 'sq.straight-arm-pulldown', name: 'Straight-arm scap pulls in hollow hang, 3×6', note: 'Straight means straight. The lats do the holding.' },
+        'short-hold': { id: 'sq.hold-ladders', name: 'Hold ladders: 3s/5s/3s with rest, 2 rounds', note: 'Seconds are reps. Collect them.' }
       },
-      rig: ['row-archer.start', 'row-archer.top'],
-      videoRef: { creator: 'FitnessFAQs', search: 'archer row one arm progression' },
-      tutorial: ['Square shoulders — the twist is the cheat', 'Weak side first']
+      rig: ['tuck-fl.hold'],
+      videoRef: { creator: 'FitnessFAQs', search: 'tuck front lever hold tutorial' },
+      tutorial: ['Hips to shoulder height — flat beam', 'Lock the elbows; the lats carry it']
     },
     {
-      id: 'pull.rows.one-arm-assisted',
-      name: 'Assisted One-Arm Row',
-      hookSlot: 'pull-rows-t7',
-      branch: 'rows',
-      prereqs: ['pull.rows.archer'],
-      equipment: ['low-bar', 'towel'],
-      noTrxFallback: 'Towel in the off hand anchored to the bar gives adjustable assist.',
-      setup: 'One hand on the bar, other hand grips a towel hung from the bar. Assist only as much as the last clean rep needs.',
+      id: 'pull.lever.tuck-pull',
+      name: 'Tuck-Lever Pull',
+      hookSlot: 'pull-lever-t4',
+      branch: 'lever',
+      prereqs: ['pull.lever.tuck-hold'],
+      equipment: ['bar'],
+      setup: 'From a hollow tuck hang, pull with straight arms to the horizontal tuck position, pause, lower with control. The dynamic version of the hold — the rowing pattern begins.',
       formStandard: [
-        'Hips and shoulders square to the bar',
-        'Towel hand assists in the bottom half only',
-        'Working arm reaches full extension every rep',
-        'No corkscrew through the trunk'
+        'Arms stay straight both directions',
+        'One-second pause at horizontal',
+        'Tuck stays tight — no kipping the knees',
+        'Three-second controlled descent'
       ],
-      scheme: { kind: 'reps', sets: 3, repWindow: [3, 6], perSide: true },
-      unlock: '3 sets of 6 per side with fingertip assist only',
-      boss: { tier: 'pull.rows.one-arm', standard: { kind: 'reps', value: 2, perSide: true }, label: '2 strict one-arm rows per side' },
-      regression: 'pull.rows.archer',
+      scheme: { kind: 'reps', sets: 3, repWindow: [3, 6] },
+      unlock: '3 sets of 6 with paused horizontals',
+      boss: { tier: 'pull.lever.tuck-row', standard: { kind: 'reps', value: 3 }, label: '3 tuck-lever rows (bar to hips at horizontal)' },
+      regression: 'pull.lever.tuck-hold',
       commonFaults: [
-        { id: 'twist', text: 'Trunk corkscrews on the pull' },
-        { id: 'overassist', text: 'Towel arm does the top half too' },
-        { id: 'rom-loss', text: 'No full hang between reps' }
+        { id: 'elbow-bend', text: 'Elbows bend on the way up' },
+        { id: 'kip', text: 'Knees throw to start the pull' },
+        { id: 'freefall', text: 'Descent becomes a drop' }
       ],
       faultSideQuests: {
-        'twist': { id: 'sq.antirotation-hold', name: 'One-arm plank holds, 3×10s per side', note: 'Square is strength.' },
-        'overassist': { id: 'sq.assist-audit', name: 'Two fingers on the towel, 2×4 per side', note: 'Count the fingers. Then count fewer.' },
-        'rom-loss': { id: 'sq.deadhang-reset', name: 'One-arm dead-stop start, 2×3 per side', note: 'Every rep starts from honest zero.' }
+        'elbow-bend': { id: 'sq.straight-arm-pulldown', name: 'Straight-arm scap pulls, 3×6', note: 'Bent elbows are a different exercise. Do this one.' },
+        'kip': { id: 'sq.deadstop-lever', name: 'Dead-stop pulls: 2s still hang before each, 2×4', note: 'Stillness, then strength. In that order.' },
+        'freefall': { id: 'sq.tuck-negatives', name: '5s negatives only, 3×3', note: 'The way down is half the rep.' }
       },
-      rig: ['row-onearm.start', 'row-onearm.top'],
-      videoRef: { creator: 'FitnessFAQs', search: 'one arm inverted row towel assist' },
-      tutorial: ['Assist the bottom, own the top', 'Square hips, square shoulders']
+      rig: ['tuck-pull.start', 'tuck-pull.top'],
+      videoRef: { creator: 'FitnessFAQs', search: 'front lever raises tuck progression' },
+      tutorial: ['Straight arms — it is a lat pull, not a curl', 'Pause flat, lower slow']
     },
     {
-      id: 'pull.rows.one-arm',
-      name: 'One-Arm Row',
-      hookSlot: 'pull-rows-t8',
-      branch: 'rows',
-      prereqs: ['pull.rows.one-arm-assisted'],
-      equipment: ['low-bar'],
-      noTrxFallback: 'Any fixed bar at knee height.',
-      setup: 'One hand on the bar, free arm at your side or behind the back. Full hang to chest-touch with a square trunk.',
+      id: 'pull.lever.tuck-row',
+      name: 'Tuck-Lever Row',
+      hookSlot: 'pull-lever-t5',
+      branch: 'lever',
+      prereqs: ['pull.lever.tuck-pull'],
+      equipment: ['bar'],
+      setup: 'Hold the horizontal tuck, then ROW: bend the arms and pull the bar to your hips, lower to straight arms without losing horizontal. This is the bodyweight equivalent of a heavy horizontal row.',
       formStandard: [
-        'Zero trunk rotation through the pull',
-        'Full extension at the bottom, chest to bar at the top',
-        'Free arm never touches anything',
-        'Both sides within one rep of each other'
+        'Body stays horizontal through the whole row',
+        'Bar travels to the hip line, elbows driving back',
+        'No hip drop at the top of the row',
+        'Straight-arm finish before the next rep'
+      ],
+      scheme: { kind: 'reps', sets: 3, repWindow: [3, 8] },
+      unlock: '3 sets of 8 at form standard',
+      boss: { tier: 'pull.lever.adv-tuck-row', standard: { kind: 'reps', value: 3 }, label: '3 advanced-tuck rows (knees at 90°)' },
+      regression: 'pull.lever.tuck-pull',
+      commonFaults: [
+        { id: 'hip-sag', text: 'Hips sink as the arms bend' },
+        { id: 'partial-row', text: 'Bar stops short of the hips' },
+        { id: 'pike', text: 'Body pikes to make the row easier' }
+      ],
+      faultSideQuests: {
+        'hip-sag': { id: 'sq.row-iso-top', name: 'Top-of-row holds, 3×5s', note: 'Own the inch you keep skipping.' },
+        'partial-row': { id: 'sq.row-iso-top', name: 'Bar-at-hips holds, 3×5s', note: 'Touch it. Hold it. Then talk.' },
+        'pike': { id: 'sq.hollow-hold', name: 'Hollow-body holds on the mat, 3×25s', note: 'The line breaks where the core gives.' }
+      },
+      rig: ['tuck-row.start', 'tuck-row.top'],
+      videoRef: { creator: 'FitnessFAQs', search: 'tuck front lever row tutorial' },
+      tutorial: ['Horizontal is the contract — the row happens inside it', 'Bar to hips, every rep']
+    },
+    {
+      id: 'pull.lever.adv-tuck-row',
+      name: 'Advanced-Tuck Row',
+      hookSlot: 'pull-lever-t6',
+      branch: 'lever',
+      prereqs: ['pull.lever.tuck-row'],
+      equipment: ['bar'],
+      setup: 'Tuck-lever row with the knees opened to 90 degrees — the hips extend, the beam gets longer, every rep gets heavier. Flat back is the whole test.',
+      formStandard: [
+        'Knee angle at 90° — thighs vertical-ish, shins parallel to floor',
+        'Lower back FLAT, tail still tucked',
+        'Bar to hips with body horizontal',
+        'No re-tucking mid-set'
+      ],
+      scheme: { kind: 'reps', sets: 3, repWindow: [3, 6] },
+      unlock: '3 sets of 6 at form standard',
+      boss: { tier: 'pull.lever.single-leg-row', standard: { kind: 'reps', value: 2, perSide: true }, label: '2 single-leg lever rows per side' },
+      regression: 'pull.lever.tuck-row',
+      commonFaults: [
+        { id: 'back-arch', text: 'Lower back arches as the legs open' },
+        { id: 're-tuck', text: 'Knees creep back in under fatigue' },
+        { id: 'hip-sag', text: 'The longer beam bends at the hips' }
+      ],
+      faultSideQuests: {
+        'back-arch': { id: 'sq.hollow-hold', name: 'Advanced-tuck hollow holds on mat, 3×20s', note: 'Find the flat back on the floor; bring it to the bar.' },
+        're-tuck': { id: 'sq.angle-watch', name: 'Filmed sets at the easier tuck, watching knee angle', note: 'Film the knees. They negotiate when you stop looking.' },
+        'hip-sag': { id: 'sq.adv-tuck-iso', name: 'Advanced-tuck holds, 3×6s', note: 'Hold the longer beam before rowing it.' }
+      },
+      rig: ['adv-tuck-row.hold'],
+      videoRef: { creator: 'FitnessFAQs', search: 'advanced tuck front lever row' },
+      tutorial: ['Open the knees, NOT the lower back', '90 degrees is a promise — keep it']
+    },
+    {
+      id: 'pull.lever.single-leg-row',
+      name: 'Single-Leg Lever Row',
+      hookSlot: 'pull-lever-t7',
+      branch: 'lever',
+      prereqs: ['pull.lever.adv-tuck-row'],
+      equipment: ['bar'],
+      setup: 'Advanced tuck with one leg extended fully. Row. Switch legs set to set — both sides earn the same count.',
+      formStandard: [
+        'Extended leg straight and in line with the torso',
+        'Hips level — no twist toward the tucked side',
+        'Bar to hips, body horizontal',
+        'Equal reps both legs'
       ],
       scheme: { kind: 'reps', sets: 3, repWindow: [2, 5], perSide: true },
-      unlock: '3 sets of 5 per side at form standard',
-      boss: null, // branch capstone in the slice; full build adds front-lever rows
-      regression: 'pull.rows.one-arm-assisted',
+      unlock: '3 sets of 5 per side',
+      boss: { tier: 'pull.lever.straddle-row', standard: { kind: 'reps', value: 2 }, label: '2 straddle-lever rows' },
+      regression: 'pull.lever.adv-tuck-row',
       commonFaults: [
-        { id: 'twist', text: 'Rotation sneaks back under max effort' },
-        { id: 'side-gap', text: 'Strong side runs away from weak side' }
+        { id: 'twist', text: 'Hips rotate toward the tucked leg' },
+        { id: 'leg-drop', text: 'Extended leg sinks below the line' },
+        { id: 'side-gap', text: 'One leg’s reps outrun the other' }
       ],
       faultSideQuests: {
-        'twist': { id: 'sq.antirotation-hold', name: 'Weighted one-arm plank, 3×8s per side', note: 'The trunk is the second arm.' },
+        'twist': { id: 'sq.antirotation-hold', name: 'Side plank, 3×20s per side', note: 'Lock the box before you tilt it.' },
+        'leg-drop': { id: 'sq.single-leg-iso', name: 'Single-leg lever holds, 3×5s per side', note: 'The leg is part of the beam. Act like it.' },
         'side-gap': { id: 'sq.weak-side-first', name: 'Weak side opens and closes every session', note: 'Symmetry is programmed, not wished for.' }
       },
-      rig: ['row-onearm.start', 'row-onearm.top'],
-      videoRef: { creator: 'FitnessFAQs', search: 'strict one arm bodyweight row' },
-      tutorial: ['This is an anti-rotation lift that happens to be a row', 'One rep gap maximum between sides']
+      rig: ['single-leg-row.hold'],
+      videoRef: { creator: 'FitnessFAQs', search: 'single leg front lever row' },
+      tutorial: ['The straight leg is the test — keep it on the line', 'Weak side first']
+    },
+    {
+      id: 'pull.lever.straddle-row',
+      name: 'Straddle-Lever Row',
+      hookSlot: 'pull-lever-t8',
+      branch: 'lever',
+      prereqs: ['pull.lever.single-leg-row'],
+      equipment: ['bar'],
+      setup: 'Both legs extended in a wide straddle, body horizontal. Row the bar to the hips. The doorway to the full front lever — the capstone of the slice.',
+      formStandard: [
+        'Both legs straight, straddled wide, on the body line',
+        'Hips level with shoulders through the row',
+        'Bar to hips, controlled straight-arm finish',
+        'No arch — flat beam, tail tucked'
+      ],
+      scheme: { kind: 'reps', sets: 3, repWindow: [2, 5] },
+      unlock: '3 sets of 5 at form standard',
+      boss: null, // branch capstone in the slice; full build: full front lever
+      regression: 'pull.lever.single-leg-row',
+      commonFaults: [
+        { id: 'hip-sag', text: 'Hips sink under the full leverage' },
+        { id: 'narrow-straddle', text: 'The straddle narrows to shorten the beam' }
+      ],
+      faultSideQuests: {
+        'hip-sag': { id: 'sq.straddle-iso', name: 'Straddle-lever holds, 3×4s', note: 'Hold the shape before moving inside it.' },
+        'narrow-straddle': { id: 'sq.straddle-width', name: 'Filmed holds with marked straddle width', note: 'Wide is honest. Mark it on the wall.' }
+      },
+      rig: ['straddle-row.hold'],
+      videoRef: { creator: 'FitnessFAQs', search: 'straddle front lever row' },
+      tutorial: ['Wide straddle, flat beam', 'This is the door to the full lever — respect it']
     },
 
-    // ════════════════════════ BAR BRANCH ════════════════════════
+    // ════════════════════════ BAR BRANCH (unchanged contract) ═══════════════
     {
       id: 'pull.bar.dead-hang',
       name: 'Dead Hang',
@@ -358,7 +339,7 @@ export const PULL_TREE = {
         { id: 'swing', text: 'Body swings or twists' }
       ],
       faultSideQuests: {
-        'grip-fade': { id: 'sq.towel-hang', name: 'Towel hang, 3×10s', note: 'Grip is built where it is hardest.' },
+        'grip-fade': { id: 'sq.grip-singles', name: 'Short max-grip hangs, 5×8s', note: 'Grip is built where it is hardest.' },
         'swing': { id: 'sq.quiet-hang', name: 'Hollow-body hang, 3×15s', note: 'A still body is a strong signal.' }
       },
       rig: ['hang-dead.start'],
@@ -381,7 +362,7 @@ export const PULL_TREE = {
       ],
       scheme: { kind: 'reps', sets: 3, repWindow: [5, 10] },
       unlock: '3 sets of 10 with a 1s pause',
-      boss: { tier: 'pull.bar.flexed-hang', standard: { kind: 'hold', value: 10 }, label: '10s flexed-arm hang' },
+      boss: { tier: 'pull.bar.flexed-hang', standard: { kind: 'hold', value: 10 }, label: 'a 10s flexed-arm hang' },
       regression: 'pull.bar.dead-hang',
       commonFaults: [
         { id: 'elbow-bend', text: 'Elbows bend — it becomes a tiny pull-up' },
@@ -401,8 +382,8 @@ export const PULL_TREE = {
       hookSlot: 'pull-bar-t3',
       branch: 'bar',
       prereqs: ['pull.bar.scap-pulls'],
-      equipment: ['bar', 'chair'],
-      setup: 'Jump or step (from a chair) to the top position — chin over bar, elbows fully bent — and hold.',
+      equipment: ['bar'],
+      setup: 'Jump from the floor to the top position — chin over bar, elbows fully bent — and hold. (No chair needed: a controlled jump from under the bar is the mount.)',
       formStandard: [
         'Chin over the bar without reaching with the neck',
         'Elbows fully closed, bar at upper chest',
@@ -423,7 +404,7 @@ export const PULL_TREE = {
       },
       rig: ['hang-flexed.top'],
       videoRef: { creator: 'GMB', search: 'flexed arm hang chin over bar' },
-      tutorial: ['Step up — do not pull up — to start', 'The hold ends when the elbows open, not the chin']
+      tutorial: ['Jump up — do not pull up — to start', 'The hold ends when the elbows open, not the chin']
     },
     {
       id: 'pull.bar.negatives',
@@ -431,13 +412,13 @@ export const PULL_TREE = {
       hookSlot: 'pull-bar-t4',
       branch: 'bar',
       prereqs: ['pull.bar.flexed-hang'],
-      equipment: ['bar', 'chair'],
-      setup: 'Start at the top (step up from a chair). Lower to a dead hang as slowly as you can control. Five seconds is the working standard.',
+      equipment: ['bar'],
+      setup: 'Jump to the top position. Lower to a dead hang as slowly as you can control. Five seconds is the working standard.',
       formStandard: [
         'Five seconds top to dead hang, evenly paced',
         'No free-fall through the middle third',
         'Finish at a full dead hang every rep',
-        'Step down and reset — no kipping back up'
+        'Drop and reset — no kipping back up'
       ],
       scheme: { kind: 'reps', sets: 3, repWindow: [3, 6] },
       unlock: '3 sets of 6 five-second negatives',
@@ -445,7 +426,7 @@ export const PULL_TREE = {
       regression: 'pull.bar.flexed-hang',
       commonFaults: [
         { id: 'midfall', text: 'Middle third free-falls — control only at top and bottom' },
-        { id: 'short-finish', text: 'Stepping off before the dead hang' }
+        { id: 'short-finish', text: 'Dropping off before the dead hang' }
       ],
       faultSideQuests: {
         'midfall': { id: 'sq.mid-iso', name: '90-degree hold, 3×8s', note: 'The middle is weakest because it is never visited.' },
@@ -595,7 +576,7 @@ export const PULL_TREE = {
       ],
       scheme: { kind: 'reps', sets: 3, repWindow: [2, 4], perSide: true },
       unlock: '3 sets of 4 per direction',
-      boss: { tier: 'pull.bar.uneven', standard: { kind: 'reps', value: 2, perSide: true }, label: '2 uneven pull-ups per side' },
+      boss: { tier: 'pull.bar.uneven', standard: { kind: 'reps', value: 2, perSide: true }, label: '2 uneven-grip pull-ups per side' },
       regression: 'pull.bar.archer',
       commonFaults: [
         { id: 'sag-middle', text: 'Body drops in the middle of the slide' },
@@ -611,33 +592,33 @@ export const PULL_TREE = {
     },
     {
       id: 'pull.bar.uneven',
-      name: 'Uneven Pull-Up',
+      name: 'Uneven-Grip Pull-Up',
       hookSlot: 'pull-bar-t10',
       branch: 'bar',
       prereqs: ['pull.bar.typewriter'],
-      equipment: ['bar', 'towel'],
-      setup: 'One hand on the bar, the other gripping a towel hung from the bar at forearm length. The towel arm assists; the bar arm leads. The doorway to the one-arm road.',
+      equipment: ['bar'],
+      setup: 'One hand on the bar, the other gripping the WRIST of the bar arm (bar + nothing else). The wrist-grip arm assists; the bar arm leads. The doorway to the one-arm road.',
       formStandard: [
         'Bar-side arm does visibly most of the work',
         'Chin over the bar-side hand',
-        'Towel grip at forearm distance or lower',
+        'Assist hand on the wrist, not the forearm',
         'No swing'
       ],
       scheme: { kind: 'reps', sets: 3, repWindow: [2, 5], perSide: true },
-      unlock: '3 sets of 5 per side with towel at full forearm length',
+      unlock: '3 sets of 5 per side with wrist-grip assist',
       boss: null, // branch capstone in the slice; full build continues to one-arm
       regression: 'pull.bar.typewriter',
       commonFaults: [
-        { id: 'towel-pull', text: 'Towel arm secretly leads' },
+        { id: 'assist-pull', text: 'Wrist hand secretly leads' },
         { id: 'swing', text: 'Asymmetric load starts a pendulum' }
       ],
       faultSideQuests: {
-        'towel-pull': { id: 'sq.assist-audit', name: 'Lower the towel grip one fist, 2×3', note: 'Lengthen the lie until it becomes the truth.' },
+        'assist-pull': { id: 'sq.assist-audit', name: 'Two-finger wrist assist, 2×3 per side', note: 'Count the fingers. Then count fewer.' },
         'swing': { id: 'sq.quiet-hang', name: 'Uneven hang holds, 3×10s per side', note: 'Still first. Strong second.' }
       },
       rig: ['uneven.top'],
-      videoRef: { creator: 'FitnessFAQs', search: 'uneven pull up towel one arm progression' },
-      tutorial: ['The towel is a witness, not a worker', 'Quiet body before strong body']
+      videoRef: { creator: 'FitnessFAQs', search: 'uneven grip wrist pull up one arm progression' },
+      tutorial: ['The wrist hand is a witness, not a worker', 'Quiet body before strong body']
     }
   ]
 };

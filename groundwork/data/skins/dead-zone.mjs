@@ -31,14 +31,14 @@ export const SKIN = {
 
   // ── Tier flavor names (sectors of the Rigging Wing) ───────────────────────
   tierNames: {
-    'pull-rows-t1': 'The Loading Ramp',
-    'pull-rows-t2': 'Cable Run, Lower',
-    'pull-rows-t3': 'The Service Crawl',
-    'pull-rows-t4': 'Counterweight Pit',
-    'pull-rows-t5': 'The Wide Gantry',
-    'pull-rows-t6': 'Asymmetric Junction',
-    'pull-rows-t7': 'The Single-Line Splice',
-    'pull-rows-t8': 'Dead Man’s Anchor',
+    'pull-lever-t1': 'The Loading Ramp',
+    'pull-lever-t2': 'Cable Run, Lower',
+    'pull-lever-t3': 'The Level Gauge',
+    'pull-lever-t4': 'Counterweight Pit',
+    'pull-lever-t5': 'The Long Gantry',
+    'pull-lever-t6': 'The Extended Boom',
+    'pull-lever-t7': 'The Single-Line Splice',
+    'pull-lever-t8': 'Dead Man’s Anchor',
     'pull-bar-t1': 'The Hanging Gallery',
     'pull-bar-t2': 'Shoulder Stock Room',
     'pull-bar-t3': 'The Held Breath',
@@ -58,7 +58,7 @@ export const SKIN = {
   // set (same tier, same scheme, same rest behind every door).
   // bias: 'intel' | 'loot' | 'encounter' | 'story' — nudges the reward table.
   roomPools: {
-    rows: [
+    lever: [
       { id: 'r-manifest', name: 'Manifest Office', bias: 'intel', desc: 'Paper everywhere. Eight filed things here, then stopped filing.' },
       { id: 'r-spool', name: 'Spool Storage', bias: 'loot', desc: 'Cable drums taller than you. Some have been unwound by hand.' },
       { id: 'r-breaker', name: 'Breaker Gallery', bias: 'encounter', desc: 'Every switch is OFF. Switched off, not failed off.' },
@@ -205,9 +205,9 @@ export const SKIN = {
         'RIGGING: “Grip went before the back did — I watched it. That’s not failure, that’s a survey result. Towel work. We splice the weak strand first.”',
         'RIGGING: “The bar wins one. Fine. It’s been here longer than both of us. What gave out — write it down while it’s honest.”'
       ] },
-      { when: { outcome: 'missed', branch: 'rows' }, lines: [
-        'RIGGING: “Hips sagged on the back half. The line broke where the middle quit. Plank work — the row is just a plank that travels.”',
-        'RIGGING: “Short of the count. The count holds no grudge. It’ll be standing right there next session.”'
+      { when: { outcome: 'missed', branch: 'lever' }, lines: [
+        'RIGGING: “The beam bent at the hips — I watched the line break. Hollow work on the mat. A lever is a plank that decided to fly.”',
+        'RIGGING: “Short of the count. The count holds no grudge. It’ll be hanging right there next session.”'
       ] },
       { when: { outcome: 'partial' }, lines: [
         'RIGGING: “Most of a set is still work the station banks. But the window has a top for a reason. Next time we touch it.”'

@@ -18,7 +18,7 @@ export function createEmptyProfile(seed) {
     settings: {
       daysPerWeek: 3,
       sessionBudgetMinutes: 40,    // 25 | 40 | 60 (volume shaping, never MED)
-      equipment: ['bar'],          // bodyweight implied; 'trx' optional
+      equipment: ['bar', 'mat'],   // THE contract: bar + mat, nothing else
       injuryFlags: [],
       concurrentTraining: [],      // modifier table inputs (full build)
       muted: false
@@ -53,6 +53,16 @@ function migrateProfile(profile) {
   }
   if (profile.settings && profile.settings.muted === undefined) profile.settings.muted = false;
   if (profile.settings && profile.settings.sessionBudgetMinutes === undefined) profile.settings.sessionBudgetMinutes = 40;
+  // Equipment contract v2 (bar + mat only): saves from the furniture-rows era
+  // reference a branch that no longer exists — clear the pull assessment so
+  // the intake re-runs against the lever ladder.
+  if (profile.active && profile.active.pull && profile.active.pull.rows) {
+    delete profile.assessments.pull;
+    delete profile.active.pull;
+    delete profile.cleared.pull;
+    if (profile.explored) delete profile.explored.rows;
+  }
+  if (profile.settings) profile.settings.equipment = ['bar', 'mat'];
   return profile;
 }
 
