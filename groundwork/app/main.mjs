@@ -47,6 +47,16 @@ const esc = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
+function figureFrames(tier) {
+  const base = 'data/figures/' + tier.id.replace(/\./g, '-');
+  return [1, 2, 3].map((n) => base + '-' + n + '.webp');
+}
+function figuresHtml(tier) {
+  return `<div class="gw-figures">${figureFrames(tier).map((src, i) =>
+    `<img src="${src}" alt="${esc(tier.name)} — frame ${i + 1}" loading="lazy"
+      onerror="this.parentElement.removeChild(this)">`).join('')}</div>`;
+}
+
 const flavorName = (tier) => (SKIN.tierNames && SKIN.tierNames[tier.hookSlot]) || tier.name;
 const fill = (t, vars) => String(t).replace(/\{\{(\w+)\}\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : ''));
 const muted = () => !!(state.profile && state.profile.settings.muted);
@@ -243,6 +253,7 @@ function renderAssess() {
       <h2 class="gw-test-name">${esc(tier.name)}</h2>
       <p class="gw-test-standard">${esc(stdText)}</p>
       <details class="gw-form"><summary>How to do it</summary>
+        ${figuresHtml(tier)}
         <p>${esc(tier.setup)}</p>
         <ul class="gw-list">${tier.formStandard.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
       </details>
@@ -379,8 +390,9 @@ function renderRoom(s) {
     </header>
     <main class="gw-panel gw-center">
       ${phase === 'set' ? `
-        ${room.learnCue ? `<div class="gw-callout">This set, one thing: <strong>${esc(room.learnCue)}</strong></div>` : `
+        ${room.learnCue ? `<div class="gw-callout">This set, one thing: <strong>${esc(room.learnCue)}</strong></div>${figuresHtml(tier)}` : `
         <details class="gw-form"><summary>Form standard</summary>
+          ${figuresHtml(tier)}
           <ul class="gw-list">${tier.formStandard.map((f) => `<li>${esc(f)}</li>`).join('')}</ul></details>`}
         <p class="gw-bigcue">Do the set.</p>
         <p class="gw-dim">Aim for ${target[1]} ${unit}. The room resolves while you rest.</p>

@@ -164,3 +164,7 @@ button:active { transform: translateY(1px); }
 .gw-tabbar { position: sticky; bottom: 0; display: flex; gap: 6px; padding: 8px 0 4px; background: var(--gw-paper); border-top: 1px solid var(--gw-rule); margin-top: 10px; }
 .gw-tab { flex: 1; min-height: 48px; font-size: 0.85rem; margin: 0; }
 .gw-tab-active { border-color: var(--gw-accent); color: var(--gw-accent); font-weight: 700; }
+
+/* Exercise-book figure photos */
+.gw-figures { display: flex; gap: 6px; margin: 8px 0; }
+.gw-figures img { flex: 1; min-width: 0; max-width: 33%; border: 1px solid var(--gw-rule); border-radius: 6px; background: var(--gw-panel); object-fit: cover; aspect-ratio: 3/4; }
