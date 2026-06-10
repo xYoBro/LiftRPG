@@ -3800,15 +3800,24 @@
           '<button type="button" id="api-open-renderer">' + (blockedForQuality ? 'Open Booklet For Review' : 'Open Booklet In Renderer') + '</button>' +
           '<button type="button" id="api-download-json">' + (blockedForQuality ? 'Download Review JSON' : 'Download JSON') + '</button>';
 
+        function stripInternalKeys(booklet) {
+          if (!booklet || typeof booklet !== 'object') return booklet;
+          var clean = JSON.parse(JSON.stringify(booklet));
+          ['_qualityReport', '_qualityGate', '_pipeline', '_stageTelemetry',
+           '_assemblyWarnings', '_continuityWarnings', '_assemblyDiagnostics',
+           '_artifactIntentDrift', '_trialMode', '_x'].forEach(function (key) {
+            delete clean[key];
+          });
+          return clean;
+        }
+
         var openRendererBtn = document.getElementById('api-open-renderer');
         var downloadBtn = document.getElementById('api-download-json');
 
         if (openRendererBtn) {
           openRendererBtn.addEventListener('click', async function () {
             try {
-              var cleanBooklet = await prepareAssemblyExport(apiRunState.booklet, { allowBlockedQualityGate: true });
-              delete cleanBooklet._qualityReport;
-              delete cleanBooklet._qualityGate;
+              var cleanBooklet = stripInternalKeys(await prepareAssemblyExport(apiRunState.booklet, { allowBlockedQualityGate: true }));
               sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(cleanBooklet));
               window.open('renderer/?source=session', '_blank');
             } catch (error) {
@@ -3834,7 +3843,7 @@
               .toLowerCase()
               .replace(/[^a-z0-9]+/g, '-')
               .replace(/^-+|-+$/g, '') || 'liftrpg-booklet';
-            var blob = new Blob([JSON.stringify(exportBooklet, null, 2)], { type: 'application/json' });
+            var blob = new Blob([JSON.stringify(stripInternalKeys(exportBooklet), null, 2)], { type: 'application/json' });
             var url = URL.createObjectURL(blob);
             var link = document.createElement('a');
             link.href = url;

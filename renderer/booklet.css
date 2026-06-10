@@ -5570,7 +5570,65 @@ body[data-demo-view="true"] .reader-unlock{
     break-after:auto;
     break-inside:avoid;
   }
-  .blank-page{
+  
+/* ── Density variants: cipher / map / fragment (AUDIT 111) ──
+   These atoms set data-density-variant and promise shrink in estimate();
+   without these rules the density solver burned revision passes on
+   unrealizable savings. Spacing/size only — theme owns character. */
+.cipher-zone[data-density-variant="compact"]{ }
+.cipher-zone[data-density-variant="dense"],
+.cipher-zone[data-density-variant="tight"]{
+  font-size:0.95em;
+}
+.cipher-zone[data-density-variant="dense"] .cipher-display,
+.cipher-zone[data-density-variant="tight"] .cipher-display{
+  font-size:5pt;
+  line-height:1.2;
+}
+.cipher-zone[data-density-variant="dense"] .cipher-lined-row{ height:9px; }
+.cipher-zone[data-density-variant="tight"] .cipher-lined-row{ height:8px; }
+.cipher-zone[data-density-variant="dense"] .cipher-key,
+.cipher-zone[data-density-variant="tight"] .cipher-key{
+  margin-top:2px;
+}
+.cipher-zone[data-density-variant="tight"] .cipher-family-note{ display:none; }
+
+.map-zone[data-density-variant="dense"] .map-note,
+.map-zone[data-density-variant="tight"] .map-note{
+  font-size:4.6pt;
+  line-height:1.2;
+  margin-top:1px;
+}
+.map-zone[data-density-variant="dense"] .map-title,
+.map-zone[data-density-variant="tight"] .map-title{
+  margin-bottom:1px;
+}
+.map-zone[data-density-variant="tight"] .map-note{ display:none; }
+
+.fragment-block[data-density-variant="compact"] .fragment-doc-body{
+  font-size:0.97em;
+}
+.fragment-block[data-density-variant="dense"] .fragment-doc-body{
+  font-size:0.93em;
+  line-height:1.32;
+}
+.fragment-block[data-density-variant="tight"] .fragment-doc-body{
+  font-size:0.9em;
+  line-height:1.26;
+}
+.fragment-block[data-density-variant="dense"] .fragment-doc-header,
+.fragment-block[data-density-variant="tight"] .fragment-doc-header{
+  margin-bottom:3px;
+}
+
+.oracle-zone[data-density-variant="compact"] .oracle-entries{
+  gap:2px 8px;
+}
+.oracle-zone[data-density-variant="compact"] .oracle-text{
+  font-size:5pt;
+}
+
+.blank-page{
     background:white;
   }
 }

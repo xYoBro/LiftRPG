@@ -181,6 +181,7 @@ export function getDocumentAtom(type) {
   const normalized = String(type || '')
     .replace(/([a-z])([A-Z])/g, '$1-$2')
     .replace(/\s+/g, '-')
-    .trim();
+    .trim()
+    .toLowerCase();
   return DOCUMENT_ATOM_REGISTRY[type] || DOCUMENT_ATOM_REGISTRY[normalized] || { family: 'custom-document' };
 }

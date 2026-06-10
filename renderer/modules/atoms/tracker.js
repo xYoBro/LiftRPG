@@ -195,6 +195,10 @@ function buildMemorySlots(data) {
     const slot = make('div', 'companion-memory-slot');
     const lbl = make('div', 'companion-slot-label', String(i + 1).padStart(2, '0'));
     const lines = make('div', 'companion-memory-lines');
+    // Three ruled lines per slot, matching the interlude-payload renderer in
+    // field-ops-primitives.js — the same component must print identically on
+    // both paths (AUDIT 112).
+    lines.appendChild(make('div', 'companion-memory-line'));
     lines.appendChild(make('div', 'companion-memory-line'));
     lines.appendChild(make('div', 'companion-memory-line'));
     slot.appendChild(lbl);

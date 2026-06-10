@@ -18,7 +18,17 @@ function decodeA1Z26(values) {
 }
 
 function isStandardAlphaTable(referenceTable) {
-  if (!referenceTable || typeof referenceTable !== 'string') return false;
+  if (!referenceTable) return false;
+  // Canonical form is the "1=A 2=B ..." string; the array form
+  // [{ value, letter }] is normalized to it so both share one check
+  // (previously two functions disagreed about the field's type — AUDIT 19).
+  if (Array.isArray(referenceTable)) {
+    referenceTable = referenceTable
+      .map((row) => row && (row.value + '=' + row.letter))
+      .filter(Boolean)
+      .join(' ');
+  }
+  if (typeof referenceTable !== 'string') return false;
   const pairs = referenceTable.match(/\d+=\s*[A-Za-z]/g);
   if (!pairs || pairs.length < 26) return false;
   for (let index = 0; index < 26; index += 1) {

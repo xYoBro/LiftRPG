@@ -188,10 +188,15 @@ export function buildBossPageModel(data, week, options = 'standard') {
   const isContinuation = continuationSegment === 'followup';
   const artifactIdentity = resolveArtifactIdentity(data || {});
   const shellFamily = artifactIdentity.shellFamily || 'field-survey';
-  const hasConvergenceAppendix = !!(
+  const hasAppendixContent = !!(
     boss.convergenceProof
     || (boss.binaryChoiceAcknowledgement && (boss.binaryChoiceAcknowledgement.ifA || boss.binaryChoiceAcknowledgement.ifB))
   );
+  // Only classified-packet shells get a separate appendix page from the
+  // adapter. Every other shell must render proof + acknowledgement inline on
+  // the main boss page — previously they were withheld for an appendix that
+  // never existed and silently dropped (AUDIT finding 107; shipped demo).
+  const hasConvergenceAppendix = shellFamily === 'classified-packet' && hasAppendixContent;
   const layoutVariant = shellFamily === 'classified-packet' && hasConvergenceAppendix
     ? 'tight'
     : requestedLayoutVariant;
@@ -235,8 +240,14 @@ export function buildBossPageModel(data, week, options = 'standard') {
     ),
     passwordLength: getPasswordLength(data, (boss.componentInputs || []).length || 6),
     convergenceProof: (!isContinuation && hasConvergenceAppendix) ? '' : sanitizeBossTextForDisplay(boss.convergenceProof || '', derivedPassword),
-    convergenceProofParagraphs: isContinuation ? continuationAppendixParagraphs : [],
-    binaryChoiceAcknowledgement: isContinuation ? (boss.binaryChoiceAcknowledgement || null) : null
+    convergenceProofParagraphs: isContinuation
+      ? continuationAppendixParagraphs
+      : (hasConvergenceAppendix
+        ? []
+        : splitParagraphs(sanitizeBossTextForDisplay(boss.convergenceProof || '', derivedPassword))),
+    binaryChoiceAcknowledgement: isContinuation
+      ? (boss.binaryChoiceAcknowledgement || null)
+      : (hasConvergenceAppendix ? null : (boss.binaryChoiceAcknowledgement || null))
   };
 }
 

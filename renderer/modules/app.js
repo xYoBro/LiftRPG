@@ -565,7 +565,15 @@ function attemptEncrypt() {
 
 function downloadJson() {
   if (!state.data) return;
-  const blob = new Blob([JSON.stringify(state.data, null, 2)], { type: 'application/json' });
+  const exportData = JSON.parse(JSON.stringify(state.data));
+  if (exportData.meta && exportData.meta.passwordEncryptedEnding) {
+    // Sealed booklet: plaintext endings and passwords must not ship beside
+    // the ciphertext (AUDIT finding 48).
+    delete exportData.meta.passwordPlaintext;
+    delete exportData.meta.demoPassword;
+    exportData.endings = [];
+  }
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;

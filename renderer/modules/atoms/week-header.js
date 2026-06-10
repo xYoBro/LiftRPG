@@ -47,11 +47,13 @@ registerAtom('week-header', {
     // Epigraph (only on first chunk of a multi-part week)
     if (week.epigraph && data.isFirstChunk !== false) {
       const epigraph = week.epigraph;
-      if (epigraph.attribution) {
-        wrap.appendChild(make('div', 'week-subtitle', epigraph.attribution));
-      }
+      // Quote text in the italic subtitle slot, attribution in the small
+      // mono meta slot (these were swapped — AUDIT finding 117).
       if (epigraph.text) {
-        wrap.appendChild(make('div', 'week-meta', epigraph.text));
+        wrap.appendChild(make('div', 'week-subtitle', epigraph.text));
+      }
+      if (epigraph.attribution) {
+        wrap.appendChild(make('div', 'week-meta', epigraph.attribution));
       }
     }
 

@@ -49,10 +49,17 @@ function buildGrid(pages, layoutMode) {
 
   if (layoutMode === 'booklet') {
     let count = pages.length;
+    if (count % 4 !== 0) {
+      // The planner owns pad-to-multiple-of-4 (padding goes BEFORE
+      // back-matter so the back cover stays last). Reaching this fallback
+      // means planning failed to pad — pages appended here land AFTER the
+      // back cover and break imposition order. Keep print working, but say so.
+      console.error('[render] planner did not pad to a multiple of 4 (' + count + ' pages); appending trailing blanks — back-cover imposition position will be wrong.');
+    }
     while (count % 4 !== 0) {
-      const blank = createBoundedPage('blank-filler', 'page-blank', {
+      const blank = createBoundedPage('blank-filler', 'blank-page', {
         boundaryRole: 'utility',
-        pageClass: 'page-blank'
+        pageClass: 'blank-page'
       }).page;
       blank.style.width = PAGE_WIDTH_IN + 'in';
       blank.style.height = PAGE_HEIGHT_IN + 'in';
