@@ -3,7 +3,7 @@
 // refresh in the background. Zero runtime network dependency (pillar 5) —
 // after install the app must complete a full session in airplane mode.
 
-const CACHE = 'groundwork-v2';
+const CACHE = 'groundwork-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -21,7 +21,8 @@ const ASSETS = [
   './app/engine/audio.mjs',
   './data/trees/pull.mjs',
   './data/tables/resolution.mjs',
-  './data/skins/dead-zone.mjs'
+  './data/skins/dead-zone.mjs',
+  './data/figures/manifest.mjs'
 ];
 
 self.addEventListener('install', (event) => {

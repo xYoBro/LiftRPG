@@ -4,7 +4,8 @@ Every tier shows up to 3 photos (start / mid / end position) in the intake's
 "How to do it," in learn mode, and behind the room's Form standard disclosure.
 **Filename contract:** `<tier id, dots→dashes>-<frame>.webp` in this folder,
 portrait 3:4, e.g. `pull-lever-tuck-hold-1.webp`. Missing files simply don't
-render — ship what you have, fill in over time.
+render — ship what you have, fill in over time. **After adding files, run
+`npm run figures`** (regenerates the manifest the app reads), then redeploy.
 
 ## Two ways to produce them
 

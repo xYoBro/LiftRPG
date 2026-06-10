@@ -19,6 +19,7 @@ import { generateSession, roomKey, buildAar, unlockHit, REST_SECONDS } from './e
 import { awardForRow, resolveEncounterChoice, fragmentById, kitItemById } from './engine/discovery.mjs';
 import { markExplored, projectWing } from './engine/map.mjs';
 import { chimeRestEnd, bossSting, rollTick, unlockAudio } from './engine/audio.mjs';
+import { FIGURES } from '../data/figures/manifest.mjs';
 
 const TREE = PULL_TREE;
 
@@ -48,13 +49,17 @@ const esc = (s) => String(s == null ? '' : s)
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 function figureFrames(tier) {
-  const base = 'data/figures/' + tier.id.replace(/\./g, '-');
-  return [1, 2, 3].map((n) => base + '-' + n + '.webp');
+  const base = tier.id.replace(/\./g, '-');
+  return [1, 2, 3]
+    .map((n) => base + '-' + n + '.webp')
+    .filter((name) => FIGURES.includes(name))
+    .map((name) => 'data/figures/' + name);
 }
 function figuresHtml(tier) {
-  return `<div class="gw-figures">${figureFrames(tier).map((src, i) =>
-    `<img src="${src}" alt="${esc(tier.name)} — frame ${i + 1}" loading="lazy"
-      onerror="this.parentElement.removeChild(this)">`).join('')}</div>`;
+  const frames = figureFrames(tier);
+  if (!frames.length) return '';
+  return `<div class="gw-figures">${frames.map((src, i) =>
+    `<img src="${src}" alt="${esc(tier.name)} — frame ${i + 1}" loading="lazy">`).join('')}</div>`;
 }
 
 const flavorName = (tier) => (SKIN.tierNames && SKIN.tierNames[tier.hookSlot]) || tier.name;
