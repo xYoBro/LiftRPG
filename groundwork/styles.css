@@ -1,0 +1,83 @@
+/* ── Groundwork theme file ────────────────────────────────────────────────────
+   Deliberately plain (pillar 6): default-adjacent, legible, functional.
+   This file is the single styling seam — a later skin pass retheme happens
+   here, by choice, without surgery. System fonts only (pillar 5: zero
+   network). */
+
+:root {
+  --gw-ink: #1a1c1e;
+  --gw-paper: #f4f3ef;
+  --gw-panel: #ffffff;
+  --gw-accent: #2d5a3d;
+  --gw-muted: #6b7280;
+  --gw-rule: #d4d2cc;
+  --gw-danger: #8b2c2c;
+  --gw-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --gw-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--gw-paper); color: var(--gw-ink); font-family: var(--gw-body); }
+#app { max-width: 640px; margin: 0 auto; padding: 12px; }
+
+.gw-header { padding: 8px 4px; }
+.gw-header h1 { font-family: var(--gw-mono); font-size: 1.05rem; letter-spacing: 0.08em; margin: 0 0 2px; }
+.gw-worldline, .gw-dim { color: var(--gw-muted); font-size: 0.82rem; }
+
+.gw-panel { background: var(--gw-panel); border: 1px solid var(--gw-rule); border-radius: 8px; padding: 16px; margin-top: 8px; }
+.gw-panel h2 { font-size: 1rem; margin: 12px 0 6px; }
+.gw-panel p { line-height: 1.5; }
+
+button { font: inherit; padding: 10px 14px; margin: 6px 6px 0 0; border-radius: 6px; border: 1px solid var(--gw-rule); background: var(--gw-paper); color: var(--gw-ink); cursor: pointer; min-height: 44px; }
+button:active { transform: translateY(1px); }
+.gw-primary { background: var(--gw-accent); border-color: var(--gw-accent); color: #fff; }
+.gw-danger { color: var(--gw-danger); border-color: var(--gw-danger); }
+.gw-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.gw-save-row { margin-top: 18px; border-top: 1px solid var(--gw-rule); padding-top: 10px; }
+.gw-amount-row { margin-top: 8px; }
+.gw-amount-row input { font: inherit; width: 90px; padding: 8px; border: 1px solid var(--gw-rule); border-radius: 6px; }
+
+.gw-list { padding-left: 20px; line-height: 1.6; }
+.gw-callout { border-left: 3px solid var(--gw-accent); background: color-mix(in srgb, var(--gw-accent) 7%, transparent); padding: 10px 12px; margin: 10px 0; border-radius: 0 6px 6px 0; font-size: 0.92rem; }
+.gw-script { font-family: var(--gw-mono); font-size: 0.9rem; line-height: 1.55; white-space: pre-wrap; }
+.gw-beat { font-style: italic; line-height: 1.5; border-top: 1px dashed var(--gw-rule); padding-top: 8px; }
+.gw-bigcue { font-size: 1.15rem; font-weight: 600; }
+.gw-form summary { cursor: pointer; color: var(--gw-muted); }
+
+.gw-stat-row { display: flex; gap: 10px; margin: 10px 0; }
+.gw-stat { flex: 1; text-align: center; border: 1px solid var(--gw-rule); border-radius: 8px; padding: 10px 4px; }
+.gw-stat-num { font-family: var(--gw-mono); font-size: 1.5rem; font-weight: 700; }
+.gw-stat-label { color: var(--gw-muted); font-size: 0.75rem; }
+
+/* Dice — the juice the player touches (pillar 6 spends here) */
+.gw-dice-stage { display: flex; justify-content: center; padding: 18px 0 8px; }
+.gw-die { font-family: var(--gw-mono); font-size: 2.4rem; font-weight: 700; width: 96px; height: 96px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--gw-ink); border-radius: 14px; background: var(--gw-panel); box-shadow: 0 3px 0 var(--gw-rule); }
+.gw-die-rolling { animation: gw-shake 0.14s infinite; }
+@keyframes gw-shake {
+  0% { transform: rotate(-3deg) translateX(-1px); }
+  50% { transform: rotate(3deg) translateX(1px); }
+  100% { transform: rotate(-2deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gw-die-rolling { animation: none; }
+}
+
+.gw-resolution { border: 1px solid var(--gw-rule); border-radius: 8px; padding: 12px; margin: 10px 0; }
+.gw-roll { font-family: var(--gw-mono); font-size: 1.3rem; font-weight: 700; }
+.gw-kind { font-family: var(--gw-mono); font-size: 0.78rem; letter-spacing: 0.12em; color: var(--gw-muted); margin-bottom: 6px; }
+.gw-res-crit { border-color: var(--gw-accent); border-width: 2px; }
+.gw-res-complication { border-color: var(--gw-danger); }
+
+.gw-timer { margin: 12px 0; }
+.gw-timer-num { font-family: var(--gw-mono); font-size: 2rem; font-weight: 700; text-align: center; }
+.gw-timer-bar { height: 8px; background: var(--gw-rule); border-radius: 4px; overflow: hidden; }
+.gw-timer-fill { height: 100%; background: var(--gw-accent); transition: width 1s linear; }
+
+/* Map — projection of engine state */
+.gw-map-branch { margin-bottom: 14px; }
+.gw-rooms { display: flex; flex-direction: column; gap: 4px; }
+.gw-room { display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--gw-rule); border-radius: 6px; padding: 8px 10px; font-size: 0.9rem; }
+.gw-room-cleared { background: color-mix(in srgb, var(--gw-accent) 10%, transparent); }
+.gw-room-active { border-color: var(--gw-accent); border-width: 2px; font-weight: 600; }
+.gw-room-locked { opacity: 0.55; }
+.gw-room-state { font-family: var(--gw-mono); }

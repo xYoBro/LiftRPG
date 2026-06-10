@@ -1,0 +1,50 @@
+// ── Groundwork service worker ────────────────────────────────────────────────
+// Offline-first: cache everything on install, serve cache-first forever,
+// refresh in the background. Zero runtime network dependency (pillar 5) —
+// after install the app must complete a full session in airplane mode.
+
+const CACHE = 'groundwork-v1';
+const ASSETS = [
+  './',
+  './index.html',
+  './styles.css',
+  './manifest.webmanifest',
+  './icon-192.png',
+  './icon-512.png',
+  './app/main.mjs',
+  './app/engine/rng.mjs',
+  './app/engine/resolver.mjs',
+  './app/engine/profile.mjs',
+  './app/engine/session.mjs',
+  './data/trees/pull.mjs',
+  './data/tables/resolution.mjs',
+  './data/skins/dead-zone.mjs'
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+  event.respondWith(
+    caches.match(event.request, { ignoreSearch: true }).then((hit) => {
+      const refresh = fetch(event.request).then((res) => {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+        }
+        return res;
+      }).catch(() => hit);
+      return hit || refresh;
+    })
+  );
+});
