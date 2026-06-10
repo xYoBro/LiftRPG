@@ -152,10 +152,31 @@ button:active { transform: translateY(2px) scale(0.99); }
 .gw-ring-wrap .gw-timer-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   font-family: var(--gw-mono); font-size: 1.7rem; font-weight: 700; }
 
-/* ── Session HUD strip ── */
+/* ── Session HUD strip + today's route instrument ── */
+.gw-hudwrap { margin-bottom: 8px; }
 .gw-hud { display: flex; justify-content: space-between; align-items: center; font-family: var(--gw-mono); font-size: 0.72rem;
-  letter-spacing: 0.1em; color: var(--gw-dim); border: 1px solid var(--gw-rule); border-radius: 8px; padding: 7px 12px; margin-bottom: 8px; background: var(--gw-panel); }
+  letter-spacing: 0.1em; color: var(--gw-dim); border: 1px solid var(--gw-rule); border-radius: 8px 8px 0 0; padding: 7px 12px; background: var(--gw-panel); }
 .gw-hud .gw-hud-stat { color: var(--gw-accent); }
+.gw-route { display: flex; align-items: center; padding: 10px 12px 8px; background: var(--gw-panel);
+  border: 1px solid var(--gw-rule); border-top: none; border-radius: 0 0 8px 8px; }
+.gw-route-entry { width: 4px; height: 15px; background: #3a453c; border-radius: 2px; flex: none; }
+.gw-route-seg { flex: 1; height: 3px; background: #3a453c; min-width: 8px; }
+.gw-route-cell { width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid var(--gw-rule); background: var(--gw-panel-2); flex: none; }
+.gw-rc-lever.gw-rc-cleared { background: #1d3328; border-color: var(--gw-accent); }
+.gw-rc-bar.gw-rc-cleared { background: #33291a; border-color: var(--gw-amber); }
+.gw-rc-lever.gw-rc-current { border-color: var(--gw-accent); }
+.gw-rc-bar.gw-rc-current { border-color: var(--gw-amber); }
+.gw-rc-current { border-width: 2.5px; animation: gw-route-pulse 1.6s ease-in-out infinite; }
+@keyframes gw-route-pulse { 50% { box-shadow: 0 0 0 4px rgba(87, 199, 135, 0.16); } }
+@media (prefers-reduced-motion: reduce) { .gw-rc-current { animation: none; } }
+.gw-route-gate { font-family: var(--gw-mono); color: var(--gw-danger); border: 1.5px solid var(--gw-danger); border-radius: 5px;
+  width: 19px; height: 19px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex: none; }
+.gw-route-here { font-family: var(--gw-mono); font-size: 0.72rem; color: var(--gw-dim); letter-spacing: 0.06em; padding: 6px 2px 0; }
+
+/* Station map view toggle (your band ↔ whole wing) */
+.gw-maprow { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+.gw-maprow .gw-map-legend { flex: 1; }
+.gw-mapview { min-height: 38px; padding: 8px 12px; font-size: 0.8rem; flex: none; }
 
 /* ── Map: chambers, not labels ── */
 .gwm { width: 100%; height: auto; display: block; background: var(--gw-panel); border: 1px solid var(--gw-rule); border-radius: 14px; }

@@ -140,5 +140,22 @@ export function buildWingMapSvg(wing, opts = {}) {
     parts.push(`<text x="${pos.x}" y="${pos.y}" class="gwm-sealed" text-anchor="${pos.anchor}">🔒 ${esc(d.name)}</text>`);
   });
 
-  return `<svg viewBox="0 0 ${W} ${H}" class="gwm" role="img" aria-label="Station wing map">${parts.join('')}</svg>`;
+  // Default view lands ON the keeper (author feedback: show where you are,
+  // almost always): a window around the active band — gate above, cleared
+  // ground below, the named next door in frame. opts.window = { tierId };
+  // the full wing is the caller's toggle away.
+  let viewBox = `0 0 ${W} ${H}`;
+  if (opts.window && opts.window.tierId) {
+    for (const b of wing.branches) {
+      const i = b.sectors.findIndex((sec) => sec.tier.id === opts.window.tierId);
+      if (i === -1) continue;
+      const iHigh = Math.min(b.sectors.length - 1, i + 2);
+      const iLow = Math.max(0, i - 1);
+      const yTop = Math.max(0, yFor(iHigh) - CH_H / 2 - GAP - 16);
+      const yBottom = iLow === 0 ? Math.min(H, entryY + 64) : yFor(iLow) + CH_H / 2 + 28;
+      viewBox = `0 ${Math.round(yTop)} ${W} ${Math.round(Math.max(140, yBottom - yTop))}`;
+      break;
+    }
+  }
+  return `<svg viewBox="${viewBox}" class="gwm" role="img" aria-label="Station wing map">${parts.join('')}</svg>`;
 }

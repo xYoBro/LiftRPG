@@ -44,6 +44,7 @@ const state = {
   coldIndex: 0,             // cold-open card index
   deskPile: null,           // archive desk: open pile (chain key)
   deskIndex: 0,             // archive desk: page within the pile
+  mapView: 'local',         // station map: 'local' (your band) | 'wing' (everything)
   sessionState: null,
   rng: null,
   timer: null,
@@ -209,7 +210,10 @@ function renderHome() {
       ${recal ? `<div class="gw-callout">Over two weeks away. The map should match the body that shows up. <button data-act="start-assess">Re-run Intake</button></div>` : ''}
       ${buildStationMap(preview)}
       <div id="map-detail" class="gw-callout" hidden></div>
-      <div class="gw-dim gw-map-legend">pulse = you · tap any chamber or gate · bar under a gate = door charge · small cells = explored rooms</div>
+      <div class="gw-maprow">
+        <div class="gw-dim gw-map-legend">pulse = you · tap any chamber or gate · bar under a gate = door charge</div>
+        <button class="gw-mapview" data-act="map-view">${state.mapView === 'local' ? 'Whole wing' : 'Your position'}</button>
+      </div>
       <div class="gw-identity gw-dim">${esc(TREE.name)} ${treeStat()}% · ${(p.cleared[TREE.id] || []).length} sectors · ${(p.archive || []).length} documents${p.intention ? ` · ${esc(fill(SKIN.sessionFrame.intention.display, p.intention))}` : ''}${p.microGoal ? ` · goal: ${esc(p.microGoal)}` : ''}</div>
     </main>
     ${bottomNav('home')}`;
@@ -217,7 +221,8 @@ function renderHome() {
     'start-assess': () => { unlockAudio(); startAssess(); },
     'start-session': () => { unlockAudio(); startSession(); },
     storm: () => { unlockAudio(); nav('storm'); },
-    dispatch: () => nav('dispatch')
+    dispatch: () => nav('dispatch'),
+    'map-view': () => { state.mapView = state.mapView === 'local' ? 'wing' : 'local'; render(); }
   });
   wireStationMap();
   wireNav();
@@ -238,7 +243,8 @@ function buildStationMap(preview) {
     charges: p.doorCharge || {},
     todayTierId: preview ? preview.focusTierId : null,
     electedTierId: p.bossElect || null,
-    exploration
+    exploration,
+    window: state.mapView === 'local' && preview ? { tierId: preview.focusTierId } : null
   });
 }
 
@@ -635,11 +641,38 @@ function renderDoor(s) {
 }
 
 function hudHtml(s, idx) {
-  return `<div class="gw-hud">
-    <span>DAY ${s.dayNumber}</span>
-    <span>ROOM ${Math.min(idx + 1, s.rooms.length)}/${s.rooms.length}${s.boss ? ' +GATE' : ''}</span>
-    <span class="gw-hud-stat">${esc(TREE.name.toUpperCase())} ${treeStat()}%</span>
+  return `<div class="gw-hudwrap">
+    <div class="gw-hud">
+      <span>ORDER №${s.dayNumber}</span>
+      <span>ROOM ${Math.min(idx + 1, s.rooms.length)}/${s.rooms.length}${s.boss ? ' +GATE' : ''}</span>
+      <span class="gw-hud-stat">${esc(TREE.name.toUpperCase())} ${treeStat()}%</span>
+    </div>
+    ${routeStripHtml(s, idx)}
   </div>`;
+}
+
+// Today's route as an instrument (author feedback round 3): one cell per
+// room, colored by corridor, filled as cleared, the current cell pulsing,
+// the sealed gate at the end of the line on boss days. ROOM n/m, spatially.
+function routeStripHtml(s, atIndex) {
+  const cells = s.rooms.map((room, i) => {
+    const cleared = !!state.resolutions[i];
+    const current = i === atIndex && atIndex < s.rooms.length;
+    return `<span class="gw-route-cell gw-rc-${esc(room.tier.branch)}${cleared ? ' gw-rc-cleared' : ''}${current ? ' gw-rc-current' : ''}"></span>`;
+  }).join('<span class="gw-route-seg"></span>');
+  const atGate = atIndex >= s.rooms.length && !!s.boss;
+  const gate = s.boss
+    ? `<span class="gw-route-seg"></span><span class="gw-route-gate${atGate ? ' gw-rc-current' : ''}">✕</span>`
+    : '';
+  const here = atGate
+    ? 'the sealed door'
+    : state.doorPicks[atIndex]
+      ? state.doorPicks[atIndex].name
+      : s.rooms[atIndex] ? flavorName(s.rooms[atIndex].tier) : '';
+  return `<div class="gw-route" role="img" aria-label="today's route, room ${Math.min(atIndex + 1, s.rooms.length)} of ${s.rooms.length}">
+      <span class="gw-route-entry"></span><span class="gw-route-seg"></span>${cells}${gate}
+    </div>
+    ${here ? `<div class="gw-route-here">▸ ${esc(here)}</div>` : ''}`;
 }
 
 function renderRoom(s) {
@@ -919,6 +952,7 @@ function renderBossApproach(s) {
     tease: SKIN.bossCeremony.teases[doorTier.hookSlot] || SKIN.bossCeremony.teases.default
   });
   root().innerHTML = `
+    ${hudHtml(s, s.rooms.length)}
     <header class="gw-header"><h1>THE SEALED DOOR</h1>
       <div class="gw-dim">rest the full ${REST_SECONDS.boss}s before the attempt</div></header>
     <main class="gw-panel">
