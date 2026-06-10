@@ -29,6 +29,55 @@ export const SKIN = {
     }
   },
 
+  // ── Cold open (Sprint 2.1) ─────────────────────────────────────────────────
+  // Three dealt cards before "Begin Intake": arrival, the dark station,
+  // RIGGING's first words. ~60 seconds of read. Skin-optional: an engine with
+  // no coldOpen goes straight to intake.
+  coldOpen: [
+    {
+      kind: 'document',
+      title: 'COMMISSION ORDER 9',
+      documentType: 'form',
+      body: 'TO THE NINTH KEEPER, RELAY STATION K-9. Proceed overland; the road holds as far as the gate. The grid in that region has been dark fourteen months. Your predecessor is four months missing, presumed walked out. Your commission is the standard one: keep the station. You will find it in worse condition than the file states. The file is wrong about that, among other things. Travel light. The station provides.',
+      hook: '— REGIONAL COMMISSION (REMAINS OF)'
+    },
+    {
+      kind: 'scene',
+      title: 'THE STATION',
+      body: 'You arrive at dusk and the gate is not locked. Inside, the dark is wrong for a ruin: the floors are swept. Every breaker in the east gallery is OFF — switched, labeled, in a careful hand. One mug stands washed on the galley rack. Chalk numbers climb a wall in the ladderwell, dated, the last set four months old. Nothing here failed. Somebody took this station apart the way you fold a flag.'
+    },
+    {
+      kind: 'voice',
+      title: 'THE INTERCOM',
+      body: 'By the rigging-wing door, an intercom panel. One switch is taped ON — old tape, deliberate. You press the call key.',
+      voiceLine: 'RIGGING: “…Took your time. I run the rigging wing — every line, every anchor, every count. I watched the last keeper rebuild a body on this bar one rung at a time, and I have kept the wing climbable since. Before you touch it: intake survey. It maps what showed up, not what you wish had. Begin when you are ready. I will be counting.”'
+    }
+  ],
+
+  // ── Intake voice (Sprint 2.1): one RIGGING line per rung, keyed by sector ──
+  // Character creation doubles as tutorial, first relationship scene, and
+  // world tour: each line names the sector and coaches the test.
+  intakeVoice: {
+    'pull-lever-t1': 'RIGGING: “The Loading Ramp. Flat, honest ground — everything heavy came through here once. Face down. Show me the shoulder blades know three letters.”',
+    'pull-bar-t1': 'RIGGING: “The Hanging Gallery. First law of the wing: before anything pulls, it hangs. Twenty seconds, relaxed, like you plan to stay. The bar has held worse.”',
+    'pull-lever-t2': 'RIGGING: “Cable Run, Lower. Lines sag when nobody tensions them. You will not. Knees up, back rounded hollow, hold. A slack body is a snapped line waiting.”',
+    'pull-bar-t2': 'RIGGING: “Shoulder Stock Room. Sockets and spares. Arms straight — lift the whole load with the blades alone. Small move. Everything above the third floor depends on it.”',
+    'pull-lever-t3': 'RIGGING: “The Level Gauge. Eight kept a spirit level on every job. Today the level is you: tucked, hips up to bar height, horizontal. The bubble does not lie.”',
+    'pull-bar-t3': 'RIGGING: “The Held Breath. Chin over the bar and stay. Not a pull — a refusal to come down. The wing respects stubborn.”',
+    'pull-lever-t4': 'RIGGING: “Counterweight Pit. Loads move because something heavier agrees to drop. From the hang, pull the tuck up to horizontal. You are both weights today.”',
+    'pull-bar-t4': 'RIGGING: “Descent Control. Any fool falls; riggers LOWER things. Top of the bar to a dead hang on a five count. The way down is the skill.”',
+    'pull-lever-t5': 'RIGGING: “The Long Gantry. A beam that carries weight across distance. Body flat, pull the bar to the hips. Beams that bend get replaced.”',
+    'pull-bar-t5': 'RIGGING: “The Half Climb. Halfway is not a failure of the whole climb — it is a rung of it. Dead hang, pull to eye level. Honest halves only.”',
+    'pull-lever-t6': 'RIGGING: “The Extended Boom. The further the load rides from the mast, the more the mast must be. Knees at ninety now. Feel the lever argue.”',
+    'pull-bar-t6': 'RIGGING: “Mast Access. The stair to the real work. Dead-hang pull-ups, chin clear, no kick. This is the door the whole wing was built to open.”',
+    'pull-bar-t7': 'RIGGING: “The High Touch. Past the chin there is another inch, and the inch is where the work lives. Chest to the bar. Touch it; do not kiss at it.”',
+    'pull-lever-t7': 'RIGGING: “The Single-Line Splice. One strand doing two strands’ work. One leg long, row it clean, both sides. Asymmetry finds every weak fiber. That is its job.”',
+    'pull-bar-t8': 'RIGGING: “Lateral Transfer. Loads do not only travel up. One arm long, one arm working, both sides. The wing is wider than it is tall — be both.”',
+    'pull-bar-t9': 'RIGGING: “The Traverse. Cross the bar without leaving it — over, across, return, both directions. Riggers who cannot traverse wait for ladders. We do not wait.”',
+    'pull-lever-t8': 'RIGGING: “Dead Man’s Anchor. The last anchor Eight set. Legs wide, body flat, row. Past this point the wing has nothing left to teach you. Almost.”',
+    'pull-bar-t10': 'RIGGING: “Uneven Ascent. One hand high, one low — the mast ladder lost rungs in the storm and nobody is replacing them. Climb what is there, not what should be.”'
+  },
+
   // ── Tier flavor names (sectors of the Rigging Wing) ───────────────────────
   tierNames: {
     'pull-lever-t1': 'The Loading Ramp',
@@ -161,6 +210,88 @@ export const SKIN = {
       hook: 'Weak hands cannot make this mistake.' }
   ],
 
+  // ── KEYSTONES (Sprint 2.2) — authored reveals on authored triggers ─────────
+  // Never in the dice pool. Fired by the engine: first seal broken, seal-count
+  // milestones (midpoint recontextualization renders ON the boss ceremony),
+  // and sector entries. Filed to the archive under the KEYSTONE FILE.
+  // presentation: 'document' (card in the aftermath) | 'recontext' (replaces
+  // the generic pass-reveal line on the boss rail).
+  keystones: [
+    {
+      id: 'KF-01', chain: 'keystone', presentation: 'document',
+      trigger: { type: 'first-boss-pass' },
+      title: 'Stenciled inside the first opened door', documentType: 'inspection',
+      body: 'The seal you just broke was not damage and was not a lock. The inner face of the door is stenciled in Eight’s paint: SEAL — the number after it left blank. Riveted below, under lacquer, a checklist: the standard you met tonight, dated and signed E.V. four months before you arrived. And beneath that line, ruled and empty, a second line. Waiting for a hand. Every sealed door in this wing is a rung Eight climbed first and then closed behind. The wing is not locked. It is graded.',
+      hook: 'The wing is not locked. It is graded.'
+    },
+    {
+      id: 'KF-02', chain: 'keystone', presentation: 'recontext',
+      trigger: { type: 'boss-pass-count', n: 3 },
+      title: 'The master sheet', documentType: 'form',
+      body: 'Taped to the inner face of the third seal: the master sheet. Every door in the wing, every standard, and two columns of dates. The first column is Eight’s — eleven months of them, one per seal, each signed the day a door was passed and closed. The second column is headed in fresher paint: NINE. Three of its rows now carry dates. They are in your handwriting — copied from your own log, down to the day. Someone has been keeping your column current. The mug. The catalog. The tally. The wing has a clerk, and the clerk believes in you with both columns.',
+      hook: 'Someone is keeping your column.'
+    },
+    {
+      id: 'KF-03', chain: 'keystone', presentation: 'document',
+      trigger: { type: 'sector-open', hookSlot: 'pull-bar-t4' },
+      title: 'The descent log', documentType: 'form',
+      body: 'Descent Control was Eight’s name for the room: rope brakes, lowering rigs, and the logbook of everything heavy that ever went DOWN the counterweight shaft. The last page is the only one in pencil. One entry, dated four months ago: a load — unnamed, sixty kilograms, the word CAREFUL in the margin — lowered to a destination that is not on the wing map: KEEL ACCESS, ROOM 0. There is no ascent logged after it. Everyone says Eight walked out the gate. The log says Eight lowered something the weight of a person into the dark under the station, and then the entries stop.',
+      hook: 'There is no ascent logged.'
+    },
+    {
+      id: 'KF-04', chain: 'keystone', presentation: 'document',
+      trigger: { type: 'sector-open', hookSlot: 'pull-lever-t5' },
+      title: 'View from the Long Gantry', documentType: 'fieldNote',
+      body: 'The gantry runs out past the wall lights, and from its far end the region comes back to you for the first time: the valley, the dark towns, the dead substations in a row like buried teeth. No light burns anywhere. Except one. Far north, a pale point — and you watch it long enough to be sure it is not steady. It pulses. Three. Five. Eight. Dark. Then again, patient as a metronome. The counting from Band 7 has an address. Whatever is getting stronger out there is not only on the radio.',
+      hook: 'Three, five, eight. Again.'
+    },
+    {
+      id: 'KF-05', chain: 'keystone', presentation: 'document',
+      trigger: { type: 'sector-open', hookSlot: 'pull-bar-t6' },
+      title: 'The transmit interlock', documentType: 'inspection',
+      body: 'The stair door opens on cold moving air and forty feet of ladder into the dark above. At its base, bolted at eye height where it cannot be missed, a steel plate in Eight’s stencil: TRANSMIT INTERLOCK. Below the title, a list — every standard from every seal in the wing, in order, a punch-hole beside each. At the bottom, a hinged steel flap stamped KEY. You lift it. It is a mirror. The mast is one strong day’s work from transmit-capable, and the lock Eight built was never on the doors. It is the body holding this plate’s gaze.',
+      hook: 'You lift the flap. It is a mirror.'
+    }
+  ],
+
+  // ── BAND 7 LIVE (Sprint 2.2) — one scripted present-tense event ────────────
+  // Fires once, on the first session at or past fireOnSession, between the
+  // work order and joint prep. Everything else in the archive HAPPENED months
+  // ago; this happens NOW, while the player stands there with chalk on.
+  liveEvent: {
+    id: 'live-band7',
+    fireOnSession: 8,
+    title: 'BAND 7 — LIVE',
+    beats: [
+      'Mid-brief, RIGGING stops counting. Down the corridor, through the signal-room glass: the receive rack — dark every hour of your watch — puts up one green eye. And holds it on you.',
+      'Carrier. No voice. The meter draws the shape your spine already knows: three pulses. Five. Eight. The counting. This is not a recording reaching you late. It is happening now, tonight, while your hands are still chalked from the work.',
+      'Then, once, the station’s own retired sign-off tone — the one not broadcast since the Quiet, the one with no recording left to play. Played back at you. A question, if a tone can be one.'
+    ],
+    voiceLine: 'RIGGING: “Steady. Eight wrote the protocol for exactly this, and you have read it: ears open, mouth shut. What I never told Eight — the rack has a key. It is in front of you.”',
+    choice: {
+      prompt: 'The key is under your hand.',
+      options: [
+        {
+          id: 'answer', label: 'Press the key',
+          result: 'The key goes down. Nothing goes out — the transmit path is severed in fourteen numbered places and you know every number. The click dies in dead copper, and you knew it would, and you pressed it anyway. On Band 7 the carrier holds one beat longer, as if it heard the silence change shape. Then it is gone.'
+        },
+        {
+          id: 'log', label: 'Log it. Ears open, mouth shut.',
+          result: 'You write the timestamp the way Eight taught you without ever meeting you, and you keep your hands flat on the desk while the carrier runs. It ends on the hour. Exact. RIGGING, quiet: “Eight held this line eleven months. Tonight it held you back. File it.”'
+        }
+      ]
+    },
+    document: {
+      id: 'SG-215', chain: 'signal', title: 'Receive log, entry 215 — your hand', documentType: 'transcript',
+      body: 'BAND 7, LIVE. Carrier forty seconds, then structure: three, five, eight. Then — once — the station’s retired sign-off tone, played back like a question. First anomalous receipt since Eight’s final entry. Logged by the Ninth Keeper, in ink, in a steady hand. The red ledger ends at entry 214. It does not end anymore.',
+      closings: {
+        answer: 'Addendum, same hand: I pressed the key. The line is dead in fourteen places and I pressed it anyway. The wanting is on the record now too.',
+        log: 'Addendum, same hand: ears open, mouth shut. The protocol held. I am no longer sure which of us it is protecting.'
+      },
+      hook: 'Entry 216 is blank. For now.'
+    }
+  },
+
   // ── Kit items (loot with bodies; keys create real map shortcuts) ──────────
   kitItems: [
     { id: 'k-headlamp', name: 'Keeper’s Headlamp', kind: 'tool', body: 'Eight’s, by the strap adjustment. The beam is honest and the switch is loud in a quiet building.' },
@@ -176,6 +307,61 @@ export const SKIN = {
     { id: 'k-photograph', name: 'Photograph, sun-faded', kind: 'comfort', body: 'Eleven people on the loading ramp, squinting. On the back: crew of K-9, final rotation. Someone drew a small circle around their own face. Smallest person in the row.' },
     { id: 'k-rations', name: 'Sealed Ration Crate', kind: 'comfort', body: 'The good kind, the kind that got hoarded. Eight left it dead center in receiving where you could not miss it.' }
   ],
+
+  // ── Room types (Sprint 2.4) — experience variants posted on doors ─────────
+  // One special room per session at most, in rotation. The special replaces
+  // the dice ceremony for that room with a deterministic payout; the SET is
+  // identical behind every door (chance-isolation law).
+
+  // Sealed caches: opened in authored order; each names the kit item it needs.
+  // Locked is not a failure — the cache stays in the wing and the want of the
+  // key is the point.
+  caches: [
+    {
+      id: 'cache-toolchest', name: 'Bolted Tool Chest', needs: 'k-spliceknife',
+      locked: 'Under a tarp: a floor chest, lid bolted, the bolt heads slotted for a blade you are not carrying. Eight never spent a lock on nothing. It stays on the map, and it knows you will be back.',
+      open: 'The splice knife walks the bolts out in four turns each, like it was cut for them. It probably was. Inside, packed in clean rag, the wing pays a debt:'
+    },
+    {
+      id: 'cache-cagebox', name: 'Service Cage Lockbox', needs: 'k-servicekey',
+      locked: 'A steel lockbox bolted to the service cage floor, keyhole stamped K-9 MAINT. The cage key would turn it. You do not have the cage key. The box does not care how strong you are getting. That is what keys are for.',
+      open: 'The service key turns twice — Eight oiled this lock on the way out. Inside the cage lockbox, wrapped in a coil of new line:'
+    },
+    {
+      id: 'cache-highshelf', name: 'The High Shelf', needs: 'k-headlamp',
+      locked: 'A shelf above the light line, deep in the dead-dark of the room. Something is up there — you can hear the shape of it when you tap the bracket. Without a beam you would be reaching blind into a station that has already surprised you twice.',
+      open: 'The headlamp throws an honest beam along the high shelf, and the dark gives up what it was holding flat against the wall:'
+    },
+    {
+      id: 'cache-yardbox', name: 'Yard Drop-Box', needs: 'k-gatekey',
+      locked: 'Out past the glass: a weather-proof drop-box on the cable yard fence, padlocked, the hasp painted the same green as the yard gate key tag. From in here it is four inches and one locked gate away.',
+      open: 'The yard gate swings and the drop-box opens with the same key — Eight believed in one key per route. Inside, dry as the day it was sealed:'
+    }
+  ],
+
+  // Echo rooms: an owned page replayed where it happened. Frame by chain.
+  echoFrames: {
+    log: 'ECHO. This is the room where the entry was filed — the desk still squared to the wall the way Eight left desks. You read it again where it was written, and it reads different standing here:',
+    personal: 'ECHO. The handwriting on this page matches a pencil mark on the wall beside you. Same hand. Maybe the same day. The room and the page hold each other up:',
+    technical: 'ECHO. The diagram was drawn standing where you are standing — the sightlines match the margins. What it describes is all around you now:',
+    signal: 'ECHO. The air in this room still carries the habit of listening. The page hums in your hand here, or you imagine it does, and there is no longer a difference worth logging:',
+    keystone: 'ECHO. Some pages move the ground under you once. This one does it again, in place:'
+  },
+
+  // Quiet rooms: a pure beat. No roll, no prize. The thing the prizes are for.
+  quietBeats: [
+    'QUIET ROOM. Nothing in here but afternoon and dust riding the light from a high vent. You rest your hand on the bar anyway. Somewhere below, the building shifts its weight like a sleeper deciding not to wake. The set you just did is already part of the station’s record of being held. That is all this room wanted: a witness, working.',
+    'QUIET ROOM. A window nobody ever washed, and through it the valley, and nothing moving in the valley. You count your breath the way RIGGING counts everything, and for a minute the body and the station are the same quiet machine, ticking warm. No reward in here. This is the thing the rewards are for.',
+    'QUIET ROOM. Someone — Eight, who else — dragged a chair to the exact spot where the morning hits the wall. You do not sit. But you stand where the chair points for one slow minute, shoulders down, hands open, and let the wing hold the weight for once.',
+    'QUIET ROOM. The rain finds the roof in this corner and turns the station into an instrument. Eleven different drips, none of them a leak that matters. You listen until the rest timer and the rain disagree about the time, and you side with the rain a few seconds longer.',
+    'QUIET ROOM. Chalk dust on the floor, and old footprints in it — someone setting up to work, feet at bar width, toes to a line. You set your feet into them without deciding to. Right size. You leave both sets there, fresh over faded.'
+  ],
+
+  roomTypeLabels: {
+    'sealed-cache': 'SEALED CACHE',
+    'echo': 'ECHO ROOM',
+    'quiet': 'QUIET ROOM'
+  },
 
   // ── Session frame ──────────────────────────────────────────────────────────
   sessionFrame: {
@@ -221,6 +407,21 @@ export const SKIN = {
         'RIGGING: “Heads up. We’re in the flat weeks — the stretch where every program feels like nothing’s happening. That’s the forecast holding, not the work failing. Tendon and wire thicken in silence. Walk the room.”',
         'RIGGING: “Day-in-the-trough report: it will feel pointless today. It felt pointless to Eight too — there’s a journal page about it. The numbers kept moving anyway. Yours are moving. You just can’t hear it yet.”',
         'RIGGING: “Boredom check. Good. Boredom is the sound load-bearing work makes. Fireworks are for stations that are on fire.”'
+      ] },
+      // Arc lines (Sprint 2.2): RIGGING remembers the relationship. Fired on
+      // first-room rests, gated by accumulated history; rollUnder keeps them
+      // occasional so the generic lines still breathe.
+      { when: { doorsOpenedAtLeast: 4, isFirstRoom: true, rollUnder: 45 }, lines: [
+        'RIGGING: “{{doorsOpened}} doors on this wing answer to you now. Eight needed eleven months for the first four. I keep both sets of dates. Check them some slow evening — that’s not an order, it’s a recommendation from the only colleague you’ve got.”'
+      ] },
+      { when: { doorsOpenedAtLeast: 2, isFirstRoom: true, rollUnder: 35 }, lines: [
+        'RIGGING: “{{doorsOpened}} seals opened, by my count, and my count is the count. I feel each one go in the long cables — the wing carries news like that. It’s starting to trust the load you put on it. So am I, for what that’s worth. Don’t quote me.”'
+      ] },
+      { when: { monthsAtLeast: 2, isFirstRoom: true, rollUnder: 30 }, lines: [
+        'RIGGING: “{{months}} months on station. The ladderwell chalk is more your hand than Eight’s now. I keep both sets of numbers anyway. That isn’t sentiment — it’s a maintenance record of keepers.”'
+      ] },
+      { when: { monthsAtLeast: 1, isFirstRoom: true, rollUnder: 30 }, lines: [
+        'RIGGING: “A month on station, by the duty clock. Buildings are slow to trust — a month is when this one stops watching you work and starts working with you. You won’t hear the difference. I do.”'
       ] },
       { when: { isFirstRoom: true }, lines: [
         'RIGGING: “First room of the day. Cold building, warm hands by the end — that’s the whole trade. Manifest says move.”'
@@ -341,6 +542,30 @@ export const SKIN = {
 
   map: {
     stationName: 'Relay Station K-9',
+    gateMeterLabel: 'DOOR CHARGE',
+    // Chamber silhouettes (Sprint 2.3): one small stroke-glyph per sector so
+    // chambers read as PLACES, not identical boxes. Local coordinates centered
+    // on the chamber (x −16..16, y −9..9), stroke-only.
+    silhouettes: {
+      'pull-lever-t1': 'M-14,7 H4 L14,-5',                                          // the ramp
+      'pull-lever-t2': 'M-15,-5 Q-7,3 1,-4 M-11,2 Q-1,9 9,1',                       // sagging cable runs
+      'pull-lever-t3': 'M-11,5 A11,11 0 0 1 11,5 M0,5 L6,-3',                       // gauge dial + needle
+      'pull-lever-t4': 'M0,-9 V-3 M-5,-3 H5 V5 H-5 Z',                              // weight on a line
+      'pull-lever-t5': 'M-15,-4 H15 M-15,5 H15 M-11,-4 L-5,5 M-5,-4 L1,5 M1,-4 L7,5', // gantry truss
+      'pull-lever-t6': 'M-12,8 V-7 H12 M-12,-1 L2,-7',                              // mast + boom + stay
+      'pull-lever-t7': 'M-15,0 H-3 M3,0 H15 M0,0 m-3,0 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0', // line with a splice loop
+      'pull-lever-t8': 'M0,-8 V3 M-8,3 H8 M-8,3 L-12,8 M8,3 L12,8',                 // the anchor
+      'pull-bar-t1': 'M-14,-6 H14 M-9,-6 V4 M0,-6 V7 M9,-6 V3',                     // hangs from a beam
+      'pull-bar-t2': 'M-13,-6 H13 M-13,0 H13 M-13,6 H13 M-13,-6 V6 M13,-6 V6',      // stock shelves
+      'pull-bar-t3': 'M-12,2 H12 M0,-3 m-4,0 a4,4 0 1 0 8,0 a4,4 0 1 0 -8,0',       // chin held over the bar
+      'pull-bar-t4': 'M-13,-7 H-3 V0 H5 V7 H13',                                    // controlled descent steps
+      'pull-bar-t5': 'M-5,8 V-3 M5,8 V-3 M-5,5 H5 M-5,1 H5 M-5,-3 H5',              // half a ladder
+      'pull-bar-t6': 'M0,8 V-8 M-7,8 L0,-8 L7,8 M-4,2 H4',                          // the mast stair
+      'pull-bar-t7': 'M-7,-7 H7 M0,8 V-4 M0,-4 L-4,0 M0,-4 L4,0',                   // reach past the line
+      'pull-bar-t8': 'M-14,0 H14 M-14,0 L-9,-4 M-14,0 L-9,4 M14,0 L9,-4 M14,0 L9,4', // lateral travel
+      'pull-bar-t9': 'M-14,-3 H14 M-10,-3 V3 M-3,-3 V3 M4,-3 V3 M11,-3 V3',         // grips along the traverse
+      'pull-bar-t10': 'M-6,8 V-8 M6,8 V-1 M-6,-8 H-1 M6,-1 H11'                     // uneven rails
+    },
     // Key-item shortcuts drawn as cross-links between corridor positions
     // (branch + tier index, 0-based from the wing entrance).
     shortcutRoutes: {

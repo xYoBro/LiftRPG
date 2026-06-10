@@ -9,6 +9,8 @@
 
 import { getTier, branchOfTier } from './profile.mjs';
 import { frontierDoors } from './map.mjs';
+import { nextCache } from './discovery.mjs';
+import { liveEventDue } from './keystones.mjs';
 
 export const REST_SECONDS = { working: 120, warmup: 60, boss: 180 };
 const PREP_DRILLS = [
@@ -80,6 +82,7 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
     for (const room of allRooms) {
       room.doorOptions = frontierDoors(skin, profile, room.tier.branch, rng, 2);
     }
+    assignSpecialRoom(skin, profile, rng, allRooms, { sessionIndex, learnMode });
   }
 
   return {
@@ -100,8 +103,52 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
       tier: focusTier,
       definition: focusTier.boss,
       restSeconds: REST_SECONDS.boss
-    } : null
+    } : null,
+    // Band 7 live event (Sprint 2.2): present-tense scripted scene between
+    // the work order and joint prep, once ever, ~session 8+.
+    liveEvent: liveEventDue(skin || {}, profile, dayNumber || sessionIndex + 1)
   };
+}
+
+// ── Room types (Sprint 2.4): one special room per session, in rotation ──────
+// The special is attached to ONE DOOR of one room (posted on the card — an
+// informed opt-in). Picking the other door is a standard room. Session 1 and
+// learn-mode sessions stay pure. Availability gates: a cache must remain
+// unopened, an echo needs an archive to replay; quiet always works.
+const SPECIAL_ROTATION = ['sealed-cache', 'echo', 'quiet'];
+
+function assignSpecialRoom(skin, profile, rng, rooms, { sessionIndex, learnMode }) {
+  if (learnMode || sessionIndex < 1) return;
+  let special = null;
+  for (let k = 0; k < SPECIAL_ROTATION.length && !special; k++) {
+    const type = SPECIAL_ROTATION[(sessionIndex + k) % SPECIAL_ROTATION.length];
+    if (type === 'sealed-cache' && nextCache(skin, profile)) special = type;
+    else if (type === 'echo' && (profile.archive || []).length >= 2) special = type;
+    else if (type === 'quiet' && (skin.quietBeats || []).length) special = type;
+  }
+  if (!special) return;
+  const candidates = rooms.filter((r) => r.doorOptions && r.doorOptions.length >= 2);
+  if (!candidates.length) return;
+  const room = candidates[Math.floor(rng() * candidates.length)];
+  const door = room.doorOptions[Math.floor(rng() * room.doorOptions.length)];
+  door.roomType = special;
+  if (special === 'sealed-cache') door.cacheId = nextCache(skin, profile).id;
+}
+
+// Door charge (Sprint 2.3): gate-eligibility progress from the most recent
+// focus work — per-set credit only for form-clean sets (that is what the gate
+// grades), proportional to the top of the window. unlockHit ⇒ exactly 1.
+export function computeDoorCharge(session, setResults) {
+  const focusRooms = session.rooms.filter((r) => r.tier && r.tier.id === session.focusTierId);
+  if (!focusRooms.length) return 0;
+  let sum = 0;
+  for (const room of focusRooms) {
+    const result = setResults[roomKey(room)];
+    if (!result || result.outcome !== 'hit') continue;
+    const top = room.scheme.kind === 'reps' ? room.scheme.repWindow[1] : room.scheme.holdWindow[1];
+    sum += Math.min(1, (result.amount || 0) / top);
+  }
+  return Math.min(1, Math.round((sum / focusRooms.length) * 100) / 100);
 }
 
 // Unlock check: did this session's working sets hit the top of the rep/hold
@@ -135,7 +182,7 @@ export function buildAar(session, { setResults, resolutions, bossResult, intelDr
     setsTotal: session.rooms.length,
     setsHit: hits,
     unlockHit: unlockHit(session, setResults),
-    rooms: resolutions.map((r) => ({ kind: r.kind, roll: r.roll, effect: r.row.effect })),
+    rooms: resolutions.map((r) => ({ kind: r.kind, roll: r.roll, effect: r.row ? r.row.effect : r.specialType || null })),
     boss: bossResult ? { attempted: true, passed: bossResult.passed, roll: bossResult.roll } : null,
     intelDrop: intelDrop || null
   };

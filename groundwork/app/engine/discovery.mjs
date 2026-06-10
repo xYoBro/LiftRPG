@@ -102,10 +102,60 @@ export function resolveEncounterChoice(skin, profile, rng, encounter, optionInde
   return { option, extraFragment: extra };
 }
 
+// Lookup across every document source: ambient pool, keystones, the live
+// event's filed entry. (Keystones live outside skin.fragments so the dice
+// draws above can never reach them.)
 export function fragmentById(skin, id) {
-  return skin.fragments.find((f) => f.id === id) || null;
+  return skin.fragments.find((f) => f.id === id)
+    || (skin.keystones || []).find((k) => k.id === id)
+    || (skin.liveEvent && skin.liveEvent.document && skin.liveEvent.document.id === id
+      ? skin.liveEvent.document : null);
 }
 
 export function kitItemById(skin, id) {
   return skin.kitItems.find((k) => k.id === id) || null;
+}
+
+// ── Room types (Sprint 2.4): deterministic special-room payouts ──────────────
+// A special room replaces the dice ceremony with its payout family: cache →
+// loot, echo → archive replay, quiet → pure beat. The set behind the door is
+// untouched (chance-isolation law); rest runs as prescribed.
+
+export function nextCache(skin, profile) {
+  const opened = new Set(profile.cachesOpened || []);
+  return (skin.caches || []).find((c) => !opened.has(c.id)) || null;
+}
+
+export function resolveSpecialRoom(skin, profile, rng, door) {
+  if (door.roomType === 'sealed-cache') {
+    const cache = (skin.caches || []).find((c) => c.id === door.cacheId) || nextCache(skin, profile);
+    if (!cache) return { type: 'quiet', text: quietBeat(skin, rng) };
+    const hasKey = (profile.kit || []).some((k) => k.id === cache.needs);
+    const needed = kitItemById(skin, cache.needs);
+    if (!hasKey) return { type: 'cache-locked', cache, neededName: needed ? needed.name : 'the right tool' };
+    profile.cachesOpened = profile.cachesOpened || [];
+    if (!profile.cachesOpened.includes(cache.id)) profile.cachesOpened.push(cache.id);
+    // The cache pays from the same honest pools as the dice: next kit item,
+    // else next fragment, else the wing is simply generous with words.
+    let award = awardForRow(skin, profile, rng, { effect: 'loot' });
+    if (award.type !== 'kit') award = awardForRow(skin, profile, rng, { effect: 'intel' });
+    return { type: 'cache-open', cache, award };
+  }
+  if (door.roomType === 'echo') {
+    const owned = profile.archive || [];
+    if (!owned.length) return { type: 'quiet', text: quietBeat(skin, rng) };
+    const pick = owned[Math.floor(rng() * owned.length)];
+    const fragment = fragmentById(skin, pick.id);
+    if (!fragment) return { type: 'quiet', text: quietBeat(skin, rng) };
+    const frame = (skin.echoFrames || {})[fragment.chain] || (skin.echoFrames || {}).log || 'ECHO.';
+    return { type: 'echo', fragment, frame };
+  }
+  return { type: 'quiet', text: quietBeat(skin, rng) };
+}
+
+function quietBeat(skin, rng) {
+  const beats = (skin && skin.quietBeats) || [];
+  return beats.length
+    ? beats[Math.floor(rng() * beats.length)]
+    : 'A quiet room. The work was the whole of it.';
 }

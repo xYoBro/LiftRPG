@@ -40,7 +40,10 @@ export function createEmptyProfile(seed) {
     lastHook: null,                // Zeigarnik teaser carried to the home screen
     intention: null,               // implementation intention {after, where}
     microGoal: null,               // weekly dispatch micro-goal
-    lastDispatchAt: null           // ISO date of last weekly dispatch
+    lastDispatchAt: null,          // ISO date of last weekly dispatch
+    firedKeystones: [],            // authored reveals that have fired (once ever)
+    cachesOpened: [],              // sealed-cache room ids opened
+    doorCharge: {}                 // tierId → 0..1 gate-eligibility progress
   };
 }
 
@@ -50,7 +53,8 @@ function migrateProfile(profile) {
   const defaults = {
     archive: [], kit: [], explored: {}, encountersSeen: [],
     choices: [], notes: [], shortcuts: [], lastHook: null,
-    intention: null, microGoal: null, lastDispatchAt: null
+    intention: null, microGoal: null, lastDispatchAt: null,
+    firedKeystones: [], cachesOpened: [], doorCharge: {}
   };
   for (const key of Object.keys(defaults)) {
     if (profile[key] === undefined) profile[key] = defaults[key];

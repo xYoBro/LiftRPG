@@ -3,7 +3,7 @@
 // refresh in the background. Zero runtime network dependency (pillar 5) —
 // after install the app must complete a full session in airplane mode.
 
-const CACHE = 'groundwork-v4';
+const CACHE = 'groundwork-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -12,12 +12,14 @@ const ASSETS = [
   './icon-192.png',
   './icon-512.png',
   './app/main.mjs',
+  './app/render/wing-map.mjs',
   './app/engine/rng.mjs',
   './app/engine/resolver.mjs',
   './app/engine/profile.mjs',
   './app/engine/session.mjs',
   './app/engine/discovery.mjs',
   './app/engine/map.mjs',
+  './app/engine/keystones.mjs',
   './app/engine/audio.mjs',
   './data/trees/pull.mjs',
   './data/tables/resolution.mjs',
