@@ -127,3 +127,24 @@ button:active { transform: translateY(1px); }
 /* Papercut adoptions */
 .gw-duty { font-family: var(--gw-mono); font-size: 0.78rem; margin: 4px 0; letter-spacing: 0.04em; }
 .gw-text { width: 100%; font: inherit; padding: 10px; border: 1px solid var(--gw-rule); border-radius: 6px; margin: 4px 0 8px; }
+
+/* Drawn wing map */
+.gwm { width: 100%; height: auto; display: block; background: var(--gw-panel); border: 1px solid var(--gw-rule); border-radius: 8px; }
+.gwm-corridor { stroke: var(--gw-ink); stroke-width: 2; }
+.gwm-corridor-unknown { stroke: var(--gw-rule); stroke-dasharray: 3 5; }
+.gwm-corridor-label, .gwm-wing-label { font-family: var(--gw-mono); font-size: 8px; fill: var(--gw-muted); letter-spacing: 0.12em; }
+.gwm-room rect { fill: var(--gw-paper); stroke: var(--gw-rule); stroke-width: 1.5; cursor: pointer; }
+.gwm-room.gw-room-cleared rect { fill: color-mix(in srgb, var(--gw-accent) 14%, var(--gw-paper)); stroke: var(--gw-accent); }
+.gwm-room.gw-room-active rect { stroke: var(--gw-accent); stroke-width: 3; }
+.gwm-room.gw-room-locked rect { opacity: 0.5; }
+.gwm-room.gw-room-locked text { opacity: 0.55; }
+.gwm-room-name { font-family: var(--gw-body); font-size: 9px; font-weight: 600; fill: var(--gw-ink); }
+.gwm-room-state { font-family: var(--gw-mono); font-size: 7px; fill: var(--gw-muted); }
+.gwm-gate { fill: var(--gw-danger); rx: 2; }
+.gwm-gate-label { font-family: var(--gw-mono); font-size: 7px; fill: var(--gw-danger); letter-spacing: 0.1em; }
+.gwm-stub circle { fill: var(--gw-accent); opacity: 0.7; }
+.gwm-stub-label { font-family: var(--gw-mono); font-size: 6.5px; fill: var(--gw-muted); }
+.gwm-shortcut { stroke: var(--gw-accent); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.gwm-shortcut-label { font-family: var(--gw-mono); font-size: 7px; fill: var(--gw-accent); }
+.gwm-sealed { font-family: var(--gw-mono); font-size: 8px; fill: var(--gw-muted); }
+.gw-map-legend { margin: 8px 0; }

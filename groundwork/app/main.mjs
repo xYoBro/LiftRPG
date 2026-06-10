@@ -874,36 +874,118 @@ function renderKit() {
   wire({ home: () => nav('home') });
 }
 
+
+// ── Drawn wing map ────────────────────────────────────────────────────────────
+// The map is a projection of engine state (mission 3.9), now literally drawn:
+// two corridors climb the wing, sector rooms on the lines, boss gates on the
+// connectors, explored narrative rooms budding off fog-of-war style, key-item
+// shortcuts as dashed cross-links, sealed wings at the edges. Plain SVG,
+// theme-var colors only.
+function buildWingMapSvg(wing) {
+  const W = 360;
+  const COL_X = { lever: 96, bar: 264 };
+  const ROOM_W = 116, ROOM_H = 34, GAP = 26;
+  const TOP_PAD = 78, BOTTOM_PAD = 96;
+  const maxSectors = Math.max(...wing.branches.map((b) => b.sectors.length));
+  const H = TOP_PAD + maxSectors * (ROOM_H + GAP) + BOTTOM_PAD;
+  const yFor = (i) => H - BOTTOM_PAD - (i + 1) * (ROOM_H + GAP) + GAP; // climb upward
+  const parts = [];
+  const activeIdx = {};
+
+  // Entry hall connecting both corridors at the bottom
+  parts.push(`<line x1="${COL_X.lever}" y1="${H - 58}" x2="${COL_X.bar}" y2="${H - 58}" class="gwm-corridor"/>`);
+  parts.push(`<text x="${W / 2}" y="${H - 42}" class="gwm-wing-label" text-anchor="middle">WING ENTRANCE</text>`);
+
+  for (const b of wing.branches) {
+    const x = COL_X[b.branch];
+    parts.push(`<text x="${x}" y="${H - 70}" class="gwm-corridor-label" text-anchor="middle">${esc(b.name.toUpperCase())} CORRIDOR</text>`);
+    b.sectors.forEach((sec, i) => {
+      const y = yFor(i);
+      // corridor segment up to this room (drawn only once both ends are known)
+      const yPrev = i === 0 ? H - 58 : yFor(i - 1);
+      const segmentKnown = i === 0 || b.sectors[i - 1].state !== 'locked';
+      parts.push(`<line x1="${x}" y1="${yPrev - (i === 0 ? 0 : ROOM_H / 2)}" x2="${x}" y2="${y + ROOM_H / 2}" class="gwm-corridor ${segmentKnown ? '' : 'gwm-corridor-unknown'}"/>`);
+      // boss gate glyph on the connector above the ACTIVE room
+      if (sec.state === 'active' && sec.tier.boss) {
+        const gy = y - ROOM_H / 2 - GAP / 2; // on the connector ABOVE the room
+        parts.push(`<rect x="${x - 9}" y="${gy - 5}" width="18" height="10" class="gwm-gate"/>`);
+        parts.push(`<text x="${x + 14}" y="${gy + 4}" class="gwm-gate-label">SEALED</text>`);
+      }
+      if (sec.state === 'active') activeIdx[b.branch] = i;
+      // the room
+      const cls = 'gwm-room gw-room-' + sec.state;
+      const label = sec.state === 'locked' && i > (activeIdx[b.branch] !== undefined ? activeIdx[b.branch] + 1 : 1)
+        ? '?????' : sec.flavorName;
+      parts.push(`<g class="${cls}" data-tier="${esc(sec.tier.id)}">`
+        + `<rect x="${x - ROOM_W / 2}" y="${y - ROOM_H / 2}" width="${ROOM_W}" height="${ROOM_H}" rx="5"/>`
+        + `<text x="${x}" y="${y + 1}" text-anchor="middle" class="gwm-room-name">${esc(label)}</text>`
+        + `<text x="${x}" y="${y + 12}" text-anchor="middle" class="gwm-room-state">${sec.state === 'cleared' ? '✓ cleared' : sec.state === 'active' ? '● working' : '🔒'}</text>`
+        + `</g>`);
+      // explored narrative rooms bud off the corridor (fog-of-war: only found ones)
+    });
+    // explored stubs along the corridor's outer side
+    const outer = b.branch === 'lever' ? -1 : 1;
+    b.explored.slice(0, 8).forEach((room, i) => {
+      const y = yFor(Math.min(i, b.sectors.length - 1)) + 6;
+      const sx = x + outer * (ROOM_W / 2 + 6);
+      parts.push(`<g class="gwm-stub"><circle cx="${sx + outer * 5}" cy="${y}" r="4"/>`
+        + `<text x="${sx + outer * 13}" y="${y + 3}" class="gwm-stub-label" text-anchor="${outer < 0 ? 'end' : 'start'}">${esc(room.name)}</text></g>`);
+    });
+  }
+
+  // Key-item shortcut cross-links
+  const routes = (SKIN.map.shortcutRoutes) || {};
+  for (const id of wing.shortcuts) {
+    const r = routes[id];
+    if (!r) continue;
+    const [bA, iA] = r.from, [bB, iB] = r.to;
+    parts.push(`<line x1="${COL_X[bA] + ROOM_W / 2}" y1="${yFor(iA)}" x2="${COL_X[bB] - ROOM_W / 2}" y2="${yFor(iB)}" class="gwm-shortcut"/>`);
+    parts.push(`<text x="${W / 2}" y="${(yFor(iA) + yFor(iB)) / 2 - 4}" class="gwm-shortcut-label" text-anchor="middle">${esc(r.label)}</text>`);
+  }
+
+  // Sealed wings at the edges (the metroidvania promise)
+  const sealed = wing.lockedDoors;
+  const sealedPos = [
+    { x: 16, y: H / 2, anchor: 'start' },                 // Pressure (left)
+    { x: 16, y: H - 14, anchor: 'start' },                // Foundation (bottom-left)
+    { x: W - 16, y: H - 14, anchor: 'end' },              // Keel (bottom-right)
+    { x: COL_X.bar, y: 26, anchor: 'middle' }             // Mast (top, past Bar)
+  ];
+  sealed.forEach((d, i) => {
+    const pos = sealedPos[i % sealedPos.length];
+    if (i === 3) {
+      // The Mast: corridor stub continuing up from the Bar capstone
+      parts.push(`<line x1="${COL_X.bar}" y1="${yFor(maxSectors - 1) - ROOM_H / 2}" x2="${COL_X.bar}" y2="40" class="gwm-corridor gwm-corridor-unknown"/>`);
+    }
+    parts.push(`<text x="${pos.x}" y="${pos.y}" class="gwm-sealed" text-anchor="${pos.anchor}">🔒 ${esc(d.name)}</text>`);
+  });
+
+  return `<svg viewBox="0 0 ${W} ${H}" class="gwm" role="img" aria-label="Station wing map">${parts.join('')}</svg>`;
+}
+
 function renderMap() {
   const wing = projectWing(SKIN, TREE, state.profile, (tierId) => tierState(state.profile, TREE, tierId));
   root().innerHTML = `
     <header class="gw-header"><h1>${esc(wing.stationName)} — ${esc(wing.wingName)}</h1>
-      <div class="gw-dim">cleared sectors are farmable · sealed doors post their standard · locked wings wait</div></header>
+      <div class="gw-dim">cleared sectors are farmable · the sealed door posts its standard · tap a room for detail</div></header>
     <main class="gw-panel gw-map">
-      ${wing.branches.map((b) => `
-        <div class="gw-map-branch">
-          <h2>${esc(b.name)} corridor</h2>
-          <div class="gw-rooms">
-            ${b.sectors.map((sec) => `
-              <div class="gw-room gw-room-${sec.state}" title="${esc(sec.tier.name)}">
-                <div>
-                  <div class="gw-room-name">${esc(sec.flavorName)}</div>
-                  <div class="gw-dim">${esc(sec.tier.name)}${sec.state === 'locked' && sec.tier.boss === null ? '' : ''}</div>
-                </div>
-                <div class="gw-room-state">${sec.state === 'cleared' ? '✓' : sec.state === 'active' ? '●' : '🔒'}</div>
-              </div>`).join('')}
-          </div>
-          ${b.explored.length ? `<div class="gw-dim gw-explored">explored: ${b.explored.map((r) => esc(r.name)).join(' · ')}</div>` : ''}
-        </div>`).join('')}
-      ${wing.shortcuts.length ? `<h2>Open shortcuts</h2><ul class="gw-list">${wing.shortcuts.map((sc) => `<li>${esc(sc)}</li>`).join('')}</ul>` : ''}
-      <h2>Sealed wings</h2>
-      ${wing.lockedDoors.map((d) => `
-        <div class="gw-room gw-room-locked">
-          <div><div class="gw-room-name">${esc(d.name)}</div><div class="gw-dim">${esc(d.tease)} <em>(requires ${esc(d.requires)})</em></div></div>
-          <div class="gw-room-state">🔒</div>
-        </div>`).join('')}
+      ${buildWingMapSvg(wing)}
+      <div id="map-detail" class="gw-callout" hidden></div>
+      <div class="gw-dim gw-map-legend">✓ cleared · ● working tier · 🔒 locked (always visible) · dashed = key-item shortcut · dots = rooms you explored</div>
       <button class="gw-primary" data-act="home">Back</button>
     </main>`;
+  // tap a room → detail
+  root().querySelectorAll('.gwm-room[data-tier]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const tier = getTier(TREE, el.getAttribute('data-tier'));
+      if (!tier) return;
+      const st = tierState(state.profile, TREE, tier.id);
+      const detail = document.getElementById('map-detail');
+      detail.hidden = false;
+      detail.innerHTML = `<strong>${esc(flavorName(tier))}</strong> <span class="gw-dim">(${esc(tier.name)} · ${esc(st)})</span><br>
+        ${esc(schemeText(tier.scheme))}${tier.boss ? ` · gate standard: ${esc(tier.boss.label)}` : ''}`;
+    });
+  });
   wire({ home: () => nav('home') });
 }
 

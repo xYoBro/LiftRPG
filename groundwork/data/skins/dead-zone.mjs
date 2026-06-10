@@ -341,6 +341,13 @@ export const SKIN = {
 
   map: {
     stationName: 'Relay Station K-9',
+    // Key-item shortcuts drawn as cross-links between corridor positions
+    // (branch + tier index, 0-based from the wing entrance).
+    shortcutRoutes: {
+      'yard-gate': { label: 'Yard Gate', from: ['lever', 1], to: ['bar', 1] },
+      'counterweight-bypass': { label: 'Counterweight Bypass', from: ['lever', 3], to: ['bar', 4] },
+      'signal-shortcut': { label: 'Signal Back Stair', from: ['lever', 5], to: ['bar', 7] }
+    },
     wings: {
       pull: 'The Rigging Wing',
       push: 'The Pressure Wing',
