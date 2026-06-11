@@ -42,6 +42,81 @@ export function isTendonGuard(profile) {
     || (rec === 'years' && age !== 'u40');
 }
 
+// ── Day shape (D62): periodization that listens ──────────────────────────────
+// The population model (D44) sets the posture; the last sessions' EVIDENCE
+// tunes the day. One pure function, shared by generateSession and
+// previewNextSession so the preview can never drift from the real session.
+//   - Wavers EARN heavy days: after a light day, the next day is heavy only
+//     when the last graded session's quality cleared the bar (≥60% of sets at
+//     form standard). Struggle extends the light block — load management,
+//     never punishment.
+//   - Reactive recovery (all populations): a rolling miss signal (≥40% missed
+//     across the last 3 graded sessions) schedules a light/recovery day —
+//     aims drop to the floor, optional volume trims by one. Nothing is taken
+//     from the prescribed work; the wing re-schedules, it never punishes.
+const QUALITY_BAR = 0.6;
+const RECOVERY_MISS_RATE = 0.4;
+
+function sessionQuality(h) {
+  return h && h.setsTotal ? (h.setsHit || 0) / h.setsTotal : 1;
+}
+
+export function computeDayShape(profile, tree) {
+  const graded = profile.history.filter((h) => h.treeId === tree.id && !h.stormProtocol);
+  const week = seasonWeek(profile);
+  const isDeload = week === DELOAD_WEEK && !seasonClosed(profile);
+  const gap = layoffDays(profile);
+  const reentry = gap >= 7 && gap <= 13;
+  const cls = profile.classification || 'trained';
+  const usesWaves = cls === 'intermediate' || cls === 'advanced';
+  const chargesNeeded = usesWaves ? 2 : 1;
+
+  // Rolling miss signal over the last three graded sessions.
+  const recent = graded.slice(-3);
+  const missRate = recent.length === 3
+    ? 1 - recent.reduce((n, h) => n + sessionQuality(h), 0) / recent.length
+    : 0;
+  const recovery = missRate >= RECOVERY_MISS_RATE && !isDeload && !reentry;
+
+  // Wave position: recover after every heavy day; earn the next heavy day.
+  let intensity = 'heavy';
+  if (usesWaves) {
+    if (isDeload || reentry || recovery) intensity = 'light';
+    else {
+      const last = graded[graded.length - 1];
+      if (!last) intensity = 'heavy';                       // open the campaign heavy
+      else if (last.intensity === 'heavy') intensity = 'light';  // always recover
+      else intensity = sessionQuality(last) >= QUALITY_BAR ? 'heavy' : 'light'; // earned
+    }
+  }
+  return { week, isDeload, reentry, recovery, usesWaves, chargesNeeded, intensity, cls };
+}
+
+// ── Aim (D62): today's target for a tier, derived from the athlete's logs ───
+// Double progression, coach-standard: climb one step past the wall when the
+// last outing was clean; repeat the wall after misses; hold the top until the
+// gate takes it. Light/recovery/learn days stay inside the window on purpose.
+// Pure guidance — gates still grade gateAmount(); chance never touches any of
+// this (the engine is the coach, not the dice).
+export function aimFor(profile, tree, tier, { intensity = 'heavy', learnMode = false, recovery = false } = {}) {
+  const w = tier.scheme.kind === 'reps' ? tier.scheme.repWindow : tier.scheme.holdWindow;
+  const step = tier.scheme.kind === 'reps' ? 1 : 2;
+  const clamp = (v) => Math.max(w[0], Math.min(w[1], v));
+  if (learnMode || recovery) return w[0];
+  const best = (profile.bests || {})[tier.id];
+  if (intensity === 'light') {
+    const mid = Math.ceil((w[0] + w[1]) / 2) - (tier.scheme.kind === 'reps' ? 0 : 1);
+    return clamp(Math.min(mid, best && Number.isFinite(best.amount) ? best.amount : mid));
+  }
+  if (!best || !Number.isFinite(best.amount)) return w[0];
+  // Misses on the last outing of THIS tier ⇒ consolidate at the wall.
+  const lastOnTier = [...profile.history].reverse().find((h) => !h.stormProtocol && h.marks && h.marks[tier.id]);
+  const lastMark = lastOnTier ? lastOnTier.marks[tier.id] : null;
+  const missedLast = lastOnTier && lastOnTier.focusTierId === tier.id && sessionQuality(lastOnTier) < QUALITY_BAR;
+  if (missedLast && lastMark) return clamp(lastMark.best);
+  return clamp(best.amount + step);
+}
+
 // Gate standard for a tier (D55): explicit gateStandard where the window top
 // is not a sane gate (entry-tier endurance walls); window top otherwise.
 export function gateAmount(tier) {
@@ -84,17 +159,10 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
   const branchCleared = cleared.filter((id) => branchOfTier(tree, id) === focusBranch);
   const warmupTier = branchCleared.length ? getTier(tree, branchCleared[branchCleared.length - 1]) : null;
 
-  // Season clock (D40): calendar week of the commission. Week 5 is the light
-  // week — OG deload doctrine (D41): roughly half volume, same movements,
-  // never zero. The finale arms at week 8+ (fires after that session's AAR).
-  const week = seasonWeek(profile);
-  const isDeload = week === DELOAD_WEEK && !seasonClosed(profile);
-
-  // Re-entry modulation (D55 / GW-14): a 7-13 day gap trims optional volume
-  // and (for wavers) forces a light day — the windows themselves never change.
-  // Past 14 days the recalibration prompt takes over (profile.mjs).
-  const gapDays = layoffDays(profile);
-  const reentry = gapDays >= 7 && gapDays <= 13;
+  // Day shape (D62): season clock + re-entry + earned waves + reactive
+  // recovery, all from one shared pure function (the preview reads the same).
+  const shape = computeDayShape(profile, tree);
+  const { week, isDeload, reentry, recovery, usesWaves, chargesNeeded, intensity } = shape;
 
   // Tendon-guard (D45, source Ch6 populations): sedentary re-entries and
   // older bodies get extended prep and +30s working rests. Safety over
@@ -105,7 +173,7 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
   // Session budget shapes optional volume only (never main progression or
   // prep — the cut-order law): 25min → 1 off-branch set, 40 → 2, 60 → 3.
   const budget = (profile.settings && profile.settings.sessionBudgetMinutes) || 40;
-  const offSets = Math.max(1, (budget <= 25 ? 1 : budget >= 60 ? 3 : 2) - (isDeload ? 1 : 0) - (reentry ? 1 : 0));
+  const offSets = Math.max(1, (budget <= 25 ? 1 : budget >= 60 ? 3 : 2) - (isDeload ? 1 : 0) - (reentry ? 1 : 0) - (recovery ? 1 : 0));
   const workingSets = learnMode || isDeload ? 2 : 3;
   const rooms = [];
   for (let i = 0; i < workingSets; i++) {
@@ -115,6 +183,7 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
       tier: focusTier,
       scheme: focusTier.scheme,
       restSeconds: workingRest,
+      aim: aimFor(profile, tree, focusTier, { intensity, learnMode, recovery }),
       learnCue: learnMode ? focusTier.tutorial[i % focusTier.tutorial.length] : null
     });
   }
@@ -124,27 +193,19 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
     tier: offTier,
     scheme: offTier.scheme,
     restSeconds: workingRest,
+    aim: aimFor(profile, tree, offTier, { intensity, recovery }),
     learnCue: null
   })) : [];
 
-  // Periodization by population (D44, from the source's models):
-  //   untrained/trained beginners — LINEAR: one charged session opens a gate.
-  //   intermediate/advanced — LIGHT/HEAVY waves: sessions alternate intensity;
-  //   only heavy days grade the door, and a gate wants two charges. Deload
-  //   weeks and re-entry days force light. The set prescription itself never
-  //   changes — the light day is an instruction to stay inside the window.
-  const cls = profile.classification || 'trained';
-  const usesWaves = cls === 'intermediate' || cls === 'advanced';
-  const chargesNeeded = usesWaves ? 2 : 1;
-  const intensity = usesWaves
-    ? (isDeload || reentry ? 'light' : (campaignSession % 2 === 0 ? 'heavy' : 'light'))
-    : 'heavy';
+  // Periodization by population (D44) tuned by evidence (D62) — see
+  // computeDayShape above. Only heavy days grade the door; a gate wants two
+  // charges for wavers. The set prescription itself never changes.
 
   // Boss eligibility (D48): gates are max efforts — they never arm on deload
   // weeks, and for waving athletes only on heavy days. Within those guards:
   // enough trailing charges, or the keeper's own map-tap election.
   const charges = focusTier ? trailingCharges(profile, tree.id, focusTier.id, usesWaves) : 0;
-  const gateDayLegal = !isDeload && !reentry && (!usesWaves || intensity === 'heavy');
+  const gateDayLegal = !isDeload && !reentry && !recovery && (!usesWaves || intensity === 'heavy');
   const bossEligible = !!(focusTier && focusTier.boss && !learnMode && gateDayLegal
     && (profile.bossElect === focusTier.id || charges >= chargesNeeded));
 
@@ -162,10 +223,11 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
 
   // Advanced dose (D55 / GW-16): heavy days may carry one OPTIONAL extra
   // focus set — engine-authored, never on deload/guard/learn/re-entry days.
-  if (cls === 'advanced' && intensity === 'heavy' && !isDeload && !learnMode && !tendonGuard && !reentry && focusTier) {
+  if (shape.cls === 'advanced' && intensity === 'heavy' && !isDeload && !learnMode && !tendonGuard && !reentry && !recovery && focusTier) {
     allRooms.push({
       kind: 'working', setNumber: workingSets + 1, tier: focusTier,
-      scheme: focusTier.scheme, restSeconds: workingRest, learnCue: null, optional: true
+      scheme: focusTier.scheme, restSeconds: workingRest,
+      aim: aimFor(profile, tree, focusTier, { intensity, recovery }), learnCue: null, optional: true
     });
   }
 
@@ -206,6 +268,7 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
     week,
     isDeload,
     reentry,
+    recovery,
     finaleArmed: !seasonClosed(profile) && week >= SEASON_WEEKS && !!(skin && skin.finale),
     prep: tendonGuard ? [...PREP_DRILLS, ...GUARD_PREP] : PREP_DRILLS,
     tendonGuard,
@@ -394,20 +457,10 @@ export function previewNextSession(profile, tree) {
   const active = profile.active[tree.id] || {};
   const focusTier = getTier(tree, active[focusBranch]);
   const cleared = profile.cleared[tree.id] || [];
-  const week = seasonWeek(profile);
-  const isDeload = week === DELOAD_WEEK && !seasonClosed(profile);
-  const gap = layoffDays(profile);
-  const reentry = gap >= 7 && gap <= 13;
-  const cls = profile.classification || 'trained';
-  const usesWaves = cls === 'intermediate' || cls === 'advanced';
-  const campaignSession = Math.max(0, n - (profile.campaignSessionBase || 0));
-  const intensity = usesWaves
-    ? (isDeload || reentry ? 'light' : (campaignSession % 2 === 0 ? 'heavy' : 'light'))
-    : 'heavy';
+  const { week, isDeload, reentry, recovery, usesWaves, chargesNeeded, intensity } = computeDayShape(profile, tree);
   const learnMode = focusTier && !profile.tutorialSeen[focusTier.id] && !cleared.includes(focusTier.id);
   const charges = focusTier ? trailingCharges(profile, tree.id, focusTier.id, usesWaves) : 0;
-  const chargesNeeded = usesWaves ? 2 : 1;
-  const gateDayLegal = !isDeload && !reentry && (!usesWaves || intensity === 'heavy');
+  const gateDayLegal = !isDeload && !reentry && !recovery && (!usesWaves || intensity === 'heavy');
   const gateOnBoard = !!(focusTier && focusTier.boss && !learnMode && gateDayLegal
     && (profile.bossElect === focusTier.id || charges >= chargesNeeded));
   return {
@@ -418,6 +471,7 @@ export function previewNextSession(profile, tree) {
     usesWaves,
     isDeload,
     reentry,
+    recovery,
     learnMode,
     gateOnBoard,
     charges,
@@ -490,6 +544,17 @@ export function fileSession(profile, tree, session, { setResults, resolutions = 
     // The opened gate retires its meters (D60).
     delete (profile.doorCharge || {})[session.boss.tier.id];
     delete (profile.doorChargeBest || {})[session.boss.tier.id];
+    // Classification drift (D62): walking through a door whose tier carries a
+    // higher abilityHint re-grades the duty cycle — ability is what the body
+    // just demonstrated, no re-intake needed. Promotion only; the map down is
+    // the keeper's own re-intake.
+    const RANK = ['untrained', 'trained', 'intermediate', 'advanced'];
+    const nextTier = getTier(tree, session.boss.definition.tier);
+    const hint = nextTier && nextTier.abilityHint;
+    if (hint && RANK.indexOf(hint) > RANK.indexOf(profile.classification || 'untrained')) {
+      profile.classification = hint;
+      aar.promoted = hint;
+    }
   }
 
   // Stall detector (D49): four graded sessions on one tier with the gate still

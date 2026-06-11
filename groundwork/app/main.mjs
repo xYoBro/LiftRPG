@@ -315,7 +315,7 @@ function renderHome() {
       ${showStormCue ? `
         <div class="gw-callout">${esc(SKIN.sessionFrame.storm.missCue)}
           <button data-act="storm">${esc(SKIN.sessionFrame.storm.button)}</button></div>` : ''}
-      ${dispatchDue() ? `<button data-act="dispatch">Weekly Dispatch is due</button>` : ''}
+      ${dispatchDue() ? `<button class="gw-linklike" data-act="dispatch">Weekly Dispatch is due</button>` : ''}
       ${recal ? `<div class="gw-callout">Over two weeks away. The map should match the body that shows up. <button data-act="start-assess">Re-run Intake</button></div>` : ''}
       ${buildStationMap(preview)}
       <div id="map-detail" class="gw-callout" hidden></div>
@@ -323,7 +323,7 @@ function renderHome() {
         <div class="gw-dim gw-map-legend">◉ you today · ○ your other posting · ◈ on the manifest · tap chambers and gates</div>
         <button class="gw-mapview" data-act="map-view">${state.mapView === 'local' ? 'Whole wing' : 'Your position'}</button>
       </div>
-      <div class="gw-identity gw-dim">${p.classification && (SKIN.grades || {})[p.classification] ? esc(SKIN.grades[p.classification].name) + ' · ' : ''}${esc(TREE.name)} ${treeStat()}% · ${(p.cleared[TREE.id] || []).length} sectors · ${(p.archive || []).length} documents${p.intention ? ` · ${esc(fill(SKIN.sessionFrame.intention.display, p.intention))}` : ''}${p.microGoal ? ` · goal: ${esc(p.microGoal)}` : ''}</div>
+      <div class="gw-identity gw-dim">${p.classification && (SKIN.grades || {})[p.classification] ? esc(SKIN.grades[p.classification].name) + ' · ' : ''}${esc(TREE.name)} ${treeStat()}% · ${(p.cleared[TREE.id] || []).length} sectors · ${(p.archive || []).length} documents${p.intention ? ` · ${esc(fill(SKIN.sessionFrame.intention.display, p.intention))}` : ''}</div>
     </main>
     ${bottomNav('home')}`;
   wire({
@@ -995,7 +995,6 @@ function renderDoor(s) {
     <header class="gw-header"><h1>PICK THE ROUTE</h1>
       <div class="gw-dim">${esc(flavorName(room.tier))} sector · the set is the same behind either door</div></header>
     <main class="gw-panel">
-      <p class="gw-bigcue">Two doors.</p>
       <div class="gw-doors">
       ${doors.map((d, i) => {
         // Strand layer: a revisited room carries Eight's trace — the wing was
@@ -1022,43 +1021,29 @@ function renderDoor(s) {
 }
 
 function hudHtml(s, idx, phase) {
-  // Rest chip (D54): the clock rides the HUD whenever a rest is running, so
-  // the one instrument that schedules the next set is never below the fold.
+  // One instrument bar (D63): order number, the route cells, and either the
+  // room count or the running rest clock. No stat in session chrome — the
+  // exercise screen is not the game's screen.
   const resting = state.restStartedAt && (phase === 'rest' || phase === 'roll' || state.encounterPending);
-  return `<div class="gw-hudwrap">
-    <div class="gw-hud">
-      <span>ORDER №${s.dayNumber}</span>
-      <span>ROOM ${Math.min(idx + 1, s.rooms.length)}/${s.rooms.length}${s.boss ? ' +GATE' : ''}</span>
-      ${resting ? `<span class="gw-hud-rest" id="hud-rest">—:——</span>` : `<span class="gw-hud-stat">${esc(TREE.name.toUpperCase())} ${treeStat()}%</span>`}
-    </div>
-    ${routeStripHtml(s, idx)}
-  </div>`;
+  return `<div class="gw-hud">
+      <span>№${s.dayNumber}</span>
+      ${routeStripHtml(s, idx)}
+      ${resting ? `<span class="gw-hud-rest" id="hud-rest">—:——</span>` : `<span>ROOM ${Math.min(idx + 1, s.rooms.length)}/${s.rooms.length}${s.boss ? ' +GATE' : ''}</span>`}
+    </div>`;
 }
 
-// Today's route as an instrument (author feedback round 3): one cell per
-// room, colored by corridor, filled as cleared, the current cell pulsing,
-// the sealed gate at the end of the line on boss days. ROOM n/m, spatially.
+// The route cells live inside the instrument bar (D63): one cell per room,
+// colored by corridor, filled as cleared, the current one pulsing, the gate
+// at the line's end on boss days.
 function routeStripHtml(s, atIndex) {
   const cells = s.rooms.map((room, i) => {
     const cleared = !!state.resolutions[i];
     const current = i === atIndex && atIndex < s.rooms.length;
     return `<span class="gw-route-cell gw-rc-${esc(room.tier.branch)}${cleared ? ' gw-rc-cleared' : ''}${current ? ' gw-rc-current' : ''}"></span>`;
-  }).join('<span class="gw-route-seg"></span>');
+  }).join('');
   const atGate = atIndex >= s.rooms.length && !!s.boss;
-  const gate = s.boss
-    ? `<span class="gw-route-seg"></span><span class="gw-route-gate${atGate ? ' gw-rc-current' : ''}">✕</span>`
-    : '';
-  let here = atGate
-    ? 'the sealed door'
-    : state.doorPicks[atIndex]
-      ? state.doorPicks[atIndex].name
-      : s.rooms[atIndex] ? flavorName(s.rooms[atIndex].tier) : '';
-  // The room screen already titles the door (GW-27) — repeat nothing.
-  if (state.doorPicks[atIndex] && state.sessionStep && state.sessionStep.phase === 'room') here = '';
-  return `<div class="gw-route" role="img" aria-label="today's route, room ${Math.min(atIndex + 1, s.rooms.length)} of ${s.rooms.length}">
-      <span class="gw-route-entry"></span><span class="gw-route-seg"></span>${cells}${gate}
-    </div>
-    ${here ? `<div class="gw-route-here">▸ ${esc(here)}</div>` : ''}`;
+  const gate = s.boss ? `<span class="gw-route-gate${atGate ? ' gw-rc-current' : ''}">✕</span>` : '';
+  return `<span class="gw-route" role="img" aria-label="today's route, room ${Math.min(atIndex + 1, s.rooms.length)} of ${s.rooms.length}">${cells}${gate}</span>`;
 }
 
 function renderRoom(s) {
@@ -1110,26 +1095,37 @@ function renderRoom(s) {
       <div class="gw-dim">${esc(door ? door.name : flavorName(tier))} · set ${room.setNumber}${lightDay ? ' · LIGHT DAY' : ''}${room.restNote === 'long-rest' ? ' · long rest follows' : ''}</div>
     </header>
     <main class="gw-panel gw-center">
-      ${phase === 'set' ? `
-        ${room.learnCue ? `<div class="gw-callout">This set, one thing: <strong>${esc(room.learnCue)}</strong></div>${videoRefHtml(tier)}${figuresHtml(tier)}` : `
-        <ul class="gw-list gw-form-list">${tier.formStandard.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
-        <details class="gw-form"><summary>How to do it</summary>
-          ${videoRefHtml(tier)}
-          ${figuresHtml(tier)}
-          <p>${esc(tier.setup)}</p></details>`}
-        <p class="gw-bigcue">Do the set.</p>
-        <p class="gw-dim">${lightDay
-          ? `Light day — stay inside the window (${target[0]}–${target[1]} ${esc(unit)}). The door isn&#39;t grading today.`
-          : `Aim for ${gateAmount(tier)} ${esc(unit)}. The room resolves while you rest.`}</p>
-        <button class="gw-primary gw-big" data-act="log">Set done</button>
-      ` : phase === 'log' ? `
-        <p class="gw-bigcue">How did it go?</p>
+      ${phase === 'set' ? (() => {
+        // The rig tag (D63): the exercise is the object — name, aim, set pips,
+        // one cue. Everything else folds inside it. No narration.
+        const sameTier = s.rooms.filter((r) => r.tier.id === tier.id && !r.optional);
+        const done = s.rooms.filter((r, j) => r.tier.id === tier.id && !r.optional && state.resolutions[j]).length;
+        const pips = sameTier.map((_, k) => `<span class="gw-tag-pip${k < done ? ' gw-pip-done' : k === done ? ' gw-pip-now' : ''}"></span>`).join('');
+        const aim = room.aim != null ? room.aim : target[0];
+        const best = (state.profile.bests || {})[tier.id];
+        return `
+        <div class="gw-rigtag gw-object">
+          <span class="gw-tag-punch"></span>
+          <div class="gw-tag-label">RIG TAG · ${esc(door ? door.name : flavorName(tier))}${room.optional ? ' · OPTIONAL' : ''}</div>
+          <div class="gw-tag-name">${esc(tier.name)}</div>
+          <div class="gw-tag-aim">aim ${aim} <span class="gw-dim">· window ${target[0]}–${target[1]} ${esc(unit)}${best ? ` · your wall: ${best.amount}` : ''}${lightDay ? ' · light day' : ''}</span></div>
+          <div class="gw-tag-sets">${pips}<span class="gw-dim"> set ${room.setNumber} of ${sameTier.length || 1}</span></div>
+          <div class="gw-tag-cue">${esc(room.learnCue || tier.formStandard[(room.setNumber - 1) % tier.formStandard.length])}</div>
+          <details class="gw-form gw-tag-more"><summary>watch the form · full standard</summary>
+            ${videoRefHtml(tier)}
+            ${figuresHtml(tier)}
+            <ul class="gw-list">${tier.formStandard.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
+            <p class="gw-dim">${esc(tier.setup)}</p></details>
+        </div>
+        <button class="gw-primary gw-big" data-act="log">Set done</button>`;
+      })() : phase === 'log' ? `
+
         ${(() => {
           // Papercut logging (D45): the stepper opens on YOUR last mark — one
           // tap up is a new mark on the chalk wall. New tiers open at the
           // window floor; the top stays the gate's standard.
           const best = (state.profile.bests || {})[tier.id];
-          const start = lightDay ? target[0] : (best && Number.isFinite(best.amount) ? best.amount : target[0]);
+          const start = room.aim != null ? room.aim : (best && Number.isFinite(best.amount) ? best.amount : target[0]);
           return `
         <div class="gw-stepper">
           <button class="gw-step" data-step="-1">−</button>
@@ -1148,19 +1144,21 @@ function renderRoom(s) {
       ` : phase === 'roll' ? `
         ${result.newMark ? newMarkHtml(result, tier, unit) : ''}
         <div id="dice-stage" class="gw-dice-stage"><div class="gw-die" id="die">--</div></div>
-        <p class="gw-dim">${esc(TREE.name)} ${treeStat()}% · ${result.outcome === 'hit' ? 'advantage' : result.outcome === 'partial' ? 'flat' : 'disadvantage'}</p>
+        <p class="gw-dim">${result.outcome === 'hit' ? 'advantage' : result.outcome === 'partial' ? 'flat' : 'disadvantage'}</p>
         <button class="gw-primary gw-big" data-act="roll">Roll d100</button>
       ` : state.encounterPending && state.encounterPending.roomIndex === idx ? `
         ${renderEncounterHtml(state.encounterPending.encounter)}
       ` : `
         ${result.newMark ? newMarkHtml(result, tier, unit) : ''}
+        <div class="gw-restcard gw-object">
         ${(() => {
           const nxt = s.rooms[idx + 1];
           if (!nxt) return s.boss ? `<div class="gw-next-set">NEXT: the sealed door — ${esc(s.boss.definition.label)}</div>` : '';
           const w = nxt.scheme.kind === 'reps' ? nxt.scheme.repWindow : nxt.scheme.holdWindow;
-          return `<div class="gw-next-set">NEXT: ${esc(nxt.tier.name)} — ${w[0]}–${w[1]} ${nxt.scheme.kind === 'reps' ? 'reps' : 'sec'}${nxt.scheme.perSide ? '/side' : ''}</div>`;
+          return `<div class="gw-next-set">NEXT: ${esc(nxt.tier.name)} — aim ${nxt.aim != null ? nxt.aim : w[1]} <span class="gw-dim">(${w[0]}–${w[1]} ${nxt.scheme.kind === 'reps' ? 'reps' : 'sec'}${nxt.scheme.perSide ? '/side' : ''})</span></div>`;
         })()}
         ${renderTimerHtml(room.restSeconds)}
+        </div>
         ${entry.kind === 'special' ? renderSpecialHtml(entry) : entry.kind === 'posting' ? renderPostingHtml(entry) : renderResolutionHtml(entry, idx)}
         <details class="gw-form"><summary>+ field note</summary>
           <div class="gw-note-row"><input id="field-note" class="gw-text" placeholder="one line" maxlength="120"></div>
@@ -1452,8 +1450,10 @@ function renderBossApproach(s) {
     <header class="gw-header"><h1>THE SEALED DOOR</h1>
       <div class="gw-dim">rest the full ${REST_SECONDS.boss}s before the attempt</div></header>
     <main class="gw-panel">
+      <div class="gw-restcard gw-object">
       <div class="gw-next-set">THE STANDARD: ${esc(boss.definition.label)}</div>
       ${renderTimerHtml(REST_SECONDS.boss)}
+      </div>
       <p class="gw-script">${esc(approach)}</p>
       <p class="gw-beat">${esc(SKIN.bossCeremony.beforeAttempt)}</p>
       <button class="gw-primary gw-big" data-act="attempt">Make the attempt</button>
@@ -1625,6 +1625,9 @@ function renderDebrief(s) {
     <header class="gw-header"><h1>${esc(SKIN.sessionFrame.debrief.title)}</h1></header>
     <main class="gw-panel gw-center">
       ${bodyHtml}
+      ${aar.promoted ? `<div class="gw-item"><div class="gw-item-kind">RE-GRADED</div>
+        <div class="gw-item-name">${esc(((SKIN.grades || {})[aar.promoted] || { name: aar.promoted.toUpperCase() }).name)}</div>
+        <p class="gw-dim">${esc((((SKIN.grades || {})[aar.promoted] || {}).line) || 'The duty cycle changes: heavy and light days now, and the doors ask for proof twice.')}</p></div>` : ''}
       <p class="gw-script">${esc(debrief)}</p>
       ${s.learnMode ? `<div class="gw-callout">${esc(SKIN.sessionFrame.tutorial.aarPrompt)}</div>` : ''}
       ${tomorrowHtml}
@@ -1910,7 +1913,7 @@ function renderArchive() {
   const ledger = ledgerRows();
   root().innerHTML = `
     <header class="gw-header"><h1>THE ARCHIVE</h1>
-      <div class="gw-dim">Eight’s desk — ${totalOwned} documents on it · tap a pile, leaf the pages</div></header>
+      <div class="gw-dim">Eight’s desk — ${totalOwned} documents on it</div></header>
     <main class="gw-panel">
       <div class="gw-desk">
         ${CHAIN_UI_ORDER.map((chain) => {
@@ -2017,7 +2020,7 @@ function renderDeskPile() {
       ? '\n\n' + doc.closings[doc.liveChoice] : '');
     root().innerHTML = `
       <header class="gw-header"><h1>${esc(CHAIN_NAMES[pile] || pile)}</h1>
-        <div class="gw-dim">page ${state.deskIndex + 1} of ${docs.length} · tap the page to leaf</div></header>
+        <div class="gw-dim">page ${state.deskIndex + 1} of ${docs.length}</div></header>
       <main class="gw-panel gw-reader">
         <div class="gw-stack">${documentHtml({ ...doc, body }, doc.keystone || pile === 'keystone' ? 'gw-keystone' : '')}</div>
         <div class="gw-leaf-row">
@@ -2120,7 +2123,6 @@ function renderTimerHtml(seconds) {
       </svg>
       <div class="gw-timer-num" id="timer-num">${fmtTime(seconds)}</div>
     </div>
-    <div class="gw-dim">rest — read, decide, breathe</div>
   </div>`;
 }
 

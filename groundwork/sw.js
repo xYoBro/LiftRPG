@@ -3,7 +3,7 @@
 // refresh in the background. Zero runtime network dependency (pillar 5) —
 // after install the app must complete a full session in airplane mode.
 
-const CACHE = 'groundwork-v18';
+const CACHE = 'groundwork-v19';
 const ASSETS = [
   './',
   './index.html',

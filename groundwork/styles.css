@@ -394,3 +394,33 @@ button:active { transform: translateY(2px) scale(0.99); }
 .gw-prose-fold summary::before { content: '▸ '; color: var(--gw-accent); }
 .gw-prose-fold[open] summary::before { content: '▾ '; }
 .gw-hero-story { margin-top: 9px; border-top: 1px dashed var(--gw-rule); padding-top: 8px; }
+
+/* ── D63: the rig tag — the exercise as an object ── */
+.gw-rigtag { position: relative; background: var(--gw-panel-2); border: 1px solid #3a453c; border-radius: 6px;
+  padding: 16px 16px 12px; margin: 14px 0; text-align: left; box-shadow: 0 5px 0 #0b0e0c; }
+.gw-tag-punch { position: absolute; top: 13px; right: 13px; width: 12px; height: 12px; border-radius: 50%;
+  border: 2.5px solid #3a453c; background: var(--gw-bg); }
+.gw-tag-label { font-family: var(--gw-mono); font-size: 0.66rem; letter-spacing: 0.15em; color: var(--gw-dim); }
+.gw-tag-name { font-size: 1.65rem; font-weight: 750; line-height: 1.12; margin: 7px 0 3px; color: var(--gw-ink); }
+.gw-tag-aim { font-family: var(--gw-mono); font-size: 1.05rem; margin: 4px 0 10px; }
+.gw-tag-aim .gw-dim { font-size: 0.78rem; }
+.gw-tag-sets { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; font-size: 0.78rem; }
+.gw-tag-pip { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid #3a453c; }
+.gw-pip-done { background: var(--gw-dim); border-color: var(--gw-dim); }
+.gw-pip-now { border-color: var(--gw-ink); border-width: 2px; }
+.gw-tag-cue { border-top: 1px dashed #3a453c; padding-top: 10px; font-size: 0.95rem; line-height: 1.45; }
+.gw-tag-more { margin-top: 4px; }
+.gw-tag-more summary { font-size: 0.78rem; }
+
+/* ── D63: one instrument bar; route cells ride inside it ── */
+.gw-hud { gap: 10px; }
+.gw-route { display: inline-flex; align-items: center; gap: 4px; flex: 1; justify-content: center; }
+.gw-route-cell { width: 13px; height: 13px; border-radius: 4px; }
+.gw-route-gate { width: 15px; height: 15px; font-size: 9px; }
+.gw-route-entry, .gw-route-seg, .gw-route-here { display: none; }
+
+/* ── D63: the rest card — the clock is the object mid-rest ── */
+.gw-restcard { background: var(--gw-panel); border: 1px solid var(--gw-rule); border-radius: 12px;
+  padding: 10px 12px 4px; margin: 12px 0; }
+.gw-restcard .gw-next-set { margin: 2px 0 0; }
+.gw-restcard .gw-timer { margin: 8px 0 10px; }

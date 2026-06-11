@@ -300,6 +300,7 @@ export const PULL_TREE = {
     },
     {
       id: 'pull.lever.adv-tuck-row',
+      abilityHint: 'intermediate',
       name: 'Advanced-Tuck Row',
       hookSlot: 'pull-lever-t6',
       branch: 'lever',
@@ -332,6 +333,7 @@ export const PULL_TREE = {
     },
     {
       id: 'pull.lever.single-leg-row',
+      abilityHint: 'intermediate',
       name: 'Single-Leg Lever Row',
       hookSlot: 'pull-lever-t7',
       branch: 'lever',
@@ -364,6 +366,7 @@ export const PULL_TREE = {
     },
     {
       id: 'pull.lever.straddle-row',
+      abilityHint: 'advanced',
       name: 'Straddle-Lever Row',
       hookSlot: 'pull-lever-t8',
       branch: 'lever',
@@ -594,6 +597,7 @@ export const PULL_TREE = {
     },
     {
       id: 'pull.bar.chest-to-bar',
+      abilityHint: 'intermediate',
       name: 'Chest-to-Bar Pull-Up',
       hookSlot: 'pull-bar-t7',
       branch: 'bar',
@@ -624,6 +628,7 @@ export const PULL_TREE = {
     },
     {
       id: 'pull.bar.archer',
+      abilityHint: 'intermediate',
       name: 'Archer Pull-Up',
       hookSlot: 'pull-bar-t8',
       branch: 'bar',
@@ -656,6 +661,7 @@ export const PULL_TREE = {
     },
     {
       id: 'pull.bar.typewriter',
+      abilityHint: 'advanced',
       name: 'Typewriter Pull-Up',
       hookSlot: 'pull-bar-t9',
       branch: 'bar',
@@ -686,6 +692,7 @@ export const PULL_TREE = {
     },
     {
       id: 'pull.bar.uneven',
+      abilityHint: 'advanced',
       name: 'Uneven-Grip Pull-Up',
       hookSlot: 'pull-bar-t10',
       branch: 'bar',
