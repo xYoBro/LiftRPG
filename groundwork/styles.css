@@ -264,6 +264,12 @@ button:active { transform: translateY(2px) scale(0.99); }
 .gw-door-locked { opacity: 0.55; }
 .gw-door-locked .gw-door-name { color: var(--gw-dim); }
 
+/* ── Grade reveal (Intake v2, D44) ── */
+.gw-grade-stamp { font-family: var(--gw-mono); font-weight: 750; font-size: 1.15rem; letter-spacing: 0.12em;
+  color: #7a4a22; border: 2.5px solid #7a4a22; border-radius: 6px; display: inline-block;
+  padding: 7px 14px; margin: 8px 0 10px; transform: rotate(-1.6deg);
+  animation: gw-stampin 320ms var(--gw-ease); }
+
 /* ── Season framing (D40) ── */
 .gw-episode { font-family: var(--gw-mono); letter-spacing: 0.12em; font-size: 0.7rem; color: var(--gw-amber); margin-top: 2px; }
 .gw-season-line { color: var(--gw-amber); margin-bottom: 6px; }

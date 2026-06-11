@@ -12,15 +12,17 @@ const COUNTS = {
 function treeFacts(tree) {
   const branches = Object.entries(tree.branches)
     .map(([id, b]) => `- branch "${id}" — ${b.name}: ${b.note}`).join('\n');
-  const ladder = tree.assessmentLadder.map((r) => {
-    const t = tree.tiers.find((x) => x.id === r.tier);
-    return `- hookSlot "${t.hookSlot}" (branch ${t.branch}): the exercise is "${t.name}"`;
+  const ladder = tree.tiers.map((t) =>
+    `- hookSlot "${t.hookSlot}" (branch ${t.branch}): the exercise is "${t.name}"`).join('\n');
+  const probes = Object.entries((tree.probes || {}).defs || {}).map(([id, p]) => {
+    const t = tree.tiers.find((x) => x.id === p.tier);
+    return `- probe "${id}": tests "${t ? t.name : p.tier}" — ${p.test}`;
   }).join('\n');
-  return { branches, ladder };
+  return { branches, ladder, probes };
 }
 
 export function buildSkinPrompt(tree, brief) {
-  const { branches, ladder } = treeFacts(tree);
+  const { branches, ladder, probes } = treeFacts(tree);
   const briefText = (brief || '').trim() || 'Author’s choice — surprise me, but commit fully to one world.';
   return `You are designing a complete campaign world for GROUNDWORK — a training game where a real
 strength program IS the story's clock. The engine owns all training content (exercises, sets,
@@ -51,10 +53,20 @@ THE PLACE MUST MAP TO THIS STRUCTURE (the training tree — rename nothing here)
 ${branches}
 
 Each hookSlot below is a SECTOR of the place (a room/zone the player works in for weeks).
-Name each one as a location in your world (tierNames), and write one VOICE line per slot for
-the intake (intakeVoice) — it should name the sector, gesture at the physical work poetically
-(without prescribing), and carry the voice's personality:
+Name each one as a location in your world (tierNames):
 ${ladder}
+
+THE INTAKE is 4-5 adaptive PROBES (not a full ladder). Write one VOICE line per probe id for
+intakeVoice — it should set the test in your world without prescribing numbers beyond what
+the probe text states, and carry the voice's character:
+${probes}
+
+THE GRADES: the intake classifies the player (engine-side) as untrained / trained /
+intermediate / advanced. Write "grades": one in-world RANK NAME and one VOICE line per class
+(e.g. a commission grade, a guild rank). The line for "untrained" must make the bottom of the
+map feel like the right place to start, never a judgment. Intermediate/advanced lines should
+mention that their duty alternates heavy and light days and the doors ask for proof twice —
+in-world language, no training numbers.
 
 OUTPUT — one JSON object, no markdown fences, no commentary, exactly these keys:
 {
@@ -64,7 +76,8 @@ OUTPUT — one JSON object, no markdown fences, no commentary, exactly these key
   "worldLine": "One sentence of world-state shown under the title.",
   "voices": { "pull-voice": { "name": "VOICENAME", "register": "two-sentence character card", "ttsHint": { "style": "delivery note" } } },
   "tierNames": { "<every hookSlot above>": "Sector Name" },
-  "intakeVoice": { "<every hookSlot above>": "VOICENAME: “one line for that intake test”" },
+  "intakeVoice": { "<every probe id above>": "VOICENAME: “one line for that probe”" },
+  "grades": { "untrained": { "name": "RANK NAME", "line": "VOICENAME: “...”" }, "trained": {...}, "intermediate": {...}, "advanced": {...} },
   "coldOpen": [
     { "kind": "document", "title": "CARD 1 TITLE", "documentType": "form", "body": "the orders/letter that sent the player here (60-90 words)", "hook": "— signature line" },
     { "kind": "scene", "title": "CARD 2 TITLE", "body": "arrival; the place is deliberately stilled, not ruined (60-90 words)" },

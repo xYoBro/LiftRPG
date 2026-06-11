@@ -13,11 +13,11 @@ import { resolveRoom, resolveBoss } from './engine/resolver.mjs';
 import {
   createEmptyProfile, loadProfile, saveProfile, clearProfile,
   exportProfile, importProfile, startNewCampaign,
-  createAssessmentRun, currentRung, recordRungResult, isAssessmentComplete,
+  createAssessmentRun, currentProbe, recordProbeResult, isAssessmentComplete,
   applyAssessment, getTier, tierState, recentHitRate, needsRecalibration,
   applyBossPass, intelDropForFault
 } from './engine/profile.mjs';
-import { generateSession, roomKey, buildAar, unlockHit, computeDoorCharge, REST_SECONDS } from './engine/session.mjs';
+import { generateSession, roomKey, buildAar, unlockHit, computeDoorCharge, trailingCharges, REST_SECONDS } from './engine/session.mjs';
 import { awardForRow, resolveEncounterChoice, resolveSpecialRoom, fragmentById, kitItemById } from './engine/discovery.mjs';
 import { markExplored, projectWing } from './engine/map.mjs';
 import { doorsOpenedCount, monthsOnStation, dueKeystonesForBossPass, fileKeystone, fileLiveEvent } from './engine/keystones.mjs';
@@ -248,7 +248,7 @@ function renderHome() {
         <div class="gw-dim gw-map-legend">pulse = you · tap any chamber or gate · bar under a gate = door charge</div>
         <button class="gw-mapview" data-act="map-view">${state.mapView === 'local' ? 'Whole wing' : 'Your position'}</button>
       </div>
-      <div class="gw-identity gw-dim">${esc(TREE.name)} ${treeStat()}% · ${(p.cleared[TREE.id] || []).length} sectors · ${(p.archive || []).length} documents${p.intention ? ` · ${esc(fill(SKIN.sessionFrame.intention.display, p.intention))}` : ''}${p.microGoal ? ` · goal: ${esc(p.microGoal)}` : ''}</div>
+      <div class="gw-identity gw-dim">${p.classification && (SKIN.grades || {})[p.classification] ? esc(SKIN.grades[p.classification].name) + ' · ' : ''}${esc(TREE.name)} ${treeStat()}% · ${(p.cleared[TREE.id] || []).length} sectors · ${(p.archive || []).length} documents${p.intention ? ` · ${esc(fill(SKIN.sessionFrame.intention.display, p.intention))}` : ''}${p.microGoal ? ` · goal: ${esc(p.microGoal)}` : ''}</div>
     </main>
     ${bottomNav('home')}`;
   wire({
@@ -319,10 +319,15 @@ function wireStationMap() {
       if (!tier || !tier.boss) return;
       const charge = (state.profile.doorCharge || {})[tier.id] || 0;
       const elected = state.profile.bossElect === tier.id;
+      const cls = state.profile.classification;
+      const waves = cls === 'intermediate' || cls === 'advanced';
+      const chargeLine = waves
+        ? `charges held: ${trailingCharges(state.profile, TREE.id, tier.id, true)}/2 (heavy days only) · last reading ${Math.round(charge * 100)}%`
+        : `${esc(SKIN.map.gateMeterLabel || 'DOOR CHARGE')}: ${Math.round(charge * 100)}%`;
       const d = detail();
       d.hidden = false;
       d.innerHTML = `<strong>SEALED GATE</strong> — ${esc(tier.boss.label)}<br>
-        <span class="gw-dim">${esc(SKIN.map.gateMeterLabel || 'DOOR CHARGE')}: ${Math.round(charge * 100)}% · the door grades the standard, not the effort. Failure files intel.</span><br>
+        <span class="gw-dim">${chargeLine} · the door grades the standard, not the effort. Failure files intel.</span><br>
         <button data-elect="${esc(tier.id)}">${elected ? 'Elected — cancel the attempt' : 'Elect the attempt (next ' + esc(TREE.branches[tier.branch].name) + ' session)'}</button>`;
       d.querySelectorAll('[data-elect]').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -523,68 +528,103 @@ function startAssess() {
   nav('assess');
 }
 
+// ── Intake v2 (D44): 4-5 adaptive probes, then the grade ─────────────────────
 function renderAssess() {
   const run = state.assessRun;
-  if (isAssessmentComplete(run, TREE)) {
-    state.profile = applyAssessment(state.profile, TREE, run);
-    saveProfile(state.profile);
-    const active = state.profile.active[TREE.id];
-    root().innerHTML = `
-      <header class="gw-header"><h1>INTAKE COMPLETE</h1></header>
-      <main class="gw-panel">
-        <p>${esc(SKIN.sessionFrame.assessment.outro)}</p>
-        <ul class="gw-list">
-          ${Object.entries(active).map(([branch, tierId]) => {
-            const tier = getTier(TREE, tierId);
-            return `<li><strong>${esc(TREE.branches[branch].name)}:</strong> ${esc(flavorName(tier))} <span class="gw-dim">(${esc(tier.name)})</span></li>`;
-          }).join('')}
-        </ul>
-        <div class="gw-callout">
-          <p>${esc(SKIN.sessionFrame.intention.prompt)}</p>
-          <label class="gw-dim">${esc(SKIN.sessionFrame.intention.afterLabel)}</label>
-          <input id="int-after" class="gw-text" placeholder="${esc(SKIN.sessionFrame.intention.afterPlaceholder)}" maxlength="60">
-          <label class="gw-dim">${esc(SKIN.sessionFrame.intention.whereLabel)}</label>
-          <input id="int-where" class="gw-text" placeholder="${esc(SKIN.sessionFrame.intention.wherePlaceholder)}" maxlength="60">
-        </div>
-        <button class="gw-primary" data-act="home">To the Station</button>
-      </main>`;
-    wire({ home: () => {
-      const after = (document.getElementById('int-after') || {}).value || '';
-      const where = (document.getElementById('int-where') || {}).value || '';
-      if (after.trim() && where.trim()) {
-        state.profile.intention = { after: after.trim(), where: where.trim() };
-        saveProfile(state.profile);
-      }
-      nav('home');
-    } });
-    return;
-  }
-  const rung = currentRung(run, TREE);
-  const tier = getTier(TREE, rung.tier);
-  const std = rung.standard;
-  const stdText = std.kind === 'hold' ? `Hold for ${std.value} seconds` : `Do ${std.value} reps${std.perSide ? ' per side' : ''}`;
-  const rungVoice = (SKIN.intakeVoice || {})[tier.hookSlot];
+  if (isAssessmentComplete(run)) { renderGradeReveal(run); return; }
+  const probe = currentProbe(run, TREE);
+  const tier = getTier(TREE, probe.tier);
+  const voice = (SKIN.intakeVoice || {})[run.current] || (SKIN.intakeVoice || {})[tier.hookSlot];
+  const isCount = probe.kind === 'count';
   root().innerHTML = `
     <header class="gw-header"><h1>INTAKE</h1>
-      <div class="gw-dim">${run.index + 1} of ${run.ladder.length} · rest as long as you like between tests</div></header>
+      <div class="gw-dim">probe ${run.results.length + 1} · at most 5 · rest as long as you like between tests</div></header>
     <main class="gw-panel gw-center">
       <div class="gw-dim">${esc(TREE.branches[tier.branch].name)} corridor · ${esc(flavorName(tier))}</div>
       <h2 class="gw-test-name">${esc(tier.name)}</h2>
-      <p class="gw-test-standard">${esc(stdText)}</p>
-      ${rungVoice ? `<p class="gw-beat gw-intake-voice">${esc(rungVoice)}</p>` : ''}
+      <p class="gw-test-standard">${esc(probe.test)}</p>
+      ${voice ? `<p class="gw-beat gw-intake-voice">${esc(voice)}</p>` : ''}
       <details class="gw-form"><summary>How to do it</summary>
         ${videoRefHtml(tier)}
         ${figuresHtml(tier)}
         <p>${esc(tier.setup)}</p>
         <ul class="gw-list">${tier.formStandard.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
       </details>
-      <button class="gw-primary gw-big" data-act="pass">Did it</button>
-      <button class="gw-big" data-act="miss">Stop here — this corridor is mapped</button>
+      ${isCount ? `
+        <div class="gw-stepper">
+          <button class="gw-step" data-step="-1">−</button>
+          <div class="gw-step-num" id="probe-count">0</div>
+          <button class="gw-step" data-step="1">+</button>
+          <div class="gw-step-unit">${esc(probe.unit || 'reps')}</div>
+        </div>
+        <button class="gw-primary gw-big" data-act="confirm">That’s my number</button>
+      ` : `
+        <button class="gw-primary gw-big" data-act="pass">Did it</button>
+        <button class="gw-big" data-act="miss">Not yet — that’s the survey working</button>
+      `}
     </main>`;
-  wire({
-    pass: () => { recordRungResult(run, TREE, true); render(); },
-    miss: () => { recordRungResult(run, TREE, false); render(); }
+  root().querySelectorAll('[data-step]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const num = document.getElementById('probe-count');
+      num.textContent = String(Math.max(0, Number(num.textContent) + Number(el.getAttribute('data-step'))));
+    });
   });
+  wire({
+    pass: () => { recordProbeResult(run, TREE, true); render(); },
+    miss: () => { recordProbeResult(run, TREE, false); render(); },
+    confirm: () => {
+      const n = Number((document.getElementById('probe-count') || {}).textContent || 0);
+      recordProbeResult(run, TREE, n);
+      render();
+    }
+  });
+}
+
+// The grade reveal: classification as a paper artifact — the keeper's
+// commission card, stamped. Periodization is posted as a duty cycle.
+function renderGradeReveal(run) {
+  state.profile = applyAssessment(state.profile, TREE, run);
+  saveProfile(state.profile);
+  const cls = state.profile.classification;
+  const grade = (SKIN.grades || {})[cls] || { name: String(cls).toUpperCase(), line: '' };
+  const waves = cls === 'intermediate' || cls === 'advanced';
+  const active = state.profile.active[TREE.id];
+  root().innerHTML = `
+    <header class="gw-header"><h1>INTAKE COMPLETE</h1></header>
+    <main class="gw-panel">
+      <p class="gw-dim">${esc(SKIN.sessionFrame.assessment.outro)}</p>
+      <div class="gw-document gw-grade">
+        <div class="gw-doc-type">KEEPER GRADE ASSESSMENT · ${run.results.length} PROBE${run.results.length === 1 ? '' : 'S'} ON RECORD</div>
+        <div class="gw-grade-stamp">${esc(grade.name)}</div>
+        <div class="gw-order-rows">
+          ${Object.entries(active).map(([branch, tierId]) => {
+            const tier = getTier(TREE, tierId);
+            return `<div class="gw-order-row"><span>${esc(TREE.branches[branch].name.toUpperCase())}</span><span>${esc(flavorName(tier))} <span class="gw-dim">(${esc(tier.name)})</span></span></div>`;
+          }).join('')}
+          <div class="gw-order-row"><span>DUTY CYCLE</span><span>${waves
+            ? 'Heavy and light days alternate. The doors grade heavy days — and ask for two.'
+            : 'Linear. Every charged session counts toward the doors.'}</span></div>
+        </div>
+        ${grade.line ? `<div class="gw-doc-hook">${esc(grade.line)}</div>` : ''}
+      </div>
+      <div class="gw-callout">
+        <p>${esc(SKIN.sessionFrame.intention.prompt)}</p>
+        <label class="gw-dim">${esc(SKIN.sessionFrame.intention.afterLabel)}</label>
+        <input id="int-after" class="gw-text" placeholder="${esc(SKIN.sessionFrame.intention.afterPlaceholder)}" maxlength="60">
+        <label class="gw-dim">${esc(SKIN.sessionFrame.intention.whereLabel)}</label>
+        <input id="int-where" class="gw-text" placeholder="${esc(SKIN.sessionFrame.intention.wherePlaceholder)}" maxlength="60">
+      </div>
+      <button class="gw-primary gw-big" data-act="home">To the Station</button>
+    </main>`;
+  wire({ home: () => {
+    const after = (document.getElementById('int-after') || {}).value || '';
+    const where = (document.getElementById('int-where') || {}).value || '';
+    if (after.trim() && where.trim()) {
+      state.profile.intention = { after: after.trim(), where: where.trim() };
+      saveProfile(state.profile);
+    }
+    nav('home');
+  } });
 }
 
 // ── Session ──────────────────────────────────────────────────────────────────
@@ -668,7 +708,9 @@ function renderBrief(s) {
           ${episode ? `<div class="gw-order-row"><span>EPISODE</span><span>${esc(episode.title)}${episode.line ? ' — ' + esc(episode.line) : ''}</span></div>` : ''}
           ${(order ? order.rows : [['ROUTE', '{{sectorName}}'], ['ROOMS', '{{roomCount}}']]).map(([k, v]) =>
             `<div class="gw-order-row"><span>${esc(k)}</span><span>${esc(fill(v, vars))}</span></div>`).join('')}
-          ${s.isDeload ? `<div class="gw-order-row"><span>NOTE</span><span>Light week, posted on purpose. Volume reduced; the standard is unchanged.</span></div>` : ''}
+          ${s.isDeload ? `<div class="gw-order-row"><span>NOTE</span><span>Light week, posted on purpose. Volume reduced; the standard is unchanged.</span></div>`
+            : s.intensity === 'light' && s.chargesNeeded > 1 ? `<div class="gw-order-row"><span>CYCLE</span><span>Light day — work inside the window. The doors grade heavy days.</span></div>`
+            : s.chargesNeeded > 1 ? `<div class="gw-order-row"><span>CYCLE</span><span>Heavy day — the door is watching. Charges held: ${s.charges}/${s.chargesNeeded}.</span></div>` : ''}
           ${s.boss && order && order.gateRow ? `<div class="gw-order-row gw-order-gate"><span>${esc(order.gateRow[0])}</span><span>${esc(fill(order.gateRow[1], vars))}</span></div>` : ''}
         </div>
         ${order && order.foot ? `<div class="gw-doc-hook">${esc(order.foot)}</div>` : ''}
@@ -876,7 +918,7 @@ function renderRoom(s) {
     ${hudHtml(s, idx)}
     <header class="gw-header">
       <h1>${esc(door ? door.name : flavorName(tier))}</h1>
-      <div class="gw-dim" id="prescription">${esc(tier.name)} · set ${room.setNumber} · ${target[0]}–${target[1]} ${unit}</div>
+      <div class="gw-dim" id="prescription">${esc(tier.name)} · set ${room.setNumber} · ${target[0]}–${target[1]} ${unit}${s.intensity === 'light' && s.chargesNeeded > 1 ? ' · light day' : ''}</div>
     </header>
     <main class="gw-panel gw-center">
       ${phase === 'set' ? `
@@ -1250,7 +1292,8 @@ function renderDebrief(s) {
     state.profile.history.push(aar);
     if (s.learnMode && s.focusTierId) state.profile.tutorialSeen[s.focusTierId] = true;
     // Door charge (Sprint 2.3): latest focus evidence drives the gate meter.
-    if (s.focusTierId) {
+    // Light days don't grade the door (D44) — the last heavy reading stands.
+    if (s.focusTierId && !(s.intensity === 'light' && s.chargesNeeded > 1)) {
       state.profile.doorCharge = state.profile.doorCharge || {};
       state.profile.doorCharge[s.focusTierId] = aar.unlockHit ? 1 : computeDoorCharge(s, state.setResults);
     }

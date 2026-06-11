@@ -44,6 +44,16 @@ export function validateSkin(skin, tree) {
   if (missingSlots.length === slots.length) err('tierNames: empty — the wing has no places');
   else if (missingSlots.length) warn(`tierNames: ${missingSlots.length} sector(s) unnamed (fallback: exercise names): ${missingSlots.join(', ')}`);
 
+  // Intake voice per probe + grades (Intake v2, D44).
+  const probeIds = Object.keys((tree.probes || {}).defs || {});
+  const voice = skin.intakeVoice || {};
+  const missingProbes = probeIds.filter((p) => !isStr(voice[p]));
+  if (missingProbes.length) warn(`intakeVoice: ${missingProbes.length} probe line(s) missing (fallback: sector lines): ${missingProbes.join(', ')}`);
+  const grades = skin.grades || {};
+  for (const g of ['untrained', 'trained', 'intermediate', 'advanced']) {
+    if (!grades[g] || !isStr(grades[g].name)) { warn('grades: missing or incomplete (fallback: plain class names)'); break; }
+  }
+
   // Room pools per branch
   const branches = Object.keys(tree.branches);
   for (const b of branches) {

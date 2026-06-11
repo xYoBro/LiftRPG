@@ -34,9 +34,74 @@ export const PULL_TREE = {
     bar: { name: 'Bar', note: 'Vertical pull. Hang tolerance before pulling strength — tendons first.' }
   },
 
-  // ── Assessment ladder (Session Zero) ──────────────────────────────────────
-  // Ordered easy → hard, alternating branches (fatigue cap). First miss per
-  // branch ends that branch. Placement = last tier passed. Impossible to fail.
+  // ── Adaptive intake probes (Intake v2, D44 — replaces the 18-rung walk) ───
+  // 4-5 information-dense tests bracket the athlete per the source's level
+  // system (beginner L1-5 / intermediate L6-9 / advanced L10-13) instead of
+  // maximal-testing every tier (junk fatigue). Each probe reuses a real
+  // tier's standards; routing is data (band tables), placement is per branch,
+  // classification drives periodization (see engine/session.mjs):
+  //   untrained/trained → linear progression (1 charge opens a gate)
+  //   intermediate/adv  → light/heavy alternation (2 charges, heavy days only)
+  probes: {
+    start: 'p-hang',
+    defs: {
+      'p-hang': {
+        kind: 'pass-fail', tier: 'pull.bar.dead-hang',
+        test: 'Hang from the bar for 20 seconds',
+        onPass: { next: 'p-pullmax' },
+        // Cannot hang yet → both corridors start at the floor; one probe,
+        // done. The shortest intake belongs to the newest body.
+        onFail: { place: { bar: 'pull.bar.dead-hang', lever: 'pull.lever.floor-scap' }, classHint: 'untrained', done: true }
+      },
+      'p-pullmax': {
+        kind: 'count', tier: 'pull.bar.full', unit: 'reps',
+        test: 'Strict dead-hang pull-ups — as many as you have, clean. Zero is a fine answer.',
+        bands: [
+          { max: 0, next: 'p-negative' },
+          { max: 3, place: { bar: 'pull.bar.full' }, classHint: 'trained', next: 'p-hollow' },
+          { max: 7, place: { bar: 'pull.bar.chest-to-bar' }, classHint: 'trained', next: 'p-hollow' },
+          { max: 14, place: { bar: 'pull.bar.archer' }, classHint: 'intermediate', next: 'p-hollow' },
+          { max: 99, place: { bar: 'pull.bar.typewriter' }, classHint: 'advanced', next: 'p-hollow' }
+        ]
+      },
+      'p-negative': {
+        kind: 'pass-fail', tier: 'pull.bar.negatives',
+        test: 'One 5-second negative: jump to the top, lower under control to a dead hang',
+        onPass: { place: { bar: 'pull.bar.negatives' }, classHint: 'trained', next: 'p-hollow' },
+        onFail: { next: 'p-flexed' }
+      },
+      'p-flexed': {
+        kind: 'pass-fail', tier: 'pull.bar.flexed-hang',
+        test: 'Flexed-arm hang, chin over the bar, 10 seconds',
+        onPass: { place: { bar: 'pull.bar.flexed-hang' }, classHint: 'untrained', next: 'p-hollow' },
+        onFail: { place: { bar: 'pull.bar.scap-pulls' }, classHint: 'untrained', next: 'p-hollow' }
+      },
+      'p-hollow': {
+        kind: 'pass-fail', tier: 'pull.lever.hollow-hang',
+        test: 'Hollow tuck hang — knees up, back rounded, 10 seconds',
+        onPass: { next: 'p-tuckhold' },
+        onFail: { place: { lever: 'pull.lever.hollow-hang' }, done: true }
+      },
+      'p-tuckhold': {
+        kind: 'pass-fail', tier: 'pull.lever.tuck-hold',
+        test: 'Tuck front-lever hold — hips to bar height, 5 seconds horizontal',
+        onPass: { next: 'p-tuckrows' },
+        onFail: { place: { lever: 'pull.lever.tuck-hold' }, done: true }
+      },
+      'p-tuckrows': {
+        kind: 'count', tier: 'pull.lever.tuck-row', unit: 'reps',
+        test: 'Tuck-lever rows — bar to hips at horizontal. How many, clean?',
+        bands: [
+          { max: 0, place: { lever: 'pull.lever.tuck-pull' }, done: true },
+          { max: 2, place: { lever: 'pull.lever.tuck-row' }, done: true },
+          { max: 99, place: { lever: 'pull.lever.adv-tuck-row' }, classHint: 'intermediate', done: true }
+        ]
+      }
+    }
+  },
+
+  // ── Assessment ladder (legacy, Session Zero v1) ────────────────────────────
+  // Kept as reference data; the probe intake above replaced it (D44).
   assessmentLadder: [
     { tier: 'pull.lever.floor-scap', standard: { kind: 'reps', value: 8 } },
     { tier: 'pull.bar.dead-hang', standard: { kind: 'hold', value: 20 } },

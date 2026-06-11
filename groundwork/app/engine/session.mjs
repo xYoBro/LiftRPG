@@ -83,15 +83,24 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
     learnCue: null
   })) : [];
 
-  // Boss eligibility: top of window across all sets at form standard was hit
-  // last session on this tier (recorded in history), and not in learn mode.
-  // Slice convenience: also eligible when the profile marks it explicitly
-  // (the author can elect the attempt to exercise the flow).
-  const lastOnTier = [...profile.history].reverse()
-    .find((h) => h.treeId === tree.id && h.focusTierId === (focusTier && focusTier.id));
+  // Periodization by population (D44, from the source's models):
+  //   untrained/trained beginners — LINEAR: one charged session opens a gate.
+  //   intermediate/advanced — LIGHT/HEAVY waves: sessions alternate intensity;
+  //   only heavy days grade the door, and a gate wants two charges. Deload
+  //   weeks force light. The set prescription itself never changes — the
+  //   light day is an instruction to stay inside the window, not a new dose.
+  const cls = profile.classification || 'trained';
+  const usesWaves = cls === 'intermediate' || cls === 'advanced';
+  const chargesNeeded = usesWaves ? 2 : 1;
+  const intensity = usesWaves
+    ? (isDeload ? 'light' : (campaignSession % 2 === 0 ? 'heavy' : 'light'))
+    : 'heavy';
+
+  // Boss eligibility: enough trailing charged sessions on this tier (heavy
+  // days only when waving), or an explicit map-tap election.
+  const charges = focusTier ? trailingCharges(profile, tree.id, focusTier.id, usesWaves) : 0;
   const bossEligible = !!(focusTier && focusTier.boss && !learnMode
-    && (profile.bossElect === focusTier.id
-      || (lastOnTier && lastOnTier.unlockHit)));
+    && (profile.bossElect === focusTier.id || charges >= chargesNeeded));
 
   // Paired-set interleave (OG audit, D41): rooms alternate corridors —
   // F O F O F — so each movement gets ~4+ minutes between ITS OWN sets while
@@ -127,6 +136,9 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
       restSeconds: REST_SECONDS.warmup
     } : null,
     rooms: allRooms,
+    intensity,
+    chargesNeeded,
+    charges,
     boss: bossEligible ? {
       tier: focusTier,
       definition: focusTier.boss,
@@ -179,6 +191,21 @@ export function computeDoorCharge(session, setResults) {
   return Math.min(1, Math.round((sum / focusRooms.length) * 100) / 100);
 }
 
+// Trailing charged sessions on a tier: consecutive unlockHit sessions, most
+// recent first. Sessions on OTHER tiers don't break the chain; a graded
+// session that missed the window does. Light days neither grade nor break
+// when the athlete is waving (intermediate+).
+export function trailingCharges(profile, treeId, tierId, usesWaves) {
+  let n = 0;
+  for (let i = profile.history.length - 1; i >= 0; i--) {
+    const h = profile.history[i];
+    if (h.treeId !== treeId || h.focusTierId !== tierId || h.stormProtocol) continue;
+    if (usesWaves && h.intensity === 'light') continue;
+    if (h.unlockHit) n += 1; else break;
+  }
+  return n;
+}
+
 // Unlock check: did this session's working sets hit the top of the rep/hold
 // window across ALL sets at form standard?
 export function unlockHit(session, setResults) {
@@ -207,6 +234,7 @@ export function buildAar(session, { setResults, resolutions, bossResult, intelDr
     focusTierId: session.focusTierId,
     focusBranch: session.focusBranch,
     learnMode: session.learnMode,
+    intensity: session.intensity || 'heavy',
     setsTotal: session.rooms.length,
     setsHit: hits,
     unlockHit: unlockHit(session, setResults),

@@ -23,7 +23,8 @@ export function createEmptyProfile(seed) {
       concurrentTraining: [],      // modifier table inputs (full build)
       muted: false
     },
-    assessments: {},               // treeId → { placedTiers: {branch: tierId|null}, ladder: [...], completedAt }
+    assessments: {},               // treeId → { probes: [...], classification, completedAt }
+    classification: null,          // untrained | trained | intermediate | advanced (D44)
     cleared: {},                   // treeId → [tierId, ...] (cleared = warm-up/farmable)
     active: {},                    // treeId → { branch → tierId } (working tiers)
     tutorialSeen: {},              // tierId → true (learn-mode fired)
@@ -104,76 +105,82 @@ function migrateProfile(profile) {
   return profile;
 }
 
-// ── Assessment ladder runner ─────────────────────────────────────────────────
-// The UI walks the tree's assessmentLadder in order, alternating branches with
-// rest (fatigue cap); the user reports pass/miss per rung; first miss per
-// branch ends that branch. Placement = last tier passed per branch.
+// ── Adaptive probe runner (Intake v2, D44) ───────────────────────────────────
+// 4-5 information-dense probes instead of an 18-rung max-test walk. Routing
+// lives in tree.probes (data: band tables); placement is per branch; the
+// classification (untrained/trained/intermediate/advanced — the source's
+// population model, by ABILITY not training age) drives periodization.
+// Impossible to fail: every route ends in a valid posting.
+
+const CLASS_RANK = ['untrained', 'trained', 'intermediate', 'advanced'];
+
 export function createAssessmentRun(tree) {
   return {
     treeId: tree.id,
-    ladder: tree.assessmentLadder.map((rung) => ({ ...rung, result: null })),
-    branchStopped: {},             // branch → true after first miss
-    index: 0
+    current: tree.probes.start,
+    results: [],                   // [{ probe, value }]
+    place: {},                     // branch → tier id (active posting)
+    classHints: [],
+    done: false
   };
 }
 
-export function currentRung(run, tree) {
-  while (run.index < run.ladder.length) {
-    const rung = run.ladder[run.index];
-    const branch = branchOfTier(tree, rung.tier);
-    if (run.branchStopped[branch]) { run.index += 1; continue; }
-    return rung;
-  }
-  return null;
+export function currentProbe(run, tree) {
+  return run.done ? null : tree.probes.defs[run.current] || null;
 }
 
-export function recordRungResult(run, tree, passed) {
-  const rung = run.ladder[run.index];
-  if (!rung) return run;
-  rung.result = passed ? 'pass' : 'miss';
-  const branch = branchOfTier(tree, rung.tier);
-  if (!passed) run.branchStopped[branch] = true;
-  run.index += 1;
+function applyOutcome(run, outcome) {
+  if (!outcome) { run.done = true; return; }
+  if (outcome.place) Object.assign(run.place, outcome.place);
+  if (outcome.classHint) run.classHints.push(outcome.classHint);
+  if (outcome.done || !outcome.next) run.done = true;
+  else run.current = outcome.next;
+}
+
+// value: boolean for pass-fail probes, number for count probes.
+export function recordProbeResult(run, tree, value) {
+  const probe = currentProbe(run, tree);
+  if (!probe) return run;
+  run.results.push({ probe: run.current, value });
+  if (probe.kind === 'count') {
+    const band = probe.bands.find((b) => value <= b.max) || probe.bands[probe.bands.length - 1];
+    applyOutcome(run, band);
+  } else {
+    applyOutcome(run, value ? probe.onPass : probe.onFail);
+  }
   return run;
 }
 
-export function isAssessmentComplete(run, tree) {
-  return currentRung(run, tree) === null;
+export function isAssessmentComplete(run) {
+  return !!run.done;
 }
 
-// Deterministic placement from ladder results.
-export function placeFromRun(run, tree) {
-  const placed = {};   // branch → last passed tier id (null = start at tier 1, learn mode)
-  const cleared = [];
-  for (const rung of run.ladder) {
-    if (rung.result !== 'pass') continue;
-    const branch = branchOfTier(tree, rung.tier);
-    placed[branch] = rung.tier;
-    cleared.push(rung.tier);
+export function classificationFromRun(run) {
+  let best = 'untrained';
+  for (const hint of run.classHints) {
+    if (CLASS_RANK.indexOf(hint) > CLASS_RANK.indexOf(best)) best = hint;
   }
-  // Active tier per branch = the tier AFTER the last passed one (or tier 1).
-  const active = {};
-  for (const branch of Object.keys(tree.branches)) {
-    const branchTiers = tree.tiers.filter((t) => t.branch === branch).map((t) => t.id);
-    const last = placed[branch];
-    const nextIndex = last ? branchTiers.indexOf(last) + 1 : 0;
-    active[branch] = branchTiers[Math.min(nextIndex, branchTiers.length - 1)];
-    // Everything before the active tier is cleared (warm-up/farmable),
-    // even rungs the ladder skipped — placement implies the floor below it.
-    for (let i = 0; i < Math.min(nextIndex, branchTiers.length); i++) {
-      if (!cleared.includes(branchTiers[i])) cleared.push(branchTiers[i]);
-    }
-  }
-  return { placed, active, cleared };
+  return best;
 }
 
 export function applyAssessment(profile, tree, run) {
-  const { placed, active, cleared } = placeFromRun(run, tree);
+  const classification = classificationFromRun(run);
+  const active = {};
+  const cleared = [];
+  for (const branch of Object.keys(tree.branches)) {
+    const branchTiers = tree.tiers.filter((t) => t.branch === branch).map((t) => t.id);
+    const target = run.place[branch] && branchTiers.includes(run.place[branch])
+      ? run.place[branch] : branchTiers[0];
+    active[branch] = target;
+    // Everything below the posting is cleared ground (warm-up/farmable).
+    for (let i = 0; i < branchTiers.indexOf(target); i++) cleared.push(branchTiers[i]);
+  }
   profile.assessments[tree.id] = {
-    placedTiers: placed,
-    ladder: run.ladder.map((r) => ({ tier: r.tier, result: r.result })),
+    probes: run.results,
+    classification,
     completedAt: new Date().toISOString()
   };
+  profile.classification = classification;
   profile.active[tree.id] = active;
   profile.cleared[tree.id] = cleared;
   return profile;

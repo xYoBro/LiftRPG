@@ -54,10 +54,39 @@ export const SKIN = {
     }
   ],
 
-  // ── Intake voice (Sprint 2.1): one RIGGING line per rung, keyed by sector ──
-  // Character creation doubles as tutorial, first relationship scene, and
-  // world tour: each line names the sector and coaches the test.
+  // ── Keeper grades (Intake v2, D44): classification as commission rank ──────
+  // The engine's population model (untrained/trained/intermediate/advanced)
+  // worn as the station's grade ladder. The grade colors voice and posts the
+  // duty cycle; it never changes the tree.
+  grades: {
+    untrained: {
+      name: 'KEEPER, PROBATIONARY',
+      line: 'RIGGING: “Probationary. Eight started lower — there’s a journal page about a doorframe. The wing was built for exactly this: floors first, then rungs. Welcome to the bottom of the map. Everything here points up.”'
+    },
+    trained: {
+      name: 'KEEPER THIRD CLASS',
+      line: 'RIGGING: “Third class. You’ve hung from things before — good. The wing doesn’t care what you used to lift; it cares what you can hold when it’s cold. Linear duty: every charged session counts. Simple as rope.”'
+    },
+    intermediate: {
+      name: 'KEEPER SECOND CLASS',
+      line: 'RIGGING: “Second class. Strong enough that simple stops working — that’s not a compliment, it’s a scheduling problem. Heavy days and light days now, posted on the orders. The doors will ask you to prove it twice. They learned that from Eight.”'
+    },
+    advanced: {
+      name: 'KEEPER FIRST CLASS',
+      line: 'RIGGING: “First class. I’ve rigged for crews that didn’t carry your numbers. The wing will not flatter you for it — at your grade the work is patience wearing a heavier coat. Heavy, light, prove it twice. The mast is closer than you think.”'
+    }
+  },
+
+  // ── Intake voice (v2: one RIGGING line per PROBE; hookSlot lines kept as
+  // fallback world-tour lines for any future full-ladder mode) ───────────────
   intakeVoice: {
+    'p-hang': 'RIGGING: “First probe, oldest law: before anything pulls, it hangs. Twenty seconds on the bar, relaxed, like you plan to stay. The wing reads grip the way I read knots.”',
+    'p-pullmax': 'RIGGING: “Now the honest number. Dead-hang pull-ups, strict, chin clear — as many as you own. Zero is a real answer; Eight’s first page says zero. I count what is, not what’s wished.”',
+    'p-negative': 'RIGGING: “Riggers LOWER things. Jump to the top, then give me five seconds of controlled descent to a dead hang. The way down tells me more than the way up ever would.”',
+    'p-flexed': 'RIGGING: “Chin over the bar and stay there. Ten seconds. Not a pull — a refusal. The wing has respect for stubborn; so does its keeper file.”',
+    'p-hollow': 'RIGGING: “Other corridor now. Knees up, back rounded hollow, ten seconds. A slack body is a snapped line waiting. Show me tension that holds its shape.”',
+    'p-tuckhold': 'RIGGING: “The Level Gauge’s own test: tucked, hips to bar height, five seconds horizontal. The bubble doesn’t lie and neither does this. If it’s not there yet, that’s a map line, not a mark against you.”',
+    'p-tuckrows': 'RIGGING: “Last probe, and only because you earned the question: from horizontal, pull the bar to your hips. Count them clean. Past this, the wing has nothing left to ask — it just has work.”',
     'pull-lever-t1': 'RIGGING: “The Loading Ramp. Flat, honest ground — everything heavy came through here once. Face down. Show me the shoulder blades know three letters.”',
     'pull-bar-t1': 'RIGGING: “The Hanging Gallery. First law of the wing: before anything pulls, it hangs. Twenty seconds, relaxed, like you plan to stay. The bar has held worse.”',
     'pull-lever-t2': 'RIGGING: “Cable Run, Lower. Lines sag when nobody tensions them. You will not. Knees up, back rounded hollow, hold. A slack body is a snapped line waiting.”',
