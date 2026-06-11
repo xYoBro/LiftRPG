@@ -53,6 +53,20 @@ export function validateSkin(skin, tree) {
   for (const g of ['untrained', 'trained', 'intermediate', 'advanced']) {
     if (!grades[g] || !isStr(grades[g].name)) { warn('grades: missing or incomplete (fallback: plain class names)'); break; }
   }
+  // Condition survey + chalk-wall lines (D45) — engine has plain fallbacks.
+  const iq = skin.intakeQuestions || {};
+  for (const qk of ['recency', 'age']) {
+    if (!iq[qk] || !isStr((iq[qk] || {}).prompt) || !isArr((iq[qk] || {}).options, 3)) {
+      warn(`intakeQuestions.${qk}: missing or incomplete (fallback: plain wording)`);
+    } else {
+      const ids = iq[qk].options.map((o) => o[0]);
+      const want = qk === 'recency' ? ['never', 'years', 'recent'] : ['u40', '40s', '55plus'];
+      if (!want.every((id) => ids.includes(id))) err(`intakeQuestions.${qk}: option ids must be exactly ${want.join('/')} (engine reads them)`);
+    }
+  }
+  if (!isStr((skin.sessionFrame || {}).newMark) || !isStr((skin.sessionFrame || {}).newMarkFirst)) {
+    warn('sessionFrame.newMark/newMarkFirst: missing (fallback: plain new-mark line)');
+  }
 
   // Room pools per branch
   const branches = Object.keys(tree.branches);

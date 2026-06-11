@@ -25,6 +25,9 @@ export function createEmptyProfile(seed) {
     },
     assessments: {},               // treeId → { probes: [...], classification, completedAt }
     classification: null,          // untrained | trained | intermediate | advanced (D44)
+    trainingRecency: null,         // never | years | recent (D45 — tendon-guard input)
+    ageBracket: null,              // u40 | 40s | 55plus (D45 — bracket, never a birthdate)
+    bests: {},                     // tierId → { amount, unit, at } — the chalk wall (D45)
     cleared: {},                   // treeId → [tierId, ...] (cleared = warm-up/farmable)
     active: {},                    // treeId → { branch → tierId } (working tiers)
     tutorialSeen: {},              // tierId → true (learn-mode fired)
@@ -85,7 +88,8 @@ function migrateProfile(profile) {
     intention: null, microGoal: null, lastDispatchAt: null,
     firedKeystones: [], cachesOpened: [], doorCharge: {},
     exploredAt: {}, seasonClosedAt: null, seasonEnding: null,
-    campaignStartedAt: null, campaignSessionBase: 0
+    campaignStartedAt: null, campaignSessionBase: 0,
+    trainingRecency: null, ageBracket: null, bests: {}
   };
   for (const key of Object.keys(defaults)) {
     if (profile[key] === undefined) profile[key] = defaults[key];
@@ -117,6 +121,8 @@ const CLASS_RANK = ['untrained', 'trained', 'intermediate', 'advanced'];
 export function createAssessmentRun(tree) {
   return {
     treeId: tree.id,
+    stage: 'recency',              // recency → age → probes (D45 condition intake)
+    answers: {},
     current: tree.probes.start,
     results: [],                   // [{ probe, value }]
     place: {},                     // branch → tier id (active posting)
@@ -127,6 +133,14 @@ export function createAssessmentRun(tree) {
 
 export function currentProbe(run, tree) {
   return run.done ? null : tree.probes.defs[run.current] || null;
+}
+
+// Condition questions before the physical probes (D45): training recency and
+// age bracket — the tendon-guard inputs. Brackets only; never a birthdate.
+export function recordIntakeAnswer(run, key, value) {
+  run.answers[key] = value;
+  run.stage = run.stage === 'recency' ? 'age' : 'probes';
+  return run;
 }
 
 function applyOutcome(run, outcome) {
@@ -177,10 +191,13 @@ export function applyAssessment(profile, tree, run) {
   }
   profile.assessments[tree.id] = {
     probes: run.results,
+    answers: run.answers,
     classification,
     completedAt: new Date().toISOString()
   };
   profile.classification = classification;
+  if (run.answers.recency) profile.trainingRecency = run.answers.recency;
+  if (run.answers.age) profile.ageBracket = run.answers.age;
   profile.active[tree.id] = active;
   profile.cleared[tree.id] = cleared;
   return profile;

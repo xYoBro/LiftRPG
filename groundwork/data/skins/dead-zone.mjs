@@ -77,6 +77,28 @@ export const SKIN = {
     }
   },
 
+  // ── Condition survey (D45): the two questions before any bar is touched ───
+  intakeQuestions: {
+    recency: {
+      prompt: 'Before this commission — when did you last hold a working post?',
+      note: 'RIGGING asks once and writes it in the file. The wing programs for the body that shows up.',
+      options: [
+        ['never', 'Never held one'],
+        ['years', 'Years ago — another life'],
+        ['recent', 'Recently — I came in working']
+      ]
+    },
+    age: {
+      prompt: 'Years on your service clock?',
+      note: 'A bracket, not a birthdate. Wire and tendon keep their own schedule.',
+      options: [
+        ['u40', 'Under forty'],
+        ['40s', 'Forty to fifty-five'],
+        ['55plus', 'Past fifty-five']
+      ]
+    }
+  },
+
   // ── Intake voice (v2: one RIGGING line per PROBE; hookSlot lines kept as
   // fallback world-tour lines for any future full-ladder mode) ───────────────
   intakeVoice: {
@@ -589,6 +611,11 @@ export const SKIN = {
       { when: { monthsAtLeast: 1, isFirstRoom: true, rollUnder: 30 }, lines: [
         'RIGGING: “A month on station, by the duty clock. Buildings are slow to trust — a month is when this one stops watching you work and starts working with you. You won’t hear the difference. I do.”'
       ] },
+      // Tendon-guard texture (D45): the long road back, dignified.
+      { when: { tendonGuard: true, isFirstRoom: true, rollUnder: 35 }, lines: [
+        'RIGGING: “Your file says long road back, so hear the wing’s only speech about it: wire and tendon learn slower than muscle, and they hold everything. We rest longer on purpose. The keepers who rushed this part are not on the wall.”',
+        'RIGGING: “Rests run long for you by design — that’s not coddling, it’s materials science. Strength is poured; connective tissue is cured. You can’t hurry curing. You can only show up while it happens.”'
+      ] },
       { when: { isFirstRoom: true }, lines: [
         'RIGGING: “First room of the day. Cold building, warm hands by the end — that’s the whole trade. Manifest says move.”'
       ] },
@@ -618,6 +645,11 @@ export const SKIN = {
     },
 
     intelDrop: 'INTEL DROP — {{faultName}}: {{sideQuestName}}. {{sideQuestNote}} Added to the route.',
+
+    // The chalk wall (D45): a clean set past your best is real progress,
+    // stamped the moment it happens.
+    newMark: '{{amount}} {{unit}} in {{tierName}} — past your {{prev}}. The ladderwell chalk gains a number in your hand.',
+    newMarkFirst: '{{amount}} {{unit}} in {{tierName}} — your first number on this rig. The wall keeps it now.',
 
     // First session of the trough window: the WORK ORDER carries the forecast.
     troughForecast: 'FORECAST, posted by the previous keeper and left up on purpose: “Weeks three through six feel like nothing. That is the program working at the depth where you cannot watch it. Attendance is the whole job until the feeling comes back. It comes back.”',

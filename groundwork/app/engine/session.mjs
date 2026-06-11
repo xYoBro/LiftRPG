@@ -24,6 +24,23 @@ const PREP_DRILLS = [
   { name: 'Hollow hold', detail: '2×20s — the lever line lives here' },
   { name: 'Dead hang', detail: '2×15s, relaxed' }
 ];
+// Extended prep under tendon-guard (D45): the source's older/sedentary
+// doctrine — longer warm-up (10min + age/4), technique before load.
+const GUARD_PREP = [
+  { name: 'Shoulder circles + arm swings', detail: '15 each way, unhurried' },
+  { name: 'Half-tempo rehearsal', detail: '1 easy set of today’s first movement at half speed — alignment first, then load' }
+];
+
+// Tendon-guard populations (D45): never-trained, long-layoff past 40, or 55+.
+// Connective tissue adapts slower than muscle; the guard buys it time.
+export function isTendonGuard(profile) {
+  const rec = profile.trainingRecency;
+  const age = profile.ageBracket;
+  if (!rec && !age) return false;
+  return rec === 'never'
+    || age === '55plus'
+    || (rec === 'years' && age !== 'u40');
+}
 
 // Slice session: alternate branch focus per session (rows ↔ bar), 3 working
 // sets of the focused branch's active tier + 2 of the other branch.
@@ -58,6 +75,12 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
   const week = seasonWeek(profile);
   const isDeload = week === DELOAD_WEEK && !seasonClosed(profile);
 
+  // Tendon-guard (D45, source Ch6 populations): sedentary re-entries and
+  // older bodies get extended prep and +30s working rests. Safety over
+  // performance; the prescription windows themselves never change.
+  const tendonGuard = isTendonGuard(profile);
+  const workingRest = REST_SECONDS.working + (tendonGuard ? 30 : 0);
+
   // Session budget shapes optional volume only (never main progression or
   // prep — the cut-order law): 25min → 1 off-branch set, 40 → 2, 60 → 3.
   const budget = (profile.settings && profile.settings.sessionBudgetMinutes) || 40;
@@ -70,7 +93,7 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
       setNumber: i + 1,
       tier: focusTier,
       scheme: focusTier.scheme,
-      restSeconds: REST_SECONDS.working,
+      restSeconds: workingRest,
       learnCue: learnMode ? focusTier.tutorial[i % focusTier.tutorial.length] : null
     });
   }
@@ -79,7 +102,7 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
     setNumber: n,
     tier: offTier,
     scheme: offTier.scheme,
-    restSeconds: REST_SECONDS.working,
+    restSeconds: workingRest,
     learnCue: null
   })) : [];
 
@@ -129,7 +152,8 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
     week,
     isDeload,
     finaleArmed: !seasonClosed(profile) && week >= SEASON_WEEKS && !!(skin && skin.finale),
-    prep: PREP_DRILLS,
+    prep: tendonGuard ? [...PREP_DRILLS, ...GUARD_PREP] : PREP_DRILLS,
+    tendonGuard,
     warmup: warmupTier ? {
       tier: warmupTier,
       sets: 1,
@@ -239,6 +263,21 @@ export function buildAar(session, { setResults, resolutions, bossResult, intelDr
     setsHit: hits,
     unlockHit: unlockHit(session, setResults),
     rooms: resolutions.map((r) => ({ kind: r.kind, roll: r.roll, effect: r.row ? r.row.effect : r.specialType || null })),
+    // The body's actual numbers (D45): best single amount + total volume per
+    // tier this session. This is the data "real progress" is made of — the
+    // ledger, the dispatch deltas, and the season audit all read from it.
+    marks: (() => {
+      const marks = {};
+      for (const room of session.rooms) {
+        const res = setResults[roomKey(room)];
+        if (!res || !res.amount) continue;
+        const m = marks[room.tier.id] = marks[room.tier.id]
+          || { best: 0, volume: 0, unit: room.scheme.kind === 'reps' ? 'reps' : 's' };
+        m.best = Math.max(m.best, res.amount);
+        m.volume += res.amount;
+      }
+      return marks;
+    })(),
     boss: bossResult ? { attempted: true, passed: bossResult.passed, roll: bossResult.roll } : null,
     intelDrop: intelDrop || null
   };

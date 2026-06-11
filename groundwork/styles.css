@@ -264,6 +264,21 @@ button:active { transform: translateY(2px) scale(0.99); }
 .gw-door-locked { opacity: 0.55; }
 .gw-door-locked .gw-door-name { color: var(--gw-dim); }
 
+/* ── The chalk wall + ledger (D45) ── */
+.gw-newmark { display: flex; align-items: baseline; gap: 10px; border: 1.5px solid var(--gw-accent); border-radius: 10px;
+  padding: 11px 13px; margin: 10px 0; background: var(--gw-panel); text-align: left;
+  animation: gw-stampin 280ms var(--gw-ease); }
+.gw-newmark-stamp { font-family: var(--gw-mono); font-weight: 750; font-size: 0.72rem; letter-spacing: 0.16em;
+  color: #0c130e; background: var(--gw-accent); border-radius: 4px; padding: 3px 7px; flex: none; transform: rotate(-1.2deg); }
+.gw-newmark > span:last-child { font-size: 0.88rem; line-height: 1.45; }
+.gw-lastmark { margin-top: -6px; }
+.gw-ledger-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0; }
+.gw-ledger-nums { font-family: var(--gw-mono); font-size: 0.95rem; }
+.gw-ledger-delta { color: var(--gw-accent); font-weight: 700; margin-left: 6px; }
+.gw-spark { width: 84px; height: 20px; flex: none; }
+.gw-spark polyline { fill: none; stroke: var(--gw-accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: 0.9; }
+.gw-answer { display: block; width: 100%; text-align: left; margin: 8px 0; }
+
 /* ── Grade reveal (Intake v2, D44) ── */
 .gw-grade-stamp { font-family: var(--gw-mono); font-weight: 750; font-size: 1.15rem; letter-spacing: 0.12em;
   color: #7a4a22; border: 2.5px solid #7a4a22; border-radius: 6px; display: inline-block;

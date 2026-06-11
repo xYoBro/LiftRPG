@@ -13,11 +13,11 @@ import { resolveRoom, resolveBoss } from './engine/resolver.mjs';
 import {
   createEmptyProfile, loadProfile, saveProfile, clearProfile,
   exportProfile, importProfile, startNewCampaign,
-  createAssessmentRun, currentProbe, recordProbeResult, isAssessmentComplete,
+  createAssessmentRun, currentProbe, recordProbeResult, recordIntakeAnswer, isAssessmentComplete,
   applyAssessment, getTier, tierState, recentHitRate, needsRecalibration,
   applyBossPass, intelDropForFault
 } from './engine/profile.mjs';
-import { generateSession, roomKey, buildAar, unlockHit, computeDoorCharge, trailingCharges, REST_SECONDS } from './engine/session.mjs';
+import { generateSession, roomKey, buildAar, unlockHit, computeDoorCharge, trailingCharges, isTendonGuard, REST_SECONDS } from './engine/session.mjs';
 import { awardForRow, resolveEncounterChoice, resolveSpecialRoom, fragmentById, kitItemById } from './engine/discovery.mjs';
 import { markExplored, projectWing } from './engine/map.mjs';
 import { doorsOpenedCount, monthsOnStation, dueKeystonesForBossPass, fileKeystone, fileLiveEvent } from './engine/keystones.mjs';
@@ -351,6 +351,7 @@ function renderMore() {
       <button class="gw-row-btn" data-act="dispatch">Weekly Dispatch</button>
       <button class="gw-row-btn" data-act="storm">${esc(SKIN.sessionFrame.storm.button)}</button>
       <button class="gw-row-btn" data-act="create">New Campaign — creation kit</button>
+      <button class="gw-row-btn" data-act="reintake">Re-run Intake — re-grade the keeper</button>
       <button class="gw-row-btn" data-act="settings">Settings</button>
       <div class="gw-save-row gw-row">
         <button data-act="export">Export Save</button>
@@ -364,6 +365,12 @@ function renderMore() {
     log: () => nav('log'), settings: () => nav('settings'),
     dispatch: () => nav('dispatch'), storm: () => { unlockAudio(); nav('storm'); },
     create: () => nav('create'),
+    reintake: () => {
+      if (confirm('Re-run the intake survey? Placements and grade are re-posted from what you show today. The archive and the log stay.')) {
+        unlockAudio();
+        startAssess();
+      }
+    },
     export: doExport,
     import: () => document.getElementById('import-file').click(),
     reset: () => { if (confirm('Erase the local save? Export first if you want to keep it.')) { clearProfile(); state.profile = null; nav('home'); } }
@@ -528,10 +535,34 @@ function startAssess() {
   nav('assess');
 }
 
-// ── Intake v2 (D44): 4-5 adaptive probes, then the grade ─────────────────────
+// ── Intake v2 (D44/D45): condition → 4-5 adaptive probes → the grade ─────────
 function renderAssess() {
   const run = state.assessRun;
   if (isAssessmentComplete(run)) { renderGradeReveal(run); return; }
+  // Condition questions (D45): two brackets before any physical test — the
+  // tendon-guard inputs. The body that has been away longest gets the most
+  // careful program, not the most ambitious one.
+  if (run.stage === 'recency' || run.stage === 'age') {
+    const q = (SKIN.intakeQuestions || {})[run.stage] || (run.stage === 'recency'
+      ? { prompt: 'When did you last train regularly?', options: [['never', 'Never, or not really'], ['years', 'Years ago'], ['recent', 'Within the last year']] }
+      : { prompt: 'Age bracket?', options: [['u40', 'Under 40'], ['40s', '40 to 55'], ['55plus', 'Over 55']] });
+    root().innerHTML = `
+      <header class="gw-header"><h1>INTAKE</h1>
+        <div class="gw-dim">condition survey · ${run.stage === 'recency' ? '1' : '2'} of 2 · then at most 5 probes</div></header>
+      <main class="gw-panel gw-center">
+        <p class="gw-bigcue">${esc(q.prompt)}</p>
+        ${q.note ? `<p class="gw-dim">${esc(q.note)}</p>` : ''}
+        ${q.options.map(([id, label]) => `
+          <button class="gw-big gw-answer" data-answer="${esc(id)}">${esc(label)}</button>`).join('')}
+      </main>`;
+    root().querySelectorAll('[data-answer]').forEach((el) => {
+      el.addEventListener('click', () => {
+        recordIntakeAnswer(run, run.stage === 'recency' ? 'recency' : 'age', el.getAttribute('data-answer'));
+        render();
+      });
+    });
+    return;
+  }
   const probe = currentProbe(run, TREE);
   const tier = getTier(TREE, probe.tier);
   const voice = (SKIN.intakeVoice || {})[run.current] || (SKIN.intakeVoice || {})[tier.hookSlot];
@@ -604,6 +635,7 @@ function renderGradeReveal(run) {
           <div class="gw-order-row"><span>DUTY CYCLE</span><span>${waves
             ? 'Heavy and light days alternate. The doors grade heavy days — and ask for two.'
             : 'Linear. Every charged session counts toward the doors.'}</span></div>
+          ${isTendonGuard(state.profile) ? `<div class="gw-order-row"><span>CONDITION</span><span>Long road back, noted. Prep runs longer, rests run longer. Wire and tendon adapt slower than muscle — the program waits for them. The wing has seen it done.</span></div>` : ''}
         </div>
         ${grade.line ? `<div class="gw-doc-hook">${esc(grade.line)}</div>` : ''}
       </div>
@@ -932,24 +964,35 @@ function renderRoom(s) {
         <button class="gw-primary gw-big" data-act="log">Set done</button>
       ` : phase === 'log' ? `
         <p class="gw-bigcue">How did it go?</p>
+        ${(() => {
+          // Papercut logging (D45): the stepper opens on YOUR last mark — one
+          // tap up is a new mark on the chalk wall. New tiers open at the
+          // window floor; the top stays the gate's standard.
+          const best = (state.profile.bests || {})[tier.id];
+          const start = best ? best.amount : target[0];
+          return `
         <div class="gw-stepper">
           <button class="gw-step" data-step="-1">−</button>
-          <div class="gw-step-num" id="amount">${target[1]}</div>
+          <div class="gw-step-num" id="amount">${start}</div>
           <button class="gw-step" data-step="1">+</button>
           <div class="gw-step-unit">${unit}</div>
         </div>
+        ${best ? `<p class="gw-dim gw-lastmark">chalk wall: ${best.amount} ${unit} — one more is a new mark</p>` : `<p class="gw-dim gw-lastmark">first marks on this rig go on the wall today</p>`}`;
+        })()}
         <button class="gw-primary gw-big" data-act="hit">Hit — clean form</button>
         <div class="gw-row gw-even">
           <button data-act="partial">Partial</button>
           <button data-act="missed">Missed</button>
         </div>
       ` : phase === 'roll' ? `
+        ${result.newMark ? newMarkHtml(result, tier, unit) : ''}
         <div id="dice-stage" class="gw-dice-stage"><div class="gw-die" id="die">--</div></div>
         <p class="gw-dim">${esc(TREE.name)} ${treeStat()}% · ${result.outcome === 'hit' ? 'advantage' : result.outcome === 'partial' ? 'flat' : 'disadvantage'}</p>
         <button class="gw-primary gw-big" data-act="roll">Roll d100</button>
       ` : state.encounterPending && state.encounterPending.roomIndex === idx ? `
         ${renderEncounterHtml(state.encounterPending.encounter)}
       ` : `
+        ${result.newMark ? newMarkHtml(result, tier, unit) : ''}
         ${entry.kind === 'special' ? renderSpecialHtml(entry) : renderResolutionHtml(entry, idx)}
         ${renderTimerHtml(room.restSeconds)}
         <details class="gw-form"><summary>+ field note</summary>
@@ -967,9 +1010,9 @@ function renderRoom(s) {
   });
   wire({
     log: () => { state._logging = key; render(); },
-    hit: () => logSet(key, 'hit'),
-    partial: () => logSet(key, 'partial'),
-    missed: () => logSet(key, 'missed'),
+    hit: () => logSet(key, 'hit', tier),
+    partial: () => logSet(key, 'partial', tier),
+    missed: () => logSet(key, 'missed', tier),
     roll: () => rollRoom(idx, room, door, key),
     next: () => {
       const note = document.getElementById('field-note');
@@ -988,9 +1031,43 @@ function renderRoom(s) {
   if (phase === 'rest') startTimer(room.restSeconds);
 }
 
-function logSet(key, outcome) {
+// The chalk-wall banner (D45): shown the moment a mark lands — on the dice
+// screen and through the rest. Body truth is independent of the roll.
+function newMarkHtml(result, tier, unit) {
+  return `
+    <div class="gw-newmark">
+      <span class="gw-newmark-stamp">NEW MARK</span>
+      <span>${esc(fill(
+    (result.prevMark != null
+      ? (SKIN.sessionFrame || {}).newMark
+      : (SKIN.sessionFrame || {}).newMarkFirst)
+    || '{{amount}} {{unit}} on {{tierName}} — the wall keeps it now.', {
+      amount: result.amount, unit, tierName: flavorName(tier),
+      prev: result.prevMark != null ? result.prevMark : ''
+    }))}</span>
+    </div>`;
+}
+
+function logSet(key, outcome, tier) {
   const amount = Number((document.getElementById('amount') || {}).textContent || 0);
-  state.setResults[key] = { outcome, amount };
+  const result = { outcome, amount };
+  // The chalk wall (D45): a clean set past your best is a NEW MARK — real
+  // progress, recorded the moment it happens. Form-clean sets only.
+  if (tier && outcome === 'hit' && amount > 0) {
+    const bests = state.profile.bests = state.profile.bests || {};
+    const prev = bests[tier.id];
+    if (!prev || amount > prev.amount) {
+      result.newMark = true;
+      result.prevMark = prev ? prev.amount : null;
+      bests[tier.id] = {
+        amount,
+        unit: tier.scheme.kind === 'reps' ? 'reps' : 's',
+        at: new Date().toISOString()
+      };
+      saveProfile(state.profile);
+    }
+  }
+  state.setResults[key] = result;
   state._logging = null;
   render();
 }
@@ -1042,7 +1119,8 @@ function stateAwareBeat(entry) {
     postBossFail: state.profile.history.some((h) => h.boss && !h.boss.passed && h.focusTierId === state.session.focusTierId),
     // Arc context (Sprint 2.2): RIGGING remembers accumulated history.
     doorsOpened: doorsOpenedCount(state.profile),
-    months: monthsOnStation(state.profile)
+    months: monthsOnStation(state.profile),
+    tendonGuard: isTendonGuard(state.profile)
   };
   for (const beat of SKIN.sessionFrame.restBeats) {
     const w = beat.when || {};
@@ -1055,6 +1133,7 @@ function stateAwareBeat(entry) {
     if (w.postBossFail && !ctx.postBossFail) continue;
     if (w.doorsOpenedAtLeast && ctx.doorsOpened < w.doorsOpenedAtLeast) continue;
     if (w.monthsAtLeast && ctx.months < w.monthsAtLeast) continue;
+    if (w.tendonGuard && !ctx.tendonGuard) continue;
     // rollUnder keeps a beat occasional without rng: the resolved roll is
     // already seeded, so the same session replays identically.
     if (w.rollUnder && entry.roll % 100 >= w.rollUnder) continue;
@@ -1401,15 +1480,28 @@ function renderFinale() {
         }).join('')}
       ` : atChoice && chosen ? `
         ${documentHtml(chosen.ending, 'gw-keystone')}
+        ${(() => {
+          // The body, audited (D45): the season's real deltas — what eight
+          // weeks actually built. This is the artifact under the artifact.
+          const rows = ledgerRows(state.profile.campaignSessionBase || 0).slice(0, 6);
+          return rows.length ? `
+          <div class="gw-item">
+            <div class="gw-item-kind">THE BODY, AUDITED — ${SEASON_WEEKS} WEEKS</div>
+            ${rows.map((r) => `<div class="gw-ledger-line"><span class="gw-ledger-nums">${esc(flavorName(r.tier))}: ${r.first} ▸ <strong>${r.peak}</strong> ${esc(r.unit)}${r.peak > r.first ? ` <span class="gw-ledger-delta">+${r.peak - r.first}</span>` : ''}</span></div>`).join('')}
+            <p class="gw-dim">Not aesthetics. Capability. It travels with you.</p>
+          </div>` : '';
+        })()}
         <p class="gw-beat">${esc(fin.closing)}</p>
-        <button class="gw-primary gw-big" data-act="fin-done">Close the season</button>
+        <button class="gw-primary gw-big" data-act="fin-done">Close the season — keep training here</button>
+        <button data-act="fin-new">Take a new commission (the body travels)</button>
       ` : `
         <button class="gw-primary gw-big" data-act="fin-next">…</button>
       `}
     </main>`;
   wire({
     'fin-next': () => { state.liveBeat += 1; render(); },
-    'fin-done': () => { state.liveChoiceResult = null; nav('home'); }
+    'fin-done': () => { state.liveChoiceResult = null; nav('home'); },
+    'fin-new': () => { state.liveChoiceResult = null; nav('create'); }
   });
   root().querySelectorAll('[data-fin-choice]').forEach((el) => {
     el.addEventListener('click', () => {
@@ -1490,6 +1582,22 @@ function renderDispatch() {
         <div class="gw-stat"><div class="gw-stat-num">${flow(window1)}</div><div class="gw-stat-label">flow min (last 3)</div></div>
         <div class="gw-stat"><div class="gw-stat-num">${treeStat()}<span class="gw-pct">%</span></div><div class="gw-stat-label">${esc(TREE.name)}</div></div>
       </div>
+      ${(() => {
+        // Body movers (D45): best mark per tier, this 3-session window vs the
+        // previous one. Real progress, in the trend review where it belongs.
+        const bestIn = (w) => {
+          const m = {};
+          for (const x of w) for (const [tid, mk] of Object.entries(x.marks || {})) m[tid] = Math.max(m[tid] || 0, mk.best || 0);
+          return m;
+        };
+        const now = bestIn(window1), prev = bestIn(window0);
+        const movers = Object.keys(now)
+          .map((tid) => ({ tier: getTier(TREE, tid), from: prev[tid] || null, to: now[tid] }))
+          .filter((x) => x.tier && x.from !== null && x.to !== x.from)
+          .sort((a, b) => (b.to - b.from) - (a.to - a.from)).slice(0, 3);
+        return movers.length ? `<div class="gw-callout"><strong>THE BODY, THIS WEEK:</strong>
+          <ul class="gw-list">${movers.map((m) => `<li>${esc(flavorName(m.tier))}: ${m.from} ▸ ${m.to} ${m.tier.scheme.kind === 'reps' ? 'reps' : 's'}${m.to > m.from ? ' ▲' : ' ▽'}</li>`).join('')}</ul></div>` : '';
+      })()}
       <label class="gw-dim">${esc(SKIN.sessionFrame.dispatch.frictionPrompt)}</label>
       <div class="gw-note-row"><input id="disp-friction" class="gw-text" maxlength="120"></div>
       <label class="gw-dim">${esc(SKIN.sessionFrame.dispatch.goalPrompt)}</label>
@@ -1541,11 +1649,43 @@ function chainTotal(chain) {
   return allDocSources().filter((d) => (d.chain || 'keystone') === chain).length;
 }
 
+// The ledger (D45): per-tier body numbers assembled from filed AAR marks —
+// first mark, peak, trajectory. This is what "real progress" looks like.
+function ledgerRows(fromIndex = 0) {
+  const seq = {};
+  for (const h of state.profile.history.slice(fromIndex)) {
+    for (const [tierId, m] of Object.entries(h.marks || {})) {
+      if (!m.best) continue;
+      (seq[tierId] = seq[tierId] || []).push(m.best);
+    }
+  }
+  return Object.entries(seq).map(([tierId, list]) => {
+    const tier = getTier(TREE, tierId);
+    if (!tier) return null;
+    return {
+      tier,
+      list,
+      first: list[0],
+      peak: Math.max(...list),
+      unit: tier.scheme.kind === 'reps' ? 'reps' : 's'
+    };
+  }).filter(Boolean).sort((a, b) => (b.peak - b.first) - (a.peak - a.first));
+}
+
+function sparklineSvg(list) {
+  if (list.length < 2) return '';
+  const w = 84, h = 20, max = Math.max(...list), min = Math.min(...list);
+  const span = Math.max(1, max - min);
+  const pts = list.map((v, i) => `${(i / (list.length - 1)) * w},${h - 2 - ((v - min) / span) * (h - 4)}`).join(' ');
+  return `<svg class="gw-spark" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts}"/></svg>`;
+}
+
 function renderArchive() {
   if (state.deskPile) { renderDeskPile(); return; }
   const p = state.profile;
   const totalOwned = (p.archive || []).length;
   const kitItems = (p.kit || []).map((k) => kitItemById(SKIN, k.id)).filter(Boolean);
+  const ledger = ledgerRows();
   root().innerHTML = `
     <header class="gw-header"><h1>THE ARCHIVE</h1>
       <div class="gw-dim">Eight’s desk — ${totalOwned} documents on it · tap a pile, leaf the pages</div></header>
@@ -1574,6 +1714,14 @@ function renderArchive() {
           </button>` : `
           <div class="gw-pile gw-pile-empty"><div class="gw-pile-kind">THE KIT</div>
             <div class="gw-pile-count">salvage doors carry it</div></div>`}
+        ${ledger.length ? `
+          <button class="gw-pile gw-pile-kit" data-pile="ledger">
+            <div class="gw-pile-kind">THE LEDGER</div>
+            <div class="gw-pile-count">${ledger.length} rig${ledger.length === 1 ? '' : 's'} on the wall</div>
+            <div class="gw-pile-top">the column kept in your hand</div>
+          </button>` : `
+          <div class="gw-pile gw-pile-empty"><div class="gw-pile-kind">THE LEDGER</div>
+            <div class="gw-pile-count">marks appear as work is filed</div></div>`}
         ${p.notes.length ? `
           <button class="gw-pile gw-pile-kit" data-pile="notes">
             <div class="gw-pile-kind">FIELD NOTES</div>
@@ -1607,6 +1755,25 @@ function renderDeskPile() {
             <div class="gw-item-kind">${esc(k.kind.toUpperCase())}${k.kind === 'key' ? ' · OPENS A ROUTE' : ''}</div>
             <div class="gw-item-name">${esc(k.name)}</div>
             <p>${esc(k.body)}</p>
+          </div>`).join('')}
+        ${back}
+      </main>
+      ${bottomNav('archive')}`;
+  } else if (pile === 'ledger') {
+    const rows = ledgerRows();
+    root().innerHTML = `
+      <header class="gw-header"><h1>THE LEDGER</h1>
+        <div class="gw-dim">first mark ▸ best mark · the only witness is honest</div></header>
+      <main class="gw-panel">
+        ${rows.map((r) => `
+          <div class="gw-item gw-ledger-row">
+            <div class="gw-item-kind">${esc(flavorName(r.tier).toUpperCase())}</div>
+            <div class="gw-ledger-line">
+              <span class="gw-ledger-nums">${r.first} ▸ <strong>${r.peak}</strong> ${esc(r.unit)}
+                ${r.peak > r.first ? `<span class="gw-ledger-delta">+${r.peak - r.first}</span>` : ''}</span>
+              ${sparklineSvg(r.list)}
+            </div>
+            <p class="gw-dim">${esc(r.tier.name)} · ${r.list.length} session${r.list.length === 1 ? '' : 's'} on record</p>
           </div>`).join('')}
         ${back}
       </main>

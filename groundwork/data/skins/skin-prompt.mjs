@@ -78,6 +78,7 @@ OUTPUT — one JSON object, no markdown fences, no commentary, exactly these key
   "tierNames": { "<every hookSlot above>": "Sector Name" },
   "intakeVoice": { "<every probe id above>": "VOICENAME: “one line for that probe”" },
   "grades": { "untrained": { "name": "RANK NAME", "line": "VOICENAME: “...”" }, "trained": {...}, "intermediate": {...}, "advanced": {...} },
+  "intakeQuestions": { "recency": { "prompt": "in-world: when did you last train/serve?", "note": "one reassuring line", "options": [["never","label"],["years","label"],["recent","label"]] }, "age": { "prompt": "in-world age-bracket question", "note": "a bracket, never a birthdate", "options": [["u40","label"],["40s","label"],["55plus","label"]] } } — KEEP the option ids exactly as shown; the engine reads them,
   "coldOpen": [
     { "kind": "document", "title": "CARD 1 TITLE", "documentType": "form", "body": "the orders/letter that sent the player here (60-90 words)", "hook": "— signature line" },
     { "kind": "scene", "title": "CARD 2 TITLE", "body": "arrival; the place is deliberately stilled, not ruined (60-90 words)" },
@@ -102,6 +103,8 @@ OUTPUT — one JSON object, no markdown fences, no commentary, exactly these key
     "tutorial": { "aarPrompt": "how the player self-checks form on a new movement (film one set, compare, file it) in your world's language" },
     "assessment": { "intro": "...", "outro": "..." },
     "intelDrop": "uses {{faultName}} {{sideQuestName}} {{sideQuestNote}}",
+    "newMark": "personal-best line, uses {{amount}} {{unit}} {{tierName}} {{prev}} — real progress, stamped in-world",
+    "newMarkFirst": "first-ever mark on a rig, uses {{amount}} {{unit}} {{tierName}}",
     "troughForecast": "a posted notice from the predecessor about weeks 3-6 feeling flat — forecasting it IS the intervention",
     "intention": { "prompt": "...", "afterLabel": "After (a daily event)", "afterPlaceholder": "...", "whereLabel": "At (where the bar lives)", "wherePlaceholder": "...", "display": "SCHEDULE — after {{after}}, at {{where}}." },
     "storm": { "button": "...", "intro": "minimum-dose day framing", "done": "...", "missCue": "never-miss-twice line" },
