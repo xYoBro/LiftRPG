@@ -39,6 +39,8 @@ export function chimeRestEnd(muted) {
 
 export function rollTick(muted) {
   if (muted) return;
+  // Cosmetic-randomness exemption (determinism law): pitch jitter on a UI
+  // sound never touches engine state — like the die-face flutter in main.mjs.
   tone(220 + Math.random() * 60, 0, 0.03, 0.05, 'square');
 }
 

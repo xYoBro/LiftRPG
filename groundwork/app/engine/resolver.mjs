@@ -38,11 +38,20 @@ function upgradeForStrong(table, rolledDigit, row) {
   return row;
 }
 
-export function resolveRoom(rng, { stat, setOutcome, sessionState, doorBias }) {
+// Skin text override (D51): worlds may reskin what a row SAYS, never what it
+// DOES — the effect/reward fields always come from the engine table.
+function skinRowText(skin, tableKey, row) {
+  const t = skin && skin.tableTexts && skin.tableTexts[tableKey];
+  const text = t && t[row.digit];
+  return typeof text === 'string' && text.trim() ? { ...row, text } : row;
+}
+
+export function resolveRoom(rng, { stat, setOutcome, sessionState, doorBias, skin }) {
   const mode = modeForSetOutcome(setOutcome);
   const { roll, rolls } = rollWithMode(rng, mode);
   const kind = classify(roll, stat);
-  const table = ROOM_TABLES[kind === 'strong' ? 'success' : kind];
+  const tableKey = kind === 'strong' ? 'success' : kind;
+  const table = ROOM_TABLES[tableKey];
   let row = applyDoorBias(table, roll % 10, doorBias, kind);
   if (kind === 'strong') row = upgradeForStrong(table, roll % 10, row);
 
@@ -58,11 +67,12 @@ export function resolveRoom(rng, { stat, setOutcome, sessionState, doorBias }) {
     }
   }
 
-  return { roll, rolls, mode, kind, stat, row };
+  return { roll, rolls, mode, kind, stat, row: skinRowText(skin, tableKey, row) };
 }
 
-export function resolveBoss(rng, { stat, passed }) {
+export function resolveBoss(rng, { stat, passed, skin }) {
   const { roll, rolls } = rollWithMode(rng, 'flat'); // the body decided; dice color it
+  const tableKey = passed ? 'boss-pass' : 'boss-fail';
   const table = passed ? BOSS_TABLES.pass : BOSS_TABLES.fail;
-  return { roll, rolls, mode: 'flat', kind: passed ? 'boss-pass' : 'boss-fail', stat, row: table[roll % 10] };
+  return { roll, rolls, mode: 'flat', kind: tableKey, stat, row: skinRowText(skin, tableKey, table[roll % 10]) };
 }

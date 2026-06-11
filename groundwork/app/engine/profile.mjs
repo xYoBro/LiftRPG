@@ -48,6 +48,8 @@ export function createEmptyProfile(seed) {
     firedKeystones: [],            // authored reveals that have fired (once ever)
     cachesOpened: [],              // sealed-cache room ids opened
     doorCharge: {},                // tierId → 0..1 gate-eligibility progress
+    activeSideQuests: {},          // branch → { id, name, note, tierId, faultId, sessionsLeft } (D49)
+    posting: null,                 // located-channel manifest posting (D52)
     exploredAt: {},                // roomId → tierId (which sector it was explored from)
     seasonClosedAt: null,          // ISO date the 8-week commission closed (D40)
     seasonEnding: null,            // ending id chosen at the finale
@@ -71,6 +73,7 @@ export function startNewCampaign(profile) {
   profile.cachesOpened = [];
   profile.firedKeystones = [];
   profile.lastHook = null;
+  profile.posting = null;            // postings name the old world's rooms (D52)
   profile.seasonClosedAt = null;
   profile.seasonEnding = null;
   delete profile.bossElect;
@@ -81,7 +84,7 @@ export function startNewCampaign(profile) {
 }
 
 // Old saves predate the narrative-state fields — backfill on load.
-function migrateProfile(profile) {
+export function migrateProfile(profile) {
   if (!profile) return profile;
   const defaults = {
     archive: [], kit: [], explored: {}, encountersSeen: [],
@@ -90,11 +93,20 @@ function migrateProfile(profile) {
     firedKeystones: [], cachesOpened: [], doorCharge: {},
     exploredAt: {}, seasonClosedAt: null, seasonEnding: null,
     campaignStartedAt: null, campaignSessionBase: 0,
-    trainingRecency: null, ageBracket: null, bests: {}
+    trainingRecency: null, ageBracket: null, bests: {},
+    activeSideQuests: {}, posting: null
   };
   for (const key of Object.keys(defaults)) {
     if (profile[key] === undefined) profile[key] = defaults[key];
   }
+  // Imports may carry malformed bests (hand-edited saves): every entry must be
+  // { amount: finite number } or the stepper opens on NaN (GW-23).
+  for (const [tierId, best] of Object.entries(profile.bests || {})) {
+    if (!best || typeof best !== 'object' || !Number.isFinite(best.amount)) {
+      delete profile.bests[tierId];
+    }
+  }
+  profile.version = PROFILE_VERSION;
   if (profile.settings && profile.settings.muted === undefined) profile.settings.muted = false;
   if (profile.settings && profile.settings.sessionBudgetMinutes === undefined) profile.settings.sessionBudgetMinutes = 40;
   // Equipment contract v2 (bar + mat only): saves from the furniture-rows era
@@ -201,7 +213,41 @@ export function applyAssessment(profile, tree, run) {
   if (run.answers.age) profile.ageBracket = run.answers.age;
   profile.active[tree.id] = active;
   profile.cleared[tree.id] = cleared;
+  // Re-intake hygiene (GW-22): stale charge bars and elects belong to the old
+  // grading; the new posting starts clean.
+  for (const tier of tree.tiers) delete (profile.doorCharge || {})[tier.id];
+  delete profile.bossElect;
+  // Dose default by population (D44 follow-through): intermediate+ bodies need
+  // the larger session unless the keeper already chose one.
+  if ((classification === 'intermediate' || classification === 'advanced')
+    && profile.settings && !profile.settings.budgetTouched) {
+    profile.settings.sessionBudgetMinutes = 60;
+  }
   return profile;
+}
+
+// Consecutive trailing Storm Protocol days (GW-15): the minimum-dose tool is
+// honest only while it is occasional.
+export function consecutiveStorms(profile) {
+  let n = 0;
+  for (let i = profile.history.length - 1; i >= 0; i--) {
+    if (profile.history[i].stormProtocol) n += 1; else break;
+  }
+  return n;
+}
+
+// Stall depth on a tier (D49): consecutive graded sessions on this tier with
+// the gate still uncharged. Storms and other tiers are skipped; an unlockHit
+// (or any boss attempt) resets the count.
+export function stallCount(profile, treeId, tierId) {
+  let n = 0;
+  for (let i = profile.history.length - 1; i >= 0; i--) {
+    const h = profile.history[i];
+    if (h.treeId !== treeId || h.stormProtocol || h.focusTierId !== tierId) continue;
+    if (h.unlockHit || h.boss) break;
+    n += 1;
+  }
+  return n;
 }
 
 // ── Tier/tree helpers ────────────────────────────────────────────────────────
@@ -283,6 +329,12 @@ export function importProfile(json) {
   const data = JSON.parse(json);
   if (!data || typeof data !== 'object' || !data.version || !data.settings) {
     throw new Error('Not a Groundwork profile file.');
+  }
+  // Refuse saves from a NEWER major version (GW-29): migrating forward is
+  // supported, guessing backward is not. Tell the user what to do.
+  const major = (v) => parseInt(String(v).split('.')[0], 10) || 0;
+  if (major(data.version) > major(PROFILE_VERSION)) {
+    throw new Error(`This save is from a newer Groundwork (v${data.version}). Update the app, then import again.`);
   }
   return migrateProfile(data);
 }

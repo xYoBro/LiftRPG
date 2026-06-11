@@ -355,3 +355,20 @@ button:active { transform: translateY(2px) scale(0.99); }
 .gw-leaf-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 14px 0 4px; }
 .gw-leaf-row button { min-width: 96px; }
 .gw-leaf-row button[disabled] { opacity: 0.35; }
+
+/* ── D54: rest chip in the HUD (the clock is never below the fold) ── */
+.gw-hud-rest { color: var(--gw-accent); font-weight: 750; letter-spacing: 0.08em; }
+
+/* ── GW-13 triage: folded fragment on encounter-heavy rests ── */
+.gw-doc-folded summary { cursor: pointer; list-style: none; }
+.gw-doc-folded summary::-webkit-details-marker { display: none; }
+.gw-doc-folded summary .gw-doc-type { display: block; }
+.gw-doc-folded summary .gw-doc-title { display: block; font-weight: 750; margin: 5px 0 7px; }
+.gw-doc-folded summary .gw-doc-hook { display: block; }
+.gw-doc-folded[open] summary .gw-doc-hook { display: none; }
+
+/* ── GW-12: the other corridor's posting ring (static — only TODAY pulses) ── */
+.gwm-post { fill: none; stroke: var(--gw-dim); stroke-width: 2; }
+
+/* ── D52: posted-manifest diamond on the map ── */
+.gwm-posting { font-size: 12px; fill: var(--gw-amber); }

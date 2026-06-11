@@ -17,15 +17,22 @@ export function frontierDoors(skin, profile, branch, rng, count = 2) {
   if (!pool.length) return [];
   const seen = exploredSet(profile, branch);
   let fresh = pool.filter((r) => !seen.has(r.id));
-  let revisiting = false;
-  if (fresh.length < count) { fresh = pool.slice(); revisiting = fresh.length < count ? true : !fresh.length; }
+  if (fresh.length < count) fresh = pool.slice(); // cleared rooms are farmable
   if (!fresh.length) return [];
-  // Seeded, order-stable pick of `count` distinct doors
+  // Seeded, order-stable pick of `count` distinct doors. When the pool offers
+  // more than one bias, the pair is bias-distinct — twin-bias pairs made the
+  // pick cosmetic (GW-21).
   const doors = [];
   const working = fresh.slice();
-  while (doors.length < Math.min(count, working.length + doors.length) && working.length) {
-    const idx = Math.floor(rng() * working.length);
-    doors.push({ ...working.splice(idx, 1)[0], revisited: seen.has(fresh[0] && fresh[0].id) && revisiting });
+  while (doors.length < count && working.length) {
+    let pickPool = working;
+    if (doors.length) {
+      const distinct = working.filter((r) => r.bias !== doors[0].bias);
+      if (distinct.length) pickPool = distinct;
+    }
+    const pick = pickPool[Math.floor(rng() * pickPool.length)];
+    working.splice(working.indexOf(pick), 1);
+    doors.push({ ...pick });
   }
   return doors;
 }

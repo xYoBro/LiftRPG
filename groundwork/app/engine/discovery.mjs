@@ -6,7 +6,24 @@
 // All draws are seeded-deterministic and never repeat until pools empty.
 // Nothing here can touch the prescription (chance-isolation law).
 
-const CHAIN_ORDER = ['log', 'personal', 'technical', 'signal'];
+import { createRng } from './rng.mjs';
+
+// Chains are skin-defined (D50): explicit `skin.chains` [{id,name}] wins;
+// otherwise distinct fragment chain ids in first-appearance order. The
+// `keystone` pile is engine-owned and always exists.
+export function skinChains(skin) {
+  if (Array.isArray(skin && skin.chains) && skin.chains.length) {
+    return skin.chains.map((c) => (typeof c === 'string' ? { id: c, name: prettyChain(c) } : { id: c.id, name: c.name || prettyChain(c.id) }));
+  }
+  const seen = [];
+  for (const f of (skin && skin.fragments) || []) {
+    if (f.chain && !seen.includes(f.chain)) seen.push(f.chain);
+  }
+  return seen.map((id) => ({ id, name: prettyChain(id) }));
+}
+export function prettyChain(id) {
+  return String(id).replace(/[-_]+/g, ' ').toUpperCase();
+}
 
 export function undiscoveredFragments(skin, profile) {
   const have = new Set((profile.archive || []).map((f) => f.id));
@@ -20,8 +37,9 @@ export function drawFragment(skin, profile, rng) {
   if (!pool.length) return null;
   const counts = {};
   for (const f of profile.archive || []) counts[f.chain] = (counts[f.chain] || 0) + 1;
-  const chains = CHAIN_ORDER.filter((c) => pool.some((f) => f.chain === c));
-  chains.sort((a, b) => (counts[a] || 0) - (counts[b] || 0) || CHAIN_ORDER.indexOf(a) - CHAIN_ORDER.indexOf(b));
+  const order = skinChains(skin).map((c) => c.id);
+  const chains = order.filter((c) => pool.some((f) => f.chain === c));
+  chains.sort((a, b) => (counts[a] || 0) - (counts[b] || 0) || order.indexOf(a) - order.indexOf(b));
   // small seeded jitter so two equal chains don't always tie-break the same way
   const pick = chains[(counts[chains[0]] || 0) === (counts[chains[1]] || 0) && chains.length > 1 && rng() < 0.35 ? 1 : 0];
   return pool.find((f) => f.chain === pick) || pool[0];
@@ -47,14 +65,14 @@ export function awardForRow(skin, profile, rng, row) {
   switch (row.effect) {
     case 'intel': {
       const frag = drawFragment(skin, profile, rng);
-      if (!frag) return { type: 'intel-exhausted', text: 'The archive holds no more new pages — for now. The intel still counts in the log.' };
+      if (!frag) return { type: 'intel-exhausted', text: (skin.emptyPools || {}).intel || 'No new pages remain — for now. The find still counts in the log.' };
       profile.archive = profile.archive || [];
       profile.archive.push({ id: frag.id, chain: frag.chain, foundAt: new Date().toISOString() });
       return { type: 'fragment', fragment: frag };
     }
     case 'loot': {
       const item = drawKitItem(skin, profile, rng);
-      if (!item) return { type: 'loot-exhausted', text: 'Salvage, ordinary grade. The kit is already carrying everything that matters.' };
+      if (!item) return { type: 'loot-exhausted', text: (skin.emptyPools || {}).loot || 'A find, ordinary grade. The kit already carries everything that matters.' };
       profile.kit = profile.kit || [];
       profile.kit.push({ id: item.id, foundAt: new Date().toISOString() });
       if (item.kind === 'key' && item.unlocks) {
@@ -157,5 +175,66 @@ function quietBeat(skin, rng) {
   const beats = (skin && skin.quietBeats) || [];
   return beats.length
     ? beats[Math.floor(rng() * beats.length)]
-    : 'A quiet room. The work was the whole of it.';
+    : 'A quiet room. The work was the whole of it.'; // neutral by design
+}
+
+// ── Posted manifests (D52): the located channel ──────────────────────────────
+// At most one live posting: a NAMED find logged at a NAMED room. The work
+// order announces it; the door appears on that branch within two sessions
+// (session.mjs guarantees inclusion); walking in recovers exactly that find.
+// Deterministic (seeded off profile history), reward-side only.
+
+
+export function createPosting(skin, profile, tree) {
+  if (!skin || !skin.roomPools) return null;
+  const rng = createRng(String(profile.seed) + ':posting:' + (profile.history || []).length);
+  const branches = Object.keys((tree && tree.branches) || skin.roomPools);
+  const branch = branches[Math.floor(rng() * branches.length)];
+  const pool = (skin.roomPools[branch] || []);
+  if (!pool.length) return null;
+  // Prefer unexplored rooms — postings should pull the keeper somewhere new.
+  const seen = new Set(((profile.explored || {})[branch]) || []);
+  const fresh = pool.filter((r) => !seen.has(r.id));
+  const room = (fresh.length ? fresh : pool)[Math.floor(rng() * (fresh.length ? fresh.length : pool.length))];
+  // The find: next unowned kit item, else the next fragment of the
+  // least-advanced chain. Nothing to post → no posting (pools exhausted).
+  const haveKit = new Set((profile.kit || []).map((k) => k.id));
+  const kitPool = (skin.kitItems || []).filter((k) => !haveKit.has(k.id));
+  if (kitPool.length) {
+    const item = kitPool[Math.floor(rng() * kitPool.length)];
+    return { findType: 'kit', findId: item.id, findName: item.name, roomId: room.id, roomName: room.name, branch, sessionsLeft: 3 };
+  }
+  const frag = drawFragment(skin, profile, rng);
+  if (frag) {
+    return { findType: 'fragment', findId: frag.id, findName: frag.title, roomId: room.id, roomName: room.name, branch, sessionsLeft: 3 };
+  }
+  return null;
+}
+
+// Recover the posted find (replaces the dice ceremony for that room, like a
+// cache — the set behind the door was untouched).
+export function resolvePosting(skin, profile, posting) {
+  if (!posting) return null;
+  let award = null;
+  if (posting.findType === 'kit') {
+    const item = kitItemById(skin, posting.findId);
+    if (item && !(profile.kit || []).some((k) => k.id === item.id)) {
+      profile.kit = profile.kit || [];
+      profile.kit.push({ id: item.id, foundAt: new Date().toISOString() });
+      if (item.kind === 'key' && item.unlocks) {
+        profile.shortcuts = profile.shortcuts || [];
+        if (!profile.shortcuts.includes(item.unlocks)) profile.shortcuts.push(item.unlocks);
+      }
+      award = { type: 'kit', item };
+    }
+  } else if (posting.findType === 'fragment') {
+    const frag = fragmentById(skin, posting.findId);
+    if (frag && !(profile.archive || []).some((a) => a.id === frag.id)) {
+      profile.archive = profile.archive || [];
+      profile.archive.push({ id: frag.id, chain: frag.chain, foundAt: new Date().toISOString() });
+      award = { type: 'fragment', fragment: frag };
+    }
+  }
+  profile.posting = null; // recovered (or stale) — the board clears either way
+  return award || { type: 'posting-stale', text: 'The manifest was out of date — the find was already in your hands. The room still counts.' };
 }

@@ -20,6 +20,98 @@ export const SKIN = {
   version: '0.2.0',
   worldLine: 'The grid is down. The station holds. So will you.',
 
+  // ── Table texts (D51): what the d100 rows SAY in this world. Effects and
+  // rewards stay engine-owned; a skin may only reskin the prose.
+  tableTexts: {
+    "crit": {
+      "0": "The room gives up something it was not supposed to have. Take a relic.",
+      "1": "A wall that was never a wall. A connection between wings reveals itself on the map.",
+      "2": "Cache, intact. Supplies beyond what the manifest listed.",
+      "3": "Perfect execution echoes down the corridor. The work counts double in the log.",
+      "4": "A complete page where fragments were expected. The picture sharpens by a full step.",
+      "5": "The tree that owns this room speaks clearly for once.",
+      "6": "A side door stands open. Optional: one extra set of warm-up-tier work to clear it. It will not be open next time.",
+      "7": "Tool, functional. Add it to the kit.",
+      "8": "From this height the layout makes sense. Two distant rooms are marked as connected.",
+      "9": "Witnessed. Somebody — something — kept score. Bonus tick."
+    },
+    "success": {
+      "0": "The room is cleared and catalogued. One fragment recovered.",
+      "1": "Standard salvage. It all counts.",
+      "2": "A quiet moment. The tree voice files its observation.",
+      "3": "Markings on the wall, recent. Somebody passed through ahead of you.",
+      "4": "Half a cache. The other half was taken in a hurry.",
+      "5": "Something is in the room with you. It watches; it does not interfere. Note it in the log.",
+      "6": "A door is marked on the map that you cannot open yet. Now at least you know where it is.",
+      "7": "The room remembers being used for something else.",
+      "8": "Personal effects, not yours. Worth keeping anyway.",
+      "9": "Clean sweep. The next room on this route is already half-known."
+    },
+    "fail": {
+      "0": "The room is dark and gives up nothing — except the certainty that the route continues. Mark it scouted.",
+      "1": "Empty. But empty is information: whatever cleared this room out left a direction of travel.",
+      "2": "Locked containers you cannot open yet. Their locations go in the log for a stronger day.",
+      "3": "The tree voice has opinions about this room. None of them are kind. All of them are useful.",
+      "4": "Dust patterns. Something heavy was dragged through here. The map gains an annotation.",
+      "5": "A dead end — which removes a wrong answer from the map. Fewer doors to wonder about.",
+      "6": "Noise beyond the far wall. Too organized to be settling. Logged.",
+      "7": "The room resists. Note what gave out first — grip, position, breath. That is the next side quest naming itself.",
+      "8": "Scratched tally marks, not yours. Count them into the log.",
+      "9": "Nothing here but the sound of your own breathing. The voice fills the silence with reconnaissance."
+    },
+    "complication": {
+      "0": "The light fails. Finish the log entry by feel. The next beat arrives in the dark.",
+      "1": "Good intel, wrong hands: the fragment names you. Someone is keeping a file.",
+      "2": "The door behind you closes — the map redraws the route out. Same rooms, new order. (The training order does not change; the story order does.)",
+      "3": "The tree voice goes quiet mid-sentence. It heard something it will not repeat.",
+      "4": "The fragment is in a cipher you have not earned yet. Hold it. Its day will come.",
+      "5": "Your own kit lighter than it should be. Inventory does not lie, but somebody altered the manifest.",
+      "6": "Two fragments that contradict each other. Both go in the log. One of them is bait.",
+      "7": "The room is already cleared — recently, badly, by someone in a hurry. Sloppy work. Whose?",
+      "8": "The voice misidentifies the room — calls it by a name from another wing. It refuses to discuss the error.",
+      "9": "The intel is solid but the price was posted: something upstream now knows the route you took."
+    },
+    "boss-pass": {
+      "0": "The door yields. Beyond it: the wing you could see but never enter. Take the keystone.",
+      "1": "The tree voice — for the first time — says nothing at all. Respect, probably.",
+      "2": "The gate mechanism comes apart in your hands. Souvenir grade.",
+      "3": "From the cleared threshold the whole wing is visible. Three new rooms map themselves.",
+      "4": "A clean kill, witnessed and recorded. Bonus tick to the ledger.",
+      "5": "Something old and heavy stops pretending to be a wall.",
+      "6": "The cleared gate opens both ways. Travel between this wing and the last is now trivial.",
+      "7": "The defeated gate had a hoard behind it, as gates do.",
+      "8": "The gate kept records of everyone it stopped. You are in there too — older entries, weaker grip.",
+      "9": "The whole map shudders. Every wing heard that. Bonus tick."
+    },
+    "boss-fail": {
+      "0": "The gate held — and in holding, showed its mechanism. You know exactly which part of you it tested. (Side quest assigned.)",
+      "1": "Repelled, but you touched the lock. Its shape is in your hands now. The next attempt starts from knowledge.",
+      "2": "The tree voice, surprisingly gentle: it has seen this gate eat better-prepared visitors. It is taking notes for you.",
+      "3": "The gate flexed under the attempt. Whatever margin it has, it spent some holding you out. Wear is wear.",
+      "4": "Reconnaissance complete: the failure point is named, mapped, and now has a training answer. (Side quest assigned.)",
+      "5": "Something on the other side of the gate knocked back. Twice. It knows you are coming eventually.",
+      "6": "You held longer than the log predicted. The model of you is out of date — in the right direction.",
+      "7": "The gate has a maker’s mark. Someone built this to be opened — by a specific kind of strong. Now you know which kind.",
+      "8": "A hairline crack where your best rep landed. The gate remembers damage. So does the log.",
+      "9": "Scouting report filed. The wing beyond is one tier away, and tiers are a known technology."
+    }
+  },
+
+  // ── Chains (D50): the archive's piles, in delivery + desk order ───────────
+  chains: [
+    { id: 'log', name: 'STATION LOG' },
+    { id: 'personal', name: 'PERSONAL EFFECTS' },
+    { id: 'technical', name: 'TECHNICAL FILES' },
+    { id: 'signal', name: 'BAND 7' }
+  ],
+
+  // ── Posted manifests (D52): the located channel's framing ─────────────────
+  postingLabels: {
+    doorTag: 'ON THE MANIFEST',
+    recovered: 'MANIFEST RECOVERED',
+    recoveredLine: 'Exactly where Eight\u2019s manifest said it would be. The paperwork, for once, was telling the truth.'
+  },
+
   // ── Tree voice ─────────────────────────────────────────────────────────────
   voices: {
     'pull-voice': {
@@ -603,20 +695,20 @@ export const SKIN = {
       // first-room rests, gated by accumulated history; rollUnder keeps them
       // occasional so the generic lines still breathe.
       { when: { doorsOpenedAtLeast: 4, isFirstRoom: true, rollUnder: 45 }, lines: [
-        'RIGGING: “{{doorsOpened}} doors on this wing answer to you now. Eight needed eleven months for the first four. I keep both sets of dates. Check them some slow evening — that’s not an order, it’s a recommendation from the only colleague you’ve got.”'
+        'RIGGING: “{{doorsOpened}} doors answer to you now. Eight needed eleven months for the first four. I keep both columns of dates — check them some slow evening, colleague.”'
       ] },
       { when: { doorsOpenedAtLeast: 2, isFirstRoom: true, rollUnder: 35 }, lines: [
-        'RIGGING: “{{doorsOpened}} seals opened, by my count, and my count is the count. I feel each one go in the long cables — the wing carries news like that. It’s starting to trust the load you put on it. So am I, for what that’s worth. Don’t quote me.”'
+        'RIGGING: “{{doorsOpened}} seals opened, by my count — and my count is the count. The wing carries news like that down the long cables. It trusts your load now. So do I. Don’t quote me.”'
       ] },
       { when: { monthsAtLeast: 2, isFirstRoom: true, rollUnder: 30 }, lines: [
         'RIGGING: “{{months}} months on station. The ladderwell chalk is more your hand than Eight’s now. I keep both sets of numbers anyway. That isn’t sentiment — it’s a maintenance record of keepers.”'
       ] },
       { when: { monthsAtLeast: 1, isFirstRoom: true, rollUnder: 30 }, lines: [
-        'RIGGING: “A month on station, by the duty clock. Buildings are slow to trust — a month is when this one stops watching you work and starts working with you. You won’t hear the difference. I do.”'
+        'RIGGING: “A month on station, by the duty clock. That’s when a building stops watching you work and starts working with you. You won’t hear the difference. I do.”'
       ] },
       // Tendon-guard texture (D45): the long road back, dignified.
       { when: { tendonGuard: true, isFirstRoom: true, rollUnder: 35 }, lines: [
-        'RIGGING: “Your file says long road back, so hear the wing’s only speech about it: wire and tendon learn slower than muscle, and they hold everything. We rest longer on purpose. The keepers who rushed this part are not on the wall.”',
+        'RIGGING: “Your file says long road back. The wing’s one speech about it: wire and tendon learn slower than muscle, and hold everything. We rest longer on purpose.”',
         'RIGGING: “Rests run long for you by design — that’s not coddling, it’s materials science. Strength is poured; connective tissue is cured. You can’t hurry curing. You can only show up while it happens.”'
       ] },
       { when: { isFirstRoom: true }, lines: [
@@ -724,6 +816,14 @@ export const SKIN = {
       options: [
         { label: 'Sweep the room again', result: 'Everything as you left it — except the chalk tally on the wall, which has one more mark than your log says. Someone is keeping your count. Or correcting it.', award: { type: 'intel' } },
         { label: 'Close it and wedge it', result: 'The splice knife makes a fine wedge. Some mysteries you solve; some you just outlast. The door does not argue. Doors never do — that is what’s wrong with this one.', award: null }
+      ]
+    },
+    {
+      id: 'enc-kettle',
+      prompt: 'The galley kettle, abandoned mid-boil months ago, is warm. Not hot — warm, like someone just gave up on tea.',
+      options: [
+        { label: 'Make the tea', result: 'You finish what somebody started. Nine minutes, as posted. It tastes like ordinary tea, which out here is a luxury bordering on a miracle. You wash the mug and set it beside the other one. Two mugs now. The rack looks better balanced.', award: { type: 'intel' } },
+        { label: 'Log the anomaly, skip the tea', result: 'ANOMALY: kettle, warm, cause unknown. You write it the way Eight would — date, time, no adjectives — and underneath, in your own hand: “next time, making the tea.” Some entries are promises.', award: null }
       ]
     },
     {

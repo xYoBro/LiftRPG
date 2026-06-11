@@ -21,8 +21,28 @@ const isArr = (v, min = 0) => Array.isArray(v) && v.length >= min;
 
 // Words that indicate the skin is trying to prescribe training. Generated
 // worlds must not carry them in mechanical positions (we scan everything —
-// blunt, but the law is blunt).
-const TRAINING_RE = /\b(\d+\s*(x|×)\s*\d+|\d+\s*reps\b|\d+\s*sets\b|rest\s+\d+\s*(s|sec|seconds|min|minutes))\b/i;
+// blunt, but the law is blunt). Hardened per GW-10: digit AND word-number
+// forms, bare exercise+count, and rest-duration phrasings all count.
+// Word-number patterns are CASE-SENSITIVE lowercase on the number: training
+// language leaks mid-sentence ("five reps"); capitalized words are usually
+// names ("Eight set the locks") and names must not trip the law.
+const NUM_WORD = '(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|twenty|thirty|forty|fifty|sixty|ninety)';
+export const TRAINING_PATTERNS = [
+  /\b\d+\s*(x|×)\s*\d+\b/i,                                          // 3x5
+  /\b\d+\s*(reps?|sets?)\b/i,                                          // 5 reps / 3 sets
+  new RegExp('\\b' + NUM_WORD + '\\s+(reps|sets)\\b'),               // five reps (lowercase, plural)
+  new RegExp('\\b(sets|reps)\\s+of\\s+(\\d+|' + NUM_WORD + ')\\b'), // sets of five
+  /\b\d+\s*(pull-?ups?|chin-?ups?|push-?ups?|rows?|negatives?|holds?)\b/i,      // 5 pullups
+  new RegExp('\\brest\\s+(for\\s+)?(a|an|\\d+|' + NUM_WORD + ')\\s*(s\\b|secs?\\b|seconds?\\b|mins?\\b|minutes?\\b)'), // rest two minutes
+  new RegExp('\\bhold\\s+(for\\s+)?(\\d+|' + NUM_WORD + ')\\s*(s\\b|secs?\\b|seconds?\\b)') // hold for thirty seconds
+];
+export function findTrainingLanguage(text) {
+  for (const re of TRAINING_PATTERNS) {
+    const m = String(text).match(re);
+    if (m) return m[0];
+  }
+  return null;
+}
 
 export function validateSkin(skin, tree) {
   const errors = [];
@@ -82,6 +102,23 @@ export function validateSkin(skin, tree) {
     });
   }
   const allRoomIds = new Set(branches.flatMap((b) => ((skin.roomPools || {})[b] || []).map((r) => r.id)));
+
+  // Chains (D50): the desk derives its piles from the skin. An explicit
+  // manifest must cover every fragment chain; without one the engine falls
+  // back to first-appearance order (warn — names will be prettified ids).
+  if (Array.isArray(skin.chains) && skin.chains.length) {
+    const declared = new Set(skin.chains.map((c) => (typeof c === 'string' ? c : c.id)));
+    skin.chains.forEach((c, i) => {
+      const id = typeof c === 'string' ? c : c.id;
+      if (!isStr(id)) err(`chains[${i}]: needs an id`);
+      if (typeof c === 'object' && !isStr(c.name)) warn(`chains[${i}]: no display name (fallback: prettified id)`);
+    });
+    for (const f of skin.fragments || []) {
+      if (isStr(f.chain) && !declared.has(f.chain)) err(`fragments: chain "${f.chain}" not in the chains manifest — its pile would never render`);
+    }
+  } else {
+    warn('chains: no manifest — desk piles fall back to first-appearance order with prettified names');
+  }
 
   // Fragments: the ambient archive
   const frags = skin.fragments || [];
@@ -166,6 +203,27 @@ export function validateSkin(skin, tree) {
     }
   } else warn('finale missing — the season will not close');
 
+  // Table texts (D51): without them the d100 rows speak in the engine's
+  // neutral register — runs fine, reads thinner.
+  if (!skin.tableTexts) warn('tableTexts: missing — dice rows use the engine\u2019s neutral lines');
+  if (!skin.postingLabels) warn('postingLabels: missing — posted manifests use plain framing');
+
+  // Reading budgets (GW-39): the gassed-reader law, enforced as warnings at
+  // import (the reference world is held to ERROR in the test battery).
+  const BUDGETS = [
+    ['rest beat', (skin.sessionFrame || {}).restBeats ? skin.sessionFrame.restBeats.flatMap((b) => b.lines || []) : [], 35],
+    ['scene line', ((skin.sessionFrame || {}).brief || {}).sceneLines ? skin.sessionFrame.brief.sceneLines.flatMap((b) => b.lines || []) : [], 45],
+    ['fragment', (skin.fragments || []).map((f) => (f.body || '') + ' ' + (f.hook || '')), 130],
+    ['keystone', (skin.keystones || []).map((k) => (k.body || '') + ' ' + (k.hook || '')), 150],
+    ['trace', Object.values(skin.traces || {}), 32],
+    ['quiet beat', skin.quietBeats || [], 75],
+    ['ending', Object.values(((skin.finale || {}).endings) || {}).map((e) => (e.body || '') + ' ' + (e.hook || '')), 190]
+  ];
+  for (const [label, list, budget] of BUDGETS) {
+    const over = list.filter((t) => String(t).trim().split(/\s+/).length > budget).length;
+    if (over) warn(`reading budget: ${over} ${label}(s) over ${budget} words — gassed readers skim, then skip`);
+  }
+
   // Traces reference real rooms
   for (const roomId of Object.keys(skin.traces || {})) {
     if (!allRoomIds.has(roomId)) warn(`traces: room id "${roomId}" not in any pool`);
@@ -176,9 +234,8 @@ export function validateSkin(skin, tree) {
   }
 
   // The law: no training content anywhere in the world.
-  const scan = JSON.stringify(skin);
-  const hit = scan.match(TRAINING_RE);
-  if (hit) err(`chance-isolation: skin text contains training prescription language ("${hit[0]}") — worlds decorate, the tree prescribes`);
+  const hit = findTrainingLanguage(JSON.stringify(skin));
+  if (hit) err(`chance-isolation: skin text contains training prescription language ("${hit}") — worlds decorate, the tree prescribes`);
 
   return { ok: errors.length === 0, errors, warnings };
 }

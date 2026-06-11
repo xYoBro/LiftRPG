@@ -25,10 +25,13 @@ export const PULL_TREE = {
   id: 'pull',
   name: 'Pull',
   voiceSlot: 'pull-voice',
-  statBase: 20,
-  statPerTier: 6,
+  // Stat curve (D53, supersedes D29 constants): beginners open ~25-40 so the
+  // success tables breathe early; saturation needs 16+ cleared tiers instead
+  // of arriving with an intermediate placement on day one.
+  statBase: 25,
+  statPerTier: 4,
   statRecentMax: 15,
-  statCap: 85,
+  statCap: 92,
   branches: {
     lever: { name: 'Lever', note: 'Horizontal pull, hanging. The front-lever road: body as the beam, bar as the pivot.' },
     bar: { name: 'Bar', note: 'Vertical pull. Hang tolerance before pulling strength — tendons first.' }
@@ -56,11 +59,15 @@ export const PULL_TREE = {
       'p-pullmax': {
         kind: 'count', tier: 'pull.bar.full', unit: 'reps',
         test: 'Strict dead-hang pull-ups — as many as you have, clean. Zero is a fine answer.',
+        // Band edges re-set (D55): a posting's rep-window floor must be within
+        // one rep of the probe count — 1-2 pull-ups belongs in partial-ROM work
+        // (full's floor is 3), and chest-to-bar focus starts around 8 strict.
         bands: [
           { max: 0, next: 'p-negative' },
-          { max: 3, place: { bar: 'pull.bar.full' }, classHint: 'trained', next: 'p-hollow' },
-          { max: 7, place: { bar: 'pull.bar.chest-to-bar' }, classHint: 'trained', next: 'p-hollow' },
-          { max: 14, place: { bar: 'pull.bar.archer' }, classHint: 'intermediate', next: 'p-hollow' },
+          { max: 2, place: { bar: 'pull.bar.partial-rom' }, classHint: 'trained', next: 'p-hollow' },
+          { max: 7, place: { bar: 'pull.bar.full' }, classHint: 'trained', next: 'p-hollow' },
+          { max: 12, place: { bar: 'pull.bar.chest-to-bar' }, classHint: 'intermediate', next: 'p-hollow' },
+          { max: 18, place: { bar: 'pull.bar.archer' }, classHint: 'intermediate', next: 'p-hollow' },
           { max: 99, place: { bar: 'pull.bar.typewriter' }, classHint: 'advanced', next: 'p-hollow' }
         ]
       },
@@ -140,7 +147,8 @@ export const PULL_TREE = {
         'One-second pause at the top of every raise'
       ],
       scheme: { kind: 'reps', sets: 3, repWindow: [8, 12] },
-      unlock: '3 sets of 12 per letter with a 1s pause',
+      gateStandard: { amount: 10 },
+      unlock: '3 sets of 10 per letter with a 1s pause',
       boss: { tier: 'pull.lever.hollow-hang', standard: { kind: 'hold', value: 6 }, label: 'a 6-second hollow tuck hang' },
       regression: null,
       commonFaults: [
@@ -402,8 +410,11 @@ export const PULL_TREE = {
       ],
       // 40s cap keeps holds in the productive zone; past that the set drifts
       // to pure endurance. Grip/tendon tolerance is the goal, not records.
+      // Gate at 30s (D55): the file's own productive ceiling — demanding 3×40
+      // froze older beginners' bar corridors for entire seasons.
       scheme: { kind: 'hold', sets: 3, holdWindow: [20, 40] },
-      unlock: '3 holds of 40s',
+      gateStandard: { amount: 30 },
+      unlock: '3 holds of 30s',
       boss: { tier: 'pull.bar.scap-pulls', standard: { kind: 'reps', value: 5 }, label: '5 clean scap pulls' },
       regression: null,
       commonFaults: [
@@ -462,8 +473,12 @@ export const PULL_TREE = {
         'Blades down — no hanging in the shrug',
         'Quiet body'
       ],
+      // Gate at 20s (D55): 30s flexed holds are an endurance grind for the
+      // bodies entering here; 3×20 plus a 10s probe pass is the negative-ready
+      // signal the next tier actually needs.
       scheme: { kind: 'hold', sets: 3, holdWindow: [10, 30] },
-      unlock: '3 holds of 30s',
+      gateStandard: { amount: 20 },
+      unlock: '3 holds of 20s',
       boss: { tier: 'pull.bar.negatives', standard: { kind: 'reps', value: 3 }, label: '3 five-second negatives' },
       regression: 'pull.bar.scap-pulls',
       commonFaults: [

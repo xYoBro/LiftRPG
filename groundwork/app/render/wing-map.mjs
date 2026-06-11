@@ -25,6 +25,16 @@ function xFor(branch, i) {
   return base + JITTER[i % JITTER.length];
 }
 
+// Generic landmark glyphs (GW-41): worlds that ship no silhouettes still get
+// distinguishable chambers — a neutral set keyed by sector position, stroke-only.
+const GENERIC_SILS = [
+  'M-12,6 H12', 'M-10,6 L0,-6 L10,6', 'M-12,-5 H12 M-12,1 H12 M-12,7 H12',
+  'M0,-8 V8 M-7,0 H7', 'M-11,5 A11,11 0 0 1 11,5', 'M-5,8 V-6 M5,8 V-6 M-5,2 H5',
+  'M-12,7 H12 M-8,7 V-3 M0,7 V-6 M8,7 V-1', 'M-9,-6 H9 V6 H-9 Z',
+  'M-12,0 H-3 M3,0 H12 M0,0 m-3,0 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0',
+  'M0,8 V-8 M-6,8 L0,-8 L6,8'
+];
+
 export function buildWingMapSvg(wing, opts = {}) {
   const silhouettes = opts.silhouettes || {};
   const charges = opts.charges || {};
@@ -65,7 +75,7 @@ export function buildWingMapSvg(wing, opts = {}) {
       if (sec.state === 'active' && sec.tier.boss) {
         const xUp = i + 1 < b.sectors.length ? xFor(b.branch, i + 1) : x;
         const gx = (x + xUp) / 2;
-        const gy = y - CH_H / 2 - GAP / 2;
+        const gy = y - CH_H / 2 - GAP / 2 - 3;
         const charge = Math.max(0, Math.min(1, charges[sec.tier.id] || 0));
         const elected = opts.electedTierId === sec.tier.id;
         parts.push(`<g class="gwm-gate ${elected ? 'gwm-gate-elected' : ''}" data-gate="${esc(sec.tier.id)}">`
@@ -80,13 +90,16 @@ export function buildWingMapSvg(wing, opts = {}) {
       // Lock economy: only the NEXT sealed door announces itself (lock + name).
       // Deeper locked sectors are fog — a dim silhouette, no icon spam; the
       // unknown should read as unknown, not as a wall of padlocks.
-      const sil = silhouettes[sec.tier.hookSlot];
+      const sil = silhouettes[sec.tier.hookSlot]
+        || (Object.keys(silhouettes).length ? null : GENERIC_SILS[i % GENERIC_SILS.length]);
       const nextDoor = sec.state === 'locked' && i > 0 && b.sectors[i - 1].state === 'active';
       parts.push(`<g class="gwm-chamber gwm-chamber-${sec.state} ${sec.state === 'locked' && !nextDoor ? 'gwm-chamber-fog' : ''}" data-tier="${esc(sec.tier.id)}">`
         + `<rect x="${x - CH_W / 2}" y="${y - CH_H / 2}" width="${CH_W}" height="${CH_H}" rx="8"/>`
         + (sil ? `<path class="gwm-sil" d="${sil}" transform="translate(${x},${y})"/>` : '')
         + (sec.state === 'active'
-          ? `<circle class="gwm-you" cx="${x - CH_W / 2 + 13}" cy="${y}" r="6" fill="${b.branch === 'lever' ? 'var(--gw-accent)' : 'var(--gw-amber)'}"/>`
+          ? (opts.todayTierId && sec.tier.id !== opts.todayTierId
+            ? `<circle class="gwm-post" cx="${x - CH_W / 2 + 13}" cy="${y}" r="5.5"/>`
+            : `<circle class="gwm-you" cx="${x - CH_W / 2 + 13}" cy="${y}" r="6" fill="${b.branch === 'lever' ? 'var(--gw-accent)' : 'var(--gw-amber)'}"/>`)
           : sec.state === 'cleared'
             ? `<text x="${x + CH_W / 2 - 12}" y="${y + 4}" text-anchor="middle" class="gwm-glyph">✓</text>`
             : nextDoor
@@ -105,6 +118,12 @@ export function buildWingMapSvg(wing, opts = {}) {
       });
       if (roomsHere.length > 6) {
         parts.push(`<text x="${x + CH_W / 2 - 9}" y="${y + CH_H / 2 - 5}" text-anchor="end" class="gwm-roomcount">+${roomsHere.length - 6}</text>`);
+      }
+
+      // Posted-manifest marker (D52): the named room's branch shows a small
+      // manifest diamond on its ACTIVE chamber until the posting is claimed.
+      if (opts.posting && opts.posting.branch === b.branch && sec.state === 'active') {
+        parts.push(`<text x="${x + CH_W / 2 - 26}" y="${y + 4}" text-anchor="middle" class="gwm-posting">◈</text>`);
       }
 
       // TODAY pin (Sprint 2.3): the work order is pinned to the pulsing chamber.
@@ -150,15 +169,21 @@ export function buildWingMapSvg(wing, opts = {}) {
   // the full wing is the caller's toggle away.
   let viewBox = `0 0 ${W} ${H}`;
   if (opts.window && opts.window.tierId) {
+    // The session works BOTH corridors: the default window spans the union of
+    // every active band (GW-12), not just the focus tier's rows.
+    const activeIdx = [];
     for (const b of wing.branches) {
-      const i = b.sectors.findIndex((sec) => sec.tier.id === opts.window.tierId);
-      if (i === -1) continue;
-      const iHigh = Math.min(b.sectors.length - 1, i + 2);
-      const iLow = Math.max(0, i - 1);
+      const i = b.sectors.findIndex((sec) => sec.state === 'active');
+      if (i !== -1) activeIdx.push(i);
+      const f = b.sectors.findIndex((sec) => sec.tier.id === opts.window.tierId);
+      if (f !== -1) activeIdx.push(f);
+    }
+    if (activeIdx.length) {
+      const iHigh = Math.min(maxSectors - 1, Math.max(...activeIdx) + 1);
+      const iLow = Math.max(0, Math.min(...activeIdx) - 1);
       const yTop = Math.max(0, yFor(iHigh) - CH_H / 2 - GAP - 16);
       const yBottom = iLow === 0 ? Math.min(H, entryY + 64) : yFor(iLow) + CH_H / 2 + 28;
       viewBox = `0 ${Math.round(yTop)} ${W} ${Math.round(Math.max(140, yBottom - yTop))}`;
-      break;
     }
   }
   return `<svg viewBox="${viewBox}" class="gwm" role="img" aria-label="Station wing map">${parts.join('')}</svg>`;

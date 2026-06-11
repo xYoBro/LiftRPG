@@ -57,10 +57,19 @@ export function seasonState(skin, profile) {
   };
 }
 
-// Mast readiness: the body cleared Mast Access — the transmit ending's real
-// gate. (cleared = the pull-up sector is farmable ground.)
+// Body-gated finale options (GW-18): the gate tier is DATA. Options declare
+// `requiresCleared: '<tierId>'`; the legacy `requiresMast` flag maps to the
+// pull wing's iconic gate. Cleared = farmable ground = the body really did it.
+export function clearedTier(profile, treeId, tierId) {
+  return ((profile.cleared || {})[treeId] || []).includes(tierId);
+}
+export function optionLocked(option, profile, treeId) {
+  const tierId = option.requiresCleared || (option.requiresMast ? 'pull.bar.full' : null);
+  return !!tierId && !clearedTier(profile, treeId, tierId);
+}
+// Back-compat alias (callers migrated to optionLocked/clearedTier).
 export function mastReady(profile, treeId) {
-  return ((profile.cleared || {})[treeId] || []).includes('pull.bar.full');
+  return clearedTier(profile, treeId, 'pull.bar.full');
 }
 
 // Close the season: file the chosen ending into the archive, stamp the close.

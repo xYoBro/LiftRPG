@@ -1,23 +1,23 @@
-// ── Session generator (slice scope) ─────────────────────────────────────────
+// ── Session generator + session lifecycle ────────────────────────────────────
 // The periodization engine authors the dungeon's skeleton; dice decorate it.
-// Slice: one pull-tree session — prep → warm-up (cleared tier) → 3 working
-// sets (= 3 rooms) of the active tier per branch focus → boss attempt when
-// eligible → debrief. Rest durations are PRESCRIBED here (never by dice).
-//
-// Full production adds: A/B/C multi-tree templates, 2/3/4-day variants,
-// duration budgets with the cut-order law, deload scheduling, travel mode.
+// generateSession() plans the day; fileSession() (D58) applies everything a
+// finished session does to the profile — the UI renders, the engine decides.
+// Rest durations are PRESCRIBED here (never by dice).
 
-import { getTier, branchOfTier } from './profile.mjs';
+import { getTier, branchOfTier, layoffDays, stallCount } from './profile.mjs';
 import { frontierDoors } from './map.mjs';
-import { nextCache } from './discovery.mjs';
+import { nextCache, createPosting, fragmentById } from './discovery.mjs';
 import { liveEventDue } from './keystones.mjs';
 import { seasonWeek, DELOAD_WEEK, SEASON_WEEKS, seasonClosed } from './season.mjs';
 
 // Rest doctrine (OG audit, D41): 120s wall-clock between rooms is compliant
 // BECAUSE rooms alternate movements (paired sets) — each movement recovers
-// ~4-5 minutes between its own sets. Boss rest is a full 180s (single max
-// effort follows). Never compress prep or boss rest.
-export const REST_SECONDS = { working: 120, warmup: 60, boss: 180 };
+// ~4-5 minutes between its own sets. Where the interleave cannot cover
+// (short-budget sessions), the uncovered pair gets the long rest instead
+// (D55 / GW-04): same-movement back-to-back is never rested under 180s.
+// Boss rest is a full 180s (single max effort follows). Never compress prep
+// or boss rest.
+export const REST_SECONDS = { working: 120, warmup: 60, boss: 180, samePair: 180 };
 const PREP_DRILLS = [
   { name: 'Wrist circles + rocks', detail: '30s each direction' },
   { name: 'Scap pulls or scap push-ups', detail: '2×6 easy' },
@@ -42,12 +42,20 @@ export function isTendonGuard(profile) {
     || (rec === 'years' && age !== 'u40');
 }
 
-// Slice session: alternate branch focus per session (rows ↔ bar), 3 working
-// sets of the focused branch's active tier + 2 of the other branch.
+// Gate standard for a tier (D55): explicit gateStandard where the window top
+// is not a sane gate (entry-tier endurance walls); window top otherwise.
+export function gateAmount(tier) {
+  if (tier.gateStandard && Number.isFinite(tier.gateStandard.amount)) return tier.gateStandard.amount;
+  return tier.scheme.kind === 'reps' ? tier.scheme.repWindow[1] : tier.scheme.holdWindow[1];
+}
+
+// Session: alternate branch focus per session (lever ↔ bar), 3 working sets
+// of the focused branch's active tier + budget-shaped sets of the other.
 export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
   const active = profile.active[tree.id] || {};
   const cleared = profile.cleared[tree.id] || [];
-  const sessionIndex = profile.history.filter((h) => h.treeId === tree.id).length;
+  const realSessions = profile.history.filter((h) => h.treeId === tree.id && !h.stormProtocol);
+  const sessionIndex = realSessions.length;
   // Campaign-relative session count (D43): live events, special-room rotation
   // and "first session stays pure" reset per world; the keeper's order number
   // (dayNumber) and body pacing stay global.
@@ -82,6 +90,12 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
   const week = seasonWeek(profile);
   const isDeload = week === DELOAD_WEEK && !seasonClosed(profile);
 
+  // Re-entry modulation (D55 / GW-14): a 7-13 day gap trims optional volume
+  // and (for wavers) forces a light day — the windows themselves never change.
+  // Past 14 days the recalibration prompt takes over (profile.mjs).
+  const gapDays = layoffDays(profile);
+  const reentry = gapDays >= 7 && gapDays <= 13;
+
   // Tendon-guard (D45, source Ch6 populations): sedentary re-entries and
   // older bodies get extended prep and +30s working rests. Safety over
   // performance; the prescription windows themselves never change.
@@ -91,7 +105,7 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
   // Session budget shapes optional volume only (never main progression or
   // prep — the cut-order law): 25min → 1 off-branch set, 40 → 2, 60 → 3.
   const budget = (profile.settings && profile.settings.sessionBudgetMinutes) || 40;
-  const offSets = Math.max(1, (budget <= 25 ? 1 : budget >= 60 ? 3 : 2) - (isDeload ? 1 : 0));
+  const offSets = Math.max(1, (budget <= 25 ? 1 : budget >= 60 ? 3 : 2) - (isDeload ? 1 : 0) - (reentry ? 1 : 0));
   const workingSets = learnMode || isDeload ? 2 : 3;
   const rooms = [];
   for (let i = 0; i < workingSets; i++) {
@@ -117,19 +131,21 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
   //   untrained/trained beginners — LINEAR: one charged session opens a gate.
   //   intermediate/advanced — LIGHT/HEAVY waves: sessions alternate intensity;
   //   only heavy days grade the door, and a gate wants two charges. Deload
-  //   weeks force light. The set prescription itself never changes — the
-  //   light day is an instruction to stay inside the window, not a new dose.
+  //   weeks and re-entry days force light. The set prescription itself never
+  //   changes — the light day is an instruction to stay inside the window.
   const cls = profile.classification || 'trained';
   const usesWaves = cls === 'intermediate' || cls === 'advanced';
   const chargesNeeded = usesWaves ? 2 : 1;
   const intensity = usesWaves
-    ? (isDeload ? 'light' : (campaignSession % 2 === 0 ? 'heavy' : 'light'))
+    ? (isDeload || reentry ? 'light' : (campaignSession % 2 === 0 ? 'heavy' : 'light'))
     : 'heavy';
 
-  // Boss eligibility: enough trailing charged sessions on this tier (heavy
-  // days only when waving), or an explicit map-tap election.
+  // Boss eligibility (D48): gates are max efforts — they never arm on deload
+  // weeks, and for waving athletes only on heavy days. Within those guards:
+  // enough trailing charges, or the keeper's own map-tap election.
   const charges = focusTier ? trailingCharges(profile, tree.id, focusTier.id, usesWaves) : 0;
-  const bossEligible = !!(focusTier && focusTier.boss && !learnMode
+  const gateDayLegal = !isDeload && !reentry && (!usesWaves || intensity === 'heavy');
+  const bossEligible = !!(focusTier && focusTier.boss && !learnMode && gateDayLegal
     && (profile.bossElect === focusTier.id || charges >= chargesNeeded));
 
   // Paired-set interleave (OG audit, D41): rooms alternate corridors —
@@ -143,12 +159,42 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
     if (rooms[i]) allRooms.push(rooms[i]);
     if (offRooms[i]) allRooms.push(offRooms[i]);
   }
+
+  // Advanced dose (D55 / GW-16): heavy days may carry one OPTIONAL extra
+  // focus set — engine-authored, never on deload/guard/learn/re-entry days.
+  if (cls === 'advanced' && intensity === 'heavy' && !isDeload && !learnMode && !tendonGuard && !reentry && focusTier) {
+    allRooms.push({
+      kind: 'working', setNumber: workingSets + 1, tier: focusTier,
+      scheme: focusTier.scheme, restSeconds: workingRest, learnCue: null, optional: true
+    });
+  }
+
+  // Rest-law repair (D55 / GW-04): wherever the interleave leaves the same
+  // movement back-to-back, the EARLIER room carries the long rest. The pair
+  // is honest about it (restNote renders on the timer).
+  for (let i = 1; i < allRooms.length; i++) {
+    if (allRooms[i].tier.branch === allRooms[i - 1].tier.branch) {
+      allRooms[i - 1].restSeconds = Math.max(allRooms[i - 1].restSeconds, REST_SECONDS.samePair + (tendonGuard ? 30 : 0));
+      allRooms[i - 1].restNote = 'long-rest';
+    }
+  }
+
   if (skin && rng) {
     for (const room of allRooms) {
       room.doorOptions = frontierDoors(skin, profile, room.tier.branch, rng, 2);
     }
     assignSpecialRoom(skin, profile, rng, allRooms, { sessionIndex: campaignSession, learnMode });
+    attachPosting(skin, profile, allRooms);
   }
+
+  // Side quest (D49): the assigned fault drill rides the session whenever its
+  // branch is in focus — authored tree data, deterministic, prescription-side.
+  const sideQuest = (profile.activeSideQuests || {})[focusBranch] || null;
+  // Deep stall (six stalled sessions, D49): offer the authored regression as an optional
+  // warm-up swap. Opt-in texture; the prescribed work is untouched.
+  const stallDepth = focusTier ? stallCount(profile, tree.id, focusTier.id) : 0;
+  const regressionOffer = stallDepth >= 6 && focusTier && focusTier.regression
+    ? getTier(tree, focusTier.regression) : null;
 
   return {
     treeId: tree.id,
@@ -158,9 +204,12 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
     learnMode,
     week,
     isDeload,
+    reentry,
     finaleArmed: !seasonClosed(profile) && week >= SEASON_WEEKS && !!(skin && skin.finale),
     prep: tendonGuard ? [...PREP_DRILLS, ...GUARD_PREP] : PREP_DRILLS,
     tendonGuard,
+    sideQuest,
+    regressionOffer,
     warmup: warmupTier ? {
       tier: warmupTier,
       sets: 1,
@@ -170,6 +219,7 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
     intensity,
     chargesNeeded,
     charges,
+    posting: profile.posting || null,
     boss: bossEligible ? {
       tier: focusTier,
       definition: focusTier.boss,
@@ -206,20 +256,48 @@ function assignSpecialRoom(skin, profile, rng, rooms, { sessionIndex, learnMode 
   if (special === 'sealed-cache') door.cacheId = nextCache(skin, profile).id;
 }
 
+// Posted manifest (D52): if a posting is live, its named room is guaranteed to
+// appear among this session's doors on its branch — walking in recovers the
+// posted find. Reward-side navigation; the set behind the door is untouched.
+function attachPosting(skin, profile, rooms) {
+  const posting = profile.posting;
+  if (!posting) return;
+  const pool = ((skin.roomPools || {})[posting.branch]) || [];
+  const postedRoom = pool.find((r) => r.id === posting.roomId);
+  if (!postedRoom) return;
+  const branchRooms = rooms.filter((r) => r.tier.branch === posting.branch && r.doorOptions && r.doorOptions.length);
+  if (!branchRooms.length) return;
+  for (const room of branchRooms) {
+    const hit = room.doorOptions.find((d) => d.id === posting.roomId);
+    if (hit) { if (!hit.roomType) hit.posted = true; return; }
+  }
+  // Not dealt naturally: post it over the last plain door of the first
+  // branch room (specials keep their door).
+  const room = branchRooms[0];
+  for (let i = room.doorOptions.length - 1; i >= 0; i--) {
+    if (!room.doorOptions[i].roomType) {
+      room.doorOptions[i] = { ...postedRoom, posted: true };
+      return;
+    }
+  }
+}
+
 // Door charge (Sprint 2.3): gate-eligibility progress from the most recent
 // focus work — per-set credit only for form-clean sets (that is what the gate
-// grades), proportional to the top of the window. unlockHit ⇒ exactly 1.
+// grades), proportional to the gate standard (D55). unlockHit ⇒ exactly 1.
 export function computeDoorCharge(session, setResults) {
-  const focusRooms = session.rooms.filter((r) => r.tier && r.tier.id === session.focusTierId);
+  const focusRooms = session.rooms.filter((r) => r.tier && r.tier.id === session.focusTierId && !r.optional);
   if (!focusRooms.length) return 0;
   let sum = 0;
   for (const room of focusRooms) {
     const result = setResults[roomKey(room)];
     if (!result || result.outcome !== 'hit') continue;
-    const top = room.scheme.kind === 'reps' ? room.scheme.repWindow[1] : room.scheme.holdWindow[1];
-    sum += Math.min(1, (result.amount || 0) / top);
+    const top = gateAmount(room.tier);
+    const amount = Number.isFinite(result.amount) ? result.amount : 0;
+    sum += Math.min(1, amount / top);
   }
-  return Math.min(1, Math.round((sum / focusRooms.length) * 100) / 100);
+  const charge = sum / focusRooms.length;
+  return Number.isFinite(charge) ? Math.min(1, Math.round(charge * 100) / 100) : 0;
 }
 
 // Trailing charged sessions on a tier: consecutive unlockHit sessions, most
@@ -237,27 +315,24 @@ export function trailingCharges(profile, treeId, tierId, usesWaves) {
   return n;
 }
 
-// Unlock check: did this session's working sets hit the top of the rep/hold
-// window across ALL sets at form standard?
+// Unlock check: did this session's working sets hit the gate standard across
+// ALL prescribed sets at form standard? Optional extra sets never gate.
 export function unlockHit(session, setResults) {
-  const focusRooms = session.rooms.filter((r) => r.tier && r.tier.id === session.focusTierId);
+  const focusRooms = session.rooms.filter((r) => r.tier && r.tier.id === session.focusTierId && !r.optional);
   if (!focusRooms.length) return false;
   return focusRooms.every((room) => {
     const result = setResults[roomKey(room)];
     if (!result || result.outcome !== 'hit') return false;
-    const scheme = room.scheme;
-    const top = scheme.kind === 'reps' ? scheme.repWindow[1] : scheme.holdWindow[1];
-    return (result.amount || 0) >= top;
+    return (result.amount || 0) >= gateAmount(room.tier);
   });
 }
 
 export function roomKey(room) {
-  return `${room.tier.id}#${room.kind}#${room.setNumber}`;
+  return `${room.tier.id}#${room.kind}#${room.setNumber}${room.optional ? '#opt' : ''}`;
 }
 
 // AAR record appended to profile.history (the log is the after-action report).
 export function buildAar(session, { setResults, resolutions, bossResult, intelDrop }) {
-  const focusRooms = session.rooms.filter((r) => r.tier && r.tier.id === session.focusTierId);
   const hits = Object.values(setResults).filter((r) => r && r.outcome === 'hit').length;
   return {
     date: new Date().toISOString(),
@@ -277,9 +352,9 @@ export function buildAar(session, { setResults, resolutions, bossResult, intelDr
       const marks = {};
       for (const room of session.rooms) {
         const res = setResults[roomKey(room)];
-        if (!res || !res.amount) continue;
+        if (!res || !res.amount || !Number.isFinite(res.amount)) continue;
         const m = marks[room.tier.id] = marks[room.tier.id]
-          || { best: 0, volume: 0, unit: room.scheme.kind === 'reps' ? 'reps' : 's' };
+          || { best: 0, volume: 0, unit: (room.scheme.kind === 'reps' ? 'reps' : 's') + (room.scheme.perSide ? '/side' : '') };
         m.best = Math.max(m.best, res.amount);
         m.volume += res.amount;
       }
@@ -288,4 +363,110 @@ export function buildAar(session, { setResults, resolutions, bossResult, intelDr
     boss: bossResult ? { attempted: true, passed: bossResult.passed, roll: bossResult.roll } : null,
     intelDrop: intelDrop || null
   };
+}
+
+// ── fileSession (D58): everything a finished session does to the profile ────
+// Extracted from the debrief screen so the engine owns its own lifecycle and
+// the sim suite can drive whole seasons headlessly. The UI calls this once,
+// then renders. Chance isolation: nothing in here reads a die.
+export function fileSession(profile, tree, session, { setResults, resolutions = [], bossResult = null, intelDrop = null, skin = null }) {
+  const aar = buildAar(session, { setResults, resolutions, bossResult, intelDrop });
+  profile.history.push(aar);
+  delete profile.routeOverride; // route choice is one-shot (D46)
+  if (session.learnMode && session.focusTierId) profile.tutorialSeen[session.focusTierId] = true;
+
+  const cls = profile.classification || 'trained';
+  const usesWaves = cls === 'intermediate' || cls === 'advanced';
+
+  // Door charge (Sprint 2.3): latest focus evidence drives the gate meter.
+  // Light days don't grade the door (D44) — the last heavy reading stands.
+  if (session.focusTierId && !(session.intensity === 'light' && session.chargesNeeded > 1)) {
+    profile.doorCharge = profile.doorCharge || {};
+    profile.doorCharge[session.focusTierId] = aar.unlockHit ? 1 : computeDoorCharge(session, setResults);
+  }
+
+  // An elect is consumed by the session that carried the attempt (D48) —
+  // whether it was passed, failed, or walked away from.
+  if (session.boss) delete profile.bossElect;
+
+  // Auto-elect only at FULL charges (D48; supersedes the one-charge elect that
+  // made the two-charge wave doctrine cosmetic). trailingCharges now includes
+  // the session just filed.
+  if (session.focusTierId) {
+    const tier = getTier(tree, session.focusTierId);
+    const charges = trailingCharges(profile, tree.id, session.focusTierId, usesWaves);
+    if (tier && tier.boss && charges >= (session.chargesNeeded || 1)) {
+      profile.bossElect = session.focusTierId;
+    }
+  }
+
+  // Side quests (D49): a failed gate files a real assignment; a passed gate
+  // clears the branch; an emitted quest spends a session.
+  profile.activeSideQuests = profile.activeSideQuests || {};
+  if (bossResult && !bossResult.passed && intelDrop && session.boss) {
+    const branch = session.boss.tier.branch;
+    profile.activeSideQuests[branch] = {
+      id: intelDrop.sideQuest.id, name: intelDrop.sideQuest.name, note: intelDrop.sideQuest.note,
+      tierId: session.boss.tier.id, faultId: intelDrop.fault.id, sessionsLeft: 3
+    };
+  } else if (session.sideQuest) {
+    const q = profile.activeSideQuests[session.focusBranch];
+    if (q) {
+      q.sessionsLeft -= 1;
+      if (q.sessionsLeft <= 0) delete profile.activeSideQuests[session.focusBranch];
+    }
+  }
+  if (bossResult && bossResult.passed && session.boss) {
+    delete profile.activeSideQuests[session.boss.tier.branch];
+  }
+
+  // Stall detector (D49): four graded sessions on one tier with the gate still
+  // under half charge ⇒ the wing names the first common fault itself.
+  if (session.focusTierId && !profile.activeSideQuests[session.focusBranch]) {
+    const tier = getTier(tree, session.focusTierId);
+    const depth = stallCount(profile, tree.id, session.focusTierId);
+    const charge = (profile.doorCharge || {})[session.focusTierId] || 0;
+    if (tier && depth >= 4 && charge < 0.5 && tier.commonFaults && tier.commonFaults.length) {
+      const fault = tier.commonFaults[0];
+      const sq = tier.faultSideQuests[fault.id];
+      if (sq) {
+        profile.activeSideQuests[session.focusBranch] = {
+          id: sq.id, name: sq.name, note: sq.note,
+          tierId: tier.id, faultId: fault.id, sessionsLeft: 3, stall: true
+        };
+      }
+    }
+  }
+
+  profile.xp += aar.setsHit;
+
+  // Zeigarnik hook for the home screen.
+  if (skin) {
+    const fill = (t, vars) => String(t || '').replace(/\{\{(\w+)\}\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : ''));
+    const teasers = ((skin.sessionFrame || {}).nextTeasers) || {};
+    const lastFrag = (profile.archive || []).slice(-1)[0];
+    const lastFragData = lastFrag ? fragmentById(skin, lastFrag.id) : null;
+    const focusTier = getTier(tree, session.focusTierId);
+    const flavor = (t) => (t && skin.tierNames && skin.tierNames[t.hookSlot]) || (t ? t.name : '');
+    if (aar.unlockHit && session.focusTierId && profile.bossElect === session.focusTierId) {
+      const next = focusTier && focusTier.boss ? getTier(tree, focusTier.boss.tier) : null;
+      profile.lastHook = fill(teasers.bossEligible, { bossDoor: next ? flavor(next) : 'the sealed door' }) || profile.lastHook;
+    } else if (lastFragData) {
+      profile.lastHook = fill(teasers.newFragment, { lastFragmentHook: lastFragData.hook }) || profile.lastHook;
+    } else {
+      profile.lastHook = fill(teasers.default, { focusRoom: flavor(focusTier) || 'the wing' }) || profile.lastHook;
+    }
+
+    // Posted manifest lifecycle (D52): unclaimed postings age out after three
+    // sessions; a fresh one is posted whenever the board is empty.
+    if (profile.posting) {
+      profile.posting.sessionsLeft -= 1;
+      if (profile.posting.sessionsLeft <= 0) profile.posting = null;
+    }
+    if (!profile.posting) {
+      profile.posting = createPosting(skin, profile, tree);
+    }
+  }
+
+  return aar;
 }
