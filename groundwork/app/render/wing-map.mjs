@@ -116,7 +116,9 @@ export function buildWingMapSvg(wing, opts = {}) {
       // Gate on the boundary to the NEXT chamber, with its charge bar.
       if (sec.state === 'active' && sec.tier.boss) {
         const nxt = i + 1 < b.sectors.length ? posFor(b.branch, i + 1) : { x, y: y - (TH + TGAP) };
-        const gx = (x + nxt.x) / 2;
+        // Tower gates sit at the boundary's right edge so the next chamber's
+        // name keeps the center; gallery gates keep the midpoint.
+        const gx = isTower ? x + w / 2 + 22 : (x + nxt.x) / 2;
         const gy = (y + nxt.y) / 2 - 2;
         const charge = Math.max(0, Math.min(1, charges[sec.tier.id] || 0));
         const elected = opts.electedTierId === sec.tier.id;
@@ -202,7 +204,7 @@ export function buildWingMapSvg(wing, opts = {}) {
   // Sealed wings at the building's edges; the Mast continues above the tower.
   const mastTop = towerPos(towerN - 1);
   const sealedPos = [
-    { x: 14, y: Math.round(H * 0.4), anchor: 'start' },
+    { x: 14, y: gTop - 8, anchor: 'start' },
     { x: 14, y: H - 2, anchor: 'start' },
     { x: W - 14, y: H - 2, anchor: 'end' },
     { x: mastTop.x, y: tTop - 6, anchor: 'middle' }

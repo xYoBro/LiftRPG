@@ -278,25 +278,29 @@ function renderHome() {
     <header class="gw-header"><h1>GROUNDWORK</h1>
       <div class="gw-worldline">${esc(SKIN.worldLine)}</div></header>
     <main class="gw-panel gw-home">
-      <div class="gw-hero">
-        <div class="gw-preview-title">TODAY'S WORK</div>
+      <div class="gw-hero gw-object">
+        <div class="gw-preview-title">TODAY'S WORK${(() => {
+          const shapeWord = preview.isDeload ? 'LIGHT WEEK'
+            : !preview.waves ? ''
+            : preview.boss ? 'HEAVY — GATE ON THE BOARD'
+            : preview.intensity === 'heavy' ? 'HEAVY — THE DOOR GRADES'
+            : preview.surveyDay ? 'LIGHT — SURVEY RUN'
+            : 'LIGHT — INSIDE THE WINDOW';
+          return shapeWord ? ' · ' + shapeWord : '';
+        })()}</div>
         <div class="gw-work-line">${esc(preview.workLine)} · ~${preview.minutes} min</div>
-        ${preview.waves ? `<div class="gw-dayshape gw-dim">${preview.isDeload ? 'light week — posted on purpose' : preview.boss ? 'heavy day — gate on the board' : preview.intensity === 'heavy' ? 'heavy day — the door grades today' : preview.surveyDay ? 'light day — survey run; the manifest is fair game' : 'light day — work inside the window'}</div>` : preview.isDeload ? `<div class="gw-dayshape gw-dim">light week — posted on purpose</div>` : ''}
-        <div class="gw-hero-line">${esc(preview.room)} · ${preview.rooms} rooms${preview.boss ? ' · <strong>SEALED DOOR</strong>' : ''}${preview.learn ? ' · new ground' : ''}</div>
-        ${p.posting ? `<div class="gw-posting-line gw-dim">◈ ${esc((SKIN.postingLabels || {}).doorTag || 'ON THE MANIFEST')}: ${esc(p.posting.findName)} — ${esc(p.posting.roomName)}</div>` : ''}
-        ${(() => {
-          // Route choice (D46): pick the day's corridor — the TODAY pin moves
-          // with it. Both corridors still train; focus biases volume only.
+        <div class="gw-hero-line">${esc(preview.room)} · ${preview.rooms} rooms${preview.boss ? ' · <strong>SEALED DOOR</strong>' : ''}${preview.learn ? ' · new ground' : ''}${(() => {
           const other = Object.keys(TREE.branches).find((b) => b !== preview.focusBranch);
-          if (!other) return '';
-          return `<div class="gw-route-pick gw-dim">${esc(TREE.branches[preview.focusBranch].name)} focus · ${p.routeOverride ? 'your call' : 'rotation'}
-            <button class="gw-linklike" data-act="switch-route">take ${esc(TREE.branches[other].name)} instead</button></div>`;
-        })()}
+          return other ? ` · <button class="gw-inline-link" data-act="switch-route">⇄ take ${esc(TREE.branches[other].name)}</button>` : '';
+        })()}</div>
+        ${p.posting ? `<div class="gw-posting-line gw-dim">◈ ${esc((SKIN.postingLabels || {}).doorTag || 'ON THE MANIFEST')}: ${esc(p.posting.findName)} — ${esc(p.posting.roomName)}</div>` : ''}
         ${gateCharge !== null ? `
           <div class="gw-charge">
-            <div class="gw-charge-label">${esc(SKIN.map.gateMeterLabel || 'DOOR CHARGE')} · ${esc(focusTier.boss.label)}${preview.waves ? ` · <span class="gw-pips">${'●'.repeat(Math.min(2, trailingCharges(p, TREE.id, focusTier.id, true)))}${'○'.repeat(Math.max(0, 2 - trailingCharges(p, TREE.id, focusTier.id, true)))}</span> heavy proofs` : ''}</div>
+            <div class="gw-charge-label">${esc(SKIN.map.gateMeterLabel || 'DOOR CHARGE')}${preview.waves ? ` <span class="gw-pips">${'●'.repeat(Math.min(2, trailingCharges(p, TREE.id, focusTier.id, true)))}${'○'.repeat(Math.max(0, 2 - trailingCharges(p, TREE.id, focusTier.id, true)))}</span>` : ''}${gateCharge > 0 ? ` · ${Math.round(gateCharge * 100)}%` : ''}</div>
             <div class="gw-charge-bar"><div class="gw-charge-fill" style="width:${Math.round(gateCharge * 100)}%"></div></div>
-            <div class="gw-charge-note gw-dim">${preview.boss ? 'Charged — the attempt is on the board today.' : gateCharge >= 1 ? 'Charged. Tap the gate on the map to elect the attempt.' : gateCharge > 0 ? Math.round(gateCharge * 100) + '% — best reading stands.' + (gateLatest && gateLatest < gateCharge ? ' Last visit read ' + Math.round(gateLatest * 100) + '%.' : '') : 'No reading yet. Clean sets at the gate standard charge the door.'}</div>
+            ${preview.boss ? `<div class="gw-charge-note gw-dim">Charged — the attempt is on the board today.</div>`
+              : gateCharge >= 1 ? `<div class="gw-charge-note gw-dim">Charged. Tap the gate on the map to elect.</div>`
+              : gateLatest && gateLatest < gateCharge ? `<div class="gw-charge-note gw-dim">Best reading stands · last visit ${Math.round(gateLatest * 100)}%.</div>` : ''}
           </div>` : ''}
         <div class="gw-hero-story">
         ${(() => {
@@ -692,15 +696,18 @@ Get the thing looked at. The station holds; the intake will be exactly here when
     <header class="gw-header"><h1>INTAKE</h1>
       <div class="gw-dim">probe ${run.results.length + 1} · at most 5 · rest as long as you like between tests</div></header>
     <main class="gw-panel gw-center">
-      <div class="gw-dim">${esc(TREE.branches[tier.branch].name)} corridor · ${esc(flavorName(tier))}</div>
-      <h2 class="gw-test-name">${esc(tier.name)}</h2>
-      <p class="gw-test-standard">${esc(probe.test)}</p>
-      <details class="gw-form"><summary>How to do it</summary>
-        ${videoRefHtml(tier)}
-        ${figuresHtml(tier)}
-        <p>${esc(tier.setup)}</p>
-        <ul class="gw-list">${tier.formStandard.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
-      </details>
+      <div class="gw-rigtag gw-object">
+        <span class="gw-tag-punch"></span>
+        <div class="gw-tag-label">PROBE ${run.results.length + 1} · ${esc(TREE.branches[tier.branch].name)} · ${esc(flavorName(tier))}</div>
+        <div class="gw-tag-name">${esc(tier.name)}</div>
+        <div class="gw-tag-cue">${esc(probe.test)}</div>
+        <details class="gw-form gw-tag-more"><summary>how to do it</summary>
+          ${videoRefHtml(tier)}
+          ${figuresHtml(tier)}
+          <p>${esc(tier.setup)}</p>
+          <ul class="gw-list">${tier.formStandard.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
+        </details>
+      </div>
       ${voice ? `<p class="gw-beat gw-intake-voice">${esc(voice)}</p>` : ''}
       ${isCount ? `
         <div class="gw-stepper">
@@ -1631,15 +1638,14 @@ function renderDebrief(s) {
       <p class="gw-script">${esc(debrief)}</p>
       ${s.learnMode ? `<div class="gw-callout">${esc(SKIN.sessionFrame.tutorial.aarPrompt)}</div>` : ''}
       ${tomorrowHtml}
-      <div class="gw-note-row">
-        <label class="gw-dim">Minutes you lost track of time:</label>
+      <details class="gw-form"><summary>+ minutes you lost track of time</summary>
         <div class="gw-stepper">
           <button class="gw-step" data-fstep="-5">−</button>
           <div class="gw-step-num" id="flow-min">0</div>
           <button class="gw-step" data-fstep="5">+</button>
           <div class="gw-step-unit">min</div>
         </div>
-      </div>
+      </details>
       ${state.profile.lastHook ? `<div class="gw-hook">${esc(state.profile.lastHook)}</div>` : ''}
       <button class="gw-primary gw-big" data-act="home">Close the log</button>
     </main>`;
@@ -1749,8 +1755,12 @@ function renderStorm() {
       ${chained >= 1 ? `<div class="gw-callout">${chained >= 2
         ? 'Three storms in a row is a forecast, not weather. The anchor holds — and the wing wants a real session next.'
         : 'Second storm running. The chain holds either way — but storms are for weather, not for seasons.'}</div>` : ''}
-      <h2>${esc(flavorName(tier))} <span class="gw-dim">(${esc(tier.name)})</span></h2>
-      <p>One easy set, well inside the ${esc(schemeText(tier.scheme))} range. Nothing else.</p>
+      <div class="gw-rigtag gw-object">
+        <span class="gw-tag-punch"></span>
+        <div class="gw-tag-label">STORM SET · ${esc(flavorName(tier))}</div>
+        <div class="gw-tag-name">${esc(tier.name)}</div>
+        <div class="gw-tag-aim">one easy set <span class="gw-dim">· inside ${esc(schemeText(tier.scheme))} · nothing else</span></div>
+      </div>
       <button class="gw-primary gw-big" data-act="done">Set done — file it</button>
       <button data-act="home">Back</button>
     </main>`;
@@ -1798,12 +1808,15 @@ function renderDispatch() {
     <header class="gw-header"><h1>${esc(SKIN.sessionFrame.dispatch.title)}</h1>
       ${dispatchEpisode ? `<div class="gw-dim gw-episode">closing the episode — ${esc(dispatchEpisode.title)}</div>` : ''}</header>
     <main class="gw-panel">
-      <p class="gw-dim">${esc(SKIN.sessionFrame.dispatch.intro)}</p>
-      <div class="gw-stat-row">
+      <div class="gw-document gw-object">
+      <div class="gw-doc-type">${esc(SKIN.sessionFrame.dispatch.title || 'WEEKLY DISPATCH')} · TREND REVIEW</div>
+      <p class="gw-doc-body">${esc(SKIN.sessionFrame.dispatch.intro)}</p>
+      <div class="gw-stat-row gw-stat-paper">
         <div class="gw-stat"><div class="gw-stat-num">${h.length}</div><div class="gw-stat-label">sessions total</div></div>
         <div class="gw-stat"><div class="gw-stat-num">${r1 === null ? '—' : r1 + '%' + trendArrow}</div><div class="gw-stat-label">hit rate (last 3)</div></div>
         <div class="gw-stat"><div class="gw-stat-num">${flow(window1)}</div><div class="gw-stat-label">flow min (last 3)</div></div>
         <div class="gw-stat"><div class="gw-stat-num">${treeStat()}<span class="gw-pct">%</span></div><div class="gw-stat-label">${esc(TREE.name)}</div></div>
+      </div>
       </div>
       ${(() => {
         // Body movers (D45): best mark per tier, this 3-session window vs the
