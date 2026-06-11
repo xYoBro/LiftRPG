@@ -17,7 +17,7 @@ import {
   applyAssessment, getTier, tierState, recentHitRate, needsRecalibration,
   applyBossPass, intelDropForFault, consecutiveStorms
 } from './engine/profile.mjs';
-import { generateSession, roomKey, fileSession, computeDoorCharge, trailingCharges, isTendonGuard, gateAmount, REST_SECONDS } from './engine/session.mjs';
+import { generateSession, previewNextSession, roomKey, fileSession, computeDoorCharge, trailingCharges, isTendonGuard, gateAmount, REST_SECONDS } from './engine/session.mjs';
 import { awardForRow, resolveEncounterChoice, resolveSpecialRoom, resolvePosting, fragmentById, kitItemById, skinChains } from './engine/discovery.mjs';
 import { markExplored, projectWing } from './engine/map.mjs';
 import { doorsOpenedCount, monthsOnStation, dueKeystonesForBossPass, fileKeystone, fileLiveEvent } from './engine/keystones.mjs';
@@ -179,8 +179,61 @@ function sessionPreview() {
     room: tier ? flavorName(tier) : '—',
     rooms: peek.rooms.length,
     boss: !!peek.boss,
-    learn: peek.learnMode
+    learn: peek.learnMode,
+    intensity: peek.intensity,
+    waves: peek.chargesNeeded > 1,
+    surveyDay: !!peek.surveyDay,
+    isDeload: peek.isDeload
   };
+}
+
+// ── Return beats (D59, the Hades pattern): the world greets a return day ────
+// Once per calendar day, on the first home render of a day that ISN'T the last
+// session's day, the voice speaks one line keyed to what yesterday actually
+// was. First matching pool wins; the pick is deterministic (no rng stream).
+const ENGINE_RETURN_BEATS = [
+  { when: { gatePassed: true }, lines: ['A door stands open this morning that was sealed when you arrived. The route past it is posted.'] },
+  { when: { gateFailed: true }, lines: ['The door held yesterday. It is still there, holding — that is the good news and the plan.'] },
+  { when: { newMark: true }, lines: ['Yesterday\u2019s mark is still on the wall this morning. Walls are reliable that way.'] },
+  { when: { gapDaysAtLeast: 3 }, lines: ['The place held while you were away. It keeps; that is most of what it does. The route is posted.'] },
+  { when: { surveyToday: true }, lines: ['Light duty today — a good day to chase what the manifest promised.'] },
+  { when: {}, lines: ['Back on the route. The work is where you left it.', 'A new order on the board. The place noticed you came back.'] }
+];
+
+function returnBeatHtml() {
+  const p = state.profile;
+  if (!p || !p.history.length) return '';
+  const last = [...p.history].reverse().find((h) => !h.stormProtocol);
+  if (!last) return '';
+  const dayKey = (iso) => String(iso).slice(0, 10);
+  const today = dayKey(new Date().toISOString());
+  if (dayKey(last.date) === today) return '';            // same-day re-open: not a return
+  if (p.lastReturnBeatDay === today) return '';           // already greeted today
+  const peek = previewNextSession(p, TREE);
+  const ctx = {
+    gatePassed: !!(last.boss && last.boss.passed),
+    gateFailed: !!(last.boss && !last.boss.passed),
+    newMark: Object.values(last.marks || {}).some((m) => m.newMark),
+    gapDays: daysSinceLastSession() || 0,
+    surveyToday: !!peek.surveyDay,
+    postingLive: !!p.posting
+  };
+  const pools = [...((SKIN.returnBeats && SKIN.returnBeats.length) ? SKIN.returnBeats : []), ...ENGINE_RETURN_BEATS];
+  for (const pool of pools) {
+    const w = pool.when || {};
+    if (w.gatePassed && !ctx.gatePassed) continue;
+    if (w.gateFailed && !ctx.gateFailed) continue;
+    if (w.newMark && !ctx.newMark) continue;
+    if (w.gapDaysAtLeast && ctx.gapDays < w.gapDaysAtLeast) continue;
+    if (w.surveyToday && !ctx.surveyToday) continue;
+    if (w.postingLive && !ctx.postingLive) continue;
+    const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+    const line = pool.lines[(p.history.length + dayOfYear) % pool.lines.length];
+    p.lastReturnBeatDay = today;
+    saveProfile(p);
+    return `<p class="gw-beat gw-return-beat">${esc(line)}</p>`;
+  }
+  return '';
 }
 
 function renderHome() {
@@ -212,8 +265,9 @@ function renderHome() {
   }
   // Map-as-home (Sprint 2.3): the Station screen IS the wing.
   const focusTier = preview.focusTierId ? getTier(TREE, preview.focusTierId) : null;
+  const gateLatest = focusTier && focusTier.boss ? ((p.doorCharge || {})[focusTier.id] || 0) : 0;
   const gateCharge = focusTier && focusTier.boss
-    ? (preview.boss ? 1 : (p.doorCharge || {})[focusTier.id] || 0) : null;
+    ? (preview.boss ? 1 : Math.max(gateLatest, (p.doorChargeBest || {})[focusTier.id] || 0)) : null;
   root().innerHTML = `
     <header class="gw-header"><h1>GROUNDWORK</h1>
       <div class="gw-worldline">${esc(SKIN.worldLine)}</div></header>
@@ -229,6 +283,8 @@ function renderHome() {
         })()}
         <div class="gw-preview-title">TODAY — PINNED TO THE MAP</div>
         <div class="gw-hero-line">${esc(preview.room)} · ${preview.rooms} rooms${preview.boss ? ' · <strong>SEALED DOOR</strong>' : ''}${preview.learn ? ' · new ground' : ''}</div>
+        ${preview.waves && !preview.boss ? `<div class="gw-dayshape gw-dim">${preview.isDeload ? 'light week — posted on purpose' : preview.intensity === 'heavy' ? 'heavy day — the door grades today' : preview.surveyDay ? 'light day — survey run; the manifest is fair game' : 'light day — work inside the window'}</div>` : ''}
+        ${p.posting ? `<div class="gw-posting-line gw-dim">◈ ${esc((SKIN.postingLabels || {}).doorTag || 'ON THE MANIFEST')}: ${esc(p.posting.findName)} — ${esc(p.posting.roomName)}</div>` : ''}
         ${(() => {
           // Route choice (D46): pick the day's corridor — the TODAY pin moves
           // with it. Both corridors still train; focus biases volume only.
@@ -239,12 +295,13 @@ function renderHome() {
         })()}
         ${gateCharge !== null ? `
           <div class="gw-charge">
-            <div class="gw-charge-label">${esc(SKIN.map.gateMeterLabel || 'DOOR CHARGE')} · ${esc(focusTier.boss.label)}</div>
+            <div class="gw-charge-label">${esc(SKIN.map.gateMeterLabel || 'DOOR CHARGE')} · ${esc(focusTier.boss.label)}${preview.waves ? ` · <span class="gw-pips">${'●'.repeat(Math.min(2, trailingCharges(p, TREE.id, focusTier.id, true)))}${'○'.repeat(Math.max(0, 2 - trailingCharges(p, TREE.id, focusTier.id, true)))}</span> heavy proofs` : ''}</div>
             <div class="gw-charge-bar"><div class="gw-charge-fill" style="width:${Math.round(gateCharge * 100)}%"></div></div>
-            <div class="gw-charge-note gw-dim">${preview.boss ? 'Charged — the attempt is on the board today.' : gateCharge >= 1 ? 'Charged. Tap the gate on the map to elect the attempt.' : gateCharge > 0 ? Math.round(gateCharge * 100) + '% — top of the window on every set charges the door.' : 'No reading yet. Clean sets at the top of the window charge the door.'}</div>
+            <div class="gw-charge-note gw-dim">${preview.boss ? 'Charged — the attempt is on the board today.' : gateCharge >= 1 ? 'Charged. Tap the gate on the map to elect the attempt.' : gateCharge > 0 ? Math.round(gateCharge * 100) + '% — best reading stands.' + (gateLatest && gateLatest < gateCharge ? ' Last visit read ' + Math.round(gateLatest * 100) + '%.' : '') : 'No reading yet. Clean sets at the gate standard charge the door.'}</div>
           </div>` : ''}
         ${p.lastHook ? `<div class="gw-hero-hook">${esc(p.lastHook)}</div>` : ''}
       </div>
+      ${returnBeatHtml()}
       <button class="gw-primary gw-big" data-act="start-session">Start Session</button>
       ${showStormCue ? `
         <div class="gw-callout">${esc(SKIN.sessionFrame.storm.missCue)}
@@ -1488,6 +1545,32 @@ function renderDebrief(s) {
     releaseWakeLock();
   }
   const aar = state._aarFiled;
+  // Peak-end (D59): the day closes on the body, then the filing, then the
+  // promissory note. Best mark of the day, NEW MARK restated with its delta.
+  const bodyMarks = Object.entries(aar.marks || {})
+    .map(([tid, m]) => ({ tier: getTier(TREE, tid), ...m }))
+    .filter((m) => m.tier && m.best > 0)
+    .sort((a, b) => (b.newMark ? 1 : 0) - (a.newMark ? 1 : 0));
+  const bodyTop = bodyMarks[0];
+  const bodyHtml = bodyTop ? (bodyTop.newMark
+    ? `<div class="gw-newmark"><span class="gw-newmark-stamp">NEW MARK</span><span>${esc(flavorName(bodyTop.tier))}: <strong>${bodyTop.best} ${esc(bodyTop.unit)}</strong>${bodyTop.prevMark != null ? ` — past your ${bodyTop.prevMark}` : ' — first number on this rig'}. The wall keeps it.</span></div>`
+    : `<div class="gw-item"><div class="gw-item-kind">BEST TODAY</div><p>${esc(flavorName(bodyTop.tier))}: <strong>${bodyTop.best} ${esc(bodyTop.unit)}</strong>${(state.profile.bests[bodyTop.tier.id] && state.profile.bests[bodyTop.tier.id].amount > bodyTop.best) ? ` <span class="gw-dim">(wall: ${state.profile.bests[bodyTop.tier.id].amount})</span>` : ''}</p></div>`) : '';
+  // Tomorrow's order is cut tonight (D59): the appointment, named.
+  const tm = previewNextSession(state.profile, TREE);
+  const tmHead = ((SKIN.sessionFrame || {}).tomorrow || {}).heading || 'TOMORROW — ALREADY ON THE PAD';
+  const tmFoot = ((SKIN.sessionFrame || {}).tomorrow || {}).foot || '';
+  const tomorrowHtml = tm.focusTier ? `
+      <div class="gw-document gw-tomorrow">
+        <div class="gw-doc-type">${esc(tmHead)}</div>
+        <div class="gw-order-rows">
+          <div class="gw-order-row"><span>ORDER</span><span>№${tm.orderNumber} — ${esc(flavorName(tm.focusTier))} <span class="gw-dim">(${esc(TREE.branches[tm.focusBranch].name)})</span></span></div>
+          ${tm.usesWaves ? `<div class="gw-order-row"><span>CYCLE</span><span>${tm.isDeload ? 'Light week' : tm.reentry ? 'Re-entry — inside the window' : tm.intensity === 'heavy' ? 'Heavy day — the door grades it' : tm.surveyDay ? 'Light day — survey run' : 'Light day — inside the window'}</span></div>` : ''}
+          ${tm.gateOnBoard ? `<div class="gw-order-row gw-order-gate"><span>GATE</span><span>${esc(tm.focusTier.boss.label)} — on the board</span></div>`
+            : tm.usesWaves && tm.focusTier.boss ? `<div class="gw-order-row"><span>PROOFS</span><span>${tm.charges}/${tm.chargesNeeded} heavy days held</span></div>` : ''}
+          ${tm.posting ? `<div class="gw-order-row"><span>MANIFEST</span><span>${esc(tm.posting.findName)} — last logged in ${esc(tm.posting.roomName)}</span></div>` : ''}
+        </div>
+        ${tmFoot ? `<div class="gw-doc-hook">${esc(tmFoot)}</div>` : ''}
+      </div>` : '';
   const loot = state.resolutions.filter((r) => r && r.award && r.award.type === 'kit').length;
   const intel = state.resolutions.filter((r) => r && r.award && (r.award.type === 'fragment' || (r.encounterResult && r.encounterResult.extraFragment))).length;
   const debrief = fill(SKIN.sessionFrame.debrief.script, {
@@ -1503,9 +1586,10 @@ function renderDebrief(s) {
   root().innerHTML = `
     <header class="gw-header"><h1>${esc(SKIN.sessionFrame.debrief.title)}</h1></header>
     <main class="gw-panel gw-center">
+      ${bodyHtml}
       <p class="gw-script">${esc(debrief)}</p>
-      ${aar.unlockHit ? `<div class="gw-callout"><strong>The sealed door is eligible next session.</strong></div>` : ''}
       ${s.learnMode ? `<div class="gw-callout">${esc(SKIN.sessionFrame.tutorial.aarPrompt)}</div>` : ''}
+      ${tomorrowHtml}
       <div class="gw-note-row">
         <label class="gw-dim">Minutes you lost track of time:</label>
         <div class="gw-stepper">

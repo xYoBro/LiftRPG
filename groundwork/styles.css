@@ -372,3 +372,11 @@ button:active { transform: translateY(2px) scale(0.99); }
 
 /* ── D52: posted-manifest diamond on the map ── */
 .gwm-posting { font-size: 12px; fill: var(--gw-amber); }
+
+/* ── D59: the return loop ── */
+.gw-return-beat { margin: 2px 0 10px; }
+.gw-dayshape { font-family: var(--gw-mono); font-size: 0.74rem; letter-spacing: 0.06em; margin: 3px 0; }
+.gw-posting-line { font-family: var(--gw-mono); font-size: 0.74rem; letter-spacing: 0.04em; color: var(--gw-amber); margin: 3px 0; }
+.gw-tomorrow { margin-top: 14px; }
+.gw-tomorrow .gw-doc-type { color: #7a4a22; font-weight: 700; }
+.gw-pips { letter-spacing: 0.2em; color: var(--gw-amber); }

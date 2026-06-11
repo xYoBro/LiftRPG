@@ -199,6 +199,7 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
   return {
     treeId: tree.id,
     dayNumber: dayNumber || sessionIndex + 1,
+    surveyDay: intensity === 'light' && usesWaves && !!profile.posting,
     focusBranch,
     focusTierId: focusTier ? focusTier.id : null,
     learnMode,
@@ -357,11 +358,63 @@ export function buildAar(session, { setResults, resolutions, bossResult, intelDr
           || { best: 0, volume: 0, unit: (room.scheme.kind === 'reps' ? 'reps' : 's') + (room.scheme.perSide ? '/side' : '') };
         m.best = Math.max(m.best, res.amount);
         m.volume += res.amount;
+        if (res.newMark) { m.newMark = true; m.prevMark = res.prevMark != null ? res.prevMark : m.prevMark; }
       }
       return marks;
     })(),
     boss: bossResult ? { attempted: true, passed: bossResult.passed, roll: bossResult.roll } : null,
     intelDrop: intelDrop || null
+  };
+}
+
+// ── previewNextSession (D59): tomorrow's facts, rng-free ────────────────────
+// The appointment mechanic: the engine already knows the next session's shape
+// (rotation, sector, day-shape, gate legality, live posting) — this derives it
+// WITHOUT consuming the rng stream or mutating anything, so the AAR can cut
+// tomorrow's order tonight and the home hero can greet the morning with it.
+// The engine suite asserts congruence with the session generateSession() then
+// actually builds.
+export function previewNextSession(profile, tree) {
+  const realSessions = profile.history.filter((h) => h.treeId === tree.id && !h.stormProtocol);
+  const n = realSessions.length;
+  const branches = Object.keys(tree.branches);
+  const focusBranch = profile.routeOverride && branches.includes(profile.routeOverride)
+    ? profile.routeOverride
+    : branches[n % branches.length];
+  const active = profile.active[tree.id] || {};
+  const focusTier = getTier(tree, active[focusBranch]);
+  const cleared = profile.cleared[tree.id] || [];
+  const week = seasonWeek(profile);
+  const isDeload = week === DELOAD_WEEK && !seasonClosed(profile);
+  const gap = layoffDays(profile);
+  const reentry = gap >= 7 && gap <= 13;
+  const cls = profile.classification || 'trained';
+  const usesWaves = cls === 'intermediate' || cls === 'advanced';
+  const campaignSession = Math.max(0, n - (profile.campaignSessionBase || 0));
+  const intensity = usesWaves
+    ? (isDeload || reentry ? 'light' : (campaignSession % 2 === 0 ? 'heavy' : 'light'))
+    : 'heavy';
+  const learnMode = focusTier && !profile.tutorialSeen[focusTier.id] && !cleared.includes(focusTier.id);
+  const charges = focusTier ? trailingCharges(profile, tree.id, focusTier.id, usesWaves) : 0;
+  const chargesNeeded = usesWaves ? 2 : 1;
+  const gateDayLegal = !isDeload && !reentry && (!usesWaves || intensity === 'heavy');
+  const gateOnBoard = !!(focusTier && focusTier.boss && !learnMode && gateDayLegal
+    && (profile.bossElect === focusTier.id || charges >= chargesNeeded));
+  return {
+    orderNumber: n + 1,
+    focusBranch,
+    focusTier,
+    intensity,
+    usesWaves,
+    isDeload,
+    reentry,
+    learnMode,
+    gateOnBoard,
+    charges,
+    chargesNeeded,
+    posting: profile.posting || null,
+    surveyDay: intensity === 'light' && usesWaves && !!profile.posting,
+    week
   };
 }
 
@@ -382,7 +435,13 @@ export function fileSession(profile, tree, session, { setResults, resolutions = 
   // Light days don't grade the door (D44) — the last heavy reading stands.
   if (session.focusTierId && !(session.intensity === 'light' && session.chargesNeeded > 1)) {
     profile.doorCharge = profile.doorCharge || {};
-    profile.doorCharge[session.focusTierId] = aar.unlockHit ? 1 : computeDoorCharge(session, setResults);
+    const reading = aar.unlockHit ? 1 : computeDoorCharge(session, setResults);
+    profile.doorCharge[session.focusTierId] = reading;
+    // Display floor (D60): the bar a player wakes up to never regresses on one
+    // weaker day — "failure only adds" extends to progress displays. The gate's
+    // real eligibility math (charges) is untouched and exact.
+    profile.doorChargeBest = profile.doorChargeBest || {};
+    profile.doorChargeBest[session.focusTierId] = Math.max(profile.doorChargeBest[session.focusTierId] || 0, reading);
   }
 
   // An elect is consumed by the session that carried the attempt (D48) —
@@ -418,6 +477,9 @@ export function fileSession(profile, tree, session, { setResults, resolutions = 
   }
   if (bossResult && bossResult.passed && session.boss) {
     delete profile.activeSideQuests[session.boss.tier.branch];
+    // The opened gate retires its meters (D60).
+    delete (profile.doorCharge || {})[session.boss.tier.id];
+    delete (profile.doorChargeBest || {})[session.boss.tier.id];
   }
 
   // Stall detector (D49): four graded sessions on one tier with the gate still

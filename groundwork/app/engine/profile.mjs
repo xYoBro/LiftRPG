@@ -50,6 +50,9 @@ export function createEmptyProfile(seed) {
     doorCharge: {},                // tierId → 0..1 gate-eligibility progress
     activeSideQuests: {},          // branch → { id, name, note, tierId, faultId, sessionsLeft } (D49)
     posting: null,                 // located-channel manifest posting (D52)
+    doorChargeBest: {},            // tierId → best recent reading (display floor, D60)
+    lastPostingChain: null,        // posting threads: continue this chain (D59)
+    lastReturnBeatDay: null,       // return beat fires once per calendar day (D59)
     exploredAt: {},                // roomId → tierId (which sector it was explored from)
     seasonClosedAt: null,          // ISO date the 8-week commission closed (D40)
     seasonEnding: null,            // ending id chosen at the finale
@@ -74,6 +77,8 @@ export function startNewCampaign(profile) {
   profile.firedKeystones = [];
   profile.lastHook = null;
   profile.posting = null;            // postings name the old world's rooms (D52)
+  profile.lastPostingChain = null;
+  profile.lastReturnBeatDay = null;
   profile.seasonClosedAt = null;
   profile.seasonEnding = null;
   delete profile.bossElect;
@@ -94,7 +99,8 @@ export function migrateProfile(profile) {
     exploredAt: {}, seasonClosedAt: null, seasonEnding: null,
     campaignStartedAt: null, campaignSessionBase: 0,
     trainingRecency: null, ageBracket: null, bests: {},
-    activeSideQuests: {}, posting: null
+    activeSideQuests: {}, posting: null,
+    doorChargeBest: {}, lastPostingChain: null, lastReturnBeatDay: null
   };
   for (const key of Object.keys(defaults)) {
     if (profile[key] === undefined) profile[key] = defaults[key];
@@ -215,7 +221,10 @@ export function applyAssessment(profile, tree, run) {
   profile.cleared[tree.id] = cleared;
   // Re-intake hygiene (GW-22): stale charge bars and elects belong to the old
   // grading; the new posting starts clean.
-  for (const tier of tree.tiers) delete (profile.doorCharge || {})[tier.id];
+  for (const tier of tree.tiers) {
+    delete (profile.doorCharge || {})[tier.id];
+    delete (profile.doorChargeBest || {})[tier.id];
+  }
   delete profile.bossElect;
   // Dose default by population (D44 follow-through): intermediate+ bodies need
   // the larger session unless the keeper already chose one.

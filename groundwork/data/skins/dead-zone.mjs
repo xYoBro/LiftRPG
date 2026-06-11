@@ -596,6 +596,36 @@ export const SKIN = {
     'quiet': 'QUIET ROOM'
   },
 
+  // ── Return beats (D59): RIGGING greets a return day, once, keyed to what
+  // yesterday actually was. The home screen is the House — it speaks.
+  returnBeats: [
+    { when: { gatePassed: true }, lines: [
+      'RIGGING: “Morning. The door you opened is still open — they stay that way. The wing routes through it now like it always did.”',
+      'RIGGING: “I walked the new sector on the wires last night. Eight left it swept. Of course they did.”'
+    ] },
+    { when: { gateFailed: true }, lines: [
+      'RIGGING: “Yesterday’s door is still holding. So is the survey you filed on it. We splice the weak strand and go back — that’s the whole trade.”'
+    ] },
+    { when: { newMark: true }, lines: [
+      'RIGGING: “Your chalk from yesterday is still on the ladderwell wall. I checked. Walls are the only honest witnesses on this station.”',
+      'RIGGING: “New number on the wall this morning. The wing carries news like that down the cables — don’t ask me how.”'
+    ] },
+    { when: { gapDaysAtLeast: 3, postingLive: true }, lines: [
+      'RIGGING: “Station held while you were out. The manifest item is still sitting where Eight logged it — paperwork is patient.”'
+    ] },
+    { when: { gapDaysAtLeast: 3 }, lines: [
+      'RIGGING: “Few days of weather, then. The wing kept. It always keeps — that’s the one thing I can promise on its behalf.”'
+    ] },
+    { when: { surveyToday: true }, lines: [
+      'RIGGING: “Light duty posted today. Good morning to go after what the manifest names — the doors aren’t grading, so walk where you like.”'
+    ] },
+    { when: {}, lines: [
+      'RIGGING: “Morning. Kettle’s on its nine minutes; the order is on the pad. Both will be ready when you are.”',
+      'RIGGING: “New order on the pad. The wing settled overnight — I heard it. It does that when somebody’s keeping it.”',
+      'RIGGING: “Back again. Eight used to say the second-hardest part is showing up. Never told me the first. Suspect that was the joke.”'
+    ] }
+  ],
+
   // ── Session frame ──────────────────────────────────────────────────────────
   sessionFrame: {
     // The brief is a SCENE, not a status line (author feedback, Sprint 2.1
@@ -652,6 +682,10 @@ export const SKIN = {
           'RIGGING: “Manifest says {{sectorName}}. I’ll be on the wire. Talk less. Hold more.”'
         ] }
       ]
+    },
+    tomorrow: {
+      heading: 'TOMORROW — ALREADY ON THE PAD · EIGHT’S STOCK',
+      foot: 'THE COUNT WILL BE THE COUNT.'
     },
     debrief: {
       title: 'AFTER-ACTION REPORT',

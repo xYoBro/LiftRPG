@@ -196,19 +196,23 @@ export function createPosting(skin, profile, tree) {
   const seen = new Set(((profile.explored || {})[branch]) || []);
   const fresh = pool.filter((r) => !seen.has(r.id));
   const room = (fresh.length ? fresh : pool)[Math.floor(rng() * (fresh.length ? fresh.length : pool.length))];
-  // The find: next unowned kit item, else the next fragment of the
-  // least-advanced chain. Nothing to post → no posting (pools exhausted).
+  // The find (D59 threads): a recovered page pulls the NEXT page of its chain
+  // onto the board — 2-3 session mini-chases. Otherwise a seeded coin picks
+  // between the kit pool and the least-advanced chain. Nothing left → no
+  // posting (pools exhausted).
+  const have = new Set((profile.archive || []).map((f) => f.id));
+  const nextOfChain = (chainId) => (skin.fragments || []).find((f) => f.chain === chainId && !have.has(f.id)) || null;
+  const threadNext = profile.lastPostingChain ? nextOfChain(profile.lastPostingChain) : null;
   const haveKit = new Set((profile.kit || []).map((k) => k.id));
   const kitPool = (skin.kitItems || []).filter((k) => !haveKit.has(k.id));
-  if (kitPool.length) {
+  const fragPosting = (frag) => frag && { findType: 'fragment', findId: frag.id, findName: frag.title, chain: frag.chain, roomId: room.id, roomName: room.name, branch, sessionsLeft: 3 };
+  if (threadNext) return fragPosting(threadNext);
+  const anyFrag = (skin.fragments || []).some((f) => !have.has(f.id));
+  if (kitPool.length && (!anyFrag || rng() < 0.5)) {
     const item = kitPool[Math.floor(rng() * kitPool.length)];
     return { findType: 'kit', findId: item.id, findName: item.name, roomId: room.id, roomName: room.name, branch, sessionsLeft: 3 };
   }
-  const frag = drawFragment(skin, profile, rng);
-  if (frag) {
-    return { findType: 'fragment', findId: frag.id, findName: frag.title, roomId: room.id, roomName: room.name, branch, sessionsLeft: 3 };
-  }
-  return null;
+  return fragPosting(drawFragment(skin, profile, rng));
 }
 
 // Recover the posted find (replaces the dice ceremony for that room, like a
@@ -233,6 +237,8 @@ export function resolvePosting(skin, profile, posting) {
       profile.archive = profile.archive || [];
       profile.archive.push({ id: frag.id, chain: frag.chain, foundAt: new Date().toISOString() });
       award = { type: 'fragment', fragment: frag };
+      // Thread (D59): the next posting chases this chain's next page.
+      profile.lastPostingChain = frag.chain;
     }
   }
   profile.posting = null; // recovered (or stale) — the board clears either way

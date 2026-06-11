@@ -207,11 +207,14 @@ export function validateSkin(skin, tree) {
   // neutral register — runs fine, reads thinner.
   if (!skin.tableTexts) warn('tableTexts: missing — dice rows use the engine\u2019s neutral lines');
   if (!skin.postingLabels) warn('postingLabels: missing — posted manifests use plain framing');
+  if (!isArr(skin.returnBeats, 3)) warn('returnBeats: missing/thin — return mornings fall back to neutral engine lines (D59)');
+  if (!(skin.sessionFrame || {}).tomorrow) warn('sessionFrame.tomorrow: missing — the AAR\u2019s tomorrow block uses plain framing');
 
   // Reading budgets (GW-39): the gassed-reader law, enforced as warnings at
   // import (the reference world is held to ERROR in the test battery).
   const BUDGETS = [
     ['rest beat', (skin.sessionFrame || {}).restBeats ? skin.sessionFrame.restBeats.flatMap((b) => b.lines || []) : [], 35],
+    ['return beat', Array.isArray(skin.returnBeats) ? skin.returnBeats.flatMap((b) => b.lines || []) : [], 40],
     ['scene line', ((skin.sessionFrame || {}).brief || {}).sceneLines ? skin.sessionFrame.brief.sceneLines.flatMap((b) => b.lines || []) : [], 45],
     ['fragment', (skin.fragments || []).map((f) => (f.body || '') + ' ' + (f.hook || '')), 130],
     ['keystone', (skin.keystones || []).map((k) => (k.body || '') + ' ' + (k.hook || '')), 150],
