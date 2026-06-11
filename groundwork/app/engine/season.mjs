@@ -9,8 +9,11 @@
 export const SEASON_WEEKS = 8;
 export const DELOAD_WEEK = 5;
 
-// The duty clock anchors on the first session ever filed.
+// The duty clock anchors on the active campaign's start (D43 — the body
+// travels between worlds; each world gets its own 8 weeks), falling back to
+// the first session ever filed for pre-campaign saves.
 export function seasonAnchor(profile) {
+  if (profile && profile.campaignStartedAt) return new Date(profile.campaignStartedAt).getTime();
   const first = profile && profile.history && profile.history[0];
   return first ? new Date(first.date).getTime() : null;
 }

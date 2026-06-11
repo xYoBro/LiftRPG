@@ -4,13 +4,15 @@
 // back. State + explicit render, no framework.
 
 import { PULL_TREE } from '../data/trees/pull.mjs';
-import { SKIN } from '../data/skins/dead-zone.mjs';
+import { SKIN as DEFAULT_SKIN } from '../data/skins/dead-zone.mjs';
+import { validateSkin, skinSummary } from '../data/skins/skin-contract.mjs';
+import { buildSkinPrompt } from '../data/skins/skin-prompt.mjs';
 import { deriveTreeStat } from '../data/tables/resolution.mjs';
 import { createRng } from './engine/rng.mjs';
 import { resolveRoom, resolveBoss } from './engine/resolver.mjs';
 import {
   createEmptyProfile, loadProfile, saveProfile, clearProfile,
-  exportProfile, importProfile,
+  exportProfile, importProfile, startNewCampaign,
   createAssessmentRun, currentRung, recordRungResult, isAssessmentComplete,
   applyAssessment, getTier, tierState, recentHitRate, needsRecalibration,
   applyBossPass, intelDropForFault
@@ -25,6 +27,28 @@ import { buildWingMapSvg } from './render/wing-map.mjs';
 import { FIGURES } from '../data/figures/manifest.mjs';
 
 const TREE = PULL_TREE;
+
+// ── Active skin (creation pipeline, D43) ─────────────────────────────────────
+// A custom campaign skin can replace DEAD ZONE wholesale. It is validated at
+// import AND at boot (a corrupted save never bricks the app — fall back to
+// the default world and say so in the console).
+const CUSTOM_SKIN_KEY = 'groundwork_custom_skin';
+function loadActiveSkin() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_SKIN_KEY);
+    if (!raw) return DEFAULT_SKIN;
+    const custom = JSON.parse(raw);
+    const v = validateSkin(custom, TREE);
+    if (!v.ok) {
+      console.warn('[groundwork] custom skin failed validation; using default world:', v.errors);
+      return DEFAULT_SKIN;
+    }
+    return custom;
+  } catch {
+    return DEFAULT_SKIN;
+  }
+}
+const SKIN = loadActiveSkin();
 
 const state = {
   screen: 'home',
@@ -120,7 +144,8 @@ function render() {
   const screens = {
     home: renderHome, 'cold-open': renderColdOpen, assess: renderAssess, session: renderSession,
     map: renderHome, log: renderLog, archive: renderArchive, kit: renderArchive, settings: renderSettings,
-    storm: renderStorm, dispatch: renderDispatch, more: renderMore, finale: renderFinale
+    storm: renderStorm, dispatch: renderDispatch, more: renderMore, finale: renderFinale,
+    create: renderCreate
   };
   (screens[state.screen] || renderHome)();
   // Re-deal animation on every state change (reduced-motion handled in CSS)
@@ -320,6 +345,7 @@ function renderMore() {
       <button class="gw-row-btn" data-act="log">AAR Log</button>
       <button class="gw-row-btn" data-act="dispatch">Weekly Dispatch</button>
       <button class="gw-row-btn" data-act="storm">${esc(SKIN.sessionFrame.storm.button)}</button>
+      <button class="gw-row-btn" data-act="create">New Campaign — creation kit</button>
       <button class="gw-row-btn" data-act="settings">Settings</button>
       <div class="gw-save-row gw-row">
         <button data-act="export">Export Save</button>
@@ -332,6 +358,7 @@ function renderMore() {
   wire({
     log: () => nav('log'), settings: () => nav('settings'),
     dispatch: () => nav('dispatch'), storm: () => { unlockAudio(); nav('storm'); },
+    create: () => nav('create'),
     export: doExport,
     import: () => document.getElementById('import-file').click(),
     reset: () => { if (confirm('Erase the local save? Export first if you want to keep it.')) { clearProfile(); state.profile = null; nav('home'); } }
@@ -386,6 +413,105 @@ function renderColdOpen() {
         state.coldIndex += 1;
         render();
       }
+    }
+  });
+}
+
+// ── Creation kit (D43): new campaign worlds on the same engine ───────────────
+// Brief → generation prompt → any chat LLM → paste the JSON world back →
+// validate → activate. The body travels (assessments, cleared sectors,
+// history persist); the station, the voice, and the archive are new.
+function renderCreate() {
+  const customActive = SKIN !== DEFAULT_SKIN;
+  root().innerHTML = `
+    <header class="gw-header"><h1>NEW CAMPAIGN</h1>
+      <div class="gw-dim">current world: ${esc(SKIN.name)}${customActive ? ' (custom)' : ''}</div></header>
+    <main class="gw-panel">
+      <p class="gw-dim">The body travels — intake results, cleared sectors, and the log come with you.
+        The world is replaced: new station, new voice, new archive, a fresh 8-week season.</p>
+
+      <h2>1 · Write a brief, copy the prompt</h2>
+      <div class="gw-note-row"><input id="create-brief" class="gw-text" maxlength="300"
+        placeholder="e.g. lighthouse on a drowned coast, 1930s, grief and tides"></div>
+      <button class="gw-primary" data-act="copy-prompt">Copy the creation prompt</button>
+      <div id="prompt-out" hidden>
+        <p class="gw-dim">Clipboard blocked — copy it manually:</p>
+        <textarea id="prompt-text" class="gw-text gw-textarea" readonly rows="8"></textarea>
+      </div>
+      <p class="gw-dim">Paste it into any chat LLM (Claude, ChatGPT, Gemini). It returns a JSON world.</p>
+
+      <h2>2 · Paste the world back</h2>
+      <textarea id="skin-json" class="gw-text gw-textarea" rows="6" placeholder='{ "id": "...", "name": "..." … }'></textarea>
+      <button class="gw-primary" data-act="validate-skin">Validate the world</button>
+      <div id="skin-report"></div>
+
+      ${customActive ? `
+        <h2>Return</h2>
+        <button data-act="restore-default">Leave this world — return to ${esc(DEFAULT_SKIN.name)}</button>
+        <p class="gw-dim">Starts a fresh campaign in the default world. The body still travels.</p>` : ''}
+      <button data-act="back">Back</button>
+    </main>`;
+  wire({
+    back: () => nav('more'),
+    'copy-prompt': async () => {
+      const brief = (document.getElementById('create-brief') || {}).value || '';
+      const prompt = buildSkinPrompt(TREE, brief);
+      try {
+        await navigator.clipboard.writeText(prompt);
+        const btn = root().querySelector('[data-act="copy-prompt"]');
+        if (btn) btn.textContent = 'Copied — paste it into your LLM';
+      } catch {
+        const out = document.getElementById('prompt-out');
+        const ta = document.getElementById('prompt-text');
+        out.hidden = false;
+        ta.value = prompt;
+        ta.focus();
+        ta.select();
+      }
+    },
+    'validate-skin': () => {
+      const report = document.getElementById('skin-report');
+      let raw = (document.getElementById('skin-json') || {}).value || '';
+      raw = raw.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
+      let parsed;
+      try { parsed = JSON.parse(raw); } catch (e) {
+        report.innerHTML = `<div class="gw-callout gw-cal-err">Not valid JSON: ${esc(e.message)}</div>`;
+        return;
+      }
+      const v = validateSkin(parsed, TREE);
+      const summary = skinSummary(parsed, TREE);
+      report.innerHTML = `
+        ${v.errors.length ? `<div class="gw-callout gw-cal-err"><strong>${v.errors.length} error(s) — cannot activate:</strong>
+          <ul class="gw-list">${v.errors.slice(0, 12).map((e) => `<li>${esc(e)}</li>`).join('')}</ul>
+          <p class="gw-dim">Paste these errors back to your LLM and ask it to fix the JSON.</p></div>` : ''}
+        ${v.warnings.length ? `<div class="gw-callout"><strong>${v.warnings.length} warning(s) — runs with fallbacks:</strong>
+          <ul class="gw-list">${v.warnings.slice(0, 10).map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
+        ${v.ok ? `
+          <div class="gw-item">
+            <div class="gw-item-kind">WORLD VALIDATED</div>
+            <div class="gw-item-name">${esc(summary.name)}</div>
+            <p>${esc(summary.worldLine)}</p>
+            <p class="gw-dim">voice: ${esc(summary.voice)} · ${summary.rooms} rooms · ${summary.fragments} documents ·
+              ${summary.keystones} keystones · ${summary.episodes} episodes · ${summary.endings} endings · ${summary.kit} kit items</p>
+          </div>
+          <button class="gw-primary gw-big" data-act="activate-skin">Begin this campaign</button>` : ''}`;
+      state._pendingSkin = v.ok ? parsed : null;
+      wire({
+        'activate-skin': () => {
+          if (!state._pendingSkin) return;
+          localStorage.setItem(CUSTOM_SKIN_KEY, JSON.stringify(state._pendingSkin));
+          startNewCampaign(state.profile);
+          saveProfile(state.profile);
+          window.location.reload();
+        }
+      });
+    },
+    'restore-default': () => {
+      if (!confirm('Leave this world? Its archive stays behind; your body and log travel.')) return;
+      localStorage.removeItem(CUSTOM_SKIN_KEY);
+      startNewCampaign(state.profile);
+      saveProfile(state.profile);
+      window.location.reload();
     }
   });
 }

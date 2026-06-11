@@ -1,0 +1,125 @@
+// ── Campaign generation prompt (creation pipeline, D12/D42) ──────────────────
+// buildSkinPrompt(tree, brief) emits ONE paste-able prompt for any chat LLM.
+// The LLM writes the WORLD; the engine owns the training. This file is the
+// single source of the generation rules — never inline prompt content
+// elsewhere (same doctrine as LiftRPG's prompt_rules.js).
+
+const COUNTS = {
+  rooms: 8, fragmentsPerChain: 4, chains: 4, kit: 10, encounters: 4,
+  keystones: 5, quietBeats: 5, caches: 4, traces: 10
+};
+
+function treeFacts(tree) {
+  const branches = Object.entries(tree.branches)
+    .map(([id, b]) => `- branch "${id}" — ${b.name}: ${b.note}`).join('\n');
+  const ladder = tree.assessmentLadder.map((r) => {
+    const t = tree.tiers.find((x) => x.id === r.tier);
+    return `- hookSlot "${t.hookSlot}" (branch ${t.branch}): the exercise is "${t.name}"`;
+  }).join('\n');
+  return { branches, ladder };
+}
+
+export function buildSkinPrompt(tree, brief) {
+  const { branches, ladder } = treeFacts(tree);
+  const briefText = (brief || '').trim() || 'Author’s choice — surprise me, but commit fully to one world.';
+  return `You are designing a complete campaign world for GROUNDWORK — a training game where a real
+strength program IS the story's clock. The engine owns all training content (exercises, sets,
+reps, rest). You own everything else: the place, the voice, the documents, the mystery.
+
+CREATIVE BRIEF
+${briefText}
+
+THE FORM (read carefully — this is a found-world, not a plot)
+- The player is a newcomer with a duty, alone in a PLACE built around two "corridors" of
+  physical work. A predecessor is gone and left the place deliberately arranged.
+- The story is told through: a 3-card cold open; one line of voice per intake test; documents
+  found during work (4 chains, delivered in order); authored keystone reveals at progress
+  milestones; one present-tense live event (~week 3); 8 titled weekly episodes; a finale with
+  a real choice and 3 endings. The player reads during REST WINDOWS — every text earns ~30
+  seconds of attention, no more.
+- One speaking character: the VOICE (like a terse mentor wired into the place). It counts
+  things, distrusts adjectives, never flatters, is secretly proud. Every line it speaks is
+  prefixed with its NAME in caps, e.g. 'NAME: "..."'.
+- Register: concrete nouns, no purple prose, second person for scene text. Every document
+  ends on a HOOK — one short line that makes stopping feel unfinished (write the hook as its
+  own field). Quality bar: a Mothership module crossed with a quiet literary novel.
+- THE LAW: never mention exercises, sets, reps, seconds of rest, or workout instructions in
+  ANY text. The world mirrors effort thematically (weight, holding, climbing, patience) —
+  it never prescribes it. Validation rejects skins containing rep/set language.
+
+THE PLACE MUST MAP TO THIS STRUCTURE (the training tree — rename nothing here):
+${branches}
+
+Each hookSlot below is a SECTOR of the place (a room/zone the player works in for weeks).
+Name each one as a location in your world (tierNames), and write one VOICE line per slot for
+the intake (intakeVoice) — it should name the sector, gesture at the physical work poetically
+(without prescribing), and carry the voice's personality:
+${ladder}
+
+OUTPUT — one JSON object, no markdown fences, no commentary, exactly these keys:
+{
+  "id": "kebab-case-world-id",
+  "name": "WORLD NAME",
+  "version": "1.0.0",
+  "worldLine": "One sentence of world-state shown under the title.",
+  "voices": { "pull-voice": { "name": "VOICENAME", "register": "two-sentence character card", "ttsHint": { "style": "delivery note" } } },
+  "tierNames": { "<every hookSlot above>": "Sector Name" },
+  "intakeVoice": { "<every hookSlot above>": "VOICENAME: “one line for that intake test”" },
+  "coldOpen": [
+    { "kind": "document", "title": "CARD 1 TITLE", "documentType": "form", "body": "the orders/letter that sent the player here (60-90 words)", "hook": "— signature line" },
+    { "kind": "scene", "title": "CARD 2 TITLE", "body": "arrival; the place is deliberately stilled, not ruined (60-90 words)" },
+    { "kind": "voice", "title": "CARD 3 TITLE", "body": "how the voice's channel opens (1-2 sentences)", "voiceLine": "VOICENAME: “first words; ends by pointing at the intake”" }
+  ],
+  "roomPools": { "<branch id>": [ ${COUNTS.rooms}+ rooms each: { "id": "unique-id", "name": "Room Name", "bias": "intel|loot|encounter|story", "desc": "one eerie concrete sentence" } ] },
+  "lockedDoors": [ 4 teases of OTHER wings of the place: { "name": "...", "requires": "...", "tease": "one sentence" } ],
+  "fragments": [ ${COUNTS.chains} chains × ${COUNTS.fragmentsPerChain}+ docs, each { "id": "XX-01", "chain": "chain-id", "title": "...", "documentType": "fieldNote|correspondence|form|inspection|report|transcript", "body": "60-110 words", "hook": "one line" } — chains: the predecessor's official record; their private writing; technical anomalies; the eerie signal/outside thread. Each chain reads in order and the LAST doc of each chain points at the finale.
+  ],
+  "kitItems": [ ${COUNTS.kit} items: { "id": "k-...", "name": "...", "kind": "tool|key|comfort|lore", "body": "one-two sentences", "unlocks": "(keys only) a shortcutRoutes id" } ],
+  "encounters": [ ${COUNTS.encounters} beats: { "id": "enc-...", "prompt": "something is here, present tense", "options": [ { "label": "...", "result": "...", "award": { "type": "intel" } }, { "label": "...", "result": "...", "award": null } ] } ],
+  "sessionFrame": {
+    "brief": {
+      "title": "WORK ORDER (or your world's term)",
+      "sceneLines": [ pools with conditions, first-match-wins: { "when": { "firstSession": true }, "lines": ["..."] }, { "when": { "bossDay": true }, "lines": ["..."] }, { "when": { "postBossFail": true }, "lines": ["..."] }, { "when": {}, "lines": [3 lines] } ],
+      "order": { "heading": "ORDER №{{orderNumber}}", "sub": "where the order form comes from", "rows": [["ROUTE", "{{wingName}} — {{sectorName}}"], ["ROOMS", "{{roomCount}} on the manifest"]], "gateRow": ["GATE", "{{gateLabel}} — posted at the door"], "foot": "A MOTTO." },
+      "riggingLines": [ pools: { "when": { "firstSession": true, "learnMode": true }, "lines": ["..."] }, { "when": { "firstSession": true }, "lines": ["..."] }, { "when": { "learnMode": true }, "lines": ["..."] }, { "when": { "bossDay": true }, "lines": ["..."] }, { "when": {}, "lines": [3 lines] } ]
+    },
+    "debrief": { "title": "...", "script": "uses {{dayNumber}} {{roomsCleared}} {{lootSummary}} {{intelCount}} {{intelPlural}} {{bossLine}}", "bossPassLine": "...", "bossFailLine": "..." },
+    "restBeats": [ 8-12 pools in priority order; conditions: kind:"crit"|"complication", outcome:"missed"|"partial" (+branch), streak:3, troughWindow+isFirstRoom (3 lines about the documented flat weeks — forecast it, normalize it), doorsOpenedAtLeast:2|4 +isFirstRoom +rollUnder:35 (the voice references {{doorsOpened}}), monthsAtLeast:1|2 similarly ({{months}}), isFirstRoom, postBossFail, and a FINAL default {} pool with 3 lines ],
+    "deloadBeats": [ "one line for the light week" ],
+    "tutorial": { "aarPrompt": "how the player self-checks form on a new movement (film one set, compare, file it) in your world's language" },
+    "assessment": { "intro": "...", "outro": "..." },
+    "intelDrop": "uses {{faultName}} {{sideQuestName}} {{sideQuestNote}}",
+    "troughForecast": "a posted notice from the predecessor about weeks 3-6 feeling flat — forecasting it IS the intervention",
+    "intention": { "prompt": "...", "afterLabel": "After (a daily event)", "afterPlaceholder": "...", "whereLabel": "At (where the bar lives)", "wherePlaceholder": "...", "display": "SCHEDULE — after {{after}}, at {{where}}." },
+    "storm": { "button": "...", "intro": "minimum-dose day framing", "done": "...", "missCue": "never-miss-twice line" },
+    "dispatch": { "title": "...", "intro": "trends not feelings", "frictionPrompt": "...", "goalPrompt": "...", "close": "..." },
+    "nextTeasers": { "bossEligible": "uses {{bossDoor}}", "newFragment": "uses {{lastFragmentHook}}", "default": "uses {{focusRoom}}" }
+  },
+  "bossCeremony": { "approach": "uses {{doorName}} {{standard}} {{tease}}", "teases": { "default": "...", "<hookSlot of a major gate>": "a special tease" }, "beforeAttempt": "VOICENAME: “...”", "passReveal": "uses {{sectorName}}", "failReveal": "failure files knowledge, never shame" },
+  "keystones": [ ${COUNTS.keystones} authored reveals: { "id": "KF-01", "chain": "keystone", "presentation": "document", "trigger": { "type": "first-boss-pass" }, ... }, one with { "presentation": "recontext", "trigger": { "type": "boss-pass-count", "n": 3 } } that REFRAMES everything mid-campaign, and 2-3 with { "type": "sector-open", "hookSlot": "<a real hookSlot>" } — the biggest on the sector whose exercise is the iconic milestone (e.g. the first full pull-up slot) ],
+  "liveEvent": { "id": "live-...", "fireOnSession": 8, "title": "...", "beats": [3 present-tense beats — this HAPPENS NOW, unlike every found document], "voiceLine": "VOICENAME: “...”", "choice": { "prompt": "...", "options": [ { "id": "a", "label": "...", "result": "..." }, { "id": "b", "label": "...", "result": "..." } ] }, "document": { "id": "...", "chain": "<signal chain id>", "title": "...", "documentType": "transcript", "body": "...", "closings": { "a": "...", "b": "..." }, "hook": "..." } },
+  "season": { "commissionLine": "COMMISSION: 8 weeks. ...", "episodes": [ 8: { "week": n, "title": "EPISODE TITLE", "line": "through-line sentence" } — week 5 is the posted light week; week 8 is the finale ], "overtime": { "title": "OVERTIME", "line": "..." }, "editorials": [ 2-3: { "week": n, "line": "VOICENAME disagreeing with the posted order — texture, never instructions" } ] },
+  "finale": { "id": "finale-s1", "title": "...", "beats": [3], "choice": { "prompt": "...", "options": [ { "id": "act", "label": "the big irreversible act", "requiresMast": true, "lockedHint": "why the body is not ready yet (in-world)" }, { "id": "inherit", "label": "inherit the predecessor's way" }, { "id": "defer", "label": "record everything, decide nothing — the sequel hook" } ] }, "endings": { "act": {doc}, "inherit": {doc}, "defer": {doc} — each { "id": "END-1|2|3", "chain": "keystone", "title": "Ending — ...", "documentType": "...", "body": "120-160 words, lands the theme", "hook": "..." } }, "closing": "SEASON ONE — ... one line." },
+  "quietBeats": [ ${COUNTS.quietBeats} pure-atmosphere rooms, 60-90 words each, no reward — the thing the rewards are for ],
+  "echoFrames": { "<each chain id>": "one situating line for re-reading a page where it was written", "keystone": "..." },
+  "caches": [ ${COUNTS.caches}: { "id": "cache-...", "name": "...", "needs": "<a kit item id>", "locked": "the want of the key (2 sentences)", "open": "the give (1-2 sentences, ends with a colon)" } ],
+  "roomTypeLabels": { "sealed-cache": "...", "echo": "...", "quiet": "..." },
+  "traces": { "<${COUNTS.traces} room ids from your pools>": "the predecessor's mark in that room — one eerie-warm sentence each" },
+  "map": { "stationName": "...", "gateMeterLabel": "DOOR CHARGE (or your term)", "wings": { "${'pull'}": "This Wing's Name", "push": "...", "legs": "...", "core": "...", "handstand": "..." }, "shortcutRoutes": { "<route-id>": { "label": "...", "from": ["<branch>", index], "to": ["<branch>", index] } × 3 }, "silhouettes": {} }
+}
+
+CRAFT RULES (the difference between a world and a word salad)
+1. ONE mystery, askable in one sentence, answered by the finale. Every chain circles it.
+2. The predecessor must be PRESENT through arrangement: things cleaned, labeled, left for
+   the player. Their absence is the second mystery.
+3. The midpoint recontext keystone must change what the player thinks the WORK is.
+4. Hooks are promises: each one must eventually be kept by a later document or the finale.
+5. Numbers beat adjectives. "Eleven watts, constant" beats "a strange power draw."
+6. The live event and finale are PRESENT tense; everything else found is past tense.
+7. Write the 8 episode titles LAST, as the season's table of contents.
+8. The finale's locked option must make the player want next season's body, not feel cheated.
+
+Return ONLY the JSON object.`;
+}
+
+export default buildSkinPrompt;

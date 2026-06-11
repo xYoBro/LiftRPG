@@ -220,6 +220,8 @@ button:active { transform: translateY(2px) scale(0.99); }
 .gw-hook { font-family: var(--gw-mono); font-size: 0.88rem; border: 1px dashed var(--gw-accent); border-radius: 10px; padding: 11px 13px; margin: 10px 0; color: var(--gw-accent); }
 .gw-duty { font-family: var(--gw-mono); font-size: 0.76rem; margin: 4px 0; letter-spacing: 0.04em; }
 .gw-text { width: 100%; font: inherit; padding: 12px; border: 1px solid var(--gw-rule); border-radius: 10px; margin: 4px 0 8px; background: var(--gw-panel-2); color: var(--gw-ink); }
+.gw-textarea { font-family: var(--gw-mono); font-size: 0.78rem; line-height: 1.5; resize: vertical; }
+.gw-cal-err { border-left-color: var(--gw-danger); }
 .gw-note-row { margin: 8px 0; }
 .gw-video-link { display: block; font-size: 0.9rem; color: var(--gw-accent); text-decoration: none; border: 1px solid var(--gw-rule); border-radius: 10px; padding: 12px 14px; margin: 8px 0; background: var(--gw-panel-2); }
 .gw-video-link:active { transform: translateY(1px); }

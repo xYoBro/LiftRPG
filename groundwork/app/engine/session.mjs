@@ -31,6 +31,10 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
   const active = profile.active[tree.id] || {};
   const cleared = profile.cleared[tree.id] || [];
   const sessionIndex = profile.history.filter((h) => h.treeId === tree.id).length;
+  // Campaign-relative session count (D43): live events, special-room rotation
+  // and "first session stays pure" reset per world; the keeper's order number
+  // (dayNumber) and body pacing stay global.
+  const campaignSession = Math.max(0, sessionIndex - (profile.campaignSessionBase || 0));
   const branches = Object.keys(tree.branches);
   const focusBranch = branches[sessionIndex % branches.length];
   const offBranch = branches[(sessionIndex + 1) % branches.length];
@@ -104,7 +108,7 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
     for (const room of allRooms) {
       room.doorOptions = frontierDoors(skin, profile, room.tier.branch, rng, 2);
     }
-    assignSpecialRoom(skin, profile, rng, allRooms, { sessionIndex, learnMode });
+    assignSpecialRoom(skin, profile, rng, allRooms, { sessionIndex: campaignSession, learnMode });
   }
 
   return {
@@ -128,9 +132,9 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
       definition: focusTier.boss,
       restSeconds: REST_SECONDS.boss
     } : null,
-    // Band 7 live event (Sprint 2.2): present-tense scripted scene between
-    // the work order and joint prep, once ever, ~session 8+.
-    liveEvent: liveEventDue(skin || {}, profile, dayNumber || sessionIndex + 1)
+    // Live event (Sprint 2.2): present-tense scripted scene between the work
+    // order and joint prep, once per campaign, ~campaign session 8+.
+    liveEvent: liveEventDue(skin || {}, profile, campaignSession + 1)
   };
 }
 

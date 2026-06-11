@@ -46,8 +46,33 @@ export function createEmptyProfile(seed) {
     doorCharge: {},                // tierId → 0..1 gate-eligibility progress
     exploredAt: {},                // roomId → tierId (which sector it was explored from)
     seasonClosedAt: null,          // ISO date the 8-week commission closed (D40)
-    seasonEnding: null             // ending id chosen at the finale
+    seasonEnding: null,            // ending id chosen at the finale
+    campaignStartedAt: null,       // season anchor for the ACTIVE campaign (D43)
+    campaignSessionBase: 0         // history length when this campaign began
   };
+}
+
+// New campaign (D43): the body travels; the station is new. Training state
+// (assessments, cleared, active, history, charge) persists — it is REAL.
+// Narrative state belongs to the world being left behind.
+export function startNewCampaign(profile) {
+  profile.archive = [];
+  profile.kit = [];
+  profile.explored = {};
+  profile.exploredAt = {};
+  profile.encountersSeen = [];
+  profile.choices = [];
+  profile.notes = [];
+  profile.shortcuts = [];
+  profile.cachesOpened = [];
+  profile.firedKeystones = [];
+  profile.lastHook = null;
+  profile.seasonClosedAt = null;
+  profile.seasonEnding = null;
+  delete profile.bossElect;
+  profile.campaignStartedAt = new Date().toISOString();
+  profile.campaignSessionBase = (profile.history || []).length;
+  return profile;
 }
 
 // Old saves predate the narrative-state fields — backfill on load.
@@ -58,7 +83,8 @@ function migrateProfile(profile) {
     choices: [], notes: [], shortcuts: [], lastHook: null,
     intention: null, microGoal: null, lastDispatchAt: null,
     firedKeystones: [], cachesOpened: [], doorCharge: {},
-    exploredAt: {}, seasonClosedAt: null, seasonEnding: null
+    exploredAt: {}, seasonClosedAt: null, seasonEnding: null,
+    campaignStartedAt: null, campaignSessionBase: 0
   };
   for (const key of Object.keys(defaults)) {
     if (profile[key] === undefined) profile[key] = defaults[key];
