@@ -17,7 +17,7 @@ import {
   applyAssessment, getTier, tierState, recentHitRate, needsRecalibration,
   applyBossPass, intelDropForFault, consecutiveStorms
 } from './engine/profile.mjs';
-import { generateSession, previewNextSession, roomKey, fileSession, computeDoorCharge, trailingCharges, isTendonGuard, gateAmount, REST_SECONDS } from './engine/session.mjs';
+import { generateSession, previewNextSession, estimateSessionMinutes, roomKey, fileSession, computeDoorCharge, trailingCharges, isTendonGuard, gateAmount, REST_SECONDS } from './engine/session.mjs';
 import { awardForRow, resolveEncounterChoice, resolveSpecialRoom, resolvePosting, fragmentById, kitItemById, skinChains } from './engine/discovery.mjs';
 import { markExplored, projectWing } from './engine/map.mjs';
 import { doorsOpenedCount, monthsOnStation, dueKeystonesForBossPass, fileKeystone, fileLiveEvent } from './engine/keystones.mjs';
@@ -172,6 +172,9 @@ function sessionPreview() {
   // Peek (no doors, no rng): what does today hold?
   const peek = generateSession(state.profile, TREE, {});
   const tier = getTier(TREE, peek.focusTierId);
+  const offRoom = peek.rooms.find((r) => r.tier.id !== peek.focusTierId);
+  const focusCount = peek.rooms.filter((r) => r.tier.id === peek.focusTierId && !r.optional).length;
+  const offCount = peek.rooms.filter((r) => offRoom && r.tier.id === offRoom.tier.id).length;
   return {
     branch: TREE.branches[peek.focusBranch].name,
     focusBranch: peek.focusBranch,
@@ -183,7 +186,10 @@ function sessionPreview() {
     intensity: peek.intensity,
     waves: peek.chargesNeeded > 1,
     surveyDay: !!peek.surveyDay,
-    isDeload: peek.isDeload
+    isDeload: peek.isDeload,
+    // The workout, plainly (D61): movements × sets and the clock cost.
+    workLine: tier ? `${tier.name} ×${focusCount}${offRoom ? ` · ${offRoom.tier.name} ×${offCount}` : ''}` : '',
+    minutes: estimateSessionMinutes(peek)
   };
 }
 
@@ -273,24 +279,17 @@ function renderHome() {
       <div class="gw-worldline">${esc(SKIN.worldLine)}</div></header>
     <main class="gw-panel gw-home">
       <div class="gw-hero">
-        ${(() => {
-          const ss = seasonState(SKIN, p);
-          if (ss.closed) {
-            const endingDoc = p.seasonEnding && SKIN.finale ? SKIN.finale.endings[p.seasonEnding] : null;
-            return `<div class="gw-preview-title gw-season-line">SEASON ONE — KEPT${endingDoc ? ' · ' + esc(endingDoc.title.replace('Ending — ', '')) : ''} · OVERTIME</div>`;
-          }
-          return ss.episode ? `<div class="gw-preview-title gw-season-line">WEEK ${Math.min(ss.week, ss.weeksTotal)} OF ${ss.weeksTotal} — ${esc(ss.episode.title)}</div>` : '';
-        })()}
-        <div class="gw-preview-title">TODAY — PINNED TO THE MAP</div>
+        <div class="gw-preview-title">TODAY'S WORK</div>
+        <div class="gw-work-line">${esc(preview.workLine)} · ~${preview.minutes} min</div>
+        ${preview.waves ? `<div class="gw-dayshape gw-dim">${preview.isDeload ? 'light week — posted on purpose' : preview.boss ? 'heavy day — gate on the board' : preview.intensity === 'heavy' ? 'heavy day — the door grades today' : preview.surveyDay ? 'light day — survey run; the manifest is fair game' : 'light day — work inside the window'}</div>` : preview.isDeload ? `<div class="gw-dayshape gw-dim">light week — posted on purpose</div>` : ''}
         <div class="gw-hero-line">${esc(preview.room)} · ${preview.rooms} rooms${preview.boss ? ' · <strong>SEALED DOOR</strong>' : ''}${preview.learn ? ' · new ground' : ''}</div>
-        ${preview.waves && !preview.boss ? `<div class="gw-dayshape gw-dim">${preview.isDeload ? 'light week — posted on purpose' : preview.intensity === 'heavy' ? 'heavy day — the door grades today' : preview.surveyDay ? 'light day — survey run; the manifest is fair game' : 'light day — work inside the window'}</div>` : ''}
         ${p.posting ? `<div class="gw-posting-line gw-dim">◈ ${esc((SKIN.postingLabels || {}).doorTag || 'ON THE MANIFEST')}: ${esc(p.posting.findName)} — ${esc(p.posting.roomName)}</div>` : ''}
         ${(() => {
           // Route choice (D46): pick the day's corridor — the TODAY pin moves
           // with it. Both corridors still train; focus biases volume only.
           const other = Object.keys(TREE.branches).find((b) => b !== preview.focusBranch);
           if (!other) return '';
-          return `<div class="gw-route-pick gw-dim">${esc(TREE.branches[preview.focusBranch].name)} corridor focus · ${p.routeOverride ? 'your call' : 'rotation'}
+          return `<div class="gw-route-pick gw-dim">${esc(TREE.branches[preview.focusBranch].name)} focus · ${p.routeOverride ? 'your call' : 'rotation'}
             <button class="gw-linklike" data-act="switch-route">take ${esc(TREE.branches[other].name)} instead</button></div>`;
         })()}
         ${gateCharge !== null ? `
@@ -299,7 +298,17 @@ function renderHome() {
             <div class="gw-charge-bar"><div class="gw-charge-fill" style="width:${Math.round(gateCharge * 100)}%"></div></div>
             <div class="gw-charge-note gw-dim">${preview.boss ? 'Charged — the attempt is on the board today.' : gateCharge >= 1 ? 'Charged. Tap the gate on the map to elect the attempt.' : gateCharge > 0 ? Math.round(gateCharge * 100) + '% — best reading stands.' + (gateLatest && gateLatest < gateCharge ? ' Last visit read ' + Math.round(gateLatest * 100) + '%.' : '') : 'No reading yet. Clean sets at the gate standard charge the door.'}</div>
           </div>` : ''}
+        <div class="gw-hero-story">
+        ${(() => {
+          const ss = seasonState(SKIN, p);
+          if (ss.closed) {
+            const endingDoc = p.seasonEnding && SKIN.finale ? SKIN.finale.endings[p.seasonEnding] : null;
+            return `<div class="gw-preview-title gw-season-line">SEASON ONE — KEPT${endingDoc ? ' · ' + esc(endingDoc.title.replace('Ending — ', '')) : ''} · OVERTIME</div>`;
+          }
+          return ss.episode ? `<div class="gw-preview-title gw-season-line">WEEK ${Math.min(ss.week, ss.weeksTotal)} OF ${ss.weeksTotal} — ${esc(ss.episode.title)}</div>` : '';
+        })()}
         ${p.lastHook ? `<div class="gw-hero-hook">${esc(p.lastHook)}</div>` : ''}
+        </div>
       </div>
       ${returnBeatHtml()}
       <button class="gw-primary gw-big" data-act="start-session">Start Session</button>
@@ -492,6 +501,7 @@ function renderColdOpen() {
         <p class="gw-script">${esc(card.body)}</p>
         ${card.voiceLine ? `<p class="gw-beat">${esc(card.voiceLine)}</p>` : ''}`}
       <button class="gw-primary gw-big" data-act="cold-next">${last ? 'Begin Intake' : 'Continue'}</button>
+      ${last ? '' : `<button class="gw-linklike" data-act="cold-skip">Skip to intake — the papers keep</button>`}
     </main>`;
   wire({
     'cold-next': () => {
@@ -503,6 +513,11 @@ function renderColdOpen() {
         state.coldIndex += 1;
         render();
       }
+    },
+    'cold-skip': () => {
+      state.profile = createEmptyProfile();
+      saveProfile(state.profile);
+      startAssess();
     }
   });
 }
@@ -680,13 +695,13 @@ Get the thing looked at. The station holds; the intake will be exactly here when
       <div class="gw-dim">${esc(TREE.branches[tier.branch].name)} corridor · ${esc(flavorName(tier))}</div>
       <h2 class="gw-test-name">${esc(tier.name)}</h2>
       <p class="gw-test-standard">${esc(probe.test)}</p>
-      ${voice ? `<p class="gw-beat gw-intake-voice">${esc(voice)}</p>` : ''}
       <details class="gw-form"><summary>How to do it</summary>
         ${videoRefHtml(tier)}
         ${figuresHtml(tier)}
         <p>${esc(tier.setup)}</p>
         <ul class="gw-list">${tier.formStandard.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
       </details>
+      ${voice ? `<p class="gw-beat gw-intake-voice">${esc(voice)}</p>` : ''}
       ${isCount ? `
         <div class="gw-stepper">
           <button class="gw-step" data-step="-1">−</button>
@@ -839,12 +854,18 @@ function renderBrief(s) {
     <header class="gw-header"><h1>${esc(brief.title || 'WORK ORDER')}</h1>
       ${episode ? `<div class="gw-dim gw-episode">WEEK ${Math.min(s.week, SEASON_WEEKS)} OF ${SEASON_WEEKS} — ${esc(episode.title)}</div>` : ''}</header>
     <main class="gw-panel">
-      ${scene ? `<p class="gw-script">${esc(fill(scene, vars))}</p>` : ''}
       <div class="gw-document gw-workorder">
         ${order && order.sub ? `<div class="gw-doc-type">${esc(fill(order.sub, vars))}</div>` : ''}
         <div class="gw-doc-title">${esc(order ? fill(order.heading, vars) : 'WORK ORDER №' + s.dayNumber)}</div>
         <div class="gw-order-rows">
           ${episode ? `<div class="gw-order-row"><span>EPISODE</span><span>${esc(episode.title)}${episode.line ? ' — ' + esc(episode.line) : ''}</span></div>` : ''}
+          ${(() => {
+            // The workout itself leads the form (D61): movements × sets.
+            const offRoom = s.rooms.find((r) => r.tier.id !== s.focusTierId);
+            const fc = s.rooms.filter((r) => r.tier.id === s.focusTierId && !r.optional).length;
+            const oc = offRoom ? s.rooms.filter((r) => r.tier.id === offRoom.tier.id).length : 0;
+            return focusTier ? `<div class="gw-order-row"><span>WORK</span><span>${esc(focusTier.name)} ${esc(schemeText(focusTier.scheme))}${offRoom ? ` + ${esc(offRoom.tier.name)} ×${oc}` : ''} · ~${estimateSessionMinutes(s)} min</span></div>` : '';
+          })()}
           ${(order ? order.rows : [['ROUTE', '{{sectorName}}'], ['ROOMS', '{{roomCount}}']]).map(([k, v]) =>
             `<div class="gw-order-row"><span>${esc(k)}</span><span>${esc(fill(v, vars))}</span></div>`).join('')}
           ${s.isDeload ? `<div class="gw-order-row"><span>NOTE</span><span>Light week, posted on purpose. Volume reduced; the standard is unchanged.</span></div>`
@@ -857,6 +878,7 @@ function renderBrief(s) {
         </div>
         ${order && order.foot ? `<div class="gw-doc-hook">${esc(order.foot)}</div>` : ''}
       </div>
+      ${scene ? `<p class="gw-script">${esc(fill(scene, vars))}</p>` : ''}
       ${(() => {
         // RIGGING speaks ONCE per brief: a week editorial outranks the deload
         // beat outranks the regular line. Never stack voice blocks.
@@ -1090,10 +1112,11 @@ function renderRoom(s) {
     <main class="gw-panel gw-center">
       ${phase === 'set' ? `
         ${room.learnCue ? `<div class="gw-callout">This set, one thing: <strong>${esc(room.learnCue)}</strong></div>${videoRefHtml(tier)}${figuresHtml(tier)}` : `
-        <details class="gw-form"><summary>Form standard</summary>
+        <ul class="gw-list gw-form-list">${tier.formStandard.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
+        <details class="gw-form"><summary>How to do it</summary>
           ${videoRefHtml(tier)}
           ${figuresHtml(tier)}
-          <ul class="gw-list">${tier.formStandard.map((f) => `<li>${esc(f)}</li>`).join('')}</ul></details>`}
+          <p>${esc(tier.setup)}</p></details>`}
         <p class="gw-bigcue">Do the set.</p>
         <p class="gw-dim">${lightDay
           ? `Light day — stay inside the window (${target[0]}–${target[1]} ${esc(unit)}). The door isn&#39;t grading today.`
@@ -1131,8 +1154,14 @@ function renderRoom(s) {
         ${renderEncounterHtml(state.encounterPending.encounter)}
       ` : `
         ${result.newMark ? newMarkHtml(result, tier, unit) : ''}
-        ${entry.kind === 'special' ? renderSpecialHtml(entry) : entry.kind === 'posting' ? renderPostingHtml(entry) : renderResolutionHtml(entry, idx)}
+        ${(() => {
+          const nxt = s.rooms[idx + 1];
+          if (!nxt) return s.boss ? `<div class="gw-next-set">NEXT: the sealed door — ${esc(s.boss.definition.label)}</div>` : '';
+          const w = nxt.scheme.kind === 'reps' ? nxt.scheme.repWindow : nxt.scheme.holdWindow;
+          return `<div class="gw-next-set">NEXT: ${esc(nxt.tier.name)} — ${w[0]}–${w[1]} ${nxt.scheme.kind === 'reps' ? 'reps' : 'sec'}${nxt.scheme.perSide ? '/side' : ''}</div>`;
+        })()}
         ${renderTimerHtml(room.restSeconds)}
+        ${entry.kind === 'special' ? renderSpecialHtml(entry) : entry.kind === 'posting' ? renderPostingHtml(entry) : renderResolutionHtml(entry, idx)}
         <details class="gw-form"><summary>+ field note</summary>
           <div class="gw-note-row"><input id="field-note" class="gw-text" placeholder="one line" maxlength="120"></div>
         </details>
@@ -1322,16 +1351,13 @@ function renderResolutionHtml(entry, idx) {
   const award = entry.award;
   let awardHtml = '';
   if (award.type === 'fragment') {
-    // Demotion rule (GW-13 triage): when the rest already carries an
-    // encounter, the fragment arrives folded — title + hook now, full page on
-    // the desk (and one tap away here).
-    awardHtml = entry.encounterResult
-      ? `<details class="gw-document gw-doc-folded"><summary>
+    // Story trails mid-session (D61): documents arrive folded — title + hook
+    // now, one tap to read during the rest, the full page always on the desk.
+    awardHtml = `<details class="gw-document gw-doc-folded"><summary>
            <span class="gw-doc-type">${esc((award.fragment.documentType || 'document').toUpperCase())} · ARCHIVE ${esc(award.fragment.id)}</span>
            <span class="gw-doc-title">${esc(award.fragment.title)}</span>
            <span class="gw-doc-hook">${esc(award.fragment.hook)} — tap to read now; it is filed on the desk either way.</span>
-         </summary><p class="gw-doc-body">${esc(award.fragment.body)}</p></details>`
-      : documentHtml(award.fragment);
+         </summary><p class="gw-doc-body">${esc(award.fragment.body)}</p></details>`;
   } else if (award.type === 'kit') {
     awardHtml = kitHtml(award.item);
   } else if (award.type === 'shortcut') {
@@ -1343,19 +1369,30 @@ function renderResolutionHtml(entry, idx) {
   } else if (award.type === 'bonus-room') {
     awardHtml = `<div class="gw-callout">${esc(award.text)} <span class="gw-dim">(optional — one extra easy set of warm-up tier; skip freely)</span></div>`;
   } else if (award.type === 'story' || award.type === 'intel-exhausted' || award.type === 'loot-exhausted') {
-    awardHtml = `<p class="gw-script">${esc(award.text || entry.row.text)}</p>`;
+    const t = award.text || entry.row.text;
+    awardHtml = `<details class="gw-prose-fold"><summary>${esc(String(t).split(/\s+/).slice(0, 6).join(' '))}…</summary><p class="gw-script">${esc(t)}</p></details>`;
   }
   const encHtml = entry.encounterResult ? `
     <p class="gw-script">${esc(entry.encounterResult.text)}</p>
     ${entry.encounterResult.extraFragment ? documentHtml(entry.encounterResult.extraFragment) : ''}` : '';
+  // Story trails (D61): the row's prose and the voice fold behind one line
+  // mid-session — present every rest, never first, one tap to read.
+  const proseBits = [];
+  if (award.type !== 'fragment' && award.type !== 'kit' && entry.row && entry.row.text
+    && award.type !== 'story' && award.type !== 'intel-exhausted' && award.type !== 'loot-exhausted') {
+    proseBits.push(`<p class="gw-script">${esc(entry.row.text)}</p>`);
+  }
+  if (beat) proseBits.push(`<p class="gw-beat">${esc(beat)}</p>`);
+  const proseHtml = proseBits.length
+    ? `<details class="gw-prose-fold"><summary>${esc((entry.row && entry.row.text ? entry.row.text : beat || '').split(/\s+/).slice(0, 6).join(' '))}…</summary>${proseBits.join('')}</details>`
+    : '';
   return `
     <div class="gw-resolution gw-res-${esc(entry.kind)}">
       <div class="gw-roll">${String(entry.roll).padStart(2, '0')} <span class="gw-dim">vs ${entry.stat} · ${esc(entry.mode)}${entry.rolls.length > 1 ? ' (' + entry.rolls.map((r) => String(r).padStart(2, '0')).join(', ') + ')' : ''}</span></div>
       <div class="gw-kind">${esc(KIND_LABEL[entry.kind] || entry.kind)}</div>
-      ${award.type === 'fragment' || award.type === 'kit' ? '' : `<p class="gw-script">${esc(entry.row.text)}</p>`}
       ${awardHtml}
       ${encHtml}
-      ${beat ? `<p class="gw-beat">${esc(beat)}</p>` : ''}
+      ${proseHtml}
     </div>`;
 }
 
@@ -1415,9 +1452,10 @@ function renderBossApproach(s) {
     <header class="gw-header"><h1>THE SEALED DOOR</h1>
       <div class="gw-dim">rest the full ${REST_SECONDS.boss}s before the attempt</div></header>
     <main class="gw-panel">
+      <div class="gw-next-set">THE STANDARD: ${esc(boss.definition.label)}</div>
+      ${renderTimerHtml(REST_SECONDS.boss)}
       <p class="gw-script">${esc(approach)}</p>
       <p class="gw-beat">${esc(SKIN.bossCeremony.beforeAttempt)}</p>
-      ${renderTimerHtml(REST_SECONDS.boss)}
       <button class="gw-primary gw-big" data-act="attempt">Make the attempt</button>
       <button data-act="skip">Walk away (no attempt)</button>
     </main>`;

@@ -367,6 +367,16 @@ export function buildAar(session, { setResults, resolutions, bossResult, intelDr
   };
 }
 
+// Rough session length (D61): a workout-layer fact the hero and order post.
+// Prep + warm-up + per-room (rest + a set's worth of work) + the gate's rest.
+export function estimateSessionMinutes(session) {
+  let secs = (session.tendonGuard ? 6 : 4) * 60;
+  if (session.warmup) secs += 110;
+  for (const room of session.rooms) secs += (room.restSeconds || 120) + 50;
+  if (session.boss) secs += 300;
+  return Math.max(10, Math.round(secs / 300) * 5);
+}
+
 // ── previewNextSession (D59): tomorrow's facts, rng-free ────────────────────
 // The appointment mechanic: the engine already knows the next session's shape
 // (rotation, sector, day-shape, gate legality, live posting) — this derives it

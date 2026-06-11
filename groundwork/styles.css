@@ -380,3 +380,17 @@ button:active { transform: translateY(2px) scale(0.99); }
 .gw-tomorrow { margin-top: 14px; }
 .gw-tomorrow .gw-doc-type { color: #7a4a22; font-weight: 700; }
 .gw-pips { letter-spacing: 0.2em; color: var(--gw-amber); }
+
+/* ── D61: one-building map ── */
+.gwm-hull { fill: rgba(87, 199, 135, 0.025); stroke: var(--gw-rule); stroke-width: 1.5; }
+
+/* ── D61: presentation hierarchy (exercise > workout > game > story) ── */
+.gw-form-list { margin: 6px 0 2px; font-size: 0.88rem; }
+.gw-work-line { font-size: 1.06rem; font-weight: 650; margin: 4px 0 2px; }
+.gw-next-set { font-family: var(--gw-mono); font-size: 0.8rem; color: var(--gw-ink); letter-spacing: 0.04em; margin: 8px 0 2px; }
+.gw-prose-fold { margin: 10px 0; }
+.gw-prose-fold summary { cursor: pointer; color: var(--gw-dim); font-family: var(--gw-mono); font-size: 0.8rem; padding: 6px 0; list-style: none; }
+.gw-prose-fold summary::-webkit-details-marker { display: none; }
+.gw-prose-fold summary::before { content: '▸ '; color: var(--gw-accent); }
+.gw-prose-fold[open] summary::before { content: '▾ '; }
+.gw-hero-story { margin-top: 9px; border-top: 1px dashed var(--gw-rule); padding-top: 8px; }
