@@ -19,6 +19,7 @@ import { generateSession, roomKey, buildAar, unlockHit, computeDoorCharge, REST_
 import { awardForRow, resolveEncounterChoice, resolveSpecialRoom, fragmentById, kitItemById } from './engine/discovery.mjs';
 import { markExplored, projectWing } from './engine/map.mjs';
 import { doorsOpenedCount, monthsOnStation, dueKeystonesForBossPass, fileKeystone, fileLiveEvent } from './engine/keystones.mjs';
+import { seasonState, episodeFor, editorialFor, mastReady, closeSeason, SEASON_WEEKS } from './engine/season.mjs';
 import { chimeRestEnd, bossSting, rollTick, unlockAudio } from './engine/audio.mjs';
 import { buildWingMapSvg } from './render/wing-map.mjs';
 import { FIGURES } from '../data/figures/manifest.mjs';
@@ -119,7 +120,7 @@ function render() {
   const screens = {
     home: renderHome, 'cold-open': renderColdOpen, assess: renderAssess, session: renderSession,
     map: renderHome, log: renderLog, archive: renderArchive, kit: renderArchive, settings: renderSettings,
-    storm: renderStorm, dispatch: renderDispatch, more: renderMore
+    storm: renderStorm, dispatch: renderDispatch, more: renderMore, finale: renderFinale
   };
   (screens[state.screen] || renderHome)();
   // Re-deal animation on every state change (reduced-motion handled in CSS)
@@ -192,6 +193,14 @@ function renderHome() {
       <div class="gw-worldline">${esc(SKIN.worldLine)}</div></header>
     <main class="gw-panel gw-home">
       <div class="gw-hero">
+        ${(() => {
+          const ss = seasonState(SKIN, p);
+          if (ss.closed) {
+            const endingDoc = p.seasonEnding && SKIN.finale ? SKIN.finale.endings[p.seasonEnding] : null;
+            return `<div class="gw-preview-title gw-season-line">SEASON ONE — KEPT${endingDoc ? ' · ' + esc(endingDoc.title.replace('Ending — ', '')) : ''} · OVERTIME</div>`;
+          }
+          return ss.episode ? `<div class="gw-preview-title gw-season-line">WEEK ${Math.min(ss.week, ss.weeksTotal)} OF ${ss.weeksTotal} — ${esc(ss.episode.title)}</div>` : '';
+        })()}
         <div class="gw-preview-title">TODAY — PINNED TO THE MAP</div>
         <div class="gw-hero-line">${esc(preview.room)} · ${preview.rooms} rooms${preview.boss ? ' · <strong>SEALED DOOR</strong>' : ''}${preview.learn ? ' · new ground' : ''}</div>
         ${gateCharge !== null ? `
@@ -237,7 +246,22 @@ function buildStationMap(preview) {
     const total = ((SKIN.roomPools || {})[branch] || []).length;
     exploration[branch] = { seen: Math.min(total, (((p.explored || {})[branch]) || []).length), total };
   }
+  // Rooms explored fill into the sector chamber they were explored from;
+  // pre-exploredAt saves fall back to the branch's active sector.
+  const roomsBySector = {};
+  for (const branch of Object.keys(TREE.branches)) {
+    const pool = (SKIN.roomPools || {})[branch] || [];
+    const fallbackTier = (p.active[TREE.id] || {})[branch];
+    for (const roomId of ((p.explored || {})[branch]) || []) {
+      const room = pool.find((r) => r.id === roomId);
+      if (!room) continue;
+      const tierId = (p.exploredAt || {})[roomId] || fallbackTier;
+      if (!tierId) continue;
+      (roomsBySector[tierId] = roomsBySector[tierId] || []).push(room);
+    }
+  }
   return buildWingMapSvg(wing, {
+    roomsBySector,
     silhouettes: (SKIN.map && SKIN.map.silhouettes) || {},
     shortcutRoutes: (SKIN.map && SKIN.map.shortcutRoutes) || {},
     charges: p.doorCharge || {},
@@ -502,21 +526,33 @@ function renderBrief(s) {
   const scene = pickBriefLine(brief.sceneLines, ctx, s.dayNumber);
   const voice = pickBriefLine(brief.riggingLines, ctx, s.dayNumber);
   const order = brief.order;
+  // Episode framing (D40): the week is a titled chapter; RIGGING may
+  // editorialize against the posted order (two authorities, pure texture).
+  const episode = episodeFor(SKIN, s.week);
+  const editorial = editorialFor(SKIN, s.week);
   root().innerHTML = `
-    <header class="gw-header"><h1>${esc(brief.title || 'WORK ORDER')}</h1></header>
+    <header class="gw-header"><h1>${esc(brief.title || 'WORK ORDER')}</h1>
+      ${episode ? `<div class="gw-dim gw-episode">WEEK ${Math.min(s.week, SEASON_WEEKS)} OF ${SEASON_WEEKS} — ${esc(episode.title)}</div>` : ''}</header>
     <main class="gw-panel">
       ${scene ? `<p class="gw-script">${esc(fill(scene, vars))}</p>` : ''}
       <div class="gw-document gw-workorder">
         ${order && order.sub ? `<div class="gw-doc-type">${esc(fill(order.sub, vars))}</div>` : ''}
         <div class="gw-doc-title">${esc(order ? fill(order.heading, vars) : 'WORK ORDER №' + s.dayNumber)}</div>
         <div class="gw-order-rows">
+          ${episode ? `<div class="gw-order-row"><span>EPISODE</span><span>${esc(episode.title)}${episode.line ? ' — ' + esc(episode.line) : ''}</span></div>` : ''}
           ${(order ? order.rows : [['ROUTE', '{{sectorName}}'], ['ROOMS', '{{roomCount}}']]).map(([k, v]) =>
             `<div class="gw-order-row"><span>${esc(k)}</span><span>${esc(fill(v, vars))}</span></div>`).join('')}
+          ${s.isDeload ? `<div class="gw-order-row"><span>NOTE</span><span>Light week, posted on purpose. Volume reduced; the standard is unchanged.</span></div>` : ''}
           ${s.boss && order && order.gateRow ? `<div class="gw-order-row gw-order-gate"><span>${esc(order.gateRow[0])}</span><span>${esc(fill(order.gateRow[1], vars))}</span></div>` : ''}
         </div>
         ${order && order.foot ? `<div class="gw-doc-hook">${esc(order.foot)}</div>` : ''}
       </div>
-      ${voice ? `<p class="gw-beat">${esc(fill(voice, vars))}</p>` : ''}
+      ${(() => {
+        // RIGGING speaks ONCE per brief: a week editorial outranks the deload
+        // beat outranks the regular line. Never stack voice blocks.
+        const line = editorial || (s.isDeload && SKIN.sessionFrame.deloadBeats ? SKIN.sessionFrame.deloadBeats[0] : null) || voice;
+        return line ? `<p class="gw-beat">${esc(fill(line, vars))}</p>` : '';
+      })()}
       ${state.profile.history.length === 6 ? `<div class="gw-callout">${esc(SKIN.sessionFrame.troughForecast)}</div>` : ''}
       <button class="gw-primary gw-big" data-act="go">Begin</button>
       <button data-act="abort">Back</button>
@@ -623,12 +659,19 @@ function renderDoor(s) {
     <main class="gw-panel">
       <p class="gw-bigcue">Two doors.</p>
       <div class="gw-doors">
-      ${doors.map((d, i) => `
+      ${doors.map((d, i) => {
+        // Strand layer: a revisited room carries Eight's trace — the wing was
+        // played before you, and the other player's litter helps.
+        const seen = ((state.profile.explored || {})[room.tier.branch] || []).includes(d.id);
+        const trace = seen ? (SKIN.traces || {})[d.id] : null;
+        return `
         <button class="gw-door ${d.roomType ? 'gw-door-rt' : ''}" data-door="${i}">
           <div class="gw-door-name">${esc(d.name)}</div>
-          <div class="gw-door-bias ${d.roomType ? 'gw-door-special' : ''}">${esc(d.roomType ? ((SKIN.roomTypeLabels || {})[d.roomType] || d.roomType.toUpperCase()) : BIAS_LABEL[d.bias] || '')}</div>
+          <div class="gw-door-bias ${d.roomType ? 'gw-door-special' : ''}">${esc(d.roomType ? ((SKIN.roomTypeLabels || {})[d.roomType] || d.roomType.toUpperCase()) : seen ? 'WALKED BEFORE' : BIAS_LABEL[d.bias] || '')}</div>
           <div class="gw-door-desc">${esc(d.desc)}</div>
-        </button>`).join('')}
+          ${trace ? `<div class="gw-door-trace">${esc(trace)}</div>` : ''}
+        </button>`;
+      }).join('')}
       </div>
     </main>`;
   root().querySelectorAll('[data-door]').forEach((el) => {
@@ -690,7 +733,7 @@ function renderRoom(s) {
   // after the set is logged. The rest timer runs as prescribed.
   if (door && door.roomType && result && !entry) {
     const special = resolveSpecialRoom(SKIN, state.profile, state.rng, door);
-    markExplored(state.profile, room.tier.branch, door.id);
+    markExplored(state.profile, room.tier.branch, door.id, room.tier.id);
     saveProfile(state.profile);
     entry = state.resolutions[idx] = {
       kind: 'special', specialType: door.roomType, special,
@@ -794,7 +837,7 @@ function rollRoom(idx, room, door, key) {
   });
   animateDie(res.roll, () => {
     const award = awardForRow(SKIN, state.profile, state.rng, res.row);
-    if (door) markExplored(state.profile, room.tier.branch, door.id);
+    if (door) markExplored(state.profile, room.tier.branch, door.id, room.tier.id);
     saveProfile(state.profile);
     state.resolutions[idx] = { ...res, award, door, outcome: result.outcome, branch: room.tier.branch, roomIndex: idx };
     if (award.type === 'encounter') state.encounterPending = { roomIndex: idx, encounter: award.encounter };
@@ -1147,8 +1190,71 @@ function renderDebrief(s) {
       saveProfile(state.profile);
     }
     state._aarFiled = null;
+    // Finale (D40): the first AAR filed in week 8+ closes out into the
+    // transmit choice instead of the home screen — the season's last scene.
+    if (s.finaleArmed && !s.stormProtocol) {
+      state.liveBeat = 0;
+      state.liveChoiceResult = null;
+      nav('finale');
+      return;
+    }
     nav('home');
   } });
+}
+
+// ── Season finale (D40): the choice Eight left ───────────────────────────────
+// Beats deal one at a time; the transmit option is gated on REAL wing-state
+// (Mast Access cleared) — the ending you cannot pick yet is the metroidvania
+// statement. Closing files the ending document and stamps the season.
+function renderFinale() {
+  const fin = SKIN.finale;
+  // A just-chosen ending must still display (closeSeason stamps the profile
+  // BEFORE the ending card renders) — only bounce when arriving already-closed.
+  if (!fin || (state.profile.seasonClosedAt && !state.liveChoiceResult)) { nav('home'); return; }
+  const beats = fin.beats || [];
+  const atChoice = state.liveBeat >= beats.length;
+  const chosen = state.liveChoiceResult;
+  const ready = mastReady(state.profile, TREE.id);
+  root().innerHTML = `
+    <header class="gw-header"><h1>${esc(fin.title)}</h1>
+      <div class="gw-dim gw-episode">WEEK ${SEASON_WEEKS} OF ${SEASON_WEEKS} — THE COMMISSION ENDS TONIGHT</div></header>
+    <main class="gw-panel gw-live">
+      ${beats.slice(0, Math.min(state.liveBeat + 1, beats.length)).map((b) => `<p class="gw-script">${esc(b)}</p>`).join('')}
+      ${atChoice && !chosen ? `
+        <p class="gw-bigcue">${esc(fin.choice.prompt)}</p>
+        ${fin.choice.options.map((o, i) => {
+          const locked = o.requiresMast && !ready;
+          return `
+          <button class="gw-door ${locked ? 'gw-door-locked' : ''}" data-fin-choice="${i}" ${locked ? 'disabled' : ''}>
+            <div class="gw-door-name">${locked ? '🔒 ' : ''}${esc(o.label)}</div>
+            ${locked ? `<div class="gw-door-desc">${esc(o.lockedHint || '')}</div>` : ''}
+          </button>`;
+        }).join('')}
+      ` : atChoice && chosen ? `
+        ${documentHtml(chosen.ending, 'gw-keystone')}
+        <p class="gw-beat">${esc(fin.closing)}</p>
+        <button class="gw-primary gw-big" data-act="fin-done">Close the season</button>
+      ` : `
+        <button class="gw-primary gw-big" data-act="fin-next">…</button>
+      `}
+    </main>`;
+  wire({
+    'fin-next': () => { state.liveBeat += 1; render(); },
+    'fin-done': () => { state.liveChoiceResult = null; nav('home'); }
+  });
+  root().querySelectorAll('[data-fin-choice]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const option = fin.choice.options[Number(el.getAttribute('data-fin-choice'))];
+      if (option.requiresMast && !ready) return;
+      const ending = closeSeason(state.profile, fin, option.id);
+      if (!ending) return;
+      state.profile.lastHook = ending.hook;
+      saveProfile(state.profile);
+      bossSting(muted(), true);
+      state.liveChoiceResult = { ending };
+      render();
+    });
+  });
 }
 
 // ── Storm Protocol (minimum dose — the identity rep) ─────────────────────────
@@ -1203,8 +1309,10 @@ function renderDispatch() {
   const flow = (w) => w.reduce((n, x) => n + (x.flowMinutes || 0), 0);
   const r1 = rate(window1), r0 = rate(window0);
   const trendArrow = r0 === null ? '' : r1 > r0 ? ' ↑' : r1 < r0 ? ' ↓' : ' →';
+  const dispatchEpisode = episodeFor(SKIN, seasonState(SKIN, state.profile).week);
   root().innerHTML = `
-    <header class="gw-header"><h1>${esc(SKIN.sessionFrame.dispatch.title)}</h1></header>
+    <header class="gw-header"><h1>${esc(SKIN.sessionFrame.dispatch.title)}</h1>
+      ${dispatchEpisode ? `<div class="gw-dim gw-episode">closing the episode — ${esc(dispatchEpisode.title)}</div>` : ''}</header>
     <main class="gw-panel">
       <p class="gw-dim">${esc(SKIN.sessionFrame.dispatch.intro)}</p>
       <div class="gw-stat-row">

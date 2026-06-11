@@ -11,6 +11,7 @@ import { getTier, branchOfTier } from './profile.mjs';
 import { frontierDoors } from './map.mjs';
 import { nextCache } from './discovery.mjs';
 import { liveEventDue } from './keystones.mjs';
+import { seasonWeek, DELOAD_WEEK, SEASON_WEEKS, seasonClosed } from './season.mjs';
 
 // Rest doctrine (OG audit, D41): 120s wall-clock between rooms is compliant
 // BECAUSE rooms alternate movements (paired sets) — each movement recovers
@@ -47,11 +48,17 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
   const branchCleared = cleared.filter((id) => branchOfTier(tree, id) === focusBranch);
   const warmupTier = branchCleared.length ? getTier(tree, branchCleared[branchCleared.length - 1]) : null;
 
+  // Season clock (D40): calendar week of the commission. Week 5 is the light
+  // week — OG deload doctrine (D41): roughly half volume, same movements,
+  // never zero. The finale arms at week 8+ (fires after that session's AAR).
+  const week = seasonWeek(profile);
+  const isDeload = week === DELOAD_WEEK && !seasonClosed(profile);
+
   // Session budget shapes optional volume only (never main progression or
   // prep — the cut-order law): 25min → 1 off-branch set, 40 → 2, 60 → 3.
   const budget = (profile.settings && profile.settings.sessionBudgetMinutes) || 40;
-  const offSets = budget <= 25 ? 1 : budget >= 60 ? 3 : 2;
-  const workingSets = learnMode ? 2 : 3;
+  const offSets = Math.max(1, (budget <= 25 ? 1 : budget >= 60 ? 3 : 2) - (isDeload ? 1 : 0));
+  const workingSets = learnMode || isDeload ? 2 : 3;
   const rooms = [];
   for (let i = 0; i < workingSets; i++) {
     rooms.push({
@@ -106,7 +113,9 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
     focusBranch,
     focusTierId: focusTier ? focusTier.id : null,
     learnMode,
-    isDeload: false, // slice: deload scheduling lands in full production
+    week,
+    isDeload,
+    finaleArmed: !seasonClosed(profile) && week >= SEASON_WEEKS && !!(skin && skin.finale),
     prep: PREP_DRILLS,
     warmup: warmupTier ? {
       tier: warmupTier,

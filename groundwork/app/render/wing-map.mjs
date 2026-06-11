@@ -95,6 +95,18 @@ export function buildWingMapSvg(wing, opts = {}) {
         + (nextDoor ? `<text x="${x}" y="${y + CH_H / 2 - 6}" text-anchor="middle" class="gwm-sealed gwm-nextdoor">${esc(sec.flavorName)}</text>` : '')
         + `</g>`);
 
+      // Explored rooms fill INTO their sector chamber (play draws the map):
+      // small lit cells along the chamber's bottom edge, one per narrative
+      // room explored while working this sector.
+      const roomsHere = (opts.roomsBySector || {})[sec.tier.id] || [];
+      roomsHere.slice(0, 6).forEach((room, ri) => {
+        const cx = x - CH_W / 2 + 9 + ri * 13;
+        parts.push(`<rect class="gwm-roomcell" x="${cx}" y="${y + CH_H / 2 - 11}" width="9" height="7" rx="2"><title>${esc(room.name)}</title></rect>`);
+      });
+      if (roomsHere.length > 6) {
+        parts.push(`<text x="${x + CH_W / 2 - 9}" y="${y + CH_H / 2 - 5}" text-anchor="end" class="gwm-roomcount">+${roomsHere.length - 6}</text>`);
+      }
+
       // TODAY pin (Sprint 2.3): the work order is pinned to the pulsing chamber.
       if (opts.todayTierId === sec.tier.id) {
         const side = b.branch === 'lever' ? -1 : 1;
@@ -106,14 +118,6 @@ export function buildWingMapSvg(wing, opts = {}) {
           + `<text x="${tx + 20}" y="${y + 4}" text-anchor="middle">TODAY</text>`
           + `</g>`);
       }
-    });
-
-    // Explored narrative rooms budding off the corridor, fog-of-war style.
-    const outer = b.branch === 'lever' ? -1 : 1;
-    b.explored.slice(0, 10).forEach((room, i) => {
-      const baseY = yFor(Math.floor(i / 2)) + (i % 2 === 0 ? -8 : 12);
-      const sx = xFor(b.branch, Math.floor(i / 2)) + outer * (CH_W / 2 + 10);
-      parts.push(`<rect class="gwm-stub" x="${sx + (outer < 0 ? -10 : 0)}" y="${baseY - 5}" width="10" height="10" rx="2"><title>${esc(room.name)}</title></rect>`);
     });
     parts.push('</g>');
   }

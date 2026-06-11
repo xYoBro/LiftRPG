@@ -30,10 +30,16 @@ export function frontierDoors(skin, profile, branch, rng, count = 2) {
   return doors;
 }
 
-export function markExplored(profile, branch, roomId) {
+export function markExplored(profile, branch, roomId, tierId) {
   profile.explored = profile.explored || {};
   profile.explored[branch] = profile.explored[branch] || [];
   if (!profile.explored[branch].includes(roomId)) profile.explored[branch].push(roomId);
+  // Remember WHERE it was explored — the map fills rooms into their sector
+  // chamber (play draws the map).
+  if (tierId) {
+    profile.exploredAt = profile.exploredAt || {};
+    if (!profile.exploredAt[roomId]) profile.exploredAt[roomId] = tierId;
+  }
 }
 
 // Bias tilt: deterministically nudge the resolved row toward the door's

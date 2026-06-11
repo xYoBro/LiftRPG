@@ -210,6 +210,96 @@ export const SKIN = {
       hook: 'Weak hands cannot make this mistake.' }
   ],
 
+  // ── SEASON (D40): eight weeks, eight titled episodes ───────────────────────
+  // The commission is the campaign. Each calendar week is an episode with a
+  // title and a through-line; the work order carries it, the weekly dispatch
+  // closes it. Week 5 is the light week (OG deload doctrine, D41). Week 8 is
+  // the finale: the transmit choice Eight left. Serialized cadence is the
+  // retention engine (narrative transportation — see game-design-research.md).
+  season: {
+    commissionLine: 'COMMISSION: 8 weeks. Keep the station.',
+    episodes: [
+      { week: 1, title: 'ARRIVAL', line: 'A keeper learns the wing; the wing learns the keeper.' },
+      { week: 2, title: 'THE ROUTE EIGHT TOOK', line: 'Every seal is a rung somebody climbed first.' },
+      { week: 3, title: 'THE COUNTING', line: 'Three, five, eight. Something keeps sets too.' },
+      { week: 4, title: 'THE CLERK', line: 'The mug. The catalog. The tally. Who keeps the column?' },
+      { week: 5, title: 'SLACK WATER', line: 'A line that never slackens snaps. Light week — posted on purpose.' },
+      { week: 6, title: 'THE LEDGER', line: 'Entries 1–214. The clasp wants both hands strong.' },
+      { week: 7, title: 'ONE STRONG DAY', line: 'The mast is one day’s work from transmit-capable.' },
+      { week: 8, title: 'THE ANSWER', line: 'Everything that listens eventually wants to answer.' }
+    ],
+    overtime: { title: 'OVERTIME', line: 'The commission ran out. The keeper did not.' },
+    // RIGGING editorializes against the posted order — two authorities,
+    // disagreement as texture, never a mechanical fork (Disco Elysium note).
+    editorials: [
+      { week: 5, line: 'RIGGING: “The Commission calls it a recovery protocol. I call it the week the wing gets to miss you. Take the light work. That’s not kindness — it’s load management.”' },
+      { week: 7, line: 'RIGGING: “The order sheet is getting dramatic. Ignore the headline; the work is the same work. Strong days are built out of ordinary ones — that’s the whole trick of them.”' },
+      { week: 8, line: 'RIGGING: “Final week of the posting. The Commission thinks commissions end. The wing and I have outlived eleven of them — but none of the others left me wondering what they’d choose. You do. Go to work.”' }
+    ]
+  },
+
+  // ── FINALE (week 8): the transmit choice ───────────────────────────────────
+  // Fires after the AAR of the first session in week 8+. Endings key to REAL
+  // wing-state (mast readiness = the body cleared Mast Access), never dice.
+  finale: {
+    id: 'finale-s1',
+    title: 'THE LAST ORDER',
+    beats: [
+      'The AAR is filed and the station knows it before you do — down the corridor, the signal room puts up its one green eye. Band 7. Carrier, then the counting, then the retired sign-off tone, twice. Not a question this time. An expectation.',
+      'You climb to the rack with chalk still on your hands. On the desk: the red ledger, unclasped — when? — open to entry 216. Blank. A pen squared beside it, the way Eight squared things. The transmit interlock list is bolted at eye height, and you know exactly how many of its punch-holes your body has earned.',
+      'RIGGING, quieter than you have ever heard it: “Eleven years I counted for Eight, and four months I counted for nobody. Whatever you write — count it out loud. I want to keep it.”'
+    ],
+    choice: {
+      prompt: 'Entry 216, and the key under your hand.',
+      options: [
+        {
+          id: 'transmit', label: 'The strong day. Restore the line — answer.',
+          requiresMast: true,
+          lockedHint: 'The interlock holds: the mast stair is one body away. Weak hands cannot make this mistake — Eight built it so. (Mast Access is not yet cleared.)'
+        },
+        { id: 'silence', label: 'Inherit the protocol. Ears open, mouth shut.' },
+        { id: 'entry216', label: 'Write it all down. Decide nothing tonight.' }
+      ]
+    },
+    endings: {
+      transmit: {
+        id: 'END-1', chain: 'keystone', title: 'Ending — The Answer', documentType: 'transcript',
+        body: 'The splices take a full day, fourteen of them, your hands doing a crew’s job alone the way a vanished keeper trained on this same rigging to do. At dusk the board goes green rung by rung. You key the retired sign-off tone once — K-9, alive — and let the silence carry it north. The reply comes in counts: three, five, eight… then, for the first time, nine. Whatever is out there has been counting you. The grid is still down. The conversation is not. Commission complete. The real work, whatever it turns out to be, starts tomorrow.',
+        hook: 'Then, for the first time: nine.'
+      },
+      silence: {
+        id: 'END-2', chain: 'keystone', title: 'Ending — The Keeper’s Silence', documentType: 'fieldNote',
+        body: 'You close the ledger with the entry written and the key untouched, and you understand Eight completely, finally, in the muscles more than the mind: someone has to be AT the listening post for the silence to mean anything. The station is not dark because it failed. It is dark because it is held — and the body that holds it is stronger than the one that arrived eight weeks ago. You post your own standard beside Eight’s on the wing door for whoever comes after. Commission complete. The silence is intact. It is yours now.',
+        hook: 'The silence is intact. It is yours now.'
+      },
+      entry216: {
+        id: 'END-3', chain: 'keystone', title: 'Ending — Entry 216', documentType: 'transcript',
+        body: 'You write until the pen is warm: the seals, the counting, the descent log with no ascent, the column kept in your handwriting by hands that are not yours. You log the choice itself as pending — not from weakness; from the discipline of a keeper who knows the difference between a decision and a deadline. Band 7 ends its carrier on the hour, patient as ever. It can count. Let it count a little longer. Commission complete; posting renewed at the keeper’s own request. Entry 217 is blank. For now.',
+        hook: 'Posting renewed at the keeper’s own request.'
+      }
+    },
+    closing: 'SEASON ONE — KEPT. The station continues. So will you.'
+  },
+
+  // ── TRACES (strand layer): Eight's asynchronous presence ───────────────────
+  // Room-keyed marks that surface when a narrative room is revisited — the
+  // wing was played before you, by somebody whose litter helps (the other
+  // player's ladders; see game-design-research.md). Texture only.
+  traces: {
+    'r-manifest': 'Eight’s trace: a filing rhythm penciled inside the drawer — IN, HELD, NEVER. Most of the drawer is HELD.',
+    'r-spool': 'Eight’s trace: cable lengths chalked on the drum heads, each crossed out and halved. Practice for something lighter.',
+    'r-breaker': 'Eight’s trace: every switch handle wiped clean of dust at the same height. Checked monthly, by hand, for nothing.',
+    'r-locker': 'Eight’s trace: inside the VOSS locker door, eleven names. Ten crossed out gently. One underlined twice.',
+    'r-galley': 'Eight’s trace: a second mug, chipped, pushed to the back of the cupboard. Somebody once expected company.',
+    'r-workshop': 'Eight’s trace: the practice splices in the scrap bin get better week by week, bottom to top. You are reading someone learn.',
+    'b-ladderwell': 'Eight’s trace: the chalk numbers climb the wall year by year — and stop two rungs short of the hatch. Two rungs.',
+    'b-relay': 'Eight’s trace: one board kept dust-free among the dead ones. Band 7. Of course it is Band 7.',
+    'b-harness': 'Eight’s trace: a worn harness retired on the lowest hook, straps cut so nobody could ever trust it again. Kindness, the rigger kind.',
+    'b-signalroom': 'Eight’s trace: pencil tallies on the desk edge, grouped in fives, hundreds of them. Eleven years of carriers, counted by hand.',
+    'b-mastlocker': 'Eight’s trace: the climbing log’s margins hold grip diagrams drawn small, like someone embarrassed to need them. Everyone needs them.',
+    'b-counterweight': 'Eight’s trace: the cage’s inside latch is polished bright from use. The outside latch is stiff. Read that twice.'
+  },
+
   // ── KEYSTONES (Sprint 2.2) — authored reveals on authored triggers ─────────
   // Never in the dice pool. Fired by the engine: first seal broken, seal-count
   // milestones (midpoint recontextualization renders ON the boss ceremony),

@@ -43,7 +43,10 @@ export function createEmptyProfile(seed) {
     lastDispatchAt: null,          // ISO date of last weekly dispatch
     firedKeystones: [],            // authored reveals that have fired (once ever)
     cachesOpened: [],              // sealed-cache room ids opened
-    doorCharge: {}                 // tierId → 0..1 gate-eligibility progress
+    doorCharge: {},                // tierId → 0..1 gate-eligibility progress
+    exploredAt: {},                // roomId → tierId (which sector it was explored from)
+    seasonClosedAt: null,          // ISO date the 8-week commission closed (D40)
+    seasonEnding: null             // ending id chosen at the finale
   };
 }
 
@@ -54,7 +57,8 @@ function migrateProfile(profile) {
     archive: [], kit: [], explored: {}, encountersSeen: [],
     choices: [], notes: [], shortcuts: [], lastHook: null,
     intention: null, microGoal: null, lastDispatchAt: null,
-    firedKeystones: [], cachesOpened: [], doorCharge: {}
+    firedKeystones: [], cachesOpened: [], doorCharge: {},
+    exploredAt: {}, seasonClosedAt: null, seasonEnding: null
   };
   for (const key of Object.keys(defaults)) {
     if (profile[key] === undefined) profile[key] = defaults[key];

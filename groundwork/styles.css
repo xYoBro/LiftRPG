@@ -196,7 +196,9 @@ button:active { transform: translateY(2px) scale(0.99); }
 @media (prefers-reduced-motion: reduce) { .gwm-you { animation: none; } }
 .gwm-gate rect { fill: var(--gw-bg); stroke: var(--gw-danger); stroke-width: 1.5; }
 .gwm-gate text { font-size: 9px; fill: var(--gw-danger); }
-.gwm-stub { fill: var(--gw-accent); opacity: 0.8; }
+.gwm-roomcell { fill: var(--gw-accent); opacity: 0.75; }
+.gwm-bar .gwm-roomcell { fill: var(--gw-amber); }
+.gwm-roomcount { font-family: var(--gw-mono); font-size: 7.5px; fill: var(--gw-dim); }
 .gwm-shortcut { stroke: var(--gw-amber); stroke-width: 2; stroke-dasharray: 6 5; opacity: 0.85; }
 .gwm-sealed { font-family: var(--gw-mono); font-size: 8.5px; fill: var(--gw-dim); }
 .gwm-corridor-label { font-family: var(--gw-mono); font-size: 8px; fill: var(--gw-dim); letter-spacing: 0.14em; }
@@ -256,6 +258,13 @@ button:active { transform: translateY(2px) scale(0.99); }
 /* ── Sprint 2: room types ── */
 .gw-door-special { color: var(--gw-accent); }
 .gw-door-rt { border-color: var(--gw-accent); }
+.gw-door-trace { font-style: italic; color: var(--gw-dim); font-size: 0.8rem; line-height: 1.45; border-top: 1px dashed var(--gw-rule); padding-top: 7px; margin-top: 8px; }
+.gw-door-locked { opacity: 0.55; }
+.gw-door-locked .gw-door-name { color: var(--gw-dim); }
+
+/* ── Season framing (D40) ── */
+.gw-episode { font-family: var(--gw-mono); letter-spacing: 0.12em; font-size: 0.7rem; color: var(--gw-amber); margin-top: 2px; }
+.gw-season-line { color: var(--gw-amber); margin-bottom: 6px; }
 .gw-res-special { border-style: dashed; }
 .gw-res-sp-quiet { border-color: var(--gw-rule); }
 .gw-res-sp-quiet .gw-kind { color: var(--gw-dim); }
