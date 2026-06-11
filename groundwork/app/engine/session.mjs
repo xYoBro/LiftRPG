@@ -53,8 +53,15 @@ export function generateSession(profile, tree, { dayNumber, skin, rng } = {}) {
   // (dayNumber) and body pacing stay global.
   const campaignSession = Math.max(0, sessionIndex - (profile.campaignSessionBase || 0));
   const branches = Object.keys(tree.branches);
-  const focusBranch = branches[sessionIndex % branches.length];
-  const offBranch = branches[(sessionIndex + 1) % branches.length];
+  // Route choice (D46): the keeper may take either corridor as the day's
+  // focus. Training-legal by construction — BOTH branches train every
+  // session; focus only biases volume 3v2, and the rotation default returns
+  // after the chosen session files. The override is one-shot.
+  const rotationDefault = branches[sessionIndex % branches.length];
+  const focusBranch = profile.routeOverride && branches.includes(profile.routeOverride)
+    ? profile.routeOverride
+    : rotationDefault;
+  const offBranch = branches.find((b) => b !== focusBranch) || branches[(sessionIndex + 1) % branches.length];
 
   const focusTier = getTier(tree, active[focusBranch]);
   const offTier = getTier(tree, active[offBranch]);

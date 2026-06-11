@@ -174,6 +174,7 @@ function sessionPreview() {
   const tier = getTier(TREE, peek.focusTierId);
   return {
     branch: TREE.branches[peek.focusBranch].name,
+    focusBranch: peek.focusBranch,
     focusTierId: peek.focusTierId,
     room: tier ? flavorName(tier) : '—',
     rooms: peek.rooms.length,
@@ -228,6 +229,14 @@ function renderHome() {
         })()}
         <div class="gw-preview-title">TODAY — PINNED TO THE MAP</div>
         <div class="gw-hero-line">${esc(preview.room)} · ${preview.rooms} rooms${preview.boss ? ' · <strong>SEALED DOOR</strong>' : ''}${preview.learn ? ' · new ground' : ''}</div>
+        ${(() => {
+          // Route choice (D46): pick the day's corridor — the TODAY pin moves
+          // with it. Both corridors still train; focus biases volume only.
+          const other = Object.keys(TREE.branches).find((b) => b !== preview.focusBranch);
+          if (!other) return '';
+          return `<div class="gw-route-pick gw-dim">${esc(TREE.branches[preview.focusBranch].name)} corridor focus · ${p.routeOverride ? 'your call' : 'rotation'}
+            <button class="gw-linklike" data-act="switch-route">take ${esc(TREE.branches[other].name)} instead</button></div>`;
+        })()}
         ${gateCharge !== null ? `
           <div class="gw-charge">
             <div class="gw-charge-label">${esc(SKIN.map.gateMeterLabel || 'DOOR CHARGE')} · ${esc(focusTier.boss.label)}</div>
@@ -256,7 +265,17 @@ function renderHome() {
     'start-session': () => { unlockAudio(); startSession(); },
     storm: () => { unlockAudio(); nav('storm'); },
     dispatch: () => nav('dispatch'),
-    'map-view': () => { state.mapView = state.mapView === 'local' ? 'wing' : 'local'; render(); }
+    'map-view': () => { state.mapView = state.mapView === 'local' ? 'wing' : 'local'; render(); },
+    'switch-route': () => {
+      const branches = Object.keys(TREE.branches);
+      const current = sessionPreview().focusBranch;
+      const other = branches.find((b) => b !== current);
+      const rotationDefault = branches[state.profile.history.filter((h) => h.treeId === TREE.id).length % branches.length];
+      if (other === rotationDefault) delete state.profile.routeOverride;
+      else state.profile.routeOverride = other;
+      saveProfile(state.profile);
+      render();
+    }
   });
   wireStationMap();
   wireNav();
@@ -1369,6 +1388,7 @@ function renderDebrief(s) {
       intelDrop: state.intelDrop
     });
     state.profile.history.push(aar);
+    delete state.profile.routeOverride; // route choice is one-shot (D46)
     if (s.learnMode && s.focusTierId) state.profile.tutorialSeen[s.focusTierId] = true;
     // Door charge (Sprint 2.3): latest focus evidence drives the gate meter.
     // Light days don't grade the door (D44) — the last heavy reading stands.

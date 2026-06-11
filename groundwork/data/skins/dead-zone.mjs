@@ -525,7 +525,10 @@ export const SKIN = {
         { when: {}, lines: [
           'Cold in the wing this morning. Somewhere overhead the long cables tick, the building counting something under its breath.',
           'Dust hangs in the beam of your light. Rooms stop being rooms when nobody walks them. Most of this job is refusing to let that happen.',
-          'The duty clock says work. The wing says nothing, as usual — it just stands there, being a route.'
+          'The duty clock says work. The wing says nothing, as usual — it just stands there, being a route.',
+          'Good light through the high windows today. Some mornings the wing is just a building and the work is just work, and that’s plenty.',
+          'The galley kettle takes nine minutes. You know because you timed it against your joint prep. The station teaches you its small clocks.',
+          'You found the broom yesterday and the entry hall shows it. Small victories go in the log too — Eight kept a column for them.'
         ] }
       ],
       order: {
@@ -617,7 +620,9 @@ export const SKIN = {
         'RIGGING: “Rests run long for you by design — that’s not coddling, it’s materials science. Strength is poured; connective tissue is cured. You can’t hurry curing. You can only show up while it happens.”'
       ] },
       { when: { isFirstRoom: true }, lines: [
-        'RIGGING: “First room of the day. Cold building, warm hands by the end — that’s the whole trade. Manifest says move.”'
+        'RIGGING: “First room of the day. Cold building, warm hands by the end — that’s the whole trade. Manifest says move.”',
+        'RIGGING: “Morning. Bar’s cold; hands warm up faster than excuses. In we go.”',
+        'RIGGING: “Coffee first next time. The manifest can wait four minutes. It’s waited four months.”'
       ] },
       { when: { postBossFail: true }, lines: [
         'RIGGING: “Same wing as the door that held. It’s still there. It’s not going anywhere — that’s the good news AND the plan.”'
@@ -625,7 +630,11 @@ export const SKIN = {
       { when: {}, lines: [
         'RIGGING: “Clean. Load path held the whole way. Mark the room and breathe — the next one isn’t going anywhere.”',
         'RIGGING: “You see how the dust sits in here? Nobody’s worked this room in a long time. Somebody does now.”',
-        'RIGGING: “Eight kept this wing climbable for a reason. Today the reason’s got your name on the duty sheet.”'
+        'RIGGING: “Eight kept this wing climbable for a reason. Today the reason’s got your name on the duty sheet.”',
+        'RIGGING: “Good set. Nothing poetic about it. Some days the report is just: it worked.”',
+        'RIGGING: “Rain coming in off the ridge. The roof holds. That used to be a whole job here; now it’s one sentence in mine.”',
+        'RIGGING: “Inventory note: we are over-provisioned on washers and under-provisioned on keepers. You’re fixing half of that.”',
+        'RIGGING: “That thermos of Eight’s seals properly. Take it up sometime. Some equipment is morale — I am quoting the manifest, which means Eight wrote that down as POLICY.”'
       ] }
     ],
 

@@ -301,6 +301,8 @@ button:active { transform: translateY(2px) scale(0.99); }
 .gw-charge-bar { height: 8px; border-radius: 4px; background: var(--gw-rule); overflow: hidden; }
 .gw-charge-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--gw-amber), var(--gw-accent)); transition: width 600ms var(--gw-ease); }
 .gw-charge-note { margin-top: 5px; font-size: 0.76rem; }
+.gw-route-pick { margin: 7px 0 2px; font-size: 0.78rem; }
+.gw-linklike { background: transparent; border: 1px solid var(--gw-rule); min-height: 30px; padding: 4px 10px; margin: 0 0 0 6px; font-size: 0.78rem; color: var(--gw-accent); border-radius: 7px; }
 
 /* ── Sprint 2: map-as-home additions ── */
 .gwm-sil { fill: none; stroke: var(--gw-dim); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0.75; }

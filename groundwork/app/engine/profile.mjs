@@ -74,6 +74,7 @@ export function startNewCampaign(profile) {
   profile.seasonClosedAt = null;
   profile.seasonEnding = null;
   delete profile.bossElect;
+  delete profile.routeOverride;
   profile.campaignStartedAt = new Date().toISOString();
   profile.campaignSessionBase = (profile.history || []).length;
   return profile;

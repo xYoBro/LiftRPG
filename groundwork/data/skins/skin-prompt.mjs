@@ -32,19 +32,33 @@ CREATIVE BRIEF
 ${briefText}
 
 THE FORM (read carefully — this is a found-world, not a plot)
-- The player is a newcomer with a duty, alone in a PLACE built around two "corridors" of
+- The player is a newcomer with a duty, alone-ish in a PLACE built around two "corridors" of
   physical work. A predecessor is gone and left the place deliberately arranged.
 - The story is told through: a 3-card cold open; one line of voice per intake test; documents
   found during work (4 chains, delivered in order); authored keystone reveals at progress
   milestones; one present-tense live event (~week 3); 8 titled weekly episodes; a finale with
   a real choice and 3 endings. The player reads during REST WINDOWS — every text earns ~30
   seconds of attention, no more.
-- One speaking character: the VOICE (like a terse mentor wired into the place). It counts
-  things, distrusts adjectives, never flatters, is secretly proud. Every line it speaks is
-  prefixed with its NAME in caps, e.g. 'NAME: "..."'.
-- Register: concrete nouns, no purple prose, second person for scene text. Every document
-  ends on a HOOK — one short line that makes stopping feel unfinished (write the hook as its
-  own field). Quality bar: a Mothership module crossed with a quiet literary novel.
+- TONE IS THE BRIEF'S, NOT YOURS. Cozy, comic, hopeful, pastoral, sporting, romantic, noir,
+  dreadful — whatever the brief implies, commit to it. The structure above supplies all the
+  mystery a metroidvania needs (locked doors, an absent predecessor, an unanswered question);
+  do NOT add dread on top unless the brief asks for it. An overgrown greenhouse run by a
+  cheerful ghost of good filing habits is as valid a world as a dead relay station.
+- One speaking character: the VOICE. Derive its personality from the brief — a warm aunt who
+  runs a tea house, a cheerful engineer, a gruff harbor master, a serene head gardener. Give
+  it two or three consistent verbal habits and one thing it quietly cares about. Every line it
+  speaks is prefixed with its NAME in caps, e.g. 'NAME: "..."'.
+- REGISTER RANGE (this is what separates writing from caricature): most lines are plain,
+  concrete, and human. Big atmospheric swings are rare and earned. Vary sentence length.
+  At least a third of all documents and beats should contain something mundane, warm, or
+  quietly funny — a kettle that takes nine minutes, an inventory joke, weather. If every
+  line sounds momentous, the world reads as parody. Numbers beat adjectives; specifics beat
+  mood. Hooks vary in temperature: some are questions, some are jokes that land later, some
+  are just a name you don't know yet.
+- Every document still ends on a HOOK (its own field) — a reason to come back, not
+  necessarily a chill.
+- Quality bar: a beloved indie module — specific, confident, rereadable — in whatever
+  register the brief demands.
 - THE LAW: never mention exercises, sets, reps, seconds of rest, or workout instructions in
   ANY text. The world mirrors effort thematically (weight, holding, climbing, patience) —
   it never prescribes it. Validation rejects skins containing rep/set language.
@@ -84,9 +98,9 @@ OUTPUT — one JSON object, no markdown fences, no commentary, exactly these key
     { "kind": "scene", "title": "CARD 2 TITLE", "body": "arrival; the place is deliberately stilled, not ruined (60-90 words)" },
     { "kind": "voice", "title": "CARD 3 TITLE", "body": "how the voice's channel opens (1-2 sentences)", "voiceLine": "VOICENAME: “first words; ends by pointing at the intake”" }
   ],
-  "roomPools": { "<branch id>": [ ${COUNTS.rooms}+ rooms each: { "id": "unique-id", "name": "Room Name", "bias": "intel|loot|encounter|story", "desc": "one eerie concrete sentence" } ] },
+  "roomPools": { "<branch id>": [ ${COUNTS.rooms}+ rooms each: { "id": "unique-id", "name": "Room Name", "bias": "intel|loot|encounter|story", "desc": "one concrete sentence with personality, in the brief's register" } ] },
   "lockedDoors": [ 4 teases of OTHER wings of the place: { "name": "...", "requires": "...", "tease": "one sentence" } ],
-  "fragments": [ ${COUNTS.chains} chains × ${COUNTS.fragmentsPerChain}+ docs, each { "id": "XX-01", "chain": "chain-id", "title": "...", "documentType": "fieldNote|correspondence|form|inspection|report|transcript", "body": "60-110 words", "hook": "one line" } — chains: the predecessor's official record; their private writing; technical anomalies; the eerie signal/outside thread. Each chain reads in order and the LAST doc of each chain points at the finale.
+  "fragments": [ ${COUNTS.chains} chains × ${COUNTS.fragmentsPerChain}+ docs, each { "id": "XX-01", "chain": "chain-id", "title": "...", "documentType": "fieldNote|correspondence|form|inspection|report|transcript", "body": "60-110 words", "hook": "one line" } — chains: the predecessor's official record; their private writing; the place's technical/working record with oddities; the outside-world/contact thread. Each chain reads in order and the LAST doc of each chain points at the finale.
   ],
   "kitItems": [ ${COUNTS.kit} items: { "id": "k-...", "name": "...", "kind": "tool|key|comfort|lore", "body": "one-two sentences", "unlocks": "(keys only) a shortcutRoutes id" } ],
   "encounters": [ ${COUNTS.encounters} beats: { "id": "enc-...", "prompt": "something is here, present tense", "options": [ { "label": "...", "result": "...", "award": { "type": "intel" } }, { "label": "...", "result": "...", "award": null } ] } ],
@@ -120,20 +134,28 @@ OUTPUT — one JSON object, no markdown fences, no commentary, exactly these key
   "echoFrames": { "<each chain id>": "one situating line for re-reading a page where it was written", "keystone": "..." },
   "caches": [ ${COUNTS.caches}: { "id": "cache-...", "name": "...", "needs": "<a kit item id>", "locked": "the want of the key (2 sentences)", "open": "the give (1-2 sentences, ends with a colon)" } ],
   "roomTypeLabels": { "sealed-cache": "...", "echo": "...", "quiet": "..." },
-  "traces": { "<${COUNTS.traces} room ids from your pools>": "the predecessor's mark in that room — one eerie-warm sentence each" },
+  "traces": { "<${COUNTS.traces} room ids from your pools>": "the predecessor's mark in that room — one sentence each; mix warm, funny, and curious" },
   "map": { "stationName": "...", "gateMeterLabel": "DOOR CHARGE (or your term)", "wings": { "${'pull'}": "This Wing's Name", "push": "...", "legs": "...", "core": "...", "handstand": "..." }, "shortcutRoutes": { "<route-id>": { "label": "...", "from": ["<branch>", index], "to": ["<branch>", index] } × 3 }, "silhouettes": {} }
 }
 
 CRAFT RULES (the difference between a world and a word salad)
-1. ONE mystery, askable in one sentence, answered by the finale. Every chain circles it.
+1. ONE question, askable in one sentence, answered by the finale. Every chain circles it.
+   The question's flavor follows the brief: it can be a wonder, a joke with a long fuse, or
+   an ache — it does not have to be a dread.
 2. The predecessor must be PRESENT through arrangement: things cleaned, labeled, left for
-   the player. Their absence is the second mystery.
+   the player. They can be charming, eccentric, beloved, exasperating — absence is not the
+   same thing as haunting.
 3. The midpoint recontext keystone must change what the player thinks the WORK is.
 4. Hooks are promises: each one must eventually be kept by a later document or the finale.
-5. Numbers beat adjectives. "Eleven watts, constant" beats "a strange power draw."
+5. Numbers beat adjectives. "Eleven watts, constant" beats "a strange power draw." Equally:
+   "the kettle takes nine minutes" beats "time moved strangely here."
 6. The live event and finale are PRESENT tense; everything else found is past tense.
 7. Write the 8 episode titles LAST, as the season's table of contents.
 8. The finale's locked option must make the player want next season's body, not feel cheated.
+9. ANTI-CARICATURE CHECK before you output: reread your default rest-beat pool and your
+   room descriptions. If more than half could be captioned "ominous", revise until the world
+   also contains weather, meals, small repairs, and one genuinely funny line the voice would
+   deny was a joke.
 
 Return ONLY the JSON object.`;
 }
