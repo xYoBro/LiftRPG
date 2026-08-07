@@ -2,20 +2,53 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101411">
-  <title>Groundwork</title>
-  <!-- Zero network (pillar 5): no CDNs, no external fonts, no analytics.
-       Every asset is local; the service worker caches all of it. -->
-  <link rel="icon" href="icon-192.png" type="image/png">
-  <link rel="stylesheet" href="styles.css">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="apple-touch-icon" href="icon-192.png">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Groundwork — decommissioned</title>
+  <style>
+    body { background: #101411; color: #b8c4b8; font: 16px/1.6 ui-monospace, Menlo, monospace;
+           display: grid; place-items: center; min-height: 100vh; margin: 0; padding: 24px; }
+    main { max-width: 34em; }
+    h1 { font-size: 1.1em; letter-spacing: 0.12em; color: #7fae7f; }
+    a, button { color: #a8d0a8; }
+    button { background: none; border: 1px solid #3a463a; border-radius: 6px;
+             font: inherit; padding: 10px 16px; cursor: pointer; margin-top: 12px; }
+    .dim { color: #6d786d; font-size: 0.9em; }
+  </style>
 </head>
 <body>
-  <div id="app"></div>
-  <script type="module" src="app/main.mjs"></script>
+  <main>
+    <h1>GROUNDWORK — DECOMMISSIONED</h1>
+    <p>The station held while it could. The commission is over; the keeper's
+       work continues on paper.</p>
+    <p><a href="https://liftrpg.co/">Continue to LiftRPG →</a></p>
+    <div id="save-row" hidden>
+      <button id="save-btn">Download your logbook (JSON)</button>
+      <p class="dim">Your training log is stored only on this device. Take it with you.</p>
+    </div>
+  </main>
+  <script>
+    // Belt and braces alongside the tombstone worker: unregister + clear here too.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister()));
+    }
+    if (window.caches) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k)));
+    // The save outlives the app: offer the profile as a download if one exists.
+    try {
+      var raw = localStorage.getItem('groundwork_profile_v1');
+      if (raw) {
+        document.getElementById('save-row').hidden = false;
+        document.getElementById('save-btn').addEventListener('click', function () {
+          var blob = new Blob([raw], { type: 'application/json' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = 'groundwork-save-final.json';
+          a.click();
+          URL.revokeObjectURL(url);
+        });
+      }
+    } catch (e) { /* storage blocked — nothing to offer */ }
+  </script>
 </body>
 </html>
