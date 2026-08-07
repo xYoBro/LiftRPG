@@ -40,8 +40,12 @@ function isStandardAlphaTable(referenceTable) {
 }
 
 export function alpha(hex, value) {
-  if (!hex || hex.charAt(0) !== '#' || (hex.length !== 7 && hex.length !== 4)) {
-    return 'rgba(0,0,0,' + value + ')';
+  // Malformed palette values must fail loudly, not paint the page black or
+  // emit rgba(NaN,…) (an invalid declaration the browser silently drops).
+  if (typeof hex !== 'string' || !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+    console.warn('[LiftRPG] alpha(): expected a #rgb/#rrggbb hex color, got '
+      + JSON.stringify(hex) + ' — falling back to neutral gray.');
+    return 'rgba(128,128,128,' + value + ')';
   }
   const full = hex.length === 4
     ? '#' + hex.charAt(1) + hex.charAt(1) + hex.charAt(2) + hex.charAt(2) + hex.charAt(3) + hex.charAt(3)

@@ -570,6 +570,15 @@ export function resolveTheme(data) {
 
 export function applyTheme(container, theme) {
   container.setAttribute('data-archetype', theme.archetype);
+  // Clear every custom property a previous applyTheme set on this container.
+  // Without this, tokens that exist in one theme but not the next (preset
+  // extras, booklet-supplied theme.tokens) leak across loads in one session.
+  const stale = [];
+  for (let i = 0; i < container.style.length; i++) {
+    const prop = container.style[i];
+    if (prop.startsWith('--')) stale.push(prop);
+  }
+  stale.forEach((prop) => container.style.removeProperty(prop));
   Object.keys(theme.tokens).forEach((key) => {
     container.style.setProperty(key, theme.tokens[key]);
   });

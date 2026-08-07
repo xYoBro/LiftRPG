@@ -118,12 +118,47 @@ function walkAndRepair(text) {
 
 // ── structural regex fixes ───────────────────────────────────────────────────
 
+// String-aware: structural repairs must never touch prose inside string
+// values ("he waited, ] then left" is narrative, not a trailing comma).
+// Runs after walkAndRepair, so quotes are balanced by the time we scan.
 function fixStructural(text) {
-  text = text.replace(/,(?=\s*[}\]])/g, '');
-  text = text.replace(/([}\]])(\s+)([{[\"])/g, function (_, close, ws, open) {
-    return close + ',' + ws + open;
-  });
-  return text;
+  var out = '';
+  var inStr = false;
+  var esc = false;
+  for (var i = 0; i < text.length; i++) {
+    var c = text[i];
+    if (inStr) {
+      out += c;
+      if (esc) { esc = false; }
+      else if (c === '\\') { esc = true; }
+      else if (c === '"') { inStr = false; }
+      continue;
+    }
+    if (c === '"') { inStr = true; out += c; continue; }
+    if (c === ',') {
+      // Trailing comma before a closing bracket: drop the comma.
+      var j = i + 1;
+      while (j < text.length && /\s/.test(text[j])) j++;
+      if (text[j] === '}' || text[j] === ']') continue;
+      out += c;
+      continue;
+    }
+    if (c === '}' || c === ']') {
+      out += c;
+      // Missing comma: a closer followed (across whitespace) by an opener.
+      var k = i + 1;
+      var ws = '';
+      while (k < text.length && /\s/.test(text[k])) { ws += text[k]; k++; }
+      var nxt = k < text.length ? text[k] : '';
+      if (ws.length && (nxt === '{' || nxt === '[' || nxt === '"')) {
+        out += ',' + ws;
+        i = k - 1;
+      }
+      continue;
+    }
+    out += c;
+  }
+  return out;
 }
 
 // ── Python / JS literal normalisation ───────────────────────────────────────
