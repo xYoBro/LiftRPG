@@ -24,7 +24,11 @@ const THEME_PRESETS = {
     '--card-surface': 'rgba(244,239,228,0.72)',
     '--line-style': 'solid',
     '--line-width-hair': '1px',
-    '--line-width-rule': '1.2px',
+    // Pastoral values below are the rendered truth: separators/field rules
+    // are 1px and canonical prose is 8pt in booklet.css. (These tokens were
+    // dead until the bridge wiring; correcting them here keeps the pastoral
+    // demo pixel-identical now that they render.)
+    '--line-width-rule': '1px',
     '--line-width-frame': '1.5px',
     '--surface-radius': '3px',
     '--surface-shadow': '0 6px 14px rgba(0,0,0,0.025)',
@@ -40,7 +44,7 @@ const THEME_PRESETS = {
     '--heading-size-xl': '32pt',
     '--heading-size-lg': '16pt',
     '--heading-size-md': '11pt',
-    '--body-size': '8.4pt',
+    '--body-size': '8pt',
     '--body-line-height': '1.58',
     '--small-size': '6.2pt',
     '--mono-size': '6.4pt',
