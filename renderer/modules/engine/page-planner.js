@@ -899,7 +899,9 @@ export function planAndMeasure(atoms, container, options = {}) {
           const candidateShareable = candidatePlacements.every(p => {
             return !placementLocksPage(p);
           });
-          if (!candidateShareable) continue;
+          // A locked page is a hard wall: merging content from beyond it would
+          // reorder printed pages (content after the wall pulled before it).
+          if (!candidateShareable) break;
 
           const mergedMeasurement = measurePlacementsPage(
             stack,

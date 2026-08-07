@@ -2075,7 +2075,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   gap:3px 5px;
 }
 .ops-directive-item{
-  font-family:var(--body);
+  font-family:var(--theme-body-family,var(--serif));
   font-size:6.1pt;
   line-height:1.35;
   min-height:18px;

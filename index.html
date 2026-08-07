@@ -6205,7 +6205,7 @@
         var aggregateScore = report && report.scores && report.scores.aggregate && typeof report.scores.aggregate.score === 'number'
           ? report.scores.aggregate.score
           : null;
-        var qualityMeta = weekCount + ' weeks &middot; validated' + (aggregateScore !== null ? ' &middot; quality ' + aggregateScore : '');
+        var qualityMeta = weekCount + ' weeks · validated' + (aggregateScore !== null ? ' · quality ' + aggregateScore : '');
 
         assemblyResultEl._assembledData = data;
         assemblyResultEl._filename = 'liftrpg-' + slug + '.json';

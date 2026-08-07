@@ -1421,7 +1421,17 @@ export function assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutp
         var nwSession = nwWeek.sessions[si];
         if (!nwSession || !nwSession.exercises || nwSession.exercises.length === 0) return;
         // Map normalized exercises to renderer shape
-        session.exercises = nwSession.exercises.map(function (ex) {
+        session.exercises = nwSession.exercises.map(function (ex, ei) {
+          var filled = [];
+          if (!ex.name) filled.push('name');
+          if (!ex.sets) filled.push('sets');
+          if (!ex.repsPerSet) filled.push('repsPerSet');
+          if (filled.length) {
+            diag.push(createDiagnostic('exercise-fields-defaulted', 'warning', 'normalize',
+              'Week ' + (wi + 1) + ' session ' + (si + 1) + ' exercise ' + (ei + 1)
+              + ': parsed workout missing ' + filled.join(', ')
+              + ' — filled with placeholder(s). Check the printed journal row.'));
+          }
           return {
             name: ex.name || 'Lift',
             sets: ex.sets || 3,

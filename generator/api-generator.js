@@ -7,8 +7,11 @@
  *
  * Exposes: window.LiftRPGAPI = { PROVIDERS, generate(settings, workout, brief) }
  *
- * SECURITY: API keys are stored in localStorage by the caller and sent
- * directly to the provider. They never pass through any LiftRPG server.
+ * SECURITY: API keys are session-only — the caller holds them in a password
+ * field and never persists them (saveApiPrefs deliberately excludes the key);
+ * they are sent as headers directly to the provider and never pass through
+ * any LiftRPG server. Pipeline checkpoints persist to sessionStorage
+ * (checkpoint.js) and contain no key material.
  * Anthropic browser-side access requires the dangerous-direct-browser-access
  * header, which Anthropic provides for exactly this use case.
  */
@@ -23,7 +26,8 @@ import {
   RATE_WINDOW_MS,
   RATE_MAX_CALLS,
   DAILY_CALL_LIMIT,
-  DOCUMENT_TYPE_ENUM
+  DOCUMENT_TYPE_ENUM,
+  VALID_ARCHETYPES
 } from './modules/constants.js';
 
 import {
@@ -124,10 +128,8 @@ import {
 // validateAssembledBooklet() check. Deeply variable inner structures (fieldOps,
 // bossEncounter) typed as generic objects — prompt text provides guidance.
 
-var TILE_TYPE_ENUM = ['empty', 'cleared', 'locked', 'anomaly', 'current', 'inaccessible'];
-var MAP_TYPE_ENUM = ['grid', 'point-to-point', 'linear-track', 'player-drawn'];
-var VISUAL_ARCHETYPE_ENUM = ['government', 'cyberpunk', 'scifi', 'fantasy', 'noir',
-  'steampunk', 'minimalist', 'nautical', 'occult', 'pastoral'];
+// Archetype enum comes from the contract (via constants.js re-export) — a new
+// archetype added to contract-constants must reach structured output too.
 
 var DESIGN_SPEC_SCHEMA = {
   type: 'object',
@@ -521,7 +523,7 @@ var STRUCTURED_SCHEMA_SHELL = {
     theme: {
       type: 'object',
       properties: {
-        visualArchetype: { type: 'string', enum: VISUAL_ARCHETYPE_ENUM },
+        visualArchetype: { type: 'string', enum: VALID_ARCHETYPES },
         palette: {
           type: 'object',
           properties: {

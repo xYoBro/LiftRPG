@@ -9,9 +9,11 @@ import { detectProviderId } from './provider.js';
 // ── Exported functions ────────────────────────────────────────────────────────
 
 export function getDailyBudget() {
-  var raw = null;
-  try { raw = localStorage.getItem(BUDGET_KEY); } catch (_e) { /* private browsing */ }
-  var budget = raw ? JSON.parse(raw) : null;
+  var budget = null;
+  try {
+    var raw = localStorage.getItem(BUDGET_KEY);
+    budget = raw ? JSON.parse(raw) : null;
+  } catch (_e) { /* private browsing, or a corrupted value — start a fresh day */ }
   var today = new Date().toISOString().slice(0, 10);
   if (!budget || budget.date !== today) {
     return { date: today, calls: 0, tokens: 0, timestamps: [] };

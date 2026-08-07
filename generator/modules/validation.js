@@ -148,7 +148,16 @@ function splitShellSectionText(text, index) {
     return { heading: titleCaseShellLabel(dashed[1]), body: dashed[2].trim() };
   }
 
-  return { heading: 'Procedure ' + (index + 1), body: normalized };
+  return { heading: fabricatedShellHeading(index), body: normalized };
+}
+
+// A fabricated heading is a repair, not a silent substitution: "Procedure N"
+// is non-diegetic and can print in any genre's booklet, so its use is logged.
+function fabricatedShellHeading(index) {
+  console.warn('[LiftRPG] rulesSpread section ' + (index + 1)
+    + ': no heading could be derived \u2014 placeholder "Procedure ' + (index + 1)
+    + '" will print unless the section is regenerated or edited.');
+  return 'Procedure ' + (index + 1);
 }
 
 function normalizeShellSection(section, index) {
@@ -165,7 +174,7 @@ function normalizeShellSection(section, index) {
   }
 
   if (!section || typeof section !== 'object') {
-    return { heading: 'Procedure ' + (index + 1), body: '' };
+    return { heading: fabricatedShellHeading(index), body: '' };
   }
 
   var objectKeys = Object.keys(section);
@@ -202,7 +211,7 @@ function normalizeShellSection(section, index) {
   }
 
   return {
-    heading: heading || ('Procedure ' + (index + 1)),
+    heading: heading || fabricatedShellHeading(index),
     body: body || ''
   };
 }
@@ -2055,10 +2064,10 @@ var DEGRADED_PATTERNS = [
   /missing designSpec/i,
   /missing epigraph/i,
   /epigraph missing/i,
-  /missing consequenceOnFull/i,
-  /missing falseAssumptions/i,
-  /missing motifPayoffs/i,
-  /missing finalRevealRecontextualizes/i
+  /missing consequenceOnFull/i
+  // falseAssumptions / motifPayoffs / finalRevealRecontextualizes are emitted
+  // as WARNINGS post-restructure and never reach this classifier — patterns
+  // for them here would be dead code.
 ];
 
 export function classifyValidationErrors(errors) {
