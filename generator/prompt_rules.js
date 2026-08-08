@@ -1683,3 +1683,162 @@
       '',
       'Return ONLY the JSON object. No markdown fences, no commentary.'
   ];
+
+  // ── Composition critic (D66): the conductor's ears ────────────────────────
+  // Grades the ASSEMBLED booklet on the compositional commitments this file
+  // demands. Dimension ids are load-bearing: modules/constants.js
+  // CRITIC_DIMENSIONS and modules/critic.js parse against them (generator
+  // tests assert parity). Scores are evidence-anchored: a score at or above
+  // the ship threshold without cited evidence is invalid by law and gets
+  // clamped client-side.
+  window.CRITIC_RUBRIC = [
+    '## The Rubric — seven dimensions, graded 0-100',
+    '',
+    'Calibration anchors (grade against these, not against hope):',
+    '- 50 = the structure is present but inert — components exist, nothing connects.',
+    '- 70 = competent and connected — systems reference each other, arc functions.',
+    '- 85 = composed — visible through-lines, payoffs land, the world feels authored.',
+    '- 90 = a working game designer would ship this without edits.',
+    '- 95+ = reserve for work you would hold up as an exemplar. Most first drafts land 60-80.',
+    '',
+    '### arcIntegrity',
+    'Does the declared arcFamily actually shape the weekly arcBeats? Does the midpoint',
+    'RECONTEXTUALIZE prior evidence (name what changes meaning) rather than merely escalate?',
+    'Does the darkest moment cost something named and irrecoverable (relational, ethical,',
+    'institutional)? Does the ending acknowledge the binary choice, the boss outcome, and a',
+    'relationship consequence?',
+    '',
+    '### systemIntegration',
+    'One living board, not parallel games: do oracle paperActions name clocks, nodes, and',
+    'companion slots that actually exist in this booklet? Does at least one clock’s',
+    'consequenceOnFull change the map? Do cipher outputs open access (route, zone, fragment)',
+    'rather than just feeding the boss decode? Does the binary choice fork board state both ways?',
+    '',
+    '### clueEconomy',
+    'Are the mystery questions answerable from evidence physically present in the booklet?',
+    'Are false assumptions planted by one document and corrected by a later one — both',
+    'identifiable? Do at least three fragments have distinct linked functions (action-changing,',
+    'interpretation-changing, character-deepening)? Is any non-boss week clue-free?',
+    '',
+    '### motifPayoff',
+    'Do recurring objects, places, or phrases appear in at least two non-adjacent weeks AND',
+    'mean something different at their final appearance? A motif that merely recurs is',
+    'decoration — grade it as inert. Cite the first and final appearances.',
+    '',
+    '### worldCohesion',
+    'Core Noun Roster discipline: do ciphers, map nodes, oracle entries, and fragments',
+    'reference nouns established in the worldContract, or does stray lore appear late? Does',
+    'the document ecology honor its declared dominant/forbidden types? Is the institutional',
+    'voice consistent across documents that claim the same author or department?',
+    '',
+    '### briefFidelity',
+    'Does the tone and register match the user’s brief — including its simplicity, if it is',
+    'simple? Has the structural scaffold drowned the voice (institutional gravity the brief',
+    'never asked for)? Are named references honored as templates, not decoration? Is the prose',
+    'free of banned cliche patterns?',
+    '',
+    '### fusionPacing',
+    'Does the physical modality of each week’s workout map to the narrative register per the',
+    'fusion matrix (heavy = crushing pressure, sprints = frantic evasion, deload = false safety)?',
+    'Do heavy weeks land on crisis beats and deloads breathe? Do at least half the sessions end',
+    'unresolved? Are storyPrompts inside their length budgets with a physical action, sensory',
+    'detail, and material object? Zero gym metaphors in the fiction?'
+  ];
+
+  window.CRITIC_EVIDENCE_LAW = [
+    '## Evidence Law (scores are claims; claims need exhibits)',
+    '- Every dimension score MUST cite at least two evidence entries: a JSON path or location',
+    '  ("weeks[2].sessions[1].storyPrompt", "fragments F.07") plus a verbatim quote of at most',
+    '  15 words from the booklet.',
+    '- A score of 90 or above with fewer than two evidence entries is INVALID.',
+    '- A score of 90 or above while open failures remain for that dimension is INVALID.',
+    '- Evidence must support the score given. Citing strong material while scoring low, or',
+    '  weak material while scoring high, makes the verdict incoherent — do not do it.',
+    '- You are an adversarial critic. Your job is to find where the composition fails, then',
+    '  grade what remains honestly. You are not the author’s friend and not their enemy.'
+  ];
+
+  window.CRITIC_FAILURE_CONTRACT = [
+    '## Failure + Directive Contract',
+    'For every weakness that holds a dimension below threshold, emit a failure object:',
+    '- "dimension": the dimension id.',
+    '- "unitType": one of "week" | "fragment" | "ending" | "rulesSpread" — the ONE unit whose',
+    '  revision would fix this. Directives must be executable within that unit alone; never',
+    '  demand cross-unit renames or structural rebuilds.',
+    '- "unitRef": weekNumber (number) for weeks, fragment id (string) for fragments, ending',
+    '  variant (string) for endings, "rulesSpread" for the rules spread.',
+    '- "issue": one sentence naming what is wrong, with the evidence location.',
+    '- "directive": one imperative sentence a reviser can execute inside that unit — concrete,',
+    '  targeted, preserving all ids, refs, and enum vocabulary.'
+  ];
+
+  window.buildCriticPrompt = function (bookletDigestJson, brief) {
+    return [
+      '# Composition Critic — Assembled Booklet Review',
+      '',
+      'You are grading an assembled print-and-play booklet (a workout journal fused with a',
+      'solo paper RPG) against the compositional commitments its generation contract makes.',
+      'The machine validator has already checked schema, counts, and reference integrity —',
+      'do NOT re-check those. You grade the MUSIC, not the notes: whether the composition',
+      'coheres as a play experience.',
+      '',
+      '## The User’s Creative Brief (fidelity target)',
+      brief || '(no brief provided — grade briefFidelity on internal tonal consistency)',
+      ''
+    ].concat(window.CRITIC_RUBRIC, [''], window.CRITIC_EVIDENCE_LAW, [''], window.CRITIC_FAILURE_CONTRACT, [
+      '',
+      '## Output Contract',
+      'Return ONLY a JSON object, no markdown fences, no commentary:',
+      '{',
+      '  "verdict": {',
+      '    "arcIntegrity":      { "score": 0, "evidence": [{ "path": "...", "quote": "..." }], "failures": [] },',
+      '    "systemIntegration": { "score": 0, "evidence": [], "failures": [] },',
+      '    "clueEconomy":       { "score": 0, "evidence": [], "failures": [] },',
+      '    "motifPayoff":       { "score": 0, "evidence": [], "failures": [] },',
+      '    "worldCohesion":     { "score": 0, "evidence": [], "failures": [] },',
+      '    "briefFidelity":     { "score": 0, "evidence": [], "failures": [] },',
+      '    "fusionPacing":      { "score": 0, "evidence": [], "failures": [] }',
+      '  },',
+      '  "summary": "two sentences: the composition’s strongest through-line and its weakest seam"',
+      '}',
+      'Every failure object follows the Failure + Directive Contract exactly.',
+      '',
+      '## The Assembled Booklet (digest — workout exercise lists compacted)',
+      bookletDigestJson
+    ]).join('\n');
+  };
+
+  // Revision prompt: apply the critic’s directives to ONE unit, changing
+  // nothing that was not directed. The validity floor is enforced client-side
+  // (a revision that increases validation errors is reverted), but the prompt
+  // carries the preservation laws so revisions rarely need reverting.
+  window.buildUnitRevisionPrompt = function (unitLabel, unitJson, directives, contextJson) {
+    var directiveLines = (directives || []).map(function (d, i) { return (i + 1) + '. ' + d; });
+    return [
+      '# Targeted Revision — ' + unitLabel,
+      '',
+      'You are revising ONE unit of an already-assembled booklet. A composition critic has',
+      'issued the directives below. Apply ALL of them. Change NOTHING that a directive does',
+      'not name.',
+      '',
+      '## Preservation Laws (violating any invalidates the revision)',
+      '- Keep every id, fragmentRef, weekNumber, variant, and cross-reference exactly as-is.',
+      '- Keep the structure: same fields, same array lengths where counts are contractual',
+      '  (oracle tables keep exactly 10 entries with the same roll bands).',
+      '- Keep all enum vocabulary (documentType, clock types, companion types, map types).',
+      '- Keep exercises, sets, and reps untouched — the workout is never revised.',
+      '- Prose may change freely WHERE A DIRECTIVE POINTS. Adjacent prose stays.',
+      '',
+      '## World Context (stay inside it — no new nouns, no stray lore)',
+      contextJson,
+      '',
+      '## Directives',
+      directiveLines.join('\n'),
+      '',
+      '## The Current Unit',
+      unitJson,
+      '',
+      '## Output',
+      'Return ONLY the complete revised unit as a JSON object. No fences, no commentary.'
+    ].join('\n');
+  };

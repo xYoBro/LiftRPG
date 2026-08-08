@@ -6202,6 +6202,11 @@
           ? report.scores.aggregate.score
           : null;
         var qualityMeta = weekCount + ' weeks · validated' + (aggregateScore !== null ? ' · quality ' + aggregateScore : '');
+        var criticReport = data._criticReport;
+        if (criticReport && typeof criticReport.finalMin === 'number') {
+          qualityMeta += ' · critic ' + criticReport.finalMin + '/' + criticReport.threshold
+            + (criticReport.finished ? ' ✓ composed' : ' — critique attached');
+        }
 
         assemblyResultEl._assembledData = data;
         assemblyResultEl._filename = 'liftrpg-' + slug + '.json';

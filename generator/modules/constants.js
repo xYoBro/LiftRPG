@@ -112,3 +112,22 @@ export var VALID_PAYLOAD_TYPES = PAYLOAD_TYPE_LIST.reduce(function (acc, name) {
   acc[name] = 1;
   return acc;
 }, {});
+
+// ── Composition critic loop (the conductor's ears) ──────────────────────────
+// The critic grades the ASSEMBLED booklet on the compositional commitments
+// prompt_rules.js already demands, then drives targeted unit revisions until
+// every dimension clears the threshold or the round cap is hit (D66).
+// Dimension ids must match the rubric in prompt_rules.js buildCriticPrompt
+// (generator tests assert the parity).
+export var CRITIC_SCORE_THRESHOLD = 90;
+export var CRITIC_MAX_ROUNDS = 3;
+export var CRITIC_MAX_REVISIONS_PER_ROUND = 6;
+export var CRITIC_DIMENSIONS = [
+  { id: 'arcIntegrity', name: 'Arc Integrity' },
+  { id: 'systemIntegration', name: 'System Integration' },
+  { id: 'clueEconomy', name: 'Clue Economy & Mystery' },
+  { id: 'motifPayoff', name: 'Motif Payoff' },
+  { id: 'worldCohesion', name: 'World Cohesion' },
+  { id: 'briefFidelity', name: 'Brief Fidelity & Register' },
+  { id: 'fusionPacing', name: 'Fusion & Pacing' }
+];

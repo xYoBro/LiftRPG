@@ -27,8 +27,23 @@ import {
   RATE_MAX_CALLS,
   DAILY_CALL_LIMIT,
   DOCUMENT_TYPE_ENUM,
-  VALID_ARCHETYPES
+  VALID_ARCHETYPES,
+  CRITIC_SCORE_THRESHOLD,
+  CRITIC_MAX_ROUNDS,
+  CRITIC_MAX_REVISIONS_PER_ROUND
 } from './modules/constants.js';
+
+import {
+  buildCriticDigest,
+  validateCriticVerdict,
+  normalizeCriticVerdict,
+  summarizeVerdict,
+  selectRevisionTargets,
+  getUnit,
+  setUnit,
+  revisionPreservesIdentity,
+  unitLabel
+} from './modules/critic.js';
 
 import {
   extractJson
@@ -1381,6 +1396,138 @@ function persistLastBooklet(booklet, meta) {
 
 // ── 10-Stage API Pipeline Orchestrator ────────────────────────────────────────
 
+// ── Composition critic loop (D66): grade → revise → regrade ─────────────────
+// Runs AFTER assembly + machine validation + the mechanical quality gate. The
+// critic grades the seven compositional dimensions (rubric in prompt_rules.js);
+// failing dimensions produce unit-scoped directives; targeted revisions apply
+// under two hard floors: identity fields never change, and a revision that
+// raises machine-validation errors is reverted. Loops until every dimension
+// clears the threshold or the round cap hits. Per D19 severity doctrine the
+// loop never blocks delivery — an unfinished booklet ships with its critique
+// attached in _criticReport.
+async function runCriticLoop(settings, booklet, brief, ctx) {
+  ctx = ctx || {};
+  if (settings && settings.criticLoop === false) return null;
+  if (ctx.trialMode) return null;
+  if (typeof window.buildCriticPrompt !== 'function' || typeof window.buildUnitRevisionPrompt !== 'function') {
+    console.warn('[LiftRPG] Critic prompt builders unavailable — skipping critic loop.');
+    return null;
+  }
+  var threshold = (settings && settings.criticThreshold) || CRITIC_SCORE_THRESHOLD;
+  var maxRounds = (settings && settings.criticMaxRounds) || CRITIC_MAX_ROUNDS;
+  var report = { threshold: threshold, rounds: [], finished: false, revisedUnits: 0 };
+  var meta = booklet.meta || {};
+  var contextJson = JSON.stringify({
+    storySpine: meta.storySpine || '',
+    worldContract: meta.worldContract || '',
+    artifactIntent: meta.artifactIntent || null,
+    weekCount: (booklet.weeks || []).length
+  });
+
+  for (var round = 1; round <= maxRounds; round++) {
+    var digestJson = JSON.stringify(buildCriticDigest(booklet));
+    var verdictRaw;
+    try {
+      verdictRaw = await runJsonStage(settings, {
+        stageKey: 'critic',
+        stageName: 'Composition Critic — round ' + round,
+        buildPrompt: (function (dj) { return function () { return window.buildCriticPrompt(dj, brief); }; })(digestJson),
+        maxTokens: 8000,
+        maxAttempts: 2,
+        validate: validateCriticVerdict,
+        rateLimiter: ctx.rateLimiter || null,
+        budgetEnforce: !!ctx.budgetEnforce,
+        onProgress: ctx.onProgress,
+        telemetryCollector: ctx.telemetryCollector
+      });
+    } catch (err) {
+      console.warn('[LiftRPG] Critic round ' + round + ' failed — booklet kept as-is:', err.message);
+      report.error = String((err && err.message) || err);
+      break;
+    }
+    var verdict = normalizeCriticVerdict(verdictRaw, threshold);
+    var summary = summarizeVerdict(verdict);
+    var roundRecord = {
+      round: round,
+      scores: summary.byDimension,
+      min: summary.min,
+      avg: summary.avg,
+      summary: verdict.summary,
+      revised: []
+    };
+    report.rounds.push(roundRecord);
+    console.log('[LiftRPG] Critic round ' + round + ': min ' + summary.min + ' avg ' + summary.avg, summary.byDimension);
+
+    if (summary.min >= threshold) { report.finished = true; break; }
+    if (round === maxRounds) break;
+
+    var targets = selectRevisionTargets(verdict, threshold, CRITIC_MAX_REVISIONS_PER_ROUND);
+    if (!targets.length) {
+      console.warn('[LiftRPG] Critic named no unit-addressable failures — stopping with critique attached.');
+      break;
+    }
+    var baselineErrors = validateAssembledBooklet(booklet).errors.length;
+
+    for (var ti = 0; ti < targets.length; ti++) {
+      var target = targets[ti];
+      var original = getUnit(booklet, target.unitType, target.unitRef);
+      if (!original) continue;
+      var label = unitLabel(target.unitType, target.unitRef);
+      var revised;
+      try {
+        revised = await runJsonStage(settings, {
+          stageKey: 'critic-revise',
+          stageName: 'Composition Revision — ' + label,
+          buildPrompt: (function (lbl, oj, dirs) {
+            return function () { return window.buildUnitRevisionPrompt(lbl, oj, dirs, contextJson); };
+          })(label, JSON.stringify(original), target.directives),
+          maxTokens: 16000,
+          maxAttempts: 2,
+          rateLimiter: ctx.rateLimiter || null,
+          budgetEnforce: !!ctx.budgetEnforce,
+          telemetryCollector: ctx.telemetryCollector
+        });
+      } catch (err) {
+        console.warn('[LiftRPG] ' + label + ' revision failed — unit kept as-is:', err.message);
+        continue;
+      }
+      if (!revisionPreservesIdentity(target.unitType, original, revised)) {
+        console.warn('[LiftRPG] ' + label + ' revision changed identity fields — rejected.');
+        continue;
+      }
+      var slot = setUnit(booklet, target.unitType, target.unitRef, revised);
+      if (!slot) continue;
+      var postErrors = validateAssembledBooklet(booklet).errors.length;
+      if (postErrors > baselineErrors) {
+        // Validity floor: a revision may never make the booklet less valid.
+        setUnit(booklet, target.unitType, target.unitRef, slot.previous);
+        console.warn('[LiftRPG] ' + label + ' revision raised validation errors ('
+          + baselineErrors + ' → ' + postErrors + ') — reverted.');
+        continue;
+      }
+      report.revisedUnits += 1;
+      roundRecord.revised.push({ unit: label, dimensions: target.dimensions, directives: target.directives.length });
+    }
+    if (!roundRecord.revised.length) {
+      console.warn('[LiftRPG] Critic round ' + round + ': no revision survived the floors — stopping.');
+      break;
+    }
+  }
+
+  if (report.rounds.length) {
+    var last = report.rounds[report.rounds.length - 1];
+    report.finalScores = last.scores;
+    report.finalMin = last.min;
+    report.finalAvg = last.avg;
+  }
+  booklet._criticReport = report;
+  if (!report.finished) {
+    console.warn('[LiftRPG] Critic loop ended below threshold ' + threshold
+      + ' — delivering with critique attached (quality heuristics warn, never block — D19).');
+  }
+  return report;
+}
+
 async function runApiPipeline(options) {
   if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
 
@@ -1913,6 +2060,20 @@ async function runApiPipeline(options) {
     console.warn('[LiftRPG] Quality gate warnings (non-blocking):', qualityGate.blockers.map(function (entry) {
       return entry.message;
     }));
+  }
+
+  // ── COMPOSITION CRITIC LOOP (D66) ───────────────────────────
+  var criticReport = await runCriticLoop(settings, booklet, brief, {
+    rateLimiter: rateLimiter,
+    budgetEnforce: useGeminiBudget,
+    onProgress: onProgress
+  });
+  if (criticReport && criticReport.revisedUnits > 0) {
+    // Revisions changed prose — refresh the mechanical report to match.
+    report = generateQualityReport(booklet);
+    qualityGate = buildQualityGate(report);
+    booklet._qualityReport = report;
+    booklet._qualityGate = qualityGate;
   }
 
   emitPipelineEvent(onProgress, totalStages, totalStages, qualityGate.passed
@@ -2592,6 +2753,21 @@ async function runSkeletonFleshPipeline(options) {
     console.warn('[S+F] Artifact intent drift:', driftResult.diagnostics.length, 'issue(s)');
   }
 
+  // ── COMPOSITION CRITIC LOOP (D66) ───────────────────────────
+  var sfCriticReport = await runCriticLoop(settings, booklet, brief, {
+    rateLimiter: rateLimiter,
+    budgetEnforce: useGeminiBudget,
+    onProgress: onProgress,
+    telemetryCollector: sfTelemetry,
+    trialMode: trialMode
+  });
+  if (sfCriticReport && sfCriticReport.revisedUnits > 0) {
+    report = generateQualityReport(booklet);
+    qualityGate = buildQualityGate(report);
+    booklet._qualityReport = report;
+    booklet._qualityGate = qualityGate;
+  }
+
   booklet._continuityWarnings = sfContinuityWarnings;
 
   // Build stage telemetry summary
@@ -2975,7 +3151,15 @@ window.LiftRPGAPI = {
     normalizeCampaignPlanOwnership: normalizeCampaignPlanOwnership,
     validateCampaignPlanStage: validateCampaignPlanStage,
     normalizeDocumentTypes: normalizeDocumentTypes,
-    auditGuidedBuild: auditGuidedBuild
+    auditGuidedBuild: auditGuidedBuild,
+    buildCriticDigest: buildCriticDigest,
+    validateCriticVerdict: validateCriticVerdict,
+    normalizeCriticVerdict: normalizeCriticVerdict,
+    summarizeVerdict: summarizeVerdict,
+    selectRevisionTargets: selectRevisionTargets,
+    criticGetUnit: getUnit,
+    criticSetUnit: setUnit,
+    revisionPreservesIdentity: revisionPreservesIdentity
   },
   _extractJson: extractJson,
   _validateSchema: validateBookletSchema,
