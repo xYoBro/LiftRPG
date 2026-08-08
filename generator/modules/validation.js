@@ -1066,9 +1066,53 @@ export function validateShellSchema(shell, expectedOptions) {
 // Validates the assembled booklet. Returns array of human-readable errors.
 // Fragment ID matching is soft: "F.01" matches "F-01", "f_01", etc.
 
+// ── Output budgets (GAP-1, DOCTRINE-LEDGER) ─────────────────────────────────
+// The prompt demands these caps (INST_OUTPUT_BUDGETS); this measures them
+// post-generation. Warnings per D19 — gassed readers skim, then skip, but an
+// overlong prompt is degraded quality, not an invalid booklet. The critic
+// loop feeds these to the critic as machine findings (must become failures).
+var OUTPUT_BUDGETS = { storyPrompt: 220, fragmentBody: 600, interludeBody: 240, endingBody: 1500 };
+
+export function collectBudgetBreaches(booklet) {
+  var breaches = [];
+  function over(text, cap) {
+    var len = String(text || '').length;
+    return len > cap ? len : 0;
+  }
+  ((booklet && booklet.weeks) || []).forEach(function (week, wi) {
+    ((week && week.sessions) || []).forEach(function (session, si) {
+      var len = over(session && session.storyPrompt, OUTPUT_BUDGETS.storyPrompt);
+      if (len) breaches.push({ unitType: 'week', unitRef: week.weekNumber || (wi + 1),
+        message: 'Week ' + (week.weekNumber || (wi + 1)) + ' session ' + (si + 1)
+          + ' storyPrompt is ' + len + ' chars (budget ' + OUTPUT_BUDGETS.storyPrompt + ')' });
+    });
+    var interlude = week && week.interlude;
+    var ilen = over(interlude && interlude.body, OUTPUT_BUDGETS.interludeBody);
+    if (ilen) breaches.push({ unitType: 'week', unitRef: week.weekNumber || (wi + 1),
+      message: 'Week ' + (week.weekNumber || (wi + 1)) + ' interlude body is ' + ilen
+        + ' chars (budget ' + OUTPUT_BUDGETS.interludeBody + ')' });
+  });
+  ((booklet && booklet.fragments) || []).forEach(function (frag) {
+    var len = over(frag && (frag.content || frag.body), OUTPUT_BUDGETS.fragmentBody);
+    if (len) breaches.push({ unitType: 'fragment', unitRef: frag.id,
+      message: 'Fragment ' + (frag.id || '?') + ' body is ' + len
+        + ' chars (budget ' + OUTPUT_BUDGETS.fragmentBody + ')' });
+  });
+  ((booklet && booklet.endings) || []).forEach(function (ending, ei) {
+    var body = ending && ending.content && ending.content.body;
+    var len = over(body, OUTPUT_BUDGETS.endingBody);
+    if (len) breaches.push({ unitType: 'ending', unitRef: (ending && (ending.variant || ending.id)) || ei,
+      message: 'Ending "' + ((ending && ending.variant) || ei) + '" body is ' + len
+        + ' chars (renderer splits awkwardly past ' + OUTPUT_BUDGETS.endingBody + ')' });
+  });
+  return breaches;
+}
+
 export function validateAssembledBooklet(booklet) {
   var errors = [];
   var warnings = []; // soft issues (stylistic, non-fatal) — attached to return value
+
+  collectBudgetBreaches(booklet).forEach(function (b) { warnings.push(b.message); });
 
   // ── Top-level structure ──────────────────────────────────────────────────
   ['meta', 'cover', 'rulesSpread', 'weeks', 'fragments', 'endings'].forEach(function (key) {
@@ -1776,6 +1820,27 @@ export function validateCampaignPlanStage(result) {
     console.warn('[LiftRPG] Campaign Plan advisory:', warnings.join('; '));
   }
   if (errors.length > 0) return errors.join('; ');
+  // Cipher family variety (GAP-3, DOCTRINE-LEDGER): the doctrine demands
+  // ≥ min(max(weekCount-2,3), weekCount-1) distinct families across non-boss
+  // weeks. Emitted as an error string matched by DEGRADED_PATTERNS — the
+  // stage is accepted with a warning (D19), never blocked.
+  if (result && Array.isArray(result.weeks)) {
+    var nonBossTypes = result.weeks
+      .filter(function (w) { return w && !w.isBossWeek; })
+      .map(function (w) { return String(w.cipherType || '').trim().toLowerCase(); })
+      .filter(Boolean);
+    var weekCount = result.weeks.length;
+    var needed = Math.min(Math.max(weekCount - 2, 3), Math.max(weekCount - 1, 1));
+    var distinct = {};
+    nonBossTypes.forEach(function (t) { distinct[t] = 1; });
+    var have = Object.keys(distinct).length;
+    if (nonBossTypes.length >= 3 && have < needed) {
+      errors.push('Campaign Plan: cipher variety below doctrine — ' + have
+        + ' distinct famil' + (have === 1 ? 'y' : 'ies') + ' across ' + nonBossTypes.length
+        + ' non-boss weeks (doctrine wants ' + needed + ')');
+    }
+  }
+
   return '';
 }
 
@@ -2061,6 +2126,7 @@ var REPAIRABLE_PATTERNS = [
 ];
 
 var DEGRADED_PATTERNS = [
+  /cipher variety below doctrine/i,
   /missing designSpec/i,
   /missing epigraph/i,
   /epigraph missing/i,

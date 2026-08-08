@@ -92,7 +92,8 @@ import {
   validateCampaignPlanStage,
   validateFragmentsStage,
   validateSkeletonStage,
-  classifyValidationErrors
+  classifyValidationErrors,
+  collectBudgetBreaches
 } from './modules/validation.js';
 
 import {
@@ -1426,12 +1427,16 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
 
   for (var round = 1; round <= maxRounds; round++) {
     var digestJson = JSON.stringify(buildCriticDigest(booklet));
+    // Machine findings (GAP-1): measured budget breaches go to the critic as
+    // facts it must convert into unit-scoped failures — recomputed each round
+    // so accepted revisions clear their own findings.
+    var machineFindings = collectBudgetBreaches(booklet).map(function (b) { return b.message; });
     var verdictRaw;
     try {
       verdictRaw = await runJsonStage(settings, {
         stageKey: 'critic',
         stageName: 'Composition Critic — round ' + round,
-        buildPrompt: (function (dj) { return function () { return window.buildCriticPrompt(dj, brief); }; })(digestJson),
+        buildPrompt: (function (dj, mf) { return function () { return window.buildCriticPrompt(dj, brief, mf); }; })(digestJson, machineFindings),
         maxTokens: 8000,
         maxAttempts: 2,
         validate: validateCriticVerdict,

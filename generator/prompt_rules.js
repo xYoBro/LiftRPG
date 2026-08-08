@@ -1742,7 +1742,9 @@
     'fusion matrix (heavy = crushing pressure, sprints = frantic evasion, deload = false safety)?',
     'Do heavy weeks land on crisis beats and deloads breathe? Do at least half the sessions end',
     'unresolved? Are storyPrompts inside their length budgets with a physical action, sensory',
-    'detail, and material object? Zero gym metaphors in the fiction?'
+    'detail, and material object? Zero gym metaphors in the fiction? Do interludes assign',
+    'real off-session engagement (a question to weigh, a code to crack, a map to study)',
+    'rather than ornamental prose breaks?'
   ];
 
   window.CRITIC_EVIDENCE_LAW = [
@@ -1772,7 +1774,14 @@
     '  targeted, preserving all ids, refs, and enum vocabulary.'
   ];
 
-  window.buildCriticPrompt = function (bookletDigestJson, brief) {
+  window.buildCriticPrompt = function (bookletDigestJson, brief, machineFindings) {
+    var machineBlock = (machineFindings && machineFindings.length) ? [
+      '',
+      '## Machine Findings (measured by the pipeline — these are facts, not opinions)',
+      'Each finding below MUST appear as a failure with a unit-scoped directive under the',
+      'relevant dimension (text-budget breaches belong to fusionPacing). A dimension with a',
+      'standing machine finding cannot score at or above the ship threshold.'
+    ].concat(machineFindings.map(function (f) { return '- ' + f; })) : [];
     return [
       '# Composition Critic — Assembled Booklet Review',
       '',
@@ -1805,7 +1814,7 @@
       '',
       '## The Assembled Booklet (digest — workout exercise lists compacted)',
       bookletDigestJson
-    ]).join('\n');
+    ], machineBlock).join('\n');
   };
 
   // Revision prompt: apply the critic’s directives to ONE unit, changing
