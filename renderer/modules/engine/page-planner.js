@@ -134,11 +134,29 @@ function groupByAffinity(orderedAtoms) {
 /**
  * Create an empty spread descriptor.
  */
-function createSpread(spreadIndex, spreadType, weekIndex = null) {
+// Padding pages are domain content; callers pass their own spec via
+// options.paddingAtom (render.js does). The default preserves the legacy
+// LiftRPG filler for estimate-only callers that predate the option.
+const DEFAULT_PADDING_ATOM = { type: 'notes-grid', data: { variant: 'dot' } };
+
+function paddingPlacement(spec, id, sequence) {
+  return createPlacement({
+    type:         spec.type,
+    id,
+    group:        'padding',
+    section:      'padding',
+    sequence,
+    sizeHint:     'full-page',
+    pageAffinity: 'either',
+    data:         spec.data || {},
+  });
+}
+
+function createSpread(spreadIndex, spreadType, mergeKey = null) {
   return {
     spreadIndex,
     spreadType,
-    weekIndex,
+    mergeKey,
     left:  [],
     right: [],
   };
@@ -296,11 +314,11 @@ function findPaddingInsertIndex(spreadPlan) {
  * @param {AtomDescriptor[]} groupAtoms
  * @param {number} startSpreadIndex
  * @param {string} spreadType
- * @param {number|null} weekIndex
+ * @param {*} mergeKey — spreads with different keys never merge in compaction
  * @param {'spread'|'page'} planningUnit
  * @returns {object[]} array of spread descriptors
  */
-function binGroupIntoSpreads(groupAtoms, startSpreadIndex, spreadType, weekIndex, planningUnit) {
+function binGroupIntoSpreads(groupAtoms, startSpreadIndex, spreadType, mergeKey, planningUnit) {
   const budget  = PAGE_BUDGET.heightPx;
 
   // ── Separate atoms by affinity ──────────────────────────────
@@ -393,7 +411,7 @@ function binGroupIntoSpreads(groupAtoms, startSpreadIndex, spreadType, weekIndex
   const maxSpreads = Math.max(leftPages.length, rightPages.length);
 
   for (let i = 0; i < maxSpreads; i++) {
-    const spread = createSpread(startSpreadIndex + spreads.length, spreadType, weekIndex);
+    const spread = createSpread(startSpreadIndex + spreads.length, spreadType, mergeKey);
     if (i < leftPages.length)  spread.left  = leftPages[i];
     if (i < rightPages.length) spread.right = rightPages[i];
     spreads.push(spread);
@@ -427,6 +445,7 @@ export function planSpreads(atoms, options = {}) {
     sectionOrder   = DEFAULT_SECTION_ORDER,
     planningUnit   = DEFAULT_PAGE_SPEC.planningUnit,
     padToMultipleOf = DEFAULT_PAGE_SPEC.padToMultipleOf,
+    paddingAtom     = DEFAULT_PADDING_ATOM,
   } = options;
 
   const diag = createDiagnostics();
@@ -440,13 +459,14 @@ export function planSpreads(atoms, options = {}) {
 
   for (const [groupKey, groupAtoms] of groups) {
     const spreadType = groupAtoms[0].section || 'body';
-    const weekIndex  = groupAtoms[0].data?.weekIndex ?? null;
+    // First-class IR field — the engine never reads domain payloads (charter).
+    const mergeKey   = groupAtoms[0].mergeKey ?? null;
 
     const groupSpreads = binGroupIntoSpreads(
       groupAtoms,
       spreadPlan.length,
       spreadType,
-      weekIndex,
+      mergeKey,
       planningUnit,
     );
 
@@ -474,16 +494,7 @@ export function planSpreads(atoms, options = {}) {
     const insertIdx = findPaddingInsertIndex(spreadPlan);
     for (let i = 0; i < paddingNeeded; i++) {
       const paddingSpread = createSpread(spreadPlan.length, 'padding');
-      paddingSpread.left.push(createPlacement({
-        type:         'notes-grid',
-        id:           `padding-${i}`,
-        group:        'padding',
-        section:      'padding',
-        sequence:     i,
-        sizeHint:     'full-page',
-        pageAffinity: 'either',
-        data:         { variant: 'dot' },
-      }));
+      paddingSpread.left.push(paddingPlacement(paddingAtom, `padding-${i}`, i));
       spreadPlan.splice(insertIdx + i, 0, paddingSpread);
       totalPages++;
     }
@@ -552,25 +563,21 @@ function scanRowGroupDiagnostics(spreadPlan, diagnostics) {
         }
       }
 
-      // Check for mismatch: cipher-panel and map-panel with different non-null rowGroups
-      const cipher = placements.find(function (p) { return p.type === 'cipher-panel'; });
-      const map    = placements.find(function (p) { return p.type === 'map-panel'; });
-      if (cipher && map) {
-        const cipherRG = cipher.atom && cipher.atom.rowGroup;
-        const mapRG    = map.atom && map.atom.rowGroup;
-        if (cipherRG && mapRG && cipherRG !== mapRG) {
-          recordWarning(diagnostics, 'rowGroup-mismatch',
-            `cipher-panel and map-panel on spread ${spread.spreadIndex} ${side} have different rowGroups ("${cipherRG}" vs "${mapRG}") — balanced pairing suppressed`,
-            {
-              cipherAtomId: cipher.atomId,
-              mapAtomId: map.atomId,
-              cipherRowGroup: cipherRG,
-              mapRowGroup: mapRG,
-              spreadIndex: spread.spreadIndex,
-              side,
-            },
-          );
-        }
+      // Check for mismatch: exactly two rowGroup-declaring placements that
+      // could have paired but declare different groups — balanced pairing
+      // suppressed. Type-agnostic: the engine knows rowGroups, not domains.
+      const declared = placements.filter(function (p) { return p.atom && p.atom.rowGroup; });
+      if (declared.length === 2 && declared[0].atom.rowGroup !== declared[1].atom.rowGroup) {
+        recordWarning(diagnostics, 'rowGroup-mismatch',
+          `${declared[0].type} and ${declared[1].type} on spread ${spread.spreadIndex} ${side} have different rowGroups ("${declared[0].atom.rowGroup}" vs "${declared[1].atom.rowGroup}") — balanced pairing suppressed`,
+          {
+            atomIds: [declared[0].atomId, declared[1].atomId],
+            types: [declared[0].type, declared[1].type],
+            rowGroups: [declared[0].atom.rowGroup, declared[1].atom.rowGroup],
+            spreadIndex: spread.spreadIndex,
+            side,
+          },
+        );
       }
     }
   }
@@ -830,8 +837,10 @@ export function planAndMeasure(atoms, container, options = {}) {
               const splitIdx = placements.findIndex(p => p.atomId === result.splitAtomId);
               if (splitIdx >= 0) {
                 const [removed] = placements.splice(splitIdx, 1);
+                // Index = actual insertion position (reindexSpreads runs later;
+                // recordSplit must log where the spread really lands).
                 const newSpread = createSpread(
-                  spreadPlan.length, spread.spreadType, spread.weekIndex,
+                  spread.spreadIndex + 1, spread.spreadType, spread.mergeKey,
                 );
                 newSpread[side].push(removed);
 
@@ -894,7 +903,7 @@ export function planAndMeasure(atoms, container, options = {}) {
 
           // Must be same section and week to merge (never cross week boundaries)
           if (spreadPlan[j].spreadType !== spreadPlan[i].spreadType) break;
-          if (spreadPlan[j].weekIndex !== spreadPlan[i].weekIndex) break;
+          if (spreadPlan[j].mergeKey !== spreadPlan[i].mergeKey) break;
 
           const candidateShareable = candidatePlacements.every(p => {
             return !placementLocksPage(p);
@@ -944,16 +953,8 @@ export function planAndMeasure(atoms, container, options = {}) {
       const postInsertIdx = findPaddingInsertIndex(spreadPlan);
       for (let pi = 0; pi < postPadding; pi++) {
         const padSpread = createSpread(spreadPlan.length, 'padding');
-        padSpread.left.push(createPlacement({
-          type:         'notes-grid',
-          id:           `post-padding-${pi}`,
-          group:        'padding',
-          section:      'padding',
-          sequence:     pi,
-          sizeHint:     'full-page',
-          pageAffinity: 'either',
-          data:         { variant: 'dot' },
-        }));
+        padSpread.left.push(paddingPlacement(
+          options.paddingAtom ?? DEFAULT_PADDING_ATOM, `post-padding-${pi}`, pi));
         spreadPlan.splice(postInsertIdx + pi, 0, padSpread);
         pageCount++;
       }

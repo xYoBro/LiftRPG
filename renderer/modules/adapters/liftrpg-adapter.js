@@ -560,6 +560,14 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
     data: data,
   }));
 
+  // Merge boundary (engine IR): spreads from different weeks must never
+  // compact together. The adapter owns the mapping week → mergeKey; the
+  // engine reads only the IR field, never data.weekIndex (charter).
+  for (const atom of atoms) {
+    if (atom.data && typeof atom.data.weekIndex === 'number') {
+      atom.mergeKey = atom.data.weekIndex;
+    }
+  }
   return atoms;
 }
 

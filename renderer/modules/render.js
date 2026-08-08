@@ -176,6 +176,7 @@ export function renderBooklet(refs, layoutMode, data, unlockedEnding, setStatus)
     sectionOrder: liftrpgAdapter.sectionOrder,
     planningUnit: 'spread',
     padToMultipleOf: 4,
+    paddingAtom: { type: 'notes-grid', data: { variant: 'dot' } },
   });
 
   // Step 3: Render atoms into pages

@@ -185,6 +185,7 @@ export function createAtom(partial) {
     group:        partial.group ?? null,
     groupPolicy:  partial.groupPolicy ?? null,
     rowGroup:     partial.rowGroup ?? null,
+    mergeKey:     partial.mergeKey ?? null,
     zone:         partial.zone ?? null,
     shellAttrs:       partial.shellAttrs ?? null,
     continuationOf:        partial.continuationOf ?? null,
