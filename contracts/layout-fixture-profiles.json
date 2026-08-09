@@ -1,7 +1,7 @@
 {
   "content/liftrpg-eastern-shore.json": {
-    "normalizedPageCount": 56,
-    "sheetCount": 28,
+    "normalizedPageCount": 52,
+    "sheetCount": 26,
     "counts": {
       "cover": 1,
       "rules-left": 1,
@@ -10,11 +10,10 @@
       "field-ops": 5,
       "overflow-doc": 6,
       "boss": 1,
-      "fragment-page": 22,
+      "fragment-page": 21,
       "assembly": 1,
       "gauge-log": 1,
       "ending-locked": 1,
-      "notes": 3,
       "back-cover": 1
     },
     "prefix": [
@@ -23,10 +22,10 @@
       "rules-right"
     ],
     "suffix": [
+      "fragment-page",
+      "assembly",
+      "gauge-log",
       "ending-locked",
-      "notes",
-      "notes",
-      "notes",
       "back-cover"
     ],
     "mustNotContain": [
