@@ -731,6 +731,39 @@ function renderUsageDie(component) {
   return wrap;
 }
 
+// percentile-stat (schema 1.5.0). Mirrors buildPercentileStat() in
+// atoms/tracker.js — the same component must print identically on both paths
+// (AUDIT 112). Change one, change the other.
+function renderPercentileStat(component) {
+  const wrap = make('div', 'companion-percentile-stat');
+
+  const head = make('div', 'companion-stat-head');
+  head.appendChild(make('div', 'companion-stat-name', component.statName || component.title || 'Standing'));
+  head.appendChild(make('div', 'companion-stat-die', 'd100 · roll under'));
+  wrap.appendChild(head);
+
+  const values = Array.isArray(component.weeklyValues) && component.weeklyValues.length
+    ? component.weeklyValues
+    : new Array(6).fill(null);
+  const track = make('div', 'companion-stat-track');
+  values.slice(0, 8).forEach((value, index) => {
+    const printable = Number.isInteger(value) && value >= 1 && value <= 99;
+    const box = make('div', 'companion-stat-week');
+    box.setAttribute('data-week', String(index + 1));
+    box.appendChild(make('div', 'companion-stat-week-label', 'WK ' + (index + 1)));
+    box.appendChild(make('div', 'companion-stat-value', printable ? String(value) : ''));
+    track.appendChild(box);
+  });
+  wrap.appendChild(track);
+
+  const advantage = String(component.advantageRule || '').trim()
+    || 'Complete every prescribed set in the session before rolling to earn one re-roll.';
+  wrap.appendChild(make('div', 'companion-stat-rule',
+    'Circle this week’s value, then roll the oracle d100. Roll under it and read one band above the roll. ' + advantage));
+
+  return wrap;
+}
+
 function renderMemorySlots(component) {
   const wrap = make('div', 'companion-memory-slots');
   const slots = (component.slots || []).length ? component.slots : new Array(5).fill(null).map((_, index) => ({
@@ -794,6 +827,8 @@ export function renderCompanionComponent(component) {
     }
   } else if (component.family === 'usage-die') {
     card.appendChild(renderUsageDie(component));
+  } else if (component.family === 'percentile-stat') {
+    card.appendChild(renderPercentileStat(component));
   } else if (component.family === 'memory-slots') {
     card.appendChild(renderMemorySlots(component));
   } else if (component.family === 'inventory-grid') {

@@ -4,8 +4,8 @@
  * Renders companion components and game trackers for the RPG mechanical layer.
  *
  * Companion types (memory-slots, dashboard, stress-track, inventory-grid,
- * return-box, usage-die) render using .companion-component markup that
- * matches the booklet.css companion section.
+ * return-box, usage-die, percentile-stat) render using .companion-component
+ * markup that matches the booklet.css companion section.
  *
  * Generic types (gauge, clock, track, tally) render as simple .tracker-atom
  * elements for when a tracker is not a companion component.
@@ -25,7 +25,20 @@ const DEFAULT_SEGMENTS = 8;
 const COMPANION_TYPES = new Set([
   'memory-slots', 'dashboard', 'stress-track',
   'inventory-grid', 'return-box', 'usage-die', 'token-sheet', 'overlay-window',
+  'percentile-stat',
 ]);
+
+/** Fallback week count for a percentile-stat with no authored values. */
+const PERCENTILE_STAT_DEFAULT_WEEKS = 6;
+
+/**
+ * The printed roll-under rule. The stat decorates the story layer only — the
+ * caption never touches sets, reps, or load (chance-isolation law).
+ */
+const PERCENTILE_STAT_ROLL_RULE =
+  'Circle this week’s value, then roll the oracle d100. Roll under it and read one band above the roll.';
+const PERCENTILE_STAT_ADVANTAGE_DEFAULT =
+  'Complete every prescribed set in the session before rolling to earn one re-roll.';
 
 /** Base heights per generic track type in px. */
 const TYPE_HEIGHTS = {
@@ -53,6 +66,11 @@ const COMPANION_HEIGHTS = {
   'usage-die':      ()      => 60,
   'token-sheet':    ()      => 120,
   'overlay-window': ()      => 160,
+  'percentile-stat': (slots, data) => {
+    const cells = percentileStatCells(data).length;
+    const rows = Math.max(1, Math.ceil(cells / 6));
+    return 30 + rows * 44 + 30;
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -72,6 +90,26 @@ function splitSentences(text) {
 
 function extractThresholdNotes(text) {
   return splitSentences(text).filter((sentence) => /^at\s+\d+/i.test(sentence)).slice(0, 3);
+}
+
+/**
+ * Normalize a percentile-stat's authored week values into printable cells.
+ * Values are AUTHORED, never computed here — the renderer prints the climb the
+ * booklet declared. Non-integer or out-of-range entries print as a blank box
+ * so the player can still write the number in by hand.
+ *
+ * @param {object} data companion atom data
+ * @returns {{week:number, value:string}[]}
+ */
+function percentileStatCells(data) {
+  const raw = Array.isArray(data && data.weeklyValues) ? data.weeklyValues : [];
+  const source = raw.length
+    ? raw
+    : new Array(data?.totalWeeks || PERCENTILE_STAT_DEFAULT_WEEKS).fill(null);
+  return source.slice(0, 8).map((value, index) => {
+    const printable = Number.isInteger(value) && value >= 1 && value <= 99;
+    return { week: index + 1, value: printable ? String(value) : '' };
+  });
 }
 
 function buildDossierLines(count) {
@@ -336,6 +374,37 @@ function buildUsageDie() {
   return container;
 }
 
+/**
+ * percentile-stat: the growing-stat d100. A named stat box over a week-by-week
+ * value track the player circles, closed by one compact rule caption.
+ *
+ * All text goes in through make()'s textContent path — no innerHTML, so LLM
+ * strings cannot inject markup.
+ */
+function buildPercentileStat(data) {
+  const wrap = make('div', 'companion-percentile-stat');
+
+  const head = make('div', 'companion-stat-head');
+  head.appendChild(make('div', 'companion-stat-name', data.statName || data.label || 'Standing'));
+  head.appendChild(make('div', 'companion-stat-die', 'd100 · roll under'));
+  wrap.appendChild(head);
+
+  const track = make('div', 'companion-stat-track');
+  percentileStatCells(data).forEach((cell) => {
+    const box = make('div', 'companion-stat-week');
+    box.dataset.week = String(cell.week);
+    box.appendChild(make('div', 'companion-stat-week-label', `WK ${cell.week}`));
+    box.appendChild(make('div', 'companion-stat-value', cell.value));
+    track.appendChild(box);
+  });
+  wrap.appendChild(track);
+
+  const advantage = String(data.advantageRule || '').trim() || PERCENTILE_STAT_ADVANTAGE_DEFAULT;
+  wrap.appendChild(make('div', 'companion-stat-rule', `${PERCENTILE_STAT_ROLL_RULE} ${advantage}`));
+
+  return wrap;
+}
+
 function buildTokenSheet(data) {
   const shellFamily = ((data.artifactIdentity || {}).shellFamily || '').toLowerCase();
   const rows = Number.isFinite(data.rows) && data.rows > 0 ? data.rows : 0;
@@ -419,6 +488,7 @@ function renderCompanionComponent(data) {
     case 'usage-die':      visual = buildUsageDie();           break;
     case 'token-sheet':    visual = buildTokenSheet(data);     break;
     case 'overlay-window': visual = buildOverlayWindow(data);  break;
+    case 'percentile-stat': visual = buildPercentileStat(data); break;
     default:               visual = buildDashboard(data);      break;
   }
 

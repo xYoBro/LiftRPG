@@ -16,10 +16,12 @@
 
 // ── Schema version ───────────────────────────────────────────────────────────
 
-export var SCHEMA_VERSION = '1.4.0';
+export var SCHEMA_VERSION = '1.5.0';
 // Accepted on input by the renderer (liberal); the validator pins fixtures to
-// SCHEMA_VERSION exactly.
-export var ACCEPTED_SCHEMA_VERSIONS = ['1.4.0'];
+// SCHEMA_VERSION exactly. 1.5.0 is strictly additive over 1.4.0 (the
+// percentile-stat companion type plus its optional fields), so 1.4.0 documents
+// remain readable; normalization bumps them to SCHEMA_VERSION (D21).
+export var ACCEPTED_SCHEMA_VERSIONS = ['1.4.0', '1.5.0'];
 
 // Extension namespace: pipeline telemetry, migration residue, and any
 // non-contract data live under `_x` (top level, week level, or bossEncounter
@@ -67,10 +69,23 @@ export var VALID_MAP_TYPES = ['grid', 'point-to-point', 'linear-track', 'player-
 // NOTE: usage-die was always renderer-supported (mechanic-registry.js:150,
 // field-ops-primitives.js:723) but missing from the generator enum — corpus
 // proof that generator validation never ran on hand fixtures (AUDIT §4.M).
+// percentile-stat (schema 1.5.0) is the growing-stat d100: an authored,
+// monotonically rising per-week value the player rolls under on the existing
+// oracle d100. Display-floor doctrine — the printed stat never regresses.
 export var VALID_COMPANION_TYPES = [
   'dashboard', 'return-box', 'inventory-grid', 'token-sheet',
-  'overlay-window', 'stress-track', 'memory-slots', 'usage-die'
+  'overlay-window', 'stress-track', 'memory-slots', 'usage-die',
+  'percentile-stat'
 ];
+
+// percentile-stat value bounds — a d100 roll-under target must leave room to
+// fail (1-99) and the printed track holds at most one value per week.
+export var PERCENTILE_STAT = {
+  minValue: 1,
+  maxValue: 99,
+  minWeeklyValues: 1,
+  maxWeeklyValues: 8
+};
 
 export var VALID_CLOCK_TYPES = [
   'progress-clock', 'danger-clock', 'racing-clock',

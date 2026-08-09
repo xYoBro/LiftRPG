@@ -232,6 +232,10 @@ export function buildCompanionModels(components) {
       conditions: Array.isArray(component.conditions) ? component.conditions : [],
       windows: Array.isArray(component.windows) ? component.windows : [],
       usageDie: component.usageDie || component.usage || '',
+      // percentile-stat (schema 1.5.0) — authored, never derived here.
+      statName: component.statName || '',
+      weeklyValues: Array.isArray(component.weeklyValues) ? component.weeklyValues : [],
+      advantageRule: component.advantageRule || '',
       playWindow: component.playWindow || 'rest',
       reminder: component.reminder || '',
       footprint: component.footprint || 'half-page',

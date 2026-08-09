@@ -3587,6 +3587,78 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   background:color-mix(in srgb, var(--accent) 20%, white 80%);
   border-width:1.5px;
 }
+/* ── percentile-stat: the growing-stat d100 ─────────────────────────────────
+   A named stat over a week-by-week value track the player circles by hand.
+   Structure only — every colour, weight, and rule comes from theme tokens, and
+   the whole surface reads in pure B&W (the value cells carry their own boxes,
+   never a fill). */
+.companion-percentile-stat{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.companion-stat-head{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:8px;
+  border-bottom:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-panel-border,var(--rule));
+  padding-bottom:3px;
+}
+.companion-stat-name{
+  font-family:var(--mono);
+  font-size:var(--theme-small-size,6.2pt);
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--ink);
+}
+.companion-stat-die{
+  font-family:var(--mono);
+  font-size:4.9pt;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--muted);
+  white-space:nowrap;
+}
+.companion-stat-track{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(30px, 1fr));
+  gap:4px;
+}
+.companion-stat-week{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:2px;
+}
+.companion-stat-week-label{
+  font-family:var(--mono);
+  font-size:4.6pt;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.companion-stat-value{
+  width:100%;
+  min-height:24px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border-radius:var(--theme-panel-radius,3px);
+  background:var(--paper);
+  font-family:var(--mono);
+  font-size:8pt;
+  color:var(--ink);
+}
+.companion-stat-rule{
+  font-family:var(--mono);
+  font-size:4.9pt;
+  line-height:1.35;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  color:color-mix(in srgb, var(--ink) 58%, var(--muted) 42%);
+}
 .companion-memory-slots{
   display:grid;
   gap:6px;

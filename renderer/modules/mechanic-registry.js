@@ -109,6 +109,12 @@ export const COMPANION_COMPONENT_REGISTRY = {
     title: 'Memory Slots',
     footprint: 'half-page',
     description: 'Slot-limited memory or evidence surface where new entries crowd out older ones.'
+  },
+  'percentile-stat': {
+    family: 'percentile-stat',
+    title: 'Standing',
+    footprint: 'half-page',
+    description: 'Growing-stat d100: an authored per-week value the player circles and rolls under on the oracle die.'
   }
 };
 

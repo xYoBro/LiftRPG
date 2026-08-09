@@ -20,7 +20,7 @@
     '## meta (object)',
     '',
     'Required fields:',
-    '- `schemaVersion` (string): Always "1.4.0"',
+    '- `schemaVersion` (string): Always "1.5.0"',
     '- `generatedAt` (string): ISO 8601 datetime',
     '- `blockTitle` (string): Full story title',
     '- `blockSubtitle` (string): One-line official or diegetic designation',
@@ -157,6 +157,7 @@
     '- Consequence entries must include `paperAction` that visibly changes the paper state (mark a clock, shade a node, cross off a route, etc.).',
     '- Oracle entries must be playable game consequences or concrete fiction events, not atmospheric vibes or prose descriptions.',
     '- If the user&apos;s creative direction specifies a different dice system (e.g. 2d6, d20), adapt oracle entries and roll bands to match.',
+    '- If the booklet carries a `percentile-stat` companion, at least TWO weeks must state the roll-under check inside `instruction`: if the roll comes in under the stat value circled for this week, read the entry one band above the one rolled (one row toward 00-09). The same die does both jobs — never ask for a second roll.',
     '',
     '### fieldOps.companionComponents',
     'Array of 0-3 companion components per week. Each is an object with `type` plus type-specific fields.',
@@ -169,6 +170,14 @@
     '- `overlay-window`: { type, label, body, windows?, playWindow? }',
     '- `stress-track`: { type, label, body, tracks?, conditions? }',
     '- `memory-slots`: { type, label, body, slots? }',
+    '- `percentile-stat`: { type, label, body, statName, weeklyValues, advantageRule? }',
+    '',
+    '`percentile-stat` is the growing-stat d100 — one printed stat box whose value rises week by week:',
+    '- `statName` (string, required): the stat itself, named from the Core Noun Roster and diegetic. It names a capability the world would actually track.',
+    '- `weeklyValues` (integer[], required): one value per week of the campaign, each 1-99. They MUST rise monotonically — the printed stat never regresses.',
+    '- `advantageRule` (string, optional): one sentence describing the re-roll earned by completing every prescribed set in a session.',
+    '- Print ONE percentile-stat per booklet. It is a campaign-wide sheet, not a per-week surface.',
+    '- The player circles the current week&apos;s value, then rolls the existing oracle d100 and reads under-or-over. No new dice.',
     '',
     'Common fields across all types:',
     '- `label` (string, required): diegetic title for the component',
@@ -852,7 +861,10 @@
     '## Companion Components',
     '- Only use companion components when they create real scarcity, tension, overwrite pressure, route denial, or strategic tradeoff.',
     '- Good uses: stress accumulation, usage depletion, evidence crowding, memory overwrite, access buffer, or dashboard state.',
-    '- Do not add companion surfaces as decorative filler.'
+    '- Do not add companion surfaces as decorative filler.',
+    '- **The growing stat (`percentile-stat`):** name it from the Core Noun Roster and make it a capability this world would actually keep a number on — standing inside a named institution, clearance against a named archive, fluency in a named record system, credit with a named faction. It must read as a line an in-world clerk would write.',
+    '- Never name the stat after the body, the training block, or the player. It is not Strength, Endurance, Fitness, Level, or XP. The workout produces it; the fiction is what carries it.',
+    '- One percentile-stat per booklet, introduced by Week 2 or 3 so it has room to climb. Its `body` must say in one sentence what having a high number means inside the world.'
   ];
 
   window.INST_PROGRESSION = [
@@ -862,7 +874,11 @@
     '- Each non-boss week must give the player something new: a cleared route, an unlocked node, a decoded access code, a revealed map area, a new companion function, a key that opens a previously locked gate.',
     '- By the penultimate week, the player should have enough capabilities and map knowledge to make real strategic choices about route, resource allocation, and risk.',
     '- The boss week should require the player to have MASTERED the space. The decodingKey should reference map node names, spatial relationships, clock history, or institutional knowledge gathered across the campaign — not just arithmetic on weekly component values.',
-    '- Do not give the player everything in Week 1. Do not gate everything behind the boss. Distribute progression evenly, with the midpoint binary choice as the biggest single state change.'
+    '- Do not give the player everything in Week 1. Do not gate everything behind the boss. Distribute progression evenly, with the midpoint binary choice as the biggest single state change.',
+    '- **Display floor:** if the booklet carries a `percentile-stat`, its `weeklyValues` must rise monotonically across the campaign — every value strictly greater than the one before it. The printed stat never regresses. A missed week costs the player the roll, never the number.',
+    '- Author those values; do not ask the player to compute them. Open low enough that early rolls usually fail (roughly 20-35) and close high enough that late rolls usually land (roughly 60-75). The climb between them is the character sheet the six weeks wrote.',
+    '- The stat must be visible in play, not just on its own page: at least two weeks&apos; oracle `instruction` must state the roll-under check and the one-band upgrade it grants.',
+    '- **Chance isolation:** the stat and the dice move the story only. No roll, no stat value, and no oracle result may ever change sets, reps, load, or rest. Advantage flows workout to game and never back.'
   ];
 
   window.INST_VISUAL_DIRECTION = [
@@ -1084,6 +1100,10 @@
     '- Map/board usage: how to annotate, what marks mean, when to update',
     '- Oracle access: what triggers a pull, how to read results, how to execute consequence tags. Include: "All oracle tables use d100. No dice? Google roll d100."',
     '- Clocks/trackers: what they are, when they advance, what happens when they fill or empty',
+    'If the booklet carries a `percentile-stat` companion, one section MUST also teach it, in the world&apos;s own voice:',
+    '- circle this week&apos;s value on the stat box before you roll',
+    '- roll under it on the oracle d100 and read the entry one band above the one you rolled',
+    '- complete every prescribed set in the session before rolling and you may re-roll once — the only thing training changes is your standing, never the sets themselves',
     'The rightPage contains the password/convergence tracker and unlock instructions.',
     'Both pages must be comprehensible to a player who has never seen the booklet before.'
   ];
@@ -1149,7 +1169,8 @@
     '  The boss decodingKey at Week 6 converts accumulated values to letters. This is non-negotiable.',
     '- Oracle tables: d100 with exactly 10 bands (00-09, 10-19, ... 90-99). Each entry has a `text` field.',
     '  Entry types: "fragment" (includes fragmentRef) or "consequence" (includes paperAction).',
-    '- Companion component types (8): dashboard, return-box, inventory-grid, token-sheet, overlay-window, stress-track, memory-slots, usage-die.',
+    '- Companion component types (9): dashboard, return-box, inventory-grid, token-sheet, overlay-window, stress-track, memory-slots, usage-die, percentile-stat.',
+    '  percentile-stat is the growing-stat d100: ONE per booklet, statName from the Core Noun Roster, weeklyValues (1-99) rising monotonically, rolled under on the oracle die.',
     '- Clock types (6): progress-clock, danger-clock, racing-clock, tug-of-war-clock, linked-clock, project-clock.',
     '- Fragment documentTypes (8): memo, report, inspection, fieldNote, correspondence, transcript, form, anomaly.',
     '- Boss encounter MUST include decodingKey with referenceTable (e.g., "1=A 2=B ... 26=Z").',

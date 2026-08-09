@@ -383,10 +383,10 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
             : (Number.isFinite(comp.currentValue)
               ? comp.currentValue
               : (Number.isFinite(comp.startValue) ? comp.startValue : 0));
-          const richBody = ['stress-track', 'token-sheet', 'overlay-window', 'memory-slots', 'inventory-grid', 'dashboard'].includes(trackType)
+          const richBody = ['stress-track', 'token-sheet', 'overlay-window', 'memory-slots', 'inventory-grid', 'dashboard', 'percentile-stat'].includes(trackType)
             ? (comp.body || comp.description || '')
             : (comp.body || '');
-          const guidance = ['stress-track', 'token-sheet', 'overlay-window', 'memory-slots', 'inventory-grid', 'dashboard'].includes(trackType)
+          const guidance = ['stress-track', 'token-sheet', 'overlay-window', 'memory-slots', 'inventory-grid', 'dashboard', 'percentile-stat'].includes(trackType)
             ? (comp.instruction || comp.description || '')
             : (comp.instruction || '');
           atoms.push(createAtom({
@@ -417,6 +417,12 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
               tracks: Array.isArray(comp.tracks) ? comp.tracks : [],
               tokens: Array.isArray(comp.tokens) ? comp.tokens : [],
               windows: Array.isArray(comp.windows) ? comp.windows : [],
+              // percentile-stat (schema 1.5.0): authored per-week values the
+              // player circles, plus the advantage sentence. Carried verbatim —
+              // the adapter never recomputes the climb.
+              statName: comp.statName || '',
+              weeklyValues: Array.isArray(comp.weeklyValues) ? comp.weeklyValues : [],
+              advantageRule: comp.advantageRule || '',
               footprint: comp.footprint || '',
               weekIndex: wi,
               totalWeeks,

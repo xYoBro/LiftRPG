@@ -12,7 +12,9 @@ import {
   VALID_COMPANION_TYPES,
   VALID_CLOCK_TYPES,
   VALID_ARCHETYPES,
-  ACCEPTED_SCHEMA_VERSIONS
+  ACCEPTED_SCHEMA_VERSIONS,
+  SCHEMA_VERSION,
+  PERCENTILE_STAT
 } from './constants.js';
 
 import {
@@ -221,10 +223,12 @@ export function normalizeShellShape(shell) {
 
   // schemaVersion is tooling-owned. LLMs replaying stale prompts emit old
   // versions; that is local drift, auto-fixed here (guided-build doctrine),
-  // never a blocker.
+  // never a blocker. Unrecognized versions AND recognized-but-stale ones both
+  // land on the current SCHEMA_VERSION — ACCEPTED_SCHEMA_VERSIONS says what we
+  // can read, SCHEMA_VERSION says what we write (D21).
   if (shell.meta && typeof shell.meta === 'object' &&
-      ACCEPTED_SCHEMA_VERSIONS.indexOf(String(shell.meta.schemaVersion)) === -1) {
-    shell.meta.schemaVersion = ACCEPTED_SCHEMA_VERSIONS[0];
+      String(shell.meta.schemaVersion) !== SCHEMA_VERSION) {
+    shell.meta.schemaVersion = SCHEMA_VERSION;
   }
 
   var rulesSpread = shell.rulesSpread || {};
@@ -1280,12 +1284,99 @@ export function collectNounRosterFindings(booklet) {
   return findings;
 }
 
+// ── Growing-stat discipline (GAP-6 Landing 1, DOCTRINE-LEDGER) ──────────────
+// The percentile-stat companion is the growing-stat d100: an AUTHORED per-week
+// value the player rolls under on the existing oracle die. Two laws bind it —
+// the display floor (values never regress) and the d100 range (a roll-under
+// target must leave room to fail). Warnings per D19: a flat or backsliding stat
+// is degraded design, not an unrenderable booklet. The schema enforces
+// presence and range per item; monotonicity and campaign-shape live here.
+
+function collectPercentileStats(booklet) {
+  var found = [];
+  ((booklet && booklet.weeks) || []).forEach(function (week, wi) {
+    var label = 'Week ' + ((week && week.weekNumber) || (wi + 1));
+    var pools = [((week && week.fieldOps) || {}).companionComponents];
+    var interlude = week && week.interlude;
+    if (interlude && interlude.payload && typeof interlude.payload === 'object') {
+      pools.push(interlude.payload.companionComponents);
+    }
+    pools.forEach(function (pool) {
+      (Array.isArray(pool) ? pool : []).forEach(function (component) {
+        if (component && component.type === 'percentile-stat') {
+          found.push({ label: label, component: component });
+        }
+      });
+    });
+  });
+  return found;
+}
+
+export function collectPercentileStatFindings(booklet) {
+  var findings = [];
+  var stats = collectPercentileStats(booklet);
+  if (!stats.length) return findings;
+
+  var weekCount = ((booklet && booklet.weeks) || []).length;
+
+  if (stats.length > 1) {
+    findings.push('percentile-stat: ' + stats.length + ' growing-stat components found ('
+      + stats.map(function (s) { return s.label; }).join(', ')
+      + ') — doctrine is ONE per booklet, a campaign-wide sheet rather than a per-week surface');
+  }
+
+  stats.forEach(function (entry) {
+    var component = entry.component;
+    var where = entry.label + ' percentile-stat';
+    var statName = String((component && component.statName) || '').trim();
+
+    if (!statName) {
+      findings.push(where + ' is missing statName — the stat must be named from the Core Noun Roster');
+    }
+
+    var values = component && component.weeklyValues;
+    if (!Array.isArray(values) || values.length === 0) {
+      findings.push(where + ' ("' + (statName || '?') + '") has no weeklyValues — authored per-week values are required');
+      return;
+    }
+
+    var offRange = values.filter(function (v) {
+      return !Number.isInteger(v) || v < PERCENTILE_STAT.minValue || v > PERCENTILE_STAT.maxValue;
+    });
+    if (offRange.length) {
+      findings.push(where + ' ("' + (statName || '?') + '") has ' + offRange.length
+        + ' weeklyValues outside ' + PERCENTILE_STAT.minValue + '-' + PERCENTILE_STAT.maxValue
+        + ' (got: ' + offRange.join(', ') + ') — a d100 roll-under target must leave room to fail');
+    }
+
+    var regressions = [];
+    for (var i = 1; i < values.length; i++) {
+      if (Number(values[i]) <= Number(values[i - 1])) {
+        regressions.push('index ' + i + ' (' + values[i - 1] + ' → ' + values[i] + ')');
+      }
+    }
+    if (regressions.length) {
+      findings.push(where + ' ("' + (statName || '?') + '") weeklyValues do not rise monotonically at '
+        + regressions.join(', ') + ' — display-floor doctrine: the printed stat never regresses');
+    }
+
+    if (weekCount && values.length !== weekCount) {
+      findings.push(where + ' ("' + (statName || '?') + '") has ' + values.length
+        + ' weeklyValues but the campaign runs ' + weekCount
+        + ' weeks — the player needs one value to circle per week');
+    }
+  });
+
+  return findings;
+}
+
 export function validateAssembledBooklet(booklet) {
   var errors = [];
   var warnings = []; // soft issues (stylistic, non-fatal) — attached to return value
 
   collectBudgetBreaches(booklet).forEach(function (b) { warnings.push(b.message); });
   collectNounRosterFindings(booklet).forEach(function (m) { warnings.push(m); });
+  collectPercentileStatFindings(booklet).forEach(function (m) { warnings.push(m); });
 
   // ── Top-level structure ──────────────────────────────────────────────────
   ['meta', 'cover', 'rulesSpread', 'weeks', 'fragments', 'endings'].forEach(function (key) {

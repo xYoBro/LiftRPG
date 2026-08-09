@@ -1,4 +1,4 @@
-// ── Canonical booklet schema v1.4.0 (APPLIED) ───────────────────────────────
+// ── Canonical booklet schema v1.5.0 (APPLIED) ───────────────────────────────
 // Replaces the never-enforced booklet-render.schema.json (AUDIT finding 57).
 //
 // Authored as a JS module rather than a .json file so every enum is IMPORTED
@@ -29,7 +29,8 @@ import {
   VALID_BOARD_STATE_MODES,
   VALID_ATTACHMENT_STRATEGIES,
   ORACLE_ROLL_BANDS,
-  SPATIAL_GUARDRAILS
+  SPATIAL_GUARDRAILS,
+  PERCENTILE_STAT
 } from './contract-constants.mjs';
 
 var G = SPATIAL_GUARDRAILS;
@@ -416,8 +417,32 @@ export var BOOKLET_SCHEMA = {
         conditions: { type: 'array' },
         currentValue: { type: ['integer', 'string'] },
         startValue: { type: ['integer', 'string'] },
-        maxValue: { type: ['integer', 'string'] }
-      }
+        maxValue: { type: ['integer', 'string'] },
+        // ── percentile-stat (schema 1.5.0) ──────────────────────────────────
+        // The growing-stat d100. Additive and optional on every other
+        // companion type; statName + weeklyValues are required when
+        // type === 'percentile-stat' (see the conditional below).
+        // Monotonicity (display-floor doctrine) is a B-class rule, checked in
+        // generator/modules/validation.js — JSON Schema cannot express it.
+        statName: nonEmptyString,
+        weeklyValues: {
+          type: 'array',
+          minItems: PERCENTILE_STAT.minWeeklyValues,
+          maxItems: PERCENTILE_STAT.maxWeeklyValues,
+          items: {
+            type: 'integer',
+            minimum: PERCENTILE_STAT.minValue,
+            maximum: PERCENTILE_STAT.maxValue
+          }
+        },
+        advantageRule: { type: 'string' }
+      },
+      allOf: [
+        {
+          if: { properties: { type: { const: 'percentile-stat' } }, required: ['type'] },
+          then: { required: ['statName', 'weeklyValues'] }
+        }
+      ]
     },
 
     gameplayClock: {
