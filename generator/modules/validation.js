@@ -1108,11 +1108,184 @@ export function collectBudgetBreaches(booklet) {
   return breaches;
 }
 
+// ── Core Noun Roster discipline (GAP-2, DOCTRINE-LEDGER) ────────────────────
+// INST_WORLD_CONTRACT demands a Core Noun Roster of 8-12 specific nouns inside
+// the meta.worldContract string, and that every cipher, map node, fragment,
+// boss mechanism, and oracle entry reference at least one roster noun. This
+// measures it post-generation, heuristically: roster nouns are the maximal
+// capitalized runs in the worldContract; a surface "references" a noun if it
+// contains the full noun or a distinctive component word. Warnings per D19.
+
+var ROSTER_CONNECTORS = { of: 1, the: 1, and: 1, '&': 1 };
+var ROSTER_STOPWORDS = {
+  The: 1, A: 1, An: 1, On: 1, In: 1, Of: 1, And: 1, Or: 1, But: 1, It: 1,
+  This: 1, That: 1, Core: 1, Noun: 1, Roster: 1, Featuring: 1, With: 1,
+  When: 1, Where: 1, After: 1, Before: 1, Every: 1, Their: 1, They: 1,
+  She: 1, He: 1, Her: 1, His: 1, You: 1, Your: 1, Its: 1, If: 1, As: 1,
+  At: 1, To: 1, By: 1, For: 1, From: 1, Between: 1, Against: 1, Write: 1
+};
+// Generic component words that must not count as a match on their own —
+// only as part of the full noun phrase.
+var ROSTER_GENERIC_COMPONENTS = {
+  department: 1, bureau: 1, division: 1, office: 1, agency: 1, captain: 1,
+  doctor: 1, sergeant: 1, officer: 1, records: 1, archive: 1, letter: 1,
+  agreement: 1, project: 1, protocol: 1, station: 1, sector: 1, wing: 1
+};
+
+var ROSTER_HONORIFICS = { Dr: 1, Mr: 1, Mrs: 1, Ms: 1, St: 1, Capt: 1, Sgt: 1, Lt: 1 };
+
+export function extractRosterNouns(worldContract) {
+  var words = String(worldContract || '').split(/\s+/).filter(Boolean);
+  var nouns = [];
+  var run = [];
+  function flushRun() {
+    while (run.length && ROSTER_CONNECTORS[run[0].toLowerCase()]) run.shift();
+    while (run.length && ROSTER_CONNECTORS[run[run.length - 1].toLowerCase()]) run.pop();
+    var filtered = run.filter(function (w) { return !ROSTER_STOPWORDS[w]; });
+    if (filtered.length > 0) {
+      var phrase = run.join(' ');
+      if (filtered.length > 1 || filtered[0].length >= 3) nouns.push(phrase);
+    }
+    run = [];
+  }
+  words.forEach(function (raw) {
+    var word = raw.replace(/^["'‘“(\[]+/g, '');
+    // List punctuation ends a noun phrase — but a period after an honorific
+    // ("Dr.") is part of the name, not a sentence boundary.
+    var breaksAfter = /[,;:.!?)\]]$/.test(word)
+      && !ROSTER_HONORIFICS[word.replace(/[^\p{L}]/gu, '')];
+    word = word.replace(/["'’”,;:.!?)\]]+$/g, '');
+    if (!word || /^\d+$/.test(word)) { flushRun(); return; } // pure numbers (roster indices, years) break runs
+    var isCap = /^[\p{Lu}\p{N}]/u.test(word);
+    var isConnector = ROSTER_CONNECTORS[word.toLowerCase()];
+    if (isCap || (isConnector && run.length > 0)) run.push(word);
+    else flushRun();
+    if (breaksAfter) flushRun();
+  });
+  flushRun();
+  // Dedupe, drop runs that are stopwords-only artifacts
+  var seen = {};
+  return nouns.filter(function (n) {
+    var key = n.toLowerCase();
+    if (seen[key]) return false;
+    seen[key] = true;
+    var parts = n.split(/\s+/).filter(function (w) { return !ROSTER_STOPWORDS[w]; });
+    return parts.length > 0;
+  });
+}
+
+// Per-noun needle sets: the full phrase plus each distinctive component word
+// (possessives stripped, generic words excluded) — so prose saying just "Yua"
+// still counts as referencing "Tamashiro Yua".
+function buildRosterNeedles(roster) {
+  return roster.map(function (noun) {
+    var needles = [noun.toLowerCase()];
+    noun.split(/\s+/).forEach(function (part) {
+      var p = part.toLowerCase().replace(/[''’]s$/u, '').replace(/[^\p{L}\p{N}-]/gu, '');
+      if (p.length >= 4 && !ROSTER_GENERIC_COMPONENTS[p] && !ROSTER_STOPWORDS[part]) {
+        needles.push(p);
+      }
+    });
+    return { noun: noun, needles: needles };
+  });
+}
+
+function nounMatches(entry, hay) {
+  for (var i = 0; i < entry.needles.length; i++) {
+    if (hay.indexOf(entry.needles[i]) !== -1) return true;
+  }
+  return false;
+}
+
+export function collectNounRosterFindings(booklet) {
+  var findings = [];
+  var wc = booklet && booklet.meta && booklet.meta.worldContract;
+  if (!wc || typeof wc !== 'string') return findings; // absence is warned elsewhere
+  var roster = extractRosterNouns(wc);
+  if (roster.length < 3) {
+    findings.push('worldContract defines no discernible Core Noun Roster ('
+      + roster.length + ' specific noun(s) found; doctrine demands 8-12 — add the roster to meta.worldContract)');
+    return findings;
+  }
+  var rosterNeedles = buildRosterNeedles(roster);
+  var referencedNouns = {};
+  // references() answers "does this surface cite any roster noun" and marks
+  // which nouns it cites (for the dead-noun sweep) in the same pass.
+  function references(text) {
+    var hay = String(text || '').toLowerCase();
+    if (!hay) return false;
+    var hit = false;
+    rosterNeedles.forEach(function (entry) {
+      if (nounMatches(entry, hay)) {
+        referencedNouns[entry.noun] = true;
+        hit = true;
+      }
+    });
+    return hit;
+  }
+
+  ((booklet && booklet.weeks) || []).forEach(function (week, wi) {
+    var label = 'Week ' + (week.weekNumber || (wi + 1));
+    var fo = week.fieldOps || {};
+    var cipher = fo.cipher;
+    if (cipher) {
+      var cipherText = [cipher.title, (cipher.body || {}).displayText, cipher.extractionInstruction].join('\n');
+      if (!references(cipherText)) {
+        findings.push(label + ' cipher references no Core Noun Roster noun');
+      }
+    }
+    var oracle = fo.oracleTable;
+    if (oracle && Array.isArray(oracle.entries) && oracle.entries.length) {
+      var missing = 0;
+      oracle.entries.forEach(function (entry) {
+        var t = entry && entry.text;
+        if (!references(t)) missing++;
+      });
+      if (missing > 0) {
+        findings.push(label + ' oracle: ' + missing + ' of ' + oracle.entries.length
+          + ' entries reference no Core Noun Roster noun');
+      }
+    }
+    var nodes = ((fo.mapState || {}).nodes) || [];
+    if (nodes.length) {
+      var unanchored = 0;
+      nodes.forEach(function (node) {
+        var t = node && node.label;
+        if (!references(t)) unanchored++;
+      });
+      if (unanchored === nodes.length) {
+        findings.push(label + ' map: no node label references a Core Noun Roster noun');
+      }
+    }
+    var boss = week.bossEncounter;
+    if (boss) {
+      var bossText = [boss.narrative, boss.mechanismDescription, boss.convergenceProof].join('\n');
+      if (!references(bossText)) {
+        findings.push(label + ' boss mechanism references no Core Noun Roster noun');
+      }
+    }
+  });
+
+  ((booklet && booklet.fragments) || []).forEach(function (frag) {
+    var fragText = [frag && frag.title, frag && (frag.content || frag.body)].join('\n');
+    if (!references(fragText)) {
+      findings.push('Fragment ' + ((frag && frag.id) || '?') + ' references no Core Noun Roster noun');
+    }
+  });
+
+  var dead = roster.filter(function (noun) { return !referencedNouns[noun]; });
+  if (dead.length > 0 && dead.length >= Math.ceil(roster.length / 2)) {
+    findings.push('Core Noun Roster nouns never referenced on any checked surface: ' + dead.join(', '));
+  }
+  return findings;
+}
+
 export function validateAssembledBooklet(booklet) {
   var errors = [];
   var warnings = []; // soft issues (stylistic, non-fatal) — attached to return value
 
   collectBudgetBreaches(booklet).forEach(function (b) { warnings.push(b.message); });
+  collectNounRosterFindings(booklet).forEach(function (m) { warnings.push(m); });
 
   // ── Top-level structure ──────────────────────────────────────────────────
   ['meta', 'cover', 'rulesSpread', 'weeks', 'fragments', 'endings'].forEach(function (key) {
