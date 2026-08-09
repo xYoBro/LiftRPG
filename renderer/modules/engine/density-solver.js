@@ -51,6 +51,30 @@ export function atomShrinkPotential(atom, currentDensity) {
 }
 
 // ---------------------------------------------------------------------------
+// Split candidacy
+// ---------------------------------------------------------------------------
+
+/**
+ * Find the atom to shed from an overfull page — the last one that is allowed
+ * to move to a new spread. Atoms whose definition declares
+ * `canSplitAway: false` (e.g. week-footer) are skipped.
+ *
+ * @param {Array<{atomId: string, type: string}>} pageAtoms
+ * @returns {string|null} atomId to split away, or null if the page cannot shed anything
+ */
+function findSplitCandidateId(pageAtoms) {
+  if (pageAtoms.length <= 1) return null;
+
+  for (let index = pageAtoms.length - 1; index >= 0; index -= 1) {
+    const candidate = pageAtoms[index];
+    const definition = getAtomDefinition(candidate.type);
+    if (definition && definition.canSplitAway === false) continue;
+    return candidate.atomId;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Overflow resolution
 // ---------------------------------------------------------------------------
 
@@ -83,20 +107,24 @@ export function resolvePageOverflow(pageAtoms, overflowPx, pageBudgetPx) {
   potentials.sort((a, b) => b.shrinkPotentialPx - a.shrinkPotentialPx);
 
   // Early exit: if combined shrink potential cannot cover the overflow,
-  // density strategies 1 & 2 will never resolve it regardless of how many
-  // revision passes we spend.  Jump straight to Strategy 3 (split) rather
-  // than burning MAX_REVISIONS on futile incremental adjustments.
+  // shedding an atom beats compressing every atom on the page. Jump straight
+  // to Strategy 3 (split) rather than burning MAX_REVISIONS on futile
+  // incremental adjustments.
+  //
+  // This shortcut applies ONLY when the page has something it can shed. A page
+  // that cannot split (single atom, or every atom canSplitAway:false) must
+  // still be compressed: shrink potential is derived from atom *estimates*,
+  // which are approximations, so it may not veto compression outright. The
+  // Charter failure model requires an unsplittable page to render at max
+  // density, and the measurement pass — not the estimate — is the authority on
+  // whether that resolved the overflow. So fall through to the density
+  // strategies below instead of giving up.
   const totalShrinkPotential = potentials.reduce((sum, a) => sum + a.shrinkPotentialPx, 0);
   if (totalShrinkPotential < overflowPx) {
-    if (pageAtoms.length > 1) {
-      for (let index = pageAtoms.length - 1; index >= 0; index -= 1) {
-        const candidate = pageAtoms[index];
-        const definition = getAtomDefinition(candidate.type);
-        if (definition && definition.canSplitAway === false) continue;
-        return { resolved: false, adjustments: [], splitAtomId: candidate.atomId };
-      }
+    const splitAtomId = findSplitCandidateId(pageAtoms);
+    if (splitAtomId) {
+      return { resolved: false, adjustments: [], splitAtomId };
     }
-    return { resolved: false, adjustments: [], splitAtomId: null };
   }
 
   // ── Strategy 1: Shrink the single largest atom ──────────────────────
@@ -138,18 +166,13 @@ export function resolvePageOverflow(pageAtoms, overflowPx, pageBudgetPx) {
   }
 
   // ── Strategy 3: Split — move the last atom to a new spread ──────────
-  if (pageAtoms.length > 1) {
-    for (let index = pageAtoms.length - 1; index >= 0; index -= 1) {
-      const candidate = pageAtoms[index];
-      const definition = getAtomDefinition(candidate.type);
-      if (definition && definition.canSplitAway === false) continue;
-
-      return {
-        resolved: false,
-        adjustments: [],
-        splitAtomId: candidate.atomId,
-      };
-    }
+  const splitAtomId = findSplitCandidateId(pageAtoms);
+  if (splitAtomId) {
+    return {
+      resolved: false,
+      adjustments: [],
+      splitAtomId,
+    };
   }
 
   // ── Strategy 4: Single atom exceeds page — flag unresolved ──────────
