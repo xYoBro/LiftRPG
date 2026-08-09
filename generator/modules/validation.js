@@ -1370,6 +1370,218 @@ export function collectPercentileStatFindings(booklet) {
   return findings;
 }
 
+// ── Posted manifests: the forward-only resolution law (GAP-6 Landing 2) ─────
+// A `manifestPointer` is a printed promise — "X was last logged in Y" — that
+// names a real surface the player has NOT reached yet. That promise is
+// machine-checkable, so it is checked: two ways to break it, both ERRORS per
+// D19 (a dangling pointer is invalidity, not degraded taste).
+//   1. The target does not exist in the booklet at all.
+//   2. The target exists but sits at or before the pointer's own position, so
+//      the chase is already over the moment it is posted.
+// Position is PLAY order, not page order: fragments print in the back archive,
+// but a fragment is *met* when the booklet first hands it over. Two components:
+//   week — the earliest week that delivers it, over every channel (a session
+//     naming it, that week's oracle or cipher pulling it, an interlude carrying
+//     it, or the week it supplements). This is the primary key.
+//   slot — the SCRIPTED position inside that week: a session index, or the
+//     end-of-week slot for interlude hand-offs and overflow supplements. Oracle
+//     and cipher routes are optional and unordered, so they leave slot null.
+// Forward means a later week, or the same week at a later scripted slot (the
+// 2-3 session mini-chase). Same week with either slot unknown is not provably
+// forward, so it fails. A week reference ("W4") sits at the head of its week
+// and therefore only ever resolves forward into a strictly later week.
+
+function manifestWeekNumber(week, index) {
+  var n = Number(week && week.weekNumber);
+  return Number.isFinite(n) && n > 0 ? n : (index + 1);
+}
+
+function parseWeekRef(ref) {
+  var match = /^w\s*(\d+)$/i.exec(String(ref || '').trim());
+  return match ? parseInt(match[1], 10) : null;
+}
+
+function buildManifestPositions(booklet) {
+  var weeks = (booklet && booklet.weeks) || [];
+  var positions = {}; // normalized document id -> { week, slot }
+
+  function place(ref, weekNo, slot) {
+    var key = normalizeId(ref);
+    if (!key) return;
+    var current = positions[key];
+    if (!current || weekNo < current.week) {
+      positions[key] = { week: weekNo, slot: slot };
+      return;
+    }
+    if (weekNo !== current.week) return;
+    if (slot === null) return;
+    if (current.slot === null || slot < current.slot) current.slot = slot;
+  }
+
+  weeks.forEach(function (week, wi) {
+    var weekNo = manifestWeekNumber(week, wi);
+    var sessions = (week && week.sessions) || [];
+    var fo = (week && week.fieldOps) || {};
+
+    sessions.forEach(function (session, si) {
+      if (session && session.fragmentRef) place(session.fragmentRef, weekNo, si);
+    });
+
+    // Oracle pulls and cipher targets are optional routes live for the whole
+    // week — they fix the week but never a scripted position inside it.
+    var oracle = fo.oracleTable || fo.oracle || {};
+    (oracle.entries || []).forEach(function (entry) {
+      if (entry && entry.fragmentRef) place(entry.fragmentRef, weekNo, null);
+    });
+    ((((fo.cipher || {}).body) || {}).referenceTargets || []).forEach(function (target) {
+      if (looksLikeFragmentRef(target)) place(target, weekNo, null);
+    });
+
+    // The interlude closes the week; a hand-off in its payload lands with it,
+    // as does the week's overflow supplement.
+    var payload = (week && week.interlude) ? week.interlude.payload : null;
+    if (payload && typeof payload === 'object' && payload.fragmentRef) {
+      place(payload.fragmentRef, weekNo, sessions.length);
+    }
+    if (week && week.overflowDocument && week.overflowDocument.id) {
+      place(week.overflowDocument.id, weekNo, sessions.length);
+    }
+  });
+
+  return positions;
+}
+
+// true when `target` is strictly later than `source` in play order.
+function manifestPointsForward(source, target) {
+  if (!source || !target) return null; // unprovable — caller falls back
+  if (target.week !== source.week) return target.week > source.week;
+  if (source.slot === null || target.slot === null) return false;
+  return target.slot > source.slot;
+}
+
+export function collectManifestPointerErrors(booklet) {
+  var errors = [];
+  var weeks = (booklet && booklet.weeks) || [];
+  var fragments = (booklet && booklet.fragments) || [];
+
+  var positions = buildManifestPositions(booklet);
+  var archiveOrder = {};  // normalized fragment id -> authored archive index
+  var knownDocs = {};     // normalized id -> true for every printable document
+
+  fragments.forEach(function (fragment, fi) {
+    if (!fragment || !fragment.id) return;
+    var key = normalizeId(fragment.id);
+    if (archiveOrder[key] === undefined) archiveOrder[key] = fi;
+    knownDocs[key] = true;
+  });
+
+  var weekNumbers = {};
+  weeks.forEach(function (week, wi) {
+    weekNumbers[manifestWeekNumber(week, wi)] = true;
+    if (week && week.overflowDocument && week.overflowDocument.id) {
+      knownDocs[normalizeId(week.overflowDocument.id)] = true;
+    }
+  });
+  var weekCount = weeks.length;
+
+  function check(pointer, label, source) {
+    if (pointer === undefined || pointer === null) return; // optional — absence is fine
+    if (typeof pointer !== 'object' || Array.isArray(pointer)) {
+      errors.push(label + ' manifestPointer must be an object { targetRef, postedAs }');
+      return;
+    }
+
+    var targetRef = String(pointer.targetRef || '').trim();
+    var postedAs = String(pointer.postedAs || '').trim();
+    if (!postedAs) {
+      errors.push(label + ' manifestPointer is missing postedAs — the manifest line the artifact prints');
+    }
+    if (!targetRef) {
+      errors.push(label + ' manifestPointer is missing targetRef — a posted manifest must name the surface it points at');
+      return;
+    }
+
+    var targetPosition = null;
+    var targetWhere = '';
+    var targetKey = null;
+    var weekRef = parseWeekRef(targetRef);
+
+    if (weekRef !== null) {
+      if (!weekNumbers[weekRef]) {
+        errors.push(label + ' manifestPointer.targetRef "' + targetRef + '" names Week ' + weekRef +
+          ', which this ' + weekCount + '-week campaign does not contain — a posted manifest must name a real surface');
+        return;
+      }
+      // A week reference means "somewhere in Week N" — it sits at the head of
+      // that week, so only a strictly later week resolves forward.
+      targetPosition = { week: weekRef, slot: 0 };
+      targetWhere = 'Week ' + weekRef + ' is not later';
+    } else {
+      targetKey = normalizeId(targetRef);
+      if (!knownDocs[targetKey]) {
+        errors.push(label + ' manifestPointer.targetRef "' + targetRef + '" does not resolve — no document in this booklet carries that id and it is not a week reference (W1-W' + weekCount + ')');
+        return;
+      }
+      if (positions[targetKey]) {
+        targetPosition = positions[targetKey];
+        targetWhere = '"' + targetRef + '" is delivered in Week ' + targetPosition.week;
+      }
+    }
+
+    // Forward-only. Same position counts as backward: a manifest that lands
+    // where it was posted is anticipation with nowhere to go.
+    var forward = manifestPointsForward(source.position, targetPosition);
+    if (forward !== null) {
+      if (!forward) {
+        errors.push(label + ' manifestPointer.targetRef "' + targetRef + '" does not point forward — the manifest is posted in Week ' +
+          source.position.week + ' and ' + targetWhere +
+          '; a posted manifest must name a surface the player has not reached yet');
+      }
+      return;
+    }
+
+    // Neither side is delivered by a week (archive-only documents): authored
+    // fragment order is the only sequence the booklet declares.
+    if (targetKey !== null && source.archiveIndex !== null && archiveOrder[targetKey] !== undefined) {
+      if (archiveOrder[targetKey] <= source.archiveIndex) {
+        errors.push(label + ' manifestPointer.targetRef "' + targetRef + '" does not point forward — it sits at or before the posting document in the fragment archive, and no week delivers either one');
+      }
+    }
+  }
+
+  fragments.forEach(function (fragment, fi) {
+    if (!fragment || fragment.manifestPointer === undefined) return;
+    var key = fragment.id ? normalizeId(fragment.id) : '';
+    check(fragment.manifestPointer, 'Fragment "' + (fragment.id || '?') + '":', {
+      position: (key && positions[key]) ? positions[key] : null,
+      archiveIndex: fi
+    });
+  });
+
+  weeks.forEach(function (week, wi) {
+    var weekNo = manifestWeekNumber(week, wi);
+    var sessions = (week && week.sessions) || [];
+    // An interlude and a week's overflow supplement both close their week.
+    var endOfWeek = { week: weekNo, slot: sessions.length };
+    var interlude = week && week.interlude;
+    if (interlude && interlude.manifestPointer !== undefined) {
+      check(interlude.manifestPointer, 'Week ' + weekNo + ' interlude:', {
+        position: endOfWeek,
+        archiveIndex: null
+      });
+    }
+    var overflow = week && week.overflowDocument;
+    if (overflow && overflow.manifestPointer !== undefined) {
+      check(overflow.manifestPointer, 'Week ' + weekNo + ' overflowDocument "' + (overflow.id || '?') + '":', {
+        position: endOfWeek,
+        archiveIndex: null
+      });
+    }
+  });
+
+  return errors;
+}
+
 export function validateAssembledBooklet(booklet) {
   var errors = [];
   var warnings = []; // soft issues (stylistic, non-fatal) — attached to return value
@@ -1377,6 +1589,8 @@ export function validateAssembledBooklet(booklet) {
   collectBudgetBreaches(booklet).forEach(function (b) { warnings.push(b.message); });
   collectNounRosterFindings(booklet).forEach(function (m) { warnings.push(m); });
   collectPercentileStatFindings(booklet).forEach(function (m) { warnings.push(m); });
+  // Posted manifests are promises, not preferences — broken ones are errors.
+  collectManifestPointerErrors(booklet).forEach(function (m) { errors.push(m); });
 
   // ── Top-level structure ──────────────────────────────────────────────────
   ['meta', 'cover', 'rulesSpread', 'weeks', 'fragments', 'endings'].forEach(function (key) {

@@ -21,6 +21,24 @@ function normalizeAuthenticityChecks(fragment) {
   };
 }
 
+/**
+ * normalizeManifestPointer(source) -> { targetRef, postedAs } | null
+ * Posted manifests (schema 1.5.0): the printed forward reference. The renderer
+ * prints `postedAs` verbatim; `targetRef` rides along as a data attribute so
+ * the chase is inspectable. Both fields are required by the schema, but a
+ * half-filled pointer must not print a blank stamp — normalize to null.
+ */
+export function normalizeManifestPointer(source) {
+  const pointer = source && source.manifestPointer;
+  if (!pointer || typeof pointer !== 'object') return null;
+  const postedAs = String(pointer.postedAs || '').trim();
+  if (!postedAs) return null;
+  return {
+    targetRef: String(pointer.targetRef || '').trim(),
+    postedAs
+  };
+}
+
 function splitBody(fragment) {
   var raw = fragment.bodyText || fragment.body || fragment.content || '';
   // content may be {html: "..."} object from guided-build — extract the string
@@ -88,6 +106,7 @@ export function buildFragmentModel(fragment) {
     designSpec: normalizeDesignSpec(fragment),
     authenticityChecks: normalizeAuthenticityChecks(fragment),
     continuationLabel: fragment.continuationLabel || '',
+    manifestPointer: normalizeManifestPointer(fragment),
     partIndex: fragment.partIndex || 0,
     partCount: fragment.partCount || 0,
     artifactIdentity: fragment.artifactIdentity || {}

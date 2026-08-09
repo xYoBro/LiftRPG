@@ -4767,6 +4767,32 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .interlude-password-element .password-box-row{
   margin-top:6px;
 }
+/* ── manifest-pointer: the posted manifest (schema 1.5.0) ───────────────────
+   "X was last logged in Y" — a filed one-liner stamped at the foot of a found
+   document or an interlude, naming a real LATER surface. Structure only: every
+   colour, weight, and rule comes from theme tokens, and it reads in pure B&W
+   (a solid filing rule down the left plus a dashed frame — never a hue). The
+   casing is the author's: `postedAs` is written in the artifact's own voice, so
+   nothing here transforms it. */
+.manifest-pointer{
+  margin-top:5px;
+  padding:3px 6px;
+  border:var(--theme-hair-width,1px) dashed color-mix(in srgb, var(--theme-panel-border,var(--rule)) 82%, transparent 18%);
+  border-left:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border-radius:var(--theme-panel-radius,2px);
+  font-family:var(--theme-label-family,var(--mono));
+  font-size:5.2pt;
+  line-height:1.35;
+  letter-spacing:.06em;
+  color:color-mix(in srgb, var(--ink) 72%, var(--muted) 28%);
+}
+.interlude-page .manifest-pointer{
+  align-self:flex-start;
+  max-width:88%;
+  margin-top:12px;
+  padding:4px 8px;
+  font-size:6pt;
+}
 .password-box-hint{
   font-family:var(--mono);
   font-size:7pt;

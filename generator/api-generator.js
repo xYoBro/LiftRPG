@@ -93,7 +93,9 @@ import {
   validateFragmentsStage,
   validateSkeletonStage,
   classifyValidationErrors,
-  collectBudgetBreaches
+  collectBudgetBreaches,
+  collectPercentileStatFindings,
+  collectNounRosterFindings
 } from './modules/validation.js';
 
 import {
@@ -1427,10 +1429,20 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
 
   for (var round = 1; round <= maxRounds; round++) {
     var digestJson = JSON.stringify(buildCriticDigest(booklet));
-    // Machine findings (GAP-1): measured budget breaches go to the critic as
-    // facts it must convert into unit-scoped failures — recomputed each round
-    // so accepted revisions clear their own findings.
-    var machineFindings = collectBudgetBreaches(booklet).map(function (b) { return b.message; });
+    // Machine findings (GAP-1): everything the pipeline can MEASURE goes to the
+    // critic as fact it must convert into unit-scoped failures — text-budget
+    // breaches (fusionPacing), Core Noun Roster drift (worldCohesion), and
+    // growing-stat discipline (systemIntegration). Recomputed each round so
+    // accepted revisions clear their own findings. Posted-manifest breakage is
+    // absent by design: it is a validation ERROR, so it never reaches here.
+    var machineFindings = []
+      .concat(collectBudgetBreaches(booklet).map(function (b) { return b.message; }))
+      .concat(collectNounRosterFindings(booklet))
+      .concat(collectPercentileStatFindings(booklet))
+      .map(function (finding) {
+        return typeof finding === 'string' ? finding : String((finding && finding.message) || finding);
+      })
+      .filter(Boolean);
     var verdictRaw;
     try {
       verdictRaw = await runJsonStage(settings, {

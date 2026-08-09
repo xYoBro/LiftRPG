@@ -17,6 +17,8 @@ const PARAGRAPH_HEIGHT = 45;
 /** Compressed values at max density */
 const CHROME_HEIGHT_MIN = 60;
 const PARAGRAPH_HEIGHT_MIN = 35;
+/** Posted manifest line (schema 1.5.0) — one stamped row plus its frame */
+const MANIFEST_HEIGHT = 16;
 
 registerAtom('fragment-doc', {
   defaultSizeHint: 'flex',
@@ -26,9 +28,10 @@ registerAtom('fragment-doc', {
   estimate(data, density) {
     const fragmentModel = buildFragmentModel(data || {});
     const paragraphCount = fragmentModel.bodyParagraphs.length || 1;
+    const manifest = fragmentModel.manifestPointer ? MANIFEST_HEIGHT : 0;
 
-    const preferred = CHROME_HEIGHT     + paragraphCount * PARAGRAPH_HEIGHT;
-    const min       = CHROME_HEIGHT_MIN + paragraphCount * PARAGRAPH_HEIGHT_MIN;
+    const preferred = CHROME_HEIGHT     + paragraphCount * PARAGRAPH_HEIGHT    + manifest;
+    const min       = CHROME_HEIGHT_MIN + paragraphCount * PARAGRAPH_HEIGHT_MIN + manifest;
 
     return { minHeight: min, preferredHeight: preferred };
   },

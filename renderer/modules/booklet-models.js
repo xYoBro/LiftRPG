@@ -5,6 +5,7 @@ import {
   splitRichContentBlocks,
   splitParagraphs
 } from './utils.js?v=47';
+import { normalizeManifestPointer } from './document-models.js?v=47';
 
 function humanizeComponentType(value) {
   return String(value || 'component').replace(/-/g, ' ');
@@ -402,6 +403,9 @@ export function buildInterludePageModel(week, layoutVariant, interludeOverride =
     body: joinRichContentBlocks(bodyBlocks),
     bodyBlocks,
     spreadAware: !!(interlude && (interlude.spreadAware || interlude['spread-aware'])),
+    // Posted manifest (schema 1.5.0) — the forward reference this interlude
+    // prints. Same normalization as fragments; see document-models.js.
+    manifestPointer: normalizeManifestPointer(interlude),
     payload: interlude.payload || null,
     payloadType: interlude.payloadType || '',
     continuationLabel: entry && entry.continuationLabel || ''

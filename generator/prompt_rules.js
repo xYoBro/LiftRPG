@@ -189,7 +189,7 @@
     '### week.interlude',
     '- Required if present: `title`, `reason`, `body`',
     '- `reason` MUST reference specific terms from the worldContract or literaryRegister. It grounds the interlude in the fiction. Do not use generic phrasing \u2014 name characters, locations, or artifacts from the Core Noun Roster.',
-    '- Optional: `payloadType`, `payload`, `spreadAware`',
+    '- Optional: `payloadType`, `payload`, `spreadAware`, `manifestPointer`',
     '- Supported `payloadType` values ONLY (no others accepted):',
     '  "none" | "narrative" | "cipher" | "map" | "clock" | "companion" | "fragment-ref" | "password-element"',
     '  Do NOT use "fragment" (use "fragment-ref" instead). Do NOT invent new payload types.',
@@ -199,6 +199,9 @@
     '- When `payloadType` is "fragment-ref", `payload` MUST be an object: `{ "fragmentRef": "F.XX", "action": "..." }`',
     '- When `payloadType` is "narrative" or "none", `payload` is a plain string or omitted.',
     '- Use interludes for discovered packets, route updates, partial instructions, fragment handoffs, password elements, or compact state shifts only when they materially change play.',
+    '- `manifestPointer` (object, optional): a posted manifest — a diegetic forward reference this interlude prints. Shape: `{ "targetRef": "...", "postedAs": "..." }`',
+    '  - `targetRef` (string, required): the surface being pointed at — a fragment id ("F.07") or a week reference ("W4"). It MUST exist and MUST come LATER in the booklet than the week this interlude sits in. A pointer to a missing or earlier surface is a broken promise and fails validation.',
+    '  - `postedAs` (string, required): the one-line manifest as this artifact would print it, in the world&apos;s own filing voice (e.g. "LAST LOGGED: tide ledger — Week 4 survey").',
     '',
     '### week.gameplayClocks',
     '- Each clock: { clockName, segments, clockType, startValue?, direction?, linkedClockName?, opposedClockName?, thresholds?, consequenceOnFull }',
@@ -242,6 +245,9 @@
     '- `content` (string)',
     '- `designSpec` (object): { paperTone, primaryTypeface, headerStyle, hasRedactions, hasAnnotations }',
     '- `authenticityChecks` (object): { hasIrrelevantDetail, couldExistInDifferentStory, redactionDoesNarrativeWork }',
+    '- `manifestPointer` (object, optional): a posted manifest — a diegetic forward reference this document prints. Shape: `{ "targetRef": "...", "postedAs": "..." }`',
+    '  - `targetRef` (string, required): the surface being pointed at — another fragment id ("F.07") or a week reference ("W4"). It MUST exist and MUST come LATER in the booklet than the week this fragment is delivered in. A pointer to a missing or earlier surface is a broken promise and fails validation.',
+    '  - `postedAs` (string, required): the one-line manifest as this artifact would print it, in the world&apos;s own filing voice (e.g. "LAST LOGGED: tide ledger — Week 4 survey"). Never write it as an instruction to the player.',
     '- Across the full booklet, include at least three linked fragment functions: one action-changing artifact, one interpretation-changing artifact, and one character-deepening artifact.',
     '- At least one incident, place, procedure, or relationship should recur across multiple document perspectives.',
     '- Fragments may arrive as threaded packets, route updates, contradictory records, or personal aftershocks, not just isolated lore drops.',
@@ -760,7 +766,15 @@
     '- End at least half of all sessions with an unresolved question the player will think about away from the gym.',
     '- Clocks that imply off-screen consequences create urgency even when the booklet is closed.',
     '- Binary choices should be presented at session end so the player deliberates before the next session.',
-    '- At least one fragment per block should plant a mystery that requires combining information from two different weeks to resolve.'
+    '- At least one fragment per block should plant a mystery that requires combining information from two different weeks to resolve.',
+    '',
+    '**Posted manifests (`manifestPointer`) — the located channel:**',
+    '- Anticipation with an address beats atmosphere. A posted manifest is a printed line on a fragment or interlude that names a specific thing at a specific LATER place: "X was last logged in Y". The player now has somewhere to be.',
+    '- Each booklet should carry 2-3 manifest chains. Post each pointer 1-3 sessions before its payoff — close enough to stay warm, far enough to be a chase.',
+    '- At least one chain must run three links: the recovered document posts the next link of its own chain, so following one manifest hands the player the next. Chains end clean — the final link posts nothing.',
+    '- `targetRef` must name a real later surface: a fragment id delivered in a later week, or a week reference ("W4"). Pointing at something missing, or at something already read, breaks the promise the line makes — validation rejects both.',
+    '- Write `postedAs` in the artifact&apos;s own filing voice, never as a note to the player: "LAST LOGGED: tide ledger — Week 4 survey", "FORWARDED TO CASE FILE 12-B, spring quarter", "Sent on with the Michaelmas accounts." Whoever kept this paper wrote that line for their own reasons.',
+    '- The pointed-to surface must actually pay off — the thing the manifest named has to be recognisably present when the player gets there.'
   ];
 
   window.INST_DIEGETIC_MECHANICS = [
@@ -1734,12 +1748,19 @@
     'companion slots that actually exist in this booklet? Does at least one clock’s',
     'consequenceOnFull change the map? Do cipher outputs open access (route, zone, fragment)',
     'rather than just feeding the boss decode? Does the binary choice fork board state both ways?',
+    'If a `percentile-stat` companion is present, is it referenced BY NAME inside oracle',
+    '`instruction` text in at least two weeks? A growing stat nothing rolls against is a',
+    'decorative page — grade it as inert and cite the oracle instructions that omit it.',
     '',
     '### clueEconomy',
     'Are the mystery questions answerable from evidence physically present in the booklet?',
     'Are false assumptions planted by one document and corrected by a later one — both',
     'identifiable? Do at least three fragments have distinct linked functions (action-changing,',
     'interpretation-changing, character-deepening)? Is any non-boss week clue-free?',
+    'Posted manifests (`manifestPointer`): does every chase resolve on the surface it pointed',
+    'at — is the thing the manifest named recognisably present when the player arrives? No',
+    'dangling anticipation, no chain that fizzles into an unrelated document. Cite the posted',
+    'line and the payoff it landed on (or failed to).',
     '',
     '### motifPayoff',
     'Do recurring objects, places, or phrases appear in at least two non-adjacent weeks AND',
@@ -1800,8 +1821,9 @@
       '',
       '## Machine Findings (measured by the pipeline — these are facts, not opinions)',
       'Each finding below MUST appear as a failure with a unit-scoped directive under the',
-      'relevant dimension (text-budget breaches belong to fusionPacing). A dimension with a',
-      'standing machine finding cannot score at or above the ship threshold.'
+      'relevant dimension: text-budget breaches belong to fusionPacing, Core Noun Roster',
+      'findings to worldCohesion, growing-stat (percentile-stat) findings to systemIntegration.',
+      'A dimension with a standing machine finding cannot score at or above the ship threshold.'
     ].concat(machineFindings.map(function (f) { return '- ' + f; })) : [];
     return [
       '# Composition Critic — Assembled Booklet Review',

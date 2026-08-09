@@ -10,6 +10,7 @@ import {
   renderMapSection
 } from './field-ops-primitives.js?v=47';
 import { inferCipherFamily, inferMapFamily } from './mechanic-registry.js?v=47';
+import { renderManifestPointer } from './document-primitives.js?v=47';
 
 function renderClassifiedPacketCoverMeta(model) {
   const wrap = make('div', 'cover-packet-meta');
@@ -502,6 +503,9 @@ export function renderInterludePage(model) {
     body.appendChild(make('p', '', paragraph));
   });
   frame.appendChild(body);
+
+  const manifest = renderManifestPointer(model.manifestPointer);
+  if (manifest) frame.appendChild(manifest);
 
   const payload = renderInterludePayload(model);
   if (payload) {

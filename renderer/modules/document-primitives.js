@@ -2,6 +2,20 @@ import { make } from './dom.js?v=47';
 import { createBoundedPage } from './page-shell.js?v=47';
 import { sanitizeHtml } from './utils.js?v=47';
 
+/**
+ * renderManifestPointer(pointer) -> Element | null
+ * The posted manifest: a filed one-liner stamped at the foot of a document or
+ * interlude, naming a surface the player has not reached yet. `postedAs` is
+ * printed as text (make() sets textContent — escaped by construction); the
+ * target rides as a data attribute for inspection, never as printed chrome.
+ */
+export function renderManifestPointer(pointer) {
+  if (!pointer || !pointer.postedAs) return null;
+  const line = make('div', 'manifest-pointer', pointer.postedAs);
+  if (pointer.targetRef) line.setAttribute('data-manifest-target', pointer.targetRef);
+  return line;
+}
+
 function buildMetaLines(fragmentModel) {
   const lines = [];
   if (fragmentModel.title) lines.push(fragmentModel.title);
@@ -54,6 +68,8 @@ export function renderFoundDocument(fragmentModel) {
     });
   }
   doc.appendChild(body);
+  const manifest = renderManifestPointer(fragmentModel.manifestPointer);
+  if (manifest) doc.appendChild(manifest);
   doc.appendChild(make('div', 'fragment-doc-sig', fragmentModel.purpose));
   block.appendChild(doc);
   return block;

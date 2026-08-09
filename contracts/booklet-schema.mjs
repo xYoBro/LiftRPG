@@ -39,6 +39,25 @@ var nonEmptyString = { type: 'string', minLength: 1 };
 var hexColor = { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' };
 var xt = { type: 'object' }; // _x extension blob
 
+// ── manifestPointer (schema 1.5.0) ──────────────────────────────────────────
+// Posted manifests: a diegetic forward reference printed on a fragment or an
+// interlude ("X was last logged in Y") that names a REAL later surface. Optional
+// everywhere; when present both fields are required.
+//   targetRef — a fragment id ("F.07") or a week reference ("W4").
+//   postedAs  — the manifest line the renderer prints, in the artifact's voice.
+// Resolution (target exists AND is later than its source) is the forward-only
+// law, checked in generator/modules/validation.js — JSON Schema cannot express
+// a cross-document ordering constraint.
+var manifestPointer = {
+  type: 'object',
+  required: ['targetRef', 'postedAs'],
+  additionalProperties: false,
+  properties: {
+    targetRef: nonEmptyString,
+    postedAs: nonEmptyString
+  }
+};
+
 export var BOOKLET_SCHEMA = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   $id: 'https://liftrpg.co/contracts/booklet/v' + SCHEMA_VERSION,
@@ -472,7 +491,8 @@ export var BOOKLET_SCHEMA = {
         body: { type: 'string' },
         payloadType: { enum: VALID_PAYLOAD_TYPES },
         payload: { type: ['object', 'string', 'null'] },
-        spreadAware: { type: 'boolean' }
+        spreadAware: { type: 'boolean' },
+        manifestPointer: manifestPointer
       }
     },
 
@@ -527,6 +547,7 @@ export var BOOKLET_SCHEMA = {
         continuationLabel: { type: 'string' },
         partIndex: { type: 'integer' },
         partCount: { type: 'integer' },
+        manifestPointer: manifestPointer,
         _x: xt
       }
     },
