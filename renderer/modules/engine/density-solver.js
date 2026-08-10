@@ -22,6 +22,28 @@ export const MAX_DENSITY = 1.0;
 /** Minimum density step per adjustment. Prevents infinite tiny adjustments. */
 const MIN_DENSITY_STEP = 0.05;
 
+/**
+ * Step to take on a page that STALLED but still has a density path (the
+ * planner's max-density probe came back clean): halfway to MAX_DENSITY.
+ *
+ * Density is continuous but rendering is not. Every atom's CSS ladder is a
+ * handful of thresholds — 0.3 / 0.6 / 0.85 for the mechanic zones — so a step
+ * that lands between two rungs changes nothing at all on the page. When the
+ * overflow is small relative to an atom's shrink potential, `fraction` rounds
+ * to nothing and the step collapses to MIN_DENSITY_STEP, which is smaller than
+ * the gap between rungs: the solver can then spend every revision pass walking
+ * 0.60 → 0.65 → 0.70 → 0.75 → 0.80 without ever crossing into `tight`, and the
+ * page ships clipped. (Measured: variety-02 page 16, 3px of oracle clipped
+ * after five passes, one step short of the rung that would have fixed it.)
+ *
+ * Halving the remaining range crosses the next threshold in at most a couple of
+ * passes and still lands on the same tier the minimal crossing would have —
+ * it is a coarser search over the same ladder, not a jump to maximum
+ * compression. Jumping straight to MAX_DENSITY would also resolve it, and would
+ * throw away the "lowest tier that fits" property the ladders were built for.
+ */
+const STALL_ESCALATION = 0.5;
+
 /** Maximum revision iterations per page. */
 export const MAX_REVISIONS = 5;
 
@@ -101,6 +123,9 @@ function findSplitCandidateId(pageAtoms) {
  * @param {object} [options]
  * @param {boolean} [options.densityExhausted] — the planner measured this page
  *   with every atom at max density and it still overflowed. See the veto below.
+ * @param {boolean} [options.stalled] — the previous pass bought less than
+ *   OVERFLOW_PROGRESS_EPSILON_PX. With densityExhausted false this means the
+ *   step landed between two rungs of the CSS ladder; see STALL_ESCALATION.
  * @returns {{ resolved: boolean, adjustments: Array<{atomId: string, newDensity: number}>, splitAtomId: string|null }}
  */
 export function resolvePageOverflow(pageAtoms, overflowPx, pageBudgetPx, options = {}) {
@@ -168,13 +193,23 @@ export function resolvePageOverflow(pageAtoms, overflowPx, pageBudgetPx, options
     }
   }
 
+  // The floor on this pass's step. A page that made no measured progress last
+  // pass has proved its last step fell between two rungs of the CSS ladder, so
+  // the arithmetic minimum is the wrong floor — see STALL_ESCALATION. Only
+  // reachable when the planner's probe said a density path still exists;
+  // `densityExhausted` short-circuits above.
+  const stepFloor = (density) => (options.stalled
+    ? Math.max(MIN_DENSITY_STEP, (MAX_DENSITY - density) * STALL_ESCALATION)
+    : MIN_DENSITY_STEP);
+
   // ── Strategy 1: Shrink the single largest atom ──────────────────────
   if (potentials.length > 0) {
     const target = potentials[0];
     const fraction   = Math.min(1.0, overflowPx / target.shrinkPotentialPx);
+    const floor      = stepFloor(target.density);
     const newDensity = Math.min(
       MAX_DENSITY,
-      target.density + fraction * (MAX_DENSITY - target.density),
+      target.density + Math.max(floor, fraction * (MAX_DENSITY - target.density)),
     );
     const densityStep = newDensity - target.density;
 
@@ -198,7 +233,7 @@ export function resolvePageOverflow(pageAtoms, overflowPx, pageBudgetPx, options
           atomId:     atom.atomId,
           newDensity: Math.min(
             MAX_DENSITY,
-            atom.density + Math.max(MIN_DENSITY_STEP, densityIncrease),
+            atom.density + Math.max(stepFloor(atom.density), densityIncrease),
           ),
         };
       });

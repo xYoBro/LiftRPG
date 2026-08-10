@@ -105,30 +105,32 @@
       "frag-1",
       "frag-3",
       "frag-5",
+      "frag-6",
       "frag-2",
       "frag-4",
-      "frag-6",
       "frag-7",
+      "frag-12",
+      "frag-17",
+      "frag-20",
       "frag-8",
       "frag-9",
       "frag-10",
       "frag-11",
-      "frag-12",
-      "frag-17",
       "frag-13",
       "frag-14",
       "frag-15",
       "frag-16",
       "frag-18",
       "frag-19",
-      "frag-20",
       "frag-21",
       "assembly",
       "ending-locked",
       "post-padding-0",
       "post-padding-1",
+      "post-padding-2",
       "back-cover"
-    ]
+    ],
+    "browserPageCount": 52
   },
   "content/The-Air-Gapped-Choir.json": {
     "normalizedPageCount": 28,
@@ -348,7 +350,8 @@
       "post-padding-0",
       "post-padding-1",
       "back-cover"
-    ]
+    ],
+    "browserPageCount": 52
   },
   "content/Palimpsest-House.json": {
     "normalizedPageCount": 28,
@@ -440,8 +443,8 @@
       "frag-0",
       "frag-1",
       "frag-3",
-      "frag-2",
       "frag-4",
+      "frag-2",
       "frag-5",
       "frag-6",
       "frag-7",
@@ -449,6 +452,7 @@
       "ending-locked",
       "post-padding-0",
       "post-padding-1",
+      "post-padding-2",
       "back-cover"
     ],
     "browserPageCount": 36
@@ -676,6 +680,7 @@
       "w5-interlude",
       "frag-0",
       "frag-6",
+      "frag-9",
       "frag-1",
       "frag-2",
       "frag-3",
@@ -683,12 +688,12 @@
       "frag-5",
       "frag-7",
       "frag-8",
-      "frag-9",
       "frag-10",
       "frag-11",
       "assembly",
       "ending-locked",
       "post-padding-0",
+      "post-padding-1",
       "back-cover"
     ]
   },
@@ -865,7 +870,7 @@
       "boss",
       "fragment-page"
     ],
-    "browserPageCount": 40,
+    "browserPageCount": 44,
     "printedAtomOrder": [
       "cover",
       "rules-left",
@@ -904,8 +909,8 @@
       "w2-cipher",
       "w2-oracle",
       "w2-map",
-      "w2-companion-0",
       "w2-companion-1",
+      "w2-companion-0",
       "w3-header",
       "w3-s0",
       "w3-s1",
@@ -950,6 +955,9 @@
       "frag-10",
       "assembly",
       "ending-locked",
+      "post-padding-0",
+      "post-padding-1",
+      "post-padding-2",
       "back-cover"
     ]
   }

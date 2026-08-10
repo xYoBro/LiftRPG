@@ -3302,7 +3302,27 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
    across the 24-zone corpus sample — a saving the solver could not see.
    The compact tier's only realizable saving is the text size: its former
    `.oracle-entries{gap:2px 8px}` declaration was byte-identical to the base
-   rule above, so it has been dropped rather than left as a plausible no-op. */
+   rule above, so it has been dropped rather than left as a plausible no-op.
+
+   TRUNCATION LAW: no tier of this ladder may buy space with -webkit-line-clamp.
+   The tight tier used to carry `-webkit-line-clamp:3` on .oracle-text, and it
+   was doing most of tight's work: 294 entry texts across the 8-fixture corpus
+   rendered with hidden overflow (up to 83px — whole paperActions and the tails
+   of results), and the loss was invisible to every gate, because the internal-
+   overflow detector skips clamped nodes on purpose (hasIntentionalClamp in
+   measurement-harness.js). It was latent only because the old estimate
+   under-promised so badly the solver never asked for tight. Replaced by real
+   geometry — 4.55pt/1.12 text, zero entry padding, and the frag-ref rule below
+   — which measures -37.0% against base where the clamp measured -38.0%: the
+   same shrink, no prose eaten. diagnostics.spec.js now asserts the invariant
+   directly ('oracle entries are never silently truncated').
+
+   CROSS-FILE CONTRACT: every number in the four oracle blocks below (plus the
+   base .oracle-header / .oracle-instruction / .oracle-entries / .oracle-entry /
+   .oracle-text / .frag-ref rules they modify) is mirrored in the LADDER table
+   of renderer/modules/atoms/oracle-table.js, whose tier keys are exactly the
+   variant names densityVariant() returns. CHANGE THEM TOGETHER — estimate()
+   runs in phase 1 with no DOM and cannot read a computed style. */
 .oracle-zone[data-density-variant="compact"] .oracle-text{
   font-size:5pt;
 }
@@ -3326,15 +3346,22 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   gap:0px 4px;
 }
 .oracle-zone[data-density-variant="tight"] .oracle-entry{
-  padding:1px 0;
+  padding:0;
 }
 .oracle-zone[data-density-variant="tight"] .oracle-text{
-  font-size:4.8pt;
-  line-height:1.18;
-  display:-webkit-box;
-  -webkit-line-clamp:3;
-  -webkit-box-orient:vertical;
-  overflow:hidden;
+  font-size:4.55pt;
+  line-height:1.12;
+}
+/* The fragment reference is a filed code ("F3", "EX-114"), not prose, and it
+   ships at 7pt mono with 4px block margins — larger than the 5.2pt entry text
+   it annotates. Inside a baseline-aligned flex row those margins raise the
+   whole entry: measured 8px per entry at base, on 200 of the corpus's 399
+   entries. Trimming the chip (not the result text) is what makes dense honest:
+   dense went from -15.3% to -23.2% on this rule alone. */
+.oracle-zone[data-density-variant="dense"] .frag-ref,
+.oracle-zone[data-density-variant="tight"] .frag-ref{
+  font-size:5.4pt;
+  margin:0;
 }
 .oracle-zone[data-density-variant="tight"] .oracle-header{
   margin-bottom:1px;
@@ -4256,9 +4283,11 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .fragment-page[data-layout-variant="tight"] .fragment-doc{
   padding:6px 10px 7px;
 }
-.fragment-page[data-layout-variant="tight"] .fragment-doc-body{
-  font-size:6.1pt;
-  line-height:1.28;
+/* Context authors write the --fragment-body-* tokens, never font-size —
+   see the ladder note on .fragment-doc-body. */
+.fragment-page[data-layout-variant="tight"]{
+  --fragment-body-size:6.1pt;
+  --fragment-body-leading:1.28;
 }
 .fragment-page[data-layout-variant="tight"] .fragment-doc-body p{
   margin-bottom:2px;
@@ -4281,9 +4310,9 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   line-height:1.2;
   margin-bottom:2px;
 }
-.fragment-page[data-layout-variant="dense"] .fragment-doc-body{
-  font-size:5.85pt;
-  line-height:1.22;
+.fragment-page[data-layout-variant="dense"]{
+  --fragment-body-size:5.85pt;
+  --fragment-body-leading:1.22;
 }
 .fragment-page[data-layout-variant="dense"] .fragment-doc-body p{
   margin-bottom:1px;
@@ -4363,9 +4392,9 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   max-width:89%;
   align-self:flex-end;
 }
-.fragment-page[data-shell-family="classified-packet"] .fragment-doc-body{
-  font-size:6.05pt;
-  line-height:1.28;
+.fragment-page[data-shell-family="classified-packet"]{
+  --fragment-body-size:6.05pt;
+  --fragment-body-leading:1.28;
 }
 
 /* Individual fragment */
@@ -4530,10 +4559,25 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   color:var(--muted);
   margin-bottom:3px;
 }
+/* ── --fragment-body-* token ladder ──
+   The body's type size has two independent authors: the CONTEXT (which kind of
+   document this is, which page layout variant it sits in, which shell family
+   the packet uses) and the DENSITY (how hard the solver is squeezing). Both
+   used to write `font-size` on `.fragment-doc-body` at identical (0,3,0)
+   specificity, so they could not compose — whichever rule sat later in the file
+   won outright. The density block sits last, so it stomped every context rule:
+   measured across the corpus, base rendered four distinct body sizes (5.95pt
+   inspection / 6.05 transcript / 6.35 default / 6.45 field-note) and compact
+   rendered ONE (6.16pt) for all of them. An inspection document therefore got
+   BIGGER as density rose — a render-side monotonicity inversion.
+   Now context sets the size token and density sets a scale token, so they
+   multiply: an inspection at tight is 5.95pt × 0.90, not 6.35pt × 0.90. This is
+   the D71 cipher pattern (`--cipher-*`) applied to the fragment body, and it is
+   what the FOLLOW-UP note on the old density block asked for. */
 .fragment-doc-body{
   font-family:var(--serif);
-  font-size:6.35pt;
-  line-height:1.31;
+  font-size:calc(var(--fragment-body-size,6.35pt) * var(--fragment-body-scale,1));
+  line-height:calc(var(--fragment-body-leading,1.31) * var(--fragment-body-leading-scale,1));
   color:var(--ink);
   flex:1;
   overflow-wrap: anywhere;
@@ -4564,9 +4608,11 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   background:white;
   padding:11px 13px;
 }
+.fragment-doc.correspondence{
+  --fragment-body-leading:1.28;
+}
 .fragment-doc.correspondence .fragment-doc-body{
   font-style:italic;
-  line-height:1.28;
 }
 
 /* Field note variant */
@@ -4574,20 +4620,24 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   background:var(--card);
   border-style:dashed;
 }
+.fragment-doc.field-note{
+  --fragment-body-size:6.45pt;
+  --fragment-body-leading:1.34;
+}
 .fragment-doc.field-note .fragment-doc-body{
   font-family:var(--mono);
-  font-size:6.45pt;
-  line-height:1.34;
 }
 
 /* Transcript variant */
 .fragment-doc.transcript{
   background:white;
 }
+.fragment-doc.transcript{
+  --fragment-body-size:6.05pt;
+  --fragment-body-leading:1.34;
+}
 .fragment-doc.transcript .fragment-doc-body{
   font-family:var(--mono);
-  font-size:6.05pt;
-  line-height:1.34;
 }
 
 /* Report variant */
@@ -4618,9 +4668,9 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   color:var(--ink);
   font-weight:700;
 }
-.fragment-doc.inspection .fragment-doc-body{
-  font-size:5.95pt;
-  line-height:1.24;
+.fragment-doc.inspection{
+  --fragment-body-size:5.95pt;
+  --fragment-body-leading:1.24;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -5562,7 +5612,22 @@ body[data-demo-view="true"] .reader-unlock{
    sample: on screen every variant measured 333px (base) — zero shrink for the
    solver to spend — while print came in 131px (dense) / 272px (tight) shorter.
    The note is a gloss, not a writable surface, so shrinking then dropping it
-   is a legitimate density affordance; it is now the same on both media. */
+   is a legitimate density affordance; it is now the same on both media.
+
+   WHAT THIS LADDER DELIBERATELY DOES NOT TOUCH: the map body. A .map-grid row
+   is a 30px writable cell, .map-network is a fixed 214px min-height frame whose
+   node positions come from the PTP spatial guardrails, .map-track steps hold
+   pencil boxes, and .player-map is a draw-on-me canvas with a 176px floor.
+   Measured across the corpus at every tier, all four are byte-identical in
+   height — and that is correct, not a defect: compressing them would shrink the
+   surfaces the player writes on. So the map's shrink is bounded by its chrome,
+   and the estimate in atoms/map-panel.js says so instead of promising a flat
+   15% the body can never give back. (Before this pass it promised 15% at every
+   tier and delivered 0 / -6.3 / -12.7%, all of it from the note — which meant a
+   map with no mapNote promised 15% and delivered nothing at all.)
+
+   CROSS-FILE CONTRACT: the figures below are mirrored in the LADDER table of
+   renderer/modules/atoms/map-panel.js. CHANGE THEM TOGETHER. */
 .map-zone[data-density-variant="dense"] .map-note,
 .map-zone[data-density-variant="tight"] .map-note{
   font-size:4.6pt;
@@ -5574,6 +5639,42 @@ body[data-demo-view="true"] .reader-unlock{
   margin-bottom:1px;
 }
 .map-zone[data-density-variant="tight"] .map-note{ display:none; }
+/* Spacing around the body, never inside it: the gutter under the map and the
+   gap above the floor annotation. */
+.map-zone[data-density-variant="dense"] .map-grid,
+.map-zone[data-density-variant="dense"] .map-network,
+.map-zone[data-density-variant="dense"] .map-track,
+.map-zone[data-density-variant="dense"] .player-map,
+.map-zone[data-density-variant="tight"] .map-grid,
+.map-zone[data-density-variant="tight"] .map-network,
+.map-zone[data-density-variant="tight"] .map-track,
+.map-zone[data-density-variant="tight"] .player-map{
+  margin-bottom:2px;
+}
+.map-zone[data-density-variant="dense"] .map-annotation,
+.map-zone[data-density-variant="tight"] .map-annotation{
+  margin-top:1px;
+}
+/* The route key is a printed legend, not a writing surface — its own chrome
+   (rule gap, label lead, row gutter) compresses like any other caption block. */
+.map-zone[data-density-variant="dense"] .map-route-key{
+  padding-top:2px;
+}
+.map-zone[data-density-variant="dense"] .map-route-key .doc-label{
+  margin-bottom:3px;
+}
+.map-zone[data-density-variant="dense"] .map-route-key-grid{
+  gap:2px 8px;
+}
+.map-zone[data-density-variant="tight"] .map-route-key{
+  padding-top:1px;
+}
+.map-zone[data-density-variant="tight"] .map-route-key .doc-label{
+  margin-bottom:2px;
+}
+.map-zone[data-density-variant="tight"] .map-route-key-grid{
+  gap:1px 8px;
+}
 
 /* ── Fragment density ladder ──
    Was print-scoped, and the scoping hid a second, worse defect: the tiers were
@@ -5585,28 +5686,73 @@ body[data-demo-view="true"] .reader-unlock{
    it ~1.76x. Being print-only, the solver never saw it: across the 8-fixture
    corpus, natural-state overflow was 5px on screen and 595px in print, all of
    it fragment-page content silently clipped by the frame (38-243px on five
-   fixtures). The multipliers are preserved as the author meant them, now
-   anchored to the base size in the same unit (6.35pt x .97/.93/.90).
-   FOLLOW-UP: .fragment-doc-body's size is re-set by several context rules
-   (layout-variant tight/dense, classified-packet). Absolute pt here stomps the
-   two that share this specificity, so the dense layout-variant lands at 5.91pt
-   where it used to be 5.85pt (+0.08px, noise). The clean fix is a
-   --fragment-body-* token ladder consumed by base + contexts, exactly as the
-   cipher got in D71; that is a separate pass. */
-.fragment-block[data-density-variant="compact"] .fragment-doc-body{
-  font-size:6.16pt;
+   fixtures). The multipliers are preserved as the author meant them, and the
+   FOLLOW-UP this block used to carry — "the clean fix is a --fragment-body-*
+   token ladder consumed by base + contexts, exactly as the cipher got in D71"
+   — is now done: the multipliers below are SCALES on the context's own size
+   token, not absolute pt that stomps it. See the ladder note on
+   .fragment-doc-body for what that fixed (an inspection document's body used to
+   grow 3.5% when density rose from base to compact).
+
+   PROSE SCALES; CHROME COMPRESSES. The type ladder is deliberately gentle
+   (.97/.93/.90) because this is the booklet's long-form reading surface. The
+   rest of the shrink comes from the document's own frame — its padding, the gap
+   under its type slug, the rule above its signature, the space between
+   paragraphs, and the posted-manifest chip. None of those is prose.
+
+   The chrome rules below DO override their context counterparts (a
+   correspondence letter's roomy 11px/13px padding collapses to the density
+   value like everything else) and that is deliberate, unlike the type stomp
+   this block used to commit: every context's padding only ever decreases as
+   density rises, so the ladder stays monotone. Type could not do that, which is
+   why type went to tokens and chrome did not.
+
+   CROSS-FILE CONTRACT: every number in this block, plus the base .fragment-doc
+   / -type / -header / -body / -sig / .manifest-pointer rules it modifies, is
+   mirrored in the LADDER table of renderer/modules/atoms/fragment-doc.js.
+   CHANGE THEM TOGETHER. */
+.fragment-block[data-density-variant="compact"]{
+  --fragment-body-scale:.97;
 }
-.fragment-block[data-density-variant="dense"] .fragment-doc-body{
-  font-size:5.91pt;
-  line-height:1.32;
+.fragment-block[data-density-variant="dense"]{
+  --fragment-body-scale:.93;
+  --fragment-body-leading-scale:.98;
 }
-.fragment-block[data-density-variant="tight"] .fragment-doc-body{
-  font-size:5.72pt;
-  line-height:1.26;
+.fragment-block[data-density-variant="tight"]{
+  --fragment-body-scale:.90;
+  --fragment-body-leading-scale:.96;
 }
 .fragment-block[data-density-variant="dense"] .fragment-doc-header,
 .fragment-block[data-density-variant="tight"] .fragment-doc-header{
   margin-bottom:3px;
+}
+.fragment-block[data-density-variant="dense"] .fragment-doc{
+  padding:5px 9px 6px;
+}
+.fragment-block[data-density-variant="tight"] .fragment-doc{
+  padding:4px 8px 5px;
+}
+.fragment-block[data-density-variant="dense"] .fragment-doc-type,
+.fragment-block[data-density-variant="tight"] .fragment-doc-type{
+  margin-bottom:2px;
+}
+.fragment-block[data-density-variant="dense"] .fragment-doc-body p,
+.fragment-block[data-density-variant="tight"] .fragment-doc-body p{
+  margin-bottom:1px;
+}
+.fragment-block[data-density-variant="dense"] .fragment-doc-sig{
+  padding-top:4px;
+}
+.fragment-block[data-density-variant="tight"] .fragment-doc-sig{
+  padding-top:3px;
+}
+/* The posted manifest is a stamped filing line, not a writing surface, so its
+   frame compresses with everything else. Its type holds: a manifest that cannot
+   be read cannot be followed to the surface it names. */
+.fragment-block[data-density-variant="dense"] .manifest-pointer,
+.fragment-block[data-density-variant="tight"] .manifest-pointer{
+  margin-top:3px;
+  padding:2px 5px;
 }
 
 /* Print-only paper rules. Nothing keyed off data-density-variant may live in

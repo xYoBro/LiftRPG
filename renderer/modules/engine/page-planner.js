@@ -846,7 +846,7 @@ export function planAndMeasure(atoms, container, options = {}) {
               })),
               overflowPx,
               effectiveBudget,
-              { densityExhausted },
+              { densityExhausted, stalled },
             );
 
             // Apply density adjustments
