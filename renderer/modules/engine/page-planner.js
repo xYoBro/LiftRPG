@@ -915,6 +915,20 @@ function runRevisionLoop(spreadPlan, stack, effectiveBudget, diagnostics, unreso
           //
           // Measured, never applied: the probe renders a shallow copy at max
           // density and throws it away. Only stalled pages pay for it.
+          //
+          // The probe asks the RENDERED page, so it inherits whatever height
+          // allocation the CSS performs — it never reasons about the flex
+          // model itself, which is why it survived that model changing. Under
+          // pure `flex: 1 1 0` it was answering a harsher question than it
+          // looked like: a page could still overflow at max density purely
+          // because one card was capped at an equal share, and the probe
+          // correctly reported "no density path" for what was really an
+          // allocation failure. With `min-height: min-content` on the card
+          // (booklet.css) the allocation is content-proportional, so a
+          // still-overflowing max-density page now means what the comment
+          // above says it means: the CONTENT does not fit. Corpus effect —
+          // five stall-shed pages stopped stalling, and density adjustments
+          // fell 62 → 11 across the eight fixtures.
           let densityExhausted = false;
           if (stalled) {
             const maxDensityProbe = measurePlacementsPage(

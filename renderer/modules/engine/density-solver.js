@@ -158,12 +158,19 @@ export function resolvePageOverflow(pageAtoms, overflowPx, pageBudgetPx, options
   // of that and the page was reported unresolved with a legal shed still on
   // the table.
   //
-  // It is not a corner case. A page of session cards distributes its height by
-  // COUNT (`.session-cards > .session-card { flex: 1 1 0 }`), so compressing a
-  // card that is not the one overflowing returns exactly zero pixels to the one
-  // that is: the shares are equal whatever the contents do. Whenever the
-  // overflowing atom is already at max density, every remaining adjustment the
-  // estimates offer is provably worthless — and the estimates cannot see it.
+  // It is not a corner case. A page of session cards distributes its height
+  // among the cards (`.session-cards > .session-card`), so compressing a card
+  // that is NOT the one overflowing may return nothing at all to the one that
+  // is. Under the old pure `flex: 1 1 0` the shares were equal whatever the
+  // contents did, and the answer was exactly zero pixels every time. The CSS
+  // now adds `min-height: min-content`, so a card's own content is a floor and
+  // only the surplus above the floors is split equally: freeing space on a
+  // sibling helps precisely while that sibling is above its floor, and stops
+  // helping the instant it reaches it. Same conclusion, one step later —
+  // whenever the overflowing atom is already at max density, and whenever
+  // every sibling has bottomed out on its own content, further adjustments the
+  // estimates offer are worthless, and the estimates cannot see either
+  // condition (they model card CONTENT, never the slot it lands in).
   //
   // `densityExhausted` is the planner's answer to the only question that
   // settles it: measured at MAX density, does the page still overflow? When it

@@ -785,6 +785,21 @@ function splitEndingBody(unlockedEnding, bookletData) {
  * the noise. And `forcedSheds` is a lower bound — a page 200px over sheds
  * twice — but no partition in the corpus is anywhere near that.
  *
+ * ── WHY THE SUM IS NOW THE RIGHT QUESTION ──────────────────────────────────
+ *
+ * This score adds card heights and compares the total to the budget. It never
+ * modelled how the page divides its height among the cards, and until the flex
+ * allocation changed that was a real hole rather than a simplification: with
+ * `.session-cards > .session-card { flex: 1 1 0 }` alone, every card got the
+ * SAME share, so a page whose total fits could still fail — one long card
+ * exceeding its equal third while its neighbours sat on unreachable surplus.
+ * `forcedSheds: 0` therefore did not imply "no shed", and five corpus pages
+ * shed exactly there (eastern-shore w2, The-Hinge w2, vale w2, what-the-soil
+ * w2, Persephone w4). `min-height: min-content` on the card gives each card a
+ * floor and splits only the SURPLUS equally, so a composition whose total fits
+ * now prints — the renderer and this score finally ask the same question. The
+ * five sheds are gone; the scoring did not have to change to lose them.
+ *
  * @param {object[]} sessions — the week's sessions, in order
  * @param {object|null} weekMeta — the week, for the header furniture estimate
  * @param {number} [maxSessionsPerPage]

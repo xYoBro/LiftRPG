@@ -1418,16 +1418,57 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   margin-bottom:8px;
 }
 
-/* Session Cards */
+/* ── Session Cards ───────────────────────────────────────────────────────────
+   HEIGHT ALLOCATION — read this before touching the three declarations below.
+
+   `flex:1 1 0` alone divides the page's free height by COUNT: three cards on a
+   page get one third each no matter what they contain. That is how the journal
+   gets its uniform ruled look, and on a page whose cards fit it is exactly
+   right. It is wrong the moment one card needs more than its equal share —
+   a long story prompt, a fourth exercise — because the slot is a hard ceiling
+   and the surplus on its neighbours is unreachable. The page then reads as
+   overflowing even though the composition fits, and no amount of density
+   shrinking helps: compressing a NON-overflowing sibling returns exactly zero
+   pixels to the card that needs them (see the veto note in
+   engine/density-solver.js, which is the other half of this contract).
+
+   `min-height:min-content` is the floor under the equal share. A card can no
+   longer be allocated less height than its own content needs; only the SURPLUS
+   above the floors is divided equally. Pages that fit are unaffected — every
+   floor is below the equal share, so heights stay uniform and those pages
+   render bit-identically. Pages at the knife edge stop shedding a card they
+   never needed to shed.
+
+   `overflow:hidden` on the container is LOAD-BEARING, not cosmetic. Once the
+   cards have floors, Σ(min-content) can exceed the container, and a flex item
+   is allowed to spill past its parent's box. Without a clip on the container
+   that spill lands on top of the week footer and is INVISIBLE to the
+   measurement harness: the boundary never grows, so the page reports 0px
+   overflow while the reader gets a collision (measured on real pages during
+   the A/A2 prototype — three fixtures shipped footer collisions without it).
+   The clip converts the same overage into container scrollHeight, which
+   measureInternalOverflowPx() reads and the solver then answers honestly.
+   Deleting it does not "tidy up a redundant clip"; it re-opens the D71 class,
+   where the layout looks fine to the solver and is wrong on paper.
+
+   `.session-card` keeps its own `overflow:hidden` (below) for the same reason
+   one level down.
+
+   Not on this ladder: solo pages. `.workout-left[data-card-count="1"]` sets
+   `flex:0 0 auto` on both the container and the card (higher specificity,
+   later in source), so a one-card page is content-sized and none of the
+   allocation above applies to it. */
 .session-cards{
   display:flex;
   flex-direction:column;
   gap:8px;
   flex:1;
   min-height:0;
+  overflow:hidden;
 }
 .session-cards > .session-card{
   flex:1 1 0;
+  min-height:min-content;
 }
 
 .session-card{
