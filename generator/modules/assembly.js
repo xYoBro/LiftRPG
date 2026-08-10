@@ -8,6 +8,7 @@ import { DOCUMENT_TYPE_ALIASES, SUPPORTED_THEME_ARCHETYPES, THEME_ARCHETYPE_ALIA
 import {
   isValidWorkspaceStyle,
   resolveWorkspaceStyle,
+  isStandardAlphaTable,
   DEFAULT_WORKSPACE_STYLE
 } from '../../contracts/contract-constants.mjs';
 
@@ -1715,30 +1716,11 @@ export function decodeA1Z26(values) {
   return letters;
 }
 
-/**
- * isStandardAlphaTable(referenceTable) -> boolean
- * Detects whether a decodingKey.referenceTable is a standard A=1 ... Z=26 table.
- * Matches tables formatted as "1=A  2=B  3=C ..." with any whitespace/newlines.
- * Returns false for any non-standard mapping (reverse alphabet, custom codes, etc.).
- */
-export function isStandardAlphaTable(referenceTable) {
-  if (!referenceTable || typeof referenceTable !== 'string') return false;
-  // Extract all N=L pairs from the table text
-  var pairs = referenceTable.match(/\d+=\s*[A-Za-z]/g);
-  if (!pairs || pairs.length < 26) return false;
-  // Verify each pair matches standard A1Z26
-  for (var i = 0; i < 26; i++) {
-    var expected = (i + 1) + '=' + String.fromCharCode(65 + i);
-    // Find this pair (allow whitespace around =)
-    var found = false;
-    for (var j = 0; j < pairs.length; j++) {
-      var cleaned = pairs[j].replace(/\s/g, '').toUpperCase();
-      if (cleaned === expected) { found = true; break; }
-    }
-    if (!found) return false;
-  }
-  return true;
-}
+// isStandardAlphaTable() is NOT defined here. It lives in
+// contracts/contract-constants.mjs (imported above) because the renderer needs
+// the same predicate, and the copy that lived here was string-only — it
+// rejected the `[{ value, letter }]` array form that the schema allows and
+// that `npm run migrate` produces. Do not reintroduce a local copy.
 
 export function normalizeThemeArchetype(value) {
   var requested = String(value || '').trim().toLowerCase();

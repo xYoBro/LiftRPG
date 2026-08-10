@@ -26,9 +26,13 @@ import {
   extractYearsFromText,
   collectAnchoredPhrases,
   decodeA1Z26,
-  isStandardAlphaTable,
   normalizeThemeArchetype
 } from './assembly.js';
+
+// The standard-A1Z26 predicate is a statement about a contract field's shape
+// (`decodingKey.referenceTable` is typed `['string','array']`), so it lives
+// with the contract — one implementation shared with the renderer.
+import { isStandardAlphaTable } from '../../contracts/contract-constants.mjs';
 
 // ── Part 1: Continuity validators ─────────────────────────────────────────────
 

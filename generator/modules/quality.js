@@ -3,7 +3,7 @@
 // Does NOT modify the booklet. Stored on window.LiftRPGAPI.lastQualityReport after each call.
 
 import { VALID_MAP_TYPES, VALID_COMPANION_TYPES } from './constants.js';
-import { normalizeId, normalizeThemeArchetype, decodeA1Z26, isStandardAlphaTable } from './assembly.js';
+import { normalizeId, normalizeThemeArchetype } from './assembly.js';
 import { validateAssembledBooklet } from './validation.js';
 
 function looksLikeFragmentRef(ref) {

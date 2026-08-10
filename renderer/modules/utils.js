@@ -1,3 +1,8 @@
+// The standard-A1Z26 predicate is shared with the generator tree — one
+// implementation in contracts/contract-constants.mjs. A local copy is how the
+// generator path ended up rejecting array-form tables the renderer accepted.
+import { isStandardAlphaTable } from '../../contracts/contract-constants.mjs';
+
 export function safeUpper(value) {
   return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
@@ -15,28 +20,6 @@ function decodeA1Z26(values) {
     letters += String.fromCharCode(64 + value);
   }
   return letters;
-}
-
-function isStandardAlphaTable(referenceTable) {
-  if (!referenceTable) return false;
-  // Canonical form is the "1=A 2=B ..." string; the array form
-  // [{ value, letter }] is normalized to it so both share one check
-  // (previously two functions disagreed about the field's type — AUDIT 19).
-  if (Array.isArray(referenceTable)) {
-    referenceTable = referenceTable
-      .map((row) => row && (row.value + '=' + row.letter))
-      .filter(Boolean)
-      .join(' ');
-  }
-  if (typeof referenceTable !== 'string') return false;
-  const pairs = referenceTable.match(/\d+=\s*[A-Za-z]/g);
-  if (!pairs || pairs.length < 26) return false;
-  for (let index = 0; index < 26; index += 1) {
-    const expected = (index + 1) + '=' + String.fromCharCode(65 + index);
-    const found = pairs.some((pair) => pair.replace(/\s/g, '').toUpperCase() === expected);
-    if (!found) return false;
-  }
-  return true;
 }
 
 export function alpha(hex, value) {

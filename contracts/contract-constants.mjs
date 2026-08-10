@@ -274,3 +274,48 @@ export function resolveWorkspaceStyle(value) {
   if (isValidWorkspaceStyle(key)) return key;
   return WORKSPACE_STYLE_ALIASES[key] || null;
 }
+
+/**
+ * isStandardAlphaTable(referenceTable) -> boolean
+ *
+ * True when bossEncounter.decodingKey.referenceTable is the full standard
+ * A=1 ... Z=26 mapping. This is the gate for deterministic password
+ * derivation (decodeA1Z26): a table that does not print all 26 letters
+ * cannot justify decoding a value the booklet never shows the player.
+ *
+ * SINGLE IMPLEMENTATION for both trees. The schema types the field as
+ * `['string','array']` (booklet-schema.mjs), and `npm run migrate` rewrites
+ * legacy object maps into the `[{ value, letter }]` array form — so the
+ * predicate MUST accept both shapes. It lived twice before: a string-only
+ * copy in generator/modules/assembly.js and an array-aware copy in
+ * renderer/modules/utils.js, which meant a valid array-form A1Z26 table was
+ * a hard error on the generator path and a working table on the render path
+ * (AUDIT 19, second half). Array rows are normalized to the canonical
+ * "N=L" string form so both shapes share one check.
+ *
+ * Consumers: generator/modules/assembly.js (password derivation),
+ * generator/modules/validation.js (strict rules), renderer/modules/utils.js
+ * (deriveBookletPassword).
+ */
+export function isStandardAlphaTable(referenceTable) {
+  if (!referenceTable) return false;
+  var table = referenceTable;
+  if (Array.isArray(table)) {
+    table = table
+      .map(function (row) { return row && (row.value + '=' + row.letter); })
+      .filter(Boolean)
+      .join(' ');
+  }
+  if (typeof table !== 'string') return false;
+  var pairs = table.match(/\d+=\s*[A-Za-z]/g);
+  if (!pairs || pairs.length < 26) return false;
+  for (var i = 0; i < 26; i++) {
+    var expected = (i + 1) + '=' + String.fromCharCode(65 + i);
+    var found = false;
+    for (var j = 0; j < pairs.length; j++) {
+      if (pairs[j].replace(/\s/g, '').toUpperCase() === expected) { found = true; break; }
+    }
+    if (!found) return false;
+  }
+  return true;
+}
