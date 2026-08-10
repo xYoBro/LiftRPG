@@ -30,7 +30,8 @@ import {
   VALID_ARCHETYPES,
   CRITIC_SCORE_THRESHOLD,
   CRITIC_MAX_ROUNDS,
-  CRITIC_MAX_REVISIONS_PER_ROUND
+  CRITIC_MAX_REVISIONS_PER_ROUND,
+  CRITIC_DIMENSIONS
 } from './modules/constants.js';
 
 import {
@@ -95,7 +96,9 @@ import {
   classifyValidationErrors,
   collectBudgetBreaches,
   collectPercentileStatFindings,
-  collectNounRosterFindings
+  collectNounRosterFindings,
+  collectVoiceTicFindings,
+  scanTerminalVoiceTics
 } from './modules/validation.js';
 
 import {
@@ -1431,14 +1434,16 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
     var digestJson = JSON.stringify(buildCriticDigest(booklet));
     // Machine findings (GAP-1): everything the pipeline can MEASURE goes to the
     // critic as fact it must convert into unit-scoped failures — text-budget
-    // breaches (fusionPacing), Core Noun Roster drift (worldCohesion), and
-    // growing-stat discipline (systemIntegration). Recomputed each round so
-    // accepted revisions clear their own findings. Posted-manifest breakage is
-    // absent by design: it is a validation ERROR, so it never reaches here.
+    // breaches (fusionPacing), Core Noun Roster drift (worldCohesion),
+    // growing-stat discipline (systemIntegration), and terminal-position voice
+    // tics (voiceDiscipline). Recomputed each round so accepted revisions clear
+    // their own findings. Posted-manifest breakage is absent by design: it is a
+    // validation ERROR, so it never reaches here.
     var machineFindings = []
       .concat(collectBudgetBreaches(booklet).map(function (b) { return b.message; }))
       .concat(collectNounRosterFindings(booklet))
       .concat(collectPercentileStatFindings(booklet))
+      .concat(collectVoiceTicFindings(booklet).map(function (f) { return f.message; }))
       .map(function (finding) {
         return typeof finding === 'string' ? finding : String((finding && finding.message) || finding);
       })
@@ -3176,7 +3181,10 @@ window.LiftRPGAPI = {
     selectRevisionTargets: selectRevisionTargets,
     criticGetUnit: getUnit,
     criticSetUnit: setUnit,
-    revisionPreservesIdentity: revisionPreservesIdentity
+    criticDimensions: CRITIC_DIMENSIONS,
+    revisionPreservesIdentity: revisionPreservesIdentity,
+    collectVoiceTicFindings: collectVoiceTicFindings,
+    scanTerminalVoiceTics: scanTerminalVoiceTics
   },
   _extractJson: extractJson,
   _validateSchema: validateBookletSchema,

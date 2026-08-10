@@ -137,5 +137,9 @@ export var CRITIC_DIMENSIONS = [
   { id: 'motifPayoff', name: 'Motif Payoff' },
   { id: 'worldCohesion', name: 'World Cohesion' },
   { id: 'briefFidelity', name: 'Brief Fidelity & Register' },
-  { id: 'fusionPacing', name: 'Fusion & Pacing' }
+  { id: 'fusionPacing', name: 'Fusion & Pacing' },
+  // Voice discipline (docs/voice/VOICE.md): the critic is the audit seat for
+  // the prose laws no regex can reach — multi-hand distinctness, terminal
+  // position, unlicensed genre moves. The B-class tic scan feeds it facts.
+  { id: 'voiceDiscipline', name: 'Voice Discipline' }
 ];

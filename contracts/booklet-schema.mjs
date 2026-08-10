@@ -13,7 +13,9 @@
 //     bossEncounter, fragment.
 //   - Deliberately open objects: designSpec, authenticityChecks, theme.tokens,
 //     literaryRegister, storySpine, artifactIntent, interlude.payload —
-//     content varies legitimately there.
+//     content varies legitimately there. literaryRegister stays open but now
+//     TYPES its voiceSpec fields (mechanisms / authorRegisters / licensedMoves)
+//     where a shape carries law; see the voiceSpec block below.
 //   - cipher.body.workSpace WAS open, and that openness was the bug: `style`
 //     was unvalidated free text while the renderer recognised exactly four
 //     geometries, so 'ruled' printed plaintext cells and nobody found out.
@@ -35,7 +37,9 @@ import {
   ORACLE_ROLL_BANDS,
   SPATIAL_GUARDRAILS,
   PERCENTILE_STAT,
-  VALID_WORKSPACE_STYLES
+  VALID_WORKSPACE_STYLES,
+  VOICE_LICENSABLE_MOVES,
+  VOICE_SPEC_LIMITS
 } from './contract-constants.mjs';
 
 var G = SPATIAL_GUARDRAILS;
@@ -60,6 +64,64 @@ var manifestPointer = {
   properties: {
     targetRef: nonEmptyString,
     postedAs: nonEmptyString
+  }
+};
+
+// ── voiceSpec (schema 1.5.0, additive) ──────────────────────────────────────
+// meta.literaryRegister grew from an unenforced vibe-phrase object into the
+// per-book prose contract (docs/voice/VOICE.md). Additive and fully optional:
+// the legacy shape { name, behaviorDescription, forbiddenMoves,
+// typographicBehavior } stays legal because the object keeps
+// additionalProperties:true. Three typed fields carry the law:
+//   mechanisms      — 2-4 borrowings stated in SELECTION terms (what the prose
+//                     DOES: "reports the reading before the person taking it").
+//                     Never a named author, never a vibe adjective.
+//   authorRegisters — the MULTI-HAND LAW. One entry per named in-world author:
+//                     what they record, what they omit, how they format. This
+//                     is where character lives; flourish is not character.
+//   licensedMoves   — the declared exception. At most one, drawn from
+//                     VOICE_LICENSABLE_MOVES, carrying a countable budget and a
+//                     rationale. The universal machine-tells are absent from
+//                     that enum, so they cannot be licensed at all.
+var voiceAuthorRegister = {
+  type: 'object',
+  required: ['author', 'records', 'omits', 'format'],
+  additionalProperties: false,
+  properties: {
+    author: nonEmptyString,   // must match an inWorldAuthor used in the booklet
+    records: nonEmptyString,  // what this hand puts on paper
+    omits: nonEmptyString,    // what this hand leaves out (identity by refusal)
+    format: nonEmptyString    // headers, fields, numbering — the document's own conventions
+  }
+};
+
+var voiceLicensedMove = {
+  type: 'object',
+  required: ['move', 'budget', 'rationale'],
+  additionalProperties: false,
+  properties: {
+    move: { enum: VOICE_LICENSABLE_MOVES },
+    budget: nonEmptyString,    // a countable ceiling AND where it applies
+    rationale: nonEmptyString  // why this brief demands it; absent = not a license
+  }
+};
+
+var literaryRegister = {
+  type: 'object',
+  additionalProperties: true, // legacy vibe fields remain legal (1.4.0 corpus)
+  properties: {
+    mechanisms: {
+      type: 'array',
+      minItems: VOICE_SPEC_LIMITS.minMechanisms,
+      maxItems: VOICE_SPEC_LIMITS.maxMechanisms,
+      items: nonEmptyString
+    },
+    authorRegisters: { type: 'array', items: voiceAuthorRegister },
+    licensedMoves: {
+      type: 'array',
+      maxItems: VOICE_SPEC_LIMITS.maxLicensedMoves,
+      items: voiceLicensedMove
+    }
   }
 };
 
@@ -103,7 +165,7 @@ export var BOOKLET_SCHEMA = {
             voiceRationale: { type: 'string' }
           }
         },
-        literaryRegister: { type: 'object' },
+        literaryRegister: literaryRegister,
         structuralShape: { type: 'object', required: ['resolution'], additionalProperties: true },
         storySpine: { type: 'object' },
         artifactIdentity: {

@@ -1836,6 +1836,11 @@
       '',
       window.INST_ARTIFACT_COMPILER.join('\n'),
       '',
+      // The skeleton authors meta.literaryRegister (the voiceSpec) and
+      // meta.worldContract (the knowing) — both are prose law, so the doctrine
+      // travels with the stage that writes them. Content lives in prompt_rules.
+      window.INST_VOICE_DISCIPLINE.join('\n'),
+      '',
       window.MECHANIC_VOCAB_BRIEF,
       '',
       window.SCHEMA_SKELETON,

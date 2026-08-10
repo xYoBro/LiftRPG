@@ -1370,6 +1370,230 @@ export function collectPercentileStatFindings(booklet) {
   return findings;
 }
 
+// ── Voice tics in terminal position (B-class voice scan) ────────────────────
+// docs/voice/VOICE.md states two laws this can partially measure: terminal
+// position is emphasis, and the machine-tells are banned in every genre. The
+// corpus measurement (scripts/measure-voice-sameness.mjs) found the tic rates
+// concentrating in endings and interludes — exactly where the law predicts.
+//
+// SCOPE IS THE POINT: only the FINAL TWO SENTENCES of each prose unit are
+// scanned. Mid-paragraph negation is ordinary English; the same construction
+// in terminal position is a closer. Full-text scanning would bury the real
+// signal in noise, so it is deliberately not done.
+//
+// LIMITS, stated because these are regexes pretending to be an ear: the
+// aphorism family matches SURFACE FORMS. It fires on innocent negation and
+// misses inverted forms it has no pattern for (irregular inflection defeats
+// stem echo — including the author's own founding ear-log catch). Treat the
+// output as a floor, never a verdict: the cold audit in docs/voice/CHECKLIST.md
+// and the critic's voiceDiscipline dimension carry the judgment.
+//
+// Warnings per D19: a tic is degraded taste, not an invalid booklet. The critic
+// loop consumes these as machine findings it must convert into failures.
+
+var VOICE_TIC_LIMITS = {
+  aphorismMaxWords: 20,     // "short sentence" ceiling for the short-only patterns
+  drumbeatMinWords: 3,      // below this it is a signature or a date, not a beat
+  drumbeatMaxWords: 7,      // a clipped sentence
+  drumbeatRunUpWords: 12,   // the longer sentence that makes the clipped pair a rhythm break
+  quoteMaxChars: 70         // how much of the offending sentence a finding quotes
+};
+
+// Line-aware: found documents carry form scaffolding with no terminal
+// punctuation ("ROUTING: NIGHT STAFF") that is still a unit of rhythm.
+function voiceSentences(text) {
+  var clean = String(text || '')
+    .replace(/\r/g, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h\d)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&mdash;/g, '—').replace(/&nbsp;/g, ' ')
+    .replace(/&apos;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+  var out = [];
+  clean.split(/\n+/).forEach(function (line) {
+    var trimmed = line.trim();
+    if (!trimmed) return;
+    // Sentence break = terminal punctuation (plus any closing quote/bracket)
+    // followed by whitespace. Written as replace-then-split rather than a
+    // lookbehind so the module parses on older Safari, which the print path
+    // still reaches.
+    trimmed.replace(/([.!?…]["'”’)\]]*)\s+/g, '$1\n').split('\n').forEach(function (part) {
+      var s = part.trim();
+      if (s) out.push(s);
+    });
+  });
+  return out;
+}
+
+function voiceWords(s) {
+  return (String(s).match(/[A-Za-z][A-Za-z'’-]*/g) || []).map(function (w) { return w.toLowerCase(); });
+}
+
+// Form scaffolding ("FILED: 14 MARCH", "[PAGES 2-6 NOT RECOVERED]") is a real
+// document's real furniture, not a rhythm choice. Ending a memo on its routing
+// line is the writer's own last business — the opposite of a manufactured
+// closer — so scaffolding is dropped before the tail is taken.
+function isVoiceLabelLine(s) {
+  var t = String(s).trim();
+  return /^[^a-z]{3,}$/.test(t) || /^[A-Z][A-Z0-9 ./#-]{2,}:/.test(t);
+}
+
+var VOICE_FUNCTION_WORDS = {
+  the: 1, of: 1, and: 1, to: 1, a: 1, in: 1, that: 1, is: 1, was: 1, it: 1,
+  for: 1, as: 1, with: 1, but: 1, on: 1, not: 1, be: 1, at: 1, by: 1, this: 1,
+  have: 1, from: 1, or: 1, are: 1, they: 1, you: 1, his: 1, her: 1, he: 1,
+  she: 1, all: 1, no: 1, one: 1, there: 1, their: 1, which: 1, when: 1, if: 1,
+  than: 1, its: 1, what: 1, who: 1, how: 1, why: 1, been: 1, were: 1, will: 1,
+  would: 1, them: 1, him: 1, has: 1, had: 1, more: 1, less: 1, into: 1,
+  out: 1, up: 1, down: 1, over: 1, then: 1, so: 1, about: 1, any: 1, some: 1
+};
+
+function voiceStem(w) {
+  return w.replace(/(?:ing|edly|ed|ies|es|s|ly)$/, '').replace(/(.)\1$/, '$1');
+}
+
+function voiceContentWords(s) {
+  return voiceWords(s).filter(function (w) { return w.length >= 4 && !VOICE_FUNCTION_WORDS[w]; });
+}
+
+// Chiasmus-ish: a shared content-word stem at the hinge of a two-clause
+// sentence (anadiplosis …X | X…, or envelope X… | …X).
+function voiceClauseMirror(sentence) {
+  var clauses = String(sentence).split(/\s*[,;—–]\s*|\s+--\s+/)
+    .map(function (c) { return c.trim(); }).filter(Boolean);
+  if (clauses.length < 2) return false;
+  for (var i = 0; i < clauses.length - 1; i++) {
+    var a = voiceContentWords(clauses[i]);
+    var b = voiceContentWords(clauses[i + 1]);
+    if (!a.length || !b.length) continue;
+    if (voiceWords(clauses[i]).length > 12 || voiceWords(clauses[i + 1]).length > 12) continue;
+    if (voiceStem(a[a.length - 1]) === voiceStem(b[0])) return true;
+    if (voiceStem(a[0]) === voiceStem(b[b.length - 1])) return true;
+  }
+  return false;
+}
+
+// The mirrored-aphorism family proper: negation and contrast pivots plus
+// chiasmus. Ported from the CORE patterns of scripts/measure-voice-sameness.mjs
+// (its "adjacent" patterns spot-checked at ~50% false positives and are
+// deliberately left out — a warning nobody trusts is a warning nobody reads).
+var VOICE_APHORISM_PATTERNS = [
+  { name: 'not-X-but-Y', test: function (s) { return /\bnot\s+(?:[\w'’-]+\s+){0,5}but\s+/i.test(s); } },
+  { name: 'X-is-not-Y', short: true, test: function (s) { return /\b(?:is|are|was|were|isn'?t|aren'?t|wasn'?t|weren'?t)\s+not\b/i.test(s); } },
+  { name: 'comma-not-Y', test: function (s) { return /,\s*not\s+(?:a|an|the|to|for|because)?\s*[\w'’-]+[.!?]?$/i.test(s); } },
+  { name: 'more/less-X-than-Y', test: function (s) { return /\b(?:less|more|fewer|rather)\s+(?:[\w'’-]+\s+){0,3}than\b/i.test(s); } },
+  { name: 'clause-mirror', short: true, test: voiceClauseMirror }
+];
+
+function voiceQuote(sentence) {
+  var s = String(sentence).trim().replace(/\s+/g, ' ');
+  return s.length > VOICE_TIC_LIMITS.quoteMaxChars
+    ? s.slice(0, VOICE_TIC_LIMITS.quoteMaxChars - 1) + '…'
+    : s;
+}
+
+// Returns the tic descriptions found in the final two sentences of `text`.
+export function scanTerminalVoiceTics(text) {
+  var sentences = voiceSentences(text).filter(function (s) { return !isVoiceLabelLine(s); });
+  if (!sentences.length) return [];
+  var tail = sentences.slice(-2);
+  var hits = [];
+
+  tail.forEach(function (sentence) {
+    var short = voiceWords(sentence).length <= VOICE_TIC_LIMITS.aphorismMaxWords;
+    for (var i = 0; i < VOICE_APHORISM_PATTERNS.length; i++) {
+      var p = VOICE_APHORISM_PATTERNS[i];
+      if (p.short && !short) continue;
+      if (!p.test(sentence)) continue;
+      hits.push('mirrored aphorism in terminal position [' + p.name + ']: "' + voiceQuote(sentence) + '"');
+      break; // one finding per sentence — the pattern name is diagnostic, not a tally
+    }
+  });
+
+  // Terminal drumbeat: two clipped sentences closing a unit that was not
+  // already running clipped. The run-up guard is what makes it a rhythm BREAK
+  // rather than a register (a telegraphic document is allowed to be terminse).
+  if (sentences.length >= 3 && tail.length === 2) {
+    var lastLens = tail.map(function (s) { return voiceWords(s).length; });
+    var runUp = voiceWords(sentences[sentences.length - 3]).length;
+    // A one- or two-word line is a signature, a date, or a name — furniture,
+    // not a beat. (Signature blocks longer than that still slip through; the
+    // cold audit catches what the floor cannot.)
+    if (lastLens[0] >= VOICE_TIC_LIMITS.drumbeatMinWords
+      && lastLens[1] >= VOICE_TIC_LIMITS.drumbeatMinWords
+      && lastLens[0] <= VOICE_TIC_LIMITS.drumbeatMaxWords
+      && lastLens[1] <= VOICE_TIC_LIMITS.drumbeatMaxWords
+      && runUp >= VOICE_TIC_LIMITS.drumbeatRunUpWords) {
+      hits.push('short-short drumbeat closing the unit (' + lastLens[0] + ' then ' + lastLens[1]
+        + ' words after a ' + runUp + '-word sentence): "' + voiceQuote(tail[1]) + '"');
+    }
+  }
+
+  return hits;
+}
+
+// Every prose unit the voice constitution governs, with the critic unit that
+// owns it (week / fragment / ending — the units a revision can target).
+function collectVoiceProseUnits(booklet) {
+  var units = [];
+  ((booklet && booklet.weeks) || []).forEach(function (week, wi) {
+    var number = (week && week.weekNumber) || (wi + 1);
+    ((week && week.sessions) || []).forEach(function (session, si) {
+      if (session && session.storyPrompt) {
+        units.push({ unitType: 'week', unitRef: number, text: session.storyPrompt,
+          label: 'Week ' + number + ' session ' + (si + 1) + ' storyPrompt' });
+      }
+    });
+    var interlude = week && week.interlude;
+    if (interlude && interlude.body) {
+      units.push({ unitType: 'week', unitRef: number, text: interlude.body,
+        label: 'Week ' + number + ' interlude' });
+    }
+    var overflow = week && week.overflowDocument;
+    var overflowBody = overflow && (overflow.content || overflow.body);
+    if (overflowBody) {
+      units.push({ unitType: 'week', unitRef: number, text: overflowBody,
+        label: 'Week ' + number + ' overflow document ' + ((overflow && overflow.id) || '') });
+    }
+  });
+  ((booklet && booklet.fragments) || []).forEach(function (frag, fi) {
+    var body = frag && (frag.content || frag.body || frag.contentHtml);
+    if (body) {
+      units.push({ unitType: 'fragment', unitRef: (frag && frag.id) || fi, text: body,
+        label: 'Fragment ' + ((frag && frag.id) || fi) });
+    }
+  });
+  ((booklet && booklet.endings) || []).forEach(function (ending, ei) {
+    var variant = (ending && (ending.variant || ending.id)) || ei;
+    var body = extractEndingBodyText(ending);
+    var finalLine = ending && ending.content && ending.content.finalLine;
+    // The finalLine IS the terminal position — it is scanned as part of the
+    // ending's tail, not as a separate unit, so a clean body cannot hide it.
+    var text = [body, finalLine].filter(Boolean).join('\n');
+    if (text) {
+      units.push({ unitType: 'ending', unitRef: variant, text: text,
+        label: 'Ending "' + variant + '"' });
+    }
+  });
+  return units;
+}
+
+export function collectVoiceTicFindings(booklet) {
+  var findings = [];
+  collectVoiceProseUnits(booklet).forEach(function (unit) {
+    scanTerminalVoiceTics(unit.text).forEach(function (hit) {
+      findings.push({
+        unitType: unit.unitType,
+        unitRef: unit.unitRef,
+        message: unit.label + ' — ' + hit
+      });
+    });
+  });
+  return findings;
+}
+
 // ── Posted manifests: the forward-only resolution law (GAP-6 Landing 2) ─────
 // A `manifestPointer` is a printed promise — "X was last logged in Y" — that
 // names a real surface the player has NOT reached yet. That promise is
@@ -1589,6 +1813,7 @@ export function validateAssembledBooklet(booklet) {
   collectBudgetBreaches(booklet).forEach(function (b) { warnings.push(b.message); });
   collectNounRosterFindings(booklet).forEach(function (m) { warnings.push(m); });
   collectPercentileStatFindings(booklet).forEach(function (m) { warnings.push(m); });
+  collectVoiceTicFindings(booklet).forEach(function (f) { warnings.push(f.message); });
   // Posted manifests are promises, not preferences — broken ones are errors.
   collectManifestPointerErrors(booklet).forEach(function (m) { errors.push(m); });
 

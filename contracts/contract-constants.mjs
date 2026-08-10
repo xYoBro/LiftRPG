@@ -146,6 +146,31 @@ export var WORKSPACE_STYLE_ALIASES = {
   'open': 'blank'
 };
 
+// ── Voice discipline ─────────────────────────────────────────────────────────
+// The per-book voiceSpec (meta.literaryRegister) splits prose rules in two
+// (docs/voice/VOICE.md §0):
+//   - Universal machine-tells — echo-callbacks, corrective constructions, wry
+//     appositives, short-short drumbeats at significance, assembled endings,
+//     narrator amusement, mirrored-aphorism closers — are banned in every genre
+//     and are UNLICENSABLE. They are deliberately absent from the enum below:
+//     there is no key to write them under, so the ban cannot be argued away.
+//   - Genre moves are banned by DEFAULT and register-licensable: a booklet may
+//     declare at most one, with a countable budget and a rationale.
+// prompt_rules.js INST_VOICE_DISCIPLINE must quote this list exactly
+// (validator-asserted, same doctrine as the workspace-style enum).
+export var VOICE_LICENSABLE_MOVES = [
+  'aphorism', 'direct-address', 'fragment-rhythm', 'ominous-closer'
+];
+
+// voiceSpec shape limits. mechanisms are 2-4 borrowings stated in SELECTION
+// terms (what the prose does, never whom it resembles); a license is rare by
+// construction — one is the ceiling, zero is the normal state.
+export var VOICE_SPEC_LIMITS = {
+  minMechanisms: 2,
+  maxMechanisms: 4,
+  maxLicensedMoves: 1
+};
+
 // ── Theme archetypes ─────────────────────────────────────────────────────────
 
 export var VALID_ARCHETYPES = [

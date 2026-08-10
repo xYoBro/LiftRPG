@@ -26,7 +26,10 @@
     '- `blockSubtitle` (string): One-line official or diegetic designation',
     '- `worldContract` (string): One sentence. The north star for every story, mechanic, and visual choice. Write this first.',
     '- `narrativeVoice` (object): { person, tense, narratorStance, voiceRationale }. Do not default to second-person present tense. Choose the person and tense that best serves the fiction: first person for intimate or unreliable narrators, second person for procedural or instructional worlds, third limited for institutional distance.',
-    '- `literaryRegister` (object): { name, behaviorDescription, forbiddenMoves, typographicBehavior }',
+    '- `literaryRegister` (object): the per-book voiceSpec. { name, behaviorDescription, forbiddenMoves, typographicBehavior } plus the three fields that carry prose law:',
+    '  * `mechanisms` (string[], 2-4): what this book&apos;s prose DOES, in selection terms. Never a vibe adjective, never a named author or work.',
+    '  * `authorRegisters` (array of { author, records, omits, format }): one entry per named in-world author who writes more than one surface. Two documents by different authors must be tellable apart with the bylines removed.',
+    '  * `licensedMoves` (array, 0-1 entries; zero is normal): { move, budget, rationale }. See the Voice Discipline section for the closed enum and the license rules.',
     '- `artifactIdentity` (object, required for shell-aware rendering): { artifactClass, artifactBlend?, authorialMode?, boardStateMode, documentEcology?, materialCulture?, openingMode?, rulesDeliveryMode?, revealShape?, unlockLogic?, shellFamily, attachmentStrategy }',
     '- `weeklyComponentType` (string): One fiction-native non-semantic measurement family used across all non-boss weeks. It should feel like an operational residue or in-world key: a number, code, reading, tag, case ID, route marker, calibration value, or designation, never a plaintext letter.',
     '- `structuralShape` (object): { resolution, temporalOrder, narratorReliability, promptFragmentRelationship, shapeRationale }.',
@@ -357,7 +360,10 @@
     '- `worldContract` (string): one sentence — the governing tension that drives the entire booklet',
     '- `weeklyComponentType` (string): fiction-native measurement family (e.g., "gauge reading", "signal frequency")',
     '- `narrativeVoice` (object): { person, tense, narratorStance, voiceRationale }',
-    '- `literaryRegister` (object): { name, behaviorDescription, forbiddenMoves, typographicBehavior }',
+    '- `literaryRegister` (object): { name, behaviorDescription, forbiddenMoves, typographicBehavior,',
+    '    mechanisms: string[] (2-4, what the prose DOES in selection terms),',
+    '    authorRegisters: [{ author, records, omits, format }] (one per named in-world author),',
+    '    licensedMoves: [{ move, budget, rationale }] (0-1 entries; zero is normal) }',
     '- `structuralShape` (object): { resolution, temporalOrder, narratorReliability, promptFragmentRelationship, shapeRationale }',
     '  resolution: "closed"|"open"|"shifted"|"costly"|"full"|"partial"|"ambiguous"',
     '  temporalOrder: "chronological"|"in-medias-res"|"rashomon"|"fragmented"|"linear"|"reverse"|"parallel"',
@@ -433,7 +439,12 @@
       blockTitle: '', blockSubtitle: '', worldContract: '',
       weeklyComponentType: '',
       narrativeVoice: { person: '', tense: '', narratorStance: '', voiceRationale: '' },
-      literaryRegister: { name: '', behaviorDescription: '', forbiddenMoves: '', typographicBehavior: '' },
+      literaryRegister: {
+        name: '', behaviorDescription: '', forbiddenMoves: '', typographicBehavior: '',
+        mechanisms: ['', ''],
+        authorRegisters: [{ author: '', records: '', omits: '', format: '' }],
+        licensedMoves: []
+      },
       structuralShape: { resolution: '', temporalOrder: '', narratorReliability: '', promptFragmentRelationship: '', shapeRationale: '' },
       storySpine: { premise: '', protagonistDrive: '', centralTension: '', midpointShift: '', finalCost: '' },
       artifactIdentity: { artifactClass: '', shellFamily: '', boardStateMode: '', attachmentStrategy: '' },
@@ -476,8 +487,37 @@
           },
           literaryRegister: {
             type: 'object',
-            properties: { name: { type: 'string' }, behaviorDescription: { type: 'string' }, forbiddenMoves: { type: 'string' }, typographicBehavior: { type: 'string' } },
-            required: ['name', 'behaviorDescription']
+            properties: {
+              name: { type: 'string' }, behaviorDescription: { type: 'string' },
+              forbiddenMoves: { type: 'string' }, typographicBehavior: { type: 'string' },
+              // voiceSpec: the prose contract (docs/voice/VOICE.md). mechanisms
+              // state what the prose DOES; authorRegisters carry the multi-hand
+              // law; licensedMoves is the declared, budgeted genre exception.
+              mechanisms: { type: 'array', items: { type: 'string' } },
+              authorRegisters: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    author: { type: 'string' }, records: { type: 'string' },
+                    omits: { type: 'string' }, format: { type: 'string' }
+                  },
+                  required: ['author', 'records', 'omits', 'format']
+                }
+              },
+              licensedMoves: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    move: { type: 'string', enum: ['aphorism', 'direct-address', 'fragment-rhythm', 'ominous-closer'] },
+                    budget: { type: 'string' }, rationale: { type: 'string' }
+                  },
+                  required: ['move', 'budget', 'rationale']
+                }
+              }
+            },
+            required: ['name', 'behaviorDescription', 'mechanisms', 'authorRegisters']
           },
           structuralShape: {
             type: 'object',
@@ -1039,6 +1079,117 @@
     '- PROSE STRIPPING: Do not use the words "delve", "echoes", "cacophony", "visceral", "smirk", or "shudder" unless medically necessary.'
   ];
 
+  // ── Voice discipline ────────────────────────────────────────────────────
+  // COMPRESSION, NOT A FORK. This section is the prompt-side compression of
+  // docs/voice/VOICE.md (the prose constitution). The two MOVE TOGETHER — the
+  // same coupling rule that binds SCHEMA_SPATIAL to contract-constants.mjs.
+  // Change one, change the other in the same commit.
+  //
+  // The licensable-move list below is quoted from VOICE_LICENSABLE_MOVES in
+  // contracts/contract-constants.mjs and is validator-asserted (validate.mjs
+  // prompt-contract parity). The universal machine-tells are absent from that
+  // enum on purpose: they cannot be licensed, so there is no key to write.
+  //
+  // D47: NO exemplar prose here, ever. This section teaches mechanisms and
+  // bans; it never shows a passage to imitate.
+  window.INST_VOICE_DISCIPLINE = [
+    '## Voice Discipline (prose law — every word of in-world prose)',
+    'Applies to: session storyPrompts, interlude title/reason/body, fragment and',
+    'overflow document bodies, ending bodies and finalLines, oracle entry text,',
+    'boss narrative prose, and epigraphs.',
+    'Two surfaces sit OUTSIDE the fiction and take a flat instrument register:',
+    'rulesSpread (it teaches a stranger to play) and cipher extractionInstruction',
+    '(an operation, not a mood). Flat is correct there, not a lapse.',
+    '',
+    '### The partition',
+    '- Universal bans hold in EVERY genre and can never be licensed away.',
+    '- Genre moves are banned by DEFAULT and licensable once, with a budget.',
+    'When the two disagree about a passage, the universal ban wins.',
+    '',
+    '### Universal bans (unlicensable, all genres)',
+    '- Echo-callbacks: a word, object, or image repeated later for wry effect.',
+    '- Corrective constructions: the sentence that pretends to correct itself to',
+    '  land a definition ("not X — X the way Y is Z").',
+    '- Wry appositives: a trailing clause commenting on the noun it just named.',
+    '- Short-short drumbeats at significance: two clipped sentences in a row at',
+    '  the moment that matters. Sentence lengths stay unpatterned near a reveal.',
+    '- Assembled endings: closing lines regrouped out of their natural order to',
+    '  manufacture a tidy ending. The writer closes on their own last business.',
+    '- Narrator amusement: the narration enjoying the material, or itself.',
+    '- Mirrored-aphorism closers: chiasmus, negation pivots, and definitional',
+    '  equations in terminal position. The pipeline MEASURES this one.',
+    '- Typography as mood: lowercase styling, dropped punctuation, spaced letters.',
+    '  Standard capitalization and punctuation in every register; format',
+    '  conventions belong to the document, never to the mood.',
+    '',
+    '### Terminal position is emphasis',
+    'A writer chooses where to stop, so stopping at the strange thing is pointing',
+    'at it — however plain the sentence. A flat ominous closer is the same move as',
+    'a purple one, better dressed. Units end on work, motion, or the next',
+    'obligation: filing, travel, weather, the next task. At least three ordinary',
+    'sentences follow any anomaly before the unit ends.',
+    'Noticing is an action: no gazing, pausing, staring, considering, or feeling a',
+    'chill. Attention shows as recorded behavior — an extra measurement, a',
+    'photograph, a log entry, a changed route, a mark on the board.',
+    'Do not complete the inference for the reader. Record the two facts and walk',
+    'on; the reader makes the connection and credits the writer with it.',
+    '',
+    '### The figurative budget',
+    'At most ONE figurative comparison or verbal turn per ~200 words. Zero is',
+    'normal and often correct. A storyPrompt (220-character budget) therefore has',
+    'NO figurative allowance at all; a fragment body spends at most one.',
+    '',
+    '### Two-pass order (run both, in this order, inside every prose field)',
+    '1. Procedural draft: information only, zero figurative language, correct',
+    '   process order, real particulars from meta.worldContract, and the',
+    '   selections that in-world writer would plausibly make.',
+    '2. Effect pass: alter at most two sentences per ~250 words, inside the budget',
+    '   above. Leaving the draft untouched is a legitimate and frequent outcome.',
+    'If the procedural draft is boring, the worldContract is thin — deepen the',
+    'knowing, never decorate the prose.',
+    '',
+    '### The voiceSpec (meta.literaryRegister) — author it, then obey it',
+    '- `mechanisms` (array, 2-4 strings): what this book’s prose DOES, in',
+    '  SELECTION terms — which detail it picks, what it reports first, what it',
+    '  refuses to explain. Derive them from the creative brief. Never a vibe',
+    '  adjective, never a named author or a specific book, film, or show.',
+    '- `authorRegisters` (array of { author, records, omits, format }): ONE entry',
+    '  for every named in-world author who writes more than one surface. Identity',
+    '  comes from what a writer records, what they omit, and how they format —',
+    '  never from flourish, lowercase styling, or aphorism. Two documents by',
+    '  different authors must be tellable apart with the bylines removed.',
+    '- `licensedMoves` (array, 0 or 1 entries — zero is the normal state): the',
+    '  declared exception. Each entry is { move, budget, rationale }.',
+    '  `licensedMoves[].move` is a CLOSED enum. Use exactly one of: "aphorism", "direct-address", "fragment-rhythm", "ominous-closer".',
+    '  `budget` states a countable ceiling AND where it applies. `rationale`',
+    '  states why this brief demands it. A license without a rationale is not a',
+    '  license, and a licensed move over budget is a failure like any other.',
+    '  License only when the brief genuinely calls for that genre register.',
+    '  The universal bans above are NOT in this enum and can never be licensed.',
+    '',
+    '### The knowing demand (plainness must be funded)',
+    'Prose decorates when it has nothing true to select from. meta.worldContract',
+    'must therefore carry more than a Core Noun Roster — the roster is a cast',
+    'list; the knowing is how that world actually works:',
+    '- the instruments and what they are actually called;',
+    '- the paperwork realities: what form gates what access, what gets signed,',
+    '  filed, countersigned, or refused;',
+    '- the order of operations of the trade or institution — what happens first,',
+    '  what cannot happen until something else does;',
+    '- period and regional specifics where the brief implies them.',
+    'Target roughly three true procedural particulars per 150 words of documentary',
+    'text. Below that the prose is padding and will reach for turns.',
+    '',
+    '### Ending audit (run before returning any prose)',
+    'Inspect the FINAL TWO SENTENCES of every storyPrompt, interlude, fragment,',
+    'overflow document, and ending (including finalLine). This is where the',
+    'failure concentrates, so it gets its own pass. Rewrite any that close on an',
+    'aphorism, a mirrored or definitional turn, an ironic beat, a short flat',
+    'sentence positioned as a closer, two clipped sentences in a row, or an image',
+    'of the anomaly. A finalLine lands by naming something specific the weeks',
+    'earned, never by cadence alone.'
+  ];
+
   window.INST_ENDING_STANDARD = [
     '## Ending Standard',
     '- The ending is a found document first, not a summary.',
@@ -1096,6 +1247,18 @@
     '- boss decodingKey references map locations, spatial relationships, or institutional knowledge — not just arithmetic',
     '- the ending reflects the binary choice, boss outcome, and at least one relationship consequence',
     '',
+    '## Ending Audit (voice — run this pass separately, on the text alone)',
+    'Read ONLY the final two sentences of every storyPrompt, interlude body,',
+    'fragment body, overflow document, and ending (including finalLine). Failure',
+    'concentrates in terminal position, and a general read passes over it.',
+    '- no aphorism, moral, ironic turn, or mirrored/definitional closer ("A is not B", "less X than Y")',
+    '- no short flat sentence positioned as a closer, and no two clipped sentences in a row',
+    '- the unit ends on work, motion, or the next obligation — not on the anomaly or an image of it',
+    '- the ending is FOUND, not assembled: no safe facts pulled out of their natural grouping to close on',
+    '- each named in-world author still reads as their own hand: what they record, omit, and how they format',
+    '- no genre move (aphorism, direct address, fragments-as-rhythm, ominous closer) appears unless',
+    '  meta.literaryRegister.licensedMoves declares it, and then only inside its stated budget',
+    '',
     '## Common Failures (fix before returning)',
     '- Fragments that could be transplanted unchanged into a different booklet — add concrete Core Noun Roster references',
     '- Oracle entries with atmospheric consequence instead of named targets — rewrite with specific clock/map/companion names',
@@ -1149,6 +1312,7 @@
     INST_ENDING_STANDARD, [''],
     INST_ANTI_GENERIC, [''],
     INST_ANTI_PATTERNS, [''],
+    INST_VOICE_DISCIPLINE, [''],
 
     // ── TIER 2: Game Design (the play experience) ─────────────────────
     ['## ── TIER 2: GAME DESIGN ──', ''],
@@ -1214,15 +1378,19 @@
     'layer-codex':    { schemas: [],                                            instructions: ['STORY_ENGINE', 'CHARACTER_WEB', 'LAYERED_ARC', 'ANTI_PATTERNS'] },
     'campaign-plan':  { schemas: [],                                            instructions: ['WORLD_CONTRACT', 'PROGRESSION', 'SYSTEM_INTEGRATION', 'ANTI_PATTERNS', 'ANTI_SAMENESS'] },
     // Shell: story + world + structural
-    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'WORLD_CONTRACT', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'RULES_TEACH', 'VISUAL_DIRECTION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
+    // Shell authors meta.literaryRegister (the voiceSpec) and meta.worldContract
+    // (the knowing) — VOICE_DISCIPLINE is the authoring doctrine for both.
+    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'RULES_TEACH', 'VISUAL_DIRECTION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
     // Week plan: lean
     'week-plan':      { schemas: ['WEEK_PLAN'],                                 instructions: [] },
     // Week flesh: full game design + story
-    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'LAYERED_ARC', 'WORKOUT_FUSION', 'PERVASIVE_PLAY', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] },
+    // Prose stages (week-final, fragment, ending) carry VOICE_DISCIPLINE: they
+    // write storyPrompts, interludes, oracle text, documents, and endings.
+    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'PERVASIVE_PLAY', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] },
     // Fragment: story quality first
-    'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'ANTI_GENERIC', 'CHARACTER_WEB', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
-    // Ending: story quality first
-    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'LAYERED_ARC', 'ANTI_GENERIC', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] }
+    'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'VOICE_DISCIPLINE', 'ANTI_GENERIC', 'CHARACTER_WEB', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
+    // Ending: story quality first (endings are where voice failure concentrates)
+    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'ANTI_GENERIC', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] }
   };
 
   window.buildStageSchema = function(stageName) {
@@ -1734,7 +1902,7 @@
   // the ship threshold without cited evidence is invalid by law and gets
   // clamped client-side.
   window.CRITIC_RUBRIC = [
-    '## The Rubric — seven dimensions, graded 0-100',
+    '## The Rubric — eight dimensions, graded 0-100',
     '',
     'Calibration anchors (grade against these, not against hope):',
     '- 50 = the structure is present but inert — components exist, nothing connects.',
@@ -1793,7 +1961,30 @@
     'unresolved? Are storyPrompts inside their length budgets with a physical action, sensory',
     'detail, and material object? Zero gym metaphors in the fiction? Do interludes assign',
     'real off-session engagement (a question to weigh, a code to crack, a map to study)',
-    'rather than ornamental prose breaks?'
+    'rather than ornamental prose breaks?',
+    '',
+    '### voiceDiscipline',
+    'Read the prose as a cold auditor: the text and the rules, nothing else.',
+    'MULTI-HAND: put two documents by different named in-world authors side by side',
+    'with the bylines removed — could you tell them apart by what each records, omits,',
+    'and how each formats? If not, the booklet has one hand wearing several names;',
+    'grade it as inert and cite both documents. Do the declared',
+    'meta.literaryRegister.mechanisms actually show in the prose, or are they a label',
+    'the text never honors?',
+    'TERMINAL POSITION: read the FINAL TWO SENTENCES of storyPrompts, interludes,',
+    'fragments, and endings (including finalLine). Do units end on work, motion, or',
+    'the next obligation — or on an aphorism, a mirrored or definitional turn, an',
+    'image of the anomaly, or a short flat sentence positioned as a closer? Is any',
+    'ending ASSEMBLED — safe facts pulled out of their natural grouping to close on?',
+    'LICENSES: every genre move (aphorism, direct address, fragments-as-rhythm,',
+    'ominous closer) must be declared in meta.literaryRegister.licensedMoves and stay',
+    'inside its stated budget. An undeclared move is a failure; so is a declared one',
+    'over budget. The machine-tells — echo-callbacks, corrective constructions, wry',
+    'appositives, short-short drumbeats, assembled endings, narrator amusement — are',
+    'unlicensable in every genre.',
+    'FUNDING: does documentary prose carry real procedural particulars (instruments,',
+    'paperwork, order of operations), roughly three per 150 words — or does it',
+    'decorate because it has nothing true to select from?'
   ];
 
   window.CRITIC_EVIDENCE_LAW = [
@@ -1829,7 +2020,8 @@
       '## Machine Findings (measured by the pipeline — these are facts, not opinions)',
       'Each finding below MUST appear as a failure with a unit-scoped directive under the',
       'relevant dimension: text-budget breaches belong to fusionPacing, Core Noun Roster',
-      'findings to worldCohesion, growing-stat (percentile-stat) findings to systemIntegration.',
+      'findings to worldCohesion, growing-stat (percentile-stat) findings to systemIntegration,',
+      'terminal-position voice tics (mirrored aphorism, short-short drumbeat) to voiceDiscipline.',
       'A dimension with a standing machine finding cannot score at or above the ship threshold.'
     ].concat(machineFindings.map(function (f) { return '- ' + f; })) : [];
     return [
@@ -1856,7 +2048,8 @@
       '    "motifPayoff":       { "score": 0, "evidence": [], "failures": [] },',
       '    "worldCohesion":     { "score": 0, "evidence": [], "failures": [] },',
       '    "briefFidelity":     { "score": 0, "evidence": [], "failures": [] },',
-      '    "fusionPacing":      { "score": 0, "evidence": [], "failures": [] }',
+      '    "fusionPacing":      { "score": 0, "evidence": [], "failures": [] },',
+      '    "voiceDiscipline":   { "score": 0, "evidence": [], "failures": [] }',
       '  },',
       '  "summary": "two sentences: the composition’s strongest through-line and its weakest seam"',
       '}',
