@@ -53,6 +53,8 @@ export function createDiagnostics() {
     perAtom:             [],
     /** @type {WarningRecord[]} */
     warnings:            [],
+    /** @type {RepackRecord[]} */
+    repacks:             [],
   };
 }
 
@@ -149,6 +151,24 @@ export function recordSpreadUsage(diag, spreadIndex, leftUsed, rightUsed, leftAt
  */
 export function recordWarning(diag, category, message, details = null) {
   diag.warnings.push({ category, message, ...(details ? { details } : {}) });
+}
+
+/**
+ * Record a repack (post-shed flow) event: a window of same-side pages was
+ * re-flowed into fewer pages after shed stabilization.
+ *
+ * @param {DiagnosticsCollector} diag
+ * @param {number} pagesBefore — page count of the window before the flow
+ * @param {number} pagesAfter  — page count of the window after the flow
+ * @param {string[][]} pages   — atom ids per resulting page
+ *
+ * @typedef {object} RepackRecord
+ * @property {number} pagesBefore
+ * @property {number} pagesAfter
+ * @property {string[][]} pages
+ */
+export function recordRepack(diag, pagesBefore, pagesAfter, pages) {
+  diag.repacks.push({ pagesBefore, pagesAfter, pages });
 }
 
 /**
@@ -269,6 +289,7 @@ export function summarize(diag) {
     revisions:   diag.revisionPasses,
     adjusted:    diag.atomsAdjusted.length,
     split:       diag.atomsSplit.length,
+    repacked:    diag.repacks.length,
     unresolved:  diag.unresolvedOverflow.length,
     warnings:    diag.warnings.length,
     spreadModel: diag.spreadModel,

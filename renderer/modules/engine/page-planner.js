@@ -22,7 +22,7 @@ import {
 import {
   createDiagnostics, recordAdjustment, recordSplit,
   recordUnresolvedOverflow, recordSpreadUsage, recordAtomMetrics,
-  recordWarning,
+  recordWarning, recordRepack,
 } from './diagnostics.js';
 import { getMechanicSlotWidthPx, getHalfWidthTypes } from '../mechanic-layout.js';
 
@@ -730,6 +730,425 @@ export function scanContinuationDiagnostics(spreadPlan, diagnostics) {
 }
 
 // ---------------------------------------------------------------------------
+// Revision loop — measure pages, resolve overflow, shed when density is spent
+// ---------------------------------------------------------------------------
+
+/**
+ * Run the bounded overflow-revision loop over every page in the plan.
+ *
+ * Extracted verbatim from planAndMeasure so the same machinery — stall
+ * detection, the D76 max-density probe, D77 stall escalation, shedding,
+ * unresolved flagging — runs both on the first pass and again after the
+ * repack pass (repacked pages must be solved exactly like first-pass pages).
+ *
+ * @param {object[]} spreadPlan
+ * @param {HTMLElement} stack — measurement stack
+ * @param {number} effectiveBudget — real CSS boundary height (px)
+ * @param {object} diagnostics
+ * @param {Set<string>} unresolvedAtomIds — shared across invocations so an
+ *   atom is never double-flagged
+ * @returns {number} revision passes applied
+ */
+function runRevisionLoop(spreadPlan, stack, effectiveBudget, diagnostics, unresolvedAtomIds) {
+  let revisionsApplied = 0;
+
+  // Overflow measured for each page on the previous pass, so the solver can
+  // be told when its density adjustments stopped buying anything (see the
+  // measurement veto in density-solver.resolvePageOverflow).
+  //
+  // Keyed on the placements ARRAY, not the spread index: splits splice new
+  // spreads into the plan mid-loop and `spreadIndex` is not re-indexed until
+  // afterwards, so indices are neither unique nor stable during the loop.
+  // The array object is — splice and push mutate it in place.
+  const lastOverflowPx = new WeakMap();
+
+  for (let pass = 0; pass < MAX_REVISIONS; pass++) {
+    let anyResolvableOverflow = false;
+
+    for (const spread of spreadPlan) {
+      for (const side of ['left', 'right']) {
+        const placements = spread[side];
+        if (placements.length === 0) continue;
+
+        // Skip pages where every atom is already flagged unresolvable
+        if (placements.every(p => unresolvedAtomIds.has(p.atomId))) continue;
+
+        const pageMeasurement = measurePlacementsPage(
+          stack,
+          placements,
+          spread.spreadType,
+        );
+        const overflowPx = pageMeasurement.overflowHeight;
+
+        if (overflowPx > 2) {
+          // Did the previous pass's adjustments actually move this page?
+          const previousOverflowPx = lastOverflowPx.get(placements);
+          const stalled = previousOverflowPx !== undefined
+            && overflowPx > previousOverflowPx - OVERFLOW_PROGRESS_EPSILON_PX;
+          lastOverflowPx.set(placements, overflowPx);
+
+          // A stalled pass is evidence, not proof. Density is a ladder of
+          // rendering thresholds, not a ramp: a step that lands between two
+          // rungs changes nothing, and the next step may still cross one. So
+          // ask the page itself the only question that settles it — does it
+          // STILL overflow with every atom at maximum density? If it does,
+          // no density path saves this composition and the solver should
+          // shed instead of spending the remaining passes. If it does not,
+          // the last step merely fell short and the solver should keep going.
+          //
+          // Measured, never applied: the probe renders a shallow copy at max
+          // density and throws it away. Only stalled pages pay for it.
+          let densityExhausted = false;
+          if (stalled) {
+            const maxDensityProbe = measurePlacementsPage(
+              stack,
+              placements.map(p => ({ ...p, density: MAX_DENSITY })),
+              spread.spreadType,
+            );
+            densityExhausted = maxDensityProbe.overflowHeight > 2;
+          }
+
+          const result = resolvePageOverflow(
+            placements.map(p => ({
+              atomId:  p.atomId,
+              type:    p.type,
+              density: p.density,
+              data:    p.atom?.data,
+            })),
+            overflowPx,
+            effectiveBudget,
+            { densityExhausted, stalled },
+          );
+
+          // Apply density adjustments
+          if (result.adjustments.length > 0 || result.splitAtomId) {
+            anyResolvableOverflow = true;
+          }
+
+          for (const adj of result.adjustments) {
+            const placement = placements.find(p => p.atomId === adj.atomId);
+            if (placement) {
+              recordAdjustment(
+                diagnostics, adj.atomId,
+                placement.density, adj.newDensity, 'overflow',
+              );
+              placement.density = adj.newDensity;
+
+              // Re-measure adjusted atom
+              const remeasure = measureAtom(
+                stack, placement.atom, placement.density,
+                getMechanicSlotWidthPx(placement, placements),
+              );
+              placement.measuredHeight = remeasure.measuredHeight;
+            }
+          }
+
+          // Handle split — move atom to a new spread
+          if (result.splitAtomId) {
+            const splitIdx = placements.findIndex(p => p.atomId === result.splitAtomId);
+            if (splitIdx >= 0) {
+              const [removed] = placements.splice(splitIdx, 1);
+              // Index = actual insertion position (reindexSpreads runs later;
+              // recordSplit must log where the spread really lands).
+              const newSpread = createSpread(
+                spread.spreadIndex + 1, spread.spreadType, spread.mergeKey,
+              );
+              newSpread[side].push(removed);
+
+              // Insert after current spread
+              const currentIdx = spreadPlan.indexOf(spread);
+              spreadPlan.splice(currentIdx + 1, 0, newSpread);
+              recordSplit(
+                diagnostics, result.splitAtomId,
+                spread.spreadIndex, newSpread.spreadIndex,
+              );
+            }
+          }
+
+          // Flag unresolved overflow (only once per atom)
+          if (!result.resolved && !result.splitAtomId) {
+            const culprit = placements.reduce((largest, placement) => {
+              if (!largest) return placement;
+              const largestHeight = largest.measuredHeight || largest.estimatedHeight || 0;
+              const placementHeight = placement.measuredHeight || placement.estimatedHeight || 0;
+              return placementHeight > largestHeight ? placement : largest;
+            }, null);
+
+            if (culprit && !unresolvedAtomIds.has(culprit.atomId)) {
+              unresolvedAtomIds.add(culprit.atomId);
+              recordUnresolvedOverflow(
+                diagnostics, culprit.atomId, overflowPx, side,
+              );
+            }
+          }
+        }
+      }
+    }
+
+    if (anyResolvableOverflow) revisionsApplied++;
+    else break;
+  }
+
+  return revisionsApplied;
+}
+
+// ---------------------------------------------------------------------------
+// Repack (flow) pass — reclaim space fragmented by shed cascades
+// ---------------------------------------------------------------------------
+
+/**
+ * Re-flow shareable pages after the shed set has stabilized.
+ *
+ * THE DEFECT THIS CLOSES: initial packing bins atoms at their max-compression
+ * estimate (minHeight) while pages render at their placement density, so full
+ * pages are systematically optimistic. When measurement exposes the overflow,
+ * the solver sheds atoms one at a time, each onto a NEW spread — and nothing
+ * ever packs subsequent atoms back into the freed or newly-created space. A
+ * cascade leaves runs of near-empty singleton pages (D77: variety-02 40→44).
+ * Whole-page compaction (Step 4) cannot fix these because it merges entire
+ * pages or nothing; a cascade typically needs a PARTIAL move (three pages of
+ * 1/3/1 atoms re-flowed as 3/2).
+ *
+ * MECHANISM: find windows of consecutive same-side pages and greedily re-flow
+ * their placements — in existing order — into the fewest pages that fit at
+ * their CURRENT densities, using measurePlacementsPage as the fit oracle (the
+ * same rendered-page measurement the planner trusts everywhere else, so row
+ * pairing, zone chrome, and shell decoration are all priced in).
+ *
+ * ORDER SAFETY (Charter inv. 5 — printed atom order is pinned): a window is a
+ * run of pages that share side, spreadType, and mergeKey, where every page
+ * BETWEEN consecutive members in the flattened print order (left page then
+ * right page, per spread) is empty. Flowing content among member pages
+ * therefore cannot move any atom across other printed content: within the
+ * window the concatenation order is preserved, and no printed page exists
+ * between members. Page boundaries move; the atom sequence cannot.
+ *
+ * CONSTRAINT HANDLING:
+ * - mustOwnPage / full-page / canShare:false pages never enter a window
+ *   (placementLocksPage) — the adapter's page locks are absolute.
+ * - mergeKey equality bounds every window: week content never flows across
+ *   the adapter's declared compaction boundary (the engine never reads
+ *   data.weekIndex — mergeKey IS the declaration).
+ * - rowGroup: a unit is the closed same-page SPAN from the first to the last
+ *   member of a rowGroup, interleaved non-members included — because
+ *   groupPlacementsIntoRows pairs same-rowGroup cols:1 members regardless of
+ *   adjacency, and the adapter's canonical emission is non-adjacent (cipher,
+ *   oracle, map with cipher+map paired). A flow boundary therefore cannot
+ *   separate an existing halves pair, adjacent or not. (Reuniting currently-
+ *   orphaned partners onto one page is allowed — the fit oracle prices the
+ *   resulting pairing.)
+ * - groupPolicy 'single-page-preferred': same-page members of such a group
+ *   are span-bundled into one unit too — the flow can merge the group's page
+ *   with neighbors but can never split a currently-together group for a
+ *   page-count win. Members already separated by shed may be reunited.
+ * - zone: routing is per-page composition; the fit oracle renders the real
+ *   page (companion zone, labels, worksheets included).
+ * - continuationAdjacency: atoms on either end of ANY adjacency pair
+ *   ('required' or 'ordered') are excluded from windows outright. 'required'
+ *   pins the immediately-next page; 'ordered' forbids same-page as well as
+ *   reordering (gap must be > 0), and the flow merges pages — so both modes
+ *   are flow barriers. (Belt and braces — every continuation-emitting type
+ *   in the corpus is also page-locked via canShare:false.)
+ *
+ * STRICT IMPROVEMENT ONLY: a window is rewritten only when the re-flow needs
+ * FEWER pages. Because every unit boundary of the current layout is available
+ * to the greedy flow (cohesion units are built per page, so they never
+ * straddle a page boundary of the current layout), the
+ * greedy result never needs more pages than a window whose pages currently
+ * fit; the guard also protects windows containing unsat pages, where that
+ * assumption fails.
+ *
+ * TERMINATION: this pass is a single linear walk over a fixed placement list —
+ * it adds no atoms, runs no solver, and executes exactly once per
+ * planAndMeasure. The post-repack revision loop that follows is the same
+ * bounded loop as the first (≤ MAX_REVISIONS passes; densities only rise;
+ * sheds strictly reduce per-page atom counts), and no further repack follows
+ * it — so no repack↔shed cycle can form.
+ *
+ * @param {object[]} spreadPlan
+ * @param {HTMLElement} stack — measurement stack
+ * @param {object} diagnostics
+ * @returns {number} number of windows rewritten
+ */
+function repackAfterShedStabilization(spreadPlan, stack, diagnostics) {
+  // Atoms bound by ANY continuation-adjacency contract (either endpoint) are
+  // flow barriers: their page relationship is load-bearing. 'required' means
+  // immediately-next page; 'ordered' means a strictly LATER page — same-page
+  // is a violation too (scanContinuationDiagnostics warns on gap <= 0), and
+  // the flow merges pages, so 'ordered' atoms must not enter windows either.
+  // (Every current continuation emitter is also page-locked via canShare:false;
+  // this set is the contract-level guard, not the accident.)
+  const adjacencyBoundIds = new Set();
+  for (const spread of spreadPlan) {
+    for (const side of ['left', 'right']) {
+      for (const p of spread[side]) {
+        const atom = p.atom || {};
+        if (atom.continuationAdjacency && atom.continuationOf) {
+          adjacencyBoundIds.add(p.atomId);
+          adjacencyBoundIds.add(atom.continuationOf);
+        }
+      }
+    }
+  }
+
+  // Flattened page list in print order — the same order the printed booklet
+  // and scanContinuationDiagnostics use.
+  const flatPages = [];
+  for (const spread of spreadPlan) {
+    for (const side of ['left', 'right']) {
+      flatPages.push({ spread, side });
+    }
+  }
+  const placementsOf = (pg) => pg.spread[pg.side];
+
+  function pageEligible(pg) {
+    const placements = placementsOf(pg);
+    return placements.length > 0 && placements.every((p) =>
+      !placementLocksPage(p)
+      && !isPaddingPlacement(p)
+      && !adjacencyBoundIds.has(p.atomId));
+  }
+
+  // Window construction: extend across empty flattened pages (they carry no
+  // printed content); stop at the first non-empty page that differs in side,
+  // spreadType, or mergeKey, or is ineligible. This walk enforces the order-
+  // safety precondition by construction: every flattened page between two
+  // window members is empty.
+  const windows = [];
+  let k = 0;
+  while (k < flatPages.length) {
+    if (!pageEligible(flatPages[k])) { k++; continue; }
+    const win = [flatPages[k]];
+    let last = flatPages[k];
+    let lastIdx = k;
+    for (let m = k + 1; m < flatPages.length; m++) {
+      const pg = flatPages[m];
+      if (placementsOf(pg).length === 0) continue;
+      if (pg.side === last.side
+        && pg.spread.spreadType === last.spread.spreadType
+        && pg.spread.mergeKey === last.spread.mergeKey
+        && pageEligible(pg)) {
+        win.push(pg);
+        last = pg;
+        lastIdx = m;
+      } else {
+        break;
+      }
+    }
+    if (win.length > 1) windows.push(win);
+    k = lastIdx + 1;
+  }
+
+  let windowsRepacked = 0;
+
+  for (const win of windows) {
+    const spreadType = win[0].spread.spreadType;
+
+    // Build flow units per page. A unit is the closed SPAN from the first to
+    // the last same-page member of any shared cohesion key, interleaved
+    // non-members included, expanded to a fixpoint so overlapping spans merge.
+    // Two keys cohere:
+    //
+    // - rowGroup: groupPlacementsIntoRows pairs same-rowGroup cols:1 members
+    //   REGARDLESS of adjacency (TOPOLOGY-CONTRACT), and the adapter's
+    //   canonical emission is exactly non-adjacent — cipher and map share a
+    //   rowGroup with the oracle between them. Consecutive-only bundling
+    //   would split that rendered halves pair; the span cannot, because the
+    //   whole [cipher, oracle, map] run rides as one unit in print order.
+    // - group where groupPolicy.mode === 'single-page-preferred': members
+    //   currently sharing a page move atomically, so a repack can never break
+    //   the single-page preference for a mere page-count win. (Members ALREADY
+    //   split across pages by shed form per-page units — reuniting them is
+    //   allowed and is an improvement for the policy, priced by the oracle.)
+    //
+    // Left-to-right span expansion is complete: a key's members can never
+    // straddle a unit boundary, because the unit containing the first member
+    // extends at least to the key's last same-page member.
+    const cohesionKeysOf = (placement) => {
+      const atom = placement.atom || {};
+      const keys = [];
+      if (atom.rowGroup) keys.push(`rg:${atom.rowGroup}`);
+      if (isSinglePagePreferredPlacement(placement) && atom.group) {
+        keys.push(`grp:${atom.group}`);
+      }
+      return keys;
+    };
+    const units = [];
+    for (const pg of win) {
+      const placements = placementsOf(pg);
+      const spanEnd = new Map();  // cohesion key -> last index on this page
+      placements.forEach((placement, idx) => {
+        for (const key of cohesionKeysOf(placement)) spanEnd.set(key, idx);
+      });
+      let i = 0;
+      while (i < placements.length) {
+        let end = i;
+        for (let j = i; j <= end; j++) {
+          for (const key of cohesionKeysOf(placements[j])) {
+            const keyEnd = spanEnd.get(key);
+            if (keyEnd > end) end = keyEnd;
+          }
+        }
+        units.push(placements.slice(i, end + 1));
+        i = end + 1;
+      }
+    }
+
+    // Greedy measured flow at CURRENT densities: close a page only when the
+    // next unit measurably does not fit (same 2px tolerance as the solver).
+    const newPages = [];
+    let current = [];
+    for (const unit of units) {
+      if (current.length === 0) {
+        current = [...unit];
+        continue;
+      }
+      const candidate = [...current, ...unit];
+      const measurement = measurePlacementsPage(stack, candidate, spreadType);
+      if (measurement.overflowHeight > 2) {
+        newPages.push(current);
+        current = [...unit];
+      } else {
+        current = candidate;
+      }
+    }
+    if (current.length > 0) newPages.push(current);
+
+    // Strict improvement only — see contract comment above.
+    if (newPages.length >= win.length) continue;
+
+    // Apply: member pages keep their plan positions; content flows forward;
+    // emptied tail pages are dropped later by removeEmptySpreads.
+    for (let wi = 0; wi < win.length; wi++) {
+      const target = placementsOf(win[wi]);
+      target.length = 0;
+      if (wi < newPages.length) target.push(...newPages[wi]);
+    }
+
+    // Refresh per-placement measurements in the new page context — width
+    // resolution depends on page composition (measurement equals render).
+    for (let wi = 0; wi < newPages.length; wi++) {
+      const pagePlacements = placementsOf(win[wi]);
+      for (const placement of pagePlacements) {
+        const remeasure = measureAtom(
+          stack, placement.atom, placement.density,
+          getMechanicSlotWidthPx(placement, pagePlacements),
+        );
+        placement.measuredHeight = remeasure.measuredHeight;
+      }
+    }
+
+    windowsRepacked++;
+    recordRepack(
+      diagnostics, win.length, newPages.length,
+      newPages.map((pagePlacements) => pagePlacements.map((p) => p.atomId)),
+    );
+  }
+
+  return windowsRepacked;
+}
+
+// ---------------------------------------------------------------------------
 // Full pipeline: plan → measure → revise
 // ---------------------------------------------------------------------------
 
@@ -777,148 +1196,11 @@ export function planAndMeasure(atoms, container, options = {}) {
       }
     }
 
-    // Step 3: Revise overflows
-    let revisionsApplied = 0;
+    // Step 3: Revise overflows (extracted loop — see runRevisionLoop)
     const unresolvedAtomIds = new Set();  // Track atoms already flagged
-
-    // Overflow measured for each page on the previous pass, so the solver can
-    // be told when its density adjustments stopped buying anything (see the
-    // measurement veto in density-solver.resolvePageOverflow).
-    //
-    // Keyed on the placements ARRAY, not the spread index: splits splice new
-    // spreads into the plan mid-loop and `spreadIndex` is not re-indexed until
-    // afterwards, so indices are neither unique nor stable during the loop.
-    // The array object is — splice and push mutate it in place.
-    const lastOverflowPx = new WeakMap();
-
-    for (let pass = 0; pass < MAX_REVISIONS; pass++) {
-      let anyResolvableOverflow = false;
-
-      for (const spread of spreadPlan) {
-        for (const side of ['left', 'right']) {
-          const placements = spread[side];
-          if (placements.length === 0) continue;
-
-          // Skip pages where every atom is already flagged unresolvable
-          if (placements.every(p => unresolvedAtomIds.has(p.atomId))) continue;
-
-          const pageMeasurement = measurePlacementsPage(
-            stack,
-            placements,
-            spread.spreadType,
-          );
-          const overflowPx = pageMeasurement.overflowHeight;
-
-          if (overflowPx > 2) {
-            // Did the previous pass's adjustments actually move this page?
-            const previousOverflowPx = lastOverflowPx.get(placements);
-            const stalled = previousOverflowPx !== undefined
-              && overflowPx > previousOverflowPx - OVERFLOW_PROGRESS_EPSILON_PX;
-            lastOverflowPx.set(placements, overflowPx);
-
-            // A stalled pass is evidence, not proof. Density is a ladder of
-            // rendering thresholds, not a ramp: a step that lands between two
-            // rungs changes nothing, and the next step may still cross one. So
-            // ask the page itself the only question that settles it — does it
-            // STILL overflow with every atom at maximum density? If it does,
-            // no density path saves this composition and the solver should
-            // shed instead of spending the remaining passes. If it does not,
-            // the last step merely fell short and the solver should keep going.
-            //
-            // Measured, never applied: the probe renders a shallow copy at max
-            // density and throws it away. Only stalled pages pay for it.
-            let densityExhausted = false;
-            if (stalled) {
-              const maxDensityProbe = measurePlacementsPage(
-                stack,
-                placements.map(p => ({ ...p, density: MAX_DENSITY })),
-                spread.spreadType,
-              );
-              densityExhausted = maxDensityProbe.overflowHeight > 2;
-            }
-
-            const result = resolvePageOverflow(
-              placements.map(p => ({
-                atomId:  p.atomId,
-                type:    p.type,
-                density: p.density,
-                data:    p.atom?.data,
-              })),
-              overflowPx,
-              effectiveBudget,
-              { densityExhausted, stalled },
-            );
-
-            // Apply density adjustments
-            if (result.adjustments.length > 0 || result.splitAtomId) {
-              anyResolvableOverflow = true;
-            }
-
-            for (const adj of result.adjustments) {
-              const placement = placements.find(p => p.atomId === adj.atomId);
-              if (placement) {
-                recordAdjustment(
-                  diagnostics, adj.atomId,
-                  placement.density, adj.newDensity, 'overflow',
-                );
-                placement.density = adj.newDensity;
-
-                // Re-measure adjusted atom
-                const remeasure = measureAtom(
-                  stack, placement.atom, placement.density,
-                  getMechanicSlotWidthPx(placement, placements),
-                );
-                placement.measuredHeight = remeasure.measuredHeight;
-              }
-            }
-
-            // Handle split — move atom to a new spread
-            if (result.splitAtomId) {
-              const splitIdx = placements.findIndex(p => p.atomId === result.splitAtomId);
-              if (splitIdx >= 0) {
-                const [removed] = placements.splice(splitIdx, 1);
-                // Index = actual insertion position (reindexSpreads runs later;
-                // recordSplit must log where the spread really lands).
-                const newSpread = createSpread(
-                  spread.spreadIndex + 1, spread.spreadType, spread.mergeKey,
-                );
-                newSpread[side].push(removed);
-
-                // Insert after current spread
-                const currentIdx = spreadPlan.indexOf(spread);
-                spreadPlan.splice(currentIdx + 1, 0, newSpread);
-                recordSplit(
-                  diagnostics, result.splitAtomId,
-                  spread.spreadIndex, newSpread.spreadIndex,
-                );
-              }
-            }
-
-            // Flag unresolved overflow (only once per atom)
-            if (!result.resolved && !result.splitAtomId) {
-              const culprit = placements.reduce((largest, placement) => {
-                if (!largest) return placement;
-                const largestHeight = largest.measuredHeight || largest.estimatedHeight || 0;
-                const placementHeight = placement.measuredHeight || placement.estimatedHeight || 0;
-                return placementHeight > largestHeight ? placement : largest;
-              }, null);
-
-              if (culprit && !unresolvedAtomIds.has(culprit.atomId)) {
-                unresolvedAtomIds.add(culprit.atomId);
-                recordUnresolvedOverflow(
-                  diagnostics, culprit.atomId, overflowPx, side,
-                );
-              }
-            }
-          }
-        }
-      }
-
-      if (anyResolvableOverflow) revisionsApplied++;
-      else break;
-    }
-
-    diagnostics.revisionPasses = revisionsApplied;
+    let revisionsApplied = runRevisionLoop(
+      spreadPlan, stack, effectiveBudget, diagnostics, unresolvedAtomIds,
+    );
 
     // Step 4: Compact — merge underfilled sharable pages
     // After measurement, estimates may have over-allocated. Walk spreads and
@@ -975,6 +1257,27 @@ export function planAndMeasure(atoms, container, options = {}) {
       removeEmptySpreads(spreadPlan);
     }
     diagnostics.compactions = compactions;
+
+    // Step 4b: Repack after shed stabilization — flow shareable content back
+    // into the space shed cascades fragmented (partial moves compaction's
+    // whole-page merges cannot express). One round, then normal solving; see
+    // repackAfterShedStabilization for the order-safety and termination
+    // arguments.
+    const repackedWindows = repackAfterShedStabilization(spreadPlan, stack, diagnostics);
+    if (repackedWindows > 0) {
+      removeEmptySpreads(spreadPlan);
+
+      // Repacked pages re-enter the SAME solve machinery as first-pass pages
+      // (stall detection, max-density probe, stall escalation, shedding).
+      // The flow only forms pages its fit oracle measured as fitting, so this
+      // is expected to no-op — it exists so measurement-equals-render holds by
+      // construction, not by assumption. Bounded (≤ MAX_REVISIONS); no repack
+      // follows it, so no repack↔shed cycle can form.
+      revisionsApplied += runRevisionLoop(
+        spreadPlan, stack, effectiveBudget, diagnostics, unresolvedAtomIds,
+      );
+    }
+    diagnostics.revisionPasses = revisionsApplied;
 
     // Any padding inserted during estimate-only planning is provisional.
     // Remove it before the final recount so imposition is based on the
