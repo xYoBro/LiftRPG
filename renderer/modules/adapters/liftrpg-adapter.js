@@ -505,7 +505,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
   for (let fi = 0; fi < fragments.length; fi++) {
     const frag = fragments[fi];
     const weight = fragmentWeight(frag);
-    const standalone = fragmentMustStandAlone(frag, weight);
+    const standalone = fragmentMustStandAlone(frag);
     const hint = standalone ? 'full-page' : weight >= 0.5 ? 'half-page' : 'flex';
     atoms.push(createAtom({
       type: 'fragment-doc',
@@ -966,17 +966,52 @@ function fragmentWeight(fragment) {
   return Math.min(weight, 1.55);
 }
 
-function fragmentMustStandAlone(fragment, weight = fragmentWeight(fragment)) {
+/**
+ * Minimum body length (reading characters, markup stripped) at which a found
+ * document is tall enough to own a printed page.
+ *
+ * CALIBRATION (measured 2026-08-10, live renderer, planner's own measured
+ * heights via window.__v2SpreadPlan; synthetic bodies swept through four
+ * document classes):
+ *
+ *     body chars   300   900  1500  2100  2700  3000  3600  4200
+ *     measured px  ~110  ~170  ~230  ~290  ~355  ~380  ~445  ~505
+ *
+ * memo / report / field-note / correspondence agree inside ±5% — document
+ * class moves the curve by less than one sampling step, so class is not a
+ * term in this rule. Half of PAGE_BUDGET.heightPx (741 → 370px) is crossed
+ * at ≈2900 characters.
+ *
+ * WHY HALF A PAGE. Not an aesthetic constant: at ≥ half the budget no second
+ * document can fit beside this one, so "fills half a page" and "cannot be
+ * shared" are the same statement. **Standalone ⟺ unpairable.** Below the
+ * line the adapter says nothing about placement and the engine's packer —
+ * which measures — decides whether the document actually shares a page.
+ *
+ * WHAT THIS REPLACES. A documentType allow-list (memo, report, inspection,
+ * correspondence, transcript, anomaly, letter) OR'd with two numeric gates
+ * (weight ≥ 0.9, length ≥ 900). Post-budget-trim the corpus tops out at 600
+ * body characters, so both numeric gates are unreachable and the type list
+ * was doing 100% of the work: 155 of 226 fragments locked a page each while
+ * covering 14–35% of it (measured range 104–257px on a 741px page; not one
+ * corpus fragment reaches even 40%). A memo does not read as a document
+ * because it is alone on a sheet — it reads as a stamp in a void. It reads
+ * as a document when the archive page around it is full.
+ *
+ * This is a content-scale gate in the only currency the adapter owns, not a
+ * height predictor; the engine remains the authority on actual fit. It is
+ * deliberately coarse — the corpus sits 5× away from the line.
+ */
+const STANDALONE_MIN_CHARS = 2900;
+
+function fragmentMustStandAlone(fragment) {
   const rawContent = fragment.bodyText || fragment.body || fragment.content || '';
   const body = (typeof rawContent === 'string' ? rawContent : (rawContent.html || ''))
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  const documentType = String(fragment.documentType || '').toLowerCase();
 
-  return weight >= 0.9
-    || body.length >= 900
-    || ['memo', 'report', 'inspection', 'correspondence', 'transcript', 'anomaly', 'letter'].includes(documentType);
+  return body.length >= STANDALONE_MIN_CHARS;
 }
 
 // ---------------------------------------------------------------------------

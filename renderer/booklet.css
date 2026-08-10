@@ -4620,12 +4620,15 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   line-height:1;
   letter-spacing:-.02em;
 }
-.page-fragment-doc[data-fragment-count="2"] .fragment-block{
-  flex:0 0 auto;
-}
-.page-fragment-doc[data-fragment-count="2"] .fragment-doc{
-  flex:0 0 auto;
-}
+/* NOTE: fragment counts 1, 3, 4, 5 all inherit `.fragment-block{flex:1}` and
+   share the page evenly. A `[data-fragment-count="2"]{flex:0 0 auto}` carve-out
+   used to sit here and made 2 the only count that did not: the two documents
+   took intrinsic height and left 60% of the sheet blank below them (conclave
+   p33 measured 301px of 764). It was the sole reason a two-document archive
+   page read as a compromise. Removed — 2 now behaves like every other count.
+   The classified-packet count=2 stagger (max-width / align-self, above) is
+   horizontal and is unaffected. */
+
 /* Left-hand pages: number on left margin */
 .fragment-page[data-side="verso"] .fragment-number{
   right:auto;
