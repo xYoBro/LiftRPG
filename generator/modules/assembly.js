@@ -5,6 +5,11 @@
 import { DOCUMENT_TYPE_ALIASES, SUPPORTED_THEME_ARCHETYPES, THEME_ARCHETYPE_ALIASES,
   SCHEMA_VERSION
 } from './constants.js';
+import {
+  isValidWorkspaceStyle,
+  resolveWorkspaceStyle,
+  DEFAULT_WORKSPACE_STYLE
+} from '../../contracts/contract-constants.mjs';
 
 // ── Structured Layer 2 diagnostics ──────────────────────────────────────────
 // Machine-readable diagnostic entries for assembly/normalization repairs.
@@ -1184,6 +1189,62 @@ export function normalizeDocumentTypes(booklet, diag) {
   });
 }
 
+// Normalize cipher workspace styles to the canonical enum in place.
+//
+// Two outcomes, two diagnostics (D19: neither is an error — an unrenderable
+// style must never block delivery, and the fallback still prints a usable
+// writing surface):
+//   - a style-vocabulary synonym ('ruled', 'boxgrid') resolves through
+//     WORKSPACE_STYLE_ALIASES  → 'workspace-style-alias'
+//   - anything else (content labels, prose left by the 1.4 string->object
+//     migration, model noise) carries no geometry intent and becomes
+//     DEFAULT_WORKSPACE_STYLE → 'workspace-style-unknown'
+//
+// Before this existed the fallback happened silently inside renderWorkspace(),
+// so an author who wrote 'ruled' got plaintext cells and no signal.
+export function normalizeWorkspaceStyles(booklet, diag) {
+  (booklet.weeks || []).forEach(function (week, wi) {
+    var containers = [week.fieldOps, week.bossEncounter];
+    containers.forEach(function (container) {
+      var body = container && container.cipher && container.cipher.body;
+      var ws = body && body.workSpace;
+      if (!ws || typeof ws !== 'object') return;
+      if (isValidWorkspaceStyle(ws.style)) return;
+      // `style` is optional in the schema. An absent one is an omission, not a
+      // wrong answer — the renderer defaults it. Don't invent a field, and
+      // don't raise a repair diagnostic for something nobody got wrong.
+      if (ws.style === undefined || ws.style === null || ws.style === '') return;
+
+      var from = ws.style;
+      var canonical = resolveWorkspaceStyle(from);
+      var label = 'Week ' + (week.weekNumber || wi + 1) + ' cipher workSpace.style';
+      var shown = String(from == null ? '' : from);
+      if (shown.length > 60) shown = shown.slice(0, 57) + '...';
+      var pathStr = 'weeks[' + wi + '].' +
+        (container === week.bossEncounter ? 'bossEncounter' : 'fieldOps') +
+        '.cipher.body.workSpace.style';
+
+      if (canonical) {
+        ws.style = canonical;
+        if (diag) {
+          diag.push(createDiagnostic('workspace-style-alias', 'warning', 'normalize',
+            label + ' "' + shown + '" resolved to "' + canonical + '"',
+            { path: pathStr, repairable: true, correction: shown + ' → ' + canonical }));
+        }
+        return;
+      }
+
+      ws.style = DEFAULT_WORKSPACE_STYLE;
+      if (diag) {
+        diag.push(createDiagnostic('workspace-style-unknown', 'warning', 'normalize',
+          label + ' "' + shown + '" names no known writing surface; defaulted to "' +
+            DEFAULT_WORKSPACE_STYLE + '"',
+          { path: pathStr, repairable: true, correction: shown + ' → ' + DEFAULT_WORKSPACE_STYLE }));
+      }
+    });
+  });
+}
+
 // ── Overflow repair collection ───────────────────────────────────────────────
 // Collects _overflowRepairs diagnostics from individual weeks into the
 // assembly-level diagnostics array, then cleans up the per-week temp field.
@@ -1346,6 +1407,7 @@ export function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, ending
   booklet.weeks.forEach(function (week) { normalizeCompanionComponents(week, diag); });
   booklet.weeks.forEach(normalizeOracleKey);
   normalizeDocumentTypes(booklet, diag);
+  normalizeWorkspaceStyles(booklet, diag);
   normalizeInterludes(booklet, diag);
 
   // Set overflow deterministically (fix C1 — was missing in this assembler)
@@ -1409,6 +1471,7 @@ export function assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutp
   booklet.weeks.forEach(function (week) { normalizeCompanionComponents(week, diag); });
   booklet.weeks.forEach(normalizeOracleKey);
   normalizeDocumentTypes(booklet, diag);
+  normalizeWorkspaceStyles(booklet, diag);
   normalizeInterludes(booklet, diag);
 
   // Override exercises with normalized data when available
@@ -2228,6 +2291,7 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
 
   // -- Normalize document types (alias resolution) --
   normalizeDocumentTypes(booklet, diag);
+  normalizeWorkspaceStyles(booklet, diag);
 
   // -- Collect overflow-registry alignment repairs from individual weeks --
   collectOverflowRepairs(booklet, diag);

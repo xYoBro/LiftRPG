@@ -12,8 +12,12 @@
 //     (pipeline telemetry, migration residue): top level, meta, week,
 //     bossEncounter, fragment.
 //   - Deliberately open objects: designSpec, authenticityChecks, theme.tokens,
-//     literaryRegister, storySpine, artifactIntent, cipher.body.workSpace,
-//     interlude.payload — content varies legitimately there.
+//     literaryRegister, storySpine, artifactIntent, interlude.payload —
+//     content varies legitimately there.
+//   - cipher.body.workSpace WAS open, and that openness was the bug: `style`
+//     was unvalidated free text while the renderer recognised exactly four
+//     geometries, so 'ruled' printed plaintext cells and nobody found out.
+//     It is now a closed object with an enumerated style.
 //
 // Consumed by scripts/validate.js (Ajv 2020-12).
 
@@ -30,7 +34,8 @@ import {
   VALID_ATTACHMENT_STRATEGIES,
   ORACLE_ROLL_BANDS,
   SPATIAL_GUARDRAILS,
-  PERCENTILE_STAT
+  PERCENTILE_STAT,
+  VALID_WORKSPACE_STYLES
 } from './contract-constants.mjs';
 
 var G = SPATIAL_GUARDRAILS;
@@ -254,7 +259,24 @@ export var BOOKLET_SCHEMA = {
           properties: {
             displayText: { type: 'string' },
             key: { type: ['string', 'object', 'array', 'integer'] },
-            workSpace: { type: 'object' },
+            // The printed writing surface. `style` names a geometry the
+            // renderer actually builds — the enum is the whole point of this
+            // object being closed. Generated content reaches canonical values
+            // via WORKSPACE_STYLE_ALIASES in assembly.js; the renderer applies
+            // the same table at render time for hand-loaded JSON.
+            // NOTE: `cellCount` is authored in the corpus (Persephone) but the
+            // cells renderer sizes from rows x cols and ignores it. Admitted
+            // here as authored intent, not as a wired field.
+            workSpace: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                style: { enum: VALID_WORKSPACE_STYLES },
+                rows: { type: 'integer', minimum: 1 },
+                cols: { type: 'integer', minimum: 1 },
+                cellCount: { type: 'integer', minimum: 1 }
+              }
+            },
             referenceTargets: { type: 'array', items: { type: 'string' } }
           }
         },

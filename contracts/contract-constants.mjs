@@ -102,6 +102,50 @@ export var ORACLE_ROLL_BANDS = [
   '50-59', '60-69', '70-79', '80-89', '90-99'
 ];
 
+// ── Cipher workspace styles ──────────────────────────────────────────────────
+// The writable surface printed under a cipher. Each value names a distinct
+// geometry the renderer builds (field-ops-primitives.js renderWorkspace) and
+// the estimate models (atoms/cipher-panel.js workspaceHeight):
+//   boxed-totals — grid of rows x cols digit boxes (aspect-capped squares)
+//   lined        — stack of ruled pencil rows
+//   blank        — one open ruled block, rows deep
+//   cells        — wrapping strip of small plaintext squares (the default)
+//
+// 'cells' is last on purpose: it is DEFAULT_WORKSPACE_STYLE, the value an
+// unrecognised style resolves to. That default is a render-safety rule, not a
+// preference — an unknown string must still print a usable writing surface.
+export var VALID_WORKSPACE_STYLES = ['boxed-totals', 'lined', 'blank', 'cells'];
+
+export var DEFAULT_WORKSPACE_STYLE = 'cells';
+
+// Aliases are style-vocabulary synonyms only — a value that names a geometry
+// in different words. Values that name the *content* of the workspace
+// ('riddle-answer') or that are prose left behind by the 1.4 string->object
+// migration carry no geometry intent and deliberately have no entry here; they
+// fall to DEFAULT_WORKSPACE_STYLE.
+//
+// Entries marked (corpus) were observed in content/ before this enum landed.
+export var WORKSPACE_STYLE_ALIASES = {
+  'boxgrid': 'boxed-totals',        // (corpus) Palimpsest-House, eastern-shore
+  'box-grid': 'boxed-totals',
+  'box_grid': 'boxed-totals',
+  'boxes': 'boxed-totals',
+  'boxed': 'boxed-totals',
+  'boxed-total': 'boxed-totals',
+  'ruled': 'lined',                 // (corpus) eastern-shore
+  'ruled-lines': 'lined',
+  'short-lines': 'lined',           // (corpus) The-Hinge
+  'lines': 'lined',
+  'writing-lines': 'lined',
+  'grid': 'cells',                  // (corpus) The-Air-Gapped-Choir, The-Hinge
+  'cell-grid': 'cells',
+  'cell': 'cells',
+  'plaintext-grid': 'cells',
+  'empty': 'blank',
+  'freeform': 'blank',
+  'open': 'blank'
+};
+
 // ── Theme archetypes ─────────────────────────────────────────────────────────
 
 export var VALID_ARCHETYPES = [
@@ -186,4 +230,22 @@ export function resolveDocumentType(value) {
   if (isValidDocumentType(value)) return value;
   var key = String(value || '').toLowerCase();
   return DOCUMENT_TYPE_ALIASES[key] || null;
+}
+
+export function isValidWorkspaceStyle(value) {
+  return VALID_WORKSPACE_STYLES.indexOf(value) !== -1;
+}
+
+/**
+ * Canonical workspace style, or null when the value carries no geometry
+ * intent. Mirrors resolveDocumentType: callers that must always end up with a
+ * style fall back to DEFAULT_WORKSPACE_STYLE themselves, so the "I guessed"
+ * case stays visible to the caller (assembly raises a diagnostic; the renderer
+ * silently prints cells, because a render must never throw).
+ */
+export function resolveWorkspaceStyle(value) {
+  if (isValidWorkspaceStyle(value)) return value;
+  var key = String(value == null ? '' : value).trim().toLowerCase();
+  if (isValidWorkspaceStyle(key)) return key;
+  return WORKSPACE_STYLE_ALIASES[key] || null;
 }

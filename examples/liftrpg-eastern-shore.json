@@ -447,7 +447,7 @@
             "key": "Calibration readings logged at BW-14, 06:00 hrs. Sequence is continuous — no interpolation.",
             "workSpace": {
               "rows": 3,
-              "style": "boxgrid"
+              "style": "boxed-totals"
             }
           },
           "extractionInstruction": "The first number in the calibration sequence is your gauge reading. Record it on your Gauge Reading Log, p.02.",
@@ -946,7 +946,7 @@
             "key": "Reversal protocol: each station code maps to its alphabetic complement.\nA↔Z  B↔Y  C↔X  D↔W  E↔V  F↔U  G↔T  H↔S  I↔R  J↔Q\nK↔P  L↔O  M↔N",
             "workSpace": {
               "rows": 2,
-              "style": "boxgrid"
+              "style": "boxed-totals"
             }
           },
           "extractionInstruction": "The flagged station's number is your gauge reading. Record it on your Gauge Reading Log, p.02.",
@@ -1455,7 +1455,7 @@
             "key": "Cross-reference the flagged parcel coordinates against the matrix. Row first, then column. Record the value.",
             "workSpace": {
               "rows": 2,
-              "style": "boxgrid"
+              "style": "boxed-totals"
             }
           },
           "extractionInstruction": "Locate the flagged parcel in the reference matrix. The value at that position is your gauge reading. Record it on your Gauge Reading Log, p.02.",
@@ -1956,7 +1956,7 @@
             "key": "Record your result on the Gauge Reading Log, p.02.",
             "workSpace": {
               "rows": 3,
-              "style": "ruled"
+              "style": "lined"
             }
           },
           "extractionInstruction": "Follow the cross-reference protocol above using Fragment F.15. The resulting number is your gauge reading. Record it on your Gauge Reading Log, p.02.",
@@ -2462,7 +2462,7 @@
             "key": "Record your result on the Gauge Reading Log, p.02.",
             "workSpace": {
               "rows": 4,
-              "style": "ruled"
+              "style": "lined"
             }
           },
           "extractionInstruction": "Complete the three-source composite protocol. The resulting number is your gauge reading. Record it on your Gauge Reading Log, p.02.",

@@ -11,6 +11,10 @@ import { registerAtom } from '../engine/atom-registry.js';
 import { buildCipherModel } from '../field-ops-models.js';
 import { renderCipherSection } from '../field-ops-primitives.js';
 import { densityVariant } from '../engine/density-util.js';
+import {
+  resolveWorkspaceStyle,
+  DEFAULT_WORKSPACE_STYLE
+} from '../../../contracts/contract-constants.mjs';
 
 // ---------------------------------------------------------------------------
 // Ladder mirror  ⇄  booklet.css `--cipher-*` tokens
@@ -155,15 +159,20 @@ function lineCount(text, charsPerLine) {
 
 /**
  * Height of the writable workspace, per style, at one ladder tier.
- * Mirrors renderWorkspace() / renderLinedWorkspace() / renderBoxedWorkspace() /
- * renderBlankWorkspace() / renderCellWorkspace() in field-ops-primitives.js —
- * including their row/col defaults and clamps, which are load-bearing (an
- * unrecognised style string falls through to the cell grid).
+ *
+ * CROSS-FILE CONTRACT — mirrors renderWorkspace() / renderLinedWorkspace() /
+ * renderBoxedWorkspace() / renderBlankWorkspace() / renderCellWorkspace() in
+ * field-ops-primitives.js, including their row/col defaults and clamps, which
+ * are load-bearing. Both sides resolve the authored style through the SAME
+ * table (resolveWorkspaceStyle in contracts/contract-constants.mjs) and share
+ * the same DEFAULT_WORKSPACE_STYLE fallback, so an alias like 'ruled' is
+ * measured as the lined geometry it renders as. When these two disagree the
+ * failure is silent clipping, not an error.
  */
 function workspaceHeight(workSpace, tier) {
   if (!workSpace) return 0;
 
-  const style = String(workSpace.style || '').trim().toLowerCase();
+  const style = resolveWorkspaceStyle(workSpace.style) || DEFAULT_WORKSPACE_STYLE;
   const rowsRaw = parseInt(workSpace.rows, 10);
   const colsRaw = parseInt(workSpace.cols, 10);
 

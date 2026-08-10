@@ -1,5 +1,9 @@
 import { make } from './dom.js?v=47';
 import { createBoundedPage } from './page-shell.js?v=47';
+import {
+  resolveWorkspaceStyle,
+  DEFAULT_WORKSPACE_STYLE
+} from '../../contracts/contract-constants.mjs';
 
 const WORD_NUMS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8 };
 const BOX_GRID_PATTERN = /(\w+)\s+rows?\s+(?:of\s+)?(\w+)\s+box(?:es)?/i;
@@ -564,8 +568,26 @@ function renderBoxedWorkspace(workSpace) {
   return wrap;
 }
 
+/**
+ * CROSS-FILE CONTRACT — the style→geometry map here is mirrored by
+ * workspaceHeight() in atoms/cipher-panel.js. Both resolve the authored style
+ * through resolveWorkspaceStyle() (contracts/contract-constants.mjs), so an
+ * alias measures as the geometry it renders as. Change the branch set in one
+ * and the estimate lies; add a style and both files plus VALID_WORKSPACE_STYLES
+ * must move together.
+ *
+ * Unknown values fall to DEFAULT_WORKSPACE_STYLE rather than throwing: this
+ * runs on hand-loaded JSON that never passed through assembly normalization,
+ * and a render must always produce a usable writing surface. The generator
+ * path raises a diagnostic for the same input (normalizeWorkspaceStyles);
+ * silence here is the render-safety floor, not the contract.
+ */
+function normalizedWorkspaceStyle(workSpace) {
+  return resolveWorkspaceStyle(workSpace && workSpace.style) || DEFAULT_WORKSPACE_STYLE;
+}
+
 function renderWorkspace(workSpace) {
-  const style = String((workSpace && workSpace.style) || '').trim().toLowerCase();
+  const style = normalizedWorkspaceStyle(workSpace);
   if (style === 'lined') return renderLinedWorkspace(workSpace);
   if (style === 'boxed-totals') return renderBoxedWorkspace(workSpace);
   if (style === 'blank') return renderBlankWorkspace(workSpace);
@@ -576,7 +598,14 @@ export function renderCipherSection(cipher) {
   const section = make('div', 'cipher-zone');
   section.setAttribute('data-cipher-type', cipher.type || '');
   section.setAttribute('data-cipher-family', cipher.family || 'none');
-  section.setAttribute('data-workspace-style', cipher.workspaceStyle || 'cells');
+  // Stamp the style that was actually built, not the authored string — before
+  // this resolved, an unrecognised value (including whole prose paragraphs
+  // left by the 1.4 string->object migration) went into the DOM verbatim while
+  // the cells grid rendered underneath it.
+  section.setAttribute(
+    'data-workspace-style',
+    resolveWorkspaceStyle(cipher.workspaceStyle) || DEFAULT_WORKSPACE_STYLE
+  );
   if (cipher.noticeabilityDesign) {
     section.setAttribute('data-cipher-noticeability', 'authored');
   }
