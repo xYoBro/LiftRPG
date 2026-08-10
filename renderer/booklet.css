@@ -1256,12 +1256,16 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .gauge-log-page[data-layout-variant="tight"] .password-log-row{
   padding-bottom:2px;
 }
+/* No clamp here — the row instruction is the weekly extraction step, a decode
+   surface (same class as the boss component values, D77/D78). The old
+   -webkit-line-clamp:2 hid up to 120px of live instruction text at tight
+   (vale 120px, Persephone 87px, conclave 66px across the corpus) while buying
+   zero fit: with the clamp removed, every fixture's gauge page renders its
+   full text at tight with 0px boundary overflow — the tier's real font/gap/
+   padding reductions already absorb the worst corpus page (vale, 145px over
+   at standard). Truncation is never shrink. */
 .gauge-log-page[data-layout-variant="tight"] .password-log-instruction{
   font-size:5pt;
-  display:-webkit-box;
-  -webkit-line-clamp:2;
-  -webkit-box-orient:vertical;
-  overflow:hidden;
 }
 .gauge-log-page[data-layout-variant="tight"] .password-log-box{
   width:22px;

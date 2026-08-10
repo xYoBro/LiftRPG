@@ -194,6 +194,60 @@ function normalizeDecodingTable(raw) {
   return String(raw);
 }
 
+/**
+ * componentInputs entries are schema-open (`componentInputs: { type: 'array' }`
+ * admits any element shape) and the corpus really does author more than one:
+ * strings ("CHC-7-ALPHA"), numbers (19), and objects
+ * ({ weekNumber, description } — Palimpsest-House). The renderer must format
+ * every authored shape into a readable line (D78/AUDIT-107: never drop or
+ * mangle authored content) — an object handed raw to make() stringifies to
+ * "[object Object]" on the printed boss page.
+ *
+ * Primitives pass verbatim. Known object shapes map their real fields to a
+ * diegetic line. Unknown object shapes fall back to joining their primitive
+ * field values — readable, never "[object Object]".
+ */
+function formatComponentInputValue(item) {
+  if (item == null) return '';
+  const type = typeof item;
+  if (type === 'string' || type === 'number' || type === 'boolean') return String(item);
+  if (Array.isArray(item)) {
+    return item.map(formatComponentInputValue).filter(Boolean).join(' · ');
+  }
+  if (type === 'object') {
+    // Corpus shape: { weekNumber, description } (Palimpsest-House) — the
+    // description IS the diegetic line; weekNumber feeds the row label.
+    if (typeof item.description === 'string' && item.description.trim()) {
+      return item.description.trim();
+    }
+    // Plausible near-miss shapes: a single value-bearing field.
+    for (const key of ['value', 'input', 'text', 'label']) {
+      const candidate = item[key];
+      if ((typeof candidate === 'string' && candidate.trim()) || typeof candidate === 'number') {
+        return String(candidate).trim();
+      }
+    }
+    // Unknown shape: surface every primitive field value in authored order.
+    const parts = Object.values(item)
+      .filter((v) => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')
+      .map((v) => String(v).trim())
+      .filter(Boolean);
+    if (parts.length) return parts.join(' — ');
+    // Nothing primitive at all — last-resort readable serialization.
+    try { return JSON.stringify(item); } catch (e) { return ''; }
+  }
+  return String(item);
+}
+
+/** Object entries may carry their own week number; honor it for the row label. */
+function componentInputWeekNumber(item, index) {
+  if (item && typeof item === 'object' && !Array.isArray(item)) {
+    const n = Number(item.weekNumber);
+    if (Number.isFinite(n) && n >= 1) return n;
+  }
+  return index + 1;
+}
+
 export function buildBossPageModel(data, week, options = 'standard') {
   const boss = week.bossEncounter || {};
   const derivedPassword = deriveBookletPassword(data || {});
@@ -245,8 +299,8 @@ export function buildBossPageModel(data, week, options = 'standard') {
     decodingInstruction: isContinuation ? '' : (hasConvergenceAppendix ? splitInstruction.head : (decodingKey.instruction || '')),
     decodingTable: isContinuation ? '' : normalizeDecodingTable(decodingKey.referenceTable),
     componentInputs: isContinuation ? [] : (boss.componentInputs || []).map((item, index) => ({
-      weekLabel: 'W' + pad2(index + 1),
-      value: item
+      weekLabel: 'W' + pad2(componentInputWeekNumber(item, index)),
+      value: formatComponentInputValue(item)
     })),
     componentLabel: shellFamily === 'classified-packet' ? 'Recovered Inputs' : 'Recorded Inputs',
     convergenceLabel: shellFamily === 'classified-packet' ? 'Incident Name' : 'Final Word',

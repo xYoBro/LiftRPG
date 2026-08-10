@@ -16,8 +16,13 @@ import { renderGaugeLogPage } from '../booklet-primitives.js';
 import { densityVariant } from '../engine/density-util.js';
 
 const FULL_PAGE_HEIGHT = 741;
-// Minimum height at maximum density (tight variant with line-clamped instructions).
-// Derived from savings at tight: ~180px less than standard.
+// Minimum height at maximum density (tight variant). The old justification
+// cited "line-clamped instructions" — that clamp is gone (it hid up to 120px
+// of live extraction-instruction text while buying zero fit; see the tight
+// .password-log-instruction note in booklet.css). Re-measured clamp-free
+// across all 18 content/ fixtures: natural tight content runs 278-488px
+// (median 332, max vale 488), so 560 remains a conservative floor above the
+// worst corpus page — the constant survives its own dead reason (D78).
 const GAUGE_LOG_MIN_HEIGHT = 560;
 
 registerAtom('gauge-log', {
