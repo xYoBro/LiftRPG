@@ -326,9 +326,13 @@ export var BOOKLET_SCHEMA = {
             // object being closed. Generated content reaches canonical values
             // via WORKSPACE_STYLE_ALIASES in assembly.js; the renderer applies
             // the same table at render time for hand-loaded JSON.
-            // NOTE: `cellCount` is authored in the corpus (Persephone) but the
-            // cells renderer sizes from rows x cols and ignores it. Admitted
-            // here as authored intent, not as a wired field.
+            // `rows`/`cols` size the boxed-totals grid, the lined stack and
+            // the blank block. The `cells` strip WRAPS to the available width,
+            // so for that style the pair is only ever a way to spell a total —
+            // and `cellCount` spells the same total directly. When present it
+            // wins; otherwise rows x cols (defaulting to 1 x 10) stands in.
+            // Both the renderer and the estimate read it through
+            // resolveWorkspaceCellCount() in contract-constants.mjs.
             workSpace: {
               type: 'object',
               additionalProperties: false,

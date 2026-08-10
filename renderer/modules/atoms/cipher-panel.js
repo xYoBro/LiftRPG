@@ -13,6 +13,7 @@ import { renderCipherSection } from '../field-ops-primitives.js';
 import { densityVariant } from '../engine/density-util.js';
 import {
   resolveWorkspaceStyle,
+  resolveWorkspaceCellCount,
   DEFAULT_WORKSPACE_STYLE
 } from '../../../contracts/contract-constants.mjs';
 
@@ -166,7 +167,9 @@ function lineCount(text, charsPerLine) {
  * are load-bearing. Both sides resolve the authored style through the SAME
  * table (resolveWorkspaceStyle in contracts/contract-constants.mjs) and share
  * the same DEFAULT_WORKSPACE_STYLE fallback, so an alias like 'ruled' is
- * measured as the lined geometry it renders as. When these two disagree the
+ * measured as the lined geometry it renders as. The cells strip goes further
+ * and shares the count itself (resolveWorkspaceCellCount) rather than
+ * duplicating the rows/cols/cellCount arithmetic. When these two disagree the
  * failure is silent clipping, not an error.
  */
 function workspaceHeight(workSpace, tier) {
@@ -211,7 +214,10 @@ function workspaceHeight(workSpace, tier) {
   }
 
   // Default — .plaintext-grid: a wrapping strip of --cipher-cell-size squares.
-  const count = Math.min((rowsRaw || 1) * (colsRaw || 10), 40);
+  // The count is resolved by the SAME function renderCellWorkspace() calls, so
+  // an authored cellCount is measured as the strip it prints; before that field
+  // was wired, the estimate and the render agreed only because both ignored it.
+  const count = resolveWorkspaceCellCount(workSpace);
   const pitch = tier.cellSizePx + tier.cellGapPx;
   const perRow = Math.max(1, Math.floor((WORKSPACE_WIDTH_PX + tier.cellGapPx) / pitch));
   const gridRows = Math.max(1, Math.ceil(count / perRow));

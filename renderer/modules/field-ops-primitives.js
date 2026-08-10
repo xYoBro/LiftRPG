@@ -2,6 +2,7 @@ import { make } from './dom.js?v=47';
 import { createBoundedPage } from './page-shell.js?v=47';
 import {
   resolveWorkspaceStyle,
+  resolveWorkspaceCellCount,
   DEFAULT_WORKSPACE_STYLE
 } from '../../contracts/contract-constants.mjs';
 
@@ -532,9 +533,21 @@ export function renderMapSection(mapState) {
   return zone;
 }
 
+/**
+ * The wrapping strip of plaintext squares. Its cell count comes from
+ * resolveWorkspaceCellCount() in contracts/contract-constants.mjs — shared
+ * with the estimate, not mirrored (see that function's note).
+ *
+ * `cellCount` was in the schema and in the corpus for a full release cycle
+ * without being read here: Persephone authors 11 / 16 / 6 / 6 / 4 squares for
+ * its five ciphers and every one of them printed the 10-square rows x cols
+ * default. A cipher whose extraction yields four characters printing ten boxes
+ * is not a cosmetic miss — the writing surface is telling the player the wrong
+ * answer length.
+ */
 function renderCellWorkspace(workSpace) {
   const grid = make('div', 'plaintext-grid');
-  const size = Math.min((workSpace.rows || 1) * (workSpace.cols || 10), 40);
+  const size = resolveWorkspaceCellCount(workSpace);
   for (let i = 0; i < size; i += 1) {
     grid.appendChild(make('div', 'plaintext-cell'));
   }
@@ -571,10 +584,11 @@ function renderBoxedWorkspace(workSpace) {
 /**
  * CROSS-FILE CONTRACT — the style→geometry map here is mirrored by
  * workspaceHeight() in atoms/cipher-panel.js. Both resolve the authored style
- * through resolveWorkspaceStyle() (contracts/contract-constants.mjs), so an
- * alias measures as the geometry it renders as. Change the branch set in one
- * and the estimate lies; add a style and both files plus VALID_WORKSPACE_STYLES
- * must move together.
+ * through resolveWorkspaceStyle() and the cells count through
+ * resolveWorkspaceCellCount() (contracts/contract-constants.mjs), so an alias
+ * measures as the geometry it renders as and a declared cell count is measured
+ * as the strip it prints. Change the branch set in one and the estimate lies;
+ * add a style and both files plus VALID_WORKSPACE_STYLES must move together.
  *
  * Unknown values fall to DEFAULT_WORKSPACE_STYLE rather than throwing: this
  * runs on hand-loaded JSON that never passed through assembly normalization,

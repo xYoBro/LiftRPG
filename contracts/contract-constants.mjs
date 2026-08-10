@@ -275,6 +275,47 @@ export function resolveWorkspaceStyle(value) {
   return WORKSPACE_STYLE_ALIASES[key] || null;
 }
 
+// Ceiling on the `cells` strip. A print guardrail, not a style choice: past
+// this the strip stops being a writing surface and starts being a page of
+// graph paper.
+export var WORKSPACE_CELL_MAX = 40;
+
+// Columns assumed when a `cells` workspace names neither cellCount nor cols.
+export var WORKSPACE_CELL_DEFAULT_COLS = 10;
+
+/**
+ * resolveWorkspaceCellCount(workSpace) -> integer
+ *
+ * How many squares a `cells` workspace prints. SINGLE IMPLEMENTATION, for the
+ * same reason resolveWorkspaceStyle is: the renderer
+ * (field-ops-primitives.js renderCellWorkspace) and the estimate
+ * (atoms/cipher-panel.js workspaceHeight) must agree on the count or the
+ * measured height and the promised height describe different grids, and the
+ * failure is silent clipping rather than an error. A comment pair cannot
+ * enforce that; a shared function can.
+ *
+ * `cellCount` is the authored total and wins outright when present. It is not
+ * a cap on rows x cols: .plaintext-grid is a WRAPPING strip whose columns come
+ * from the available width, so rows/cols were only ever a way to spell a
+ * count — reading cellCount as min(rows x cols, cellCount) would silently
+ * discard the author's number (Persephone asks for 11 cells with no rows/cols,
+ * where the rows x cols fallback yields exactly 10).
+ */
+export function resolveWorkspaceCellCount(workSpace) {
+  var ws = workSpace || {};
+  var declared = parseInt(ws.cellCount, 10);
+  if (isFinite(declared) && declared > 0) {
+    return Math.min(declared, WORKSPACE_CELL_MAX);
+  }
+  var rows = parseInt(ws.rows, 10);
+  var cols = parseInt(ws.cols, 10);
+  return Math.min(
+    (isFinite(rows) && rows > 0 ? rows : 1)
+      * (isFinite(cols) && cols > 0 ? cols : WORKSPACE_CELL_DEFAULT_COLS),
+    WORKSPACE_CELL_MAX
+  );
+}
+
 /**
  * isStandardAlphaTable(referenceTable) -> boolean
  *

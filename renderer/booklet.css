@@ -4131,6 +4131,47 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   border-radius:2px;
   background:white;
 }
+/* ── Boss density ladder ──
+   TRUNCATION LAW (D77): no tier of this ladder may buy space with
+   -webkit-line-clamp. Three rules here used to, and all three were live losses
+   measured on the 8-fixture corpus by the clamped-node scan in
+   diagnostics.spec.js:
+
+     .boss-narrative            tight, clamp:3 — 12px hidden on eastern-shore
+                                and The-Air-Gapped-Choir, 48px on variety-02
+     .boss-component-value      tight, clamp:3 — 43/61/69/69/69px hidden across
+                                vale's five Recovered Inputs
+     .boss-decoding-instruction tight, clamp:2 — 0px hidden today, but the head
+                                it clips is decode instruction; the corpus is
+                                one longer sentence away from eating it
+
+   Component values ARE the decode anchors and the narrative IS the ceremony
+   the whole six weeks pay for, so this is the worst page in the book to delete
+   prose on. It was also unnecessary: measured at the tier each page actually
+   renders at, unclamping every boss page in the corpus leaves 56-386px of
+   slack inside the frame (thinnest: eastern-shore 692->704 of 760). The clamps
+   were not making anything fit; they were hiding text on pages that already
+   fit.
+
+   What replaces them is real geometry — tighter leading on the narrative and
+   the component value, a smaller value type size at dense (where the clamp:4
+   was the tier's ONLY component saving: vale measured 1103px standard ->
+   905px dense, and all 198px of that was truncation), and paragraph margins
+   in place of the `display:inline` hack the clamp needed. That hack is worth
+   naming: it existed only so a multi-paragraph narrative would clamp as one
+   box, and it ran paragraphs together with no separator at all. Nothing in
+   the corpus renders a multi-paragraph narrative at tight today, so the run-on
+   was latent — it would have shipped the first time one did.
+
+   The tight tier still delivers 28-39% off standard after the change; the
+   clamped figure was 28-45%, and the difference is exactly the prose that was
+   being deleted.
+
+   CROSS-FILE CONTRACT: the standard->tight delta these rules produce is
+   mirrored as BOSS_MAX_SHRINK (main page) and BOSS_FOLLOWUP_MAX_SHRINK
+   (appendix page) in renderer/modules/atoms/boss-encounter.js, which carries
+   the reverse pointer. CHANGE THEM TOGETHER — estimate() runs in phase 1 with
+   no DOM and cannot read a computed style. */
 .boss-right[data-layout-variant="tight"] .boss-header{
   font-size:5.4pt;
   padding-bottom:3px;
@@ -4142,16 +4183,20 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 }
 .boss-right[data-layout-variant="tight"] .boss-narrative{
   font-size:6.8pt;
-  line-height:1.33;
-  margin-bottom:5px;
-  padding-left:8px;
-  display:-webkit-box;
-  -webkit-line-clamp:3;
-  -webkit-box-orient:vertical;
-  overflow:hidden;
+  line-height:1.26;
+  margin-bottom:4px;
+  padding-left:7px;
 }
+/* Block paragraphs, separated. The `display:inline` this replaces ran
+   paragraphs together with no separator at all (the clamp needed one box);
+   plain blocks would stack with zero gap, because the global `*{margin:0}`
+   reset is the only `p` rule on this page. 2px is the smallest gap that still
+   reads as a break at 6.8pt. */
 .boss-right[data-layout-variant="tight"] .boss-narrative p{
-  display:inline;
+  margin-bottom:2px;
+}
+.boss-right[data-layout-variant="tight"] .boss-narrative p:last-child{
+  margin-bottom:0;
 }
 .boss-right[data-layout-variant="tight"] .boss-mechanism{
   font-size:6pt;
@@ -4161,12 +4206,8 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 }
 .boss-right[data-layout-variant="tight"] .boss-decoding-instruction{
   font-size:5.6pt;
-  line-height:1.28;
+  line-height:1.24;
   margin-top:5px;
-  display:-webkit-box;
-  -webkit-line-clamp:2;
-  -webkit-box-orient:vertical;
-  overflow:hidden;
 }
 .boss-right[data-layout-variant="tight"] .boss-decoding-table{
   margin-top:5px;
@@ -4234,19 +4275,19 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   width:20px;
   height:20px;
 }
-.boss-right[data-layout-variant="tight"] .boss-component-value{
-  display:-webkit-box;
-  -webkit-line-clamp:3;
-  -webkit-box-orient:vertical;
-  overflow:hidden;
-  font-size:5pt;
-  line-height:1.3;
-}
+/* The value is what the player copied out of a week's cipher — the decode
+   anchor. It inherits 7pt from .boss-component-item at base; the tiers below
+   set the real type size instead of the clamps that used to stand in for one.
+   Dense had NO component rule at all before, only clamp:4, so 6.2pt is this
+   tier's first honest saving here (measured on vale, whose five values are
+   authored as whole sentences: 198px of "dense shrink" was pure truncation). */
 .boss-right[data-layout-variant="dense"] .boss-component-value{
-  display:-webkit-box;
-  -webkit-line-clamp:4;
-  -webkit-box-orient:vertical;
-  overflow:hidden;
+  font-size:6.2pt;
+  line-height:1.26;
+}
+.boss-right[data-layout-variant="tight"] .boss-component-value{
+  font-size:5pt;
+  line-height:1.22;
 }
 
 /* ══════════════════════════════════════════════════════════════
