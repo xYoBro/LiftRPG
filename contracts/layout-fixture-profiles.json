@@ -223,7 +223,8 @@
       "post-padding-1",
       "post-padding-2",
       "back-cover"
-    ]
+    ],
+    "browserPageCount": 36
   },
   "content/The-Hinge.json": {
     "normalizedPageCount": 48,
@@ -450,7 +451,8 @@
       "post-padding-0",
       "post-padding-1",
       "back-cover"
-    ]
+    ],
+    "browserPageCount": 36
   },
   "content/the-conclave-s-legacy.json": {
     "normalizedPageCount": 32,
@@ -687,6 +689,7 @@
       "frag-11",
       "assembly",
       "ending-locked",
+      "post-padding-0",
       "back-cover"
     ]
   },
@@ -950,6 +953,7 @@
       "ending-locked",
       "post-padding-0",
       "post-padding-1",
+      "post-padding-2",
       "back-cover"
     ]
   }

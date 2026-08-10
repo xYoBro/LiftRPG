@@ -2168,7 +2168,13 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
    These are the cipher's shrink affordances: the density variants at the
    bottom of this file re-set them, and every cipher sub-element consumes
    them instead of hardcoding a size. Writable surfaces (workspaces) have
-   floors — a box you cannot write a digit in is not a saving. */
+   floors — a box you cannot write a digit in is not a saving.
+
+   CROSS-FILE CONTRACT: these values are mirrored as named constants in the
+   LADDER table of renderer/modules/atoms/cipher-panel.js, which models
+   workspace geometry per style per density in estimate() (phase 1 has no DOM,
+   so it cannot read a custom property). CHANGE THEM TOGETHER — a token moved
+   here alone makes the density solver's shrink-potential math lie. */
 .cipher-zone{
   --cipher-seq-size:6.7pt;
   --cipher-seq-leading:1.42;
@@ -5441,11 +5447,20 @@ body[data-demo-view="true"] .reader-unlock{
     break-after:auto;
     break-inside:avoid;
   }
-  
+}
+
 /* ── Density variants: cipher / map / fragment (AUDIT 111) ──
    These atoms set data-density-variant and promise shrink in estimate();
    without these rules the density solver burned revision passes on
-   unrealizable savings. Spacing/size only — theme owns character. */
+   unrealizable savings. Spacing/size only — theme owns character.
+
+   SCOPE: the cipher block below is deliberately OUTSIDE @media print.
+   Measurement runs on screen (measurement-harness.js parks the harness at
+   -200vw, screen media), so a print-only ladder is invisible to the solver:
+   every density measured identically and the promised shrink was
+   unrealizable — the same defect class D71 fixed at the token level. The
+   map/fragment/oracle rules that follow are still print-scoped and carry
+   that defect; they are left alone here (out of scope). */
 /* The cipher's shrink is expressed as token resets, not per-element rules.
    Earlier revisions targeted `.cipher-display` (a class the renderer never
    emits) and set `height` on `.cipher-lined-row` (overridden by its own
@@ -5453,7 +5468,11 @@ body[data-demo-view="true"] .reader-unlock{
    page measured identically at density 0.6, 0.85 and 1.0.
    Writable floors: a boxed cell's height never drops below --cipher-box-min-h
    (20px) and ruled pitch never below 15px — pencil surfaces stay pencil
-   surfaces. The tight caps trade box height, not writability. */
+   surfaces. The tight caps trade box height, not writability.
+
+   CROSS-FILE CONTRACT: every number in the three blocks below is mirrored in
+   the LADDER table of renderer/modules/atoms/cipher-panel.js (tier keys match
+   densityVariant()). CHANGE THEM TOGETHER. */
 .cipher-zone[data-density-variant="compact"]{
   --cipher-seq-leading:1.34;
   --cipher-box-max-h:40px;
@@ -5497,6 +5516,7 @@ body[data-demo-view="true"] .reader-unlock{
 }
 .cipher-zone[data-density-variant="tight"] .cipher-family-note{ display:none; }
 
+@media print{
 .map-zone[data-density-variant="dense"] .map-note,
 .map-zone[data-density-variant="tight"] .map-note{
   font-size:4.6pt;
