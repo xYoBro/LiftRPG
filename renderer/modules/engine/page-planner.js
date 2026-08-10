@@ -13,7 +13,9 @@
 
 import { getAtomDefinition } from './atom-registry.js';
 import { PAGE_BUDGET, DEFAULT_PAGE_SPEC } from './page-spec.js';
-import { resolvePageOverflow, MAX_REVISIONS } from './density-solver.js';
+import {
+  resolvePageOverflow, MAX_REVISIONS, MAX_DENSITY, OVERFLOW_PROGRESS_EPSILON_PX,
+} from './density-solver.js';
 import {
   createMeasurementRoot, measureAtom, measurePlacementsPage,
 } from './measurement-harness.js';
@@ -779,6 +781,16 @@ export function planAndMeasure(atoms, container, options = {}) {
     let revisionsApplied = 0;
     const unresolvedAtomIds = new Set();  // Track atoms already flagged
 
+    // Overflow measured for each page on the previous pass, so the solver can
+    // be told when its density adjustments stopped buying anything (see the
+    // measurement veto in density-solver.resolvePageOverflow).
+    //
+    // Keyed on the placements ARRAY, not the spread index: splits splice new
+    // spreads into the plan mid-loop and `spreadIndex` is not re-indexed until
+    // afterwards, so indices are neither unique nor stable during the loop.
+    // The array object is — splice and push mutate it in place.
+    const lastOverflowPx = new WeakMap();
+
     for (let pass = 0; pass < MAX_REVISIONS; pass++) {
       let anyResolvableOverflow = false;
 
@@ -798,6 +810,33 @@ export function planAndMeasure(atoms, container, options = {}) {
           const overflowPx = pageMeasurement.overflowHeight;
 
           if (overflowPx > 2) {
+            // Did the previous pass's adjustments actually move this page?
+            const previousOverflowPx = lastOverflowPx.get(placements);
+            const stalled = previousOverflowPx !== undefined
+              && overflowPx > previousOverflowPx - OVERFLOW_PROGRESS_EPSILON_PX;
+            lastOverflowPx.set(placements, overflowPx);
+
+            // A stalled pass is evidence, not proof. Density is a ladder of
+            // rendering thresholds, not a ramp: a step that lands between two
+            // rungs changes nothing, and the next step may still cross one. So
+            // ask the page itself the only question that settles it — does it
+            // STILL overflow with every atom at maximum density? If it does,
+            // no density path saves this composition and the solver should
+            // shed instead of spending the remaining passes. If it does not,
+            // the last step merely fell short and the solver should keep going.
+            //
+            // Measured, never applied: the probe renders a shallow copy at max
+            // density and throws it away. Only stalled pages pay for it.
+            let densityExhausted = false;
+            if (stalled) {
+              const maxDensityProbe = measurePlacementsPage(
+                stack,
+                placements.map(p => ({ ...p, density: MAX_DENSITY })),
+                spread.spreadType,
+              );
+              densityExhausted = maxDensityProbe.overflowHeight > 2;
+            }
+
             const result = resolvePageOverflow(
               placements.map(p => ({
                 atomId:  p.atomId,
@@ -807,6 +846,7 @@ export function planAndMeasure(atoms, container, options = {}) {
               })),
               overflowPx,
               effectiveBudget,
+              { densityExhausted },
             );
 
             // Apply density adjustments

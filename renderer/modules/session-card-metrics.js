@@ -12,94 +12,164 @@ const MIN_EXERCISES = 2;
 // ---------------------------------------------------------------------------
 // Every `_MIN` below is the value at density 1.0 (tight) and every `_MAX` the
 // value at density 0.0 (spacious) — see lerp(). That naming works for SIZE
-// quantities, which shrink as density rises. It does NOT work for
-// chars-per-line, which is an INVERSE-size quantity, so those two pairs are
-// named by their end instead.
+// quantities, which shrink as density rises. The wrapped-text terms are NOT
+// interpolated at all any more: they read the step ladder below, because the
+// renderer's own geometry is a step function of density, not a ramp.
 
-const PROMPT_MIN_LINE_HEIGHT = 10.2;   // 6.35pt × 1.22 — the tight variant
-const PROMPT_MAX_LINE_HEIGHT = 12.4;   // 7.5pt × ~1.24 — the base variant
-const PROMPT_PADDING_MIN = 4;
-const PROMPT_PADDING_MAX = 8;
-const CHOICE_MIN_LINE_HEIGHT = 9.6;
-const CHOICE_MAX_LINE_HEIGHT = 11.6;
-const CHOICE_LABEL_MIN_HEIGHT = 11;
-const CHOICE_LABEL_MAX_HEIGHT = 15;
-const CHOICE_CHROME_MIN = 12;
-const CHOICE_CHROME_MAX = 18;
 const NOTE_CHROME_MIN = 6;
 const NOTE_CHROME_MAX = 10;
 const EXERCISE_INSTRUCTION_LINE_HEIGHT = 8.4;
 const EXERCISE_INSTRUCTION_CHARS_PER_LINE = 18;
 
+// ---------------------------------------------------------------------------
+// Density variant ladder — the single source for the card's density tiers
+// ---------------------------------------------------------------------------
 /**
- * Wrap widths — CHARACTERS PER LINE.
+ * CROSS-FILE CONTRACT (three-way):
+ *   booklet.css      `.session-card[data-density-variant="compact|dense|tight"]`
+ *   atoms/session-card.js  sets that attribute from `sessionCardVariant()`
+ *   this file        models the geometry each of those blocks produces
  *
- * KNOWN INACCURACY, deliberately kept. These interpolate the wrong way. The
- * card column is a fixed width and density changes only the font, so a denser
- * card fits MORE characters per line, never fewer — `.story-prompt` runs 7.5pt
- * (base) → 7pt (compact) → 6.35pt (dense/tight) and `.binary-choice-text` 7pt
- * → 6.1pt → 5.8pt in booklet.css. The model does the opposite: 70 chars at
- * density 0.0 narrowing to 54 at density 1.0.
+ * `sessionCardVariant()` is exported and consumed by the atom renderer, so the
+ * thresholds exist once. Density below 0.2 gets no attribute at all — the
+ * base `.story-prompt` / `.binary-choice` rules apply; that tier is keyed
+ * 'base' internally.
  *
- * Raising density therefore added wrapped lines faster than it shrank them
- * (wrap ratio 70/54 = 1.30 beats line-height ratio 12.4/10.2 = 1.22), and at
- * every wrap boundary the raw term stepped UP as density rose — a breach of
- * Charter invariant 4, measured at 120 steps across 103 of the corpus's 184
- * session cards. The clamp below removes the breach; these constants are left
- * alone because re-orienting them is NOT a local change:
- *
- *   • Only the density-1.0 value reaches the planner —
- *     `page-planner.estimateAtomHeight()` packs on `minHeight`, which is
- *     `estimateSessionCardHeight(session, 1)`. Widening the tight end (the
- *     physically correct direction) lowers that floor, which re-plans every
- *     page: it packed a 4th session card onto The-Hinge page 13 and clipped it
- *     8px, and shifted printed atom order in two fixtures.
- *   • Narrowing the spacious end instead keeps the floor but inflates
- *     `preferredHeight` at mid densities, which inflates the solver's shrink
- *     potential (`preferred(d) − min(1.0)`). That flipped The-Hinge page 13
- *     from "shed a card" to "compress three", and the compressed page clips
- *     8px inside a card whose notes-box is already at its 66px floor.
- *
- * Both are real re-plans of a print artifact and need author review, so the
- * calibration stays and the contract is enforced by the clamp. Note the whole
- * span is conservative anyway: a browser sweep of the rendered `.story-prompt`
- * at the tight variant (439px column, 8.47px font) measures ~110 characters on
- * a full line, twice what is modelled here, so the term over-counts lines.
+ * Adding a variant means: a CSS block, a threshold here, and a row in BOTH
+ * ladders below. A missing ladder row silently falls back to 'base' geometry,
+ * which is the largest — safe, but wrong.
  */
-const PROMPT_CHARS_PER_LINE_SPACIOUS = 70;   // density 0.0
-const PROMPT_CHARS_PER_LINE_TIGHT    = 54;   // density 1.0 — planner anchor
-const CHOICE_CHARS_PER_LINE_SPACIOUS = 46;
-const CHOICE_CHARS_PER_LINE_TIGHT    = 34;   // density 1.0 — planner anchor
+const VARIANT_THRESHOLDS = [
+  { key: 'tight',   minDensity: 0.6  },
+  { key: 'dense',   minDensity: 0.35 },
+  { key: 'compact', minDensity: 0.2  },
+];
+
+/** Internal tier key, including the attribute-less 'base' tier. */
+function variantKey(density) {
+  const d = Number.isFinite(density) ? density : 0.6;
+  for (const tier of VARIANT_THRESHOLDS) {
+    if (d >= tier.minDensity) return tier.key;
+  }
+  return 'base';
+}
+
+/**
+ * The `data-density-variant` attribute value for a density, or null when the
+ * card renders with base styling (no attribute). Consumed by
+ * `atoms/session-card.js` — do not re-declare these thresholds there.
+ *
+ * @param {number} density — 0.0 (spacious) to 1.0 (maximum compression)
+ * @returns {'compact'|'dense'|'tight'|null}
+ */
+export function sessionCardVariant(density) {
+  const key = variantKey(density);
+  return key === 'base' ? null : key;
+}
+
+/**
+ * WRAPPED-TEXT GEOMETRY — measured, not guessed.
+ *
+ * CROSS-FILE CONTRACT: every number below was read off the rendered DOM and
+ * mirrors a specific `booklet.css` declaration. Changing the CSS without
+ * changing the matching row here makes the density solver's shrink-potential
+ * arithmetic (`preferred(d) − min(1.0)`) lie — the D71 defect class. Both
+ * files carry reciprocal comments.
+ *
+ * How these were obtained (2026-08-10): every session card in the 8-fixture
+ * corpus was rendered at ten densities inside a real bounded page and the
+ * `.story-prompt` / `.binary-choice-*` boxes measured — 1,840 prompt samples
+ * and 128 binary-choice samples across all three body font families the
+ * archetype presets use (IBM Plex Mono, Libre Baskerville, system-ui).
+ *
+ *   lineHeight — computed style, exact. `base` has no `line-height`
+ *     declaration, so it inherits and varies by archetype (15.00 mono/noir,
+ *     15.80 pastoral, 16.00 sci-fi); the model has no theme knowledge and
+ *     takes the worst case, 16.00.
+ *   padY — the element's own vertical padding, exact.
+ *   charsPerLine — the LARGEST value at which `ceil(len / C)` never predicted
+ *     fewer lines than the browser actually laid out, over every sample. This
+ *     is a fit, not a capacity: a first-line capacity probe measures 84–115
+ *     characters at `tight`, but greedy word wrap wastes the line end, so
+ *     modelling with the capacity under-counts lines. The binding archetype is
+ *     always IBM Plex Mono (widest glyphs, fewest characters per line).
+ *
+ * MONOTONICITY IS A PROPERTY OF THESE TABLES, not of the clamp below.
+ * charsPerLine is non-decreasing down the ladder (denser ⇒ smaller font ⇒ more
+ * characters fit) and every height term is non-increasing, so the raw term is
+ * non-increasing by construction — Charter invariant 4 without a correction.
+ *
+ * ONE HONEST FUDGE, and it is the CSS that is wrong, not the model: `dense`
+ * measures a 10.16px prompt line-height but `tight` measures 10.33px, because
+ * `booklet.css` gives `tight` a LOOSER line-height (1.22) than `dense` (1.2)
+ * at the same 6.35pt font. A card therefore gets very slightly taller prompt
+ * lines as it is compressed. Modelling that faithfully would breach invariant
+ * 4 by ~0.5px on a 3-line prompt, so `dense` carries `tight`'s 10.33 — the
+ * running maximum from the compressed end, which is the same worst-case rule
+ * `monotoneTail()` applies, just resolved statically. Cost: `dense` prompts
+ * are over-estimated by 1.7%. Fixing the CSS (making `tight` genuinely tighter
+ * than `dense`) would let this row drop back to 10.16, and is a print-artifact
+ * change, so it is not made here.
+ */
+const PROMPT_LADDER = {
+  //         charsPerLine  lineHeight  padY   ← booklet.css `.story-prompt`
+  base:    { charsPerLine: 68, lineHeight: 16.00, padY: 4 }, // 7.5pt,  inherited lh, padding 2px 0
+  compact: { charsPerLine: 71, lineHeight: 11.95, padY: 4 }, // 7pt,    lh 1.28,      padding 2px 0
+  dense:   { charsPerLine: 82, lineHeight: 10.33, padY: 2 }, // 6.35pt, lh 1.2*,      padding 1px 0
+  tight:   { charsPerLine: 84, lineHeight: 10.33, padY: 2 }, // 6.35pt, lh 1.22,      padding 1px 0
+};
+
+/**
+ * Binary-choice geometry. `booklet.css` declares density blocks for `dense`
+ * and `tight` only, so `compact` renders identically to `base` — the two rows
+ * below are equal on purpose, not by oversight.
+ *
+ * `chrome` is the measured residual (block padding + option gaps + marker
+ * rows) after subtracting the label and both option texts; it varied by less
+ * than 0.2px across the whole corpus at each tier.
+ *
+ * The label defaults to 'Route Decision' when `choiceLabel` is absent —
+ * mirrors `buildBinaryChoiceModel()` in workout-models.js. Labels in the
+ * corpus run 12–151 characters and do wrap to two lines, so the label is a
+ * wrapped-text term too, not a constant.
+ */
+const CHOICE_LADDER = {
+  base:    { labelChars: 100, labelLineHeight: 13.07, textChars:  88, textLineHeight: 13.07, chrome: 20.94 },
+  compact: { labelChars: 100, labelLineHeight: 13.07, textChars:  88, textLineHeight: 13.07, chrome: 20.94 },
+  dense:   { labelChars: 110, labelLineHeight:  9.92, textChars:  97, textLineHeight:  9.60, chrome: 12.00 },
+  tight:   { labelChars: 116, labelLineHeight:  8.97, textChars: 104, textLineHeight:  8.51, chrome: 10.00 },
+};
+
+/** Mirrors buildBinaryChoiceModel() in workout-models.js. */
+const DEFAULT_CHOICE_LABEL = 'Route Decision';
 
 /**
  * MONOTONE CLAMP — Charter invariant 4 ("estimates never rise with density").
  *
- * A wrapped-text term is a step function of density, and the step direction
- * above is wrong, so the raw term can rise. `monotoneTail()` returns the
- * WORST CASE over every sampled density at or above the requested one, which
- * makes the result non-increasing by construction: raising the query density
- * can only shrink the sampled set, so the max can only fall. Sampling starts
- * at the grid point at or below the query, so the clamp never reports less
- * than the raw model would at that grid step.
+ * Now a GUARD, not a correction. Both ladders above are non-increasing by
+ * construction, so this returns the raw term unchanged at every density; it
+ * exists so that a future ladder edit that breaks the ordering degrades into a
+ * conservative over-estimate instead of a solver that fails to converge.
  *
- * Two properties matter downstream and both hold:
- *   • at density 1.0 the sampled set is exactly {1.0}, so `minHeight` — the
- *     planner's packing anchor — is bit-identical to the pre-clamp value;
- *   • `preferredHeight` moves only where the raw term was about to rise,
- *     which is the minimum perturbation any monotone correction can make
- *     (a non-increasing g with g(1) = raw(1) must have g(d) ≥ raw(1) for all
- *     d, so no zero-change fix exists).
+ * `monotoneTail()` returns the worst case over the requested density and every
+ * tier at or above it, which is non-increasing by construction: raising the
+ * query can only shrink the sampled set, so the max can only fall. The
+ * requested density is always sampled itself, so the clamp can never report
+ * less than the raw model does at that density.
  *
- * The 0.05 grid resolves every density variant threshold the renderer uses.
+ * Sampling the TIER BOUNDARIES rather than a fixed 0.05 grid is exact here:
+ * the raw term is constant within a tier, so the boundary representatives are
+ * the complete set of distinct values above the query. (The old 0.05 grid was
+ * also inexact at d = 0.6 — `floor(0.6 / 0.05)` is 11 in floating point, so it
+ * sampled the 0.55 dense tier and reported dense geometry at the planner's
+ * baseline density.)
  */
-const CLAMP_GRID_STEP = 0.05;
-
 function monotoneTail(rawAt, density) {
   const d = Number.isFinite(density) ? Math.min(Math.max(density, 0), 1) : 0.6;
-  const steps = Math.round(1 / CLAMP_GRID_STEP);
-  let worst = 0;
-  for (let i = Math.floor(d / CLAMP_GRID_STEP); i <= steps; i += 1) {
-    const value = rawAt(Math.min(1, i * CLAMP_GRID_STEP));
+  let worst = rawAt(d);
+  for (const tier of VARIANT_THRESHOLDS) {
+    if (tier.minDensity <= d) break;         // tiers are ordered densest-first
+    const value = rawAt(tier.minDensity);
     if (value > worst) worst = value;
   }
   return worst;
@@ -131,12 +201,11 @@ function countWrappedLines(text, charsPerLine) {
 }
 
 function rawPromptHeight(prompt, density) {
-  const charsPerLine = lerp(PROMPT_CHARS_PER_LINE_TIGHT, PROMPT_CHARS_PER_LINE_SPACIOUS, density);
-  const lineHeight = lerp(PROMPT_MIN_LINE_HEIGHT, PROMPT_MAX_LINE_HEIGHT, density);
-  const lineCount = countWrappedLines(prompt, charsPerLine);
+  const tier = PROMPT_LADDER[variantKey(density)];
+  const lineCount = countWrappedLines(prompt, tier.charsPerLine);
   if (!lineCount) return 0;
 
-  return lineCount * lineHeight + lerp(PROMPT_PADDING_MIN, PROMPT_PADDING_MAX, density);
+  return lineCount * tier.lineHeight + tier.padY;
 }
 
 export function estimatePromptHeight(session, density) {
@@ -147,14 +216,17 @@ export function estimatePromptHeight(session, density) {
 }
 
 function rawBinaryChoiceHeight(choice, density) {
-  const charsPerLine = lerp(CHOICE_CHARS_PER_LINE_TIGHT, CHOICE_CHARS_PER_LINE_SPACIOUS, density);
-  const lineHeight = lerp(CHOICE_MIN_LINE_HEIGHT, CHOICE_MAX_LINE_HEIGHT, density);
-  const optionLines = countWrappedLines(choice.promptA, charsPerLine)
-    + countWrappedLines(choice.promptB, charsPerLine);
+  const tier = CHOICE_LADDER[variantKey(density)];
+  const labelLines = Math.max(
+    1,
+    countWrappedLines(choice.choiceLabel || DEFAULT_CHOICE_LABEL, tier.labelChars),
+  );
+  const optionLines = countWrappedLines(choice.promptA, tier.textChars)
+    + countWrappedLines(choice.promptB, tier.textChars);
 
-  return lerp(CHOICE_LABEL_MIN_HEIGHT, CHOICE_LABEL_MAX_HEIGHT, density)
-    + optionLines * lineHeight
-    + lerp(CHOICE_CHROME_MIN, CHOICE_CHROME_MAX, density);
+  return labelLines * tier.labelLineHeight
+    + optionLines * tier.textLineHeight
+    + tier.chrome;
 }
 
 export function estimateBinaryChoiceHeight(session, density) {

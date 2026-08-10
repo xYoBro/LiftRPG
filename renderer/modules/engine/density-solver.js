@@ -25,6 +25,16 @@ const MIN_DENSITY_STEP = 0.05;
 /** Maximum revision iterations per page. */
 export const MAX_REVISIONS = 5;
 
+/**
+ * Overflow reduction (px) a revision pass must buy to count as progress.
+ *
+ * The planner measures each page before and after a pass and passes
+ * `densityExhausted` when a pass bought less than this. Half a pixel is below
+ * the 2px overflow tolerance the planner already uses, so a pass that moves
+ * the page at all still counts.
+ */
+export const OVERFLOW_PROGRESS_EPSILON_PX = 0.5;
+
 // ---------------------------------------------------------------------------
 // Shrink potential
 // ---------------------------------------------------------------------------
@@ -88,11 +98,42 @@ function findSplitCandidateId(pageAtoms) {
  * @param {Array<{atomId: string, type: string, density: number, data: object}>} pageAtoms
  * @param {number} overflowPx — pixels over budget (positive = overflowing)
  * @param {number} pageBudgetPx — total available height in px
+ * @param {object} [options]
+ * @param {boolean} [options.densityExhausted] — the planner measured this page
+ *   with every atom at max density and it still overflowed. See the veto below.
  * @returns {{ resolved: boolean, adjustments: Array<{atomId: string, newDensity: number}>, splitAtomId: string|null }}
  */
-export function resolvePageOverflow(pageAtoms, overflowPx, pageBudgetPx) {
+export function resolvePageOverflow(pageAtoms, overflowPx, pageBudgetPx, options = {}) {
   if (overflowPx <= 0) {
     return { resolved: true, adjustments: [], splitAtomId: null };
+  }
+
+  // ── Measurement veto: the density ladder is spent ────────────────────────
+  //
+  // Strategies 1 and 2 return `resolved: true` optimistically — the comment on
+  // Strategy 1 says the measurement pass will verify. Nothing was verifying.
+  // The planner re-measured, saw the same overflow, and asked again; the
+  // solver, reasoning only from estimates, answered the same way. Five passes
+  // of that and the page was reported unresolved with a legal shed still on
+  // the table.
+  //
+  // It is not a corner case. A page of session cards distributes its height by
+  // COUNT (`.session-cards > .session-card { flex: 1 1 0 }`), so compressing a
+  // card that is not the one overflowing returns exactly zero pixels to the one
+  // that is: the shares are equal whatever the contents do. Whenever the
+  // overflowing atom is already at max density, every remaining adjustment the
+  // estimates offer is provably worthless — and the estimates cannot see it.
+  //
+  // `densityExhausted` is the planner's answer to the only question that
+  // settles it: measured at MAX density, does the page still overflow? When it
+  // does, no density path saves this composition, so skip to shedding. A page
+  // with nothing to shed falls through, because the Charter failure model
+  // still requires an unsplittable page to be driven to max density.
+  if (options.densityExhausted) {
+    const shedAtomId = findSplitCandidateId(pageAtoms);
+    if (shedAtomId) {
+      return { resolved: false, adjustments: [], splitAtomId: shedAtomId };
+    }
   }
 
   // Gather shrink potential for every atom that can still shrink

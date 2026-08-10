@@ -1742,6 +1742,21 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .workout-left[data-page-compaction="5"] .notes-box{
   padding:2px 6px;
 }
+/* ── Session-card density ladder ─────────────────────────────────────────────
+   CROSS-FILE CONTRACT: renderer/modules/session-card-metrics.js PROMPT_LADDER
+   mirrors the `.story-prompt` font-size / line-height / vertical padding of
+   each block below (the estimate phase has no DOM and cannot resolve them),
+   and atoms/session-card.js picks the variant via sessionCardVariant(), whose
+   thresholds live in that same file. Change a `.story-prompt` size here and
+   the corresponding PROMPT_LADDER row must move with it, or the density
+   solver's shrink-potential arithmetic silently lies. No harness enforces the
+   pairing yet.
+
+   KNOWN ANOMALY: `tight` below sets line-height 1.22 at the same 6.35pt font
+   `dense` uses at 1.2 — compressing the card makes its prompt lines TALLER.
+   PROMPT_LADDER carries 10.33 on both rows to stay monotone; see the note
+   there before "fixing" either side.
+   ────────────────────────────────────────────────────────────────────────── */
 .session-card[data-density-variant="compact"]{
   padding:7px 9px 7px;
   gap:2px;
@@ -5218,6 +5233,11 @@ body[data-demo-view="true"] .reader-unlock{
   width:9px;
   height:9px;
 }
+/* CROSS-FILE CONTRACT: renderer/modules/session-card-metrics.js CHOICE_LADDER
+   mirrors the label/text line-heights and the block chrome of these rules.
+   Only `dense` and `tight` variants are declared below, so `compact` renders
+   with base geometry — the CHOICE_LADDER base and compact rows are equal on
+   purpose. Adding a `compact` block here requires splitting them. */
 .binary-choice-text{
   font-family:var(--serif);
   font-size:7pt;

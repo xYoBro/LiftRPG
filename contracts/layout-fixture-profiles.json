@@ -64,9 +64,9 @@
       "w2-s1",
       "w2-s2",
       "w2-s3",
-      "w2-s4",
       "w2-footer",
       "w2-overflow-doc-0",
+      "w2-s4",
       "w2-cipher",
       "w2-oracle",
       "w2-map",
@@ -127,7 +127,6 @@
       "ending-locked",
       "post-padding-0",
       "post-padding-1",
-      "post-padding-2",
       "back-cover"
     ]
   },

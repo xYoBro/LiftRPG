@@ -10,16 +10,13 @@
 import { registerAtom } from '../engine/atom-registry.js';
 import { buildWorkoutCardModel } from '../workout-models.js';
 import { renderWorkoutCard } from '../workout-primitives.js';
-import { estimateSessionCardHeight } from '../session-card-metrics.js';
+// sessionCardVariant lives beside the geometry it selects: the estimate model
+// keys its measured ladder off the same thresholds, and a copy here would let
+// the two drift (the D71 defect class). See the CROSS-FILE CONTRACT note in
+// session-card-metrics.js.
+import { estimateSessionCardHeight, sessionCardVariant } from '../session-card-metrics.js';
 
 const NOTES_LINE_HEIGHT = 22;
-
-function sessionCardVariant(density) {
-  if (density >= 0.6) return 'tight';
-  if (density >= 0.35) return 'dense';
-  if (density >= 0.2) return 'compact';
-  return null;
-}
 
 registerAtom('session-card', {
   defaultSizeHint: 'quarter-page',
