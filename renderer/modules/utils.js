@@ -298,6 +298,35 @@ export function readingLength(value) {
   return stripHtml(splitParagraphs(value).join(' ')).length;
 }
 
+/**
+ * Lines a string occupies in a wrapped box of `charsPerLine` characters.
+ *
+ * The shared primitive behind every measured wrap term in the estimate models
+ * (`session-card-metrics.js`, `atoms/week-header.js`). `charsPerLine` is
+ * always a FIT — the largest divisor that never predicted fewer lines than the
+ * browser actually laid out over the corpus — not a column capacity: greedy
+ * word wrap wastes the end of every line, so modelling with the capacity
+ * under-counts.
+ *
+ * Newlines are NOT hard breaks. Every element these models measure renders
+ * with `white-space: normal`, which collapses a newline to a space, so
+ * splitting on `\n` would model a break the browser never draws. The collapse
+ * below is what the browser does, applied before measuring.
+ *
+ * `Math.max(12, …)` floors the divisor so a corrupted ladder row cannot make
+ * the line count explode.
+ *
+ * @param {string} text
+ * @param {number} charsPerLine
+ * @returns {number} line count; 0 for empty text
+ */
+export function countWrappedLines(text, charsPerLine) {
+  const normalized = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return 0;
+
+  return Math.max(1, Math.ceil(normalized.length / Math.max(12, charsPerLine)));
+}
+
 export function pad2(value) {
   return value < 10 ? '0' + value : String(value);
 }

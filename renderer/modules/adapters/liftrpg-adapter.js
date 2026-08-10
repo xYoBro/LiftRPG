@@ -15,7 +15,19 @@
 import { createAtom } from '../engine/atom-registry.js';
 import { PAGE_BUDGET } from '../engine/page-spec.js';
 import { resolveWeekMechanicProfile } from '../mechanic-registry.js';
-import { estimateSessionCardHeight } from '../session-card-metrics.js';
+import {
+  estimateSessionCardHeight,
+  estimateSoloSessionCardHeight,
+  sessionCardsGapPx,
+  PAGE_FRAME_PAD_Y_PX,
+} from '../session-card-metrics.js';
+// The chunker charges the week furniture the same numbers the atoms estimate
+// for themselves — importing the estimate is how those stay one model rather
+// than two constants drifting apart (the old CHUNK_HEADER_HEIGHT was 92px
+// against a measured 79.6–141.1). The adapter already reaches into Layer 0 for
+// booklet-primitives; these are estimate exports, not renderers.
+import { estimateWeekHeaderHeight } from '../atoms/week-header.js';
+import { WEEK_FOOTER_HEIGHT_PX } from '../atoms/week-footer.js';
 import {
   buildUnlockedEndingPageModel,
   resolveArtifactIdentity,
@@ -35,9 +47,16 @@ export const LIFTRPG_SECTIONS = [
   'end-matter', 'endings', 'back-matter', 'padding',
 ];
 
+/**
+ * The density the chunker evaluates candidate pages at.
+ *
+ * Maximum, deliberately: the chunker is not asking "does this page fit
+ * comfortably", it is asking "CAN this page be made to fit at all". A page
+ * that overflows at 1.0 has no density path left, which is precisely the state
+ * the planner's stall probe resolves by shedding a card onto a new page. See
+ * scorePartition() below.
+ */
 const SESSION_CHUNK_DENSITY = 1.0;
-const CHUNK_HEADER_HEIGHT = 92;
-const CHUNK_FOOTER_HEIGHT = 24;
 export const MAX_BOOKLET_PAGES = 80;
 
 function singlePageGroupPolicy() {
@@ -199,7 +218,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
     const week = weeks[wi];
     const isBoss = !!week.isBossWeek;
     const profile = resolveWeekMechanicProfile(week);
-    const sessionChunks = chunkWeekSessions(week.sessions || []);
+    const sessionChunks = chunkWeekSessions(week.sessions || [], week);
     const primaryGroup = `week-${wi}-chunk-0`;
     const attachmentStrategy = resolveWeekAttachmentStrategy(artifactIdentity);
     const balancedRowGroup = isBoss ? null : resolveBalancedRowGroup(artifactIdentity, week, wi, attachmentStrategy);
@@ -706,7 +725,72 @@ function splitEndingBody(unlockedEnding, bookletData) {
   }
 }
 
-function chunkWeekSessions(sessions, maxSessionsPerPage = 3) {
+/**
+ * Decide which sessions share a workout page.
+ *
+ * ── WHAT THE SCORE MEANS ───────────────────────────────────────────────────
+ *
+ * The number of pages is NOT a free variable: `targetChunkCount` fixes it at
+ * `ceil(n / 3)` before anything is scored, and only partitions with exactly
+ * that many chunks are considered. So the question this function answers is
+ * narrow and answerable: given that the week costs N pages, which arrangement
+ * of sessions across those N pages FITS BEST?
+ *
+ * `pageLoadPx` is the height of the page the renderer will actually build:
+ *
+ *     frame padding
+ *   + week header furniture          (first chunk only — that is where the
+ *                                     adapter puts the week-header atom)
+ *   + every card's measured height at SESSION_CHUNK_DENSITY
+ *   + `.session-cards` row-gap × (cards − 1)
+ *   + week progress footer           (last chunk only)
+ *
+ * against `PAGE_BUDGET.heightPx`. `slackPx` is what is left over: positive
+ * means the page fits with room, negative means it genuinely does not.
+ *
+ * Partitions are ordered by, in strict priority:
+ *
+ *   1. `forcedSheds` — how many pages overflow at MAXIMUM density. Every term
+ *      above is evaluated at SESSION_CHUNK_DENSITY = 1.0, so an overflow here
+ *      is not "this page is full", it is "no amount of compression saves this
+ *      page". Downstream that is exactly the state the planner's stall probe
+ *      detects (D76) and answers by shedding a card onto a new page. One
+ *      overflowing page therefore costs at least one extra page, and page
+ *      count is the thing the chunker was trying to control in the first
+ *      place. Counting pages beats counting pixels.
+ *   2. `overflowPx` — total pixels over, as the severity tiebreak between
+ *      partitions that force the same number of sheds.
+ *   3. `tightestSlackPx`, DESCENDING — maximise the headroom of the page with
+ *      the least of it. With page count fixed, this is the whole of "true
+ *      fit": it picks the arrangement furthest from the cliff, which is also
+ *      the arrangement the density solver has to compress least.
+ *   4. enumeration order, so the result is deterministic without relying on
+ *      the sort being stable.
+ *
+ * ── WHY IT USED TO BE A LIE ────────────────────────────────────────────────
+ *
+ * The old score was `totalOverflow`, then chunk count, then `maxLoad`. It read
+ * the same way, and it never worked, because the card estimate it summed ran
+ * 1.39x measured: every three-card page came out ~190px over a 741px budget
+ * when the truth was within ±13px. `totalOverflow` was therefore positive for
+ * every candidate, the shed count it implied was fantasy, and the comparison
+ * degenerated into "whichever fiction is smaller" — a 58px correction to a
+ * single card flipped a whole week's chunking in D76. The metric is only
+ * meaningful now because the estimate under it is measured (D79); the honest
+ * scoring and the honest model had to land together.
+ *
+ * Two known limits, stated rather than hidden. `PAGE_BUDGET.heightPx` (741) is
+ * the nominal boundary; the real one is archetype-dependent and measured
+ * between 729.6 and 760.3px, so a page within ~12px of the budget is inside
+ * the noise. And `forcedSheds` is a lower bound — a page 200px over sheds
+ * twice — but no partition in the corpus is anywhere near that.
+ *
+ * @param {object[]} sessions — the week's sessions, in order
+ * @param {object|null} weekMeta — the week, for the header furniture estimate
+ * @param {number} [maxSessionsPerPage]
+ * @returns {{startIndex: number, sessions: object[]}[]}
+ */
+function chunkWeekSessions(sessions, weekMeta = null, maxSessionsPerPage = 3) {
   const list = Array.isArray(sessions) ? sessions : [];
   if (!list.length) return [{ startIndex: 0, sessions: [] }];
   if (list.length <= maxSessionsPerPage) {
@@ -715,6 +799,8 @@ function chunkWeekSessions(sessions, maxSessionsPerPage = 3) {
 
   const partitions = [];
   const targetChunkCount = Math.ceil(list.length / maxSessionsPerPage);
+  const headerHeight = estimateWeekHeaderHeight(weekMeta, true);
+  const cardsGap = sessionCardsGapPx(SESSION_CHUNK_DENSITY);
 
   function walk(startIndex, sizes) {
     if (startIndex >= list.length) {
@@ -730,32 +816,42 @@ function chunkWeekSessions(sessions, maxSessionsPerPage = 3) {
     }
   }
 
-  function scorePartition(sizes) {
+  function scorePartition(sizes, ordinal) {
     let startIndex = 0;
-    let totalOverflow = 0;
-    let maxLoad = 0;
+    let forcedSheds = 0;
+    let overflowPx = 0;
+    let tightestSlackPx = Infinity;
 
     sizes.forEach((size, index) => {
       const chunk = list.slice(startIndex, startIndex + size);
-      const sessionLoad = chunk.reduce(
-        (sum, session) => sum + estimateSessionCardHeight(session, SESSION_CHUNK_DENSITY),
-        0,
-      );
-      const pageLoad = sessionLoad
-        + (index === 0 ? CHUNK_HEADER_HEIGHT : 0)
-        + (index === sizes.length - 1 ? CHUNK_FOOTER_HEIGHT : 0);
 
-      totalOverflow += Math.max(0, pageLoad - PAGE_BUDGET.heightPx);
-      maxLoad = Math.max(maxLoad, pageLoad);
+      // A one-card page is a different object — the wrapper stops flexing and
+      // the notes box takes a 260px floor (`[data-card-count="1"]`). Modelling
+      // it with the shared card estimate under-reads by ~194px, which made
+      // 1+3 splits look far cheaper than they print.
+      const cardsLoadPx = size === 1
+        ? estimateSoloSessionCardHeight(chunk[0])
+        : chunk.reduce(
+          (sum, session) => sum + estimateSessionCardHeight(session, SESSION_CHUNK_DENSITY),
+          0,
+        ) + (size - 1) * cardsGap;
+
+      const pageLoadPx = PAGE_FRAME_PAD_Y_PX
+        + (index === 0 ? headerHeight : 0)
+        + cardsLoadPx
+        + (index === sizes.length - 1 ? WEEK_FOOTER_HEIGHT_PX : 0);
+
+      const slackPx = PAGE_BUDGET.heightPx - pageLoadPx;
+      if (slackPx < 0) {
+        forcedSheds += 1;
+        overflowPx += -slackPx;
+      }
+      if (slackPx < tightestSlackPx) tightestSlackPx = slackPx;
+
       startIndex += size;
     });
 
-    return {
-      sizes,
-      totalOverflow,
-      chunkCount: sizes.length,
-      maxLoad,
-    };
+    return { sizes, ordinal, forcedSheds, overflowPx, tightestSlackPx };
   }
 
   walk(0, []);
@@ -764,9 +860,10 @@ function chunkWeekSessions(sessions, maxSessionsPerPage = 3) {
     .filter((sizes) => sizes.length === targetChunkCount)
     .map(scorePartition)
     .sort((a, b) =>
-      a.totalOverflow - b.totalOverflow
-      || a.chunkCount - b.chunkCount
-      || a.maxLoad - b.maxLoad
+      a.forcedSheds - b.forcedSheds
+      || a.overflowPx - b.overflowPx
+      || b.tightestSlackPx - a.tightestSlackPx
+      || a.ordinal - b.ordinal
     )[0];
 
   const chunks = [];

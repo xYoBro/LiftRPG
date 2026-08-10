@@ -1743,19 +1743,32 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   padding:2px 6px;
 }
 /* ── Session-card density ladder ─────────────────────────────────────────────
-   CROSS-FILE CONTRACT: renderer/modules/session-card-metrics.js PROMPT_LADDER
-   mirrors the `.story-prompt` font-size / line-height / vertical padding of
-   each block below (the estimate phase has no DOM and cannot resolve them),
-   and atoms/session-card.js picks the variant via sessionCardVariant(), whose
-   thresholds live in that same file. Change a `.story-prompt` size here and
-   the corresponding PROMPT_LADDER row must move with it, or the density
-   solver's shrink-potential arithmetic silently lies. No harness enforces the
-   pairing yet.
+   CROSS-FILE CONTRACT: renderer/modules/session-card-metrics.js models EVERY
+   block below — PROMPT_LADDER mirrors `.story-prompt`, CHOICE_LADDER mirrors
+   the `.binary-choice*` rules further down, VARIANT_BOX mirrors the
+   `.session-card` padding/gap here, and CARD_LADDER mirrors `.session-header`,
+   `.session-meta`, `.session-body`, `.exercise-*` and `.notes-box`. The
+   estimate phase has no DOM and cannot resolve any of them. atoms/session-card.js
+   picks the variant via sessionCardVariant(), whose thresholds live in that
+   same file. Change a size here and the matching row must move with it, or the
+   density solver's shrink-potential arithmetic silently lies. No harness
+   enforces the pairing yet.
 
-   KNOWN ANOMALY: `tight` below sets line-height 1.22 at the same 6.35pt font
-   `dense` uses at 1.2 — compressing the card makes its prompt lines TALLER.
-   PROMPT_LADDER carries 10.33 on both rows to stay monotone; see the note
-   there before "fixing" either side.
+   THE OTHER LADDER: `.workout-left[data-page-compaction="N"]` above is a
+   SECOND density ladder on the same card, and it does not agree with this one.
+   For `.session-card`'s own padding and gap (and `.session-cards`' gap) the
+   compaction rules WIN on specificity; for every descendant these blocks win
+   on source order because they come later. session-card-metrics.js carries
+   both tables (PAGE_COMPACTION_BOX + VARIANT_BOX for the box, CARD_LADDER for
+   the interior) for exactly that reason. Insert a new rule ABOVE the
+   compaction blocks and you silently move a descendant to the other ladder.
+
+   KNOWN ANOMALIES, both left in the CSS on purpose and absorbed by
+   monotoneTail() in the model — read the notes there before "fixing" either:
+   · `tight` sets line-height 1.22 at the same 6.35pt font `dense` uses at
+     1.2, so compressing the card makes its prompt lines TALLER;
+   · the compaction ladder is looser than this one in the 0.35–0.62 band, so
+     the card BOX grows by 5px as density crosses 0.48.
    ────────────────────────────────────────────────────────────────────────── */
 .session-card[data-density-variant="compact"]{
   padding:7px 9px 7px;
@@ -1883,6 +1896,13 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .session-card[data-density-variant="tight"] .notes-box{
   padding:1px 4px;
 }
+/* ── Single-card page ────────────────────────────────────────────────────────
+   CROSS-FILE CONTRACT: renderer/modules/session-card-metrics.js SOLO_CARD +
+   estimateSoloSessionCardHeight(), which the adapter's session chunker calls
+   whenever it considers a one-card chunk. This block makes a solo card a
+   different object — spacious padding at every density, and a notes box with a
+   260px floor, because on a one-card page the notes box IS the page. None of
+   it responds to density, so none of it is on the ladders above. */
 .workout-left[data-card-count="1"] .session-cards{
   flex:0 0 auto;
 }
@@ -5328,7 +5348,18 @@ body[data-demo-view="true"] .reader-unlock{
    mirrors the label/text line-heights and the block chrome of these rules.
    Only `dense` and `tight` variants are declared below, so `compact` renders
    with base geometry — the CHOICE_LADDER base and compact rows are equal on
-   purpose. Adding a `compact` block here requires splitting them. */
+   purpose. Adding a `compact` block here requires splitting them.
+
+   AND MIND THE CARD-COUNT RULES. `.workout-left[data-card-count="2"]
+   .binary-choice-label` sits ABOVE the variant blocks, so the variant wins and
+   the label compresses. `.workout-left[data-card-count="2"]
+   .binary-choice-text` sits BELOW them, so IT wins and the option text does
+   not compress at all on a two-card page — a density lever quietly disabled by
+   source order, the D71/D72 class. CHOICE_LADDER carries 10.76 for
+   textLineHeight at `dense` and `tight` because the estimate cannot see the
+   page's card count and must take that worst case. Moving the card-count rule
+   above the variant blocks would fix the lever and let those rows drop to
+   9.60 / 8.51; it is a print-artifact change, so it is not made here. */
 .binary-choice-text{
   font-family:var(--serif);
   font-size:7pt;

@@ -14,9 +14,9 @@ import { renderWorkoutCard } from '../workout-primitives.js';
 // keys its measured ladder off the same thresholds, and a copy here would let
 // the two drift (the D71 defect class). See the CROSS-FILE CONTRACT note in
 // session-card-metrics.js.
-import { estimateSessionCardHeight, sessionCardVariant } from '../session-card-metrics.js';
-
-const NOTES_LINE_HEIGHT = 22;
+import {
+  estimateSessionCardHeight, sessionCardVariant, sessionCardNotesHeight,
+} from '../session-card-metrics.js';
 
 registerAtom('session-card', {
   defaultSizeHint: 'quarter-page',
@@ -36,9 +36,9 @@ registerAtom('session-card', {
     const session = data.session || {};
     const normalizedDensity = Number.isFinite(density) ? density : 0.6;
 
-    // Compute notes height from density
-    const notesLines = Math.max(3, Math.round(8 - normalizedDensity * 6));
-    const notesHeight = notesLines * NOTES_LINE_HEIGHT;
+    // Notes height comes from the metrics module, which also models it —
+    // one formula, so the estimate and the render cannot disagree.
+    const notesHeight = sessionCardNotesHeight(normalizedDensity);
 
     // Build a layoutPlan compatible with buildWorkoutCardModel
     const layoutPlan = {
