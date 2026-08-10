@@ -113,13 +113,83 @@ function splitLongInstruction(text, maxLength) {
   };
 }
 
+// bossEncounter.decodingKey.referenceTable is authored in several shapes, and
+// every one of them has to print as a readable lookup row \u2014 the decode chain
+// only closes if the player can actually run it off the page. The shapes the
+// corpus and the schema carry:
+//   \u2022 the canonical A1Z26 string ("1=A 2=B ...") and free-form key prose
+//   \u2022 [{ value, letter }] \u2014 the canonical array row, also what migrate-1.4.mjs
+//     emits from the legacy { "8": "H" } object map; may carry a `derivation`
+//     gloss naming the in-world reason for the mapping
+//   \u2022 [{ input, instruction }] \u2014 per-input derivation steps
+//   \u2022 [{ input, nodeLabel / decodedNode, fenceEra }] \u2014 map-node decode
+// They all collapse to the same printed line: key \u2192 result [gloss].
+//
+// The previous implementation read only the last of those four, so every
+// { value, letter } row printed the literal placeholder "?  \u2192  ?  []". A row
+// must never render as question marks: unrecognised rows fall back to printing
+// their own scalar content, and nothing here throws on malformed input.
+const DECODE_ARROW = '  \u2192  ';
+const DECODE_KEY_FIELDS = ['value', 'input'];
+// Order matters: `nodeLabel` before `decodedNode` keeps the map-node fixtures
+// rendering the human label they already shipped with.
+const DECODE_RESULT_FIELDS = ['letter', 'nodeLabel', 'decodedNode', 'instruction'];
+const DECODE_NOTE_FIELDS = ['derivation', 'fenceEra'];
+
+function decodeCellText(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'object') return '';
+  return String(value).trim();
+}
+
+function pickDecodeField(row, fields) {
+  for (let index = 0; index < fields.length; index += 1) {
+    const text = decodeCellText(row[fields[index]]);
+    if (text) return text;
+  }
+  return '';
+}
+
+function decodeRowLine(row) {
+  if (row === null || row === undefined) return '';
+  if (typeof row !== 'object') return decodeCellText(row);
+
+  const key = pickDecodeField(row, DECODE_KEY_FIELDS);
+  const result = pickDecodeField(row, DECODE_RESULT_FIELDS);
+  const note = pickDecodeField(row, DECODE_NOTE_FIELDS);
+
+  let line;
+  if (key && result) {
+    line = key + DECODE_ARROW + result;
+  } else if (key || result) {
+    line = key || result;
+  } else {
+    // Unknown row shape \u2014 print whatever scalar content it carries rather than
+    // inventing placeholders or dropping the author's table silently.
+    line = Object.keys(row).map((field) => decodeCellText(row[field])).filter(Boolean).join('  ');
+  }
+
+  if (!line) return '';
+  return note && note !== line ? line + '  [' + note + ']' : line;
+}
+
 function normalizeDecodingTable(raw) {
-  if (!raw) return '';
+  if (raw === null || raw === undefined) return '';
   if (typeof raw === 'string') return raw;
   if (Array.isArray(raw)) {
-    return raw.map(function (r) {
-      return (r.input || '?') + '  \u2192  ' + (r.nodeLabel || r.decodedNode || '?') + '  [' + (r.fenceEra || '') + ']';
-    }).join('\n');
+    return raw.map(decodeRowLine).filter(Boolean).join('\n');
+  }
+  if (typeof raw === 'object') {
+    // Legacy object map { "8": "H", ... }. Schema-invalid since 1.4.0 and
+    // rewritten by `npm run migrate`, but a replayed or hand-edited booklet can
+    // still carry one, and "[object Object]" is not an acceptable render.
+    return Object.keys(raw)
+      .map((key) => {
+        const value = decodeCellText(raw[key]);
+        return value ? key + DECODE_ARROW + value : '';
+      })
+      .filter(Boolean)
+      .join('\n');
   }
   return String(raw);
 }
