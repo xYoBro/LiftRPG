@@ -4,7 +4,8 @@
  * Operates on a page's atom list to resolve overflow. Strategies applied in order:
  * 1. Shrink largest atom (increase density on most shrinkable)
  * 2. Shrink multiple atoms (distribute density proportionally)
- * 3. Split (move last atom to a new spread)
+ * 3. Split (break the page at its last movable atom — that atom and everything
+ *    after it move to a new spread)
  * 4. Flag as unresolved (atom too large for page at max density)
  *
  * @module engine/density-solver
@@ -87,17 +88,32 @@ export function atomShrinkPotential(atom, currentDensity) {
 // ---------------------------------------------------------------------------
 
 /**
- * Find the atom to shed from an overfull page — the last one that is allowed
- * to move to a new spread. Atoms whose definition declares
+ * Find the BREAK POINT for shedding from an overfull page — the last atom that
+ * is allowed to move to a new spread. Atoms whose definition declares
  * `canSplitAway: false` (e.g. week-footer) are skipped.
  *
+ * The returned id is a page break, not an extraction: the planner moves this
+ * atom AND every atom after it (see the shed handler in page-planner.js). That
+ * is what makes shedding order-preserving — Charter inv. 5 — and it is why the
+ * break point must be a PROPER suffix (index > 0). Two consequences:
+ *
+ * - `canSplitAway: false` means "never the atom that leaves on its own", not
+ *   "never moves": a week-footer still rides along behind the last session card
+ *   it belongs to. Before the suffix rule, skipping backwards over the footer
+ *   extracted an interior card and printed the week footer BEFORE that card
+ *   (six of eight corpus fixtures did this).
+ * - A page whose only legal break point is index 0 cannot shed at all — moving
+ *   the whole page resolves nothing and would loop. Such a page falls through
+ *   to the density strategies and, if those fail, to unresolved (Charter
+ *   failure model).
+ *
  * @param {Array<{atomId: string, type: string}>} pageAtoms
- * @returns {string|null} atomId to split away, or null if the page cannot shed anything
+ * @returns {string|null} atomId to break at, or null if the page cannot shed
  */
 function findSplitCandidateId(pageAtoms) {
   if (pageAtoms.length <= 1) return null;
 
-  for (let index = pageAtoms.length - 1; index >= 0; index -= 1) {
+  for (let index = pageAtoms.length - 1; index >= 1; index -= 1) {
     const candidate = pageAtoms[index];
     const definition = getAtomDefinition(candidate.type);
     if (definition && definition.canSplitAway === false) continue;

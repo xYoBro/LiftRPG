@@ -248,6 +248,60 @@ function countPaddingPages(spreadPlan) {
   return pageCount;
 }
 
+// ---------------------------------------------------------------------------
+// Print-order walk — ONE implementation of the empty-between invariant
+// ---------------------------------------------------------------------------
+
+/**
+ * Flatten the plan into printed page order: for each spread, the left page then
+ * the right page. This is the order the booklet prints in, the order
+ * `scanContinuationDiagnostics` measures, and the order the `printedAtomOrder`
+ * pin records.
+ *
+ * @param {object[]} spreadPlan
+ * @returns {Array<{spread: object, side: 'left'|'right'}>}
+ */
+function flattenPagesInPrintOrder(spreadPlan) {
+  const flatPages = [];
+  for (const spread of spreadPlan) {
+    for (const side of ['left', 'right']) {
+      flatPages.push({ spread, side });
+    }
+  }
+  return flatPages;
+}
+
+/** Live placements array for a flattened page (mutated in place by callers). */
+function pagePlacementsOf(flatPage) {
+  return flatPage.spread[flatPage.side];
+}
+
+/**
+ * Index of the next flattened page at or after `fromIndex` that has printed
+ * content, or -1.
+ *
+ * THE INVARIANT THIS ENCODES (Charter inv. 5): every page skipped on the way is
+ * EMPTY, so moving content between the page you started from and the page this
+ * returns cannot jump any printed content — the printed atom order is preserved
+ * by construction. Any pass that moves atoms between two pages must reach the
+ * second page through this walk, never by index arithmetic on one side of the
+ * book: stepping spread-to-spread on a single side is blind to the opposite
+ * page of the spreads in between, which is exactly the 2026-08-07 compaction
+ * reorder the `printedAtomOrder` pin exists to catch.
+ *
+ * Both Step 4 (whole-page compaction) and Step 4b (repack windows) walk here.
+ *
+ * @param {Array<{spread: object, side: string}>} flatPages
+ * @param {number} fromIndex
+ * @returns {number}
+ */
+function nextPrintedPageIndex(flatPages, fromIndex) {
+  for (let i = fromIndex; i < flatPages.length; i++) {
+    if (pagePlacementsOf(flatPages[i]).length > 0) return i;
+  }
+  return -1;
+}
+
 function removeEmptySpreads(spreadPlan) {
   for (let i = spreadPlan.length - 1; i >= 0; i--) {
     if (spreadPlan[i].left.length === 0 && spreadPlan[i].right.length === 0) {
@@ -376,35 +430,98 @@ function binGroupIntoSpreads(groupAtoms, startSpreadIndex, spreadType, mergeKey,
   const rightPages = binToPages(rightAtoms, rightHalfWidthTypes);
 
   // ── Distribute 'either' atoms into pages with room ─────────
+  //
+  // ORDER SAFETY (Charter inv. 5 — atoms keep their relative sequence).
+  //
+  // This pass used to be a plain first-fit run independently, per atom, over
+  // every page from the front. That reorders same-group content two ways, both
+  // of which were live in the corpus:
+  //
+  //   1. FRONTIER VIOLATION — an atom that fits nowhere opens a NEW page at the
+  //      end of the run, and the next atom, being smaller, then slides into an
+  //      EARLIER page that had just rejected its predecessor. variety-02 week 2:
+  //      companion-0 (memory-slots) opened its own page, then companion-1
+  //      (percentile-stat) fitted onto the oracle/map page in front of it, so
+  //      the book printed companion-1 before companion-0.
+  //
+  //   2. BRACKET VIOLATION — an atom lands on a page that already prints BEFORE
+  //      pages holding lower-sequence atoms. The whole fragment archive
+  //      interleaved this way: standalone fragments lock a page each, so every
+  //      shareable fragment behind one fell back into the first shareable page
+  //      in the run and printed frag-0, frag-2, frag-4, frag-6, frag-1, …
+  //      (variety-02; six of eight fixtures had a shuffled archive).
+  //
+  // Two anchors make the pass order-preserving without giving up gap filling.
+  // Both are pure restrictions on the old candidate set — every placement the
+  // new pass accepts, the old pass would also have accepted:
+  //
+  //   FRONTIER — candidate pages are never below the printed rank used by the
+  //   previous 'either' atom, so two 'either' atoms can never exchange places.
+  //   A newly opened page is opened at or after the frontier for the same
+  //   reason (left pages can outrun right pages within a group).
+  //
+  //   BRACKET — an atom may only join a page whose atoms all sort BEFORE it and
+  //   whose later pages in the same side stream all sort AFTER it. Appending to
+  //   the end of such a page is that atom's true position in the stream;
+  //   anything else jumps printed content.
+  //
+  // Order is compared by position within `groupAtoms` — the ordering the
+  // planner itself produced (section, then sequence) — not by raw `sequence`,
+  // so cross-section groups compare correctly.
+  const groupOrderIndex = new Map();
+  groupAtoms.forEach((atom, index) => { groupOrderIndex.set(atom.id, index); });
+  const orderOf = (placement) => {
+    const index = groupOrderIndex.get(placement.atomId);
+    return index === undefined ? -1 : index;
+  };
+
+  // Spreads pair leftPages[i] with rightPages[i], and a spread prints its left
+  // page before its right page — so this is the printed position of a page slot.
+  const printedRank = (side, index) => index * 2 + (side === 'right' ? 1 : 0);
+
+  let frontierRank = -1;
+
   for (const atom of eitherAtoms) {
     const placement = createPlacement(atom, ESTIMATE_DENSITY, rightHalfWidthTypes);
     const ownPage = atom.mustOwnPage || atom.sizeHint === 'full-page' || !getAtomDefinition(atom.type)?.canShare;
+    const atomOrder = groupOrderIndex.get(atom.id) ?? -1;
     let placed = false;
 
     if (!ownPage) {
-      // Try right pages first (they tend to have more room)
-      for (const page of rightPages) {
+      // Right pages are still preferred over left (they tend to have more
+      // room); the guards below, not the scan order, are what keep it safe.
+      const candidates = [];
+      for (let i = 0; i < rightPages.length; i++) candidates.push({ side: 'right', index: i, stream: rightPages });
+      for (let i = 0; i < leftPages.length; i++)  candidates.push({ side: 'left',  index: i, stream: leftPages });
+
+      for (const candidate of candidates) {
+        const page = candidate.stream[candidate.index];
+        if (printedRank(candidate.side, candidate.index) < frontierRank) continue;
         if (page.some(placementLocksPage)) continue;
-        if (pageEstimatedHeight(page) + placement.estimatedHeight <= budget) {
-          page.push(placement);
-          placed = true;
-          break;
+        // Everything already on the page must sort before this atom …
+        if (page.some((p) => orderOf(p) > atomOrder)) continue;
+        // … and everything printed later in this stream must sort after it.
+        let bracketed = true;
+        for (let j = candidate.index + 1; j < candidate.stream.length; j++) {
+          if (candidate.stream[j].some((p) => orderOf(p) < atomOrder)) { bracketed = false; break; }
         }
-      }
-      if (!placed) {
-        for (const page of leftPages) {
-          if (page.some(placementLocksPage)) continue;
-          if (pageEstimatedHeight(page) + placement.estimatedHeight <= budget) {
-            page.push(placement);
-            placed = true;
-            break;
-          }
-        }
+        if (!bracketed) continue;
+        if (pageEstimatedHeight(page) + placement.estimatedHeight > budget) continue;
+
+        page.push(placement);
+        frontierRank = printedRank(candidate.side, candidate.index);
+        placed = true;
+        break;
       }
     }
+
     if (!placed) {
-      // New page (right side for either-affinity overflow)
+      // New page (right side for either-affinity overflow), opened at or after
+      // the frontier so it cannot print before an 'either' atom already placed
+      // further along the left stream.
+      while (printedRank('right', rightPages.length) < frontierRank) rightPages.push([]);
       rightPages.push([placement]);
+      frontierRank = printedRank('right', rightPages.length - 1);
     }
   }
 
@@ -843,25 +960,43 @@ function runRevisionLoop(spreadPlan, stack, effectiveBudget, diagnostics, unreso
             }
           }
 
-          // Handle split — move atom to a new spread
+          // Handle split — break the page and move the whole tail to a new spread.
+          //
+          // ORDER SAFETY (Charter inv. 5): shedding is a page BREAK, not an
+          // extraction. The solver picks WHERE the page breaks (the last atom it
+          // is allowed to move); the planner moves that atom and everything
+          // after it, so the printed sequence is preserved by construction.
+          //
+          // Extracting the single chosen atom used to jump it past its own
+          // page-mates whenever the solver had to skip a trailing
+          // `canSplitAway: false` atom: a week page of
+          // [header, s0, s1, s2, footer] shed s2 onto the NEXT page and printed
+          // the week footer before the session card it belongs to. The break
+          // point is guaranteed to be a proper suffix (index > 0), so the page
+          // always keeps content and the shed always reduces its atom count.
           if (result.splitAtomId) {
             const splitIdx = placements.findIndex(p => p.atomId === result.splitAtomId);
-            if (splitIdx >= 0) {
-              const [removed] = placements.splice(splitIdx, 1);
+            if (splitIdx > 0) {
+              const removed = placements.splice(splitIdx);
               // Index = actual insertion position (reindexSpreads runs later;
               // recordSplit must log where the spread really lands).
               const newSpread = createSpread(
                 spread.spreadIndex + 1, spread.spreadType, spread.mergeKey,
               );
-              newSpread[side].push(removed);
+              newSpread[side].push(...removed);
 
               // Insert after current spread
               const currentIdx = spreadPlan.indexOf(spread);
               spreadPlan.splice(currentIdx + 1, 0, newSpread);
-              recordSplit(
-                diagnostics, result.splitAtomId,
-                spread.spreadIndex, newSpread.spreadIndex,
-              );
+              // Every moved atom is recorded — scanContinuationDiagnostics reads
+              // this set to tell "the engine moved it" from "it was authored
+              // that way", and passengers moved as much as the break atom did.
+              for (const movedPlacement of removed) {
+                recordSplit(
+                  diagnostics, movedPlacement.atomId,
+                  spread.spreadIndex, newSpread.spreadIndex,
+                );
+              }
             }
           }
 
@@ -993,13 +1128,8 @@ function repackAfterShedStabilization(spreadPlan, stack, diagnostics) {
 
   // Flattened page list in print order — the same order the printed booklet
   // and scanContinuationDiagnostics use.
-  const flatPages = [];
-  for (const spread of spreadPlan) {
-    for (const side of ['left', 'right']) {
-      flatPages.push({ spread, side });
-    }
-  }
-  const placementsOf = (pg) => pg.spread[pg.side];
+  const flatPages = flattenPagesInPrintOrder(spreadPlan);
+  const placementsOf = pagePlacementsOf;
 
   function pageEligible(pg) {
     const placements = placementsOf(pg);
@@ -1009,11 +1139,11 @@ function repackAfterShedStabilization(spreadPlan, stack, diagnostics) {
       && !adjacencyBoundIds.has(p.atomId));
   }
 
-  // Window construction: extend across empty flattened pages (they carry no
-  // printed content); stop at the first non-empty page that differs in side,
-  // spreadType, or mergeKey, or is ineligible. This walk enforces the order-
-  // safety precondition by construction: every flattened page between two
-  // window members is empty.
+  // Window construction: step page to page through nextPrintedPageIndex — the
+  // shared print-order walk — so every flattened page between two window
+  // members is empty by construction (the order-safety precondition). Stop at
+  // the first printed page that differs in side, spreadType, or mergeKey, or is
+  // ineligible.
   const windows = [];
   let k = 0;
   while (k < flatPages.length) {
@@ -1021,16 +1151,17 @@ function repackAfterShedStabilization(spreadPlan, stack, diagnostics) {
     const win = [flatPages[k]];
     let last = flatPages[k];
     let lastIdx = k;
-    for (let m = k + 1; m < flatPages.length; m++) {
-      const pg = flatPages[m];
-      if (placementsOf(pg).length === 0) continue;
+    for (;;) {
+      const nextIdx = nextPrintedPageIndex(flatPages, lastIdx + 1);
+      if (nextIdx < 0) break;
+      const pg = flatPages[nextIdx];
       if (pg.side === last.side
         && pg.spread.spreadType === last.spread.spreadType
         && pg.spread.mergeKey === last.spread.mergeKey
         && pageEligible(pg)) {
         win.push(pg);
         last = pg;
-        lastIdx = m;
+        lastIdx = nextIdx;
       } else {
         break;
       }
@@ -1206,48 +1337,66 @@ export function planAndMeasure(atoms, container, options = {}) {
     // After measurement, estimates may have over-allocated. Walk spreads and
     // merge consecutive same-side single-atom pages when their measured
     // heights fit together within the page budget.
+    //
+    // ORDER SAFETY (Charter inv. 5): the look-ahead walks PRINTED pages via
+    // nextPrintedPageIndex, not spreads on one side of the book. Stepping
+    // spread-to-spread on a single side — as this loop used to — is blind to
+    // the opposite page of every intervening spread: merging spread J's left
+    // page into spread I's left page pulls its atoms in front of spread I's
+    // right page and every page between, which is the 2026-08-07 compaction
+    // reorder the `printedAtomOrder` pin exists to catch. Through the shared
+    // walk, every page skipped between the two is empty by construction, so
+    // there is no printed content to jump. Same invariant, same helper, as the
+    // Step 4b repack windows.
     let compactions = 0;
-    for (let i = 0; i < spreadPlan.length; i++) {
-      for (const side of ['left', 'right']) {
-        const placements = spreadPlan[i][side];
-        if (placements.length === 0) continue;
+    const compactionPages = flattenPagesInPrintOrder(spreadPlan);
+    for (let fi = 0; fi < compactionPages.length; fi++) {
+      const page = compactionPages[fi];
+      const placements = pagePlacementsOf(page);
+      if (placements.length === 0) continue;
 
-        // Only compact sharable atoms
-        const allShareable = placements.every(p => {
+      // Only compact sharable atoms
+      const allShareable = placements.every(p => {
+        return !placementLocksPage(p);
+      });
+      if (!allShareable) continue;
+
+      // Look ahead for the next PRINTED page — everything skipped is empty.
+      let cursor = fi;
+      for (;;) {
+        const nextIdx = nextPrintedPageIndex(compactionPages, cursor + 1);
+        if (nextIdx < 0) break;
+        const candidate = compactionPages[nextIdx];
+
+        // The next printed page is on the other side of the book: it is printed
+        // content in its own right, so nothing beyond it may be pulled back.
+        if (candidate.side !== page.side) break;
+        // Must be same section and week to merge (never cross week boundaries)
+        if (candidate.spread.spreadType !== page.spread.spreadType) break;
+        if (candidate.spread.mergeKey !== page.spread.mergeKey) break;
+
+        const candidatePlacements = pagePlacementsOf(candidate);
+        const candidateShareable = candidatePlacements.every(p => {
           return !placementLocksPage(p);
         });
-        if (!allShareable) continue;
+        // A locked page is a hard wall: merging content from beyond it would
+        // reorder printed pages (content after the wall pulled before it).
+        if (!candidateShareable) break;
 
-        // Look ahead for the next spread with same-side sharable atoms
-        for (let j = i + 1; j < spreadPlan.length; j++) {
-          const candidatePlacements = spreadPlan[j][side];
-          if (candidatePlacements.length === 0) continue;
+        const mergedMeasurement = measurePlacementsPage(
+          stack,
+          [...placements, ...candidatePlacements],
+          page.spread.spreadType,
+        );
 
-          // Must be same section and week to merge (never cross week boundaries)
-          if (spreadPlan[j].spreadType !== spreadPlan[i].spreadType) break;
-          if (spreadPlan[j].mergeKey !== spreadPlan[i].mergeKey) break;
-
-          const candidateShareable = candidatePlacements.every(p => {
-            return !placementLocksPage(p);
-          });
-          // A locked page is a hard wall: merging content from beyond it would
-          // reorder printed pages (content after the wall pulled before it).
-          if (!candidateShareable) break;
-
-          const mergedMeasurement = measurePlacementsPage(
-            stack,
-            [...placements, ...candidatePlacements],
-            spreadPlan[i].spreadType,
-          );
-
-          if (mergedMeasurement.overflowHeight <= 2) {
-            // Merge: move all candidate placements into current page
-            placements.push(...candidatePlacements);
-            candidatePlacements.length = 0;
-            compactions++;
-          } else {
-            break;  // Won't fit, stop looking
-          }
+        if (mergedMeasurement.overflowHeight <= 2) {
+          // Merge: move all candidate placements into current page
+          placements.push(...candidatePlacements);
+          candidatePlacements.length = 0;
+          compactions++;
+          cursor = nextIdx;
+        } else {
+          break;  // Won't fit, stop looking
         }
       }
     }
