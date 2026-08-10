@@ -489,7 +489,7 @@
       "fragment-page",
       "interlude"
     ],
-    "browserPageCount": 44,
+    "browserPageCount": 40,
     "printedAtomOrder": [
       "cover",
       "rules-left",
@@ -600,7 +600,7 @@
       "fragment-page",
       "interlude"
     ],
-    "browserPageCount": 64,
+    "browserPageCount": 60,
     "printedAtomOrder": [
       "cover",
       "rules-left",
@@ -687,9 +687,6 @@
       "frag-11",
       "assembly",
       "ending-locked",
-      "post-padding-0",
-      "post-padding-1",
-      "post-padding-2",
       "back-cover"
     ]
   },

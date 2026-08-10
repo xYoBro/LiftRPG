@@ -2164,7 +2164,33 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 }
 
 /* Zone containers */
-.cipher-zone{}
+/* Cipher geometry tokens — structure only, no visual character.
+   These are the cipher's shrink affordances: the density variants at the
+   bottom of this file re-set them, and every cipher sub-element consumes
+   them instead of hardcoding a size. Writable surfaces (workspaces) have
+   floors — a box you cannot write a digit in is not a saving. */
+.cipher-zone{
+  --cipher-seq-size:6.7pt;
+  --cipher-seq-leading:1.42;
+  --cipher-seq-gap:3px;
+  --cipher-key-size:7.5pt;
+  --cipher-key-leading:1.5;
+  --cipher-key-gap:6px;
+  --cipher-ws-gap-top:8px;
+  --cipher-ws-gap-bottom:6px;
+  /* boxed-totals: cells prefer a square but are capped so a wide column
+     cannot turn a 2-column grid into a stack of 232px boxes. */
+  --cipher-box-max-h:44px;
+  --cipher-box-min-h:20px;
+  --cipher-box-gap:4px;
+  /* lined: pitch = row min-height + gap. Already near the pencil floor at
+     base, so its density range is deliberately narrow. */
+  --cipher-rule-h:10px;
+  --cipher-rule-gap:7px;
+  --cipher-blank-row-h:20px;
+  --cipher-cell-size:16px;
+  --cipher-cell-gap:3px;
+}
 .map-zone{
   display:flex;
   flex-direction:column;
@@ -2628,15 +2654,15 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 }
 .cipher-sequence{
   font-family:var(--mono);
-  font-size:6.7pt;
-  line-height:1.42;
+  font-size:var(--cipher-seq-size,6.7pt);
+  line-height:var(--cipher-seq-leading,1.42);
   color:var(--ink);
-  margin-bottom:3px;
+  margin-bottom:var(--cipher-seq-gap,3px);
   word-break:normal;
   overflow-wrap:break-word;
 }
 .cipher-key{
-  margin-bottom:6px;
+  margin-bottom:var(--cipher-key-gap,6px);
 }
 .cipher-key-table{
   display:flex;
@@ -2672,8 +2698,8 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 }
 .key-grid{
   font-family:var(--mono);
-  font-size:7.5pt;
-  line-height:1.5;
+  font-size:var(--cipher-key-size,7.5pt);
+  line-height:var(--cipher-key-leading,1.5);
   color:var(--ink);
   white-space:pre-wrap;
 }
@@ -2694,44 +2720,51 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 /* Plaintext workspace */
 .plaintext-grid{
   display:flex;
-  gap:3px;
+  gap:var(--cipher-cell-gap,3px);
   flex-wrap:wrap;
-  margin-top:8px;
-  margin-bottom:6px;
+  margin-top:var(--cipher-ws-gap-top,8px);
+  margin-bottom:var(--cipher-ws-gap-bottom,6px);
 }
 .cipher-lined-workspace,
 .cipher-blank-workspace,
 .cipher-boxed-workspace{
-  margin-top:8px;
-  margin-bottom:6px;
+  margin-top:var(--cipher-ws-gap-top,8px);
+  margin-bottom:var(--cipher-ws-gap-bottom,6px);
 }
 .cipher-lined-workspace{
   display:flex;
   flex-direction:column;
-  gap:7px;
+  gap:var(--cipher-rule-gap,7px);
 }
 .cipher-lined-row{
   border-bottom:1px solid color-mix(in srgb, var(--theme-field-rule,var(--rule)) 88%, transparent 12%);
-  min-height:10px;
+  min-height:var(--cipher-rule-h,10px);
 }
 .cipher-blank-workspace{
-  min-height:calc(var(--workspace-rows, 3) * 20px);
+  min-height:calc(var(--workspace-rows, 3) * var(--cipher-blank-row-h,20px));
   border:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-panel-border,var(--rule));
   background:linear-gradient(to bottom, transparent 0, transparent calc(100% - 1px), color-mix(in srgb, var(--theme-field-rule,var(--rule)) 65%, transparent 35%) calc(100% - 1px), color-mix(in srgb, var(--theme-field-rule,var(--rule)) 65%, transparent 35%) 100%);
 }
 .cipher-boxed-workspace{
   display:grid;
   grid-template-columns:repeat(var(--workspace-cols, 4), minmax(0, 1fr));
-  gap:4px;
+  gap:var(--cipher-box-gap,4px);
 }
 .cipher-boxed-cell{
+  /* Square is the preference, not the law. Without the cap a 2-column grid
+     at full page width renders 232px-tall boxes and the whole workspace
+     becomes taller than the page — and, being width-derived, it never
+     responded to density. The cap makes the box a form field: bounded,
+     density-shrinkable, still wide enough to write a total in. */
   aspect-ratio:1 / 1;
+  min-height:var(--cipher-box-min-h,20px);
+  max-height:var(--cipher-box-max-h,44px);
   border:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
   background:rgba(255,255,255,.45);
 }
 .plaintext-cell{
-  width:16px;
-  height:16px;
+  width:var(--cipher-cell-size,16px);
+  height:var(--cipher-cell-size,16px);
   border:1px solid var(--ink);
   border-radius:1px;
   background:white;
@@ -5413,18 +5446,51 @@ body[data-demo-view="true"] .reader-unlock{
    These atoms set data-density-variant and promise shrink in estimate();
    without these rules the density solver burned revision passes on
    unrealizable savings. Spacing/size only — theme owns character. */
-.cipher-zone[data-density-variant="compact"]{ }
-.cipher-zone[data-density-variant="dense"],
+/* The cipher's shrink is expressed as token resets, not per-element rules.
+   Earlier revisions targeted `.cipher-display` (a class the renderer never
+   emits) and set `height` on `.cipher-lined-row` (overridden by its own
+   min-height), so the promised shrink was unrealizable and a solo cipher
+   page measured identically at density 0.6, 0.85 and 1.0.
+   Writable floors: a boxed cell's height never drops below --cipher-box-min-h
+   (20px) and ruled pitch never below 15px — pencil surfaces stay pencil
+   surfaces. The tight caps trade box height, not writability. */
+.cipher-zone[data-density-variant="compact"]{
+  --cipher-seq-leading:1.34;
+  --cipher-box-max-h:40px;
+  --cipher-ws-gap-top:7px;
+}
+.cipher-zone[data-density-variant="dense"]{
+  --cipher-seq-size:6.3pt;
+  --cipher-seq-leading:1.3;
+  --cipher-seq-gap:2px;
+  --cipher-key-size:7pt;
+  --cipher-key-leading:1.34;
+  --cipher-key-gap:4px;
+  --cipher-ws-gap-top:6px;
+  --cipher-ws-gap-bottom:4px;
+  --cipher-box-max-h:34px;
+  --cipher-box-gap:3px;
+  --cipher-rule-gap:6px;
+  --cipher-blank-row-h:17px;
+  --cipher-cell-size:14px;
+}
 .cipher-zone[data-density-variant="tight"]{
-  font-size:0.95em;
+  --cipher-seq-size:5.9pt;
+  --cipher-seq-leading:1.24;
+  --cipher-seq-gap:2px;
+  --cipher-key-size:6.6pt;
+  --cipher-key-leading:1.26;
+  --cipher-key-gap:3px;
+  --cipher-ws-gap-top:5px;
+  --cipher-ws-gap-bottom:3px;
+  --cipher-box-max-h:26px;
+  --cipher-box-min-h:20px;
+  --cipher-box-gap:3px;
+  --cipher-rule-gap:5px;
+  --cipher-blank-row-h:15px;
+  --cipher-cell-size:13px;
+  --cipher-cell-gap:2px;
 }
-.cipher-zone[data-density-variant="dense"] .cipher-display,
-.cipher-zone[data-density-variant="tight"] .cipher-display{
-  font-size:5pt;
-  line-height:1.2;
-}
-.cipher-zone[data-density-variant="dense"] .cipher-lined-row{ height:9px; }
-.cipher-zone[data-density-variant="tight"] .cipher-lined-row{ height:8px; }
 .cipher-zone[data-density-variant="dense"] .cipher-key,
 .cipher-zone[data-density-variant="tight"] .cipher-key{
   margin-top:2px;
