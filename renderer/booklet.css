@@ -3273,6 +3273,24 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   flex:1;
   overflow-wrap: anywhere;
 }
+/* ── Oracle density ladder ──
+   SCOPE LAW: density-variant rules must never sit inside @media print.
+   Measurement runs on screen (measurement-harness.js parks the harness at
+   -200vw, screen media), so a print-only tier is invisible to the density
+   solver: every density measures identically, the promised shrink is
+   unrealizable, and print then renders denser (or looser) than what was
+   measured — measurement-equals-render violated toward the deliverable.
+   The `compact` tier below used to live in the print block at the bottom of
+   this file while `dense`/`tight` lived here; it was moved up to rejoin its
+   own ladder. Measured effect of the orphaned tier: oracle zones were
+   identical on screen at compact (base height) and 408px shorter in print
+   across the 24-zone corpus sample — a saving the solver could not see.
+   The compact tier's only realizable saving is the text size: its former
+   `.oracle-entries{gap:2px 8px}` declaration was byte-identical to the base
+   rule above, so it has been dropped rather than left as a plausible no-op. */
+.oracle-zone[data-density-variant="compact"] .oracle-text{
+  font-size:5pt;
+}
 .oracle-zone[data-density-variant="dense"] .oracle-entries{
   gap:1px 6px;
 }
@@ -5454,13 +5472,16 @@ body[data-demo-view="true"] .reader-unlock{
    without these rules the density solver burned revision passes on
    unrealizable savings. Spacing/size only — theme owns character.
 
-   SCOPE: the cipher block below is deliberately OUTSIDE @media print.
+   SCOPE LAW: every density-variant rule in this file is OUTSIDE @media print.
    Measurement runs on screen (measurement-harness.js parks the harness at
    -200vw, screen media), so a print-only ladder is invisible to the solver:
    every density measured identically and the promised shrink was
    unrealizable — the same defect class D71 fixed at the token level. The
-   map/fragment/oracle rules that follow are still print-scoped and carry
-   that defect; they are left alone here (out of scope). */
+   cipher ladder was un-scoped first; the map / fragment / oracle-compact
+   tiers followed (they carried the identical defect, and the fragment tier
+   carried a worse one — see its block below). The print block that remains
+   at the bottom of this file holds page-geometry and paper rules only: if a
+   rule keys off data-density-variant, it does not belong in there. */
 /* The cipher's shrink is expressed as token resets, not per-element rules.
    Earlier revisions targeted `.cipher-display` (a class the renderer never
    emits) and set `height` on `.cipher-lined-row` (overridden by its own
@@ -5516,7 +5537,12 @@ body[data-demo-view="true"] .reader-unlock{
 }
 .cipher-zone[data-density-variant="tight"] .cipher-family-note{ display:none; }
 
-@media print{
+/* ── Map density ladder ──
+   Was print-scoped. Measured effect of that scoping across the 24-zone corpus
+   sample: on screen every variant measured 333px (base) — zero shrink for the
+   solver to spend — while print came in 131px (dense) / 272px (tight) shorter.
+   The note is a gloss, not a writable surface, so shrinking then dropping it
+   is a legitimate density affordance; it is now the same on both media. */
 .map-zone[data-density-variant="dense"] .map-note,
 .map-zone[data-density-variant="tight"] .map-note{
   font-size:4.6pt;
@@ -5529,15 +5555,33 @@ body[data-demo-view="true"] .reader-unlock{
 }
 .map-zone[data-density-variant="tight"] .map-note{ display:none; }
 
+/* ── Fragment density ladder ──
+   Was print-scoped, and the scoping hid a second, worse defect: the tiers were
+   authored as `font-size:0.97em / 0.93em / 0.9em`, read as "97% of current".
+   `em` resolves against the PARENT's computed font-size, and no ancestor of
+   .fragment-doc-body sets one, so the parent chain sat at the 16px default and
+   the declaration meant 0.93 x 16px = 14.88px — against a base of 6.35pt
+   (8.47px). The density tiers did not shrink the body in print, they INFLATED
+   it ~1.76x. Being print-only, the solver never saw it: across the 8-fixture
+   corpus, natural-state overflow was 5px on screen and 595px in print, all of
+   it fragment-page content silently clipped by the frame (38-243px on five
+   fixtures). The multipliers are preserved as the author meant them, now
+   anchored to the base size in the same unit (6.35pt x .97/.93/.90).
+   FOLLOW-UP: .fragment-doc-body's size is re-set by several context rules
+   (layout-variant tight/dense, classified-packet). Absolute pt here stomps the
+   two that share this specificity, so the dense layout-variant lands at 5.91pt
+   where it used to be 5.85pt (+0.08px, noise). The clean fix is a
+   --fragment-body-* token ladder consumed by base + contexts, exactly as the
+   cipher got in D71; that is a separate pass. */
 .fragment-block[data-density-variant="compact"] .fragment-doc-body{
-  font-size:0.97em;
+  font-size:6.16pt;
 }
 .fragment-block[data-density-variant="dense"] .fragment-doc-body{
-  font-size:0.93em;
+  font-size:5.91pt;
   line-height:1.32;
 }
 .fragment-block[data-density-variant="tight"] .fragment-doc-body{
-  font-size:0.9em;
+  font-size:5.72pt;
   line-height:1.26;
 }
 .fragment-block[data-density-variant="dense"] .fragment-doc-header,
@@ -5545,14 +5589,10 @@ body[data-demo-view="true"] .reader-unlock{
   margin-bottom:3px;
 }
 
-.oracle-zone[data-density-variant="compact"] .oracle-entries{
-  gap:2px 8px;
-}
-.oracle-zone[data-density-variant="compact"] .oracle-text{
-  font-size:5pt;
-}
-
-.blank-page{
+/* Print-only paper rules. Nothing keyed off data-density-variant may live in
+   here — see the SCOPE LAW above. */
+@media print{
+  .blank-page{
     background:white;
   }
 }

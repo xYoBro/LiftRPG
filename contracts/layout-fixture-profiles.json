@@ -866,7 +866,7 @@
       "boss",
       "fragment-page"
     ],
-    "browserPageCount": 44,
+    "browserPageCount": 40,
     "printedAtomOrder": [
       "cover",
       "rules-left",
@@ -951,9 +951,6 @@
       "frag-10",
       "assembly",
       "ending-locked",
-      "post-padding-0",
-      "post-padding-1",
-      "post-padding-2",
       "back-cover"
     ]
   }
