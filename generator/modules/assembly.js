@@ -3,7 +3,8 @@
 // continuity ledger, fragment batching, and derivation helpers.
 
 import { DOCUMENT_TYPE_ALIASES, SUPPORTED_THEME_ARCHETYPES, THEME_ARCHETYPE_ALIASES,
-  SCHEMA_VERSION
+  SCHEMA_VERSION,
+  MARK_STRIP, MARK_STRIP_TARGET_KINDS, RECKONING_SINK_KINDS, RECKONING_THRESHOLD_RATIO
 } from './constants.js';
 import {
   isValidWorkspaceStyle,
@@ -1383,6 +1384,400 @@ export function normalizeInterludes(booklet, diag) {
   });
 }
 
+// ── Mark economy derivation (Session 1 / D89) ───────────────────────────────
+// DERIVATION-AS-REPAIR. The Mark surface (session.markStrip) and the Resolve
+// surface (week.reckoning) are standard on generated booklets, but a model
+// cannot be trusted to emit 3-5 legal tick labels on every session of every
+// week. So this pass derives the STRUCTURE — count, ids, kinds, and a working
+// label for anything missing or illegal — from the booklet's OWN FINAL DATA,
+// and leaves every legal authored label untouched. "Targets derived in
+// assembly" holds for structure and guarantees; diegesis stays authored.
+//
+// It runs on all three assemble paths, AFTER the normalizedWorkout exercise
+// override (the effort/record trees read the exercises that will actually
+// print) and BEFORE enforceBookletDerivedFields (which owns the password
+// spine this pass may never touch).
+//
+// What it will never do: touch componentInputs, decodingKey, weeklyComponent
+// values, or meta.passwordLength. The economy may not own the six-week payoff
+// (spine-determinism law); the boss threshold is a separate, derived, and
+// always-reachable number.
+
+var MARK_STRIP_DEFAULT_CURRENCY_ID = 'reserve';
+var MARK_STRIP_DEFAULT_CURRENCY_LABEL = 'Reserve';
+var RECKONING_DEFAULT_SINK_KIND = 'notes';
+// The floor sink: every session card carries a notes rail, so 'notes' is the
+// one sink that can never name a surface the booklet does not print.
+var RECKONING_DEFAULT_SINK_INSTRUCTION = 'Bank the marks in the notes rail.';
+// meta.economy.currencyId — mirror of the schema pattern. Machine handle for
+// later cross-references (Session 3 `unlocked-by`), never printed.
+var CURRENCY_ID_PATTERN = /^[a-z][a-z0-9-]{1,31}$/;
+
+/**
+ * A printed tick label is legal when it is non-empty, at most
+ * MARK_STRIP.maxLabelWords words, and carries NO DIGITS. The digit ban is the
+ * ten-second law in enforceable form: a number on the strip invites arithmetic
+ * between sets, which is exactly the interaction the Mark surface exists to
+ * avoid. Illegal labels are dropped and replaced, never silently printed.
+ */
+function isLegalMarkLabel(label) {
+  var text = String(label == null ? '' : label).trim();
+  if (!text) return false;
+  if (/\d/.test(text)) return false;
+  return text.split(/\s+/).length <= MARK_STRIP.maxLabelWords;
+}
+
+function cleanMarkLabel(value) {
+  return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+}
+
+// Kind classification for AUTHORED labels only (derived defaults carry their
+// kind directly). MOST-SPECIFIC FAMILY FIRST, first match wins — 'record' verbs
+// name one concrete act, 'effort' words name a quality of the work, and
+// 'completion' words are the broadest, so testing completion first would
+// swallow "Every log line written". Anything unread is 'custom', which is the
+// honest answer rather than a guess. Kinds are machine-only provenance: they
+// decide top-up novelty and nothing else, and are never printed.
+var MARK_KIND_PATTERNS = [
+  ['record', /\b(log|logs|logged|write|writes|written|wrote|note|notes|noted|record|records|recorded|entry|entries|read|signed|initial|initialled)\b/i],
+  ['effort', /\b(top|heavy|heavier|hard|harder|load|loaded|weight|weighted|range|held|hold|holds|push|pushed|max|heaviest|slow|slower|tempo|depth|deeper)\b/i],
+  ['completion', /\b(all|every|each|complete|completed|finish|finished|close|closed|done|whole|through|clean)\b/i]
+];
+
+function classifyMarkLabel(label) {
+  var text = String(label || '');
+  for (var i = 0; i < MARK_KIND_PATTERNS.length; i++) {
+    if (MARK_KIND_PATTERNS[i][1].test(text)) return MARK_KIND_PATTERNS[i][0];
+  }
+  return 'custom';
+}
+
+// A rep RANGE ("8-12", "6 to 8") is the tell that the session has room at the
+// top of the prescription; a fixed rep count has none.
+function sessionHasRepRange(exercises) {
+  return (exercises || []).some(function (ex) {
+    return /\d\s*(?:[-–—]|to)\s*\d/i.test(String((ex && ex.repsPerSet) || ''));
+  });
+}
+
+// weightField is variously true, "170lb", "0lb", "" or absent across the
+// corpus. Present-and-meaningful is the question, not truthiness.
+function sessionHasWeightField(exercises) {
+  return (exercises || []).some(function (ex) {
+    var value = ex && ex.weightField;
+    if (value === true) return true;
+    if (value === false || value === undefined || value === null) return false;
+    var text = String(value).trim().toLowerCase();
+    return !!text && text !== 'false' && text !== 'none' && text !== 'n/a' && text !== '-';
+  });
+}
+
+/**
+ * The derived-default ladder. Three targets, in this fixed order, each anchored
+ * to a surface the session CERTAINLY PRINTS — a default that promises an
+ * unprinted surface is the same unpaid promise the sink law forbids.
+ *
+ *   completion — always "Every set closed". Explicitly the ROLL-UP of the
+ *                rep-box row: the boxes record the work, the strip scores it.
+ *                One philosophy, not two competing logs.
+ *   effort     — rep range present        -> "Top of the range held"
+ *                else any weightField      -> "Load added to the bar"
+ *                else                      -> "Every movement attempted"
+ *   record     — showNotes                 -> "The log line written"
+ *                else storyPrompt present  -> "The prompt line read"
+ *                else                      -> "The session card signed"
+ */
+function defaultCompletionTarget() {
+  return { label: 'Every set closed', kind: 'completion' };
+}
+
+function defaultEffortTarget(session) {
+  var exercises = (session && session.exercises) || [];
+  if (sessionHasRepRange(exercises)) return { label: 'Top of the range held', kind: 'effort' };
+  if (sessionHasWeightField(exercises)) return { label: 'Load added to the bar', kind: 'effort' };
+  return { label: 'Every movement attempted', kind: 'effort' };
+}
+
+function defaultRecordTarget(session) {
+  if (session && session.showNotes) return { label: 'The log line written', kind: 'record' };
+  if (session && String(session.storyPrompt || '').trim()) {
+    return { label: 'The prompt line read', kind: 'record' };
+  }
+  return { label: 'The session card signed', kind: 'record' };
+}
+
+function coerceCurrencyId(value) {
+  var token = toSlugToken(value);
+  return CURRENCY_ID_PATTERN.test(token) ? token : '';
+}
+
+/**
+ * resolveBossWeekIndex(weeks) -> index | -1
+ *
+ * SINGLE IMPLEMENTATION shared with generator/modules/validation.js, so the
+ * week that assembly writes a threshold onto is always the week validation
+ * demands one from. Mirrors enforceBookletDerivedFields' backward scan, then
+ * falls back to the final week: a booklet with no isBossWeek is already a hard
+ * validation error, and a second error about a missing threshold on a week
+ * nobody can name would only bury it.
+ */
+export function resolveBossWeekIndex(weeks) {
+  var list = weeks || [];
+  for (var i = list.length - 1; i >= 0; i--) {
+    if (list[i] && list[i].isBossWeek) return i;
+  }
+  return list.length ? list.length - 1 : -1;
+}
+
+function normalizeSessionMarkStrip(session, weekNumber, sessionNumber, diag) {
+  var path = 'weeks[' + weekNumber + '].sessions[' + sessionNumber + '].markStrip';
+  var where = 'Week ' + weekNumber + ' session ' + sessionNumber;
+  var strip = (session.markStrip && typeof session.markStrip === 'object') ? session.markStrip : null;
+  var authored = (strip && Array.isArray(strip.targets)) ? strip.targets : [];
+
+  var kept = [];
+  var seenLabels = {};
+  var haveKinds = {};
+  var dropped = [];
+
+  authored.forEach(function (entry) {
+    var label = cleanMarkLabel(typeof entry === 'string' ? entry : (entry && entry.label));
+    if (!isLegalMarkLabel(label)) { dropped.push(label || '(blank)'); return; }
+    var key = label.toLowerCase();
+    if (seenLabels[key]) { dropped.push(label + ' (duplicate)'); return; }
+    var authoredKind = entry && entry.kind;
+    var kind = MARK_STRIP_TARGET_KINDS.indexOf(authoredKind) !== -1
+      ? authoredKind
+      : classifyMarkLabel(label);
+    seenLabels[key] = true;
+    haveKinds[kind] = true;
+    kept.push({ label: label, kind: kind });
+  });
+
+  if (dropped.length && diag) {
+    diag.push(createDiagnostic('mark-strip-label-rejected', 'warning', 'normalize',
+      where + ': dropped ' + dropped.length + ' markStrip target(s) — a label must be non-empty, '
+      + 'at most ' + MARK_STRIP.maxLabelWords + ' words, digit-free, and unique within the strip. '
+      + 'Rejected: ' + dropped.join(' | '),
+      { path: path + '.targets', repairable: true, correction: 'replaced by derived default(s)' }));
+  }
+
+  // Top-up. Pass 1 prefers a kind the strip does not already carry (so a strip
+  // of two authored effort lines gains a completion, not a third effort);
+  // pass 2 ignores kind novelty and only avoids duplicate labels, so the floor
+  // of MARK_STRIP.minTargets is reached even when kinds are saturated.
+  var ladder = [defaultCompletionTarget(), defaultEffortTarget(session), defaultRecordTarget(session)];
+  var added = [];
+  function tryAppend(candidate, requireNovelKind) {
+    if (kept.length >= MARK_STRIP.minTargets) return;
+    if (requireNovelKind && haveKinds[candidate.kind]) return;
+    var key = candidate.label.toLowerCase();
+    if (seenLabels[key]) return;
+    seenLabels[key] = true;
+    haveKinds[candidate.kind] = true;
+    kept.push(candidate);
+    added.push(candidate.label);
+  }
+  ladder.forEach(function (candidate) { tryAppend(candidate, true); });
+  ladder.forEach(function (candidate) { tryAppend(candidate, false); });
+
+  if (added.length && diag) {
+    diag.push(createDiagnostic('mark-strip-targets-derived', 'warning', 'synthesize',
+      where + ': markStrip had ' + (kept.length - added.length) + ' legal target(s); derived '
+      + added.length + ' to reach the ' + MARK_STRIP.minTargets + '-target floor — '
+      + added.join(' | ') + '. Derived labels are generic by construction; the world should author its own.',
+      { path: path + '.targets', repairable: true, correction: 'added ' + added.join(', ') }));
+  }
+
+  if (kept.length > MARK_STRIP.maxTargets) {
+    var overflow = kept.slice(MARK_STRIP.maxTargets).map(function (t) { return t.label; });
+    kept = kept.slice(0, MARK_STRIP.maxTargets);
+    if (diag) {
+      diag.push(createDiagnostic('mark-strip-truncated', 'warning', 'normalize',
+        where + ': markStrip carried more than ' + MARK_STRIP.maxTargets
+        + ' targets — a strip past that stops being tickable between sets. Dropped: ' + overflow.join(' | '),
+        { path: path + '.targets', repairable: true, correction: 'truncated to ' + MARK_STRIP.maxTargets }));
+    }
+  }
+
+  session.markStrip = {
+    targets: kept.map(function (target, index) {
+      return {
+        id: 'ms-w' + weekNumber + '-s' + sessionNumber + '-' + (index + 1),
+        label: target.label,
+        kind: target.kind
+      };
+    })
+  };
+  return session.markStrip.targets.length;
+}
+
+function ensureWeekReckoning(week, weekNumber, currencyLabel, diag) {
+  var path = 'weeks[' + weekNumber + '].reckoning';
+  var where = 'Week ' + weekNumber;
+  var authored = (week.reckoning && typeof week.reckoning === 'object') ? week.reckoning : {};
+
+  var conversion = String(authored.conversion || '').trim();
+  if (!conversion) {
+    conversion = 'Each mark banks one ' + currencyLabel + '.';
+    if (diag) {
+      diag.push(createDiagnostic('reckoning-conversion-derived', 'warning', 'synthesize',
+        where + ': no reckoning conversion authored — defaulted to "' + conversion
+        + '". The conversion rule teaches on the panel where it fires; a generic one is a missed beat.',
+        { path: path + '.conversion', repairable: true, correction: conversion }));
+    }
+  }
+
+  var authoredSink = (authored.sink && typeof authored.sink === 'object') ? authored.sink : null;
+  var kind = (authoredSink && RECKONING_SINK_KINDS.indexOf(authoredSink.kind) !== -1)
+    ? authoredSink.kind : '';
+  var instruction = authoredSink ? String(authoredSink.instruction || '').trim() : '';
+  if (!kind || !instruction) {
+    var reason = !authoredSink ? 'no sink authored'
+      : (!kind ? 'sink.kind "' + String(authoredSink.kind) + '" is not one of ' + RECKONING_SINK_KINDS.join(', ')
+        : 'sink.instruction was empty');
+    kind = kind || RECKONING_DEFAULT_SINK_KIND;
+    instruction = instruction || RECKONING_DEFAULT_SINK_INSTRUCTION;
+    if (diag) {
+      diag.push(createDiagnostic('reckoning-sink-derived', 'warning', 'synthesize',
+        where + ': ' + reason + ' — fell back to the notes rail, the one sink every session card prints.',
+        { path: path + '.sink', repairable: true, correction: kind + ': ' + instruction }));
+    }
+  }
+
+  var sink = { kind: kind, instruction: instruction };
+  var ref = authoredSink && String(authoredSink.ref || '').trim();
+  if (ref) sink.ref = ref;
+
+  var next = { conversion: conversion, sink: sink };
+  // Authored thresholds survive here; the boss week's is overwritten below.
+  if (Number.isInteger(authored.threshold) && authored.threshold >= 1) {
+    next.threshold = authored.threshold;
+  }
+  week.reckoning = next;
+}
+
+/**
+ * deriveMarkStripEconomy(booklet, diag) -> summary
+ *
+ * Establishes the whole mark economy on a freshly assembled booklet:
+ * meta.economy, a normalized markStrip on every session, a reckoning on every
+ * week, and the derived boss threshold. Idempotent — running it twice produces
+ * the same document (second run finds every label legal and every id already
+ * in canonical form).
+ *
+ * NO-OP GUARD: a document with no sessions AND no economy signal at all is left
+ * exactly as it was. That is the safety valve for a caller assembling something
+ * that is not a campaign; every real generated booklet has sessions, so the
+ * Mark surface is standard.
+ *
+ * @returns {{ established, currencyId, currencyLabel, totalAttainableTicks,
+ *             bossWeekIndex, threshold }}
+ */
+export function deriveMarkStripEconomy(booklet, diag) {
+  var weeks = (booklet && booklet.weeks) || [];
+  var meta = (booklet && booklet.meta) || {};
+  var sessionCount = 0;
+  var hasStripSignal = false;
+  var hasReckoningSignal = false;
+
+  weeks.forEach(function (week) {
+    (((week || {}).sessions) || []).forEach(function (session) {
+      sessionCount++;
+      if (session && session.markStrip) hasStripSignal = true;
+    });
+    if (week && week.reckoning) hasReckoningSignal = true;
+  });
+
+  var hasEconomySignal = !!(meta.economy || hasStripSignal || hasReckoningSignal);
+  if (!sessionCount && !hasEconomySignal) {
+    return {
+      established: false, currencyId: '', currencyLabel: '',
+      totalAttainableTicks: 0, bossWeekIndex: -1, threshold: 0
+    };
+  }
+
+  booklet.meta = meta;
+
+  // ── The declaration ──────────────────────────────────────────────────────
+  var authoredEconomy = (meta.economy && typeof meta.economy === 'object') ? meta.economy : null;
+  var currencyLabel = firstNonEmpty(
+    authoredEconomy && authoredEconomy.currencyLabel,
+    MARK_STRIP_DEFAULT_CURRENCY_LABEL
+  );
+  var currencyId = coerceCurrencyId(authoredEconomy && authoredEconomy.currencyId)
+    || coerceCurrencyId(currencyLabel)
+    || MARK_STRIP_DEFAULT_CURRENCY_ID;
+
+  if (!authoredEconomy) {
+    if (diag) {
+      diag.push(createDiagnostic('mark-economy-synthesized', 'warning', 'synthesize',
+        'meta.economy absent — synthesized currency "' + currencyLabel + '" (id "' + currencyId
+        + '"). This is the safety floor, not a design: the world should name what a mark banks into.',
+        { path: 'meta.economy', repairable: true, correction: currencyId + ' / ' + currencyLabel }));
+    }
+  } else if (String(authoredEconomy.currencyId || '') !== currencyId) {
+    if (diag) {
+      diag.push(createDiagnostic('mark-economy-currency-id-normalized', 'warning', 'normalize',
+        'meta.economy.currencyId "' + String(authoredEconomy.currencyId || '(absent)')
+        + '" is not a machine handle — normalized to "' + currencyId + '". The printed label is untouched.',
+        { path: 'meta.economy.currencyId', repairable: true,
+          correction: String(authoredEconomy.currencyId || '(absent)') + ' → ' + currencyId }));
+    }
+  }
+  meta.economy = { currencyId: currencyId, currencyLabel: currencyLabel };
+
+  // ── The Mark surface, per session; the Resolve surface, per week ─────────
+  var totalAttainableTicks = 0;
+  weeks.forEach(function (week, wi) {
+    if (!week) return;
+    var weekNumber = week.weekNumber || (wi + 1);
+    (week.sessions || []).forEach(function (session, si) {
+      if (!session) return;
+      totalAttainableTicks += normalizeSessionMarkStrip(
+        session, weekNumber, session.sessionNumber || (si + 1), diag
+      );
+    });
+    ensureWeekReckoning(week, weekNumber, currencyLabel, diag);
+  });
+
+  // ── The derived boss threshold ───────────────────────────────────────────
+  // Cumulative across the whole campaign — the wallet does not reset weekly.
+  // Always overwritten, exactly like componentInputs: a threshold the model
+  // invented is an unreachability risk, and this one is reachable by
+  // construction. Never touches the password chain.
+  var bossWeekIndex = resolveBossWeekIndex(weeks);
+  var threshold = 0;
+  if (bossWeekIndex >= 0 && totalAttainableTicks > 0 && weeks[bossWeekIndex].reckoning) {
+    threshold = Math.max(1, Math.round(RECKONING_THRESHOLD_RATIO * totalAttainableTicks));
+    var bossReckoning = weeks[bossWeekIndex].reckoning;
+    if (bossReckoning.threshold !== threshold) {
+      if (diag) {
+        diag.push(createDiagnostic('reckoning-threshold-derived', 'warning', 'synthesize',
+          'Week ' + (weeks[bossWeekIndex].weekNumber || (bossWeekIndex + 1))
+          + ' reckoning.threshold set to ' + threshold + ' — '
+          + RECKONING_THRESHOLD_RATIO + ' x ' + totalAttainableTicks
+          + ' attainable ticks across the campaign'
+          + (bossReckoning.threshold === undefined ? ' (none authored)'
+            : ' (model had ' + bossReckoning.threshold + ')'),
+          { path: 'weeks[' + (bossWeekIndex + 1) + '].reckoning.threshold', repairable: true,
+            correction: String(bossReckoning.threshold === undefined ? '(absent)' : bossReckoning.threshold)
+              + ' → ' + threshold }));
+      }
+      bossReckoning.threshold = threshold;
+    }
+  }
+
+  return {
+    established: true,
+    currencyId: currencyId,
+    currencyLabel: currencyLabel,
+    totalAttainableTicks: totalAttainableTicks,
+    bossWeekIndex: bossWeekIndex,
+    threshold: threshold
+  };
+}
+
 // ── Booklet assemblers ──────────────────────────────────────────────────────
 // Merges partial JSON chunks from the 10-stage pipeline into a complete booklet.
 
@@ -1423,6 +1818,10 @@ export function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, ending
 
   // Normalize overflow documents (auto-assign missing IDs, dedup collisions)
   normalizeOverflowDocuments(booklet, diag);
+
+  // Establish the mark economy (markStrip + reckoning + derived boss threshold)
+  // before the password spine is enforced — the two never touch.
+  deriveMarkStripEconomy(booklet, diag);
 
   // Enforce deterministic derived fields (meta counts, componentInputs, password)
   var result = enforceBookletDerivedFields(booklet, diag);
@@ -1523,6 +1922,11 @@ export function assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutp
 
   // Normalize overflow documents (auto-assign missing IDs, dedup collisions)
   normalizeOverflowDocuments(booklet, diag);
+
+  // Establish the mark economy. MUST run after the normalizedWorkout exercise
+  // override above: the effort and record trees read the exercises that will
+  // actually print, not the model's placeholder ones.
+  deriveMarkStripEconomy(booklet, diag);
 
   // Enforce deterministic derived fields (meta counts, componentInputs, password)
   var result = enforceBookletDerivedFields(booklet, diag);
@@ -2223,6 +2627,12 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
     endings: flattenSkeletonEndings(endingsOutputs || [])
   };
 
+  // booklet.meta above is an EXPLICIT field list, so any meta key not named
+  // there is dropped. Carry an authored economy declaration across CONDITIONALLY
+  // — assigning undefined would leave an own key that the closed meta schema
+  // rejects. deriveMarkStripEconomy synthesizes one below when none was authored.
+  if (meta.economy) booklet.meta.economy = meta.economy;
+
   // -- Weeks: merge skeleton structural fields + flesh content --
   for (var i = 0; i < weekOutputs.length; i++) {
     var week = weekOutputs[i];
@@ -2289,6 +2699,11 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
     totalSessions += (booklet.weeks[ti].sessions || []).length;
   }
   booklet.meta.totalSessions = totalSessions;
+
+  // -- Mark economy: markStrip per session, reckoning per week, boss threshold --
+  // After the exercise overlay above (the effort/record trees read the final
+  // exercises) and before the password spine below (which it never touches).
+  deriveMarkStripEconomy(booklet, diag);
 
   // -- Enforce derived fields (boss componentInputs, password, theme normalization) --
   var enforcement = enforceBookletDerivedFields(booklet, diag);

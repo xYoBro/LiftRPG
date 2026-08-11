@@ -56,6 +56,38 @@ function renderExerciseTable(cardModel) {
   return exercises;
 }
 
+/**
+ * The Mark surface — one row of tick targets, printed between the exercise
+ * table and the notes box.
+ *
+ * NULL-GUARD (the renderBinaryChoice pattern, exactly): a null model appends
+ * nothing, so a session without a markStrip builds byte-identical DOM.
+ *
+ * The row NEVER wraps. Targets divide the card's width; they do not stack.
+ * That is what makes the strip's height independent of how many targets it
+ * carries, which is the property session-card-metrics.js STRIP_LADDER models —
+ * see the CROSS-FILE CONTRACT note there before changing `flex-wrap` or the
+ * label's `white-space` in booklet.css.
+ *
+ * Labels go in via make()'s textContent, never innerHTML, so LLM-authored text
+ * cannot carry markup into the page.
+ */
+function renderMarkStrip(markStripModel) {
+  if (!markStripModel) return null;
+
+  const strip = make('div', 'mark-strip');
+  strip.setAttribute('data-target-count', String(markStripModel.targets.length));
+
+  markStripModel.targets.forEach((target) => {
+    const item = make('div', 'mark-target');
+    item.appendChild(make('div', 'mark-box'));
+    item.appendChild(make('div', 'mark-label', target.label));
+    strip.appendChild(item);
+  });
+
+  return strip;
+}
+
 function renderBinaryChoice(binaryChoiceModel) {
   if (!binaryChoiceModel) return null;
 
@@ -98,6 +130,11 @@ export function renderWorkoutCard(cardModel) {
   const body = make('div', 'session-body');
   if (cardModel.exerciseRows.length) {
     body.appendChild(renderExerciseTable(cardModel));
+  }
+
+  const markStrip = renderMarkStrip(cardModel.markStrip);
+  if (markStrip) {
+    body.appendChild(markStrip);
   }
 
   const binaryChoice = renderBinaryChoice(cardModel.binaryChoice);

@@ -163,6 +163,7 @@
     var arcs = mergeUnique(primary.arcMoves, secondary && secondary.arcMoves).slice(0, 4);
     var puzzles = mergeUnique(primary.puzzleFamilies, secondary && secondary.puzzleFamilies).slice(0, 5);
     var clocks = mergeUnique(primary.pressureClocks, secondary && secondary.pressureClocks).slice(0, 4);
+    var currencySeeds = mergeUnique(primary.currencySeeds, secondary && secondary.currencySeeds).slice(0, 4);
     var scarcity = mergeUnique(primary.scarcitySurfaces, secondary && secondary.scarcitySurfaces).slice(0, 4);
     var payloads = mergeUnique(primary.interludePayloads, secondary && secondary.interludePayloads).slice(0, 4);
     var documents = mergeUnique(primary.documentTypes, secondary && secondary.documentTypes).slice(0, 6);
@@ -183,6 +184,7 @@
       '- Exploration surfaces to prefer: ' + mapTypes.join('; '),
       '- Oracle tempo to prefer: ' + oracleModes.join('; '),
       '- Pressure systems to favor: ' + clocks.join('; '),
+      '- Currency-name families to draw from or beat (a label portable between briefs is the wrong label): ' + currencySeeds.join('; '),
       '- Scarcity surfaces to favor: ' + scarcity.join('; '),
       '- Puzzle families to recombine: ' + puzzles.join('; '),
       '- Interlude payloads to favor: ' + payloads.join('; '),

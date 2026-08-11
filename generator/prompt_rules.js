@@ -32,6 +32,10 @@
     '  * `licensedMoves` (array, 0-1 entries; zero is normal): { move, budget, rationale }. See the Voice Discipline section for the closed enum and the license rules.',
     '- `artifactIdentity` (object, required for shell-aware rendering): { artifactClass, artifactBlend?, authorialMode?, boardStateMode, documentEcology?, materialCulture?, openingMode?, rulesDeliveryMode?, revealShape?, unlockLogic?, shellFamily, attachmentStrategy }',
     '- `weeklyComponentType` (string): One fiction-native non-semantic measurement family used across all non-boss weeks. It should feel like an operational residue or in-world key: a number, code, reading, tag, case ID, route marker, calibration value, or designation, never a plaintext letter.',
+    '- `economy` (object): { currencyId, currencyLabel }. The single thing the workout pays out. Declared once here; every session markStrip earns it and every week reckoning spends it. Nothing else in the booklet is a tick currency.',
+    '  * `currencyId` (string): the machine slug — lowercase, hyphen-separated, stable for the life of the booklet. Never printed on any page. Tooling cross-references it.',
+    '  * `currencyLabel` (string): the printed name, in the world\'s own accounting language. It should be a noun this trade, house, office, watch, or congregation already counts — an operational residue with a ledger behind it, the same family of thing as `weeklyComponentType` but spendable. Never a game term bolted onto the fiction.',
+    '  * ANTI-SAMENESS: the label must derive from THIS brief. A currency that could be lifted unchanged into any other booklet — Supply, Scrip, Credits, Points, Resolve, Favor — is a differentiation defect, not a safe default. If two booklets built from different briefs could plausibly share the name, it is the wrong name for both.',
     '- `structuralShape` (object): { resolution, temporalOrder, narratorReliability, promptFragmentRelationship, shapeRationale }.',
     '  * Resolution: "closed" (mystery solved), "open" (ambiguity persists), "shifted" (question changed), "costly" (resolved at a price), "full" (complete resolution), "partial" (some threads resolved), "ambiguous" (deliberately unclear).',
     '  * TemporalOrder: "chronological", "in-medias-res" (starts at crisis, flashes back), "rashomon" (contradictory overlapping timelines), "fragmented" (acausal memory), "linear" (strict forward), "reverse" (end-to-beginning), "parallel" (simultaneous threads).',
@@ -83,7 +87,9 @@
     '- `epigraph` (object): { text, attribution }',
     '- `isBossWeek` (boolean): True for the final week only',
     '- `weeklyComponent` (object): { type, value, extractionInstruction }. Type must match meta.weeklyComponentType on non-boss weeks. Value is non-semantic raw data, not a letter, and should feel like a collectable operational clue rather than arbitrary filler. Boss week value is null.',
-    '- `sessions` (array, 3-6 items): Each session has { sessionNumber, label, exercises: [{ name, sets, repsPerSet, weightField?, notes? }], storyPrompt, fragmentRef?, binaryChoice?: { choiceLabel, promptA, promptB } }',
+    '- `sessions` (array, 3-6 items): Each session has { sessionNumber, label, exercises: [{ name, sets, repsPerSet, weightField?, notes? }], storyPrompt, fragmentRef?, markStrip?, binaryChoice?: { choiceLabel, promptA, promptB } }',
+    '- `sessions[].markStrip` (object): the mid-workout tick strip. See the session.markStrip section below for the authored fields.',
+    '- `reckoning` (object): the week-close conversion panel. See the week.reckoning section below.',
     '- `fieldOps` (object, required on non-boss weeks): contains mapState, cipher, oracleTable, and optional companionComponents',
     '- `bossEncounter` (object, required on boss week): replaces fieldOps',
     '- `overflow` (boolean): MUST be true when sessions.length > 3. This is a hard contract — the renderer uses it to build a Part 2 spread. Omitting it when sessions exceed 3 breaks page layout.',
@@ -194,6 +200,27 @@
     '- `footprint` (string, optional): "half-page" (default) or "full-page"',
     '- `subtitle` (string, optional): secondary label',
     '- `reminder` (string, optional): short reminder note shown at bottom',
+    '',
+    '### session.markStrip',
+    'The tick strip printed inside every session card, under the exercise table. It is the only thing the player touches mid-workout besides the rep boxes.',
+    '- Shape: { targets: [{ label }] } — 3 to 5 targets, in the order they will be ticked.',
+    '- `label` (string, required): the printed target, in this world\'s own language. HARD LIMITS: 5 words maximum, and NO DIGITS of any kind. A label with a number in it is asking the player to count, and counting is not a tick.',
+    '- The strip prints on ONE line, so labels share it: at 3 targets a label may run 4-5 words; at 4 or 5 targets keep every label to 2-3 words or the print truncates them mid-word.',
+    '- A target must be satisfiable by ONE pencil mark, decidable in ten seconds, with the booklet lying open at this page. If answering it needs arithmetic, a lookup, a choice, or a page turn, it is not a strip target.',
+    '- Exactly ONE target per strip is the completion roll-up: the whole prescribed session done, ticked once. It is the rep-box row scored, never re-recorded. Do not ask the player to restate any number the exercise table already holds.',
+    '- The remaining targets name what this session asked for beyond finishing it — a standard held, a record kept, a shortcut refused, a duty discharged — always phrased as this artifact would phrase it, never in the language of exercise science.',
+    '- Ticked targets pay out `meta.economy.currencyLabel` and nothing else.',
+    '- `id` and `kind` on each target are TOOLING-OWNED. Do not author them; tooling assigns and repairs them from the session\'s own exercises. Write labels only.',
+    '',
+    '### week.reckoning',
+    'One panel per week, printed on the field-ops spread facing the session cards. The player totals the week\'s ticks here, converts them, and spends them. This is a sit-down surface, not a mid-workout one.',
+    '- Shape: { conversion, sink: { kind, ref, instruction } }',
+    '- `conversion` (string, required): ONE sentence, in the book\'s voice, stating what the week\'s ticks become. This sentence IS the rule and this panel is its only home — do not restate it on the rules spread.',
+    '- `sink` (object, required): where the currency goes. It must be a surface THIS booklet actually prints, and it must already be printed by the week that spends into it.',
+    '- `sink.kind` is a CLOSED enum. Use exactly one of: "map" | "companion" | "clock" | "oracle" | "notes". Any other string is not a sink — the panel prints a spend with nowhere to put it, and the currency leaks out of the booklet.',
+    '- `sink.ref` (string, required): names the actual target inside this booklet — a map node or route label, a companionComponent label, a clockName, an oracle band, or the notes rail. A ref naming something the booklet never prints is a broken promise, exactly like a manifestPointer aimed at a missing fragment.',
+    '- `sink.instruction` (string, required): one line, world-voiced, saying what the spend DOES to that surface — a mark made, a route opened, a slot filled, a band shifted. Never a menu of options, never a formula.',
+    '- `threshold` on the boss week is TOOLING-OWNED and derived from what the weeks can actually pay out. Never author it, never state a number in prose, never imply what the bar is.',
     '',
     '### week.interlude',
     '- Required if present: `title`, `reason`, `body`',
@@ -313,7 +340,9 @@
     '- `epigraph` (object): { text, attribution }',
     '- `isBossWeek` (boolean)',
     '- `weeklyComponent` (object): { type, value, extractionInstruction }',
-    '- `sessions` (array, 3-6 items): { sessionNumber, label, exercises: [{ name, sets, repsPerSet, weightField?, notes? }], storyPrompt, fragmentRef?, binaryChoice?: { choiceLabel, promptA, promptB } }',
+    '- `sessions` (array, 3-6 items): { sessionNumber, label, exercises: [{ name, sets, repsPerSet, weightField?, notes? }], storyPrompt, fragmentRef?, markStrip, binaryChoice?: { choiceLabel, promptA, promptB } }',
+    '- `sessions[].markStrip` (object): { targets: [{ label }] } — 3-5 tick targets. See the session.markStrip section for the authoring law.',
+    '- `reckoning` (object): { conversion, sink: { kind, ref, instruction } }. See the week.reckoning section.',
     '- `fieldOps` (object): mapState, cipher, oracleTable, companionComponents',
     '- `bossEncounter` (object): replaces fieldOps if boss week',
     '- `overflow` (boolean) and `overflowDocument` (foundDocument object)',
@@ -359,6 +388,9 @@
     '- `blockSubtitle` (string): one-line diegetic designation',
     '- `worldContract` (string): one sentence — the governing tension that drives the entire booklet',
     '- `weeklyComponentType` (string): fiction-native measurement family (e.g., "gauge reading", "signal frequency")',
+    '- `economy` (object): { currencyId, currencyLabel } — the one currency the workout pays out.',
+    '  currencyId: machine slug, lowercase and hyphen-separated, never printed.',
+    '  currencyLabel: the printed name, in this world\'s own accounting language — a noun the artifact already counts, derived from THIS brief and portable to no other booklet.',
     '- `narrativeVoice` (object): { person, tense, narratorStance, voiceRationale }',
     '- `literaryRegister` (object): { name, behaviorDescription, forbiddenMoves, typographicBehavior,',
     '    mechanisms: string[] (2-4, what the prose DOES in selection terms),',
@@ -438,6 +470,7 @@
     meta: {
       blockTitle: '', blockSubtitle: '', worldContract: '',
       weeklyComponentType: '',
+      economy: { currencyId: '', currencyLabel: '' },
       narrativeVoice: { person: '', tense: '', narratorStance: '', voiceRationale: '' },
       literaryRegister: {
         name: '', behaviorDescription: '', forbiddenMoves: '', typographicBehavior: '',
@@ -480,6 +513,14 @@
         properties: {
           blockTitle: { type: 'string' }, blockSubtitle: { type: 'string' },
           worldContract: { type: 'string' }, weeklyComponentType: { type: 'string' },
+          // The markStrip economy declaration (Session 1). currencyId is the
+          // stable machine handle for future cross-references; currencyLabel is
+          // the only half that ever prints.
+          economy: {
+            type: 'object',
+            properties: { currencyId: { type: 'string' }, currencyLabel: { type: 'string' } },
+            required: ['currencyId', 'currencyLabel']
+          },
           narrativeVoice: {
             type: 'object',
             properties: { person: { type: 'string' }, tense: { type: 'string' }, narratorStance: { type: 'string' }, voiceRationale: { type: 'string' } },
@@ -569,7 +610,7 @@
             required: ['briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily', 'documentEcology', 'exclusions', 'homePull']
           }
         },
-        required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'storySpine', 'artifactIdentity', 'artifactIntent']
+        required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'economy', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'storySpine', 'artifactIdentity', 'artifactIntent']
       },
       theme: {
         type: 'object',
@@ -797,6 +838,103 @@
     '- Identify the dominant physical modality in the raw workout and apply its metaphor translation strictly to the `storyPrompts`. Only use literal gym terminology if the theme demands it.',
     '- **CRITICAL: Every session MUST have a non-empty exercises array.** Transcribe the user&apos;s workout exactly — name, sets, repsPerSet, weightField. Never omit exercises on any session, even the last session in a high-session-count week. If the user provides 6 sessions of exercises, all 6 must appear with complete exercise data.',
     '- **HARD CONSTRAINT — EXERCISE FIDELITY:** Copy exercise names VERBATIM from the user&apos;s liftoscript. Do NOT add, invent, substitute, or supplement sessions with exercises not explicitly written by the user. Do NOT guess what accessory work the program implies. If the user provided 3 exercises per session, use those 3. If a session needs more volume, add more sets of the user&apos;s exercises — never new exercise names. Machine exercises, cable exercises, and isolation movements are FORBIDDEN unless the user explicitly listed them.'
+  ];
+
+  // ── The Mark surface ────────────────────────────────────────────────────
+  // Session 1 (markStrip + Reckoning). COMPRESSION, NOT A FORK: the
+  // three-phase law, the ten-second law, the one-currency-per-markStrip law
+  // and the spine-determinism guard are the design constitution in
+  // docs/plans/2026-08-10-hardening-program-amended.md; the economy laws it
+  // leans on (pressures vs resources, per-spread teachCost, scarcity beats
+  // options, print-before-rules-fire, renderers resolve against the actual
+  // booklet) come from docs/plans/2026-08-09-game-design-space-grammar.md.
+  // Those docs and this section MOVE TOGETHER — change one, change the other
+  // in the same commit.
+  //
+  // Field shapes live in SCHEMA_META (economy) and SCHEMA_WEEKS_POST
+  // (session.markStrip, week.reckoning). This section is doctrine only.
+  window.INST_MARK_SURFACE = [
+    '## The Mark Surface (markStrip and Reckoning)',
+    'The workout is the story\'s clock, and this is the seam where the clock pays.',
+    'Every session card prints a strip of tick targets. Every week prints one',
+    'reckoning panel that converts those ticks into the booklet\'s one currency and',
+    'spends them on a surface the booklet already prints. Design it as one economy,',
+    'not as two separate features that happen to share a page.',
+    '',
+    '### The three-phase law',
+    'Every demand this booklet makes of the player sits in exactly one phase. Know',
+    'which phase you are writing for before you write the words.',
+    '- MARK — mid-workout, between sets, under load. Ticks only.',
+    '- RESOLVE — after the last set. Five minutes at most, sitting down. Totalling,',
+    '  converting, spending. The reckoning panel lives here.',
+    '- READ — rest days and week boundaries. Fragments, interludes, the ending.',
+    'A demand printed for the wrong phase is not met, it is skipped — and a strip',
+    'the player has learned to skip stops being marked at all.',
+    '',
+    '### The ten-second law (MARK phase only)',
+    '- A markStrip target is satisfied by ONE pencil mark. Nothing else.',
+    '- No number to write, no arithmetic to do, no option to weigh, no table to',
+    '  consult, no page to turn. A gassed lifter between sets can do exactly one',
+    '  thing, and that thing is drawing a line.',
+    '- Nothing new to read, either. The storyPrompt is the entire mid-workout',
+    '  reading budget and it stays inside its 220-character cap.',
+    '',
+    '### The strip scores the work; the table records it',
+    'The exercise table already RECORDS the session — sets, reps, load, the rep',
+    'boxes. The strip SCORES it. One target on every strip is the completion',
+    'roll-up: the whole prescribed session done, ticked once. That target is the',
+    'rep-box row judged, never the rep-box row copied. Never ask the player to',
+    'restate in the strip a number the table already holds — a strip target that',
+    'duplicates the table is a chore, and a strip target that judges the table is a',
+    'game.',
+    'The other targets name what this session asked for beyond finishing it: a',
+    'standard held, a record kept, a shortcut refused, a duty discharged. Phrase',
+    'them the way this artifact would phrase them, never in the language of',
+    'exercise science, and never with a digit in the line.',
+    '',
+    '### One currency',
+    'Every markStrip pays out the ONE currency declared in `meta.economy`. One name,',
+    'one label, whole booklet. Do not invent a second tick currency, a bonus token,',
+    'or a parallel point pool.',
+    'This governs INCOME only. The booklet may still run pressures the world spends',
+    'against the player — clocks, deadlines, suspicion, contamination. Those are',
+    'pressures, not resources: they need no source in the strip and no sink in the',
+    'reckoning.',
+    'Scarcity is what turns a spend into a decision. A week that pays out more than',
+    'its sink can absorb has no decision in it. Prefer a tight number to a menu — a',
+    'ration set below what the player wants costs one integer to teach, and a table',
+    'of options costs a page of teaching the player does not have.',
+    '',
+    '### Teach the conversion where it fires',
+    '- `week.reckoning.conversion` is ONE sentence, in the book\'s voice, printed on',
+    '  the reckoning panel. It states what the week\'s ticks become. That sentence IS',
+    '  the rule, and the panel is its only home.',
+    '- Do not restate the conversion on the rules spread. The rules spread may name',
+    '  the strip once inside the play cadence — one clause, no arithmetic. Teaching',
+    '  budget is spent per spread, not per booklet, and a rule taught twice has been',
+    '  paid for twice.',
+    '- The sink must name a surface THIS booklet actually prints, and that surface',
+    '  must already be printed by the week that spends into it. A sink pointing at',
+    '  something the booklet never prints, or does not print yet, is a broken',
+    '  promise — the same defect as a manifestPointer aimed at a missing fragment.',
+    '- Let the panel demand rather than explain. Labelled tally boxes, a sink line,',
+    '  and one conversion sentence carry more than a paragraph of instruction does.',
+    '',
+    '### The spine is not for sale',
+    'Banked currency may colour prose, open optional surfaces, and decide WHICH',
+    'ending variant reads as earned. It may NEVER gate the password, the weekly',
+    'component values, the decodingKey, or any link in the decode chain. A player',
+    'who trains six weeks cannot be priced out of the ending. If the economy is the',
+    'only thing standing between the player and the six-week payoff, the design is',
+    'wrong — move that gate off the spine.',
+    '',
+    '### What tooling owns (never author these)',
+    '- `markStrip.targets[].id` and `.kind` — assigned and repaired by tooling from',
+    '  the session\'s own exercises. Write labels; leave those two out entirely.',
+    '- `week.reckoning.threshold` — derived by tooling from what the weeks can',
+    '  actually pay out. Write the boss week as though a bar exists and the player',
+    '  may or may not clear it. Never author the number, state it in prose, or write',
+    '  a line that only reads correctly if the bar sits at one particular value.'
   ];
 
   window.INST_PERVASIVE_PLAY = [
@@ -1226,6 +1364,10 @@
     '- every oracle table has exactly 10 entries using the d100 roll bands "00-09" through "90-99"',
     '- `cipher.body` is an object with { displayText?, key?, workSpace?, referenceTargets? }, never a string',
     '- every cipher `workSpace.style` is one of "boxed-totals", "lined", "blank", "cells" — never prose, never an invented name',
+    '- every session carries a markStrip of 3-5 targets, each label 5 words or fewer with no digit anywhere in it',
+    '- exactly one markStrip target per session is the completion roll-up, and no target restates a number the exercise table already holds',
+    '- every week carries a reckoning whose conversion is one sentence and whose `sink.ref` names a surface this booklet actually prints, by that week',
+    '- nothing earned on a markStrip gates the password, the weekly component values, or the decodingKey',
     '- most non-boss weeks share a persistent main topology — maps are not unrelated one-offs',
     '- story prompts contain zero gym/exercise metaphors — the workout is real, the fiction is fiction',
     '- boss decodingKey requires spatial or institutional knowledge, not simple arithmetic on weekly values',
@@ -1319,6 +1461,7 @@
     INST_WORLD_CONTRACT, [''],
     INST_ENVIRONMENT, [''],
     INST_WORKOUT_FUSION, [''],
+    INST_MARK_SURFACE, [''],
     INST_PERVASIVE_PLAY, [''],
     INST_DIEGETIC_MECHANICS, [''],
     INST_SYSTEM_INTEGRATION, [''],
@@ -1357,6 +1500,9 @@
     '- Companion component types (9): dashboard, return-box, inventory-grid, token-sheet, overlay-window, stress-track, memory-slots, usage-die, percentile-stat.',
     '  percentile-stat is the growing-stat d100: ONE per booklet, statName from the Core Noun Roster, weeklyValues (1-99) rising monotonically, rolled under on the oracle die.',
     '- Clock types (6): progress-clock, danger-clock, racing-clock, tug-of-war-clock, linked-clock, project-clock.',
+    '- Mark surface: EVERY session prints a markStrip of 3-5 tick targets (labels only, 5 words max, no digits, one pencil mark each).',
+    '  EVERY week prints one reckoning panel converting those ticks into the single currency declared in meta.economy.',
+    '  Reckoning sink kinds (5): map, companion, clock, oracle, notes. The sink must name a surface this booklet actually prints.',
     '- Fragment documentTypes (8): memo, report, inspection, fieldNote, correspondence, transcript, form, anomaly.',
     '- Boss encounter MUST include decodingKey with referenceTable (e.g., "1=A 2=B ... 26=Z").',
     '- Visual archetypes (10): government, cyberpunk, scifi, fantasy, noir, steampunk, minimalist, nautical, occult, pastoral.',
@@ -1380,13 +1526,15 @@
     // Shell: story + world + structural
     // Shell authors meta.literaryRegister (the voiceSpec) and meta.worldContract
     // (the knowing) — VOICE_DISCIPLINE is the authoring doctrine for both.
-    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'RULES_TEACH', 'VISUAL_DIRECTION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
+    // MARK_SURFACE rides the shell stage because meta.economy is authored here:
+    // the currency cannot be named well without knowing what it is FOR.
+    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
     // Week plan: lean
     'week-plan':      { schemas: ['WEEK_PLAN'],                                 instructions: [] },
     // Week flesh: full game design + story
     // Prose stages (week-final, fragment, ending) carry VOICE_DISCIPLINE: they
     // write storyPrompts, interludes, oracle text, documents, and endings.
-    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'PERVASIVE_PLAY', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] },
+    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'MARK_SURFACE', 'PERVASIVE_PLAY', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] },
     // Fragment: story quality first
     'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'VOICE_DISCIPLINE', 'ANTI_GENERIC', 'CHARACTER_WEB', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
     // Ending: story quality first (endings are where voice failure concentrates)

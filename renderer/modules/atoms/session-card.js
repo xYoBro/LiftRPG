@@ -52,6 +52,7 @@ registerAtom('session-card', {
     const variant = sessionCardVariant(normalizedDensity);
     if (variant) card.setAttribute('data-density-variant', variant);
     if (session.binaryChoice) card.setAttribute('data-has-binary-choice', 'true');
+    if (session.markStrip) card.setAttribute('data-has-mark-strip', 'true');
     card.setAttribute('data-exercise-count', String(Array.isArray(session.exercises) ? session.exercises.length : 0));
     return card;
   },

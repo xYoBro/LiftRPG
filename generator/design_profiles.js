@@ -37,6 +37,16 @@
     'Kids on a summer mission: find what adults buried in the woods'
   ];
 
+  // `currencySeeds` — candidate label families for `meta.economy.currencyLabel`,
+  // the single currency a booklet's markStrips pay out and its reckoning panels
+  // spend (doctrine: INST_MARK_SURFACE in prompt_rules.js).
+  //
+  // These are SEEDS, not a menu. The model should draw from the family that
+  // fits the brief, or BEAT it with something this particular world would
+  // actually keep a count of. A currency label that could be lifted unchanged
+  // into a booklet built from a different brief is a differentiation defect —
+  // the seeds exist to point away from the convergent defaults (Supply, Scrip,
+  // Credits, Points), never to become the new convergent default themselves.
   window.DESIGN_PROFILES = [
     {
       id: 'institutional-mystery',
@@ -69,6 +79,7 @@
       oracleMode: 'banded-d100',
       puzzleFamilies: ['fragment cross-reference', 'grid-coordinate reading', 'observational anomaly hunting', 'process deduction'],
       pressureClocks: ['Exposure Risk', 'Evidence Chain', 'Site Integrity'],
+      currencySeeds: ['Countersignatures', 'Docket Weight', 'Clearance'],
       scarcitySurfaces: ['dashboard', 'stress-track', 'return-box'],
       interludePayloads: ['fragment-ref', 'password-element', 'narrative'],
       documentTypes: ['memo', 'report', 'inspection', 'fieldNote', 'form', 'transcript'],
@@ -105,6 +116,7 @@
       oracleMode: 'banded-d100',
       puzzleFamilies: ['path tracing', 'route adjacency', 'environmental pattern recognition', 'resource clock pressure'],
       pressureClocks: ['Exposure', 'Supplies', 'Distance Remaining'],
+      currencySeeds: ['Fair Miles', 'Depot Credit', 'Daylight'],
       scarcitySurfaces: ['stress-track', 'inventory-grid', 'dashboard'],
       interludePayloads: ['narrative', 'cipher', 'map'],
       documentTypes: ['fieldNote', 'report', 'letter', 'correspondence', 'memo'],
@@ -141,6 +153,7 @@
       oracleMode: 'banded-d100',
       puzzleFamilies: ['logic deduction', 'witness contradiction', 'fragment cross-reference', 'branch consequence tracking'],
       pressureClocks: ['Suspicion', 'Trust', 'Public Attention'],
+      currencySeeds: ['Good Word', 'Quiet Debts', 'Reserved Seats'],
       scarcitySurfaces: ['memory-slots', 'dashboard', 'return-box'],
       interludePayloads: ['fragment-ref', 'narrative', 'companion'],
       documentTypes: ['correspondence', 'letter', 'transcript', 'memo', 'fieldNote', 'form'],
@@ -177,6 +190,7 @@
       oracleMode: 'banded-d100',
       puzzleFamilies: ['symbol decoding', 'layered metapuzzle assembly', 'observational anomaly hunting', 'oracle-triggered rule mutation'],
       pressureClocks: ['Contamination', 'Witness', 'Seal Integrity'],
+      currencySeeds: ['Vigil Hours', 'Lamp Oil', 'Silence Owed'],
       scarcitySurfaces: ['stress-track', 'memory-slots', 'overlay-window'],
       interludePayloads: ['cipher', 'password-element', 'map'],
       documentTypes: ['anomaly', 'fieldNote', 'letter', 'transcript', 'correspondence'],
@@ -213,6 +227,7 @@
       oracleMode: 'banded-d100',
       puzzleFamilies: ['process deduction', 'index extraction', 'observational anomaly hunting', 'route denial'],
       pressureClocks: ['Containment Loss', 'Triage Load', 'Exposure Window'],
+      currencySeeds: ['Clean Minutes', 'Filter Life', 'Sample Slots'],
       scarcitySurfaces: ['dashboard', 'stress-track', 'inventory-grid'],
       interludePayloads: ['clock', 'cipher', 'narrative'],
       documentTypes: ['report', 'memo', 'form', 'transcript', 'inspection', 'anomaly'],
@@ -249,6 +264,7 @@
       oracleMode: 'banded-d100',
       puzzleFamilies: ['path tracing', 'adjacency extraction', 'constraint logic', 'resource clock pressure'],
       pressureClocks: ['Weather', 'Supplies', 'Pursuit'],
+      currencySeeds: ['Water Rights', 'Powder and Feed', 'Grazing Days'],
       scarcitySurfaces: ['inventory-grid', 'stress-track', 'return-box'],
       interludePayloads: ['map', 'narrative', 'fragment-ref'],
       documentTypes: ['fieldNote', 'letter', 'report', 'inspection', 'memo'],
@@ -285,6 +301,7 @@
       oracleMode: 'banded-d100',
       puzzleFamilies: ['room-label derivation', 'fragment cross-reference', 'pattern recognition', 'logic deduction'],
       pressureClocks: ['Strain', 'Suspicion', 'Caretaking Load'],
+      currencySeeds: ['Pantry Count', 'Rent in Kind', 'Confidences Held'],
       scarcitySurfaces: ['memory-slots', 'dashboard', 'inventory-grid'],
       interludePayloads: ['narrative', 'fragment-ref', 'companion'],
       documentTypes: ['letter', 'correspondence', 'fieldNote', 'form', 'transcript', 'memo'],
@@ -321,6 +338,7 @@
       oracleMode: 'banded-d100',
       puzzleFamilies: ['route adjacency', 'tracker-value lookup', 'process deduction', 'visual pattern'],
       pressureClocks: ['Load', 'Outage Risk', 'Public Fallout'],
+      currencySeeds: ['Load Margin', 'Shift Credit', 'Bypass Keys'],
       scarcitySurfaces: ['dashboard', 'memory-slots', 'stress-track'],
       interludePayloads: ['clock', 'map', 'password-element'],
       documentTypes: ['inspection', 'report', 'memo', 'form', 'fieldNote', 'transcript'],
@@ -357,6 +375,7 @@
       oracleMode: 'banded-d100',
       puzzleFamilies: ['path tracing', 'route adjacency', 'constraint logic', 'resource clock pressure'],
       pressureClocks: ['Distance', 'Enemy Pursuit', 'Ally Endurance'],
+      currencySeeds: ['Oaths Kept', 'Torchlight', 'Road Coin'],
       scarcitySurfaces: ['inventory-grid', 'stress-track', 'dashboard'],
       interludePayloads: ['narrative', 'map', 'companion'],
       documentTypes: ['fieldNote', 'letter', 'report', 'correspondence'],
@@ -393,6 +412,7 @@
       oracleMode: 'banded-d100',
       puzzleFamilies: ['observational anomaly hunting', 'logic deduction', 'pattern recognition', 'contextual-question'],
       pressureClocks: ['Credibility', 'Chaos Level', 'Time Before Discovery'],
+      currencySeeds: ['Plausible Deniability', 'Unspent Excuses', 'Front-Desk Goodwill'],
       scarcitySurfaces: ['stress-track', 'memory-slots', 'return-box'],
       interludePayloads: ['narrative', 'companion', 'fragment-ref'],
       documentTypes: ['memo', 'form', 'transcript', 'fieldNote', 'letter'],
@@ -429,6 +449,7 @@
       oracleMode: 'banded-d100',
       puzzleFamilies: ['fragment cross-reference', 'logic deduction', 'witness contradiction', 'branch consequence tracking'],
       pressureClocks: ['Trust', 'Distance', 'Time Left'],
+      currencySeeds: ['Honest Answers', 'Patience Left', 'Time Given Freely'],
       scarcitySurfaces: ['memory-slots', 'stress-track', 'dashboard'],
       interludePayloads: ['narrative', 'fragment-ref', 'companion'],
       documentTypes: ['letter', 'correspondence', 'transcript', 'memo', 'fieldNote'],
@@ -465,6 +486,7 @@
       oracleMode: 'banded-d100',
       puzzleFamilies: ['path tracing', 'route adjacency', 'constraint logic', 'resource clock pressure'],
       pressureClocks: ['Security Response', 'Target Escaping', 'Ammo/Supplies'],
+      currencySeeds: ['Leverage', 'Untraced Exits', 'Unburned Cover'],
       scarcitySurfaces: ['inventory-grid', 'stress-track', 'dashboard'],
       interludePayloads: ['map', 'cipher', 'fragment-ref'],
       documentTypes: ['memo', 'report', 'inspection', 'form'],

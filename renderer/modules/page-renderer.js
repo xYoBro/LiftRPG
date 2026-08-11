@@ -14,6 +14,11 @@ import { getShellDecorator } from './shell-decorator-registry.js';
 import './decorators/index.js';
 
 const WORKOUT_PAGE_TYPES = new Set(['week-header', 'session-card', 'week-footer']);
+// reckoning-panel is deliberately NOT a mechanic page type: on non-boss weeks
+// it shares field-ops pages that cipher/oracle already classify, and on boss
+// weeks it joins the final session-chunk page — where mechanic classification
+// would hoist it into the mechanic zone ABOVE the cards, inverting printed
+// order (found live, Session 1).
 const MECHANIC_PAGE_TYPES = new Set(['cipher-panel', 'oracle-table', 'map-panel', 'tracker']);
 const BOARD_STATE_COPY = {
   'survey-grid': {

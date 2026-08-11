@@ -385,6 +385,8 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         }));
       }
 
+      // Reckoning panel — see the emission below the boss branch.
+
       // Companion components (trackers)
       if (profile.needsCompanionSpread && profile.companionComponents) {
         for (let ci = 0; ci < profile.companionComponents.length; ci++) {
@@ -450,6 +452,55 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
           }));
         }
       }
+    }
+
+    // ── Reckoning panel (the Resolve surface) ─────────────────────────────
+    // Emitted OUTSIDE the boss branch on purpose: the boss week is where the
+    // threshold prints, and a boss week has no cipher/oracle/map to ride
+    // along with. Everything about it is dormant until `week.reckoning`
+    // exists — no corpus fixture carries one, so no corpus atom stream moves.
+    //
+    // `weekTargetCount` is summed HERE, not in the atom, so the panel's
+    // estimate() stays a pure function of its own data. An estimator that
+    // reached back into the week's sessions would be reading data the engine
+    // never handed it, which is how a phase-1 estimate starts disagreeing
+    // with the DOM it is supposed to predict.
+    if (week.reckoning) {
+      const weekTargetCount = (week.sessions || []).reduce((sum, session) => {
+        const targets = session && session.markStrip && session.markStrip.targets;
+        return sum + (Array.isArray(targets) ? targets.length : 0);
+      }, 0);
+
+      // KNOWN SHAPE DEBT (Session 1): on boss weeks the panel takes a mostly
+      // empty right page — boss weeks have no cipher/oracle/map to share
+      // with, and the boss encounter is full-page. Two seating attempts were
+      // made and reverted the night this landed: 'either' affinity (the
+      // lonely attachment group's singlePageGroupPolicy still takes a page)
+      // and joining the final session-chunk group on the left (the panel
+      // rendered ABOVE the chunk's last card despite a higher sequence —
+      // page-composition routing, not binning, owns that order; suspect
+      // zone routing). Order-correct-but-underfilled beats inverted; the
+      // refinement is chipped with the repro. Non-boss weeks are unaffected:
+      // the panel rides the field-ops page beside cipher/oracle/map.
+      atoms.push(createAtom({
+        type: 'reckoning-panel',
+        id: `w${wi}-reckoning`,
+        shellAttrs,
+        group: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'reckoning', artifactIdentity),
+        groupPolicy: singlePageGroupPolicy(),
+        section: 'body',
+        sequence: wi * 1000 + 103,
+        sizeHint: 'quarter-page',
+        pageAffinity: 'right',
+        data: {
+          reckoning: week.reckoning,
+          weekIndex: wi,
+          totalWeeks,
+          economy: data.meta && data.meta.economy,
+          weekTargetCount,
+          artifactIdentity,
+        },
+      }));
     }
 
     if (week.overflowDocument) {

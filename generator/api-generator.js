@@ -96,6 +96,7 @@ import {
   classifyValidationErrors,
   collectBudgetBreaches,
   collectPercentileStatFindings,
+  collectMarkStripFindings,
   collectNounRosterFindings,
   collectVoiceTicFindings,
   collectLicensedMovePlacementFindings,
@@ -1436,7 +1437,8 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
     // Machine findings (GAP-1): everything the pipeline can MEASURE goes to the
     // critic as fact it must convert into unit-scoped failures — text-budget
     // breaches (fusionPacing), Core Noun Roster drift (worldCohesion),
-    // growing-stat discipline (systemIntegration), and terminal-position voice
+    // growing-stat discipline and mark-economy taste — clumsy tick labels,
+    // dangling sink refs (systemIntegration) — and terminal-position voice
     // tics plus licensed-move placement (voiceDiscipline). Recomputed each
     // round so accepted revisions clear their own findings. Posted-manifest
     // breakage is absent by design: it is a validation ERROR, so it never
@@ -1445,6 +1447,7 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
       .concat(collectBudgetBreaches(booklet).map(function (b) { return b.message; }))
       .concat(collectNounRosterFindings(booklet))
       .concat(collectPercentileStatFindings(booklet))
+      .concat(collectMarkStripFindings(booklet).warnings)
       .concat(collectVoiceTicFindings(booklet).map(function (f) { return f.message; }))
       .concat(collectLicensedMovePlacementFindings(booklet).map(function (f) { return f.message; }))
       .map(function (finding) {

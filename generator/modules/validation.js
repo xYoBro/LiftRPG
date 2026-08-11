@@ -14,12 +14,17 @@ import {
   VALID_ARCHETYPES,
   ACCEPTED_SCHEMA_VERSIONS,
   SCHEMA_VERSION,
-  PERCENTILE_STAT
+  PERCENTILE_STAT,
+  MARK_STRIP,
+  RECKONING_SINK_KINDS,
+  RECKONING_THRESHOLD_RATIO
 } from './constants.js';
 
 import {
   buildContinuityLedger,
   continuityRefExists,
+  resolveBossWeekIndex,
+  toSlugWords,
   normalizeId,
   extractInputCountClaims,
   extractEndingBodyText,
@@ -1374,6 +1379,285 @@ export function collectPercentileStatFindings(booklet) {
   return findings;
 }
 
+// ── Mark economy demand (Session 1 / D89) ───────────────────────────────────
+// The Mark surface is the fusion seam — the one near-universal this project can
+// defend demanding — so the assembled booklet must carry it. THE DEMAND LIVES
+// HERE AND ONLY HERE, never in validateWeekSchema: the stub bench derives stage
+// payloads from a corpus fixture and --forge-check never runs assembly, and the
+// guided-build harness replays hand-authored week payloads. A week-stage demand
+// would break both on day one, and neither failure would mean anything about
+// the feature.
+//
+// Severity follows D19. Missing/undersized strips and unreachable thresholds
+// are ERRORS: the booklet promises a game it cannot print. Label taste and
+// dangling sink refs are WARNINGS — degraded design, still renderable.
+//
+// The hand-authored corpus predates all of this. Absence of meta.economy is a
+// single WARNING (the "no markStrip economy" line, also listed in
+// scripts/validate.mjs RULE_DEMOTIONS), never a cascade of per-session errors.
+
+// Sink refs cannot use continuityRefExists(): that predicate resolves fragment
+// and overflow ids ONLY, and its ledger is built from GENERATION-STAGE chunk
+// outputs (shell / weekChunkOutputs / campaignPlan), not an assembled booklet.
+// A sink may name a clock, a companion, a map node, or an oracle. So this is a
+// deliberate pragmatic existence scan over the assembled document — every
+// surface the booklet actually prints, indexed two ways: normalizeId for
+// id-shaped refs and slug words for names.
+function buildSinkRefIndex(booklet) {
+  var ids = {};
+  var names = {};
+  function addId(value) {
+    var key = normalizeId(value);
+    if (key) ids[key] = true;
+  }
+  function addName(value) {
+    var key = toSlugWords(value);
+    if (key) names[key] = true;
+  }
+  function addBoth(value) { addId(value); addName(value); }
+
+  (((booklet || {}).fragments) || []).forEach(function (fragment) {
+    if (!fragment) return;
+    addId(fragment.id);
+    addName(fragment.title);
+  });
+
+  function indexCompanions(pool) {
+    (Array.isArray(pool) ? pool : []).forEach(function (component) {
+      if (!component) return;
+      addName(component.title);
+      addName(component.label);
+      addName(component.statName);
+      addName(component.type);
+    });
+  }
+
+  (((booklet || {}).weeks) || []).forEach(function (week) {
+    if (!week) return;
+    var fieldOps = week.fieldOps || {};
+    indexCompanions(fieldOps.companionComponents);
+    var interlude = week.interlude;
+    if (interlude && interlude.payload && typeof interlude.payload === 'object') {
+      indexCompanions(interlude.payload.companionComponents);
+    }
+    (week.gameplayClocks || []).forEach(function (clock) {
+      if (clock) addName(clock.clockName);
+    });
+    if (fieldOps.oracleTable) addName(fieldOps.oracleTable.title);
+    if (fieldOps.cipher) addName(fieldOps.cipher.title);
+    var mapState = fieldOps.mapState || {};
+    addName(mapState.title);
+    addName(mapState.floorLabel);
+    (mapState.nodes || []).forEach(function (node) {
+      if (!node) return;
+      addBoth(node.id);
+      addName(node.label);
+    });
+    (mapState.tiles || []).forEach(function (tile) { if (tile) addName(tile.label); });
+    (mapState.positions || []).forEach(function (pos) { if (pos) addName(pos.label); });
+    if (week.overflowDocument) {
+      addId(week.overflowDocument.id);
+      addName(week.overflowDocument.title);
+    }
+  });
+
+  return { ids: ids, names: names };
+}
+
+function sinkRefResolves(index, ref) {
+  var raw = String(ref == null ? '' : ref).trim();
+  if (!raw) return true;              // absent ref is legal — the kind alone is a sink
+  if (index.ids[normalizeId(raw)]) return true;
+  return !!index.names[toSlugWords(raw)];
+}
+
+// Singular/plural tolerance for the one-currency check. Deliberately crude: it
+// is looking for a NOUN the panel prints, not parsing English.
+function singularizeToken(word) {
+  if (/(?:ses|xes|zes|ches|shes)$/.test(word)) return word.slice(0, -2);
+  if (word.length > 3 && /s$/.test(word) && !/ss$/.test(word)) return word.slice(0, -1);
+  return word;
+}
+
+/**
+ * Does this conversion sentence name the booklet's declared currency?
+ *
+ * HEURISTIC, and stated as one: full label first, then its head noun, each
+ * matched with singular/plural tolerance. It exists to catch the real failure —
+ * week 1 banking "Embers" while week 4 banks "Tokens", two income currencies
+ * where the amended one-per-markStrip law allows one — not to grade prose.
+ */
+function conversionNamesCurrency(text, currencyLabel) {
+  var haystack = ' ' + toSlugWords(text) + ' ';
+  var words = toSlugWords(currencyLabel).split(' ').filter(Boolean);
+  if (!words.length) return false;
+  var candidates = [words.join(' '), words[words.length - 1]];
+  return candidates.some(function (candidate) {
+    var stem = singularizeToken(candidate);
+    return haystack.indexOf(' ' + candidate + ' ') !== -1
+      || haystack.indexOf(' ' + stem + ' ') !== -1
+      || haystack.indexOf(' ' + stem + 's ') !== -1
+      || haystack.indexOf(' ' + stem + 'es ') !== -1;
+  });
+}
+
+function markLabelComplaint(label) {
+  var text = String(label == null ? '' : label).trim();
+  if (!text) return 'is empty';
+  if (/\d/.test(text)) return 'contains a digit — a number on the strip invites arithmetic mid-workout';
+  if (text.split(/\s+/).length > MARK_STRIP.maxLabelWords) {
+    return 'runs ' + text.split(/\s+/).length + ' words (max ' + MARK_STRIP.maxLabelWords + ')';
+  }
+  return '';
+}
+
+/**
+ * collectMarkStripFindings(booklet) -> { errors: string[], warnings: string[] }
+ *
+ * Both severities in one pass, because the rules interlock: the strip count
+ * error and the label warning read the same targets, and the threshold error
+ * reads the total the strips add up to. Consumers:
+ *   - validateAssembledBooklet — errors to errors, warnings to warnings
+ *   - api-generator.js critic loop — warnings only (errors never reach the
+ *     critic by design; they are the validity floor a revision may not raise)
+ */
+export function collectMarkStripFindings(booklet) {
+  var errors = [];
+  var warnings = [];
+  var weeks = ((booklet || {}).weeks) || [];
+  var meta = (booklet || {}).meta || {};
+  var economy = (meta.economy && typeof meta.economy === 'object') ? meta.economy : null;
+
+  var strippedSessions = 0;
+  var totalAttainableTicks = 0;
+  weeks.forEach(function (week) {
+    (((week || {}).sessions) || []).forEach(function (session) {
+      var targets = ((session || {}).markStrip || {}).targets;
+      if (Array.isArray(targets)) {
+        strippedSessions++;
+        totalAttainableTicks += targets.length;
+      }
+    });
+  });
+
+  // ── Dormancy: the pre-Session-1 corpus ───────────────────────────────────
+  if (!economy) {
+    warnings.push('meta.economy is absent — no markStrip economy declared'
+      + (strippedSessions
+        ? ', yet ' + strippedSessions + ' session(s) carry a markStrip (orphan strips: '
+          + 'the marks bank into a currency the booklet never names)'
+        : ' (pre-Session-1 booklet; the Mark surface is standard on generated booklets)'));
+    return { errors: errors, warnings: warnings };
+  }
+
+  var currencyLabel = String(economy.currencyLabel || '').trim();
+  var currencyId = String(economy.currencyId || '').trim();
+  if (!currencyId || !currencyLabel) {
+    errors.push('meta.economy is incomplete (currencyId "' + currencyId + '", currencyLabel "'
+      + currencyLabel + '") — the markStrip economy needs both a machine handle and a printed label');
+  }
+
+  // ── The Mark surface: every session, 3-5 targets ─────────────────────────
+  weeks.forEach(function (week, wi) {
+    if (!week) return;
+    var weekNumber = week.weekNumber || (wi + 1);
+    (week.sessions || []).forEach(function (session, si) {
+      if (!session) return;
+      var where = 'Week ' + weekNumber + ' session ' + (session.sessionNumber || (si + 1));
+      var targets = ((session.markStrip || {}).targets);
+      if (!Array.isArray(targets) || targets.length === 0) {
+        errors.push(where + ': no markStrip — meta.economy declares "' + currencyLabel
+          + '" but the session prints nothing to tick');
+        return;
+      }
+      if (targets.length < MARK_STRIP.minTargets || targets.length > MARK_STRIP.maxTargets) {
+        errors.push(where + ': markStrip has ' + targets.length + ' target(s) — the Mark surface requires '
+          + MARK_STRIP.minTargets + '-' + MARK_STRIP.maxTargets);
+      }
+      var seen = {};
+      targets.forEach(function (target, ti) {
+        var label = String((target || {}).label || '');
+        var complaint = markLabelComplaint(label);
+        if (complaint) {
+          warnings.push(where + ' markStrip target ' + (ti + 1) + ' ("' + label + '") ' + complaint);
+        }
+        var key = toSlugWords(label);
+        if (key && seen[key]) {
+          warnings.push(where + ' markStrip repeats the target "' + label
+            + '" — a duplicate tick is a target the player cannot lose');
+        }
+        if (key) seen[key] = true;
+      });
+    });
+  });
+
+  // ── The Resolve surface: every week, one reckoning ───────────────────────
+  var sinkIndex = buildSinkRefIndex(booklet);
+  weeks.forEach(function (week, wi) {
+    if (!week) return;
+    var weekNumber = week.weekNumber || (wi + 1);
+    var reckoning = (week.reckoning && typeof week.reckoning === 'object') ? week.reckoning : null;
+    if (!reckoning) {
+      errors.push('Week ' + weekNumber + ': no reckoning — marks are banked but never resolved');
+      return;
+    }
+    var conversion = String(reckoning.conversion || '').trim();
+    if (!conversion) {
+      errors.push('Week ' + weekNumber + ' reckoning has no conversion rule — the panel teaches nothing');
+    } else if (currencyLabel && !conversionNamesCurrency(conversion, currencyLabel)) {
+      errors.push('Week ' + weekNumber + ' reckoning conversion does not name the declared currency "'
+        + currencyLabel + '" ("' + conversion + '") — the markStrip economy resolves into exactly '
+        + 'one currency per booklet');
+    }
+    var sink = (reckoning.sink && typeof reckoning.sink === 'object') ? reckoning.sink : null;
+    if (!sink) {
+      errors.push('Week ' + weekNumber + ' reckoning has no sink — the marks convert into nothing');
+      return;
+    }
+    if (RECKONING_SINK_KINDS.indexOf(sink.kind) === -1) {
+      errors.push('Week ' + weekNumber + ' reckoning sink.kind "' + String(sink.kind)
+        + '" is not one of ' + RECKONING_SINK_KINDS.join(', ')
+        + ' — a sink must reference vocabulary the booklet already renders');
+    }
+    if (!String(sink.instruction || '').trim()) {
+      errors.push('Week ' + weekNumber + ' reckoning sink has no instruction — the player is told where '
+        + 'the marks go but not what to do');
+    }
+    if (sink.ref && !sinkRefResolves(sinkIndex, sink.ref)) {
+      warnings.push('Week ' + weekNumber + ' reckoning sink.ref "' + sink.ref
+        + '" names nothing in the booklet — no fragment, companion, clock, oracle or map surface answers to it');
+    }
+  });
+
+  // ── The boss threshold: derived, and reachable by arithmetic ─────────────
+  // Band bounds use floor/ceil with a floor of 1 so a one-tick campaign
+  // (round(0.75 x 1) = 1) is not reported as out of band by rounding alone.
+  var bossWeekIndex = resolveBossWeekIndex(weeks);
+  weeks.forEach(function (week, wi) {
+    var reckoning = (week && week.reckoning) || null;
+    if (!reckoning || reckoning.threshold === undefined) return;
+    var weekNumber = (week && week.weekNumber) || (wi + 1);
+    var lower = Math.max(1, Math.floor(0.5 * totalAttainableTicks));
+    var upper = Math.max(1, Math.ceil(0.85 * totalAttainableTicks));
+    if (reckoning.threshold < lower || reckoning.threshold > upper) {
+      errors.push('Week ' + weekNumber + ' reckoning.threshold ' + reckoning.threshold
+        + ' sits outside the reachable band ' + lower + '-' + upper + ' (0.5-0.85 x '
+        + totalAttainableTicks + ' attainable ticks) — assembly derives '
+        + RECKONING_THRESHOLD_RATIO + ', so an out-of-band value means the derivation was bypassed');
+    }
+  });
+  if (strippedSessions > 0 && bossWeekIndex >= 0) {
+    var bossReckoning = (weeks[bossWeekIndex] || {}).reckoning;
+    if (bossReckoning && bossReckoning.threshold === undefined) {
+      errors.push('Week ' + ((weeks[bossWeekIndex] || {}).weekNumber || (bossWeekIndex + 1))
+        + ' is the boss week and carries no reckoning.threshold — the campaign banks '
+        + totalAttainableTicks + ' marks toward nothing');
+    }
+  }
+
+  return { errors: errors, warnings: warnings };
+}
+
 // ── Voice tics in terminal position (B-class voice scan) ────────────────────
 // docs/voice/VOICE.md states two laws this can partially measure: terminal
 // position is emphasis, and the machine-tells are banned in every genre. The
@@ -1943,6 +2227,11 @@ export function validateAssembledBooklet(booklet) {
   collectBudgetBreaches(booklet).forEach(function (b) { warnings.push(b.message); });
   collectNounRosterFindings(booklet).forEach(function (m) { warnings.push(m); });
   collectPercentileStatFindings(booklet).forEach(function (m) { warnings.push(m); });
+  // The mark economy carries both severities (see collectMarkStripFindings):
+  // a missing strip is an unprintable promise, a clumsy label is taste.
+  var markStripFindings = collectMarkStripFindings(booklet);
+  markStripFindings.errors.forEach(function (m) { errors.push(m); });
+  markStripFindings.warnings.forEach(function (m) { warnings.push(m); });
   collectVoiceTicFindings(booklet).forEach(function (f) { warnings.push(f.message); });
   collectLicensedMovePlacementFindings(booklet).forEach(function (f) { warnings.push(f.message); });
   // Posted manifests are promises, not preferences — broken ones are errors.

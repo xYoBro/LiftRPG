@@ -39,7 +39,10 @@ import {
   PERCENTILE_STAT,
   VALID_WORKSPACE_STYLES,
   VOICE_LICENSABLE_MOVES,
-  VOICE_SPEC_LIMITS
+  VOICE_SPEC_LIMITS,
+  MARK_STRIP,
+  MARK_STRIP_TARGET_KINDS,
+  RECKONING_SINK_KINDS
 } from './contract-constants.mjs';
 
 var G = SPATIAL_GUARDRAILS;
@@ -125,6 +128,95 @@ var literaryRegister = {
   }
 };
 
+// ── Mark economy (schema 1.5.0, Session 1 / D89) ────────────────────────────
+// Three additive optional fields carrying one economy: session.markStrip (the
+// Mark surface), week.reckoning (the Resolve surface), meta.economy (the
+// declaration). session / week / meta are all additionalProperties:false, so
+// without these definitions the feature cannot exist in a valid document.
+//
+// DELIBERATELY LOOSER THAN THE ASSEMBLED INVARIANT. The strip's real law is
+// 3-5 targets; the schema demands only 1. A model that emits two targets must
+// produce a SCHEMA-VALID document that assembly can repair (deriveMarkStripEconomy
+// tops up to minTargets), rather than a parse-stage rejection that costs a
+// retry. The 3-5 demand lives on the assembled-booklet path, where repair has
+// already run — generator/modules/validation.js collectMarkStripFindings.
+var markStripTarget = {
+  type: 'object',
+  required: ['label'],
+  additionalProperties: false,
+  properties: {
+    // Assigned by assembly (ms-w{week}-s{session}-{n}); a model may author it,
+    // and assembly overwrites. Machine identity only — never printed.
+    id: { type: 'string' },
+    // The printed tick label. Diegetic per world, capped at
+    // MARK_STRIP.maxLabelWords words and digit-free — both checked in
+    // assembly (repair) and validation (report), not here: JSON Schema can
+    // count characters but not words.
+    label: nonEmptyString,
+    // MACHINE-ONLY derivation provenance. Never printed, never prompted.
+    kind: { enum: MARK_STRIP_TARGET_KINDS }
+  }
+};
+
+var markStrip = {
+  type: 'object',
+  required: ['targets'],
+  additionalProperties: false,
+  properties: {
+    targets: {
+      type: 'array',
+      minItems: 1,
+      maxItems: MARK_STRIP.maxTargets,
+      items: markStripTarget
+    }
+  }
+};
+
+// The week's Resolve surface. `conversion` is the one-sentence rule the panel
+// teaches where it fires (per-spread teachCost — rules live where they fire).
+// `sink` names where the marks GO, and its kind is drawn from the vocabulary
+// the renderer already prints: a mark converting into a surface the player
+// cannot see is an unpaid promise. `threshold` appears on the boss week and is
+// DERIVED in assembly (RECKONING_THRESHOLD_RATIO x attainable ticks) — the
+// reachability band is asserted on the assembled path.
+var reckoning = {
+  type: 'object',
+  required: ['conversion', 'sink'],
+  additionalProperties: false,
+  properties: {
+    conversion: nonEmptyString,
+    sink: {
+      type: 'object',
+      required: ['kind', 'instruction'],
+      additionalProperties: false,
+      properties: {
+        kind: { enum: RECKONING_SINK_KINDS },
+        // Optional pointer at the named surface (a clock name, a companion
+        // title, a fragment id, a map node). Resolution is checked on the
+        // assembled path — JSON Schema cannot reach across the document.
+        ref: { type: 'string' },
+        instruction: nonEmptyString
+      }
+    },
+    threshold: { type: 'integer', minimum: 1 }
+  }
+};
+
+// The economy declaration: machine id / printed label split. currencyId is the
+// stable handle later contracts point at (Session 3's `unlocked-by:<currency>`);
+// currencyLabel is the diegetic noun the booklet prints. Exactly one markStrip
+// currency per booklet — the amended one-currency law reads per-markStrip, so
+// this object is the whole income-stream declaration.
+var economy = {
+  type: 'object',
+  required: ['currencyId', 'currencyLabel'],
+  additionalProperties: false,
+  properties: {
+    currencyId: { type: 'string', pattern: '^[a-z][a-z0-9-]{1,31}$' },
+    currencyLabel: nonEmptyString
+  }
+};
+
 export var BOOKLET_SCHEMA = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   $id: 'https://liftrpg.co/contracts/booklet/v' + SCHEMA_VERSION,
@@ -178,6 +270,7 @@ export var BOOKLET_SCHEMA = {
           }
         },
         artifactIntent: { type: 'object' },
+        economy: economy,
         weeklyComponentType: nonEmptyString,
         weekCount: { type: 'integer', minimum: 1 },
         totalSessions: { type: 'integer', minimum: 1 },
@@ -237,6 +330,7 @@ export var BOOKLET_SCHEMA = {
           }
         },
         sessions: { type: 'array', minItems: 1, items: { $ref: '#/$defs/session' } },
+        reckoning: reckoning,
         fieldOps: { $ref: '#/$defs/fieldOps' },
         bossEncounter: { $ref: '#/$defs/bossEncounter' },
         overflow: { type: 'boolean' },
@@ -270,6 +364,7 @@ export var BOOKLET_SCHEMA = {
         showNotes: { type: 'boolean' },
         continuationLabel: { type: 'string' },
         exercises: { type: 'array', minItems: 1, items: { $ref: '#/$defs/exercise' } },
+        markStrip: markStrip,
         binaryChoice: {
           type: 'object',
           required: ['promptA', 'promptB'],

@@ -87,7 +87,11 @@ import {
   PERCENTILE_STAT,
   VALID_WORKSPACE_STYLES,
   WORKSPACE_STYLE_ALIASES,
-  DEFAULT_WORKSPACE_STYLE
+  DEFAULT_WORKSPACE_STYLE,
+  MARK_STRIP,
+  MARK_STRIP_TARGET_KINDS,
+  RECKONING_SINK_KINDS,
+  RECKONING_THRESHOLD_RATIO
 } from '../../contracts/contract-constants.mjs';
 
 export {
@@ -107,7 +111,13 @@ export {
   PERCENTILE_STAT,
   VALID_WORKSPACE_STYLES,
   WORKSPACE_STYLE_ALIASES,
-  DEFAULT_WORKSPACE_STYLE
+  DEFAULT_WORKSPACE_STYLE,
+  // Mark economy (Session 1 / D89) — markStrip shape, machine-only target
+  // kinds, Reckoning sink vocabulary, derived-threshold ratio.
+  MARK_STRIP,
+  MARK_STRIP_TARGET_KINDS,
+  RECKONING_SINK_KINDS,
+  RECKONING_THRESHOLD_RATIO
 };
 
 export var SUPPORTED_THEME_ARCHETYPES = VALID_ARCHETYPES.reduce(function (acc, name) {

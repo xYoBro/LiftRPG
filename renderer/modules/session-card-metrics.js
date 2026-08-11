@@ -321,6 +321,54 @@ const CHOICE_LADDER = {
 const DEFAULT_CHOICE_LABEL = 'Route Decision';
 
 /**
+ * MARK STRIP — the Mark surface's geometry (Session 1).
+ *
+ * CROSS-FILE CONTRACT: mirrors the `.mark-strip` base block and the three
+ * `.session-card[data-density-variant="…"] .mark-strip` blocks in
+ * `booklet.css`, which carries the reciprocal pointer. Phase-1 estimation has
+ * no DOM and cannot resolve a custom property, so the numbers live twice;
+ * change them together or the solver's shrink potential lies (the D71 class).
+ *
+ * WHY THE TARGET COUNT DOES NOT APPEAR IN THE HEIGHT. The strip is one flex
+ * line with `flex-wrap: nowrap`, and each label is pinned to a single line by
+ * `white-space: nowrap; overflow: hidden; text-overflow: ellipsis`. Three
+ * targets and five targets therefore produce the SAME height — they divide the
+ * card's width, they do not stack. Charging per target would over-estimate a
+ * five-target strip by ~4×, and an over-estimate is not "the safe direction"
+ * here: at ~20px a target it would add ~250px of phantom height to a
+ * three-card page and shed a page that fits. The clamp in the CSS is what
+ * makes this modellable at all — it converts an unbounded text term into a
+ * constant. Relaxing `nowrap` in either place without adding a wrap term here
+ * is the D71 defect, pointed the other way.
+ *
+ * WHY IT IS FLAT ACROSS THE LADDER. `box` is the tick target — the thing a
+ * pencil has to land in — and it holds 15px at every tier by design, above the
+ * 14px print floor. The row is `align-items:center`, so its height is
+ * max(box, labelLine), and the box wins at all four tiers: the strip's only
+ * real shrink is its own padding, 3px end to end. That is the honest number.
+ * Modelling the box as scaling with density would hand the solver 12px of
+ * shrink potential that the CSS will never deliver.
+ *
+ *   padTop    `.mark-strip` padding-top.
+ *   border    its border-top. `--theme-hair-width` resolves to 1px in nine
+ *             archetypes and 1.5px in one (`--line-width-hair`); the model has
+ *             no theme knowledge and takes the worst case, as CARD_LADDER's
+ *             header row does for the same reason.
+ *   box       `.mark-box` height — density-invariant, and deliberately so.
+ *   labelLine `.mark-label` line box (font-size × line-height), carried so the
+ *             max() above is explicit rather than assumed. It is below `box`
+ *             at every tier today; if a theme ever pushes it above, the model
+ *             follows without an edit.
+ */
+const STRIP_LADDER = {
+  //         padTop  border  box  labelLine   ← booklet.css `.mark-strip`
+  base:    { padTop: 5, border: 1.5, box: 15, labelLine: 8.96 }, // 5.6pt × 1.2
+  compact: { padTop: 4, border: 1.5, box: 15, labelLine: 8.96 }, // 5.6pt × 1.2
+  dense:   { padTop: 3, border: 1.5, box: 15, labelLine: 8.48 }, // 5.3pt × 1.2
+  tight:   { padTop: 2, border: 1.5, box: 15, labelLine: 8.16 }, // 5.1pt × 1.2
+};
+
+/**
  * SINGLE-CARD PAGE GEOMETRY (`data-card-count="1"`).
  *
  * CROSS-FILE CONTRACT: `booklet.css` `.workout-left[data-card-count="1"] …`.
@@ -352,6 +400,15 @@ const SOLO_CARD = {
   promptLineHeight: 13.62,  // 7.4pt × 1.38
   promptPadY: 4,
   promptCharsPerLine: 68,   // base-tier column, same 7.4pt-ish measure
+  // THE MARK STRIP ON A SOLO CARD. `.mark-strip` carries no `data-card-count`
+  // override, so its geometry is whatever the card's density variant stamps —
+  // but this estimate is density-invariant by contract, so it charges the
+  // TALLEST row of the ladder. That is STRIP_LADDER.base, reached by asking
+  // rawMarkStripHeight() at density 0, exactly as the binary-choice term above
+  // reaches CHOICE_LADDER.base. Reading it rather than repeating the number is
+  // deliberate: a copied constant here is the D71 drift hazard, and a term
+  // MISSING here is the D79 one — the unmodelled solo notes box cost 194px.
+  stripDensity: 0,
 };
 
 /**
@@ -438,6 +495,37 @@ export function estimateBinaryChoiceHeight(session, density) {
   return monotoneTail((d) => rawBinaryChoiceHeight(choice, d), density);
 }
 
+/**
+ * `.mark-strip` height, or 0 when the session carries no strip.
+ *
+ * Zero is the whole dormancy guarantee on the estimate side: every session in
+ * the corpus predates the feature, so this term must contribute nothing at all
+ * to their totals — not a rounding difference, not a gap.
+ */
+function rawMarkStripHeight(markStrip, density) {
+  if (!markStrip) return 0;
+  const targets = Array.isArray(markStrip.targets) ? markStrip.targets : [];
+  if (!targets.length) return 0;
+
+  const tier = STRIP_LADDER[variantKey(density)];
+  return tier.padTop + tier.border + Math.max(tier.box, tier.labelLine);
+}
+
+/**
+ * Height of one session's mark strip at a density. Exported for symmetry with
+ * the prompt and choice terms; the card estimate uses the raw term directly.
+ *
+ * @param {object} session — a schema session object
+ * @param {number} density
+ * @returns {number} px, 0 when the session has no markStrip
+ */
+export function estimateMarkStripHeight(session, density) {
+  const strip = session && session.markStrip;
+  if (!strip) return 0;
+
+  return monotoneTail((d) => rawMarkStripHeight(strip, d), density);
+}
+
 // ---------------------------------------------------------------------------
 // Card composition
 // ---------------------------------------------------------------------------
@@ -454,6 +542,10 @@ function cardComposition(session) {
   const hasPrompt = !!(session && session.storyPrompt);
   const hasTable = exercises.length > 0;
   const hasChoice = !!(session && session.binaryChoice);
+  // Mirrors buildMarkStripModel(): a strip with no targets renders nothing, so
+  // it is not a body child and pays no gap.
+  const strip = (session || {}).markStrip;
+  const hasStrip = !!(strip && Array.isArray(strip.targets) && strip.targets.length);
   // `showNotes` mirrors buildWorkoutCardModel: explicit boolean wins, else the
   // notes box appears only when there are exercises to write against.
   const showNotes = typeof (session || {}).showNotes === 'boolean'
@@ -465,11 +557,12 @@ function cardComposition(session) {
     hasPrompt,
     hasTable,
     hasChoice,
+    hasStrip,
     showNotes,
     // header + [prompt] + meta + body
     cardChildren: 1 + (hasPrompt ? 1 : 0) + 1 + 1,
-    // [table] + [choice] + [notes]
-    bodyChildren: (hasTable ? 1 : 0) + (hasChoice ? 1 : 0) + (showNotes ? 1 : 0),
+    // [table] + [strip] + [choice] + [notes]
+    bodyChildren: (hasTable ? 1 : 0) + (hasStrip ? 1 : 0) + (hasChoice ? 1 : 0) + (showNotes ? 1 : 0),
   };
 }
 
@@ -532,6 +625,7 @@ function rawSessionCardHeight(session, density) {
     + (session && session.fragmentRef ? tier.meta : tier.metaEmpty)
     + Math.max(0, parts.bodyChildren - 1) * tier.bodyGap
     + rawExerciseTableHeight(parts.exercises, tier)
+    + rawMarkStripHeight(parts.hasStrip ? session.markStrip : null, density)
     + (parts.hasChoice ? rawBinaryChoiceHeight(session.binaryChoice, density) : 0)
     + (parts.showNotes ? notesBoxHeight(density) : 0);
 }
@@ -577,6 +671,7 @@ export function estimateSoloSessionCardHeight(session) {
     + (session && session.fragmentRef ? tier.meta : tier.metaEmpty)
     + Math.max(0, parts.bodyChildren - 1) * SOLO_CARD.bodyGap
     + rawExerciseTableHeight(parts.exercises, tier)
+    + rawMarkStripHeight(parts.hasStrip ? session.markStrip : null, SOLO_CARD.stripDensity)
     + (parts.hasChoice ? rawBinaryChoiceHeight(session.binaryChoice, 0) : 0)
     + (parts.showNotes ? SOLO_CARD.notes : 0);
 }

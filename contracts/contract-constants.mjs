@@ -93,6 +93,47 @@ export var VALID_CLOCK_TYPES = [
   'tug-of-war-clock', 'linked-clock', 'project-clock'
 ];
 
+// ── Mark economy: markStrip -> Reckoning (schema 1.5.0, Session 1 / D89) ─────
+// The Mark surface (mid-workout ticks on the session card) and the Resolve
+// surface (the week's Reckoning panel) are one economy in two halves. All three
+// fields below are OPTIONAL at schema level and additive over 1.4.0; the
+// assembled-booklet path derives them and then demands them
+// (generator/modules/assembly.js deriveMarkStripEconomy, then
+// validation.js collectMarkStripFindings). The stage validators deliberately
+// know nothing about them — a week-stage demand would break the stub bench and
+// the guided-build harness, which both replay hand-authored week payloads.
+// Hand-authored corpus fixtures predate the feature and are tolerated by a
+// RULE_DEMOTIONS entry in scripts/validate.mjs (D19 severity doctrine).
+
+// Strip shape. 3-5 targets is the ten-second law made countable: fewer than
+// three is not a strip, more than five stops being tickable between sets.
+// maxLabelWords caps the printed label. Digits are illegal in a label (enforced
+// in assembly, warned in validation) because a printed number invites
+// arithmetic mid-workout — design constitution law 2.
+export var MARK_STRIP = { minTargets: 3, maxTargets: 5, maxLabelWords: 5 };
+
+// MACHINE-ONLY provenance. A kind records WHY a target exists, so derivation is
+// auditable and repairs are idempotent. Kinds are NEVER printed and never reach
+// a prompt: the amendment killed the printed target-kind taxonomy, because
+// labels derive diegetically per world and two booklets sharing a kind must not
+// share a phrase. 'custom' is the honest bucket for an authored label whose
+// intent the classifier cannot read.
+export var MARK_STRIP_TARGET_KINDS = ['completion', 'effort', 'record', 'custom'];
+
+// Where a week's marks GO. The grammar law: a sink must reference vocabulary
+// the booklet ALREADY RENDERS — a mark that converts into a surface the player
+// cannot see is an unpaid promise. 'notes' is the floor (every session card
+// carries a notes rail), which is why it is the repair default.
+export var RECKONING_SINK_KINDS = ['map', 'companion', 'clock', 'oracle', 'notes'];
+
+// Derived boss threshold = round(ratio x total attainable ticks), summed across
+// ALL weeks (the wallet is cumulative, not per-week). Reachable by
+// construction: a player who ticks three quarters of everything clears it, so
+// the boss week can never print a target the campaign could not pay for.
+// The password chain is untouched — the economy may never own the six-week
+// payoff (spine-determinism law).
+export var RECKONING_THRESHOLD_RATIO = 0.75;
+
 export var VALID_PAYLOAD_TYPES = [
   'none', 'narrative', 'cipher', 'map', 'clock',
   'companion', 'fragment-ref', 'password-element'

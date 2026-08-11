@@ -1757,6 +1757,74 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   pointer-events:none;
 }
 
+/* Mark Strip — the Mark surface (Session 1)
+   The mid-workout tick row: one box per target, printed between the exercise
+   table and the notes box. Ten-second law — ticks only, nothing to read, count
+   or decide. The rep boxes record the work; this strip scores it.
+
+   CROSS-FILE CONTRACT: renderer/modules/session-card-metrics.js STRIP_LADDER
+   mirrors the padding, border, box size and label line box of this block and
+   of the three density blocks further down. Phase-1 estimation has no DOM and
+   cannot read a custom property, so the numbers live twice — change them
+   together or the density solver's shrink-potential arithmetic lies (D71).
+
+   TWO DECLARATIONS ARE LOAD-BEARING BEYOND THEIR LOOKS:
+   · `flex-wrap:nowrap` on the strip and `white-space:nowrap` + ellipsis on the
+     label pin the row to ONE line whatever the target count. That is the only
+     reason the strip's height is modellable without a wrap term. Relax either
+     and the estimate silently under-reads a wrapped strip.
+   · `--mark-box-size` holds 15px at every density tier. A tick box is a place
+     a pencil has to land; shrinking it is not a saving, and modelling it as
+     shrinkable would promise the solver 12px it never delivers. The strip's
+     honest shrink is its own padding, 3px end to end.
+
+   Character comes from theme tokens only (--ink / --rule / --paper /
+   --theme-*), so a new archetype restyles the strip without touching this
+   block, and it prints in B&W: the box is an outline, never a fill. */
+.mark-strip{
+  --mark-box-size:15px;
+  --mark-strip-gap:8px;
+  --mark-strip-pad-top:5px;
+  display:flex;
+  flex-wrap:nowrap;
+  align-items:center;
+  gap:var(--mark-strip-gap);
+  /* Pinned against `.session-body`'s column flex. Without this the strip is
+     `flex:0 1 auto` and an over-full body compresses the tick boxes — the one
+     element that must not give, and a silent divergence from the height
+     STRIP_LADDER models. The notes box carries `flex:1 1 auto` and is what
+     absorbs the squeeze instead. */
+  flex:0 0 auto;
+  padding-top:var(--mark-strip-pad-top);
+  border-top:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-field-rule,var(--rule));
+}
+.mark-target{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  flex:1 1 0;
+  min-width:0;
+}
+.mark-box{
+  width:var(--mark-box-size);
+  height:var(--mark-box-size);
+  flex:0 0 auto;
+  border:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border-radius:2px;
+  background:var(--paper);
+}
+.mark-label{
+  font-family:var(--mono);
+  font-size:5.6pt;
+  line-height:1.2;
+  letter-spacing:.04em;
+  color:var(--ink);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  min-width:0;
+}
+
 /* Notes Box */
 .notes-box{
   min-height:var(--notes-box-height, 30px);
@@ -1940,6 +2008,30 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 }
 .session-card[data-density-variant="tight"] .notes-box{
   padding:1px 4px;
+}
+/* Mark-strip density tiers. ON SCREEN, never inside @media print (D72): the
+   measurement harness is parked off-screen at -200vw and reads screen styles,
+   so a print-scoped shrink is invisible to the solver and print then renders
+   what was never measured. The validator's densityPrintScopeScan enforces it.
+   `--mark-box-size` is absent from all three blocks on purpose — see the tick
+   floor note in the base block. STRIP_LADDER mirrors every number here. */
+.session-card[data-density-variant="compact"] .mark-strip{
+  --mark-strip-gap:7px;
+  --mark-strip-pad-top:4px;
+}
+.session-card[data-density-variant="dense"] .mark-strip{
+  --mark-strip-gap:6px;
+  --mark-strip-pad-top:3px;
+}
+.session-card[data-density-variant="dense"] .mark-label{
+  font-size:5.3pt;
+}
+.session-card[data-density-variant="tight"] .mark-strip{
+  --mark-strip-gap:5px;
+  --mark-strip-pad-top:2px;
+}
+.session-card[data-density-variant="tight"] .mark-label{
+  font-size:5.1pt;
 }
 /* ── Single-card page ────────────────────────────────────────────────────────
    CROSS-FILE CONTRACT: renderer/modules/session-card-metrics.js SOLO_CARD +
@@ -2283,6 +2375,121 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 }
 .oracle-zone{border-top:1px solid var(--rule);padding-top:3px;}
 .oracle-zone{border-top-color:var(--theme-field-rule,var(--rule));}
+/* Reckoning panel — the Resolve surface (Session 1)
+   The week's banked ticks, the conversion rule, the sink line, and (on the
+   week that carries one) the threshold. Prints on the field-ops spread facing
+   the session cards, because a rule should teach where it fires.
+
+   CROSS-FILE CONTRACT: every number in this block and in the three
+   `.reckoning-panel[data-density-variant="…"]` blocks at the bottom of this
+   file is mirrored by the LADDER table in
+   renderer/modules/atoms/reckoning-panel.js, which carries the reverse
+   pointer. Phase-1 estimation has no DOM and cannot resolve a custom property.
+   CHANGE THEM TOGETHER — a value moved here alone makes the solver's
+   shrink-potential math lie (D71).
+
+   THE TALLY IS A FIXED-COLUMN GRID, NOT A WRAPPING FLEX ROW. Ten columns
+   exactly, so the printed row count is ceil(ticks / 10) — a number the
+   estimate can compute instead of guess. A `flex-wrap` tally would put the
+   break point at the mercy of the container width, which the estimate does
+   not know. Ten boxes plus nine gaps is 186px, so the grid also survives a
+   half-width slot without reflowing.
+
+   `--reckoning-box-size` holds 15px at every density tier, above the 14px
+   print floor: it is a square a pencil has to land in. Character comes from
+   theme tokens only, and the boxes are outlines, so the panel prints in B&W. */
+.reckoning-panel{
+  --reckoning-box-size:15px;
+  --reckoning-tally-gap:4px;
+  --reckoning-text-size:6pt;
+  border-top:1px solid var(--theme-field-rule,var(--rule));
+  padding-top:3px;
+}
+.reckoning-header{
+  font-family:var(--mono);
+  font-size:5.9pt;
+  text-transform:uppercase;
+  letter-spacing:.14em;
+  color:var(--ink);
+  padding-bottom:2px;
+  border-bottom:1px solid var(--theme-field-rule,var(--rule));
+  margin-bottom:3px;
+}
+.reckoning-tally{
+  display:grid;
+  grid-template-columns:repeat(10, var(--reckoning-box-size));
+  gap:var(--reckoning-tally-gap);
+  justify-content:start;
+  margin-bottom:5px;
+}
+.reckoning-tally-box{
+  width:var(--reckoning-box-size);
+  height:var(--reckoning-box-size);
+  border:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border-radius:2px;
+  background:var(--paper);
+}
+.reckoning-conversion,
+.reckoning-sink{
+  font-family:var(--serif);
+  font-size:var(--reckoning-text-size);
+  line-height:1.35;
+  color:var(--ink);
+  margin-bottom:3px;
+}
+.reckoning-sink{
+  font-style:italic;
+  color:var(--muted);
+}
+.reckoning-threshold{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  margin-top:4px;
+}
+.reckoning-threshold-label{
+  font-family:var(--mono);
+  font-size:5.4pt;
+  text-transform:uppercase;
+  letter-spacing:.12em;
+  color:var(--muted);
+}
+.reckoning-threshold-value{
+  font-family:var(--mono);
+  font-size:6.4pt;
+  line-height:1;
+  color:var(--ink);
+  min-width:15px;
+  padding:2px 4px;
+  text-align:center;
+  border:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--rule));
+  border-radius:2px;
+}
+/* The running-balance write-in. A threshold the player cannot track a balance
+   against is an unpaid promise — this is the pencil surface that pays it.
+   The box height mirrors the atom LADDER's bankedLine (15px, density-invariant
+   like every tick target: a write-in a pencil cannot land in is not a saving). */
+.reckoning-banked{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  margin-top:4px;
+}
+.reckoning-banked-label{
+  font-family:var(--mono);
+  font-size:5.4pt;
+  text-transform:uppercase;
+  letter-spacing:.12em;
+  color:var(--muted);
+}
+.reckoning-banked-box{
+  height:15px;
+  min-width:42px;
+  border:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--rule));
+  border-radius:2px;
+  background:transparent;
+}
+
 .companion-zone{
   border-top:1px solid var(--rule);
   padding-top:6px;
@@ -3511,6 +3718,58 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 }
 .oracle-zone[data-density-variant="tight"] .oracle-instruction{
   margin-bottom:1px;
+}
+/* Reckoning-panel density tiers — mirrored by the LADDER table in
+   renderer/modules/atoms/reckoning-panel.js (base block near .companion-zone
+   carries the full contract note). ON SCREEN, never inside @media print (D72):
+   measurement runs on the screen stylesheet, so a print-scoped density block
+   is invisible to the solver. `--reckoning-box-size` is deliberately absent
+   from all three — the tally box is the pencil floor and does not shrink. */
+.reckoning-panel[data-density-variant="compact"]{
+  --reckoning-text-size:5.8pt;
+}
+.reckoning-panel[data-density-variant="compact"] .reckoning-tally{
+  margin-bottom:4px;
+}
+.reckoning-panel[data-density-variant="dense"]{
+  --reckoning-tally-gap:3px;
+  --reckoning-text-size:5.4pt;
+  padding-top:2px;
+}
+.reckoning-panel[data-density-variant="dense"] .reckoning-header{
+  font-size:5.6pt;
+  padding-bottom:1px;
+  margin-bottom:2px;
+}
+.reckoning-panel[data-density-variant="dense"] .reckoning-tally{
+  margin-bottom:3px;
+}
+.reckoning-panel[data-density-variant="dense"] .reckoning-conversion,
+.reckoning-panel[data-density-variant="dense"] .reckoning-sink{
+  margin-bottom:2px;
+}
+.reckoning-panel[data-density-variant="dense"] .reckoning-threshold{
+  margin-top:3px;
+}
+.reckoning-panel[data-density-variant="tight"]{
+  --reckoning-tally-gap:3px;
+  --reckoning-text-size:5.2pt;
+  padding-top:2px;
+}
+.reckoning-panel[data-density-variant="tight"] .reckoning-header{
+  font-size:5.4pt;
+  padding-bottom:1px;
+  margin-bottom:1px;
+}
+.reckoning-panel[data-density-variant="tight"] .reckoning-tally{
+  margin-bottom:3px;
+}
+.reckoning-panel[data-density-variant="tight"] .reckoning-conversion,
+.reckoning-panel[data-density-variant="tight"] .reckoning-sink{
+  margin-bottom:2px;
+}
+.reckoning-panel[data-density-variant="tight"] .reckoning-threshold{
+  margin-top:3px;
 }
 .companion-component{
   border:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-panel-border,var(--rule));

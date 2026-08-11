@@ -58,6 +58,30 @@ function buildBinaryChoiceModel(binaryChoice) {
   };
 }
 
+/**
+ * The Mark surface: the strip of tick targets printed inside the session body.
+ *
+ * DORMANCY (the binaryChoice pattern, exactly): returns null when the session
+ * carries no `markStrip` — which is every session in the corpus. A null model
+ * makes renderMarkStrip() a no-op, which keeps `.session-body`'s child count,
+ * and therefore every gap the geometry model charges, unchanged.
+ *
+ * `kind` is deliberately NOT read. It is a machine enum for the generator's
+ * derivation pass; nothing about it is ever printed, so the renderer has no
+ * business knowing its values (and cannot drift from them).
+ */
+function buildMarkStripModel(markStrip) {
+  if (!markStrip) return null;
+  const targets = Array.isArray(markStrip.targets) ? markStrip.targets : [];
+  if (!targets.length) return null;
+
+  return {
+    targets: targets.map((target) => ({
+      label: String((target && target.label) || '').trim()
+    }))
+  };
+}
+
 export function buildWorkoutCardModel(session, layoutPlan) {
   const exercises = session.exercises || [];
   const showNotes = typeof session.showNotes === 'boolean' ? session.showNotes : exercises.length > 0;
@@ -73,6 +97,7 @@ export function buildWorkoutCardModel(session, layoutPlan) {
     exerciseNameWidthPx: resolveExerciseNameWidthPx(exercises),
     exerciseRows: exercises.map((exercise) => buildExerciseRowModel(exercise)),
     binaryChoice: buildBinaryChoiceModel(session.binaryChoice),
+    markStrip: buildMarkStripModel(session.markStrip),
     showNotes
   };
 }
