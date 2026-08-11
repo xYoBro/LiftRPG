@@ -1,16 +1,16 @@
-import { make } from './dom.js?v=47';
-import { splitRichText } from './booklet-models.js?v=47';
-import { buildClockModels, buildCompanionModels } from './field-ops-models.js?v=47';
-import { createBoundedPage } from './page-shell.js?v=47';
-import { sanitizeHtml, sanitizeSvg } from './utils.js?v=47';
+import { make } from './dom.js?v=48';
+import { splitRichText } from './booklet-models.js?v=48';
+import { buildClockModels, buildCompanionModels } from './field-ops-models.js?v=48';
+import { createBoundedPage } from './page-shell.js?v=48';
+import { sanitizeHtml, sanitizeSvg } from './utils.js?v=48';
 import {
   renderCipherSection,
   renderCompanionComponent,
   renderGameplayClocks,
   renderMapSection
-} from './field-ops-primitives.js?v=47';
-import { inferCipherFamily, inferMapFamily } from './mechanic-registry.js?v=47';
-import { renderManifestPointer } from './document-primitives.js?v=47';
+} from './field-ops-primitives.js?v=48';
+import { inferCipherFamily, inferMapFamily } from './mechanic-registry.js?v=48';
+import { renderManifestPointer } from './document-primitives.js?v=48';
 
 function renderClassifiedPacketCoverMeta(model) {
   const wrap = make('div', 'cover-packet-meta');

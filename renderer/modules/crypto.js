@@ -4,8 +4,8 @@ import {
   CRYPTO_IV_BYTES,
   CRYPTO_KEY_BITS,
   CRYPTO_SALT_BYTES
-} from './constants.js?v=47';
-import { normalisePassword } from './utils.js?v=47';
+} from './constants.js?v=48';
+import { normalisePassword } from './utils.js?v=48';
 
 function deriveKey(password, salt, usage) {
   const encoder = new TextEncoder();
@@ -38,14 +38,20 @@ function uint8ToBase64url(bytes) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+// Every failure path must REJECT, never throw synchronously: base64urlToUint8's
+// atob() throws InvalidCharacterError on a corrupt blob, and a sync throw here
+// escapes past the caller's .catch() (app.js attemptUnlock), hanging the unlock
+// bar at "Unlocking…". Promise.resolve() puts the whole body inside the chain.
 export function decryptBlob(blob, password) {
-  const packed = base64urlToUint8(blob);
-  const salt = packed.slice(0, CRYPTO_SALT_BYTES);
-  const iv = packed.slice(CRYPTO_SALT_BYTES, CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES);
-  const ciphertext = packed.slice(CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES);
-  return deriveKey(password, salt, ['decrypt'])
-    .then((key) => crypto.subtle.decrypt({ name: CRYPTO_ALGO, iv }, key, ciphertext))
-    .then((plainBuffer) => JSON.parse(new TextDecoder().decode(plainBuffer)));
+  return Promise.resolve().then(() => {
+    const packed = base64urlToUint8(blob);
+    const salt = packed.slice(0, CRYPTO_SALT_BYTES);
+    const iv = packed.slice(CRYPTO_SALT_BYTES, CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES);
+    const ciphertext = packed.slice(CRYPTO_SALT_BYTES + CRYPTO_IV_BYTES);
+    return deriveKey(password, salt, ['decrypt'])
+      .then((key) => crypto.subtle.decrypt({ name: CRYPTO_ALGO, iv }, key, ciphertext))
+      .then((plainBuffer) => JSON.parse(new TextDecoder().decode(plainBuffer)));
+  });
 }
 
 export function encryptBlob(payload, password) {

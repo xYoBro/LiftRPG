@@ -1,4 +1,4 @@
-import { describeExerciseLoad, countWrappedLines } from './utils.js?v=47';
+import { describeExerciseLoad, countWrappedLines } from './utils.js?v=48';
 
 // ---------------------------------------------------------------------------
 // Session-card geometry model

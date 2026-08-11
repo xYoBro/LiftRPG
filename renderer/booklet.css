@@ -2347,6 +2347,23 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .field-ops-right[data-shell-family="classified-packet"] .companion-zone:only-child{
   min-height:100%;
 }
+/* CONSTRAINT: second stop mixes --warm, NOT --paper-2. These four board modes
+   are the only board-mode rules reachable OUTSIDE classified-packet scope,
+   where --paper-2 resolves to --panel-surface — which theme.js emits as a
+   linear-gradient() STRING in 8 of 10 archetypes (and in every custom
+   palette). A gradient is not a valid color-mix() operand, so the whole
+   `background` declaration became invalid at computed-value time and dropped
+   silently; the border survived and masked it. --warm is colour-valued in
+   every theme by construction (--secondary-paper ← --page-secondary-paper,
+   always a hex), and inside classified-packet scope it re-binds to #dad5ca
+   against --paper-2's #d8d3c8 — a 1.9/255 per-channel shift, invisible.
+   Found 2026-08-11. Two siblings still mix --paper-2 without a shell gate:
+   `.ops-directive-board`, safe only because the classified-packet decorator is
+   its sole emitter and it therefore always inherits the classified hex
+   re-bind; and the LATER `[data-board-state-mode="ledger-board"] .cipher-zone`
+   rule below, which overrides this one for that mode and is STILL DROPPING on
+   non-classified shells — dormant only because no fixture uses ledger-board,
+   so the diagnostics sweep has no visible element to catch it with. */
 .field-ops-right[data-board-state-mode="node-graph"] .map-zone,
 .field-ops-right[data-board-state-mode="timeline-reconstruction"] .map-zone,
 .field-ops-right[data-board-state-mode="testimony-matrix"] .oracle-zone,
@@ -2354,7 +2371,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   padding:5px 6px 6px;
   border:1px solid color-mix(in srgb, var(--theme-panel-border,var(--rule)) 78%, transparent 22%);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--paper) 92%, white 8%), color-mix(in srgb, var(--paper-2) 94%, white 6%));
+    linear-gradient(180deg, color-mix(in srgb, var(--paper) 92%, white 8%), color-mix(in srgb, var(--warm) 94%, white 6%));
 }
 .field-ops-right[data-board-state-mode="timeline-reconstruction"] .map-zone{
   position:relative;
@@ -2763,6 +2780,12 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   border:1px solid color-mix(in srgb, var(--theme-box-border,var(--ink)) 76%, transparent 24%);
 }
 .field-ops-right[data-board-state-mode="ledger-board"] .cipher-zone{
+  /* --warm, not --paper-2: outside classified-packet scope --paper-2 resolves to
+     a gradient string (panel surface), and a gradient operand voids the whole
+     declaration — the same silent drop fixed in the board-state zone rule above.
+     This ungated rule overrides that one at identical specificity, so it must
+     carry the same colour-valued operand. No fixture exercises ledger-board yet,
+     so the runtime sweep cannot see this rule — the comment is the guard. */
   background:
     repeating-linear-gradient(
       to bottom,
@@ -2771,7 +2794,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
       color-mix(in srgb, var(--theme-field-rule,var(--rule)) 24%, transparent 76%) 17px,
       color-mix(in srgb, var(--theme-field-rule,var(--rule)) 24%, transparent 76%) 18px
     ),
-    linear-gradient(180deg, color-mix(in srgb, var(--paper) 94%, white 6%), color-mix(in srgb, var(--paper-2) 94%, white 6%));
+    linear-gradient(180deg, color-mix(in srgb, var(--paper) 94%, white 6%), color-mix(in srgb, var(--warm) 94%, white 6%));
 }
 .field-ops-right[data-board-state-mode="ledger-board"] .password-extract{
   border-left:none;
@@ -4484,6 +4507,28 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .page-fragment-doc[data-fragment-count="2"]{
   justify-content:flex-start;
 }
+/* EVIDENCE LAYOUT — currently unreachable corpus-wide. The rules below are
+   correct and stay; nothing renders against them today.
+
+   `shouldUsePacketEvidenceLayout()` (decorators/classified-packet.js) admits a
+   fragment page only when it carries exactly 2 non-dense documents of <= 420
+   chars AND <= 4 paragraphs. Across all 226 fragments in the 19 content/
+   fixtures, three pass type+length (The-Hinge F.2 at 339 and F.8 at 405,
+   The-Air-Gapped-Choir F.8 at 288) and all three fail the paragraph ceiling,
+   scoring 8, 7 and 9 — because the paragraph split is `/\n\s*\n|\n/`, whose
+   `|\n` branch counts EVERY newline, so each header line reads as a paragraph.
+   Under blank-line splitting the same three score 3, 4 and 4: all would pass.
+   Of the nine fixtures that resolve to classified-packet, only The-Hinge holds
+   any fragment under 420 chars at all — the threshold predates the post-D83
+   budget-trimmed corpus.
+
+   Liveness is pinned by an expected-fail marker in
+   tests/playwright/shell-decorator.spec.js; the feature's fate is an open
+   author decision. Deleted from this block (D71 class — selectors no tuning
+   can reach): `.fragment-evidence-secondary` and `.fragment-evidence-cell`,
+   which no JS emits (the decorator emits only -primary and -sidebar), and the
+   `[data-fragment-count="3"|"4"]` rules, unreachable because the gate hard-
+   requires exactly 2 placements and the attribute is set from that length. */
 .fragment-evidence-layout{
   flex:1;
   display:grid;
@@ -4491,15 +4536,8 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   gap:8px;
   min-height:0;
 }
-.fragment-evidence-layout[data-fragment-count="3"],
-.fragment-evidence-layout[data-fragment-count="4"]{
-  grid-template-columns:1fr;
-  grid-template-rows:minmax(0, 1.05fr) minmax(0, 0.95fr);
-}
 .fragment-evidence-primary,
-.fragment-evidence-sidebar,
-.fragment-evidence-secondary,
-.fragment-evidence-cell{
+.fragment-evidence-sidebar{
   min-height:0;
 }
 .fragment-evidence-primary{
@@ -4509,18 +4547,6 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .fragment-evidence-sidebar{
   display:flex;
   min-height:0;
-}
-.fragment-evidence-secondary{
-  display:grid;
-  grid-template-columns:repeat(2, minmax(0, 1fr));
-  gap:8px;
-  min-height:0;
-}
-.fragment-evidence-layout[data-fragment-count="4"] .fragment-evidence-secondary{
-  grid-template-columns:repeat(3, minmax(0, 1fr));
-}
-.fragment-evidence-cell{
-  display:flex;
 }
 .fragment-page[data-shell-family="classified-packet"]{
   position:relative;

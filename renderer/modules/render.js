@@ -1,10 +1,10 @@
-import { PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from './constants.js?v=47';
-import { make } from './dom.js?v=47';
-import { buildBookletMetaModel, resolveArtifactIdentity } from './booklet-models.js?v=47';
-import { setPageNumbers } from './pagination.js?v=47';
-import { createBoundedPage } from './page-shell.js?v=47';
-import { renderPageFromPlacements } from './page-renderer.js?v=47';
-import { applyTheme, resolveTheme } from './theme.js?v=47';
+import { PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from './constants.js?v=48';
+import { make } from './dom.js?v=48';
+import { buildBookletMetaModel, resolveArtifactIdentity } from './booklet-models.js?v=48';
+import { setPageNumbers } from './pagination.js?v=48';
+import { createBoundedPage } from './page-shell.js?v=48';
+import { renderPageFromPlacements } from './page-renderer.js?v=48';
+import { applyTheme, resolveTheme } from './theme.js?v=48';
 
 // ── V2 Engine imports ───────────────────────────────────────────────
 import { planAndMeasure, scanContinuationDiagnostics } from './engine/page-planner.js';

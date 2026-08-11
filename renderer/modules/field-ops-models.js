@@ -4,12 +4,12 @@ import {
   pad2,
   sanitizeBossTextForDisplay,
   splitParagraphs
-} from './utils.js?v=47';
+} from './utils.js?v=48';
 import {
   inferCipherFamily,
   inferMapFamily
-} from './mechanic-registry.js?v=47';
-import { normalizeD100Language, resolveArtifactIdentity } from './booklet-models.js?v=47';
+} from './mechanic-registry.js?v=48';
+import { normalizeD100Language, resolveArtifactIdentity } from './booklet-models.js?v=48';
 
 function splitKeyRows(text) {
   return String(text || '')

@@ -1,18 +1,19 @@
 // ── Contract constants — THE single source of truth ─────────────────────────
 // Every enum, guardrail, and version literal that more than one module relies
 // on lives here. Consumed by:
+//   - contracts/booklet-schema.mjs (imports enums directly — drift impossible
+//     by construction)
 //   - generator/modules/constants.js (re-exports for the pipeline)
 //   - generator/modules/assembly.js + validation.js (identity normalization)
-//   - scripts/validate.js (canonical validator, Node)
-//   - contracts/booklet-1.4.schema.json (kept in sync by the validator's
-//     self-check — the validator fails if schema enums drift from this file)
+//   - scripts/validate.mjs (canonical validator, Node)
+//   - scripts/gen-reference.mjs (generated reference tables, validator-diffed)
 //
 // prompt_rules.js is a classic script and cannot import this module; the
 // canonical validator asserts its literals match these values (see
-// scripts/validate.js "prompt-contract parity" checks).
+// scripts/validate.mjs "prompt-contract parity" checks).
 //
-// This file is synced to public/contracts/ by `npm run build:gold-disk`
-// (scripts/sync-renderer-to-public.js). Edit it HERE, never in public/.
+// contracts/ is a SYMLINK to public/contracts — one physical file. Editing
+// through either path touches the same bytes; nothing is synced.
 
 // ── Schema version ───────────────────────────────────────────────────────────
 
@@ -234,8 +235,10 @@ export var SPATIAL_GUARDRAILS = {
 };
 
 // ── Crypto contract ──────────────────────────────────────────────────────────
-// Must match renderer/modules/constants.js + crypto.js and
-// generator/liftrpg-encrypt.js (validator-asserted).
+// Validator-asserted against renderer/modules/constants.js and
+// generator/liftrpg-encrypt.js; crypto.js is covered transitively, since it
+// imports these constants from renderer/modules/constants.js rather than
+// declaring its own.
 
 export var CRYPTO_CONTRACT = {
   algo: 'AES-GCM',

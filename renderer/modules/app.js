@@ -1,8 +1,8 @@
-import { decryptBlob, encryptBlob } from './crypto.js?v=47';
-import { qs } from './dom.js?v=47';
-import { exportBookletPdf } from './pdf-export.js?v=47';
-import { renderBooklet, syncLayoutMode } from './render.js?v=47';
-import { deriveBookletPassword, normalisePassword, validateBooklet } from './utils.js?v=47';
+import { decryptBlob, encryptBlob } from './crypto.js?v=48';
+import { qs } from './dom.js?v=48';
+import { exportBookletPdf } from './pdf-export.js?v=48';
+import { renderBooklet, syncLayoutMode } from './render.js?v=48';
+import { deriveBookletPassword, normalisePassword, validateBooklet } from './utils.js?v=48';
 
 const state = {
   data: null,
@@ -488,7 +488,11 @@ function attemptUnlock() {
     inputDisabled: false,
     buttonDisabled: true
   });
-  decryptBlob(state.data.meta.passwordEncryptedEnding, password)
+  // Belt-and-braces: any synchronous throw out of decryptBlob must reach the
+  // rejection UX below rather than escaping to the click listener and leaving
+  // the bar stuck at "Unlocking…" (crypto.js now guarantees it can only reject).
+  Promise.resolve()
+    .then(() => decryptBlob(state.data.meta.passwordEncryptedEnding, password))
     .then((payload) => {
       unlockWithPayload(payload, password);
     })

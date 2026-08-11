@@ -4,8 +4,8 @@ import {
   pad2,
   splitRichContentBlocks,
   splitParagraphs
-} from './utils.js?v=47';
-import { normalizeManifestPointer } from './document-models.js?v=47';
+} from './utils.js?v=48';
+import { normalizeManifestPointer } from './document-models.js?v=48';
 
 function humanizeComponentType(value) {
   return String(value || 'component').replace(/-/g, ' ');

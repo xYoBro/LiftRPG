@@ -1,6 +1,6 @@
-import { make } from './dom.js?v=47';
-import { createBoundedPage } from './page-shell.js?v=47';
-import { sanitizeHtml } from './utils.js?v=47';
+import { make } from './dom.js?v=48';
+import { createBoundedPage } from './page-shell.js?v=48';
+import { sanitizeHtml } from './utils.js?v=48';
 
 /**
  * renderManifestPointer(pointer) -> Element | null

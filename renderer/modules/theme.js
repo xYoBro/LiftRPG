@@ -1,4 +1,4 @@
-import { alpha, mergeObjects } from './utils.js?v=47';
+import { alpha, mergeObjects } from './utils.js?v=48';
 
 const THEME_PRESETS = {
   pastoral: {

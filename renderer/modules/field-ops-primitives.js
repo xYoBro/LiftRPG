@@ -1,5 +1,5 @@
-import { make } from './dom.js?v=47';
-import { createBoundedPage } from './page-shell.js?v=47';
+import { make } from './dom.js?v=48';
+import { createBoundedPage } from './page-shell.js?v=48';
 import {
   resolveWorkspaceStyle,
   resolveWorkspaceCellCount,
