@@ -5,47 +5,13 @@
 import { VALID_MAP_TYPES, VALID_COMPANION_TYPES } from './constants.js';
 import { normalizeId, normalizeThemeArchetype } from './assembly.js';
 import { validateAssembledBooklet } from './validation.js';
-
-function looksLikeFragmentRef(ref) {
-  return /^f\d+$/i.test(normalizeId(ref || ''));
-}
+import { buildMapEvolutionFingerprint, looksLikeFragmentRef } from './fingerprint.js';
 
 export function extractWeekCompanionTypes(week) {
   return ((((week || {}).fieldOps || {}).companionComponents) || [])
     .map(function (component) { return String((component || {}).type || '').trim(); })
     .filter(Boolean)
     .sort();
-}
-
-function buildMapEvolutionFingerprint(mapState) {
-  var ms = mapState || {};
-  var mapType = String(ms.mapType || 'grid').trim().toLowerCase();
-
-  if (mapType === 'point-to-point' || mapType === 'node-graph') {
-    var nodes = (ms.nodes || []).map(function (node) {
-      return [node.id || '', node.label || '', node.state || '', node.x || '', node.y || ''].join(':');
-    }).sort().join('|');
-    var edges = (ms.edges || []).map(function (edge) {
-      return [edge.from || '', edge.to || '', edge.label || ''].join(':');
-    }).sort().join('|');
-    return 'network::' + nodes + '::' + edges + '::' + String(ms.currentNode || '');
-  }
-
-  if (mapType === 'linear-track') {
-    var stops = (ms.stops || ms.nodes || []).map(function (stop) {
-      return [stop.id || '', stop.label || '', stop.state || '', stop.position || ''].join(':');
-    }).sort().join('|');
-    return 'track::' + stops + '::' + String(ms.currentPosition || ms.currentNode || '');
-  }
-
-  if (mapType === 'player-drawn') {
-    return 'player::' + String(ms.mapNote || '') + '::' + String(ms.currentPosition || '');
-  }
-
-  var tiles = (ms.tiles || []).map(function (tile) {
-    return [tile.label || '', tile.type || '', tile.x || '', tile.y || ''].join(':');
-  }).sort().join('|');
-  return 'grid::' + tiles + '::' + String(ms.currentPosition || '');
 }
 
 function findBossPasswordSpoiler(boss) {

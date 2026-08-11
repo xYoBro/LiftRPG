@@ -16,9 +16,13 @@ import './decorators/index.js';
 const WORKOUT_PAGE_TYPES = new Set(['week-header', 'session-card', 'week-footer']);
 // reckoning-panel is deliberately NOT a mechanic page type: on non-boss weeks
 // it shares field-ops pages that cipher/oracle already classify, and on boss
-// weeks it joins the final session-chunk page — where mechanic classification
-// would hoist it into the mechanic zone ABOVE the cards, inverting printed
-// order (found live, Session 1).
+// weeks it shares the final session-chunk page, which routes as a workout page
+// regardless (renderPageFromPlacements tests workout content first). Listing
+// it here would only change the one case where it lands alone on a page —
+// giving that page a mechanic frame and a week footer it does not ask for.
+//
+// It is NOT what inverted the panel against the cards in Session 1: that was
+// the type partition in renderWorkoutPage(), fixed there.
 const MECHANIC_PAGE_TYPES = new Set(['cipher-panel', 'oracle-table', 'map-panel', 'tracker']);
 const BOARD_STATE_COPY = {
   'survey-grid': {
@@ -264,13 +268,42 @@ function renderWorkoutPage(placements, planIndex) {
   frame.setAttribute('data-card-count', String(sessionPlacements.length));
   frame.setAttribute('data-page-compaction', String(workoutCompactionLevel(sessionPlacements)));
 
-  placements
-    .filter((placement) => placement.type !== 'session-card' && placement.type !== 'week-footer')
-    .forEach((placement) => renderPlacementInto(frame, placement));
+  // PRINTED ORDER = PLACEMENT ORDER.
+  //
+  // This loop used to be a type partition: every non-card atom rendered into
+  // the frame first, then the cards, then the footer. That silently hoisted
+  // ANY non-card atom above the cards no matter what sequence the adapter gave
+  // it — the page composed by type, while the plan was ordered by (section,
+  // sequence). It never showed because the only non-card atom that had ever
+  // landed on a workout page was the week header, which sorts first anyway.
+  // Session 1's reckoning panel, seated between the last card and the footer,
+  // printed above the card and exposed it.
+  //
+  // The planner's per-(group, side) sequence law (D81) governs the placement
+  // array; composing in that array's order is what carries the law into the
+  // DOM. Nothing here may reorder placements — only group them.
+  //
+  // Consecutive cards share one `.session-cards` flex column, because that
+  // container is what lets cards stretch to fill the page (`flex:1` + `flex:1
+  // 1 0` children). A run breaks when a non-card atom is seated between cards,
+  // and each run gets its own column — the atom prints where its sequence put
+  // it. The week footer is the one exception: it is a page-structural band the
+  // renderer positions, not a flow atom (ZONE-ASSIGNMENT-DESIGN §6), and
+  // appendWeeklyFooter synthesises one when no footer placement is present.
+  const flowPlacements = placements.filter((placement) => placement.type !== 'week-footer');
+  let cursor = 0;
+  while (cursor < flowPlacements.length) {
+    if (flowPlacements[cursor].type !== 'session-card') {
+      renderPlacementInto(frame, flowPlacements[cursor]);
+      cursor++;
+      continue;
+    }
 
-  if (sessionPlacements.length > 0) {
     const cards = make('div', 'session-cards');
-    sessionPlacements.forEach((placement) => renderPlacementInto(cards, placement));
+    while (cursor < flowPlacements.length && flowPlacements[cursor].type === 'session-card') {
+      renderPlacementInto(cards, flowPlacements[cursor]);
+      cursor++;
+    }
     frame.appendChild(cards);
   }
 
@@ -440,16 +473,7 @@ export function renderPageFromPlacements(placements, spreadType, planIndex) {
       shellAttrs,
       placements,
       fragmentCount: placements.length,
-      renderPlacementInto,
     };
-
-    // Decorator: override fragment layout (evidence layout, etc.)
-    const customLayout = fragmentDecorator.buildFragmentLayout
-      && fragmentDecorator.buildFragmentLayout(fragmentFacts);
-    if (customLayout) {
-      frame.appendChild(customLayout);
-      return page;
-    }
   }
 
   for (const placement of placements) {

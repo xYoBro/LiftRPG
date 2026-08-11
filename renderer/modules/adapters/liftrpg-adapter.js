@@ -471,27 +471,48 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         return sum + (Array.isArray(targets) ? targets.length : 0);
       }, 0);
 
-      // KNOWN SHAPE DEBT (Session 1): on boss weeks the panel takes a mostly
-      // empty right page — boss weeks have no cipher/oracle/map to share
-      // with, and the boss encounter is full-page. Two seating attempts were
-      // made and reverted the night this landed: 'either' affinity (the
-      // lonely attachment group's singlePageGroupPolicy still takes a page)
-      // and joining the final session-chunk group on the left (the panel
-      // rendered ABOVE the chunk's last card despite a higher sequence —
-      // page-composition routing, not binning, owns that order; suspect
-      // zone routing). Order-correct-but-underfilled beats inverted; the
-      // refinement is chipped with the repro. Non-boss weeks are unaffected:
-      // the panel rides the field-ops page beside cipher/oracle/map.
+      // SEATING (the shape debt, paid): a boss week has no cipher/oracle/map
+      // for the panel to ride beside, and the boss encounter owns a full page,
+      // so a field-ops seat there stranded the panel on an ~85%-void right
+      // page. On boss weeks the panel now joins the week's FINAL session-chunk
+      // group on the left, seated between the last card and the week footer.
+      // Everywhere else it keeps its field-ops seat beside cipher/oracle/map.
+      //
+      // This seating was tried once and reverted, because the panel printed
+      // ABOVE the last card despite its higher sequence. That was never a
+      // binning or zone-routing fault — the plan was right all along. The
+      // hoist lived in page COMPOSITION: renderWorkoutPage() in
+      // page-renderer.js emitted a workout page by TYPE PARTITION (every
+      // non-card atom first, then the cards, then the footer), so any atom
+      // seated after a card was lifted above it. It had never shown because
+      // the week header was the only non-card atom that had ever landed on a
+      // workout page, and it sorts first anyway. renderWorkoutPage() now
+      // composes in placement order — the fix lives there, not here.
+      const lastChunkIndex = Math.max(0, sessionChunks.length - 1);
+      const reckoningSeat = isBoss
+        ? {
+          // Cards in the chunk run at +0…+n, the footer at +50; +40 lands the
+          // panel after every card and before the footer.
+          group: `week-${wi}-chunk-${lastChunkIndex}`,
+          sequence: wi * 1000 + lastChunkIndex * 100 + 40,
+          pageAffinity: 'left',
+        }
+        : {
+          group: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'reckoning', artifactIdentity),
+          sequence: wi * 1000 + 103,
+          pageAffinity: 'right',
+        };
+
       atoms.push(createAtom({
         type: 'reckoning-panel',
         id: `w${wi}-reckoning`,
         shellAttrs,
-        group: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'reckoning', artifactIdentity),
+        group: reckoningSeat.group,
         groupPolicy: singlePageGroupPolicy(),
         section: 'body',
-        sequence: wi * 1000 + 103,
+        sequence: reckoningSeat.sequence,
         sizeHint: 'quarter-page',
-        pageAffinity: 'right',
+        pageAffinity: reckoningSeat.pageAffinity,
         data: {
           reckoning: week.reckoning,
           weekIndex: wi,

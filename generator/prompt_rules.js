@@ -27,7 +27,7 @@
     '- `worldContract` (string): One sentence. The north star for every story, mechanic, and visual choice. Write this first.',
     '- `narrativeVoice` (object): { person, tense, narratorStance, voiceRationale }. Do not default to second-person present tense. Choose the person and tense that best serves the fiction: first person for intimate or unreliable narrators, second person for procedural or instructional worlds, third limited for institutional distance.',
     '- `literaryRegister` (object): the per-book voiceSpec. { name, behaviorDescription, forbiddenMoves, typographicBehavior } plus the three fields that carry prose law:',
-    '  * `mechanisms` (string[], 2-4): what this book&apos;s prose DOES, in selection terms. Never a vibe adjective, never a named author or work.',
+    '  * `mechanisms` (string[], 2-4): what this book\'s prose DOES, in selection terms. Never a vibe adjective, never a named author or work.',
     '  * `authorRegisters` (array of { author, records, omits, format }): one entry per named in-world author who writes more than one surface. Two documents by different authors must be tellable apart with the bylines removed.',
     '  * `licensedMoves` (array, 0-1 entries; zero is normal): { move, budget, rationale }. See the Voice Discipline section for the closed enum and the license rules.',
     '- `artifactIdentity` (object, required for shell-aware rendering): { artifactClass, artifactBlend?, authorialMode?, boardStateMode, documentEcology?, materialCulture?, openingMode?, rulesDeliveryMode?, revealShape?, unlockLogic?, shellFamily, attachmentStrategy }',
@@ -171,7 +171,7 @@
     '- Fragment entries (type: "fragment") must include `fragmentRef` pointing to a real fragment ID.',
     '- Consequence entries must include `paperAction` that visibly changes the paper state (mark a clock, shade a node, cross off a route, etc.).',
     '- Oracle entries must be playable game consequences or concrete fiction events, not atmospheric vibes or prose descriptions.',
-    '- If the user&apos;s creative direction specifies a different dice system (e.g. 2d6, d20), adapt oracle entries and roll bands to match.',
+    '- If the user\'s creative direction specifies a different dice system (e.g. 2d6, d20), adapt oracle entries and roll bands to match.',
     '- If the booklet carries a `percentile-stat` companion, at least TWO weeks must state the roll-under check inside `instruction`: if the roll comes in under the stat value circled for this week, read the entry one band above the one rolled (one row toward 00-09). The same die does both jobs — never ask for a second roll.',
     '',
     '### fieldOps.companionComponents',
@@ -192,7 +192,7 @@
     '- `weeklyValues` (integer[], required): one value per week of the campaign, each 1-99. They MUST rise monotonically — the printed stat never regresses.',
     '- `advantageRule` (string, optional): one sentence describing the re-roll earned by completing every prescribed set in a session.',
     '- Print ONE percentile-stat per booklet. It is a campaign-wide sheet, not a per-week surface.',
-    '- The player circles the current week&apos;s value, then rolls the existing oracle d100 and reads under-or-over. No new dice.',
+    '- The player circles the current week\'s value, then rolls the existing oracle d100 and reads under-or-over. No new dice.',
     '',
     'Common fields across all types:',
     '- `label` (string, required): diegetic title for the component',
@@ -237,7 +237,7 @@
     '- Use interludes for discovered packets, route updates, partial instructions, fragment handoffs, password elements, or compact state shifts only when they materially change play.',
     '- `manifestPointer` (object, optional): a posted manifest — a diegetic forward reference this interlude prints. Shape: `{ "targetRef": "...", "postedAs": "..." }`',
     '  - `targetRef` (string, required): the surface being pointed at — a fragment id ("F.07") or a week reference ("W4"). It MUST exist and MUST come LATER in the booklet than the week this interlude sits in. A pointer to a missing or earlier surface is a broken promise and fails validation.',
-    '  - `postedAs` (string, required): the one-line manifest as this artifact would print it, in the world&apos;s own filing voice (e.g. "LAST LOGGED: tide ledger — Week 4 survey").',
+    '  - `postedAs` (string, required): the one-line manifest as this artifact would print it, in the world\'s own filing voice (e.g. "LAST LOGGED: tide ledger — Week 4 survey").',
     '',
     '### week.gameplayClocks',
     '- Each clock: { clockName, segments, clockType, startValue?, direction?, linkedClockName?, opposedClockName?, thresholds?, consequenceOnFull }',
@@ -283,7 +283,7 @@
     '- `authenticityChecks` (object): { hasIrrelevantDetail, couldExistInDifferentStory, redactionDoesNarrativeWork }',
     '- `manifestPointer` (object, optional): a posted manifest — a diegetic forward reference this document prints. Shape: `{ "targetRef": "...", "postedAs": "..." }`',
     '  - `targetRef` (string, required): the surface being pointed at — another fragment id ("F.07") or a week reference ("W4"). It MUST exist and MUST come LATER in the booklet than the week this fragment is delivered in. A pointer to a missing or earlier surface is a broken promise and fails validation.',
-    '  - `postedAs` (string, required): the one-line manifest as this artifact would print it, in the world&apos;s own filing voice (e.g. "LAST LOGGED: tide ledger — Week 4 survey"). Never write it as an instruction to the player.',
+    '  - `postedAs` (string, required): the one-line manifest as this artifact would print it, in the world\'s own filing voice (e.g. "LAST LOGGED: tide ledger — Week 4 survey"). Never write it as an instruction to the player.',
     '- Across the full booklet, include at least three linked fragment functions: one action-changing artifact, one interpretation-changing artifact, and one character-deepening artifact.',
     '- At least one incident, place, procedure, or relationship should recur across multiple document perspectives.',
     '- Fragments may arrive as threaded packets, route updates, contradictory records, or personal aftershocks, not just isolated lore drops.',
@@ -836,8 +836,8 @@
     '  * **Long Zone 2 / Steady State:** Paranoia, vast distances, slow depletion of resources, eerie quiet before a storm, tracking or being tracked.',
     '  * **Deload / Recovery:** False safety, painful memory surfacing, treating wounds, studying the map, discovering a horrifying truth in the quiet.',
     '- Identify the dominant physical modality in the raw workout and apply its metaphor translation strictly to the `storyPrompts`. Only use literal gym terminology if the theme demands it.',
-    '- **CRITICAL: Every session MUST have a non-empty exercises array.** Transcribe the user&apos;s workout exactly — name, sets, repsPerSet, weightField. Never omit exercises on any session, even the last session in a high-session-count week. If the user provides 6 sessions of exercises, all 6 must appear with complete exercise data.',
-    '- **HARD CONSTRAINT — EXERCISE FIDELITY:** Copy exercise names VERBATIM from the user&apos;s liftoscript. Do NOT add, invent, substitute, or supplement sessions with exercises not explicitly written by the user. Do NOT guess what accessory work the program implies. If the user provided 3 exercises per session, use those 3. If a session needs more volume, add more sets of the user&apos;s exercises — never new exercise names. Machine exercises, cable exercises, and isolation movements are FORBIDDEN unless the user explicitly listed them.'
+    '- **CRITICAL: Every session MUST have a non-empty exercises array.** Transcribe the user\'s workout exactly — name, sets, repsPerSet, weightField. Never omit exercises on any session, even the last session in a high-session-count week. If the user provides 6 sessions of exercises, all 6 must appear with complete exercise data.',
+    '- **HARD CONSTRAINT — EXERCISE FIDELITY:** Copy exercise names VERBATIM from the user\'s liftoscript. Do NOT add, invent, substitute, or supplement sessions with exercises not explicitly written by the user. Do NOT guess what accessory work the program implies. If the user provided 3 exercises per session, use those 3. If a session needs more volume, add more sets of the user\'s exercises — never new exercise names. Machine exercises, cable exercises, and isolation movements are FORBIDDEN unless the user explicitly listed them.'
   ];
 
   // ── The Mark surface ────────────────────────────────────────────────────
@@ -957,7 +957,7 @@
     '- Each booklet should carry 2-3 manifest chains. Post each pointer 1-3 sessions before its payoff — close enough to stay warm, far enough to be a chase.',
     '- At least one chain must run three links: the recovered document posts the next link of its own chain, so following one manifest hands the player the next. Chains end clean — the final link posts nothing.',
     '- `targetRef` must name a real later surface: a fragment id delivered in a later week, or a week reference ("W4"). Pointing at something missing, or at something already read, breaks the promise the line makes — validation rejects both.',
-    '- Write `postedAs` in the artifact&apos;s own filing voice, never as a note to the player: "LAST LOGGED: tide ledger — Week 4 survey", "FORWARDED TO CASE FILE 12-B, spring quarter", "Sent on with the Michaelmas accounts." Whoever kept this paper wrote that line for their own reasons.',
+    '- Write `postedAs` in the artifact\'s own filing voice, never as a note to the player: "LAST LOGGED: tide ledger — Week 4 survey", "FORWARDED TO CASE FILE 12-B, spring quarter", "Sent on with the Michaelmas accounts." Whoever kept this paper wrote that line for their own reasons.',
     '- The pointed-to surface must actually pay off — the thing the manifest named has to be recognisably present when the player gets there.'
   ];
 
@@ -1075,7 +1075,7 @@
     '- Do not give the player everything in Week 1. Do not gate everything behind the boss. Distribute progression evenly, with the midpoint binary choice as the biggest single state change.',
     '- **Display floor:** if the booklet carries a `percentile-stat`, its `weeklyValues` must rise monotonically across the campaign — every value strictly greater than the one before it. The printed stat never regresses. A missed week costs the player the roll, never the number.',
     '- Author those values; do not ask the player to compute them. Open low enough that early rolls usually fail (roughly 20-35) and close high enough that late rolls usually land (roughly 60-75). The climb between them is the character sheet the six weeks wrote.',
-    '- The stat must be visible in play, not just on its own page: at least two weeks&apos; oracle `instruction` must state the roll-under check and the one-band upgrade it grants.',
+    '- The stat must be visible in play, not just on its own page: at least two weeks\' oracle `instruction` must state the roll-under check and the one-band upgrade it grants.',
     '- **Chance isolation:** the stat and the dice move the story only. No roll, no stat value, and no oracle result may ever change sets, reps, load, or rest. Advantage flows workout to game and never back.'
   ];
 
@@ -1426,8 +1426,8 @@
     '- Map/board usage: how to annotate, what marks mean, when to update',
     '- Oracle access: what triggers a pull, how to read results, how to execute consequence tags. Include: "All oracle tables use d100. No dice? Google roll d100."',
     '- Clocks/trackers: what they are, when they advance, what happens when they fill or empty',
-    'If the booklet carries a `percentile-stat` companion, one section MUST also teach it, in the world&apos;s own voice:',
-    '- circle this week&apos;s value on the stat box before you roll',
+    'If the booklet carries a `percentile-stat` companion, one section MUST also teach it, in the world\'s own voice:',
+    '- circle this week\'s value on the stat box before you roll',
     '- roll under it on the oracle d100 and read the entry one band above the one you rolled',
     '- complete every prescribed set in the session before rolling and you may re-roll once — the only thing training changes is your standing, never the sets themselves',
     'The rightPage contains the password/convergence tracker and unlock instructions.',

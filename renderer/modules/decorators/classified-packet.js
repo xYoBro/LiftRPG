@@ -201,21 +201,6 @@ function buildMechanicStrip(pageFacts) {
 // Fragment helpers (moved from page-renderer.js)
 // ---------------------------------------------------------------------------
 
-function shouldUsePacketEvidenceLayout(placements) {
-  if (placements.length !== 2) return false;
-
-  return placements.every((placement) => {
-    const data = placement.atom?.data || placement.data || {};
-    const documentType = String(data.documentType || '').trim().toLowerCase();
-    const denseTypes = new Set(['form', 'inspection', 'report', 'transcript', 'anomaly']);
-    if (denseTypes.has(documentType)) return false;
-
-    const body = String(data.bodyText || data.body || data.content || '').trim();
-    const paragraphCount = body ? body.split(/\n\s*\n|\n/).filter(Boolean).length : 0;
-    return body.length <= 420 && paragraphCount <= 4;
-  });
-}
-
 function buildArchiveFooter(placements) {
   const footer = make('section', 'archive-footer');
   footer.appendChild(make('div', 'doc-label', 'Packet Ledger'));
@@ -343,33 +328,6 @@ const classifiedPacketDecorator = {
   },
 
   // --- Fragment page hooks ---
-
-  /**
-   * Override fragment page layout with evidence layout when eligible.
-   * Returns a DocumentFragment containing the evidence layout + archive footer,
-   * or null to fall through to the default sequential rendering path.
-   *
-   * @param {object} fragmentFacts
-   * @returns {DocumentFragment|null}
-   */
-  buildFragmentLayout(fragmentFacts) {
-    if (!shouldUsePacketEvidenceLayout(fragmentFacts.placements)) return null;
-
-    const { placements, renderPlacementInto } = fragmentFacts;
-    const frag = document.createDocumentFragment();
-
-    const evidenceLayout = make('div', 'fragment-evidence-layout');
-    evidenceLayout.setAttribute('data-fragment-count', String(placements.length));
-    placements.forEach((placement, index) => {
-      const cell = make('div', index === 0 ? 'fragment-evidence-primary' : 'fragment-evidence-sidebar');
-      renderPlacementInto(cell, placement);
-      evidenceLayout.appendChild(cell);
-    });
-
-    frag.appendChild(evidenceLayout);
-    frag.appendChild(buildArchiveFooter(placements));
-    return frag;
-  },
 
   /**
    * Return the packet ledger for fragment pages. The ledger ADAPTS to how many

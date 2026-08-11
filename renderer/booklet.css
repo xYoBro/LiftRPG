@@ -4766,47 +4766,6 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .page-fragment-doc[data-fragment-count="2"]{
   justify-content:flex-start;
 }
-/* EVIDENCE LAYOUT — currently unreachable corpus-wide. The rules below are
-   correct and stay; nothing renders against them today.
-
-   `shouldUsePacketEvidenceLayout()` (decorators/classified-packet.js) admits a
-   fragment page only when it carries exactly 2 non-dense documents of <= 420
-   chars AND <= 4 paragraphs. Across all 226 fragments in the 19 content/
-   fixtures, three pass type+length (The-Hinge F.2 at 339 and F.8 at 405,
-   The-Air-Gapped-Choir F.8 at 288) and all three fail the paragraph ceiling,
-   scoring 8, 7 and 9 — because the paragraph split is `/\n\s*\n|\n/`, whose
-   `|\n` branch counts EVERY newline, so each header line reads as a paragraph.
-   Under blank-line splitting the same three score 3, 4 and 4: all would pass.
-   Of the nine fixtures that resolve to classified-packet, only The-Hinge holds
-   any fragment under 420 chars at all — the threshold predates the post-D83
-   budget-trimmed corpus.
-
-   Liveness is pinned by an expected-fail marker in
-   tests/playwright/shell-decorator.spec.js; the feature's fate is an open
-   author decision. Deleted from this block (D71 class — selectors no tuning
-   can reach): `.fragment-evidence-secondary` and `.fragment-evidence-cell`,
-   which no JS emits (the decorator emits only -primary and -sidebar), and the
-   `[data-fragment-count="3"|"4"]` rules, unreachable because the gate hard-
-   requires exactly 2 placements and the attribute is set from that length. */
-.fragment-evidence-layout{
-  flex:1;
-  display:grid;
-  grid-template-columns:minmax(0, 1.2fr) minmax(0, 0.8fr);
-  gap:8px;
-  min-height:0;
-}
-.fragment-evidence-primary,
-.fragment-evidence-sidebar{
-  min-height:0;
-}
-.fragment-evidence-primary{
-  display:flex;
-  min-height:0;
-}
-.fragment-evidence-sidebar{
-  display:flex;
-  min-height:0;
-}
 .fragment-page[data-shell-family="classified-packet"]{
   position:relative;
 }

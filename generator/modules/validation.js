@@ -39,6 +39,15 @@ import {
 // with the contract — one implementation shared with the renderer.
 import { isStandardAlphaTable } from '../../contracts/contract-constants.mjs';
 
+// Map-evolution fingerprint + companions: one implementation, shared with quality.js.
+// Formerly a private copy here that silently diverged from quality.js's — see D91 and
+// the header of fingerprint.js. Guarded by singleFingerprintHome() in validate.mjs.
+import {
+  buildMapEvolutionFingerprint,
+  hasComparableMapState,
+  looksLikeFragmentRef
+} from './fingerprint.js';
+
 // ── Part 1: Continuity validators ─────────────────────────────────────────────
 
 // Normalize component type strings for comparison: trim, lowercase, underscores→spaces
@@ -56,59 +65,6 @@ function isMapNoChangePlaceholder(value) {
   return /^(?:none|n\/a|na|same|same state|same map|unchanged|static|no change|no visible change|nothing new|no new unlock|no unlock)$/i.test(normalized);
 }
 
-function looksLikeFragmentRef(ref) {
-  return /^f\d+$/i.test(normalizeId(ref || ''));
-}
-
-function buildMapEvolutionFingerprint(mapState) {
-  var ms = mapState || {};
-  var mapType = String(ms.mapType || 'grid').trim().toLowerCase();
-
-  if (mapType === 'point-to-point' || mapType === 'node-graph') {
-    var nodes = (ms.nodes || []).map(function (node) {
-      return [node.id || '', node.label || '', node.state || '', node.x || '', node.y || ''].join(':');
-    }).sort().join('|');
-    var edges = (ms.edges || []).map(function (edge) {
-      return [edge.from || '', edge.to || '', edge.label || ''].join(':');
-    }).sort().join('|');
-    return 'network::' + nodes + '::' + edges + '::' + String(ms.currentNode || '');
-  }
-
-  if (mapType === 'linear-track') {
-    var stops = (ms.stops || ms.nodes || []).map(function (stop) {
-      return [stop.id || '', stop.label || '', stop.state || '', stop.position || ''].join(':');
-    }).sort().join('|');
-    return 'track::' + stops + '::' + String(ms.currentPosition || ms.currentNode || '');
-  }
-
-  if (mapType === 'player-drawn') {
-    return 'player::' + String(ms.mapNote || '') + '::' + String(ms.currentPosition || '');
-  }
-
-  var tiles = (ms.tiles || []).map(function (tile) {
-    return [tile.label || '', tile.type || '', tile.x || tile.col || '', tile.y || tile.row || ''].join(':');
-  }).sort().join('|');
-  return 'grid::' + tiles + '::' + String(ms.currentPosition ? [ms.currentPosition.row || '', ms.currentPosition.col || ''].join(',') : '');
-}
-
-function hasComparableMapState(mapState) {
-  var ms = mapState || {};
-  var mapType = String(ms.mapType || 'grid').trim().toLowerCase();
-
-  if (mapType === 'point-to-point' || mapType === 'node-graph') {
-    return !!(((ms.nodes || []).length > 0) || ((ms.edges || []).length > 0) || ms.currentNode);
-  }
-
-  if (mapType === 'linear-track') {
-    return !!((((ms.stops || ms.nodes || []).length > 0) || ms.currentPosition || ms.currentNode));
-  }
-
-  if (mapType === 'player-drawn') {
-    return !!(ms.mapNote || ms.currentPosition);
-  }
-
-  return !!(((ms.tiles || []).length > 0) || ms.currentPosition);
-}
 
 function firstNonEmptyShellText() {
   for (var i = 0; i < arguments.length; i++) {
