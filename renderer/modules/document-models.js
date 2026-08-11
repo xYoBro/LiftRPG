@@ -45,7 +45,10 @@ function splitBody(fragment) {
   if (raw && typeof raw === 'object') {
     raw = raw.html || raw.text || '';
   }
-  return splitParagraphs(raw);
+  // Plain-text bodies are escaped downstream, so an HTML entity in authored
+  // text prints literally ("&nbsp;" on variety-02's routing slip). Decode the
+  // one whitespace entity LLMs habitually leak into plain-text fields.
+  return splitParagraphs(String(raw).replace(/&nbsp;/g, ' '));
 }
 
 /**

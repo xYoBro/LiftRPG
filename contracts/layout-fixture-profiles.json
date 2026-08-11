@@ -1,7 +1,7 @@
 {
   "content/liftrpg-eastern-shore.json": {
-    "normalizedPageCount": 44,
-    "sheetCount": 22,
+    "normalizedPageCount": 40,
+    "sheetCount": 20,
     "counts": {
       "cover": 1,
       "rules-left": 1,
@@ -10,12 +10,12 @@
       "field-ops": 5,
       "overflow-doc": 6,
       "boss": 1,
-      "fragment-page": 11,
+      "fragment-page": 8,
       "assembly": 1,
       "gauge-log": 1,
       "ending-locked": 1,
       "back-cover": 1,
-      "notes": 2
+      "notes": 1
     },
     "prefix": [
       "cover",
@@ -23,9 +23,9 @@
       "rules-right"
     ],
     "suffix": [
+      "assembly",
       "gauge-log",
       "ending-locked",
-      "notes",
       "notes",
       "back-cover"
     ],
@@ -143,12 +143,12 @@
       "field-ops": 4,
       "interlude": 1,
       "boss": 1,
-      "fragment-page": 5,
+      "fragment-page": 3,
       "assembly": 1,
       "gauge-log": 1,
       "ending-locked": 1,
       "back-cover": 1,
-      "notes": 1
+      "notes": 3
     },
     "prefix": [
       "cover",
@@ -156,9 +156,9 @@
       "rules-right"
     ],
     "suffix": [
-      "assembly",
-      "gauge-log",
       "ending-locked",
+      "notes",
+      "notes",
       "notes",
       "back-cover"
     ],
@@ -227,8 +227,8 @@
     "browserPageCount": 28
   },
   "content/The-Hinge.json": {
-    "normalizedPageCount": 40,
-    "sheetCount": 20,
+    "normalizedPageCount": 36,
+    "sheetCount": 18,
     "counts": {
       "cover": 1,
       "rules-left": 1,
@@ -238,11 +238,10 @@
       "overflow-doc": 6,
       "interlude": 1,
       "boss": 1,
-      "fragment-page": 7,
+      "fragment-page": 4,
       "assembly": 1,
       "gauge-log": 1,
       "ending-locked": 1,
-      "notes": 1,
       "back-cover": 1
     },
     "prefix": [
@@ -251,10 +250,10 @@
       "rules-right"
     ],
     "suffix": [
+      "fragment-page",
       "assembly",
       "gauge-log",
       "ending-locked",
-      "notes",
       "back-cover"
     ],
     "mustContain": [
@@ -361,11 +360,12 @@
       "field-ops": 5,
       "interlude": 1,
       "boss": 1,
-      "fragment-page": 4,
+      "fragment-page": 3,
       "assembly": 1,
       "gauge-log": 1,
       "ending-locked": 1,
-      "back-cover": 1
+      "back-cover": 1,
+      "notes": 1
     },
     "prefix": [
       "cover",
@@ -373,10 +373,10 @@
       "rules-right"
     ],
     "suffix": [
-      "fragment-page",
       "assembly",
       "gauge-log",
       "ending-locked",
+      "notes",
       "back-cover"
     ],
     "mustContain": [
@@ -453,8 +453,8 @@
     "browserPageCount": 32
   },
   "content/the-conclave-s-legacy.json": {
-    "normalizedPageCount": 32,
-    "sheetCount": 16,
+    "normalizedPageCount": 28,
+    "sheetCount": 14,
     "counts": {
       "cover": 1,
       "rules-left": 1,
@@ -464,12 +464,11 @@
       "interlude": 5,
       "overflow-doc": 1,
       "boss": 1,
-      "fragment-page": 3,
+      "fragment-page": 2,
       "assembly": 1,
       "gauge-log": 1,
       "ending-locked": 1,
-      "back-cover": 1,
-      "notes": 3
+      "back-cover": 1
     },
     "prefix": [
       "cover",
@@ -477,10 +476,10 @@
       "rules-right"
     ],
     "suffix": [
+      "fragment-page",
+      "assembly",
+      "gauge-log",
       "ending-locked",
-      "notes",
-      "notes",
-      "notes",
       "back-cover"
     ],
     "mustContain": [
@@ -579,10 +578,10 @@
       "field-ops": 5,
       "interlude": 6,
       "boss": 1,
-      "fragment-page": 6,
+      "fragment-page": 4,
       "assembly": 1,
       "ending-locked": 1,
-      "notes": 1,
+      "notes": 3,
       "back-cover": 1
     },
     "prefix": [
@@ -591,9 +590,9 @@
       "rules-right"
     ],
     "suffix": [
-      "assembly",
-      "gauge-log",
       "ending-locked",
+      "notes",
+      "notes",
       "notes",
       "back-cover"
     ],
@@ -697,8 +696,8 @@
   },
   "content/what-the-soil-remembers.json": {
     "_purpose": "Companion-heavy + overflow + dense PTP maps (8-15 nodes/week). Stresses zone routing, continuation chains, and half-width map legibility.",
-    "normalizedPageCount": 44,
-    "sheetCount": 22,
+    "normalizedPageCount": 40,
+    "sheetCount": 20,
     "counts": {
       "cover": 1,
       "rules-left": 1,
@@ -709,10 +708,10 @@
       "overflow-doc": 5,
       "interlude": 6,
       "boss": 1,
-      "fragment-page": 6,
+      "fragment-page": 4,
       "assembly": 1,
       "ending-locked": 1,
-      "notes": 3,
+      "notes": 1,
       "back-cover": 1
     },
     "prefix": [
@@ -721,9 +720,9 @@
       "rules-right"
     ],
     "suffix": [
+      "assembly",
+      "gauge-log",
       "ending-locked",
-      "notes",
-      "notes",
       "notes",
       "back-cover"
     ],
@@ -833,8 +832,8 @@
   },
   "content/variety-02-homecoming.json": {
     "_purpose": "Showcase fixture: 6 weeks x 5 sessions, per-week overflow documents, dense boss encounter. Pins the boss-page density-solver engagement fixed in the 2026-08-09 unsplittable-page overflow fix.",
-    "normalizedPageCount": 40,
-    "sheetCount": 20,
+    "normalizedPageCount": 36,
+    "sheetCount": 18,
     "counts": {
       "cover": 1,
       "rules-left": 1,
@@ -843,11 +842,11 @@
       "field-ops": 5,
       "overflow-doc": 6,
       "boss": 1,
-      "fragment-page": 6,
+      "fragment-page": 4,
       "assembly": 1,
       "gauge-log": 1,
       "ending-locked": 1,
-      "notes": 3,
+      "notes": 1,
       "back-cover": 1
     },
     "prefix": [
@@ -856,9 +855,9 @@
       "rules-right"
     ],
     "suffix": [
+      "assembly",
+      "gauge-log",
       "ending-locked",
-      "notes",
-      "notes",
       "notes",
       "back-cover"
     ],

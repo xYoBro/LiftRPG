@@ -1540,25 +1540,34 @@ export function scanTerminalVoiceTics(text) {
 
 // Every prose unit the voice constitution governs, with the critic unit that
 // owns it (week / fragment / ending — the units a revision can target).
+// `terminal` marks the surfaces read after maximum invested effort — the
+// final week's interlude and the endings (the boss narrative is also terminal
+// but is not a collected prose unit) — the licensed home for a declared
+// genre move (Constitution Law 6: resonance lives at the end).
 function collectVoiceProseUnits(booklet) {
   var units = [];
-  ((booklet && booklet.weeks) || []).forEach(function (week, wi) {
+  var weeks = (booklet && booklet.weeks) || [];
+  weeks.forEach(function (week, wi) {
     var number = (week && week.weekNumber) || (wi + 1);
+    var finalWeek = wi === weeks.length - 1;
     ((week && week.sessions) || []).forEach(function (session, si) {
       if (session && session.storyPrompt) {
         units.push({ unitType: 'week', unitRef: number, text: session.storyPrompt,
+          terminal: false,
           label: 'Week ' + number + ' session ' + (si + 1) + ' storyPrompt' });
       }
     });
     var interlude = week && week.interlude;
     if (interlude && interlude.body) {
       units.push({ unitType: 'week', unitRef: number, text: interlude.body,
+        terminal: finalWeek,
         label: 'Week ' + number + ' interlude' });
     }
     var overflow = week && week.overflowDocument;
     var overflowBody = overflow && (overflow.content || overflow.body);
     if (overflowBody) {
       units.push({ unitType: 'week', unitRef: number, text: overflowBody,
+        terminal: false,
         label: 'Week ' + number + ' overflow document ' + ((overflow && overflow.id) || '') });
     }
   });
@@ -1566,6 +1575,7 @@ function collectVoiceProseUnits(booklet) {
     var body = frag && (frag.content || frag.body || frag.contentHtml);
     if (body) {
       units.push({ unitType: 'fragment', unitRef: (frag && frag.id) || fi, text: body,
+        terminal: false,
         label: 'Fragment ' + ((frag && frag.id) || fi) });
     }
   });
@@ -1578,6 +1588,7 @@ function collectVoiceProseUnits(booklet) {
     var text = [body, finalLine].filter(Boolean).join('\n');
     if (text) {
       units.push({ unitType: 'ending', unitRef: variant, text: text,
+        terminal: true,
         label: 'Ending "' + variant + '"' });
     }
   });
@@ -1592,6 +1603,121 @@ export function collectVoiceTicFindings(booklet) {
         unitType: unit.unitType,
         unitRef: unit.unitRef,
         message: unit.label + ' — ' + hit
+      });
+    });
+  });
+  return findings;
+}
+
+// ── Licensed-move placement (Constitution Law 6: resonance lives at the end) ─
+// A licensed genre move's home is the terminal surfaces — the final interlude,
+// the boss narrative, and the endings: the pages read after maximum invested
+// effort. When meta.literaryRegister.licensedMoves declares a move, this scan
+// looks for that move's pattern family in NON-terminal prose (storyPrompts,
+// non-final interludes, overflow documents, fragments) and flags each unit
+// where it appears as a spend before the end. Findings are WARNINGS (D19):
+// early placement is degraded taste, not invalidity — the budget text is free
+// prose and cannot be machine-parsed, so placement, not budget count, is what
+// the machine can check.
+//
+// Detector honesty (each is a regex pretending to be an ear):
+//   aphorism        — the mirrored-aphorism pattern family over EVERY sentence
+//                     (not just the tail — a spend mid-unit is still a spend).
+//                     Fires on innocent negation; misses inverted forms it has
+//                     no pattern for.
+//   ominous-closer  — the terminal-position tic scan reused as-is: a closer
+//                     performed at the end of a non-terminal unit. Sees only
+//                     the aphorism family and the drumbeat; a flat ominous
+//                     image with no structural signature is invisible to it.
+//   direct-address  — second-person pronouns in unquoted narration. Sentences
+//                     carrying double quotes are skipped (a spoken "you"
+//                     belongs to a character, not the narrator); pronoun-free
+//                     imperatives ("Look at the board.") are missed.
+//   fragment-rhythm — a run of two or more consecutive 1-4-word sentences.
+//                     Word count is not verblessness: label lines are dropped
+//                     first, but terse legitimate prose can still fire, and a
+//                     verbless fragment longer than four words never will.
+
+function detectAphorismMove(text) {
+  var hits = [];
+  voiceSentences(text).filter(function (s) { return !isVoiceLabelLine(s); }).forEach(function (sentence) {
+    var short = voiceWords(sentence).length <= VOICE_TIC_LIMITS.aphorismMaxWords;
+    for (var i = 0; i < VOICE_APHORISM_PATTERNS.length; i++) {
+      var p = VOICE_APHORISM_PATTERNS[i];
+      if (p.short && !short) continue;
+      if (!p.test(sentence)) continue;
+      hits.push('mirrored aphorism [' + p.name + ']: "' + voiceQuote(sentence) + '"');
+      break; // one finding per sentence, same law as the tic scan
+    }
+  });
+  return hits;
+}
+
+function detectOminousCloserMove(text) {
+  return scanTerminalVoiceTics(text).map(function (hit) {
+    return 'closer performed at the unit’s end — ' + hit;
+  });
+}
+
+function detectDirectAddressMove(text) {
+  var hits = [];
+  voiceSentences(text).filter(function (s) { return !isVoiceLabelLine(s); }).forEach(function (sentence) {
+    if (/["“”]/.test(sentence)) return; // spoken address is a character's, not the narrator's
+    if (/\byou(?:r|rs|rself|rselves)?\b/i.test(sentence)) {
+      hits.push('second-person address: "' + voiceQuote(sentence) + '"');
+    }
+  });
+  return hits;
+}
+
+var FRAGMENT_RHYTHM_MAX_WORDS = 4; // above this a sentence is a sentence, not a fragment beat
+function detectFragmentRhythmMove(text) {
+  var sentences = voiceSentences(text).filter(function (s) { return !isVoiceLabelLine(s); });
+  var hits = [];
+  var run = 0;
+  for (var i = 0; i <= sentences.length; i++) {
+    var words = i < sentences.length ? voiceWords(sentences[i]).length : 0;
+    if (i < sentences.length && words >= 1 && words <= FRAGMENT_RHYTHM_MAX_WORDS) {
+      run++;
+      continue;
+    }
+    if (run >= 2) {
+      hits.push(run + ' consecutive clipped fragments ending "' + voiceQuote(sentences[i - 1]) + '"');
+    }
+    run = 0;
+  }
+  return hits;
+}
+
+var LICENSED_MOVE_DETECTORS = {
+  'aphorism': detectAphorismMove,
+  'ominous-closer': detectOminousCloserMove,
+  'direct-address': detectDirectAddressMove,
+  'fragment-rhythm': detectFragmentRhythmMove
+};
+
+export function collectLicensedMovePlacementFindings(booklet) {
+  var register = (booklet && booklet.meta && booklet.meta.literaryRegister) || {};
+  var moves = Array.isArray(register.licensedMoves) ? register.licensedMoves : [];
+  if (!moves.length) return []; // zero licenses is the normal state — nothing to place
+  var findings = [];
+  var units = collectVoiceProseUnits(booklet).filter(function (unit) { return !unit.terminal; });
+  moves.forEach(function (entry) {
+    var move = entry && entry.move;
+    var detect = LICENSED_MOVE_DETECTORS[move];
+    if (!detect) return; // enum validity is the schema's problem, not placement's
+    units.forEach(function (unit) {
+      var hits = detect(unit.text);
+      if (!hits.length) return;
+      // One warning per unit per move: the first exhibit plus a count, so a
+      // unit written entirely in the move does not drown the report.
+      var more = hits.length > 1 ? ' (+' + (hits.length - 1) + ' more in this unit)' : '';
+      findings.push({
+        unitType: unit.unitType,
+        unitRef: unit.unitRef,
+        message: unit.label + ' — licensed move "' + move + '" spent before the end — '
+          + hits[0] + more
+          + '; its licensed home is the final interlude, the boss narrative, and the endings'
       });
     });
   });
@@ -1818,6 +1944,7 @@ export function validateAssembledBooklet(booklet) {
   collectNounRosterFindings(booklet).forEach(function (m) { warnings.push(m); });
   collectPercentileStatFindings(booklet).forEach(function (m) { warnings.push(m); });
   collectVoiceTicFindings(booklet).forEach(function (f) { warnings.push(f.message); });
+  collectLicensedMovePlacementFindings(booklet).forEach(function (f) { warnings.push(f.message); });
   // Posted manifests are promises, not preferences — broken ones are errors.
   collectManifestPointerErrors(booklet).forEach(function (m) { errors.push(m); });
 
