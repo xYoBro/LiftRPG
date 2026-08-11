@@ -3,7 +3,62 @@
 // Every module in the pipeline imports from here — never duplicate these.
 
 export var DEFAULT_TIMEOUT_MS = 600000; // 10 minutes — long frontier-model stages often exceed 5m
-export var MAX_OUTPUT_TOKENS = 64000;   // max supported by Claude Sonnet 4.6 — generous ceiling, only pay for generated
+export var MAX_OUTPUT_TOKENS = 64000;   // hard ceiling for a single stage; only generated tokens are billed
+
+// ── Anthropic streaming transport windows ────────────────────────────────────
+// The Anthropic path streams (SSE). Wall-clock is the WRONG failure signal for
+// a stream: a legitimate 24k-token completion at a conservative 20 tok/s runs
+// ~20 minutes, while a dead socket produces no bytes at all. So the transport
+// fails fast on SILENCE and stays patient with PROGRESS:
+//
+//   connect  — no response headers within this window  -> abort (server unreachable)
+//   idle     — no bytes for this long mid-stream       -> abort (connection died)
+//   overall  — absolute ceiling regardless of progress -> abort (runaway)
+//
+// The caller's per-stage requestTimeoutMs is treated as ADVISORY on this path:
+// it is clamped into [ANTHROPIC_STREAM_MIN_OVERALL_MS, ANTHROPIC_STREAM_MAX_MS]
+// and used as the overall cap only. Idle is the real guard.
+export var ANTHROPIC_CONNECT_TIMEOUT_MS = 90000;       // 90s to first response headers
+export var ANTHROPIC_STREAM_IDLE_TIMEOUT_MS = 120000;  // 2m of total silence mid-stream
+export var ANTHROPIC_STREAM_MIN_OVERALL_MS = 600000;   // never cap a live stream below 10m
+export var ANTHROPIC_STREAM_MAX_MS = 1800000;          // 30m absolute ceiling
+
+// ── Per-stage token / timeout ladder (single source) ─────────────────────────
+// THE LADDER LIVES HERE. Do not hand-write maxTokens/requestTimeoutMs literals
+// at stage call sites — pass a stage budget key instead (see stageBudget() in
+// api-generator.js), which also owns retry escalation.
+//
+// Ceilings are ~3-4x the output measured across the three real Anthropic S+F
+// runs (docs/plans/2026-03-28-gemini-flash-pipeline-optimization-audit.md §2:
+// skeleton ~6.9k, rules ~0.8k, week ~4.3k, fragments ~12.2k bundled, endings
+// ~7.4k bundled). Timeouts are sized so the ceiling is actually REACHABLE at a
+// conservative ~20 tok/s planning floor — the pairing the old blanket
+// 64000-tokens/120000-ms configuration could never satisfy.
+//
+// INVARIANT: retries escalate. A retry must never get less budget than the
+// attempt it is replacing (the Story Plan stage previously shrank 420s -> 300s
+// on retry, which is how a slow-but-healthy generation got killed twice).
+export var STAGE_BUDGETS = {
+  // Skeleton+Flesh
+  skeleton:   { maxTokens: 24000, timeoutMs: 600000 },
+  rules:      { maxTokens: 12000, timeoutMs: 300000 },
+  week:       { maxTokens: 24000, timeoutMs: 600000 },
+  fragments:  { maxTokens: 40000, timeoutMs: 900000 },
+  endings:    { maxTokens: 24000, timeoutMs: 480000 },
+  // Multi-stage / structured
+  layerBible: { maxTokens: 24000, timeoutMs: 600000 },
+  campaign:   { maxTokens: 24000, timeoutMs: 600000 },
+  shell:      { maxTokens: 16000, timeoutMs: 420000 },
+  fragment:   { maxTokens: 24000, timeoutMs: 480000 },
+  // Critic loop (D66)
+  critic:         { maxTokens: 8000,  timeoutMs: 300000 },
+  'critic-revise': { maxTokens: 16000, timeoutMs: 360000 }
+};
+
+// Retry escalation: each attempt gets more wall clock than the last, and a
+// truncated attempt gets its token ceiling raised to MAX_OUTPUT_TOKENS.
+export var RETRY_TIMEOUT_GROWTH = 1.5;
+export var RETRY_TIMEOUT_CEILING_MS = 1200000; // 20m — no retry waits longer
 
 // ── Provider presets ─────────────────────────────────────────────────────────
 

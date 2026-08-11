@@ -21,7 +21,31 @@ export function buildStructuredStageName(stageName) {
     .slice(0, 48) || 'stage';
 }
 
+// ── Finish reason: the classifier is PROVIDER-BLIND ──────────────────────────
+// This module never learns a provider's vocabulary. The transport layer
+// (provider.js normalizeFinishReason) is the single home for mapping raw
+// provider values — Anthropic stop_reason, OpenAI finish_reason, Gemini
+// finishReason — onto the canonical enum:
+//
+//   'stop' | 'truncation' | 'filtered' | 'tool_use' | 'pause' | 'error' | 'unknown'
+//
+// Everything below reads the canonical value only. Adding a provider must never
+// require an edit to this file — if it does, the normalization leaked.
+export var FINISH_REASON_TRUNCATION = 'truncation';
+
+export function isTruncationFinishReason(normalized) {
+  return String(normalized || '') === FINISH_REASON_TRUNCATION;
+}
+
 export function isLikelyTruncationError(err) {
+  // Structural signal first — the transport tells us outright.
+  if (err && err.errorType === 'truncation') return true;
+  if (err && isTruncationFinishReason(err.finishReason)) return true;
+  if (err && err.meta && isTruncationFinishReason(err.meta.finishReason)) return true;
+
+  // Fallback: message heuristics for paths that surface no structured reason
+  // at all (a compat provider that streams no finish_reason, a mid-JSON socket
+  // cut). Provider-agnostic by construction — these are English, not vocabulary.
   var lower = String((err && err.message) || err || '').toLowerCase();
   return lower.indexOf('truncated') !== -1
     || lower.indexOf('max_tokens') !== -1

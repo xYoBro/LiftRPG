@@ -31,7 +31,10 @@ import {
   CRITIC_SCORE_THRESHOLD,
   CRITIC_MAX_ROUNDS,
   CRITIC_MAX_REVISIONS_PER_ROUND,
-  CRITIC_DIMENSIONS
+  CRITIC_DIMENSIONS,
+  STAGE_BUDGETS,
+  RETRY_TIMEOUT_GROWTH,
+  RETRY_TIMEOUT_CEILING_MS
 } from './modules/constants.js';
 
 import {
@@ -127,7 +130,8 @@ import {
 
 import {
   shouldRetryStageError,
-  shouldSplitFragmentBatch
+  shouldSplitFragmentBatch,
+  isLikelyTruncationError
 } from './modules/error-classify.js';
 
 import {
@@ -139,6 +143,7 @@ import {
   listProviderModels,
   callProvider,
   callProviderStructured,
+  transportSupports,
   resolveStructuredPipelineSettings,
   allowsEmptyApiKey
 } from './modules/provider.js';
@@ -782,6 +787,26 @@ function shouldEchoFailedOutputForRetry(stageName) {
 }
 
 function buildSmartRetryDirective(stageName, attempt, err) {
+  // Truncation is a capacity failure, not a correctness failure. Re-sending the
+  // "fix these validation errors" directive would just re-roll the same
+  // oversized output. stageBudget() raises the token ceiling; this tells the
+  // model to spend the budget on substance instead of length.
+  if (isLikelyTruncationError(err)) {
+    return [
+      '',
+      '## Length Directive (Retry ' + (attempt + 1) + ')',
+      '',
+      'Your previous output for ' + stageName + ' was cut off before the JSON closed —',
+      'it exceeded the output token limit.',
+      '',
+      '### Instructions',
+      '- Return the SAME structure, complete and closed. Completeness beats length.',
+      '- Tighten prose: shorter paragraphs, fewer restatements, no preamble or commentary.',
+      '- Do NOT drop required fields, sessions, or entries to save space. Shorten their text instead.',
+      '- Return valid JSON only. No markdown fences.'
+    ].join('\n');
+  }
+
   var errors = err._blockingErrors || [truncateText((err && err.message) || 'unknown', 500)];
   var failedOutput = err._failedOutput || null;
   var echoFailedOutput = failedOutput && shouldEchoFailedOutputForRetry(stageName);
@@ -827,10 +852,72 @@ function buildSmartRetryDirective(stageName, attempt, err) {
   return lines.join('\n');
 }
 
+// Classification markers must survive the stage-name prefix. Rebuilding a bare
+// Error here used to strip errorType / finishReason / retryable, which is how a
+// classified truncation could reach a caller as an unclassifiable 'unknown'.
+var STAGE_ERROR_MARKERS = [
+  'errorType', 'finishReason', 'retryable', 'status',
+  'structuredUnsupported', '_failedOutput', '_blockingErrors'
+];
+
+function carryStageErrorMarkers(source, target) {
+  if (!source || !target) return target;
+  STAGE_ERROR_MARKERS.forEach(function (key) {
+    if (source[key] !== undefined && target[key] === undefined) target[key] = source[key];
+  });
+  return target;
+}
+
 function prefixStageError(stageName, err) {
   var message = String((err && err.message) || err || 'Unknown error');
-  if (message.indexOf('[' + stageName + '] ') === 0) return err instanceof Error ? err : new Error(message);
-  return new Error('[' + stageName + '] ' + message);
+  if (message.indexOf('[' + stageName + '] ') === 0) {
+    return err instanceof Error ? err : carryStageErrorMarkers(err, new Error(message));
+  }
+  return carryStageErrorMarkers(err, new Error('[' + stageName + '] ' + message));
+}
+
+// ── Stage budget ladder (W2) ─────────────────────────────────────────────────
+// The ONLY place stage token ceilings and timeouts are resolved. Values live in
+// STAGE_BUDGETS (constants.js); escalation policy lives here; runJsonStage
+// applies it automatically from config.stageKey. A stage should NOT hand-write
+// maxTokens / requestTimeoutMs — doing so opts out of the ladder (which is how
+// Story Plan ended up shrinking 420s -> 300s on retry).
+//
+// Two invariants:
+//   1. Retries ESCALATE — attempt N+1 always gets at least as much wall clock
+//      as attempt N (growth ^ attempt, capped at RETRY_TIMEOUT_CEILING_MS).
+//   2. A truncated attempt gets its token ceiling raised to MAX_OUTPUT_TOKENS
+//      rather than re-rolled at the ceiling that just proved too small.
+function normalizeStageBudgetKey(stageKey) {
+  var key = String(stageKey || '');
+  if (STAGE_BUDGETS[key]) return key;
+  // Per-week checkpoint keys are 'week_1', 'week_2', ...; the multi-stage
+  // pipeline calls its per-week stage 'weeks'. Both share the 'week' budget.
+  if (/^week(s|_\d+)?$/i.test(key)) return 'week';
+  if (/^fragment/i.test(key)) return 'fragments';
+  if (/^ending/i.test(key)) return 'endings';
+  return '';
+}
+
+function stageBudget(stageKey) {
+  var key = normalizeStageBudgetKey(stageKey);
+  var base = STAGE_BUDGETS[key] || { maxTokens: MAX_OUTPUT_TOKENS, timeoutMs: DEFAULT_TIMEOUT_MS };
+  var baseTokens = base.maxTokens;
+  var baseTimeout = base.timeoutMs;
+
+  return {
+    maxTokens: function (retryState) {
+      if (retryState && retryState.attempt > 0 && isLikelyTruncationError(retryState.error)) {
+        return MAX_OUTPUT_TOKENS;
+      }
+      return baseTokens;
+    },
+    requestTimeoutMs: function (retryState) {
+      var attempt = (retryState && retryState.attempt) || 0;
+      var escalated = baseTimeout * Math.pow(RETRY_TIMEOUT_GROWTH, attempt);
+      return Math.round(Math.min(escalated, RETRY_TIMEOUT_CEILING_MS));
+    }
+  };
 }
 
 function getApiPromptBuilders() {
@@ -961,12 +1048,20 @@ async function runJsonStage(settings, config) {
     var retryState = { attempt: attempt, error: lastErr };
     var prompt = config.buildPrompt(retryState);
     if (attempt > 0) prompt += buildSmartRetryDirective(config.stageName, attempt, lastErr);
-    var resolvedMaxTokens = typeof config.maxTokens === 'function'
-      ? config.maxTokens(retryState)
-      : config.maxTokens;
-    var resolvedTimeoutMs = typeof config.requestTimeoutMs === 'function'
-      ? config.requestTimeoutMs(retryState)
-      : (config.requestTimeoutMs || settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS);
+
+    // Stage budgets come from the ladder (STAGE_BUDGETS + stageBudget()) keyed
+    // by stageKey. An explicit config.maxTokens / config.requestTimeoutMs still
+    // wins, but opting out also opts out of retry escalation — prefer the ladder.
+    var budget = stageBudget(config.budgetKey || config.stageKey);
+    var maxTokensSpec = config.maxTokens !== undefined ? config.maxTokens : budget.maxTokens;
+    var timeoutSpec = config.requestTimeoutMs !== undefined ? config.requestTimeoutMs : budget.requestTimeoutMs;
+
+    var resolvedMaxTokens = typeof maxTokensSpec === 'function'
+      ? maxTokensSpec(retryState)
+      : maxTokensSpec;
+    var resolvedTimeoutMs = typeof timeoutSpec === 'function'
+      ? timeoutSpec(retryState)
+      : (timeoutSpec || settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS);
     var stageSettings = resolvedTimeoutMs === (settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS)
       ? settings
       : Object.assign({}, settings, { requestTimeoutMs: resolvedTimeoutMs });
@@ -1199,7 +1294,6 @@ async function generateSingleFragmentAdaptive(settings, builders, config) {
     onProgress: config.silent ? null : (config.onProgress || null),
     getTotalStages: config.getTotalStages || null,
     schema: null,
-    maxTokens: MAX_OUTPUT_TOKENS,
     maxAttempts: 2,
     rateLimiter: config.rateLimiter || null,
     budgetEnforce: config.budgetEnforce || false,
@@ -1285,7 +1379,6 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
       onProgress: config.onProgress || null,
       getTotalStages: config.getTotalStages || null,
       schema: STRUCTURED_SCHEMA_FRAGMENTS,
-      maxTokens: MAX_OUTPUT_TOKENS,
       unwrapKey: 'fragments',
       maxAttempts: 2,
       rateLimiter: config.rateLimiter || null,
@@ -1460,7 +1553,6 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
         stageKey: 'critic',
         stageName: 'Composition Critic — round ' + round,
         buildPrompt: (function (dj, mf) { return function () { return window.buildCriticPrompt(dj, brief, mf); }; })(digestJson, machineFindings),
-        maxTokens: 8000,
         maxAttempts: 2,
         validate: validateCriticVerdict,
         rateLimiter: ctx.rateLimiter || null,
@@ -1509,7 +1601,6 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
           buildPrompt: (function (lbl, oj, dirs) {
             return function () { return window.buildUnitRevisionPrompt(lbl, oj, dirs, contextJson); };
           })(label, JSON.stringify(original), target.directives),
-          maxTokens: 16000,
           maxAttempts: 2,
           rateLimiter: ctx.rateLimiter || null,
           budgetEnforce: !!ctx.budgetEnforce,
@@ -1651,8 +1742,6 @@ async function runApiPipeline(options) {
       onProgress: onProgress,
       getTotalStages: function () { return totalStages; },
       schema: STRUCTURED_SCHEMA_BIBLE,
-      maxTokens: MAX_OUTPUT_TOKENS,
-      requestTimeoutMs: 300000,
       maxAttempts: 2,
       rateLimiter: rateLimiter,
       budgetEnforce: useGeminiBudget,
@@ -1684,10 +1773,6 @@ async function runApiPipeline(options) {
       getTotalStages: function () { return totalStages; },
       schema: STRUCTURED_SCHEMA_CAMPAIGN,
       normalizeResult: normalizeCampaignPlanOwnership,
-      requestTimeoutMs: function (retryState) {
-        return retryState && retryState.attempt > 0 ? 300000 : 420000;
-      },
-      maxTokens: MAX_OUTPUT_TOKENS,
       maxAttempts: 2,
       rateLimiter: rateLimiter,
       budgetEnforce: useGeminiBudget,
@@ -1726,8 +1811,6 @@ async function runApiPipeline(options) {
       onProgress: onProgress,
       getTotalStages: function () { return totalStages; },
       schema: STRUCTURED_SCHEMA_SHELL,
-      maxTokens: MAX_OUTPUT_TOKENS,
-      requestTimeoutMs: 300000,
       unwrapKey: 'meta',
       maxAttempts: 2,
       rateLimiter: rateLimiter,
@@ -1767,8 +1850,10 @@ async function runApiPipeline(options) {
   var identityContract = buildIdentityContract(shell, campaignPlan);
   var shellContext = extractShellContext(shell);
 
-  // ── ANTHROPIC PROMPT CACHING ──────────────────────────────────
-  if (settings.format === 'anthropic') {
+  // ── PROMPT CACHING ────────────────────────────────────────────
+  // Capability lookup, not a format check: any transport advertising
+  // systemPromptCaching gets the cacheable prefix.
+  if (transportSupports(settings, 'systemPromptCaching')) {
     settings._systemPrompt = [
       'You are generating components of a LiftRPG print-and-play booklet.',
       'World contract: ' + (shellContext.worldContract || ''),
@@ -1817,8 +1902,6 @@ async function runApiPipeline(options) {
       onProgress: onProgress,
       getTotalStages: function () { return totalStages; },
       schema: null,
-      maxTokens: MAX_OUTPUT_TOKENS,
-      requestTimeoutMs: DEFAULT_TIMEOUT_MS,
       maxAttempts: 3,
       rateLimiter: rateLimiter,
       budgetEnforce: useGeminiBudget,
@@ -2016,8 +2099,6 @@ async function runApiPipeline(options) {
       onProgress: onProgress,
       getTotalStages: function () { return totalStages; },
       schema: null,
-      maxTokens: MAX_OUTPUT_TOKENS,
-      requestTimeoutMs: 120000,
       maxAttempts: 2,
       rateLimiter: rateLimiter,
       budgetEnforce: useGeminiBudget,
@@ -2343,8 +2424,6 @@ async function runSkeletonFleshPipeline(options) {
       completeMessage:  'Skeleton complete',
       onProgress:       onProgress,
       schema:           window.STRUCTURED_SCHEMA_SKELETON || null,
-      maxTokens:        MAX_OUTPUT_TOKENS,
-      requestTimeoutMs: 360000,
       maxAttempts:      trialMode ? TRIAL_ATTEMPTS : 2,
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
@@ -2366,8 +2445,9 @@ async function runSkeletonFleshPipeline(options) {
   var fullFragRegistry = skeleton.fragmentRegistry || [];
   totalStages = 1 + 1 + (skeleton.weekPlan || []).length + 1 + 1;
 
-  // Anthropic prompt caching: set system prompt from skeleton identity
-  if (settings.format === 'anthropic' && skeleton.meta) {
+  // Prompt caching: set system prompt from skeleton identity when the
+  // resolved transport advertises support (capability, not format).
+  if (transportSupports(settings, 'systemPromptCaching') && skeleton.meta) {
     settings._systemPrompt = [
       'You are writing content for a LiftRPG booklet.',
       'World contract: ' + (skeleton.meta.worldContract || ''),
@@ -2400,8 +2480,6 @@ async function runSkeletonFleshPipeline(options) {
       completeMessage:  'Rules spread complete',
       onProgress:       onProgress,
       schema:           null,
-      maxTokens:        MAX_OUTPUT_TOKENS,
-      requestTimeoutMs: 120000,
       maxAttempts:      trialMode ? TRIAL_ATTEMPTS : 2,
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
@@ -2469,8 +2547,6 @@ async function runSkeletonFleshPipeline(options) {
       completeMessage:  'Week ' + weekNum + ' complete',
       onProgress:       onProgress,
       schema:           null,
-      maxTokens:        MAX_OUTPUT_TOKENS,
-      requestTimeoutMs: 300000,
       maxAttempts:      trialMode ? TRIAL_ATTEMPTS : 3,
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
@@ -2598,8 +2674,6 @@ async function runSkeletonFleshPipeline(options) {
       completeMessage:  'Fragments complete',
       onProgress:       onProgress,
       schema:           null,
-      maxTokens:        MAX_OUTPUT_TOKENS,
-      requestTimeoutMs: DEFAULT_TIMEOUT_MS,
       maxAttempts:      trialMode ? TRIAL_ATTEMPTS : 2,
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
@@ -2675,8 +2749,6 @@ async function runSkeletonFleshPipeline(options) {
       completeMessage:  'Endings complete',
       onProgress:       onProgress,
       schema:           null,
-      maxTokens:        MAX_OUTPUT_TOKENS,
-      requestTimeoutMs: 180000,
       maxAttempts:      trialMode ? TRIAL_ATTEMPTS : 2,
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,

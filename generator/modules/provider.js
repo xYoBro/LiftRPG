@@ -17,7 +17,15 @@
 //   Discovery:  listProviderModels, fetchJsonWithTimeout
 //   Settings:   resolveStructuredPipelineSettings, allowsEmptyApiKey
 
-import { DEFAULT_TIMEOUT_MS, MAX_OUTPUT_TOKENS, PROVIDERS } from './constants.js';
+import {
+  DEFAULT_TIMEOUT_MS,
+  MAX_OUTPUT_TOKENS,
+  PROVIDERS,
+  ANTHROPIC_CONNECT_TIMEOUT_MS,
+  ANTHROPIC_STREAM_IDLE_TIMEOUT_MS,
+  ANTHROPIC_STREAM_MIN_OVERALL_MS,
+  ANTHROPIC_STREAM_MAX_MS
+} from './constants.js';
 import { extractJson } from './repair.js';
 import { cloneSimple } from './assembly.js';
 import {
@@ -27,6 +35,54 @@ import {
   isLikelyJsonFailure,
   shouldFallbackFromStructured
 } from './error-classify.js';
+
+// ── Finish reason normalization (SINGLE HOME) ────────────────────────────────
+// Provider vocabulary stops here. Everything downstream — error-classify.js,
+// the retry ladder, the UI — reads only the canonical enum:
+//
+//   'stop'       generation completed normally
+//   'truncation' hit the output token ceiling mid-answer  (the only value the
+//                retry ladder branches on)
+//   'filtered'   refused / safety-stopped / recitation-blocked
+//   'tool_use'   stopped to call a tool
+//   'pause'      server-tool pause; caller may resume
+//   'error'      provider reported a stream-level failure
+//   'unknown'    provider said nothing, or said something we do not recognize
+//
+// ADDING A PROVIDER MEANS ADDING ROWS HERE AND NOWHERE ELSE. An unrecognized
+// value degrades to 'unknown' — never throws, never guesses.
+// Keys are lower-cased before lookup, so Gemini's upper-case wire values
+// (MAX_TOKENS, SAFETY, …) land on the same rows as their lower-case twins.
+var FINISH_REASON_MAP = {
+  // Anthropic — stop_reason
+  end_turn: 'stop',
+  stop_sequence: 'stop',
+  max_tokens: 'truncation',
+  refusal: 'filtered',
+  tool_use: 'tool_use',
+  pause_turn: 'pause',
+  model_context_window_exceeded: 'truncation',
+  // OpenAI-compatible — finish_reason (Kimi, Codex, Groq, Ollama, OpenRouter, …)
+  stop: 'stop',
+  length: 'truncation',
+  tool_calls: 'tool_use',
+  function_call: 'tool_use',
+  content_filter: 'filtered',
+  // Gemini — finishReason
+  safety: 'filtered',
+  recitation: 'filtered',
+  blocklist: 'filtered',
+  prohibited_content: 'filtered',
+  spii: 'filtered',
+  malformed_function_call: 'error',
+  other: 'unknown'
+};
+
+export function normalizeFinishReason(raw) {
+  var value = String(raw == null ? '' : raw).trim().toLowerCase();
+  if (!value) return 'unknown';
+  return FINISH_REASON_MAP[value] || 'unknown';
+}
 
 // ── Pricing constants ─────────────────────────────────────────────────────────
 
@@ -105,6 +161,29 @@ export var MODEL_PRICING_RULES = [
     outputPerMillion: 5,
     cacheWritePerMillion: 1.25,
     cacheReadPerMillion: 0.10,
+    source: PRICING_SOURCES.anthropic
+  },
+  {
+    // Standard rate. Introductory pricing of $2 in / $10 out per MTok runs
+    // through 2026-08-31; the standard rate is carried here so the headline
+    // figure over-estimates rather than under-estimates during the intro window.
+    provider: 'anthropic',
+    match: /^claude-(?:sonnet-5|5-sonnet)(?:$|[-_.])/i,
+    label: 'Claude Sonnet 5',
+    inputPerMillion: 3,
+    outputPerMillion: 15,
+    cacheWritePerMillion: 3.75,
+    cacheReadPerMillion: 0.30,
+    source: PRICING_SOURCES.anthropic
+  },
+  {
+    provider: 'anthropic',
+    match: /^claude-(?:opus-5|5-opus)(?:$|[-_.])/i,
+    label: 'Claude Opus 5',
+    inputPerMillion: 5,
+    outputPerMillion: 25,
+    cacheWritePerMillion: 6.25,
+    cacheReadPerMillion: 0.50,
     source: PRICING_SOURCES.anthropic
   },
   {
@@ -1086,9 +1165,12 @@ export function buildOpenAICompatHeaders(apiKey) {
 // ── Request handlers ──────────────────────────────────────────────────────────
 
 // Anthropic model output token limits — models reject requests above their cap.
+// Haiku 4.5 caps at 64000 output tokens; Sonnet 5 / Opus 5 / Sonnet 4.6 reach
+// 128000. MAX_OUTPUT_TOKENS is 64000 (constants.js), i.e. already at or below
+// every current model's cap — this table only matters if that ceiling is ever
+// raised past 64000.
 var ANTHROPIC_MAX_OUTPUT = {
   'haiku': 64000
-  // Sonnet/Opus default to MAX_OUTPUT_TOKENS (65536+)
 };
 
 function clampAnthropicMaxTokens(model, requested) {
@@ -1101,11 +1183,371 @@ function clampAnthropicMaxTokens(model, requested) {
   return requested;
 }
 
+export var ANTHROPIC_MESSAGES_URL = 'https://api.anthropic.com/v1/messages';
+
+// Headers are deliberately minimal. NOTE: no `anthropic-beta` header —
+// 128k output is built into Claude 4+ models, so `output-128k-2025-02-19` was
+// a no-op fossil. And no temperature/top_p/top_k anywhere in the payload:
+// claude-sonnet-5 and claude-opus-5 reject non-default sampling params with a
+// 400, and omitting them is uniformly safe on every model.
+export function buildAnthropicHeaders(apiKey) {
+  return {
+    'x-api-key': apiKey,
+    'anthropic-version': '2023-06-01',
+    'anthropic-dangerous-direct-browser-access': 'true',
+    'content-type': 'application/json'
+  };
+}
+
+// ── Shared streaming guard ───────────────────────────────────────────────────
+// Wall-clock is the WRONG failure signal for a stream: a healthy 24k-token
+// completion runs for many minutes, while a dead socket produces no bytes at
+// all. So every streaming transport fails fast on SILENCE and stays patient
+// with PROGRESS. One harness, used by every format — a new adapter gets the
+// same semantics for free.
+//
+//   connect — no response headers yet          -> abort
+//   idle    — no bytes for this long mid-stream -> abort
+//   overall — absolute ceiling regardless       -> abort
+//
+// The caller's per-stage timeout is ADVISORY on a streaming path: it becomes
+// the overall cap, clamped so a healthy long stream is never killed early and
+// a runaway is never unbounded.
+function createStreamGuard(label, requestedTimeoutMs) {
+  var controller = new AbortController();
+  var phase = '';
+  var phaseMs = 0;
+  var silenceTimer = null;
+  var overallTimer = null;
+  var overallMs = Math.min(
+    ANTHROPIC_STREAM_MAX_MS,
+    Math.max(Number(requestedTimeoutMs) > 0 ? Number(requestedTimeoutMs) : DEFAULT_TIMEOUT_MS,
+      ANTHROPIC_STREAM_MIN_OVERALL_MS)
+  );
+
+  function abortWithPhase(nextPhase, ms) {
+    phase = nextPhase;
+    phaseMs = ms;
+    try { controller.abort(); } catch (abortErr) { /* already aborted */ }
+  }
+  function armSilence(ms, nextPhase) {
+    if (silenceTimer) clearTimeout(silenceTimer);
+    silenceTimer = setTimeout(function () { abortWithPhase(nextPhase, ms); }, ms);
+  }
+
+  return {
+    signal: controller.signal,
+    overallMs: overallMs,
+    start: function () {
+      armSilence(ANTHROPIC_CONNECT_TIMEOUT_MS, 'connect');
+      overallTimer = setTimeout(function () { abortWithPhase('overall', overallMs); }, overallMs);
+    },
+    // Call once headers land, then on every chunk, to re-arm the idle window.
+    touch: function () {
+      armSilence(ANTHROPIC_STREAM_IDLE_TIMEOUT_MS, 'idle');
+    },
+    clear: function () {
+      if (silenceTimer) clearTimeout(silenceTimer);
+      if (overallTimer) clearTimeout(overallTimer);
+      silenceTimer = null;
+      overallTimer = null;
+    },
+    // Maps a thrown fetch/read failure onto a classified pipeline error.
+    // Returns null when the error is not one this guard is responsible for.
+    toTimeoutError: function (err) {
+      var lower = String((err && err.message) || err || '').toLowerCase();
+      var aborted = (err && err.name === 'AbortError') || lower.indexOf('abort') !== -1;
+      if (!aborted || !phase) return null;
+      var seconds = Math.round(phaseMs / 1000);
+      var detail = phase === 'connect'
+        ? label + ' did not send response headers within ' + seconds + 's.'
+        : phase === 'idle'
+          ? 'The ' + label + ' stream went silent for ' + seconds + 's mid-response (connection likely dropped).'
+          : 'The ' + label + ' stream exceeded its overall ' + seconds + 's ceiling.';
+      var timeoutError = new Error(detail + ' Try again.');
+      timeoutError.errorType = 'timeout';
+      timeoutError.retryable = true;
+      return timeoutError;
+    }
+  };
+}
+
+function buildNetworkError(err) {
+  var networkError = new Error(
+    'Network error reaching API: ' + ((err && err.message) || err) + '. ' +
+    'Check your API key, internet connection, and that the provider URL is correct.'
+  );
+  networkError.errorType = 'network';
+  networkError.retryable = true;
+  return networkError;
+}
+
+// Splits an SSE byte stream into `data:` payload lines and hands each to
+// onFrame. Shared by every streaming format — the frame FORMAT is universal
+// (text/event-stream); only the payload SCHEMA differs per provider.
+// `onFrame` returning false stops the read (used for the `[DONE]` sentinel).
+async function readSseFrames(response, onActivity, onFrame) {
+  var reader = response.body.getReader();
+  var decoder = new TextDecoder();
+  var buffer = '';
+  var stopped = false;
+
+  function drainLine(line) {
+    if (stopped) return;
+    if (line.indexOf('data:') !== 0) return;   // `event:` / `id:` / `:` comments
+    var raw = line.slice(5).trim();
+    if (!raw) return;
+    if (onFrame(raw) === false) stopped = true;
+  }
+
+  while (!stopped) {
+    var step = await reader.read();
+    if (onActivity) onActivity();
+    if (step.done) break;
+    buffer += decoder.decode(step.value, { stream: true });
+    var newlineIndex;
+    while (!stopped && (newlineIndex = buffer.indexOf('\n')) !== -1) {
+      var line = buffer.slice(0, newlineIndex).replace(/\r$/, '');
+      buffer = buffer.slice(newlineIndex + 1);
+      drainLine(line);
+    }
+  }
+  if (!stopped) {
+    buffer += decoder.decode();
+    if (buffer.trim()) drainLine(buffer.replace(/\r$/, '').trim());
+  }
+}
+
+// Parses one SSE data payload as JSON. Unparseable frames are skipped, never
+// thrown — a provider emitting a keepalive or a shape we do not know must not
+// kill a healthy generation.
+function parseSseJson(raw, label) {
+  try {
+    return JSON.parse(raw);
+  } catch (parseErr) {
+    console.warn('[LiftRPG] Skipping unparseable ' + label + ' SSE frame:', raw.slice(0, 200));
+    return null;
+  }
+}
+
+// POSTs a streaming request and consumes it under the shared guard. Every
+// streaming transport routes through here, so timeout semantics, HTTP-error
+// shaping, and network-error classification are identical across formats.
+async function runStreamingRequest(spec) {
+  var guard = createStreamGuard(spec.label, spec.timeoutMs);
+  guard.start();
+  try {
+    var resp = await fetch(spec.url, {
+      method: 'POST',
+      headers: spec.headers,
+      body: JSON.stringify(spec.payload),
+      signal: guard.signal
+    });
+
+    if (!resp.ok) {
+      var errorText = '';
+      try { errorText = await resp.text(); } catch (readErr) { errorText = ''; }
+      var parsed = null;
+      try { parsed = errorText ? JSON.parse(errorText) : null; } catch (jsonErr) { parsed = null; }
+      var errObj = Array.isArray(parsed) ? parsed[0] : parsed;   // Gemini returns array errors
+      var errMsg = (errObj && errObj.error && errObj.error.message)
+        || (errObj && errObj.message)
+        || (errorText ? errorText.slice(0, 500) : '')
+        || ('HTTP ' + resp.status);
+      var httpError = new Error(spec.errorPrefix + errMsg);
+      httpError.status = resp.status;
+      if (resp.status === 429 || resp.status >= 500) httpError.retryable = true;
+      throw httpError;
+    }
+
+    if (!resp.body || typeof resp.body.getReader !== 'function') {
+      throw new Error(spec.label + ' streaming response has no readable body. Check the console.');
+    }
+
+    guard.touch();   // headers landed — switch connect window -> idle window
+    return await spec.consume(resp, guard.touch);
+  } catch (err) {
+    var timeoutError = guard.toTimeoutError(err);
+    if (timeoutError) throw timeoutError;
+    if (err && err.name === 'TypeError' && !err.status) throw buildNetworkError(err);
+    throw err;
+  } finally {
+    guard.clear();
+  }
+}
+
+// Consumes an OpenAI-compatible SSE stream. This is the path every third-party
+// and local model rides (Kimi via Moonshot/OpenRouter, Codex-style endpoints,
+// Groq, Ollama, Gemini's compat endpoint), so it is deliberately forgiving:
+//
+//   - text accumulates from choices[0].delta.content
+//   - the stream terminates on a literal `[DONE]` sentinel (unlike Anthropic)
+//   - usage is OPTIONAL. Many compat providers omit it from streams or reject
+//     stream_options entirely. Missing usage means "tokens unknown", which is
+//     a reportable state — NOT an error.
+//   - unknown fields, unknown delta shapes, and non-JSON keepalives are ignored
+async function readOpenAICompatStream(response, onActivity) {
+  var text = '';
+  var finishReasonRaw = '';
+  var streamedModel = '';
+  var usage = null;
+  var streamError = null;
+  var sawDone = false;
+
+  await readSseFrames(response, onActivity, function (raw) {
+    if (raw === '[DONE]') {
+      sawDone = true;
+      return false;   // stop reading
+    }
+    var payload = parseSseJson(raw, 'OpenAI-compatible');
+    if (!payload) return true;
+
+    if (payload.error) {
+      streamError = new Error('API error: ' + (payload.error.message || payload.error.type || 'stream error'));
+      streamError.retryable = true;
+      return false;
+    }
+    if (payload.model && !streamedModel) streamedModel = payload.model;
+
+    // Usage arrives either on a dedicated final chunk (empty choices, with
+    // stream_options.include_usage) or not at all.
+    if (payload.usage) usage = payload.usage;
+
+    var choice = Array.isArray(payload.choices) ? payload.choices[0] : null;
+    if (!choice) return true;
+    if (choice.finish_reason) finishReasonRaw = choice.finish_reason;
+
+    var delta = choice.delta || {};
+    // `content` is normally a string; some providers send typed parts.
+    if (typeof delta.content === 'string') {
+      text += delta.content;
+    } else if (delta.content) {
+      text += extractTextContent(delta.content);
+    }
+    return true;
+  });
+
+  if (streamError) throw streamError;
+
+  return {
+    text: text,
+    usage: usage,
+    finishReasonRaw: finishReasonRaw,
+    model: streamedModel,
+    complete: sawDone
+  };
+}
+
+// Provider-neutral: raised whenever a normalized finishReason is 'truncation'
+// (Anthropic stop_reason max_tokens, OpenAI finish_reason length, Gemini
+// MAX_TOKENS). The structural markers are what error-classify.js reads — the
+// message text is for humans only.
+function buildTruncationError(detail) {
+  var err = new Error(
+    'Response truncated: the model hit the output token limit before completing the JSON.\n\n' +
+    (detail || 'The booklet JSON requires more output tokens than this model provided. ' +
+      'Retry with a higher max output token limit, switch to a model with a larger output window, or use Chat mode.')
+  );
+  err.errorType = 'truncation';
+  err.finishReason = 'truncation';
+  err.retryable = true;
+  return err;
+}
+
+// Consumes an Anthropic SSE stream and accumulates assistant text + usage.
+//
+// Event order: message_start (message.usage: input_tokens,
+// cache_creation_input_tokens, cache_read_input_tokens) -> content_block_start
+// -> content_block_delta* -> content_block_stop -> message_delta
+// (delta.stop_reason, usage.output_tokens) -> message_stop.
+//
+// There is NO "[DONE]" sentinel — message_stop ends the stream.
+//
+// Only `delta.type === 'text_delta'` contributes to the returned text.
+// `thinking_delta`, `signature_delta`, `input_json_delta`, and any future delta
+// type are skipped silently: claude-sonnet-5 and claude-opus-5 run adaptive
+// thinking by default and legitimately emit thinking blocks alongside text.
+async function readAnthropicStream(response, onActivity) {
+  var text = '';
+  var usage = {
+    input_tokens: 0,
+    output_tokens: 0,
+    cache_creation_input_tokens: 0,
+    cache_read_input_tokens: 0
+  };
+  var stopReason = '';
+  var streamedModel = '';
+  var streamError = null;
+  var sawMessageStop = false;
+
+  function handleEvent(payload) {
+    var type = payload && payload.type;
+    if (type === 'message_start') {
+      var message = payload.message || {};
+      streamedModel = message.model || streamedModel;
+      var startUsage = message.usage || {};
+      usage.input_tokens = safeNumber(startUsage.input_tokens);
+      usage.cache_creation_input_tokens = safeNumber(startUsage.cache_creation_input_tokens);
+      usage.cache_read_input_tokens = safeNumber(startUsage.cache_read_input_tokens);
+      // Some responses report output tokens on message_start too; message_delta wins.
+      usage.output_tokens = safeNumber(startUsage.output_tokens);
+      return;
+    }
+    if (type === 'content_block_delta') {
+      var delta = payload.delta || {};
+      if (delta.type === 'text_delta' && typeof delta.text === 'string') {
+        text += delta.text;
+      }
+      return;
+    }
+    if (type === 'message_delta') {
+      var messageDelta = payload.delta || {};
+      if (messageDelta.stop_reason) stopReason = messageDelta.stop_reason;
+      var deltaUsage = payload.usage || {};
+      if (deltaUsage.output_tokens !== undefined) {
+        usage.output_tokens = safeNumber(deltaUsage.output_tokens);
+      }
+      if (deltaUsage.input_tokens !== undefined && !usage.input_tokens) {
+        usage.input_tokens = safeNumber(deltaUsage.input_tokens);
+      }
+      return;
+    }
+    if (type === 'message_stop') {
+      sawMessageStop = true;
+      return;
+    }
+    if (type === 'error') {
+      var apiError = payload.error || {};
+      streamError = new Error('Anthropic API error: ' + (apiError.message || apiError.type || 'stream error'));
+      streamError.retryable = true;
+    }
+    // content_block_start / content_block_stop / ping and unknown types: ignore.
+  }
+
+  // Each frame is an `event:` line followed by a `data:` line. The data payload
+  // is standalone JSON carrying its own `type`, so the event: line is redundant.
+  await readSseFrames(response, onActivity, function (raw) {
+    var payload = parseSseJson(raw, 'Anthropic');
+    if (payload) handleEvent(payload);
+  });
+
+  if (streamError) throw streamError;
+
+  return {
+    text: text,
+    usage: usage,
+    stopReason: stopReason,
+    model: streamedModel,
+    complete: sawMessageStop
+  };
+}
+
 export async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs, pricingRule, systemPrompt) {
   var resolvedMax = clampAnthropicMaxTokens(model, maxTokens || MAX_OUTPUT_TOKENS);
   var payload = {
     model: model,
     max_tokens: resolvedMax,
+    stream: true,
     messages: [{ role: 'user', content: prompt }]
   };
 
@@ -1119,116 +1561,295 @@ export async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs,
     }];
   }
 
-  var resp = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-      'anthropic-beta': 'output-128k-2025-02-19',
-      'content-type': 'application/json'
-    },
-    body: JSON.stringify(payload)
-  }, timeoutMs);
+  var streamed = await runStreamingRequest({
+    label: 'Anthropic',
+    errorPrefix: 'Anthropic API error: ',
+    url: ANTHROPIC_MESSAGES_URL,
+    headers: buildAnthropicHeaders(apiKey),
+    payload: payload,
+    timeoutMs: timeoutMs,
+    consume: readAnthropicStream
+  });
 
-  var body = await resp.json();
-
-  if (!resp.ok) {
-    var errMsg = (body.error && body.error.message) || ('HTTP ' + resp.status);
-    throw new Error('Anthropic API error: ' + errMsg);
-  }
-
-  if (!body.content || !body.content[0] || !body.content[0].text) {
-    throw new Error('Unexpected Anthropic response shape. Check the console.');
-  }
-
-  var rawText = body.content[0].text;
+  var rawText = streamed.text;
   var meta = {
     provider: 'anthropic',
-    stop_reason: body.stop_reason,
-    model: body.model,
-    usage: body.usage
+    stop_reason: streamed.stopReason,
+    finishReason: normalizeFinishReason(streamed.stopReason),
+    model: streamed.model || model,
+    usage: streamed.usage,
+    streamed: true
   };
   window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
   window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = meta);
-  if (body.stop_reason === 'max_tokens') {
-    throw new Error(
-      'Response truncated: the model hit the output token limit before completing the JSON.\n\n' +
-      'The booklet JSON requires more output tokens than this model provided. ' +
-      'Retry with a higher max output token limit, switch to a model with a larger output window, or use Chat mode.'
-    );
+
+  if (meta.finishReason === 'truncation') {
+    throw buildTruncationError();
   }
+
+  if (!rawText) {
+    var emptyError = new Error(
+      'Anthropic returned no text content' +
+      (streamed.stopReason ? ' (stop_reason: ' + streamed.stopReason + ')' : '') + '. Check the console.'
+    );
+    emptyError.finishReason = meta.finishReason;
+    throw emptyError;
+  }
+
   return {
     text: rawText,
     meta: meta,
-    usage: buildUsageSnapshot('anthropic', body.model || model, body.usage, pricingRule)
+    usage: buildUsageSnapshot('anthropic', meta.model, streamed.usage, pricingRule)
   };
+}
+
+// Provider identity from the base URL. This is CONFIG matching, not code
+// branching \u2014 a base URL we do not recognize is simply 'openai', which is the
+// correct answer for every custom OpenAI-compatible endpoint.
+function detectOpenAICompatProvider(baseUrl) {
+  var normalized = normalizeUrl(baseUrl);
+  if (normalized === normalizeUrl(PROVIDERS.groq.baseUrl)) return 'groq';
+  if (normalized === normalizeUrl(PROVIDERS.gemini.baseUrl)) return 'gemini';
+  if (normalized === normalizeUrl(PROVIDERS.ollama.baseUrl)) return 'ollama';
+  return 'openai';
+}
+
+// `stream_options: {include_usage: true}` is the standard way to get token
+// counts out of an OpenAI-compatible stream, but plenty of compat servers
+// reject unknown parameters outright. We ask once per endpoint; if the endpoint
+// refuses, we remember and stop asking for the rest of the session. Tokens then
+// report as unknown, which is honest \u2014 never an error.
+var STREAM_OPTIONS_UNSUPPORTED = {};
+
+function rejectsStreamOptions(err) {
+  if (!err || err.status !== 400) return false;
+  var message = String(err.message || '');
+  return message.toLowerCase().indexOf('stream_options') !== -1
+    || isStructuredOutputUnsupportedMessage(message);
 }
 
 export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens, timeoutMs, pricingRule) {
-  var url = baseUrl.replace(/\/+$/, '') + '/chat/completions';
-  var headers = { 'content-type': 'application/json' };
-  if (apiKey) {
-    headers['Authorization'] = 'Bearer ' + apiKey;
+  var url = buildOpenAICompatUrl(baseUrl);
+  var endpointKey = normalizeUrl(baseUrl);
+  var headers = buildOpenAICompatHeaders(apiKey);
+
+  function buildPayload(includeUsage) {
+    var extra = { stream: true };
+    if (includeUsage) extra.stream_options = { include_usage: true };
+    return buildOpenAICompatChatPayload(model, prompt, maxTokens, extra);
   }
 
-  var resp = await fetchWithTimeout(url, {
-    method: 'POST',
-    headers: headers,
-    body: JSON.stringify(buildOpenAICompatChatPayload(model, prompt, maxTokens))
-  }, timeoutMs);
-
-  var body = await resp.json();
-  // Gemini may return array-format error responses
-  var errObj = Array.isArray(body) ? body[0] : body;
-
-  if (!resp.ok) {
-    var errMsg = (errObj.error && errObj.error.message)
-      || (errObj.error && errObj.error.status && (errObj.error.status + ': ' + JSON.stringify(errObj.error)))
-      || (errObj.message)
-      || ('HTTP ' + resp.status + ' \u2014 ' + JSON.stringify(body).slice(0, 500));
-    throw new Error('API error: ' + errMsg);
+  async function attempt(includeUsage) {
+    return runStreamingRequest({
+      label: 'API',
+      errorPrefix: 'API error: ',
+      url: url,
+      headers: headers,
+      payload: buildPayload(includeUsage),
+      timeoutMs: timeoutMs,
+      consume: readOpenAICompatStream
+    });
   }
 
-  if (!body.choices || !body.choices[0] || !body.choices[0].message) {
-    throw new Error('Unexpected API response shape. Check the console.');
+  var askForUsage = !STREAM_OPTIONS_UNSUPPORTED[endpointKey];
+  var streamed;
+  try {
+    streamed = await attempt(askForUsage);
+  } catch (err) {
+    if (askForUsage && rejectsStreamOptions(err)) {
+      // Endpoint refuses the usage opt-in. Remember, retry once without it.
+      console.warn('[LiftRPG] ' + endpointKey + ' rejected stream_options; retrying without usage reporting.');
+      STREAM_OPTIONS_UNSUPPORTED[endpointKey] = true;
+      streamed = await attempt(false);
+    } else {
+      throw err;
+    }
   }
 
-  var rawText = extractTextContent(body.choices[0].message.content);
+  var providerId = detectOpenAICompatProvider(baseUrl);
   var meta = {
-    provider: normalizeUrl(baseUrl) === normalizeUrl(PROVIDERS.groq.baseUrl) ? 'groq'
-      : normalizeUrl(baseUrl) === normalizeUrl(PROVIDERS.gemini.baseUrl) ? 'gemini'
-        : normalizeUrl(baseUrl) === normalizeUrl(PROVIDERS.ollama.baseUrl) ? 'ollama'
-          : 'openai',
-    finish_reason: body.choices[0].finish_reason,
-    model: body.model,
-    usage: body.usage
+    provider: providerId,
+    finish_reason: streamed.finishReasonRaw,
+    finishReason: normalizeFinishReason(streamed.finishReasonRaw),
+    model: streamed.model || model,
+    usage: streamed.usage || null,
+    usageReported: !!streamed.usage,
+    streamed: true
   };
-  window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
+  window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = streamed.text);
   window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = meta);
-  if (body.choices[0].finish_reason === 'length' || body.choices[0].finish_reason === 'MAX_TOKENS') {
-    throw new Error(
-      'Response truncated: the model hit the output token limit before completing the JSON.\n\n' +
-      'The booklet JSON requires more output tokens than this model provided. ' +
-      'Retry with a higher max output token limit, switch to a model with a larger output window, or use Chat mode.'
-    );
+
+  if (meta.finishReason === 'truncation') {
+    throw buildTruncationError();
   }
+
+  if (!streamed.text) {
+    var emptyError = new Error(
+      'The provider returned no text content' +
+      (streamed.finishReasonRaw ? ' (finish_reason: ' + streamed.finishReasonRaw + ')' : '') +
+      '. Check the console.'
+    );
+    emptyError.finishReason = meta.finishReason;
+    throw emptyError;
+  }
+
   return {
-    text: rawText,
+    text: streamed.text,
     meta: meta,
-    usage: buildUsageSnapshot(meta.provider, body.model || model, body.usage, pricingRule)
+    // No usage in the stream is a normal outcome: buildUsageSnapshot zeroes the
+    // counters and the cost meter reports the run as unpriced rather than $0.00.
+    usage: buildUsageSnapshot(providerId, meta.model, streamed.usage || {}, pricingRule)
   };
 }
 
+// ── Transport registry ────────────────────────────────────────────────────────
+//
+// THE EXTENSION SEAM. A provider is CONFIG (a preset in constants.js: format +
+// baseUrl + key + model id + discovery kind). A wire FORMAT is the only thing
+// that is code, and it lives here as one adapter.
+//
+// Adding wire format #4 requires exactly three things and nothing else:
+//   1. one adapter implementing the interface below,
+//   2. one `registerTransport()` entry,
+//   3. one provider preset in constants.js.
+// Everything downstream — runJsonStage, error-classify.js, the retry ladder,
+// the cost meter, checkpointing, the UI — is format-blind by construction. If a
+// new format forces an edit outside these three places, the seam has leaked.
+//
+// This is the project's "new theme next month" scalability test (CLAUDE.md
+// Design System Principles) applied to transports.
+//
+/**
+ * @typedef {Object} TransportResult
+ * @property {string} text          Assistant text (the stage's JSON, as a string).
+ * @property {Object} meta          Diagnostics: provider, model, raw + normalized
+ *                                  finishReason, usageReported, streamed.
+ * @property {Object} usage         Usage snapshot from buildUsageSnapshot().
+ *                                  Zeroed counters when the provider reported
+ *                                  none — "unknown", never an error.
+ */
+/**
+ * @typedef {Object} TransportCapabilities
+ * @property {boolean} streaming        Adapter consumes an incremental stream.
+ * @property {'reliable'|'optional'|'none'} usageInStream
+ *           reliable — usage always present; optional — may be absent and the
+ *           run must degrade to unknown tokens; none — never reported.
+ * @property {boolean} structuredOutput Honors a JSON-schema response format.
+ *           When false, callProviderStructured falls back to freeform JSON
+ *           extraction instead of sending a schema.
+ * @property {boolean} systemPromptCaching
+ *           Accepts a cacheable system prompt via settings._systemPrompt.
+ */
+/**
+ * @typedef {Object} TransportAdapter
+ * @property {string} id                       Wire format id; matches settings.format.
+ * @property {string} label                    Human-readable, for diagnostics.
+ * @property {TransportCapabilities} capabilities
+ * @property {(settings: Object, prompt: string, opts: {maxTokens: number, timeoutMs: number}) => Promise<TransportResult>} call
+ * @property {((settings: Object) => Promise<Object>)=} listModels
+ *           RESERVED. Not implemented today: model discovery is preset-driven
+ *           (PROVIDERS[*].modelDiscovery -> listProviderModels), which is config
+ *           rather than code. Implement only if a format's discovery cannot be
+ *           expressed as a preset.
+ */
+
+export var DEFAULT_TRANSPORT_FORMAT = 'openai';
+
+var TRANSPORT_REGISTRY = {};
+
+export function registerTransport(adapter) {
+  if (!adapter || !adapter.id || typeof adapter.call !== 'function') {
+    throw new Error('registerTransport requires an adapter with { id, call }.');
+  }
+  TRANSPORT_REGISTRY[adapter.id] = adapter;
+  return adapter;
+}
+
+export function getTransport(formatId) {
+  return TRANSPORT_REGISTRY[String(formatId || '').trim().toLowerCase()] || null;
+}
+
+export function listTransportFormats() {
+  return Object.keys(TRANSPORT_REGISTRY);
+}
+
+// Unknown/blank format resolves to the OpenAI-compatible adapter — the correct
+// default for any custom endpoint the user points at with a base URL.
+export function resolveTransport(settings) {
+  return getTransport(settings && settings.format) || getTransport(DEFAULT_TRANSPORT_FORMAT);
+}
+
+registerTransport({
+  id: 'anthropic',
+  label: 'Anthropic Messages',
+  capabilities: {
+    streaming: true,
+    usageInStream: 'reliable',
+    structuredOutput: false,
+    systemPromptCaching: true
+  },
+  call: function (settings, prompt, opts) {
+    return callAnthropic(
+      settings.apiKey, settings.model, prompt,
+      opts.maxTokens, opts.timeoutMs,
+      settings._pricingRule, settings._systemPrompt
+    );
+  }
+});
+
+registerTransport({
+  id: 'openai',
+  label: 'OpenAI-compatible chat completions',
+  capabilities: {
+    streaming: true,
+    // Third-party and local servers frequently omit usage from streams.
+    usageInStream: 'optional',
+    structuredOutput: true,
+    systemPromptCaching: false
+  },
+  call: function (settings, prompt, opts) {
+    return callOpenAICompat(
+      settings.apiKey, settings.baseUrl, settings.model, prompt,
+      opts.maxTokens, opts.timeoutMs, settings._pricingRule
+    );
+  }
+});
+
+// Gemini is NOT a distinct wire format in this codebase — PROVIDERS.gemini.format
+// is 'openai' and it is reached through Google's OpenAI-compatibility endpoint.
+// This alias exists so a settings object that still carries format:'gemini'
+// (pre-normalization, or hand-built) resolves instead of silently falling back.
+// Its finishReason vocabulary is already covered by FINISH_REASON_MAP.
+registerTransport({
+  id: 'gemini',
+  label: 'Google Gemini (OpenAI-compatible endpoint)',
+  capabilities: {
+    streaming: true,
+    usageInStream: 'optional',
+    structuredOutput: true,
+    systemPromptCaching: false
+  },
+  call: function (settings, prompt, opts) {
+    return getTransport('openai').call(settings, prompt, opts);
+  }
+});
+
 // ── Provider dispatcher ────────────────────────────────────────────────────────
 // Unified dispatch used by both single-stage generate() and generateMultiStage().
+// Format branching lives in the registry lookup and nowhere else.
 
 export async function callProvider(settings, prompt, maxTokens) {
-  var timeoutMs = settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS;
-  if (settings.format === 'anthropic') {
-    return callAnthropic(settings.apiKey, settings.model, prompt, maxTokens, timeoutMs, settings._pricingRule, settings._systemPrompt);
-  }
-  return callOpenAICompat(settings.apiKey, settings.baseUrl, settings.model, prompt, maxTokens, timeoutMs, settings._pricingRule);
+  var adapter = resolveTransport(settings);
+  return adapter.call(settings, prompt, {
+    maxTokens: maxTokens,
+    timeoutMs: settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS
+  });
+}
+
+// Capability probe for callers that used to branch on `format === 'anthropic'`.
+export function transportSupports(settings, capability) {
+  var adapter = resolveTransport(settings);
+  return !!(adapter && adapter.capabilities && adapter.capabilities[capability]);
 }
 
 // ── Structured output calls ───────────────────────────────────────────────────
@@ -1273,6 +1894,7 @@ export async function callOpenAICompatStructured(apiKey, baseUrl, model, prompt,
   var meta = {
     provider: providerId,
     finish_reason: body.choices[0].finish_reason,
+    finishReason: normalizeFinishReason(body.choices[0].finish_reason),
     model: body.model,
     usage: body.usage,
     response_mode: 'json_schema'
@@ -1293,11 +1915,8 @@ export async function callOpenAICompatStructured(apiKey, baseUrl, model, prompt,
   window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
   window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = meta);
 
-  if (body.choices[0].finish_reason === 'length' || body.choices[0].finish_reason === 'MAX_TOKENS') {
-    throw new Error(
-      'Response truncated: the model hit the output token limit before completing the JSON.\n\n' +
-      'The stage output requires more output tokens than this model provided.'
-    );
+  if (meta.finishReason === 'truncation') {
+    throw buildTruncationError('The stage output requires more output tokens than this model provided.');
   }
 
   try {
@@ -1317,7 +1936,9 @@ export async function callOpenAICompatStructured(apiKey, baseUrl, model, prompt,
 }
 
 export async function callProviderStructured(settings, prompt, schema, maxTokens, stageName) {
-  if (!schema || settings.format === 'anthropic') {
+  // Capability lookup, not a format check — an adapter that cannot honor a
+  // JSON-schema response format falls back to freeform extraction.
+  if (!schema || !transportSupports(settings, 'structuredOutput')) {
     var unstructuredResponse = await callProvider(settings, prompt, maxTokens);
     return {
       result: extractJson(unstructuredResponse.text),
