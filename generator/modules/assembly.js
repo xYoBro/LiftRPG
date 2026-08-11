@@ -701,6 +701,12 @@ export function extractShellContext(shell) {
   if (meta.literaryRegister) { ctx.literaryRegister = meta.literaryRegister; hasContent = true; }
   if (meta.structuralShape) { ctx.structuralShape = meta.structuralShape; hasContent = true; }
   if (meta.artifactIdentity) { ctx.artifactIdentity = meta.artifactIdentity; hasContent = true; }
+  // The knowing (§11 Wave 1.5). This is the whole point of the shell-context
+  // channel for the process particulars: week-final, fragment, and ending
+  // prompts all read their world through this projection, so a particular that
+  // does not reach here funds nothing. Absent on any booklet planned before
+  // the knowing stage existed — every consumer tolerates its absence.
+  if (meta.processParticulars) { ctx.processParticulars = meta.processParticulars; hasContent = true; }
   // Fix M2: return null when hasContent is false
   return hasContent ? ctx : null;
 }
@@ -2599,6 +2605,11 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
   // — assigning undefined would leave an own key that the closed meta schema
   // rejects. deriveMarkStripEconomy synthesizes one below when none was authored.
   if (meta.economy) booklet.meta.economy = meta.economy;
+  // Same conditional rule for the knowing (§11 Wave 1.5). It is authored by the
+  // knowing stage onto skeleton.meta; without this line the field would reach
+  // every prose prompt and then vanish from the shipped booklet, and nothing
+  // would report the loss.
+  if (meta.processParticulars) booklet.meta.processParticulars = meta.processParticulars;
 
   // -- Weeks: merge skeleton structural fields + flesh content --
   for (var i = 0; i < weekOutputs.length; i++) {

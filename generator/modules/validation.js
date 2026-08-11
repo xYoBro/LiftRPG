@@ -3220,6 +3220,73 @@ export function validateSkeletonStage(result, weekCount) {
   return '';
 }
 
+// ── The knowing stage (§11 Wave 1.5) ────────────────────────────────────────
+// Same idiom as every other stage validator: '' passes, a string hard-fails
+// and costs a retry, console.warn is advisory.
+//
+// The severity split is D19 applied literally. UNUSABLE SHAPE is a hard fail:
+// if the stage did not return an object of arrays there is nothing for the
+// prose stages to select from, and the whole point of the stage is gone —
+// retrying is the correct spend. Everything about how MUCH was authored, and
+// which categories were covered, is generation POLICY and warns only. A thin
+// knowing still funds more prose than no knowing, and a booklet must never be
+// blocked from shipping because a model was terse about paperwork.
+//
+// NOT BUILT (deliberate, noted so it is not mistaken for an oversight): the
+// FUNDING heuristic — particulars-per-150-words measured against the assembled
+// prose, per VOICE.md §7 / CHECKLIST.md → FUNDING. It cannot run here (there is
+// no prose yet at this stage) and belongs on the assembled-booklet path beside
+// the other B-class scans. This validator checks that funds EXIST; the funding
+// audit will check that they were SPENT.
+export var KNOWING_THIN_COUNT = 3;
+
+export function validateKnowingStage(result) {
+  if (!result || typeof result !== 'object') return 'Knowing: not an object';
+
+  var particulars = result.processParticulars;
+  if (!particulars || typeof particulars !== 'object' || Array.isArray(particulars)) {
+    return 'Knowing → processParticulars: missing or not an object';
+  }
+
+  var CATEGORIES = ['instruments', 'paperworkRealities', 'orderOfOperations', 'periodSpecifics'];
+  var warnings = [];
+  var usableTotal = 0;
+
+  for (var i = 0; i < CATEGORIES.length; i++) {
+    var key = CATEGORIES[i];
+    var value = particulars[key];
+    if (value === undefined || value === null) {
+      // periodSpecifics is legitimately omitted when the brief implies no
+      // period or place — the schema does not require it either.
+      if (key !== 'periodSpecifics') {
+        warnings.push(key + ': absent (the prose stages will have nothing to select from here)');
+      }
+      continue;
+    }
+    if (!Array.isArray(value)) {
+      return 'Knowing → processParticulars.' + key + ': not an array';
+    }
+    var usable = value.filter(function (entry) {
+      return typeof entry === 'string' && entry.trim().length > 0;
+    });
+    usableTotal += usable.length;
+    if (usable.length === 0) {
+      warnings.push(key + ': empty');
+    } else if (usable.length < KNOWING_THIN_COUNT && key !== 'periodSpecifics') {
+      warnings.push(key + ': only ' + usable.length + ' particular(s) — thin, prose will reach for turns');
+    }
+  }
+
+  if (usableTotal === 0) {
+    return 'Knowing → processParticulars: no usable particulars in any category';
+  }
+
+  if (warnings.length > 0) {
+    console.warn('[LiftRPG] Knowing advisory: ' + warnings.join('; '));
+  }
+  return '';
+}
+
 // ── Error severity classification ───────────────────────────────────────────
 // Categorizes validation error strings by severity so runJsonStage can decide
 // whether to retry (blocking), accept (degraded), or skip (repairable by

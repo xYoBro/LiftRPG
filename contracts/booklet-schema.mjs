@@ -296,6 +296,40 @@ var economy = {
   }
 };
 
+// ── Process particulars (schema 1.5.0, §11 Wave 1.5 — "the knowing") ────────
+// VOICE.md §7's funding rule, made supply-side. `meta.worldContract` stays what
+// it has always been: the prose string carrying the governing tension and the
+// Core Noun Roster — WHO and WHAT exists. This sibling object carries HOW that
+// world actually works, authored by the knowing stage as structured material
+// every prose stage selects FROM rather than inventing per-unit.
+//
+// Arrays of short strings by ruling. A particular is one true fact about the
+// process ("the bell log is countersigned before the relief signs on"), not a
+// paragraph — a paragraph is prose, and unfunded prose is the failure this
+// exists to prevent. Selection is the point; a wall of text cannot be selected
+// from, only paraphrased.
+//
+// Additive and wholly optional (required: []). Zero shipped fixtures carry it;
+// a booklet without it renders byte-identically to before. The renderer never
+// reads it — it is generation-side material that reaches the page only as the
+// prose it funded.
+var processParticulars = {
+  type: 'object',
+  required: [],
+  additionalProperties: false,
+  properties: {
+    // The instruments and what they are actually called.
+    instruments: { type: 'array', items: nonEmptyString },
+    // What form gates what access; what gets signed, filed, countersigned, refused.
+    paperworkRealities: { type: 'array', items: nonEmptyString },
+    // What happens first; what cannot happen until something else does.
+    orderOfOperations: { type: 'array', items: nonEmptyString },
+    // Period and regional specifics, where the brief implies them.
+    periodSpecifics: { type: 'array', items: nonEmptyString },
+    _x: xt
+  }
+};
+
 export var BOOKLET_SCHEMA = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   $id: 'https://liftrpg.co/contracts/booklet/v' + SCHEMA_VERSION,
@@ -349,6 +383,7 @@ export var BOOKLET_SCHEMA = {
           }
         },
         artifactIntent: artifactIntent,
+        processParticulars: processParticulars,
         economy: economy,
         weeklyComponentType: nonEmptyString,
         weekCount: { type: 'integer', minimum: 1 },

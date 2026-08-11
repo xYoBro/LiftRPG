@@ -3559,6 +3559,11 @@
         layerBible: 'Foundation',
         campaignPlan: 'Booklet Plan',
         shell: 'Identity',
+        // D99 plain language: this stage authors the world's process
+        // particulars. The reader is told what it produces, never the internal
+        // pipeline name ("knowing"), which is the stageKey below and stays
+        // out of the interface.
+        knowing: 'World Detail',
         weeks: 'Weeks',
         fragments: 'Extras',
         endings: 'Ending',
@@ -3572,6 +3577,7 @@
           { key: 'layerBible', label: STAGE_LABELS.layerBible },
           { key: 'campaign', label: STAGE_LABELS.campaignPlan },
           { key: 'shell', label: STAGE_LABELS.shell },
+          { key: 'knowing', label: STAGE_LABELS.knowing },
           { key: 'weeks', label: STAGE_LABELS.weeks },
           { key: 'fragments', label: STAGE_LABELS.fragments },
           { key: 'endings', label: STAGE_LABELS.endings },
@@ -3582,6 +3588,7 @@
           // reader sees on the rail, so they name booklet parts, not
           // internal pipeline stages.
           { key: 'skeleton', label: 'Book Plan' },
+          { key: 'knowing', label: STAGE_LABELS.knowing },
           { key: 'rules', label: 'Rules Spread' },
           { key: 'weeks', label: STAGE_LABELS.weeks },
           { key: 'fragments', label: STAGE_LABELS.fragments },

@@ -438,6 +438,106 @@
     return lines.join('\n');
   }
 
+  // ── Skeleton context extractor (Skeleton+Flesh) ─────────────────────────
+  // The S+F sibling of assembly.js `extractShellContext`. Every flesh builder
+  // used to pluck meta.blockTitle / worldContract / narrativeVoice /
+  // literaryRegister by hand, five times over, which is how a new identity
+  // field reaches four of five prompts and nobody notices. One projection, one
+  // renderer, five callers.
+  //
+  // Returns a plain object rather than prompt text so callers can read
+  // individual fields (the week builder needs weeklyComponentType, the ending
+  // builder needs the resolution) without re-reaching into meta.
+  function extractSkeletonContext(skeleton) {
+    var meta = (skeleton || {}).meta || {};
+    return {
+      blockTitle:          meta.blockTitle || '',
+      worldContract:       meta.worldContract || '',
+      narrativeVoice:      meta.narrativeVoice || {},
+      literaryRegister:    meta.literaryRegister || {},
+      structuralShape:     meta.structuralShape || {},
+      artifactIdentity:    meta.artifactIdentity || {},
+      weeklyComponentType: meta.weeklyComponentType || '',
+      // The knowing (§11 Wave 1.5). Null when the stage did not run or the
+      // model returned nothing usable — every consumer must tolerate absence,
+      // because a booklet generated before this wave has none.
+      processParticulars:  meta.processParticulars || null,
+      intentContract:      formatArtifactIntentContract(meta)
+    };
+  }
+
+  // ── Process particulars renderer (the knowing, in prompt form) ──────────
+  // Prompt-side rendering of meta.processParticulars for the prose stages.
+  // Returns '' when there is nothing authored, so callers can .filter(Boolean)
+  // it out and a pre-knowing skeleton produces byte-identical prompts.
+  //
+  // Entry and length caps are prompt-budget defence, not doctrine: this block
+  // rides EVERY week, fragment, and ending prompt, so an over-generous knowing
+  // stage must not be able to crowd out the schema it is meant to fund.
+  var KNOWING_MAX_ENTRIES_PER_CATEGORY = 14;
+  var KNOWING_MAX_ENTRY_CHARS = 200;
+  var KNOWING_CATEGORIES = [
+    ['instruments',        'Instruments and what they are called'],
+    ['paperworkRealities', 'Paperwork realities'],
+    ['orderOfOperations',  'Order of operations'],
+    ['periodSpecifics',    'Period and regional specifics']
+  ];
+
+  function formatProcessParticulars(particulars) {
+    if (!particulars || typeof particulars !== 'object') return '';
+    var blocks = [];
+    for (var i = 0; i < KNOWING_CATEGORIES.length; i++) {
+      var key = KNOWING_CATEGORIES[i][0];
+      var heading = KNOWING_CATEGORIES[i][1];
+      var list = particulars[key];
+      if (!Array.isArray(list) || list.length === 0) continue;
+      var entries = [];
+      for (var j = 0; j < list.length && entries.length < KNOWING_MAX_ENTRIES_PER_CATEGORY; j++) {
+        var raw = String(list[j] == null ? '' : list[j]).trim();
+        if (!raw) continue;
+        entries.push('- ' + (raw.length > KNOWING_MAX_ENTRY_CHARS
+          ? raw.slice(0, KNOWING_MAX_ENTRY_CHARS - 1) + '…'
+          : raw));
+      }
+      if (entries.length) blocks.push('### ' + heading + '\n' + entries.join('\n') + '\n');
+    }
+    if (!blocks.length) return '';
+
+    return [
+      '## The Knowing — this world\'s process particulars (BINDING)',
+      '',
+      'These were authored for this booklet before any prose was written. They',
+      'are the material your plainness is funded by: SELECT from them, do not',
+      'invent a parallel set, and do not contradict them. Use the working names',
+      'exactly as written. Not every particular belongs in every unit — choosing',
+      'which ones a given writer would have recorded IS the characterization.',
+      ''
+    ].concat(blocks).join('\n');
+  }
+
+  // Shared identity header for the Skeleton+Flesh flesh builders. `extraLines`
+  // are the per-stage additions (component type, resolution, artifact shape);
+  // `includeKnowing` is false for the rules spread, which is deliberately
+  // instrument-flat and outside the fiction (VOICE.md §1).
+  function formatSkeletonIdentityBlock(ctx, options) {
+    options = options || {};
+    var lines = [
+      '## Booklet Identity',
+      '- Title: ' + ctx.blockTitle,
+      '- World Contract: ' + ctx.worldContract,
+      '- Voice: ' + JSON.stringify(ctx.narrativeVoice),
+      '- Register: ' + JSON.stringify(ctx.literaryRegister)
+    ].concat(options.extraLines || []);
+
+    var parts = [lines.join('\n'), ''];
+    if (ctx.intentContract) parts.push(ctx.intentContract, '');
+    if (options.includeKnowing !== false) {
+      var knowing = formatProcessParticulars(ctx.processParticulars);
+      if (knowing) parts.push(knowing, '');
+    }
+    return parts.join('\n');
+  }
+
   function formatUserBrief(brief, fallbackText) {
     var raw = String(brief || '').trim();
     if (!raw) return fallbackText;
@@ -890,6 +990,10 @@
         parts.push('**Artifact Identity Contract:** ' + JSON.stringify(shellContext.artifactIdentity));
         parts.push('Do not flatten this into a generic ops dossier. Preserve shellFamily, boardStateMode, openingMode, rulesDeliveryMode, and unlockLogic.');
       }
+      // The knowing (§11 Wave 1.5): authored process particulars ride the
+      // same shell channel as the rest of the identity contract.
+      var knowingBlock = formatProcessParticulars(shellContext.processParticulars);
+      if (knowingBlock) { parts.push(''); parts.push(knowingBlock); }
       parts.push('');
     }
 
@@ -1218,6 +1322,10 @@
         parts.push('**Artifact Identity Contract:** ' + JSON.stringify(shellContext.artifactIdentity));
         parts.push('Do not normalize this batch into generic reports. Preserve the approved artifact family and document ecology.');
       }
+      // The knowing (§11 Wave 1.5): authored process particulars ride the
+      // same shell channel as the rest of the identity contract.
+      var knowingBlock = formatProcessParticulars(shellContext.processParticulars);
+      if (knowingBlock) { parts.push(''); parts.push(knowingBlock); }
       parts.push('');
     }
 
@@ -1363,6 +1471,10 @@
         parts.push('**Artifact Identity Contract:** ' + JSON.stringify(shellContext.artifactIdentity));
         parts.push('The ending must feel like the same artifact family and reveal shape promised by the shell.');
       }
+      // The knowing (§11 Wave 1.5): authored process particulars ride the
+      // same shell channel as the rest of the identity contract.
+      var knowingBlock = formatProcessParticulars(shellContext.processParticulars);
+      if (knowingBlock) { parts.push(''); parts.push(knowingBlock); }
       parts.push('');
     }
 
@@ -2071,29 +2183,105 @@
   };
 
   /**
+   * Knowing prompt: the world's process particulars (§11 Wave 1.5).
+   *
+   * Shared by BOTH API pipelines — Skeleton+Flesh passes the skeleton,
+   * multi-stage/structured passes the shell. Both carry the same `meta`
+   * surface (worldContract, artifactIntent + its recorded reading), so one
+   * builder serves both and the stub bench has one prompt head to route.
+   *
+   * Input: skeleton-or-shell + the creative brief
+   * Output: { processParticulars: { instruments, paperworkRealities,
+   *           orderOfOperations, periodSpecifics } }
+   */
+  window.generateKnowingPrompt = function (source, brief, options) {
+    options = options || {};
+    var meta = (source || {}).meta || {};
+    var intent = meta.artifactIntent || {};
+    var reading = intent.reading || {};
+
+    var readingLines = [];
+    var READING_LABELS = [
+      ['tone', 'Tone'], ['register', 'Register'], ['povFrame', 'POV frame'],
+      ['impliedSetting', 'Implied setting'], ['emotionalArc', 'Emotional arc'],
+      ['genreTemplate', 'Genre template']
+    ];
+    for (var r = 0; r < READING_LABELS.length; r++) {
+      var val = reading[READING_LABELS[r][0]];
+      if (val) readingLines.push('- ' + READING_LABELS[r][1] + ': ' + val);
+    }
+    if (reading.briefEvidence) {
+      readingLines.push('- Evidence from the brief: ' + reading.briefEvidence);
+    }
+
+    var parts = [
+      '# LiftRPG Knowing Stage — Process Particulars',
+      '',
+      'You are writing down how this booklet\'s world actually works, before any',
+      'of its prose exists. Later stages will write every session prompt, found',
+      'document, and ending by selecting from what you author here.',
+      '',
+      '## Booklet Identity',
+      '- Title: ' + (meta.blockTitle || ''),
+      '- World Contract (the Core Noun Roster and the governing tension): ' + (meta.worldContract || ''),
+      '- Register: ' + JSON.stringify(meta.literaryRegister || {}),
+      '- Artifact: ' + JSON.stringify(meta.artifactIdentity || {}),
+      ''
+    ];
+
+    // D101: the recorded reading is what makes a misread localizable. The
+    // knowing is the first stage downstream of it that can contradict it in a
+    // way nothing else would catch — a world of the wrong period funds every
+    // prose stage wrongly — so the reading is quoted here as binding.
+    if (readingLines.length) {
+      parts.push(
+        '## The Recorded Reading of the Brief (BINDING)',
+        'The compiler read the brief and wrote this reading down. Author',
+        'particulars that belong to THIS world, not a more interesting one.'
+      );
+      parts = parts.concat(readingLines, ['']);
+    }
+
+    var intentContract = formatArtifactIntentContract(meta);
+    if (intentContract) parts.push(intentContract, '');
+
+    parts.push(
+      window.buildStageSchema('knowing'),
+      '',
+      '## Creative Direction (the brief, verbatim)',
+      brief ? truncateText(String(brief), 2000) : '(none supplied — derive the particulars from the identity above.)',
+      ''
+    );
+    if (options.retryMode) {
+      parts.push('Retry mode: keep every entry to one flat line. Ensure the JSON completes cleanly.', '');
+    }
+    parts.push('Return ONLY the JSON object. No markdown fences, no commentary.');
+
+    return parts.join('\n');
+  };
+
+  /**
    * Flesh prompt: rules spread.
    * Input: skeleton meta + cover + artifactIdentity
    * Output: { rulesSpread: { leftPage, rightPage } }
+   *
+   * No knowing block: the rules spread is procedural instruction from OUTSIDE
+   * the fiction (VOICE.md §1), so it takes the instrument-flat register and
+   * has no prose to fund.
    */
   window.generateFleshRulesPrompt = function (skeleton, options) {
     options = options || {};
-    var meta = skeleton.meta || {};
-    var cover = skeleton.cover || {};
+    var ctx = extractSkeletonContext(skeleton);
     return [
       '# LiftRPG Flesh Stage — Rules Spread',
       '',
       'You are writing the RULES SPREAD for a LiftRPG booklet.',
       'This is two pages: leftPage teaches the game rules in-world, rightPage provides tracking instructions.',
       '',
-      '## Booklet Identity',
-      '- Title: ' + (meta.blockTitle || ''),
-      '- World Contract: ' + (meta.worldContract || ''),
-      '- Artifact: ' + JSON.stringify(meta.artifactIdentity || {}),
-      '- Literary Register: ' + JSON.stringify(meta.literaryRegister || {}),
-      '- Voice: ' + JSON.stringify(meta.narrativeVoice || {}),
-      '',
-      formatArtifactIntentContract(meta),
-      '',
+      formatSkeletonIdentityBlock(ctx, {
+        extraLines: ['- Artifact: ' + JSON.stringify(ctx.artifactIdentity)],
+        includeKnowing: false
+      })
     ].concat(window.FLESH_RULES_SPREAD_SPEC).filter(Boolean).join('\n');
   };
 
@@ -2104,7 +2292,7 @@
    */
   window.generateFleshWeekPrompt = function (skeleton, weekPlan, weekWorkout, priorSummaries, allComponentValues, options) {
     options = options || {};
-    var meta = skeleton.meta || {};
+    var ctx = extractSkeletonContext(skeleton);
     var isBoss = weekPlan.isBossWeek;
     var weekNum = weekPlan.weekNumber;
 
@@ -2113,15 +2301,9 @@
       '',
       'You are writing the COMPLETE CONTENT for Week ' + weekNum + ' of a LiftRPG booklet.',
       '',
-      '## Booklet Identity',
-      '- Title: ' + (meta.blockTitle || ''),
-      '- World Contract: ' + (meta.worldContract || ''),
-      '- Voice: ' + JSON.stringify(meta.narrativeVoice || {}),
-      '- Register: ' + JSON.stringify(meta.literaryRegister || {}),
-      '- Weekly Component Type: ' + (meta.weeklyComponentType || ''),
-      '',
-      formatArtifactIntentContract(meta),
-      '',
+      formatSkeletonIdentityBlock(ctx, {
+        extraLines: ['- Weekly Component Type: ' + ctx.weeklyComponentType]
+      }),
       '## This Week\'s Skeleton',
       JSON.stringify(weekPlan, null, 2),
       '',
@@ -2193,7 +2375,7 @@
    */
   window.generateFleshFragmentBatchPrompt = function (skeleton, batchEntries, weekSummaries, priorFragments, batchIndex, totalBatches, options) {
     options = options || {};
-    var meta = skeleton.meta || {};
+    var ctx = extractSkeletonContext(skeleton);
 
     return [
       '# LiftRPG Flesh Stage — Fragment Batch ' + (batchIndex + 1) + '/' + totalBatches,
@@ -2201,14 +2383,7 @@
       'You are writing FOUND DOCUMENTS for a LiftRPG booklet.',
       'These are in-world documents discovered during play — memos, reports, field notes, etc.',
       '',
-      '## Booklet Identity',
-      '- Title: ' + (meta.blockTitle || ''),
-      '- World Contract: ' + (meta.worldContract || ''),
-      '- Voice: ' + JSON.stringify(meta.narrativeVoice || {}),
-      '- Register: ' + JSON.stringify(meta.literaryRegister || {}),
-      '',
-      formatArtifactIntentContract(meta),
-      '',
+      formatSkeletonIdentityBlock(ctx),
       '## Fragment Schema',
       window.buildStageSchema('fragment'),
       '',
@@ -2238,7 +2413,7 @@
    */
   window.generateFleshEndingPrompt = function (skeleton, variant, finalWeekSummary, weekSummaries, options) {
     options = options || {};
-    var meta = skeleton.meta || {};
+    var ctx = extractSkeletonContext(skeleton);
     var boss = skeleton.bossPlan || {};
 
     return [
@@ -2247,15 +2422,9 @@
       'You are writing a BOOKLET ENDING for a LiftRPG zine.',
       'This is the payoff document the player unlocks after solving the password.',
       '',
-      '## Booklet Identity',
-      '- Title: ' + (meta.blockTitle || ''),
-      '- World Contract: ' + (meta.worldContract || ''),
-      '- Voice: ' + JSON.stringify(meta.narrativeVoice || {}),
-      '- Register: ' + JSON.stringify(meta.literaryRegister || {}),
-      '- Resolution: ' + ((meta.structuralShape || {}).resolution || ''),
-      '',
-      formatArtifactIntentContract(meta),
-      '',
+      formatSkeletonIdentityBlock(ctx, {
+        extraLines: ['- Resolution: ' + (ctx.structuralShape.resolution || '')]
+      }),
       '## Boss Context',
       '- Password: ' + (boss.passwordWord || ''),
       '- Convergence: ' + (boss.convergenceRequirements || ''),
@@ -2264,6 +2433,14 @@
       finalWeekSummary ? '## Final Week Summary\n' + compactJson(finalWeekSummary) + '\n' : '',
       weekSummaries ? '## All Week Summaries\n' + compactJson(weekSummaries) + '\n' : '',
       '',
+      // The S+F ending path reached the model with NO voice discipline at all,
+      // while multi-stage endings got it through buildStageSchema('ending').
+      // Endings are the constitution's own named highest-failure surface and
+      // S+F is the default pipeline, so the gap sat on the most-run path over
+      // the most fragile prose. Included directly, the same way
+      // generateSkeletonPrompt carries it.
+      window.INST_VOICE_DISCIPLINE.join('\n'),
+      ''
     ].concat(window.buildFleshEndingSpec(variant)).filter(Boolean).join('\n');
   };
 
@@ -2274,7 +2451,7 @@
    */
   window.generateFleshEndingsBundledPrompt = function (skeleton, endingVariants, finalWeekSummary, weekSummaries, options) {
     options = options || {};
-    var meta = skeleton.meta || {};
+    var ctx = extractSkeletonContext(skeleton);
     var boss = skeleton.bossPlan || {};
 
     var variantList = endingVariants.map(function (v) { return '"' + v + '"'; }).join(', ');
@@ -2286,15 +2463,9 @@
       'Each ending is a payoff document the player unlocks after solving the password.',
       'Generate one ending per variant: ' + variantList,
       '',
-      '## Booklet Identity',
-      '- Title: ' + (meta.blockTitle || ''),
-      '- World Contract: ' + (meta.worldContract || ''),
-      '- Voice: ' + JSON.stringify(meta.narrativeVoice || {}),
-      '- Register: ' + JSON.stringify(meta.literaryRegister || {}),
-      '- Resolution: ' + ((meta.structuralShape || {}).resolution || ''),
-      '',
-      formatArtifactIntentContract(meta),
-      '',
+      formatSkeletonIdentityBlock(ctx, {
+        extraLines: ['- Resolution: ' + (ctx.structuralShape.resolution || '')]
+      }),
       '## Boss Context',
       '- Password: ' + (boss.passwordWord || ''),
       '- Convergence: ' + (boss.convergenceRequirements || ''),
@@ -2303,6 +2474,10 @@
       finalWeekSummary ? '## Final Week Summary\n' + compactJson(finalWeekSummary) + '\n' : '',
       weekSummaries ? '## All Week Summaries\n' + compactJson(weekSummaries) + '\n' : '',
       '',
+      // Same gap, same fix — see generateFleshEndingPrompt above. The bundled
+      // builder is the one the pipeline actually calls by default.
+      window.INST_VOICE_DISCIPLINE.join('\n'),
+      ''
     ].concat(window.FLESH_ENDINGS_BUNDLE_SPEC).filter(Boolean).join('\n');
   };
 
@@ -2470,6 +2645,8 @@
       '## Booklet Setup Contract',
       compactJson(summarizeShellContractForApi(shellContext)),
       '',
+      formatProcessParticulars((shellContext || {}).processParticulars),
+      '',
       '## Layer Codex Slice',
       compactJson(summarizeLayerBibleForWeeks(layerBible, weekNumbers)),
       '',
@@ -2518,6 +2695,8 @@
       '## Booklet Setup Contract',
       compactJson(summarizeShellContractForApi(shellContext)),
       '',
+      formatProcessParticulars((shellContext || {}).processParticulars),
+      '',
       '## Fragment Voice Packet',
       compactJson(summarizeFragmentVoicePacket(layerBible, campaignPlan.fragmentRegistry || [], weekSummaries, [], shellContext)),
       '',
@@ -2551,6 +2730,8 @@
       '',
       '## Booklet Setup Contract',
       compactJson(summarizeShellContractForApi(shellContext)),
+      '',
+      formatProcessParticulars((shellContext || {}).processParticulars),
       '',
       '## Fragment Voice Packet',
       compactJson(summarizeFragmentVoicePacket(layerBible, batchRegistry || [], batchWeekSummaries, priorFragments, shellContext)),
@@ -2587,6 +2768,8 @@
       '',
       '## Booklet Setup Contract',
       compactJson(summarizeShellContractForApi(shellContext)),
+      '',
+      formatProcessParticulars((shellContext || {}).processParticulars),
       '',
       '## Ending Voice Packet',
       compactJson(summarizeEndingVoicePacket(layerBible, campaignPlan, bossWeek, binaryChoiceWeek, shellContext)),
@@ -2677,6 +2860,8 @@
       '**World Contract:** ' + (shellContext.worldContract || ''),
       '**Narrative Voice:** ' + JSON.stringify(shellContext.narrativeVoice || {}),
       '**Literary Register:** ' + JSON.stringify(shellContext.literaryRegister || {}),
+      '',
+      formatProcessParticulars(shellContext.processParticulars),
       '',
       '**Week Workout:** ' + weekWorkout,
       '',
@@ -2811,6 +2996,8 @@
       '**World Contract:** ' + (shellContext.worldContract || ''),
       '**Artifact Identity:** ' + JSON.stringify(shellContext.artifactIdentity || {}),
       '',
+      formatProcessParticulars(shellContext.processParticulars),
+      '',
       '**Current Timeline (Cross-Reference Support):**',
       JSON.stringify(weekSummaries || []),
       '',
@@ -2840,6 +3027,8 @@
       '## Context',
       '**World Contract:** ' + (shellContext.worldContract || ''),
       '**Narrative Voice:** ' + JSON.stringify(shellContext.narrativeVoice || {}),
+      '',
+      formatProcessParticulars(shellContext.processParticulars),
       '',
       '**Journey So Far:**',
       JSON.stringify(weekSummaries || []),

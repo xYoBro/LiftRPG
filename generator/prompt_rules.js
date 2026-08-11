@@ -711,6 +711,61 @@
     required: ['meta', 'theme', 'cover', 'weekPlan', 'fragmentRegistry', 'bossPlan', 'endingVariants']
   };
 
+  // ── Knowing Schema (the knowing stage — §11 Wave 1.5) ───────────────────
+  // The supply side of VOICE.md §7's funding rule. The roster says who and
+  // what exists; THIS says how their world actually works, authored once as
+  // structured material every prose stage selects from.
+  //
+  // PARITY: the four category names are mirrored in
+  // STRUCTURED_SCHEMA_KNOWING below and in `meta.processParticulars` in
+  // contracts/booklet-schema.mjs. validate.mjs (knowingParticularsParity)
+  // anchors both prompt surfaces on the booklet schema — a category added to
+  // one surface alone is an ERROR, not a silent hole.
+  window.SCHEMA_KNOWING = [
+    '# Process Particulars Schema',
+    '',
+    'Return a single JSON object with exactly this structure.',
+    '',
+    '## processParticulars (object)',
+    '- `instruments` (array of strings): the tools, devices, and measures of this trade',
+    '  and what the people who use them actually call them — the working name, not the',
+    '  catalogue name. Include what each one reads, in what unit, and its ordinary failure.',
+    '- `paperworkRealities` (array of strings): what form gates what access; what gets',
+    '  signed, countersigned, filed, stamped, held, or refused; who may refuse it and on',
+    '  what grounds; where a copy goes and how long it is kept.',
+    '- `orderOfOperations` (array of strings): the sequence this trade or institution',
+    '  actually runs in. What happens first. What cannot happen until something else does.',
+    '  What gets skipped when there is no time, and what that costs later.',
+    '- `periodSpecifics` (array of strings): period, regional, and material specifics the',
+    '  brief implies — what things are made of, what they cost, how long they take, what',
+    '  everyone in this world knows without being told. Omit this array entirely if the',
+    '  brief implies no period or place; a guessed century is worse than none.',
+    '',
+    'Every entry is ONE fact, stated flat, in a single line. Not a paragraph, not a',
+    'sentence with a flourish, not an observation about what a fact means.',
+    'Aim for 6-10 instruments, 6-10 paperworkRealities, 5-8 orderOfOperations.'
+  ];
+
+  // Structured output schema for the knowing stage (OpenAI json_schema format).
+  // `periodSpecifics` is deliberately NOT required: a brief that implies no
+  // period must be allowed to say so by omission rather than by invention.
+  window.STRUCTURED_SCHEMA_KNOWING = {
+    type: 'object',
+    properties: {
+      processParticulars: {
+        type: 'object',
+        properties: {
+          instruments: { type: 'array', items: { type: 'string' } },
+          paperworkRealities: { type: 'array', items: { type: 'string' } },
+          orderOfOperations: { type: 'array', items: { type: 'string' } },
+          periodSpecifics: { type: 'array', items: { type: 'string' } }
+        },
+        required: ['instruments', 'paperworkRealities', 'orderOfOperations']
+      }
+    },
+    required: ['processParticulars']
+  };
+
   window.SCHEMA_SPEC = [].concat(
     SCHEMA_HEADER, [''],
     SCHEMA_META, [''],
@@ -1311,6 +1366,17 @@
   // prompt-contract parity). The universal machine-tells are absent from that
   // enum on purpose: they cannot be licensed, so there is no key to write.
   //
+  // The universal list carries all TEN bans of VOICE.md §4. Two of them —
+  // emotion summary and gym metaphor — also appear in INST_ANTI_PATTERNS, and
+  // that dual home is deliberate: ANTI_PATTERNS rides the planning stages
+  // (layer-codex, campaign-plan) which carry no VOICE_DISCIPLINE, and
+  // VOICE_DISCIPLINE rides the prose stages (shell/skeleton, week-final,
+  // fragment, ending) which carried no ANTI_PATTERNS. Neither set alone covers
+  // the pipeline. The prohibitions are identical, so this is one rule with two
+  // reaches, not two rules that can disagree. VOICE.md §4 is the authority for
+  // the wording; §4 itself notes the gym-metaphor ban is "enforced elsewhere
+  // too". Change the constitution first, then both surfaces.
+  //
   // D47: NO exemplar prose here, ever. This section teaches mechanisms and
   // bans; it never shows a passage to imitate.
   window.INST_VOICE_DISCIPLINE = [
@@ -1342,6 +1408,12 @@
     '- Typography as mood: lowercase styling, dropped punctuation, spaced letters.',
     '  Standard capitalization and punctuation in every register; format',
     '  conventions belong to the document, never to the mood.',
+    '- Emotion summary: naming the feeling instead of recording what showed.',
+    '  Posture, omission, and action carry it; a stated emotion replaces it.',
+    '- Gym metaphor in the fiction: the workout is real and the story is fiction.',
+    '  They fuse through timing and tension, never through literal mapping. No',
+    '  lift, set, rep, or bodily exertion stands in as a figure for a story event,',
+    '  and no story event is narrated as training.',
     '',
     '### Terminal position is emphasis',
     'A writer chooses where to stop, so stopping at the strange thing is pointing',
@@ -1389,15 +1461,19 @@
     '  The universal bans above are NOT in this enum and can never be licensed.',
     '',
     '### The knowing demand (plainness must be funded)',
-    'Prose decorates when it has nothing true to select from. meta.worldContract',
-    'must therefore carry more than a Core Noun Roster — the roster is a cast',
-    'list; the knowing is how that world actually works:',
-    '- the instruments and what they are actually called;',
-    '- the paperwork realities: what form gates what access, what gets signed,',
-    '  filed, countersigned, or refused;',
-    '- the order of operations of the trade or institution — what happens first,',
-    '  what cannot happen until something else does;',
-    '- period and regional specifics where the brief implies them.',
+    'Prose decorates when it has nothing true to select from. The world is',
+    'therefore KNOWN before it is narrated, and the knowing is already written',
+    'down: `meta.processParticulars` carries this booklet\'s instruments and what',
+    'they are actually called, its paperwork realities (what form gates what',
+    'access; what gets signed, filed, countersigned, or refused), its order of',
+    'operations (what happens first, what cannot happen until something else',
+    'does), and its period and regional specifics.',
+    'SELECT from that material. Do not invent a parallel set of particulars, and',
+    'do not contradict the ones you were given — a second, disagreeing world is',
+    'worse than a thin one. If a scene needs a particular the list does not',
+    'carry, extend the list\'s own logic rather than opening a new subject.',
+    'meta.worldContract remains the roster: who and what exists. The particulars',
+    'are how their world works. Both are binding.',
     'Target roughly three true procedural particulars per 150 words of documentary',
     'text. Below that the prose is padding and will reach for turns.',
     '',
@@ -1409,6 +1485,69 @@
     'sentence positioned as a closer, two clipped sentences in a row, or an image',
     'of the anomaly. A finalLine lands by naming something specific the weeks',
     'earned, never by cadence alone.'
+  ];
+
+  // ── The knowing stage (§11 Wave 1.5) ────────────────────────────────────
+  // The SUPPLY side of the funding rule. INST_VOICE_DISCIPLINE's knowing
+  // demand tells prose stages to select from authored particulars; this
+  // section is what authors them. It rides exactly one stage ('knowing') and
+  // writes no prose of its own.
+  //
+  // D47: no worked examples here. A sample instrument or a sample form name
+  // would be house flavor manufactured at the one point in the pipeline whose
+  // entire job is to manufacture the BOOK's flavor — the bleed would land
+  // upstream of every prose stage at once.
+  window.INST_KNOWING = [
+    '## The Knowing (author this world\'s process particulars)',
+    'You are not writing prose. You are writing down what a person who works',
+    'inside this world knows without being told, as a list of flat true facts',
+    'that every later writing stage will select from.',
+    '',
+    '### Why this exists',
+    'Prose decorates when it has nothing true to say. Given real material, it',
+    'stops reaching for turns; given nothing, it reaches every time. Everything',
+    'you author here is the funding for the plainness the prose stages owe.',
+    '',
+    '### Binding context',
+    '- The recorded reading of the brief is BINDING. Every particular must be',
+    '  something that could be true in the world that reading describes — its',
+    '  tone, register, implied setting, and period. Do not author a second,',
+    '  more interesting world alongside it.',
+    '- The Core Noun Roster inside meta.worldContract is BINDING. Particulars',
+    '  attach to the roster\'s people, places, departments, and objects. A',
+    '  particular about a noun that does not exist in this book is waste.',
+    '- The artifact intent contract is BINDING. Paperwork realities must be',
+    '  paperwork this artifact\'s document ecology would actually produce.',
+    '',
+    '### What a good particular is',
+    '- ONE fact. Flat. A single line. No paragraph, no framing, no reflection.',
+    '- SPECIFIC to this world. If the same line could sit in a different',
+    '  booklet with the proper nouns swapped, it funds nothing — cut it.',
+    '- CONSEQUENTIAL. Prefer the fact that constrains someone: the step that',
+    '  cannot be skipped, the signature that gates the door, the reading that',
+    '  is always wrong in the same direction.',
+    '- KNOWN, not explained. Write it the way an insider would say it to',
+    '  another insider — no gloss on why it matters, no aside for the reader.',
+    '- TRUE ENOUGH TO BE BORING. A particular that is already dramatic is a',
+    '  plot point wearing a procedure\'s coat. The drama is the prose stages\'',
+    '  job; yours is to make their drama cost something real.',
+    '',
+    '### What is not a particular',
+    '- Atmosphere, mood, or sensory colour. Those are prose.',
+    '- A rule of the GAME (dice, clocks, marks, tick targets). Those are',
+    '  mechanics, decided elsewhere. Particulars are facts about the FICTION\'s',
+    '  working world.',
+    '- Anything about training, lifting, sets, or reps. The workout is real and',
+    '  sits outside the fiction.',
+    '- A secret, a twist, or a reveal. Particulars are the ordinary floor those',
+    '  stand on. If a fact is only interesting once, it belongs to a fragment.',
+    '',
+    '### Coverage',
+    'Spread the particulars across the whole institution or trade, not one',
+    'corner of it: the people who make the records and the people who read',
+    'them, the routine week and the exception, the thing that always works and',
+    'the thing that never quite does.',
+    'Return ONLY the JSON object. No commentary, no markdown fences.'
   ];
 
   window.INST_ENDING_STANDARD = [
@@ -1612,6 +1751,12 @@
     // MARK_SURFACE rides the shell stage because meta.economy is authored here:
     // the currency cannot be named well without knowing what it is FOR.
     'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
+    // Knowing: the world's process particulars, authored once after the
+    // skeleton/shell and consumed by every prose stage (§11 Wave 1.5). It
+    // writes no prose, so it carries no VOICE_DISCIPLINE — it carries the
+    // brief-fidelity law instead, because a particular that drifts from the
+    // brief mis-funds every stage downstream of it.
+    'knowing':        { schemas: ['KNOWING'],                                   instructions: ['KNOWING', 'BRIEF_FIDELITY'] },
     // Week plan: lean
     'week-plan':      { schemas: ['WEEK_PLAN'],                                 instructions: [] },
     // Week flesh: full game design + story

@@ -98,6 +98,7 @@ import {
   validateCampaignPlanStage,
   validateFragmentsStage,
   validateSkeletonStage,
+  validateKnowingStage,
   classifyValidationErrors,
   collectBudgetBreaches,
   collectPercentileStatFindings,
@@ -944,6 +945,8 @@ function getApiPromptBuilders() {
     stage1: window.generateApiStage1Prompt || window.generateStage1Prompt,
     stage2: window.generateApiStage2Prompt || window.generateStage2Prompt,
     shell: window.generateApiShellPrompt || window.generateShellPrompt,
+    // Shared with the Skeleton+Flesh pipeline — same builder, same head.
+    knowing: window.generateKnowingPrompt,
     weeks: window.generateApiWeekChunkPrompt || window.generateWeekChunkPrompt,
     singleWeekFinal: window.generateSingleWeekFinalPrompt,
     fragments: window.generateApiFragmentsPrompt,
@@ -955,7 +958,7 @@ function getApiPromptBuilders() {
 }
 
 function assertApiPromptBuilders(builders) {
-  if (!builders.stage1 || !builders.stage2 || !builders.shell || !builders.weeks ||
+  if (!builders.stage1 || !builders.stage2 || !builders.shell || !builders.knowing || !builders.weeks ||
     !builders.singleWeekFinal ||
     !builders.fragments || !builders.singleFragment ||
     !builders.fragmentBatch || !builders.endings || !builders.singleEnding) {
@@ -1686,6 +1689,59 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
   return report;
 }
 
+// ── The knowing stage (§11 Wave 1.5) ────────────────────────────────────────
+// Both pipelines run the same stage against the same surface: the compiler
+// stage's output (skeleton in Skeleton+Flesh, shell in multi-stage/structured)
+// carries `meta`, and the knowing is written back onto that same `meta`.
+//
+// Writing it back — rather than carrying it in a parallel variable — is what
+// makes it flow for free through everything already keyed on meta:
+// extractShellContext (multi-stage prose prompts), extractSkeletonContext
+// (S+F prose prompts), and the assemblers. One assignment, three consumers.
+//
+// The knowing stage is checkpointed on its own key, so the compiler stage's
+// checkpoint (saved BEFORE this ran) never carries particulars. Resume
+// therefore re-applies them here from the knowing checkpoint. The merge is
+// idempotent for exactly that reason.
+function applyProcessParticulars(target, knowingOutput) {
+  if (!target || !knowingOutput) return null;
+  var particulars = knowingOutput.processParticulars;
+  if (!particulars || typeof particulars !== 'object' || Array.isArray(particulars)) return null;
+  target.meta = target.meta || {};
+  target.meta.processParticulars = particulars;
+  return particulars;
+}
+
+// Freeform providers reliably return the payload one level flatter than asked
+// (the four category arrays at the root, with no `processParticulars` wrapper).
+// That is a shape mistake, not a content one — retrying it buys a second call
+// and the same answer. Rewrap instead, exactly like the week stage unwraps a
+// weeks[] wrapper it never asked for.
+function normalizeKnowingShape(result) {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
+  if (result.processParticulars) return result;
+  var CATEGORIES = ['instruments', 'paperworkRealities', 'orderOfOperations', 'periodSpecifics'];
+  var bare = CATEGORIES.some(function (k) { return Array.isArray(result[k]); });
+  if (!bare) return result;
+  console.warn('[LiftRPG] Knowing stage returned bare particulars — rewrapping');
+  var wrapped = {};
+  CATEGORIES.forEach(function (k) { if (Array.isArray(result[k])) wrapped[k] = result[k]; });
+  return { processParticulars: wrapped };
+}
+
+// One-line run-log summary. Counting is the honest report here: the operator's
+// question about this stage is "did it author anything", and a category list
+// with counts answers it without printing the world back at them.
+function describeProcessParticulars(particulars) {
+  if (!particulars) return 'no process particulars authored';
+  var parts = [];
+  ['instruments', 'paperworkRealities', 'orderOfOperations', 'periodSpecifics'].forEach(function (key) {
+    var list = particulars[key];
+    if (Array.isArray(list) && list.length) parts.push(key + ' ' + list.length);
+  });
+  return parts.length ? 'World detail: ' + parts.join(', ') + '.' : 'no process particulars authored';
+}
+
 async function runApiPipeline(options) {
   if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
 
@@ -1698,8 +1754,9 @@ async function runApiPipeline(options) {
   var weekCount = options.weekCount || (typeof window.parseWeekCount === 'function' ? window.parseWeekCount(workout) : 6);
   var totalSessions = options.totalSessions || 0;
 
-  // Initial estimation: 3 setup + weekCount (single-stage per week) + endings
-  var totalStages = 3 + weekCount + 2;
+  // Initial estimation: 4 setup (codex, campaign, shell, knowing) + weekCount
+  // (single-stage per week) + endings
+  var totalStages = 4 + weekCount + 2;
   var stageNum = 0;
   var onProgress = options.onProgress;
 
@@ -1919,6 +1976,54 @@ async function runApiPipeline(options) {
   }
 
   var identityContract = buildIdentityContract(shell, campaignPlan);
+
+  // ── THE KNOWING: process particulars (§11 Wave 1.5) ───────────
+  // After the shell (which authors the roster and the recorded reading) and
+  // before extractShellContext, because that projection is how every prose
+  // stage downstream receives this world.
+  //
+  // Deliberately NOT part of the identity contract: the contract exists to
+  // catch shell identity DRIFT in generated weeks, and the particulars are
+  // authored after it is built. They are material, not a promise to keep.
+
+  var knowingOutput;
+  if (checkpoint && checkpoint.stages && checkpoint.stages.knowing) {
+    knowingOutput = checkpoint.stages.knowing;
+    stageNum++;
+    console.log('[LiftRPG] Resumed: World Detail (cached)');
+    emitPipelineEvent(onProgress, stageNum, totalStages, 'World detail restored from checkpoint.', {
+      phase: 'complete',
+      stageKey: 'knowing',
+      stageName: 'World Detail',
+      completionSource: 'checkpoint'
+    });
+  } else {
+    progress('knowing', 'Working out how this world runs…');
+    knowingOutput = await runJsonStage(settings, {
+      stageKey: 'knowing',
+      stageName: 'World Detail',
+      stageIndex: stageNum,
+      completeMessage: 'World detail complete.',
+      onProgress: onProgress,
+      getTotalStages: function () { return totalStages; },
+      schema: window.STRUCTURED_SCHEMA_KNOWING || null,
+      maxAttempts: 2,
+      rateLimiter: rateLimiter,
+      budgetEnforce: useGeminiBudget,
+      normalizeResult: normalizeKnowingShape,
+      validate: function (result) {
+        return validateKnowingStage(result);
+      },
+      buildPrompt: function (retryState) {
+        return builders.knowing(shell, brief, { retryMode: retryState.attempt > 0 });
+      }
+    });
+    checkpoint = saveCheckpoint('knowing', knowingOutput, checkpoint);
+  }
+
+  var msParticulars = applyProcessParticulars(shell, knowingOutput);
+  console.log('[LiftRPG] ' + describeProcessParticulars(msParticulars));
+
   var shellContext = extractShellContext(shell);
 
   // ── PROMPT CACHING ────────────────────────────────────────────
@@ -2082,7 +2187,7 @@ async function runApiPipeline(options) {
   var totalBatches = fragmentBatches.length;
 
   // Update totalStages now that we know batch count instead of individual count
-  totalStages = 3 + weekCount + totalBatches + 1;
+  totalStages = 4 + weekCount + totalBatches + 1;
 
   for (var fb = 0; fb < fragmentBatches.length; fb++) {
     var batch = fragmentBatches[fb];
@@ -2451,6 +2556,8 @@ async function generateStructured(settings, workout, brief, onProgress) {
 function getSkeletonFleshBuilders() {
   return {
     skeleton:              window.generateSkeletonPrompt              || null,
+    // Shared with the multi-stage pipeline — one builder, one prompt head.
+    knowing:               window.generateKnowingPrompt               || null,
     fleshRules:            window.generateFleshRulesPrompt            || null,
     fleshWeek:             window.generateFleshWeekPrompt             || null,
     fleshFragmentBatch:    window.generateFleshFragmentBatchPrompt    || null,
@@ -2460,7 +2567,7 @@ function getSkeletonFleshBuilders() {
 }
 
 function assertSkeletonFleshBuilders(builders) {
-  var required = ['skeleton', 'fleshRules', 'fleshWeek', 'fleshFragmentBatch', 'fleshEnding'];
+  var required = ['skeleton', 'knowing', 'fleshRules', 'fleshWeek', 'fleshFragmentBatch', 'fleshEnding'];
   for (var i = 0; i < required.length; i++) {
     if (typeof builders[required[i]] !== 'function') {
       throw new Error('Skeleton+Flesh pipeline: missing prompt builder "' + required[i] + '". Reload the page.');
@@ -2587,10 +2694,10 @@ async function runSkeletonFleshPipeline(options) {
     checkpoint = saveCheckpoint('skeleton', skeleton, checkpoint);
   }
 
-  // Update stage estimate: skeleton + rules + weeks + 1 fragment call + 1 ending call
+  // Update stage estimate: skeleton + knowing + rules + weeks + 1 fragment call + 1 ending call
   var endingVariants = skeleton.endingVariants || ['canonical'];
   var fullFragRegistry = skeleton.fragmentRegistry || [];
-  totalStages = 1 + 1 + (skeleton.weekPlan || []).length + 1 + 1;
+  totalStages = 1 + 1 + 1 + (skeleton.weekPlan || []).length + 1 + 1;
 
   // Prompt caching: set system prompt from skeleton identity when the
   // resolved transport advertises support (capability, not format).
@@ -2606,7 +2713,51 @@ async function runSkeletonFleshPipeline(options) {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // STAGE 2: FLESH — RULES SPREAD
+  // STAGE 2: THE KNOWING — process particulars
+  // ════════════════════════════════════════════════════════════════════
+  // Runs after the skeleton (which authors the roster and the recorded
+  // reading) and before any prose stage, because every prose stage from the
+  // rules spread onward reads this world through skeleton.meta.
+
+  var knowingOutput;
+  if (cached('knowing')) {
+    knowingOutput = checkpoint.stages.knowing;
+    console.log('[S+F] Resuming — knowing loaded from checkpoint');
+    progress('knowing', 'World detail restored from checkpoint.');
+    emitPipelineEvent(onProgress, stageNum, totalStages, 'World detail restored from checkpoint.', {
+      phase: 'complete', stageKey: 'knowing', stageName: 'World Detail',
+      completionSource: 'checkpoint'
+    });
+  } else {
+    progress('knowing', 'Working out how this world runs…');
+    knowingOutput = await runJsonStage(settings, {
+      stageKey:        'knowing',
+      stageName:       'World Detail',
+      stageIndex:      stageNum,
+      getTotalStages:  function () { return totalStages; },
+      completeMessage: 'World detail complete',
+      onProgress:      onProgress,
+      schema:          window.STRUCTURED_SCHEMA_KNOWING || null,
+      maxAttempts:     trialMode ? TRIAL_ATTEMPTS : 2,
+      rateLimiter:     rateLimiter,
+      budgetEnforce:   useGeminiBudget,
+      telemetryCollector: sfTelemetry,
+      normalizeResult: normalizeKnowingShape,
+      buildPrompt: function (retryState) {
+        return builders.knowing(skeleton, brief, { retryMode: retryState.attempt > 0 });
+      },
+      validate: function (result) {
+        return validateKnowingStage(result);
+      }
+    });
+    checkpoint = saveCheckpoint('knowing', knowingOutput, checkpoint);
+  }
+
+  var sfParticulars = applyProcessParticulars(skeleton, knowingOutput);
+  console.log('[S+F] ' + describeProcessParticulars(sfParticulars));
+
+  // ════════════════════════════════════════════════════════════════════
+  // STAGE 3: FLESH — RULES SPREAD
   // ════════════════════════════════════════════════════════════════════
 
   var rulesOutput;
@@ -2645,7 +2796,7 @@ async function runSkeletonFleshPipeline(options) {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // STAGES 3–N: FLESH — PER-WEEK CONTENT
+  // STAGES 4–N: FLESH — PER-WEEK CONTENT
   // ════════════════════════════════════════════════════════════════════
 
   var weekOutputs = [];
