@@ -2361,7 +2361,8 @@
             <div class="api-field">
               <label class="field-label" for="api-method">Pipeline</label>
               <select class="api-select" id="api-method">
-                <option value="generateMultiStage">Multi-stage API (Recommended)</option>
+                <option value="generateSkeletonFlesh" selected>Skeleton + Flesh (Recommended)</option>
+                <option value="generateMultiStage">Multi-stage API</option>
                 <option value="generateStructured">Structured API</option>
               </select>
             </div>
@@ -2437,7 +2438,7 @@
                 </div>
                 <div class="api-run-metric">
                   <div class="wizard-state-label">Run Total</div>
-                  <div class="api-run-metric-value" id="api-state-cost">$0.00</div>
+                  <div class="api-run-metric-value" id="api-state-cost">—</div>
                 </div>
               </div>
             </div>
@@ -2448,7 +2449,7 @@
               </div>
               <div class="wizard-state-card api-run-sidecard">
                 <div class="wizard-state-label">Pricing And Tokens</div>
-                <div class="wizard-state-value api-run-side-value" id="api-state-cost-side">$0.00</div>
+                <div class="wizard-state-value api-run-side-value" id="api-state-cost-side">—</div>
                 <div class="wizard-state-caption" id="api-state-cost-caption">LiftRPG starts with the local pricing table, then refreshes live pricing in the background when the provider allows browser access.</div>
               </div>
             </div>
@@ -2842,15 +2843,62 @@
         endings: 'Ending',
         quality: 'Quality Check'
       };
-      var API_STAGE_ORDER = [
-        { key: 'layerBible', label: STAGE_LABELS.layerBible },
-        { key: 'campaign', label: STAGE_LABELS.campaignPlan },
-        { key: 'shell', label: STAGE_LABELS.shell },
-        { key: 'weeks', label: STAGE_LABELS.weeks },
-        { key: 'fragments', label: STAGE_LABELS.fragments },
-        { key: 'endings', label: STAGE_LABELS.endings },
-        { key: 'quality', label: STAGE_LABELS.quality }
-      ];
+      // The progress rail shows the stages of the SELECTED pipeline, not the
+      // union of all of them — a node that can never light up is a UI lie.
+      // Multi-stage and structured share a shape; Skeleton+Flesh has its own.
+      var API_STAGE_ORDER_BY_PIPELINE = {
+        generateMultiStage: [
+          { key: 'layerBible', label: STAGE_LABELS.layerBible },
+          { key: 'campaign', label: STAGE_LABELS.campaignPlan },
+          { key: 'shell', label: STAGE_LABELS.shell },
+          { key: 'weeks', label: STAGE_LABELS.weeks },
+          { key: 'fragments', label: STAGE_LABELS.fragments },
+          { key: 'endings', label: STAGE_LABELS.endings },
+          { key: 'quality', label: STAGE_LABELS.quality }
+        ],
+        generateSkeletonFlesh: [
+          { key: 'skeleton', label: 'Skeleton' },
+          { key: 'rules', label: 'Rules Spread' },
+          { key: 'weeks', label: STAGE_LABELS.weeks },
+          { key: 'fragments', label: STAGE_LABELS.fragments },
+          { key: 'endings', label: STAGE_LABELS.endings },
+          { key: 'quality', label: STAGE_LABELS.quality }
+        ]
+      };
+      API_STAGE_ORDER_BY_PIPELINE.generateStructured = API_STAGE_ORDER_BY_PIPELINE.generateMultiStage;
+
+      // Pipelines the API surface will dispatch. Values must exist on
+      // window.LiftRPGAPI; the select's option values are validated against this.
+      var API_PIPELINE_METHODS = {
+        generateSkeletonFlesh: 'skeleton + flesh API.',
+        generateMultiStage: 'multi-stage API.',
+        generateStructured: 'structured API.'
+      };
+      var API_PIPELINE_DEFAULT = 'generateSkeletonFlesh';
+
+      function resolveApiPipelineMethod(value) {
+        var name = String(value || '');
+        return API_PIPELINE_METHODS[name] ? name : API_PIPELINE_DEFAULT;
+      }
+
+      // Reassigned whenever the pipeline selection changes; every consumer
+      // reads this one binding.
+      var API_STAGE_ORDER = API_STAGE_ORDER_BY_PIPELINE[API_PIPELINE_DEFAULT];
+
+      function applyPipelineStageOrder(methodValue) {
+        var method = resolveApiPipelineMethod(methodValue);
+        API_STAGE_ORDER = API_STAGE_ORDER_BY_PIPELINE[method]
+          || API_STAGE_ORDER_BY_PIPELINE[API_PIPELINE_DEFAULT];
+        return method;
+      }
+
+      // Pipelines report per-week progress under distinct keys — the
+      // multi-stage path uses 'weeks', Skeleton+Flesh uses 'week_1', 'week_2',
+      // … Collapse them so the rail's Weeks node advances on either.
+      function normalizeApiStageKey(key) {
+        var value = String(key || '');
+        return /^week_\d+$/i.test(value) ? 'weeks' : value;
+      }
 
       var wizStep = 0;
       var wizData = {};
@@ -2944,6 +2992,19 @@
         var output = Number(usage.outputTokens || 0);
         if (!input && !output) return 'No billed tokens yet.';
         return formatCompactTokens(input) + ' input · ' + formatCompactTokens(output) + ' output';
+      }
+
+      // Cost is BEST-EFFORT; token counts are always true. A model with no
+      // pricing rule (any custom / third-party / local model, and every future
+      // model we have not hand-listed) must read as unpriced — never as $0.00,
+      // which is a lie that looks like a free run.
+      var UNPRICED_DISPLAY = '—';
+
+      function formatRunCost(state) {
+        if (!state || !state.costKnown) return UNPRICED_DISPLAY;
+        var amount = Number(state.usageTotals && state.usageTotals.estimatedCostUsd);
+        if (!Number.isFinite(amount) || amount <= 0) return UNPRICED_DISPLAY;
+        return formatUsd(amount);
       }
 
       function formatUsd(value) {
@@ -3070,7 +3131,8 @@
           currentStageKey: '',
           tokens: '0 tokens',
           tokensCaption: 'Prompt and completion totals appear here as each stage finishes.',
-          cost: '$0.00',
+          cost: UNPRICED_DISPLAY,
+          costKnown: false,
           costCaption: 'LiftRPG starts with the local pricing table, then refreshes live pricing in the background when the provider allows browser access.',
           usageTotals: createApiUsageTotals(),
           stageMetrics: stageMetrics,
@@ -3132,7 +3194,7 @@
         try {
           localStorage.setItem(API_PREFS_KEY, JSON.stringify({
             provider: apiProviderEl ? apiProviderEl.value : 'openai',
-            method: apiMethodEl ? apiMethodEl.value : 'generateMultiStage',
+            method: apiMethodEl ? resolveApiPipelineMethod(apiMethodEl.value) : API_PIPELINE_DEFAULT,
             model: getApiModelValue(),
             baseUrl: apiBaseUrlEl ? apiBaseUrlEl.value.trim() : '',
             requestTimeoutMs: apiTimeoutEl ? Number(apiTimeoutEl.value || 600000) : 600000
@@ -3387,7 +3449,8 @@
         var prefs = loadApiPrefs() || {};
         var providerId = getProviderPreset(prefs.provider) ? prefs.provider : 'openai';
         if (apiProviderEl) apiProviderEl.value = providerId;
-        if (apiMethodEl) apiMethodEl.value = prefs.method || 'generateMultiStage';
+        if (apiMethodEl) apiMethodEl.value = resolveApiPipelineMethod(prefs.method);
+        applyPipelineStageOrder(apiMethodEl ? apiMethodEl.value : API_PIPELINE_DEFAULT);
         if (apiTimeoutEl) apiTimeoutEl.value = String(Number(prefs.requestTimeoutMs || 600000));
         renderApiModelOptions([]);
         if (prefs.model) setApiModelValue(prefs.model);
@@ -3526,7 +3589,8 @@
 
         apiRunState.tokens = formatCompactTokens(apiRunState.usageTotals.totalTokens) + ' tokens';
         apiRunState.tokensCaption = formatTokenSummary(apiRunState.usageTotals);
-        apiRunState.cost = formatUsd(apiRunState.usageTotals.estimatedCostUsd);
+        if (metrics.pricing) apiRunState.costKnown = true;
+        apiRunState.cost = formatRunCost(apiRunState);
         if (metrics.pricing && metrics.pricing.sourceLabel) {
           apiRunState.pricingLabel = describePricingSource(metrics.pricing);
           apiRunState.pricingUrl = metrics.pricing.sourceUrl || '';
@@ -3535,7 +3599,7 @@
           apiRunState.pricingRefreshedAt = metrics.pricing.fetchedAt || '';
           apiRunState.costCaption = buildPricingCostCaption(metrics.pricing, metrics.model || apiRunState.model || 'the selected model', metrics.pricing.fallbackReason || '');
         } else if (!apiRunState.usageTotals.estimatedCostUsd && apiRunState.usageTotals.totalTokens > 0) {
-          apiRunState.costCaption = 'Token totals are available, but pricing is not mapped for this model yet.';
+          apiRunState.costCaption = 'Token counts are exact. Cost is unpriced \u2014 no pricing is mapped for this model.';
         }
       }
 
@@ -3655,7 +3719,7 @@
           apiRunState.costCaption = 'Pricing could not be refreshed for ' + (result.model || apiRunState.model || 'the selected model') + '. ' + apiRunState.pricingError;
           return;
         }
-        apiRunState.costCaption = 'Token totals are available, but pricing is not mapped for this model yet.';
+        apiRunState.costCaption = 'Token counts are exact. Cost is unpriced — no pricing is mapped for this model.';
       }
 
       function renderApiStageStatsHtml(metrics) {
@@ -3885,8 +3949,8 @@
             ? (providerDisplay + (modelDisplay ? ' · ' + modelDisplay : ''))
             : 'No provider active yet.';
         }
-        if (apiStateCost) apiStateCost.textContent = apiRunState.cost || '$0.00';
-        if (apiStateCostSide) apiStateCostSide.textContent = apiRunState.cost || '$0.00';
+        if (apiStateCost) apiStateCost.textContent = apiRunState.cost || UNPRICED_DISPLAY;
+        if (apiStateCostSide) apiStateCostSide.textContent = apiRunState.cost || UNPRICED_DISPLAY;
         if (apiStateCostCaption) apiStateCostCaption.textContent = apiRunState.costCaption || 'LiftRPG starts with the local pricing table, then refreshes live pricing in the background when the provider allows browser access.';
         var apiStageItems = buildApiStageItems();
         renderPipelineRail(apiPipelineRail, apiStageItems.map(function (item) {
@@ -4700,6 +4764,7 @@
         if (!el) return;
         el.addEventListener('input', function () {
           if (el === apiModelEl) syncApiModelControlVisibility();
+          if (el === apiMethodEl) applyPipelineStageOrder(apiMethodEl.value);
           saveApiPrefs();
           resetApiRunStateForConfigChange('API configuration changed. Previous run state cleared.');
           if (el === apiBaseUrlEl) scheduleApiModelDiscovery();
@@ -6392,7 +6457,8 @@
         apiRunState.requestTimeoutMs = settings.requestTimeoutMs;
         apiRunState.tokens = '0 tokens';
         apiRunState.tokensCaption = 'Prompt and completion totals appear here as each stage finishes.';
-        apiRunState.cost = '$0.00';
+        apiRunState.cost = UNPRICED_DISPLAY;
+        apiRunState.costKnown = false;
         apiRunState.costCaption = 'Using the local pricing table until live pricing refresh completes.';
         apiRunState.log = [];
         renderApiRunState();
@@ -6429,15 +6495,13 @@
           apiRunState.summaryCaption = 'Requests are sent directly from this browser to ' + settings._providerLabel + '.';
           apiRunState.target = 'Initialize Pipeline';
           apiRunState.targetCaption = 'Preparing the staged generation run.';
-          pushApiLog('Starting ' + settings._providerLabel + ' · ' + settings.model + ' via ' + (apiMethodEl.value === 'generateStructured' ? 'structured API.' : 'multi-stage API.') + ' ' + formatTimeoutLabel(settings.requestTimeoutMs) + '.');
+          var methodName = applyPipelineStageOrder(apiMethodEl && apiMethodEl.value);
+          pushApiLog('Starting ' + settings._providerLabel + ' · ' + settings.model + ' via ' + API_PIPELINE_METHODS[methodName] + ' ' + formatTimeoutLabel(settings.requestTimeoutMs) + '.');
           renderApiRunState();
-          var methodName = apiMethodEl && apiMethodEl.value === 'generateStructured'
-            ? 'generateStructured'
-            : 'generateMultiStage';
           var booklet = await api()[methodName](settings, workout, briefEl.value.trim(), function (stageIndex, totalStages, message, meta) {
             if (runId !== activeApiRunId) return;
             meta = meta || {};
-            var stageKey = meta.stageKey || inferApiStageKey(message);
+            var stageKey = normalizeApiStageKey(meta.stageKey || inferApiStageKey(message));
             var phase = meta.phase || 'start';
             apiRunState.status = 'running';
             apiRunState.totalStages = totalStages;
