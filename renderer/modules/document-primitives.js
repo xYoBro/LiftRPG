@@ -16,6 +16,73 @@ export function renderManifestPointer(pointer) {
   return line;
 }
 
+/**
+ * renderCiteRef(citeRef) -> Element | null
+ *
+ * THE REFERENCE TOKEN. One home, two callers — found documents (below) and
+ * session micro-lines (workout-primitives.js imports this) — because a citation
+ * drawn differently on the two surfaces would stop reading as one grammar. The
+ * pattern is the same one booklet-primitives.js already uses for
+ * renderManifestPointer(): the shared printed pointer lives with the documents.
+ *
+ * INLINE, and that is load-bearing rather than cosmetic. A non-replaced inline
+ * box's vertical padding and border do NOT enter the line box, so the token's
+ * frame cannot change the height of the line it sits in. That is what lets both
+ * estimate paths charge a citation as characters only, with no height term at
+ * all. Switching `.cite-ref` to `inline-block` in booklet.css would silently
+ * grow every line that carries one, and nothing models that — the D71 class.
+ * booklet.css carries the reciprocal note.
+ *
+ * `citedAs` goes in through make()'s textContent; the machine target rides as a
+ * data attribute so it is inspectable without being printed twice.
+ */
+export function renderCiteRef(citeRef) {
+  if (!citeRef || !citeRef.citedAs) return null;
+  const token = make('span', 'cite-ref', citeRef.citedAs);
+  if (citeRef.targetRef) token.setAttribute('data-cite-target', citeRef.targetRef);
+  return token;
+}
+
+/**
+ * renderSealBand(seal) -> Element | null
+ *
+ * The sealed cache's head band (schema 1.5.0 `fragment.seal`): a stamp, the key
+ * to look for, and what must already be true to open this. Printed at the TOP
+ * of the document, above its type slug — a seal is the first thing you meet on
+ * a sealed paper, and the classified-packet shell's `::before` evidence stamp
+ * is a pseudo-element, so it still precedes this band without either knowing
+ * about the other.
+ *
+ * NULL-GUARD (the renderManifestPointer pattern): a fragment without a seal
+ * appends nothing and builds byte-identical DOM to the pre-Wave-4b renderer.
+ *
+ * Each field prints as ONE line whose label is inline, so the band's height is
+ * (stamp line) + (wrapped lines of each present field) — the shape
+ * atoms/fragment-doc.js models. Adding a stacked label would add a row the
+ * estimate does not know about.
+ */
+export function renderSealBand(seal) {
+  if (!seal) return null;
+
+  const band = make('div', 'fragment-seal');
+  band.appendChild(make('div', 'fragment-seal-mark', 'Sealed'));
+
+  if (seal.keyHint) {
+    const line = make('div', 'fragment-seal-line');
+    line.appendChild(make('span', 'fragment-seal-key', 'Key'));
+    line.appendChild(make('span', 'fragment-seal-text', seal.keyHint));
+    band.appendChild(line);
+  }
+  if (seal.unlockCondition) {
+    const line = make('div', 'fragment-seal-line');
+    line.appendChild(make('span', 'fragment-seal-key', 'Opens'));
+    line.appendChild(make('span', 'fragment-seal-text', seal.unlockCondition));
+    band.appendChild(line);
+  }
+
+  return band;
+}
+
 function buildMetaLines(fragmentModel) {
   const lines = [];
   if (fragmentModel.title) lines.push(fragmentModel.title);
@@ -44,6 +111,11 @@ export function renderFoundDocument(fragmentModel) {
 
   const doc = make('div', 'fragment-doc ' + fragmentModel.documentClass);
   doc.setAttribute('data-shell-family', shellFamily);
+  const sealBand = renderSealBand(fragmentModel.seal);
+  if (sealBand) {
+    doc.setAttribute('data-sealed', 'true');
+    doc.appendChild(sealBand);
+  }
   doc.appendChild(make('div', 'fragment-doc-type', fragmentModel.documentType));
   if (fragmentModel.continuationLabel) {
     doc.appendChild(make('div', 'fragment-doc-continuation', fragmentModel.continuationLabel));
@@ -70,6 +142,15 @@ export function renderFoundDocument(fragmentModel) {
   doc.appendChild(body);
   const manifest = renderManifestPointer(fragmentModel.manifestPointer);
   if (manifest) doc.appendChild(manifest);
+  // The filed citation, on its own line above the signature. A document may
+  // both POST a chase forward and CITE the authority it was filed under, so
+  // this is co-resident with the manifest rather than an alternative to it.
+  const cite = renderCiteRef(fragmentModel.citeRef);
+  if (cite) {
+    const citeLine = make('div', 'fragment-cite');
+    citeLine.appendChild(cite);
+    doc.appendChild(citeLine);
+  }
   doc.appendChild(make('div', 'fragment-doc-sig', fragmentModel.purpose));
   block.appendChild(doc);
   return block;

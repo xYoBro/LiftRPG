@@ -28,6 +28,7 @@ import './atoms/overflow-doc.js';
 import './atoms/assembly-page.js';
 import './atoms/ending.js';
 import './atoms/back-cover.js';
+import './atoms/ledger-spread.js';
 import './atoms/notes-grid.js';
 import './atoms/text-block.js';
 import './atoms/image.js';

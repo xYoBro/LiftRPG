@@ -28,6 +28,10 @@ import {
 // booklet-primitives; these are estimate exports, not renderers.
 import { estimateWeekHeaderHeight } from '../atoms/week-header.js';
 import { WEEK_FOOTER_HEIGHT_PX } from '../atoms/week-footer.js';
+// The ledger's page capacity is derived from its own row geometry, so the
+// chunk size below and the atom's height model are one piece of arithmetic —
+// an over-long roster cannot become an unsat page.
+import { LEDGER_ROWS_PER_PAGE } from '../atoms/ledger-spread.js';
 import {
   buildUnlockedEndingPageModel,
   resolveArtifactIdentity,
@@ -649,6 +653,54 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
     }
   }
 
+  // ── The Ledger — the closing spread ─────────────────────────
+  //
+  // EMISSION GATE: `meta.economy` and nothing else. The ledger is the mark
+  // economy's capstone (D89 family) — a page that audits what six weeks moved,
+  // in a book whose whole spine is banking marks. A booklet with no economy
+  // gets no ledger, which is also what keeps the nineteen pre-economy corpus
+  // fixtures byte-identical in their page plans: the gate is the dormancy
+  // guarantee, not a preference.
+  //
+  // SEATED IN `endings`, NOT `back-matter`, and the reason is mechanical. The
+  // planner inserts saddle-stitch padding immediately BEFORE the first
+  // back-matter spread (findPaddingInsertIndex), so a back-matter seat would
+  // print the ledger AFTER the blank notes pages — the closing spread, filed
+  // behind the filler. Sequence 900 puts it after every ending chunk, so the
+  // printed order is: ending → ledger → padding → back cover.
+  //
+  // The adapter owns the roster and the chunking; the engine owns placement.
+  // Nothing here names a page.
+  const economy = (data.meta || {}).economy;
+  if (economy) {
+    const roster = extractMovementRoster(data);
+    if (roster.length) {
+      const ledgerPageCount = Math.ceil(roster.length / LEDGER_ROWS_PER_PAGE);
+      for (let li = 0; li < ledgerPageCount; li++) {
+        const slice = roster.slice(li * LEDGER_ROWS_PER_PAGE, (li + 1) * LEDGER_ROWS_PER_PAGE);
+        atoms.push(createAtom({
+          type: 'ledger-spread',
+          id: `ledger-${li}`,
+          continuationOf: li > 0 ? `ledger-${li - 1}` : null,
+          continuationOrigin: li > 0 ? 'adapter' : null,
+          continuationAdjacency: li > 0 ? 'ordered' : null,
+          group: 'ledger',
+          section: 'endings',
+          sequence: 900 + li,
+          sizeHint: 'full-page',
+          pageAffinity: 'either',
+          data: {
+            movements: slice,
+            partIndex: li,
+            partCount: ledgerPageCount,
+            continuationLabel: li > 0 ? 'Continued' : '',
+            economy,
+          },
+        }));
+      }
+    }
+  }
+
   // ── Back cover ──────────────────────────────────────────────
   atoms.push(createAtom({
     type: 'back-cover', id: 'back-cover', group: 'back-matter',
@@ -964,6 +1016,40 @@ function chunkWeekSessions(sessions, weekMeta = null, maxSessionsPerPage = 3) {
   });
 
   return chunks;
+}
+
+/**
+ * The movement roster: every distinct exercise the program prescribes, in the
+ * order the book first asks for it.
+ *
+ * Case-insensitive de-duplication, first spelling wins. Programs name the same
+ * lift inconsistently across six weeks ("Back Squat" in week 1, "back squat" in
+ * week 5), and a ledger that printed the same movement twice would ask the
+ * player to audit one body part in two places.
+ *
+ * Derivation lives HERE, not in the atom: reaching into weeks and sessions is
+ * domain knowledge, and an estimate that read the whole booklet would stop
+ * being a pure function of the data the engine handed it — the same ruling
+ * that put `weekTargetCount` in the adapter rather than the reckoning panel.
+ */
+function extractMovementRoster(data) {
+  const seen = new Set();
+  const roster = [];
+
+  for (const week of (data.weeks || [])) {
+    for (const session of (week.sessions || [])) {
+      for (const exercise of (session.exercises || [])) {
+        const name = String((exercise && exercise.name) || '').trim();
+        if (!name) continue;
+        const key = name.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        roster.push(name);
+      }
+    }
+  }
+
+  return roster;
 }
 
 function resolveWeekAttachmentStrategy(artifactIdentity) {

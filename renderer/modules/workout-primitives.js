@@ -1,4 +1,9 @@
 import { make } from './dom.js?v=48';
+// The REFERENCE token has one home, beside the manifest pointer it twins
+// (booklet-primitives.js already reaches for renderManifestPointer the same
+// way). A second copy here would let the two surfaces' citations drift apart
+// visually, which is the one thing a citation grammar cannot survive.
+import { renderCiteRef } from './document-primitives.js?v=48';
 
 function renderExerciseRow(rowModel) {
   const row = make('div', 'exercise-row');
@@ -88,6 +93,73 @@ function renderMarkStrip(markStripModel) {
   return strip;
 }
 
+/**
+ * The micro-line strip — conditional lines keyed to printed state, read after
+ * the marking is done. One row per line: the condition in the label face, the
+ * cue in the reading face, and an optional REFERENCE token trailing the cue.
+ *
+ * NULL-GUARD (the renderBinaryChoice pattern, exactly): a null model appends
+ * nothing, so a session without micro-lines builds byte-identical DOM.
+ *
+ * The condition and the cue share ONE line box on purpose. Stacking them would
+ * add a row per line that session-card-metrics.js MICRO_LINE geometry does not
+ * model, and the model cannot see DOM. The visual key is typographic contrast
+ * (label face vs reading face), the same idiom the reckoning panel's
+ * label/value pair uses — not a stacked heading.
+ *
+ * Text goes in through make()'s textContent, never innerHTML.
+ */
+function renderMicroLines(microLineModels) {
+  if (!microLineModels) return null;
+
+  const strip = make('div', 'micro-line-strip');
+  strip.setAttribute('data-line-count', String(microLineModels.length));
+
+  microLineModels.forEach((line) => {
+    const row = make('div', 'micro-line');
+    if (line.condition) {
+      row.appendChild(make('span', 'micro-line-condition', line.condition));
+    }
+    const cue = make('span', 'micro-line-cue', line.cue);
+    const cite = renderCiteRef(line.citeRef);
+    if (cite) cue.appendChild(cite);
+    row.appendChild(cue);
+    strip.appendChild(row);
+  });
+
+  return strip;
+}
+
+/**
+ * The opening echo — the world acknowledging the last session, printed at the
+ * card's head where the player meets it before anything else.
+ */
+function renderOpeningEcho(returnBeatModel) {
+  if (!returnBeatModel || !returnBeatModel.openingEcho) return null;
+  return make('div', 'session-echo', returnBeatModel.openingEcho);
+}
+
+/**
+ * Tomorrow cut tonight — the closing write-in, printed LAST.
+ *
+ * The order is the doctrine, not a layout preference (peak-end law): the body's
+ * win is what the session ends on, and the promissory note is the very last
+ * thing the pencil touches before the book closes. Anything appended after this
+ * demotes the note to a middle.
+ *
+ * The blank is a pencil target, so its height is fixed at the D89 form-field
+ * floor and does not move with density — see RETURN_BEAT in
+ * session-card-metrics.js and the reciprocal note in booklet.css.
+ */
+function renderReturnBeat(returnBeatModel) {
+  if (!returnBeatModel || !returnBeatModel.closingLine) return null;
+
+  const beat = make('div', 'return-beat');
+  beat.appendChild(make('div', 'return-beat-label', returnBeatModel.closingLine));
+  beat.appendChild(make('div', 'return-beat-blank'));
+  return beat;
+}
+
 function renderBinaryChoice(binaryChoiceModel) {
   if (!binaryChoiceModel) return null;
 
@@ -115,6 +187,11 @@ export function renderWorkoutCard(cardModel) {
     : cardModel.sessionLabel;
   card.appendChild(make('div', 'session-header', headerText));
 
+  const echo = renderOpeningEcho(cardModel.returnBeat);
+  if (echo) {
+    card.appendChild(echo);
+  }
+
   if (cardModel.storyPrompt) {
     card.appendChild(make('div', 'story-prompt', cardModel.storyPrompt));
   }
@@ -137,6 +214,13 @@ export function renderWorkoutCard(cardModel) {
     body.appendChild(markStrip);
   }
 
+  // Micro-lines sit after the strip and before the route decision: they are
+  // read once the marking that answers them has been done.
+  const microLines = renderMicroLines(cardModel.microLines);
+  if (microLines) {
+    body.appendChild(microLines);
+  }
+
   const binaryChoice = renderBinaryChoice(cardModel.binaryChoice);
   if (binaryChoice) {
     body.appendChild(binaryChoice);
@@ -146,6 +230,12 @@ export function renderWorkoutCard(cardModel) {
     const notesBox = make('div', 'notes-box');
     notesBox.style.setProperty('--notes-box-height', Math.max(12, cardModel.notesHeight || 0) + 'px');
     body.appendChild(notesBox);
+  }
+
+  // LAST — see renderReturnBeat(). The peak-end ordering is the mechanism.
+  const returnBeat = renderReturnBeat(cardModel.returnBeat);
+  if (returnBeat) {
+    body.appendChild(returnBeat);
   }
 
   card.appendChild(body);

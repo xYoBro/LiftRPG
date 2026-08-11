@@ -372,7 +372,10 @@
     '- `overflow` (boolean) and `overflowDocument` (foundDocument object)',
     '- `interlude` (object, optional)',
     '- `gameplayClocks` (array, optional)',
-    '- `isDeload` (boolean, optional)'
+    '- `isDeload` (boolean, optional)',
+    '- `sessions[].microLines` (array, optional, max 2): { condition, cue, citeRef? }. See Point Of Use.',
+    '- `sessions[].returnBeat` (object, optional): { closingLine, openingEcho? }. See The Return Loop.',
+    '- `doorChoice` (object, optional): { label?, optionA: { label, lean }, optionB: { label, lean } }. See Door Bias.'
   ];
 
   window.SCHEMA_SINGLE_FRAGMENT = [
@@ -387,7 +390,9 @@
     '- `inWorldPurpose` (string)',
     '- `content` (string)',
     '- `designSpec` (object): { paperTone, primaryTypeface, headerStyle, hasRedactions, hasAnnotations }',
-    '- `authenticityChecks` (object): { hasIrrelevantDetail, couldExistInDifferentStory, redactionDoesNarrativeWork }'
+    '- `authenticityChecks` (object): { hasIrrelevantDetail, couldExistInDifferentStory, redactionDoesNarrativeWork }',
+    '- `citeRef` (object, optional): { targetRef, citedAs } — a citation at another surface. See Point Of Use.',
+    '- `seal` (object, optional): { keyHint, unlockCondition } — a sealed cache opening on an EARLIER surface. See Sealed Caches.'
   ];
 
   window.SCHEMA_SINGLE_ENDING = [
@@ -1112,6 +1117,48 @@
     '- `targetRef` must name a real later surface: a fragment id delivered in a later week, or a week reference ("W4"). Pointing at something missing, or at something already read, breaks the promise the line makes — validation rejects both.',
     '- Write `postedAs` in the artifact\'s own filing voice, never as a note to the player: "LAST LOGGED: tide ledger — Week 4 survey", "FORWARDED TO CASE FILE 12-B, spring quarter", "Sent on with the Michaelmas accounts." Whoever kept this paper wrote that line for their own reasons.',
     '- The pointed-to surface must actually pay off — the thing the manifest named has to be recognisably present when the player gets there.'
+  ];
+
+  // ── Point of use (§11 Wave 4a) ─────────────────────────────────────────────
+  // The register hierarchy, made authorable. Grounded in
+  // docs/reference/point-of-use-rules-research.md — the pinpoint law (§4), the
+  // one-home law (§0), the no-chain law (§1.4), the three load states (§5.2),
+  // and the density budget (§1.6/§5.1). The citation grammars quoted below are
+  // SHELL_CITATION_STYLES in contract-constants.mjs; validate.mjs asserts this
+  // menu against that table, so a shell added there without a line here is an
+  // error rather than a family that quietly cites in someone else's dialect.
+  window.INST_POINT_OF_USE = [
+    '## Point Of Use — Cues, Pointers, And Citation',
+    'A rule is not printed where it fires. What fires there is the DEMAND (the blank), the CUE (a handle, a few words), and at most one POINTER. Each rule is stated in full ONCE, on one surface. Restating it at the fire point taxes a Week-4 reader for a lesson they no longer need.',
+    '',
+    '**Conditional micro-lines (`session.microLines`) — the cheapest content in the book.**',
+    'Same printed page, new pencil state, new reading: thirty keyed lines out-branch the page count at one line each. Shape `{ condition, cue, citeRef? }`.',
+    '- `condition` names a CHECKABLE PRINTED STATE — a clock segment filled, a node shaded, a strip target ticked, a slot crossed off, a stat circled. The player answers it by LOOKING. "If the Relief Ledger stands at 3 or more" is checkable; "if you feel ready", "if you remember the letter" are not, because nothing on the page settles them.',
+    '- `cue` is the payload: what to read, mark, or do now that it holds. One clause.',
+    '- MAX TWO per session, at most ONE carrying a `citeRef`. A rest interval is ninety seconds and the blank already spends it.',
+    '- Voice them as the document\'s own conditional filing note, never as a rules paragraph addressed to a player.',
+    '',
+    '**`citeRef` — the pointer.** Shape `{ targetRef, citedAs }`, legal on a microLine and on a fragment. `targetRef` is a fragment id ("F.07") or a week ref ("W4"), and unlike a manifest it may point EITHER WAY: Week 5 cites the rule taught in Week 1.',
+    '- THE PINPOINT LAW. `citedAs` names what is there AND where. "The abbot\'s letter is already waiting" makes the reader guess; "the abbot\'s letter — Folio 12" does not. A citation with no pinpoint fails validation.',
+    '- NEVER cite a page number — pages are numbered by the press long after you write. Cite by the booklet\'s refs ("F.07", "W4") or the shell\'s filing labels below.',
+    '- THE NO-CHAIN LAW. A citeRef may not land on a surface carrying a citeRef or manifestPointer. A reader who spends the flip must arrive at the answer, not a forwarding address.',
+    '- DENSITY IS A BUDGET: about two pointers per week for the whole book, manifests and citations counted together. Cross-reference density kills a layout independently of how well each pointer is written.',
+    '- THE INTEGRATION EXCEPTION. Anything that must be read TOGETHER to make sense — a table and the roll that reads it, a diagram and its key — goes on the same spread. Pointers are for consulting to adjudicate, never for integrating to understand.',
+    '',
+    '**Citation grammar — one style per booklet, set by `artifactIdentity.shellFamily`.** A citation is not an instruction, it is a fact about the document, so it carries procedure with no explaining voice. Use your shell\'s labels with a number, every time:',
+    '- `field-survey`: Sheet / Station / Plate / Traverse',
+    '- `classified-packet`: Annex / Enclosure / Tab / Serial',
+    '- `ship-logbook`: Entry / Watch / Bearing / Fathom',
+    '- `witness-binder`: Exhibit / Statement / Deposition / Divider',
+    '- `court-packet`: Exhibit / Docket / Schedule / Recital',
+    '- `devotional-manual`: Office / Rubric / Verse / Antiphon',
+    '- `household-archive`: Folio / Bundle / Leaf / Drawer',
+    '- `technical-manual`: Figure / Clause / Procedure / Revision',
+    'Borrowing another shell\'s labels fails validation: an inconsistent citation style is noise, not a cue.',
+    '',
+    '**Marginalia as evidence.** A later week may cite what the PLAYER wrote, in the same citation grammar it uses for printed documents ("the margin note against Sheet 4"). The world reading their handwriting back to them is the strongest re-entry move the form has. Once per book, not routinely.',
+    '',
+    '**Sealed caches (`fragment.seal`).** One or two per booklet. A document printed late that opens on a key found early — page-flipping as travel. `keyHint` describes the key well enough to be recognised weeks before the lock; `unlockCondition` names the EARLIER surface by ref ("opens with what was filed at F.04"). There is no real lock: the honour system IS the mechanism, because the deciding and the flip are the pleasure. Key at least two weeks ahead of its cache, and never a demand mid-workout — a cache is opened between sessions, unhurried.'
   ];
 
   window.INST_DIEGETIC_MECHANICS = [
@@ -2410,6 +2457,8 @@
       '  board state change, clock tick, gate effect, or companion reaction.',
       '- Oracle entries that reference fragments must name the fragment ID.',
       '- No oracle table is purely atmospheric — every table advances the mystery or changes the board.',
+      '- FAILURE ONLY ADDS: every band puts something on the paper — intel, a mark, a pointer, board motion.',
+      '  A setback is the world doing something. Never "nothing happens", never a bare subtraction.',
       '- Oracle consequences should connect to the week\'s zone focus and active pressures.',
       '',
       '## Companion & Choice Doctrine',

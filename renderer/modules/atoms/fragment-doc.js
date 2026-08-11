@@ -147,6 +147,53 @@ const PACKET_HEADER_RULE_PX = 5 + 1;
 const PACKET_STAMP_PX = 20.25;
 const PACKET_STAMP_CLASSES = ['form', 'report', 'inspection'];
 
+/**
+ * SEAL BAND (schema 1.5.0 `fragment.seal`) — `.fragment-seal` and its two
+ * children in booklet.css, which carries the reciprocal note.
+ *
+ * DENSITY-INVARIANT BY DESIGN, and it is a design choice rather than an
+ * oversight: no `.fragment-block[data-density-variant] .fragment-seal` rule
+ * exists, so the band renders identically at every tier and the model must
+ * say so. A seal that shrank with page pressure would be the one piece of
+ * chrome a player has to recognise weeks later, rendered smallest exactly on
+ * the busiest page.
+ *
+ * CONTENT-WRAPPED, not a flat constant. `keyHint` and `unlockCondition` are
+ * free prose; charging the band one fixed height would under-read every seal
+ * whose key hint runs past a line and clip it inside `.fragment-doc`'s
+ * `overflow:hidden`. Flat means flat across DENSITY, not across content.
+ *
+ *   SEAL_CHROME_PX  padding-block 6 + borders 3 (hair width worst case 1.5,
+ *                   as the header row does) + margin-bottom 4 + the `Sealed`
+ *                   stamp's line box 8.7 + its 2px margin.
+ *   SEAL_LINE_PX    `.fragment-seal-line` 5.2pt × 1.35.
+ *   SEAL_CHAR_PX    the same 5.2pt mono advance the manifest chip is fitted
+ *                   at — same family, same size, so the same number.
+ *   SEAL_FRAME_X    padding 12 + borders 2.5, the manifest chip's inset.
+ *   SEAL_LABEL_CHARS the inline `Key` / `Opens` label plus its gap, charged
+ *                   into the line it shares.
+ */
+const SEAL_CHROME_PX = 23.7;
+const SEAL_LINE_PX = 9.36;
+const SEAL_CHAR_PX = 4.57;
+const SEAL_FRAME_X = 12 + 2.5;
+const SEAL_LABEL_CHARS = 7;
+
+/**
+ * FILED CITATION (schema 1.5.0 `fragment.citeRef`) — `.fragment-cite` in
+ * booklet.css, one line above the signature.
+ *
+ * The `.cite-ref` token inside it costs NO height term, and that is a property
+ * of the CSS rather than an approximation: the token is a true inline box, and
+ * a non-replaced inline's vertical padding and border do not enter the line
+ * box. Only its characters count, which is why `citedAs` is measured against
+ * this line's own advance width. See the reciprocal note on `.cite-ref` in
+ * booklet.css and in document-primitives.js renderCiteRef().
+ */
+const CITE_LINE_PX = 9.72;   // .fragment-cite 5.4pt × 1.35
+const CITE_CHAR_PX = 4.75;   // 5.4pt mono advance
+const CITE_MT = 4;
+
 /** .fragment-doc-sig — mono 5.7pt, 1px rule above. */
 const SIG_LINE_PX = 12.14;
 const SIG_CHAR_PX = 4.6;
@@ -206,6 +253,22 @@ function fragmentHeightAt(model, tier, shellFamily) {
 
   if (isPacket && PACKET_STAMP_CLASSES.includes(kind)) height += PACKET_STAMP_PX;
 
+  // Seal band — first real child, above the type slug. Zero when the fragment
+  // carries no seal, which is every fragment in the corpus: the dormancy
+  // guarantee is that a seal-less document estimates byte-identically to the
+  // pre-Wave-4b model, not merely close to it.
+  const seal = model.seal;
+  if (seal) {
+    height += SEAL_CHROME_PX;
+    const sealWidth = textWidth - SEAL_FRAME_X;
+    if (seal.keyHint) {
+      height += wrappedLines(seal.keyHint.length + SEAL_LABEL_CHARS, sealWidth, SEAL_CHAR_PX) * SEAL_LINE_PX;
+    }
+    if (seal.unlockCondition) {
+      height += wrappedLines(seal.unlockCondition.length + SEAL_LABEL_CHARS, sealWidth, SEAL_CHAR_PX) * SEAL_LINE_PX;
+    }
+  }
+
   // Document-type slug
   height += wrappedLines(String(model.documentType || 'Document').length, textWidth, TYPE_CHAR_PX)
     * TYPE_LINE_PX + tier.typeMB;
@@ -241,6 +304,13 @@ function fragmentHeightAt(model, tier, shellFamily) {
     height += tier.manifestMT + tier.manifestPadV + MANIFEST_BORDER_V
       + wrappedLines(String(manifest.postedAs).length, textWidth - MANIFEST_FRAME_X, MANIFEST_CHAR_PX)
         * MANIFEST_LINE_PX;
+  }
+
+  // Filed citation, one line above the signature.
+  const cite = model.citeRef;
+  if (cite && cite.citedAs) {
+    height += CITE_MT
+      + wrappedLines(cite.citedAs.length, textWidth, CITE_CHAR_PX) * CITE_LINE_PX;
   }
 
   height += tier.sigPadTop + SIG_BORDER_PX

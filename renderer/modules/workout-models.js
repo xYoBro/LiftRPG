@@ -4,6 +4,10 @@ import {
   getRepTargets,
   showLoadSuffix
 } from './utils.js?v=48';
+// The citation normalizer has ONE home, beside its twin normalizeManifestPointer
+// — a citeRef on a micro-line and a citeRef on a found document are the same
+// grammar, and two normalizers would be the D91 defect class.
+import { normalizeCiteRef } from './document-models.js?v=48';
 
 let textMeasureContext = null;
 
@@ -82,6 +86,59 @@ function buildMarkStripModel(markStrip) {
   };
 }
 
+/**
+ * Conditional micro-lines (schema 1.5.0 `session.microLines`): the re-entry
+ * mechanism, and the cheapest content the book can carry — same printed page,
+ * new pencil state, new reading.
+ *
+ * DORMANCY (the binaryChoice pattern, exactly): null when the session carries
+ * none, which is every session in the corpus. A null model makes
+ * renderMicroLines() a no-op, which keeps `.session-body`'s child count and
+ * therefore every gap the geometry model charges.
+ *
+ * NO CAP, deliberately. The density law is ≤2 lines per session with at most
+ * one citation among them, and it is a generation-side WARN (D19: a
+ * reading-budget heuristic, not a validity claim). Silently dropping a third
+ * line here would print a book that disagrees with its own JSON; the renderer
+ * prints what was authored and session-card-metrics.js charges for all of it.
+ *
+ * A line with neither clause is dropped rather than printed as an empty row —
+ * the normalizeManifestPointer rule: a half-filled pointer must not print a
+ * blank stamp.
+ */
+function buildMicroLineModels(microLines) {
+  if (!Array.isArray(microLines) || !microLines.length) return null;
+
+  const models = microLines
+    .map((line) => ({
+      condition: String((line && line.condition) || '').trim(),
+      cue: String((line && line.cue) || '').trim(),
+      citeRef: normalizeCiteRef(line)
+    }))
+    .filter((line) => line.condition || line.cue);
+
+  return models.length ? models : null;
+}
+
+/**
+ * The return beat (schema 1.5.0 `session.returnBeat`): tomorrow cut tonight,
+ * and the world's answer when the book reopens.
+ *
+ * `openingEcho` is optional at the schema level because the first session has
+ * no prior session to echo, so the model carries the two halves independently:
+ * a session may print an echo, a closing line, or both. Null only when neither
+ * survives trimming.
+ */
+function buildReturnBeatModel(returnBeat) {
+  if (!returnBeat || typeof returnBeat !== 'object') return null;
+
+  const closingLine = String(returnBeat.closingLine || '').trim();
+  const openingEcho = String(returnBeat.openingEcho || '').trim();
+  if (!closingLine && !openingEcho) return null;
+
+  return { closingLine, openingEcho };
+}
+
 export function buildWorkoutCardModel(session, layoutPlan) {
   const exercises = session.exercises || [];
   const showNotes = typeof session.showNotes === 'boolean' ? session.showNotes : exercises.length > 0;
@@ -98,6 +155,8 @@ export function buildWorkoutCardModel(session, layoutPlan) {
     exerciseRows: exercises.map((exercise) => buildExerciseRowModel(exercise)),
     binaryChoice: buildBinaryChoiceModel(session.binaryChoice),
     markStrip: buildMarkStripModel(session.markStrip),
+    microLines: buildMicroLineModels(session.microLines),
+    returnBeat: buildReturnBeatModel(session.returnBeat),
     showNotes
   };
 }

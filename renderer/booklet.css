@@ -1418,6 +1418,79 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   margin-bottom:8px;
 }
 
+/* ── The Door — the weekly decision, bias posted (Wave 4b) ───────────────────
+   Two routes, identical work behind either: agency lives on the reward side
+   only, so the chance-isolation law is untouched and the prescription never
+   moves. The LEAN sits beside its label because a bias the reader has to hunt
+   for is not posted, and the mark box is the commitment — tick the door you
+   took, once, at the head of the week.
+
+   CROSS-FILE CONTRACT: renderer/modules/atoms/week-header.js mirrors every
+   number here as DOOR_CHROME_PX / DOOR_OPTION_LINE / DOOR_MARK_PX and the
+   option gap. That estimate is ALSO what the adapter's session chunker charges
+   for week furniture, so a value moved here alone does not merely detune the
+   solver — it changes how many session cards the planner believes fit on the
+   page. Change them together (D71).
+
+   Density-invariant: no `[data-density-variant]` or `[data-page-compaction]`
+   rule reaches these elements, matching the rest of the week header. Character
+   comes from theme tokens only and the mark is an outline, so it prints in
+   B&W. */
+.week-door{
+  margin-top:2px;
+  margin-bottom:8px;
+  padding:5px 8px 6px;
+  border:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-panel-border,var(--rule));
+  border-left:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border-radius:var(--theme-panel-radius,2px);
+}
+.week-door-label{
+  font-family:var(--theme-label-family,var(--mono));
+  font-size:5.4pt;
+  line-height:1.3;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:4px;
+}
+.week-door-option{
+  display:flex;
+  align-items:flex-start;
+  gap:6px;
+}
+.week-door-option + .week-door-option{
+  margin-top:4px;
+}
+/* The commitment tick. 15px at every tier — the D89 form-field floor the mark
+   box and the Banked box hold, for the same reason: a pencil has to land in it. */
+.week-door-mark{
+  width:15px;
+  height:15px;
+  flex:0 0 auto;
+  border:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border-radius:2px;
+  background:var(--paper);
+}
+.week-door-text{
+  flex:1 1 auto;
+  min-width:0;
+  font-size:6pt;
+  line-height:1.3;
+}
+.week-door-name{
+  font-family:var(--serif);
+  color:var(--ink);
+}
+/* Inline, sharing the label's line box — see the wrap term in week-header.js,
+   which charges the two together. A block-level lean would add a row the
+   estimate does not know about. */
+.week-door-lean{
+  font-family:var(--theme-label-family,var(--mono));
+  font-size:.92em;
+  color:var(--muted);
+  margin-left:5px;
+}
+
 /* ── Session Cards ───────────────────────────────────────────────────────────
    HEIGHT ALLOCATION — read this before touching the three declarations below.
 
@@ -1757,6 +1830,124 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   pointer-events:none;
 }
 
+/* ── The REFERENCE token (schema 1.5.0 citeRef, Wave 4b) ────────────────────
+   The citation grammar's one visual form, shared by session micro-lines and
+   found documents — same token, same reading, wherever a surface cites an
+   authority. Structure only: face, rule and colour all come from theme tokens,
+   so a new archetype restyles it without touching this block, and it prints in
+   B&W (a hairline frame, never a hue).
+
+   INLINE, AND THAT IS LOAD-BEARING. A non-replaced inline box's vertical
+   padding and border do not enter the line box, so this frame cannot change
+   the height of the line it sits in. That property is what lets BOTH estimate
+   paths — session-card-metrics.js microLineChars() and atoms/fragment-doc.js
+   CITE_* — charge a citation in characters with no height term at all.
+   Switching this to `display:inline-block` would silently grow every line
+   carrying a citation, and nothing models it: the D71 defect class, reached
+   through a one-word change. document-primitives.js renderCiteRef() carries
+   the reciprocal note.
+
+   `em`, not `pt`, so the token scales with whichever surface hosts it — but it
+   is only ever placed inside `.micro-line-cue` and `.fragment-cite`, both of
+   which set an explicit font-size. An `em` against an unstyled parent is how a
+   fragment tier once INFLATED 1.76× while looking like a shrink rule (D71); if
+   a third host ever appears, give it a font-size first.
+
+   The casing is the author's — `citedAs` is written in the artifact's own
+   voice, exactly as `postedAs` is, so nothing here transforms it. */
+.cite-ref{
+  font-family:var(--theme-label-family,var(--mono));
+  font-size:.92em;
+  line-height:inherit;
+  letter-spacing:.04em;
+  color:color-mix(in srgb, var(--ink) 66%, var(--muted) 34%);
+  margin-left:4px;
+  padding:1px 3px;
+  border:var(--theme-hair-width,1px) var(--theme-line-style,solid)
+    color-mix(in srgb, var(--theme-panel-border,var(--rule)) 78%, transparent 22%);
+  border-radius:var(--theme-panel-radius,2px);
+}
+
+/* ── Return beat + micro-lines (Wave 4b) ────────────────────────────────────
+   Three surfaces, one type size, and no density ladder between them.
+
+   CROSS-FILE CONTRACT: renderer/modules/session-card-metrics.js models every
+   number below — LINE_PX mirrors the 5.9pt/1.3 line box these three share,
+   MICRO_STRIP_* mirrors `.micro-line-strip`'s padding, rule and row gap, and
+   RETURN_* mirrors `.return-beat`'s padding, rule, gap and blank. Phase-1
+   estimation has no DOM. Change a number here and the matching constant must
+   move with it, or the solver's arithmetic lies (D71).
+
+   THEY DO NOT SHRINK, DELIBERATELY. No `.session-card[data-density-variant]`
+   rule reaches any of these elements. The micro-line is the one thing on the
+   card read while the reader is gassed, and the return blank is where a pencil
+   lands at the end of a session — compressing exactly the surfaces that get
+   used under load is the failure GW-39's reading budget exists to prevent. The
+   estimate says the same thing at every tier, so the model and the sheet
+   agree; a shrinking line here would be a promise of pixels the CSS never
+   gives back, which is what STRIP_LADDER refuses to say about the tick box. */
+.session-echo{
+  font-family:var(--serif);
+  font-size:5.9pt;
+  line-height:1.3;
+  font-style:italic;
+  color:var(--muted);
+}
+.micro-line-strip{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  /* Pinned against `.session-body`'s column flex for the same reason the mark
+     strip is: an over-full body must squeeze the notes box, never the lines
+     the player has to read. */
+  flex:0 0 auto;
+  padding-top:4px;
+  border-top:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-field-rule,var(--rule));
+}
+.micro-line{
+  font-family:var(--serif);
+  font-size:5.9pt;
+  line-height:1.3;
+  color:var(--ink);
+}
+/* The condition is keyed by typographic contrast, not by a stacked heading or
+   a pseudo-element: a `content:` glyph would add characters the wrap model
+   cannot see, and a second line would add a row it does not charge. */
+.micro-line-condition{
+  font-family:var(--theme-label-family,var(--mono));
+  letter-spacing:.06em;
+  color:var(--muted);
+  margin-right:5px;
+}
+.micro-line-cue{
+  color:var(--ink);
+}
+/* Tomorrow cut tonight. The label is the authored prompt; the blank under it
+   is the pencil surface, held at the D89 form-field floor at every tier — a
+   write-in a pencil cannot land in is not a saving. */
+.return-beat{
+  flex:0 0 auto;
+  padding-top:4px;
+  border-top:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-field-rule,var(--rule));
+}
+.return-beat-label{
+  font-family:var(--serif);
+  font-size:5.9pt;
+  line-height:1.3;
+  color:var(--ink);
+  margin-bottom:3px;
+}
+/* The write-in rule, drawn the way this book already draws write-in rules:
+   `.exercise-load-line`'s field rule, not a box border. A pencil mark has to
+   read ABOVE the line it sits on, and the frame weight used for tick boxes is
+   heavy enough to swallow it. The 15px height is the pencil floor and does not
+   change with the rule weight. */
+.return-beat-blank{
+  height:15px;
+  border-bottom:var(--theme-rule-width,1px) var(--theme-line-style,solid) var(--theme-field-rule,var(--rule));
+  background:transparent;
+}
+
 /* Mark Strip — the Mark surface (Session 1)
    The mid-workout tick row: one box per target, printed between the exercise
    table and the notes box. Ten-second law — ticks only, nothing to read, count
@@ -2077,6 +2268,103 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   position:absolute;
   top:4px;
   left:8px;
+}
+
+/* ── The Ledger — the closing spread (salvage seed 8, Wave 4b) ───────────────
+   "The body, audited." One row per movement, three pencil columns: the first
+   mark, the best mark reached, and the difference. The engine prints nothing
+   into them — the player prints the middle of this page, and that is the whole
+   point of the surface.
+
+   CROSS-FILE CONTRACT: renderer/modules/atoms/ledger-spread.js mirrors every
+   number here (HEADER_PX / LEDE_PX / HEAD_ROW_PX / ROW_GAP_PX / ROW_MIN_PX /
+   ROW_MAX_PX) and carries the reverse pointer. Phase-1 estimation has no DOM.
+   Change them together (D71).
+
+   THE ROW HEIGHT IS NOT WRITTEN HERE. `--ledger-row-height` is computed by
+   ledgerRowHeightPx() and stamped onto `.ledger-table` by render(), because it
+   depends on how many movements the book has — a four-movement program gets
+   generous bands, a twenty-movement one compacts to the pencil floor. One
+   function serves both the estimate and the render, so the page cannot print
+   at a height the model did not predict. A row height declared in this file
+   would be a second author for the same number.
+
+   Density-invariant: no `[data-density-variant]` rule reaches these elements.
+   Every cell is a place a pencil has to land, and a row too short to write a
+   number in is not a saving — the same ruling that pins the mark box and the
+   reckoning tally at 15px.
+
+   Prints in B&W: the ledger is drawn in rules, never fills. */
+.page-frame.ledger-page{
+  display:flex;
+  flex-direction:column;
+  height:100%;
+  padding:4px 6px 2px;
+}
+.ledger-lede{
+  font-family:var(--serif);
+  font-size:6pt;
+  line-height:1.35;
+  color:var(--muted);
+  margin-bottom:6px;
+}
+.ledger-table{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  flex:1;
+  min-height:0;
+}
+.ledger-head,
+.ledger-row{
+  display:grid;
+  grid-template-columns:1fr 62px 62px 62px;
+  gap:6px;
+  align-items:stretch;
+}
+.ledger-head{
+  font-family:var(--theme-label-family,var(--mono));
+  font-size:5.2pt;
+  line-height:1.3;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--muted);
+  padding-bottom:3px;
+  border-bottom:var(--theme-rule-width,1px) var(--theme-line-style,solid) var(--theme-header-border,var(--rule));
+  margin-bottom:4px;
+}
+.ledger-head-cell{
+  text-align:center;
+}
+/* `min-height`, not `height`: the row takes the modelled band as its floor and
+   `.ledger-table`'s own `flex:1` shares out whatever the page has left over —
+   the same stretch `.fragment-doc{flex:1}` applies to a document that
+   estimated shorter than its share. The estimate models the floor, so the
+   printed row is never SHORTER than predicted, which is the direction that
+   matters. */
+.ledger-row{
+  min-height:var(--ledger-row-height, 18px);
+  flex:1 1 auto;
+  border-bottom:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-field-rule,var(--rule));
+}
+.ledger-name{
+  display:flex;
+  align-items:flex-end;
+  font-family:var(--serif);
+  font-size:6.5pt;
+  line-height:1.2;
+  color:var(--ink);
+  padding-bottom:2px;
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+/* The write-in columns. A hairline down the left of each is what makes the
+   three cells read as columns of one ledger rather than three loose boxes,
+   and it costs no height. */
+.ledger-cell{
+  border-left:var(--theme-hair-width,1px) var(--theme-line-style,solid)
+    color-mix(in srgb, var(--theme-field-rule,var(--rule)) 70%, transparent 30%);
+  background:transparent;
 }
 
 /* Full-page notes sheets */
@@ -5358,6 +5646,69 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   overflow:hidden;
   background:var(--theme-doc-fill,rgba(232,223,200,.78));
   box-shadow:none;
+}
+/* ── Seal band — the sealed cache (schema 1.5.0 seal, Wave 4b) ──────────────
+   A document printed late that wants a key found early: page-flipping as
+   travel. No crypto — the honour system IS the mechanism, so this band's whole
+   job is to make the seal legible now and the key recognisable weeks before it
+   turns up.
+
+   FIRST REAL CHILD of `.fragment-doc`, above the type slug, because a seal is
+   the first thing you meet on a sealed paper. The classified-packet shell's
+   evidence stamp is a `::before` pseudo-element, so it still precedes this
+   band without either rule knowing about the other — the two compose instead
+   of competing.
+
+   CROSS-FILE CONTRACT: renderer/modules/atoms/fragment-doc.js mirrors this
+   block as SEAL_CHROME_PX / SEAL_LINE_PX / SEAL_CHAR_PX / SEAL_FRAME_X and
+   carries the reverse pointer. Density-invariant on purpose: no
+   `.fragment-block[data-density-variant]` rule reaches it, because the one
+   piece of chrome a player has to recognise weeks later should not be drawn
+   smallest on the busiest page. Change them together (D71).
+
+   Each field is ONE line with its label inline — a stacked label would add a
+   row the estimate does not charge. Structure only; every colour and rule is a
+   theme token, and it reads in pure B&W (a solid seal rule down the left plus
+   a hairline frame). */
+.fragment-seal{
+  margin-bottom:4px;
+  padding:3px 6px;
+  border:var(--theme-hair-width,1px) var(--theme-line-style,solid)
+    color-mix(in srgb, var(--theme-panel-border,var(--rule)) 82%, transparent 18%);
+  border-left:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border-radius:var(--theme-panel-radius,2px);
+}
+.fragment-seal-mark{
+  font-family:var(--theme-label-family,var(--mono));
+  font-size:5pt;
+  line-height:1.3;
+  letter-spacing:.2em;
+  text-transform:uppercase;
+  color:var(--ink);
+  margin-bottom:2px;
+}
+.fragment-seal-line{
+  font-family:var(--theme-label-family,var(--mono));
+  font-size:5.2pt;
+  line-height:1.35;
+  color:color-mix(in srgb, var(--ink) 70%, var(--muted) 30%);
+  overflow-wrap:anywhere;
+}
+.fragment-seal-key{
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-right:4px;
+}
+/* The filed citation, one line above the signature. The `.cite-ref` token
+   inside costs no height — see its block above — so fragment-doc.js models
+   this line by its characters alone (CITE_LINE_PX / CITE_CHAR_PX / CITE_MT). */
+.fragment-cite{
+  margin-top:4px;
+  font-family:var(--theme-label-family,var(--mono));
+  font-size:5.4pt;
+  line-height:1.35;
+  color:var(--muted);
 }
 .fragment-doc-type{
   font-size:5.1pt;

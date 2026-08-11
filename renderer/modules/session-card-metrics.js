@@ -369,6 +369,70 @@ const STRIP_LADDER = {
 };
 
 /**
+ * MICRO-LINES, OPENING ECHO, RETURN BEAT — the Wave 4b re-entry surfaces.
+ *
+ * CROSS-FILE CONTRACT: mirrors the `.micro-line-strip` / `.micro-line*`,
+ * `.session-echo` and `.return-beat*` blocks in `booklet.css`, which carries
+ * the reciprocal pointer. Phase-1 estimation has no DOM; the numbers live
+ * twice, so change them together or the solver's shrink potential lies (D71).
+ *
+ * WHY THERE IS NO LADDER HERE, and why that is the honest shape rather than an
+ * unfinished one: these three surfaces carry NO `[data-density-variant]` rule
+ * in booklet.css. They render at one size at every tier, so the model reports
+ * one number at every tier. Handing the solver a shrinking micro-line would
+ * promise it pixels the CSS never gives back — the same lie STRIP_LADDER
+ * refuses to tell about the tick box, arrived at from the other direction (the
+ * strip shrinks its padding and says so; these shrink nothing and say that).
+ *
+ * The reason they do not shrink is not laziness either. The micro-line is the
+ * one thing on the card read under load, and the return blank is a place a
+ * pencil has to land at the end of a session. Compressing the surfaces that
+ * are used when the reader is gassed is the exact failure GW-39's reading
+ * budget exists to prevent.
+ *
+ *   LINE_PX      `.micro-line` / `.session-echo` / `.return-beat-label` all at
+ *                5.9pt × 1.3. One face size across the three, so one constant.
+ *   *_CHARS      DERIVED, NOT FITTED — stated plainly because every other wrap
+ *                term in this file was measured off rendered cards and these
+ *                could not be: no fixture carries these fields yet. Derivation:
+ *                PROMPT_LADDER's fitted 6.35pt/80-char row implies ~6.47px of
+ *                effective advance per character INCLUDING greedy-wrap waste,
+ *                which scales to ~86 characters at 5.9pt. 78 is taken instead,
+ *                ~9% conservative, because a micro-line mixes the wider label
+ *                face into the same line box. Over-counting lines
+ *                over-estimates, which the planner's compaction absorbs;
+ *                under-counting clips inside `.session-card`'s overflow:hidden.
+ *                REFIT THESE against rendered cards once a fixture carries the
+ *                fields — the D76 lesson is that a wrap term fitted in the
+ *                wrong box is worse than one fitted in none.
+ *   MICRO_CONDITION_GAP_CHARS
+ *                `.micro-line-condition`'s margin-right, charged as characters
+ *                because it consumes line width, not height.
+ *   CITE_TOKEN_GAP_CHARS
+ *                the REFERENCE token costs characters and NOTHING ELSE: it is
+ *                a true inline box, and a non-replaced inline's padding and
+ *                border do not enter the line box. This covers only its own
+ *                inline margin. See the note on `.cite-ref` in booklet.css —
+ *                turning it into an inline-block would break this silently.
+ *   RETURN_BLANK_PX
+ *                `.return-beat-blank`, the write-in. 15px at every tier, the
+ *                D89 form-field floor the mark box and the Banked box hold.
+ */
+const LINE_PX = 10.23;              // 5.9pt × 1.3
+const MICRO_LINE_CHARS = 78;
+const MICRO_STRIP_PAD_TOP = 4;
+const MICRO_STRIP_BORDER = 1.5;     // --theme-hair-width worst case, as elsewhere
+const MICRO_STRIP_ROW_GAP = 2;
+const MICRO_CONDITION_GAP_CHARS = 2;
+const CITE_TOKEN_GAP_CHARS = 2;
+const ECHO_CHARS = 78;
+const RETURN_LABEL_CHARS = 78;
+const RETURN_PAD_TOP = 4;
+const RETURN_BORDER = 1.5;
+const RETURN_LABEL_GAP = 3;
+const RETURN_BLANK_PX = 15;
+
+/**
  * SINGLE-CARD PAGE GEOMETRY (`data-card-count="1"`).
  *
  * CROSS-FILE CONTRACT: `booklet.css` `.workout-left[data-card-count="1"] …`.
@@ -526,6 +590,138 @@ export function estimateMarkStripHeight(session, density) {
   return monotoneTail((d) => rawMarkStripHeight(strip, d), density);
 }
 
+/**
+ * Printed rows a run of `chars` characters occupies at a character capacity.
+ *
+ * The character-count sibling of `countWrappedLines()`, which takes text. The
+ * micro-line's row is assembled from three separately-authored strings plus
+ * the width their inline gaps consume, so its length is arithmetic before it
+ * is text — building a fake string just to hand it to the text form would be
+ * the same computation with a detour through memory.
+ */
+function linesFromChars(chars, charsPerLine) {
+  if (!chars) return 0;
+  return Math.max(1, Math.ceil(chars / Math.max(12, charsPerLine)));
+}
+
+/**
+ * Whether a micro-line prints at all.
+ *
+ * MIRRORS buildMicroLineModels() (workout-models.js) EXACTLY — condition or
+ * cue, and the citation does not count. A citeRef attached to a line with no
+ * clauses is dropped by the model, so charging it a row here would bill the
+ * card for a strip the DOM never builds. Over-estimating is the safe
+ * direction, but a model that disagrees with the renderer about what EXISTS is
+ * how the two stop being one model.
+ */
+function microLinePrints(line) {
+  return !!(String((line && line.condition) || '').trim()
+    || String((line && line.cue) || '').trim());
+}
+
+/** Characters a micro-line occupies on one printed row, gaps included. */
+function microLineChars(line) {
+  const condition = String((line && line.condition) || '').trim();
+  const cue = String((line && line.cue) || '').trim();
+  const cite = line && line.citeRef ? String(line.citeRef.citedAs || '').trim() : '';
+
+  return condition.length
+    + (condition ? MICRO_CONDITION_GAP_CHARS : 0)
+    + cue.length
+    + (cite ? cite.length + CITE_TOKEN_GAP_CHARS : 0);
+}
+
+/**
+ * `.micro-line-strip` height, or 0 when the session carries no micro-lines.
+ *
+ * Zero is the whole dormancy guarantee on the estimate side: every session in
+ * the corpus predates the feature, so this term must contribute nothing at all
+ * to their totals — not a rounding difference, not a gap.
+ */
+function rawMicroLinesHeight(microLines, _density) {
+  if (!Array.isArray(microLines) || !microLines.length) return 0;
+
+  // A line with neither clause renders nothing, so it is not a row and pays
+  // no gap — see microLinePrints().
+  const printed = microLines.filter(microLinePrints);
+  if (!printed.length) return 0;
+
+  const rows = printed.reduce(
+    (sum, line) => sum + linesFromChars(microLineChars(line), MICRO_LINE_CHARS) * LINE_PX,
+    0,
+  );
+
+  return MICRO_STRIP_PAD_TOP + MICRO_STRIP_BORDER
+    + rows
+    + (printed.length - 1) * MICRO_STRIP_ROW_GAP;
+}
+
+/**
+ * Height of one session's micro-line strip at a density.
+ *
+ * Density-invariant by construction (no `[data-density-variant]` rule reaches
+ * these elements). The monotone wrapper is kept anyway, for symmetry with
+ * every other term in this file and so that adding a density rule later cannot
+ * silently skip the Charter invariant-4 clamp.
+ *
+ * @param {object} session — a schema session object
+ * @param {number} density
+ * @returns {number} px, 0 when the session has no microLines
+ */
+export function estimateMicroLinesHeight(session, density) {
+  const lines = session && session.microLines;
+  if (!Array.isArray(lines) || !lines.length) return 0;
+
+  return monotoneTail((d) => rawMicroLinesHeight(lines, d), density);
+}
+
+/** `.session-echo` height, or 0 when the session carries no opening echo. */
+function rawOpeningEchoHeight(returnBeat, _density) {
+  const echo = String((returnBeat && returnBeat.openingEcho) || '').trim();
+  if (!echo) return 0;
+
+  return countWrappedLines(echo, ECHO_CHARS) * LINE_PX;
+}
+
+/**
+ * Height of the card's opening echo at a density.
+ *
+ * @param {object} session
+ * @param {number} density
+ * @returns {number} px, 0 when the session has no openingEcho
+ */
+export function estimateOpeningEchoHeight(session, density) {
+  const beat = session && session.returnBeat;
+  if (!beat) return 0;
+
+  return monotoneTail((d) => rawOpeningEchoHeight(beat, d), density);
+}
+
+/** `.return-beat` height, or 0 when the session carries no closing line. */
+function rawReturnBeatHeight(returnBeat, _density) {
+  const closing = String((returnBeat && returnBeat.closingLine) || '').trim();
+  if (!closing) return 0;
+
+  return RETURN_PAD_TOP + RETURN_BORDER
+    + countWrappedLines(closing, RETURN_LABEL_CHARS) * LINE_PX
+    + RETURN_LABEL_GAP
+    + RETURN_BLANK_PX;
+}
+
+/**
+ * Height of the card's closing write-in at a density.
+ *
+ * @param {object} session
+ * @param {number} density
+ * @returns {number} px, 0 when the session has no closingLine
+ */
+export function estimateReturnBeatHeight(session, density) {
+  const beat = session && session.returnBeat;
+  if (!beat) return 0;
+
+  return monotoneTail((d) => rawReturnBeatHeight(beat, d), density);
+}
+
 // ---------------------------------------------------------------------------
 // Card composition
 // ---------------------------------------------------------------------------
@@ -546,6 +742,16 @@ function cardComposition(session) {
   // it is not a body child and pays no gap.
   const strip = (session || {}).markStrip;
   const hasStrip = !!(strip && Array.isArray(strip.targets) && strip.targets.length);
+  // Mirrors buildMicroLineModels(): a strip whose every line is blank renders
+  // nothing, so it is not a body child and pays no gap.
+  const microLines = Array.isArray((session || {}).microLines) ? session.microLines : [];
+  const hasMicroLines = microLines.some(microLinePrints);
+  // Mirrors buildReturnBeatModel(): the echo and the closing line are
+  // independent children in independent places — a first session may carry a
+  // closing line with no echo, and either half may be blank.
+  const beat = (session || {}).returnBeat;
+  const hasEcho = !!(beat && String(beat.openingEcho || '').trim());
+  const hasReturnClose = !!(beat && String(beat.closingLine || '').trim());
   // `showNotes` mirrors buildWorkoutCardModel: explicit boolean wins, else the
   // notes box appears only when there are exercises to write against.
   const showNotes = typeof (session || {}).showNotes === 'boolean'
@@ -558,11 +764,15 @@ function cardComposition(session) {
     hasTable,
     hasChoice,
     hasStrip,
+    hasMicroLines,
+    hasEcho,
+    hasReturnClose,
     showNotes,
-    // header + [prompt] + meta + body
-    cardChildren: 1 + (hasPrompt ? 1 : 0) + 1 + 1,
-    // [table] + [strip] + [choice] + [notes]
-    bodyChildren: (hasTable ? 1 : 0) + (hasStrip ? 1 : 0) + (hasChoice ? 1 : 0) + (showNotes ? 1 : 0),
+    // header + [echo] + [prompt] + meta + body
+    cardChildren: 1 + (hasEcho ? 1 : 0) + (hasPrompt ? 1 : 0) + 1 + 1,
+    // [table] + [strip] + [micro-lines] + [choice] + [notes] + [return beat]
+    bodyChildren: (hasTable ? 1 : 0) + (hasStrip ? 1 : 0) + (hasMicroLines ? 1 : 0)
+      + (hasChoice ? 1 : 0) + (showNotes ? 1 : 0) + (hasReturnClose ? 1 : 0),
   };
 }
 
@@ -621,13 +831,16 @@ function rawSessionCardHeight(session, density) {
   return box.padY
     + box.gap * (parts.cardChildren - 1)
     + tier.header
+    + rawOpeningEchoHeight(parts.hasEcho ? session.returnBeat : null, density)
     + (parts.hasPrompt ? rawPromptHeight(session.storyPrompt, density) : 0)
     + (session && session.fragmentRef ? tier.meta : tier.metaEmpty)
     + Math.max(0, parts.bodyChildren - 1) * tier.bodyGap
     + rawExerciseTableHeight(parts.exercises, tier)
     + rawMarkStripHeight(parts.hasStrip ? session.markStrip : null, density)
+    + rawMicroLinesHeight(parts.hasMicroLines ? session.microLines : null, density)
     + (parts.hasChoice ? rawBinaryChoiceHeight(session.binaryChoice, density) : 0)
-    + (parts.showNotes ? notesBoxHeight(density) : 0);
+    + (parts.showNotes ? notesBoxHeight(density) : 0)
+    + rawReturnBeatHeight(parts.hasReturnClose ? session.returnBeat : null, density);
 }
 
 /**
@@ -664,14 +877,22 @@ export function estimateSoloSessionCardHeight(session) {
       * SOLO_CARD.promptLineHeight + SOLO_CARD.promptPadY
     : 0;
 
+  // The Wave 4b surfaces carry no card-count override and no density rule, so
+  // they contribute the same height here as on a shared page. Reading them
+  // through the same raw terms rather than repeating their constants is the
+  // point (a copied constant here is the D71 drift hazard, a MISSING term is
+  // the D79 one — the unmodelled solo notes box cost 194px).
   return SOLO_CARD.padY
     + SOLO_CARD.gap * (parts.cardChildren - 1)
     + tier.header
+    + rawOpeningEchoHeight(parts.hasEcho ? session.returnBeat : null, 0)
     + prompt
     + (session && session.fragmentRef ? tier.meta : tier.metaEmpty)
     + Math.max(0, parts.bodyChildren - 1) * SOLO_CARD.bodyGap
     + rawExerciseTableHeight(parts.exercises, tier)
     + rawMarkStripHeight(parts.hasStrip ? session.markStrip : null, SOLO_CARD.stripDensity)
+    + rawMicroLinesHeight(parts.hasMicroLines ? session.microLines : null, 0)
     + (parts.hasChoice ? rawBinaryChoiceHeight(session.binaryChoice, 0) : 0)
-    + (parts.showNotes ? SOLO_CARD.notes : 0);
+    + (parts.showNotes ? SOLO_CARD.notes : 0)
+    + rawReturnBeatHeight(parts.hasReturnClose ? session.returnBeat : null, 0);
 }

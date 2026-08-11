@@ -278,6 +278,190 @@ export var VALID_SHELL_FAMILIES = [
   'court-packet', 'devotional-manual', 'household-archive', 'technical-manual'
 ];
 
+// ── Shell citation grammars (§11 Wave 4a) ───────────────────────────────────
+// The pointer form, per shell family. A booklet points at its own surfaces
+// constantly — a micro-line citing the rule it fires under, a fragment citing
+// the document that supersedes it — and the point-of-use research is blunt
+// about what makes a pointer work: it must name WHAT is there, not only WHERE
+// (docs/reference/point-of-use-rules-research.md §1.5, §4). Legal editors call
+// the destination-without-payload form a BLIND REFERENCE, and every mature
+// print tradition examined carries a native vocabulary for avoiding it —
+// `Exhibit 4`, `Annex B`, `Folio 12`, Mothership's `(PSG 29)`.
+//
+// This table lives beside VALID_SHELL_FAMILIES for the same reason
+// resolveShellFamily does: the family IS the choice, and a per-booklet
+// improvised citation style would defeat the mechanism. Signaling only pays
+// when the signal is systematic across the whole artifact (§1.2, §5.3).
+//
+// D47 (no exemplar bleed): STRUCTURAL patterns and GENERIC vocabulary only.
+// `Exhibit` and `Folio` are filing furniture in any world; `the Tidewall
+// Survey` is a house image and would leak into every generated book. Nothing
+// here names a place, a person, an instrument, or a period.
+//
+// Two halves, and validate.mjs asserts they agree:
+//   labelVocabulary — the structural nouns this shell files under.
+//   tokenPattern    — regex SOURCE (string, not RegExp: this file is imported
+//                     by Node, the browser, and quoted into prompt_rules) that
+//                     matches a pinpoint: one of those labels followed by an
+//                     identifier. Every family also accepts the booklet's own
+//                     refs (`F.07`, `W4`) — those are pinpoints in any grammar,
+//                     and they are the ONLY destinations a generating model can
+//                     name, because page numbers are assigned by the layout
+//                     engine long after the prose is written.
+//
+// Keys ≡ VALID_SHELL_FAMILIES (validator-asserted). A family without a grammar
+// would silently fall back to the default and cite in a dialect that is not
+// its own — the exact inconsistency the table exists to prevent.
+
+// The in-book reference forms every shell accepts. Fragment ids and week refs
+// are the machine handles the resolver already understands (parseWeekRef /
+// normalizeId in validation.js), so a citation carrying one is checkable as
+// well as readable.
+export var CITATION_UNIVERSAL_TOKEN = '\\b(?:F\\.?\\s*\\d+|W\\s*\\d+)\\b';
+
+export var SHELL_CITATION_STYLES = {
+  'field-survey': {
+    labelVocabulary: ['Sheet', 'Station', 'Plate', 'Traverse'],
+    tokenPattern: '\\b(?:Sheet|Station|Plate|Traverse)\\s*[A-Z]?[-.\\u2013]?\\s*\\d+\\b'
+  },
+  'classified-packet': {
+    labelVocabulary: ['Annex', 'Enclosure', 'Tab', 'Serial'],
+    tokenPattern: '\\b(?:Annex|Enclosure|Tab|Serial)\\s*[A-Z]?[-.\\u2013]?\\s*\\d+\\b'
+  },
+  'ship-logbook': {
+    labelVocabulary: ['Entry', 'Watch', 'Bearing', 'Fathom'],
+    tokenPattern: '\\b(?:Entry|Watch|Bearing|Fathom)\\s*[A-Z]?[-.\\u2013]?\\s*\\d+\\b'
+  },
+  'witness-binder': {
+    labelVocabulary: ['Exhibit', 'Statement', 'Deposition', 'Divider'],
+    tokenPattern: '\\b(?:Exhibit|Statement|Deposition|Divider)\\s*[A-Z]?[-.\\u2013]?\\s*\\d+\\b'
+  },
+  'court-packet': {
+    labelVocabulary: ['Exhibit', 'Docket', 'Schedule', 'Recital'],
+    tokenPattern: '\\b(?:Exhibit|Docket|Schedule|Recital)\\s*[A-Z]?[-.\\u2013]?\\s*\\d+\\b'
+  },
+  'devotional-manual': {
+    labelVocabulary: ['Office', 'Rubric', 'Verse', 'Antiphon'],
+    tokenPattern: '\\b(?:Office|Rubric|Verse|Antiphon)\\s*[A-Z]?[-.\\u2013]?\\s*\\d+\\b'
+  },
+  'household-archive': {
+    labelVocabulary: ['Folio', 'Bundle', 'Leaf', 'Drawer'],
+    tokenPattern: '\\b(?:Folio|Bundle|Leaf|Drawer)\\s*[A-Z]?[-.\\u2013]?\\s*\\d+\\b'
+  },
+  'technical-manual': {
+    labelVocabulary: ['Figure', 'Clause', 'Procedure', 'Revision'],
+    tokenPattern: '\\b(?:Figure|Clause|Procedure|Revision)\\s*[A-Z]?[-.\\u2013]?\\s*\\d+\\b'
+  }
+};
+
+/**
+ * resolveCitationStyle(shellFamily) -> { labelVocabulary, tokenPattern }
+ *
+ * The citation grammar a booklet cites in. Unknown or absent families get
+ * 'field-survey', matching resolveShellFamily's declared default — a booklet
+ * always prints in SOME shell, so it always cites in some grammar.
+ *
+ * SINGLE HOME (D93), same argument as resolveFamilyBoardModes: the table is
+ * the gate, and a consumer that rebuilt the lookup would answer "which grammar
+ * does this book cite in?" a second time in its own dialect. Guarded by
+ * singleDeclarationHomes() in scripts/validate.mjs.
+ *
+ * Consumers: generator/modules/validation.js (the blind-pointer and
+ * citation-style scans).
+ */
+export function resolveCitationStyle(shellFamily) {
+  var key = String(shellFamily || '').trim().toLowerCase();
+  return SHELL_CITATION_STYLES[key] || SHELL_CITATION_STYLES['field-survey'];
+}
+
+/**
+ * citationPinpoints(citedAs, shellFamily) -> { own, foreign }
+ *
+ * The pinpoint audit of one printed citation. `own` is true when the string
+ * carries a pinpoint this shell may use — its own labelled form, or one of the
+ * booklet's own refs. `foreign` lists the OTHER families whose labelled form
+ * appears, so a caller can say "this book cites like a court packet" rather
+ * than only "this citation is blind".
+ *
+ * The two findings are deliberately separable, because they are different
+ * defects with different fixes: a citation with no pinpoint at all makes the
+ * reader guess (the blind reference, §4), while a citation with the wrong
+ * shell's pinpoint is legible but breaks the consistency that makes signaling
+ * work at all (§1.2). Callers route severity; this function only reads.
+ *
+ * SINGLE HOME (D93). Co-located with the table it reads.
+ */
+export function citationPinpoints(citedAs, shellFamily) {
+  var text = String(citedAs || '');
+  var family = String(shellFamily || '').trim().toLowerCase();
+  if (!SHELL_CITATION_STYLES[family]) family = 'field-survey';
+
+  var own = new RegExp(CITATION_UNIVERSAL_TOKEN, 'i').test(text)
+    || new RegExp(SHELL_CITATION_STYLES[family].tokenPattern, 'i').test(text);
+
+  var foreign = [];
+  for (var other in SHELL_CITATION_STYLES) {
+    if (!Object.prototype.hasOwnProperty.call(SHELL_CITATION_STYLES, other)) continue;
+    if (other === family) continue;
+    if (!new RegExp(SHELL_CITATION_STYLES[other].tokenPattern, 'i').test(text)) continue;
+    // Vocabularies overlap on purpose ('Exhibit' files both a witness binder
+    // and a court packet). A label this shell already owns is not foreign, no
+    // matter which other shell also owns it.
+    var shared = SHELL_CITATION_STYLES[other].labelVocabulary.filter(function (label) {
+      return SHELL_CITATION_STYLES[family].labelVocabulary.indexOf(label) !== -1;
+    });
+    var exclusive = SHELL_CITATION_STYLES[other].labelVocabulary.filter(function (label) {
+      return shared.indexOf(label) === -1;
+    });
+    if (!exclusive.length) continue;
+    var exclusiveRe = new RegExp('\\b(?:' + exclusive.join('|') + ')\\s*[A-Z]?[-.\\u2013]?\\s*\\d+\\b', 'i');
+    if (exclusiveRe.test(text)) foreign.push(other);
+  }
+  return { own: own, foreign: foreign };
+}
+
+// ── Pointer density budgets (§11 Wave 4a) ───────────────────────────────────
+// Cross-reference DENSITY is a documented killer independently of whether any
+// individual pointer is well-formed: the hypertext literature finds links
+// impose load regardless of what they lead to, the Federal Plain Language
+// Guidelines say cross-references "frustrate any attempt to write clearly",
+// and NN/g's board-game heuristics name First Martians' excessive
+// cross-referencing as the anti-pattern (point-of-use §1.6, §3.3, §5.1
+// amendment 3). So pointers are a budget, not a free resource.
+//
+// EVERY NUMBER HERE IS ARBITRARY UNTIL PLAYTEST, and the research says so in
+// as many words (§7.2: "Every cue budget we write will be arbitrary until the
+// playtest data exists. Ship them as warnings."). They are all WARN-class on
+// the assembled path. The derivations, stated so a later wave can argue with
+// them rather than guess at them:
+//
+//   maxMicroLinesPerSession (2) — the reading budget (GW-39). A rest interval
+//     is ninety seconds and the blank plus the cue already spend it.
+//   maxCiteRefsPerSession (1) — the REST-state law directly: "at most one
+//     Tier-2 pointer, and it should be spread-local" (§5.2). A flip during
+//     rest must be a choice the player can DECLINE, which stops being true
+//     the moment there are two of them.
+//   pointersPerWeek (2) — the book-level budget, multiplied by week count so
+//     it scales with the artifact instead of pinning a six-week number onto a
+//     twelve-week book. Counts BOTH channels (manifestPointer + citeRef),
+//     because the reader does not know which channel a pointer belongs to and
+//     spends the same navigation either way. Calibrated against the manifest
+//     doctrine already in force: 2-3 chains of up to 3 links is ~9 pointers in
+//     a six-week book, so 12 leaves genuine room for the citation channel
+//     without doubling the navigation load — roughly one pointer per four
+//     printed pages.
+//   maxSealsPerBooklet (2) / minSealLeadWeeks (2) — a sealed cache is a
+//     page-scale lookup, and lookups are a BETWEEN-state pleasure. Two per
+//     book keeps the flip rare enough to stay a pleasure; two weeks of lead
+//     is what makes the key feel found rather than handed over.
+export var POINTER_BUDGETS = {
+  maxMicroLinesPerSession: 2,
+  maxCiteRefsPerSession: 1,
+  pointersPerWeek: 2,
+  maxSealsPerBooklet: 2,
+  minSealLeadWeeks: 2
+};
+
 export var VALID_BOARD_STATE_MODES = [
   'survey-grid', 'node-graph', 'timeline-reconstruction', 'testimony-matrix',
   'ledger-board', 'route-tracker', 'profile-assembly', 'player-drawn'

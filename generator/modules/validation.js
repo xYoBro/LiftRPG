@@ -52,7 +52,14 @@ import {
   VALID_CONVERGENCE_PATTERNS,
   FAMILY_CLUSTERS,
   REJECTED_READING_AXES,
-  resolveNeighborFamilies
+  resolveNeighborFamilies,
+  // Wave 4a: the citation grammar and the pointer budgets. The grammar table
+  // and its two readers live with VALID_SHELL_FAMILIES (D93) — this module
+  // routes severity, it does not own what a pinpoint looks like.
+  POINTER_BUDGETS,
+  resolveCitationStyle,
+  citationPinpoints,
+  resolveShellFamily
 } from '../../contracts/contract-constants.mjs';
 
 // Map-evolution fingerprint + companions: one implementation, shared with quality.js.
@@ -665,6 +672,113 @@ export function validateBookletSchema(booklet) {
 
 // ── Part 3: Per-stage validators ──────────────────────────────────────────────
 
+// ── Wave 4a shape checks (stage-level) ──────────────────────────────────────
+// The stage validators run against a single stage's JSON, before assembly and
+// long before the cross-document ledger exists — so they cannot ask whether a
+// citeRef RESOLVES (that is the assembled-path job, collectCiteRefFindings).
+// What they can and must ask is whether a field the model emitted is BUILT: a
+// citeRef with a targetRef and no citedAs is a pointer with no scent, and it
+// would reach the page as a destination the reader is asked to guess at.
+//
+// Every check below is conditional on the field being present. These fields are
+// optional richness (D19) — demanding them here would fail complete books and
+// spend a retry on a field the doctrine only invites.
+
+function citeRefShapeError(where, ref) {
+  if (ref === undefined || ref === null) return '';
+  if (typeof ref !== 'object' || Array.isArray(ref)) {
+    return where + ' citeRef must be an object { targetRef, citedAs }';
+  }
+  if (!String(ref.targetRef || '').trim()) {
+    return where + ' citeRef is missing targetRef — a citation must name the surface it cites';
+  }
+  if (!String(ref.citedAs || '').trim()) {
+    return where + ' citeRef is missing citedAs — a destination with no payload is a blind reference';
+  }
+  return '';
+}
+
+// Session-level: microLines[] and returnBeat.
+function pushShapeErrors(errors, where, session) {
+  var lines = session && session.microLines;
+  if (lines !== undefined && lines !== null) {
+    if (!Array.isArray(lines)) {
+      errors.push(where + ' microLines must be an array of { condition, cue, citeRef? }');
+    } else {
+      lines.forEach(function (line, mi) {
+        var at = where + ' microLine ' + (mi + 1);
+        if (!line || typeof line !== 'object' || Array.isArray(line)) {
+          errors.push(at + ' must be an object { condition, cue, citeRef? }');
+          return;
+        }
+        if (!String(line.condition || '').trim()) {
+          errors.push(at + ' is missing condition — a keyed line must name the printed state it fires on');
+        }
+        if (!String(line.cue || '').trim()) {
+          errors.push(at + ' is missing cue — a condition with no payload asks the player to check something for nothing');
+        }
+        var refErr = citeRefShapeError(at, line.citeRef);
+        if (refErr) errors.push(refErr);
+      });
+    }
+  }
+
+  var rb = session && session.returnBeat;
+  if (rb !== undefined && rb !== null) {
+    if (typeof rb !== 'object' || Array.isArray(rb)) {
+      errors.push(where + ' returnBeat must be an object { closingLine, openingEcho? }');
+    } else if (!String(rb.closingLine || '').trim()) {
+      errors.push(where + ' returnBeat is missing closingLine — the return beat exists to name tomorrow before the book closes');
+    }
+  }
+}
+
+// Week-level: doorChoice.
+function pushDoorChoiceErrors(errors, door) {
+  if (door === undefined || door === null) return;
+  if (typeof door !== 'object' || Array.isArray(door)) {
+    errors.push('doorChoice must be an object { label?, optionA, optionB }');
+    return;
+  }
+  ['optionA', 'optionB'].forEach(function (side) {
+    var option = door[side];
+    if (option === undefined || option === null) {
+      errors.push('doorChoice is missing ' + side + ' — a door with one side is a corridor');
+      return;
+    }
+    if (typeof option !== 'object' || Array.isArray(option)) {
+      errors.push('doorChoice.' + side + ' must be an object { label, lean? }');
+      return;
+    }
+    if (!String(option.label || '').trim()) {
+      errors.push('doorChoice.' + side + ' is missing label — the player must be able to say which way they went');
+    }
+  });
+}
+
+// Fragment-level: citeRef and seal. Exported because the fragment stage and the
+// assembled path both reach for it, and a second copy would drift.
+export function collectFragmentPointerShapeErrors(fragment) {
+  var errors = [];
+  var where = 'Fragment "' + ((fragment && fragment.id) || '?') + '"';
+  var refErr = citeRefShapeError(where, fragment && fragment.citeRef);
+  if (refErr) errors.push(refErr);
+
+  var s = fragment && fragment.seal;
+  if (s === undefined || s === null) return errors;
+  if (typeof s !== 'object' || Array.isArray(s)) {
+    errors.push(where + ' seal must be an object { keyHint, unlockCondition }');
+    return errors;
+  }
+  if (!String(s.keyHint || '').trim()) {
+    errors.push(where + ' seal is missing keyHint — the player must be able to recognise the key weeks before the lock');
+  }
+  if (!String(s.unlockCondition || '').trim()) {
+    errors.push(where + ' seal is missing unlockCondition — a lock with no stated opening is a page nobody may turn');
+  }
+  return errors;
+}
+
 /**
  * Per-week structural validation. Runs after each week is generated
  * in the pipeline, before proceeding to the next stage.
@@ -695,8 +809,19 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
       if (!Array.isArray(s.exercises) || s.exercises.length === 0) {
         errors.push('Session ' + (si+1) + ' missing exercises');
       }
+      // ── Wave 4a optional richness ──────────────────────────────────────────
+      // PRESENCE IS NOT DEMANDED, deliberately (D19). A week without micro-lines
+      // or a return beat is a complete, valid, printable week; these fields buy
+      // depth, and a stage validator that required them would fail a good book
+      // and burn a retry to get a field the doctrine only asks for. What IS
+      // checked is that a field the model DID emit has a shape the renderer can
+      // print — a half-built micro-line is worse than none, because it reaches
+      // the page as a condition with no payload.
+      pushShapeErrors(errors, 'Session ' + (si + 1), s);
     });
   }
+
+  pushDoorChoiceErrors(errors, weekObj.doorChoice);
 
   // Non-boss weeks must have weeklyComponent.extractionInstruction
   if (!isBoss) {
@@ -1102,7 +1227,20 @@ export function validateShellSchema(shell, expectedOptions) {
 // post-generation. Warnings per D19 — gassed readers skim, then skip, but an
 // overlong prompt is degraded quality, not an invalid booklet. The critic
 // loop feeds these to the critic as machine findings (must become failures).
-var OUTPUT_BUDGETS = { storyPrompt: 220, fragmentBody: 600, interludeBody: 240, endingBody: 1500 };
+//
+// Wave 4a adds the point-of-use surfaces, and they are budgeted HARDER than
+// prose is. Every string below prints beside a blank in a ninety-second rest
+// window, where the reader's capacity is degraded, brief, and single-threaded
+// (point-of-use §5.2). A cue that needs three lines has stopped being a cue and
+// become the rule again, which is the split the tiers exist to make. Same D19
+// severity as the prose budgets — the numbers are ship-as-warnings until
+// playtest, per the research's own §7.2.
+var OUTPUT_BUDGETS = {
+  storyPrompt: 220, fragmentBody: 600, interludeBody: 240, endingBody: 1500,
+  microLineCondition: 90, microLineCue: 120, citedAs: 90,
+  returnBeatClosing: 140, returnBeatOpening: 140,
+  doorOptionLean: 90, sealKeyHint: 120, sealUnlockCondition: 140
+};
 
 export function collectBudgetBreaches(booklet) {
   var breaches = [];
@@ -1122,12 +1260,55 @@ export function collectBudgetBreaches(booklet) {
     if (ilen) breaches.push({ unitType: 'week', unitRef: week.weekNumber || (wi + 1),
       message: 'Week ' + (week.weekNumber || (wi + 1)) + ' interlude body is ' + ilen
         + ' chars (budget ' + OUTPUT_BUDGETS.interludeBody + ')' });
+
+    // ── Wave 4a point-of-use surfaces ────────────────────────────────────────
+    var wn = week.weekNumber || (wi + 1);
+    function weekBreach(msg) { breaches.push({ unitType: 'week', unitRef: wn, message: msg }); }
+    ((week && week.sessions) || []).forEach(function (session, si) {
+      var where = 'Week ' + wn + ' session ' + (si + 1);
+      ((session && session.microLines) || []).forEach(function (line, mi) {
+        var c = over(line && line.condition, OUTPUT_BUDGETS.microLineCondition);
+        if (c) weekBreach(where + ' microLine ' + (mi + 1) + ' condition is ' + c
+          + ' chars (budget ' + OUTPUT_BUDGETS.microLineCondition + ')');
+        var q = over(line && line.cue, OUTPUT_BUDGETS.microLineCue);
+        if (q) weekBreach(where + ' microLine ' + (mi + 1) + ' cue is ' + q
+          + ' chars (budget ' + OUTPUT_BUDGETS.microLineCue + ')');
+        var a = over(line && line.citeRef && line.citeRef.citedAs, OUTPUT_BUDGETS.citedAs);
+        if (a) weekBreach(where + ' microLine ' + (mi + 1) + ' citeRef.citedAs is ' + a
+          + ' chars (budget ' + OUTPUT_BUDGETS.citedAs + ')');
+      });
+      var rb = session && session.returnBeat;
+      var rc = over(rb && rb.closingLine, OUTPUT_BUDGETS.returnBeatClosing);
+      if (rc) weekBreach(where + ' returnBeat.closingLine is ' + rc
+        + ' chars (budget ' + OUTPUT_BUDGETS.returnBeatClosing + ')');
+      var ro = over(rb && rb.openingEcho, OUTPUT_BUDGETS.returnBeatOpening);
+      if (ro) weekBreach(where + ' returnBeat.openingEcho is ' + ro
+        + ' chars (budget ' + OUTPUT_BUDGETS.returnBeatOpening + ')');
+    });
+    var door = week && week.doorChoice;
+    ['optionA', 'optionB'].forEach(function (side) {
+      var lean = over(door && door[side] && door[side].lean, OUTPUT_BUDGETS.doorOptionLean);
+      if (lean) weekBreach('Week ' + wn + ' doorChoice.' + side + '.lean is ' + lean
+        + ' chars (budget ' + OUTPUT_BUDGETS.doorOptionLean + ')');
+    });
   });
   ((booklet && booklet.fragments) || []).forEach(function (frag) {
     var len = over(frag && (frag.content || frag.body), OUTPUT_BUDGETS.fragmentBody);
     if (len) breaches.push({ unitType: 'fragment', unitRef: frag.id,
       message: 'Fragment ' + (frag.id || '?') + ' body is ' + len
         + ' chars (budget ' + OUTPUT_BUDGETS.fragmentBody + ')' });
+    var cited = over(frag && frag.citeRef && frag.citeRef.citedAs, OUTPUT_BUDGETS.citedAs);
+    if (cited) breaches.push({ unitType: 'fragment', unitRef: frag.id,
+      message: 'Fragment ' + (frag.id || '?') + ' citeRef.citedAs is ' + cited
+        + ' chars (budget ' + OUTPUT_BUDGETS.citedAs + ')' });
+    var hint = over(frag && frag.seal && frag.seal.keyHint, OUTPUT_BUDGETS.sealKeyHint);
+    if (hint) breaches.push({ unitType: 'fragment', unitRef: frag.id,
+      message: 'Fragment ' + (frag.id || '?') + ' seal.keyHint is ' + hint
+        + ' chars (budget ' + OUTPUT_BUDGETS.sealKeyHint + ')' });
+    var unlock = over(frag && frag.seal && frag.seal.unlockCondition, OUTPUT_BUDGETS.sealUnlockCondition);
+    if (unlock) breaches.push({ unitType: 'fragment', unitRef: frag.id,
+      message: 'Fragment ' + (frag.id || '?') + ' seal.unlockCondition is ' + unlock
+        + ' chars (budget ' + OUTPUT_BUDGETS.sealUnlockCondition + ')' });
   });
   ((booklet && booklet.endings) || []).forEach(function (ending, ei) {
     var body = ending && ending.content && ending.content.body;
@@ -2115,30 +2296,69 @@ function manifestPointsForward(source, target) {
   return target.slot > source.slot;
 }
 
+// ── The shared pointer ledger ───────────────────────────────────────────────
+// Everything both pointer channels need to know about where things sit. It was
+// inline in collectManifestPointerErrors until the citation channel arrived and
+// needed the same four tables; copying them would have been D91 in miniature —
+// two derivations of "which documents does this booklet print" that nobody
+// would notice diverging, because each caller only ever reads its own.
+//
+//   positions      — play-order position per document (buildManifestPositions).
+//   knownDocs      — every printable document id, normalized.
+//   archiveOrder   — authored fragment order, the fallback sequence for
+//                    documents no week delivers.
+//   weekNumbers    — the weeks that exist.
+//   pointerBearing — normalized doc id -> the channel that document points
+//                    with. This is what makes the no-chain law checkable.
+function buildPointerLedger(booklet) {
+  var weeks = (booklet && booklet.weeks) || [];
+  var fragments = (booklet && booklet.fragments) || [];
+  var ledger = {
+    positions: buildManifestPositions(booklet),
+    knownDocs: {},
+    archiveOrder: {},
+    weekNumbers: {},
+    pointerBearing: {},
+    weekCount: weeks.length
+  };
+
+  function noteDocument(doc) {
+    if (!doc || !doc.id) return;
+    var key = normalizeId(doc.id);
+    ledger.knownDocs[key] = true;
+    if (ledger.pointerBearing[key]) return;
+    if (doc.citeRef && typeof doc.citeRef === 'object') ledger.pointerBearing[key] = 'citeRef';
+    else if (doc.manifestPointer && typeof doc.manifestPointer === 'object') {
+      ledger.pointerBearing[key] = 'manifestPointer';
+    }
+  }
+
+  fragments.forEach(function (fragment, fi) {
+    if (!fragment || !fragment.id) return;
+    var key = normalizeId(fragment.id);
+    if (ledger.archiveOrder[key] === undefined) ledger.archiveOrder[key] = fi;
+    noteDocument(fragment);
+  });
+
+  weeks.forEach(function (week, wi) {
+    ledger.weekNumbers[manifestWeekNumber(week, wi)] = true;
+    if (week && week.overflowDocument) noteDocument(week.overflowDocument);
+  });
+
+  return ledger;
+}
+
 export function collectManifestPointerErrors(booklet) {
   var errors = [];
   var weeks = (booklet && booklet.weeks) || [];
   var fragments = (booklet && booklet.fragments) || [];
 
-  var positions = buildManifestPositions(booklet);
-  var archiveOrder = {};  // normalized fragment id -> authored archive index
-  var knownDocs = {};     // normalized id -> true for every printable document
-
-  fragments.forEach(function (fragment, fi) {
-    if (!fragment || !fragment.id) return;
-    var key = normalizeId(fragment.id);
-    if (archiveOrder[key] === undefined) archiveOrder[key] = fi;
-    knownDocs[key] = true;
-  });
-
-  var weekNumbers = {};
-  weeks.forEach(function (week, wi) {
-    weekNumbers[manifestWeekNumber(week, wi)] = true;
-    if (week && week.overflowDocument && week.overflowDocument.id) {
-      knownDocs[normalizeId(week.overflowDocument.id)] = true;
-    }
-  });
-  var weekCount = weeks.length;
+  var ledger = buildPointerLedger(booklet);
+  var positions = ledger.positions;
+  var archiveOrder = ledger.archiveOrder;
+  var knownDocs = ledger.knownDocs;
+  var weekNumbers = ledger.weekNumbers;
+  var weekCount = ledger.weekCount;
 
   function check(pointer, label, source) {
     if (pointer === undefined || pointer === null) return; // optional — absence is fine
@@ -2238,6 +2458,431 @@ export function collectManifestPointerErrors(booklet) {
   return errors;
 }
 
+// ── Cited authorities: the citeRef family (§11 Wave 4a) ─────────────────────
+// The manifest channel's twin, and deliberately parameterized rather than
+// copied. A manifestPointer POSTS a chase and is forward-only by law; a citeRef
+// CITES an authority, and an authority sits wherever it sits — the rule a
+// Week-5 micro-line fires under was taught in Week 1, and a later fragment may
+// cite an earlier one. Direction is the whole difference, so it is an argument.
+//
+// Four ERROR-class checks, from docs/reference/point-of-use-rules-research.md
+// §6.3, and every one of them is a broken PRINTED PROMISE rather than degraded
+// taste — the D19 line:
+//   1. Resolution — the cited surface exists. A citation to nothing is the same
+//      defect as a manifest aimed at a missing fragment.
+//   2. No-chain — the cited surface does not itself point somewhere. Two
+//      disclosure levels is the documented ceiling (NN/g); the plain-language
+//      literature calls the unbounded form the "never-ending story". A reader
+//      who spends the flip must land on the thing, not on a forwarding address.
+//   3. Blind pointer — `citedAs` carries a pinpoint. A destination without a
+//      payload makes the reader guess, which is what legal editors mean by a
+//      blind reference, and it is the amendment the research forces on the
+//      author's original "just give the page number" hypothesis.
+//   4. Citation-style parity — the pinpoint is in THIS shell's grammar.
+//      Signaling only pays when the signal is systematic across the artifact.
+//
+// 3 and 4 are split, where the spec stated one check. They are different
+// defects with different fixes ("you cited nothing" vs "you cited like a court
+// packet in a ship's logbook"), splitting them keeps the two from double-firing
+// on the same string, and it lets the message name the vocabulary the book
+// should have used. Force is unchanged: both are ERRORS.
+//
+// One thing a generating model CANNOT cite is a page number: pagination is
+// assigned by the layout engine long after the prose exists. That is why the
+// universal pinpoint is the booklet's own ref vocabulary (F.07 / W4) and why
+// the shell grammars file by label rather than by page.
+
+var POINTER_REF_TOKEN = /\b(?:F\.?\s*\d+|W\s*\d+)\b/gi;
+
+// true / false / null-when-unprovable, for a required direction of travel.
+// 'either' is the citation channel: an authority may sit on any side.
+function pointerTravelsCorrectly(direction, source, target) {
+  if (direction === 'either') return true;
+  var forward = manifestPointsForward(source, target);
+  if (forward === null) return null;
+  return direction === 'forward' ? forward : !forward;
+}
+
+// Resolve one ref token against the ledger. Returns the target position plus a
+// human phrase for it, or a `missing` reason the caller turns into a message.
+function resolveLedgerRef(ledger, rawRef) {
+  var ref = String(rawRef || '').trim();
+  if (!ref) return { missing: 'empty' };
+  var weekRef = parseWeekRef(ref);
+  if (weekRef !== null) {
+    if (!ledger.weekNumbers[weekRef]) return { missing: 'week', weekRef: weekRef };
+    // A week reference sits at the head of its week, exactly as the manifest
+    // channel reads it — one position vocabulary, two channels.
+    return { weekRef: weekRef, position: { week: weekRef, slot: 0 }, where: 'Week ' + weekRef };
+  }
+  var key = normalizeId(ref);
+  if (!ledger.knownDocs[key]) return { missing: 'doc', key: key };
+  return {
+    key: key,
+    position: ledger.positions[key] || null,
+    where: ledger.positions[key] ? ('Week ' + ledger.positions[key].week) : 'the archive'
+  };
+}
+
+export function collectCiteRefFindings(booklet) {
+  var errors = [];
+  var warnings = [];
+  var weeks = (booklet && booklet.weeks) || [];
+  var fragments = (booklet && booklet.fragments) || [];
+  var ledger = buildPointerLedger(booklet);
+  var identity = (booklet && booklet.meta && booklet.meta.artifactIdentity) || {};
+  var shellFamily = resolveShellFamily(
+    identity.shellFamily,
+    identity.artifactClass,
+    ((booklet && booklet.theme) || {}).visualArchetype
+  );
+  var style = resolveCitationStyle(shellFamily);
+
+  function check(ref, label, source, direction) {
+    if (ref === undefined || ref === null) return;
+    if (typeof ref !== 'object' || Array.isArray(ref)) {
+      errors.push(label + ' citeRef must be an object { targetRef, citedAs }');
+      return;
+    }
+    var targetRef = String(ref.targetRef || '').trim();
+    var citedAs = String(ref.citedAs || '').trim();
+
+    if (!citedAs) {
+      errors.push(label + ' citeRef is missing citedAs — a citation the artifact never prints points at nothing');
+    }
+    if (!targetRef) {
+      errors.push(label + ' citeRef is missing targetRef — a citation must name the surface it cites');
+      return;
+    }
+
+    // 1. Resolution.
+    var target = resolveLedgerRef(ledger, targetRef);
+    if (target.missing === 'week') {
+      errors.push(label + ' citeRef.targetRef "' + targetRef + '" names Week ' + target.weekRef
+        + ', which this ' + ledger.weekCount + '-week campaign does not contain');
+      return;
+    }
+    if (target.missing) {
+      errors.push(label + ' citeRef.targetRef "' + targetRef + '" does not resolve — no document in this booklet carries that id and it is not a week reference (W1-W'
+        + ledger.weekCount + ')');
+      return;
+    }
+
+    // 2. No-chain. Week references are exempt: a week is a place, not a
+    //    surface, so landing in one is not landing on a forwarding address.
+    if (target.key && ledger.pointerBearing[target.key]) {
+      errors.push(label + ' citeRef.targetRef "' + targetRef + '" lands on a surface that itself carries a '
+        + ledger.pointerBearing[target.key]
+        + ' — a pointer may not point at another pointer; cite the surface that holds the answer');
+    }
+
+    // 3 + 4. The pinpoint audit.
+    if (citedAs) {
+      var pin = citationPinpoints(citedAs, shellFamily);
+      if (!pin.own && !pin.foreign.length) {
+        errors.push(label + ' citeRef.citedAs "' + citedAs
+          + '" carries no pinpoint — name the destination as this ' + shellFamily
+          + ' would file it (' + style.labelVocabulary.join(' / ') + ' + a number, or the ref itself)');
+      } else if (!pin.own && pin.foreign.length) {
+        errors.push(label + ' citeRef.citedAs "' + citedAs + '" cites in the ' + pin.foreign[0]
+          + ' grammar, but this booklet is a ' + shellFamily + ' — one citation style per artifact ('
+          + style.labelVocabulary.join(' / ') + ')');
+      }
+    }
+
+    // Directionality. 'either' short-circuits; the parameter exists so the
+    // seal channel below can demand backward travel from the same machinery.
+    var travels = pointerTravelsCorrectly(direction, source && source.position, target.position);
+    if (travels === false) {
+      errors.push(label + ' citeRef.targetRef "' + targetRef + '" must point '
+        + direction + ', but ' + target.where + ' does not sit that way');
+    }
+  }
+
+  weeks.forEach(function (week, wi) {
+    var weekNo = manifestWeekNumber(week, wi);
+    ((week && week.sessions) || []).forEach(function (session, si) {
+      ((session && session.microLines) || []).forEach(function (line, mi) {
+        if (!line || line.citeRef === undefined) return;
+        check(line.citeRef,
+          'Week ' + weekNo + ' session ' + (si + 1) + ' microLine ' + (mi + 1) + ':',
+          { position: { week: weekNo, slot: si } },
+          'either');
+      });
+    });
+  });
+
+  // Every document that can carry a pointer, in one list. An overflowDocument
+  // IS a fragment (it shares the schema $def), so it inherits citeRef and seal
+  // — and a scan that walked only `booklet.fragments` would have left the
+  // overflow archive silently unchecked. It closes its own week, which is the
+  // position the manifest channel already assigns it.
+  var pointerDocs = [];
+  fragments.forEach(function (fragment) {
+    if (!fragment) return;
+    var key = fragment.id ? normalizeId(fragment.id) : '';
+    pointerDocs.push({
+      doc: fragment,
+      label: 'Fragment "' + (fragment.id || '?') + '"',
+      position: (key && ledger.positions[key]) ? ledger.positions[key] : null,
+      key: key
+    });
+  });
+  weeks.forEach(function (week, wi) {
+    var overflow = week && week.overflowDocument;
+    if (!overflow) return;
+    var weekNo = manifestWeekNumber(week, wi);
+    var key = overflow.id ? normalizeId(overflow.id) : '';
+    pointerDocs.push({
+      doc: overflow,
+      label: 'Week ' + weekNo + ' overflowDocument "' + (overflow.id || '?') + '"',
+      position: (key && ledger.positions[key])
+        ? ledger.positions[key]
+        : { week: weekNo, slot: ((week.sessions || []).length) },
+      key: key
+    });
+  });
+
+  pointerDocs.forEach(function (entry) {
+    if (entry.doc.citeRef === undefined) return;
+    check(entry.doc.citeRef, entry.label + ':', { position: entry.position }, 'either');
+  });
+
+  // ── Sealed caches ─────────────────────────────────────────────────────────
+  // Honour-system locks: no crypto, because the flip IS the pleasure and a page
+  // the player physically cannot open is a worse artifact than one they choose
+  // not to open yet. What IS checkable is the geometry — the key must already
+  // be behind the player when they meet the lock, or the seal is a wall.
+  var sealed = [];
+  pointerDocs.forEach(function (entry) {
+    var fragment = entry.doc;
+    if (!fragment.seal || typeof fragment.seal !== 'object') return;
+    sealed.push(fragment);
+    var label = entry.label + ' seal:';
+    var here = entry.position;
+    var condition = String(fragment.seal.unlockCondition || '');
+    var refs = condition.match(POINTER_REF_TOKEN) || [];
+
+    if (!refs.length) {
+      warnings.push(label + ' unlockCondition names no surface this booklet prints ("' + condition
+        + '") — a lock whose key cannot be located is a wall, not a cache');
+      return;
+    }
+    refs.forEach(function (raw) {
+      var target = resolveLedgerRef(ledger, raw);
+      if (target.missing) {
+        errors.push(label + ' unlockCondition cites "' + raw
+          + '", which this booklet does not print — the key to a sealed cache must exist');
+        return;
+      }
+      var travels = pointerTravelsCorrectly('backward', here, target.position);
+      if (travels === false) {
+        errors.push(label + ' unlockCondition cites "' + raw + '" (' + target.where
+          + '), which the player has not reached when this cache is printed — a seal opens on what is already behind them');
+      }
+    });
+  });
+
+  if (sealed.length > POINTER_BUDGETS.maxSealsPerBooklet) {
+    warnings.push('This booklet seals ' + sealed.length + ' caches (budget '
+      + POINTER_BUDGETS.maxSealsPerBooklet
+      + ') — page-flipping is a pleasure while it stays rare and a chore once it is routine');
+  }
+
+  return { errors: errors, warnings: warnings };
+}
+
+// ── Pointer density (§11 Wave 4a) ───────────────────────────────────────────
+// Cross-reference density is a documented killer independently of whether any
+// individual pointer is well-formed (point-of-use §1.6, §3.3, §5.1 amendment
+// 3). Nothing counted these before: the manifest channel was budgeted in prose
+// doctrine only, and the citation channel is new.
+//
+// WARN-class throughout, and honestly so — the research states plainly that
+// every cue budget is arbitrary until playtest data exists (§7.2). What the
+// numbers encode is a ratio the literature does support: a rest-window surface
+// may offer at most ONE pointer the reader can decline, and a book may not
+// spend its whole navigation budget on being cross-referenced.
+export function collectPointerDensityFindings(booklet) {
+  var findings = [];
+  var weeks = (booklet && booklet.weeks) || [];
+  var total = 0;
+
+  weeks.forEach(function (week, wi) {
+    var weekNo = manifestWeekNumber(week, wi);
+    ((week && week.sessions) || []).forEach(function (session, si) {
+      var lines = (session && session.microLines) || [];
+      if (!Array.isArray(lines) || !lines.length) return;
+      var where = 'Week ' + weekNo + ' session ' + (si + 1);
+      if (lines.length > POINTER_BUDGETS.maxMicroLinesPerSession) {
+        findings.push(where + ' carries ' + lines.length + ' microLines (budget '
+          + POINTER_BUDGETS.maxMicroLinesPerSession
+          + ') — every keyed line spends the same ninety seconds the set does');
+      }
+      var pointered = lines.filter(function (l) { return l && l.citeRef; }).length;
+      total += pointered;
+      if (pointered > POINTER_BUDGETS.maxCiteRefsPerSession) {
+        findings.push(where + ' offers ' + pointered
+          + ' citeRef pointers on one session card (budget ' + POINTER_BUDGETS.maxCiteRefsPerSession
+          + ') — a rest-interval flip has to stay a choice the player can decline');
+      }
+    });
+    // The other channel, counted on the same ledger: a reader does not know
+    // which kind of pointer they are spending attention on.
+    if (week && week.interlude && week.interlude.manifestPointer) total++;
+    if (week && week.overflowDocument && week.overflowDocument.manifestPointer) total++;
+  });
+
+  ((booklet && booklet.fragments) || []).forEach(function (fragment) {
+    if (!fragment) return;
+    if (fragment.manifestPointer) total++;
+    if (fragment.citeRef) total++;
+  });
+
+  var budget = POINTER_BUDGETS.pointersPerWeek * Math.max(1, weeks.length);
+  if (total > budget) {
+    findings.push('This booklet prints ' + total + ' pointers across both channels (manifests + citations); the budget for '
+      + weeks.length + ' weeks is ' + budget
+      + ' — cross-reference density is a documented cost independent of how well each pointer is written');
+  }
+  return findings;
+}
+
+// ── Play-loop advisories (§11 Wave 4a) ──────────────────────────────────────
+// Four heuristics over content the machine can only read as text. B-class by
+// the doctrine ledger: each one measures a PROXY for the law it serves, and
+// each will miss cases and occasionally fire on a good one. Named honestly per
+// the D89 one-currency precedent — a heuristic that presents itself as a proof
+// is worse than no check, because it stops anyone from building the real one.
+//
+// What each can and cannot see:
+//   Micro-line checkability — the law is "the condition names a state the
+//     player can verify by looking at the page". The check is a keyword scan
+//     for conditions that reach OFF the page (feelings, memory, intent). It
+//     cannot tell whether a named clock actually exists; it only catches the
+//     obvious uncheckables.
+//   Door leans — structural, and therefore the most reliable of the four: a
+//     door option with no `lean` string is a coin flip rather than a decision.
+//   Return echo — structural too: a session after the first with no
+//     openingEcho is the return-loop simulation's deficit 2 (the return moment
+//     is mute) sitting in plain sight.
+//   Failure-only-adds — the law is "every failure band ADDS something printed:
+//     intel, a mark, a pointer, state motion; never pure loss". The check is a
+//     keyword scan for pure-nothing phrasings ("nothing happens", "no effect",
+//     "lose your progress"). A model that writes an elegant empty outcome will
+//     pass it, and a legitimate setback that also adds intel may trip it.
+var UNCHECKABLE_CONDITION_PATTERNS = [
+  /\bif you (?:feel|felt|think|thought|believe|remember|recall|want|wish|decide|choose|prefer|suspect)\b/i,
+  /\bif you (?:have|had) (?:been|ever)\b/i,
+  /\bif it (?:feels|felt|seems|seemed)\b/i,
+  /\bif you are (?:ready|willing|unsure|certain|sure)\b/i,
+  /\bwhen you are ready\b/i
+];
+
+//
+// The failure-only-adds scan is CLAUSE-level, and it has to be. A first draft
+// matched loss phrases against the whole entry and fired on two corpus bands
+// that read "if not completed: advance the clock and annotate the map; if
+// completed: no effect — mark COMPLIANT". Those entries add twice; the phrase
+// "no effect" was sitting in a conditional branch beside the addition. Matching
+// the entry as one string could not see that, so the rule is now: an entry is
+// pure loss when some clause reads as loss and NO clause reads as gain.
+//
+// A clause "gains" if it carries an additive paper instruction that is not
+// governing a negative quantity — which is what separates "mark Z5 COMPLIANT"
+// from "Mark -1 Impulse Point", the real violation in the corpus. State motion
+// counts as a gain even when the motion is against the player: advancing a
+// danger clock is the world spending a pressure, which is printed consequence,
+// not the absence of one.
+var LOSS_CLAUSE_PATTERNS = [
+  /\bnothing (?:happens|changes|is (?:found|gained|learned)|comes of it)\b/i,
+  /\bno (?:effect|change|result|consequence|gain)\b/i,
+  /\b(?:lose|forfeit|erase|surrender|give up)\s+(?:a|one|your|the|\d)/i,
+  /\bthe (?:trail|lead|search|attempt) (?:goes|is) (?:cold|dead|nowhere)\b/i,
+  /\b(?:wasted|for nothing|to no avail|dead end|empty-handed)\b/i
+];
+
+var GAIN_CLAUSE_PATTERN =
+  /\b(?:mark|annotate|shade|circle|record|write|note|add|advance|tick|fill|open|reveal|unlock|cross off|log|stamp|redraw|strike)\b/i;
+
+// A negative quantity anywhere in the clause disqualifies it as a gain: the
+// additive verb is being used to subtract.
+var NEGATIVE_QUANTITY_PATTERN = /(?:^|[\s(])[-−]\s*\d|\bminus\s+\d|\b(?:remove|subtract|deduct)\b/i;
+
+function readsAsPureLoss(text) {
+  // Split on sentence and branch boundaries so a two-branch oracle entry is
+  // read as the two outcomes it actually prints.
+  var clauses = String(text || '').split(/[.;]|—|\bif\b/i).filter(function (c) {
+    return c && c.trim();
+  });
+  var lost = false;
+  var gained = false;
+  clauses.forEach(function (clause) {
+    if (LOSS_CLAUSE_PATTERNS.some(function (re) { return re.test(clause); })) lost = true;
+    if (GAIN_CLAUSE_PATTERN.test(clause) && !NEGATIVE_QUANTITY_PATTERN.test(clause)) gained = true;
+  });
+  return lost && !gained;
+}
+
+export function collectPlayLoopFindings(booklet) {
+  var findings = [];
+  var weeks = (booklet && booklet.weeks) || [];
+  var sessionsSeen = 0;
+
+  weeks.forEach(function (week, wi) {
+    var weekNo = manifestWeekNumber(week, wi);
+
+    ((week && week.sessions) || []).forEach(function (session, si) {
+      sessionsSeen++;
+      var where = 'Week ' + weekNo + ' session ' + (si + 1);
+
+      ((session && session.microLines) || []).forEach(function (line, mi) {
+        var condition = String((line && line.condition) || '');
+        var uncheckable = UNCHECKABLE_CONDITION_PATTERNS.some(function (re) { return re.test(condition); });
+        if (uncheckable) {
+          findings.push(where + ' microLine ' + (mi + 1)
+            + ' keys off something the page cannot show ("' + condition
+            + '") — a condition must name a mark, a shaded node, a filled segment, or a circled value');
+        }
+      });
+
+      var rb = session && session.returnBeat;
+      // Deficit 2 (return-loop-design §1): the return moment is mute. The
+      // booklet's FIRST session is exempt by construction — it has no prior
+      // session to echo, which is why the schema leaves openingEcho optional.
+      if (rb && typeof rb === 'object' && sessionsSeen > 1
+        && !String(rb.openingEcho || '').trim()) {
+        findings.push(where + ' returnBeat has a closingLine but no openingEcho — the book names tomorrow'
+          + ' and then says nothing about yesterday when the player comes back');
+      }
+    });
+
+    var door = week && week.doorChoice;
+    if (door && typeof door === 'object') {
+      ['optionA', 'optionB'].forEach(function (side) {
+        var option = door[side];
+        if (!option || typeof option !== 'object') return;
+        if (!String(option.lean || '').trim()) {
+          findings.push('Week ' + weekNo + ' doorChoice.' + side
+            + ' posts no lean — an unposted door is a coin flip, not a decision; the player must be told what each way is likely to pay');
+        }
+      });
+    }
+
+    var oracle = ((week && week.fieldOps) || {}).oracleTable || ((week && week.fieldOps) || {}).oracle || {};
+    ((oracle && oracle.entries) || []).forEach(function (entry) {
+      var text = String((entry && entry.text) || '') + '. ' + String((entry && entry.paperAction) || '');
+      if (readsAsPureLoss(text)) {
+        findings.push('Week ' + weekNo + ' oracle band "' + ((entry && entry.roll) || '?')
+          + '" reads as pure loss ("' + String((entry && entry.text) || '').slice(0, 60)
+          + '") — every band must ADD something printed: intel, a mark, a pointer, or state motion');
+      }
+    });
+  });
+
+  return findings;
+}
+
 export function validateAssembledBooklet(booklet) {
   var errors = [];
   var warnings = []; // soft issues (stylistic, non-fatal) — attached to return value
@@ -2254,6 +2899,14 @@ export function validateAssembledBooklet(booklet) {
   collectLicensedMovePlacementFindings(booklet).forEach(function (f) { warnings.push(f.message); });
   // Posted manifests are promises, not preferences — broken ones are errors.
   collectManifestPointerErrors(booklet).forEach(function (m) { errors.push(m); });
+  // Citations are the same class of promise (Wave 4a): a pointer that resolves
+  // nowhere, chains, or makes the reader guess is invalidity. The seal budget
+  // and the density counts are taste, and ride the warning channel.
+  var citeFindings = collectCiteRefFindings(booklet);
+  citeFindings.errors.forEach(function (m) { errors.push(m); });
+  citeFindings.warnings.forEach(function (m) { warnings.push(m); });
+  collectPointerDensityFindings(booklet).forEach(function (m) { warnings.push(m); });
+  collectPlayLoopFindings(booklet).forEach(function (m) { warnings.push(m); });
 
   // ── Top-level structure ──────────────────────────────────────────────────
   ['meta', 'cover', 'rulesSpread', 'weeks', 'fragments', 'endings'].forEach(function (key) {
@@ -3052,12 +3705,16 @@ export function validateFragmentsStage(result, expectedRegistry) {
   var missingTitle = [];
   var missingDocType = [];
   var missingAuthor = [];
+  var pointerShape = [];
   var validDocLookup = {};
   DOCUMENT_TYPE_ENUM.forEach(function (t) { validDocLookup[t] = true; });
 
   result.fragments.forEach(function (fragment) {
     var id = normalizeId(fragment && fragment.id);
     if (!id) return;
+    // Wave 4a: shape only. Whether the citation RESOLVES needs the whole
+    // booklet and is checked on the assembled path.
+    collectFragmentPointerShapeErrors(fragment).forEach(function (m) { pointerShape.push(m); });
     if (!fragment.content && !fragment.bodyParagraphs && !fragment.bodyText && !fragment.body) {
       invalid.push(fragment.id);
     }
@@ -3092,6 +3749,9 @@ export function validateFragmentsStage(result, expectedRegistry) {
   }
   if (missingAuthor.length > 0) {
     return 'Fragment stage validation failed: missing inWorldAuthor in IDs ' + missingAuthor.slice(0, 8).join(', ') + '.';
+  }
+  if (pointerShape.length > 0) {
+    return 'Fragment stage validation failed: ' + pointerShape.slice(0, 4).join('; ') + '.';
   }
   var missing = expected.filter(function (id) { return !seen[id]; });
   if (missing.length > 0) {

@@ -972,8 +972,8 @@
       "assembly": 1,
       "gauge-log": 1,
       "ending-locked": 1,
-      "notes": 1,
-      "back-cover": 1
+      "back-cover": 1,
+      "ledger-spread": 1
     },
     "prefix": [
       "cover",
@@ -984,7 +984,7 @@
       "assembly",
       "gauge-log",
       "ending-locked",
-      "notes",
+      "ledger-spread",
       "back-cover"
     ],
     "mustNotContain": [
@@ -1062,8 +1062,12 @@
       "frag-11",
       "assembly",
       "ending-locked",
+      "ledger-0",
+      "post-padding-0",
+      "post-padding-1",
+      "post-padding-2",
       "back-cover"
     ],
-    "browserPageCount": 0
+    "browserPageCount": 28
   }
 }

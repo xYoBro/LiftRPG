@@ -39,6 +39,53 @@ export function normalizeManifestPointer(source) {
   };
 }
 
+/**
+ * normalizeCiteRef(source) -> { targetRef, citedAs } | null
+ *
+ * The printed citation (schema 1.5.0, §11 Wave 4a) — `manifestPointer`'s twin,
+ * pointed at an authority instead of a chase. `citedAs` is what the artifact
+ * prints; `targetRef` rides along as a data attribute so the citation is
+ * inspectable without being printed twice.
+ *
+ * SINGLE HOME. Session micro-lines carry a citeRef too (workout-models.js
+ * imports this), because a citation that normalized differently on the two
+ * surfaces would stop being one grammar — the D91 defect class.
+ *
+ * Both fields are schema-required, but a half-filled ref must not print an
+ * empty token, so a blank `citedAs` normalizes to null exactly as a blank
+ * `postedAs` does above.
+ */
+export function normalizeCiteRef(source) {
+  const ref = source && source.citeRef;
+  if (!ref || typeof ref !== 'object') return null;
+  const citedAs = String(ref.citedAs || '').trim();
+  if (!citedAs) return null;
+  return {
+    targetRef: String(ref.targetRef || '').trim(),
+    citedAs
+  };
+}
+
+/**
+ * normalizeSeal(source) -> { keyHint, unlockCondition } | null
+ *
+ * The sealed cache (schema 1.5.0, §11 Wave 4a — salvage seed 5). No crypto:
+ * the honour system IS the mechanism, so the renderer's whole job is to make
+ * the seal legible and the key recognisable weeks before it is found.
+ *
+ * Either field alone is still a printable seal (a key with no stated condition
+ * is a puzzle; a condition with no key hint is a locked door), so the band
+ * survives on one — it collapses to null only when both are blank.
+ */
+export function normalizeSeal(source) {
+  const seal = source && source.seal;
+  if (!seal || typeof seal !== 'object') return null;
+  const keyHint = String(seal.keyHint || '').trim();
+  const unlockCondition = String(seal.unlockCondition || '').trim();
+  if (!keyHint && !unlockCondition) return null;
+  return { keyHint, unlockCondition };
+}
+
 function splitBody(fragment) {
   var raw = fragment.bodyText || fragment.body || fragment.content || '';
   // content may be {html: "..."} object from guided-build — extract the string
@@ -110,6 +157,8 @@ export function buildFragmentModel(fragment) {
     authenticityChecks: normalizeAuthenticityChecks(fragment),
     continuationLabel: fragment.continuationLabel || '',
     manifestPointer: normalizeManifestPointer(fragment),
+    citeRef: normalizeCiteRef(fragment),
+    seal: normalizeSeal(fragment),
     partIndex: fragment.partIndex || 0,
     partCount: fragment.partCount || 0,
     artifactIdentity: fragment.artifactIdentity || {}

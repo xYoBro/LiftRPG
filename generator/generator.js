@@ -3021,6 +3021,19 @@
       retryError ? '## Retry Focus\nThe previous attempt failed with this blocking error: ' + retryError + '\nFix that exact contract violation in this response.' : '',
       retryScaffolds.length ? '## Retry Scaffolds\n' + retryScaffolds.join('\n') : '',
       '',
+      // ── Point-of-use doctrine (§11 Wave 4a) ───────────────────────────────
+      // Routed to the STAGE that authors these fields rather than into the flat
+      // INSTRUCTIONS bundle, because the single-prompt path is hard against its
+      // 108,000-char ceiling (measured 107.6k before this wave; this doctrine
+      // is ~8.2k). Compression could not close that: a 4-gram overlap scan
+      // across the whole bundle found at most 1.7% cross-section redundancy, so
+      // there is no duplication left to harvest and the only remaining lever is
+      // deleting live doctrine — an author decision, not an engineering one.
+      // ONE LINE reverses this the moment the ceiling moves: add
+      // INST_POINT_OF_USE back to the INSTRUCTIONS bundle in prompt_rules.js
+      // and drop it from here and the fragment stage.
+      window.INST_POINT_OF_USE.join('\n'),
+      '',
       '## Constraints',
       '- Preserve Specificity: storyPrompts must contain physical action and named places.',
       '- Oracle paperAction text must be concrete and singular: name the exact clock, map node, gate, companion slot, or document state being changed. Avoid vague bundled edits.',
@@ -3077,6 +3090,11 @@
       pastFragments && pastFragments.length ? '**Prior Fragments (Prevent Repetition):** ' + JSON.stringify(pastFragments) : '',
       '',
       retryError ? '## Retry Focus\nThe previous attempt failed with this blocking error: ' + retryError + '\nFix that exact contract violation in this response.' : '',
+      '',
+      // Wave 4a: `citeRef` and `seal` are authored here, so the citation
+      // grammar has to reach this stage. See the note in the week stage above
+      // for why this rides the stage builders rather than INSTRUCTIONS.
+      window.INST_POINT_OF_USE.join('\n'),
       '',
       '## Constraints',
       '- The fragment MUST feel like an authentic, found document (memo, letter, dispatch).',

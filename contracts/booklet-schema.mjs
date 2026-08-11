@@ -157,6 +157,158 @@ var manifestPointer = {
   }
 };
 
+// ── citeRef (schema 1.5.0, §11 Wave 4a) ─────────────────────────────────────
+// The manifest's twin, and deliberately its near-copy: a printed pointer at
+// another surface of this same booklet. Where a manifestPointer POSTS a chase
+// ("X was last logged in Y" — always forward, always a promise), a citeRef
+// CITES an authority ("the tally rule — Sheet 4"), and an authority may sit in
+// either direction: the rule a Week-5 micro-line fires under was taught in
+// Week 1, and a later fragment may cite the reader's own earlier marginal note.
+// Directionality is the only semantic difference, which is why the resolver is
+// parameterized on it rather than duplicated.
+//
+// NAMED `citeRef`, NOT the research doc's `referenceRef`. `referenceTable` and
+// `referenceTargets` already mean specific, unrelated things inside the decode
+// chain (bossEncounter.decodingKey.referenceTable is the A1Z26 table), and a
+// third `reference*` field pointing at surfaces would have collided with that
+// vocabulary in every prompt, validator message, and doc that had to say which
+// "reference" it meant.
+//
+//   targetRef — a fragment id ("F.07") or a week reference ("W4"), same
+//               vocabulary manifestPointer uses and the same resolver reads.
+//   citedAs   — the citation as the artifact prints it. It must carry a
+//               PINPOINT (the destination named in the shell's own citation
+//               grammar, or one of the booklet's refs) or it is a blind
+//               reference — a pointer that makes the reader guess.
+// Resolution, no-chain, blind-pointer, and citation-style parity are checked
+// in generator/modules/validation.js; JSON Schema can require the fields but
+// cannot look across the document to see whether they mean anything.
+var citeRef = {
+  type: 'object',
+  required: ['targetRef', 'citedAs'],
+  additionalProperties: false,
+  properties: {
+    targetRef: nonEmptyString,
+    citedAs: nonEmptyString
+  }
+};
+
+// ── Conditional micro-lines (schema 1.5.0, §11 Wave 4a) ─────────────────────
+// The re-entry mechanism, and the cheapest content the book can carry: same
+// printed page, new pencil state, new reading. A micro-line costs one line and
+// buys a branch, which is why thirty of them out-branch the page count.
+//
+//   condition — the state test, in the artifact's voice. It must name a
+//               CHECKABLE PRINTED STATE (a marked clock, a shaded node, a
+//               ticked strip target, a spent token, a circled stat) so the
+//               player can answer it by looking at the page. Checkability is
+//               generation doctrine and is scanned advisorily, not here: JSON
+//               Schema cannot tell "if the Ledger stands at 3" from "if you
+//               feel ready".
+//   cue       — the payload clause. What to do or read now that it holds.
+//   citeRef   — optional. Present only when the payload needs a rule or
+//               document that does not fit beside the blank.
+//
+// NO maxItems, deliberately. The density law is ≤2 per session and at most one
+// citeRef among them, but it is a WARN (D19: a reading-budget heuristic, not a
+// validity claim), so capping it here would convert an advisory into a parse
+// failure and cost a retry for a book that is merely dense.
+var microLine = {
+  type: 'object',
+  required: ['condition', 'cue'],
+  additionalProperties: false,
+  properties: {
+    condition: nonEmptyString,
+    cue: nonEmptyString,
+    citeRef: citeRef
+  }
+};
+
+// ── returnBeat (schema 1.5.0, §11 Wave 4a — salvage seed 7) ─────────────────
+// The return loop, at one line per session. The Groundwork simulation's four
+// deficits (docs/reference/return-loop-design.md §1) are what this closes:
+// tomorrow is unnamed, the return moment is mute, progress reads flat, and the
+// session ends on logistics instead of the body's win.
+//
+//   closingLine — tomorrow cut tonight. The write-in prompt that names the
+//                 NEXT session before the player closes the book.
+//   openingEcho — the world acknowledging the last session, keyed to something
+//                 the player actually marked.
+//
+// `openingEcho` is OPTIONAL while `closingLine` is required, because the
+// booklet's first session has no prior session to echo. Requiring both would
+// have forced every book to either skip the return beat on session 1 or invent
+// a memory of a session that never happened. A missing echo on a LATER session
+// is deficit 2 and is warned about on the assembled path.
+var returnBeat = {
+  type: 'object',
+  required: ['closingLine'],
+  additionalProperties: false,
+  properties: {
+    closingLine: nonEmptyString,
+    openingEcho: nonEmptyString
+  }
+};
+
+// ── doorChoice (schema 1.5.0, §11 Wave 4a — salvage seed 3) ─────────────────
+// The weekly decision, with the bias POSTED. Two routes, identical work behind
+// either — agency lives on the reward side only, so the chance-isolation law is
+// untouched and the prescription never moves.
+//
+// `lean` is what makes it a decision rather than a coin flip: the player is
+// told what each door is likely to pay in. It is optional at the schema level
+// and demanded by generation policy (WARN), following D19 — a door missing its
+// lean is a weaker design, not an unprintable document.
+//
+// DELIBERATELY NOT session.binaryChoice. That field carries the midpoint fork
+// and the boss encounter's binaryChoiceAcknowledgement cross-check, both of
+// which assume exactly one exists in the booklet; a second choice channel on
+// the same field would have broken an assumption the tests pin.
+var doorOption = {
+  type: 'object',
+  required: ['label'],
+  additionalProperties: false,
+  properties: {
+    label: nonEmptyString,
+    lean: { type: 'string' }
+  }
+};
+
+var doorChoice = {
+  type: 'object',
+  required: ['optionA', 'optionB'],
+  additionalProperties: false,
+  properties: {
+    label: { type: 'string' },
+    optionA: doorOption,
+    optionB: doorOption
+  }
+};
+
+// ── seal (schema 1.5.0, §11 Wave 4a — salvage seed 5) ───────────────────────
+// The sealed cache: a document printed late that wants a key found early. No
+// crypto — the honour system IS the mechanism, because the pleasure is the flip
+// and the deciding, and a locked page the player physically cannot open is a
+// worse artifact than one they choose not to open yet.
+//
+//   keyHint         — what the key looks like, so the player recognises it when
+//                     they meet it weeks early.
+//   unlockCondition — what must already be true to open this. It names an
+//                     EARLIER printed surface; the assembled-path check reads
+//                     any refs it carries and requires them to resolve backward.
+//
+// Page-flipping as travel is a BETWEEN-state pleasure only (point-of-use §5.2):
+// a seal is never a demand made during a rest interval.
+var seal = {
+  type: 'object',
+  required: ['keyHint', 'unlockCondition'],
+  additionalProperties: false,
+  properties: {
+    keyHint: nonEmptyString,
+    unlockCondition: nonEmptyString
+  }
+};
+
 // ── voiceSpec (schema 1.5.0, additive) ──────────────────────────────────────
 // meta.literaryRegister grew from an unenforced vibe-phrase object into the
 // per-book prose contract (docs/voice/VOICE.md). Additive and fully optional:
@@ -459,6 +611,7 @@ export var BOOKLET_SCHEMA = {
         },
         sessions: { type: 'array', minItems: 1, items: { $ref: '#/$defs/session' } },
         reckoning: reckoning,
+        doorChoice: doorChoice,
         fieldOps: { $ref: '#/$defs/fieldOps' },
         bossEncounter: { $ref: '#/$defs/bossEncounter' },
         overflow: { type: 'boolean' },
@@ -493,6 +646,8 @@ export var BOOKLET_SCHEMA = {
         continuationLabel: { type: 'string' },
         exercises: { type: 'array', minItems: 1, items: { $ref: '#/$defs/exercise' } },
         markStrip: markStrip,
+        microLines: { type: 'array', items: microLine },
+        returnBeat: returnBeat,
         binaryChoice: {
           type: 'object',
           required: ['promptA', 'promptB'],
@@ -906,6 +1061,10 @@ export var BOOKLET_SCHEMA = {
         partIndex: { type: 'integer' },
         partCount: { type: 'integer' },
         manifestPointer: manifestPointer,
+        // Co-resident with manifestPointer on purpose: a document may both
+        // POST a chase forward and CITE the authority it was filed under.
+        citeRef: citeRef,
+        seal: seal,
         _x: xt
       }
     },
