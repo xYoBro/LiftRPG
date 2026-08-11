@@ -23,8 +23,51 @@
       --accent: #8b2a2a;
       --muted: #857d72;
       --rule: #ccc5b6;
+
+      /* ── Type voices ──────────────────────────────────────────────
+         Three voices, one story. All four families are VENDORED
+         (vendor/fonts/fonts.css) — never CDN-fetched (D92).
+           --mono     stamped chrome: kickers, labels, buttons (the brand)
+           --ui-mono  machine readout: values the user typed or the model
+                      returned — ids, URLs, tokens, log lines. Plex has a
+                      400/500/600/700 range, so instrument density comes
+                      from WEIGHT instead of shrinking type off the page.
+           --body     sentences meant to be read.                        */
       --mono: 'Share Tech Mono', monospace;
+      --ui-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+      --body: 'Libre Baskerville', Georgia, serif;
       --display: 'Playfair Display', Georgia, serif;
+
+      /* ── Type scale ───────────────────────────────────────────────
+         Legibility floor: nothing interactive or informational below
+         --fs-meta (8.5pt / 11.3px). --fs-micro is TRUE fine print —
+         captions and legends only, never a control or a value.         */
+      --fs-micro: 7.5pt;
+      --fs-meta: 8.5pt;
+      --fs-label: 8.5pt;
+      --fs-body: 9pt;
+      --fs-lead: 11pt;
+      --fs-title: 13pt;
+      --fs-hero: 16pt;
+
+      /* ── Derived rule + surface tokens ────────────────────────────
+         Ink-on-paper hairlines at three strengths. Every border in the
+         generator surface resolves to one of these — no loose rgba().  */
+      --rule-faint: rgba(24, 23, 20, .07);
+      --rule-soft: rgba(24, 23, 20, .12);
+      --rule-strong: rgba(24, 23, 20, .18);
+      --surface-sunken: rgba(255, 255, 255, .24);
+      --surface-raised: rgba(255, 255, 255, .46);
+      --surface-card: rgba(255, 255, 255, .62);
+      --field-surface: rgba(255, 255, 255, .86);
+      --ink-wash: rgba(24, 23, 20, .04);
+      --ink-fill: rgba(24, 23, 20, .92);
+      --accent-wash: rgba(139, 42, 42, .08);
+      --accent-line: rgba(139, 42, 42, .28);
+      --alarm: #9c4033;
+      --alarm-line: rgba(156, 64, 51, .26);
+      --alarm-wash: rgba(156, 64, 51, .10);
+      --focus-ring: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--accent);
     }
 
     body {
@@ -483,11 +526,20 @@
       color: var(--ink);
     }
 
+    /* [hidden] is a CONTRACT, not a hint. Author display rules below
+       (.generator-flow-back is display:inline-flex) outrank the UA
+       [hidden] rule, which is how #api-stop-btn stayed on screen through
+       finished runs while its .hidden property read true — a control that
+       lies about whether a run is stoppable. One rule, no exceptions. */
+    [hidden] {
+      display: none !important;
+    }
+
     /* ── Form fields ──────────────── */
     .field-label {
       display: block;
-      font-size: 7pt;
-      letter-spacing: .3em;
+      font-size: var(--fs-label);
+      letter-spacing: .22em;
       text-transform: uppercase;
       color: var(--accent);
       margin-top: 16px;
@@ -520,7 +572,7 @@
 
     .field-error {
       display: none;
-      font-size: 6pt;
+      font-size: var(--fs-meta);
       letter-spacing: .1em;
       text-transform: uppercase;
       color: var(--accent);
@@ -532,9 +584,11 @@
     }
 
     .gen-tip {
-      font-size: 6pt;
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.7;
       color: var(--muted);
-      letter-spacing: .04em;
+      letter-spacing: .01em;
       margin-top: 6px;
     }
 
@@ -553,7 +607,7 @@
 
     .brief-randomize {
       font-family: var(--mono);
-      font-size: 6pt;
+      font-size: var(--fs-meta);
       letter-spacing: .12em;
       text-transform: uppercase;
       color: var(--ink);
@@ -575,22 +629,55 @@
       display: block;
       width: 100%;
       font-family: var(--mono);
-      font-size: 8pt;
+      font-size: var(--fs-body);
       letter-spacing: .1em;
       text-transform: uppercase;
       text-align: left;
       color: var(--paper);
       background: var(--ink);
       border: 1.5px solid var(--ink);
-      padding: 9px 14px;
+      padding: 11px 14px;
       cursor: pointer;
       margin-top: 18px;
-      transition: background .15s, border-color .15s;
+      transition: background .15s, border-color .15s, opacity .15s;
     }
 
-    .gen-submit:hover {
+    .gen-submit:hover:not(:disabled) {
       background: var(--accent);
       border-color: var(--accent);
+    }
+
+    /* A run is in flight. The button must SAY so — the duplicate-submit
+       guard used to swallow the second click into console.warn, leaving
+       a fully live-looking button that did nothing. */
+    .gen-submit:disabled {
+      cursor: default;
+      background: var(--muted);
+      border-color: var(--muted);
+      color: var(--paper);
+    }
+
+    .gen-submit.is-busy {
+      position: relative;
+      overflow: hidden;
+      background: var(--ink);
+      border-color: var(--ink);
+      color: rgba(241, 235, 224, .82);
+    }
+
+    /* Press-at-work: a carriage of ink sweeping the plate, not a spinner. */
+    .gen-submit.is-busy::after {
+      content: '';
+      position: absolute;
+      inset: auto 0 0 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--paper), transparent);
+      animation: press-sweep 1.9s linear infinite;
+    }
+
+    @keyframes press-sweep {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(100%); }
     }
 
     .generator-mode-switch {
@@ -602,7 +689,7 @@
     .generator-mode-btn {
       flex: 1;
       font-family: var(--mono);
-      font-size: 6pt;
+      font-size: var(--fs-meta);
       letter-spacing: .12em;
       text-transform: uppercase;
       border: 1.5px solid var(--ink);
@@ -625,10 +712,11 @@
     }
 
     .generator-mode-copy {
-      margin-top: 8px;
-      font-size: 6pt;
-      line-height: 1.6;
-      letter-spacing: .03em;
+      margin-top: 10px;
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.75;
+      letter-spacing: .01em;
       color: var(--muted);
     }
 
@@ -641,43 +729,49 @@
       display: block;
     }
 
-    #generator-intake-panel,
-    #api-config-panel {
+    #generator-intake-panel {
       max-width: 560px;
       margin: 0 auto;
     }
 
+    #api-config-panel {
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
     #api-status-panel {
-      max-width: 760px;
+      max-width: 860px;
       margin: 0 auto;
     }
 
     .generator-flow-head {
       display: grid;
-      gap: 5px;
-      margin-bottom: 12px;
+      gap: 6px;
+      margin-bottom: 18px;
     }
 
     .generator-flow-kicker {
       font-family: var(--mono);
-      font-size: 5.8pt;
-      letter-spacing: .18em;
+      font-size: var(--fs-meta);
+      letter-spacing: .22em;
       text-transform: uppercase;
       color: var(--accent);
     }
 
     .generator-flow-title {
       font-family: var(--display);
-      font-size: 13pt;
+      font-size: var(--fs-title);
       line-height: 1.14;
       color: var(--ink);
     }
 
     .generator-flow-copy {
-      font-size: 6.4pt;
-      line-height: 1.65;
-      letter-spacing: .03em;
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.8;
+      letter-spacing: .01em;
       color: var(--muted);
+      max-width: 68ch;
     }
 
     .generator-flow-actions {
@@ -692,13 +786,13 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 34px;
+      min-height: 36px;
       padding: 8px 14px;
       border: 1.5px solid var(--ink);
       background: none;
       color: var(--ink);
       font-family: var(--mono);
-      font-size: 6.6pt;
+      font-size: var(--fs-meta);
       letter-spacing: .1em;
       text-transform: uppercase;
       cursor: pointer;
@@ -723,9 +817,9 @@
     .validated-models-table {
       width: 100%;
       border-collapse: collapse;
-      font-family: var(--mono);
-      font-size: 6.5pt;
-      letter-spacing: .04em;
+      font-family: var(--ui-mono);
+      font-size: var(--fs-meta);
+      letter-spacing: 0;
       margin-top: 4px;
     }
 
@@ -733,17 +827,18 @@
       text-align: left;
       text-transform: uppercase;
       letter-spacing: .12em;
-      font-size: 5.5pt;
+      font-family: var(--mono);
+      font-size: var(--fs-micro);
       font-weight: normal;
       color: var(--muted);
-      padding: 4px 8px 4px 0;
+      padding: 5px 8px 5px 0;
       border-bottom: 1px solid var(--rule);
     }
 
     .validated-models-table td {
-      padding: 5px 8px 5px 0;
+      padding: 6px 8px 6px 0;
       color: var(--ink);
-      border-bottom: 1px solid rgba(0,0,0,.06);
+      border-bottom: 1px solid var(--rule-faint);
     }
 
     .validated-models-table tr:last-child td {
@@ -756,51 +851,139 @@
 
     .api-panel {
       display: grid;
-      gap: 12px;
+      gap: 16px;
     }
 
-    .api-panel[hidden] {
-      display: none !important;
+    /* ── Config panel: a guided sequence of stations ──────────────────
+       Connect → choose a model → hand over the key → say how to build.
+       Each station is a titled leaf so the custom-provider path (any
+       OpenAI-compatible endpoint) reads as the FIRST-CLASS route it is,
+       not as expert debris under a preset dropdown. */
+    .api-station {
+      display: grid;
+      gap: 10px;
+      padding: 14px 15px 15px;
+      border: 1px solid var(--rule-soft);
+      border-left: 2px solid var(--accent-line);
+      background: var(--surface-raised);
+    }
+
+    .api-station-head {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .api-station-index {
+      font-family: var(--mono);
+      font-size: var(--fs-micro);
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    .api-station-title {
+      font-family: var(--display);
+      font-size: var(--fs-lead);
+      line-height: 1.1;
+      color: var(--ink);
+    }
+
+    .api-station-copy {
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.8;
+      color: var(--muted);
+      max-width: 70ch;
     }
 
     .api-config-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
+      gap: 12px 14px;
+      align-items: start;
+    }
+
+    .api-config-grid--single {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .api-field {
       display: grid;
       gap: 6px;
+      align-content: start;
+      min-width: 0;
+    }
+
+    .api-field--wide {
+      grid-column: 1 / -1;
     }
 
     .api-field .field-label {
+      margin-top: 0;
       margin-bottom: 0;
     }
 
+    /* Machine strings — ids, URLs, keys — are read character by
+       character. They get the readout voice, never the prose voice. */
     .api-select,
     .api-input {
       width: 100%;
-      font-family: var(--body);
-      font-size: 8pt;
-      padding: 12px 14px;
-      border: 1px solid rgba(24, 23, 20, .15);
-      background: rgba(255, 255, 255, .86);
+      font-family: var(--ui-mono);
+      font-size: var(--fs-body);
+      line-height: 1.4;
+      padding: 10px 12px;
+      border: 1px solid var(--rule-strong);
+      background: var(--field-surface);
       color: var(--ink);
       box-sizing: border-box;
+      transition: border-color .15s, box-shadow .15s;
     }
 
+    .api-select {
+      /* Native selects ignore line-height; match the input box height. */
+      min-height: 38px;
+    }
+
+    .api-select:hover:not(:disabled),
+    .api-input:hover:not(:disabled) {
+      border-color: var(--muted);
+    }
+
+    .api-select:focus-visible,
+    .api-input:focus-visible,
     .api-select:focus,
     .api-input:focus {
       outline: none;
       border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px var(--accent-wash);
+    }
+
+    .api-select:disabled,
+    .api-input:disabled {
+      opacity: .5;
+      cursor: default;
+    }
+
+    .api-input::placeholder {
+      color: var(--muted);
+      opacity: .75;
+    }
+
+    .api-field-help {
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.7;
+      color: var(--muted);
     }
 
     .api-model-row {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 8px;
-      align-items: stretch;
+      align-items: start;
     }
 
     .api-model-select-wrap {
@@ -809,18 +992,15 @@
       min-width: 0;
     }
 
-    .api-model-custom[hidden] {
-      display: none !important;
-    }
-
     .api-inline-btn {
-      min-width: 142px;
+      min-width: 132px;
+      min-height: 38px;
       padding: 0 14px;
       border: 1.5px solid var(--ink);
       background: none;
       color: var(--ink);
       font-family: var(--mono);
-      font-size: 6.2pt;
+      font-size: var(--fs-meta);
       letter-spacing: .12em;
       text-transform: uppercase;
       cursor: pointer;
@@ -837,10 +1017,42 @@
       cursor: default;
     }
 
+    .api-key-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: start;
+    }
+
+    .api-key-toggle {
+      min-width: 76px;
+      min-height: 38px;
+      padding: 0 12px;
+      border: 1px solid var(--rule-strong);
+      background: var(--surface-card);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: var(--fs-meta);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+
+    .api-key-toggle:hover:not(:disabled) {
+      border-color: var(--ink);
+      color: var(--ink);
+    }
+
+    .api-key-toggle:disabled {
+      opacity: .45;
+      cursor: default;
+    }
+
     .api-model-status {
-      font-size: 5.8pt;
-      line-height: 1.55;
-      letter-spacing: .03em;
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.7;
       color: var(--muted);
     }
 
@@ -849,45 +1061,209 @@
     }
 
     .api-model-status.is-error {
-      color: #9c4033;
+      color: var(--alarm);
     }
 
     .api-note {
-      font-size: 6pt;
-      line-height: 1.65;
-      letter-spacing: .03em;
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.8;
       color: var(--muted);
+      max-width: 74ch;
     }
 
+    /* ── Advanced drawer ────────────────────────────────────────── */
+    .api-advanced {
+      border: 1px solid var(--rule-soft);
+      background: var(--surface-sunken);
+      padding: 0 14px;
+    }
+
+    .api-advanced > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 11px 0;
+      font-family: var(--mono);
+      font-size: var(--fs-meta);
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      transition: color .15s;
+    }
+
+    .api-advanced > summary:hover {
+      color: var(--ink);
+    }
+
+    .api-advanced > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .api-advanced > summary::before {
+      content: '+ ';
+      color: var(--accent);
+    }
+
+    .api-advanced[open] > summary::before {
+      /* NBSP, not a space: a trailing space terminates the \2212 escape. */
+      content: '\2212\00a0';
+    }
+
+    .api-advanced-body {
+      display: grid;
+      gap: 12px;
+      padding: 4px 0 14px;
+      border-top: 1px solid var(--rule-faint);
+      margin-top: -1px;
+    }
+
+    /* ── Inline notice (replaces alert()) ───────────────────────── */
+    .app-notice-stack {
+      position: fixed;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 200;
+      display: grid;
+      gap: 8px;
+      width: min(520px, calc(100vw - 32px));
+      pointer-events: none;
+    }
+
+    .app-notice {
+      pointer-events: auto;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--rule-strong);
+      border-left: 3px solid var(--accent);
+      background: linear-gradient(135deg, #f5f0e6 0%, var(--paper) 100%);
+      box-shadow: 0 10px 30px -12px rgba(0, 0, 0, .55);
+      animation: notice-in .22s cubic-bezier(.4, 0, .2, 1);
+    }
+
+    .app-notice.is-error {
+      border-left-color: var(--alarm);
+    }
+
+    .app-notice.is-warn {
+      border-left-color: #8a6d2d;
+    }
+
+    .app-notice.is-ok {
+      border-left-color: #2d8a4e;
+    }
+
+    .app-notice-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 9px;
+    }
+
+    .app-notice-action {
+      font-family: var(--mono);
+      font-size: var(--fs-micro);
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      padding: 6px 11px;
+      border: 1px solid var(--rule-strong);
+      background: var(--field-surface);
+      color: var(--ink);
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+
+    .app-notice-action:hover {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: var(--paper);
+    }
+
+    .app-notice-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .app-notice-kicker {
+      font-family: var(--mono);
+      font-size: var(--fs-micro);
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .app-notice.is-error .app-notice-kicker {
+      color: var(--alarm);
+    }
+
+    .app-notice-text {
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.75;
+      color: var(--ink);
+      overflow-wrap: anywhere;
+    }
+
+    .app-notice-close {
+      flex-shrink: 0;
+      border: none;
+      background: none;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: var(--fs-body);
+      line-height: 1;
+      padding: 2px 4px;
+      cursor: pointer;
+    }
+
+    .app-notice-close:hover {
+      color: var(--ink);
+    }
+
+    @keyframes notice-in {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Pipeline rail — the hero of the live-run surface ────────────
+       Shared by #api-pipeline-rail and #wiz-pipeline-rail. Sized so a
+       7-stage run lands on one line at modal width and degrades to
+       whole rows rather than one orphan node. */
     .pipeline-rail {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
-      gap: 10px;
-      margin-bottom: 10px;
-      padding: 12px;
-      border: 1px solid rgba(24, 23, 20, .07);
-      background: rgba(255, 255, 255, .24);
+      /* Narrow enough that a 7-stage run lands on ONE line at modal width.
+         At 112px the seventh node orphaned onto a row of its own, which
+         read as an eighth phase rather than the end of the first. */
+      grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+      gap: 8px;
+      margin-bottom: 14px;
+      padding: 14px;
+      border: 1px solid var(--rule-soft);
+      background: var(--surface-sunken);
     }
 
     .pipeline-stage-node {
       position: relative;
-      border: 1px solid rgba(24, 23, 20, .08);
-      background: rgba(255, 255, 255, .46);
-      padding: 11px 11px 12px;
+      border: 1px solid var(--rule-soft);
+      background: var(--surface-raised);
+      padding: 11px 10px 12px;
       display: grid;
       gap: 7px;
-      min-height: 86px;
+      min-height: 92px;
       align-content: start;
+      min-width: 0;
     }
 
     .pipeline-stage-node::before {
       content: '';
       position: absolute;
-      top: 20px;
-      left: -10px;
-      right: calc(100% - 10px);
+      top: 21px;
+      left: -8px;
+      right: calc(100% - 8px);
       height: 1px;
-      background: rgba(24, 23, 20, .12);
+      background: var(--rule-soft);
     }
 
     .pipeline-stage-node:first-child::before {
@@ -898,85 +1274,128 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
+      gap: 6px;
     }
 
     .pipeline-stage-node-dot {
-      width: 22px;
-      height: 22px;
+      width: 23px;
+      height: 23px;
       border-radius: 999px;
-      border: 1px solid rgba(24, 23, 20, .18);
+      border: 1px solid var(--rule-strong);
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-family: var(--mono);
-      font-size: 5.5pt;
-      letter-spacing: .12em;
-      text-transform: uppercase;
+      font-family: var(--ui-mono);
+      font-size: var(--fs-micro);
+      font-weight: 600;
       color: var(--muted);
-      background: rgba(24, 23, 20, .04);
+      background: var(--ink-wash);
       flex-shrink: 0;
     }
 
     .pipeline-stage-node-status {
       font-family: var(--mono);
-      font-size: 5.1pt;
-      letter-spacing: .14em;
+      font-size: var(--fs-micro);
+      letter-spacing: .1em;
       text-transform: uppercase;
       color: var(--muted);
       text-align: right;
+      min-width: 0;
+      overflow-wrap: anywhere;
     }
 
     .pipeline-stage-node-title {
       font-family: var(--display);
-      font-size: 9.1pt;
-      line-height: 1.08;
+      font-size: var(--fs-body);
+      line-height: 1.12;
       color: var(--ink);
     }
 
     .pipeline-stage-node-meta {
-      font-size: 5.8pt;
-      line-height: 1.55;
-      letter-spacing: .03em;
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.6;
       color: var(--muted);
     }
 
     .pipeline-stage-node.is-complete {
-      border-color: rgba(24, 23, 20, .12);
+      border-color: var(--rule-soft);
       background: linear-gradient(180deg, rgba(255, 252, 247, .92), rgba(252, 247, 238, .72));
     }
 
     .pipeline-stage-node.is-complete .pipeline-stage-node-dot {
-      background: rgba(24, 23, 20, .92);
+      background: var(--ink-fill);
       color: var(--paper);
-      border-color: rgba(24, 23, 20, .92);
+      border-color: var(--ink-fill);
     }
 
     .pipeline-stage-node.is-current {
-      border-color: rgba(191, 106, 79, .28);
-      background: rgba(255, 250, 246, .74);
-      box-shadow: inset 0 0 0 1px rgba(191, 106, 79, .1);
+      border-color: var(--accent-line);
+      background: rgba(255, 250, 246, .8);
+      box-shadow: inset 0 0 0 1px var(--accent-wash);
     }
 
     .pipeline-stage-node.is-current .pipeline-stage-node-dot {
-      background: rgba(191, 106, 79, .12);
-      border-color: rgba(191, 106, 79, .28);
+      background: var(--accent-wash);
+      border-color: var(--accent-line);
       color: var(--accent);
+      animation: stage-ink 2.2s ease-in-out infinite;
+    }
+
+    /* The press is running. Ink gathers and releases under the plate —
+       one slow breath, no spinner, nothing that outruns the paper. */
+    @keyframes stage-ink {
+      0%, 100% { box-shadow: 0 0 0 0 var(--accent-wash); }
+      50% { box-shadow: 0 0 0 5px rgba(139, 42, 42, 0); background: rgba(139, 42, 42, .2); }
+    }
+
+    .pipeline-stage-node.is-current::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 2px;
+      overflow: hidden;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      background-size: 55% 100%;
+      background-repeat: no-repeat;
+      animation: stage-sweep 2.6s linear infinite;
+      opacity: .55;
+    }
+
+    @keyframes stage-sweep {
+      from { background-position: -60% 0; }
+      to { background-position: 160% 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pipeline-stage-node.is-current .pipeline-stage-node-dot,
+      .pipeline-stage-node.is-current::after,
+      .gen-submit.is-busy::after,
+      .app-notice {
+        animation: none;
+      }
+
+      .pipeline-stage-node.is-current::after {
+        background: var(--accent);
+        opacity: .5;
+      }
     }
 
     .pipeline-stage-node.is-alert {
-      border-color: rgba(156, 64, 51, .26);
-      background: rgba(255, 246, 244, .76);
+      border-color: var(--alarm-line);
+      background: rgba(255, 246, 244, .78);
     }
 
     .pipeline-stage-node.is-alert .pipeline-stage-node-dot {
-      background: rgba(156, 64, 51, .12);
-      border-color: rgba(156, 64, 51, .26);
-      color: #9c4033;
+      background: var(--alarm-wash);
+      border-color: var(--alarm-line);
+      color: var(--alarm);
     }
 
     .pipeline-stage-node.is-upcoming .pipeline-stage-node-dot {
-      background: rgba(24, 23, 20, .04);
+      background: var(--ink-wash);
       color: var(--muted);
     }
 
@@ -1002,65 +1421,192 @@
       margin-bottom: 10px;
     }
 
-    .api-run-focus {
-      border: 1px solid rgba(24, 23, 20, .08);
-      background: linear-gradient(180deg, rgba(255, 252, 247, .92), rgba(252, 247, 238, .72));
-      padding: 14px 15px;
+    /* ── Run notices ──────────────────────────────────────────────────
+       The pipeline's notice channel carries money-safety facts: storage
+       fell back to this tab only, a daily budget is nearly spent, stages
+       came back for free. Toasts vanish; these persist for the run. */
+    .api-run-notices:empty {
+      display: none;
+    }
+
+    .api-run-notices {
       display: grid;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .api-run-notice {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+      padding: 10px 12px;
+      border: 1px solid var(--rule-soft);
+      border-left: 3px solid var(--muted);
+      background: var(--surface-card);
+    }
+
+    .api-run-notice.is-warn {
+      border-left-color: #8a6d2d;
+      background: rgba(255, 250, 240, .8);
+    }
+
+    .api-run-notice.is-error {
+      border-left-color: var(--alarm);
+      background: rgba(255, 246, 244, .82);
+    }
+
+    .api-run-notice-tag {
+      font-family: var(--mono);
+      font-size: var(--fs-micro);
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+      padding-top: 2px;
+    }
+
+    .api-run-notice.is-warn .api-run-notice-tag {
+      color: #8a6d2d;
+    }
+
+    .api-run-notice.is-error .api-run-notice-tag {
+      color: var(--alarm);
+    }
+
+    .api-run-notice-text {
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.75;
+      color: var(--ink);
+    }
+
+    /* Money already spent on EARLIER attempts at this booklet. Deliberately
+       set apart from the live meter and never added into it — this session's
+       total must stay this session's total. */
+    .api-spend-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 8px;
+      padding: 5px 10px;
+      border: 1px dashed var(--rule-strong);
+      background: var(--ink-wash);
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .api-spend-chip-label {
+      font-family: var(--mono);
+      font-size: var(--fs-micro);
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .api-spend-chip-value {
+      font-family: var(--ui-mono);
+      font-weight: 600;
+      color: var(--ink);
+      white-space: nowrap;
+    }
+
+    /* Progress is riding sessionStorage — closing the tab loses it. */
+    .api-durability-badge {
+      display: flex;
+      align-items: center;
       gap: 9px;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border: 1px solid rgba(138, 109, 45, .34);
+      border-left: 3px solid #8a6d2d;
+      background: rgba(255, 250, 240, .86);
+    }
+
+    .api-durability-badge-tag {
+      font-family: var(--mono);
+      font-size: var(--fs-micro);
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: #8a6d2d;
+      white-space: nowrap;
+    }
+
+    .api-durability-badge-text {
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.6;
+      color: var(--ink);
+    }
+
+    .api-run-focus {
+      border: 1px solid var(--rule-soft);
+      background: linear-gradient(180deg, rgba(255, 252, 247, .92), rgba(252, 247, 238, .72));
+      padding: 15px 16px 16px;
+      display: grid;
+      gap: 10px;
     }
 
     .api-run-focus-kicker {
       font-family: var(--mono);
-      font-size: 5.8pt;
-      letter-spacing: .18em;
+      font-size: var(--fs-meta);
+      letter-spacing: .2em;
       text-transform: uppercase;
       color: var(--accent);
     }
 
     .api-run-focus-title {
       font-family: var(--display);
-      font-size: 14pt;
+      font-size: var(--fs-hero);
       line-height: 1.08;
       color: var(--ink);
     }
 
     .api-run-focus-copy {
-      font-size: 6.3pt;
-      line-height: 1.7;
-      letter-spacing: .03em;
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.8;
       color: var(--ink);
-      max-width: 58ch;
+      max-width: 62ch;
     }
 
     .api-run-metrics {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
+      gap: 10px;
       margin-top: 2px;
     }
 
     .api-run-metric {
-      border-top: 1px solid rgba(24, 23, 20, .08);
-      padding-top: 8px;
+      border-top: 1px solid var(--rule-soft);
+      padding-top: 9px;
       min-width: 0;
     }
 
     .api-run-metric-value {
       font-family: var(--display);
-      font-size: 9.5pt;
-      line-height: 1.12;
+      font-size: var(--fs-lead);
+      line-height: 1.15;
       color: var(--ink);
       min-width: 0;
       overflow-wrap: anywhere;
       word-break: break-word;
     }
 
+    /* The unpriced total. It is a real answer, not a missing one. */
+    .api-run-metric-value.is-unpriced {
+      color: var(--muted);
+      letter-spacing: .1em;
+    }
+
     .api-run-metric-value--compact {
-      font-size: 7.2pt;
-      line-height: 1.35;
-      font-family: var(--mono);
-      letter-spacing: .03em;
+      font-size: var(--fs-meta);
+      line-height: 1.45;
+      font-family: var(--ui-mono);
+      letter-spacing: 0;
     }
 
     .api-run-sidecar {
@@ -1070,96 +1616,120 @@
 
     .api-run-sidecard {
       min-height: 0;
-      background: rgba(255, 255, 255, .48);
+      background: var(--surface-card);
     }
 
     .api-run-side-value {
-      font-size: 10pt;
+      font-size: var(--fs-lead);
       margin-bottom: 6px;
+    }
+
+    .api-run-side-value.is-unpriced {
+      color: var(--muted);
+      letter-spacing: .1em;
     }
 
     .api-run-legend {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 10px;
-      padding: 9px 10px;
-      border: 1px solid rgba(24, 23, 20, .07);
-      background: rgba(255, 255, 255, .24);
+      gap: 8px 16px;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--rule-faint);
+      background: var(--surface-sunken);
     }
 
     .api-run-legend-item {
       display: inline-flex;
       align-items: center;
-      gap: 7px;
+      gap: 8px;
       min-width: 0;
       color: var(--muted);
-      font-size: 5.9pt;
-      line-height: 1.55;
-      letter-spacing: .03em;
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.6;
     }
 
     .api-run-legend-chip {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 18px;
-      padding: 0 7px;
+      min-height: 20px;
+      padding: 0 9px;
       border-radius: 999px;
       font-family: var(--mono);
-      font-size: 5.2pt;
+      font-size: var(--fs-micro);
       letter-spacing: .12em;
       text-transform: uppercase;
-      border: 1px solid rgba(24, 23, 20, .12);
-      background: rgba(24, 23, 20, .06);
+      border: 1px solid var(--rule-soft);
+      background: var(--ink-wash);
       color: var(--ink);
       white-space: nowrap;
     }
 
     .api-run-legend-chip.is-complete {
-      background: rgba(24, 23, 20, .92);
+      background: var(--ink-fill);
       color: var(--paper);
     }
 
     .api-run-legend-chip.is-restored {
-      background: rgba(140, 116, 94, .12);
-      border-color: rgba(140, 116, 94, .18);
+      background: rgba(140, 116, 94, .14);
+      border-color: rgba(140, 116, 94, .22);
     }
 
     .api-run-legend-chip.is-local {
-      background: rgba(191, 106, 79, .12);
-      border-color: rgba(191, 106, 79, .24);
+      background: var(--accent-wash);
+      border-color: var(--accent-line);
       color: var(--accent);
     }
 
+    /* Run notes are a printout: readout voice, real reading size. */
     .api-run-log {
-      border: 1px solid rgba(24, 23, 20, .08);
-      background: rgba(255, 255, 255, .42);
-      padding: 10px 11px;
-      min-height: 86px;
-      font-size: 6pt;
-      line-height: 1.7;
-      color: var(--muted);
+      border: 1px solid var(--rule-soft);
+      background: var(--field-surface);
+      padding: 12px 13px;
+      min-height: 92px;
+      max-height: 220px;
+      overflow-y: auto;
+      font-family: var(--ui-mono);
+      font-size: var(--fs-meta);
+      line-height: 1.85;
+      color: var(--ink);
       white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    /* ── Completion actions ───────────────────────────────────────
+       These used to sit dead last, roughly 1,700px down a finished run,
+       under the ledger AND the checkpoint row. The booklet being ready
+       is the whole point of the screen; it gets announced where the eye
+       already is. */
+    .api-run-actions:empty {
+      display: none;
     }
 
     .api-run-actions {
       display: flex;
-      gap: 8px;
+      gap: 10px;
       flex-wrap: wrap;
+      margin-bottom: 12px;
+      padding: 14px 15px;
+      border: 1px solid var(--rule-strong);
+      border-left: 3px solid var(--accent);
+      background: linear-gradient(180deg, rgba(255, 252, 247, .96), rgba(252, 247, 238, .78));
     }
 
     .api-run-actions button {
-      flex: 1 1 180px;
+      flex: 1 1 200px;
       font-family: var(--mono);
-      font-size: 7pt;
+      font-size: var(--fs-body);
       letter-spacing: .1em;
       text-transform: uppercase;
-      padding: 8px 14px;
+      padding: 12px 16px;
       cursor: pointer;
       border: 1.5px solid var(--ink);
       transition: background .15s, color .15s;
-      background: none;
+      background: var(--field-surface);
       color: var(--ink);
     }
 
@@ -1169,7 +1739,8 @@
     }
 
     .api-run-actions button:hover:not(:disabled) {
-      background: var(--ink);
+      background: var(--accent);
+      border-color: var(--accent);
       color: var(--paper);
     }
 
@@ -1181,18 +1752,32 @@
     .api-checkpoint-actions {
       display: flex;
       gap: 8px;
-      margin-top: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--rule-faint);
+      background: var(--surface-sunken);
+    }
+
+    .api-checkpoint-label {
+      font-family: var(--mono);
+      font-size: var(--fs-micro);
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-right: 4px;
     }
 
     .checkpoint-btn {
       font-family: var(--mono);
-      font-size: 6.5pt;
+      font-size: var(--fs-meta);
       letter-spacing: .08em;
       text-transform: uppercase;
-      padding: 6px 12px;
+      padding: 8px 13px;
       cursor: pointer;
       border: 1px solid var(--rule);
-      background: none;
+      background: var(--surface-card);
       color: var(--muted);
       transition: border-color .15s, color .15s;
     }
@@ -1207,10 +1792,27 @@
       align-items: center;
     }
 
+    /* ── Focus visibility (B6) ─────────────────────────────────────
+       Every control on this surface answers the keyboard. */
+    .api-inline-btn:focus-visible,
+    .api-key-toggle:focus-visible,
+    .checkpoint-btn:focus-visible,
+    .checkpoint-upload-label:focus-within,
+    .api-run-actions button:focus-visible,
+    .generator-flow-back:focus-visible,
+    .generator-mode-btn:focus-visible,
+    .gen-submit:focus-visible,
+    .brief-randomize:focus-visible,
+    .api-advanced > summary:focus-visible,
+    .app-notice-close:focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring);
+    }
+
     /* ── Output section ───────────── */
     .gen-output {
-      background: rgba(24, 23, 20, .04);
-      font-size: 7pt;
+      background: var(--ink-wash);
+      font-size: var(--fs-meta);
       line-height: 1.5;
       color: var(--muted);
     }
@@ -1358,7 +1960,7 @@
     }
 
     .wizard-project-bar {
-      border: 1px solid rgba(24, 23, 20, .08);
+      border: 1px solid var(--rule-soft);
       background: rgba(255, 255, 255, .32);
       padding: 10px 12px;
       display: grid;
@@ -1381,33 +1983,33 @@
     }
 
     .wizard-state-card {
-      border: 1px solid rgba(24, 23, 20, .08);
-      background: rgba(255, 255, 255, .48);
-      padding: 10px 11px;
+      border: 1px solid var(--rule-soft);
+      background: var(--surface-card);
+      padding: 12px 13px;
       min-height: 86px;
     }
 
     .wizard-state-label {
       font-family: var(--mono);
-      font-size: 5.6pt;
-      letter-spacing: .18em;
+      font-size: var(--fs-micro);
+      letter-spacing: .2em;
       text-transform: uppercase;
       color: var(--muted);
-      margin-bottom: 6px;
+      margin-bottom: 7px;
     }
 
     .wizard-state-value {
       font-family: var(--display);
-      font-size: 11.5pt;
+      font-size: var(--fs-title);
       line-height: 1.14;
       color: var(--ink);
       margin-bottom: 5px;
     }
 
     .wizard-state-caption {
-      font-size: 6pt;
-      line-height: 1.6;
-      letter-spacing: .02em;
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.75;
       color: var(--muted);
     }
 
@@ -1417,8 +2019,8 @@
       gap: 10px;
       margin-bottom: 4px;
       padding: 12px;
-      border: 1px solid rgba(24, 23, 20, .07);
-      background: rgba(255, 255, 255, .22);
+      border: 1px solid var(--rule-faint);
+      background: var(--surface-sunken);
     }
 
     .pipeline-stage-board {
@@ -1427,76 +2029,98 @@
       padding: 0;
       border: none;
       background: none;
+      /* Columns are a KANBAN, not a table: each pile is as tall as its
+         own contents. Stretching them to the tallest sibling is what put
+         a 600px void above a single in-progress card. */
+      align-items: start;
     }
 
     .pipeline-stage-group {
-      border: 1px solid rgba(24, 23, 20, .07);
-      background: rgba(255, 255, 255, .24);
-      padding: 10px;
+      border: 1px solid var(--rule-faint);
+      background: var(--surface-sunken);
+      padding: 11px;
       display: grid;
       gap: 10px;
       min-width: 0;
+      align-content: start;
     }
 
     .pipeline-stage-group-head {
       display: flex;
-      align-items: end;
+      align-items: baseline;
       justify-content: space-between;
       gap: 8px;
     }
 
     .pipeline-stage-group-title {
       font-family: var(--display);
-      font-size: 11pt;
+      font-size: var(--fs-lead);
       line-height: 1.05;
       color: var(--ink);
     }
 
     .pipeline-stage-group-meta {
-      font-family: var(--mono);
-      font-size: 5.4pt;
-      letter-spacing: .14em;
-      text-transform: uppercase;
+      font-family: var(--ui-mono);
+      font-size: var(--fs-meta);
+      font-weight: 600;
+      letter-spacing: .06em;
       color: var(--muted);
       white-space: nowrap;
     }
 
     .pipeline-stage-group-copy {
-      font-size: 5.9pt;
-      line-height: 1.55;
-      letter-spacing: .03em;
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.7;
       color: var(--muted);
       margin-top: -4px;
+    }
+
+    .pipeline-stage-group-copy:empty {
+      display: none;
     }
 
     .pipeline-stage-group-list {
       display: grid;
       gap: 10px;
+      align-content: start;
+    }
+
+    /* A finished run collapses to one pile. Leaving it in a third of the
+       board strands every card in a narrow column beside two-thirds of
+       nothing — so the last pile standing takes the whole table. */
+    .pipeline-stage-board .pipeline-stage-group:only-child {
+      grid-column: 1 / -1;
+    }
+
+    .pipeline-stage-board .pipeline-stage-group:only-child .pipeline-stage-group-list {
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
     }
 
     .pipeline-stage-group .wizard-stage-item {
-      min-height: 104px;
+      min-height: 0;
     }
 
     .wizard-stage-item {
-      border: 1px solid rgba(24, 23, 20, .08);
-      background: rgba(255, 255, 255, .36);
-      padding: 11px 12px;
+      border: 1px solid var(--rule-soft);
+      background: var(--surface-raised);
+      padding: 12px 13px;
       box-sizing: border-box;
       display: grid;
       gap: 8px;
-      min-height: 112px;
+      min-height: 0;
       min-width: 0;
       width: 100%;
       text-align: left;
       color: inherit;
       overflow: hidden;
+      align-content: start;
     }
 
     .wizard-stage-item.is-current {
-      border-color: rgba(191, 106, 79, .28);
-      box-shadow: inset 0 0 0 1px rgba(191, 106, 79, .12);
-      background: rgba(255, 250, 246, .72);
+      border-color: var(--accent-line);
+      box-shadow: inset 0 0 0 1px var(--accent-wash);
+      background: rgba(255, 250, 246, .78);
     }
 
     button.wizard-stage-item {
@@ -1508,7 +2132,7 @@
     button.wizard-stage-item.is-clickable:hover,
     button.wizard-stage-item.is-clickable:focus-visible {
       transform: translateY(-1px);
-      border-color: rgba(24, 23, 20, .2);
+      border-color: var(--rule-strong);
       outline: none;
     }
 
@@ -1533,7 +2157,7 @@
 
     .wizard-stage-step {
       font-family: var(--mono);
-      font-size: 5pt;
+      font-size: var(--fs-micro);
       letter-spacing: .18em;
       text-transform: uppercase;
       color: var(--muted);
@@ -1542,8 +2166,8 @@
 
     .wizard-stage-name {
       font-family: var(--mono);
-      font-size: 5.8pt;
-      letter-spacing: .16em;
+      font-size: var(--fs-meta);
+      letter-spacing: .14em;
       text-transform: uppercase;
       color: var(--ink);
       min-width: 0;
@@ -1553,14 +2177,14 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 18px;
-      padding: 0 7px;
+      min-height: 20px;
+      padding: 0 9px;
       border-radius: 999px;
-      border: 1px solid rgba(24, 23, 20, .12);
-      background: rgba(24, 23, 20, .05);
+      border: 1px solid var(--rule-soft);
+      background: var(--ink-wash);
       color: var(--muted);
       font-family: var(--mono);
-      font-size: 5.4pt;
+      font-size: var(--fs-micro);
       letter-spacing: .12em;
       text-transform: uppercase;
       white-space: nowrap;
@@ -1568,43 +2192,59 @@
 
     .wizard-status-chip.is-valid,
     .wizard-stage-item.is-valid {
-      border-color: rgba(24, 23, 20, .12);
+      border-color: var(--rule-soft);
     }
 
     .wizard-status-chip.is-valid {
-      background: rgba(24, 23, 20, .92);
+      background: var(--ink-fill);
       color: var(--paper);
     }
 
     .wizard-status-chip.is-in-progress {
-      background: rgba(191, 106, 79, .12);
-      border-color: rgba(191, 106, 79, .24);
+      background: var(--accent-wash);
+      border-color: var(--accent-line);
       color: var(--accent);
     }
 
     .wizard-status-chip.is-drafted {
-      background: rgba(140, 116, 94, .12);
-      border-color: rgba(140, 116, 94, .18);
+      background: rgba(140, 116, 94, .14);
+      border-color: rgba(140, 116, 94, .2);
       color: var(--ink);
+    }
+
+    /* A completed stage is not one thing. These two must match the swatches
+       in the run legend exactly, or the legend is decoration: restored cost
+       nothing this run, local never touched the API at all. */
+    .wizard-status-chip.is-restored {
+      background: rgba(140, 116, 94, .14);
+      border-color: rgba(140, 116, 94, .22);
+      color: var(--ink);
+    }
+
+    .wizard-status-chip.is-local-done {
+      background: var(--accent-wash);
+      border-color: var(--accent-line);
+      color: var(--accent);
     }
 
     .wizard-status-chip.is-needs-review,
     .wizard-status-chip.is-invalidated,
     .wizard-status-chip.is-blocked {
-      background: rgba(191, 106, 79, .1);
+      background: var(--accent-wash);
       border-color: rgba(191, 106, 79, .3);
       color: var(--accent);
     }
 
     .wizard-status-chip.is-not-needed,
     .wizard-status-chip.is-empty {
-      background: rgba(24, 23, 20, .04);
+      background: var(--ink-wash);
       color: var(--muted);
     }
 
     .wizard-stage-detail {
-      font-size: 6.4pt;
-      line-height: 1.6;
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.75;
       color: var(--ink);
       min-width: 0;
       overflow-wrap: anywhere;
@@ -1612,11 +2252,10 @@
     }
 
     .wizard-stage-meta {
-      font-family: var(--mono);
-      font-size: 5.6pt;
-      letter-spacing: .06em;
+      font-family: var(--body);
+      font-size: var(--fs-micro);
       color: var(--muted);
-      line-height: 1.6;
+      line-height: 1.7;
       min-width: 0;
       overflow-wrap: anywhere;
       word-break: break-word;
@@ -1624,8 +2263,12 @@
     }
 
     .wizard-stage-meta strong {
+      font-family: var(--mono);
+      font-size: var(--fs-micro);
+      letter-spacing: .12em;
+      text-transform: uppercase;
       color: var(--ink);
-      font-weight: 600;
+      font-weight: 400;
     }
 
     .wizard-stage-stats {
@@ -1637,23 +2280,24 @@
     .wizard-stage-stat {
       display: inline-flex;
       align-items: center;
-      min-height: 18px;
-      padding: 0 7px;
+      min-height: 20px;
+      padding: 0 8px;
       border-radius: 999px;
-      background: rgba(24, 23, 20, .05);
-      border: 1px solid rgba(24, 23, 20, .08);
+      background: var(--ink-wash);
+      border: 1px solid var(--rule-soft);
       color: var(--ink);
-      font-family: var(--mono);
-      font-size: 5.2pt;
-      letter-spacing: .08em;
+      font-family: var(--ui-mono);
+      font-size: var(--fs-micro);
+      font-weight: 500;
+      letter-spacing: .02em;
       text-transform: uppercase;
       white-space: nowrap;
     }
 
     .api-run-log-shell {
       display: grid;
-      gap: 6px;
-      margin-top: 8px;
+      gap: 7px;
+      margin-top: 10px;
     }
 
     @media (max-width: 900px) {
@@ -1675,24 +2319,27 @@
     }
 
     .wizard-draft-status {
-      font-family: var(--mono);
-      font-size: 6pt;
-      letter-spacing: .04em;
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      letter-spacing: .01em;
       color: var(--muted);
-      line-height: 1.6;
+      line-height: 1.7;
       flex: 1;
       min-width: 220px;
     }
 
+    /* Interactive controls in the shared intake panel — they sit above the
+       legibility floor even though the wizard's own body scale is a later
+       wave's problem. */
     .wizard-draft-clear {
-      border: 1px solid rgba(24, 23, 20, .16);
-      background: rgba(255, 255, 255, .5);
+      border: 1px solid var(--rule-strong);
+      background: var(--surface-card);
       color: var(--ink);
       font-family: var(--mono);
-      font-size: 6pt;
+      font-size: var(--fs-meta);
       letter-spacing: .08em;
       text-transform: uppercase;
-      padding: 6px 10px;
+      padding: 7px 12px;
       cursor: pointer;
     }
 
@@ -1738,14 +2385,14 @@
     }
 
     .wizard-action-btn {
-      border: 1px solid rgba(24, 23, 20, .16);
-      background: rgba(255, 255, 255, .5);
+      border: 1px solid var(--rule-strong);
+      background: var(--surface-card);
       color: var(--ink);
       font-family: var(--mono);
-      font-size: 6pt;
+      font-size: var(--fs-meta);
       letter-spacing: .08em;
       text-transform: uppercase;
-      padding: 6px 10px;
+      padding: 7px 12px;
       cursor: pointer;
     }
 
@@ -2353,55 +3000,116 @@
         </div>
 
         <div class="api-panel" id="api-panel">
-          <div class="api-config-grid">
-            <div class="api-field">
-              <label class="field-label" for="api-provider">Provider</label>
-              <select class="api-select" id="api-provider"></select>
+
+          <section class="api-station">
+            <div class="api-station-head">
+              <span class="api-station-index">Step 1</span>
+              <span class="api-station-title">Where should LiftRPG send the work?</span>
             </div>
-            <div class="api-field">
-              <label class="field-label" for="api-method">Pipeline</label>
-              <select class="api-select" id="api-method">
-                <option value="generateSkeletonFlesh" selected>Skeleton + Flesh (Recommended)</option>
-                <option value="generateMultiStage">Multi-stage API</option>
-                <option value="generateStructured">Structured API</option>
-              </select>
-            </div>
-            <div class="api-field">
-              <label class="field-label" for="api-model">Model</label>
-              <div class="api-model-row">
-                <div class="api-model-select-wrap">
-                  <select class="api-select" id="api-model"></select>
-                  <input class="api-input api-model-custom" id="api-model-custom" type="text" placeholder="Enter a custom model ID" hidden>
-                </div>
-                <button class="api-inline-btn" id="api-model-refresh" type="button">Refresh Models</button>
+            <div class="api-station-copy">Pick a provider from the list, or point the Base URL at any service that speaks the OpenAI API — Moonshot (Kimi), OpenRouter, Together, DeepSeek, or a model running on your own machine. Choosing a provider fills in a sensible Base URL; overwrite it whenever you are going somewhere else.</div>
+            <div class="api-config-grid">
+              <div class="api-field">
+                <label class="field-label" for="api-provider">Provider</label>
+                <select class="api-select" id="api-provider"></select>
               </div>
-              <div class="api-model-status" id="api-model-status">LiftRPG can load the current model list from supported providers so you do not have to keep updating this field by hand.</div>
+              <div class="api-field">
+                <label class="field-label" for="api-base-url">Base URL</label>
+                <input class="api-input" id="api-base-url" type="text" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="https://api.openai.com/v1">
+              </div>
             </div>
-            <div class="api-field">
-              <label class="field-label" for="api-base-url">Base URL</label>
-              <input class="api-input" id="api-base-url" type="text" placeholder="https://api.openai.com/v1">
+            <div class="api-field-help">Running a model locally? Ollama and LM Studio both serve an OpenAI-compatible endpoint on your machine, and most local servers need no key at all.</div>
+          </section>
+
+          <section class="api-station">
+            <div class="api-station-head">
+              <span class="api-station-index">Step 2</span>
+              <span class="api-station-title">Which model writes the booklet?</span>
             </div>
-            <div class="api-field">
-              <label class="field-label" for="api-timeout">Request Timeout</label>
-              <select class="api-select" id="api-timeout">
-                <option value="300000">5 minutes</option>
-                <option value="600000" selected>10 minutes (Recommended)</option>
-                <option value="900000">15 minutes</option>
-                <option value="1200000">20 minutes</option>
-              </select>
+            <div class="api-station-copy">Refresh Models asks your provider what it currently offers. If your model is not on the list — or the provider does not publish one — choose <em>Custom model</em> and type the id yourself.</div>
+            <div class="api-config-grid api-config-grid--single">
+              <div class="api-field">
+                <label class="field-label" for="api-model">Model</label>
+                <div class="api-model-row">
+                  <div class="api-model-select-wrap">
+                    <select class="api-select" id="api-model"></select>
+                    <input class="api-input api-model-custom" id="api-model-custom" type="text" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="Type the exact model id, e.g. moonshot-v1-128k" hidden>
+                  </div>
+                  <button class="api-inline-btn" id="api-model-refresh" type="button">Refresh Models</button>
+                </div>
+                <div class="api-model-status" id="api-model-status">LiftRPG can load the current model list from supported providers so you do not have to keep updating this field by hand.</div>
+              </div>
             </div>
-            <div class="api-field" style="grid-column:1 / -1">
-              <label class="field-label" for="api-key">API Key</label>
-              <input class="api-input" id="api-key" type="password" placeholder="Paste your key for this session" autocomplete="off">
+          </section>
+
+          <section class="api-station">
+            <div class="api-station-head">
+              <span class="api-station-index">Step 3</span>
+              <span class="api-station-title">Your key</span>
             </div>
-          </div>
-          <div class="api-note">Your key is sent directly from this browser to the provider you choose. LiftRPG does not proxy or store it on a server. Provider, model, base URL, and pipeline preference are saved locally on this device for convenience.</div>
+            <div class="api-station-copy">Held in this tab for this session only. It goes straight from your browser to the provider you chose — LiftRPG has no server in the middle and never stores it.</div>
+            <div class="api-config-grid api-config-grid--single">
+              <div class="api-field">
+                <label class="field-label" for="api-key">API Key</label>
+                <div class="api-key-row">
+                  <input class="api-input" id="api-key" type="password" placeholder="Paste your key for this session" autocomplete="off" spellcheck="false">
+                  <button class="api-key-toggle" id="api-key-toggle" type="button" aria-pressed="false" aria-label="Show the API key">Show</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="api-station">
+            <div class="api-station-head">
+              <span class="api-station-index">Step 4</span>
+              <span class="api-station-title">How should it build?</span>
+            </div>
+            <div class="api-station-copy">The default plans the whole booklet first, then writes each part against that plan — the most consistent result on most models. The timeout is how long LiftRPG waits before giving up on a single request; slow stages are allowed to take longer than this.</div>
+            <div class="api-config-grid">
+              <div class="api-field api-field--wide">
+                <label class="field-label" for="api-method">Build Method</label>
+                <select class="api-select" id="api-method">
+                  <option value="generateSkeletonFlesh" selected>Plan the whole book first, then write it (recommended)</option>
+                  <option value="generateMultiStage">Write it straight through, part by part</option>
+                  <option value="generateStructured">Let the provider lock the format</option>
+                </select>
+              </div>
+              <div class="api-field">
+                <label class="field-label" for="api-timeout">Per-Request Wait</label>
+                <select class="api-select" id="api-timeout">
+                  <option value="300000">5 minutes</option>
+                  <option value="600000" selected>10 minutes (Recommended)</option>
+                  <option value="900000">15 minutes</option>
+                  <option value="1200000">20 minutes</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <details class="api-advanced" id="api-advanced">
+            <summary>Advanced</summary>
+            <div class="api-advanced-body">
+              <div class="api-field-help">LiftRPG knows list prices for the major models. For anything else — a new release, a reseller, your own endpoint — the run total honestly reads &ldquo;&mdash;&rdquo; rather than inventing a number. Enter your provider&rsquo;s rates here and this run will show a real total instead.</div>
+              <div class="api-config-grid">
+                <div class="api-field">
+                  <label class="field-label" for="api-price-input">Input $ / Million Tokens</label>
+                  <input class="api-input" id="api-price-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 0.60">
+                </div>
+                <div class="api-field">
+                  <label class="field-label" for="api-price-output">Output $ / Million Tokens</label>
+                  <input class="api-input" id="api-price-output" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 2.50">
+                </div>
+              </div>
+              <div class="api-field-help">Optional, and display only. These numbers change what the cost meter shows you; they never change what your provider charges.</div>
+            </div>
+          </details>
+
           <div class="api-note" id="api-daily-budget-display" hidden></div>
           <div id="validated-models-section" hidden>
             <label class="field-label">Validated Models</label>
             <div class="api-note" style="margin-bottom:6px">Not every model can complete the full build pipeline. The models below have successfully generated a complete booklet on this device and are validated for use.</div>
             <table class="validated-models-table" id="validated-models-table"></table>
           </div>
+          <div class="api-note">Provider, model, base URL, build method, and any pricing you enter are saved on this device for next time. Your key never is.</div>
           <div class="generator-flow-actions">
           <button class="generator-flow-back" id="api-config-back" type="button">Back To Brief</button>
           <button class="gen-submit" id="api-submit" type="button" style="margin-top:0; flex:1">Build Booklet With My API &rarr;</button>
@@ -2422,6 +3130,11 @@
         </div>
         <div class="wizard-state-board api-run-board">
           <div class="pipeline-rail" id="api-pipeline-rail"></div>
+          <div class="api-durability-badge" id="api-durability-badge" hidden>
+            <span class="api-durability-badge-tag">Keep This Tab Open</span>
+            <span class="api-durability-badge-text">Saved progress is too large for durable storage, so it is being kept in this tab only. Closing or reloading this tab loses it — use Save Progress below to keep a copy on disk.</span>
+          </div>
+          <div class="api-run-notices" id="api-run-notices"></div>
           <div class="api-run-overview">
             <div class="api-run-focus">
               <div class="api-run-focus-kicker" id="api-state-summary">Waiting For Settings</div>
@@ -2451,9 +3164,13 @@
                 <div class="wizard-state-label">Pricing And Tokens</div>
                 <div class="wizard-state-value api-run-side-value" id="api-state-cost-side">—</div>
                 <div class="wizard-state-caption" id="api-state-cost-caption">LiftRPG starts with the local pricing table, then refreshes live pricing in the background when the provider allows browser access.</div>
+                <div class="api-spend-chip" id="api-prior-spend" hidden></div>
               </div>
             </div>
           </div>
+          <!-- The payoff sits directly under the headline state, above the
+               ledger. A finished booklet should never need a scroll to find. -->
+          <div class="api-run-actions" id="api-run-actions"></div>
           <div class="api-run-legend" aria-label="Run state legend">
             <div class="api-run-legend-item"><span class="api-run-legend-chip is-complete">Complete</span><span>finished with a live API call in this run</span></div>
             <div class="api-run-legend-item"><span class="api-run-legend-chip is-restored">Restored</span><span>reused from checkpoint instead of calling the model again</span></div>
@@ -2465,13 +3182,13 @@
             <div class="api-run-log" id="api-run-log">API build is ready. Add your provider settings, then start the booklet build.</div>
           </div>
           <div class="api-checkpoint-actions" id="api-checkpoint-actions">
+            <span class="api-checkpoint-label">Checkpoint</span>
             <button type="button" id="api-save-checkpoint" class="checkpoint-btn" title="Download current build progress as a file">Save Progress</button>
             <label class="checkpoint-btn checkpoint-upload-label" title="Upload a previously saved checkpoint file to resume">
               Resume From File
               <input type="file" id="api-upload-checkpoint" accept=".json" hidden>
             </label>
           </div>
-          <div class="api-run-actions" id="api-run-actions"></div>
         </div>
       </div>
 
@@ -2739,6 +3456,10 @@
       var apiBaseUrlEl = document.getElementById('api-base-url');
       var apiTimeoutEl = document.getElementById('api-timeout');
       var apiKeyEl = document.getElementById('api-key');
+      var apiKeyToggleBtn = document.getElementById('api-key-toggle');
+      var apiPriceInputEl = document.getElementById('api-price-input');
+      var apiPriceOutputEl = document.getElementById('api-price-output');
+      var apiAdvancedEl = document.getElementById('api-advanced');
       var apiSubmitBtn = document.getElementById('api-submit');
       var apiStateSummary = document.getElementById('api-state-summary');
       var apiStateTarget = document.getElementById('api-state-target');
@@ -2857,7 +3578,10 @@
           { key: 'quality', label: STAGE_LABELS.quality }
         ],
         generateSkeletonFlesh: [
-          { key: 'skeleton', label: 'Skeleton' },
+          // Keys are the pipeline's stageKey contract. Labels are what the
+          // reader sees on the rail, so they name booklet parts, not
+          // internal pipeline stages.
+          { key: 'skeleton', label: 'Book Plan' },
           { key: 'rules', label: 'Rules Spread' },
           { key: 'weeks', label: STAGE_LABELS.weeks },
           { key: 'fragments', label: STAGE_LABELS.fragments },
@@ -2869,10 +3593,14 @@
 
       // Pipelines the API surface will dispatch. Values must exist on
       // window.LiftRPGAPI; the select's option values are validated against this.
+      // Values are USER-FACING run-log copy ("… via <value>"). Keys are the
+      // API method names and are the contract — never rename a key. Labels
+      // describe what the build does; the internal pipeline codenames stay
+      // out of the interface (author directive, 2026-08-11).
       var API_PIPELINE_METHODS = {
-        generateSkeletonFlesh: 'skeleton + flesh API.',
-        generateMultiStage: 'multi-stage API.',
-        generateStructured: 'structured API.'
+        generateSkeletonFlesh: 'a plan-first build.',
+        generateMultiStage: 'a part-by-part build.',
+        generateStructured: 'a provider-locked build.'
       };
       var API_PIPELINE_DEFAULT = 'generateSkeletonFlesh';
 
@@ -3143,6 +3871,14 @@
           pricingRefreshedAt: '',
           requestTimeoutMs: 600000,
           log: ['API mode is ready. Add your provider settings, then start the generation run.'],
+          // Checkpoint / budget notices from the pipeline's notice channel.
+          notices: [],
+          // True once the pipeline reports that progress fell back to
+          // tab-only storage — the tab must stay open to keep it.
+          storageIsTabOnly: false,
+          // Spend from EARLIER attempts at this same booklet. Reported
+          // beside the live meter, never inside it.
+          priorSpend: null,
           ledger: ledger,
           booklet: null,
           error: '',
@@ -3197,7 +3933,11 @@
             method: apiMethodEl ? resolveApiPipelineMethod(apiMethodEl.value) : API_PIPELINE_DEFAULT,
             model: getApiModelValue(),
             baseUrl: apiBaseUrlEl ? apiBaseUrlEl.value.trim() : '',
-            requestTimeoutMs: apiTimeoutEl ? Number(apiTimeoutEl.value || 600000) : 600000
+            requestTimeoutMs: apiTimeoutEl ? Number(apiTimeoutEl.value || 600000) : 600000,
+            // Same convenience contract as baseUrl: a setting the operator
+            // typed and should not have to retype. Never the key.
+            priceInputPerMillion: apiPriceInputEl ? apiPriceInputEl.value.trim() : '',
+            priceOutputPerMillion: apiPriceOutputEl ? apiPriceOutputEl.value.trim() : ''
           }));
         } catch (error) {}
       }
@@ -3452,6 +4192,12 @@
         if (apiMethodEl) apiMethodEl.value = resolveApiPipelineMethod(prefs.method);
         applyPipelineStageOrder(apiMethodEl ? apiMethodEl.value : API_PIPELINE_DEFAULT);
         if (apiTimeoutEl) apiTimeoutEl.value = String(Number(prefs.requestTimeoutMs || 600000));
+        if (apiPriceInputEl && prefs.priceInputPerMillion) apiPriceInputEl.value = prefs.priceInputPerMillion;
+        if (apiPriceOutputEl && prefs.priceOutputPerMillion) apiPriceOutputEl.value = prefs.priceOutputPerMillion;
+        // Saved rates mean the operator cared about this drawer; open it.
+        if (apiAdvancedEl && (prefs.priceInputPerMillion || prefs.priceOutputPerMillion)) {
+          apiAdvancedEl.open = true;
+        }
         renderApiModelOptions([]);
         if (prefs.model) setApiModelValue(prefs.model);
         if (apiBaseUrlEl && prefs.baseUrl) apiBaseUrlEl.value = prefs.baseUrl;
@@ -3529,6 +4275,128 @@
         if (!apiRunState) apiRunState = createApiRunState();
         apiRunState.log.unshift(message);
         apiRunState.log = apiRunState.log.slice(0, 8);
+      }
+
+      // ── Pipeline notice channel ──────────────────────────────────────
+      // These messages are the ones that cost money if missed: progress that
+      // will not survive a tab close, a daily budget about to run out, stages
+      // that came back for free. The run log scrolls; these do not.
+      var API_NOTICE_TAGS = { error: 'Action Needed', warn: 'Heads Up', info: 'Note' };
+
+      function applyApiNotice(level, message, meta) {
+        if (!apiRunState) apiRunState = createApiRunState();
+        meta = meta || {};
+        var tone = level === 'error' ? 'error' : (level === 'warn' ? 'warn' : 'info');
+        var text = String(message || '').trim();
+        if (!text) return;
+
+        if (meta.priorSpend) apiRunState.priorSpend = meta.priorSpend;
+
+        // The tab-only fallback is a standing condition for the rest of the
+        // run, not an event. It gets the persistent badge and nothing else —
+        // repeating it as a notice row directly below says the same sentence
+        // twice and teaches the reader to skip both.
+        if (tone === 'warn' && /kept in this tab only/i.test(text)) {
+          var firstTime = !apiRunState.storageIsTabOnly;
+          apiRunState.storageIsTabOnly = true;
+          pushApiLog(text);
+          if (firstTime) showNotice(text, { tone: 'warn', kicker: API_NOTICE_TAGS.warn });
+          return;
+        }
+
+        var already = apiRunState.notices.some(function (entry) { return entry.text === text; });
+        if (!already) {
+          apiRunState.notices.unshift({ tone: tone, text: text });
+          apiRunState.notices = apiRunState.notices.slice(0, 4);
+        }
+        pushApiLog(text);
+        // Errors and warnings also surface immediately — a run in flight is
+        // scrolled somewhere else on the page by the time these arrive.
+        if (tone !== 'info' && !already) {
+          showNotice(text, { tone: tone, kicker: API_NOTICE_TAGS[tone] });
+        }
+      }
+
+      function readCheckpointPriorSpend() {
+        try {
+          var surface = api();
+          if (!surface || !surface.checkpoint || typeof surface.checkpoint.spend !== 'function') return null;
+          var prior = (surface.checkpoint.spend() || {}).priorAttempts;
+          return prior && prior.calls > 0 ? prior : null;
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function renderApiNotices() {
+        var host = document.getElementById('api-run-notices');
+        if (host) {
+          var notices = (apiRunState && apiRunState.notices) || [];
+          host.innerHTML = notices.map(function (entry) {
+            return '<div class="api-run-notice is-' + entry.tone + '">' +
+              '<span class="api-run-notice-tag">' + escapeForHtml(API_NOTICE_TAGS[entry.tone] || 'Note') + '</span>' +
+              '<span class="api-run-notice-text">' + escapeForHtml(entry.text) + '</span>' +
+            '</div>';
+          }).join('');
+        }
+
+        var badge = document.getElementById('api-durability-badge');
+        if (badge) badge.hidden = !(apiRunState && apiRunState.storageIsTabOnly);
+
+        var chip = document.getElementById('api-prior-spend');
+        if (chip) {
+          var prior = apiRunState && apiRunState.priorSpend;
+          if (!prior || !prior.calls) {
+            chip.hidden = true;
+            chip.innerHTML = '';
+          } else {
+            // Never folded into the live meter: the headline total answers
+            // "what did THIS run cost", and that answer must stay true.
+            var amount = Number(prior.usd) > 0 ? '~' + formatUsd(prior.usd) : 'an unpriced amount';
+            chip.hidden = false;
+            chip.innerHTML =
+              '<span class="api-spend-chip-label">Earlier Attempts</span>' +
+              '<span class="api-spend-chip-value">' + escapeForHtml(amount) + '</span>' +
+              '<span>across ' + escapeForHtml(String(prior.calls)) + ' call' + (prior.calls === 1 ? '' : 's') + ' — not in this meter</span>';
+          }
+        }
+      }
+
+      // Progress belonging to a DIFFERENT booklet was set aside so this one
+      // could start clean. Say so once; discarding is the only action the
+      // checkpoint module offers (there is no restore-from-shelf API).
+      var shelvedNoticeShown = false;
+
+      function announceShelvedCheckpoint() {
+        if (shelvedNoticeShown) return;
+        var surface = api();
+        if (!surface || !surface.checkpoint || typeof surface.checkpoint.getShelved !== 'function') return;
+        var shelved = null;
+        try { shelved = surface.checkpoint.getShelved(); } catch (error) { return; }
+        if (!shelved) return;
+        shelvedNoticeShown = true;
+        var when = shelved.shelvedAt ? formatPricingTimestamp(shelved.shelvedAt) : '';
+        var dismiss = showNotice(
+          'Saved progress for a different booklet was set aside' + (when ? ' on ' + when : '') +
+          '. It is not being used by this run.',
+          { tone: 'warn', kicker: 'Set Aside' }
+        );
+        var stack = document.querySelector('.app-notice-stack');
+        var notice = stack ? stack.lastElementChild : null;
+        var body = notice ? notice.querySelector('.app-notice-body') : null;
+        if (!body) return;
+        var actions = document.createElement('div');
+        actions.className = 'app-notice-actions';
+        var discard = document.createElement('button');
+        discard.type = 'button';
+        discard.className = 'app-notice-action';
+        discard.textContent = 'Discard It';
+        discard.addEventListener('click', function () {
+          try { surface.checkpoint.clearShelved(); } catch (error) {}
+          dismiss();
+        });
+        actions.appendChild(discard);
+        body.appendChild(actions);
       }
 
       function markApiStageInProgress(stageKey) {
@@ -3645,6 +4513,54 @@
         return '';
       }
 
+      // ── Per-run pricing override ──────────────────────────────────────
+      // LiftRPG only knows list prices for models it has been told about, so
+      // every custom, resold, local, and newly-released model reports an
+      // honest "—". Rather than maintain a pricing table forever, let the
+      // operator state the two numbers they already know.
+      //
+      // The rule shape is provider.js's: resolveModelPricing() only honours
+      // an override whose .provider equals the detected provider id and whose
+      // .match tests the normalized (lowercased) model id.
+      function readPricePerMillion(el) {
+        if (!el) return null;
+        var raw = String(el.value || '').trim();
+        if (!raw) return null;
+        var value = Number(raw);
+        if (!Number.isFinite(value) || value < 0) return null;
+        return value;
+      }
+
+      function getPricingOverride() {
+        var input = readPricePerMillion(apiPriceInputEl);
+        var output = readPricePerMillion(apiPriceOutputEl);
+        if (input === null && output === null) return null;
+        return { inputPerMillion: input === null ? 0 : input, outputPerMillion: output === null ? 0 : output };
+      }
+
+      function escapeRegExpLiteral(value) {
+        return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      }
+
+      function buildPricingOverrideRule(providerId, modelId) {
+        var rates = getPricingOverride();
+        if (!rates) return null;
+        var normalizedModel = String(modelId || '').trim().toLowerCase();
+        if (!providerId || !normalizedModel) return null;
+        return {
+          provider: providerId,
+          match: new RegExp('^' + escapeRegExpLiteral(normalizedModel) + '$'),
+          label: modelId + ' (your rates)',
+          // Surfaces in the cost caption as "Estimated from <sourceLabel>".
+          live: false,
+          inputPerMillion: rates.inputPerMillion,
+          outputPerMillion: rates.outputPerMillion,
+          source: { label: 'Rates you entered', url: '' },
+          verifiedAt: '',
+          sourceKind: 'manual'
+        };
+      }
+
       function buildApiSettings() {
         var providerId = apiProviderEl ? apiProviderEl.value : 'openai';
         var preset = getProviderPreset(providerId);
@@ -3666,6 +4582,11 @@
         }
         settings._providerId = providerId;
         settings._providerLabel = preset && preset.label ? preset.label : providerId;
+        // The provider select is populated from LiftRPGAPI.PROVIDERS, so
+        // detectProviderId() resolves _providerId on its first branch and this
+        // rule always matches the id the pipeline will compute.
+        var overrideRule = buildPricingOverrideRule(providerId, settings.model);
+        if (overrideRule) settings._pricingRule = overrideRule;
         return settings;
       }
 
@@ -3679,12 +4600,22 @@
         });
       }
 
+      var API_SUBMIT_IDLE_LABEL = apiSubmitBtn ? apiSubmitBtn.textContent : '';
+
       function setApiControlsDisabled(disabled) {
-        [manualModeBtn, apiModeBtn, apiProviderEl, apiMethodEl, apiModelEl, apiModelCustomEl, apiModelRefreshBtn, apiBaseUrlEl, apiTimeoutEl, apiKeyEl, apiSubmitBtn, submitBtn].forEach(function (el) {
+        [manualModeBtn, apiModeBtn, apiProviderEl, apiMethodEl, apiModelEl, apiModelCustomEl, apiModelRefreshBtn, apiBaseUrlEl, apiTimeoutEl, apiKeyEl, apiKeyToggleBtn, apiPriceInputEl, apiPriceOutputEl, apiSubmitBtn, submitBtn].forEach(function (el) {
           if (!el) return;
           if (el === apiKeyEl && apiKeyEl.disabled && !disabled) return;
           el.disabled = !!disabled;
         });
+        // A live run must be legible on the button itself. Before this, the
+        // control looked identical whether idle or mid-build, and the
+        // duplicate-click guard answered only the console.
+        if (apiSubmitBtn) {
+          apiSubmitBtn.classList.toggle('is-busy', !!disabled);
+          apiSubmitBtn.setAttribute('aria-busy', disabled ? 'true' : 'false');
+          apiSubmitBtn.textContent = disabled ? 'Building Booklet…' : API_SUBMIT_IDLE_LABEL;
+        }
       }
 
       function resetApiRunStateForConfigChange(message) {
@@ -3821,6 +4752,13 @@
 
       function renderApiStageCard(item, stageIndex, providerDisplay, modelDisplay) {
         var tone = getStatusTone(item.status);
+        // "Complete" already reads three different ways on this board. The
+        // chip SAYS which one; it should also LOOK like the legend swatch it
+        // belongs to, so a restored stage never passes for a paid API call.
+        if (item.status === 'valid' && item.metrics) {
+          if (item.metrics.restoredFromCheckpoint) tone = 'is-restored';
+          else if (item.metrics.completedLocally) tone = 'is-local-done';
+        }
         var currentClass = apiRunState.currentStageKey === item.key ? ' is-current' : '';
         var detail = formatApiStageDetail(item.key, item.status, item.metrics);
         return '' +
@@ -3949,8 +4887,19 @@
             ? (providerDisplay + (modelDisplay ? ' · ' + modelDisplay : ''))
             : 'No provider active yet.';
         }
-        if (apiStateCost) apiStateCost.textContent = apiRunState.cost || UNPRICED_DISPLAY;
-        if (apiStateCostSide) apiStateCostSide.textContent = apiRunState.cost || UNPRICED_DISPLAY;
+        renderApiNotices();
+        // "—" is an answer (this model has no pricing we can trust), not a
+        // blank. Style it as a stated unknown so it never reads as $0.00.
+        var costText = apiRunState.cost || UNPRICED_DISPLAY;
+        var costUnpriced = costText === UNPRICED_DISPLAY;
+        if (apiStateCost) {
+          apiStateCost.textContent = costText;
+          apiStateCost.classList.toggle('is-unpriced', costUnpriced);
+        }
+        if (apiStateCostSide) {
+          apiStateCostSide.textContent = costText;
+          apiStateCostSide.classList.toggle('is-unpriced', costUnpriced);
+        }
         if (apiStateCostCaption) apiStateCostCaption.textContent = apiRunState.costCaption || 'LiftRPG starts with the local pricing table, then refreshes live pricing in the background when the provider allows browser access.';
         var apiStageItems = buildApiStageItems();
         renderPipelineRail(apiPipelineRail, apiStageItems.map(function (item) {
@@ -4787,6 +5736,23 @@
           scheduleApiModelDiscovery({ immediate: true });
         });
       }
+      if (apiKeyToggleBtn && apiKeyEl) {
+        apiKeyToggleBtn.addEventListener('click', function () {
+          var reveal = apiKeyEl.type === 'password';
+          apiKeyEl.type = reveal ? 'text' : 'password';
+          apiKeyToggleBtn.textContent = reveal ? 'Hide' : 'Show';
+          apiKeyToggleBtn.setAttribute('aria-pressed', reveal ? 'true' : 'false');
+          apiKeyToggleBtn.setAttribute('aria-label', reveal ? 'Hide the API key' : 'Show the API key');
+        });
+      }
+      [apiPriceInputEl, apiPriceOutputEl].forEach(function (el) {
+        if (!el) return;
+        el.addEventListener('input', function () {
+          saveApiPrefs();
+          renderApiRunState();
+        });
+        el.addEventListener('change', saveApiPrefs);
+      });
       if (apiModelRefreshBtn) {
         apiModelRefreshBtn.addEventListener('click', function () {
           requestApiModelDiscovery({ force: true });
@@ -4916,7 +5882,7 @@
               setDraftStatus('Project file opened.');
             })
             .catch(function (error) {
-              alert(error && error.message ? error.message : 'Could not open the project file.');
+              showNotice(error && error.message ? error.message : 'Could not open the project file.', { tone: 'error', kicker: 'Project Not Opened' });
             })
             .finally(function () {
               wizImportInput.value = '';
@@ -5248,6 +6214,46 @@
           .replace(/"/g, '&quot;');
       }
 
+      // ── Inline notice ────────────────────────────────────────────────
+      // Replaces alert(): a native dialog blocks the page, throws away the
+      // modal's visual context, and cannot carry the paper identity.
+      // Errors stay until dismissed; everything else clears itself.
+      var noticeStackEl = null;
+
+      function getNoticeStack() {
+        if (noticeStackEl && noticeStackEl.isConnected) return noticeStackEl;
+        noticeStackEl = document.createElement('div');
+        noticeStackEl.className = 'app-notice-stack';
+        document.body.appendChild(noticeStackEl);
+        return noticeStackEl;
+      }
+
+      function showNotice(message, options) {
+        options = options || {};
+        var tone = options.tone === 'error' ? 'is-error' : (options.tone === 'ok' ? 'is-ok' : '');
+        var kicker = options.kicker || (options.tone === 'error' ? 'Cannot Continue' : 'Notice');
+        var stack = getNoticeStack();
+        var notice = document.createElement('div');
+        notice.className = 'app-notice' + (tone ? ' ' + tone : '');
+        notice.setAttribute('role', options.tone === 'error' ? 'alert' : 'status');
+        notice.innerHTML = '' +
+          '<div class="app-notice-body">' +
+            '<div class="app-notice-kicker">' + escapeForHtml(kicker) + '</div>' +
+            '<div class="app-notice-text">' + escapeForHtml(message) + '</div>' +
+          '</div>' +
+          '<button class="app-notice-close" type="button" aria-label="Dismiss">&times;</button>';
+
+        var timer = 0;
+        function dismiss() {
+          if (timer) window.clearTimeout(timer);
+          if (notice.parentNode) notice.parentNode.removeChild(notice);
+        }
+        notice.querySelector('.app-notice-close').addEventListener('click', dismiss);
+        stack.appendChild(notice);
+        if (options.tone !== 'error') timer = window.setTimeout(dismiss, 6000);
+        return dismiss;
+      }
+
       function renderPromptPreview(textareaId, buttonId, rows, copyLabel) {
         return '<button class="gen-copy" id="' + escapeForHtml(buttonId) + '" type="button">' + escapeForHtml(copyLabel || 'Copy Step Prompt') + '</button>' +
           '<details class="wizard-inline-details wizard-stage-details">' +
@@ -5453,7 +6459,7 @@
           .then(callback)
           .catch(function (error) {
             console.error(error);
-            alert(error && error.message ? error.message : 'Could not prepare the booklet export.');
+            showNotice(error && error.message ? error.message : 'Could not prepare the booklet export.', { tone: 'error', kicker: 'Export Failed' });
           })
           .finally(function () {
             button.disabled = false;
@@ -6364,7 +7370,7 @@
         if (!workout) return;
 
         if (typeof window.generateStage1Prompt !== 'function' || !api() || !manualApi()) {
-          alert('Generator unavailable. Please reload the page.');
+          showNotice('The prompt generator did not finish loading. Reload the page and try again.', { tone: 'error', kicker: 'Generator Unavailable' });
           return;
         }
 
@@ -6400,6 +7406,7 @@
       async function handleApiGenerate() {
         if (_apiGenerateRunning) {
           console.warn('[LiftRPG] Generation already in progress — ignoring duplicate click.');
+          showNotice('A booklet build is already running. Watch the stage rail, or use Stop Build before starting another.', { kicker: 'Already Building' });
           return;
         }
         var workout = validateWorkout();
@@ -6461,14 +7468,47 @@
         apiRunState.costKnown = false;
         apiRunState.costCaption = 'Using the local pricing table until live pricing refresh completes.';
         apiRunState.log = [];
+        // Earlier attempts at this booklet are money already gone. Show them
+        // from the first frame, beside the meter and never inside it. The
+        // pipeline re-reports this on resume; reading it here means it is on
+        // screen before the first stage lands.
+        apiRunState.priorSpend = readCheckpointPriorSpend();
+        announceShelvedCheckpoint();
         renderApiRunState();
         setGeneratorSurface('api-status', { skipFocus: true });
 
         var runId = ++activeApiRunId;
         setApiControlsDisabled(true);
 
-        // Fire-and-forget: refresh pricing in the background without blocking generation
-        if (api() && typeof api().refreshPricing === 'function') {
+        // Fire-and-forget: refresh pricing in the background without blocking generation.
+        // SKIPPED when the operator supplied rates: refreshPricing() writes its
+        // own result back onto settings._pricingRule, which would silently
+        // discard the override mid-run. Stated rates win; nothing to look up.
+        if (settings._pricingRule) {
+          applyPricingRefreshResult({
+            model: settings.model,
+            live: false,
+            error: '',
+            pricing: {
+              label: settings._pricingRule.label,
+              sourceLabel: 'the rates you entered',
+              sourceUrl: '',
+              verifiedAt: '',
+              fetchedAt: '',
+              live: false,
+              sourceKind: 'manual',
+              fallbackReason: '',
+              inputPerMillion: settings._pricingRule.inputPerMillion,
+              outputPerMillion: settings._pricingRule.outputPerMillion,
+              longContextApplied: false
+            }
+          });
+          apiRunState.costCaption = 'Priced with the rates you entered ($'
+            + settings._pricingRule.inputPerMillion + ' in / $'
+            + settings._pricingRule.outputPerMillion
+            + ' out per million tokens). Display only — your provider bills you, not LiftRPG.';
+          pushApiLog('Using the rates you entered for ' + settings.model + '. Token counts are exact; the total is your arithmetic, not a quote.');
+        } else if (api() && typeof api().refreshPricing === 'function') {
           api().refreshPricing(settings).then(function (pricingResult) {
             if (runId !== activeApiRunId) return;
             applyPricingRefreshResult(pricingResult);
@@ -6501,6 +7541,16 @@
           var booklet = await api()[methodName](settings, workout, briefEl.value.trim(), function (stageIndex, totalStages, message, meta) {
             if (runId !== activeApiRunId) return;
             meta = meta || {};
+            // Notice events (checkpoint durability, budget, resume facts) ride
+            // this same channel with an EMPTY stageKey. They are handled first
+            // and returned: falling through would hand the message to
+            // inferApiStageKey(), whose keyword matching could pin a notice
+            // onto an unrelated stage and light up a stage that never ran.
+            if (meta.noticeLevel) {
+              applyApiNotice(meta.noticeLevel, message, meta);
+              renderApiRunState();
+              return;
+            }
             var stageKey = normalizeApiStageKey(meta.stageKey || inferApiStageKey(message));
             var phase = meta.phase || 'start';
             apiRunState.status = 'running';
