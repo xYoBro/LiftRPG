@@ -5,10 +5,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LiftRPG &mdash; Renderer</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Fonts VENDORED (author decision 2026-08-11): self-hosted woff2 set in
+       ../vendor/fonts/ so rendering — and therefore measurement-equals-render —
+       is identical on restricted/offline networks. Regenerate with
+       scripts/vendor-fonts.sh; provenance in vendor/fonts/MANIFEST.sha256. -->
   <link
-    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Share+Tech+Mono&family=Playfair+Display:ital,wght@0,700;1,400;1,700&display=swap"
+    href="../vendor/fonts/fonts.css"
     rel="stylesheet" />
   <link rel="stylesheet" href="booklet.css?v=48" />
 </head>
@@ -107,9 +109,19 @@
     <div id="unlock-hint" class="reader-unlock-hint">Use the final designation/password from your booklet. Scroll to explore the full booklet.</div>
   </div>
 
-  <!-- PDF generation (Safari can't print booklet spreads via CSS) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <!-- PDF generation (Safari can't print booklet spreads via CSS).
+       VENDORED, not CDN (author decision 2026-08-11): pinned first-party copies
+       so export works on restricted networks and carries zero third-party
+       runtime fetches. html2canvas 1.4.1 is the final upstream release (its
+       color() parse gap is shimmed in pdf-export.js; the export gate's
+       non-blankness assertion catches any future gap).
+       Provenance: html2canvas 1.4.1 via cdnjs, verified against the cdnjs
+       published SRI; jsPDF 2.5.2 via unpkg, byte-identical to the jsdelivr
+       mirror at fetch time.
+       sha384 html2canvas: ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H
+       sha384 jspdf:       en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/ -->
+  <script src="../vendor/html2canvas.min.js"></script>
+  <script src="../vendor/jspdf.umd.min.js"></script>
   <script type="module" src="renderer.js?v=48"></script>
 </body>
 
