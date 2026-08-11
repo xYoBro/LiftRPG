@@ -1,4 +1,8 @@
 import { alpha, mergeObjects } from './utils.js?v=48';
+import {
+  VALID_COMPONENT_DIALECTS,
+  DEFAULT_COMPONENT_DIALECT
+} from '../../contracts/contract-constants.mjs';
 
 const THEME_PRESETS = {
   pastoral: {
@@ -568,12 +572,29 @@ export function resolveTheme(data) {
 
   return {
     archetype,
+    // The component dialect rides on the resolved theme because it is the same
+    // KIND of thing — a book-wide presentation choice stamped once on the
+    // container and read by CSS. It is NOT a token: a dialect changes drawing,
+    // never a value, and giving it a custom property would invite a rule that
+    // sizes something from it. See THE HEIGHT LAW in contract-constants.mjs.
+    componentDialect: resolveComponentDialect(data),
     tokens
   };
 }
 
+/**
+ * The book's component dialect, defaulted. Reads meta.artifactIdentity rather
+ * than data.theme: the dialect is an artifact-identity decision (whose
+ * instrument this is), not a palette one.
+ */
+function resolveComponentDialect(data) {
+  const raw = (((data || {}).meta || {}).artifactIdentity || {}).componentDialect;
+  return VALID_COMPONENT_DIALECTS.indexOf(raw) === -1 ? DEFAULT_COMPONENT_DIALECT : raw;
+}
+
 export function applyTheme(container, theme) {
   container.setAttribute('data-archetype', theme.archetype);
+  container.setAttribute('data-component-dialect', theme.componentDialect || DEFAULT_COMPONENT_DIALECT);
   // Clear every custom property a previous applyTheme set on this container.
   // Without this, tokens that exist in one theme but not the next (preset
   // extras, booklet-supplied theme.tokens) leak across loads in one session.

@@ -9,6 +9,7 @@ import {
   DOCUMENT_TYPE_ENUM,
   DOCUMENT_TYPE_ALIASES,
   VALID_MAP_TYPES,
+  SPATIAL_GUARDRAILS,
   VALID_COMPANION_TYPES,
   VALID_CLOCK_TYPES,
   VALID_ARCHETYPES,
@@ -804,6 +805,52 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
           var label = String(node.label || '').trim();
           if (label.length > 24) {
             warnings.push('PTP node "' + label.substring(0, 20) + '...": label is ' + label.length + ' chars (recommend \u226420 for print legibility)');
+          }
+        });
+      }
+      // Wave 3 geometries. Numbers come from SPATIAL_GUARDRAILS rather than
+      // literals \u2014 the PTP/grid checks above predate the import and are left
+      // alone rather than refactored under an unrelated change.
+      if (fo.mapState.mapType === 'concentric') {
+        var ringGuard = SPATIAL_GUARDRAILS.concentric;
+        var rings = fo.mapState.rings || [];
+        if (rings.length < ringGuard.minRings || rings.length > ringGuard.maxRings) {
+          errors.push('Concentric map: ' + rings.length + ' rings outside range '
+            + ringGuard.minRings + '-' + ringGuard.maxRings);
+        }
+        var currentRing = fo.mapState.currentRing;
+        if (currentRing !== undefined && currentRing !== null
+          && (!Number.isInteger(Number(currentRing)) || Number(currentRing) < 1 || Number(currentRing) > rings.length)) {
+          errors.push('Concentric map: currentRing=' + currentRing + ' does not name a ring (1-' + rings.length + ')');
+        }
+        rings.forEach(function (ring, ri) {
+          var label = String((ring || {}).label || '').trim();
+          if (label.length > ringGuard.ringLabelMaxChars) {
+            warnings.push('Concentric ring[' + ri + '] label is ' + label.length
+              + ' chars (recommend \u2264' + ringGuard.ringLabelMaxChars + ' for print legibility)');
+          }
+        });
+      }
+      if (fo.mapState.mapType === 'maze') {
+        var mazeGuard = SPATIAL_GUARDRAILS.maze;
+        var mazeNodes = fo.mapState.nodes || [];
+        var passages = fo.mapState.passages || [];
+        if (mazeNodes.length > mazeGuard.maxNodes) {
+          errors.push('Maze map: ' + mazeNodes.length + ' nodes exceeds max ' + mazeGuard.maxNodes);
+        }
+        if (passages.length > mazeGuard.maxPassages) {
+          errors.push('Maze map: ' + passages.length + ' passages exceeds max ' + mazeGuard.maxPassages);
+        }
+        var mazeIds = {};
+        mazeNodes.forEach(function (node) { mazeIds[node.id] = true; });
+        passages.forEach(function (passage, pi) {
+          // A passage to nowhere draws nothing at all \u2014 the renderer skips it,
+          // so the corridor the fiction promised is silently absent.
+          if (!mazeIds[passage.from]) {
+            errors.push('Maze passage[' + pi + '] from="' + passage.from + '" names no node');
+          }
+          if (!mazeIds[passage.to]) {
+            errors.push('Maze passage[' + pi + '] to="' + passage.to + '" names no node');
           }
         });
       }

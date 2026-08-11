@@ -11,7 +11,11 @@ import { normalizeManifestPointer } from './document-models.js?v=48';
 // VALID_SHELL_FAMILIES enum that gates it. The local copy that used to live
 // here is why the generator inferred a different shell for the same booklet
 // on 114 of 600 identity combinations (D93).
-import { resolveShellFamily } from '../../contracts/contract-constants.mjs';
+import {
+  resolveShellFamily,
+  VALID_COMPONENT_DIALECTS,
+  DEFAULT_COMPONENT_DIALECT
+} from '../../contracts/contract-constants.mjs';
 
 function humanizeComponentType(value) {
   return String(value || 'component').replace(/-/g, ' ');
@@ -144,6 +148,13 @@ export function resolveArtifactIdentity(data = {}) {
     unlockLogic: raw.unlockLogic || '',
     shellFamily,
     attachmentStrategy: raw.attachmentStrategy || 'split-technical',
+    // Whose instrument the countable surfaces are. An unknown value falls to
+    // the default rather than propagating: a dialect the CSS does not know
+    // would print unstyled boxes, and an unstyled tick box is not a dialect,
+    // it is a missing one.
+    componentDialect: VALID_COMPONENT_DIALECTS.indexOf(raw.componentDialect) === -1
+      ? DEFAULT_COMPONENT_DIALECT
+      : raw.componentDialect,
     copy
   };
 }

@@ -2885,12 +2885,18 @@ var MECHANIC_GRAMMAR_PROXIES = {
   'ledger-board':             { expectedMapTypes: ['grid'], expectedCipherTypes: [] },
   'profile-assembly':         { expectedMapTypes: [], expectedCipherTypes: [] },
   heat:                       { expectedMapTypes: [], expectedCipherTypes: [] },
-  attrition:                  { expectedMapTypes: ['linear-track', 'grid'], expectedCipherTypes: [] },
-  siege:                      { expectedMapTypes: ['grid', 'player-drawn'], expectedCipherTypes: [] },
+  attrition:                  { expectedMapTypes: ['linear-track', 'grid', 'maze'], expectedCipherTypes: [] },
+  // Wave 3 gave siege its own geometry. 'concentric' leads because rings ARE the
+  // verb (hold ground while it closes); grid and player-drawn stay legal because
+  // six books of siege must not all draw the same disc.
+  siege:                      { expectedMapTypes: ['concentric', 'grid', 'player-drawn'], expectedCipherTypes: [] },
   stewardship:                { expectedMapTypes: ['grid', 'point-to-point'], expectedCipherTypes: [] },
   'loyalty-web':              { expectedMapTypes: ['point-to-point'], expectedCipherTypes: [] },
-  evasion:                    { expectedMapTypes: ['linear-track'], expectedCipherTypes: [] },
-  observance:                 { expectedMapTypes: ['linear-track', 'player-drawn'], expectedCipherTypes: [] },
+  // A pursuit is a line or a labyrinth — both are "ahead of them", differently.
+  evasion:                    { expectedMapTypes: ['linear-track', 'maze'], expectedCipherTypes: [] },
+  // A rite is an order of operations; a precinct learned inward is the same rite
+  // in space, which is why concentric belongs here and not only under siege.
+  observance:                 { expectedMapTypes: ['linear-track', 'player-drawn', 'concentric'], expectedCipherTypes: [] },
   rivalry:                    { expectedMapTypes: [], expectedCipherTypes: [] }
 };
 

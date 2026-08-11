@@ -39,6 +39,26 @@ function segmentPath(cx, cy, radius, startAngle, endAngle) {
   ].join(' ');
 }
 
+/**
+ * The clock face — the only clock renderer the printed book can reach.
+ *
+ * DIALECT LAYERS (Wave 3). All four dialects are DRAWN, every time, into the
+ * same 100x100 viewBox; `[data-component-dialect]` in booklet.css shows one and
+ * paints the rest out with `fill:none; stroke:none`. Drawing-then-hiding rather
+ * than branching on the dialect here is deliberate three ways: this function
+ * has no access to meta.artifactIdentity, the box is identical in every dialect
+ * so THE HEIGHT LAW holds by construction, and hiding via paint (not `display`)
+ * keeps every dialect rule inside the property set the validator's
+ * componentDialectHeightLaw() pass permits.
+ *
+ * NOTE ON THE OTHER CLOCK: atoms/tracker.js buildClock() draws a second clock
+ * face and is NOT unified with this one, because it is unreachable — its switch
+ * runs only for a `trackType` outside VALID_COMPANION_TYPES, and the schema
+ * closes that enum, which is also why no `.tracker-*` class has ever had CSS.
+ * Unifying a live renderer with a dead one would buy no drift protection and
+ * would import a dead presentation profile into the live path. It stays where
+ * it is, with the rest of the generic-tracker seed (D6 class).
+ */
 export function renderGameplayClocks(clocks) {
   const section = make('section', 'ops-section ops-clocks');
   section.appendChild(make('div', 'doc-label', 'Active Clocks'));
@@ -59,10 +79,12 @@ export function renderGameplayClocks(clocks) {
     circle.setAttribute('stroke-width', '2');
     svg.appendChild(circle);
 
+    const filled = clock.startValue || 0;
+
     for (let i = 0; i < clock.segments; i += 1) {
       const startAngle = (i * 360) / clock.segments;
       const endAngle = ((i + 1) * 360) / clock.segments;
-      if (i < (clock.startValue || 0)) {
+      if (i < filled) {
         const wedge = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         wedge.setAttribute('d', segmentPath(50, 50, 46, startAngle, endAngle));
         wedge.setAttribute('fill', 'var(--accent-soft)');
@@ -79,8 +101,50 @@ export function renderGameplayClocks(clocks) {
       line.setAttribute('y2', String(50 + 48 * Math.sin(rad)));
       line.setAttribute('stroke', 'var(--page-rule)');
       line.setAttribute('stroke-width', '1.5');
+      line.setAttribute('class', 'progress-clock-divider');
       svg.appendChild(line);
+
+      // beads — one countable bead per segment on the inner ring.
+      const beadCentre = polarPoint(50, 50, 33, startAngle + (180 / clock.segments));
+      const bead = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      bead.setAttribute('cx', beadCentre.x.toFixed(2));
+      bead.setAttribute('cy', beadCentre.y.toFixed(2));
+      bead.setAttribute('r', '7');
+      bead.setAttribute('class', 'progress-clock-bead');
+      if (i < filled) bead.setAttribute('data-filled', 'true');
+      svg.appendChild(bead);
+
+      // tally — a notched rim: a short bar across each segment's rim tick,
+      // struck through once the segment is spent.
+      const rimOuter = polarPoint(50, 50, 47, startAngle);
+      const rimInner = polarPoint(50, 50, 38, startAngle);
+      const notch = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      notch.setAttribute('x1', rimInner.x.toFixed(2));
+      notch.setAttribute('y1', rimInner.y.toFixed(2));
+      notch.setAttribute('x2', rimOuter.x.toFixed(2));
+      notch.setAttribute('y2', rimOuter.y.toFixed(2));
+      notch.setAttribute('class', 'progress-clock-notch');
+      if (i < filled) notch.setAttribute('data-filled', 'true');
+      svg.appendChild(notch);
     }
+
+    // gauge — one swept arc reading the whole clock at a glance, plus the
+    // needle at the reading. Drawn last so it sits over the rim.
+    const sweep = Math.max(0, Math.min(filled, clock.segments));
+    if (sweep > 0) {
+      const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      arc.setAttribute('d', segmentPath(50, 50, 42, 0, (sweep * 360) / clock.segments));
+      arc.setAttribute('class', 'progress-clock-arc');
+      svg.appendChild(arc);
+    }
+    const needleEnd = polarPoint(50, 50, 44, (sweep * 360) / clock.segments);
+    const needle = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    needle.setAttribute('x1', '50');
+    needle.setAttribute('y1', '50');
+    needle.setAttribute('x2', needleEnd.x.toFixed(2));
+    needle.setAttribute('y2', needleEnd.y.toFixed(2));
+    needle.setAttribute('class', 'progress-clock-needle');
+    svg.appendChild(needle);
 
     const visuals = make('div', 'clock-visuals');
     visuals.appendChild(svg);
@@ -114,7 +178,104 @@ export function renderGameplayClocks(clocks) {
   return section;
 }
 
+// ---------------------------------------------------------------------------
+// Hex cell variant (mapState.cellShape === 'hex')
+// ---------------------------------------------------------------------------
+/**
+ * Pointy-top hexes in odd-row-offset layout, drawn as SVG polygons.
+ *
+ * WHY SVG AND NOT clip-path: the Safari export path rasterises through
+ * html2canvas 1.4.1 (D87), which does not honour clip-path. Inline SVG is
+ * already proven through that path by point-to-point.
+ *
+ * WHY THE HEIGHT IS FIXED IN px AND THE WIDTH IS NOT: phase-1 estimation has no
+ * DOM and cannot know whether this map renders full-width or in a half slot, so
+ * a width-derived hex height would be wrong by ~2x in the half-width case (the
+ * D71 defect class). The container's height comes from the row count alone;
+ * `preserveAspectRatio="xMidYMid meet"` then sizes the hexes to whichever axis
+ * binds and centres the slack. Height is density-invariant and width-invariant
+ * by construction.
+ *
+ * CROSS-FILE CONTRACT: HEX_ROW_UNITS / HEX_CAP_UNITS below are mirrored as
+ * HEX_ROW_PX / HEX_CAP_PX in atoms/map-panel.js, and the `.map-hex` height rule
+ * in booklet.css is written from the same two numbers. Change all three together.
+ */
+const HEX_ROW_UNITS = 26;   // vertical step between hex rows (0.75 x hex height)
+const HEX_CAP_UNITS = 9;    // the bottom quarter of the last row
+
+function hexPolygonPoints(cx, cy, size) {
+  // Pointy-top: vertices at 30 deg increments starting from the top.
+  const points = [];
+  for (let i = 0; i < 6; i += 1) {
+    const angle = (Math.PI / 180) * (60 * i - 90);
+    points.push(
+      (cx + size * Math.cos(angle)).toFixed(2) + ',' + (cy + size * Math.sin(angle)).toFixed(2)
+    );
+  }
+  return points.join(' ');
+}
+
+function renderHexGridMap(mapState) {
+  const dims = mapState.gridDimensions || { columns: 6, rows: 5 };
+  const cols = Math.max(1, parseInt(dims.columns, 10) || 6);
+  const rows = Math.max(1, parseInt(dims.rows, 10) || 5);
+
+  const wrap = make('div', 'map-hex');
+  wrap.style.height = (rows * HEX_ROW_UNITS + HEX_CAP_UNITS) + 'px';
+  wrap.setAttribute('data-hex-columns', String(cols));
+
+  // One hex is 2 units wide and 2.31 units tall in this local space; rows step
+  // 1.732 units and odd rows shift a half-width right.
+  const size = 1.1547;                 // circumradius for a 2-unit-wide hex
+  const stepX = 2;
+  const stepY = size * 1.5;
+  const vbWidth = cols * stepX + stepX / 2 + 0.6;
+  const vbHeight = (rows - 1) * stepY + size * 2 + 0.6;
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'map-hex-svg');
+  svg.setAttribute('viewBox', '0 0 ' + vbWidth.toFixed(2) + ' ' + vbHeight.toFixed(2));
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  const tilesByPosition = {};
+  (mapState.tiles || []).forEach((tile) => {
+    tilesByPosition[tile.col + ':' + tile.row] = tile;
+  });
+  const current = mapState.currentPosition || null;
+
+  for (let row = 1; row <= rows; row += 1) {
+    for (let col = 1; col <= cols; col += 1) {
+      const tile = tilesByPosition[col + ':' + row] || {};
+      const isCurrent = !!(current && current.col === col && current.row === row);
+      const cx = 0.3 + size + (col - 1) * stepX + (row % 2 === 0 ? stepX / 2 : 0);
+      const cy = 0.3 + size + (row - 1) * stepY;
+
+      const cell = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      cell.setAttribute('points', hexPolygonPoints(cx, cy, size));
+      cell.setAttribute('class', 'map-hex-cell');
+      cell.setAttribute('data-state', isCurrent ? 'current' : (tile.type || 'empty'));
+      svg.appendChild(cell);
+
+      const rawLabel = tile.label || (isCurrent ? 'YOU' : '');
+      if (rawLabel) {
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', cx.toFixed(2));
+        text.setAttribute('y', cy.toFixed(2));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'middle');
+        text.setAttribute('class', 'map-hex-label');
+        text.textContent = rawLabel.substring(0, 5);
+        svg.appendChild(text);
+      }
+    }
+  }
+
+  wrap.appendChild(svg);
+  return wrap;
+}
+
 function renderGridMap(mapState) {
+  if (mapState.cellShape === 'hex') return renderHexGridMap(mapState);
   const wrap = make('div', 'map-grid');
   const dims = mapState.gridDimensions || { columns: 6, rows: 5 };
   const cols = dims.columns || 6;
@@ -278,6 +439,13 @@ function compactNodeLabel(label, maxLen) {
 function renderPointMap(mapState) {
   const wrap = make('div', 'map-network');
   const shellFamily = ((mapState.artifactIdentity || {}).shellFamily || '').toLowerCase();
+  // Constellation mode: same geometry, different reading. An edge stops being a
+  // way to get there and becomes a tie, so the CSS variant restyles the edge
+  // vocabulary and the printed nouns follow — a legend that still said "routes"
+  // over a sociogram would be the interface telling the player the wrong game.
+  const relational = mapState.edgeSemantics === 'relational';
+  wrap.setAttribute('data-edge-semantics', relational ? 'relational' : 'traversal');
+  const edgeNoun = relational ? 'ties' : 'routes';
   const useInstrumentationRail = shellFamily === 'classified-packet';
   if (useInstrumentationRail) {
     wrap.setAttribute('data-has-rail', 'true');
@@ -285,7 +453,7 @@ function renderPointMap(mapState) {
     [
       ['Sector', mapState.title || 'Topology'],
       ['Current', mapState.currentNode || '--'],
-      ['Routes', String((mapState.edges || []).length || 0)],
+      [relational ? 'Ties' : 'Routes', String((mapState.edges || []).length || 0)],
     ].forEach(([label, value]) => {
       const item = make('div', 'map-network-rail-item');
       item.appendChild(make('div', 'map-network-rail-label', label));
@@ -377,9 +545,12 @@ function renderPointMap(mapState) {
       const normalY = dx / distance;
       const offsetSign = edgeIndex % 2 === 0 ? 1 : -1;
       const isDeferredRoute = edge.state === 'locked' || edge.state === 'inaccessible';
+      // Relational ties are drawn heavier than traversal edges (a `strong` tie
+      // is 2.4 wide), so a 3.2 offset put the label ON the line and a strong
+      // tie read as a struck-through one — the opposite of what it means.
       const labelOffset = shellFamily === 'classified-packet'
         ? (isDeferredRoute ? 6.4 : 4.8)
-        : 3.2;
+        : (relational ? 4.8 : 3.2);
 
       // Try multiple positions along the edge to avoid node overlap
       const candidateProgressions = shellFamily === 'classified-packet'
@@ -443,7 +614,7 @@ function renderPointMap(mapState) {
 
   const legend = make('div', 'map-network-legend');
   legend.appendChild(make('div', 'map-network-chip', (nodeCount || 0) + ' nodes'));
-  legend.appendChild(make('div', 'map-network-chip', ((mapState.edges || []).length || 0) + ' routes'));
+  legend.appendChild(make('div', 'map-network-chip', ((mapState.edges || []).length || 0) + ' ' + edgeNoun));
   if (mapState.currentNode) {
     legend.appendChild(make('div', 'map-network-chip', 'Current ' + mapState.currentNode));
   }
@@ -505,6 +676,268 @@ function renderPlayerMap(mapState) {
   return wrap;
 }
 
+// ---------------------------------------------------------------------------
+// concentric — approach rings
+// ---------------------------------------------------------------------------
+/**
+ * Nested rings, OUTERMOST FIRST, drawn in the same 100x100 viewBox idiom every
+ * other SVG map uses. The band between ring i and ring i+1 carries ring i's
+ * label on the vertical meridian, where a printed label has the most room.
+ *
+ * The whole diagram is stroke-and-dash, never fill: the bands are where the
+ * player writes, so filling them would take the surface away, and a hue-coded
+ * ring would not survive the B&W print requirement.
+ */
+const RINGS_OUTER_R = 46;
+
+/** Ring i's radius, outermost first, for an N-ring diagram. */
+function ringRadius(index, count) {
+  return RINGS_OUTER_R - (index * (RINGS_OUTER_R / count));
+}
+
+function renderRingsMap(mapState) {
+  const rings = Array.isArray(mapState.rings) ? mapState.rings : [];
+  const count = rings.length;
+  const wrap = make('div', 'map-rings');
+  wrap.setAttribute('data-ring-count', String(count));
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'map-rings-svg');
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  const current = parseInt(mapState.currentRing, 10) || 0;
+
+  rings.forEach((ring, index) => {
+    const radius = ringRadius(index, Math.max(1, count));
+    const inner = index + 1 < count ? ringRadius(index + 1, count) : 0;
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', '50');
+    circle.setAttribute('cy', '50');
+    circle.setAttribute('r', radius.toFixed(2));
+    circle.setAttribute('class', 'map-ring');
+    circle.setAttribute('data-state', ring.state || 'empty');
+    if (current === index + 1) circle.setAttribute('data-current', 'true');
+    svg.appendChild(circle);
+
+    const label = String(ring.label || '').trim();
+    if (!label) return;
+
+    // Mid-band on the meridian above centre. The chord at that height bounds
+    // how wide the label may be; textLength only engages when the natural
+    // width would exceed it, so short labels are never stretched.
+    const bandMid = (radius + inner) / 2;
+    const y = 50 - bandMid;
+    const chord = 2 * Math.sqrt(Math.max(1, (radius * radius) - (bandMid * bandMid)));
+    const available = Math.max(12, chord * 0.82);
+    const natural = label.length * 2.2;
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', '50');
+    text.setAttribute('y', y.toFixed(2));
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'middle');
+    text.setAttribute('class', 'map-ring-label');
+    if (natural > available) {
+      text.setAttribute('textLength', available.toFixed(2));
+      text.setAttribute('lengthAdjust', 'spacingAndGlyphs');
+    }
+    text.textContent = label;
+    svg.appendChild(text);
+  });
+
+  wrap.appendChild(svg);
+
+  const legend = make('div', 'map-rings-legend');
+  legend.appendChild(make('div', 'map-rings-chip', count + (count === 1 ? ' ring' : ' rings')));
+  if (current > 0 && rings[current - 1]) {
+    legend.appendChild(make('div', 'map-rings-chip', 'Held to ' + (rings[current - 1].label || current)));
+  }
+  wrap.appendChild(legend);
+
+  // Write-in breach boxes: the pencil half of "mark breaches". Fixed row
+  // height, so the body's modelled height stays exact.
+  const breaches = Math.max(0, parseInt(mapState.breachMarks, 10) || 0);
+  if (breaches > 0) {
+    const row = make('div', 'map-rings-breach');
+    row.appendChild(make('div', 'map-rings-breach-label', 'Breaches'));
+    for (let i = 0; i < breaches; i += 1) {
+      row.appendChild(make('div', 'map-rings-breach-box'));
+    }
+    wrap.appendChild(row);
+  }
+
+  return wrap;
+}
+
+// ---------------------------------------------------------------------------
+// maze — orthogonal corridor graph
+// ---------------------------------------------------------------------------
+/**
+ * Nodes are ROLES (junction / dead-end / door / entrance / goal); passages are
+ * PROGRESS (open / locked / hidden). That split is deliberate and is the
+ * difference between this and point-to-point: on a network the node carries the
+ * progress state, because the question is where you have been. In a labyrinth
+ * the question is what you have learned about the shape, so the topology role
+ * is printed and the doors are what change week over week.
+ *
+ * Corridors are horizontal-leg-first elbows — always, never alternating — so a
+ * given maze draws the same way every render and the player can annotate a
+ * printed page that will still match next week's copy.
+ */
+const MAZE_DENSITY_MAX_STANDARD = 8;
+
+const MAZE_INSETS = {
+  standard: { xStart: 14, xEnd: 86, yStart: 13, yEnd: 84 },
+  dense:    { xStart: 10, xEnd: 90, yStart: 9,  yEnd: 88 },
+};
+
+function renderMazeMap(mapState) {
+  const wrap = make('div', 'map-maze');
+  const nodes = (mapState.nodes || []).map((node) => ({ ...node }));
+  const tier = nodes.length <= MAZE_DENSITY_MAX_STANDARD ? 'standard' : 'dense';
+  const insets = MAZE_INSETS[tier];
+  wrap.setAttribute('data-maze-density', tier);
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'map-maze-svg');
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  // Same coordinate normalisation as the network: authored 1-12 coords, or any
+  // other integer range, map onto the inset box by their own bounds.
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  nodes.forEach((node) => {
+    const nx = Number(node.x) || 0;
+    const ny = Number(node.y) || 0;
+    if (nx < minX) minX = nx;
+    if (nx > maxX) maxX = nx;
+    if (ny < minY) minY = ny;
+    if (ny > maxY) maxY = ny;
+  });
+  if (!isFinite(minX)) { minX = 0; maxX = 1; }
+  if (!isFinite(minY)) { minY = 0; maxY = 1; }
+  const spanX = Math.max(1, maxX - minX);
+  const spanY = Math.max(1, maxY - minY);
+
+  const byId = {};
+  nodes.forEach((node) => {
+    node._x = insets.xStart + (((Number(node.x) || 0) - minX) / spanX) * (insets.xEnd - insets.xStart);
+    node._y = insets.yStart + (((Number(node.y) || 0) - minY) / spanY) * (insets.yEnd - insets.yStart);
+    byId[node.id] = node;
+  });
+
+  (mapState.passages || []).forEach((passage) => {
+    const from = byId[passage.from];
+    const to = byId[passage.to];
+    if (!from || !to) return;
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', [
+      'M', from._x.toFixed(2), from._y.toFixed(2),
+      'H', to._x.toFixed(2),
+      'V', to._y.toFixed(2)
+    ].join(' '));
+    path.setAttribute('class', 'map-corridor');
+    path.setAttribute('data-state', passage.state || 'open');
+    svg.appendChild(path);
+
+    // A locked passage prints its door: a bar across the longer leg, which is
+    // the mark the player crosses out when the door opens.
+    if (passage.state === 'locked') {
+      const horizontalLeg = Math.abs(to._x - from._x);
+      const verticalLeg = Math.abs(to._y - from._y);
+      const bar = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      if (horizontalLeg >= verticalLeg) {
+        const midX = (from._x + to._x) / 2;
+        bar.setAttribute('x1', midX.toFixed(2));
+        bar.setAttribute('y1', (from._y - 2.6).toFixed(2));
+        bar.setAttribute('x2', midX.toFixed(2));
+        bar.setAttribute('y2', (from._y + 2.6).toFixed(2));
+      } else {
+        const midY = (from._y + to._y) / 2;
+        bar.setAttribute('x1', (to._x - 2.6).toFixed(2));
+        bar.setAttribute('y1', midY.toFixed(2));
+        bar.setAttribute('x2', (to._x + 2.6).toFixed(2));
+        bar.setAttribute('y2', midY.toFixed(2));
+      }
+      bar.setAttribute('class', 'map-corridor-door');
+      svg.appendChild(bar);
+    }
+  });
+
+  const markerR = tier === 'dense' ? 2.4 : 3;
+  nodes.forEach((node) => {
+    const role = node.state || 'junction';
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('class', 'map-maze-node');
+    group.setAttribute('data-state', role);
+
+    if (role === 'entrance' || role === 'goal') {
+      const box = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      box.setAttribute('x', (node._x - markerR).toFixed(2));
+      box.setAttribute('y', (node._y - markerR).toFixed(2));
+      box.setAttribute('width', (markerR * 2).toFixed(2));
+      box.setAttribute('height', (markerR * 2).toFixed(2));
+      box.setAttribute('class', 'map-maze-marker');
+      group.appendChild(box);
+      if (role === 'goal') {
+        const inner = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        const r2 = markerR * 0.5;
+        inner.setAttribute('x', (node._x - r2).toFixed(2));
+        inner.setAttribute('y', (node._y - r2).toFixed(2));
+        inner.setAttribute('width', (r2 * 2).toFixed(2));
+        inner.setAttribute('height', (r2 * 2).toFixed(2));
+        inner.setAttribute('class', 'map-maze-marker-core');
+        group.appendChild(inner);
+      }
+    } else {
+      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.setAttribute('cx', node._x.toFixed(2));
+      dot.setAttribute('cy', node._y.toFixed(2));
+      dot.setAttribute('r', String(markerR));
+      dot.setAttribute('class', 'map-maze-marker');
+      group.appendChild(dot);
+      if (role === 'dead-end') {
+        // The stub cap: a bar across the dead end, the shape the player is
+        // hunting. Finding one is intel, never a penalty.
+        const cap = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        cap.setAttribute('x1', (node._x - markerR * 1.5).toFixed(2));
+        cap.setAttribute('y1', node._y.toFixed(2));
+        cap.setAttribute('x2', (node._x + markerR * 1.5).toFixed(2));
+        cap.setAttribute('y2', node._y.toFixed(2));
+        cap.setAttribute('class', 'map-maze-cap');
+        group.appendChild(cap);
+      }
+    }
+
+    const label = compactNodeLabel(node.label || '', tier === 'dense' ? 10 : 14);
+    if (label) {
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', node._x.toFixed(2));
+      text.setAttribute('y', (node._y + markerR + 3.4).toFixed(2));
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('class', 'map-maze-label');
+      text.textContent = label;
+      group.appendChild(text);
+    }
+    svg.appendChild(group);
+  });
+
+  wrap.appendChild(svg);
+
+  const legend = make('div', 'map-maze-legend');
+  const passages = (mapState.passages || []).length;
+  legend.appendChild(make('div', 'map-maze-chip', nodes.length + ' nodes'));
+  legend.appendChild(make('div', 'map-maze-chip', passages + (passages === 1 ? ' passage' : ' passages')));
+  const deadEnds = nodes.filter((node) => node.state === 'dead-end').length;
+  if (deadEnds) legend.appendChild(make('div', 'map-maze-chip', deadEnds + ' dead ends'));
+  wrap.appendChild(legend);
+
+  return wrap;
+}
+
 export function renderMapSection(mapState) {
   // .map-zone is the peer of .cipher-zone and .oracle-zone in the zone contract.
   // All zone-level CSS (classified-packet, boardStateMode variants, data-layout-variant
@@ -523,6 +956,10 @@ export function renderMapSection(mapState) {
     section.appendChild(renderLinearMap(mapState));
   } else if (mapState.mapType === 'player-drawn') {
     section.appendChild(renderPlayerMap(mapState));
+  } else if (mapState.mapType === 'concentric') {
+    section.appendChild(renderRingsMap(mapState));
+  } else if (mapState.mapType === 'maze') {
+    section.appendChild(renderMazeMap(mapState));
   } else {
     section.appendChild(renderGridMap(mapState));
   }

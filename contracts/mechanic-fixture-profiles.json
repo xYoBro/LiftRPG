@@ -90,5 +90,22 @@
       "point-to-point"
     ],
     "requireCoverArt": true
+  },
+  "content/geometry-01-tidewall.json": {
+    "requiredCompanionTypes": [],
+    "requiredClockTypes": [
+      "danger-clock",
+      "progress-clock"
+    ],
+    "requiredInterludePayloadTypes": [
+      "clock"
+    ],
+    "requiredMapTypes": [
+      "concentric",
+      "maze",
+      "grid",
+      "point-to-point"
+    ],
+    "requireCoverArt": false
   }
 }

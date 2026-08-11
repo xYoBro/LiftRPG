@@ -99,13 +99,13 @@
     '- `isDeload` (boolean, optional): tonal flag only'
   ];
 
-  // Later: deepen spatial play before adding new map types.
-  // First get more mileage out of revisitation, denied routes,
-  // checkpoints, changed annotations, and floorLabel within the
-  // current renderer-supported map schema.
+  // The board serves the verb, never decoration (§4 of the gameplay brainstorm).
+  // Wave 3 added two geometries because two grammar families had no board at
+  // all; the guardrail numbers below are quoted from SPATIAL_GUARDRAILS in
+  // contracts/contract-constants.mjs and are parity-asserted by validate.mjs.
   window.SCHEMA_SPATIAL = [
     '### fieldOps.mapState',
-    '- `mapType` (string): one of "grid" | "point-to-point" | "linear-track" | "player-drawn"',
+    '- `mapType` (string): one of "grid" | "point-to-point" | "linear-track" | "player-drawn" | "concentric" | "maze"',
     '- `title` (string): diegetic heading',
     '- `floorLabel` (string, optional): deck, floor, wing, district, sector, or stratum label when it strengthens spatial identity',
     '- `mapNote` (string, optional): footer note',
@@ -119,6 +119,7 @@
     '- `gridDimensions`: { columns: 5-12, rows: 4-8 }',
     '- `tiles`: [{ col, row, type, label?, annotation? }] with route meaning, blocked movement, checkpoints, or discoverable annotations, not filler cells',
     '- `currentPosition`: { col, row }',
+    '- `cellShape` (optional): "square" (default) | "hex". Hex reads as surveyed ground with six-way movement — charts, wilderness traverses, dig sites. Same tiles and dimensions either way; choose hex only when six-way agency is the point.',
     '',
     'POINT-TO-POINT:',
     '- `nodes`: [{ id, label, x, y, state }] — x and y MUST be integers in range 1–12 INCLUSIVE. Zero (0) and negative values are ILLEGAL and cause nodes to stack. Use the full 1–12 range.',
@@ -129,6 +130,24 @@
     '- **Coordinate spread requirement:** For maps with 6+ nodes, max(x) MUST be ≥ 9 and max(y) MUST be ≥ 7. No more than 2 nodes may share the same x value. No more than 2 nodes may share the same y value. Do NOT pack all nodes into a sub-range like 1–5.',
     '- **Label discipline:** Node labels are rendered in ~5pt monospace on a small page. Keep labels to 2–3 words (≤20 characters). Prefer short location names over full descriptive phrases. BAD: "Conclave Records Office West Annex". GOOD: "Records West". Edge labels (route names) should be even shorter: 1–2 words, ≤12 characters.',
     '- **Network growth across weeks:** Show progression via node `state` changes ("locked"→"empty"→"active"→"visited"), not by adding nodes beyond the 12 limit. Start with most nodes locked; open them as the story progresses.',
+    '- `edgeSemantics` (optional): "traversal" (default) | "relational". Traversal means an edge is a way to get there. Relational is the constellation mode: the edge is a TIE between people, houses, or claims, and the board is a sociogram — a case-file web, a family tree, a correspondence map, a court alliance chart.',
+    '- **RELATIONAL MODE:** node/edge shape is unchanged; only the reading changes. Edge `state` uses "strong" | "strained" | "severed" | "redrawn" instead of the access states, and each prints differently. The player verbs are strengthen, strain, sever, redraw — never travel. Do not mix relational and traversal edges on the same board.',
+    '',
+    'CONCENTRIC (approach rings — the siege board):',
+    '- `rings`: [{ label, state, annotation? }] ordered OUTERMOST FIRST. The last ring is what the siege is about.',
+    '- **Limits: 3-6 rings, ring labels max 18 characters.** Fewer than three rings is a target, not an approach; more than six and the innermost band is thinner than the pencil that marks it.',
+    '- `currentRing` (integer, 1-based): which ring the player currently holds to. 1 is the outermost.',
+    '- `breachMarks` (integer, 0-8, optional): how many write-in breach boxes print under the diagram. The pencil half of "mark breaches".',
+    '- Player verbs: advance inward, hold or lose a ring, mark a breach. Week over week a ring changes state or the held ring moves — the topology itself does not.',
+    '- Serves siege, observance, and heat: quarantine cordons, shrine precincts, siege works, blast radii, orbit charts.',
+    '',
+    'MAZE (corridor graph — the evasion board):',
+    '- `nodes`: [{ id, label?, x, y, state }] where `state` is the topology ROLE: "junction" | "dead-end" | "door" | "entrance" | "goal". Node labels max 14 characters.',
+    '- `passages`: [{ from, to, label?, state? }] where `state` is PROGRESS: "open" | "locked" | "hidden". Corridors print as right-angle runs; a locked passage prints a door bar the player crosses out when it opens.',
+    '- **HARD LIMITS: max 12 nodes, max 14 passages.** Same x/y rules as point-to-point: integers 1-12 inclusive, spread across the range.',
+    '- The role/progress split is the point: nodes say what the shape IS, passages say what has opened. Week over week, passages change state — the corridors do not move.',
+    '- Player verbs: trace the path, mark dead ends, unlock doors. A discovered dead end is INTEL — it narrows the search. It never costs the player anything.',
+    '- Serves evasion, attrition, and reconstruction: catacombs, archive stacks, hedge labyrinths, vent systems, a bureaucratic process rendered as corridors.',
     '',
     'LINEAR-TRACK:',
     '- `positions`: [{ index, label, state, annotation? }] should suggest route logic, pressure, or access stages rather than generic progress pips',
@@ -443,7 +462,7 @@
     '- `arcBeat` (string): 1-sentence narrative focus for this week',
     '- `epigraphText` (string): epigraph quote for this week',
     '- `epigraphAttribution` (string): attribution for the epigraph',
-    '- `mapType` (string): grid|point-to-point|linear-track|player-drawn',
+    '- `mapType` (string): grid|point-to-point|linear-track|player-drawn|concentric|maze',
     '- `cipherType` (string): the cipher technique name',
     '- `componentValue` (number|null): fiction-native value for password system (null for boss week)',
     '- `isBossWeek` (boolean): true ONLY for final week',
@@ -719,7 +738,7 @@
           properties: {
             weekNumber: { type: 'integer' }, title: { type: 'string' }, arcBeat: { type: 'string' },
             epigraphText: { type: 'string' }, epigraphAttribution: { type: 'string' },
-            mapType: { type: 'string', enum: ['grid', 'point-to-point', 'linear-track', 'player-drawn'] },
+            mapType: { type: 'string', enum: ['grid', 'point-to-point', 'linear-track', 'player-drawn', 'concentric', 'maze'] },
             cipherType: { type: 'string' },
             componentValue: {}, isBossWeek: { type: 'boolean' }, isDeload: { type: 'boolean' },
             isBinaryChoiceWeek: { type: 'boolean' }, sessionCount: { type: 'integer' },
@@ -1101,7 +1120,7 @@
     '- **Session Phase Loop:** Design and name a specific play cadence for this booklet (e.g., "Workout → Oracle Pull → Execute Consequence → Read Fragment → Mark Board → Record Component"). Commit to this loop in the rulesSpread and follow it consistently. The loop is what makes this feel like a board game, not a journal.',
     '- **Clocks:** Use only when the story implies countdowns, rising institutional heat, structural failure, or approaching pursuers.',
     '- **Ciphers / Puzzles:** Use only when the player intersects hidden communications, corrupted data, or encrypted journals. Do not bury a door code in an abstract puzzle unless someone in-world hid it that way.',
-    '- **Maps:** If exploring or tracking, use hex/point-to-point. If breaching a facility, use strict grid.',
+    '- **Maps:** Pick the geometry from the verb, not the setting — see "Choosing the geometry" in the maps section. Exploring open ground reads as a hex grid; moving between named places reads as point-to-point; holding a perimeter reads as concentric rings; getting out unseen reads as a maze.',
     '- **Companions:** Use stress/inventory tracks only if resource scarcity is a central thematic pressure.',
     '- **Player Reflection (Logging):** At least twice per booklet, prompt the player to document a diegetic thought, sketch an observation, or log an answer directly onto the paper.',
     '- **Legacy Mutability:** When narrative shifts are permanent, demand permanent physical actions from the player ("cross out this paragraph permanently", "black out this node", "tear off this corner").',
@@ -1170,7 +1189,24 @@
     '- If the mapType or topology truly changes for a week (zoom-in, new sector), the change must be diegetically justified and the main topology must return.',
     '- **Point-to-point print legibility:** Node and edge labels print at ~5pt on a half-letter page. Keep node labels to 2–3 words. Edge labels to 1–2 words. If a location has a long institutional name, abbreviate it for the map label and use the full name in prose. The map is a board, not a paragraph.',
     '- Use `floorLabel` when layered spaces such as decks, wings, sectors, or strata matter to orientation.',
-    '- Player-drawn maps should still give enough seed markers or prompts to feel purposeful, not empty.'
+    '- Player-drawn maps should still give enough seed markers or prompts to feel purposeful, not empty.',
+    '',
+    '### Choosing the geometry',
+    'ONE geometry per book. Choose it because it serves the grammar family — the board serves the verb, never decoration. A second geometry in the same booklet is a topology change and needs the diegetic justification above.',
+    '',
+    '| Geometry | Player verbs | Serves |',
+    '|---|---|---|',
+    '| `grid` | clear cells, annotate ground, mark position | survey-grid, ledger-board, stewardship |',
+    '| `grid` + `cellShape: "hex"` | reveal hexes, plot traverses (six-way agency) | attrition, stewardship, reconstruction |',
+    '| `point-to-point` | move between nodes, open routes | node-graph, heat, stewardship |',
+    '| `point-to-point` + `edgeSemantics: "relational"` | strengthen, strain, sever, redraw ties | loyalty-web, testimony-matrix |',
+    '| `linear-track` | advance the line, hold ground behind you | route-tracker, timeline-reconstruction |',
+    '| `concentric` | advance inward, hold or lose rings, mark breaches | siege, observance, heat |',
+    '| `maze` | trace the path, mark dead ends, unlock doors | evasion, attrition, reconstruction |',
+    '| `player-drawn` | draw the space as you learn it | any family whose world is unmapped |',
+    '',
+    '- A geometry is not an aesthetic. If the family\'s verb is "hold ground while it closes", rings ARE that verb and a square grid is a translation of it. If the verb is "get out without being seen", corridors are that verb and a straight line is a summary of it.',
+    '- The map is an in-world document with an in-world maker: it has a reason to exist, labels drawn from the world\'s own nouns, and weekly deltas someone in the fiction would name. Two booklets that both chose `concentric` must not produce the same drawing.'
   ];
 
   // ── Convergence Design (Wave 2; the March 2026 convergence-variants design) ─
@@ -1962,8 +1998,9 @@
   // SCHEMA_FRAGMENTS, and SCHEMA_THEME above. If those change, update this.
   window.MECHANIC_VOCAB_BRIEF = [
     'RENDERER MECHANICAL CONSTRAINTS (plan within these boundaries):',
-    '- Map types (exactly 4): grid, point-to-point, linear-track, player-drawn.',
-    '  Grid: max 12 cols x 8 rows. PTP: max 12 nodes, max 10 edges. Linear: max 12 positions. Player-drawn: canvas instructions only.',
+    '- Map types (exactly 6): grid, point-to-point, linear-track, player-drawn, concentric, maze.',
+    '  Grid: max 12 cols x 8 rows (cellShape square or hex). PTP: max 12 nodes, max 10 edges (edgeSemantics traversal or relational). Linear: max 12 positions. Player-drawn: canvas instructions only.',
+    '  Concentric: 3-6 rings, labels max 18 chars. Maze: max 12 nodes, max 14 passages.',
     '- Ciphers: DELAYED INTERPRETATION. Weekly values are fiction-native (numbers, codes, instrument readings), NEVER raw letters.',
     '  The boss decodingKey at Week 6 converts accumulated values to letters. This is non-negotiable.',
     '- Oracle tables: d100 with exactly 10 bands (00-09, 10-19, ... 90-99). Each entry has a `text` field.',

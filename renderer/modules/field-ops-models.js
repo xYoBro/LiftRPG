@@ -10,6 +10,12 @@ import {
   inferMapFamily
 } from './mechanic-registry.js?v=48';
 import { normalizeD100Language, resolveArtifactIdentity } from './booklet-models.js?v=48';
+import {
+  VALID_EDGE_SEMANTICS,
+  DEFAULT_EDGE_SEMANTICS,
+  VALID_CELL_SHAPES,
+  DEFAULT_CELL_SHAPE
+} from '../../contracts/contract-constants.mjs';
 
 function splitKeyRows(text) {
   return String(text || '')
@@ -429,6 +435,20 @@ export function buildMapModel(mapState, mechanicProfile = null) {
     nodes: mapState.nodes || [],
     edges: mapState.edges || [],
     currentNode: mapState.currentNode || '',
+    // Variant axes. Normalized here so the renderer never re-derives them and
+    // never has to defend against an unknown string: an unrecognised value
+    // falls to the default, exactly like DEFAULT_WORKSPACE_STYLE does for the
+    // cipher workspace — a board must still print.
+    edgeSemantics: VALID_EDGE_SEMANTICS.indexOf(mapState.edgeSemantics) === -1
+      ? DEFAULT_EDGE_SEMANTICS : mapState.edgeSemantics,
+    cellShape: VALID_CELL_SHAPES.indexOf(mapState.cellShape) === -1
+      ? DEFAULT_CELL_SHAPE : mapState.cellShape,
+    // concentric: rings are ordered outermost-first and stay in authored order.
+    rings: Array.isArray(mapState.rings) ? mapState.rings : [],
+    currentRing: parseInt(mapState.currentRing, 10) > 0 ? parseInt(mapState.currentRing, 10) : 0,
+    breachMarks: Math.max(0, parseInt(mapState.breachMarks, 10) || 0),
+    // maze: corridors between nodes[].
+    passages: Array.isArray(mapState.passages) ? mapState.passages : [],
     positions: mapState.positions || [],
     direction: mapState.direction || 'horizontal',
     dimensions: mapState.dimensions || { columns: 12, rows: 8 },

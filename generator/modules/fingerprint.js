@@ -48,10 +48,41 @@ export function buildMapEvolutionFingerprint(mapState) {
     var nodes = (ms.nodes || []).map(function (node) {
       return [node.id || '', node.label || '', node.state || '', node.x || '', node.y || ''].join(':');
     }).sort().join('|');
+    // `edge.state` is part of the fingerprint. It was omitted while `node.state`
+    // was included — an asymmetry, not a ruling: INST_MAPS_BOARD names "route
+    // closed" as legitimate week-to-week evolution, so a week whose only delta
+    // was a locked route fingerprinted as stagnant. Adding the field can only
+    // make consecutive weeks MORE distinct, so this strictly reduces false
+    // stagnation findings. It also makes the relational (constellation) mode
+    // legible at all: there, the tie state IS the weekly delta.
     var edges = (ms.edges || []).map(function (edge) {
-      return [edge.from || '', edge.to || '', edge.label || ''].join(':');
+      return [edge.from || '', edge.to || '', edge.label || '', edge.state || ''].join(':');
     }).sort().join('|');
-    return 'network::' + nodes + '::' + edges + '::' + String(ms.currentNode || '');
+    return 'network::' + nodes + '::' + edges + '::' + String(ms.currentNode || '')
+      + '::' + String(ms.edgeSemantics || '');
+  }
+
+  if (mapType === 'maze') {
+    // Nodes carry the ROLE and passages carry the PROGRESS, so a maze's weekly
+    // delta lives almost entirely in the passage states.
+    var mazeNodes = (ms.nodes || []).map(function (node) {
+      return [node.id || '', node.label || '', node.state || '', node.x || '', node.y || ''].join(':');
+    }).sort().join('|');
+    var passages = (ms.passages || []).map(function (passage) {
+      return [passage.from || '', passage.to || '', passage.label || '', passage.state || ''].join(':');
+    }).sort().join('|');
+    return 'maze::' + mazeNodes + '::' + passages + '::' + String(ms.currentNode || '');
+  }
+
+  if (mapType === 'concentric') {
+    // Ring ORDER is meaning (outermost first), so this one is deliberately
+    // unsorted — two books with the same ring labels in a different order are
+    // different boards.
+    var rings = (ms.rings || []).map(function (ring) {
+      return [ring.label || '', ring.state || '', ring.annotation || ''].join(':');
+    }).join('|');
+    return 'rings::' + rings + '::' + String(ms.currentRing || '')
+      + '::' + String(ms.breachMarks || '');
   }
 
   if (mapType === 'linear-track') {
@@ -101,6 +132,14 @@ export function hasComparableMapState(mapState) {
 
   if (mapType === 'player-drawn') {
     return !!(ms.mapNote || ms.currentPosition);
+  }
+
+  if (mapType === 'maze') {
+    return !!(((ms.nodes || []).length > 0) || ((ms.passages || []).length > 0));
+  }
+
+  if (mapType === 'concentric') {
+    return !!(((ms.rings || []).length > 0) || ms.currentRing);
   }
 
   return !!(((ms.tiles || []).length > 0) || ms.currentPosition);

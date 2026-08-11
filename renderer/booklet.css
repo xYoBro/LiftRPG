@@ -3486,6 +3486,306 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   background:#2b3027;
   border-color:#2b3027;
 }
+/* ── Hex grid variant (mapState.cellShape === "hex") ──
+   The height comes from the row count and is set INLINE by renderHexGridMap
+   (rows x 26px + 9px); nothing here may set a height, or the estimate in
+   atoms/map-panel.js (HEX_ROW_PX / HEX_CAP_PX) starts lying. `meet` scaling
+   sizes the hexes to whichever axis binds and centres the slack. */
+.map-hex{
+  width:100%;
+  margin-bottom:4px;
+  /* The inline height is the contract with the estimate; without this the hex
+     grid is a flex item in `.map-content` and would shrink under pressure,
+     rendering shorter than the height map-panel.js promised. */
+  flex:0 0 auto;
+}
+.map-hex-svg{
+  width:100%;
+  height:100%;
+  display:block;
+}
+.map-hex-cell{
+  fill:transparent;
+  stroke:var(--rule);
+  /* With `non-scaling-stroke` the width is in RENDERED pixels, not user units —
+     a user-unit hairline here measured 0.06px on the page and the unmarked
+     panels printed invisible, which turns a shadeable survey board into a
+     scatter of marks. A constant printed hairline is also the right behaviour:
+     the rule weight must not change with the grid's dimensions. */
+  stroke-width:.75;
+  vector-effect:non-scaling-stroke;
+}
+.map-hex-cell[data-state="cleared"]{
+  fill:color-mix(in srgb, var(--fog) 55%, transparent 45%);
+}
+.map-hex-cell[data-state="locked"]{
+  fill:color-mix(in srgb, var(--fog) 30%, transparent 70%);
+  stroke-dasharray:2 1.6;
+}
+.map-hex-cell[data-state="anomaly"]{
+  fill:color-mix(in srgb, var(--ink) 22%, transparent 78%);
+  stroke-width:1.6;
+}
+.map-hex-cell[data-state="current"]{
+  fill:var(--ink);
+  stroke:var(--ink);
+}
+.map-hex-cell[data-state="inaccessible"]{
+  fill:#2b3027;
+  stroke:#2b3027;
+}
+.map-hex-label{
+  font-family:var(--mono);
+  font-size:.42px;
+  fill:var(--ink);
+  text-transform:uppercase;
+}
+.map-hex-cell[data-state="current"] + .map-hex-label,
+.map-hex-cell[data-state="inaccessible"] + .map-hex-label{
+  fill:var(--paper);
+}
+
+/* ── concentric — approach rings ──
+   Stroke-and-dash only: the bands are the writing surface, so no ring may be
+   filled, and every state must read in B&W by weight and dash alone.
+   CROSS-FILE CONTRACT: the 196px floor is mirrored as RINGS_MIN_PX in
+   renderer/modules/atoms/map-panel.js, and the two fixed rows below are what
+   keep that floor honest. Change them together. */
+.map-rings{
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  min-height:196px;
+  margin-bottom:4px;
+  border:1px solid color-mix(in srgb, var(--theme-panel-border,var(--rule)) 70%, transparent 30%);
+  background:color-mix(in srgb, var(--paper) 92%, white 8%);
+  overflow:hidden;
+  flex:1;
+}
+.map-rings-svg{
+  flex:1;
+  min-height:0;
+  width:100%;
+  display:block;
+}
+.map-ring{
+  fill:none;
+  stroke:color-mix(in srgb, var(--ink) 68%, var(--muted) 32%);
+  stroke-width:1.1;
+}
+.map-ring[data-state="cleared"]{
+  stroke-width:1.6;
+  stroke-dasharray:5 2.4;
+}
+.map-ring[data-state="locked"]{
+  stroke-width:.8;
+  stroke-dasharray:1.4 2;
+  stroke:color-mix(in srgb, var(--muted) 78%, var(--paper) 22%);
+}
+.map-ring[data-state="anomaly"]{
+  stroke-width:1.8;
+  stroke-dasharray:6 1.6 1.2 1.6;
+}
+.map-ring[data-state="inaccessible"]{
+  stroke-width:2.4;
+  stroke:#2b3027;
+}
+.map-ring[data-current="true"]{
+  stroke:var(--accent);
+  stroke-width:2.2;
+  stroke-dasharray:none;
+}
+.map-ring-label{
+  font-family:var(--mono);
+  font-size:3.4px;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  fill:color-mix(in srgb, var(--ink) 78%, var(--muted) 22%);
+  paint-order:stroke fill;
+  stroke:color-mix(in srgb, var(--paper) 94%, white 6%);
+  stroke-width:1.1px;
+  stroke-linejoin:round;
+}
+.map-rings-legend{
+  display:flex;
+  flex-wrap:nowrap;
+  align-items:center;
+  gap:4px;
+  height:14px;
+  padding:0 6px;
+  overflow:hidden;
+}
+.map-rings-chip{
+  padding:1px 4px;
+  border:1px solid color-mix(in srgb, var(--theme-panel-border,var(--rule)) 78%, transparent 22%);
+  background:color-mix(in srgb, var(--paper) 94%, white 6%);
+  font-family:var(--mono);
+  font-size:4.9pt;
+  line-height:1;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  white-space:nowrap;
+  overflow:hidden;
+}
+.map-rings-breach{
+  display:flex;
+  align-items:center;
+  gap:3px;
+  height:16px;
+  padding:0 6px 3px;
+  overflow:hidden;
+}
+.map-rings-breach-label{
+  font-family:var(--mono);
+  font-size:4.4pt;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:color-mix(in srgb, var(--ink) 58%, var(--muted) 42%);
+}
+.map-rings-breach-box{
+  width:9px;
+  height:9px;
+  border:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-panel-border,var(--rule));
+  background:color-mix(in srgb, var(--paper) 94%, white 6%);
+  flex:0 0 auto;
+}
+
+/* ── maze — orthogonal corridor graph ──
+   Corridor = thick stroke. Door = a bar the player crosses out. Hidden = the
+   dotted run you have not proved yet. B&W-safe by weight and dash.
+   CROSS-FILE CONTRACT: the 214px floor is mirrored as MAZE_MIN_PX in
+   renderer/modules/atoms/map-panel.js. */
+.map-maze{
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  min-height:214px;
+  margin-bottom:4px;
+  border:1px solid color-mix(in srgb, var(--theme-panel-border,var(--rule)) 70%, transparent 30%);
+  background:color-mix(in srgb, var(--paper) 92%, white 8%);
+  overflow:hidden;
+  flex:1;
+}
+.map-maze-svg{
+  flex:1;
+  min-height:0;
+  width:100%;
+  display:block;
+}
+.map-corridor{
+  fill:none;
+  stroke:color-mix(in srgb, var(--ink) 42%, var(--paper) 58%);
+  stroke-width:3.2;
+  stroke-linecap:square;
+  stroke-linejoin:miter;
+}
+.map-corridor[data-state="locked"]{
+  stroke:color-mix(in srgb, var(--muted) 70%, var(--paper) 30%);
+  stroke-dasharray:3 1.6;
+}
+.map-corridor[data-state="hidden"]{
+  stroke-width:1;
+  stroke-dasharray:.8 2.2;
+  stroke-linecap:round;
+}
+.map-corridor-door{
+  stroke:var(--ink);
+  stroke-width:1.4;
+}
+.map-maze-marker{
+  fill:color-mix(in srgb, var(--paper) 94%, white 6%);
+  stroke:color-mix(in srgb, var(--ink) 76%, var(--muted) 24%);
+  stroke-width:.9;
+}
+.map-maze-node[data-state="entrance"] .map-maze-marker{
+  stroke-width:1.6;
+}
+.map-maze-node[data-state="goal"] .map-maze-marker{
+  stroke-width:1.6;
+}
+.map-maze-marker-core{
+  fill:var(--ink);
+  stroke:none;
+}
+.map-maze-node[data-state="door"] .map-maze-marker{
+  fill:color-mix(in srgb, var(--fog) 62%, var(--paper) 38%);
+  stroke-dasharray:1.6 1.1;
+}
+.map-maze-node[data-state="dead-end"] .map-maze-marker{
+  fill:color-mix(in srgb, var(--fog) 45%, var(--paper) 55%);
+}
+.map-maze-cap{
+  stroke:var(--ink);
+  stroke-width:1.2;
+}
+.map-maze-label{
+  font-family:var(--mono);
+  font-size:3.1px;
+  letter-spacing:.03em;
+  text-transform:uppercase;
+  fill:color-mix(in srgb, var(--ink) 76%, var(--muted) 24%);
+  paint-order:stroke fill;
+  stroke:color-mix(in srgb, var(--paper) 94%, white 6%);
+  stroke-width:1px;
+  stroke-linejoin:round;
+}
+.map-maze[data-maze-density="dense"] .map-maze-label{
+  font-size:2.7px;
+}
+.map-maze[data-maze-density="dense"] .map-corridor{
+  stroke-width:2.6;
+}
+.map-maze-legend{
+  display:flex;
+  flex-wrap:nowrap;
+  align-items:center;
+  gap:4px;
+  height:16px;
+  padding:0 6px 3px;
+  overflow:hidden;
+}
+.map-maze-chip{
+  padding:1px 4px;
+  border:1px solid color-mix(in srgb, var(--theme-panel-border,var(--rule)) 78%, transparent 22%);
+  background:color-mix(in srgb, var(--paper) 94%, white 6%);
+  font-family:var(--mono);
+  font-size:4.9pt;
+  line-height:1;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+
+/* ── constellation mode (mapState.edgeSemantics === "relational") ──
+   Same node-link geometry as any point-to-point board; the edge STATES change
+   meaning, so they change drawing. CROSS-FILE CONTRACT: the four state names
+   below are the vocabulary SCHEMA_SPATIAL offers the model under RELATIONAL
+   MODE in public/generator/prompt_rules.js. A state named there and unstyled
+   here prints as a plain tie and the distinction the fiction promised is gone.
+   Weight and dash only — never hue alone. */
+.map-network[data-edge-semantics="relational"] .map-edge{
+  stroke-dasharray:none;
+  stroke-width:1.2;
+}
+.map-network[data-edge-semantics="relational"] .map-edge[data-state="strong"]{
+  stroke:var(--ink);
+  stroke-width:2.4;
+}
+.map-network[data-edge-semantics="relational"] .map-edge[data-state="strained"]{
+  stroke-width:1.2;
+  stroke-dasharray:3.2 1.6;
+}
+.map-network[data-edge-semantics="relational"] .map-edge[data-state="severed"]{
+  stroke:color-mix(in srgb, var(--muted) 72%, var(--paper) 28%);
+  stroke-width:.7;
+  stroke-dasharray:.8 3.2;
+}
+.map-network[data-edge-semantics="relational"] .map-edge[data-state="redrawn"]{
+  stroke:var(--accent);
+  stroke-width:1.8;
+  stroke-dasharray:6 1.4 1.4 1.4;
+}
+
 .map-annotation{
   font-family:var(--mono);
   font-size:5.9pt;
@@ -3590,6 +3890,120 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 }
 .clock-item[data-clock-type="tug-of-war-clock"] .progress-clock-fill{
   fill:color-mix(in srgb, var(--accent) 28%, var(--ink) 72%);
+}
+
+/* ── Component dialect ──────────────────────────────────────────────────────
+   `data-component-dialect` is stamped on #booklet-container by applyTheme()
+   from meta.artifactIdentity.componentDialect. It answers "whose instrument is
+   this" — the same question the shell family answers for the document.
+
+   THE HEIGHT LAW (contracts/contract-constants.mjs, gate:
+   componentDialectHeightLaw() in scripts/validate.mjs): a dialect rule may
+   change DRAWING only. No height, padding, margin, font-size, line-height,
+   gap, border-width, display, or position may appear in any rule below. Two
+   reasons, and the second is the load-bearing one: phase-1 atom estimation has
+   no DOM and cannot resolve this attribute, so a dialect that moved geometry
+   would make every tracker, session-card and reckoning estimate lie — the D71
+   defect class reached from a new direction.
+
+   Every clock dialect layer is drawn by renderGameplayClocks(); the base rule
+   below paints three of the four out, and each dialect paints its own back in.
+   Hiding via paint, never `display`, is what keeps these rules inside the
+   permitted property set. */
+.progress-clock-bead,
+.progress-clock-notch,
+.progress-clock-arc,
+.progress-clock-needle{
+  fill:none;
+  stroke:none;
+}
+
+/* segments — the wedge clock. The default, and the historical drawing. */
+
+/* beads — a counted rosary: one bead per segment, filled as it is spent.
+   The wedge-suppression selectors carry `.clock-item[data-clock-type]` for
+   specificity, not for scope: the per-clock-type fill rules above score (0,3,0)
+   and a plain two-class dialect selector loses to them, so a danger clock kept
+   its wedges under every dialect. Caught by the Wave 3 render proof; the shape
+   is the D71 lesson again — a rule that looks applied and is not. */
+[data-component-dialect="beads"] .clock-item[data-clock-type] .progress-clock-fill{
+  fill:none;
+}
+[data-component-dialect="beads"] .progress-clock-divider{
+  stroke:none;
+}
+[data-component-dialect="beads"] .progress-clock-bead{
+  fill:color-mix(in srgb, var(--paper) 92%, white 8%);
+  stroke:color-mix(in srgb, var(--ink) 72%, var(--muted) 28%);
+  stroke-width:2;
+}
+[data-component-dialect="beads"] .progress-clock-bead[data-filled="true"]{
+  fill:var(--ink);
+}
+[data-component-dialect="beads"] .mark-box,
+[data-component-dialect="beads"] .reckoning-tally-box,
+[data-component-dialect="beads"] .companion-track-box,
+[data-component-dialect="beads"] .companion-dashboard-box{
+  border-radius:50%;
+}
+
+/* gauge — a swept instrument read at a glance: one arc and a needle. */
+[data-component-dialect="gauge"] .clock-item[data-clock-type] .progress-clock-fill{
+  fill:none;
+}
+[data-component-dialect="gauge"] .progress-clock-divider{
+  stroke:color-mix(in srgb, var(--rule) 40%, transparent 60%);
+  stroke-width:.8;
+}
+[data-component-dialect="gauge"] .progress-clock-arc{
+  fill:color-mix(in srgb, var(--accent) 22%, transparent 78%);
+  stroke:color-mix(in srgb, var(--ink) 60%, var(--muted) 40%);
+  stroke-width:1.2;
+}
+[data-component-dialect="gauge"] .progress-clock-needle{
+  stroke:var(--ink);
+  stroke-width:3;
+  stroke-linecap:round;
+}
+[data-component-dialect="gauge"] .mark-box,
+[data-component-dialect="gauge"] .reckoning-tally-box,
+[data-component-dialect="gauge"] .companion-track-box,
+[data-component-dialect="gauge"] .companion-dashboard-box{
+  background:linear-gradient(
+    to right,
+    transparent 0 22%,
+    color-mix(in srgb, var(--ink) 34%, transparent 66%) 22% 78%,
+    transparent 78% 100%
+  );
+  border-color:color-mix(in srgb, var(--ink) 52%, var(--paper) 48%);
+}
+
+/* tally — a struck rim and a struck box: the countable made by hand. */
+[data-component-dialect="tally"] .clock-item[data-clock-type] .progress-clock-fill{
+  fill:none;
+}
+[data-component-dialect="tally"] .progress-clock-divider{
+  stroke:none;
+}
+[data-component-dialect="tally"] .progress-clock-notch{
+  stroke:color-mix(in srgb, var(--ink) 66%, var(--muted) 34%);
+  stroke-width:2.4;
+}
+[data-component-dialect="tally"] .progress-clock-notch[data-filled="true"]{
+  stroke:var(--ink);
+  stroke-width:4;
+}
+[data-component-dialect="tally"] .mark-box,
+[data-component-dialect="tally"] .reckoning-tally-box,
+[data-component-dialect="tally"] .companion-track-box,
+[data-component-dialect="tally"] .companion-dashboard-box{
+  background:linear-gradient(
+    to bottom right,
+    transparent calc(50% - .5px),
+    color-mix(in srgb, var(--ink) 28%, transparent 72%) calc(50% - .5px) calc(50% + .5px),
+    transparent calc(50% + .5px)
+  );
+  border-style:dashed;
 }
 
 /* ── Oracle ──────────────────────────────────────────── */
@@ -6038,7 +6452,9 @@ body[data-demo-view="true"] .reader-unlock{
    pencil boxes, and .player-map is a draw-on-me canvas with a 176px floor.
    Measured across the corpus at every tier, all four are byte-identical in
    height — and that is correct, not a defect: compressing them would shrink the
-   surfaces the player writes on. So the map's shrink is bounded by its chrome,
+   surfaces the player writes on. The Wave 3 bodies join them on the same terms:
+   .map-rings (196px floor) and .map-maze (214px floor) are framed boards, and
+   .map-hex takes its height inline from the row count. So the map's shrink is bounded by its chrome,
    and the estimate in atoms/map-panel.js says so instead of promising a flat
    15% the body can never give back. (Before this pass it promised 15% at every
    tier and delivered 0 / -6.3 / -12.7%, all of it from the note — which meant a
@@ -6060,13 +6476,19 @@ body[data-demo-view="true"] .reader-unlock{
 /* Spacing around the body, never inside it: the gutter under the map and the
    gap above the floor annotation. */
 .map-zone[data-density-variant="dense"] .map-grid,
+.map-zone[data-density-variant="dense"] .map-hex,
 .map-zone[data-density-variant="dense"] .map-network,
 .map-zone[data-density-variant="dense"] .map-track,
 .map-zone[data-density-variant="dense"] .player-map,
+.map-zone[data-density-variant="dense"] .map-rings,
+.map-zone[data-density-variant="dense"] .map-maze,
 .map-zone[data-density-variant="tight"] .map-grid,
+.map-zone[data-density-variant="tight"] .map-hex,
 .map-zone[data-density-variant="tight"] .map-network,
 .map-zone[data-density-variant="tight"] .map-track,
-.map-zone[data-density-variant="tight"] .player-map{
+.map-zone[data-density-variant="tight"] .player-map,
+.map-zone[data-density-variant="tight"] .map-rings,
+.map-zone[data-density-variant="tight"] .map-maze{
   margin-bottom:2px;
 }
 .map-zone[data-density-variant="dense"] .map-annotation,

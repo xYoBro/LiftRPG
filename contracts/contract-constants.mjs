@@ -65,7 +65,47 @@ export var DOCUMENT_TYPE_ALIASES = {
 
 // ── Mechanic vocabularies ────────────────────────────────────────────────────
 
-export var VALID_MAP_TYPES = ['grid', 'point-to-point', 'linear-track', 'player-drawn'];
+// Render GEOMETRY, not usage semantics — `boardStateMode` carries the latter.
+// Wave 3 (§4 of the gameplay brainstorm) added `concentric` and `maze` because
+// two grammar families had no board at all: siege had to borrow a square grid
+// for a cordon, and evasion had to spell a labyrinth as a straight line.
+export var VALID_MAP_TYPES = [
+  'grid', 'point-to-point', 'linear-track', 'player-drawn',
+  'concentric', 'maze'
+];
+
+// ── Map variant axes (Wave 3) ────────────────────────────────────────────────
+// Two geometries got a VARIANT instead of a type, because the data model is
+// unchanged and only the drawing differs. A variant costs one enum and one CSS
+// block; a type costs the whole add-map-type chain. Spend the type budget only
+// when the topology itself is new.
+
+// How a point-to-point map's edges MEAN. 'traversal' is the historical reading
+// (an edge is a way to get there); 'relational' is the constellation mode (an
+// edge is a tie between people or claims, and the pencil verb is strengthen /
+// strain / sever / redraw). Node and edge SHAPE is identical either way — which
+// is what keeps buildMapEvolutionFingerprint comparable across the two.
+export var VALID_EDGE_SEMANTICS = ['traversal', 'relational'];
+export var DEFAULT_EDGE_SEMANTICS = 'traversal';
+
+// The cell a grid map prints. 'hex' reuses tiles/gridDimensions untouched and
+// only changes the cell polygon + row offset, so grid guardrails still bound it.
+export var VALID_CELL_SHAPES = ['square', 'hex'];
+export var DEFAULT_CELL_SHAPE = 'square';
+
+// ── Component dialect (Wave 3) ───────────────────────────────────────────────
+// WHOSE instrument this book's countable surfaces are. A dialect changes how a
+// clock face, a mark strip, and a track are DRAWN — never how tall they are.
+//
+// THE HEIGHT LAW (binding, generalizes the D89 flat-height precedent): dialects
+// are height-identical by construction. No dialect may add, remove, or resize a
+// box; it restyles what is inside one. That is what lets the dialect be a pure
+// CSS layer with zero estimate changes and zero new ladders — phase-1 estimation
+// has no DOM and cannot resolve `data-component-dialect`, so a dialect that
+// moved geometry would make every tracker/reckoning estimate lie (the D71
+// defect class, arrived at from a new direction).
+export var VALID_COMPONENT_DIALECTS = ['segments', 'beads', 'gauge', 'tally'];
+export var DEFAULT_COMPONENT_DIALECT = 'segments';
 
 // NOTE: usage-die was always renderer-supported (mechanic-registry.js:150,
 // field-ops-primitives.js:723) but missing from the generator enum — corpus
@@ -588,6 +628,28 @@ export var SPATIAL_GUARDRAILS = {
     edgeLabelMaxChars: 12
   },
   grid: { maxColumns: 12, maxRows: 8 },
+  // Approach rings. Fewer than three rings is a target, not an approach; more
+  // than six and the innermost band is thinner than the pencil that marks it
+  // (the printed diagram is ~196px tall, so a 7th band lands under 4px).
+  // Single-tier on purpose: unlike a node graph there is no "packed" render
+  // fallback to absorb an over-eager model — a 9-ring diagram is not dense,
+  // it is unusable — so generation policy IS the render ceiling here.
+  concentric: { minRings: 3, maxRings: 6, ringLabelMaxChars: 18, maxBreachMarks: 8 },
+  // Corridor graph. Two-tier like ptp.
+  //
+  // WHY THE NODE CEILING IS 15 AND NOT HIGHER: a maze reuses `mapState.nodes`,
+  // the same physical array point-to-point uses, so one `maxItems` bounds both.
+  // Raising it for maze would weaken the ptp gate that keeps a 20-node network
+  // out of the corpus, and the maze does not need the room: at 12 marked
+  // junctions the orthogonal corridors are already at minimum separation in a
+  // 100-unit viewBox. Passages get their own array and so carry their own tier.
+  maze: {
+    maxNodes: 12,
+    maxPassages: 14,
+    renderMaxNodes: 15,
+    renderMaxPassages: 20,
+    nodeLabelMaxChars: 14
+  },
   linearTrack: { minPositions: 3, maxPositions: 12 },
   playerDrawn: { maxPrompts: 4, maxSeedMarkers: 3 },
   cipher: { displayTextMaxChars: 350, extractionInstructionMaxChars: 200 },

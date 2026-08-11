@@ -30,6 +30,9 @@ import {
   VALID_CONVERGENCE_PATTERNS,
   DOCUMENT_TYPE_ENUM,
   VALID_MAP_TYPES,
+  VALID_EDGE_SEMANTICS,
+  VALID_CELL_SHAPES,
+  VALID_COMPONENT_DIALECTS,
   VALID_COMPANION_TYPES,
   VALID_CLOCK_TYPES,
   VALID_PAYLOAD_TYPES,
@@ -384,7 +387,13 @@ export var BOOKLET_SCHEMA = {
           properties: {
             shellFamily: { enum: VALID_SHELL_FAMILIES },
             boardStateMode: { enum: VALID_BOARD_STATE_MODES },
-            attachmentStrategy: { enum: VALID_ATTACHMENT_STRATEGIES }
+            attachmentStrategy: { enum: VALID_ATTACHMENT_STRATEGIES },
+            // Whose instrument the countable surfaces are. Additive and
+            // optional (absent = 'segments'); declared explicitly even though
+            // artifactIdentity allows extra keys, because a declared property
+            // is still enum-checked and an unrenderable dialect must fail here
+            // rather than print as the default and look intentional.
+            componentDialect: { enum: VALID_COMPONENT_DIALECTS }
           }
         },
         artifactIntent: artifactIntent,
@@ -664,6 +673,53 @@ export var BOOKLET_SCHEMA = {
           }
         },
         currentNode: { type: 'string' },
+        // point-to-point edge reading. Absent = 'traversal' (the historical
+        // meaning); 'relational' is the constellation mode. Declared here
+        // rather than under a new map type on purpose: the node/edge shape is
+        // byte-identical, so the map-evolution fingerprint stays comparable.
+        edgeSemantics: { enum: VALID_EDGE_SEMANTICS },
+        // grid cell polygon. Absent = 'square'. Reuses tiles + gridDimensions.
+        cellShape: { enum: VALID_CELL_SHAPES },
+        // ── concentric ──────────────────────────────────────────────────────
+        // Ordered OUTERMOST FIRST. rings[0] is the perimeter you hold or lose;
+        // the last ring is what the siege is about.
+        rings: {
+          type: 'array',
+          minItems: G.concentric.minRings,
+          maxItems: G.concentric.maxRings,
+          items: {
+            type: 'object',
+            required: ['label'],
+            additionalProperties: false,
+            properties: {
+              label: { type: 'string', maxLength: G.concentric.ringLabelMaxChars },
+              state: { type: 'string' },
+              annotation: { type: 'string' }
+            }
+          }
+        },
+        // 1-based index into rings[]. Integer, not a label: the renderer has to
+        // match it against a ring, and a label typo would silently mark nothing.
+        currentRing: { type: 'integer', minimum: 1, maximum: G.concentric.maxRings },
+        // How many write-in breach boxes print under the rings. A pencil
+        // affordance, not a count of breaches that happened.
+        breachMarks: { type: 'integer', minimum: 0, maximum: G.concentric.maxBreachMarks },
+        // ── maze ────────────────────────────────────────────────────────────
+        // Corridors between nodes[]. `state` here is PROGRESS (a locked door
+        // opens week over week); node `state` is the topology ROLE.
+        passages: {
+          type: 'array',
+          maxItems: G.maze.renderMaxPassages,
+          items: {
+            type: 'object',
+            required: ['from', 'to'],
+            additionalProperties: false,
+            properties: {
+              from: { type: 'string' }, to: { type: 'string' },
+              label: { type: 'string' }, state: { type: 'string' }
+            }
+          }
+        },
         positions: {
           type: 'array',
           maxItems: G.linearTrack.maxPositions,

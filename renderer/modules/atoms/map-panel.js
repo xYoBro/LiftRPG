@@ -23,12 +23,15 @@ import { wrappedLines } from '../utils.js';
  * ladder). booklet.css carries the reverse pointer. **Change them together or
  * the estimate lies.**
  *
- * THE HONEST ZERO. The four map bodies are density-invariant, measured, at
+ * THE HONEST ZERO. The map bodies are density-invariant, measured, at
  * every tier across the corpus:
  *   grid           rows × 30px cell + 2px gutter   — a writable square
+ *   grid (hex)     rows × 26px + 9px cap           — same, offset-packed
  *   point-to-point 214px min-height frame          — fixed aspect, guardrailed
  *   linear-track   step boxes sized by their text  — pencil boxes
  *   player-drawn   176px min-height canvas         — draw-on-me surface
+ *   concentric     196px min-height frame          — ring bands + breach row
+ *   maze           214px min-height frame          — corridor runs
  * None of them shrinks with density and none of them should: they are the
  * surfaces the player writes on. What this atom used to do was promise a flat
  * ~15% anyway (280→240, 360→300, …) with no reference to the map's contents;
@@ -105,6 +108,23 @@ const GRID_GAP_PX = 2;
 /** .map-network min-height. On a real page the network also carries `flex:1`,
  *  so it grows into slack; 214 is its floor and what the harness measures. */
 const NETWORK_MIN_PX = 214;
+/** .map-maze min-height. Deliberately the SAME floor as the network: a maze is
+ *  the same class of object — a node-link diagram inside a framed box — and
+ *  giving it a second, slightly different number would be two constants
+ *  pretending to be a design decision. They are independent: either may move
+ *  without the other, and each mirrors its own CSS rule. */
+const MAZE_MIN_PX = 214;
+/** .map-rings min-height. Shorter than the network on purpose: the diagram is a
+ *  circle, so its usable area is bounded by the SHORTER axis, and past ~170px of
+ *  ring the extra height is margin either side of the disc. 196 leaves a 162px
+ *  disc above the legend and the breach row, both of which are fixed-height. */
+const RINGS_MIN_PX = 196;
+/** Hex grid geometry — mirrors HEX_ROW_UNITS / HEX_CAP_UNITS in
+ *  field-ops-primitives.js and the `.map-hex` rule in booklet.css. The height is
+ *  set inline from the row count, so it is width-invariant by construction and
+ *  this estimate is exact at either column width. */
+const HEX_ROW_PX = 26;
+const HEX_CAP_PX = 9;
 /** .player-map min-height, and the flow height of one .player-map-prompt
  *  (4.9pt mono chip + its 6px top margin). Seed markers are absolutely
  *  positioned and cost nothing. */
@@ -166,8 +186,9 @@ function ladderFor(density) {
 
 /**
  * Height of the map body itself. Every branch here is density-free on purpose
- * — see THE HONEST ZERO above. Mirrors renderGridMap / renderPointMap /
- * renderLinearMap / renderPlayerMap in field-ops-primitives.js, including
+ * — see THE HONEST ZERO above. Mirrors renderGridMap / renderHexGridMap /
+ * renderPointMap / renderLinearMap / renderPlayerMap / renderRingsMap /
+ * renderMazeMap in field-ops-primitives.js, including
  * their defaults (a missing gridDimensions renders 6×5, a missing dimensions
  * renders 12×8) and renderPlayerMap's `.slice(0, 4)` prompt cap.
  */
@@ -176,6 +197,19 @@ function bodyHeight(map, widthPx) {
 
   if (mapType === 'point-to-point' || mapType === 'node-graph') {
     return NETWORK_MIN_PX;
+  }
+
+  // Both Wave 3 geometries are framed boxes with a fixed floor and `flex:1`,
+  // exactly like the network — and, like the network, they are density-invariant
+  // by design. The ring bands and the corridor runs are what the player writes
+  // on; a solver that could shrink them would be taking the board away to buy
+  // four pixels of page.
+  if (mapType === 'maze') {
+    return MAZE_MIN_PX;
+  }
+
+  if (mapType === 'concentric') {
+    return RINGS_MIN_PX;
   }
 
   if (mapType === 'linear-track') {
@@ -218,6 +252,9 @@ function bodyHeight(map, widthPx) {
   const dims = map.gridDimensions || { columns: 6, rows: 5 };
   const rows = Math.max(0, parseInt(dims.rows, 10) || 0);
   if (!rows) return 0;
+  // Hex cells overlap vertically — a row costs three quarters of a hex, plus
+  // the last row's bottom quarter once.
+  if (map.cellShape === 'hex') return rows * HEX_ROW_PX + HEX_CAP_PX;
   return rows * GRID_ROW_PX + (rows - 1) * GRID_GAP_PX;
 }
 

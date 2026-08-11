@@ -18,6 +18,16 @@ export const MAP_FAMILY_REGISTRY = {
     label: 'Sketchspace',
     sourceType: 'player-drawn',
     description: 'Player-drawn cartographic or diagrammatic surface.'
+  },
+  'approach-rings': {
+    label: 'Approach Rings',
+    sourceType: 'concentric',
+    description: 'Nested rings held or lost from the perimeter inward — cordons, precincts, siege works, blast radii.'
+  },
+  'corridor-maze': {
+    label: 'Corridor Maze',
+    sourceType: 'maze',
+    description: 'Orthogonal corridor graph with doors and dead ends — catacombs, stacks, vent runs, process labyrinths.'
   }
 };
 

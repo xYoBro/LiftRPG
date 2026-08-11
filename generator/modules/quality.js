@@ -89,20 +89,25 @@ export function collectIdentityVariationFindings(booklet, nonBossWeeks, fragment
     // diagram and a pursuit IS a line — and the other six can legitimately
     // vary their geometry, which means a monotonous board in one of them is
     // still worth reporting.
+    // Values are LISTS because Wave 3 gave two families a second inherent
+    // geometry: a pursuit is a line or a labyrinth, and a siege is rings (which
+    // is the whole reason concentric was built). A one-value table would have
+    // reported every maze-boarded evasion book as monotonous.
     var STABLE_MAP_GRAMMARS = {
-      'survey-grid': 'grid',
-      'ledger-board': 'grid',
-      'timeline-reconstruction': 'linear-track',
-      'route-tracker': 'linear-track',
-      'node-graph': 'point-to-point',
-      'loyalty-web': 'point-to-point',
-      evasion: 'linear-track'
+      'survey-grid': ['grid'],
+      'ledger-board': ['grid'],
+      'timeline-reconstruction': ['linear-track'],
+      'route-tracker': ['linear-track'],
+      'node-graph': ['point-to-point'],
+      'loyalty-web': ['point-to-point'],
+      evasion: ['linear-track', 'maze'],
+      siege: ['concentric']
     };
 
     var expectedByGrammar = STABLE_MAP_GRAMMARS[declaredGrammar];
     var expectedByBoard = STABLE_MAP_GRAMMARS[declaredBoard];
-    var suppressed = (expectedByGrammar && expectedByGrammar === soleMapType) ||
-                     (expectedByBoard && expectedByBoard === soleMapType);
+    var suppressed = (expectedByGrammar && expectedByGrammar.indexOf(soleMapType) !== -1) ||
+                     (expectedByBoard && expectedByBoard.indexOf(soleMapType) !== -1);
 
     if (!suppressed) {
       report.weakSpots.push({
