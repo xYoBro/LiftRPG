@@ -10,8 +10,10 @@
  * SECURITY: API keys are session-only — the caller holds them in a password
  * field and never persists them (saveApiPrefs deliberately excludes the key);
  * they are sent as headers directly to the provider and never pass through
- * any LiftRPG server. Pipeline checkpoints persist to sessionStorage
- * (checkpoint.js) and contain no key material.
+ * any LiftRPG server. Pipeline checkpoints persist to localStorage, mirrored
+ * to sessionStorage (checkpoint.js), and contain no key material: the run
+ * fingerprint hashes only workout + brief + pipeline method, and the stored
+ * inputs record provider/model names but never the key or base URL.
  * Anthropic browser-side access requires the dangerous-direct-browser-access
  * header, which Anthropic provides for exactly this use case.
  */
@@ -120,12 +122,18 @@ import {
 } from './modules/budget.js';
 
 import {
-  loadCheckpoint,
-  initCheckpoint,
   saveCheckpoint,
   clearCheckpoint,
   countResumedStages,
-  getCheckpoint
+  getCheckpoint,
+  setCheckpointNotice,
+  resumeCheckpointForRun,
+  describeResume,
+  recordCheckpointSpend,
+  getCheckpointSpend,
+  getShelvedCheckpoint,
+  clearShelvedCheckpoint,
+  computeRunFingerprint
 } from './modules/checkpoint.js';
 
 import {
@@ -1015,6 +1023,23 @@ function emitPipelineEvent(handler, stageIndex, totalStages, message, meta) {
   }
 }
 
+// Checkpoint notices — durable-storage degradation, progress set aside for a
+// different build, resume facts — ride the pipeline's existing progress/log
+// channel rather than inventing a UI surface. Shape: a 'start'-phase event with
+// an EMPTY stageKey, which the status surface logs verbatim while leaving the
+// stage ledger untouched (markApiStageInProgress no-ops on a blank key).
+// `noticeLevel` is advisory metadata for any surface that wants to style it.
+function wireCheckpointNotices(onProgress, getStageIndex, getTotalStages) {
+  setCheckpointNotice(function (level, message) {
+    emitPipelineEvent(onProgress, getStageIndex(), getTotalStages(), message, {
+      phase: 'start',
+      stageKey: '',
+      stageName: 'Checkpoint',
+      noticeLevel: level
+    });
+  });
+}
+
 
 // ── Validation helpers for smart retry ───────────────────────────────────────
 
@@ -1135,6 +1160,9 @@ async function runJsonStage(settings, config) {
         }
       }
       var summary = summarizeStageTelemetry(stageTelemetry);
+      // Single choke point for every paid call in every pipeline (critic rounds
+      // included) — the cross-session spend ledger is fed from here and only here.
+      recordCheckpointSpend(summary);
       emitPipelineEvent(config.onProgress, config.stageIndex || 0, config.getTotalStages ? config.getTotalStages() : 0, config.completeMessage || config.stageName, {
         phase: 'complete',
         stageKey: config.stageKey || '',
@@ -1664,30 +1692,41 @@ async function runApiPipeline(options) {
   var weekCount = options.weekCount || (typeof window.parseWeekCount === 'function' ? window.parseWeekCount(workout) : 6);
   var totalSessions = options.totalSessions || 0;
 
-  // ── Checkpoint: resume from last completed stage if available ────
-  var checkpoint = loadCheckpoint();
-  var isResume = checkpoint && checkpoint.stages;
-  var resumed = checkpoint ? countResumedStages(checkpoint) : 0;
+  // Initial estimation: 3 setup + weekCount (single-stage per week) + endings
+  var totalStages = 3 + weekCount + 2;
+  var stageNum = 0;
+  var onProgress = options.onProgress;
 
-  // Don't resume from a different pipeline type
-  if (isResume && (!checkpoint.inputs || checkpoint.inputs.pipeline !== 'structured')) {
-    console.warn('[structured] Found checkpoint from different pipeline — starting fresh');
-    clearCheckpoint();
-    checkpoint = null;
-    isResume = false;
-    resumed = 0;
-  }
+  // ── Checkpoint: resume from last completed stage if available ────
+  // Wired before the resume decision so storage-degradation and set-aside
+  // warnings reach the operator through the run log.
+  wireCheckpointNotices(onProgress, function () { return stageNum; }, function () { return totalStages; });
+
+  // The pipeline label is part of the run identity: multi-stage and structured
+  // share this orchestrator but format the workout differently and assemble
+  // differently, so their stage outputs are not interchangeable. Before Wave A.1
+  // both wrote the tag 'structured' and silently resumed into each other.
+  var pipelineLabel = options.pipelineLabel || 'structured';
+  var resumeState = resumeCheckpointForRun({
+    workout: workout,
+    brief: brief,
+    model: settings.model,
+    provider: detectProviderId(settings),
+    pipeline: pipelineLabel
+  });
+  var checkpoint = resumeState.checkpoint;
+  var resumed = resumeState.resumed;
 
   if (resumed > 0) {
-    console.log('[LiftRPG] Resuming pipeline from checkpoint (' + resumed + ' cached stages).');
-  } else {
-    // Fresh run — init checkpoint with inputs so UI can restore them on page load
-    checkpoint = initCheckpoint({
-      workout: workout,
-      brief: brief,
-      model: settings.model,
-      provider: detectProviderId(settings),
-      pipeline: 'structured'
+    var resumeLine = describeResume(resumeState);
+    console.log('[LiftRPG] ' + resumeLine);
+    emitPipelineEvent(onProgress, stageNum, totalStages, resumeLine, {
+      phase: 'start',
+      stageKey: '',
+      stageName: 'Checkpoint',
+      noticeLevel: 'info',
+      restoredStages: resumeState.restoredStages,
+      priorSpend: resumeState.priorSpend
     });
   }
 
@@ -1705,14 +1744,19 @@ async function runApiPipeline(options) {
         'or switch to a paid API key.';
       if (options.onStatus) options.onStatus(msg);
       console.warn('[LiftRPG] ' + msg);
+      // The UI drives these pipelines with an onProgress function and no
+      // options.onStatus, so the budget warning also rides the notice channel —
+      // otherwise the one message that tells the user they can stop and resume
+      // tomorrow never reaches them.
+      emitPipelineEvent(onProgress, stageNum, totalStages, msg, {
+        phase: 'start',
+        stageKey: '',
+        stageName: 'Budget',
+        noticeLevel: 'warn'
+      });
       // Don't block — checkpoint resume makes partial runs viable
     }
   }
-
-  // Initial estimation: 3 setup + weekCount (single-stage per week) + endings
-  var totalStages = 3 + weekCount + 2;
-  var stageNum = 0;
-  var onProgress = options.onProgress;
 
   function progress(stageKey, message) {
     stageNum++;
@@ -2176,6 +2220,14 @@ async function runApiPipeline(options) {
     }));
   }
 
+  // Every paid generation stage is now banked and the booklet is assembled.
+  // The critic that follows makes more paid calls, so snapshot the recoverable
+  // booklet FIRST: if the run dies mid-critic, the user still has a complete,
+  // fully-paid-for book instead of only a checkpoint that has to be re-graded.
+  persistLastBooklet(booklet, {
+    source: options && options.pipelineLabel ? options.pipelineLabel : 'structured'
+  });
+
   // ── COMPOSITION CRITIC LOOP (D66) ───────────────────────────
   var criticReport = await runCriticLoop(settings, booklet, brief, {
     rateLimiter: rateLimiter,
@@ -2376,31 +2428,38 @@ async function runSkeletonFleshPipeline(options) {
     });
   }
 
-  // Checkpoint support
-  var checkpoint = loadCheckpoint();
-  var isResume = checkpoint && checkpoint.stages;
+  // ── Checkpoint support ──
+  // Wired before the resume decision so storage-degradation and set-aside
+  // warnings reach the operator through the run log.
+  wireCheckpointNotices(onProgress, function () { return stageNum; }, function () { return totalStages; });
 
-  // Don't resume from a different pipeline type
-  if (isResume && (!checkpoint.inputs || checkpoint.inputs.pipeline !== 'skeleton-flesh')) {
-    console.warn('[S+F] Found checkpoint from different pipeline — starting fresh');
-    clearCheckpoint();
-    checkpoint = null;
-    isResume = false;
-  }
+  var sfResumeState = resumeCheckpointForRun({
+    // Stored in full: a truncated copy corrupts both the fingerprint and the
+    // workout/brief the UI restores from an uploaded checkpoint file.
+    workout: workout,
+    brief: brief || '',
+    model: settings.model || '',
+    provider: detectProviderId ? detectProviderId(settings) : '',
+    pipeline: 'skeleton-flesh'
+  });
+  var checkpoint = sfResumeState.checkpoint;
+  var isResume = sfResumeState.resumed > 0;
 
-  if (!isResume) {
-    checkpoint = null;
-    initCheckpoint({
-      workout: workout.substring(0, 200),
-      brief: (brief || '').substring(0, 200),
-      model: settings.model || '',
-      provider: detectProviderId ? detectProviderId(settings) : '',
-      pipeline: 'skeleton-flesh'
+  if (isResume) {
+    var sfResumeLine = describeResume(sfResumeState);
+    console.log('[S+F] ' + sfResumeLine);
+    emitPipelineEvent(onProgress, stageNum, totalStages, sfResumeLine, {
+      phase: 'start',
+      stageKey: '',
+      stageName: 'Checkpoint',
+      noticeLevel: 'info',
+      restoredStages: sfResumeState.restoredStages,
+      priorSpend: sfResumeState.priorSpend
     });
   }
 
   function cached(key) {
-    return isResume && checkpoint.stages && checkpoint.stages[key];
+    return isResume && checkpoint && checkpoint.stages ? checkpoint.stages[key] : null;
   }
 
   // ── Telemetry + continuity accumulators ──
@@ -2415,9 +2474,12 @@ async function runSkeletonFleshPipeline(options) {
   if (cached('skeleton')) {
     skeleton = checkpoint.stages.skeleton;
     console.log('[S+F] Resuming — skeleton loaded from checkpoint');
-    progress('skeleton', 'Skeleton (cached)');
-    emitPipelineEvent(onProgress, stageNum, totalStages, 'Skeleton (cached)', {
-      phase: 'complete', stageKey: 'skeleton', stageName: 'Skeleton'
+    progress('skeleton', 'Skeleton restored from checkpoint.');
+    // completionSource is what tells the status surface this stage cost nothing.
+    // Without it a restored stage renders as a paid API completion.
+    emitPipelineEvent(onProgress, stageNum, totalStages, 'Skeleton restored from checkpoint.', {
+      phase: 'complete', stageKey: 'skeleton', stageName: 'Skeleton',
+      completionSource: 'checkpoint'
     });
   } else {
     progress('skeleton', 'Building structural skeleton\u2026');
@@ -2442,7 +2504,7 @@ async function runSkeletonFleshPipeline(options) {
         return validateSkeletonStage(result, weekCount);
       }
     });
-    saveCheckpoint('skeleton', skeleton, checkpoint);
+    checkpoint = saveCheckpoint('skeleton', skeleton, checkpoint);
   }
 
   // Update stage estimate: skeleton + rules + weeks + 1 fragment call + 1 ending call
@@ -2471,9 +2533,10 @@ async function runSkeletonFleshPipeline(options) {
   if (cached('rules')) {
     rulesOutput = checkpoint.stages.rules;
     console.log('[S+F] Resuming — rules loaded from checkpoint');
-    progress('rules', 'Rules spread (cached)');
-    emitPipelineEvent(onProgress, stageNum, totalStages, 'Rules spread (cached)', {
-      phase: 'complete', stageKey: 'rules', stageName: 'Rules Spread'
+    progress('rules', 'Rules spread restored from checkpoint.');
+    emitPipelineEvent(onProgress, stageNum, totalStages, 'Rules spread restored from checkpoint.', {
+      phase: 'complete', stageKey: 'rules', stageName: 'Rules Spread',
+      completionSource: 'checkpoint'
     });
   } else {
     progress('rules', 'Writing rules spread\u2026');
@@ -2498,7 +2561,7 @@ async function runSkeletonFleshPipeline(options) {
         return '';
       }
     });
-    saveCheckpoint('rules', rulesOutput, checkpoint);
+    checkpoint = saveCheckpoint('rules', rulesOutput, checkpoint);
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -2520,9 +2583,10 @@ async function runSkeletonFleshPipeline(options) {
       var cachedWeekSF = checkpoint.stages[ckKey];
       weekOutputs.push(cachedWeekSF);
       console.log('[S+F] Resuming — week ' + weekNum + ' loaded from checkpoint');
-      progress(ckKey, 'Week ' + weekNum + ' (cached)');
-      emitPipelineEvent(onProgress, stageNum, totalStages, 'Week ' + weekNum + ' (cached)', {
-        phase: 'complete', stageKey: ckKey, stageName: 'Week ' + weekNum
+      progress(ckKey, 'Week ' + weekNum + ' restored from checkpoint.');
+      emitPipelineEvent(onProgress, stageNum, totalStages, 'Week ' + weekNum + ' restored from checkpoint.', {
+        phase: 'complete', stageKey: ckKey, stageName: 'Week ' + weekNum,
+        completionSource: 'checkpoint'
       });
       if (!isBoss && cachedWeekSF.weeklyComponent && cachedWeekSF.weeklyComponent.value != null) {
         allComponentValuesSF.push(cachedWeekSF.weeklyComponent.value);
@@ -2624,7 +2688,7 @@ async function runSkeletonFleshPipeline(options) {
     }
 
     weekOutputs.push(weekResult);
-    saveCheckpoint(ckKey, weekResult, checkpoint);
+    checkpoint = saveCheckpoint(ckKey, weekResult, checkpoint);
 
     if (!isBoss && weekResult.weeklyComponent && weekResult.weeklyComponent.value != null) {
       allComponentValuesSF.push(weekResult.weeklyComponent.value);
@@ -2664,9 +2728,10 @@ async function runSkeletonFleshPipeline(options) {
   if (cached('fragments')) {
     allFragments = checkpoint.stages.fragments || [];
     console.log('[S+F] Resuming — fragments loaded from checkpoint');
-    progress('fragments', 'Fragments (cached)');
-    emitPipelineEvent(onProgress, stageNum, totalStages, 'Fragments (cached)', {
-      phase: 'complete', stageKey: 'fragments', stageName: 'Fragments'
+    progress('fragments', 'Fragments restored from checkpoint.');
+    emitPipelineEvent(onProgress, stageNum, totalStages, 'Fragments restored from checkpoint.', {
+      phase: 'complete', stageKey: 'fragments', stageName: 'Fragments',
+      completionSource: 'checkpoint'
     });
   } else {
     progress('fragments', 'Writing all fragments\u2026');
@@ -2708,7 +2773,7 @@ async function runSkeletonFleshPipeline(options) {
     allFragments = Array.isArray(fragResultSF)
       ? fragResultSF
       : (fragResultSF && fragResultSF.fragments ? fragResultSF.fragments : [fragResultSF]);
-    saveCheckpoint('fragments', allFragments, checkpoint);
+    checkpoint = saveCheckpoint('fragments', allFragments, checkpoint);
   }
 
   // ── Cross-stage continuity: fragments ──
@@ -2739,9 +2804,10 @@ async function runSkeletonFleshPipeline(options) {
   if (cached('endings')) {
     allEndings = checkpoint.stages.endings || [];
     console.log('[S+F] Resuming — endings loaded from checkpoint');
-    progress('endings', 'Endings (cached)');
-    emitPipelineEvent(onProgress, stageNum, totalStages, 'Endings (cached)', {
-      phase: 'complete', stageKey: 'endings', stageName: 'Endings'
+    progress('endings', 'Endings restored from checkpoint.');
+    emitPipelineEvent(onProgress, stageNum, totalStages, 'Endings restored from checkpoint.', {
+      phase: 'complete', stageKey: 'endings', stageName: 'Endings',
+      completionSource: 'checkpoint'
     });
   } else {
     progress('endings', 'Writing all endings\u2026');
@@ -2790,7 +2856,7 @@ async function runSkeletonFleshPipeline(options) {
     allEndings = Array.isArray(endingsResultSF)
       ? endingsResultSF
       : (endingsResultSF && endingsResultSF.endings ? endingsResultSF.endings : [endingsResultSF]);
-    saveCheckpoint('endings', allEndings, checkpoint);
+    checkpoint = saveCheckpoint('endings', allEndings, checkpoint);
   }
 
   // ── Cross-stage continuity: endings ──
@@ -2857,6 +2923,11 @@ async function runSkeletonFleshPipeline(options) {
   if (driftResult.diagnostics.length > 0) {
     console.warn('[S+F] Artifact intent drift:', driftResult.diagnostics.length, 'issue(s)');
   }
+
+  // Snapshot before the critic spends more money (see the same guard in
+  // runApiPipeline): a run that dies mid-critic still leaves a complete,
+  // already-paid-for booklet the user can recover.
+  persistLastBooklet(booklet, { source: 'skeleton-flesh' });
 
   // ── COMPOSITION CRITIC LOOP (D66) ───────────────────────────
   var sfCriticReport = await runCriticLoop(settings, booklet, brief, {
@@ -3220,6 +3291,17 @@ window.LiftRPGAPI = {
   generateSkeletonFlesh: generateSkeletonFlesh,
   clearCheckpoint: clearCheckpoint,
   getCheckpoint: getCheckpoint,
+  // Durability surface: the resume economics the status UI and the eval bench
+  // need, so neither has to reach into storage keys or recompute identity.
+  checkpoint: {
+    get: getCheckpoint,
+    clear: clearCheckpoint,
+    stages: countResumedStages,
+    spend: getCheckpointSpend,
+    fingerprint: computeRunFingerprint,
+    getShelved: getShelvedCheckpoint,
+    clearShelved: clearShelvedCheckpoint
+  },
   manual: {
     structuredSchemas: {
       shell: STRUCTURED_SCHEMA_SHELL
