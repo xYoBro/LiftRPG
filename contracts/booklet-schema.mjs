@@ -12,7 +12,7 @@
 //     (pipeline telemetry, migration residue): top level, meta, week,
 //     bossEncounter, fragment.
 //   - Deliberately open objects: designSpec, authenticityChecks, theme.tokens,
-//     literaryRegister, storySpine, artifactIntent, interlude.payload —
+//     literaryRegister, storySpine, interlude.payload —
 //     content varies legitimately there. literaryRegister stays open but now
 //     TYPES its voiceSpec fields (mechanisms / authorRegisters / licensedMoves)
 //     where a shape carries law; see the voiceSpec block below.
@@ -25,6 +25,8 @@
 
 import {
   SCHEMA_VERSION,
+  VALID_ARC_FAMILIES,
+  VALID_MECHANIC_GRAMMAR_FAMILIES,
   DOCUMENT_TYPE_ENUM,
   VALID_MAP_TYPES,
   VALID_COMPANION_TYPES,
@@ -50,6 +52,83 @@ var G = SPATIAL_GUARDRAILS;
 var nonEmptyString = { type: 'string', minLength: 1 };
 var hexColor = { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' };
 var xt = { type: 'object' }; // _x extension blob
+
+// ── artifactIntent (Layer 3 planning contract, §10 "the Armed Lens") ────────
+// The compiled binding contract the skeleton/shell stage produces: how the
+// brief was read, which families the booklet committed to, and what it refuses.
+//
+// Strict but wholly OPTIONAL (required: []). Two different severities meet
+// here and both are honoured:
+//   - Generation POLICY demands these fields — the structured skeleton schema
+//     lists them as required and the stage validators warn on absence (D19:
+//     policy heuristics warn, they do not break fixtures).
+//   - The ARTIFACT contract does not: no corpus fixture carries artifactIntent
+//     at all (it is a pipeline product, not a rendered surface), so requiring
+//     anything here would break every fixture to enforce a prompt rule.
+//
+// `additionalProperties: false` is the point of the block. The failure mode it
+// closes is a misnamed sibling — `pov` for `povFrame`, `reason` for
+// `selectionReason` — which reads as a complete record, renders identically
+// (nothing renders), and silently costs the audit trail the recorded reading
+// exists to provide. `_x` is the declared escape hatch for anything genuinely
+// off-contract (e.g. the compiler's rejected-candidate one-liners).
+var artifactIntentReading = {
+  type: 'object',
+  required: [],
+  additionalProperties: false,
+  properties: {
+    // Free strings by ruling: the reading is a RECORD of interpretation, not a
+    // controlled vocabulary. Enumerating tone or register would re-impose the
+    // house flavour the lens exists to escape. The field NAMES are the contract
+    // (they mirror the six signals INST_BRIEF_INTERPRETATION extracts); the
+    // values are the model's own words.
+    tone: { type: 'string' },
+    register: { type: 'string' },
+    povFrame: { type: 'string' },
+    impliedSetting: { type: 'string' },
+    emotionalArc: { type: 'string' },
+    genreTemplate: { type: 'string' },
+    // 1-2 sentences citing the brief phrases that drove the reading. This is
+    // what makes a misread localizable: the critic grades the booklet against
+    // the recorded reading, and a reading the brief cannot support is a cited
+    // finding rather than a vague "tone feels off".
+    briefEvidence: { type: 'string' },
+    _x: xt
+  }
+};
+
+var artifactIntent = {
+  type: 'object',
+  required: [],
+  additionalProperties: false,
+  properties: {
+    briefMode: { type: 'string' },
+    fidelityMode: { type: 'string' },
+    arcFamily: { enum: VALID_ARC_FAMILIES },
+    mechanicGrammarFamily: { enum: VALID_MECHANIC_GRAMMAR_FAMILIES },
+    documentEcology: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        dominant: { type: 'array', items: { type: 'string' } },
+        forbidden: { type: 'array', items: { type: 'string' } }
+      }
+    },
+    exclusions: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        mechanicExclusions: { type: 'array', items: { type: 'string' } },
+        documentExclusions: { type: 'array', items: { type: 'string' } },
+        arcExclusions: { type: 'array', items: { type: 'string' } }
+      }
+    },
+    homePull: { type: 'string' },
+    reading: artifactIntentReading,
+    selectionReason: { type: 'string' },
+    _x: xt
+  }
+};
 
 // ── manifestPointer (schema 1.5.0) ──────────────────────────────────────────
 // Posted manifests: a diegetic forward reference printed on a fragment or an
@@ -269,7 +348,7 @@ export var BOOKLET_SCHEMA = {
             attachmentStrategy: { enum: VALID_ATTACHMENT_STRATEGIES }
           }
         },
-        artifactIntent: { type: 'object' },
+        artifactIntent: artifactIntent,
         economy: economy,
         weeklyComponentType: nonEmptyString,
         weekCount: { type: 'integer', minimum: 1 },

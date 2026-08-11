@@ -237,6 +237,160 @@
     return { briefMode: 'explicit', fidelityMode: 'literal' };
   }
 
+  // ── The Armed Lens: compiler context (§10 of the gameplay brainstorm) ────
+  //
+  // ONE function assembles everything the artifact-intent compiler needs that
+  // is not the schema itself: the pre-computed brief classification, the
+  // divergence seed, and the derived program-shape digest. All three compiler
+  // stages consume it (S+F skeleton, multi-stage shell, structured shell) so
+  // the lens cannot be armed on one path and blind on another — which is what
+  // "the compiler" being three separate prompt builders had already made easy.
+  //
+  // Home ruling: this lives in generator.js because classifyBrief,
+  // formatUserBrief and buildDefaultBrief are IIFE-private here and the brief
+  // channel is assembled from all three. It is window-exposed for
+  // api-generator.js (a module, which cannot reach into this closure).
+
+  // Which classifications earn a drawn seed. `empty` is the design case; a
+  // `sparse` brief gets material to be specific IN, never material that
+  // replaces what the user said (see buildBriefChannel).
+  function seedReasonFor(briefMode) {
+    if (briefMode === 'empty') return 'empty';
+    if (briefMode === 'sparse') return 'sparse';
+    return null;
+  }
+
+  function drawDivergenceSeed(reason) {
+    if (typeof window.randomizeBrief !== 'function') return null;   // story-tables absent — signal simply removed
+    var text = '';
+    try { text = String(window.randomizeBrief() || ''); } catch (_e) { return null; }
+    if (!text.trim()) return null;
+    // `source` names the table set so a future second drawer is distinguishable
+    // in the record. No timestamp: this object is persisted in the checkpoint
+    // and compared across resumes, and a clock would make it unstable.
+    return { source: 'story-tables', reason: reason, text: text };
+  }
+
+  // The brief CHANNEL, not the instruction channel (§10.3). A drawn seed is the
+  // same material a user could have pasted, so it enters where user direction
+  // enters — which is what structurally satisfies D47 rather than promising to.
+  function buildBriefChannel(workout, brief, blend, seed) {
+    var userChannel = formatUserBrief(brief, buildDefaultBrief(workout, blend));
+    if (!seed) return userChannel;
+
+    if (seed.reason === 'empty') {
+      // Total substitution. buildDefaultBrief's "no direction provided" block
+      // offers four alternative pushes and a trope ban — all of it is now
+      // noise that competes with an actual choice. The seed IS the choosing.
+      return [
+        '[SEEDED DIRECTION]: The direction field was empty. A seed direction was drawn for',
+        'this booklet. Interpret it under FULL fidelity doctrine — it is direction, not a',
+        'suggestion. Build around what it names, exactly, the way you would around a brief',
+        'the user typed. Do not abstract it toward something safer or more general.',
+        '',
+        seed.text
+      ].join('\n');
+    }
+
+    // Sparse: the user DID write something. Precedence is the whole contract
+    // here — the seed is ten times the mass of a five-word premise and will
+    // eat it unless the ordering is stated in the imperative.
+    return [
+      userChannel,
+      '',
+      '[SEED MATERIAL — SUBORDINATE]: The direction above is thin, so supporting material was',
+      'drawn to give it a specific world to happen in. The user\'s own words are PRIMARY and',
+      'BINDING. Use the seed only where it does not contradict them: borrow texture, pressure,',
+      'and specificity; never a premise, protagonist, or setting that displaces what the user',
+      'named. Where the two disagree, the user wins and the seed is discarded.',
+      '',
+      seed.text
+    ].join('\n');
+  }
+
+  /**
+   * Arm the artifact-intent compiler for one stage call.
+   *
+   * @param {string} workout  raw program text (or normalized-workout object)
+   * @param {string} brief    the USER's creative direction, pre-seed
+   * @param {object} options
+   *   options.divergenceSeed  an already-drawn seed to REUSE (resume/retry).
+   *                           Supplying it is how "draw exactly once per run"
+   *                           is enforced: prompt builders run per attempt.
+   *   options.drawSeed        false to suppress drawing entirely.
+   * @returns {{briefMode, fidelityMode, divergenceSeed, topology,
+   *            briefChannel, contextBlock}}
+   */
+  function armCompilerContext(workout, brief, options) {
+    // Coerced, not merely defaulted. window.generatePrompt's third parameter
+    // was vestigial for years — the smoke and generator suites both pass a
+    // dice string there that the function never read — and giving that slot
+    // meaning would otherwise turn 'd6' into an options bag whose every lookup
+    // silently returns undefined. Anything that is not an object is not options.
+    options = (options && typeof options === 'object') ? options : {};
+    var classified = classifyBrief(brief);
+    var briefMode = classified.briefMode;
+    var fidelityMode = classified.fidelityMode;
+
+    var seed = options.divergenceSeed || null;
+    if (!seed && options.drawSeed !== false) {
+      var reason = seedReasonFor(briefMode);
+      if (reason) seed = drawDivergenceSeed(reason);
+    }
+
+    // A drawn seed for an EMPTY brief upgrades fidelity to literal. Leaving it
+    // at `compositional` ("infer aggressively") while the brief channel says
+    // "full fidelity doctrine" would put two contradictory instructions in one
+    // prompt — the model splits the difference and the seed dissolves. The
+    // RECORD still says the user gave nothing: briefMode stays `empty`.
+    if (seed && seed.reason === 'empty') fidelityMode = 'literal';
+
+    var topology = typeof window.buildWorkoutTopology === 'function'
+      ? window.buildWorkoutTopology(workout)
+      : null;
+
+    var contextLines = [
+      '## Brief Classification (pre-computed)',
+      'The system has classified this brief as:',
+      '- briefMode: ' + briefMode,
+      '- fidelityMode: ' + fidelityMode,
+      'Use these as your starting point for meta.artifactIntent. You may refine them',
+      'based on your interpretation, but do not ignore them.'
+    ];
+    if (seed) {
+      contextLines.push(
+        '- divergenceSeed: drawn (reason: ' + seed.reason + '). The creative direction channel',
+        '  below carries seeded material. Record briefMode as classified above — it describes',
+        '  what the USER supplied — and read the seeded material as real direction.'
+      );
+    }
+
+    var topologyBlock = (topology && typeof window.formatWorkoutTopologyBlock === 'function')
+      ? window.formatWorkoutTopologyBlock(topology)
+      : '';
+
+    return {
+      briefMode: briefMode,
+      fidelityMode: fidelityMode,
+      divergenceSeed: seed,
+      topology: topology,
+      briefChannel: function (blend) { return buildBriefChannel(workout, brief, blend, seed); },
+      contextBlock: [contextLines.join('\n'), topologyBlock].filter(Boolean).join('\n\n')
+    };
+  }
+
+  window.armCompilerContext = armCompilerContext;
+
+  // Draw-once-per-run seam. A prompt builder runs once per ATTEMPT, so a
+  // builder that draws its own seed hands every retry a different world. The
+  // run orchestrator calls this exactly once, then passes the result into every
+  // builder as options.divergenceSeed. Returns null when the brief does not
+  // qualify — which is most runs.
+  window.resolveDivergenceSeed = function (brief) {
+    var reason = seedReasonFor(classifyBrief(brief).briefMode);
+    return reason ? drawDivergenceSeed(reason) : null;
+  };
+
   // ── Artifact intent contract formatter (Layer 3 planning) ──────────────
   // Produces compact binding contract text from meta.artifactIntent for
   // downstream flesh prompts. Reused across week, fragment, and ending
@@ -329,9 +483,16 @@
   var STAGE1_OUTPUT_SCHEMA = window.STAGE1_OUTPUT_SCHEMA;
   var STAGE2_OUTPUT_SCHEMA = window.STAGE2_OUTPUT_SCHEMA;
 
-  window.generatePrompt = function (workout, brief) {
+  window.generatePrompt = function (workout, brief, options) {
     var blend = deriveDesignBlend(brief, workout);
     window.authorProfile = deriveAuthorBlend(brief);
+    // The classic modal path assembles the flat INSTRUCTIONS bundle, which
+    // includes INST_ARTIFACT_COMPILER — so this IS a compiler surface and gets
+    // the armed context (ruling D, §11 Wave 1). One prompt, one paste, no run
+    // orchestration: the seed is drawn here and lives only in the text the user
+    // copies. There is no checkpoint to replay, and re-opening the modal
+    // legitimately draws a new direction.
+    var armed = armCompilerContext(workout, brief, options || {});
     var parts = [
       SCHEMA_SPEC,
       '',
@@ -345,7 +506,9 @@
       '',
       '## Creative Direction',
       '',
-      formatUserBrief(brief, buildDefaultBrief(workout, blend)),
+      armed.briefChannel(blend),
+      '',
+      armed.contextBlock,
       '',
       formatDesignBias(blend),
       formatAuthorBias(authorProfile || window.authorProfile),
@@ -526,11 +689,18 @@
   /**
    * Stage 3 (API pipeline): Booklet Shell — meta, cover, rulesSpread, theme
    */
-  window.generateShellPrompt = function (brief, layerBible, campaignPlan) {
+  window.generateShellPrompt = function (brief, layerBible, campaignPlan, options) {
+    options = options || {};
     var blendContext = buildBlendContextFromPlans(layerBible, campaignPlan);
     var blend = deriveDesignBlend(brief, blendContext);
     var authorProfile = deriveAuthorBlend(brief);
     var weekCount = (campaignPlan.weeks || []).length || 6;
+    // The shell stage is this pipeline's artifact-intent compiler (INSTRUCTIONS
+    // and buildStageSchema('shell') both carry INST_ARTIFACT_COMPILER), so it
+    // gets the same armed context the S+F skeleton gets. options.workout is
+    // supplied by the run orchestrator — this builder's own signature has never
+    // carried the program, and topology without it would be silently absent.
+    var armed = armCompilerContext(options.workout || blendContext, brief, options);
     var parts = [
       '# Booklet Setup — meta, cover, rulesSpread, theme',
       '',
@@ -560,7 +730,9 @@
       '',
       '## Creative Direction',
       '',
-      formatUserBrief(brief, buildDefaultBrief(blendContext, blend)),
+      armed.briefChannel(blend),
+      '',
+      armed.contextBlock,
       '',
       formatDesignBias(blend),
       formatAuthorBias(authorProfile || window.authorProfile),
@@ -1336,6 +1508,21 @@
     return text.slice(0, Math.max(0, maxLength - 3)).replace(/\s+\S*$/, '') + '...';
   }
 
+  // Same cap, but LINE-PRESERVING. truncateText collapses every run of
+  // whitespace to a single space, which is right for a paragraph of prose and
+  // wrong for material whose structure carries the meaning: a drawn seed is ten
+  // labelled lines (Protagonist / Fatal flaw / Antagonist / …), and collapsing
+  // them yields one 1,500-character run-on that the model has to re-parse.
+  //
+  // Deliberately NOT swapped in for the unseeded brief channel: that would
+  // change the prompt bytes of every existing run for a reason this wave has no
+  // evidence for. Seeded material is new, so it gets the better treatment.
+  function capText(value, maxLength) {
+    var text = String(value || '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+    if (!maxLength || text.length <= maxLength) return text;
+    return text.slice(0, Math.max(0, maxLength - 3)).replace(/\s+\S*$/, '') + '...';
+  }
+
   function summarizeDesignBiasForApi(blend) {
     blend = blend || {};
     var primary = blend.primary || {};
@@ -1816,7 +2003,7 @@
     options = options || {};
     var weekCount = window.parseWeekCount(workout);
     var blend = deriveDesignBlend(brief, workout);
-    var briefClass = classifyBrief(brief);
+    var armed = armCompilerContext(workout, brief, options);
     return [
       '# LiftRPG Booklet Skeleton',
       '',
@@ -1829,12 +2016,7 @@
       'no session content, no fragment bodies, no exercise details. Just the scaffold that',
       'later stages will fill with writing.',
       '',
-      '## Brief Classification (pre-computed)',
-      'The system has classified this brief as:',
-      '- briefMode: ' + briefClass.briefMode,
-      '- fidelityMode: ' + briefClass.fidelityMode,
-      'Use these as your starting point for meta.artifactIntent. You may refine them',
-      'based on your interpretation, but do not ignore them.',
+      armed.contextBlock,
       '',
       window.INST_ARTIFACT_COMPILER.join('\n'),
       '',
@@ -1874,7 +2056,11 @@
       truncateText(workout, 3200),
       '',
       '### Creative Direction',
-      truncateText(formatUserBrief(brief, buildDefaultBrief(workout, blend)), 2000),
+      // Wider budget when a seed is present: the drawn material is ~1KB on its
+      // own, and truncating it mid-sentence hands the compiler a half-world.
+      armed.divergenceSeed
+        ? capText(armed.briefChannel(blend), 3200)
+        : truncateText(armed.briefChannel(blend), 2000),
       '',
       '### Design Bias',
       compactJson(summarizeDesignBiasForApi(blend)),
@@ -2203,6 +2389,10 @@
     var blendContext = buildBlendContextFromPlans(layerBible, campaignPlan);
     var blend = deriveDesignBlend(brief, blendContext);
     var weekCount = (campaignPlan.weeks || []).length || 6;
+    // Same armed context as the other two compiler stages (see
+    // generateShellPrompt). The '# API Stage 3' opener is load-bearing for the
+    // eval bench's stub router — added context goes BELOW it, never above.
+    var armed = armCompilerContext(options.workout || blendContext, brief, options);
     return [
       '# API Stage 3 — Booklet Setup',
       '',
@@ -2237,7 +2427,11 @@
       compactJson(summarizeShellVoicePacket(layerBible, campaignPlan, blend)),
       '',
       '## Creative Direction',
-      truncateText(formatUserBrief(brief, buildDefaultBrief(blendContext, blend)), 1200),
+      armed.divergenceSeed
+        ? capText(armed.briefChannel(blend), 2800)
+        : truncateText(armed.briefChannel(blend), 1200),
+      '',
+      armed.contextBlock,
       '',
       '## Design Bias',
       compactJson(summarizeDesignBiasForApi(blend)),

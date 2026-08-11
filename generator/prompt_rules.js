@@ -413,6 +413,11 @@
     '  - `documentEcology` (object): { dominant: string[], forbidden: string[] }',
     '  - `exclusions` (object): { mechanicExclusions: string[], documentExclusions: string[], arcExclusions: string[] }',
     '  - `homePull` (string): story | game | investigation | mixed',
+    '  - `reading` (object): the recorded reading — your interpretation of the brief, written down.',
+    '    { tone, register, povFrame, impliedSetting, emotionalArc, genreTemplate, briefEvidence }',
+    '    All free strings in your own words; these are a record, not a menu.',
+    '    briefEvidence is 1-2 sentences naming the brief phrases that drove the reading.',
+    '  - `selectionReason` (string): why the winning candidate reading beat the others.',
     '',
     '## theme (object)',
     '- `visualArchetype` (string): one of government|cyberpunk|scifi|fantasy|noir|steampunk|minimalist|nautical|occult|pastoral',
@@ -486,7 +491,16 @@
         arcFamily: 'slow-burn-investigation', mechanicGrammarFamily: 'survey-grid',
         documentEcology: { dominant: ['fieldNote', 'report'], forbidden: ['transcript'] },
         exclusions: { mechanicExclusions: ['testimony-matrix'], documentExclusions: ['transcript'], arcExclusions: ['institutional-collapse'] },
-        homePull: 'investigation'
+        homePull: 'investigation',
+        // Free strings, deliberately blank in the example: enum members are
+        // shown because they are a closed menu; the recorded reading is the
+        // model's own words and a filled-in sample would function as an
+        // exemplar to copy (the exact bleed D47 bans).
+        reading: {
+          tone: '', register: '', povFrame: '', impliedSetting: '',
+          emotionalArc: '', genreTemplate: '', briefEvidence: ''
+        },
+        selectionReason: ''
       }
     },
     theme: { visualArchetype: '', palette: { ink: '#000000', paper: '#ffffff', accent: '#000000', muted: '#888888', rule: '#cccccc', fog: '#eeeeee' } },
@@ -605,9 +619,28 @@
                 },
                 required: ['mechanicExclusions', 'documentExclusions', 'arcExclusions']
               },
-              homePull: { type: 'string', enum: ['story', 'game', 'investigation', 'mixed'] }
+              homePull: { type: 'string', enum: ['story', 'game', 'investigation', 'mixed'] },
+              // The recorded reading (§10.1). Required HERE by generation
+              // policy — this literal is the machine-enforced contract handed
+              // to the transport, and an optional reading is a reading the
+              // model skips. The artifact schema keeps it optional; the two
+              // stances are deliberate, not drift (see booklet-schema.mjs).
+              reading: {
+                type: 'object',
+                properties: {
+                  tone: { type: 'string' },
+                  register: { type: 'string' },
+                  povFrame: { type: 'string' },
+                  impliedSetting: { type: 'string' },
+                  emotionalArc: { type: 'string' },
+                  genreTemplate: { type: 'string' },
+                  briefEvidence: { type: 'string' }
+                },
+                required: ['tone', 'register', 'povFrame', 'impliedSetting', 'emotionalArc', 'genreTemplate', 'briefEvidence']
+              },
+              selectionReason: { type: 'string' }
             },
-            required: ['briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily', 'documentEcology', 'exclusions', 'homePull']
+            required: ['briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily', 'documentEcology', 'exclusions', 'homePull', 'reading', 'selectionReason']
           }
         },
         required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'economy', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'storySpine', 'artifactIdentity', 'artifactIntent']
@@ -1115,7 +1148,9 @@
     'Set `briefMode` to one of:',
     '- `explicit`: rich direction with clear genre, tone, and object cues',
     '- `sparse`: short premise that still implies an object and emotional engine',
-    '- `empty`: no creative direction provided',
+    '- `empty`: no creative direction provided (if a seed direction was drawn for you and',
+    '  appears in the creative direction channel, it IS direction — classify and honor it as',
+    '  though the user had written it, and do not fall back to a generic default)',
     '- `mashup`: combines multiple references or domains (X meets Y)',
     '- `reference-led`: names a specific author, film, book, game, or cultural work',
     '- `personal-subject`: includes a real person, pet, or intimate real-world referent',
@@ -1129,7 +1164,32 @@
     'KEY RULE: a sparser brief does not mean "make it more generic."',
     'It means make STRONGER object choices on the user\'s behalf.',
     '',
-    '### Step 3: Choose one arc family',
+    '### Step 3: Read the brief three ways, then choose one (the candidate triptych)',
+    'Before committing to any family, construct THREE candidate readings of this brief.',
+    'Do this silently, inside this one response — do not ask for more turns and do not',
+    'output the deliberation as prose.',
+    '',
+    'Each candidate is a complete reading: tone, register, POV frame, implied setting,',
+    'emotional arc, genre template, and the arc + mechanic grammar families it implies.',
+    '',
+    'Rules for the triptych:',
+    '- The three candidates MUST differ on at least one MAJOR axis: `mechanicGrammarFamily`,',
+    '  `arcFamily`, or POV frame. Three shades of one idea is a rule violation — if all three',
+    '  would produce the same board and the same tension curve, you have not read three ways.',
+    '- The program shape supplied in the derived-context block is candidate PRESSURE, not',
+    '  determinism: the program\'s shape must be legible in at least one candidate\'s arc or',
+    '  mechanic choice. Topology proposes; the triptych disposes.',
+    '- SELECTION CRITERION: choose the candidate with the sharpest creative tension that still',
+    '  honors the fidelityMode. Never the safest read. Never the average of the three.',
+    '  Honoring the dissonance is the rule for every brief class, not only mashups.',
+    '- A candidate that a `literal` fidelityMode cannot support is disqualified no matter how',
+    '  interesting it is. Sharpness never licenses ignoring what the brief actually says.',
+    '',
+    'Emit ONLY the winner. The losing candidates are not output as readings; you may record',
+    'a one-line note per rejected candidate under `artifactIntent._x.rejectedReadings`',
+    '(string[], optional) as an audit trail.',
+    '',
+    '### Step 4: Choose one arc family',
     'Set `arcFamily` to one of these families. Each shapes the entire booklet\'s tension curve:',
     '',
     '| Arc Family | Opening | Midpoint Shift | Endgame Pressure | Fragment Function |',
@@ -1145,7 +1205,7 @@
     'The arc family constrains how weekly arcBeats develop. Do not choose one family and then',
     'write beats that follow a different one.',
     '',
-    '### Step 4: Choose one mechanic grammar family',
+    '### Step 5: Choose one mechanic grammar family',
     'Set `mechanicGrammarFamily` to one of these. Each changes what the player DOES each week:',
     '',
     '| Family | Board-State Mode | Primary Player Action | Oracle Role | Convergence Shape |',
@@ -1162,7 +1222,7 @@
     'the oracle, cipher, and companion surface choices. Do not choose one family and then',
     'design mechanics from a different one.',
     '',
-    '### Step 5: Declare document ecology',
+    '### Step 6: Declare document ecology',
     'Set `documentEcology`:',
     '- `dominant` (string[], 2-3 types): document types that make up 50%+ of fragments',
     '- `forbidden` (string[], 1-3 types): document types that must NOT appear in this booklet',
@@ -1172,7 +1232,7 @@
     'The ecology must feel native to the artifact. A court packet is mostly transcript and',
     'correspondence. A ship log is mostly fieldNote and inspection. Do not use all 8 types.',
     '',
-    '### Step 6: Declare exclusions',
+    '### Step 7: Declare exclusions',
     'Set `exclusions`:',
     '- `mechanicExclusions` (string[], at least 1): board-state modes this booklet will NOT use',
     '- `documentExclusions` (string[], at least 1): same as forbidden in ecology — reinforced here',
@@ -1180,14 +1240,37 @@
     '',
     'Exclusions are identity. Every booklet must refuse something.',
     '',
-    '### Step 7: Name the home pull',
+    '### Step 8: Name the home pull',
     'Set `homePull` to one of: `story` | `game` | `investigation` | `mixed`',
     '',
     'This is: what kind of evening object is this when the lifter opens it at home?',
     '- `story`: the player returns for narrative curiosity',
     '- `game`: the player returns for mechanical progression',
     '- `investigation`: the player returns to assemble evidence and solve',
-    '- `mixed`: balanced pull across dimensions'
+    '- `mixed`: balanced pull across dimensions',
+    '',
+    '### Step 9: Record the reading',
+    'The winning candidate from Step 3 stops being private. Write it down.',
+    '',
+    'Set `reading` to an object with all seven fields, in your own words (these are free',
+    'strings — a record of how you read this brief, not a menu to pick from):',
+    '- `tone`: the emotional register you committed to',
+    '- `register`: the prose style you committed to',
+    '- `povFrame`: who experiences this story and through what frame',
+    '- `impliedSetting`: where and when',
+    '- `emotionalArc`: what changes for the protagonist by the end',
+    '- `genreTemplate`: the genre conventions now in force',
+    '- `briefEvidence`: 1-2 sentences naming the ACTUAL phrases in the brief that drove this',
+    '  reading. Quote or name the words that are there. If the brief cannot support a claim,',
+    '  do not make the claim — write what the brief actually gives you, even if that is little.',
+    '',
+    'Set `selectionReason` (string): why this candidate beat the other two. Name the tension',
+    'it buys and the axis on which it differed from the runner-up. "It fit best" is not a',
+    'reason; a reason survives someone disagreeing with it.',
+    '',
+    'The reading is BINDING and it is AUDITABLE. Later stages write against it, and the',
+    'composition critic grades the finished booklet against this recorded reading — a reading',
+    'the brief cannot support becomes a cited finding, not a vague complaint about tone.'
   ];
 
   window.INST_ANTI_GENERIC = [
@@ -2101,6 +2184,12 @@
     'simple? Has the structural scaffold drowned the voice (institutional gravity the brief',
     'never asked for)? Are named references honored as templates, not decoration? Is the prose',
     'free of banned cliche patterns?',
+    'Grade against the booklet’s OWN recorded reading (`meta.artifactIntent.reading`) when it',
+    'is present. Two distinct failures live here and they cite differently: (a) the booklet',
+    'departs from its recorded reading — cite the reading field and the prose that contradicts',
+    'it; (b) the recorded reading itself is not supportable by the brief, most often a',
+    '`briefEvidence` that asserts more than the brief says — cite the reading field and the',
+    'brief phrase it overreaches. A misread is now localizable; say which of the two it is.',
     '',
     '### fusionPacing',
     'Does the physical modality of each week’s workout map to the narrative register per the',

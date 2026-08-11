@@ -156,6 +156,12 @@ import {
   allowsEmptyApiKey
 } from './modules/provider.js';
 
+// Side-effect import (§10.4): registers window.buildWorkoutTopology and
+// window.formatWorkoutTopologyBlock for generator.js, which is a classic IIFE
+// and cannot import. Nothing in this file calls them directly — armCompilerContext
+// in generator.js is the single consumer, and it reads them off window.
+import './modules/workout-topology.js';
+
 
 // ── Structured Output JSON Schemas ──────────────────────────────────────────
 // JSON Schema objects for Gemini native structured output (responseJsonSchema).
@@ -1839,6 +1845,11 @@ async function runApiPipeline(options) {
   if (!Array.isArray(campaignPlan.fragmentRegistry)) campaignPlan.fragmentRegistry = [];
   if (!Array.isArray(campaignPlan.overflowRegistry)) campaignPlan.overflowRegistry = [];
 
+  // The divergence seed for this run. Resolved from the cached compiler stage
+  // when resuming; drawn exactly once otherwise. See resolveRunSeed.
+  var divergenceSeed = resolveRunSeed(
+    (checkpoint && checkpoint.stages && checkpoint.stages.shell) || null, brief);
+
   var shell;
   if (checkpoint && checkpoint.stages && checkpoint.stages.shell) {
     shell = checkpoint.stages.shell;
@@ -1891,8 +1902,19 @@ async function runApiPipeline(options) {
         if (result && result.endings) { delete result.endings; }
         return '';
       },
-      buildPrompt: function (retryState) { return builders.shell(brief, layerBible, campaignPlan, retryState.attempt > 0 ? { retryMode: 'tight' } : undefined); }
+      buildPrompt: function (retryState) {
+        return builders.shell(brief, layerBible, campaignPlan, {
+          retryMode: retryState.attempt > 0 ? 'tight' : undefined,
+          // The compiler stage needs the program to derive its topology digest;
+          // this builder's signature never carried it.
+          workout: workout,
+          // Passing the run's seed is what makes retries reuse it instead of
+          // drawing a fresh world on attempt 2.
+          divergenceSeed: divergenceSeed
+        });
+      }
     });
+    recordSeedOnStage(shell, divergenceSeed);
     checkpoint = saveCheckpoint('shell', shell, checkpoint);
   }
 
@@ -2182,6 +2204,7 @@ async function runApiPipeline(options) {
   var booklet = options.assemble(shell, assembledWeeksOutput, assembledFragmentsOutput, assembledEndingsOutput, campaignPlan);
   enforceIdentityContract(booklet, identityContract);
   truthBoardStateMode(booklet, booklet._assemblyDiagnostics || []);
+  recordSeedOnBooklet(booklet, divergenceSeed);
 
   var validationResult = validateAssembledBooklet(booklet);
   if (validationResult.warnings && validationResult.warnings.length > 0) {
@@ -2260,6 +2283,57 @@ async function runApiPipeline(options) {
   console.log('[LiftRPG] Pipeline complete. Checkpoint cleared.');
 
   return booklet;
+}
+
+
+// ── Divergence seed lifecycle (§10.3 — the Armed Lens) ─────────────────────
+//
+// When the direction field is empty or thin, generator JS draws creative
+// material from story-tables.js and injects it into the BRIEF channel before
+// the compiler stage runs. Three properties have to hold, and each is bought by
+// exactly one line below:
+//
+//  1. IDENTITY IS UNPERTURBED. computeRunFingerprint hashes the RAW pre-seed
+//     brief and runs at the very top of the pipeline, before any of this. A
+//     draw therefore cannot move a run onto a different checkpoint — which it
+//     would, silently, if the seeded text were spliced into `brief` instead.
+//  2. DRAWN EXACTLY ONCE. Prompt builders run once per ATTEMPT; a builder that
+//     drew its own seed would hand retry #2 a different world than retry #1.
+//     The run resolves the seed here and passes it down.
+//  3. RESUME REPLAYS THE SAME BOOK. The seed rides on the compiler stage's own
+//     checkpointed output, so a resume recovers it with the stage it shaped. A
+//     re-draw would write the back half of a book against a world the front
+//     half never saw.
+
+function resolveRunSeed(cachedCompilerStage, brief) {
+  if (cachedCompilerStage) {
+    // Resuming. Whatever the paid-for stage was written against is the truth —
+    // including "no seed", which is why this returns rather than falling
+    // through to a draw.
+    var cached = cachedCompilerStage._x && cachedCompilerStage._x.divergenceSeed;
+    return cached || null;
+  }
+  return typeof window.resolveDivergenceSeed === 'function'
+    ? window.resolveDivergenceSeed(brief)
+    : null;
+}
+
+// Carried on the stage output so the checkpoint persists it for free — the
+// checkpoint stores stage outputs verbatim, so no new checkpoint key and no
+// change to CHECKPOINT_STORAGE_KEY's four touchpoints (D98).
+function recordSeedOnStage(stageOutput, seed) {
+  if (!stageOutput || !seed) return;
+  if (!stageOutput._x || typeof stageOutput._x !== 'object') stageOutput._x = {};
+  stageOutput._x.divergenceSeed = seed;
+}
+
+// The RECORD. `_x` is the declared extension namespace at the booklet's top
+// level, and this is where a reader (or the bench) looks to answer "where did
+// this world come from when nobody asked for one?"
+function recordSeedOnBooklet(booklet, seed) {
+  if (!booklet || !seed) return;
+  if (!booklet._x || typeof booklet._x !== 'object') booklet._x = {};
+  booklet._x.divergenceSeed = seed;
 }
 
 
@@ -2470,6 +2544,10 @@ async function runSkeletonFleshPipeline(options) {
   // STAGE 1: SKELETON
   // ════════════════════════════════════════════════════════════════════
 
+  // Same lifecycle as the shell stage — see resolveRunSeed. The skeleton is
+  // this pipeline's compiler stage, so it is the seed's carrier here.
+  var divergenceSeed = resolveRunSeed(cached('skeleton'), brief);
+
   var skeleton;
   if (cached('skeleton')) {
     skeleton = checkpoint.stages.skeleton;
@@ -2497,13 +2575,15 @@ async function runSkeletonFleshPipeline(options) {
       telemetryCollector: sfTelemetry,
       buildPrompt: function (retryState) {
         return builders.skeleton(workout, brief, {
-          retryMode: retryState.attempt > 0
+          retryMode: retryState.attempt > 0,
+          divergenceSeed: divergenceSeed
         });
       },
       validate: function (result) {
         return validateSkeletonStage(result, weekCount);
       }
     });
+    recordSeedOnStage(skeleton, divergenceSeed);
     checkpoint = saveCheckpoint('skeleton', skeleton, checkpoint);
   }
 
@@ -2884,6 +2964,7 @@ async function runSkeletonFleshPipeline(options) {
   var booklet = assembleSkeletonFleshBooklet(
     skeleton, rulesOutput, weekOutputs, allFragments, allEndings, options.nw
   );
+  recordSeedOnBooklet(booklet, divergenceSeed);
 
   var identityContract = typeof buildIdentityContract === 'function'
     ? buildIdentityContract(skeleton, null)

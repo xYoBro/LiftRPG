@@ -7765,7 +7765,13 @@
         }
         wizData.campaignPlan = campaignPlan;
         clearStageFlag('campaignPlan');
-        wizPrompts[3].value = window.generateShellPrompt(briefEl.value.trim(), wizData.layerBible, campaignPlan);
+        // The shell stage is a compiler stage, so it gets the program: without
+        // it armCompilerContext has nothing to derive a topology digest from
+        // and the guided path silently ships one signal short of the API paths.
+        wizPrompts[3].value = window.generateShellPrompt(
+          briefEl.value.trim(), wizData.layerBible, campaignPlan,
+          { workout: workoutEl.value }
+        );
         wizSetStep(2);
       });
 

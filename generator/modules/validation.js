@@ -3093,6 +3093,33 @@ export function validateSkeletonStage(result, weekCount) {
         console.warn('Skeleton → artifactIntent.exclusions.arcExclusions: empty or missing (advisory)');
       }
     }
+
+    // ── The recorded reading (§10.1) ──
+    // Policy-demand, never a hard failure (D19): the structured skeleton schema
+    // lists these as required, so a compliant transport supplies them; a
+    // freeform provider that skips them still ships a booklet. What the warning
+    // buys is a NAMED absence — before this, a lens that silently stopped
+    // recording its reading looked exactly like a lens that never had one.
+    var reading = intent.reading;
+    if (!reading || typeof reading !== 'object') {
+      console.warn('Skeleton → artifactIntent.reading: missing (advisory — the recorded reading is what makes a misread localizable)');
+    } else {
+      var READING_FIELDS = ['tone', 'register', 'povFrame', 'impliedSetting', 'emotionalArc', 'genreTemplate'];
+      for (var ri = 0; ri < READING_FIELDS.length; ri++) {
+        var rf = READING_FIELDS[ri];
+        if (!reading[rf] || typeof reading[rf] !== 'string' || !reading[rf].trim()) {
+          console.warn('Skeleton → artifactIntent.reading.' + rf + ': empty or missing (advisory)');
+        }
+      }
+      // briefEvidence is the load-bearing half: without it the reading is an
+      // assertion, and the critic has nothing to check the assertion against.
+      if (!reading.briefEvidence || typeof reading.briefEvidence !== 'string' || !reading.briefEvidence.trim()) {
+        console.warn('Skeleton → artifactIntent.reading.briefEvidence: empty or missing (advisory — an unevidenced reading cannot be audited against the brief)');
+      }
+    }
+    if (!intent.selectionReason || typeof intent.selectionReason !== 'string' || !intent.selectionReason.trim()) {
+      console.warn('Skeleton → artifactIntent.selectionReason: empty or missing (advisory — the triptych ran without recording why the winner won)');
+    }
   }
 
   // ── theme ──
