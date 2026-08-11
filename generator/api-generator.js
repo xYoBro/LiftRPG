@@ -899,11 +899,16 @@ function normalizeStageBudgetKey(stageKey) {
   return '';
 }
 
-function stageBudget(stageKey) {
+function stageBudget(stageKey, userTimeoutMs) {
   var key = normalizeStageBudgetKey(stageKey);
   var base = STAGE_BUDGETS[key] || { maxTokens: MAX_OUTPUT_TOKENS, timeoutMs: DEFAULT_TIMEOUT_MS };
   var baseTokens = base.maxTokens;
-  var baseTimeout = base.timeoutMs;
+  // The user's timeout setting is a FLOOR, never a cap: they may grant a stage
+  // more wall clock than the ladder budgets, but may not starve one below what
+  // its token ceiling needs. Keeps the UI's timeout label honest (it is a real
+  // minimum) without letting a single knob flatten per-stage differences.
+  var floor = Number(userTimeoutMs) > 0 ? Number(userTimeoutMs) : 0;
+  var baseTimeout = Math.max(base.timeoutMs, floor);
 
   return {
     maxTokens: function (retryState) {
@@ -1052,7 +1057,7 @@ async function runJsonStage(settings, config) {
     // Stage budgets come from the ladder (STAGE_BUDGETS + stageBudget()) keyed
     // by stageKey. An explicit config.maxTokens / config.requestTimeoutMs still
     // wins, but opting out also opts out of retry escalation — prefer the ladder.
-    var budget = stageBudget(config.budgetKey || config.stageKey);
+    var budget = stageBudget(config.budgetKey || config.stageKey, settings.requestTimeoutMs);
     var maxTokensSpec = config.maxTokens !== undefined ? config.maxTokens : budget.maxTokens;
     var timeoutSpec = config.requestTimeoutMs !== undefined ? config.requestTimeoutMs : budget.requestTimeoutMs;
 
