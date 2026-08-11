@@ -14,8 +14,9 @@
 import { registerAtom } from '../engine/atom-registry.js';
 import { buildBossPageModel } from '../field-ops-models.js';
 import { renderBossPage } from '../field-ops-primitives.js';
+import { PAGE_BUDGET } from '../engine/page-spec.js';
 
-const FULL_PAGE_HEIGHT = 741;
+const FULL_PAGE_HEIGHT = PAGE_BUDGET.heightPx;
 const BOSS_BASE_OVERFLOW = 38;
 
 /**

@@ -11,13 +11,14 @@
 
 import { registerAtom } from '../engine/atom-registry.js';
 import { make } from '../dom.js';
+import { PAGE_BUDGET } from '../engine/page-spec.js';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 /** Full page height in px (5.5" × 8.5" at 96dpi minus margins). */
-const FULL_PAGE_HEIGHT = 741;
+const FULL_PAGE_HEIGHT = PAGE_BUDGET.heightPx;
 
 /** Full-page stationery spacing (24 cols × 36 rows = 864). */
 const DEFAULT_CELL_COUNT = 864;

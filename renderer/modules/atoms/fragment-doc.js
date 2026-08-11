@@ -11,6 +11,7 @@ import { registerAtom } from '../engine/atom-registry.js';
 import { buildFragmentModel } from '../document-models.js';
 import { renderFoundDocument } from '../document-primitives.js';
 import { densityVariant } from '../engine/density-util.js';
+import { wrappedLines } from '../utils.js';
 
 // ---------------------------------------------------------------------------
 // Ladder mirror  ⇄  booklet.css fragment blocks
@@ -178,11 +179,6 @@ const BODY_CHAR_RATIO = 0.58;
 
 function ladderFor(density) {
   return LADDER[densityVariant(density) || 'base'];
-}
-
-function wrappedLines(chars, widthPx, charPx) {
-  if (!chars) return 0;
-  return Math.max(1, Math.ceil(chars * charPx / Math.max(1, widthPx)));
 }
 
 function bodyLines(chars, widthPx, fontSizePx) {

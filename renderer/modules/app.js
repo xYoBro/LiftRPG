@@ -2,7 +2,7 @@ import { decryptBlob, encryptBlob } from './crypto.js?v=48';
 import { qs } from './dom.js?v=48';
 import { exportBookletPdf } from './pdf-export.js?v=48';
 import { renderBooklet, syncLayoutMode } from './render.js?v=48';
-import { deriveBookletPassword, normalisePassword, validateBooklet } from './utils.js?v=48';
+import { deriveBookletPassword, normalisePassword, validateBooklet, waitForPaint } from './utils.js?v=48';
 
 const state = {
   data: null,
@@ -32,14 +32,6 @@ function syncLoadedState() {
 
 function isSafariBrowser() {
   return /^((?!chrome|android).)*safari/i.test(window.navigator.userAgent);
-}
-
-function waitForPaint() {
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(resolve);
-    });
-  });
 }
 
 function parseAuditNumber(value, fallbackValue) {

@@ -206,6 +206,35 @@ function renderRowInto(container, row) {
   }
 }
 
+// IDENTITY STAMP — `data-atom-id` on whatever element actually lands in a frame.
+//
+// The plan knows which atom each placement is; the DOM did not. Every
+// order invariant we had (the D81 printed-sequence law, the printedAtomOrder
+// pin) reads `window.__v2SpreadPlan` — the PLAN — so a composition step that
+// reorders placements on their way into the frame was invisible to all of
+// them. That is exactly what the pre-2026-08-11 type partition in
+// renderWorkoutPage() did: plan said card | panel | footer, DOM said panel |
+// cards | footer, and nothing failed. This attribute is what lets a gate read
+// the rendered composition back (see the DOM-order gate in
+// tests/playwright/diagnostics.spec.js).
+//
+// Geometry-safe by construction: an attribute with no CSS consumer changes no
+// box. It is also render-only — measurement-harness.js renders atoms directly
+// via `def.render()` and never routes through this function — so measurement
+// and render cannot diverge over it.
+//
+// Stamped on the element that lands in the frame, NOT on `rendered`: an atom
+// whose renderer returns a whole `.booklet-page` (cover, fragment-doc, boss,
+// interlude — anything built on createBoundedPage) has that wrapper discarded
+// below, and its inner frame's children are what actually get appended. Those
+// children each carry the id, so an atom occupies a contiguous run of stamped
+// elements rather than exactly one.
+function stampAtomIdentity(element, atomId) {
+  if (!atomId) return;
+  if (!element || element.nodeType !== 1) return;
+  element.setAttribute('data-atom-id', atomId);
+}
+
 export function renderPlacementInto(target, placement) {
   const def = getAtomDefinition(placement.type);
   if (!def) {
@@ -214,6 +243,7 @@ export function renderPlacementInto(target, placement) {
   }
 
   const rendered = def.render(placement.atom, placement.density);
+  const atomId = placement.atomId == null ? '' : String(placement.atomId);
 
   if (rendered.classList && rendered.classList.contains('booklet-page')) {
     const innerFrame = rendered.querySelector('.page-frame');
@@ -223,6 +253,7 @@ export function renderPlacementInto(target, placement) {
         if (child.style && child.style.flex && placement.type !== 'session-card') {
           child.style.flex = '';
         }
+        stampAtomIdentity(child, atomId);
         target.appendChild(child);
       }
     }
@@ -232,6 +263,7 @@ export function renderPlacementInto(target, placement) {
   if (rendered.style && rendered.style.flex && placement.type !== 'session-card') {
     rendered.style.flex = '';
   }
+  stampAtomIdentity(rendered, atomId);
   target.appendChild(rendered);
 }
 

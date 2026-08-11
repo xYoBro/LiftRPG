@@ -30,14 +30,15 @@ import {
   extractEndingBodyText,
   extractYearsFromText,
   collectAnchoredPhrases,
-  decodeA1Z26,
   normalizeThemeArchetype
 } from './assembly.js';
 
 // The standard-A1Z26 predicate is a statement about a contract field's shape
 // (`decodingKey.referenceTable` is typed `['string','array']`), so it lives
-// with the contract — one implementation shared with the renderer.
-import { isStandardAlphaTable } from '../../contracts/contract-constants.mjs';
+// with the contract — one implementation shared with the renderer. decodeA1Z26
+// is the decoder that predicate gates, and moved to the same home in D93; it
+// used to reach here second-hand via assembly.js.
+import { decodeA1Z26, isStandardAlphaTable } from '../../contracts/contract-constants.mjs';
 
 // Map-evolution fingerprint + companions: one implementation, shared with quality.js.
 // Formerly a private copy here that silently diverged from quality.js's — see D91 and

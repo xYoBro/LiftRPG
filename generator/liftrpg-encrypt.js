@@ -21,7 +21,7 @@
  * Encrypted blob = base64url( salt(32) | iv(12) | ciphertext )
  * Key derivation: PBKDF2-SHA256, 200,000 iterations, 256-bit AES-GCM key
  * Password normalisation: trim → uppercase → strip non-alphanumeric
- * This normalisation is mirrored in renderer/modules/app.js
+ * This normalisation is mirrored in renderer/modules/utils.js (safeUpper)
  *
  * ── PAYLOAD FORMAT ──────────────────────────────────────────────────────────
  * The plaintext that gets encrypted is JSON:
@@ -42,7 +42,17 @@ const IV_BYTES   = 12;
 const ITER       = 200_000;
 
 // ── NORMALISE ──────────────────────────────────────────────────────────────
-// Must match the normalisation in renderer/modules/app.js exactly.
+// Must match the normalisation in renderer/modules/utils.js exactly — that is
+// safeUpper(), which normalisePassword() there delegates to. (app.js only
+// imports it; it has never held the implementation.)
+//
+// Deliberately dual-homed, and NOT a unification candidate like the D93 pairs:
+// the two trees are different module systems that never share a runtime, and
+// the seam is already gate-watched. tests/playwright/diagnostics.spec.js,
+// "Crypto behavioural parity (fresh seal ⇄ shipping opener)", asserts on seeded
+// pairs that both modules normalise a password to the same secret and that a
+// fresh seal opens in the shipping opener. Per D93, that gate is the
+// enforcement here — a comment pair would not be.
 export function normalisePassword(raw) {
   return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
@@ -101,7 +111,9 @@ export async function encryptEnding(payload, password) {
 // ── DECRYPT (for testing) ──────────────────────────────────────────────────
 /**
  * Decrypts a blob produced by encryptEnding.
- * Mirrors the decryption in renderer/modules/app.js.
+ * Mirrors the decryption in renderer/modules/crypto.js (decryptBlob) —
+ * app.js only calls it. The seam is gate-watched by the behavioural-parity
+ * suite in diagnostics.spec.js (D93).
  *
  * @param {string} blobBase64url
  * @param {string} password

@@ -14,8 +14,9 @@ import { registerAtom } from '../engine/atom-registry.js';
 import { buildGaugeLogPageModelWithVariant } from '../booklet-models.js';
 import { renderGaugeLogPage } from '../booklet-primitives.js';
 import { densityVariant } from '../engine/density-util.js';
+import { PAGE_BUDGET } from '../engine/page-spec.js';
 
-const FULL_PAGE_HEIGHT = 741;
+const FULL_PAGE_HEIGHT = PAGE_BUDGET.heightPx;
 // Minimum height at maximum density (tight variant). The old justification
 // cited "line-clamped instructions" — that clamp is gone (it hid up to 120px
 // of live extraction-instruction text while buying zero fit; see the tight

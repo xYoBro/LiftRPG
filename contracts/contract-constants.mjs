@@ -247,6 +247,71 @@ export var VALID_ATTACHMENT_STRATEGIES = [
   'split-technical', 'single-dominant', 'narrative-support'
 ];
 
+/**
+ * resolveShellFamily(rawShellFamily, artifactClass, themeArchetype) -> family
+ *
+ * The canonical shell family for an artifact identity. Co-located with
+ * VALID_SHELL_FAMILIES because the enum IS the validity gate in step 1 — the
+ * resolver and the enum cannot be separated without the "is this token real?"
+ * question being answered twice.
+ *
+ * Unlike resolveDocumentType / resolveWorkspaceStyle this never returns null:
+ * every booklet prints with some shell, and 'field-survey' is the declared
+ * default (schema + assembly + renderer all already fell back to it).
+ *
+ * Resolution order:
+ *   1. An authored shellFamily that slugs to a member of VALID_SHELL_FAMILIES
+ *      wins outright.
+ *   2. Otherwise the token is DISCARDED and artifactClass keywords decide.
+ *   3. Otherwise the theme archetype decides.
+ *   4. Otherwise 'field-survey'.
+ *
+ * SINGLE IMPLEMENTATION (D93). It lived twice — renderer/modules/booklet-models.js
+ * and generator/modules/assembly.js — and the copies disagreed on 114 of 600
+ * synthetic identity combinations. The renderer's semantics are the ones kept
+ * here, because it was right on both root causes:
+ *
+ *   RC1 — rejected token fed back into inference. assembly.js called
+ *   inferShellFamily(firstNonEmpty(value, artifactClass), ...) after already
+ *   deciding `value` was not a valid family, so an invalid token like
+ *   "ships-manifest" still steered the answer to ship-logbook and artifactClass
+ *   never got a vote. A token judged invalid must carry no weight — step 2
+ *   above reads artifactClass, not the discarded token.
+ *
+ *   RC2 — truncated archetype fallback. assembly.js mapped only
+ *   'government' -> classified-packet; nautical, occult and minimalist booklets
+ *   with an unrecognised artifactClass silently fell to field-survey on the
+ *   generator path while the renderer gave them their proper shell.
+ *
+ * Consumers: generator/modules/assembly.js (normalizeArtifactIdentity),
+ * renderer/modules/booklet-models.js (resolveArtifactIdentity).
+ * Guarded by singleDeclarationHomes() in scripts/validate.mjs.
+ */
+export function resolveShellFamily(rawShellFamily, artifactClass, themeArchetype) {
+  var token = String(rawShellFamily || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (VALID_SHELL_FAMILIES.indexOf(token) !== -1) return token;
+
+  var klass = String(artifactClass || '').toLowerCase();
+  if (klass.indexOf('ship') !== -1) return 'ship-logbook';
+  if (klass.indexOf('court') !== -1) return 'court-packet';
+  if (klass.indexOf('devotional') !== -1) return 'devotional-manual';
+  if (klass.indexOf('witness') !== -1) return 'witness-binder';
+  if (klass.indexOf('archive') !== -1 || klass.indexOf('household') !== -1) return 'household-archive';
+  if (klass.indexOf('manual') !== -1) return 'technical-manual';
+  if (klass.indexOf('packet') !== -1 || klass.indexOf('dossier') !== -1) return 'classified-packet';
+
+  switch (String(themeArchetype || '').toLowerCase()) {
+    case 'government': return 'classified-packet';
+    case 'nautical': return 'ship-logbook';
+    case 'occult': return 'devotional-manual';
+    case 'minimalist': return 'technical-manual';
+    default: return 'field-survey';
+  }
+}
+
 // ── Spatial guardrails ───────────────────────────────────────────────────────
 // One set of numbers. prompt_rules.js SCHEMA_SPATIAL and MECHANIC_VOCAB_BRIEF
 // must quote exactly these (validator-asserted); the generator validators
@@ -381,6 +446,10 @@ export function resolveWorkspaceCellCount(workSpace) {
  * Consumers: generator/modules/assembly.js (password derivation),
  * generator/modules/validation.js (strict rules), renderer/modules/utils.js
  * (deriveBookletPassword).
+ *
+ * Its decoder, decodeA1Z26, lives directly below for the same reason: the
+ * predicate is the gate and the decoder is the thing gated, and splitting them
+ * across trees is what produced the drift both now record.
  */
 export function isStandardAlphaTable(referenceTable) {
   if (!referenceTable) return false;
@@ -403,4 +472,41 @@ export function isStandardAlphaTable(referenceTable) {
     if (!found) return false;
   }
   return true;
+}
+
+/**
+ * decodeA1Z26(values) -> string
+ *
+ * Converts an array of numeric values to uppercase letters via A=1 ... Z=26.
+ * Returns the EMPTY STRING when the array is empty or any value is not an
+ * integer in 1-26 — i.e. "no password could be derived". Callers test it for
+ * truthiness; none distinguishes empty-string from any other falsy failure.
+ *
+ * SINGLE IMPLEMENTATION (D93). It lived twice, and the copies returned
+ * different falsy values for the same failure: '' in renderer/modules/utils.js,
+ * null in generator/modules/assembly.js. The divergence was unobservable —
+ * all three call sites branch on truthiness or coerce through
+ * String(value || '') — so this unification is behaviour-preserving. The ''
+ * return is kept because it makes the function total over strings: the
+ * renderer feeds the result straight into safeUpper(), where a leaked null
+ * would otherwise have had to survive on the `|| ''` guard alone.
+ *
+ * The gate for calling this at all is isStandardAlphaTable() above: a
+ * referenceTable that does not print all 26 letters cannot justify decoding a
+ * value the booklet never shows the player.
+ *
+ * Consumers: generator/modules/assembly.js (enforceBookletDerivedFields),
+ * generator/modules/validation.js (demoPassword cross-check),
+ * renderer/modules/utils.js (deriveBookletPassword).
+ * Guarded by singleDeclarationHomes() in scripts/validate.mjs.
+ */
+export function decodeA1Z26(values) {
+  if (!Array.isArray(values) || values.length === 0) return '';
+  var letters = '';
+  for (var index = 0; index < values.length; index += 1) {
+    var value = Number(values[index]);
+    if (!Number.isInteger(value) || value < 1 || value > 26) return '';
+    letters += String.fromCharCode(64 + value);
+  }
+  return letters;
 }

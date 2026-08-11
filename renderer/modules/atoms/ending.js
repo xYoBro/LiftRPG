@@ -14,6 +14,7 @@
  */
 
 import { registerAtom } from '../engine/atom-registry.js';
+import { PAGE_BUDGET } from '../engine/page-spec.js';
 import {
   buildLockedEndingPageModel,
   buildUnlockedEndingPageModel,
@@ -23,7 +24,7 @@ import {
   renderUnlockedEndingPage,
 } from '../booklet-primitives.js';
 
-const FULL_PAGE_HEIGHT = 741;
+const FULL_PAGE_HEIGHT = PAGE_BUDGET.heightPx;
 
 /**
  * Infer the layout variant from the ending's designSpec.

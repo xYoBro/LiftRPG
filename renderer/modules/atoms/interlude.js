@@ -10,8 +10,9 @@
 import { registerAtom } from '../engine/atom-registry.js';
 import { buildInterludePageModel } from '../booklet-models.js';
 import { renderInterludePage } from '../booklet-primitives.js';
+import { PAGE_BUDGET } from '../engine/page-spec.js';
 
-const FULL_PAGE_HEIGHT = 741;
+const FULL_PAGE_HEIGHT = PAGE_BUDGET.heightPx;
 
 function inferLayoutVariant(interlude) {
   const payloadType = String((interlude || {}).payloadType || '').trim().toLowerCase();

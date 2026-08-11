@@ -14,8 +14,9 @@
 import { registerAtom } from '../engine/atom-registry.js';
 import { buildCoverPageModel } from '../booklet-models.js';
 import { renderCoverPage } from '../booklet-primitives.js';
+import { PAGE_BUDGET } from '../engine/page-spec.js';
 
-const FULL_PAGE_HEIGHT = 741;
+const FULL_PAGE_HEIGHT = PAGE_BUDGET.heightPx;
 
 registerAtom('cover', {
   defaultSizeHint: 'full-page',

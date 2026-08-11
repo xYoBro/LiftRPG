@@ -13,6 +13,7 @@
  */
 
 import { registerAtom } from '../engine/atom-registry.js';
+import { PAGE_BUDGET } from '../engine/page-spec.js';
 import {
   buildRulesLeftPageModelWithVariant,
   buildSealedPageModel,
@@ -22,7 +23,7 @@ import {
   renderSealedPage,
 } from '../booklet-primitives.js';
 
-const FULL_PAGE_HEIGHT = 741;
+const FULL_PAGE_HEIGHT = PAGE_BUDGET.heightPx;
 
 registerAtom('rules-block', {
   defaultSizeHint: 'full-page',

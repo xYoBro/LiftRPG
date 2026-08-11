@@ -1,10 +1,4 @@
-function waitForPaint() {
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(resolve);
-    });
-  });
-}
+import { waitForPaint } from './utils.js?v=48';
 
 function delay(ms) {
   return new Promise((resolve) => {

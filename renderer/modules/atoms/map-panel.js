@@ -11,6 +11,7 @@ import { registerAtom } from '../engine/atom-registry.js';
 import { buildMapModel } from '../field-ops-models.js';
 import { renderMapSection } from '../field-ops-primitives.js';
 import { densityVariant } from '../engine/density-util.js';
+import { wrappedLines } from '../utils.js';
 
 // ---------------------------------------------------------------------------
 // Ladder mirror  ⇄  booklet.css `.map-zone[data-density-variant]` blocks
@@ -161,11 +162,6 @@ const MAP_WIDTH_PX = 432;
 
 function ladderFor(density) {
   return LADDER[densityVariant(density) || 'base'];
-}
-
-function wrappedLines(chars, widthPx, charPx) {
-  if (!chars) return 0;
-  return Math.max(1, Math.ceil(chars * charPx / Math.max(1, widthPx)));
 }
 
 /**

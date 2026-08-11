@@ -1,7 +1,9 @@
-// The standard-A1Z26 predicate is shared with the generator tree — one
-// implementation in contracts/contract-constants.mjs. A local copy is how the
-// generator path ended up rejecting array-form tables the renderer accepted.
-import { isStandardAlphaTable } from '../../contracts/contract-constants.mjs';
+// The standard-A1Z26 predicate and the decoder it gates are shared with the
+// generator tree — one implementation in contracts/contract-constants.mjs. A
+// local copy is how the generator path ended up rejecting array-form tables
+// the renderer accepted, and how decodeA1Z26 came to signal "no password" as
+// null on one side and '' on the other (D93).
+import { decodeA1Z26, isStandardAlphaTable } from '../../contracts/contract-constants.mjs';
 
 export function safeUpper(value) {
   return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -9,17 +11,6 @@ export function safeUpper(value) {
 
 export function normalisePassword(raw) {
   return safeUpper(raw);
-}
-
-function decodeA1Z26(values) {
-  if (!Array.isArray(values) || values.length === 0) return '';
-  let letters = '';
-  for (let index = 0; index < values.length; index += 1) {
-    const value = Number(values[index]);
-    if (!Number.isInteger(value) || value < 1 || value > 26) return '';
-    letters += String.fromCharCode(64 + value);
-  }
-  return letters;
 }
 
 export function alpha(hex, value) {
@@ -325,6 +316,58 @@ export function countWrappedLines(text, charsPerLine) {
   if (!normalized) return 0;
 
   return Math.max(1, Math.ceil(normalized.length / Math.max(12, charsPerLine)));
+}
+
+/**
+ * Lines a run of `chars` characters occupies in a box `widthPx` wide, given an
+ * average advance width of `charPx` per character.
+ *
+ * The pixel-space sibling of `countWrappedLines()` above: that one divides by a
+ * character capacity, this one divides by a measured width. Atom estimate()
+ * paths that already carry a px budget (fragment-doc, map-panel) use this form.
+ *
+ * SINGLE HOME (see the declaration registry in scripts/validate.mjs). This was
+ * declared privately in atoms/fragment-doc.js and atoms/map-panel.js — the D91
+ * defect class: two copies of a measurement helper feeding the density solver,
+ * with nothing to stop one from being tuned and the other not. They were
+ * byte-identical at unification.
+ *
+ * NOT the same function as `wrappedLines()` in atoms/oracle-table.js, whose
+ * third parameter is a FONT SIZE (it derives a per-line character capacity via
+ * CHAR_WIDTH_RATIO) rather than a per-character width. That one is a namesake
+ * with a different contract, deliberately left in place.
+ *
+ * `Math.max(1, widthPx)` guards the divisor; a zero-width box would otherwise
+ * return Infinity and poison the estimate.
+ *
+ * @param {number} chars   — character count
+ * @param {number} widthPx — box width in CSS pixels
+ * @param {number} charPx  — average character advance in CSS pixels
+ * @returns {number} line count; 0 for empty input
+ */
+export function wrappedLines(chars, widthPx, charPx) {
+  if (!chars) return 0;
+  return Math.max(1, Math.ceil(chars * charPx / Math.max(1, widthPx)));
+}
+
+/**
+ * Resolves after the browser has painted the current DOM mutations.
+ *
+ * Two nested rAF callbacks: the first fires before the paint that flushes
+ * pending mutations, the second after it. Callers that measure or rasterize
+ * (PDF export, post-render font settle) need the second.
+ *
+ * SINGLE HOME (see the declaration registry in scripts/validate.mjs). Declared
+ * privately in app.js and pdf-export.js; byte-identical at unification.
+ *
+ * @returns {Promise<void>}
+ */
+export function waitForPaint() {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(resolve);
+    });
+  });
 }
 
 export function pad2(value) {

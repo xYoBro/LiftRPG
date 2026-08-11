@@ -10,6 +10,8 @@ import {
   isValidWorkspaceStyle,
   resolveWorkspaceStyle,
   isStandardAlphaTable,
+  decodeA1Z26,
+  resolveShellFamily,
   DEFAULT_WORKSPACE_STYLE
 } from '../../contracts/contract-constants.mjs';
 
@@ -134,30 +136,12 @@ export function inferArtifactClassFromShell(shell) {
   return 'field survey folio';
 }
 
-export function inferShellFamily(artifactClass, themeArchetype) {
-  var artifact = toSlugWords(artifactClass);
-  if (artifact.indexOf('ship') !== -1) return 'ship-logbook';
-  if (artifact.indexOf('court') !== -1) return 'court-packet';
-  if (artifact.indexOf('devotional') !== -1) return 'devotional-manual';
-  if (artifact.indexOf('witness') !== -1) return 'witness-binder';
-  if (artifact.indexOf('archive') !== -1 || artifact.indexOf('household') !== -1) return 'household-archive';
-  if (artifact.indexOf('manual') !== -1) return 'technical-manual';
-  if (artifact.indexOf('packet') !== -1 || artifact.indexOf('dossier') !== -1 || themeArchetype === 'government') {
-    return 'classified-packet';
-  }
-  return 'field-survey';
-}
-
-var SUPPORTED_SHELL_FAMILIES = {
-  'field-survey': true,
-  'classified-packet': true,
-  'ship-logbook': true,
-  'witness-binder': true,
-  'court-packet': true,
-  'devotional-manual': true,
-  'household-archive': true,
-  'technical-manual': true
-};
+// inferShellFamily() and its normalizeShellFamilyValue() wrapper are NOT
+// defined here. resolveShellFamily() in contracts/contract-constants.mjs
+// (imported above) owns that decision for both trees. The copy that lived here
+// disagreed with the renderer's on 114 of 600 identity combinations: it fed a
+// shellFamily token it had just rejected back into inference, and its archetype
+// fallback knew only 'government'. See D93 and the function's header.
 
 var SUPPORTED_BOARD_STATE_MODES = {
   'survey-grid': true,
@@ -175,12 +159,6 @@ var SUPPORTED_ATTACHMENT_STRATEGIES = {
   'single-dominant': true,
   'narrative-support': true
 };
-
-function normalizeShellFamilyValue(value, artifactClass, themeArchetype) {
-  var token = toSlugToken(value);
-  if (SUPPORTED_SHELL_FAMILIES[token]) return token;
-  return inferShellFamily(firstNonEmpty(value, artifactClass), themeArchetype);
-}
 
 function normalizeBoardStateModeToken(value) {
   var token = toSlugToken(value);
@@ -256,7 +234,7 @@ export function normalizeArtifactIdentity(rawIdentity, shell, campaignPlan) {
   var identity = rawIdentity && typeof rawIdentity === 'object' ? rawIdentity : {};
   var themeArchetype = String((((shell || {}).theme || {}).visualArchetype) || '').toLowerCase();
   var artifactClass = firstNonEmpty(identity.artifactClass, inferArtifactClassFromShell(shell));
-  var shellFamily = normalizeShellFamilyValue(identity.shellFamily, artifactClass, themeArchetype);
+  var shellFamily = resolveShellFamily(identity.shellFamily, artifactClass, themeArchetype);
   var boardStateMode = normalizeBoardStateModeToken(identity.boardStateMode) || inferBoardStateModeFromContext(shell, campaignPlan);
   var attachmentStrategy = normalizeAttachmentStrategyValue(identity.attachmentStrategy, shellFamily, boardStateMode);
 
@@ -2104,27 +2082,16 @@ export function findBinaryChoiceWeek(weekChunkOutputs) {
 // ── Deterministic derivation helpers ────────────────────────────────────────
 // Compute bookkeeping facts from assembled data instead of trusting model prose.
 
-/**
- * decodeA1Z26(values) -> string | null
- * Converts an array of numeric values to uppercase letters via A=1 ... Z=26.
- * Returns null if any value is out of range or non-numeric.
- */
-export function decodeA1Z26(values) {
-  if (!Array.isArray(values) || values.length === 0) return null;
-  var letters = '';
-  for (var i = 0; i < values.length; i++) {
-    var n = Number(values[i]);
-    if (isNaN(n) || n < 1 || n > 26 || n !== Math.floor(n)) return null;
-    letters += String.fromCharCode(64 + n); // 65='A', so 64+1='A'
-  }
-  return letters;
-}
-
-// isStandardAlphaTable() is NOT defined here. It lives in
-// contracts/contract-constants.mjs (imported above) because the renderer needs
-// the same predicate, and the copy that lived here was string-only — it
-// rejected the `[{ value, letter }]` array form that the schema allows and
-// that `npm run migrate` produces. Do not reintroduce a local copy.
+// Neither isStandardAlphaTable() nor decodeA1Z26() is defined here. Both live
+// in contracts/contract-constants.mjs (imported above) because the renderer
+// needs the same predicate and the same decoder.
+//
+// The isStandardAlphaTable copy that lived here was string-only — it rejected
+// the `[{ value, letter }]` array form that the schema allows and that
+// `npm run migrate` produces. The decodeA1Z26 copy returned null where the
+// renderer's returned '' for the same failure; every call site branches on
+// truthiness, so the two trees never disagreed observably, but they were still
+// two implementations of one rule (D93). Do not reintroduce a local copy.
 
 export function normalizeThemeArchetype(value) {
   var requested = String(value || '').trim().toLowerCase();

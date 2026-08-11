@@ -6,6 +6,12 @@ import {
   splitParagraphs
 } from './utils.js?v=48';
 import { normalizeManifestPointer } from './document-models.js?v=48';
+// Shell-family resolution is shared with the generator tree — one
+// implementation in contracts/contract-constants.mjs, co-located with the
+// VALID_SHELL_FAMILIES enum that gates it. The local copy that used to live
+// here is why the generator inferred a different shell for the same booklet
+// on 114 of 600 identity combinations (D93).
+import { resolveShellFamily } from '../../contracts/contract-constants.mjs';
 
 function humanizeComponentType(value) {
   return String(value || 'component').replace(/-/g, ' ');
@@ -118,40 +124,11 @@ const SHELL_FAMILY_COPY = {
   }
 };
 
-function toShellFamily(value) {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
-function inferShellFamily(meta = {}, theme = {}) {
-  const explicit = toShellFamily(meta.artifactIdentity && meta.artifactIdentity.shellFamily);
-  if (explicit && SHELL_FAMILY_COPY[explicit]) return explicit;
-
-  const artifactClass = String((meta.artifactIdentity && meta.artifactIdentity.artifactClass) || '').toLowerCase();
-  if (artifactClass.includes('ship')) return 'ship-logbook';
-  if (artifactClass.includes('court')) return 'court-packet';
-  if (artifactClass.includes('devotional')) return 'devotional-manual';
-  if (artifactClass.includes('witness')) return 'witness-binder';
-  if (artifactClass.includes('archive') || artifactClass.includes('household')) return 'household-archive';
-  if (artifactClass.includes('manual')) return 'technical-manual';
-  if (artifactClass.includes('packet') || artifactClass.includes('dossier')) return 'classified-packet';
-
-  switch (String(theme.visualArchetype || '').toLowerCase()) {
-    case 'government': return 'classified-packet';
-    case 'nautical': return 'ship-logbook';
-    case 'occult': return 'devotional-manual';
-    case 'minimalist': return 'technical-manual';
-    default: return 'field-survey';
-  }
-}
-
 export function resolveArtifactIdentity(data = {}) {
   const meta = data.meta || {};
   const theme = data.theme || {};
   const raw = meta.artifactIdentity || {};
-  const shellFamily = inferShellFamily(meta, theme);
+  const shellFamily = resolveShellFamily(raw.shellFamily, raw.artifactClass, theme.visualArchetype);
   const copy = SHELL_FAMILY_COPY[shellFamily] || SHELL_FAMILY_COPY['field-survey'];
 
   return {

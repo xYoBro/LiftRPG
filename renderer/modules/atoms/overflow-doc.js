@@ -10,8 +10,9 @@
 import { registerAtom } from '../engine/atom-registry.js';
 import { buildDocumentPageModel } from '../document-models.js';
 import { renderDocumentPage } from '../document-primitives.js';
+import { PAGE_BUDGET } from '../engine/page-spec.js';
 
-const FULL_PAGE_HEIGHT = 741;
+const FULL_PAGE_HEIGHT = PAGE_BUDGET.heightPx;
 
 registerAtom('overflow-doc', {
   defaultSizeHint: 'full-page',
