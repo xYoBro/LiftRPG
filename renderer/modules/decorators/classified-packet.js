@@ -242,6 +242,52 @@ function buildArchiveFooter(placements) {
   return footer;
 }
 
+/**
+ * Compact packet ledger — one line, for archive pages carrying 3+ documents.
+ *
+ * Why it exists: the full ledger above measures 65-83px of grid. On a 1-up or
+ * 2-up page that is affordable furniture. On the 3-5-up archive pages D83
+ * introduced it would be a tenth of the sheet, so the ledger was gated off
+ * entirely — and simply vanished. That is the wrong answer twice over: a
+ * packet holding MORE documents needs its index more, not less, and chrome
+ * that disappears at scale was never really the packet's furniture.
+ *
+ * So the clerk compresses rather than abandons. He keeps the ledger's name
+ * and, per document, the two marks that do work: the reference that says
+ * WHICH, and the box he ticks when he has filed it. What he drops is the
+ * Type column — measured against the corpus, its cell reproduces verbatim the
+ * type slug already stamped at the head of the document itself, two inches
+ * up the same page (ledger row "F.08 MEMO" over a document headed "MEMO").
+ * The column headers go too; a one-line form does not caption itself.
+ *
+ * Nothing is sliced away. The full ledger caps at 3 rows; the strip carries a
+ * mark for every document on the page, which is the whole point of adapting
+ * instead of vanishing.
+ *
+ * HEIGHT CONTRACT: the strip must stay at or under ~18px, because fragment
+ * blocks are `flex:1` and it takes its height out of theirs. It is a single
+ * nowrap row (see `.archive-strip` in booklet.css) and measures ~13px.
+ *
+ * @param {Array} placements — every fragment placement on the page
+ * @returns {HTMLElement}
+ */
+function buildArchiveStrip(placements) {
+  const strip = make('section', 'archive-strip');
+  strip.appendChild(make('div', 'archive-strip-label', 'Packet Ledger'));
+
+  const marks = make('div', 'archive-strip-marks');
+  placements.forEach((placement) => {
+    const data = placement.atom?.data || placement.data || {};
+    const mark = make('div', 'archive-strip-mark');
+    mark.appendChild(make('span', 'archive-strip-ref', data.id || placement.id || 'F.--'));
+    mark.appendChild(make('span', 'archive-strip-box'));
+    marks.appendChild(mark);
+  });
+
+  strip.appendChild(marks);
+  return strip;
+}
+
 // ---------------------------------------------------------------------------
 // Decorator hooks
 // ---------------------------------------------------------------------------
@@ -326,14 +372,23 @@ const classifiedPacketDecorator = {
   },
 
   /**
-   * Return an archive footer for fragment pages with ≤ 2 fragments.
-   * Called after the default sequential rendering path.
+   * Return the packet ledger for fragment pages. The ledger ADAPTS to how many
+   * documents the page carries — it never vanishes:
+   *
+   *   ≤ 2 documents  → the full ledger (Ref / Type / Checked grid), unchanged
+   *   ≥ 3 documents  → the compact one-line strip (see buildArchiveStrip)
+   *
+   * The branch keys off `fragmentCount`, which the hook already receives; no
+   * new inputs, no DOM reads. Called after the default sequential rendering
+   * path, so it is measured and rendered identically.
    *
    * @param {object} fragmentFacts
-   * @returns {HTMLElement|null}
+   * @returns {HTMLElement}
    */
   buildFragmentFooter(fragmentFacts) {
-    if (fragmentFacts.fragmentCount > 2) return null;
+    if (fragmentFacts.fragmentCount > 2) {
+      return buildArchiveStrip(fragmentFacts.placements);
+    }
     return buildArchiveFooter(fragmentFacts.placements);
   },
 };
