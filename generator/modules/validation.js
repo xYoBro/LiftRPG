@@ -38,7 +38,17 @@ import {
 // with the contract — one implementation shared with the renderer. decodeA1Z26
 // is the decoder that predicate gates, and moved to the same home in D93; it
 // used to reach here second-hand via assembly.js.
-import { decodeA1Z26, isStandardAlphaTable } from '../../contracts/contract-constants.mjs';
+//
+// The artifactIntent planning menus (arc families, mechanic grammar families)
+// come from the same home: the skeleton prompt offers them, this pass checks
+// what came back, and a menu that drifted from the checker would make every
+// advisory here a lie. See VALID_ARC_FAMILIES in contract-constants.mjs.
+import {
+  decodeA1Z26,
+  isStandardAlphaTable,
+  VALID_ARC_FAMILIES,
+  VALID_MECHANIC_GRAMMAR_FAMILIES
+} from '../../contracts/contract-constants.mjs';
 
 // Map-evolution fingerprint + companions: one implementation, shared with quality.js.
 // Formerly a private copy here that silently diverged from quality.js's — see D91 and
@@ -3034,15 +3044,10 @@ export function validateSkeletonStage(result, weekCount) {
   // ── artifactIntent (Layer 3 planning contract) ──
   var VALID_BRIEF_MODES = { explicit: 1, sparse: 1, empty: 1, mashup: 1, 'reference-led': 1, 'personal-subject': 1 };
   var VALID_FIDELITY_MODES = { literal: 1, interpretive: 1, compositional: 1 };
-  var VALID_ARC_FAMILIES = {
-    'slow-burn-investigation': 1, 'institutional-collapse': 1, 'witness-accumulation': 1,
-    'contamination-spiral': 1, 'procedural-deepening': 1, 'pilgrimage-approach': 1, 'false-order-to-rupture': 1
-  };
-  var VALID_MECHANIC_FAMILIES = {
-    'survey-grid': 1, 'node-graph': 1, 'timeline-reconstruction': 1,
-    'testimony-matrix': 1, 'ledger-board': 1, 'route-tracker': 1, 'profile-assembly': 1
-  };
   var VALID_HOME_PULLS = { story: 1, game: 1, investigation: 1, mixed: 1 };
+  // arcFamily / mechanicGrammarFamily are imported from contract-constants.mjs
+  // (the menus the skeleton prompt offers). They are arrays, not object maps —
+  // membership is indexOf, not a property read.
 
   var intent = meta.artifactIntent;
   if (!intent || typeof intent !== 'object') {
@@ -3054,10 +3059,10 @@ export function validateSkeletonStage(result, weekCount) {
     if (!intent.fidelityMode || !VALID_FIDELITY_MODES[intent.fidelityMode]) {
       console.warn('Skeleton → artifactIntent.fidelityMode: "' + (intent.fidelityMode || '') + '" not in known values (advisory)');
     }
-    if (!intent.arcFamily || !VALID_ARC_FAMILIES[intent.arcFamily]) {
+    if (!intent.arcFamily || VALID_ARC_FAMILIES.indexOf(intent.arcFamily) === -1) {
       console.warn('Skeleton → artifactIntent.arcFamily: "' + (intent.arcFamily || '') + '" not in known families (advisory)');
     }
-    if (!intent.mechanicGrammarFamily || !VALID_MECHANIC_FAMILIES[intent.mechanicGrammarFamily]) {
+    if (!intent.mechanicGrammarFamily || VALID_MECHANIC_GRAMMAR_FAMILIES.indexOf(intent.mechanicGrammarFamily) === -1) {
       console.warn('Skeleton → artifactIntent.mechanicGrammarFamily: "' + (intent.mechanicGrammarFamily || '') + '" not in known families (advisory)');
     }
     if (!intent.homePull || !VALID_HOME_PULLS[intent.homePull]) {

@@ -2819,7 +2819,11 @@ function collectObservedCipherTypes(booklet) {
 }
 
 // Mechanic grammar → expected board-state proxies mapping.
-// Not exhaustive; covers the strongest observable correlations.
+// Not exhaustive in what it EXPECTS (several families have no strong map-type
+// proxy), but exhaustive in its KEYS: validate.mjs asserts this key set equals
+// VALID_MECHANIC_GRAMMAR_FAMILIES in contracts/contract-constants.mjs exactly,
+// so widening the family menu forces a conscious ruling here rather than a
+// silently unproxied family.
 var MECHANIC_GRAMMAR_PROXIES = {
   'survey-grid':              { expectedMapTypes: ['grid'], expectedCipherTypes: [] },
   'node-graph':               { expectedMapTypes: ['point-to-point'], expectedCipherTypes: [] },

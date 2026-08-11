@@ -247,6 +247,45 @@ export var VALID_ATTACHMENT_STRATEGIES = [
   'split-technical', 'single-dominant', 'narrative-support'
 ];
 
+// ── Artifact intent: planning families (Layer 3 compiler contract) ──────────
+// The two menus the artifact-intent compiler chooses from. They were written
+// five times — the STRUCTURED_SCHEMA_SKELETON enum literal and the
+// INST_ARTIFACT_COMPILER menu tables in prompt_rules.js, validation.js's
+// advisory maps, assembly.js's MECHANIC_GRAMMAR_PROXIES keys, quality.js's
+// STABLE_MAP_GRAMMARS keys — with nothing holding them together. This is the
+// single source; validate.mjs asserts every copy against it in both
+// directions.
+//
+// The arc family shapes the booklet's tension curve (opening → midpoint shift
+// → endgame pressure → fragment function). Ordered as the compiler menu is.
+
+export var VALID_ARC_FAMILIES = [
+  'slow-burn-investigation', 'institutional-collapse', 'witness-accumulation',
+  'contamination-spiral', 'procedural-deepening', 'pilgrimage-approach',
+  'false-order-to-rupture'
+];
+
+// The mechanic grammar family determines what the player DOES each week, and
+// today also determines meta.artifactIdentity.boardStateMode.
+//
+// INDEPENDENCE RULING (Wave 0, 2026-08-11). These seven values coincide with
+// VALID_BOARD_STATE_MODES minus 'player-drawn'. That coincidence is
+// HISTORICAL, not structural: both menus were written during the
+// single-macro-genre era, when one family implied exactly one board. Wave 2
+// widens the family menu to macro-genre clusters and the coincidence ends,
+// so this is a SEPARATE array — never derive one from the other, and never
+// collapse them back together on the grounds that they look equal today.
+//
+// The consequence is in prompt_rules.js's INST_ARTIFACT_COMPILER family menu:
+// its "Board-State Mode" column is currently an identity mapping (each family
+// names itself). When the menu widens, that column becomes a real derivation
+// — a family will choose a board rather than being one.
+
+export var VALID_MECHANIC_GRAMMAR_FAMILIES = [
+  'survey-grid', 'node-graph', 'timeline-reconstruction', 'testimony-matrix',
+  'ledger-board', 'route-tracker', 'profile-assembly'
+];
+
 /**
  * resolveShellFamily(rawShellFamily, artifactClass, themeArchetype) -> family
  *

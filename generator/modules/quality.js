@@ -77,7 +77,11 @@ export function collectIdentityVariationFindings(booklet, nonBossWeeks, fragment
     var declaredBoard = String(artifactIdentity.boardStateMode || '').toLowerCase();
     var soleMapType = Object.keys(mapTypes)[0];
 
-    // Grammars/board-state modes that inherently use a single map type
+    // Grammars/board-state modes that inherently use a single map type.
+    // Deliberately PARTIAL — only families with one stable expected map type
+    // appear. Keys are drawn from VALID_MECHANIC_GRAMMAR_FAMILIES +
+    // VALID_BOARD_STATE_MODES (contracts/contract-constants.mjs); validate.mjs
+    // asserts the subset, never full coverage.
     var STABLE_MAP_GRAMMARS = {
       'survey-grid': 'grid',
       'ledger-board': 'grid',
