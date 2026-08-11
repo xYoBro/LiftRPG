@@ -21,10 +21,10 @@ import {
   DEFAULT_TIMEOUT_MS,
   MAX_OUTPUT_TOKENS,
   PROVIDERS,
-  ANTHROPIC_CONNECT_TIMEOUT_MS,
-  ANTHROPIC_STREAM_IDLE_TIMEOUT_MS,
-  ANTHROPIC_STREAM_MIN_OVERALL_MS,
-  ANTHROPIC_STREAM_MAX_MS
+  STREAM_CONNECT_TIMEOUT_MS,
+  STREAM_IDLE_TIMEOUT_MS,
+  STREAM_MIN_OVERALL_MS,
+  STREAM_MAX_OVERALL_MS
 } from './constants.js';
 import { extractJson } from './repair.js';
 import { cloneSimple } from './assembly.js';
@@ -1220,9 +1220,9 @@ function createStreamGuard(label, requestedTimeoutMs) {
   var silenceTimer = null;
   var overallTimer = null;
   var overallMs = Math.min(
-    ANTHROPIC_STREAM_MAX_MS,
+    STREAM_MAX_OVERALL_MS,
     Math.max(Number(requestedTimeoutMs) > 0 ? Number(requestedTimeoutMs) : DEFAULT_TIMEOUT_MS,
-      ANTHROPIC_STREAM_MIN_OVERALL_MS)
+      STREAM_MIN_OVERALL_MS)
   );
 
   function abortWithPhase(nextPhase, ms) {
@@ -1239,12 +1239,12 @@ function createStreamGuard(label, requestedTimeoutMs) {
     signal: controller.signal,
     overallMs: overallMs,
     start: function () {
-      armSilence(ANTHROPIC_CONNECT_TIMEOUT_MS, 'connect');
+      armSilence(STREAM_CONNECT_TIMEOUT_MS, 'connect');
       overallTimer = setTimeout(function () { abortWithPhase('overall', overallMs); }, overallMs);
     },
     // Call once headers land, then on every chunk, to re-arm the idle window.
     touch: function () {
-      armSilence(ANTHROPIC_STREAM_IDLE_TIMEOUT_MS, 'idle');
+      armSilence(STREAM_IDLE_TIMEOUT_MS, 'idle');
     },
     clear: function () {
       if (silenceTimer) clearTimeout(silenceTimer);

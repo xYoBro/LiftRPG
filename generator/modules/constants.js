@@ -5,8 +5,8 @@
 export var DEFAULT_TIMEOUT_MS = 600000; // 10 minutes — long frontier-model stages often exceed 5m
 export var MAX_OUTPUT_TOKENS = 64000;   // hard ceiling for a single stage; only generated tokens are billed
 
-// ── Anthropic streaming transport windows ────────────────────────────────────
-// The Anthropic path streams (SSE). Wall-clock is the WRONG failure signal for
+// ── Streaming transport windows (format-agnostic) ────────────────────────────
+// Every streaming transport shares these. Wall-clock is the WRONG failure signal for
 // a stream: a legitimate 24k-token completion at a conservative 20 tok/s runs
 // ~20 minutes, while a dead socket produces no bytes at all. So the transport
 // fails fast on SILENCE and stays patient with PROGRESS:
@@ -16,12 +16,12 @@ export var MAX_OUTPUT_TOKENS = 64000;   // hard ceiling for a single stage; only
 //   overall  — absolute ceiling regardless of progress -> abort (runaway)
 //
 // The caller's per-stage requestTimeoutMs is treated as ADVISORY on this path:
-// it is clamped into [ANTHROPIC_STREAM_MIN_OVERALL_MS, ANTHROPIC_STREAM_MAX_MS]
+// it is clamped into [STREAM_MIN_OVERALL_MS, STREAM_MAX_OVERALL_MS]
 // and used as the overall cap only. Idle is the real guard.
-export var ANTHROPIC_CONNECT_TIMEOUT_MS = 90000;       // 90s to first response headers
-export var ANTHROPIC_STREAM_IDLE_TIMEOUT_MS = 120000;  // 2m of total silence mid-stream
-export var ANTHROPIC_STREAM_MIN_OVERALL_MS = 600000;   // never cap a live stream below 10m
-export var ANTHROPIC_STREAM_MAX_MS = 1800000;          // 30m absolute ceiling
+export var STREAM_CONNECT_TIMEOUT_MS = 90000;       // 90s to first response headers
+export var STREAM_IDLE_TIMEOUT_MS = 120000;  // 2m of total silence mid-stream
+export var STREAM_MIN_OVERALL_MS = 600000;   // never cap a live stream below 10m
+export var STREAM_MAX_OVERALL_MS = 1800000;          // 30m absolute ceiling
 
 // ── Per-stage token / timeout ladder (single source) ─────────────────────────
 // THE LADDER LIVES HERE. Do not hand-write maxTokens/requestTimeoutMs literals
