@@ -247,7 +247,12 @@
     '### bossEncounter',
     '- Shape: { title, narrative, mechanismDescription, componentInputs, decodingKey, convergenceProof, passwordRevealInstruction, binaryChoiceAcknowledgement?: { ifA, ifB } }',
     '- `decodingKey`: { instruction, referenceTable }',
-    '- `componentInputs` must match the prior weeklyComponent values in order',
+    '- `componentInputs` must match the prior weeklyComponent values in order. This is the',
+    '  collection record and it is fixed in every convergence pattern — a pattern changes what',
+    '  the player must UNDERSTAND about those values, never which ones are listed or in what',
+    '  order (see Convergence Design).',
+    '- `convergenceProof`: the worked proof, and what it must contain depends on the declared',
+    '  `meta.artifactIntent.convergencePattern` — see Convergence Design.',
     '- The boss page reveals how raw values become letters for the first time'
   ];
 
@@ -413,6 +418,7 @@
     '  - `documentEcology` (object): { dominant: string[], forbidden: string[] }',
     '  - `exclusions` (object): { mechanicExclusions: string[], documentExclusions: string[], arcExclusions: string[] }',
     '  - `homePull` (string): story | game | investigation | mixed',
+    '  - `convergencePattern` (string): the endgame shape — sequential-assembly | reordering | red-herring | dual-source',
     '  - `reading` (object): the recorded reading — your interpretation of the brief, written down.',
     '    { tone, register, povFrame, impliedSetting, emotionalArc, genreTemplate, briefEvidence }',
     '    All free strings in your own words; these are a record, not a menu.',
@@ -490,8 +496,9 @@
         briefMode: 'sparse', fidelityMode: 'interpretive',
         arcFamily: 'slow-burn-investigation', mechanicGrammarFamily: 'survey-grid',
         documentEcology: { dominant: ['fieldNote', 'report'], forbidden: ['transcript'] },
-        exclusions: { mechanicExclusions: ['testimony-matrix'], documentExclusions: ['transcript'], arcExclusions: ['institutional-collapse'] },
+        exclusions: { mechanicExclusions: ['testimony-matrix', 'profile-assembly'], documentExclusions: ['transcript'], arcExclusions: ['institutional-collapse'] },
         homePull: 'investigation',
+        convergencePattern: 'sequential-assembly',
         // Free strings, deliberately blank in the example: enum members are
         // shown because they are a closed menu; the recorded reading is the
         // model's own words and a filled-in sample would function as an
@@ -500,7 +507,16 @@
           tone: '', register: '', povFrame: '', impliedSetting: '',
           emotionalArc: '', genreTemplate: '', briefEvidence: ''
         },
-        selectionReason: ''
+        selectionReason: '',
+        // The two candidates that lost. `axis` is a closed menu, so it is
+        // shown; the rest is the model's own words and stays blank for the
+        // same D47 reason the reading does.
+        _x: {
+          rejectedReadings: [
+            { axis: 'mechanicGrammarFamily', value: '', oneLiner: '' },
+            { axis: 'arcFamily', value: '', oneLiner: '' }
+          ]
+        }
       }
     },
     theme: { visualArchetype: '', palette: { ink: '#000000', paper: '#ffffff', accent: '#000000', muted: '#888888', rule: '#cccccc', fog: '#eeeeee' } },
@@ -601,7 +617,7 @@
               briefMode: { type: 'string', enum: ['explicit', 'sparse', 'empty', 'mashup', 'reference-led', 'personal-subject'] },
               fidelityMode: { type: 'string', enum: ['literal', 'interpretive', 'compositional'] },
               arcFamily: { type: 'string', enum: ['slow-burn-investigation', 'institutional-collapse', 'witness-accumulation', 'contamination-spiral', 'procedural-deepening', 'pilgrimage-approach', 'false-order-to-rupture'] },
-              mechanicGrammarFamily: { type: 'string', enum: ['survey-grid', 'node-graph', 'timeline-reconstruction', 'testimony-matrix', 'ledger-board', 'route-tracker', 'profile-assembly'] },
+              mechanicGrammarFamily: { type: 'string', enum: ['survey-grid', 'node-graph', 'timeline-reconstruction', 'testimony-matrix', 'ledger-board', 'route-tracker', 'profile-assembly', 'heat', 'attrition', 'siege', 'stewardship', 'loyalty-web', 'evasion', 'observance', 'rivalry'] },
               documentEcology: {
                 type: 'object',
                 properties: {
@@ -620,6 +636,11 @@
                 required: ['mechanicExclusions', 'documentExclusions', 'arcExclusions']
               },
               homePull: { type: 'string', enum: ['story', 'game', 'investigation', 'mixed'] },
+              // The endgame's shape (Wave 2). Same two-stance split as the
+              // reading below: required here because generation policy demands
+              // a declared pattern, optional in booklet-schema.mjs because no
+              // corpus fixture carries an artifactIntent at all.
+              convergencePattern: { type: 'string', enum: ['sequential-assembly', 'reordering', 'red-herring', 'dual-source'] },
               // The recorded reading (§10.1). Required HERE by generation
               // policy — this literal is the machine-enforced contract handed
               // to the transport, and an optional reading is a reading the
@@ -638,9 +659,34 @@
                 },
                 required: ['tone', 'register', 'povFrame', 'impliedSetting', 'emotionalArc', 'genreTemplate', 'briefEvidence']
               },
-              selectionReason: { type: 'string' }
+              selectionReason: { type: 'string' },
+              // The triptych's audit trail (Wave 2). `_x` is the schema's
+              // declared extension namespace, so this shape is enforced HERE
+              // and stays permissive in booklet-schema.mjs — the artifact
+              // contract has no opinion on what a pipeline leaves in `_x`,
+              // while generation policy needs the rejected readings to be
+              // machine-comparable. A string[] of one-liners could not be
+              // checked for axis difference; this can.
+              _x: {
+                type: 'object',
+                properties: {
+                  rejectedReadings: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        axis: { type: 'string', enum: ['mechanicGrammarFamily', 'arcFamily', 'povFrame'] },
+                        value: { type: 'string' },
+                        oneLiner: { type: 'string' }
+                      },
+                      required: ['axis', 'value', 'oneLiner']
+                    }
+                  }
+                },
+                required: ['rejectedReadings']
+              }
             },
-            required: ['briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily', 'documentEcology', 'exclusions', 'homePull', 'reading', 'selectionReason']
+            required: ['briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily', 'documentEcology', 'exclusions', 'homePull', 'convergencePattern', 'reading', 'selectionReason', '_x']
           }
         },
         required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'economy', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'storySpine', 'artifactIdentity', 'artifactIntent']
@@ -1127,6 +1173,86 @@
     '- Player-drawn maps should still give enough seed markers or prompts to feel purposeful, not empty.'
   ];
 
+  // ── Convergence Design (Wave 2; the March 2026 convergence-variants design) ─
+  // The endgame used to be one shape in every booklet: collect one component
+  // per week, concatenate in week order, decode. This is the menu that breaks
+  // it — and the law that keeps every pattern sealable.
+  //
+  // THE DECODE CHAIN IS NOT PROMPT-ONLY (correction to the March design, which
+  // was written against an older pipeline and claimed prompt-only scope). Three
+  // machine facts bound what a pattern may vary, all of them ERROR-class today:
+  //   1. assembly.js enforceBookletDerivedFields OVERWRITES
+  //      bossEncounter.componentInputs with the collected non-boss
+  //      weeklyComponent values, in week order.
+  //   2. validation.js validateAssembledBooklet errors when componentInputs
+  //      count differs from the non-boss week count, or when any entry differs
+  //      from its week's value.
+  //   3. meta.passwordLength is derived from the A1Z26 decode of that list, and
+  //      the renderer prints that many password boxes.
+  // So a pattern may vary WHERE the weekly value comes from, WHAT the player
+  // must know to read it, and WHAT the decoded letters mean — never the count,
+  // never the stored order. The March doc's "more components than the password
+  // needs" would print the wrong number of boxes; it is landed below as more
+  // READINGS than the password needs, which delivers the same filtration on the
+  // surface where the mark is made.
+  window.INST_CONVERGENCE_DESIGN = [
+    '## Convergence Design (how the weeks become the password)',
+    '',
+    'The spine is fixed in every pattern, because the printed booklet depends on it:',
+    '- Every non-boss week yields EXACTLY ONE component value, an integer 1-26.',
+    '- The boss page lists those values in WEEK ORDER. That is the collection record.',
+    '- `decodingKey.referenceTable` is the standard A1Z26 table (1=A ... 26=Z).',
+    '- The password has exactly as many letters as there are non-boss weeks.',
+    'A convergence needing a different count, a different stored order, or a non-alphabetic',
+    'table is not a creative choice; it is a booklet whose printed unlock does not work.',
+    '',
+    'Within that spine, choose what serves the world contract. Do NOT default to sequential',
+    'assembly every time — by the fourth booklet a player who has seen only that shape is',
+    'doing data entry, not a puzzle.',
+    '',
+    '### `sequential-assembly`',
+    'The letters, read in week order, are the password. Correct when the fiction is about',
+    'accumulation and the last week should feel like arrival. `convergenceProof` shows the',
+    'values, the letters, and the resulting word.',
+    '',
+    '### `reordering`',
+    'The week-order letters are an ANAGRAM of the password. The boss reveals the true reading',
+    'order, which must be something the player learned in play — an order the world',
+    'established, never an arbitrary shuffle.',
+    '- `convergenceProof` MUST show BOTH: the week-order string, marked as the wrong reading,',
+    '  and the true-order string.',
+    '- HARD REQUIREMENT: `passwordRevealInstruction` MUST state the final password in exactly',
+    '  the form `The password is WORD.` — one sentence, the word in capitals. The tooling that',
+    '  seals the ending reads that sentence; without it the anagram gets sealed and the player',
+    '  is locked out of their own booklet after six weeks. Export redacts the sentence before',
+    '  printing, so stating it spoils nothing.',
+    '- Do not choose this pattern if the true order cannot be derived from something printed.',
+    '',
+    '### `red-herring`',
+    'Each week\\\'s surface offers MORE candidate readings than the week needs — several figures,',
+    'marks, or values — and only one is this week\\\'s component. The player must know the',
+    'discriminating rule to write the right number in the box.',
+    '- The discriminator is established in the fiction and CONFIRMED at the boss, which states',
+    '  the rule plainly so the player can check all six weeks against it.',
+    '- `convergenceProof` MUST identify the decoys — at least one wrong reading per week the',
+    '  player could have taken — and then show the filtered result.',
+    '- The tracker still holds ONE value per week. The filtering happens where the mark is',
+    '  made, not at the end, and a player who wrote a wrong value must be able to fix it.',
+    '',
+    '### `dual-source`',
+    'The weekly values do not all come from the cipher. Some are extracted from an oracle',
+    'result, a found document, a map state, or a companion surface, and the boss combines',
+    'cipher-derived and narrative-derived values.',
+    '- Each week must make its SOURCE unambiguous.',
+    '- `convergenceProof` MUST document both kinds of source and which week gave which.',
+    '- At least two weeks must draw from a non-cipher source, or this is sequential assembly',
+    '  wearing a label.',
+    '',
+    'Whatever the pattern, the password-record layout is fixed (one box per week, one final',
+    'assembly row) and `convergenceProof` stays strict. A pattern changes what the player must',
+    'UNDERSTAND, never what the booklet must PRINT.',
+  ];
+
   window.INST_INTERLUDES = [
     '## Interludes And Messaging',
     '- Use supported interlude payloads for discovered packets, route updates, partial instructions, password elements, fragment references, or compact state changes only when they materially affect play.',
@@ -1240,9 +1366,13 @@
     '- A candidate that a `literal` fidelityMode cannot support is disqualified no matter how',
     '  interesting it is. Sharpness never licenses ignoring what the brief actually says.',
     '',
-    'Emit ONLY the winner. The losing candidates are not output as readings; you may record',
-    'a one-line note per rejected candidate under `artifactIntent._x.rejectedReadings`',
-    '(string[], optional) as an audit trail.',
+    'Emit ONLY the winner as the reading. Record the two that lost under',
+    '`artifactIntent._x.rejectedReadings` — at least TWO entries, each an object:',
+    '- `axis`: the MAJOR axis it differed on — `mechanicGrammarFamily` | `arcFamily` | `povFrame`',
+    '- `value`: what it would have chosen on that axis. It must differ from the winner\\\'s.',
+    '- `oneLiner`: one sentence on what that book would have been.',
+    'An entry matching the winner on both family axes is not a rejected reading; it is the same',
+    'book described twice, and it means the triptych did not run.',
     '',
     '### Step 4: Choose one arc family',
     'Set `arcFamily` to one of these families. Each shapes the entire booklet\'s tension curve:',
@@ -1261,23 +1391,127 @@
     'write beats that follow a different one.',
     '',
     '### Step 5: Choose one mechanic grammar family',
-    'Set `mechanicGrammarFamily` to one of these. Each changes what the player DOES each week:',
+    'Set `mechanicGrammarFamily` to one of these fifteen. Each changes what the player DOES each',
+    'week and, more importantly, what the WORLD spends against them. They fall into nine',
+    'clusters; the first seven share one because they are one macro-genre — all seven read an',
+    'incomplete record and rebuild it. Choosing across clusters changes the game; choosing',
+    'within the reconstruction cluster changes the documents.',
     '',
-    '| Family | Board-State Mode | Primary Player Action | Oracle Role | Convergence Shape |',
-    '|--------|-----------------|----------------------|-------------|------------------|',
-    '| `survey-grid` | survey-grid | Mark, clear, annotate grid positions | Discovery: reveals what is at a location | Sequential assembly of surveyed values |',
-    '| `node-graph` | node-graph | Connect, traverse, sever nodes | Routing: determines which connections are traversable | Route confirmation: correct traversal yields the key |',
-    '| `timeline-reconstruction` | timeline-reconstruction | Sequence events, identify gaps | Dating: assigns events to time slots | Chronological assembly: correct order yields the key |',
-    '| `testimony-matrix` | testimony-matrix | Compare accounts, mark contradictions | Interrogation: surfaces claims that may be true or false | Reconciliation: resolving contradictions yields the key |',
-    '| `ledger-board` | ledger-board | Track quantities, debits, credits | Auditing: reveals discrepancies | Balance: correct ledger state yields the key |',
-    '| `route-tracker` | route-tracker | Advance position, choose direction | Scouting: reveals conditions ahead | Arrival: correct waypoint sequence yields the key |',
-    '| `profile-assembly` | profile-assembly | Collect attributes, compare profiles | Profiling: surfaces traits of several subjects | Identification: assembling the correct profile yields the key |',
+    '| Family | Cluster | Board-State Mode | Primary Player Action |',
+    '|--------|---------|-----------------|----------------------|',
+    '| `survey-grid` | reconstruction | survey-grid | Mark, clear, annotate grid positions |',
+    '| `node-graph` | reconstruction | node-graph | Connect, traverse, sever nodes |',
+    '| `timeline-reconstruction` | reconstruction | timeline-reconstruction | Sequence events, identify gaps |',
+    '| `testimony-matrix` | reconstruction | testimony-matrix | Compare accounts, mark contradictions |',
+    '| `ledger-board` | reconstruction | ledger-board | Track quantities, debits, credits |',
+    '| `route-tracker` | reconstruction | route-tracker | Advance position, choose direction |',
+    '| `profile-assembly` | reconstruction | profile-assembly | Collect attributes, compare profiles |',
+    '| `heat` | heat | ledger-board | Act loudly or quietly, and pay the difference |',
+    '| `attrition` | attrition | route-tracker | Spend stores to cover ground |',
+    '| `siege` | siege | survey-grid | Fortify, concede, hold a position |',
+    '| `stewardship` | stewardship | survey-grid | Repair one failing thing, let others worsen |',
+    '| `loyalty-web` | loyalty-web | node-graph | Answer one claimant in front of the others |',
+    '| `evasion` | evasion | route-tracker | Choose the fast line or the hidden one |',
+    '| `observance` | observance | timeline-reconstruction | Keep the form exactly, or keep the day |',
+    '| `rivalry` | rivalry | ledger-board | Stake something against a posted result |',
     '',
-    'The mechanic grammar family determines `meta.artifactIdentity.boardStateMode` and shapes',
-    'the oracle, cipher, and companion surface choices. Do not choose one family and then',
-    'design mechanics from a different one.',
+    'The Board-State Mode column is the family\'s DEFAULT board, not its identity. A family may',
+    'take a different `meta.artifactIdentity.boardStateMode` when the world argues for it —',
+    'state the argument in `selectionReason`. The family also shapes the oracle, cipher, and',
+    'companion surface choices. Do not choose one family and then design mechanics from a',
+    'different one.',
     '',
-    '### Step 6: Declare document ecology',
+    '### Step 5a: The cluster recipes (BINDING — invariants on effect)',
+    'Each recipe states what a book in that cluster must FEEL like, never which components to',
+    'use. Two books in the same cluster built from different pieces are both correct; two built',
+    'from the same pieces that produce different pressures are also both correct. Compose',
+    'freely — the recipe is the constraint, the component list is not.',
+    '',
+    'PRESSURE is what the world spends against the player. DECISION is what the player must own',
+    'every week. REFUSES is what the family will not do, and it feeds your exclusions in Step 8.',
+    '"Usually made from" is a non-binding note on how the effect commonly gets built.',
+    '',
+    '**Reconstruction** — `survey-grid` `node-graph` `timeline-reconstruction` `testimony-matrix` `ledger-board` `route-tracker` `profile-assembly`',
+    '- PRESSURE: the record\'s incompleteness. The world spends GAPS: what is missing, misfiled or contradicted denies access until resolved.',
+    '- DECISION: which gap to close this week, knowing the others stay open another week.',
+    '- REFUSES: an antagonist who spends resources against the player. Nothing is coming FOR them; the difficulty is epistemic. Grow a pursuer and you have changed family.',
+    '- Usually: persistent board marks; a companion holding partial results; ciphers that open access.',
+    '',
+    '**Heat**',
+    '- PRESSURE: attention. The world spends AWARENESS: it rises when the player acts loudly, falls only when they accept a slower week.',
+    '- DECISION: push or lie low, priced. Every acquisition has a loud price and a quiet one, and the quiet one costs time the campaign lacks.',
+    '- REFUSES: the free action, and forgetting. Nothing costs nothing; attention never decays on its own.',
+    '- Usually: a rising track nobody wants; thresholds that change costs; a sink that buys quiet.',
+    '',
+    '**Attrition**',
+    '- PRESSURE: depletion against distance. Stores are spent for the fact of continuing, and the ground left does not shrink to match.',
+    '- DECISION: ration: spend now to move well, or arrive thin — a bet about a week not yet visible.',
+    '- REFUSES: replenishment on demand, and the free route. Stores are found, never bought at will; every direction costs something different.',
+    '- Usually: a depleting die; positions that advance only by paying; a far end visible from week one.',
+    '',
+    '**Siege**',
+    '- PRESSURE: a clock the player cannot stop. The world spends TIME toward an arrival no action of theirs slows.',
+    '- DECISION: prioritize inside a fixed budget — what is held, and therefore what is given up. Never enough to hold everything.',
+    '- REFUSES: escape and permanence. No outrunning, no negotiating, and nothing fortified stays safe.',
+    '- Usually: a racing clock with thresholds; regions held or conceded; a final week that IS the arrival.',
+    '',
+    '**Stewardship**',
+    '- PRESSURE: decay. The world spends CONDITION: surfaces degrade on a schedule the player did not set and cannot pause.',
+    '- DECISION: mend — which failing thing gets this week\'s hands, knowing the rest worsen meanwhile.',
+    '- REFUSES: total restoration, and blame. Something ends unrepaired, and decay never advances because the player fell short, in the book or the gym.',
+    '- Usually: fill clocks as repair; board states that improve where worked and worsen where not.',
+    '',
+    '**Loyalty web**',
+    '- PRESSURE: competing claims. The world spends OBLIGATION: parties wanting incompatible things who notice which one was answered.',
+    '- DECISION: choose whom to answer, in public. Standing buys action, and spending it is visible to the others.',
+    '- REFUSES: the neutral move and the villain. Nothing satisfies everyone, nothing is unobserved, and every claimant wants something reasonable.',
+    '- Usually: opposed tracks moving together; a gate only regard opens; a choice that shuts one door for good.',
+    '',
+    '**Evasion**',
+    '- PRESSURE: a pursuer closing. The world spends PROXIMITY, advancing on the campaign\'s own beats — dates, milestones, revelations.',
+    '- DECISION: route versus concealment. The fast line is the known line; distance bought loudly is distance lost later.',
+    '- REFUSES: punishing the player\'s week, and the repeatable hiding place. The pursuit NEVER advances because a session was missed — print that rule — and no cover works twice.',
+    '- Usually: a drain clock on the spine; caches along the alternates; positions that name the cost of leaving.',
+    '',
+    '**Observance**',
+    '- PRESSURE: exactness. The world spends the RITE\'s demands: a form kept precisely while conditions make precision harder each week.',
+    '- DECISION: keep the rite or keep the day — which part of the form is done correctly when the week does not allow all of it.',
+    '- REFUSES: grading the player, and improvisation. Nothing says they were devout enough; a lapse changes what the rite MEANS rather than subtracting. The form is given.',
+    '- Usually: standing read as position, not skill; slots that fill and overwrite; a printed order of operations.',
+    '',
+    '**Rivalry**',
+    '- PRESSURE: a counterpart\'s authored progress. The world spends ANOTHER\'S ADVANCE: a rival whose weekly position is printed in advance.',
+    '- DECISION: wager against a posted result — how much to stake on beating a number already known and unchangeable.',
+    '- REFUSES: the villain, and reactivity. The rival is not an enemy, and nothing the player lifts, rolls or marks moves their line.',
+    '- Usually: two clocks on different schedules; a stake spent before a result is read; a final week as the meeting.',
+    '',
+    '### Step 5b: How the family is chosen (consonance, then program shape)',
+    'The family is DERIVED, never picked at random. Two signals propose; the triptych disposes.',
+    '',
+    'FIRST, the brief\'s emotional core — the mechanic must BE the theme, not represent it:',
+    'urgency or a deadline arriving -> `siege` · corruption or exposure -> `heat` · competing',
+    'loyalties -> `loyalty-web` · scarcity or going without -> `attrition` · discovery or buried',
+    'knowledge -> the reconstruction cluster · trust or keeping something alive -> `stewardship`',
+    '· pursuit or dread -> `evasion` · devotion or exactness -> `observance` · competition or',
+    'pride -> `rivalry`. This proposes; it does not decide. Depart from it when the sharper',
+    'reading demands it, and say so in `selectionReason`.',
+    '',
+    'SECOND, the program\'s shape from the derived-context block (physiological congruence,',
+    'promoted from a pacing rule to a genre signal): a program that PEAKS late means a `siege`',
+    'candidate must appear in the triptych; a STEADY grind makes `attrition` live; a WAVE or',
+    'deload rhythm makes `evasion` live. An unknown shape removes the signal, never forces a',
+    'default. Binding: the program\'s shape must be legible in at least one candidate, and the',
+    'winning family must be defensible from the brief.',
+    '',
+    '### Step 6: Choose the convergence pattern',
+    'Set `convergencePattern` to one of: `sequential-assembly` | `reordering` | `red-herring` |',
+    '`dual-source`. This is the SHAPE of the endgame — how six weeks of collected values become',
+    'the password. The macro-genre varies the middle of the book; this varies the end. Do NOT',
+    'default to `sequential-assembly` every time. Read the Convergence Design section before',
+    'choosing: it states what each pattern may and may not change, and one of them carries a',
+    'hard requirement on what the boss page must state.',
+    '',
+    '### Step 7: Declare document ecology',
     'Set `documentEcology`:',
     '- `dominant` (string[], 2-3 types): document types that make up 50%+ of fragments',
     '- `forbidden` (string[], 1-3 types): document types that must NOT appear in this booklet',
@@ -1287,15 +1521,29 @@
     'The ecology must feel native to the artifact. A court packet is mostly transcript and',
     'correspondence. A ship log is mostly fieldNote and inspection. Do not use all 8 types.',
     '',
-    '### Step 7: Declare exclusions',
+    '### Step 8: Declare exclusions',
     'Set `exclusions`:',
-    '- `mechanicExclusions` (string[], at least 1): board-state modes this booklet will NOT use',
+    '- `mechanicExclusions` (string[], at least 1): mechanic grammar families or board-state',
+    '  modes this booklet will NOT use',
     '- `documentExclusions` (string[], at least 1): same as forbidden in ecology — reinforced here',
     '- `arcExclusions` (string[], at least 1): arc families this booklet is NOT following',
     '',
     'Exclusions are identity. Every booklet must refuse something.',
     '',
-    '### Step 8: Name the home pull',
+    'NEIGHBOUR RULE. A booklet must refuse the families it is most likely to slide into, which',
+    'are never the distant ones. Neighbour pairs: `heat`<->`rivalry` (both press a wager against',
+    'a counterparty who keeps score), `attrition`<->`evasion` (both spend to move while stores',
+    'fall), `siege`<->`stewardship` (both hold the same walls, against assault or against decay),',
+    '`loyalty-web`<->`observance` (both answer to something outside the player: people, or a form).',
+    '- Chose one of the eight macro-genres? `mechanicExclusions` must name at least one NEIGHBOUR.',
+    '- Chose a reconstruction family? Name at least TWO of the other six — they are all siblings,',
+    '  so they blur fastest of all.',
+    '- Refusing a distant family is free and proves nothing. The refusal must forbid the move',
+    '  your book will actually be tempted to make in week 4, and it must hold in the built',
+    '  booklet: a `heat` book that refuses `rivalry` and then prints a rival\\\'s weekly standings',
+    '  has broken its own contract.',
+    '',
+    '### Step 9: Name the home pull',
     'Set `homePull` to one of: `story` | `game` | `investigation` | `mixed`',
     '',
     'This is: what kind of evening object is this when the lifter opens it at home?',
@@ -1304,7 +1552,7 @@
     '- `investigation`: the player returns to assemble evidence and solve',
     '- `mixed`: balanced pull across dimensions',
     '',
-    '### Step 9: Record the reading',
+    '### Step 10: Record the reading',
     'The winning candidate from Step 3 stops being private. Write it down.',
     '',
     'Set `reading` to an object with all seven fields, in your own words (these are free',
@@ -1689,6 +1937,7 @@
     INST_SYSTEM_INTEGRATION, [''],
     INST_WEEKLY_COMPONENTS, [''],
     INST_CIPHER_DESIGN, [''],
+    INST_CONVERGENCE_DESIGN, [''],
     INST_MAPS_BOARD, [''],
     INST_ORACLES_CLOCKS, [''],
     INST_COMPANIONS, [''],
@@ -1750,7 +1999,12 @@
     // (the knowing) — VOICE_DISCIPLINE is the authoring doctrine for both.
     // MARK_SURFACE rides the shell stage because meta.economy is authored here:
     // the currency cannot be named well without knowing what it is FOR.
-    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
+    // CONVERGENCE_DESIGN rides the shell because the compiler CHOOSES the
+    // pattern here (Step 6) and cannot choose well without knowing what each
+    // one costs. It rides week-final and ending too — the stages that build
+    // the boss page and the payoff — so the pattern is legible everywhere it
+    // has consequences.
+    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
     // Knowing: the world's process particulars, authored once after the
     // skeleton/shell and consumed by every prose stage (§11 Wave 1.5). It
     // writes no prose, so it carries no VOICE_DISCIPLINE — it carries the
@@ -1762,11 +2016,11 @@
     // Week flesh: full game design + story
     // Prose stages (week-final, fragment, ending) carry VOICE_DISCIPLINE: they
     // write storyPrompts, interludes, oracle text, documents, and endings.
-    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'MARK_SURFACE', 'PERVASIVE_PLAY', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] },
+    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'MARK_SURFACE', 'PERVASIVE_PLAY', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'CONVERGENCE_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] },
     // Fragment: story quality first
     'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'VOICE_DISCIPLINE', 'ANTI_GENERIC', 'CHARACTER_WEB', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
     // Ending: story quality first (endings are where voice failure concentrates)
-    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'ANTI_GENERIC', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] }
+    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'CONVERGENCE_DESIGN', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'ANTI_GENERIC', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] }
   };
 
   window.buildStageSchema = function(stageName) {
@@ -2302,6 +2556,16 @@
     'If a `percentile-stat` companion is present, is it referenced BY NAME inside oracle',
     '`instruction` text in at least two weeks? A growing stat nothing rolls against is a',
     'decorative page — grade it as inert and cite the oracle instructions that omit it.',
+    'THE DECLARED FAMILY: grade the booklet against the recipe of the',
+    '`meta.artifactIntent.mechanicGrammarFamily` it declared, on three counts. (a) Is the',
+    'family\'s PRESSURE actually spent against the player — is there a printed surface where',
+    'the world takes something, on a schedule the player does not control? A declared `heat`',
+    'book whose attention never rises, or a `siege` book whose clock the player can stop, has',
+    'a label instead of a genre. (b) Is the family\'s DECISION present every week — does the',
+    'player choose between named alternatives with different costs, or is the week a sequence',
+    'of instructions? (c) Are the family\'s REFUSALS honoured, including the exclusions the',
+    'booklet declared for itself in `artifactIntent.exclusions`? Cite the surface that carries',
+    'the pressure (or the absence of one) and the week where the decision is made.',
     '',
     '### clueEconomy',
     'Are the mystery questions answerable from evidence physically present in the booklet?',

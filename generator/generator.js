@@ -260,10 +260,25 @@
     return null;
   }
 
+  // The draw is SIZED to the reason (Wave 2). An empty direction field gets
+  // the full brief — there is nothing to bury, and the seed IS the choosing.
+  // A sparse brief gets the texture slice only: four texture rolls and a
+  // touchstone, no premise, no protagonist, no setting, no voice. The full
+  // draw was ten times the mass of a five-word premise, and buildBriefChannel
+  // could only ask the model to subordinate it; this makes the subordination
+  // structural instead of rhetorical — the seed no longer CONTAINS a competing
+  // premise, so it cannot displace the user's.
   function drawDivergenceSeed(reason) {
     if (typeof window.randomizeBrief !== 'function') return null;   // story-tables absent — signal simply removed
     var text = '';
-    try { text = String(window.randomizeBrief() || ''); } catch (_e) { return null; }
+    try {
+      if (reason === 'sparse' && typeof window.randomizeBriefSlice === 'function') {
+        text = String(window.randomizeBriefSlice('texture') || '');
+      }
+      // Empty briefs, and any environment whose story-tables predates the
+      // slice API, fall back to the full draw.
+      if (!text.trim()) text = String(window.randomizeBrief() || '');
+    } catch (_e) { return null; }
     if (!text.trim()) return null;
     // `source` names the table set so a future second drawer is distinguishable
     // in the record. No timestamp: this object is persisted in the checkpoint
@@ -298,11 +313,11 @@
     return [
       userChannel,
       '',
-      '[SEED MATERIAL — SUBORDINATE]: The direction above is thin, so supporting material was',
-      'drawn to give it a specific world to happen in. The user\'s own words are PRIMARY and',
-      'BINDING. Use the seed only where it does not contradict them: borrow texture, pressure,',
-      'and specificity; never a premise, protagonist, or setting that displaces what the user',
-      'named. Where the two disagree, the user wins and the seed is discarded.',
+      '[SEED MATERIAL — SUBORDINATE]: The direction above is thin, so TEXTURE was drawn to give',
+      'it specifics to be specific in. It is texture and a tonal touchstone only — no premise,',
+      'no protagonist, no setting — because those are the user\'s to name and the user\'s words',
+      'are PRIMARY and BINDING. Use the seed only where it does not contradict them. Where the',
+      'two disagree, the user wins and the seed is discarded.',
       '',
       seed.text
     ].join('\n');
@@ -393,8 +408,14 @@
 
   // ── Artifact intent contract formatter (Layer 3 planning) ──────────────
   // Produces compact binding contract text from meta.artifactIntent for
-  // downstream flesh prompts. Reused across week, fragment, and ending
-  // prompt builders to avoid duplicating contract language.
+  // downstream prompts. ONE formatter, both pipelines: the S+F builders reach
+  // it through extractSkeletonContext, and the multi-stage builders reach it
+  // through assembly.js extractShellContext (which now carries artifactIntent
+  // for exactly this reason). Window-exposed because api-generator.js and the
+  // multi-stage builders are outside this closure.
+  //
+  // Takes anything with an `.artifactIntent` — a skeleton's meta or a shell
+  // context — so neither caller has to reshape its object first.
 
   function formatArtifactIntentContract(meta) {
     var intent = (meta || {}).artifactIntent;
@@ -402,6 +423,7 @@
 
     var ecology = intent.documentEcology || {};
     var exclusions = intent.exclusions || {};
+    var reading = intent.reading || {};
 
     var lines = [
       '## Artifact Intent Contract (BINDING — do not drift)',
@@ -414,6 +436,10 @@
       '- Home pull: ' + (intent.homePull || 'mixed'),
       '- Fidelity mode: ' + (intent.fidelityMode || 'interpretive')
     ];
+
+    if (intent.convergencePattern) {
+      lines.push('- Convergence pattern: ' + intent.convergencePattern);
+    }
 
     if (ecology.dominant && ecology.dominant.length > 0) {
       lines.push('- Document ecology dominant: ' + ecology.dominant.join(', '));
@@ -428,6 +454,24 @@
       lines.push('- Arc exclusions: ' + exclusions.arcExclusions.join(', ') + ' — do NOT follow these arc patterns');
     }
 
+    // The recorded reading, compacted (Wave 2). The compiler wrote down how it
+    // read the brief and then every prose stage wrote the book without ever
+    // seeing it — the reading was auditable after the fact and invisible
+    // during. Three fields only: tone and register are what the prose must
+    // sound like, emotionalArc is what it must move toward. briefEvidence is
+    // deliberately excluded — it is the critic's exhibit for grading the
+    // reading against the brief, and quoting the brief back at a week-writer
+    // invites transcription rather than interpretation.
+    var readingLines = [];
+    if (reading.tone) readingLines.push('- Tone: ' + reading.tone);
+    if (reading.register) readingLines.push('- Register: ' + reading.register);
+    if (reading.emotionalArc) readingLines.push('- Emotional arc: ' + reading.emotionalArc);
+    if (readingLines.length) {
+      lines.push('');
+      lines.push('The recorded reading of the brief — write inside it, not beside it:');
+      lines = lines.concat(readingLines);
+    }
+
     lines.push('');
     lines.push('Obligations:');
     lines.push('- Session prompts must follow the ' + (intent.arcFamily || '') + ' tension curve, not a generic escalation');
@@ -437,6 +481,8 @@
 
     return lines.join('\n');
   }
+
+  window.formatArtifactIntentContract = formatArtifactIntentContract;
 
   // ── Skeleton context extractor (Skeleton+Flesh) ─────────────────────────
   // The S+F sibling of assembly.js `extractShellContext`. Every flesh builder
@@ -990,6 +1036,12 @@
         parts.push('**Artifact Identity Contract:** ' + JSON.stringify(shellContext.artifactIdentity));
         parts.push('Do not flatten this into a generic ops dossier. Preserve shellFamily, boardStateMode, openingMode, rulesDeliveryMode, and unlockLogic.');
       }
+      // The planning contract (Wave 2). Same shell channel, same formatter the
+      // S+F builders use — before this, the multi-stage pipeline compiled an
+      // artifactIntent at the shell stage and then never showed it to any
+      // stage that wrote prose.
+      var intentBlock = formatArtifactIntentContract(shellContext);
+      if (intentBlock) { parts.push(''); parts.push(intentBlock); }
       // The knowing (§11 Wave 1.5): authored process particulars ride the
       // same shell channel as the rest of the identity contract.
       var knowingBlock = formatProcessParticulars(shellContext.processParticulars);
@@ -1322,6 +1374,12 @@
         parts.push('**Artifact Identity Contract:** ' + JSON.stringify(shellContext.artifactIdentity));
         parts.push('Do not normalize this batch into generic reports. Preserve the approved artifact family and document ecology.');
       }
+      // The planning contract (Wave 2). Same shell channel, same formatter the
+      // S+F builders use — before this, the multi-stage pipeline compiled an
+      // artifactIntent at the shell stage and then never showed it to any
+      // stage that wrote prose.
+      var intentBlock = formatArtifactIntentContract(shellContext);
+      if (intentBlock) { parts.push(''); parts.push(intentBlock); }
       // The knowing (§11 Wave 1.5): authored process particulars ride the
       // same shell channel as the rest of the identity contract.
       var knowingBlock = formatProcessParticulars(shellContext.processParticulars);
@@ -1471,6 +1529,12 @@
         parts.push('**Artifact Identity Contract:** ' + JSON.stringify(shellContext.artifactIdentity));
         parts.push('The ending must feel like the same artifact family and reveal shape promised by the shell.');
       }
+      // The planning contract (Wave 2). Same shell channel, same formatter the
+      // S+F builders use — before this, the multi-stage pipeline compiled an
+      // artifactIntent at the shell stage and then never showed it to any
+      // stage that wrote prose.
+      var intentBlock = formatArtifactIntentContract(shellContext);
+      if (intentBlock) { parts.push(''); parts.push(intentBlock); }
       // The knowing (§11 Wave 1.5): authored process particulars ride the
       // same shell channel as the rest of the identity contract.
       var knowingBlock = formatProcessParticulars(shellContext.processParticulars);
@@ -2440,6 +2504,13 @@
       // the most fragile prose. Included directly, the same way
       // generateSkeletonPrompt carries it.
       window.INST_VOICE_DISCIPLINE.join('\n'),
+      '',
+      // Same gap shape, same idiom (Wave 2): the ending STANDARD — pay off
+      // three recurring details, acknowledge the choice and the boss outcome,
+      // land a final line — also rode buildStageSchema('ending') only. The
+      // voice law says how to write; this says what the ending must DO, and
+      // the default pipeline was getting neither.
+      window.INST_ENDING_STANDARD.join('\n'),
       ''
     ].concat(window.buildFleshEndingSpec(variant)).filter(Boolean).join('\n');
   };
@@ -2477,6 +2548,8 @@
       // Same gap, same fix — see generateFleshEndingPrompt above. The bundled
       // builder is the one the pipeline actually calls by default.
       window.INST_VOICE_DISCIPLINE.join('\n'),
+      '',
+      window.INST_ENDING_STANDARD.join('\n'),
       ''
     ].concat(window.FLESH_ENDINGS_BUNDLE_SPEC).filter(Boolean).join('\n');
   };

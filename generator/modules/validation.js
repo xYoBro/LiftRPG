@@ -47,7 +47,11 @@ import {
   decodeA1Z26,
   isStandardAlphaTable,
   VALID_ARC_FAMILIES,
-  VALID_MECHANIC_GRAMMAR_FAMILIES
+  VALID_MECHANIC_GRAMMAR_FAMILIES,
+  VALID_CONVERGENCE_PATTERNS,
+  FAMILY_CLUSTERS,
+  REJECTED_READING_AXES,
+  resolveNeighborFamilies
 } from '../../contracts/contract-constants.mjs';
 
 // Map-evolution fingerprint + companions: one implementation, shared with quality.js.
@@ -2586,6 +2590,43 @@ export function validateAssembledBooklet(booklet) {
         }
       }
 
+      // ── Reordering convergence: the seal must be able to find the answer ──
+      // (Wave 2.) The tooling that encrypts the ending derives the password
+      // from the boss page, and its LAST resort is decodeA1Z26 of
+      // componentInputs — the week-order string. For every pattern but one
+      // that is the right answer. For `reordering` the week-order string is
+      // deliberately the WRONG word, so unless the boss states the true
+      // password in the form the deriver recognises, the booklet ships sealed
+      // with the anagram: the player does six weeks of work, solves the
+      // reorder correctly, types the right word, and is locked out of their
+      // own ending. Nothing else in this repo would notice — the JSON is
+      // valid, the render is clean, and the failure only exists at unlock.
+      //
+      // ERROR, not a warning, and safe to be one: no corpus fixture declares a
+      // convergencePattern, so this can only fire on a booklet that opted in.
+      // The phrase is a PRESENCE check against the doctrine's required
+      // wording (INST_CONVERGENCE_DESIGN), not a second password derivation.
+      var declaredPattern = String(((meta.artifactIntent || {}).convergencePattern) || '').toLowerCase();
+      if (declaredPattern === 'reordering') {
+        var bossReveal = [
+          boss.passwordRevealInstruction, boss.narrative, boss.convergenceProof
+        ].filter(Boolean).join('\n');
+        var statedMatch = bossReveal.match(/\bpassword\s+is\s+([A-Za-z0-9-]{3,})\b/);
+        if (!statedMatch) {
+          errors.push('convergencePattern is "reordering" but the boss encounter never states its final password '
+            + '("The password is WORD."). The sealed password would be the week-order string "'
+            + (derivedPassword || '?') + '", which this pattern defines as the WRONG reading.');
+        } else {
+          var stated = statedMatch[1].toUpperCase().replace(/[^A-Z0-9]/g, '');
+          var sortLetters = function (s) { return String(s || '').split('').sort().join(''); };
+          if (derivedPassword && sortLetters(stated) !== sortLetters(derivedPassword)) {
+            errors.push('convergencePattern is "reordering" but the stated password "' + stated
+              + '" is not a rearrangement of the collected letters "' + derivedPassword
+              + '" — the player cannot reach it from the values the booklet had them collect.');
+          }
+        }
+      }
+
       // Repeated decoded letters (warning — stylistic, not impossible)
       if (derivedPassword) {
         var letterCounts = {};
@@ -3091,6 +3132,72 @@ export function validateSkeletonStage(result, weekCount) {
       }
       if (!Array.isArray(excl.arcExclusions) || excl.arcExclusions.length === 0) {
         console.warn('Skeleton → artifactIntent.exclusions.arcExclusions: empty or missing (advisory)');
+      }
+      // ── The neighbour rule (Wave 2) ──
+      // "Every booklet must refuse something" was satisfiable by refusing
+      // anything, and the cheapest refusal is the most distant family — which
+      // costs nothing and prevents no blur. What a booklet actually risks
+      // becoming is its NEIGHBOUR: the cluster next door shares the pressure
+      // shape, so the drift is invisible from inside. Advisory by D19 (this is
+      // generation policy, and a booklet that refuses the wrong thing is still
+      // a booklet), but named: before this, a refusal that protected nothing
+      // looked identical to one that did.
+      var neighbors = resolveNeighborFamilies(intent.mechanicGrammarFamily);
+      if (neighbors.length && Array.isArray(excl.mechanicExclusions) && excl.mechanicExclusions.length) {
+        var declaredEx = excl.mechanicExclusions.map(function (e) { return String(e || '').trim().toLowerCase(); });
+        var refusedNeighbors = neighbors.filter(function (n) { return declaredEx.indexOf(n) !== -1; });
+        // Reconstruction families are mutual siblings, so one refusal inside a
+        // seven-member cluster barely narrows anything — two is the floor there.
+        var required = FAMILY_CLUSTERS[intent.mechanicGrammarFamily] === 'reconstruction' ? 2 : 1;
+        if (refusedNeighbors.length < required) {
+          console.warn('Skeleton → artifactIntent.exclusions.mechanicExclusions: "'
+            + intent.mechanicGrammarFamily + '" refuses ' + refusedNeighbors.length + ' of its '
+            + neighbors.length + ' neighbour families (needs ' + required
+            + ') — refusing a distant family prevents no blur (advisory). Neighbours: '
+            + neighbors.join(', '));
+        }
+      }
+    }
+    // ── The convergence pattern (Wave 2) ──
+    if (!intent.convergencePattern || VALID_CONVERGENCE_PATTERNS.indexOf(intent.convergencePattern) === -1) {
+      console.warn('Skeleton → artifactIntent.convergencePattern: "' + (intent.convergencePattern || '')
+        + '" not in known patterns (advisory — an undeclared pattern is a booklet that will default to sequential assembly)');
+    }
+    // ── The triptych's audit trail (Wave 2) ──
+    // The rejected readings are the only externally visible evidence that
+    // three candidates existed. Two checks, both advisory: fewer than two
+    // entries means the deliberation was not recorded, and an entry matching
+    // the winner on both family axes means the "candidates" were one book
+    // described twice — the exact failure mode the MAJOR-axis rule exists to
+    // prevent, and the one that cannot be seen from the winner alone.
+    var rejected = ((intent._x || {}).rejectedReadings) || null;
+    if (!Array.isArray(rejected) || rejected.length < 2) {
+      console.warn('Skeleton → artifactIntent._x.rejectedReadings: '
+        + (Array.isArray(rejected) ? rejected.length : 0)
+        + ' entries (advisory — the triptych produces three readings, so two must have lost)');
+    } else {
+      for (var rj = 0; rj < rejected.length; rj++) {
+        var cand = rejected[rj] || {};
+        var axis = String(cand.axis || '').trim();
+        var value = String(cand.value || '').trim().toLowerCase();
+        if (axis && REJECTED_READING_AXES.indexOf(axis) === -1) {
+          console.warn('Skeleton → artifactIntent._x.rejectedReadings[' + rj + ']: axis "' + axis
+            + '" is not a major axis (' + REJECTED_READING_AXES.join(', ')
+            + ') — a candidate that differed on a minor axis is not a third reading (advisory)');
+        }
+        if (!axis || !value) {
+          console.warn('Skeleton → artifactIntent._x.rejectedReadings[' + rj
+            + ']: missing axis or value (advisory — an unlabelled rejection cannot be checked for difference)');
+          continue;
+        }
+        var winner = axis === 'arcFamily'
+          ? String(intent.arcFamily || '').toLowerCase()
+          : (axis === 'mechanicGrammarFamily' ? String(intent.mechanicGrammarFamily || '').toLowerCase() : null);
+        if (winner !== null && value === winner) {
+          console.warn('Skeleton → artifactIntent._x.rejectedReadings[' + rj + ']: declares axis "'
+            + axis + '" but names the same value the winner chose ("' + value
+            + '") — that is the same book described twice, not a rejected reading (advisory)');
+        }
       }
     }
 

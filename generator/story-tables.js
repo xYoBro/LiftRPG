@@ -1555,6 +1555,31 @@
 
   window.STORY_TABLES = T;
 
+  // Partial draws. The full brief is a whole book's worth of decisions —
+  // correct for the user-facing randomizer and for an EMPTY direction field,
+  // wrong for a thin one the user actually wrote: ten lines of premise,
+  // protagonist, and voice will bury five words of real direction no matter
+  // how the precedence is phrased.
+  //
+  // 'texture' is the sparse slice: four texture rolls and a touchstone. It
+  // supplies specificity to be specific IN — objects, dynamics, ironies,
+  // motifs, a tonal reference — and deliberately no premise, no protagonist,
+  // no setting, and no voice, because those are the user's to name.
+  var SLICES = {
+    texture: function () {
+      return [
+        'Texture: ' + lc(roll(T.textureObject)) + '; ' + lc(roll(T.textureDynamic)) + '; '
+          + lc(roll(T.textureIrony)) + '; ' + lc(roll(T.textureMotif)) + '.',
+        'Touchstone: ' + roll(T.touchstone) + '.'
+      ].join('\n');
+    }
+  };
+
+  window.randomizeBriefSlice = function (kind) {
+    var slice = SLICES[String(kind || '')];
+    return slice ? slice() : '';
+  };
+
   window.randomizeBrief = function () {
     var parts = [
       roll(T.genreTone) + '. ' + roll(T.setting) + '.',

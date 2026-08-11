@@ -27,6 +27,7 @@ import {
   SCHEMA_VERSION,
   VALID_ARC_FAMILIES,
   VALID_MECHANIC_GRAMMAR_FAMILIES,
+  VALID_CONVERGENCE_PATTERNS,
   DOCUMENT_TYPE_ENUM,
   VALID_MAP_TYPES,
   VALID_COMPANION_TYPES,
@@ -124,6 +125,10 @@ var artifactIntent = {
       }
     },
     homePull: { type: 'string' },
+    // The endgame's shape (Wave 2). Enum-gated like the two family fields
+    // because it is a closed menu, optional like everything else in this block
+    // because no corpus fixture carries an artifactIntent at all.
+    convergencePattern: { enum: VALID_CONVERGENCE_PATTERNS },
     reading: artifactIntentReading,
     selectionReason: { type: 'string' },
     _x: xt

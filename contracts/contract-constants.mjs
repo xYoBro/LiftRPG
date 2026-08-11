@@ -265,26 +265,241 @@ export var VALID_ARC_FAMILIES = [
   'false-order-to-rupture'
 ];
 
-// The mechanic grammar family determines what the player DOES each week, and
-// today also determines meta.artifactIdentity.boardStateMode.
+// The mechanic grammar family determines what the player DOES each week.
 //
-// INDEPENDENCE RULING (Wave 0, 2026-08-11). These seven values coincide with
-// VALID_BOARD_STATE_MODES minus 'player-drawn'. That coincidence is
-// HISTORICAL, not structural: both menus were written during the
-// single-macro-genre era, when one family implied exactly one board. Wave 2
-// widens the family menu to macro-genre clusters and the coincidence ends,
-// so this is a SEPARATE array — never derive one from the other, and never
-// collapse them back together on the grounds that they look equal today.
+// INDEPENDENCE RULING (Wave 0, 2026-08-11), DISCHARGED (Wave 2, 2026-08-11).
+// The first seven values used to coincide with VALID_BOARD_STATE_MODES minus
+// 'player-drawn', and Wave 0 ruled that coincidence historical rather than
+// structural. Wave 2 ended it: the menu now carries fifteen families in nine
+// clusters, a family CHOOSES a board (FAMILY_BOARD_MODE_GUIDANCE below)
+// instead of being one, and the two arrays no longer have the same length.
+// Never derive one from the other.
 //
-// The consequence is in prompt_rules.js's INST_ARTIFACT_COMPILER family menu:
-// its "Board-State Mode" column is currently an identity mapping (each family
-// names itself). When the menu widens, that column becomes a real derivation
-// — a family will choose a board rather than being one.
+// WIDENING RULING (Wave 2, §3 of the gameplay brainstorm). The original seven
+// were all epistemic — mark, connect, sequence, compare, track, advance,
+// collect — which made them seven subgenres of ONE macro-genre, "reconstruct
+// the record". That was the located cause of gameplay sameness across books.
+// They are preserved verbatim (they are the Reconstruction cluster) and eight
+// macro-genres join them, each naming a different thing the world spends
+// against the player. Order is the compiler menu's order: the reconstruction
+// seven first, then the eight.
+//
+// No new widget is implied by any of them (the composition law): every family
+// compiles to atoms, clocks, companions, and map types that already ship.
 
 export var VALID_MECHANIC_GRAMMAR_FAMILIES = [
   'survey-grid', 'node-graph', 'timeline-reconstruction', 'testimony-matrix',
-  'ledger-board', 'route-tracker', 'profile-assembly'
+  'ledger-board', 'route-tracker', 'profile-assembly',
+  'heat', 'attrition', 'siege', 'stewardship', 'loyalty-web', 'evasion',
+  'observance', 'rivalry'
 ];
+
+// ── Family clusters and their neighbours ────────────────────────────────────
+// The cluster is the macro-genre; the family is the member. Nine clusters: the
+// seven legacy families share one ('reconstruction'), and each new family is
+// its own — a cluster of one is legal and says "this pressure has one shape
+// so far", not "this is a lesser genre".
+//
+// EVERY family must appear here. validate.mjs asserts key parity against
+// VALID_MECHANIC_GRAMMAR_FAMILIES, so a family added without a cluster is an
+// ERROR rather than a family that silently stops being neighbour-checked.
+
+export var FAMILY_CLUSTERS = {
+  'survey-grid': 'reconstruction',
+  'node-graph': 'reconstruction',
+  'timeline-reconstruction': 'reconstruction',
+  'testimony-matrix': 'reconstruction',
+  'ledger-board': 'reconstruction',
+  'route-tracker': 'reconstruction',
+  'profile-assembly': 'reconstruction',
+  heat: 'heat',
+  attrition: 'attrition',
+  siege: 'siege',
+  stewardship: 'stewardship',
+  'loyalty-web': 'loyalty-web',
+  evasion: 'evasion',
+  observance: 'observance',
+  rivalry: 'rivalry'
+};
+
+// Adjacency, with the justification IN the table because an unjustified
+// adjacency list is a taste claim that nobody can argue with later. Two
+// clusters are neighbours when a book could slide from one into the other
+// without anyone noticing — which is exactly the blur the exclusion rule
+// (INST_ARTIFACT_COMPILER Step 7) exists to prevent.
+//
+// Symmetric by construction; validate.mjs asserts the symmetry.
+
+export var CLUSTER_NEIGHBORS = {
+  // The seven reconstruction families are mutual siblings: all of them read a
+  // record and rebuild it, so any two of them blur into each other faster than
+  // any cross-cluster pair does.
+  reconstruction: ['reconstruction'],
+  // Both press a wager against a counterparty who is keeping score. Heat's
+  // counterparty is watching you; rivalry's is racing you. One book can drift
+  // from "how exposed am I" into "am I ahead" without changing a single widget.
+  heat: ['rivalry'],
+  rivalry: ['heat'],
+  // Both spend to move while the stores fall. Attrition's cost is the distance;
+  // evasion's cost is the pursuer. The ledger looks identical.
+  attrition: ['evasion'],
+  evasion: ['attrition'],
+  // Both hold the same walls. Siege holds them against an assault that arrives;
+  // stewardship holds them against decay that never stops. Swap the antagonist
+  // and the board plays the same.
+  siege: ['stewardship'],
+  stewardship: ['siege'],
+  // Both answer to someone else. Loyalty-web is answering to PEOPLE who pull in
+  // different directions; observance is answering to a FORM that must be kept
+  // exactly. Both are obligation games and both fail the same way — a book that
+  // means "duty" and never decides duty to whom.
+  'loyalty-web': ['observance'],
+  observance: ['loyalty-web']
+};
+
+// ── Family → board-state mode guidance ──────────────────────────────────────
+// Ranked CANDIDATES, not a mapping. The first entry is the default reading of
+// the family; later entries are legitimate alternatives the compiler may take
+// when the world argues for them.
+//
+// ONE HOME (D93 law). Three ungoverned family/map↔board resolvers already
+// exist in this repo — assembly.js's inferBoardStateModeFromContext, quality.js's
+// STABLE_MAP_GRAMMARS, check-artifact-differentiation.js's mapTypeToBoardMode —
+// each written for its own caller and none of them agreeing by construction.
+// This is deliberately not a fourth: it is the family's OWN statement of what
+// board it wants, consumed through resolveFamilyBoardModes(), and the existing
+// trio is reported as future unification work rather than extended here.
+//
+// The reconstruction seven keep the identity reading they have always had (the
+// family names its board), which is why widening the menu changed no existing
+// book's board.
+//
+// Wave 3 adds map GEOMETRIES (concentric, maze, …), not board modes, so this
+// table is expected to stay stable across that wave. A siege whose board is
+// 'survey-grid' today gets a concentric MAP inside the same board semantics.
+//
+// Every family must appear; validate.mjs asserts key parity, and every value
+// must be a member of VALID_BOARD_STATE_MODES.
+
+export var FAMILY_BOARD_MODE_GUIDANCE = {
+  'survey-grid': ['survey-grid'],
+  'node-graph': ['node-graph'],
+  'timeline-reconstruction': ['timeline-reconstruction'],
+  'testimony-matrix': ['testimony-matrix'],
+  'ledger-board': ['ledger-board'],
+  'route-tracker': ['route-tracker'],
+  'profile-assembly': ['profile-assembly'],
+  // Exposure is accounted for: what they know about you is a running balance.
+  // The alternative is the network of who has seen what.
+  heat: ['ledger-board', 'node-graph'],
+  // Distance against stores. The route is the board; a surveyed ground works
+  // when the depletion is territory rather than travel.
+  attrition: ['route-tracker', 'survey-grid'],
+  // The ground you still hold. 'player-drawn' is the honest second option
+  // until Wave 3's concentric geometry lands — a hand-drawn cordon is cheaper
+  // and more diegetic than forcing rings onto a square grid.
+  siege: ['survey-grid', 'player-drawn'],
+  // The fabric under your hands, parcel by parcel — or the dependency web that
+  // decides which repair enables the next.
+  stewardship: ['survey-grid', 'node-graph'],
+  // The web IS the board. The second reading is the matrix of who claims what
+  // about whom, when the loyalties are contested in words rather than ties.
+  'loyalty-web': ['node-graph', 'testimony-matrix'],
+  // A pursuit has one board: the line you are ahead on.
+  evasion: ['route-tracker'],
+  // The rite is an order of operations. Second: the player draws the precinct
+  // as they learn what belongs where.
+  observance: ['timeline-reconstruction', 'player-drawn'],
+  // Standings are a ledger. Nothing else reads as "who is ahead" on paper.
+  rivalry: ['ledger-board']
+};
+
+/**
+ * resolveFamilyBoardModes(family) -> string[]
+ *
+ * The ranked board-state candidates a mechanic grammar family wants. Returns
+ * an empty array for an unknown or absent family so callers can treat "no
+ * guidance" as a removed signal rather than a default.
+ *
+ * SINGLE HOME (D93). Co-located with the guidance table for the same reason
+ * resolveShellFamily sits next to VALID_SHELL_FAMILIES: the table IS the
+ * validity gate, and a consumer that re-implemented the lookup would answer
+ * "which board does this family want?" a second time, in its own dialect.
+ *
+ * Consumers: generator/modules/assembly.js (inferBoardStateModeFromContext).
+ * Guarded by singleDeclarationHomes() in scripts/validate.mjs.
+ */
+export function resolveFamilyBoardModes(family) {
+  var key = String(family || '').trim().toLowerCase();
+  var modes = FAMILY_BOARD_MODE_GUIDANCE[key];
+  return Array.isArray(modes) ? modes.slice() : [];
+}
+
+/**
+ * resolveNeighborFamilies(family) -> string[]
+ *
+ * Every family a booklet declaring `family` risks blurring into — the other
+ * members of its own cluster plus every member of each neighbouring cluster.
+ * The family itself is never included (a booklet cannot refuse what it chose).
+ *
+ * This is what makes the neighbour-exclusion rule checkable rather than
+ * rhetorical: INST_ARTIFACT_COMPILER Step 7 demands at least one refusal from
+ * this list, and validateSkeletonStage warns when none of the declared
+ * exclusions names anything in it.
+ *
+ * SINGLE HOME (D93), same argument as resolveFamilyBoardModes.
+ * Consumers: generator/modules/validation.js (validateSkeletonStage).
+ */
+export function resolveNeighborFamilies(family) {
+  var key = String(family || '').trim().toLowerCase();
+  var cluster = FAMILY_CLUSTERS[key];
+  if (!cluster) return [];
+  var clusters = CLUSTER_NEIGHBORS[cluster] || [];
+  var out = [];
+  for (var i = 0; i < VALID_MECHANIC_GRAMMAR_FAMILIES.length; i++) {
+    var candidate = VALID_MECHANIC_GRAMMAR_FAMILIES[i];
+    if (candidate === key) continue;
+    if (clusters.indexOf(FAMILY_CLUSTERS[candidate]) !== -1) out.push(candidate);
+  }
+  return out;
+}
+
+// ── Convergence patterns (Wave 2; the March 2026 convergence-variants design) ─
+// The SHAPE of the endgame — how the weekly components become the password.
+// Macro-genres vary the middle game; without this the last week was one shape
+// in every book ever generated.
+//
+// These are recorded, not enforced: the artifact schema keeps the field
+// optional (no corpus fixture carries one) while generation policy demands it.
+// What each pattern may vary is bounded by the decode chain, and that boundary
+// is doctrine in prompt_rules.js (INST_CONVERGENCE_DESIGN) rather than a
+// comment here — see that section for why 'red-herring' filters READINGS and
+// never component COUNT.
+
+export var VALID_CONVERGENCE_PATTERNS = [
+  'sequential-assembly', 'reordering', 'red-herring', 'dual-source'
+];
+
+// ── The triptych's audit trail (Wave 2) ─────────────────────────────────────
+// `artifactIntent._x.rejectedReadings` records the two candidate readings that
+// lost. It lives under `_x` because the artifact contract has no opinion on
+// pipeline debris — but generation policy needs it MACHINE-COMPARABLE, because
+// the only failure worth catching here is invisible in prose: three candidates
+// that were one book described three ways.
+//
+// The field names and the axis vocabulary are stated once, here, because they
+// are asserted in three places that cannot see each other — the structured
+// skeleton schema literal (what the transport enforces), INST_ARTIFACT_COMPILER
+// Step 3 (what the model reads), and validateSkeletonStage (what checks the
+// answer). A rename in one of those was previously a silent no-op in the other
+// two: the check would look at a field that no longer exists and pass.
+//
+// The axes are the MAJOR axes from §10.2 — the three on which two readings must
+// differ to be genuinely different books.
+
+export var REJECTED_READING_FIELDS = ['axis', 'value', 'oneLiner'];
+
+export var REJECTED_READING_AXES = ['mechanicGrammarFamily', 'arcFamily', 'povFrame'];
 
 /**
  * resolveShellFamily(rawShellFamily, artifactClass, themeArchetype) -> family

@@ -82,12 +82,21 @@ export function collectIdentityVariationFindings(booklet, nonBossWeeks, fragment
     // appear. Keys are drawn from VALID_MECHANIC_GRAMMAR_FAMILIES +
     // VALID_BOARD_STATE_MODES (contracts/contract-constants.mjs); validate.mjs
     // asserts the subset, never full coverage.
+    // Deliberately PARTIAL (validate.mjs asserts subset, not coverage): a row
+    // here suppresses the board-monotony finding, so it may only name a family
+    // whose single map type is inherent rather than merely likely. Of Wave 2's
+    // eight new families only two qualify — a loyalty web IS a node-link
+    // diagram and a pursuit IS a line — and the other six can legitimately
+    // vary their geometry, which means a monotonous board in one of them is
+    // still worth reporting.
     var STABLE_MAP_GRAMMARS = {
       'survey-grid': 'grid',
       'ledger-board': 'grid',
       'timeline-reconstruction': 'linear-track',
       'route-tracker': 'linear-track',
-      'node-graph': 'point-to-point'
+      'node-graph': 'point-to-point',
+      'loyalty-web': 'point-to-point',
+      evasion: 'linear-track'
     };
 
     var expectedByGrammar = STABLE_MAP_GRAMMARS[declaredGrammar];

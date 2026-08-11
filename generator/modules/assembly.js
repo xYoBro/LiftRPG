@@ -12,6 +12,7 @@ import {
   isStandardAlphaTable,
   decodeA1Z26,
   resolveShellFamily,
+  resolveFamilyBoardModes,
   DEFAULT_WORKSPACE_STYLE
 } from '../../contracts/contract-constants.mjs';
 
@@ -176,6 +177,17 @@ function normalizeBoardStateModeToken(value) {
 }
 
 function inferBoardStateModeFromContext(shell, campaignPlan) {
+  // The declared mechanic grammar family speaks FIRST (Wave 2). Before this,
+  // a booklet could declare `siege` in its planning contract and be handed a
+  // board inferred from the phrase "gauge" in its component type — the intent
+  // contract was binding on every downstream stage except the one field it
+  // most directly determines. The guidance's first candidate is the family's
+  // default reading; an explicit boardStateMode still wins outright (this
+  // function only runs when there isn't one), so a family that wants its
+  // second candidate simply says so.
+  var family = (((shell || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily;
+  var guided = resolveFamilyBoardModes(family);
+  if (guided.length) return guided[0];
 
   var topology = (((campaignPlan || {}).topology || {}).type || '').toLowerCase();
   if (topology) {
@@ -407,7 +419,11 @@ export function buildIdentityContract(shell, campaignPlan) {
     literaryRegister: cloneSimple(meta.literaryRegister) || null,
     structuralShape: cloneSimple(meta.structuralShape) || null,
     weeklyComponentType: meta.weeklyComponentType || '',
-    artifactIdentity: cloneSimple(meta.artifactIdentity) || null
+    artifactIdentity: cloneSimple(meta.artifactIdentity) || null,
+    // Wave 2: the planning contract travels with the identity contract. Both
+    // are shell-stage commitments that later stages must not drift from, and
+    // keeping them in separate channels is how one of them got forgotten.
+    artifactIntent: cloneSimple(meta.artifactIntent) || null
   };
 }
 
@@ -477,6 +493,16 @@ export function formatIdentityContractLines(contract) {
   if (contract.narrativeVoice) lines.push('- Keep meta.narrativeVoice exactly as provided.');
   if (contract.literaryRegister) lines.push('- Keep meta.literaryRegister exactly as provided.');
   if (contract.structuralShape) lines.push('- Keep meta.structuralShape exactly as provided.');
+  // Wave 2: the planning contract is as un-normalizable as the identity one.
+  // A repair pass that "fixes" a booklet by dropping its declared family has
+  // repaired it into the generic book this contract exists to prevent.
+  var intent = contract.artifactIntent;
+  if (intent) {
+    lines.push('- Keep meta.artifactIntent exactly as provided — it is a planning contract, not metadata.');
+    if (intent.mechanicGrammarFamily) lines.push('- Do not change mechanicGrammarFamily: ' + intent.mechanicGrammarFamily);
+    if (intent.arcFamily) lines.push('- Do not change arcFamily: ' + intent.arcFamily);
+    if (intent.convergencePattern) lines.push('- Do not change convergencePattern: ' + intent.convergencePattern);
+  }
   return lines;
 }
 
@@ -701,6 +727,14 @@ export function extractShellContext(shell) {
   if (meta.literaryRegister) { ctx.literaryRegister = meta.literaryRegister; hasContent = true; }
   if (meta.structuralShape) { ctx.structuralShape = meta.structuralShape; hasContent = true; }
   if (meta.artifactIdentity) { ctx.artifactIdentity = meta.artifactIdentity; hasContent = true; }
+  // The Layer 3 planning contract (Wave 2). This channel is how the
+  // multi-stage pipeline's week, fragment, and ending prompts see the shell —
+  // and until now artifactIntent was not in it, so that pipeline compiled a
+  // binding contract at the shell stage and then wrote every word of the
+  // booklet without ever showing it to the writer. The S+F pipeline had the
+  // contract from the start (generator.js formatArtifactIntentContract); this
+  // is the same material on the other path, rendered by the same formatter.
+  if (meta.artifactIntent) { ctx.artifactIntent = meta.artifactIntent; hasContent = true; }
   // The knowing (§11 Wave 1.5). This is the whole point of the shell-context
   // channel for the process particulars: week-final, fragment, and ending
   // prompts all read their world through this projection, so a particular that
@@ -2835,6 +2869,13 @@ function collectObservedCipherTypes(booklet) {
 // VALID_MECHANIC_GRAMMAR_FAMILIES in contracts/contract-constants.mjs exactly,
 // so widening the family menu forces a conscious ruling here rather than a
 // silently unproxied family.
+// The eight macro-genre families (Wave 2) are proxied from the map types their
+// FAMILY_BOARD_MODE_GUIDANCE candidates imply — survey-grid→grid,
+// node-graph→point-to-point, route-tracker/timeline→linear-track,
+// player-drawn→player-drawn. Four of them get an empty ruling rather than a
+// guess: heat and rivalry are pressures, not geometries (a heat book is a heat
+// book on any board), and an expectation the family does not actually carry
+// would spend this check's credibility on noise.
 var MECHANIC_GRAMMAR_PROXIES = {
   'survey-grid':              { expectedMapTypes: ['grid'], expectedCipherTypes: [] },
   'node-graph':               { expectedMapTypes: ['point-to-point'], expectedCipherTypes: [] },
@@ -2842,7 +2883,15 @@ var MECHANIC_GRAMMAR_PROXIES = {
   'route-tracker':            { expectedMapTypes: ['linear-track', 'point-to-point'], expectedCipherTypes: [] },
   'testimony-matrix':         { expectedMapTypes: [], expectedCipherTypes: [] },
   'ledger-board':             { expectedMapTypes: ['grid'], expectedCipherTypes: [] },
-  'profile-assembly':         { expectedMapTypes: [], expectedCipherTypes: [] }
+  'profile-assembly':         { expectedMapTypes: [], expectedCipherTypes: [] },
+  heat:                       { expectedMapTypes: [], expectedCipherTypes: [] },
+  attrition:                  { expectedMapTypes: ['linear-track', 'grid'], expectedCipherTypes: [] },
+  siege:                      { expectedMapTypes: ['grid', 'player-drawn'], expectedCipherTypes: [] },
+  stewardship:                { expectedMapTypes: ['grid', 'point-to-point'], expectedCipherTypes: [] },
+  'loyalty-web':              { expectedMapTypes: ['point-to-point'], expectedCipherTypes: [] },
+  evasion:                    { expectedMapTypes: ['linear-track'], expectedCipherTypes: [] },
+  observance:                 { expectedMapTypes: ['linear-track', 'player-drawn'], expectedCipherTypes: [] },
+  rivalry:                    { expectedMapTypes: [], expectedCipherTypes: [] }
 };
 
 /**
