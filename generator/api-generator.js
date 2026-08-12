@@ -1069,6 +1069,71 @@ function extractErrorList(vr) {
   return ['Schema validation failed'];
 }
 
+// ── The stage heartbeat ───────────────────────────────────────────────────────
+//
+// THE INCIDENT (live run, 2026-08-11): a long prose stage is ONE streaming call
+// that can run 3-8+ minutes and reports its token usage only at the very end.
+// The panel showed a fixed line and a frozen cost meter, and the operator asked
+// whether to hit Stop — which would have discarded every token already paid
+// for. Silence is not a state a paid pipeline is allowed to have.
+//
+// Two ADDITIVE event phases answer it, keyed to the same stageKey the existing
+// start/complete/failed events already use:
+//
+//   'streaming' — one beat at dispatch (`received:false` — asked, nothing back
+//                 yet), then a throttled tick per batch of received text, then
+//                 one `final:true` tick carrying the true count.
+//   'retrying'  — an attempt failed and another is coming. This used to be a
+//                 console.warn and nothing else, so from the panel a silent
+//                 retry escalation and a hang looked exactly alike.
+//
+// Surfaces that only know start/complete/failed keep working untouched.
+
+function emitStageStreamEvent(config, message, extra) {
+  emitPipelineEvent(
+    config.onProgress,
+    config.stageIndex || 0,
+    config.getTotalStages ? config.getTotalStages() : 0,
+    message,
+    Object.assign({
+      phase: 'streaming',
+      stageKey: config.stageKey || '',
+      stageName: config.stageName
+    }, extra)
+  );
+}
+
+// Why an attempt died, in words a reader owes nothing to a wire format for.
+// Reads STRUCTURAL markers only — the guard's streamPhase and our own
+// errorType — never provider prose and never the error message text.
+function describeStageFailureCause(err) {
+  var streamPhase = err && err.streamPhase;
+  if (streamPhase === 'connect') return 'the provider never started answering';
+  if (streamPhase === 'idle') return 'the answer stopped arriving partway through';
+  if (streamPhase === 'overall') return 'it ran past its time limit';
+  var errorType = (err && err.errorType) || '';
+  if (errorType === 'timeout') return 'it timed out';
+  if (errorType === 'truncation') return 'the answer was cut off at the length limit';
+  if (errorType === 'schema') return 'the answer came back missing required parts';
+  if (errorType === 'network') return 'the connection dropped';
+  return 'it did not complete';
+}
+
+function formatBudgetMinutes(ms) {
+  return Math.max(1, Math.round(Number(ms || 0) / 60000));
+}
+
+// Deliberately NOT "nothing you paid for is lost" — the tokens spent on the
+// attempt that just died ARE gone. What is true is that finished stages are
+// checkpointed, so that is what we say (D96 honesty family).
+function buildStageRetryNotice(config, attempt, attemptCount, err, nextTimeoutMs) {
+  var minutes = formatBudgetMinutes(nextTimeoutMs);
+  return config.stageName + ': attempt ' + (attempt + 1) + ' of ' + attemptCount +
+    ' did not finish (' + describeStageFailureCause(err) + '). ' +
+    'Trying again automatically with more time — up to ' + minutes + ' minute' +
+    (minutes === 1 ? '' : 's') + '. Stages that already finished are saved.';
+}
+
 // ── Core stage runner ─────────────────────────────────────────────────────────
 
 // Authoritative API-stage discipline helper. Guided build should mirror this
@@ -1114,11 +1179,39 @@ async function runJsonStage(settings, config) {
 
     stageTelemetry.attempts += 1;
 
+    // The heartbeat. `budgetMs` is the RESOLVED ladder value for this attempt
+    // (escalated on retries), so any surface can state how long this step may
+    // run without a hand-written per-stage minute literal anywhere (D97).
+    var attemptStreamMeta = {
+      attempt: attempt,
+      attemptCount: attemptCount,
+      budgetMs: resolvedTimeoutMs
+    };
+    emitStageStreamEvent(config, 'Waiting on ' + config.stageName + '…', Object.assign({
+      received: false,
+      chars: 0,
+      approxTokens: 0,
+      elapsedMs: 0,
+      final: false
+    }, attemptStreamMeta));
+
+    var callOptions = {
+      onStreamTick: function (tick) {
+        emitStageStreamEvent(config, 'Receiving ' + config.stageName + '…', Object.assign({
+          received: true,
+          chars: tick.chars,
+          approxTokens: tick.approxTokens,
+          elapsedMs: tick.elapsedMs,
+          final: !!tick.final
+        }, attemptStreamMeta));
+      }
+    };
+
     try {
       var response = config.schema
-        ? await callProviderStructured(stageSettings, prompt, config.schema, resolvedMaxTokens, config.stageName)
+        ? await callProviderStructured(stageSettings, prompt, config.schema, resolvedMaxTokens, config.stageName, callOptions)
         : await (async function () {
-          var rawResponse = await callProvider(stageSettings, prompt, resolvedMaxTokens);
+          var rawResponse = await callProvider(stageSettings, prompt, resolvedMaxTokens, callOptions);
           return {
             result: extractJson(rawResponse.text),
             meta: rawResponse.meta,
@@ -1204,6 +1297,22 @@ async function runJsonStage(settings, config) {
         });
         throw prefixStageError(config.stageName, err);
       }
+      // Another attempt is coming. Say so — from the panel, a silent retry
+      // and a hang are the same picture, and the reader's only lever is Stop.
+      var nextTimeoutMs = typeof timeoutSpec === 'function'
+        ? timeoutSpec({ attempt: attempt + 1, error: err })
+        : resolvedTimeoutMs;
+      emitPipelineEvent(config.onProgress, config.stageIndex || 0, config.getTotalStages ? config.getTotalStages() : 0,
+        buildStageRetryNotice(config, attempt, attemptCount, err, nextTimeoutMs), {
+          phase: 'retrying',
+          stageKey: config.stageKey || '',
+          stageName: config.stageName,
+          attempt: attempt,
+          attemptCount: attemptCount,
+          errorClass: stageTelemetry.errorClass,
+          streamPhase: (err && err.streamPhase) || '',
+          nextTimeoutMs: nextTimeoutMs
+        });
     }
   }
 
@@ -3352,6 +3461,19 @@ async function runSkeletonFleshPipeline(options) {
   // ASSEMBLY + QUALITY GATE
   // ════════════════════════════════════════════════════════════════════
 
+  // The final stage announces itself, exactly as the multi-stage pipeline
+  // does. Without this the S+F run went silent the moment the last writing
+  // stage finished: the panel's headline stayed frozen on "Writing all
+  // endings…" while assembly, the quality gate and the whole critic loop ran
+  // underneath it, every card read Complete, and the Quality card sat Pending.
+  // Minutes of paid work with no stage claiming them (live run, 2026-08-11).
+  emitPipelineEvent(onProgress, totalStages, totalStages,
+    'Assembling the booklet and running the editorial review…', {
+      phase: 'start',
+      stageKey: 'quality',
+      stageName: 'Quality Check'
+    });
+
   // `nw`, not `options.nw`: canonicalization reassigns the local, and assembly
   // is the consumer that most needs the canonical form. Reading the option here
   // would hand assembly the empty raw-branch object while every prompt upstream
@@ -3420,6 +3542,15 @@ async function runSkeletonFleshPipeline(options) {
     booklet._qualityReport = report;
     booklet._qualityGate = qualityGate;
   }
+
+  emitPipelineEvent(onProgress, totalStages, totalStages, qualityGate.passed
+    ? 'Assembled and validated locally on this device.'
+    : 'Assembled locally. Quality warnings were found.', {
+    phase: 'complete',
+    stageKey: 'quality',
+    stageName: 'Quality Check',
+    completionSource: 'local'
+  });
 
   booklet._continuityWarnings = sfContinuityWarnings;
 

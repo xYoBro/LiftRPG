@@ -3917,12 +3917,56 @@
           // Spend from EARLIER attempts at this same booklet. Reported
           // beside the live meter, never inside it.
           priorSpend: null,
+          // Live heartbeat for the stage currently talking to the provider.
+          // Null between stages. Shape mirrors the pipeline's 'streaming'
+          // event: { stageKey, received, chars, approxTokens, elapsedMs,
+          // budgetMs, attempt, attemptCount, final }.
+          stream: null,
           ledger: ledger,
           booklet: null,
           error: '',
           qualityReport: null,
           qualityGate: null
         };
+      }
+
+      // ── The heartbeat line ────────────────────────────────────────────────
+      //
+      // A long writing stage is one request that can run for many minutes and
+      // reports its token usage only when it finishes. Without this the panel
+      // showed a fixed sentence and a frozen meter, and Stop looked like the
+      // reasonable move — which throws the in-flight spend away.
+      //
+      // Three states, all of them true statements about the wire:
+      //   asked, nothing back      -> we have sent the request
+      //   answering, no words yet  -> data is arriving (a model can spend
+      //                               minutes thinking before its first word)
+      //   receiving, N tokens      -> text is accumulating
+      //
+      // The token count is CHARACTERS / 4. It is labelled as approximate and
+      // never touches the cost meter, which only ever shows billed usage.
+      function formatStreamHeartbeat(stream) {
+        if (!stream) return '';
+        if (!stream.received) return 'Sent to the model — nothing back yet.';
+        var chars = Number(stream.chars || 0);
+        if (chars <= 0) return 'The model is answering — no words back yet.';
+        return 'Receiving the model’s writing — roughly ' +
+          formatCompactTokens(stream.approxTokens) + ' tokens so far (estimated).';
+      }
+
+      // "Can take up to N minutes" is DERIVED from the stage's own resolved
+      // budget, which rides the streaming event. No per-stage minute literal
+      // lives in this file — the ladder in constants.js is the only source, and
+      // a retry that escalates its budget says the larger number by itself.
+      function formatStreamExpectation(stream) {
+        if (!stream || !Number(stream.budgetMs)) return '';
+        var minutes = Math.max(1, Math.round(Number(stream.budgetMs) / 60000));
+        return 'This step can take up to ' + minutes + ' minute' + (minutes === 1 ? '' : 's') + '.';
+      }
+
+      function getActiveStreamFor(stageKey) {
+        if (!apiRunState || !apiRunState.stream || !stageKey) return null;
+        return apiRunState.stream.stageKey === stageKey ? apiRunState.stream : null;
       }
 
       function formatApiElapsed(ms) {
@@ -4755,10 +4799,24 @@
           var baseDetail = stageKey === 'quality'
             ? 'Assembling and checking the booklet locally on this device.'
             : (apiRunState.targetCaption || 'Working…');
+          var parts = [baseDetail.replace(/\.$/, '')];
+          // The heartbeat sits between what the stage is doing and how long it
+          // has been doing it — the middle fact the panel was missing.
+          var stageStream = getActiveStreamFor(stageKey);
+          var heartbeat = formatStreamHeartbeat(stageStream);
+          if (heartbeat) parts.push(heartbeat.replace(/\.$/, ''));
           if (apiRunState && apiRunState.currentStageKey === stageKey && apiRunState.currentStageStartedAt) {
-            return baseDetail.replace(/\.$/, '') + ' · ' + formatApiElapsed(Date.now() - apiRunState.currentStageStartedAt) + ' elapsed.';
+            parts.push(formatApiElapsed(Date.now() - apiRunState.currentStageStartedAt) + ' elapsed');
           }
-          return baseDetail;
+          // A second attempt is why a stage suddenly looks slow. Say which
+          // attempt is running; the full reason is in the notice and the log.
+          if (stageStream && stageStream.attempt > 0 && stageStream.attemptCount) {
+            parts.push('attempt ' + (stageStream.attempt + 1) + ' of ' + stageStream.attemptCount);
+          }
+          var expectation = formatStreamExpectation(stageStream);
+          var line = parts.join(' · ') + '.';
+          if (expectation) line += ' ' + expectation;
+          return line;
         }
         if (status === 'invalidated') {
           return apiRunState.error || 'This run stopped on this stage.';
@@ -4816,11 +4874,21 @@
 
       function renderApiActions() {
         if (!apiRunActions) return;
-        // Show retry button on failure
-        if (apiRunState && apiRunState.status === 'error') {
-          apiRunActions.innerHTML = '' +
-            '<button type="button" id="api-retry-checkpoint" style="margin-right:8px">Retry From Checkpoint</button>' +
-            '<button type="button" id="api-start-fresh">Start Fresh</button>';
+        // A failed run offers recovery. It used to offer ONLY recovery — the
+        // early return below sat above the booklet buttons, so a run that
+        // DELIVERED and then fell over on a later step showed no way to reach
+        // the finished book at all. That happened live (2026-08-11) and the
+        // author had to read window.LiftRPGAPI.lastBooklet from the console.
+        // If a booklet exists, its buttons render no matter what the run
+        // status says; the recovery pair is appended, not substituted.
+        var isErrorState = !!(apiRunState && apiRunState.status === 'error');
+        var recoveryHtml = isErrorState
+          ? '<button type="button" id="api-retry-checkpoint" style="margin-right:8px">Retry From Checkpoint</button>' +
+            '<button type="button" id="api-start-fresh">Start Fresh</button>'
+          : '';
+
+        function wireRecoveryButtons() {
+          if (!isErrorState) return;
           var retryBtn = document.getElementById('api-retry-checkpoint');
           var freshBtn = document.getElementById('api-start-fresh');
           if (retryBtn) retryBtn.addEventListener('click', function () {
@@ -4830,16 +4898,19 @@
             if (api() && api().clearCheckpoint) api().clearCheckpoint();
             handleApiGenerate();
           });
-          return;
         }
+
         if (!apiRunState || !apiRunState.booklet) {
-          apiRunActions.innerHTML = '';
+          apiRunActions.innerHTML = recoveryHtml;
+          wireRecoveryButtons();
           return;
         }
         var blockedForQuality = apiRunState.status === 'blocked';
         apiRunActions.innerHTML = '' +
           '<button type="button" id="api-open-renderer">' + (blockedForQuality ? 'Open Booklet For Review' : 'Open Booklet In Renderer') + '</button>' +
-          '<button type="button" id="api-download-json">' + (blockedForQuality ? 'Download Review JSON' : 'Download JSON') + '</button>';
+          '<button type="button" id="api-download-json" style="margin-right:8px">' + (blockedForQuality ? 'Download Review JSON' : 'Download JSON') + '</button>' +
+          recoveryHtml;
+        wireRecoveryButtons();
 
         function stripInternalKeys(booklet) {
           if (!booklet || typeof booklet !== 'object') return booklet;
@@ -4911,7 +4982,15 @@
           var elapsed = formatApiElapsed(Date.now() - apiRunState.currentStageStartedAt);
           var timeoutLabel = formatTimeoutLabel(apiRunState.requestTimeoutMs || (apiTimeoutEl ? Number(apiTimeoutEl.value || 600000) : 600000));
           apiRunState.progressCaption = 'Waiting on ' + activeStageLabel + ' for ' + elapsed + '. ' + timeoutLabel + '.';
-          if ((Date.now() - apiRunState.currentStageStartedAt) >= 90000) {
+          // "Still waiting on provider response" was the whole story after 90
+          // seconds, and it is the sentence that made a healthy 6-minute stage
+          // read as a hang. When the heartbeat has something better to say, it
+          // replaces it; when it does not, the honest fallback stands.
+          var headlineStream = getActiveStreamFor(apiRunState.currentStageKey);
+          var headlineBeat = formatStreamHeartbeat(headlineStream);
+          if (headlineBeat) {
+            apiRunState.progressCaption += ' ' + headlineBeat;
+          } else if ((Date.now() - apiRunState.currentStageStartedAt) >= 90000) {
             apiRunState.progressCaption += ' Still waiting on provider response.';
           }
         }
@@ -5914,6 +5993,7 @@
           apiRunState.targetCaption = 'Change settings or hit the build button again to resume.';
           apiRunState.error = 'Build stopped by user.';
           apiRunState.currentStageStartedAt = 0;
+          apiRunState.stream = null;
           pushApiLog('Build stopped by user.');
           renderApiRunState();
           _apiGenerateRunning = false;
@@ -7587,6 +7667,7 @@
         apiRunState.model = settings.model;
         apiRunState.runStartedAt = Date.now();
         apiRunState.currentStageStartedAt = 0;
+        apiRunState.stream = null;
         apiRunState.requestTimeoutMs = settings.requestTimeoutMs;
         apiRunState.tokens = '0 tokens';
         apiRunState.tokensCaption = 'Prompt and completion totals appear here as each stage finishes.';
@@ -7679,6 +7760,56 @@
             }
             var stageKey = normalizeApiStageKey(meta.stageKey || inferApiStageKey(message));
             var phase = meta.phase || 'start';
+
+            // HEARTBEAT. Handled before the run-wide fields below because a
+            // tick is not a stage transition: it must not rewrite the headline
+            // target, bump the stage counter, or push a log line (they arrive
+            // twice a second). It reports one thing — this stage is alive.
+            if (phase === 'streaming') {
+              if (stageKey) {
+                // Work is demonstrably in flight, so the card says so. This is
+                // also the self-correction for a stage that emits more than one
+                // completion (a split fragment batch completes its first half
+                // while the second half is still writing): the next beat pulls
+                // the card back out of Complete instead of leaving a finished
+                // badge over a stage that is still spending money.
+                if (apiRunState.currentStageKey !== stageKey || apiRunState.ledger[stageKey] !== 'in progress') {
+                  markApiStageInProgress(stageKey);
+                }
+                apiRunState.stream = {
+                  stageKey: stageKey,
+                  received: !!meta.received,
+                  chars: Number(meta.chars || 0),
+                  approxTokens: Number(meta.approxTokens || 0),
+                  elapsedMs: Number(meta.elapsedMs || 0),
+                  budgetMs: Number(meta.budgetMs || 0),
+                  attempt: Number(meta.attempt || 0),
+                  attemptCount: Number(meta.attemptCount || 0),
+                  final: !!meta.final
+                };
+              }
+              renderApiRunState();
+              return;
+            }
+
+            // A retry is about to happen. Previously this was a console.warn
+            // and nothing else, so from here a silent escalation and a hang
+            // looked identical — and Stop was the only lever on offer.
+            if (phase === 'retrying') {
+              apiRunState.stream = null;
+              if (stageKey) {
+                var retryMetrics = apiRunState.stageMetrics[stageKey] || createApiStageMetrics();
+                apiRunState.stageMetrics[stageKey] = retryMetrics;
+                retryMetrics.lastStageName = meta.stageName || retryMetrics.lastStageName;
+              }
+              applyApiNotice('warn', message, meta);
+              renderApiRunState();
+              return;
+            }
+
+            // Any stage transition retires the previous heartbeat — a count
+            // from the call that just ended must never sit under the next one.
+            apiRunState.stream = null;
             apiRunState.status = 'running';
             apiRunState.totalStages = totalStages;
             apiRunState.summary = 'Generation In Progress';
@@ -7705,72 +7836,130 @@
             renderApiRunState();
           });
 
-          if (runId !== activeApiRunId) return;
-
-          markAllApiStages('valid');
-          var qualityGate = booklet._qualityGate || { passed: true, blockers: [] };
-          var isQualityBlocked = !qualityGate.passed && qualityGate.blockers && qualityGate.blockers.length > 0;
-          var blockerMessages = summarizeQualityGateBlockers(qualityGate.blockers, { limit: 2 });
-          apiRunState.qualityGate = qualityGate;
-          if (isQualityBlocked) {
-            markApiStageBlocked(
-              'quality',
-              'Local quality gate blocked export for this booklet.',
-              { completionSource: 'local' }
-            );
-            apiRunState.status = 'blocked';
-            apiRunState.summary = 'Quality Gate Blocked';
-            apiRunState.summaryCaption = 'Generation finished, but the booklet needs another pass before export.';
-            apiRunState.target = 'Review Quality Blockers';
-            apiRunState.targetCaption = blockerMessages.join(' · ') || 'Open the review artifact and fix the blockers before export.';
-            removeValidatedModel(settings.model, settings._providerLabel);
-          } else {
-            markApiStageComplete(
-              'quality',
-              'Assembled and validated locally on this device.',
-              { completionSource: 'local' }
-            );
-            apiRunState.status = 'success';
-            apiRunState.summary = 'Booklet Ready';
-            apiRunState.summaryCaption = 'The API pipeline completed and the booklet passed local validation.';
-            apiRunState.target = 'Open Or Download';
-            apiRunState.targetCaption = 'Send the generated booklet to the renderer or download the JSON.';
-          }
-          apiRunState.progress = apiRunState.totalStages + ' / ' + apiRunState.totalStages + ' stages';
-          var report = api().lastQualityReport || null;
-          apiRunState.qualityReport = report;
-          apiRunState.runSignature = getApiConfigSignature();
-          apiRunState.currentStageStartedAt = 0;
-          var aggregateScore = report && report.scores && report.scores.aggregate ? report.scores.aggregate.score : '';
-          apiRunState.progressCaption = isQualityBlocked
-            ? (blockerMessages.length ? blockerMessages.length + ' blockers' : 'Quality blocked') + (aggregateScore ? ' · score ' + aggregateScore : '') + ' · ' + settings._providerLabel
-            : aggregateScore
-              ? 'Quality score ' + aggregateScore + ' · ' + settings._providerLabel
-              : settings._providerLabel + (settings.model ? ' · ' + settings.model : '');
-          apiRunState.booklet = booklet;
+          // ── DELIVERY IS UNCONDITIONAL ──────────────────────────────────
+          // The pipeline returned a booklet the user has already paid for.
+          // Claim it, save it, and put it on screen BEFORE any presentation
+          // work, because everything below this point is decoration — scores,
+          // captions, telemetry, surface switching — and decoration must never
+          // be able to hide the artifact.
+          //
+          // A live run (2026-08-11) delivered, logged its delivery, and left
+          // the panel frozen mid-stage with no way to reach the book; the
+          // author recovered it by reading window.LiftRPGAPI.lastBooklet from
+          // the console. Nothing below may reintroduce that failure shape.
           persistRecoverableApiBooklet(booklet, methodName);
-          apiRunState.costCaption = (apiRunState.pricingLabel ? 'Estimated from ' + apiRunState.pricingLabel + '. ' : '') +
-            'Run total: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + '.';
-          pushApiLog(
-            isQualityBlocked
-              ? 'Generation finished, but export is blocked by the quality gate. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.'
-              : 'Generation complete. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.'
-          );
-          if (isQualityBlocked) {
-            pushApiLog('Quality blockers: ' + summarizeQualityGateBlockers(qualityGate.blockers).join(' · '));
-          } else {
-            saveValidatedModel({
-              model: settings.model,
-              provider: settings._providerLabel,
-              cost: apiRunState.cost || '—',
-              date: new Date().toISOString()
-            });
+          if (runId !== activeApiRunId) {
+            // A newer run owns the panel now. The artifact is still saved and
+            // reachable — we simply do not repaint someone else's state.
+            return;
           }
-          renderApiRunState();
-          setGeneratorSurface('api-status', { skipFocus: true });
+          apiRunState.booklet = booklet;
+          apiRunState.status = 'success';
+          apiRunState.summary = 'Booklet Ready';
+          apiRunState.summaryCaption = 'The build finished. Your booklet is saved on this device.';
+          apiRunState.target = 'Open Or Download';
+          apiRunState.targetCaption = 'Send the generated booklet to the renderer or download the JSON.';
+          apiRunState.currentStageStartedAt = 0;
+          apiRunState.stream = null;
+
+          // Everything from here is PRESENTATION over an artifact that is
+          // already saved and already claimed by the run state. A throw in any
+          // of it (a quality-report shape we did not expect, a storage limit,
+          // a pricing caption) costs a line of detail — never the booklet.
+          try {
+            markAllApiStages('valid');
+            var qualityGate = booklet._qualityGate || { passed: true, blockers: [] };
+            var isQualityBlocked = !qualityGate.passed && qualityGate.blockers && qualityGate.blockers.length > 0;
+            var blockerMessages = summarizeQualityGateBlockers(qualityGate.blockers, { limit: 2 });
+            apiRunState.qualityGate = qualityGate;
+            if (isQualityBlocked) {
+              markApiStageBlocked(
+                'quality',
+                'Local quality gate blocked export for this booklet.',
+                { completionSource: 'local' }
+              );
+              apiRunState.status = 'blocked';
+              apiRunState.summary = 'Quality Gate Blocked';
+              apiRunState.summaryCaption = 'Generation finished, but the booklet needs another pass before export.';
+              apiRunState.target = 'Review Quality Blockers';
+              apiRunState.targetCaption = blockerMessages.join(' · ') || 'Open the review artifact and fix the blockers before export.';
+              removeValidatedModel(settings.model, settings._providerLabel);
+            } else {
+              markApiStageComplete(
+                'quality',
+                'Assembled and validated locally on this device.',
+                { completionSource: 'local' }
+              );
+              apiRunState.status = 'success';
+              apiRunState.summary = 'Booklet Ready';
+              apiRunState.summaryCaption = 'The API pipeline completed and the booklet passed local validation.';
+              apiRunState.target = 'Open Or Download';
+              apiRunState.targetCaption = 'Send the generated booklet to the renderer or download the JSON.';
+            }
+            apiRunState.progress = apiRunState.totalStages + ' / ' + apiRunState.totalStages + ' stages';
+            var report = (api() && api().lastQualityReport) || null;
+            apiRunState.qualityReport = report;
+            apiRunState.runSignature = getApiConfigSignature();
+            apiRunState.currentStageStartedAt = 0;
+            apiRunState.stream = null;
+            var aggregateScore = report && report.scores && report.scores.aggregate ? report.scores.aggregate.score : '';
+            apiRunState.progressCaption = isQualityBlocked
+              ? (blockerMessages.length ? blockerMessages.length + ' blockers' : 'Quality blocked') + (aggregateScore ? ' · score ' + aggregateScore : '') + ' · ' + settings._providerLabel
+              : aggregateScore
+                ? 'Quality score ' + aggregateScore + ' · ' + settings._providerLabel
+                : settings._providerLabel + (settings.model ? ' · ' + settings.model : '');
+            apiRunState.costCaption = (apiRunState.pricingLabel ? 'Estimated from ' + apiRunState.pricingLabel + '. ' : '') +
+              'Run total: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + '.';
+            pushApiLog(
+              isQualityBlocked
+                ? 'Generation finished, but export is blocked by the quality gate. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.'
+                : 'Generation complete. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.'
+            );
+            if (isQualityBlocked) {
+              pushApiLog('Quality blockers: ' + summarizeQualityGateBlockers(qualityGate.blockers).join(' · '));
+            } else {
+              saveValidatedModel({
+                model: settings.model,
+                provider: settings._providerLabel,
+                cost: apiRunState.cost || '—',
+                date: new Date().toISOString()
+              });
+            }
+          } catch (presentationError) {
+            console.warn('[LiftRPG] Post-delivery display step failed:', presentationError);
+            pushApiLog('Your booklet is ready and saved. Some run details could not be displayed: ' +
+              ((presentationError && presentationError.message) || presentationError));
+          }
+          // The one render that matters. If the panel's own painter fails,
+          // say so loudly and still put the artifact's buttons on screen: a
+          // book the user paid for must never be reachable only from the
+          // console, whatever else went wrong.
+          try {
+            renderApiRunState();
+            setGeneratorSurface('api-status', { skipFocus: true });
+          } catch (renderError) {
+            console.error('[LiftRPG] Run panel failed to render after delivery:', renderError);
+            try { renderApiActions(); } catch (actionsError) {
+              console.error('[LiftRPG] Delivery actions failed to render:', actionsError);
+            }
+            if (apiStateSummary) apiStateSummary.textContent = 'Booklet Ready';
+            if (apiStateTargetCaption) {
+              apiStateTargetCaption.textContent = 'Your booklet finished and is saved on this device. ' +
+                'Use the buttons above to open or download it.';
+            }
+          }
         } catch (error) {
           if (runId !== activeApiRunId) return;
           var failureMessage = (error && error.message) ? error.message : String(error || 'Generation failed.');
+          // Did the pipeline DELIVER before it fell over? The critic and the
+          // post-assembly steps run after the booklet is complete and already
+          // snapshotted, so a failure there is a failure of the report, not of
+          // the book. A booklet that exists belongs to the user and must be
+          // reachable from the panel — never only from the console.
+          var deliveredBooklet = (apiRunState && apiRunState.booklet)
+            || (api() && api().lastBooklet)
+            || null;
+          if (deliveredBooklet) apiRunState.booklet = deliveredBooklet;
           var failingStageKey = apiRunState.currentStageKey || inferApiStageKey(failureMessage);
           if (failingStageKey) {
             if (apiRunState.currentStageKey && apiRunState.currentStageKey !== failingStageKey && apiRunState.ledger[apiRunState.currentStageKey] === 'in progress') {
@@ -7787,15 +7976,31 @@
             : 'Review Failure';
           apiRunState.targetCaption = 'The log below shows the last completed step and the failure reason.';
           apiRunState.progress = apiRunState.stageIndex + ' / ' + apiRunState.totalStages + ' stages';
-          apiRunState.progressCaption = 'No booklet was committed to the renderer.';
+          apiRunState.progressCaption = deliveredBooklet
+            ? 'A finished booklet was saved before this failure — open or download it below.'
+            : 'No booklet was committed to the renderer.';
+          if (deliveredBooklet) {
+            apiRunState.targetCaption = 'Your booklet finished and is saved on this device. ' +
+              'The step that failed came after it was written.';
+          }
           apiRunState.error = failureMessage;
           apiRunState.currentStageStartedAt = 0;
+          apiRunState.stream = null;
           if (apiRunState.usageTotals && apiRunState.usageTotals.totalTokens > 0) {
             apiRunState.costCaption = 'Usage before failure: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.';
           }
           pushApiLog(failureMessage);
-          renderApiRunState();
-          setGeneratorSurface('api-status', { skipFocus: true });
+          // Same rule on the failure path: a delivered booklet has buttons even
+          // if the panel cannot paint the rest of the story.
+          try {
+            renderApiRunState();
+            setGeneratorSurface('api-status', { skipFocus: true });
+          } catch (renderError) {
+            console.error('[LiftRPG] Run panel failed to render after failure:', renderError);
+            try { renderApiActions(); } catch (actionsError) {
+              console.error('[LiftRPG] Recovery actions failed to render:', actionsError);
+            }
+          }
         } finally {
           _apiGenerateRunning = false;
           if (runId === activeApiRunId) {

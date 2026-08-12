@@ -1332,7 +1332,65 @@ function createStreamGuard(label, requestedTimeoutMs) {
       var timeoutError = new Error(detail + ' Try again.');
       timeoutError.errorType = 'timeout';
       timeoutError.retryable = true;
+      // STRUCTURAL marker, not prose. Surfaces that explain a retry in plain
+      // language pick their wording from this ('connect' | 'idle' | 'overall')
+      // instead of regexing the message above — the message is for humans and
+      // is free to change.
+      timeoutError.streamPhase = phase;
       return timeoutError;
+    }
+  };
+}
+
+// ── Streaming progress ticks (the heartbeat) ─────────────────────────────────
+//
+// A long stage is ONE streaming call that can run for many minutes and reports
+// its token usage only at the very end. Without a signal, a healthy stage and a
+// hung one look identical, and the rational move for a waiting operator is to
+// hit Stop and throw away the spend. So the transports offer a heartbeat.
+//
+// The channel is INERT BY DEFAULT, the same way vision is (D108): no callback
+// means no emitter, no wrapper, and — critically — nothing added to any request
+// payload. `onStreamTick` never touches the wire; it only reports what already
+// came back. A text-only call made without it is byte-identical to one made
+// before this channel existed (test-asserted).
+//
+// Ticks fire on stream ACTIVITY, not on text growth. A model that spends four
+// minutes in a thinking block is alive and must look alive, even though the
+// assistant text is still empty. `chars` is what has been accumulated so far;
+// `approxTokens` is chars/4 — an ESTIMATE, and every surface that shows it must
+// say so. The billed count arrives with the stage's usage snapshot.
+export var STREAM_TICK_MIN_INTERVAL_MS = 500;
+
+// Returns a throttled emit(chars, isFinal) — or null when no callback was
+// supplied, so callers can skip the wrapper entirely.
+//
+// Leading edge fires immediately (the UI should react to first contact, not
+// half a second later). The FINAL tick always fires and is never throttled:
+// the last number a reader sees has to be the real one rather than whatever
+// the throttle happened to let through, and `final` is the only signal that
+// this call is done talking. One extra callback per request — the throttle
+// exists to stop hundreds, not one.
+function createStreamTickEmitter(onStreamTick) {
+  if (typeof onStreamTick !== 'function') return null;
+  var startedAt = Date.now();
+  var lastAt = 0;
+
+  return function emitStreamTick(chars, isFinal) {
+    var count = Number(chars) > 0 ? Math.floor(Number(chars)) : 0;
+    var now = Date.now();
+    if (!isFinal && lastAt && (now - lastAt) < STREAM_TICK_MIN_INTERVAL_MS) return;
+    lastAt = now;
+    try {
+      onStreamTick({
+        chars: count,
+        approxTokens: Math.round(count / 4),
+        elapsedMs: now - startedAt,
+        final: !!isFinal
+      });
+    } catch (tickErr) {
+      // A progress callback is decoration. It must never kill a paid generation.
+      console.warn('[LiftRPG] Stream progress callback threw; continuing:', tickErr);
     }
   };
 }
@@ -1400,6 +1458,7 @@ function parseSseJson(raw, label) {
 // shaping, and network-error classification are identical across formats.
 async function runStreamingRequest(spec) {
   var guard = createStreamGuard(spec.label, spec.timeoutMs);
+  var emitTick = createStreamTickEmitter(spec.onStreamTick);
   guard.start();
   try {
     var resp = await fetch(spec.url, {
@@ -1430,7 +1489,12 @@ async function runStreamingRequest(spec) {
     }
 
     guard.touch();   // headers landed — switch connect window -> idle window
-    return await spec.consume(resp, guard.touch);
+    var streamed = await spec.consume(resp, guard.touch, emitTick);
+    // One final, unthrottled tick from the one place every format passes
+    // through — so the closing number is the true total for every transport,
+    // present and future, without each consumer remembering to do it.
+    if (emitTick) emitTick(String((streamed && streamed.text) || '').length, true);
+    return streamed;
   } catch (err) {
     var timeoutError = guard.toTimeoutError(err);
     if (timeoutError) throw timeoutError;
@@ -1451,7 +1515,7 @@ async function runStreamingRequest(spec) {
 //     stream_options entirely. Missing usage means "tokens unknown", which is
 //     a reportable state — NOT an error.
 //   - unknown fields, unknown delta shapes, and non-JSON keepalives are ignored
-async function readOpenAICompatStream(response, onActivity) {
+async function readOpenAICompatStream(response, onActivity, onTick) {
   var text = '';
   var finishReasonRaw = '';
   var streamedModel = '';
@@ -1459,7 +1523,10 @@ async function readOpenAICompatStream(response, onActivity) {
   var streamError = null;
   var sawDone = false;
 
-  await readSseFrames(response, onActivity, function (raw) {
+  await readSseFrames(response, function () {
+    if (onActivity) onActivity();
+    if (onTick) onTick(text.length);
+  }, function (raw) {
     if (raw === '[DONE]') {
       sawDone = true;
       return false;   // stop reading
@@ -1532,7 +1599,7 @@ function buildTruncationError(detail) {
 // `thinking_delta`, `signature_delta`, `input_json_delta`, and any future delta
 // type are skipped silently: claude-sonnet-5 and claude-opus-5 run adaptive
 // thinking by default and legitimately emit thinking blocks alongside text.
-async function readAnthropicStream(response, onActivity) {
+async function readAnthropicStream(response, onActivity, onTick) {
   var text = '';
   var usage = {
     input_tokens: 0,
@@ -1591,7 +1658,13 @@ async function readAnthropicStream(response, onActivity) {
 
   // Each frame is an `event:` line followed by a `data:` line. The data payload
   // is standalone JSON carrying its own `type`, so the event: line is redundant.
-  await readSseFrames(response, onActivity, function (raw) {
+  // The tick rides ACTIVITY, not text growth: adaptive thinking legitimately
+  // produces minutes of `thinking_delta` frames with `text` still empty. That
+  // is the exact stretch a reader needs to see is alive.
+  await readSseFrames(response, function () {
+    if (onActivity) onActivity();
+    if (onTick) onTick(text.length);
+  }, function (raw) {
     var payload = parseSseJson(raw, 'Anthropic');
     if (payload) handleEvent(payload);
   });
@@ -1607,7 +1680,7 @@ async function readAnthropicStream(response, onActivity) {
   };
 }
 
-export async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs, pricingRule, systemPrompt, images) {
+export async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs, pricingRule, systemPrompt, images, onStreamTick) {
   var resolvedMax = clampAnthropicMaxTokens(model, maxTokens || MAX_OUTPUT_TOKENS);
   var payload = {
     model: model,
@@ -1633,6 +1706,7 @@ export async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs,
     headers: buildAnthropicHeaders(apiKey),
     payload: payload,
     timeoutMs: timeoutMs,
+    onStreamTick: onStreamTick,
     consume: readAnthropicStream
   });
 
@@ -1693,7 +1767,7 @@ function rejectsStreamOptions(err) {
     || isStructuredOutputUnsupportedMessage(message);
 }
 
-export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens, timeoutMs, pricingRule, images) {
+export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens, timeoutMs, pricingRule, images, onStreamTick) {
   var url = buildOpenAICompatUrl(baseUrl);
   var endpointKey = normalizeUrl(baseUrl);
   var headers = buildOpenAICompatHeaders(apiKey);
@@ -1712,6 +1786,7 @@ export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens
       headers: headers,
       payload: buildPayload(includeUsage),
       timeoutMs: timeoutMs,
+      onStreamTick: onStreamTick,
       consume: readOpenAICompatStream
     });
   }
@@ -1817,6 +1892,11 @@ export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens
  * @property {string} label                    Human-readable, for diagnostics.
  * @property {TransportCapabilities} capabilities
  * @property {(settings: Object, prompt: string, opts: {maxTokens: number, timeoutMs: number}) => Promise<TransportResult>} call
+ *           `opts` may also carry `images` (see vision) and `onStreamTick` — a
+ *           progress callback handed only to adapters that declare
+ *           `capabilities.streaming`. Both are absent-by-default: an adapter
+ *           that knows about neither receives the same two-key object it always
+ *           did, and no request payload changes either way.
  * @property {((settings: Object) => Promise<Object>)=} listModels
  *           RESERVED. Not implemented today: model discovery is preset-driven
  *           (PROVIDERS[*].modelDiscovery -> listProviderModels), which is config
@@ -1865,7 +1945,7 @@ registerTransport({
       settings.apiKey, settings.model, prompt,
       opts.maxTokens, opts.timeoutMs,
       settings._pricingRule, settings._systemPrompt,
-      opts.images
+      opts.images, opts.onStreamTick
     );
   }
 });
@@ -1888,7 +1968,7 @@ registerTransport({
     return callOpenAICompat(
       settings.apiKey, settings.baseUrl, settings.model, prompt,
       opts.maxTokens, opts.timeoutMs, settings._pricingRule,
-      opts.images
+      opts.images, opts.onStreamTick
     );
   }
 });
@@ -1930,6 +2010,12 @@ export async function callProvider(settings, prompt, maxTokens, options) {
   // knows nothing about vision is never handed a key it does not understand.
   if (images.length && adapter && adapter.capabilities && adapter.capabilities.vision) {
     opts.images = images;
+  }
+  // Same absent-means-inert rule for the heartbeat. No callback, or an adapter
+  // that does not stream, and `opts` keeps exactly the two keys it always had.
+  if (typeof (options && options.onStreamTick) === 'function'
+    && adapter && adapter.capabilities && adapter.capabilities.streaming) {
+    opts.onStreamTick = options.onStreamTick;
   }
   return adapter.call(settings, prompt, opts);
 }
@@ -2023,11 +2109,16 @@ export async function callOpenAICompatStructured(apiKey, baseUrl, model, prompt,
   }
 }
 
-export async function callProviderStructured(settings, prompt, schema, maxTokens, stageName) {
+export async function callProviderStructured(settings, prompt, schema, maxTokens, stageName, options) {
   // Capability lookup, not a format check — an adapter that cannot honor a
   // JSON-schema response format falls back to freeform extraction.
+  //
+  // The schema path itself is one-shot (no stream to tick), so a structured
+  // stage reports "nothing back yet" for its whole duration — which is the
+  // truth. Both FALLBACK paths land on callProvider, so a stage that degrades
+  // to freeform gets its heartbeat back.
   if (!schema || !transportSupports(settings, 'structuredOutput')) {
-    var unstructuredResponse = await callProvider(settings, prompt, maxTokens);
+    var unstructuredResponse = await callProvider(settings, prompt, maxTokens, options);
     return {
       result: extractJson(unstructuredResponse.text),
       meta: unstructuredResponse.meta,
@@ -2050,7 +2141,7 @@ export async function callProviderStructured(settings, prompt, schema, maxTokens
   } catch (err) {
     if (!shouldFallbackFromStructured(err) || isLikelyTruncationError(err)) throw err;
     console.warn('[LiftRPG] Structured output unavailable for ' + stageName + '; falling back to freeform JSON repair:', err.message);
-    var fallbackResponse = await callProvider(settings, prompt, maxTokens);
+    var fallbackResponse = await callProvider(settings, prompt, maxTokens, options);
     return {
       result: extractJson(fallbackResponse.text),
       meta: fallbackResponse.meta,
