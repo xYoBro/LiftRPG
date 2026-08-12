@@ -3069,19 +3069,20 @@
       retryError ? '## Retry Focus\nThe previous attempt failed with this blocking error: ' + retryError + '\nFix that exact contract violation in this response.' : '',
       retryScaffolds.length ? '## Retry Scaffolds\n' + retryScaffolds.join('\n') : '',
       '',
-      // ── Point-of-use doctrine (§11 Wave 4a) ───────────────────────────────
-      // Routed to the STAGE that authors these fields rather than into the flat
-      // INSTRUCTIONS bundle, because the single-prompt path is hard against its
-      // 108,000-char ceiling (measured 107.6k before this wave; this doctrine
-      // is ~8.2k). Compression could not close that: a 4-gram overlap scan
-      // across the whole bundle found at most 1.7% cross-section redundancy, so
-      // there is no duplication left to harvest and the only remaining lever is
-      // deleting live doctrine — an author decision, not an engineering one.
-      // ONE LINE reverses this the moment the ceiling moves: add
-      // INST_POINT_OF_USE back to the INSTRUCTIONS bundle in prompt_rules.js
-      // and drop it from here and the fragment stage.
-      window.INST_POINT_OF_USE.join('\n'),
-      '',
+      // ── Point-of-use doctrine (§11 Wave 4a; re-routed Teeth Round T1a) ────
+      // This used to paste window.INST_POINT_OF_USE in HERE, which reached this
+      // multi-stage builder and no other. The S+F flesh builders — the DEFAULT
+      // pipeline — never saw it, so their weeks were asked for `microLines` by
+      // a one-line field shape pointing at doctrine that was not in the prompt.
+      // It now rides STAGE_SCHEMA_MAP['week-final'], which both pipelines build
+      // from, and buildStageSchema('week-final') above already carries it.
+      //
+      // Still off the flat INSTRUCTIONS bundle: the single-prompt path is hard
+      // against its 108,000-char ceiling (measured 107.6k at Wave 4a; this
+      // doctrine is ~8.2k). Compression could not close that — a 4-gram overlap
+      // scan across the whole bundle found at most 1.7% cross-section
+      // redundancy — so the only remaining lever is deleting live doctrine, an
+      // author decision rather than an engineering one.
       '## Constraints',
       '- Preserve Specificity: storyPrompts must contain physical action and named places.',
       '- Oracle paperAction text must be concrete and singular: name the exact clock, map node, gate, companion slot, or document state being changed. Avoid vague bundled edits.',
@@ -3140,10 +3141,9 @@
       retryError ? '## Retry Focus\nThe previous attempt failed with this blocking error: ' + retryError + '\nFix that exact contract violation in this response.' : '',
       '',
       // Wave 4a: `citeRef` and `seal` are authored here, so the citation
-      // grammar has to reach this stage. See the note in the week stage above
-      // for why this rides the stage builders rather than INSTRUCTIONS.
-      window.INST_POINT_OF_USE.join('\n'),
-      '',
+      // grammar has to reach this stage — it now does through
+      // buildStageSchema('fragment') above (STAGE_SCHEMA_MAP), which the S+F
+      // fragment-batch builder shares. See the note in the week stage above.
       '## Constraints',
       '- The fragment MUST feel like an authentic, found document (memo, letter, dispatch).',
       '- Do not summarize lore. Include trivial details (routing codes, times) to heighten realism.',

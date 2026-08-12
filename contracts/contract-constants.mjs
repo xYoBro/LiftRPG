@@ -688,6 +688,96 @@ export function resolveNeighborFamilies(family) {
   return out;
 }
 
+// ── Door-leaning families (Teeth Round, Wave T1a) ───────────────────────────
+// Which mechanic grammar families must print a weekly `week.doorChoice`.
+//
+// The membership is READ OFF the cluster recipes in INST_ARTIFACT_COMPILER
+// Step 5a, not chosen by taste. Each recipe states a DECISION the player must
+// own every week, and a doorChoice is exactly that decision printed with a
+// posted `lean` on each side. The eight macro-genre families all state a
+// TWO-SIDED fork the world prices:
+//
+//   heat         push or lie low, priced
+//   attrition    spend now to move well, or arrive thin
+//   siege        what is held, and therefore what is given up
+//   stewardship  which failing thing gets this week's hands
+//   loyalty-web  choose whom to answer, in public
+//   evasion      route versus concealment
+//   observance   keep the rite or keep the day
+//   rivalry      how much to stake against a posted result
+//
+// The seven reconstruction families are EXCLUDED, on their own recipe's terms:
+// their DECISION is a selection among open gaps ("which gap to close this
+// week") rather than a fork, and the cluster explicitly REFUSES "an antagonist
+// who spends resources against the player". With nothing spending against the
+// player there is no lean to post, and a door with no lean is the coin flip
+// collectPlayLoopFindings already warns about — so requiring one there would
+// manufacture the defect rather than prevent it.
+//
+// PARITY: the prompt states this membership once, in INST_ARTIFACT_COMPILER
+// Step 5c, and validate.mjs (doorLeaningParity) asserts the two agree in both
+// directions. A family named here and not there is a door the model is never
+// told to build but the stage validator will demand.
+
+export var DOOR_LEANING_FAMILIES = [
+  'heat', 'attrition', 'siege', 'stewardship', 'loyalty-web', 'evasion',
+  'observance', 'rivalry'
+];
+
+/**
+ * isDoorLeaningFamily(family) -> boolean
+ *
+ * Whether a booklet declaring `family` must print a weekly doorChoice.
+ * Unknown or absent families answer false: a missing declaration removes the
+ * signal, it does not invent a requirement (the same stance
+ * resolveFamilyBoardModes takes).
+ *
+ * SINGLE HOME (D93). The generator asks this to decide a BLOCKING stage error;
+ * a second implementation would be a second opinion about what a booklet owes,
+ * and each tree would only ever read its own.
+ *
+ * Consumers: generator/modules/validation.js (validateWeekSchema).
+ * Guarded by singleDeclarationHomes() in scripts/validate.mjs.
+ */
+export function isDoorLeaningFamily(family) {
+  var key = String(family || '').trim().toLowerCase();
+  return DOOR_LEANING_FAMILIES.indexOf(key) !== -1;
+}
+
+// ── Output budgets (Teeth Round, Wave T1a — hoisted from validation.js) ──────
+// The character caps every authored prose surface is held to. One table, three
+// readers that cannot see each other:
+//
+//   generator/modules/validation.js   collectBudgetBreaches — measures them
+//   generator/prompt_rules.js         INST_OUTPUT_BUDGETS — states them to the
+//                                     model (literals, parity-asserted)
+//   generator/api-generator.js        structured-schema maxLength (via the
+//                                     constants.js re-export)
+//
+// They lived in validation.js while only validation.js read them. The Teeth
+// Round makes breaches BLOCKING at the week/fragment/ending stages, which means
+// the number now costs a retry — and a cap the prompt states differently from
+// the cap the validator enforces would spend that retry on an instruction the
+// model already followed. validate.mjs (outputBudgetParity) ties the surfaces.
+//
+// SEVERITY SPLIT (D19 preserved): blocking at a STAGE (a retry is cheap and the
+// model can simply write less), warning on the ASSEMBLED booklet (delivery is
+// never blocked). Same numbers, two severities, one home.
+//
+// markStripLabel is the Teeth Round addition: D89's "≤5 words, no digits" law
+// made measurable. Five words at print-average length is 28 characters; the
+// corpus's only strip-bearing fixture peaks at 27, and the label overflow the
+// Playthrough Auditor flagged book-wide on Book 1 sat in the 31-36 range. The
+// word law stays the doctrine; this is the cap a machine can hold it to.
+
+export var OUTPUT_BUDGETS = {
+  storyPrompt: 220, fragmentBody: 600, interludeBody: 240, endingBody: 1500,
+  microLineCondition: 90, microLineCue: 120, citedAs: 90,
+  returnBeatClosing: 140, returnBeatOpening: 140,
+  doorOptionLean: 90, sealKeyHint: 120, sealUnlockCondition: 140,
+  markStripLabel: 28
+};
+
 // ── Convergence patterns (Wave 2; the March 2026 convergence-variants design) ─
 // The SHAPE of the endgame — how the weekly components become the password.
 // Macro-genres vary the middle game; without this the last week was one shape

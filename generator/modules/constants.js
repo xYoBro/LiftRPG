@@ -162,7 +162,8 @@ import {
   MARK_STRIP,
   MARK_STRIP_TARGET_KINDS,
   RECKONING_SINK_KINDS,
-  RECKONING_THRESHOLD_RATIO
+  RECKONING_THRESHOLD_RATIO,
+  OUTPUT_BUDGETS
 } from '../../contracts/contract-constants.mjs';
 
 export {
@@ -195,7 +196,11 @@ export {
   MARK_STRIP,
   MARK_STRIP_TARGET_KINDS,
   RECKONING_SINK_KINDS,
-  RECKONING_THRESHOLD_RATIO
+  RECKONING_THRESHOLD_RATIO,
+  // Prose caps (Teeth Round T1a). Hoisted to contract-constants when breaches
+  // became stage-blocking: api-generator.js reads them through here to stamp
+  // maxLength onto the structured schemas the compat transports enforce.
+  OUTPUT_BUDGETS
 };
 
 export var SUPPORTED_THEME_ARCHETYPES = VALID_ARCHETYPES.reduce(function (acc, name) {

@@ -36,7 +36,12 @@ import {
   CRITIC_DIMENSIONS,
   STAGE_BUDGETS,
   RETRY_TIMEOUT_GROWTH,
-  RETRY_TIMEOUT_CEILING_MS
+  RETRY_TIMEOUT_CEILING_MS,
+  // Teeth Round T1a: the dialect enum and the prose caps, both stamped onto the
+  // structured schemas below so a compat transport enforces what the stage
+  // validators enforce.
+  VALID_COMPONENT_DIALECTS,
+  OUTPUT_BUDGETS
 } from './modules/constants.js';
 
 import {
@@ -157,11 +162,12 @@ import {
   allowsEmptyApiKey
 } from './modules/provider.js';
 
-// Side-effect import (§10.4): registers window.buildWorkoutTopology and
+// §10.4: importing this also registers window.buildWorkoutTopology and
 // window.formatWorkoutTopologyBlock for generator.js, which is a classic IIFE
-// and cannot import. Nothing in this file calls them directly — armCompilerContext
-// in generator.js is the single consumer, and it reads them off window.
-import './modules/workout-topology.js';
+// and cannot import — armCompilerContext there reads them off window.
+// looksLikeDeloadWeek IS called here (Teeth Round T1a): the week floors exempt
+// deload weeks, and DELOAD_MARKER has exactly one home, in that module.
+import { looksLikeDeloadWeek } from './modules/workout-topology.js';
 
 // The Liftosaur seam (§11 Wave 5). The pure half is used here; the network half
 // self-registers on window for index.html's program-lookup affordance.
@@ -513,9 +519,14 @@ var STRUCTURED_SCHEMA_SHELL = {
             revealShape: { type: 'string' },
             unlockLogic: { type: 'string' },
             shellFamily: { type: 'string' },
-            attachmentStrategy: { type: 'string' }
+            attachmentStrategy: { type: 'string' },
+            // Teeth Round F2, mirroring STRUCTURED_SCHEMA_SKELETON's
+            // artifactIdentity: the multi-stage shell is the other place a book
+            // declares its identity, and a floor enforced on one pipeline only
+            // is a floor the other pipeline routes around.
+            componentDialect: { type: 'string', enum: VALID_COMPONENT_DIALECTS }
           },
-          required: ['artifactClass', 'boardStateMode', 'shellFamily', 'attachmentStrategy']
+          required: ['artifactClass', 'boardStateMode', 'shellFamily', 'attachmentStrategy', 'componentDialect']
         },
         weeklyComponentType: { type: 'string' },
         passwordEncryptedEnding: { type: 'string' },
@@ -604,7 +615,13 @@ var STRUCTURED_SCHEMA_FRAGMENTS = {
           inWorldAuthor: { type: 'string' },
           inWorldRecipient: { type: 'string' },
           inWorldPurpose: { type: 'string' },
-          content: { type: 'string' },
+          // Teeth Round F6. The cap binds on the compat transports that honor
+          // json_schema; the anthropic transport declares no structured-output
+          // capability and falls back to freeform extraction, which is why the
+          // same number is ALSO enforced by collectBudgetBreaches at the stage
+          // validator. Wire schema and validator are two readings of one
+          // OUTPUT_BUDGETS row, not two policies.
+          content: { type: 'string', maxLength: OUTPUT_BUDGETS.fragmentBody },
           designSpec: DESIGN_SPEC_SCHEMA,
           authenticityChecks: AUTHENTICITY_CHECKS_SCHEMA
         },
@@ -1459,7 +1476,8 @@ async function generateSingleFragmentAdaptive(settings, builders, config) {
       return normalizeSingleFragmentResult(result, registryEntry);
     },
     validate: function (result) {
-      return validateFragmentsStage({ fragments: result ? [result] : [] }, registryEntry ? [registryEntry] : []);
+      return validateFragmentsStage({ fragments: result ? [result] : [] },
+        registryEntry ? [registryEntry] : [], { generationFloors: true });
     },
     buildPrompt: function (retryState) {
       return builders.singleFragment(
@@ -1545,7 +1563,7 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
         return normalizeFragmentBatchResult(result, config.registry);
       },
       validate: function (result) {
-        return validateFragmentsStage(result, config.registry);
+        return validateFragmentsStage(result, config.registry, { generationFloors: true });
       },
       buildPrompt: function (retryState) {
         return builders.fragmentBatch(
@@ -2045,7 +2063,13 @@ async function runApiPipeline(options) {
       maxAttempts: 2,
       rateLimiter: rateLimiter,
       budgetEnforce: useGeminiBudget,
-      validate: validateCampaignPlanStage,
+      // generationFloors turns on the cipher-variety floor (F5). Passed here
+      // and nowhere else: the guided-build harness and the manual API replay
+      // hand-built plans and owe no generation policy (see floorsOn in
+      // validation.js).
+      validate: function (result) {
+        return validateCampaignPlanStage(result, { generationFloors: true });
+      },
       buildPrompt: function (retryState) {
         if (!retryState || !retryState.attempt) {
           return builders.stage2(workout, brief, layerBible);
@@ -2107,7 +2131,11 @@ async function runApiPipeline(options) {
         return result;
       },
       validate: function(result) {
-        var v = validateShellSchema(result, { weekCount: weekCount, totalSessions: totalSessions });
+        var v = validateShellSchema(result, {
+          weekCount: weekCount,
+          totalSessions: totalSessions,
+          generationFloors: true   // F2: componentDialect is declared here or nowhere
+        });
         if (!v.valid) {
           return 'Shell schema validation: ' + v.errors.join('; ');
         }
@@ -2226,6 +2254,30 @@ async function runApiPipeline(options) {
       return Number(pw.weekNumber) === w;
     })[0] || { weekNumber: w };
 
+    // ── Generation-floor context (Teeth Round T1a) ────────────────────────
+    // The floors need two facts the week output cannot supply about itself.
+    //
+    // DELOAD: the multi-stage campaign plan carries no isDeload field at all
+    // (STRUCTURED_SCHEMA_CAMPAIGN's week items have no such property), so the
+    // only honest source is the program's own text. looksLikeDeloadWeek reads
+    // the DECLARED marker only — a week that dips in volume without saying so
+    // is NOT excused, because the floors must fail toward demanding content.
+    //
+    // FAMILY: the compiler runs on the shell stage in this pipeline, so the
+    // grammar family lives at shell.meta.artifactIntent — the same place
+    // assembly.js reads it. Absent family = removed signal: isDoorLeaningFamily
+    // answers false and the door floor simply does not apply.
+    var weekWorkoutText = (typeof window.extractWeekWorkout === 'function')
+      ? window.extractWeekWorkout(workout, [w])
+      : '';
+    var weekIsDeload = !!campaignWeekPlan.isDeload || looksLikeDeloadWeek(weekWorkoutText);
+    var weekFloorOptions = {
+      generationFloors: true,
+      weekNumber: w,
+      isDeload: weekIsDeload,
+      mechanicGrammarFamily: (((shell || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || ''
+    };
+
     progress('weeks', 'Writing Week ' + w + (isBossWeek ? ' (Boss)' : '') + '\u2026');
     var weekObject = await runJsonStage(settings, {
       stageKey: 'weeks',
@@ -2270,12 +2322,12 @@ async function runApiPipeline(options) {
         if (!result) return 'Week generation returned empty result. Model may have returned a shell instead of a week object.';
         if (!result.title) return 'Week object missing "title" field. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
         if (!result.sessions) return 'Week object missing "sessions" array. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
-        var schemaValidation = validateWeekSchema(result, isBossWeek, {
+        var schemaValidation = validateWeekSchema(result, isBossWeek, Object.assign({
           componentInputs: isBossWeek ? allComponentValues : undefined,
           approvedFragmentIds: campaignWeekPlan ? (campaignWeekPlan.fragmentIds || []) : [],
           currentWeekNumber: w,
           previousWeek: !isBossWeek && finalWeeks.length ? finalWeeks[finalWeeks.length - 1] : null
-        });
+        }, weekFloorOptions));
         if (schemaValidation && schemaValidation.valid === false) {
           return schemaValidation;
         }
@@ -2443,6 +2495,12 @@ async function runApiPipeline(options) {
         if (!content.body) return 'Ending missing content.body.';
         if (!content.documentType) return 'Ending missing content.documentType.';
         if (!result.designSpec || typeof result.designSpec !== 'object') return 'Ending missing designSpec object.';
+        // F6, the multi-stage twin of the S+F endings gate above.
+        var endingBreaches = collectBudgetBreaches({ endings: [result] })
+          .map(function (b) { return b.message; });
+        if (endingBreaches.length > 0) {
+          return 'Over budget: ' + endingBreaches.join('; ');
+        }
         return '';
       },
       buildPrompt: function (retryState) {
@@ -3036,7 +3094,11 @@ async function runSkeletonFleshPipeline(options) {
         });
       },
       validate: function (result) {
-        return validateSkeletonStage(result, weekCount);
+        // generationFloors turns on F2 (componentDialect), F5 (the cipher plan)
+        // and F8 (the companion floor). The skeleton is the only stage that
+        // sees the whole book at once, so it is where a book-level floor can
+        // be held at all.
+        return validateSkeletonStage(result, weekCount, { generationFloors: true });
       }
     });
     recordSeedOnStage(skeleton, divergenceSeed);
@@ -3242,7 +3304,15 @@ async function runSkeletonFleshPipeline(options) {
           componentInputs: isBoss ? allComponentValuesSF.map(String) : undefined,
           approvedFragmentIds: weekPlan.fragmentIds || [],
           currentWeekNumber: weekNum,
-          previousWeek: !isBoss && weekOutputs.length ? weekOutputs[weekOutputs.length - 1] : null
+          previousWeek: !isBoss && weekOutputs.length ? weekOutputs[weekOutputs.length - 1] : null,
+          // ── Generation-floor context (Teeth Round T1a) ──────────────────
+          // Unlike the multi-stage plan, the skeleton's weekPlan DOES carry
+          // isDeload (it is in STRUCTURED_SCHEMA_SKELETON), so the plan is the
+          // first source and the program text is the corroborating one.
+          generationFloors: true,
+          weekNumber: weekNum,
+          isDeload: !!weekPlan.isDeload || looksLikeDeloadWeek(weekWorkout),
+          mechanicGrammarFamily: (((skeleton || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || ''
         });
         if (vResult && typeof vResult === 'object' && !vResult.valid) {
           return (vResult.errors || []).join('; ');
@@ -3345,7 +3415,7 @@ async function runSkeletonFleshPipeline(options) {
           return 'Fragments: missing or empty fragments array';
         }
         var wrapped = Array.isArray(result) ? { fragments: result } : result;
-        return validateFragmentsStage(wrapped, fullFragRegistry);
+        return validateFragmentsStage(wrapped, fullFragRegistry, { generationFloors: true });
       }
     });
 
@@ -3428,6 +3498,12 @@ async function runSkeletonFleshPipeline(options) {
         if (endingsArray.length < endingVariants.length) {
           errors.push('Endings: expected ' + endingVariants.length + ' variants but got ' + endingsArray.length);
         }
+        // F6: the ending body cap costs a retry here. Book 1's endings ran ~3x
+        // budget, and an ending that long does not just cost pages — the
+        // renderer splits it across page breaks it was never composed for.
+        collectBudgetBreaches({ endings: endingsArray }).forEach(function (b) {
+          errors.push('Over budget: ' + b.message);
+        });
         return errors.length > 0 ? errors.join('; ') : '';
       }
     });

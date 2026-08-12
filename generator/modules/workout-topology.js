@@ -279,9 +279,30 @@ export function formatWorkoutTopologyBlock(topology) {
   return lines.join('\n');
 }
 
+/**
+ * looksLikeDeloadWeek(text) -> boolean
+ *
+ * Whether a slice of program text DECLARES itself a deload. The explicit-intent
+ * half of the deload signal, exported so the Teeth Round's week floors can ask
+ * the question without re-growing the pattern (Teeth Round T1a).
+ *
+ * It is deliberately the DECLARED half only — never the volume-dip inference,
+ * which needs the whole program to compare against and cannot be answered from
+ * one week's text. A week that dips without saying so still owes its
+ * micro-line: the floors must fail SAFE toward demanding content, and a wrong
+ * "this is a deload" would silently excuse a week from the whole game layer.
+ *
+ * SINGLE HOME: DELOAD_MARKER is declared once, here, and read by
+ * weeksFromNormalized / weeksFromRawText above and by this predicate.
+ */
+export function looksLikeDeloadWeek(text) {
+  return DELOAD_MARKER.test(String(text || ''));
+}
+
 // Classic-IIFE consumers (generator.js) cannot import; they read these off
 // window. Guarded so Node imports stay side-effect free.
 if (typeof window !== 'undefined') {
   window.buildWorkoutTopology = buildWorkoutTopology;
   window.formatWorkoutTopologyBlock = formatWorkoutTopologyBlock;
+  window.looksLikeDeloadWeek = looksLikeDeloadWeek;
 }

@@ -13,7 +13,8 @@ import {
   decodeA1Z26,
   resolveShellFamily,
   resolveFamilyBoardModes,
-  DEFAULT_WORKSPACE_STYLE
+  DEFAULT_WORKSPACE_STYLE,
+  VALID_COMPONENT_DIALECTS
 } from '../../contracts/contract-constants.mjs';
 
 // ── Structured Layer 2 diagnostics ──────────────────────────────────────────
@@ -249,8 +250,9 @@ export function normalizeArtifactIdentity(rawIdentity, shell, campaignPlan) {
   var shellFamily = resolveShellFamily(identity.shellFamily, artifactClass, themeArchetype);
   var boardStateMode = normalizeBoardStateModeToken(identity.boardStateMode) || inferBoardStateModeFromContext(shell, campaignPlan);
   var attachmentStrategy = normalizeAttachmentStrategyValue(identity.attachmentStrategy, shellFamily, boardStateMode);
+  var componentDialect = String(identity.componentDialect || '').trim().toLowerCase();
 
-  return {
+  var out = {
     artifactClass: artifactClass,
     artifactBlend: Array.isArray(identity.artifactBlend) ? identity.artifactBlend.slice(0, 4) : (identity.artifactBlend || ''),
     authorialMode: firstNonEmpty(identity.authorialMode, themeArchetype === 'government' ? 'procedural' : ''),
@@ -264,6 +266,30 @@ export function normalizeArtifactIdentity(rawIdentity, shell, campaignPlan) {
     shellFamily: shellFamily,
     attachmentStrategy: attachmentStrategy
   };
+
+  // ── componentDialect (D105, caught by the Teeth Round T1b bench run) ───────
+  // This normalizer returns a WHITELIST, so a field absent from the literal is
+  // not passed through — it is deleted. componentDialect was missing from that
+  // literal from the day D105 added the field, which made it write-only on the
+  // generated path: the shell stage authored a dialect, ensureArtifactIdentity
+  // dropped it, and theme.js's resolveComponentDialect fell back to the default
+  // with nothing logged anywhere. The Teeth Round's F2 floor turned that into a
+  // real cost — the model is now BLOCKED until it declares a dialect, and every
+  // one of those retries was buying a value this function then discarded. The
+  // stub bench is what surfaced it: the shell validated carrying `gauge` and
+  // the delivered booklet carried no dialect at all.
+  //
+  // ASSIGNED ONLY WHEN VALID, rather than always with a blank fallback, for two
+  // reasons that point the same way. `componentDialect` is a CLOSED enum in
+  // booklet-schema.mjs with no empty member, so a blank would make every
+  // dialect-less booklet fail its own schema; and the value is stamped straight
+  // into the `data-component-dialect` attribute the CSS selects on, where an
+  // unrecognized string is a dialect that silently draws nothing. Absence is
+  // the shape the schema and the renderer both already know how to read.
+  if (VALID_COMPONENT_DIALECTS.indexOf(componentDialect) !== -1) {
+    out.componentDialect = componentDialect;
+  }
+  return out;
 }
 
 export function ensureArtifactIdentity(shell, campaignPlan) {
@@ -394,9 +420,14 @@ export function diagnoseIdentityPreservation(booklet, upstreamMeta, diag) {
   // 2. artifactIdentity field blanking
   var uIdentity = uMeta.artifactIdentity || {};
   var bIdentity = bMeta.artifactIdentity || {};
+  // componentDialect joins the list with the fix above: it is exactly the kind
+  // of field this scan exists for — declared once at the shell stage, read once
+  // by the renderer, and invisible in between. The drop it would have caught
+  // survived from D105 to the Teeth Round because nothing watched this field.
   var identityFields = ['artifactClass', 'shellFamily', 'boardStateMode', 'openingMode',
     'rulesDeliveryMode', 'unlockLogic', 'attachmentStrategy', 'materialCulture',
-    'annotationCulture', 'documentEcology', 'revealShape', 'authorialMode'];
+    'annotationCulture', 'documentEcology', 'revealShape', 'authorialMode',
+    'componentDialect'];
 
   identityFields.forEach(function (field) {
     var uVal = uIdentity[field];
@@ -2780,6 +2811,9 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
   // Diagnose identity preservation regressions
   diagnoseIdentityPreservation(booklet, meta, diag);
 
+  // Cipher variety, planned vs built (Teeth Round F5, assembly half — WARN)
+  diagnoseCipherVariety(booklet, skeleton.weekPlan || [], diag);
+
   // Attach structured diagnostics (survives JSON serialization)
   booklet._assemblyDiagnostics = diag;
 
@@ -2909,6 +2943,52 @@ function collectObservedCipherTypes(booklet) {
     if (ct) types[ct] = (types[ct] || 0) + 1;
   });
   return types;
+}
+
+/**
+ * diagnoseCipherVariety(booklet, plannedWeeks, diag)
+ *
+ * The assembly-side half of the cipher-variety floor (Teeth Round F5). The
+ * skeleton stage BLOCKS on the planned variety; this reports what was actually
+ * BUILT, and whether it still matches the plan the skeleton was held to.
+ *
+ * WARN-class throughout, deliberately: by the time assembly runs, the weeks are
+ * generated and paid for, and D19 says delivery is never blocked. What this
+ * buys is a named divergence — before it, a plan that scheduled four families
+ * and a book that built two looked identical from outside, which is exactly the
+ * gap Book 1 fell through.
+ *
+ * collectObservedCipherTypes had ZERO call sites before this. It was written
+ * beside collectObservedMapTypes and never wired, so the observed-vs-planned
+ * comparison it exists for had never once run.
+ */
+function diagnoseCipherVariety(booklet, plannedWeeks, diag) {
+  var observed = collectObservedCipherTypes(booklet);
+  var observedFamilies = Object.keys(observed);
+  var planned = {};
+  (plannedWeeks || []).forEach(function (w) {
+    if (!w || w.isBossWeek) return;
+    var t = String(w.cipherType || '').trim().toLowerCase();
+    if (t) planned[t] = 1;
+  });
+  var plannedFamilies = Object.keys(planned);
+
+  if (plannedFamilies.length && observedFamilies.length < plannedFamilies.length) {
+    diag.push(createDiagnostic('cipher-variety-below-plan', 'warning', 'validate',
+      'The plan scheduled ' + plannedFamilies.length + ' cipher families ('
+        + plannedFamilies.join(', ') + ') but the built booklet carries '
+        + observedFamilies.length + ' (' + observedFamilies.join(', ')
+        + ') — a week collapsed onto a technique the player has already learned',
+      { path: 'weeks[].fieldOps.cipher.type' }));
+  }
+
+  var unplanned = observedFamilies.filter(function (t) { return !planned[t]; });
+  if (plannedFamilies.length && unplanned.length) {
+    diag.push(createDiagnostic('cipher-type-off-plan', 'warning', 'validate',
+      'Built cipher type(s) ' + unplanned.join(', ') + ' were not in the plan ('
+        + plannedFamilies.join(', ') + ')',
+      { path: 'weeks[].fieldOps.cipher.type' }));
+  }
 }
 
 // Mechanic grammar → expected board-state proxies mapping.

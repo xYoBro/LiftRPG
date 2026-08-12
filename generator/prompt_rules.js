@@ -30,7 +30,8 @@
     '  * `mechanisms` (string[], 2-4): what this book\'s prose DOES, in selection terms. Never a vibe adjective, never a named author or work.',
     '  * `authorRegisters` (array of { author, records, omits, format }): one entry per named in-world author who writes more than one surface. Two documents by different authors must be tellable apart with the bylines removed.',
     '  * `licensedMoves` (array, 0-1 entries; zero is normal): { move, budget, rationale }. See the Voice Discipline section for the closed enum and the license rules.',
-    '- `artifactIdentity` (object, required for shell-aware rendering): { artifactClass, artifactBlend?, authorialMode?, boardStateMode, documentEcology?, materialCulture?, openingMode?, rulesDeliveryMode?, revealShape?, unlockLogic?, shellFamily, attachmentStrategy }',
+    '- `artifactIdentity` (object, required for shell-aware rendering): { artifactClass, artifactBlend?, authorialMode?, boardStateMode, documentEcology?, materialCulture?, openingMode?, rulesDeliveryMode?, revealShape?, unlockLogic?, shellFamily, attachmentStrategy, componentDialect }',
+    '  * `componentDialect` (string, REQUIRED): CLOSED enum — "segments" (a bar or pie cut into wedges) | "beads" (a counted string) | "gauge" (a dial reading) | "tally" (marks scored in fives). How every clock, track and tick strip is DRAWN. Pick what this world would reach for to keep a count; it changes no geometry and no rule.',
     '- `weeklyComponentType` (string): One fiction-native non-semantic measurement family used across all non-boss weeks. It should feel like an operational residue or in-world key: a number, code, reading, tag, case ID, route marker, calibration value, or designation, never a plaintext letter.',
     '- `economy` (object): { currencyId, currencyLabel }. The single thing the workout pays out. Declared once here; every session markStrip earns it and every week reckoning spends it. Nothing else in the booklet is a tick currency.',
     '  * `currencyId` (string): the machine slug — lowercase, hyphen-separated, stable for the life of the booklet. Never printed on any page. Tooling cross-references it.',
@@ -182,9 +183,10 @@
     '- Cipher body displayText should present the puzzle cleanly — no "thinking out loud" about the method, no self-referential explanations of how to solve it.',
     '',
     '### fieldOps.oracleTable',
+    '- REQUIRED on every non-boss week: it is the loop\'s variable reward. A week without one is rejected.',
     '- Shape: { title, instruction, mode, entries[] }',
     '- `mode` is optional metadata; if present prefer "fragment", "consequence", or "mixed"',
-    '- Oracle tables use exactly 10 entries with roll bands "00-09", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90-99"',
+    '- Exactly 10 entries, roll bands "00-09", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90-99" — each band exactly once. Entries numbered 1-10 are not a d100 table and are rejected.',
     '- Each entry: { roll: string, type: "fragment"|"consequence", text: string, paperAction?: string, fragmentRef?: string }',
     '- CRITICAL: the text field is called `text`, never `description` or `label`.',
     '- Fragment entries (type: "fragment") must include `fragmentRef` pointing to a real fragment ID.',
@@ -373,10 +375,14 @@
     '- `interlude` (object, optional)',
     '- `gameplayClocks` (array, optional)',
     '- `isDeload` (boolean, optional)',
-    '- `sessions[].microLines` (array, optional, max 2): { condition, cue, citeRef? }. See Point Of Use.',
-    '- `sessions[].returnBeat` (object, optional): { closingLine, openingEcho? }. See The Return Loop.',
+    '- `sessions[].microLines` (array, REQUIRED — at least ONE somewhere in this week, max 2 per session): { condition, cue, citeRef? }. See Point Of Use.',
+    '  A week that prints no conditional micro-line is rejected. Deload weeks are exempt; every other week owes at least one.',
+    '- `sessions[].returnBeat` (object, REQUIRED on EVERY session): { closingLine, openingEcho? }. See The Return Loop.',
+    '  `closingLine` is required on every session. From week 2 onward `openingEcho` is required too — only week 1 has nothing to echo.',
     '- `sessions[].progressionTarget` (object, optional): { rule, targetLabel }. Both required together. See The Progression Target — omit the field when the program states no progression.',
-    '- `doorChoice` (object, optional): { label?, optionA: { label, lean }, optionB: { label, lean } }. See Door Bias.'
+    '- `doorChoice` (object): { label?, optionA: { label, lean }, optionB: { label, lean } }. See Door Bias.',
+    '  REQUIRED on every non-boss, non-deload week when this booklet\'s `mechanicGrammarFamily` is one of the eight',
+    '  pressure families (see Door Bias for the list). Optional — and welcome — for the reconstruction families.'
   ];
 
   window.SCHEMA_SINGLE_FRAGMENT = [
@@ -432,7 +438,12 @@
     '  narratorReliability: "reliable"|"compromised"|"unreliable"|"institutional"|"multiple"|"shifting"',
     '  promptFragmentRelationship: "fragments-deepen"|"fragments-contradict"|"fragments-parallel"|"fragments-precede"',
     '- `storySpine` (object): { premise, protagonistDrive, centralTension, midpointShift, finalCost } — 5 sentences total',
-    '- `artifactIdentity` (object): { artifactClass, shellFamily, boardStateMode, attachmentStrategy }',
+    '- `artifactIdentity` (object): { artifactClass, shellFamily, boardStateMode, attachmentStrategy, componentDialect }',
+    '  `componentDialect` is REQUIRED and is a CLOSED enum: "segments" | "beads" | "gauge" | "tally".',
+    '  It is the instrument this book counts in — how every clock, track and tick strip is DRAWN.',
+    '  segments: a pie or bar cut into wedges. beads: a counted string. gauge: a dial reading.',
+    '  tally: scored marks in fives. Choose the one this world would actually use to keep a count;',
+    '  it changes no geometry and no rule, only whose hand drew the instrument.',
     '  Plus optional: artifactBlend?, authorialMode?, documentEcology?, materialCulture?, openingMode?, rulesDeliveryMode?, revealShape?, unlockLogic?',
     '- `artifactIntent` (object, required): The compiled planning contract from the Artifact Intent Compiler.',
     '  Required fields:',
@@ -516,7 +527,11 @@
       },
       structuralShape: { resolution: '', temporalOrder: '', narratorReliability: '', promptFragmentRelationship: '', shapeRationale: '' },
       storySpine: { premise: '', protagonistDrive: '', centralTension: '', midpointShift: '', finalCost: '' },
-      artifactIdentity: { artifactClass: '', shellFamily: '', boardStateMode: '', attachmentStrategy: '' },
+      // componentDialect is a closed enum, but it is left blank here for the
+      // same reason theme.visualArchetype is: a filled-in sample of a choice
+      // that carries the book's LOOK functions as an exemplar to copy, and
+      // every booklet would then count in the same instrument.
+      artifactIdentity: { artifactClass: '', shellFamily: '', boardStateMode: '', attachmentStrategy: '', componentDialect: '' },
       artifactIntent: {
         briefMode: 'sparse', fidelityMode: 'interpretive',
         arcFamily: 'slow-burn-investigation', mechanicGrammarFamily: 'survey-grid',
@@ -633,8 +648,17 @@
           },
           artifactIdentity: {
             type: 'object',
-            properties: { artifactClass: { type: 'string' }, shellFamily: { type: 'string' }, boardStateMode: { type: 'string' }, attachmentStrategy: { type: 'string' } },
-            required: ['artifactClass', 'shellFamily', 'boardStateMode', 'attachmentStrategy']
+            properties: {
+              artifactClass: { type: 'string' }, shellFamily: { type: 'string' },
+              boardStateMode: { type: 'string' }, attachmentStrategy: { type: 'string' },
+              // Teeth Round F2. Required HERE by generation policy for the same
+              // reason the recorded reading is: this literal is what a compat
+              // transport enforces, and an optional bounded choice is a choice
+              // the model skips. booklet-schema.mjs keeps it optional — the
+              // corpus predates the field and must not move.
+              componentDialect: { type: 'string', enum: ['segments', 'beads', 'gauge', 'tally'] }
+            },
+            required: ['artifactClass', 'shellFamily', 'boardStateMode', 'attachmentStrategy', 'componentDialect']
           },
           artifactIntent: {
             type: 'object',
@@ -962,12 +986,24 @@
     '- Author the plaintext `endings` array now. Tooling will encrypt later.'
   ];
 
+  // PARITY: every number quoted here is OUTPUT_BUDGETS in
+  // contracts/contract-constants.mjs, and validate.mjs (outputBudgetParity)
+  // asserts the two agree. They are no longer advice — a breach is BLOCKING at
+  // the week, fragment, and ending stages, so a cap stated here that differs
+  // from the cap enforced there spends a whole retry on an instruction the
+  // model already followed.
   window.INST_OUTPUT_BUDGETS = [
     '## Output Length Budgets',
-    '- `storyPrompt`: max 220 characters per session prompt.',
-    '- Fragment `content` (any body field): max 600 characters.',
-    '- `interlude.body`: max 240 characters.',
-    '- `ending.content.body`: 400–700 characters preferred. The renderer auto-splits long endings across pages, but extremely long bodies (1500+ chars) produce awkward breaks. Prioritize density over length.',
+    'HARD CAPS, in characters. Output over a cap is rejected and costs a retry.',
+    '- `storyPrompt`: 220 per session prompt.',
+    '- Fragment `content` (any body field): 600.',
+    '- `interlude.body`: 240.',
+    '- `ending.content.body`: 1500 max, 400–700 target — the renderer splits long endings, so anything near the cap breaks awkwardly.',
+    '- `markStrip` target `label`: 28 (the five-word law). Prints on ONE line: a long label truncates mid-word, it does not wrap.',
+    '- `microLines[].condition`: 90. `microLines[].cue`: 120.',
+    '- `returnBeat.closingLine` and `returnBeat.openingEcho`: 140 each.',
+    '- `doorChoice.optionA.lean` / `optionB.lean`: 90 each.',
+    '- `citeRef.citedAs`: 90. `seal.keyHint`: 120. `seal.unlockCondition`: 140.',
     '- Prefer the minimum valid count of fragments and endings unless the brief clearly requires more.',
     '- Avoid quoted dialogue unless it materially advances story or game state.'
   ];
@@ -1214,6 +1250,46 @@
     '**Marginalia as evidence.** A later week may cite what the PLAYER wrote, in the same citation grammar it uses for printed documents ("the margin note against Sheet 4"). The world reading their handwriting back to them is the strongest re-entry move the form has. Once per book, not routinely.',
     '',
     '**Sealed caches (`fragment.seal`).** One or two per booklet. A document printed late that opens on a key found early — page-flipping as travel. `keyHint` describes the key well enough to be recognised weeks before the lock; `unlockCondition` names the EARLIER surface by ref ("opens with what was filed at F.04"). There is no real lock: the honour system IS the mechanism, because the deciding and the flip are the pleasure. Key at least two weeks ahead of its cache, and never a demand mid-workout — a cache is opened between sessions, unhurried.'
+  ];
+
+  // ── The return loop + the weekly door (Teeth Round, Wave T1a) ─────────────
+  // `SCHEMA_SINGLE_WEEK` has pointed at "The Return Loop" and "Door Bias" since
+  // Wave 4a landed the fields. NEITHER SECTION EXISTED. The model was handed
+  // two one-line field shapes, told they were optional, and referred to
+  // doctrine that was not in its prompt — which is precisely the shape of Book
+  // 1's absence: 0 doors across six weeks, return beats on 9 of 20 sessions.
+  //
+  // Both are stage-routed (STAGE_SCHEMA_MAP → week-final) rather than added to
+  // the flat INSTRUCTIONS bundle, for the ceiling reason INST_POINT_OF_USE was:
+  // the single-prompt path is hard against 108,000 characters.
+  //
+  // Sourced from docs/reference/return-loop-design.md §1 (the four deficits)
+  // and the doorChoice contract in contracts/booklet-schema.mjs.
+  window.INST_RETURN_LOOP = [
+    '## The Return Loop (sessions[].returnBeat)',
+    'A session that ends on logistics ends on nothing. The return beat is one line at each end of the session — the cheapest re-entry mechanism the form has, and the only one that survives a week of not opening the book.',
+    '',
+    '- `closingLine` (REQUIRED, every session): tomorrow, cut tonight. Name the NEXT session before the player closes the book — the specific thing waiting, in this world\'s voice. Not a summary of what just happened, not a mood. Something with an address.',
+    '- `openingEcho` (REQUIRED from week 2 onward): the world acknowledging the session just finished, keyed to something the player actually MARKED — a shaded node, a filled segment, a ticked target, a circled value. Week 1 is exempt because it has nothing to echo; every later session does.',
+    '- Both are ONE line. They print in the margin of a session card, not in the prose block.',
+    '- Voice them as the artifact\'s own note to itself, never as encouragement and never as a rules instruction to the player. "The gate log still shows Tuesday open" is a return beat; "Great work — see you next session!" is not.',
+    '- The echo must be FALSIFIABLE from the page: if the player cannot look down and see the thing being referred to, it is atmosphere, and it will read as the book talking to someone else.'
+  ];
+
+  window.INST_DOOR_BIAS = [
+    '## Door Bias (week.doorChoice)',
+    'The weekly decision, with the bias POSTED. Two routes; the prescribed work behind either one is IDENTICAL — the agency lives entirely on the reward side, so the training never moves and the player never pays for a choice with a harder session.',
+    '',
+    '- Shape: { label?, optionA: { label, lean }, optionB: { label, lean } }.',
+    '- `label` (optional): what this artifact calls the fork, in its own filing voice.',
+    '- `optionA.label` / `optionB.label` (REQUIRED): the two ways, named so the player can say afterwards which one they took.',
+    '- `lean` (REQUIRED on both sides): what that way is LIKELY to pay in. A door with no posted lean is a coin flip, and a coin flip is not a decision. State the tendency, never a guarantee — "the survey road is slower and the ledger stays quiet" leans; "choose A for +2" is a rules table.',
+    '- ONE door per week at most. It is the week\'s decision, not a menu.',
+    '- It is NOT `session.binaryChoice`. That field carries the single midpoint fork the boss encounter acknowledges; the door is the weekly one, and the two must not be confused.',
+    '- The two leans must genuinely differ in KIND, not in size. Both roads slower-but-safer versus faster-but-safer is one road drawn twice.',
+    '',
+    '**REQUIRED for the eight pressure families.** If this booklet\'s `mechanicGrammarFamily` is `heat`, `attrition`, `siege`, `stewardship`, `loyalty-web`, `evasion`, `observance`, or `rivalry`, every non-boss, non-deload week MUST print a doorChoice. Those eight recipes each name a decision the player owns every week — push or lie low, ration or arrive thin, hold or concede, mend this or let that worsen, answer this claimant or that one, route or conceal, keep the rite or keep the day, stake or hold. The door is where that decision gets printed. A week of such a book without one has removed the thing the family is made of.',
+    '**Optional for the reconstruction families** (`survey-grid`, `node-graph`, `timeline-reconstruction`, `testimony-matrix`, `ledger-board`, `route-tracker`, `profile-assembly`). Nothing spends resources against the player there, so there is often no lean to post honestly. Print one when the week really does fork; never print an empty one to fill the field.'
   ];
 
   window.INST_DIEGETIC_MECHANICS = [
@@ -1640,6 +1716,14 @@
     'deload rhythm makes `evasion` live. An unknown shape removes the signal, never forces a',
     'default. Binding: the program\'s shape must be legible in at least one candidate, and the',
     'winning family must be defensible from the brief.',
+    '',
+    '### Step 5c: What the family OBLIGES (doors)',
+    'The eight pressure families — `heat`, `attrition`, `siege`, `stewardship`, `loyalty-web`,',
+    '`evasion`, `observance`, `rivalry` — each name a decision the player owns weekly, so every',
+    'non-boss, non-deload week owes a `week.doorChoice` with a posted lean on both sides. The',
+    'seven reconstruction families owe none: nothing spends against the player there, so there is',
+    'often no lean that can be posted honestly, and an unposted door is a coin flip. They may',
+    'still print one on a week that genuinely forks.',
     '',
     '### Step 6: Choose the convergence pattern',
     'Set `convergencePattern` to one of: `sequential-assembly` | `reordering` | `red-herring` |',
@@ -2259,9 +2343,19 @@
     // Week flesh: full game design + story
     // Prose stages (week-final, fragment, ending) carry VOICE_DISCIPLINE: they
     // write storyPrompts, interludes, oracle text, documents, and endings.
-    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'MARK_SURFACE', 'PERVASIVE_PLAY', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'CONVERGENCE_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'PROGRESSION_TARGET', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] },
+    //
+    // POINT_OF_USE / RETURN_LOOP / DOOR_BIAS ride the STAGE MAP as of the Teeth
+    // Round, and that is a fix, not a preference. Until now INST_POINT_OF_USE
+    // was pasted directly into the two MULTI-STAGE builders in generator.js and
+    // reached the S+F flesh builders NOWHERE — so the default pipeline authored
+    // `microLines`, `citeRef` and `seal` having been shown a one-line field
+    // shape and a cross-reference to a section that was not in its prompt.
+    // Book 1 (S+F) came back with zero of all three. The stage map reaches both
+    // pipelines from one place and still keeps this off the single-prompt path,
+    // which is hard against its 108,000-character ceiling.
+    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'MARK_SURFACE', 'PERVASIVE_PLAY', 'POINT_OF_USE', 'RETURN_LOOP', 'DOOR_BIAS', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'CONVERGENCE_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'PROGRESSION_TARGET', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] },
     // Fragment: story quality first
-    'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'VOICE_DISCIPLINE', 'ANTI_GENERIC', 'CHARACTER_WEB', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
+    'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'VOICE_DISCIPLINE', 'POINT_OF_USE', 'ANTI_GENERIC', 'CHARACTER_WEB', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
     // Ending: story quality first (endings are where voice failure concentrates)
     'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'CONVERGENCE_DESIGN', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'ANTI_GENERIC', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] }
   };

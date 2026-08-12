@@ -59,7 +59,14 @@ import {
   POINTER_BUDGETS,
   resolveCitationStyle,
   citationPinpoints,
-  resolveShellFamily
+  resolveShellFamily,
+  // Teeth Round T1a. Both of these decide BLOCKING stage errors, so both live
+  // with the contract rather than here: what a booklet OWES (which families
+  // must print a door) and how long its prose may be are statements the prompt
+  // surfaces quote too, and validate.mjs ties every copy back to that home.
+  VALID_COMPONENT_DIALECTS,
+  isDoorLeaningFamily,
+  OUTPUT_BUDGETS
 } from '../../contracts/contract-constants.mjs';
 
 // Map-evolution fingerprint + companions: one implementation, shared with quality.js.
@@ -779,10 +786,54 @@ export function collectFragmentPointerShapeErrors(fragment) {
   return errors;
 }
 
+// ── The generation floors (Teeth Round, Wave T1a) ───────────────────────────
+// Book 1 shipped legally with zero micro-lines, zero doors, no componentDialect
+// and two cipher families, because every one of those surfaces was described to
+// the model as optional. The law the round teaches: a mid-tier model treats
+// "optional but demanded" as "skip" — so what is creative and undeliverable by
+// derivation must be GENERATION-STRICT, not merely requested.
+//
+// OPT-IN, DELIBERATELY. Every floor below is gated on
+// `options.generationFloors`, and the ONLY callers that pass it are the API
+// pipelines' stage gates. Three other callers reach these same validators:
+//
+//   • the guided-build wizard's harness, replaying hand-assembled payloads
+//   • window.LiftRPGAPI.manual, the browser-side inspection surface
+//   • the safety-net re-validations that log advisories after a stage passes
+//
+// None of those is the generation path, and a hand-built booklet that prints no
+// micro-lines is a complete, valid, printable artifact. Gating keeps this a
+// generation POLICY rather than a new artifact requirement — booklet-schema.mjs
+// is untouched and the corpus never moves (D19, and the Teeth Round's own R1).
+function floorsOn(options) {
+  return !!(options && options.generationFloors);
+}
+
+/**
+ * cipherVarietyFloor(weekCount) -> number
+ *
+ * How many distinct cipher families a book of this length owes. Six weeks (the
+ * standard block) yields 4, which is the Teeth Round's stated floor; the
+ * formula generalises it so a four-week book is asked for 3 rather than for
+ * more families than it has non-boss weeks to carry them.
+ *
+ * One implementation, two readers: the skeleton's cipher PLAN and the campaign
+ * plan's. They used to disagree by construction — the campaign plan carried
+ * this formula and the skeleton carried no check at all.
+ */
+export function cipherVarietyFloor(weekCount) {
+  var n = Number(weekCount) || 0;
+  return Math.min(Math.max(n - 2, 3), Math.max(n - 1, 1));
+}
+
 /**
  * Per-week structural validation. Runs after each week is generated
  * in the pipeline, before proceeding to the next stage.
  * Returns { valid: boolean, errors: string[] }
+ *
+ * expectedOptions.generationFloors turns on the Teeth Round floors (micro-lines,
+ * return beats, doors, prose budgets). See floorsOn() above for why they are
+ * opt-in rather than default.
  */
 export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
   var errors = [];
@@ -821,7 +872,62 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
     });
   }
 
+  // ── Floor: the return beat (F7) ───────────────────────────────────────────
+  // closingLine on EVERY session, openingEcho from week 2 onward. The first
+  // week is exempt from the echo by construction — it has nothing to echo,
+  // which is why the artifact schema leaves openingEcho optional and only
+  // generation policy demands it. Deficit 2 of the return-loop design, made
+  // structural instead of measured after the fact.
+  if (floorsOn(expectedOptions) && Array.isArray(weekObj.sessions)) {
+    var floorWeekNumber = Number(
+      expectedOptions.weekNumber || expectedOptions.currentWeekNumber || weekObj.weekNumber || 0
+    );
+    weekObj.sessions.forEach(function (s, si) {
+      var rb = s && s.returnBeat;
+      if (!rb || typeof rb !== 'object' || Array.isArray(rb)) {
+        errors.push('Session ' + (si + 1) + ' has no returnBeat — every session must cut tomorrow tonight'
+          + ' (returnBeat.closingLine), or the book ends on logistics');
+        return;
+      }
+      // A present-but-empty closingLine is already reported by pushShapeErrors.
+      if (floorWeekNumber >= 2 && !String(rb.openingEcho || '').trim()) {
+        errors.push('Session ' + (si + 1) + ' returnBeat has no openingEcho — from week 2 onward the world must'
+          + ' acknowledge the session just finished, keyed to something the player marked');
+      }
+    });
+  }
+
+  // ── Floor: conditional micro-lines (F3) ───────────────────────────────────
+  // At least one keyed line per non-deload week. Same printed page, new pencil
+  // state, new reading — the cheapest content the form has, and Book 1 printed
+  // none of it in six weeks. The ≤2-per-session ceiling stays a WARN on the
+  // assembled path (collectPointerDensityFindings); this is the floor only.
+  if (floorsOn(expectedOptions) && !expectedOptions.isDeload && Array.isArray(weekObj.sessions)) {
+    var microLineCount = 0;
+    weekObj.sessions.forEach(function (s) {
+      var lines = s && s.microLines;
+      if (Array.isArray(lines)) microLineCount += lines.length;
+    });
+    if (microLineCount === 0) {
+      errors.push('Week prints no conditional micro-lines — a non-deload week must carry at least one'
+        + ' sessions[].microLines entry { condition, cue } keyed to a printed state the player can look at');
+    }
+  }
+
   pushDoorChoiceErrors(errors, weekObj.doorChoice);
+
+  // ── Floor: the weekly door (F4) ───────────────────────────────────────────
+  // Required only for the door-leaning families (DOOR_LEANING_FAMILIES in
+  // contract-constants). Those eight recipes each state a two-sided decision the
+  // world PRICES, and a doorChoice with both leans posted is that decision
+  // printed. The reconstruction seven refuse an antagonist who spends against
+  // the player, so they have no lean to post — demanding a door there would
+  // manufacture the coin flip the play-loop scan already warns about.
+  if (floorsOn(expectedOptions) && !isBoss && !expectedOptions.isDeload
+    && isDoorLeaningFamily(expectedOptions.mechanicGrammarFamily) && !weekObj.doorChoice) {
+    errors.push('Week posts no doorChoice — the "' + expectedOptions.mechanicGrammarFamily
+      + '" grammar prices a decision every week, so this week owes { optionA, optionB } with a lean on each side');
+  }
 
   // Non-boss weeks must have weeklyComponent.extractionInstruction
   if (!isBoss) {
@@ -1102,6 +1208,39 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
     if (!weekObj.interlude.body) errors.push('Interlude missing body');
   }
 
+  // ── Floor: the oracle is band-complete (F1) ───────────────────────────────
+  // Absence and a wrong entry COUNT were already blocking above; what was never
+  // checked at the stage is whether the ten entries actually cover the ten d100
+  // bands. A table with ten entries rolled "1".."10" prints as a dice layer the
+  // d100 the booklet hands the player cannot address.
+  if (floorsOn(expectedOptions) && !isBoss && weekObj.fieldOps) {
+    var floorOracle = weekObj.fieldOps.oracleTable || weekObj.fieldOps.oracle;
+    if (floorOracle && Array.isArray(floorOracle.entries) && floorOracle.entries.length === 10) {
+      collectOracleBandErrors(floorOracle.entries, 'oracleTable').forEach(function (m) {
+        errors.push(m);
+      });
+    }
+  }
+
+  // ── Floor: prose budgets cost a retry, not a shrug (F6) ───────────────────
+  // Same numbers the assembled path warns on (OUTPUT_BUDGETS), one severity
+  // higher because here they are still cheap to fix: the model rewrites the
+  // overweight field. Book 1 blew every budget — twelve fragments at roughly
+  // double, endings at triple — and shipped sixty pages, because nothing
+  // between the prompt and the page ever charged for it.
+  if (floorsOn(expectedOptions)) {
+    // The stage runs before weekNumber is stamped onto the output, so hand the
+    // collector the number the caller knows — otherwise every book's breaches
+    // read "Week 1" and the correction directive points at the wrong page.
+    var budgetWeek = Object.assign({}, weekObj, {
+      weekNumber: Number(expectedOptions.weekNumber || expectedOptions.currentWeekNumber
+        || weekObj.weekNumber || 0) || weekObj.weekNumber
+    });
+    collectBudgetBreaches({ weeks: [budgetWeek] }).forEach(function (b) {
+      errors.push('Over budget: ' + b.message);
+    });
+  }
+
   if (warnings.length > 0) {
     console.warn('[LiftRPG] Week advisory:', warnings.join('; '));
   }
@@ -1172,6 +1311,23 @@ export function validateShellSchema(shell, expectedOptions) {
   }
 
   // ── Meta sub-fields consumed by renderer ──────────────────────────────────
+  // ── Floor: the component dialect (F2) ─────────────────────────────────────
+  // A bounded choice, not content — the recorded-reading precedent says a
+  // required enum field arrives and an optional one does not. Book 1 declared
+  // none, so every countable surface in it drew in the default instrument.
+  // Opt-in like every other floor: the guided-build wizard and the manual API
+  // hand-assemble shells and owe nothing here (see floorsOn).
+  if (floorsOn(expectedOptions)) {
+    var shellDialect = String(((shell.meta || {}).artifactIdentity || {}).componentDialect || '').trim();
+    if (!shellDialect) {
+      errors.push('meta.artifactIdentity.componentDialect is unset — declare the instrument this book counts in: '
+        + VALID_COMPONENT_DIALECTS.join(' | '));
+    } else if (VALID_COMPONENT_DIALECTS.indexOf(shellDialect) === -1) {
+      errors.push('meta.artifactIdentity.componentDialect "' + shellDialect + '" is not a dialect this engine draws: '
+        + VALID_COMPONENT_DIALECTS.join(' | '));
+    }
+  }
+
   if (shell.meta) {
     if (!shell.meta.blockTitle) errors.push('meta.blockTitle missing');
     if (!shell.meta.worldContract) warnings.push('Shell → meta: missing worldContract');
@@ -1224,23 +1380,22 @@ export function validateShellSchema(shell, expectedOptions) {
 
 // ── Output budgets (GAP-1, DOCTRINE-LEDGER) ─────────────────────────────────
 // The prompt demands these caps (INST_OUTPUT_BUDGETS); this measures them
-// post-generation. Warnings per D19 — gassed readers skim, then skip, but an
-// overlong prompt is degraded quality, not an invalid booklet. The critic
-// loop feeds these to the critic as machine findings (must become failures).
+// post-generation. The NUMBERS now live in contracts/contract-constants.mjs
+// (OUTPUT_BUDGETS, imported above) — they were hoisted in the Teeth Round when
+// breaches became BLOCKING at the week/fragment/ending stages, because a cap
+// the prompt states differently from the cap the retry enforces spends a whole
+// attempt on an instruction the model already obeyed.
 //
-// Wave 4a adds the point-of-use surfaces, and they are budgeted HARDER than
-// prose is. Every string below prints beside a blank in a ninety-second rest
-// window, where the reader's capacity is degraded, brief, and single-threaded
-// (point-of-use §5.2). A cue that needs three lines has stopped being a cue and
-// become the rule again, which is the split the tiers exist to make. Same D19
-// severity as the prose budgets — the numbers are ship-as-warnings until
-// playtest, per the research's own §7.2.
-var OUTPUT_BUDGETS = {
-  storyPrompt: 220, fragmentBody: 600, interludeBody: 240, endingBody: 1500,
-  microLineCondition: 90, microLineCue: 120, citedAs: 90,
-  returnBeatClosing: 140, returnBeatOpening: 140,
-  doorOptionLean: 90, sealKeyHint: 120, sealUnlockCondition: 140
-};
+// The SEVERITY split stays here and stays D19: a breach costs a retry at the
+// stage (the model can simply write less), and warns on the assembled booklet
+// (delivery is never blocked — an overlong prompt is degraded quality, not an
+// invalid booklet). The critic loop feeds these in as machine findings.
+//
+// Wave 4a's point-of-use surfaces are budgeted HARDER than prose is. Every one
+// of them prints beside a blank in a ninety-second rest window, where the
+// reader's capacity is degraded, brief, and single-threaded (point-of-use
+// §5.2). A cue that needs three lines has stopped being a cue and become the
+// rule again, which is the split the tiers exist to make.
 
 export function collectBudgetBreaches(booklet) {
   var breaches = [];
@@ -1290,6 +1445,19 @@ export function collectBudgetBreaches(booklet) {
       var lean = over(door && door[side] && door[side].lean, OUTPUT_BUDGETS.doorOptionLean);
       if (lean) weekBreach('Week ' + wn + ' doorChoice.' + side + '.lean is ' + lean
         + ' chars (budget ' + OUTPUT_BUDGETS.doorOptionLean + ')');
+    });
+
+    // ── The mark strip's labels (D89's word law, measured) ───────────────────
+    // The strip prints on ONE line at every density tier, so a long label does
+    // not wrap — it truncates, and the player is left ticking a box whose
+    // demand ran off the edge of the card.
+    ((week && week.sessions) || []).forEach(function (session, si) {
+      var targets = ((session && session.markStrip) || {}).targets;
+      (Array.isArray(targets) ? targets : []).forEach(function (target, ti) {
+        var l = over(target && target.label, OUTPUT_BUDGETS.markStripLabel);
+        if (l) weekBreach('Week ' + wn + ' session ' + (si + 1) + ' markStrip target ' + (ti + 1)
+          + ' label is ' + l + ' chars (budget ' + OUTPUT_BUDGETS.markStripLabel + ')');
+      });
     });
   });
   ((booklet && booklet.fragments) || []).forEach(function (frag) {
@@ -3408,7 +3576,7 @@ export function validateLayerBibleStage(result) {
   return '';
 }
 
-export function validateCampaignPlanStage(result) {
+export function validateCampaignPlanStage(result, options) {
   if (!result) return 'Campaign Plan → missing required sections (null result).';
   var errors = [];
   var warnings = [];
@@ -3651,24 +3819,32 @@ export function validateCampaignPlanStage(result) {
     console.warn('[LiftRPG] Campaign Plan advisory:', warnings.join('; '));
   }
   if (errors.length > 0) return errors.join('; ');
-  // Cipher family variety (GAP-3, DOCTRINE-LEDGER): the doctrine demands
-  // ≥ min(max(weekCount-2,3), weekCount-1) distinct families across non-boss
-  // weeks. Emitted as an error string matched by DEGRADED_PATTERNS — the
-  // stage is accepted with a warning (D19), never blocked.
-  if (result && Array.isArray(result.weeks)) {
+
+  // ── Floor: the cipher plan carries real variety (F5, multi-stage twin) ────
+  // DEAD UNTIL THE TEETH ROUND, and dead in the quietest way: the block below
+  // pushed onto `errors` AFTER the `return errors.join('; ')` above it, so the
+  // array it filled was discarded and the function returned '' regardless. The
+  // DEGRADED_PATTERNS entry that was supposed to demote it never matched
+  // anything, because nothing was ever emitted. Book 1's two families passed a
+  // check that had not run since it was written.
+  //
+  // Now it returns, and it is BLOCKING under generationFloors — cipher variety
+  // is creative and has no derivation, so it can only come from the model.
+  // Ungated callers (the guided-build harness, the manual API) keep the old
+  // silence: they replay hand-built plans and owe no generation policy.
+  if (floorsOn(options) && result && Array.isArray(result.weeks)) {
     var nonBossTypes = result.weeks
       .filter(function (w) { return w && !w.isBossWeek; })
       .map(function (w) { return String(w.cipherType || '').trim().toLowerCase(); })
       .filter(Boolean);
-    var weekCount = result.weeks.length;
-    var needed = Math.min(Math.max(weekCount - 2, 3), Math.max(weekCount - 1, 1));
+    var needed = cipherVarietyFloor(result.weeks.length);
     var distinct = {};
     nonBossTypes.forEach(function (t) { distinct[t] = 1; });
     var have = Object.keys(distinct).length;
     if (nonBossTypes.length >= 3 && have < needed) {
-      errors.push('Campaign Plan: cipher variety below doctrine — ' + have
-        + ' distinct famil' + (have === 1 ? 'y' : 'ies') + ' across ' + nonBossTypes.length
-        + ' non-boss weeks (doctrine wants ' + needed + ')');
+      return 'Campaign Plan → weeks schedule only ' + have + ' distinct cipherType value'
+        + (have === 1 ? '' : 's') + ' across ' + nonBossTypes.length + ' non-boss weeks; this book owes '
+        + needed + ' — give each week a technique the player has to learn fresh';
     }
   }
 
@@ -3692,9 +3868,22 @@ export function validateWeeksStage(result, expectedWeeks) {
   return '';
 }
 
-export function validateFragmentsStage(result, expectedRegistry) {
+export function validateFragmentsStage(result, expectedRegistry, options) {
   if (!result || !Array.isArray(result.fragments)) {
     return 'Fragment stage validation failed: expected a { fragments:[...] } object.';
+  }
+
+  // ── Floor: prose budgets cost a retry (F6) ────────────────────────────────
+  // Twelve fragments at roughly double budget is how Book 1 reached sixty
+  // pages. Checked FIRST because a fragment that is twice as long as it may be
+  // is wrong before any of its ids are, and the correction directive should
+  // lead with the thing that actually blew the book up.
+  if (floorsOn(options)) {
+    var budgetBreaches = collectBudgetBreaches({ fragments: result.fragments })
+      .map(function (b) { return b.message; });
+    if (budgetBreaches.length > 0) {
+      return 'Fragment stage validation failed — over budget: ' + budgetBreaches.slice(0, 6).join('; ') + '.';
+    }
   }
   var expected = (expectedRegistry || []).map(function (entry) { return normalizeId(entry.id); }).filter(Boolean);
   if (!expected.length) return '';
@@ -3766,8 +3955,12 @@ export function validateFragmentsStage(result, expectedRegistry) {
 /**
  * Validates the skeleton output shape.
  * Convention: returns '' on pass, non-empty string on hard failure.
+ *
+ * `options.generationFloors` turns on the Teeth Round skeleton floors: the
+ * component dialect, the cipher-family plan, and the companion floor. Opt-in
+ * for the same reason every other floor is — see floorsOn().
  */
-export function validateSkeletonStage(result, weekCount) {
+export function validateSkeletonStage(result, weekCount, options) {
   if (!result || typeof result !== 'object') return 'Skeleton: not an object';
 
   // ── meta ──
@@ -4031,6 +4224,63 @@ export function validateSkeletonStage(result, weekCount) {
     return 'Skeleton → endingVariants: missing or empty';
   }
 
+  // ── The Teeth Round skeleton floors ───────────────────────────────────────
+  // Everything above this line was already structural. Everything below was
+  // "demanded" in prose and therefore skipped: Book 1 came back with no
+  // dialect, two cipher families against a floor of four, and companions only
+  // because a hotfix regeneration happened to include them.
+  //
+  // Collected rather than early-returned, because a skeleton that misses three
+  // of them should cost ONE retry that names all three, not three retries that
+  // each name one. This is the only stage validator in the file that runs long
+  // enough for that to matter.
+  if (floorsOn(options)) {
+    var floorErrors = [];
+
+    // ── Floor: the component dialect (F2) ──
+    var dialect = String(((result.meta || {}).artifactIdentity || {}).componentDialect || '').trim();
+    if (!dialect) {
+      floorErrors.push('Skeleton → meta.artifactIdentity.componentDialect is unset — declare the instrument this'
+        + ' book counts in: ' + VALID_COMPONENT_DIALECTS.join(' | '));
+    } else if (VALID_COMPONENT_DIALECTS.indexOf(dialect) === -1) {
+      floorErrors.push('Skeleton → meta.artifactIdentity.componentDialect "' + dialect
+        + '" is not a dialect this engine draws: ' + VALID_COMPONENT_DIALECTS.join(' | '));
+    }
+
+    // ── Floor: the cipher plan carries real variety (F5) ──
+    // Scheduled HERE, at the only stage that sees the whole book at once. The
+    // week stage cannot see it: each week's cipher looks fine alone, and six
+    // fine weeks were how Book 1 arrived with two families.
+    var plannedTypes = wp
+      .filter(function (w) { return w && !w.isBossWeek; })
+      .map(function (w) { return String(w.cipherType || '').trim().toLowerCase(); })
+      .filter(Boolean);
+    var neededFamilies = cipherVarietyFloor(wp.length);
+    var distinctPlanned = {};
+    plannedTypes.forEach(function (t) { distinctPlanned[t] = 1; });
+    var havePlanned = Object.keys(distinctPlanned).length;
+    if (plannedTypes.length >= 3 && havePlanned < neededFamilies) {
+      floorErrors.push('Skeleton → weekPlan schedules only ' + havePlanned + ' distinct cipherType value'
+        + (havePlanned === 1 ? '' : 's') + ' across ' + plannedTypes.length + ' non-boss weeks; this book owes '
+        + neededFamilies + ' — give each week a technique the player has to learn fresh');
+    }
+
+    // ── Floor: at least one companion component (F8) ──
+    // Book-level, not per-week: companions are a campaign surface and three of
+    // six weeks carrying none is a legitimate design. Zero across the whole
+    // book is a booklet with nothing to hold state in.
+    var companionTotal = 0;
+    wp.forEach(function (w) {
+      if (w && Array.isArray(w.companionTypes)) companionTotal += w.companionTypes.length;
+    });
+    if (companionTotal === 0) {
+      floorErrors.push('Skeleton → weekPlan plans no companionTypes anywhere in the book — at least one week must'
+        + ' carry a companion component for the play state to live on');
+    }
+
+    if (floorErrors.length) return floorErrors.join('; ');
+  }
+
   return '';
 }
 
@@ -4120,7 +4370,12 @@ var REPAIRABLE_PATTERNS = [
 ];
 
 var DEGRADED_PATTERNS = [
-  /cipher variety below doctrine/i,
+  // /cipher variety below doctrine/i lived here from GAP-3 until the Teeth
+  // Round and never matched anything: validateCampaignPlanStage pushed that
+  // string onto an array it had already returned past, so the demotion was
+  // guarding an error that was never emitted. Cipher variety is now emitted,
+  // and it is BLOCKING (F5) — the pattern is deleted rather than updated,
+  // because a demotion for a floor is a floor that does not exist.
   /missing designSpec/i,
   /missing epigraph/i,
   /epigraph missing/i,
