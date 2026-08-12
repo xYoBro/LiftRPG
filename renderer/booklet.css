@@ -496,6 +496,61 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   --page-live-right:var(--page-margin,0.34in);
   --page-live-bottom:var(--page-margin,0.34in);
   --page-live-left:var(--page-margin,0.34in);
+  /* ── THE FONT FREEZE (D116(b)) — BLOCKED, and now we know by what ─────────
+     `--display`/`--serif`/`--mono` are the OLD alias names. 175 rules read
+     them DIRECTLY; 20 more read them only as a fallback behind a --theme-*
+     family, and those 20 were never frozen. The aliases are declared ONLY at
+     `:root`, and that is the defect: a custom property's value is computed
+     WHERE IT IS DECLARED, so `--mono:var(--theme-label-family,…)` at `:root`
+     resolves against `:root`'s pastoral fallback and inherits that frozen
+     literal into this container. applyTheme() setting --font-mono here cannot
+     reach it, so every archetype renders pastoral's typefaces through those
+     175 rules — `.week-title` (font-family:var(--display)) is why a minimalist
+     book prints Playfair italic.
+
+     THE MECHANISM IS THREE LINES, HERE: re-declare the aliases on this
+     container as `var(--theme-label-family,…)` / `--theme-body-family` /
+     `--theme-title-family`, so they resolve against the mapping above. It has
+     now been implemented, measured and reverted TWICE (Teeth T6, T6b). It is
+     not the mechanism that is wrong.
+
+     WHAT BLOCKS IT (T6b, measured — this is the part T6 did not have):
+     THE ESTIMATE LAYER IS CALIBRATED TO THE FROZEN FONT SET. Phase-1
+     estimation has no DOM, so every atom models wrapped text as chars × a
+     hard-coded per-character advance: BODY_CHAR_RATIO plus eight *_CHAR_PX
+     constants in atoms/fragment-doc.js, six more in atoms/map-panel.js,
+     three in atoms/oracle-table.js, three in atoms/clocks-panel.js. Each was
+     calibrated against the only two faces the freeze could produce — the
+     comment on BODY_CHAR_RATIO says so outright: "both families the corpus
+     themes use (Libre Baskerville and Share Tech Mono)". Measured over 1,072
+     real corpus paragraphs, mean advance per em: Share Tech Mono 0.540,
+     Libre Baskerville 0.532 — and IBM Plex Mono, which SEVEN of the ten
+     presets name, 0.600. BODY_CHAR_RATIO is 0.58. Un-freeze the aliases and
+     every mono-bodied document is estimated ~3.5% short, the doc is allocated
+     too little height, and `.fragment-doc{overflow:hidden}` eats the residue.
+
+     Mutation-proven, not inferred: on what-the-soil-remembers, pinning every
+     `var(--mono)` back to Share Tech Mono clears the 4px `.fragment-doc.report`
+     clip AND the +4 pages; raising BODY_CHAR_RATIO to 0.62 only shrinks the
+     clip to 1px and moves it to another page — so it is not one constant.
+     Corpus-wide (220 book×archetype renders): boundary overflow stays 0→0
+     everywhere and pastoral moves 0 of 4,822 elements, but internal clipping
+     goes 150→177 elements, with 50 new clip kinds (including four books'
+     SHIPPING archetype) and 25 existing clips deepened — Persephone's cover
+     26→50px, its boss page 330→438px.
+
+     SO THE PRECONDITION IS NAMED: phase-1 estimation must learn which typeface
+     it is estimating before the aliases can resolve per-archetype. That is a
+     Layer 1 design ruling (does the estimate get to see the archetype's font
+     stack, or do the advance constants become worst-case and cost every book?),
+     not a tuning job — shaving the constants until today's corpus fits is the
+     D71/D105 defect class arriving a fourth time, through fonts. Do not land
+     the three lines until that ruling exists.
+
+     What DID land from this wave: occult and fantasy were declaring a
+     proportional serif as `--font-mono`. That is a defect TODAY — the 20
+     unfrozen `--theme-label-family` rules already consume it — and it is fixed
+     in renderer/modules/theme.js independently of anything above. */
 }
 
 .booklet-grid {
@@ -1672,10 +1727,14 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
    `.session-card` keeps its own `overflow:hidden` (below) for the same reason
    one level down.
 
-   Not on this ladder: solo pages. `.workout-left[data-card-count="1"]` sets
-   `flex:0 0 auto` on both the container and the card (higher specificity,
-   later in source), so a one-card page is content-sized and none of the
-   allocation above applies to it. */
+   Not on this ladder: page-owning cards. `.workout-left[data-solo-card="1"]`
+   sets `flex:0 0 auto` on both the container and the card (higher
+   specificity, later in source), so a page the card owns is content-sized and
+   none of the allocation above applies to it. A card that is merely ALONE on
+   its page — one shed here, or seated with the week header — stays on this
+   ladder and stretches, its `.notes-box` (`flex:1 1 auto`) absorbing the
+   surplus; measured 247px on a header+card page, so the reader loses nothing
+   the 260px floor was there to guarantee (D112). */
 .session-cards{
   display:flex;
   flex-direction:column;
@@ -2480,37 +2539,50 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .session-card[data-density-variant="tight"] .mark-label{
   font-size:5.1pt;
 }
-/* ── Single-card page ────────────────────────────────────────────────────────
+/* ── Page-owning card ────────────────────────────────────────────────────────
    CROSS-FILE CONTRACT: renderer/modules/session-card-metrics.js SOLO_CARD +
-   estimateSoloSessionCardHeight(), which the adapter's session chunker calls
-   whenever it considers a one-card chunk. This block makes a solo card a
-   different object — spacious padding at every density, and a notes box with a
-   260px floor, because on a one-card page the notes box IS the page. None of
-   it responds to density, so none of it is on the ladders above. */
-.workout-left[data-card-count="1"] .session-cards{
+   estimateSoloSessionCardHeight(), reached from atoms/session-card.js
+   estimate() and the adapter's session chunker whenever the card OWNS its
+   page. This block makes such a card a different object — spacious padding at
+   every density, and a notes box with a 260px floor, because when the card is
+   the page the notes box IS the page. None of it responds to density, so none
+   of it is on the ladders above.
+
+   IT KEYS ON `data-solo-card`, NOT `data-card-count="1"` — that is the whole
+   of D112's fix and it must stay that way. "Only card here" and "owns the
+   page" are different questions: a page carrying a WEEK HEADER plus one card
+   answered yes to the first, took the 260px floor, and overflowed by 44px
+   (measured) with every rule here density-invariant — nothing to shrink, so
+   the solver shed the card and stranded the header alone at 11% fill. The
+   attribute is stamped by page-renderer.js from the adapter's `data.ownsPage`
+   declaration ANDed with the page it actually composed, so phase-1 estimation
+   (which has no DOM, and cannot see a selector) predicts this geometry
+   exactly where it fires. Widening the selector back to a page-composition
+   guess the estimate side cannot derive is the D71 defect class. */
+.workout-left[data-solo-card="1"] .session-cards{
   flex:0 0 auto;
 }
-.workout-left[data-card-count="1"] .session-card{
+.workout-left[data-solo-card="1"] .session-card{
   flex:0 0 auto;
   padding:8px 10px 10px;
   gap:3px;
 }
-.workout-left[data-card-count="1"] .session-header{
+.workout-left[data-solo-card="1"] .session-header{
   font-size:7pt;
   padding-bottom:4px;
 }
-.workout-left[data-card-count="1"] .story-prompt{
+.workout-left[data-solo-card="1"] .story-prompt{
   font-size:7.4pt;
   line-height:1.38;
   padding:2px 0 2px 10px;
 }
-.workout-left[data-card-count="1"] .session-meta{
+.workout-left[data-solo-card="1"] .session-meta{
   min-height:7px;
 }
-.workout-left[data-card-count="1"] .session-body{
+.workout-left[data-solo-card="1"] .session-body{
   gap:3px;
 }
-.workout-left[data-card-count="1"] .notes-box{
+.workout-left[data-solo-card="1"] .notes-box{
   min-height:260px;
   padding:4px 8px;
 }
@@ -3471,9 +3543,30 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   align-items:center;
   justify-content:center;
 }
+/* The full ledger's tick box, and the one writable surface in this shell that
+   can simply HAVE the D89 15px floor. It sat at 10px (~2.6mm) until Teeth T6b
+   and no audit had ever judged it — it was missing from PENCIL_SELECTORS in
+   scripts/playthrough-audit.mjs, so the gate was silent, not satisfied. Listing
+   it there made Book 1 report five pencil-floor pages; raising it here is the
+   ruling that answers them.
+
+   WHY THIS BOX GETS 15 AND `.archive-strip-box` BELOW IS STUCK AT 13: they are
+   the same law with different budgets. This ledger caps at three rows and lives
+   on a 1-up/2-up fragment page where `.archive-footer` is `margin-top:auto`
+   furniture; the strip's row competes directly with `flex:1` fragment blocks,
+   where every pixel comes off the documents and 16px is the measured ceiling.
+   MEASURED (8 books, fonts as they ship): `.archive-footer` grows 83.4→91.4px
+   on a three-row ledger and 65.4→69.4px on a one-row one; page counts unchanged
+   on all eight, boundary overflow 0→0, no page-type deltas. Five books actually
+   carry the box — the-lumina-protocol (2), the-conclave-s-legacy (2),
+   sf-c5-noir-institutional (3), sf-haiku45-c5-trial-1 (1) and Book 1 (9).
+   what-the-soil-remembers, vale and The-Hinge carry NONE: every fragment page
+   they compose holds 3+ documents, so they take the compact strip instead.
+   Mirrored by PENCIL_SELECTORS — this box now needs no override entry, which
+   is the point: it MEETS the floor rather than documenting an exception. */
 .archive-footer-checkbox{
-  width:10px;
-  height:10px;
+  width:15px;
+  height:15px;
   border:1px solid color-mix(in srgb, var(--theme-box-border,var(--ink)) 76%, transparent 24%);
 }
 /* Compact packet ledger — the 3-5-up variant of .archive-footer above.
@@ -6759,13 +6852,24 @@ body[data-demo-view="true"] .reader-unlock{
 
    1. THE ACCENT SPLIT. The rule at the top of this block pins `--accent`, but
       `--page-accent` still carries the BOOK's palette (olive in the demo). The
-      container derives --theme-designation-color, --theme-cover-rule,
-      --theme-prompt-border and --theme-doc-badge-color from --page-accent, so
-      every one of those resolves olive while --accent resolves red. Each rule
-      below that says `color:var(--accent)` is choosing red over the book's own
-      data — which is why deleting it turns that element olive, and why the
-      badge slugs pastoral never covered (`.boss-proof::before`) ARE olive
-      today. The split is the bug; these rules are the demo's look surviving it.
+      container derives --theme-designation-color, --theme-cover-rule and
+      --theme-prompt-border from --page-accent, so each of those TOKENS resolves
+      olive while --accent resolves red. Each rule below that says
+      `color:var(--accent)` is choosing red over the book's own data — which is
+      why deleting it turns that element olive.
+
+      WHAT THE SPLIT IS NOT (re-measured 2026-08-12, Teeth T6, correcting both
+      an earlier line of this comment and D116(a)): it is not visible. Every
+      element that consumes an olive token is pinned red by a selector in this
+      block — .cover-designation, .cover-rule, .story-prompt's keyline,
+      .cipher-zone::before and the doc badges all render rgb(139,42,42), and so
+      does `.boss-proof::before`, which this comment previously called out as
+      the one olive slug beside red siblings. It is not: --theme-doc-badge-color
+      is derived from --accent, not --page-accent, exactly so that it inherits
+      the pin (see the note on that declaration in the #booklet-container
+      block). Zero elements in the pastoral demo render olive. The split is real
+      in the TOKEN layer and dead-ended at every consumer — which is the honest
+      shape of the ruling below, and the reason nothing here is a live defect.
 
    2. BOOK TOKENS OUTRANK PRESETS. `resolveTheme()` merges `theme.tokens` OVER
       the preset, and the Eastern Shore demo ships its own --card-surface /

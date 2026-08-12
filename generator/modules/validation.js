@@ -827,6 +827,81 @@ export function cipherVarietyFloor(weekCount) {
 }
 
 /**
+ * isPrintableRepTarget(value) -> boolean
+ *
+ * THE LEGALITY CONTRACT FOR A REP BOX. `repsPerSet` is typed
+ * `['string','integer']` in booklet-schema.mjs with no sanity bound, and the
+ * renderer prints whatever arrives, verbatim: getRepTargets() in
+ * renderer/modules/utils.js does `String(value).trim()` and stamps the result
+ * into every set box (null/undefined become the empty string). So `-1` prints
+ * "-1" three times and `null` prints three empty boxes — which is exactly what
+ * Book 1 shipped (D112 flagged both as generation territory; this is the floor
+ * that closes them, and content/sf-haiku45-c5-trial-1.json carries the blank
+ * variant of the same defect).
+ *
+ * WHAT STAYS LEGAL, deliberately. A rep target is a WRITTEN INSTRUCTION, not a
+ * number — the corpus carries "AMRAP", "45s", "see sets", "Max", "rounds",
+ * "10 each", "35 min", "6+", "12+ (TEST)". Banning non-numerics would ban the
+ * form's own vocabulary. The nonsense class is narrow and mechanical: a value
+ * that reaches the box as a blank, a zero, a negative, or a serialized
+ * null/NaN. Everything else is a target a player can read and act on.
+ *
+ * Slash forms are judged SEGMENT BY SEGMENT because that is how they print:
+ * getRepTargets splits on '/' and gives each set its own target, so "5/-1/5"
+ * puts a sentinel in box two while looking legal as a whole string.
+ *
+ * CROSS-FILE CONTRACT — this is the AUTHORITY; `printableRepTarget()` in
+ * generator/modules/liftosaur.js is the producer-side mirror that refuses to
+ * emit a value this would reject. It cannot import this one (that module is
+ * deliberately dependency-free), so the two are pinned by one shared case table
+ * in scripts/check-generation-floors.mjs §12: nothing the producer keeps may be
+ * a value this predicate blocks. Loosening this one without loosening that one
+ * is safe; loosening THAT one alone re-opens the laundering hole.
+ *
+ * @param {*} value  the raw repsPerSet as authored
+ * @returns {boolean} true when a rep box can print it and a player can read it
+ */
+export function isPrintableRepTarget(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'number') return isFinite(value) && value > 0;
+  if (typeof value === 'boolean') return false;
+  if (typeof value !== 'string') return false;
+
+  var text = value.trim();
+  if (!text) return false;
+
+  var parts = text.indexOf('/') === -1 ? [text] : text.split('/');
+  var printable = 0;
+  for (var i = 0; i < parts.length; i++) {
+    var part = parts[i].trim();
+    // The renderer drops empty segments ("5//5" prints two targets), so an
+    // empty one is not itself a defect — a string of NOTHING BUT empties is.
+    if (!part) continue;
+    var lowered = part.toLowerCase();
+    if (lowered === 'null' || lowered === 'undefined' || lowered === 'nan') return false;
+    // Bare number only. "0-5" and "6+" are written targets that merely start
+    // with a digit; parseFloat would read them as 0 and 6 and judge the wrong
+    // thing. Anything that is not a bare number is a token the player reads.
+    if (/^[+-]?\d+(?:\.\d+)?$/.test(part) && Number(part) <= 0) return false;
+    printable++;
+  }
+  return printable > 0;
+}
+
+/**
+ * How to name an unprintable value in an error the model has to act on.
+ * The model needs to see WHAT IT SENT, not a category — "repsPerSet is -1"
+ * corrects; "repsPerSet is invalid" invites the same guess again.
+ */
+function describeRepTarget(value) {
+  if (value === undefined) return 'absent';
+  if (value === null) return 'null';
+  if (typeof value === 'string') return '"' + value.slice(0, 24) + '"';
+  if (typeof value === 'object') return 'an object';
+  return String(value);
+}
+
+/**
  * Per-week structural validation. Runs after each week is generated
  * in the pipeline, before proceeding to the next stage.
  * Returns { valid: boolean, errors: string[] }
@@ -869,6 +944,34 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
       // print — a half-built micro-line is worse than none, because it reaches
       // the page as a condition with no payload.
       pushShapeErrors(errors, 'Session ' + (si + 1), s);
+    });
+  }
+
+  // ── Floor: the rep box prints something a player can act on (F9) ──────────
+  // D111's class from the data side. The other floors are about surfaces the
+  // model SKIPS; this one is about a surface it fills with nonsense. Book 1
+  // asked for "Chin-ups 3xAMRAP" and got `repsPerSet: -1` in week 2 and
+  // `null` in week 6 — the C-programmer's AMRAP sentinel and a shrug — which
+  // printed as three boxes reading "-1" and three reading nothing. Nothing in
+  // the stack could have caught it: the artifact schema types the field
+  // `['string','integer']` with no bound, no stage validator looked at it, and
+  // every `|| '5'` fallback downstream is defeated by a truthy `-1`.
+  //
+  // NO EXEMPTIONS. Boss weeks and deload weeks print rep boxes like every
+  // other week, so unlike F3/F4 there is nothing here to excuse.
+  if (floorsOn(expectedOptions) && Array.isArray(weekObj.sessions)) {
+    weekObj.sessions.forEach(function (s, si) {
+      var exercises = (s && Array.isArray(s.exercises)) ? s.exercises : [];
+      exercises.forEach(function (ex, ei) {
+        if (!ex || typeof ex !== 'object' || Array.isArray(ex)) return;
+        if (isPrintableRepTarget(ex.repsPerSet)) return;
+        errors.push('Session ' + (si + 1) + ' exercise ' + (ei + 1)
+          + ' (' + (String((ex.name || '')).trim() || 'unnamed') + '): repsPerSet is '
+          + describeRepTarget(ex.repsPerSet)
+          + ' — the rep boxes print this verbatim, so it must be a positive count or a written'
+          + ' target the player can read ("AMRAP", "45s", "8-12", "30s"); blanks, zero, negatives'
+          + ' and sentinel values reach the page as nonsense the player cannot act on');
+      });
     });
   }
 

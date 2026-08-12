@@ -201,6 +201,21 @@ function buildMechanicStrip(pageFacts) {
 // Fragment helpers (moved from page-renderer.js)
 // ---------------------------------------------------------------------------
 
+/**
+ * Full packet ledger — up to three rows, for archive pages carrying 1–2
+ * documents. The 3+ case compresses into buildArchiveStrip() below.
+ *
+ * HEIGHT CONTRACT: `.archive-footer` is `margin-top:auto` furniture on a page
+ * whose fragment blocks have room to give, which is why its tick box carries
+ * the full D89 15px write-in floor while the strip's is stuck at 13px. Measured
+ * over 8 books at 15px (Teeth T6b): the footer runs 91.4px at three rows and
+ * 69.4px at one, page counts unchanged everywhere, boundary overflow 0. The
+ * reasoning and the book list live with the `.archive-footer-checkbox` rule in
+ * booklet.css; move one and the other stops being true.
+ *
+ * @param {Array} placements — every fragment placement on the page
+ * @returns {HTMLElement}
+ */
 function buildArchiveFooter(placements) {
   const footer = make('section', 'archive-footer');
   footer.appendChild(make('div', 'doc-label', 'Packet Ledger'));

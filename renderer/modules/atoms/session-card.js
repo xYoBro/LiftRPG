@@ -15,7 +15,8 @@ import { renderWorkoutCard } from '../workout-primitives.js';
 // the two drift (the D71 defect class). See the CROSS-FILE CONTRACT note in
 // session-card-metrics.js.
 import {
-  estimateSessionCardHeight, sessionCardVariant, sessionCardNotesHeight,
+  estimateSessionCardHeight, estimateSoloSessionCardHeight,
+  sessionCardVariant, sessionCardNotesHeight,
 } from '../session-card-metrics.js';
 
 registerAtom('session-card', {
@@ -24,7 +25,24 @@ registerAtom('session-card', {
   pageAffinity: 'left',
 
   estimate(data, density) {
-    const session = (data || {}).session || {};
+    const atomData = data || {};
+    const session = atomData.session || {};
+
+    // A card that OWNS its page is a different object, and the atom cannot
+    // work that out for itself — it is handed a session and a density, never a
+    // page. The adapter declares it (`data.ownsPage`, see sessionChunkOwnsPage
+    // in adapters/liftrpg-adapter.js) and the renderer stamps the same answer
+    // as `data-solo-card`, so the geometry this estimate predicts is the
+    // geometry that prints. Still a pure function of the atom's own data.
+    //
+    // min === preferred is not a shortcut: every rule in the solo CSS block is
+    // density-invariant, so the shrink potential really is zero, and saying so
+    // is what stops the solver spending passes on a card that cannot move.
+    if (atomData.ownsPage) {
+      const soloHeight = estimateSoloSessionCardHeight(session);
+      return { minHeight: soloHeight, preferredHeight: soloHeight };
+    }
+
     return {
       minHeight: estimateSessionCardHeight(session, 1),
       preferredHeight: estimateSessionCardHeight(session, density),

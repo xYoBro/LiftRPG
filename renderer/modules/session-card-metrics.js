@@ -467,19 +467,26 @@ const PROGRESSION_LABEL_GAP = 3;
 const PROGRESSION_BLANK_PX = 15;
 
 /**
- * SINGLE-CARD PAGE GEOMETRY (`data-card-count="1"`).
+ * PAGE-OWNING CARD GEOMETRY (`data-solo-card="1"`).
  *
- * CROSS-FILE CONTRACT: `booklet.css` `.workout-left[data-card-count="1"] …`.
- * A page holding exactly one session card is a different object: the wrapper
- * stops flexing, the card reverts to spacious padding whatever the density
- * says, and — the term that matters — `.notes-box` gets `min-height:260px`,
- * because on a one-card page the notes box IS the page. None of that responds
- * to density; the card measures 400–562px at every density in the corpus.
+ * CROSS-FILE CONTRACT: `booklet.css` `.workout-left[data-solo-card="1"] …`.
+ * A card that OWNS its page is a different object: the wrapper stops flexing,
+ * the card reverts to spacious padding whatever the density says, and — the
+ * term that matters — `.notes-box` gets `min-height:260px`, because when the
+ * card is the page the notes box IS the page. None of that responds to
+ * density; the card measures 400–562px at every density in the corpus.
  *
- * The atom's own `estimate()` cannot use this: it is handed a density and a
- * session, never the page's card count. The CHUNKER can, and does — it is the
- * component deciding how many cards share a page in the first place. See
- * `estimateSoloSessionCardHeight()`.
+ * WHICH PAGES: the ones the adapter declared, not every page that happens to
+ * hold one card (D112). `sessionChunkOwnsPage()` in liftrpg-adapter.js is the
+ * predicate; it rides the atom as `data.ownsPage`; `page-renderer.js` ANDs it
+ * with the page it composed and stamps `data-solo-card`. A lone card sharing
+ * its page with the week header is NOT this object — it is a normal card on
+ * the density ladder, which is the only reason the solver can answer overflow
+ * there at all.
+ *
+ * The atom's `estimate()` reads that declaration and calls this model; the
+ * CHUNKER asks the same predicate while scoring partitions. Neither infers a
+ * page it cannot see. See `estimateSoloSessionCardHeight()`.
  *
  * Unmodelled before D79, and worth 194px: the notes term read 66px (three
  * lines at maximum density) against a 262px box.
@@ -928,11 +935,13 @@ export function estimateSessionCardHeight(session, density) {
 }
 
 /**
- * Height of a session card that will be ALONE on its page
- * (`data-card-count="1"`). Density-invariant by construction — see SOLO_CARD.
+ * Height of a session card that OWNS its page (`data-solo-card="1"`).
+ * Density-invariant by construction — see SOLO_CARD.
  *
- * Only the chunker may call this: it is the one component that knows a chunk's
- * size before the page exists.
+ * Callable only where ownership is DECLARED: the chunker (scoring partitions)
+ * and the session-card atom's estimate() reading `data.ownsPage`. Calling it
+ * for a card that merely happens to be alone on a page models geometry the
+ * renderer will not produce.
  *
  * @param {object} session
  * @returns {number} px

@@ -94,6 +94,58 @@ export function looksLikeLiftoscript(text) {
 // ── Tier 1: canonical shape ─────────────────────────────────────────────────
 
 /**
+ * A rep target this seam is willing to pass on, or null to drop it.
+ *
+ * CROSS-FILE CONTRACT — the authority is `isPrintableRepTarget()` in
+ * generator/modules/validation.js, which decides what a rep box may legally
+ * print. This is deliberately a SUBSET of it: a producer may be stricter than
+ * the gate, never looser. It is duplicated rather than imported because this
+ * module's purity (no imports, Node-testable in isolation) is load-bearing and
+ * validation.js drags in constants.js + assembly.js. The pair is pinned by
+ * scripts/check-generation-floors.mjs §12, which runs one shared case table
+ * through BOTH implementations and fails if they disagree on the nonsense class.
+ *
+ * WHY DROP RATHER THAN STRINGIFY. This used to be
+ * `if (x != null) entry.repsPerSet = String(x).trim()`, which laundered a
+ * model's `-1` or `0` into the STRING "-1"/"0" — truthy, and therefore immune
+ * to every `|| '5'` fallback between here and the page. The canonical-workout
+ * wire schema types repsPerSet as `string` (SCHEMA_CANONICAL_WORKOUT in
+ * prompt_rules.js), so the sentinel arrives pre-stringified in the likely case
+ * and the old guard could not have seen it at all. Dropping mirrors the `sets`
+ * guard directly above: the value is absent, assembly.js fills its placeholder
+ * and raises the `exercise-fields-defaulted` diagnostic, and the operator gets
+ * a printed "5" with a warning instead of a printed "-1" with silence. It also
+ * keeps the sentinel out of formatNormalizedForPrompt(), which would otherwise
+ * teach the model "Chin-ups 3x-1" as the program it must transcribe.
+ *
+ * @param {*} value
+ * @returns {string|null} the trimmed target, or null when nothing printable
+ */
+function printableRepTarget(value) {
+  if (value === null || value === undefined || typeof value === 'boolean') return null;
+  if (typeof value === 'object') return null;
+  // Numbers are judged as numbers, never via their spelling: String(Infinity)
+  // is "Infinity", which no numeric test below would catch.
+  if (typeof value === 'number') return (isFinite(value) && value > 0) ? String(value) : null;
+  const text = String(value).trim();
+  if (!text) return null;
+  // Slash forms print as one target per set, so each segment is judged on its
+  // own — "5/-1/5" is a sentinel in box two wearing a legal-looking string.
+  const parts = text.indexOf('/') === -1 ? [text] : text.split('/');
+  let printable = 0;
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i].trim();
+    if (!part) continue;                 // the renderer drops empty segments
+    const lowered = part.toLowerCase();
+    if (lowered === 'null' || lowered === 'undefined' || lowered === 'nan') return null;
+    // Bare number only — "6+", "0-5" and "45s" are written targets, not numbers.
+    if (/^[+-]?\d+(?:\.\d+)?$/.test(part) && Number(part) <= 0) return null;
+    printable++;
+  }
+  return printable > 0 ? text : null;
+}
+
+/**
  * Shape a canonicalization stage's output into the normalized workout object
  * the pipeline already knows how to consume.
  *
@@ -140,7 +192,8 @@ export function normalizeCanonicalWorkout(rawText, output) {
         const entry = { name: name };
         const sets = parseInt(exercise.sets, 10);
         if (isFinite(sets) && sets > 0) entry.sets = sets;
-        if (exercise.repsPerSet != null) entry.repsPerSet = String(exercise.repsPerSet).trim();
+        const reps = printableRepTarget(exercise.repsPerSet);
+        if (reps !== null) entry.repsPerSet = reps;
         if (exercise.weightField) entry.weightField = String(exercise.weightField).trim();
         if (exercise.notes) entry.notes = String(exercise.notes).trim();
         exercises.push(entry);

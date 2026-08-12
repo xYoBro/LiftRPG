@@ -321,6 +321,30 @@ function renderWorkoutPage(placements, planIndex) {
   frame.setAttribute('data-card-count', String(sessionPlacements.length));
   frame.setAttribute('data-page-compaction', String(workoutCompactionLevel(sessionPlacements)));
 
+  // THE OWNERSHIP TEST (render half) — what `booklet.css`'s single-card block
+  // keys on. `data-card-count="1"` used to carry it, and that question is the
+  // wrong one: a page holding a WEEK HEADER plus one card answered yes, took
+  // the density-invariant 260px notes floor, overflowed with no shrink path,
+  // and shed the card — stranding the header alone (D112's mute spread).
+  //
+  // Two clauses, both necessary. The adapter's declaration (`data.ownsPage`,
+  // see sessionChunkOwnsPage in adapters/liftrpg-adapter.js) is what phase-1
+  // estimation reads, so honouring it is what keeps estimate and render
+  // modelling the same object. The composition check is the renderer's own
+  // eyes: the planner can seat a foreign atom here, and a declaration made
+  // before placement must not outrank the page that actually exists. The
+  // conjunction can only turn solo OFF, never on — and off is the shorter
+  // geometry, so render never needs more height than the estimate reserved.
+  //
+  // The week footer is exempt: page-structural band, not flow content
+  // (ZONE-ASSIGNMENT-DESIGN §6), and it has always shared the solo page.
+  const flowPlacementCount = placements
+    .filter((placement) => placement.type !== 'week-footer').length;
+  const cardOwnsPage = sessionPlacements.length === 1
+    && flowPlacementCount === 1
+    && !!(sessionPlacements[0].data && sessionPlacements[0].data.ownsPage);
+  if (cardOwnsPage) frame.setAttribute('data-solo-card', '1');
+
   // PRINTED ORDER = PLACEMENT ORDER.
   //
   // This loop used to be a type partition: every non-card atom rendered into

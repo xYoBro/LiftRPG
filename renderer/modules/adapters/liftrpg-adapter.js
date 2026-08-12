@@ -244,6 +244,13 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
     for (let chunkIndex = 0; chunkIndex < sessionChunks.length; chunkIndex++) {
       const chunk = sessionChunks[chunkIndex];
       const chunkGroup = `week-${wi}-chunk-${chunkIndex}`;
+      // THE OWNERSHIP DECLARATION (see sessionChunkOwnsPage). Declared here,
+      // where the seating is decided, and carried on the atom so phase-1
+      // estimation and the renderer read the SAME answer — the estimate side
+      // has no DOM and the renderer has no chunk table.
+      const ownsPage = sessionChunkOwnsPage(
+        week, chunkIndex, sessionChunks.length, chunk.sessions.length,
+      );
       for (let si = 0; si < chunk.sessions.length; si++) {
         const sessionIndex = chunk.startIndex + si;
         atoms.push(createAtom({
@@ -261,6 +268,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
             weekMeta: week,
             profile,
             totalWeeks,
+            ownsPage,
           },
         }));
       }
@@ -908,6 +916,72 @@ function splitEndingBody(unlockedEnding, bookletData) {
 }
 
 /**
+ * THE OWNERSHIP TEST — does a one-card chunk's card actually OWN its page?
+ *
+ * DECLARATION, not a guess: this is the single home of the predicate, and the
+ * adapter is the only component that can answer it at estimate time, because
+ * the adapter is what SEATS the other atoms. Its answer rides the session-card
+ * atom as `data.ownsPage`, and three consumers read that one flag:
+ *
+ *   • `chunkWeekSessions()` scoring (below) — which chunk shapes to prefer.
+ *   • `atoms/session-card.js` estimate() — phase 1, no DOM: solo geometry is a
+ *     different object, and the atom cannot know its page without being told.
+ *   • `page-renderer.js` renderWorkoutPage() — stamps `data-solo-card="1"`,
+ *     which is what `booklet.css`'s single-card block now keys on. The
+ *     renderer ANDs the declaration with the page it actually composed, so
+ *     render can only be less solo than the estimate assumed (the safe
+ *     direction: the solo model is the taller one).
+ *
+ * ── WHY THE OLD CONDITION WAS WRONG (D112, the mute-spread mechanism) ───────
+ *
+ * The CSS asked `data-card-count="1"` — "is this the only card here?" — and
+ * answered yes on a page carrying a WEEK HEADER plus one card. The notes floor
+ * (260px, density-invariant by contract, because on a one-card page the notes
+ * box IS the page) then claimed height the page did not have: measured on
+ * book1-glassworks, grafting the 83px week header onto a solo card page took
+ * the frame from 720/720px to 764/720 — 44px of overflow that NO density can
+ * answer, because every rule in that block is density-invariant. The solver
+ * spent its passes, shed the card onto its own page, and the header stranded
+ * alone at 11% fill: one mute spread per week. The floor was right; its
+ * CONDITION was wrong. A card owns its page only when nothing else is seated
+ * there.
+ *
+ * ── WHAT COUNTS AS SHARING ─────────────────────────────────────────────────
+ *
+ *   • Chunk 0 always carries the week-header atom (see the emission loop) —
+ *     never solo, however few cards it holds.
+ *   • A BOSS week's final chunk carries the clocks panel and/or the reckoning
+ *     panel on the left (`pageAffinity: 'left'`, same chunk group) — never
+ *     solo. The two conditions below mirror those emission guards exactly;
+ *     changing one without the other re-opens this defect class.
+ *   • The week footer does NOT count. It is a ~20px page-structural band the
+ *     renderer positions (ZONE-ASSIGNMENT-DESIGN §6), not flow content, and it
+ *     has always shared the solo page.
+ *
+ * @param {object|null} week — the schema week (for boss-panel seating)
+ * @param {number} chunkIndex
+ * @param {number} chunkCount
+ * @param {number} chunkSize — cards in this chunk
+ * @returns {boolean}
+ */
+function sessionChunkOwnsPage(week, chunkIndex, chunkCount, chunkSize) {
+  if (chunkSize !== 1) return false;
+  if (chunkIndex === 0) return false;
+  if (chunkIndex === chunkCount - 1 && weekSeatsBossPanelsLeft(week)) return false;
+  return true;
+}
+
+/**
+ * Does this week seat a clocks and/or reckoning panel on the LEFT, beside its
+ * final session chunk? Mirrors the seating guards in the emission loop.
+ */
+function weekSeatsBossPanelsLeft(week) {
+  if (!week || !week.isBossWeek) return false;
+  const hasClocks = Array.isArray(week.gameplayClocks) && week.gameplayClocks.length > 0;
+  return hasClocks || !!week.reckoning;
+}
+
+/**
  * Decide which sessions share a workout page.
  *
  * ── WHAT THE SCORE MEANS ───────────────────────────────────────────────────
@@ -1022,11 +1096,15 @@ function chunkWeekSessions(sessions, weekMeta = null, maxSessionsPerPage = 3) {
     sizes.forEach((size, index) => {
       const chunk = list.slice(startIndex, startIndex + size);
 
-      // A one-card page is a different object — the wrapper stops flexing and
-      // the notes box takes a 260px floor (`[data-card-count="1"]`). Modelling
-      // it with the shared card estimate under-reads by ~194px, which made
-      // 1+3 splits look far cheaper than they print.
-      const cardsLoadPx = size === 1
+      // A page the card OWNS is a different object — the wrapper stops flexing
+      // and the notes box takes a 260px floor. Modelling that with the shared
+      // card estimate under-reads by ~194px, which made 1+3 splits look far
+      // cheaper than they print. But the solo model only applies where the
+      // solo CSS now fires: `sessionChunkOwnsPage()` is the one predicate, and
+      // a lone card sharing its page with the week header (chunk 0) or the
+      // boss panels is a NORMAL card, priced on the density ladder — which is
+      // also the only reason the solver has a shrink path on those pages.
+      const cardsLoadPx = sessionChunkOwnsPage(weekMeta, index, sizes.length, size)
         ? estimateSoloSessionCardHeight(chunk[0])
         : chunk.reduce(
           (sum, session) => sum + estimateSessionCardHeight(session, SESSION_CHUNK_DENSITY),

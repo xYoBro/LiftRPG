@@ -306,7 +306,19 @@ const THEME_PRESETS = {
   fantasy: {
     '--font-display': '"Playfair Display", serif',
     '--font-body': '"Libre Baskerville", serif',
-    '--font-mono': '"Libre Baskerville", serif',
+    // THE MONO SLOT MUST NAME A MONOSPACE (Teeth T6b, 2026-08-12). This preset
+    // declared "Libre Baskerville" here — a proportional serif in the slot the
+    // machine-voice surfaces read. That is live TODAY, freeze or no freeze: 16
+    // rules take `--font-mono` through `--theme-label-family` rather than the
+    // frozen `--mono` alias (`.map-title`, `.ledger-head`, `.cite-ref`,
+    // `.boss-mechanism`, `.week-kicker`, `.cipher-zone::before`, the
+    // `.fragment-seal-*` pair…), so fantasy printed its whole instrument voice
+    // in a book serif. Of the two monospaces the vendored set carries (D92 —
+    // IBM Plex Mono and Share Tech Mono), IBM Plex Mono is the one an
+    // illuminated field book can hold: its typewriter lineage reads as the
+    // surveyor's tally sheet bound in with the parchment, where Share Tech
+    // Mono's squared terminal forms would be a screen on a gilt page.
+    '--font-mono': '"IBM Plex Mono", monospace',
     '--font-accent': '"Playfair Display", serif',
     '--weight-body': '400',
     '--weight-heading': '700',
@@ -626,7 +638,20 @@ const THEME_PRESETS = {
   occult: {
     '--font-display': '"Playfair Display", serif',
     '--font-body': '"Libre Baskerville", serif',
-    '--font-mono': '"Libre Baskerville", serif',
+    // THE MONO SLOT MUST NAME A MONOSPACE — see the same note under `fantasy`.
+    // IBM Plex Mono for the same reason fantasy takes it: a handled manuscript
+    // can hold a TYPED apparatus (the archivist's slip, the transcription) but
+    // never a terminal readout.
+    //
+    // MEASURED COST of both repairs, paired A/B over 20 books × 3 archetypes
+    // (scratchpad harness, HEAD theme.js route-intercepted against the tree):
+    // pastoral 0 of 20 combos moved a single element; occult and fantasy move
+    // 4–423 elements per book with ZERO page-count moves, zero boundary
+    // overflow, and horizontal spill unchanged at 486 elements. One cost, and
+    // it is real: vale-a-record-of-orcus FORCED to occult gains a 5px internal
+    // clip on its gauge-log page. Vale ships as noir, so no book in the corpus
+    // regresses — but the combination exists and this is where it is recorded.
+    '--font-mono': '"IBM Plex Mono", monospace',
     '--font-accent': '"Playfair Display", serif',
     '--weight-body': '400',
     '--weight-heading': '700',
