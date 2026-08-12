@@ -2,7 +2,7 @@
 // Deterministic post-generation analysis: scores, warnings, weak-spot flags.
 // Does NOT modify the booklet. Stored on window.LiftRPGAPI.lastQualityReport after each call.
 
-import { VALID_MAP_TYPES, VALID_COMPANION_TYPES, DEMOTED_COMPANION_TYPES } from './constants.js';
+import { VALID_MAP_TYPES, VALID_COMPANION_TYPES, DEMOTED_COMPANION_TYPES, readPipelineDebris } from './constants.js';
 import { normalizeId, normalizeThemeArchetype } from './assembly.js';
 import { validateAssembledBooklet } from './validation.js';
 import { buildMapEvolutionFingerprint, looksLikeFragmentRef } from './fingerprint.js';
@@ -650,7 +650,7 @@ export function generateQualityReport(booklet) {
   }
 
   // ── Artifact intent coherence (Layer 3 variety contract drift) ────────
-  var intentDrift = (booklet._artifactIntentDrift || {}).diagnostics || [];
+  var intentDrift = (readPipelineDebris(booklet, '_artifactIntentDrift') || {}).diagnostics || [];
   var intentIssueCount = 0;
 
   if (intentDrift.length > 0) {
@@ -689,7 +689,7 @@ export function generateQualityReport(booklet) {
   }
 
   // ── S+F cross-stage continuity (surfaced from pipeline instrumentation) ──
-  var sfContinuity = booklet._continuityWarnings || [];
+  var sfContinuity = readPipelineDebris(booklet, '_continuityWarnings') || [];
   if (sfContinuity.length > 0) {
     sfContinuity.forEach(function (cw) {
       report.warnings.push('[S+F continuity/' + (cw.stage || '?') + '] ' + (cw.message || ''));

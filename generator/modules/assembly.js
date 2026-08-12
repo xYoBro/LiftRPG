@@ -4,7 +4,10 @@
 
 import { DOCUMENT_TYPE_ALIASES, SUPPORTED_THEME_ARCHETYPES, THEME_ARCHETYPE_ALIASES,
   SCHEMA_VERSION,
-  MARK_STRIP, MARK_STRIP_TARGET_KINDS, RECKONING_SINK_KINDS, RECKONING_THRESHOLD_RATIO
+  MARK_STRIP, MARK_STRIP_TARGET_KINDS, RECKONING_SINK_KINDS, RECKONING_THRESHOLD_RATIO,
+  // D128 → W4a: `_assemblyDiagnostics` is pipeline debris and belongs under
+  // `_x` like the other nine. api-generator.js reads and deletes it there.
+  writePipelineDebris
 } from './constants.js';
 import {
   isValidWorkspaceStyle,
@@ -1942,7 +1945,7 @@ export function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, ending
   diagnoseIdentityPreservation(booklet, shell.meta, diag);
 
   // Attach structured diagnostics (survives JSON serialization)
-  booklet._assemblyDiagnostics = diag;
+  writePipelineDebris(booklet, '_assemblyDiagnostics', diag);
 
   return booklet;
 }
@@ -2047,7 +2050,7 @@ export function assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutp
   diagnoseIdentityPreservation(booklet, shell.meta, diag);
 
   // Attach structured diagnostics (survives JSON serialization)
-  booklet._assemblyDiagnostics = diag;
+  writePipelineDebris(booklet, '_assemblyDiagnostics', diag);
 
   return booklet;
 }
@@ -2821,7 +2824,7 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
   diagnoseCipherVariety(booklet, skeleton.weekPlan || [], diag);
 
   // Attach structured diagnostics (survives JSON serialization)
-  booklet._assemblyDiagnostics = diag;
+  writePipelineDebris(booklet, '_assemblyDiagnostics', diag);
 
   return booklet;
 }

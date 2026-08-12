@@ -29,6 +29,72 @@ export var ACCEPTED_SCHEMA_VERSIONS = ['1.4.0', '1.5.0'];
 // level). The schema forbids unknown keys everywhere else.
 export var EXTENSION_KEY = '_x';
 
+// ── Pipeline debris: the keys, and the one place they may live (D128 → W4a) ──
+// The rule above is not new — the schema has said "`_x` is the ONLY place for
+// non-contract data (pipeline telemetry, migration residue)" since 1.4. The
+// pipelines were writing ten of these at TOP LEVEL anyway, where
+// `additionalProperties: false` rejects every one of them, so every booklet the
+// real API path has ever produced carried contract violations by construction
+// (D128 found six; the sweep that landed this constant found four more).
+//
+// This list is therefore the CLASS, not the six that were noticed. The failure
+// that earned the difference: `_criticReport` was missing from BOTH
+// hand-maintained debris lists (migrate-1.4.mjs DEBRIS_KEYS and index.html
+// stripInternalKeys), so it survived migration AND the user-facing JSON
+// download — the one debris field that reached a user's disk unstripped.
+//
+// The keys keep their leading underscore INSIDE `_x` (`_x._criticReport`, not
+// `_x.criticReport`). It reads redundantly and it is deliberate: one name means
+// the legacy fallback is one-to-one, the top-level scan in validate.mjs is
+// exact, and there is no second spelling for a list to drift against.
+export var PIPELINE_DEBRIS_KEYS = [
+  '_pipeline', '_stageTelemetry', '_qualityGate', '_qualityReport',
+  '_assemblyWarnings', '_continuityWarnings', '_assemblyDiagnostics',
+  '_artifactIntentDrift', '_trialMode', '_criticReport'
+];
+
+/**
+ * readPipelineDebris(booklet, key) -> value | undefined
+ *
+ * The one reader. Prefers the lawful home (`_x`), falls back to the legacy
+ * top-level position so every booklet generated before this landed still reads
+ * — the bench's saved runs, uploaded checkpoints, and the eval history are all
+ * pre-move documents and none of them are regenerable.
+ *
+ * SINGLE HOME (D93): four trees consume debris (eval-bench, playthrough-audit,
+ * quality.js, the landing page) and a fallback re-implemented per consumer is
+ * exactly how one of them ends up reading only the new position and reporting
+ * a clean $0 run that actually failed. Guarded by singleDeclarationHomes().
+ */
+export function readPipelineDebris(booklet, key) {
+  if (!booklet || typeof booklet !== 'object') return undefined;
+  var ext = booklet[EXTENSION_KEY];
+  if (ext && typeof ext === 'object' && ext[key] !== undefined) return ext[key];
+  return booklet[key];
+}
+
+/**
+ * writePipelineDebris(booklet, key, value) -> booklet
+ *
+ * The one writer, and the reason the move cannot half-happen: a pipeline that
+ * assigns `booklet._criticReport = x` directly is caught by the top-level scan
+ * in validate.mjs, and the only way to satisfy that scan is this function.
+ * Creates `_x` on demand; refuses keys outside the declared class so a
+ * eleventh debris field has to be declared above before it can be written.
+ */
+export function writePipelineDebris(booklet, key, value) {
+  if (!booklet || typeof booklet !== 'object') return booklet;
+  if (PIPELINE_DEBRIS_KEYS.indexOf(key) === -1) {
+    throw new Error('writePipelineDebris: "' + key + '" is not a declared debris key — '
+      + 'add it to PIPELINE_DEBRIS_KEYS in contracts/contract-constants.mjs first');
+  }
+  if (!booklet[EXTENSION_KEY] || typeof booklet[EXTENSION_KEY] !== 'object') {
+    booklet[EXTENSION_KEY] = {};
+  }
+  booklet[EXTENSION_KEY][key] = value;
+  return booklet;
+}
+
 // ── Document types ───────────────────────────────────────────────────────────
 
 export var DOCUMENT_TYPE_ENUM = [
@@ -841,6 +907,182 @@ export var VALID_CONVERGENCE_PATTERNS = [
 export var REJECTED_READING_FIELDS = ['axis', 'value', 'oneLiner'];
 
 export var REJECTED_READING_AXES = ['mechanicGrammarFamily', 'arcFamily', 'povFrame'];
+
+// ════════════════════════════════════════════════════════════════════════════
+// THE LUDIC SPINE (VISION §4.4 · PLAY.md §3 · Wave 4a)
+// ════════════════════════════════════════════════════════════════════════════
+// Play is global — the fourth constitution. Fun cannot be requested per
+// component: every component is generated to be good AS a component, and a book
+// of competent components can still be a series of things to do. So the
+// composition is DECLARED before content exists, and the declaration is what
+// the floors can hold.
+//
+// Everything below is the vocabulary that declaration is written in. The shapes
+// live in booklet-schema.mjs (meta.playSpine, weeks[].fusionBeat); the demands
+// live in prompt_rules.js; the teeth live in validation.js under
+// generationFloors. This file owns only the closed sets, so no surface can
+// invent a sixth marking or an eleventh library entry on its own.
+
+// ── Dynamic markings (the FUSION §6 promotion) ──────────────────────────────
+// FUSION §4.1's fusion score has always demanded "a dynamic marking (which
+// weeks are loud, which sparse)"; until now nothing stored one, so the score
+// was G-class — asked for, never held. A FIVE-STEP ORDINAL rather than free
+// strings, and the reason is the D114 evidence frame: it already builds a
+// per-week prose-volume curve indexed to the book's own maximum, so a marking
+// on a comparable scale can be checked AGAINST that curve. "hushed" and
+// "muted" and "quiet" as three free strings would cost that comparison and
+// leave the marking decorative, which is what it already was.
+//
+// Ordered quiet → loud. The order is load-bearing (an ordinal is only an
+// ordinal if the index means something); never alphabetize this array.
+export var VALID_DYNAMIC_MARKINGS = ['quiet', 'spare', 'steady', 'full', 'loud'];
+
+// ── The Ludic Library: the implemented shelf ────────────────────────────────
+// PLAY.md §1 names two shelves. This is the IMPLEMENTED one — the playable
+// families a generated book can already print today — and it is deliberately
+// seeded from the atoms that exist rather than from the research menu, because
+// a composition naming something unrenderable is a promise the engine breaks
+// silently (the honest-when-lacking law exists precisely so the model says
+// "the library lacks this" instead of inventing an entry).
+//
+// Entries are named for what they PLAY, not for the file that draws them: a
+// composition reads "the spend economy wired to the decode chain", never
+// "session-card + cipher-panel". LUDIC_LIBRARY_ATOMS carries the binding, and
+// validate.mjs proves every atom named there is one the LiftRPG adapter
+// actually emits — which is what keeps this list derived from the engine
+// instead of aspirational.
+//
+// W5 (the Ludic Harvest) widens this from the researched shelf and gives each
+// entry its Inputs/Process/Outputs/Locks. Until then: ten entries, and
+// `honestGaps` is where everything else goes.
+export var LUDIC_LIBRARY = [
+  'reckoning-economy',  // markStrip ticks → tally → Banked → priced spends
+  'board',              // the map: 6 geometries under 8 board-state modes
+  'decode-chain',       // the weekly cipher and its workspace
+  'clock-bank',         // fill / drain / race / tug-of-war pressure
+  'companion-kit',      // the state-holding components (dashboards, tracks, stats)
+  'oracle-pull',        // the d100 leg of the Hook loop
+  'door-fork',          // the week's posted choice, priced on the reward side
+  'sealed-cache',       // sealed-by-honor content and the key that opens it
+  'boss-convergence',   // the convergence ceremony, assembly, and the locked finale
+  'ledger-audit'        // the body audited: first / peak / change per movement
+];
+
+// The binding that makes the library non-aspirational. Keys ≡ LUDIC_LIBRARY
+// (validator-asserted); every value names atom types the LiftRPG adapter emits
+// (validator-asserted against liftrpg-adapter.js, the reachability authority —
+// an atom that registers but is never emitted is D6-quarantined and cannot
+// carry a library entry).
+export var LUDIC_LIBRARY_ATOMS = {
+  'reckoning-economy': ['session-card', 'reckoning-panel'],
+  'board': ['map-panel'],
+  'decode-chain': ['cipher-panel'],
+  'clock-bank': ['clocks-panel'],
+  'companion-kit': ['tracker'],
+  'oracle-pull': ['oracle-table'],
+  'door-fork': ['week-header'],
+  'sealed-cache': ['fragment-doc'],
+  'boss-convergence': ['boss-encounter', 'assembly-page', 'ending'],
+  'ledger-audit': ['ledger-spread']
+};
+
+// ── Spine budgets ───────────────────────────────────────────────────────────
+// The arity rule is the anti-house-economy law made numeric. TWO is the floor
+// because one entry is not a composition — it is a single-family pick, which is
+// the thing §4.6 forbids by name. FOUR is the ceiling because a six-week book
+// that wires five systems teaches none of them; the tension budget has nowhere
+// to put a fifth.
+//
+// consequenceWithinWeeks is the echo law's clock: a fillable thing must be
+// answered by a surface within this many weeks. 0 means "in the same week", and
+// 2 is the ceiling because an answer three weeks out is not an echo, it is a
+// coincidence the player has stopped waiting for.
+export var SPINE_BUDGETS = {
+  compositionMin: 2,
+  compositionMax: 4,
+  consequenceWithinWeeksMax: 2,
+  consequenceWithinWeeksDefault: 1
+};
+
+// ── The surface-ref grammar ─────────────────────────────────────────────────
+// Spine edges point at surfaces, and a pointer nobody can resolve is a promise
+// nobody can check. This extends the precedent the manifestPointer / citeRef
+// channels already set: a ref is a STRING with a kind prefix, so the grammar is
+// readable by a model, quotable into a prompt, and parseable by a machine.
+//
+//   kind:id   — `week:W3` `session:W3.2` `markStrip:W3.2` `reckoning:W3`
+//               `clock:Relief Ledger` `oracle:W4` `cipher:W2` `map:West Run`
+//               `companion:Standing` `fragment:F.07` `door:W5` `seal:F.07`
+//               `ending:E2`
+//   singleton — `banked` `boss` `assembly`: the three surfaces a book has at
+//               most one of, so naming an id would be noise.
+//
+// ONE PARAMETERIZED RESOLVER (D93). The split against buildSurfaceIndex in
+// validation.js is deliberate and stated so nobody "unifies" it later: this
+// function owns the GRAMMAR (is this a well-formed ref, and of what kind),
+// which is closed, dependency-free, and needed by prompt parity checks and the
+// W4b simulated player alike. The INDEX — which surfaces a given booklet
+// actually prints — owns booklet traversal and lives beside the other booklet
+// walkers in validation.js. Grammar here, inventory there.
+export var SURFACE_REF_KINDS = [
+  'week', 'session', 'markStrip', 'reckoning', 'clock', 'oracle', 'cipher',
+  'map', 'companion', 'fragment', 'door', 'seal', 'ending'
+];
+
+export var SURFACE_REF_SINGLETONS = ['banked', 'boss', 'assembly'];
+
+// Regex SOURCE (a string, not a RegExp — this file is read by Node, the
+// browser, and the prompt-parity pass), built FROM the arrays so a new kind
+// cannot land without the pattern following it.
+//
+// MATCH IT CASE-INSENSITIVELY (`new RegExp(SURFACE_REF_PATTERN, 'i')`). The
+// pattern carries the CANONICAL spellings because it is quoted into prompt
+// doctrine, where `markStrip:` is what the model should read; parseSurfaceRef
+// accepts any casing, so a case-sensitive consumer would reject refs the
+// resolver happily parses.
+export var SURFACE_REF_PATTERN =
+  '^(?:(?:' + SURFACE_REF_KINDS.join('|') + '):\\s*\\S.*|(?:'
+  + SURFACE_REF_SINGLETONS.join('|') + '))$';
+
+/**
+ * parseSurfaceRef(ref) -> { kind, id, valid, raw }
+ *
+ * `kind` is the canonical spelling from the arrays above (matching is
+ * case-insensitive so `Clock:` and `markstrip:` parse, but the canonical form
+ * is what comes back — consumers index by it). `id` is '' for singletons.
+ * `valid` false means the string is not a ref at all, which is a different
+ * finding from a ref that parses but resolves to nothing: the first is a
+ * grammar error the model can fix from the message, the second needs the book.
+ */
+export function parseSurfaceRef(ref) {
+  var raw = String(ref == null ? '' : ref).trim();
+  var out = { kind: '', id: '', valid: false, raw: raw };
+  if (!raw) return out;
+
+  var lowered = raw.toLowerCase();
+  for (var s = 0; s < SURFACE_REF_SINGLETONS.length; s++) {
+    if (lowered === SURFACE_REF_SINGLETONS[s]) {
+      out.kind = SURFACE_REF_SINGLETONS[s];
+      out.valid = true;
+      return out;
+    }
+  }
+
+  var colon = raw.indexOf(':');
+  if (colon <= 0) return out;
+  var head = raw.slice(0, colon).trim().toLowerCase();
+  var tail = raw.slice(colon + 1).trim();
+  if (!tail) return out;
+
+  for (var k = 0; k < SURFACE_REF_KINDS.length; k++) {
+    if (SURFACE_REF_KINDS[k].toLowerCase() !== head) continue;
+    out.kind = SURFACE_REF_KINDS[k];
+    out.id = tail;
+    out.valid = true;
+    return out;
+  }
+  return out;
+}
 
 /**
  * resolveShellFamily(rawShellFamily, artifactClass, themeArchetype) -> family

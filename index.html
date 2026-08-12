@@ -5006,13 +5006,18 @@
           recoveryHtml;
         wireRecoveryButtons();
 
+        // Strip by CLASS, not by list (D128 -> W4a). The hand-kept list this
+        // replaces was missing `_criticReport` from the day the critic landed,
+        // so the file a user downloaded carried a top-level key the schema
+        // rejects — the download failed `npm run validate` and nobody saw it.
+        // Every lawful top-level key is a plain name (meta, theme, weeks,
+        // fragments, cover, rulesSpread, endings); everything underscored is
+        // ours, including `_x`, which the old list already deleted.
         function stripInternalKeys(booklet) {
           if (!booklet || typeof booklet !== 'object') return booklet;
           var clean = JSON.parse(JSON.stringify(booklet));
-          ['_qualityReport', '_qualityGate', '_pipeline', '_stageTelemetry',
-           '_assemblyWarnings', '_continuityWarnings', '_assemblyDiagnostics',
-           '_artifactIntentDrift', '_trialMode', '_x'].forEach(function (key) {
-            delete clean[key];
+          Object.keys(clean).forEach(function (key) {
+            if (key.charAt(0) === '_') delete clean[key];
           });
           return clean;
         }
@@ -6541,6 +6546,18 @@
           .replace(/"/g, '&quot;');
       }
 
+      // ── Pipeline debris reads ────────────────────────────────────────
+      // Debris lives under `_x` (D128 → W4a). This page is a classic script and
+      // cannot import contract-constants, so it DELEGATES to the one resolver
+      // rather than re-implementing the legacy fallback — a second copy is how
+      // one surface ends up reading only the new position and captioning a real
+      // critic run as "no critique". api-generator.js is a module script on this
+      // page, so LiftRPGAPI is present long before any handler below can fire.
+      function readBookletDebris(booklet, key) {
+        var api = window.LiftRPGAPI;
+        return api && api.readPipelineDebris ? api.readPipelineDebris(booklet, key) : undefined;
+      }
+
       // ── Inline notice ────────────────────────────────────────────────
       // Replaces alert(): a native dialog blocks the page, throws away the
       // modal's visual context, and cannot carry the paper identity.
@@ -7602,7 +7619,7 @@
           ? report.scores.aggregate.score
           : null;
         var qualityMeta = weekCount + ' weeks · validated' + (aggregateScore !== null ? ' · quality ' + aggregateScore : '');
-        var criticReport = data._criticReport;
+        var criticReport = readBookletDebris(data, '_criticReport');
         if (criticReport && typeof criticReport.finalMin === 'number') {
           qualityMeta += ' · critic ' + criticReport.finalMin + '/' + criticReport.threshold
             + (criticReport.finished ? ' ✓ composed' : ' — critique attached');
@@ -7993,7 +8010,7 @@
           // a pricing caption) costs a line of detail — never the booklet.
           try {
             markAllApiStages('valid');
-            var qualityGate = booklet._qualityGate || { passed: true, blockers: [] };
+            var qualityGate = readBookletDebris(booklet, '_qualityGate') || { passed: true, blockers: [] };
             var isQualityBlocked = !qualityGate.passed && qualityGate.blockers && qualityGate.blockers.length > 0;
             var blockerMessages = summarizeQualityGateBlockers(qualityGate.blockers, { limit: 2 });
             apiRunState.qualityGate = qualityGate;

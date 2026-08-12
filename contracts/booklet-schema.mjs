@@ -48,7 +48,10 @@ import {
   VOICE_SPEC_LIMITS,
   MARK_STRIP,
   MARK_STRIP_TARGET_KINDS,
-  RECKONING_SINK_KINDS
+  RECKONING_SINK_KINDS,
+  LUDIC_LIBRARY,
+  VALID_DYNAMIC_MARKINGS,
+  SPINE_BUDGETS
 } from './contract-constants.mjs';
 
 var G = SPATIAL_GUARDRAILS;
@@ -520,6 +523,179 @@ var processParticulars = {
   }
 };
 
+// ── playSpine (Layer 3 play contract, PLAY.md §3 / VISION §4.4) ─────────────
+// The Ludic Spine: composition with consequence, declared before content
+// exists. Play is global — the fourth constitution — and the whole reason this
+// block exists is that a property of the whole cannot be secured by asking each
+// part for it. Every component can be good and the book can still be a series
+// of things to do.
+//
+// SEVERITY: the artifactIntent split, exactly (see that block above).
+//   - The ARTIFACT contract is strict but wholly OPTIONAL (`required: []`,
+//     `additionalProperties: false`, `_x` hatch). No corpus fixture carries a
+//     spine; requiring anything here would break every fixture to enforce a
+//     prompt rule, and the sealed-corpus rule forbids editing them back green.
+//   - GENERATION POLICY demands it: the structured stage schema requires it and
+//     the closure floors BLOCK at the stage gates (D111 derived-or-strict).
+//
+// Sub-objects follow the manifestPointer idiom — optional everywhere, but when
+// an object IS present the fields that make it mean something are required. An
+// edge with a `from` and no `to` is not a half-edge; it is a typo that reads as
+// a record and checks as nothing.
+var spineComposition = {
+  type: 'array',
+  items: {
+    type: 'object',
+    // Both required by the same argument: `entry` is the machine handle the
+    // floors and the W4b sim index by, `role` is what this entry does IN THIS
+    // BOOK — the sentence that stops a composition from being a parts list.
+    required: ['entry', 'role'],
+    additionalProperties: false,
+    properties: {
+      entry: { enum: LUDIC_LIBRARY },
+      role: nonEmptyString,
+      _x: xt
+    }
+  }
+};
+
+var spineEconomyGraph = {
+  type: 'array',
+  items: {
+    type: 'object',
+    // `currency` is deliberately NOT required. Not every edge is a payment: a
+    // door gating a branch and a key opening a seal both move the player
+    // without spending anything, and demanding a currency there would make the
+    // model invent one — the silent-substitution failure this project names as
+    // its founding law.
+    required: ['from', 'to'],
+    additionalProperties: false,
+    properties: {
+      from: nonEmptyString,
+      to: nonEmptyString,
+      currency: { type: 'string' },
+      _x: xt
+    }
+  }
+};
+
+var spineConsequenceEdges = {
+  type: 'array',
+  items: {
+    type: 'object',
+    required: ['source', 'answeredBy'],
+    additionalProperties: false,
+    properties: {
+      source: nonEmptyString,
+      answeredBy: nonEmptyString,
+      // The echo law's clock. 0 = answered in the same week. The ceiling is
+      // SPINE_BUDGETS.consequenceWithinWeeksMax because an answer three weeks
+      // out is not an echo — it is a coincidence the player stopped waiting for.
+      withinWeeks: {
+        type: 'integer',
+        minimum: 0,
+        maximum: SPINE_BUDGETS.consequenceWithinWeeksMax
+      },
+      _x: xt
+    }
+  }
+};
+
+var spineDecisionLedger = {
+  type: 'array',
+  items: {
+    type: 'object',
+    required: ['fork', 'differsBy'],
+    additionalProperties: false,
+    properties: {
+      fork: nonEmptyString,
+      // What MECHANICALLY differs across the fork. A door the ledger cannot
+      // describe is flavor-only by definition (PLAY.md §2) — and the floor
+      // that holds this reads for a named surface, not an adjective.
+      differsBy: nonEmptyString,
+      _x: xt
+    }
+  }
+};
+
+var spineTensionBudget = {
+  type: 'array',
+  items: {
+    type: 'object',
+    // Only `week` is required. An absent axis is a DECLARATION that this week
+    // has nothing scarce (or nothing losable, or no way to fall behind), which
+    // is a legitimate shape — a deload week is exactly that. The floor asks for
+    // at least one named axis per week, not all three.
+    required: ['week'],
+    additionalProperties: false,
+    properties: {
+      week: { type: 'integer', minimum: 1 },
+      scarce: { type: 'string' },
+      losable: { type: 'string' },
+      fallBehind: { type: 'string' },
+      _x: xt
+    }
+  }
+};
+
+var spineDifficultyCurve = {
+  type: 'object',
+  required: [],
+  additionalProperties: false,
+  properties: {
+    // The sudoku-academy law is "where the brief warrants", never "always".
+    // `keyedToLoad: false` is a legitimate, recorded answer — a book whose
+    // difficulty runs against the load curve on purpose is not a defect, and
+    // making the field required-true would have made it one.
+    keyedToLoad: { type: 'boolean' },
+    shape: { type: 'string' },
+    perWeek: { type: 'array', items: { type: 'string' } },
+    _x: xt
+  }
+};
+
+var playSpine = {
+  type: 'object',
+  required: [],
+  additionalProperties: false,
+  properties: {
+    composition: spineComposition,
+    // What the brief wanted that the library lacks. The honest-when-lacking law
+    // made a recorded surface: "fail loudly, never silently substitute" applied
+    // to genre. A model that wants a deck-builder says so here instead of
+    // dressing the reckoning economy up as one.
+    honestGaps: { type: 'array', items: nonEmptyString },
+    economyGraph: spineEconomyGraph,
+    consequenceEdges: spineConsequenceEdges,
+    decisionLedger: spineDecisionLedger,
+    tensionBudget: spineTensionBudget,
+    difficultyCurve: spineDifficultyCurve,
+    _x: xt
+  }
+};
+
+// ── fusionBeat (FUSION §4.1's fusion score, promoted from G-class) ──────────
+// "The plan declares, per week, how this week's training texture IS this week's
+// story texture — a fusionBeat — plus a dynamic marking (which weeks are loud,
+// which sparse)." That has been doctrine since FUSION was written and nothing
+// stored it: the compiler was asked to think in beats and the answer went
+// nowhere. This is the storage.
+//
+// Both fields required when the object is present, because a marking with no
+// beat marks nothing and a beat with no marking is the prose the score was
+// supposed to shape. Optional at the artifact level like everything else added
+// after the corpus was sealed.
+var fusionBeat = {
+  type: 'object',
+  required: ['beat', 'marking'],
+  additionalProperties: false,
+  properties: {
+    beat: nonEmptyString,
+    marking: { enum: VALID_DYNAMIC_MARKINGS },
+    _x: xt
+  }
+};
+
 export var BOOKLET_SCHEMA = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   $id: 'https://liftrpg.co/contracts/booklet/v' + SCHEMA_VERSION,
@@ -580,6 +756,7 @@ export var BOOKLET_SCHEMA = {
         },
         artifactIntent: artifactIntent,
         processParticulars: processParticulars,
+        playSpine: playSpine,
         economy: economy,
         weeklyComponentType: nonEmptyString,
         weekCount: { type: 'integer', minimum: 1 },
@@ -648,6 +825,7 @@ export var BOOKLET_SCHEMA = {
         overflowDocument: { $ref: '#/$defs/fragment' },
         interlude: { $ref: '#/$defs/interlude' },
         gameplayClocks: { type: 'array', items: { $ref: '#/$defs/gameplayClock' } },
+        fusionBeat: fusionBeat,
         _x: xt
       },
       allOf: [

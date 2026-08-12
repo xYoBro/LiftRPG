@@ -42,7 +42,12 @@ import {
   // structured schemas below so a compat transport enforces what the stage
   // validators enforce.
   VALID_COMPONENT_DIALECTS,
-  OUTPUT_BUDGETS
+  OUTPUT_BUDGETS,
+  // D128 → W4a: pipeline debris lives under `_x`, the only home the schema
+  // has ever allowed it. These two are the whole move — a direct
+  // `booklet._foo =` is caught by pipelineDebrisHome() in validate.mjs.
+  readPipelineDebris,
+  writePipelineDebris
 } from './modules/constants.js';
 
 import {
@@ -1897,7 +1902,7 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
     report.finalMin = last.min;
     report.finalAvg = last.avg;
   }
-  booklet._criticReport = report;
+  writePipelineDebris(booklet, '_criticReport', report);
   if (!report.finished) {
     console.warn('[LiftRPG] Critic loop ended below threshold ' + threshold
       + ' — delivering with critique attached (quality heuristics warn, never block — D19).');
@@ -2618,7 +2623,7 @@ async function runApiPipeline(options) {
 
   var booklet = options.assemble(shell, assembledWeeksOutput, assembledFragmentsOutput, assembledEndingsOutput, campaignPlan);
   enforceIdentityContract(booklet, identityContract);
-  truthBoardStateMode(booklet, booklet._assemblyDiagnostics || []);
+  truthBoardStateMode(booklet, readPipelineDebris(booklet, '_assemblyDiagnostics') || []);
   recordSeedOnBooklet(booklet, divergenceSeed);
   recordWorkoutLifecycle(booklet, workoutLifecycle);
 
@@ -2634,21 +2639,21 @@ async function runApiPipeline(options) {
 
   var report = generateQualityReport(booklet);
   var qualityGate = buildQualityGate(report);
-  booklet._qualityReport = report;
-  booklet._qualityGate = qualityGate;
-  booklet._pipeline = booklet._pipeline || 'standard';
+  writePipelineDebris(booklet, '_qualityReport', report);
+  writePipelineDebris(booklet, '_qualityGate', qualityGate);
+  writePipelineDebris(booklet, '_pipeline', readPipelineDebris(booklet, '_pipeline') || 'standard');
 
   // Persist Layer 2 assembly diagnostics (serialization-safe)
-  booklet._assemblyWarnings = {
-    diagnostics: booklet._assemblyDiagnostics || [],
+  writePipelineDebris(booklet, '_assemblyWarnings', {
+    diagnostics: readPipelineDebris(booklet, '_assemblyDiagnostics') || [],
     validationErrors: validationResult.errors,
     validationWarnings: validationResult.warnings
-  };
-  delete booklet._assemblyDiagnostics;
+  });
+  delete booklet._x._assemblyDiagnostics;
 
   // Post-assembly artifact-intent drift diagnostics (Layer 3 planning contract)
   var driftResult = compareArtifactIntentDrift(booklet);
-  booklet._artifactIntentDrift = driftResult;
+  writePipelineDebris(booklet, '_artifactIntentDrift', driftResult);
   if (driftResult.diagnostics.length > 0) {
     console.warn('[LiftRPG] Artifact intent drift:', driftResult.diagnostics.length, 'issue(s)');
   }
@@ -2677,8 +2682,8 @@ async function runApiPipeline(options) {
     // Revisions changed prose — refresh the mechanical report to match.
     report = generateQualityReport(booklet);
     qualityGate = buildQualityGate(report);
-    booklet._qualityReport = report;
-    booklet._qualityGate = qualityGate;
+    writePipelineDebris(booklet, '_qualityReport', report);
+    writePipelineDebris(booklet, '_qualityGate', qualityGate);
   }
 
   emitPipelineEvent(onProgress, totalStages, totalStages, qualityGate.passed
@@ -3665,7 +3670,7 @@ async function runSkeletonFleshPipeline(options) {
     : null;
   if (identityContract) {
     enforceIdentityContract(booklet, identityContract);
-    truthBoardStateMode(booklet, booklet._assemblyDiagnostics || []);
+    truthBoardStateMode(booklet, readPipelineDebris(booklet, '_assemblyDiagnostics') || []);
   }
 
   var validationResult = validateAssembledBooklet(booklet);
@@ -3679,22 +3684,22 @@ async function runSkeletonFleshPipeline(options) {
   // ── Persist telemetry, continuity, and assembly diagnostics ──
   var report = generateQualityReport(booklet);
   var qualityGate = buildQualityGate(report);
-  booklet._qualityReport = report;
-  booklet._qualityGate = qualityGate;
-  booklet._pipeline = 'skeleton-flesh';
-  booklet._trialMode = trialMode;
+  writePipelineDebris(booklet, '_qualityReport', report);
+  writePipelineDebris(booklet, '_qualityGate', qualityGate);
+  writePipelineDebris(booklet, '_pipeline', 'skeleton-flesh');
+  writePipelineDebris(booklet, '_trialMode', trialMode);
 
   // Persist Layer 2 assembly diagnostics (serialization-safe, same shape as standard pipeline)
-  booklet._assemblyWarnings = {
-    diagnostics: booklet._assemblyDiagnostics || [],
+  writePipelineDebris(booklet, '_assemblyWarnings', {
+    diagnostics: readPipelineDebris(booklet, '_assemblyDiagnostics') || [],
     validationErrors: validationResult.errors,
     validationWarnings: validationResult.warnings
-  };
-  delete booklet._assemblyDiagnostics;
+  });
+  delete booklet._x._assemblyDiagnostics;
 
   // Post-assembly artifact-intent drift diagnostics (Layer 3 planning contract)
   var driftResult = compareArtifactIntentDrift(booklet);
-  booklet._artifactIntentDrift = driftResult;
+  writePipelineDebris(booklet, '_artifactIntentDrift', driftResult);
   if (driftResult.diagnostics.length > 0) {
     console.warn('[S+F] Artifact intent drift:', driftResult.diagnostics.length, 'issue(s)');
   }
@@ -3715,8 +3720,8 @@ async function runSkeletonFleshPipeline(options) {
   if (sfCriticReport && sfCriticReport.revisedUnits > 0) {
     report = generateQualityReport(booklet);
     qualityGate = buildQualityGate(report);
-    booklet._qualityReport = report;
-    booklet._qualityGate = qualityGate;
+    writePipelineDebris(booklet, '_qualityReport', report);
+    writePipelineDebris(booklet, '_qualityGate', qualityGate);
   }
 
   emitPipelineEvent(onProgress, totalStages, totalStages, qualityGate.passed
@@ -3728,7 +3733,7 @@ async function runSkeletonFleshPipeline(options) {
     completionSource: 'local'
   });
 
-  booklet._continuityWarnings = sfContinuityWarnings;
+  writePipelineDebris(booklet, '_continuityWarnings', sfContinuityWarnings);
 
   // Build stage telemetry summary
   var totalLatencyMs = 0;
@@ -3744,7 +3749,7 @@ async function runSkeletonFleshPipeline(options) {
     totalTokens += safeNumber(stUsage.totalTokens);
     totalCostUsd += safeNumber(sfTelemetry[ti].estimatedCostUsd);
   }
-  booklet._stageTelemetry = {
+  writePipelineDebris(booklet, '_stageTelemetry', {
     stages: sfTelemetry,
     summary: {
       totalStages: sfTelemetry.length,
@@ -3754,7 +3759,7 @@ async function runSkeletonFleshPipeline(options) {
       totalTokens: totalTokens,
       totalCostUsd: totalCostUsd
     }
-  };
+  });
 
   persistLastBooklet(booklet, { source: 'skeleton-flesh' });
   clearCheckpoint();
@@ -3986,7 +3991,7 @@ function auditGuidedBuild(data) {
         gate.blockers.forEach(function (b) { entry.degraded.push(b.message); });
       }
       // Artifact intent drift
-      var drift = data.assembledBooklet._artifactIntentDrift || compareArtifactIntentDrift(data.assembledBooklet);
+      var drift = readPipelineDebris(data.assembledBooklet, '_artifactIntentDrift') || compareArtifactIntentDrift(data.assembledBooklet);
       if (drift.diagnostics && drift.diagnostics.length > 0) {
         drift.diagnostics.forEach(function (d) {
           if (d.severity === 'error') entry.blocking.push('[drift] ' + d.message);
@@ -4090,6 +4095,12 @@ window.LiftRPGAPI = {
     getShelved: getShelvedCheckpoint,
     clearShelved: clearShelvedCheckpoint
   },
+  // The one debris reader, exposed so the landing page reads through the same
+  // function the pipeline writes with (D93). index.html is a classic script and
+  // cannot import contract-constants; a second inline fallback there is exactly
+  // how the new position gets read in one place and the legacy position in
+  // another (D128 → W4a).
+  readPipelineDebris: readPipelineDebris,
   manual: {
     structuredSchemas: {
       shell: STRUCTURED_SCHEMA_SHELL

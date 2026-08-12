@@ -188,7 +188,17 @@ import {
   MARK_STRIP_TARGET_KINDS,
   RECKONING_SINK_KINDS,
   RECKONING_THRESHOLD_RATIO,
-  OUTPUT_BUDGETS
+  OUTPUT_BUDGETS,
+  LUDIC_LIBRARY,
+  LUDIC_LIBRARY_ATOMS,
+  VALID_DYNAMIC_MARKINGS,
+  SPINE_BUDGETS,
+  SURFACE_REF_KINDS,
+  SURFACE_REF_SINGLETONS,
+  parseSurfaceRef,
+  PIPELINE_DEBRIS_KEYS,
+  readPipelineDebris,
+  writePipelineDebris
 } from '../../contracts/contract-constants.mjs';
 
 export {
@@ -230,7 +240,26 @@ export {
   // Prose caps (Teeth Round T1a). Hoisted to contract-constants when breaches
   // became stage-blocking: api-generator.js reads them through here to stamp
   // maxLength onto the structured schemas the compat transports enforce.
-  OUTPUT_BUDGETS
+  OUTPUT_BUDGETS,
+  // ── The Ludic Spine (W4a) ──────────────────────────────────────────────
+  // The play vocabulary and its one ref grammar. Re-exported, never
+  // re-declared: parseSurfaceRef has a single home (D93) and the floors, the
+  // prompt-parity pass, and the W4b simulated player all reach it through
+  // this seam.
+  LUDIC_LIBRARY,
+  LUDIC_LIBRARY_ATOMS,
+  VALID_DYNAMIC_MARKINGS,
+  SPINE_BUDGETS,
+  SURFACE_REF_KINDS,
+  SURFACE_REF_SINGLETONS,
+  parseSurfaceRef,
+  // ── Pipeline debris (D128) ─────────────────────────────────────────────
+  // `_x` is the only lawful home for non-contract data and always was; the
+  // pipelines wrote ten keys at top level anyway, where the schema rejects
+  // every one. write/read are the seam that makes the move total.
+  PIPELINE_DEBRIS_KEYS,
+  readPipelineDebris,
+  writePipelineDebris
 };
 
 export var SUPPORTED_THEME_ARCHETYPES = VALID_ARCHETYPES.reduce(function (acc, name) {
