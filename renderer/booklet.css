@@ -4228,6 +4228,48 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   fill:color-mix(in srgb, var(--accent) 28%, var(--ink) 72%);
 }
 
+/* ── Clocks panel — the week-level gameplayClocks surface ───────────────────
+   `.clocks-panel` is stamped by atoms/clocks-panel.js onto the section
+   renderGameplayClocks() returns, so everything above (and every
+   `[data-component-dialect]` rule below) applies to it unchanged. Only the
+   grid's column count is panel business.
+
+   CROSS-FILE CONTRACT: the two numbers here — the column count and the two
+   gaps — are mirrored as GRID_COLS / GRID_COL_GAP_PX / GRID_ROW_GAP_PX in
+   renderer/modules/atoms/clocks-panel.js, together with the `.ops-clocks`,
+   `.doc-label`, `.clock-item`, `.clock-visuals`, `.clock-name`,
+   `.clock-subtext`, `.clock-consequence`, `.clock-thresholds` and
+   `.clock-threshold` figures it reads from the rules above. That file carries
+   the reverse pointer and the ruling on why this panel has no density ladder.
+   Change them together or the estimate lies.
+
+   WHY A FIXED COLUMN COUNT and not the shared `auto-fit minmax(120px,1fr)`:
+   phase-1 estimation has no DOM, so a wrap point set by the container width is
+   one the estimate cannot compute — the same reason `.reckoning-tally` is a
+   fixed-column grid. Two columns keep the info column near the width it has in
+   a half slot, which is what the 5pt type was drawn for; a lone clock takes the
+   full panel rather than sitting beside a void. Interlude clock payloads keep
+   the auto-fit rule — they are not this panel. */
+.clocks-panel .clock-grid{
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  column-gap:8px;
+  row-gap:6px;
+}
+.clocks-panel[data-clock-count="1"] .clock-grid{
+  grid-template-columns:1fr;
+}
+/* The dial is a 42px box and must MEASURE as one. An inline `<svg>` sits on a
+   text baseline, so `.clock-visuals` reports a 50px scrollHeight around its
+   42px client box — 8px of phantom descender that reaches the planner as
+   internal overflow (measurement-harness.js measureInternalOverflowPx) and
+   makes every panel measure ~4px taller than its own geometry says. Blocking
+   the SVG removes the line box, not any drawing. Scoped to the panel: the
+   interlude clock payload keeps its current rendering byte-for-byte, and the
+   same looseness there is a separate, cosmetic follow-up. */
+.clocks-panel .progress-clock-svg{
+  display:block;
+}
+
 /* ── Component dialect ──────────────────────────────────────────────────────
    `data-component-dialect` is stamped on #booklet-container by applyTheme()
    from meta.artifactIdentity.componentDialect. It answers "whose instrument is

@@ -404,6 +404,113 @@ export function buildOracleModel(oracle) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Clock thresholds — normalisation to printable strings
+// ---------------------------------------------------------------------------
+/**
+ * `gameplayClock.thresholds` is schema-typed `['array','object']` with NO item
+ * schema (contracts/booklet-schema.mjs), and the corpus proves the LLM took the
+ * invitation: across 113 authored clocks the field arrives in twelve shapes —
+ * plain strings, bare segment numbers, `{value,consequence}`, `{at,effect}`
+ * (the plurality), `{segment,description}`, `{value,label,consequence}`,
+ * `{side,segment,consequence}`, `{atSegment,consequence}` and friends, plus
+ * three clocks where `thresholds` is a bare map (`{"4":"…"}`, `{halfway:3}`).
+ *
+ * The renderer prints each entry with `String(entry)`. Fifty-eight of those
+ * clocks would therefore have printed the literal text "[object Object]" onto
+ * a page, and the three map-shaped ones would have dropped their thresholds
+ * silently (the old `Array.isArray(...) ? ... : []` clause). That never
+ * surfaced because until now the ONLY clock that reached paper was the
+ * tidewall interlude payload, whose thresholds are plain sentences.
+ *
+ * So the normalisation lives here, in the model layer, where both clock call
+ * sites (interlude payload, week-level clocks panel) already pass through:
+ * `thresholds` leaves this function as an array of printable strings, which is
+ * also what lets the clocks-panel estimate count characters against exactly the
+ * strings render() will lay out.
+ *
+ * Strings pass through with only `.trim()`, so tidewall's render is unchanged.
+ *
+ * Key names are pipeline vocabulary and are never printed; only their values
+ * are. The final fallback joins every primitive value an unrecognised object
+ * carries — an ugly line is a bug report, "[object Object]" is a lie.
+ */
+const THRESHOLD_SIDE_KEYS = ['side', 'track', 'pole'];
+const THRESHOLD_AT_KEYS = ['value', 'segment', 'at', 'atSegment', 'tick'];
+const THRESHOLD_TEXT_KEYS = ['consequence', 'effect', 'description', 'label', 'text', 'note'];
+const THRESHOLD_JOIN = ' — ';
+
+function isPrintablePrimitive(value) {
+  return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+}
+
+function thresholdEntryText(entry) {
+  if (entry == null) return '';
+  if (isPrintablePrimitive(entry)) return String(entry).trim();
+  if (Array.isArray(entry)) {
+    return entry.map(thresholdEntryText).filter(Boolean).join(THRESHOLD_JOIN);
+  }
+  if (typeof entry !== 'object') return '';
+
+  const parts = [];
+  const claimed = new Set();
+  const claimFirst = (keys) => {
+    for (const key of keys) {
+      if (claimed.has(key)) continue;
+      if (!isPrintablePrimitive(entry[key])) continue;
+      const text = String(entry[key]).trim();
+      claimed.add(key);
+      if (text) { parts.push(text); return; }
+    }
+  };
+  claimFirst(THRESHOLD_SIDE_KEYS);
+  claimFirst(THRESHOLD_AT_KEYS);
+  for (const key of THRESHOLD_TEXT_KEYS) {
+    if (claimed.has(key) || !isPrintablePrimitive(entry[key])) continue;
+    const text = String(entry[key]).trim();
+    claimed.add(key);
+    if (text) parts.push(text);
+  }
+  if (parts.length) return parts.join(THRESHOLD_JOIN);
+
+  return Object.keys(entry)
+    .map((key) => entry[key])
+    .filter(isPrintablePrimitive)
+    .map((value) => String(value).trim())
+    .filter(Boolean)
+    .join(THRESHOLD_JOIN);
+}
+
+/**
+ * @param {*} raw — `clock.thresholds` exactly as authored
+ * @returns {string[]} printable threshold lines (never objects, never empty strings)
+ */
+export function normalizeClockThresholds(raw) {
+  if (Array.isArray(raw)) {
+    return raw.map(thresholdEntryText).filter(Boolean);
+  }
+  if (raw && typeof raw === 'object') {
+    // Map form. The key carries the reading in both observed variants —
+    // `{"4": "the screen backs up"}` (segment → consequence) and
+    // `{halfway: 3}` (label → segment) — so "key — value" reads correctly
+    // either way without guessing which is which.
+    return Object.keys(raw)
+      .map((key) => {
+        const value = thresholdEntryText(raw[key]);
+        const label = String(key).trim();
+        if (!value) return label;
+        if (!label) return value;
+        return label + THRESHOLD_JOIN + value;
+      })
+      .filter(Boolean);
+  }
+  if (isPrintablePrimitive(raw)) {
+    const text = String(raw).trim();
+    return text ? [text] : [];
+  }
+  return [];
+}
+
 export function buildClockModels(clocks) {
   return (clocks || []).map((clock) => ({
     clockName: clock.clockName || 'Clock',
@@ -413,7 +520,7 @@ export function buildClockModels(clocks) {
     direction: String(clock.direction || '').trim().toLowerCase() || 'fill',
     linkedClockName: clock.linkedClockName || clock.linkedTo || '',
     opposedClockName: clock.opposedClockName || clock.racingAgainst || '',
-    thresholds: Array.isArray(clock.thresholds) ? clock.thresholds : [],
+    thresholds: normalizeClockThresholds(clock.thresholds),
     consequenceOnFull: clock.consequenceOnFull || ''
   }));
 }

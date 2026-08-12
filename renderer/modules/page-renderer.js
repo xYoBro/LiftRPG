@@ -13,7 +13,20 @@ import { getShellDecorator } from './shell-decorator-registry.js';
 // (including the measurement harness) also gets decorator registration.
 import './decorators/index.js';
 
-const WORKOUT_PAGE_TYPES = new Set(['week-header', 'session-card', 'week-footer']);
+// A page is a session log because it carries session content, NOT because it
+// carries a week footer. The footer is a page-structural band the renderer
+// positions (ZONE-ASSIGNMENT-DESIGN §6) and appendWeeklyFooter() synthesises
+// one on any page that needs it — so a footer is evidence of which WEEK a page
+// belongs to, never of what is on it.
+//
+// It was listed here until the clocks panel produced the first page whose only
+// workout-typed placement was a footer: a boss week's clocks, pushed off a full
+// card page, arrived as a `page-workout-left` shell with `data-card-count="0"`
+// and a session-log boundary — which is what the diagnostics gate 'session
+// cards exist on workout pages' caught. Measured across the corpus, no page
+// before the clocks panel had a footer without a header or a card, so this
+// narrowing reclassifies those pages and nothing else.
+const WORKOUT_PAGE_TYPES = new Set(['week-header', 'session-card']);
 // reckoning-panel is deliberately NOT a mechanic page type: on non-boss weeks
 // it shares field-ops pages that cipher/oracle already classify, and on boss
 // weeks it shares the final session-chunk page, which routes as a workout page
@@ -23,7 +36,15 @@ const WORKOUT_PAGE_TYPES = new Set(['week-header', 'session-card', 'week-footer'
 //
 // It is NOT what inverted the panel against the cards in Session 1: that was
 // the type partition in renderWorkoutPage(), fixed there.
-const MECHANIC_PAGE_TYPES = new Set(['cipher-panel', 'oracle-table', 'map-panel', 'tracker']);
+//
+// clocks-panel IS listed: unlike the reckoning panel it has no workout-page
+// fallback seat, so the one case that matters is the opposite one — a week
+// whose clocks are pushed onto a page of their own. Without an entry here that
+// page would fall through to the generic branch and be built as a
+// `page-clocks-panel` shell that no CSS has ever styled; with it, a solo clocks
+// page is a field-ops page with the frame, the board-state title and the week
+// footer that every other field-ops page carries.
+const MECHANIC_PAGE_TYPES = new Set(['cipher-panel', 'oracle-table', 'map-panel', 'clocks-panel', 'tracker']);
 const BOARD_STATE_COPY = {
   'survey-grid': {
     pageTitle: 'Field Operations',

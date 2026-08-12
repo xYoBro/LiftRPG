@@ -21,6 +21,7 @@ import './atoms/cipher-panel.js';
 import './atoms/oracle-table.js';
 import './atoms/reckoning-panel.js';
 import './atoms/map-panel.js';
+import './atoms/clocks-panel.js';
 import './atoms/boss-encounter.js';
 import './atoms/interlude.js';
 import './atoms/fragment-doc.js';

@@ -389,6 +389,8 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         }));
       }
 
+      // Clocks panel — see the emission below the boss branch.
+
       // Reckoning panel — see the emission below the boss branch.
 
       // Companion components (trackers)
@@ -456,6 +458,62 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
           }));
         }
       }
+    }
+
+    // ── Clocks panel (week-level gameplayClocks) ──────────────────────────
+    // Emitted OUTSIDE the boss branch, and that placement is load-bearing:
+    // nine of the eleven corpus fixtures that author clocks put a set on the
+    // BOSS week — twenty clocks on the weeks that matter most, where the
+    // danger clock is supposed to be running out. A non-boss-only emission
+    // would have printed 48 of the 57 authored panels and quietly reproduced
+    // the very defect this atom exists to close.
+    //
+    // SEATING, both cases:
+    //   • Non-boss — a PEER of cipher / oracle / map in the week's field-ops
+    //     attachment group, sequenced after the map. clocks-panel is not a
+    //     mechanic SURFACE type, so mechanic-layout.js's row template drops it
+    //     into the `other` bucket (one full-width row below the oracle) and
+    //     getMechanicSlotWidthPx() never offers it a half slot. No rowGroup:
+    //     the balanced pair is cipher and map, and a third member would either
+    //     orphan (the planner's rowGroup-orphan diagnostic) or displace one.
+    //   • Boss — the reckoning panel's seat, for the reckoning panel's reason.
+    //     A boss week has no cipher/oracle/map to ride beside and the boss
+    //     encounter locks a full page, so a field-ops seat strands the panel on
+    //     a near-void right page. It joins the week's FINAL session-chunk group
+    //     on the left instead, between the last card and the week footer, at a
+    //     sequence just ahead of the reckoning panel: mark the sets, read the
+    //     clocks, then resolve.
+    if (Array.isArray(week.gameplayClocks) && week.gameplayClocks.length) {
+      const lastChunk = Math.max(0, sessionChunks.length - 1);
+      const clocksSeat = isBoss
+        ? {
+          group: `week-${wi}-chunk-${lastChunk}`,
+          sequence: wi * 1000 + lastChunk * 100 + 39,
+          pageAffinity: 'left',
+        }
+        : {
+          group: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'clocks', artifactIdentity),
+          sequence: wi * 1000 + 104,
+          pageAffinity: 'right',
+        };
+
+      atoms.push(createAtom({
+        type: 'clocks-panel',
+        id: `w${wi}-clocks`,
+        shellAttrs,
+        group: clocksSeat.group,
+        groupPolicy: singlePageGroupPolicy(),
+        section: 'body',
+        sequence: clocksSeat.sequence,
+        sizeHint: 'quarter-page',
+        pageAffinity: clocksSeat.pageAffinity,
+        data: {
+          clocks: week.gameplayClocks,
+          weekIndex: wi,
+          totalWeeks,
+          artifactIdentity,
+        },
+      }));
     }
 
     // ── Reckoning panel (the Resolve surface) ─────────────────────────────

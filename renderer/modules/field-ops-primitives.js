@@ -59,6 +59,35 @@ function segmentPath(cx, cy, radius, startAngle, endAngle) {
  * would import a dead presentation profile into the live path. It stays where
  * it is, with the rest of the generic-tracker seed (D6 class).
  */
+/**
+ * The one line of derived prose a clock face carries under its name, or ''.
+ *
+ * SINGLE HOME. Exported because atoms/clocks-panel.js has to count this
+ * string's characters in phase 1 to predict the height render() will produce,
+ * and a hand-mirrored copy of these four branches is exactly the kind of
+ * quiet divergence the ladder-mirror rules exist to prevent. Pure over its
+ * argument; no DOM.
+ *
+ * @param {object} clock — a model from buildClockModels()
+ * @returns {string}
+ */
+export function clockSubtext(clock) {
+  if (!clock) return '';
+  if (clock.clockType === 'linked-clock' && clock.linkedClockName) {
+    return 'Unlocks ' + clock.linkedClockName;
+  }
+  if (clock.clockType === 'racing-clock' && clock.opposedClockName) {
+    return 'Opposes ' + clock.opposedClockName;
+  }
+  if (clock.clockType === 'tug-of-war-clock') return 'Push / pull state';
+  if (clock.clockType === 'danger-clock') return 'Threat escalates on fill';
+  return '';
+}
+
+/** The prefix `renderGameplayClocks` stamps ahead of `consequenceOnFull`.
+ *  Mirrored by CONSEQUENCE_PREFIX_CHARS in atoms/clocks-panel.js. */
+export const CLOCK_CONSEQUENCE_PREFIX = 'ON FULL: ';
+
 export function renderGameplayClocks(clocks) {
   const section = make('section', 'ops-section ops-clocks');
   section.appendChild(make('div', 'doc-label', 'Active Clocks'));
@@ -152,15 +181,8 @@ export function renderGameplayClocks(clocks) {
 
     const info = make('div', 'clock-info');
     info.appendChild(make('div', 'clock-name', clock.clockName));
-    if (clock.clockType === 'linked-clock' && clock.linkedClockName) {
-      info.appendChild(make('div', 'clock-subtext', 'Unlocks ' + clock.linkedClockName));
-    } else if (clock.clockType === 'racing-clock' && clock.opposedClockName) {
-      info.appendChild(make('div', 'clock-subtext', 'Opposes ' + clock.opposedClockName));
-    } else if (clock.clockType === 'tug-of-war-clock') {
-      info.appendChild(make('div', 'clock-subtext', 'Push / pull state'));
-    } else if (clock.clockType === 'danger-clock') {
-      info.appendChild(make('div', 'clock-subtext', 'Threat escalates on fill'));
-    }
+    const subtext = clockSubtext(clock);
+    if (subtext) info.appendChild(make('div', 'clock-subtext', subtext));
     if ((clock.thresholds || []).length) {
       const thresholds = make('div', 'clock-thresholds');
       (clock.thresholds || []).forEach((threshold) => {
@@ -169,7 +191,7 @@ export function renderGameplayClocks(clocks) {
       info.appendChild(thresholds);
     }
     if (clock.consequenceOnFull) {
-      info.appendChild(make('div', 'clock-consequence', 'ON FULL: ' + clock.consequenceOnFull));
+      info.appendChild(make('div', 'clock-consequence', CLOCK_CONSEQUENCE_PREFIX + clock.consequenceOnFull));
     }
     item.appendChild(info);
     grid.appendChild(item);
