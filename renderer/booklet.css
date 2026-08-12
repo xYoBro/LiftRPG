@@ -1809,9 +1809,40 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   align-items:flex-end;
   justify-content:flex-end;
 }
+/* THE BOX IS SQUARE BY DEFAULT AND WIDER ON DEMAND (Teeth T3).
+   Two facts forced this, both measured on book1-glassworks:
+
+   · The HEIGHT is the pencil floor and stays pinned to `--rep-box-size` at
+     every tier (17.1 / 15 / 14px). It is the term `.exercise-row`'s
+     `min-height` is built from and the term session-card-metrics.js
+     CARD_LADDER.row mirrors, so it must not move — and nothing here moves it:
+     `.rep-boxes` is a single nowrap flex line, so a wider box cannot add a
+     row. This block is width-only by construction.
+   · The WIDTH was fixed at the same token, which made the CONTENT area
+     `--rep-box-size` minus twice the theme frame — 10px in `minimalist`
+     (2px frame), 9.1px in a 4px-frame archetype. A numeric target fits that;
+     a word does not. `AMRAP` (Liftoscript's `+` suffix, utils.js
+     normalizeExerciseCue) measures 16.2px at the tight tier and burst the box
+     on 18 rows; `45s` measures 9.73px and clears a 10px content area by
+     0.27px — the next archetype along would have burst too. Hiding the token
+     is not an option: the rep target is the instruction for the set.
+
+   So the token becomes a FLOOR: min-width keeps every numeric box square, and
+   a longer target widens its own box instead of overflowing it. The reps cell
+   is the grid's `auto` track and the dots cell beside it is `minmax(18px,1fr)`
+   with 230px of slack on the corpus's tightest row, so the growth is paid out
+   of dot leader, not out of the page.
+
+   `flex:0 0 auto` is the second half: without it the boxes were `flex:0 1 auto`
+   inside `.rep-boxes` and a crowded row could shrink them under the 14px floor
+   with nothing to catch it — the same reason `.mark-box` carries the pin. */
 .rep-box{
-  width:var(--rep-box-size);
+  flex:0 0 auto;
+  min-width:var(--rep-box-size);
   height:var(--rep-box-size);
+  /* Ratio, not a pixel literal: the gutter has to scale with whichever tier of
+     the token the card renders at (≈2px at base, 1.7px at tight). */
+  padding-inline:calc(var(--rep-box-size) * 0.12);
   border:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
   border-radius:2px;
   background:var(--paper);
@@ -1828,6 +1859,11 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   letter-spacing:0;
   text-transform:none;
   pointer-events:none;
+  /* One line, always — `line-height:1` and the box's fixed height both assume
+     it. The box widens to hold the token (see `.rep-box`), so this clips
+     nothing; it only stops a squeezed grid track from folding `AMRAP` in half
+     inside a box whose height cannot follow. */
+  white-space:nowrap;
 }
 
 /* ── The REFERENCE token (schema 1.5.0 citeRef, Wave 4b) ────────────────────
@@ -2008,14 +2044,34 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
    together or the density solver's shrink-potential arithmetic lies (D71).
 
    TWO DECLARATIONS ARE LOAD-BEARING BEYOND THEIR LOOKS:
-   · `flex-wrap:nowrap` on the strip and `white-space:nowrap` + ellipsis on the
-     label pin the row to ONE line whatever the target count. That is the only
-     reason the strip's height is modellable without a wrap term. Relax either
-     and the estimate silently under-reads a wrapped strip.
+   · `flex-wrap:nowrap` on the strip keeps the TARGETS on one row whatever the
+     count — they divide the card's width, they never stack. That is what
+     makes the strip's height independent of the target count, and it has not
+     changed. What DID change (Teeth T3) is the label: it used to be pinned to
+     one line by `white-space:nowrap` + ellipsis, and that pin was hiding live
+     text. Measured on book1-glassworks: 41 of 71 labels overflowed their
+     column, up to 44px each, with the ellipsis quietly eating the end of the
+     instruction — and nothing could see it, because a horizontal ellipsis
+     clamp is invisible to both the engine's internal-overflow detector and
+     the density solver. One line is not recoverable by any re-budget either:
+     four targets on a 402px strip leave 78px per label, and a 28-character
+     label (T1's schema cap) needs ~110px at the tight tier's 5.1pt — fitting
+     it on one line would take a ~3.6pt face, which is not print-legible.
+     So the label is now a FIXED TWO-LINE ZONE: `height` = 2 × its own line
+     box (in `em`, so every tier follows its own font-size — D72), wrapping
+     normally inside it. Fixed, not min: the height stays a constant the
+     estimate can carry, exactly as the one-line pin did, and it no longer
+     depends on how long the label is. No `-webkit-line-clamp` — the D77
+     truncation law, and a clamped node is one `measureInternalOverflowPx`
+     skips on purpose; a plain bounded box means a label that ever needs a
+     third line reports as real overflow instead of vanishing.
    · `--mark-box-size` holds 15px at every density tier. A tick box is a place
      a pencil has to land; shrinking it is not a saving, and modelling it as
      shrinkable would promise the solver 12px it never delivers. The strip's
-     honest shrink is its own padding, 3px end to end.
+     honest shrink is its own padding, 3px end to end. (The two-line zone is
+     now the taller term at every tier — 16.3px at tight against the 15px box
+     — so the strip's height is the label zone's; STRIP_LADDER's `max()` picks
+     that up without an edit.)
 
    Character comes from theme tokens only (--ink / --rule / --paper /
    --theme-*), so a new archetype restyles the strip without touching this
@@ -2053,14 +2109,21 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   background:var(--paper);
 }
 .mark-label{
+  /* Both mirrored in session-card-metrics.js: MARK_LABEL_LINES and the
+     STRIP_LADDER `labelLine` column (font-size × this line-height). */
+  --mark-label-lines:2;
+  --mark-label-line-height:1.2;
   font-family:var(--mono);
   font-size:5.6pt;
-  line-height:1.2;
+  line-height:var(--mark-label-line-height);
   letter-spacing:.04em;
   color:var(--ink);
-  white-space:nowrap;
+  /* `1em` resolves against the label's OWN font-size, so each density tier's
+     zone follows the font-size that tier declares — no per-tier height rule,
+     and no `em` measured against an unstyled parent (D72). */
+  height:calc(var(--mark-label-lines) * var(--mark-label-line-height) * 1em);
   overflow:hidden;
-  text-overflow:ellipsis;
+  overflow-wrap:break-word;
   min-width:0;
 }
 
@@ -3275,16 +3338,40 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
    HEIGHT CONTRACT (load-bearing): fragment blocks are `flex:1`, so this strip
    takes its height out of theirs — every pixel here is a pixel off the
    documents, and enough of them flips a page count. It must stay a single
-   nowrap row: ~9px of content (the 7px box is the tallest thing in it) + 3px
-   pad + 1px rule = ~13px, against an ~18px ceiling. Do not add a second line,
-   a heading row, or vertical padding without re-measuring the corpus. */
+   nowrap row, and the whole row must stay at or under the ~18px ceiling. Do
+   not add a second line, a heading row, or vertical padding without
+   re-measuring the corpus.
+
+   THE CEILING IS NOT ~18px. IT IS 16px, AND THE CORPUS SET IT (Teeth T3).
+   The tick box used to be 7px — ~1.9mm on paper, which the auditor flagged
+   against D89's 15px write-in floor, and rightly: a box the clerk cannot tick
+   is decoration, not furniture. Raising it to a true 15px is arithmetically
+   inside the stated ~18px ceiling (15 + 2 pad + 1 rule = 18) and is still not
+   landable: measured over the corpus, a strip taller than 16px takes enough
+   off The-Hinge's fragment blocks to shed a page and pull in three
+   post-padding pages (diagnostics.spec.js pins the printed order; 17px fails,
+   16px passes). The stated ceiling was theory; 16px is the measured one.
+
+   So the box is 13px — the largest that fits a 16px row with the separator
+   still breathing (13 + 2 pad + 1 rule). 15px would fit the same row only at
+   `padding-top:0`, flush against the dashed rule, which prints as a broken
+   join. 13px is ~3.4mm: markable, and 86% more box than before, but it is
+   BELOW the D89 floor and that residual is real — scripts/playthrough-audit.mjs
+   carries a matching PENCIL_FLOOR_OVERRIDES entry marked provisional, pending
+   the author's ruling on whether a true 15px is worth re-recording The-Hinge's
+   pin for. There is no slack left here: anything added to this strip comes out
+   of the box, and the box is the one thing that cannot give. */
 .archive-strip{
+  /* Mirrored by the `.archive-strip-box` entry in PENCIL_FLOOR_OVERRIDES
+     (scripts/playthrough-audit.mjs) — the auditor's floor for this surface IS
+     this number, so the two move together or the gate stops meaning anything. */
+  --archive-strip-box-size:13px;
   flex:0 0 auto;
   margin-top:auto;
   display:flex;
   align-items:center;
   gap:6px;
-  padding-top:3px;
+  padding-top:2px;
   border-top:1px dashed color-mix(in srgb, var(--theme-field-rule,var(--rule)) 48%, transparent 52%);
   font-family:var(--mono);
   font-size:4.4pt;
@@ -3318,8 +3405,8 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 }
 .archive-strip-box{
   flex:0 0 auto;
-  width:7px;
-  height:7px;
+  width:var(--archive-strip-box-size);
+  height:var(--archive-strip-box-size);
   border:1px solid color-mix(in srgb, var(--theme-box-border,var(--ink)) 76%, transparent 24%);
 }
 .field-ops-right[data-board-state-mode="ledger-board"] .cipher-zone{

@@ -249,9 +249,16 @@ function buildArchiveFooter(placements) {
  * mark for every document on the page, which is the whole point of adapting
  * instead of vanishing.
  *
- * HEIGHT CONTRACT: the strip must stay at or under ~18px, because fragment
- * blocks are `flex:1` and it takes its height out of theirs. It is a single
- * nowrap row (see `.archive-strip` in booklet.css) and measures ~13px.
+ * HEIGHT CONTRACT: fragment blocks are `flex:1`, so this strip takes its
+ * height out of theirs. It is a single nowrap row (see `.archive-strip` in
+ * booklet.css) and measures 16px. The ~18px figure this note used to quote was
+ * theory; Teeth T3 measured the real ceiling at 16px, where The-Hinge starts
+ * shedding a fragment page and pulling in post-padding. The strip spent that
+ * headroom raising the tick box from 7px (~1.9mm — unmarkable, and flagged by
+ * the auditor against D89's 15px floor) to 13px, which is the most a 16px row
+ * holds with the separator still breathing. That is BELOW the D89 floor; the
+ * residual is recorded in the booklet.css block and in the auditor's
+ * PENCIL_FLOOR_OVERRIDES, marked provisional. No headroom remains.
  *
  * @param {Array} placements — every fragment placement on the page
  * @returns {HTMLElement}

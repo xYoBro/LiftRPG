@@ -71,8 +71,15 @@ function renderExerciseTable(cardModel) {
  * The row NEVER wraps. Targets divide the card's width; they do not stack.
  * That is what makes the strip's height independent of how many targets it
  * carries, which is the property session-card-metrics.js STRIP_LADDER models —
- * see the CROSS-FILE CONTRACT note there before changing `flex-wrap` or the
- * label's `white-space` in booklet.css.
+ * see the CROSS-FILE CONTRACT note there before changing `flex-wrap` in
+ * booklet.css.
+ *
+ * The LABEL, by contrast, does wrap, inside a fixed two-line zone (Teeth T3).
+ * Its height is a constant either way, so the strip stays modellable; what
+ * went away is the one-line ellipsis that used to hide the tail of a long
+ * instruction. Labels are schema-capped at 28 characters, which the zone holds
+ * at every tier; a longer legacy label clips, and clips VISIBLY to the engine
+ * (no line-clamp — see the D77 truncation law note in booklet.css).
  *
  * Labels go in via make()'s textContent, never innerHTML, so LLM-authored text
  * cannot carry markup into the page.

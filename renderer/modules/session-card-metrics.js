@@ -330,24 +330,39 @@ const DEFAULT_CHOICE_LABEL = 'Route Decision';
  * change them together or the solver's shrink potential lies (the D71 class).
  *
  * WHY THE TARGET COUNT DOES NOT APPEAR IN THE HEIGHT. The strip is one flex
- * line with `flex-wrap: nowrap`, and each label is pinned to a single line by
- * `white-space: nowrap; overflow: hidden; text-overflow: ellipsis`. Three
- * targets and five targets therefore produce the SAME height — they divide the
- * card's width, they do not stack. Charging per target would over-estimate a
- * five-target strip by ~4×, and an over-estimate is not "the safe direction"
- * here: at ~20px a target it would add ~250px of phantom height to a
- * three-card page and shed a page that fits. The clamp in the CSS is what
- * makes this modellable at all — it converts an unbounded text term into a
- * constant. Relaxing `nowrap` in either place without adding a wrap term here
- * is the D71 defect, pointed the other way.
+ * line with `flex-wrap: nowrap`. Three targets and five targets therefore
+ * produce the SAME height — they divide the card's width, they do not stack.
+ * Charging per target would over-estimate a five-target strip by ~4×, and an
+ * over-estimate is not "the safe direction" here: at ~20px a target it would
+ * add ~250px of phantom height to a three-card page and shed a page that fits.
+ * Relaxing `flex-wrap` in the CSS without adding a stack term here is the D71
+ * defect, pointed the other way.
  *
- * WHY IT IS FLAT ACROSS THE LADDER. `box` is the tick target — the thing a
- * pencil has to land in — and it holds 15px at every tier by design, above the
- * 14px print floor. The row is `align-items:center`, so its height is
- * max(box, labelLine), and the box wins at all four tiers: the strip's only
- * real shrink is its own padding, 3px end to end. That is the honest number.
- * Modelling the box as scaling with density would hand the solver 12px of
- * shrink potential that the CSS will never deliver.
+ * WHY THE LABEL'S LENGTH DOES NOT APPEAR EITHER, AND HOW THAT CHANGED.
+ * Until Teeth T3 the label was pinned to one line by `white-space: nowrap;
+ * overflow: hidden; text-overflow: ellipsis`, and THAT is what converted an
+ * unbounded text term into a constant. It also silently ate live text: 41 of
+ * book1-glassworks' 71 labels overflowed their column by up to 44px, invisibly,
+ * because a horizontal ellipsis clamp is not something the internal-overflow
+ * detector or the solver can see. One line was never recoverable by a width
+ * re-budget — four targets on a 402px strip leave 78px each, and the schema's
+ * 28-character cap needs ~110px at the tight tier's 5.1pt.
+ *
+ * The label is now a FIXED TWO-LINE ZONE (`.mark-label` height = 2 × its own
+ * line box, in `em`). Fixed, not min: a one-word label and a 28-character one
+ * occupy the same zone, so the term stays a constant and the model stays exact
+ * — and a label that ever needs a THIRD line reports as real internal overflow
+ * rather than disappearing, because the zone carries no `-webkit-line-clamp`
+ * (D77's truncation law; measureInternalOverflowPx skips clamped nodes).
+ *
+ * WHY IT IS STILL FLAT ACROSS THE LADDER. `box` is the tick target — the thing
+ * a pencil has to land in — and it holds 15px at every tier by design, above
+ * the 14px print floor. The row is `align-items:center`, so its height is
+ * max(box, label zone). The zone (2 × labelLine) is now the taller term at all
+ * four tiers, so the strip's only real shrink is its own padding, 3px end to
+ * end, plus the ~0.8px the label face loses between base and tight. Modelling
+ * the box as scaling with density would still hand the solver 12px of shrink
+ * potential the CSS will never deliver.
  *
  *   padTop    `.mark-strip` padding-top.
  *   border    its border-top. `--theme-hair-width` resolves to 1px in nine
@@ -355,10 +370,10 @@ const DEFAULT_CHOICE_LABEL = 'Route Decision';
  *             no theme knowledge and takes the worst case, as CARD_LADDER's
  *             header row does for the same reason.
  *   box       `.mark-box` height — density-invariant, and deliberately so.
- *   labelLine `.mark-label` line box (font-size × line-height), carried so the
- *             max() above is explicit rather than assumed. It is below `box`
- *             at every tier today; if a theme ever pushes it above, the model
- *             follows without an edit.
+ *   labelLine ONE `.mark-label` line box (font-size × line-height). The zone is
+ *             MARK_LABEL_LINES of these; the max() above is written out so a
+ *             theme that ever pushed the box above the zone would follow
+ *             without an edit.
  */
 const STRIP_LADDER = {
   //         padTop  border  box  labelLine   ← booklet.css `.mark-strip`
@@ -367,6 +382,13 @@ const STRIP_LADDER = {
   dense:   { padTop: 3, border: 1.5, box: 15, labelLine: 8.48 }, // 5.3pt × 1.2
   tight:   { padTop: 2, border: 1.5, box: 15, labelLine: 8.16 }, // 5.1pt × 1.2
 };
+
+/**
+ * Lines the label zone always reserves. Mirrors `--mark-label-lines` on
+ * `.mark-label` in booklet.css — the two must move together, or the strip
+ * renders at a height the model did not predict (D71).
+ */
+const MARK_LABEL_LINES = 2;
 
 /**
  * MICRO-LINES, OPENING ECHO, RETURN BEAT — the Wave 4b re-entry surfaces.
@@ -584,7 +606,8 @@ function rawMarkStripHeight(markStrip, density) {
   if (!targets.length) return 0;
 
   const tier = STRIP_LADDER[variantKey(density)];
-  return tier.padTop + tier.border + Math.max(tier.box, tier.labelLine);
+  return tier.padTop + tier.border
+    + Math.max(tier.box, tier.labelLine * MARK_LABEL_LINES);
 }
 
 /**
