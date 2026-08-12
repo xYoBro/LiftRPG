@@ -28,6 +28,167 @@ function setStatus(message, tone) {
 
 function syncLoadedState() {
   document.body.setAttribute('data-booklet-loaded', state.data ? 'true' : 'false');
+  if (!state.data) publishRenderState('idle', 'no-booklet');
+}
+
+// ── Render-settled marker ────────────────────────────────────────────────────
+//
+// `document.body[data-render-state]` is the machine-readable answer to the only
+// question a browser harness actually asks: "is what I am looking at the FINAL
+// layout?" The status line was never that answer. It is written by four
+// branches of loadBooklet() and again by every render pass, so which render a
+// harness samples depends on the book's ending state rather than on the render:
+// a book that lands on loadBooklet()'s `hasPlaceholderEnding` branch leaves
+// "Loaded <file>. Ending is still unsealed…" on screen at the FIRST render,
+// while a demo or generator book leaves a line with no "Loaded" in it and the
+// harness waits — by accident — for the font-aware pass.
+//
+// Fonts make that a correctness problem rather than a cosmetic one. The
+// vendored faces are `font-display: swap` (D92), so the first render lays out
+// in FALLBACK metrics and the swap reflows the book underneath it. Measured
+// 2026-08-12 by pinning the renderer pre-swap: the pre-font and post-font
+// layouts differ on 3 of 4 corpus fixtures sampled (1–3 pages each). Sampling
+// early does not add noise to a number — it reports a different book.
+//
+// States: idle (nothing loaded) → rendering → settled; stalled on timeout.
+// `settled` is only ever raised by a watcher whose generation still matches,
+// and only when ALL of:
+//   (a) document.fonts.status === 'loaded' — no face in flight. Re-checked at
+//       every sample and un-latched by the FontFaceSet 'loading' event, because
+//       'loaded' is ALSO what the set reports BEFORE loading has begun. That is
+//       not a hypothetical: MEASURED on this renderer, document.fonts.ready
+//       resolves ~250ms in against the TOOLBAR's faces — before the booklet has
+//       rendered at all (~600ms) and before its own faces have been requested.
+//       Awaiting that promise proves nothing about the book.
+//   (b) no font-aware re-render is pending (state.pendingFontRenderToken);
+//   (c) the booklet's geometry signature is identical across two samples that
+//       straddle an animation frame — nothing moved after a layout and a paint.
+//       Read that literally: it means "held still across one ~76ms sample gap",
+//       NOT "will never move again". MEASURED: geometry wobbling on a 120ms
+//       period slips through this leg (two samples can agree between wobbles);
+//       only per-frame motion always trips it. That is the honest limit of any
+//       quiescence test, and the reason (a) and (b) — not (c) — are what make
+//       this marker sound. (c) is the backstop for motion with no font event
+//       behind it, and it is why 'stalled' exists at all.
+//   (d) at least one page exists. A render that produced nothing is a failure
+//       to shout about, not a quiet green sample of an empty container.
+// Every render bumps the generation before touching the DOM, so a watcher from
+// an earlier pass can never raise the flag for a newer one.
+//
+// Inert for readers: one attribute nothing styles, one bounded poll, one font
+// listener. Nothing here changes what is rendered or when.
+
+const RENDER_SETTLE_POLL_MS = 60;
+const RENDER_SETTLE_MAX_MS = 20000;
+
+let renderGeneration = 0;
+let renderSettleTimer = null;
+
+function publishRenderState(value, reason, extra) {
+  document.body.setAttribute('data-render-state', value);
+  window.__liftrpgRenderState = Object.assign({
+    state: value,
+    reason: reason || '',
+    generation: renderGeneration,
+    atMs: Math.round(window.performance ? window.performance.now() : 0)
+  }, extra || {});
+}
+
+// Font-sensitive on purpose. Page boxes are a fixed 5.5×8.5in and say nothing;
+// what a font swap moves is the CONTENT — how far down the frame the last block
+// ends, how much the frame scrolls, how the planner split the book.
+function bookletGeometrySignature() {
+  const pages = refs.booklet
+    ? refs.booklet.querySelectorAll('.booklet-page[data-page-number]')
+    : [];
+  let hash = 5381;
+  const mix = (value) => { hash = ((hash * 33) ^ (Number(value) | 0)) >>> 0; };
+  mix(pages.length);
+  for (let i = 0; i < pages.length; i += 1) {
+    const frame = pages[i].querySelector('.page-frame') || pages[i];
+    const last = frame.lastElementChild;
+    mix(frame.scrollHeight);
+    mix(frame.scrollWidth);
+    mix(frame.childElementCount);
+    mix(last ? last.offsetTop : -1);
+    mix(last ? last.offsetHeight : -1);
+  }
+  return { pages: pages.length, hash };
+}
+
+function renderSettleBlocker(sample) {
+  if (document.fonts && document.fonts.status !== 'loaded') return 'fonts-loading';
+  if (state.pendingFontRenderToken) return 'font-rerender-pending';
+  if (!sample.pages) return 'no-pages';
+  return '';
+}
+
+function beginRenderPass(reason) {
+  renderGeneration += 1;
+  if (renderSettleTimer !== null) {
+    window.clearTimeout(renderSettleTimer);
+    renderSettleTimer = null;
+  }
+  publishRenderState('rendering', reason || 'render-in-progress');
+}
+
+function watchForRenderSettled() {
+  const generation = renderGeneration;
+  const startedAt = window.performance ? window.performance.now() : Date.now();
+  let previousHash = null;
+  let samples = 0;
+
+  function sampleOnce() {
+    if (generation !== renderGeneration) return; // a newer pass owns the flag now
+
+    const sample = bookletGeometrySignature();
+    const blocker = renderSettleBlocker(sample);
+    samples += 1;
+
+    if (!blocker && previousHash !== null && previousHash === sample.hash) {
+      publishRenderState('settled', 'quiescent', {
+        pages: sample.pages,
+        signature: sample.hash,
+        samples
+      });
+      return;
+    }
+
+    // Any blocker voids the pair — two equal samples only mean something when
+    // both were taken with the fonts down and no re-render owed.
+    previousHash = blocker ? null : sample.hash;
+
+    const elapsed = (window.performance ? window.performance.now() : Date.now()) - startedAt;
+    if (elapsed > RENDER_SETTLE_MAX_MS) {
+      publishRenderState('stalled', blocker || 'geometry-moving', {
+        pages: sample.pages,
+        samples,
+        elapsedMs: Math.round(elapsed)
+      });
+      return;
+    }
+
+    renderSettleTimer = window.setTimeout(scheduleSample, RENDER_SETTLE_POLL_MS);
+  }
+
+  function scheduleSample() {
+    // rAF first: sample after layout and paint, never mid-frame.
+    window.requestAnimationFrame(sampleOnce);
+  }
+
+  scheduleSample();
+}
+
+function watchLateFontActivity() {
+  if (!document.fonts || typeof document.fonts.addEventListener !== 'function') return;
+  document.fonts.addEventListener('loading', () => {
+    if (!state.data) return;
+    if (document.body.getAttribute('data-render-state') !== 'settled') return;
+    // A face began loading after we called the layout final. The swap that
+    // follows reflows text, so the flag comes back down and must be re-earned.
+    beginRenderPass('late-font-load');
+    watchForRenderSettled();
+  });
 }
 
 function isSafariBrowser() {
@@ -198,9 +359,17 @@ function publishAuditStatus() {
 
 function renderCurrentBooklet() {
   if (!state.data) return;
+  // The single funnel for every render — load, unlock, layout-mode switch and
+  // the font-aware pass all arrive here, so this is the one place the marker
+  // needs to be lowered and re-armed.
+  beginRenderPass();
   renderBooklet(refs, state.layoutMode, state.data, state.unlockedEnding, setStatus);
   publishAuditStatus();
   scrollPreviewTargetIntoView();
+  // ORDER MATTERS: loadBooklet() calls scheduleFontAwareRerender() on the very
+  // next line, and the watcher's first sample is an animation frame away, so
+  // the pending-render token is always set before anything can read it.
+  watchForRenderSettled();
 }
 
 function waitForFontsReady() {
@@ -640,6 +809,7 @@ function captureRefs() {
 export function initRendererApp() {
   captureRefs();
   wireUi();
+  watchLateFontActivity();
   const params = new URLSearchParams(window.location.search);
   const requestedMode = params.get('mode');
   if (requestedMode === 'single' || requestedMode === 'spread' || requestedMode === 'booklet') {
