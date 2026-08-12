@@ -14,15 +14,29 @@ import {
  * ten archetypes carry zero `[data-archetype]` CSS; pastoral's residue is
  * geometry (see the block at the end of booklet.css), not character.
  *
+ * AND THE ARCHETYPE IS A FLOOR, NOT AN IDENTITY (D126). Authored design
+ * language wins: a book's `theme.palette` outranks the preset, and the preset
+ * is what a book that authors nothing falls back to. Pastoral's `--page-accent:
+ * #8b2a2a` below is the whole of what the retired
+ * `[data-archetype="pastoral"]{--accent:#8b2a2a}` selector used to enforce — a
+ * palette-less pastoral book still prints red; the Eastern Shore demo, which
+ * authors olive, now prints olive. Adding an archetype CSS selector that pins a
+ * palette value is the defect that ruling names; add a preset token instead.
+ *
  * THE DRAWING LAW. Every axis added by this wave paints and never measures:
  * background-image on a pseudo-element, an outline (outside the box model), a
  * box-shadow (outside the box model), a border colour, a fill. Phase-1
  * estimation has no DOM and cannot resolve a custom property — the D71/D105
  * lesson — so a token that changed a height would make the solver's math lie
- * with nothing to catch it. Two deliberate exceptions, both confined to the
+ * with nothing to catch it. THREE deliberate exceptions, all confined to the
  * cover page, whose atom estimates a flat full page and models nothing inside
- * it: `--cover-padding` / `--designation-padding` and `--cover-title-case` /
- * `--cover-title-spacing`. Gate: no page may gain `data-layout-overflow`.
+ * it: `--cover-padding` / `--designation-padding`, `--cover-title-case` /
+ * `--cover-title-spacing`, and — added at D126 — `--label-size`, which is a
+ * SIZE axis and therefore the sharpest of the three. Gate: no page may gain
+ * `data-layout-overflow`. Measured for the third: the minimalist cover's
+ * designation block moves 35.84px → 31.59px and the stack below it shifts up
+ * 4.25px, while the page height stays 816px and overflow stays 0 — the shift is
+ * real, contained, and invisible to every estimate.
  *
  * Each axis below names its booklet.css consumer. Adding a token here without
  * a consumer (or a consumer without a token) breaks the theme contract row in
@@ -40,6 +54,56 @@ import {
  *   --doc-radius                          → fragment-doc corner (drawing only)
  *   --cover-padding                       → cover page live padding
  *   --cover-title-case / -spacing         → cover title register
+ *
+ * WIRED AT D126 (authored since Teeth T5, dead until now — the tokens existed
+ * in all ten presets with zero var() consumers, which is a theme contract row
+ * that was silently false):
+ *
+ *   --stamp-opacity      → --theme-designation-opacity → .cover-designation
+ *                          `opacity` (how hard the stamp was pressed)
+ *   --rule-opacity       → --theme-field-rule ink, mixed toward transparent →
+ *                          the 38 hairline / field-rule declarations that read
+ *                          it (63 references across 58 lines; counted, not
+ *                          estimated). NOT --rule itself: that ink also draws
+ *                          map-cell borders and structural boxes, and the
+ *                          archetype must not be able to fade a grid the player
+ *                          marks. Unset, the mix is `X calc(1*100%), transparent`
+ *                          — measured byte-identical to bare X on canvas, which
+ *                          is why the four presets authoring 1 (minimalist, noir,
+ *                          scifi, cyberpunk) re-recorded byte-for-byte unchanged
+ *   --grid-dot-opacity   → .player-map[data-canvas-type="dot-grid"] dot alpha
+ *                          (compounds with --rule-opacity, deliberately). No
+ *                          corpus fixture authors that canvasType, so it has no
+ *                          `carries` entry — a stated gap, not a false gate
+ *   --label-size         → --theme-label-size → .cover-designation `font-size`,
+ *                          AND NOTHING ELSE. See the refusal below
+ *
+ * REFUSED AT D126 (still authored in every preset, deliberately unwired; a
+ * documented refusal is a valid outcome, silent damage is not):
+ *
+ *   --label-size, beyond the cover. THE DRAWING LAW forbids a theme axis from
+ *   moving geometry phase-1 estimation cannot see, and every other consumer of
+ *   the label family — page headers, doc labels, session headers, week kickers
+ *   — sits inside an atom whose estimate charges for its height. A 6pt→7.5pt
+ *   swing there is the D71/D105/D118 class exactly. The cover is the one safe
+ *   zone, by the same containment argument as the two exceptions above.
+ *
+ *   --fog-opacity. It has no consumer that is not a gameplay state signal:
+ *   every `var(--fog)` fill in booklet.css is a map cell, hex, node or maze
+ *   marker STATE (cleared / locked / door / dead-end), each with its own tuned
+ *   alpha, and minimalist authors 0. Wiring it would let an archetype erase the
+ *   distinction between a hex the player has cleared and one they have not.
+ *   The archetype guarantees legibility; it does not get to spend it. A page
+ *   atmosphere wash would be a safe home, but that is a new treatment needing a
+ *   compositing design (cyberpunk's --page-fog is #111111), not a wiring.
+ *
+ *   --grid-fill. Named for the map cell fill, which is drawn as an OPAQUE
+ *   45° hatch of --paper/--fog precisely so it survives a monochrome laser
+ *   printer. Replacing the hatch with the authored tints (0.02–0.28 alpha,
+ *   several of them hue-only: cyan, gold, crimson) breaks both the B&W print
+ *   law and the state floor; layering the tint underneath is invisible because
+ *   the hatch is opaque. Same finding shape as the panel-texture axis (D116):
+ *   it needs a compositing design, not a token.
  *
  * B&W PRINT LAW: every value here reads without hue. Identity is carried by
  * weight, pattern and structure — a hatch, a neatline, a double rule, an

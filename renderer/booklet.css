@@ -442,7 +442,28 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   --theme-label-weight:var(--weight-label,400);
   --theme-label-case:var(--label-transform,uppercase);
   --theme-label-spacing:var(--label-spacing,.18em);
-  --theme-designation-color:var(--designation-ink,var(--page-accent,#8b2a2a));
+  /* ── THE ACCENT, ONE VALUE (D126) ────────────────────────────────────────
+     `--accent` above is the SINGLE point where the book's authored accent
+     enters the container, and every accent-derived token below reads it. Until
+     D126 an archetype selector could re-pin `--accent` after this block, which
+     split the two: `--page-accent` carried the book's olive while `--accent`
+     carried pastoral's red, so a token derived from one resolved differently
+     from a token derived from the other. That pin is retired (see the pastoral
+     block at the end of this file) — authored palette data wins, and the
+     archetype's own accent now lives in its PRESET, where a book's palette
+     legitimately outranks it. No ARCHETYPE selector may re-pin `--accent`
+     below this line. (One SHELL scope still does — classified-packet repaints
+     its own pages' palette wholesale, `--accent:#395a78` among them. That is a
+     different mechanism and a different question: it is page-scoped, it moves
+     the whole palette together rather than splitting one token off, and no
+     ruling covers it. The container-scoped `--theme-*` tokens below are
+     unaffected either way, because a custom property resolves where it is
+     declared — here — not where it is read.) */
+  --theme-designation-color:var(--designation-ink,var(--accent));
+  /* The stamp's ink density: how hard this archetype pressed the designation.
+     Pure paint — `opacity` composites, it does not measure. Shell families that
+     set their own designation opacity (household-archive) still outrank it. */
+  --theme-designation-opacity:var(--stamp-opacity,1);
   --theme-panel-fill:var(--panel-surface,rgba(241,235,224,.96));
   --theme-panel-border:var(--page-rule,#ccc5b6);
   --theme-panel-shadow:var(--surface-shadow,0 12px 24px rgba(0,0,0,.06));
@@ -452,11 +473,21 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
      it picks up the --card-border override. One declaration, one home. */
   --theme-session-separator:var(--page-rule,#d8cfbf);
   --theme-prompt-fill:var(--callout-surface,rgba(255,255,255,.36));
-  --theme-prompt-border:var(--page-accent,#8b2a2a);
+  --theme-prompt-border:var(--accent);
   --theme-header-border:var(--page-ink,#181714);
   --theme-box-border:var(--page-ink,#181714);
-  --theme-field-rule:var(--page-rule,#d8cfbf);
-  --theme-cover-rule:var(--page-accent,#8b2a2a);
+  /* THE RULE WEIGHT (D126). `--rule-opacity` is how heavily an archetype draws
+     its hairline rules, and this is the one place it enters: the field-rule INK,
+     which ~30 hairline and field-rule declarations below read. Unset, the mix is
+     `X 100%, transparent` — X exactly, so a theme that omits the token renders
+     byte-identical. Deliberately NOT applied to `--rule` itself: that ink also
+     draws map-cell borders and structural boxes, where an archetype must not be
+     able to fade a grid the player marks (the legibility floor — the archetype
+     guarantees legibility, it never owns it). Consumers that already carry their
+     own `color-mix(… N%, transparent)` compound with this, which is the point:
+     the per-surface ladder stays relative, the base carries the character. */
+  --theme-field-rule:color-mix(in srgb, var(--page-rule,#d8cfbf) calc(var(--rule-opacity,1) * 100%), transparent);
+  --theme-cover-rule:var(--accent);
   --theme-page-overlay:var(--page-underlay,linear-gradient(180deg, rgba(255,255,255,.06) 0%, rgba(0,0,0,.02) 100%));
   --theme-page-noise-opacity:var(--noise-opacity,.35);
   --theme-panel-radius:var(--surface-radius,3px);
@@ -496,17 +527,32 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   --theme-designation-border:var(--designation-border,var(--rule));
   --theme-designation-border-width:var(--designation-border-width,var(--theme-hair-width,1px));
   --theme-designation-padding:var(--designation-padding,0);
-  /* Falls back to --accent, not --page-accent, and the difference is real:
-     --accent is the EFFECTIVE accent after any archetype pin, and one archetype
-     pins it. Reading --page-accent here would flip `.boss-proof::before` — the
-     one badge slug no pastoral selector covers — from the demo's red to the
-     book's olive, which is a baseline move disguised as a refactor. */
+  /* Reads --accent, which since D126 no archetype re-pins, so this is the
+     book's authored accent unless the preset names a --badge-color of its own.
+     (Before D126 the distinction was load-bearing: --accent was the EFFECTIVE
+     accent after pastoral's pin, and `.boss-proof::before` — the one badge slug
+     no pastoral selector covered — inherited the pin through this line. The pin
+     is gone; the two now resolve to the same value by construction.) */
   --theme-doc-badge-color:var(--badge-color,var(--accent));
   --theme-session-border:var(--card-border,var(--page-rule,#ccc5b6));
   --theme-doc-radius:var(--doc-radius,var(--theme-panel-radius,3px));
   --theme-cover-padding:var(--cover-padding,8px 8px 0 8px);
   --theme-cover-title-case:var(--cover-title-case,var(--theme-title-case,none));
   --theme-cover-title-spacing:var(--cover-title-spacing,var(--theme-title-spacing,normal));
+  /* A SIZE axis, and therefore cover-scoped by law (D126). --label-size is the
+     archetype's label register (6pt–7.5pt across the presets). The Drawing Law
+     forbids a theme axis from moving geometry phase-1 estimation cannot see, and
+     the label family at the top of this file is read by page headers, doc
+     labels, session headers and week kickers — every one of them inside an atom
+     whose estimate charges for its height. So this token reaches exactly ONE
+     consumer: `.cover-designation`, on the cover page, whose atom estimates a
+     flat full page and models nothing inside it. Same containment argument, and
+     the same gate, as --cover-padding / --designation-padding / --cover-title-*
+     above: no page may gain data-layout-overflow. Shell families that pin their
+     own designation size (ship-logbook, household-archive, devotional-manual,
+     field-survey) and pastoral's cover block outrank it, deliberately — cover
+     chrome is the shell's before it is the archetype's. */
+  --theme-label-size:var(--label-size,7pt);
   --page-live-top:var(--page-margin,0.34in);
   --page-live-right:var(--page-margin,0.34in);
   --page-live-bottom:var(--page-margin,0.34in);
@@ -1109,7 +1155,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   max-width:92%;
 }
 .cover-designation{
-  font-size:7pt;
+  font-size:var(--theme-label-size,7pt);
   color:var(--theme-designation-color,var(--accent));
   margin-bottom:8px;
   background:var(--theme-designation-fill,transparent);
@@ -4087,9 +4133,17 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .player-map[data-canvas-type="blank"]{
   background:none;
 }
+/* --grid-dot-opacity is the archetype's dot density on a draw-on-me canvas
+   (0.1–0.8 across the presets); unset it computes `45%, transparent` — the
+   value this rule always carried. It compounds with --rule-opacity, which is
+   correct: the ink already carries the archetype's rule weight and this is the
+   dot's share of it. A drawing aid, never a state signal, so no floor applies.
+   NOTE (D126): no fixture in the corpus authors `canvasType: "dot-grid"`, so
+   this axis carries no `carries` entry in visual-regression.spec.js — an
+   honest gap, not a vacuous contract. */
 .player-map[data-canvas-type="dot-grid"]{
   background:
-    radial-gradient(circle, color-mix(in srgb, var(--theme-field-rule,var(--rule)) 45%, transparent 55%) 0 0.8px, transparent 1px);
+    radial-gradient(circle, color-mix(in srgb, var(--theme-field-rule,var(--rule)) calc(var(--grid-dot-opacity,0.45) * 100%), transparent) 0 0.8px, transparent 1px);
   background-size:calc(100% / var(--grid-columns, 10)) calc(100% / var(--grid-rows, 8));
 }
 .player-map-seed{
@@ -6768,6 +6822,17 @@ body[data-demo-view="true"] .reader-unlock{
    this refactor's oracle, so "pastoral must not move" was the constraint the
    whole wave was proved against.
 
+   D126 RETIRED THE PALETTE HALF OF THAT RESIDUE. This block used to re-pin
+   `--accent` and then spend eight selectors enforcing that pin over the book's
+   own `theme.palette.accent`. The ruling landed the other way — authored
+   design language wins; the archetype is a legibility floor, never the
+   identity — so the pin and every selector that existed only to serve it are
+   gone, and the demo's olive (#6d7f4d) now reaches its kickers, rules, badges
+   and cover designation. Pastoral's red survives where it belongs: as
+   `--page-accent: #8b2a2a` in the PRESET, which is what a pastoral book that
+   authors no palette still renders. "Pastoral must not move" was the law of a
+   refactor; this is a ruling, and the demo going olive is the correct outcome.
+
    The live-area rule below is also load-bearing in a way that is easy to miss:
    at (1,2,0) it outranks the per-page-type insets (.26in fragments, .24in
    field-ops/boss at (0,3,0)), so pastoral runs a uniform live area while every
@@ -6776,20 +6841,16 @@ body[data-demo-view="true"] .reader-unlock{
    print-artifact change and needs the author's eye, not a refactor's.
    ══════════════════════════════════════════════════════════════ */
 
-/* NOT redundant, and not what it looks like. This does not restate the
-   pastoral preset's accent — it OVERRIDES the booklet's own
-   `theme.palette.accent`, which resolveTheme() writes onto --page-accent. The
-   Eastern Shore demo authors #6d7f4d (olive); every red rule, kicker and badge
-   in the shipped demo is this line beating that data. Deleting it turns the
-   demo olive, which is how Teeth T5 found it.
-   FLAGGED FOR RULING: CSS outranking an authored palette is backwards under
-   "theme variables are the single source of visual character", but choosing
-   between the demo's look and the author's data is a product decision, not a
-   refactor's. Kept as-is so pastoral does not move. */
-#booklet-container[data-archetype="pastoral"]{
-  --accent:#8b2a2a;
-}
-
+/* THE PIN THAT USED TO BE HERE (D116 finding → D126 ruling → executed).
+   `#booklet-container[data-archetype="pastoral"]{ --accent:#8b2a2a; }` sat at
+   this line and did not restate the pastoral preset's accent — it OVERRODE the
+   booklet's own `theme.palette.accent`, which resolveTheme() writes onto
+   --page-accent. Every red rule, kicker and badge in the shipped demo was this
+   one declaration beating the book's authored olive. It is deleted rather than
+   moved: the value it carried is already in the preset as --page-accent, so a
+   pastoral book with no palette is unchanged, and a book that authors one now
+   gets what it authored. No archetype selector may re-pin --accent; see THE
+   ACCENT, ONE VALUE in the #booklet-container block. */
 #booklet-container[data-archetype="pastoral"] .page-boundary{
   inset:var(--page-live-top,0.3in) var(--page-live-right,0.3in) var(--page-live-bottom,0.28in) var(--page-live-left,0.3in);
 }
@@ -6797,12 +6858,14 @@ body[data-demo-view="true"] .reader-unlock{
 /* Cover proportions. The designation's `border:none` is not decoration: it
    suppresses the field-survey shell's underline, so it cannot become a
    transparent border-colour token without the shell rule winning and the
-   demo's cover gaining a rule it has never had. `color` is likewise
-   load-bearing — see THE ACCENT SPLIT below. */
+   demo's cover gaining a rule it has never had. `color:var(--accent)` used to
+   sit here too and was deleted at D126: it existed only to carry the pin, and
+   the base rule's --theme-designation-color resolves to the same --accent now
+   that nothing re-pins it. The 5.75pt also outranks --theme-label-size, which
+   is deliberate — this is pastoral's cover proportion, not its label register. */
 #booklet-container[data-archetype="pastoral"] .cover-designation{
   font-size:5.75pt;
   letter-spacing:.28em;
-  color:var(--accent);
   border:none;
   margin-bottom:9px;
 }
@@ -6830,9 +6893,11 @@ body[data-demo-view="true"] .reader-unlock{
   margin-bottom:30px;
 }
 
+/* Width only. The `background:var(--accent)` that sat beside it carried the
+   pin and was deleted at D126; the base rule's --theme-cover-rule now resolves
+   to the book's own accent. */
 #booklet-container[data-archetype="pastoral"] .cover-rule{
   width:44px;
-  background:var(--accent);
 }
 
 #booklet-container[data-archetype="pastoral"] .cover-colophon{
@@ -6859,42 +6924,38 @@ body[data-demo-view="true"] .reader-unlock{
   line-height:1.03;
 }
 
-/* ── THE ACCENT SPLIT, and the surfaces the demo's own tokens would take back
+/* ── WHAT THE ACCENT SPLIT WAS, AND WHAT SURVIVED IT ─────────────────────────
    ─────────────────────────────────────────────────────────────────────────
-   Everything from here down looks like restatement and is not. Two mechanisms
-   make these rules load-bearing, both discovered by measuring rather than
-   reading:
+   THE SPLIT (D116 finding, D126 executed). While the pin existed, `--accent`
+   resolved red and `--page-accent` resolved the book's olive, so a token
+   derived from one disagreed with a token derived from the other — and eight
+   selectors in this block existed solely to make the pin win at every consumer
+   (.cover-designation, .cover-rule, .story-prompt's keyline, the doc badges,
+   .cipher-zone::before, .week-kicker). Measured at the time, the split was
+   invisible precisely BECAUSE those selectors dead-ended it: zero elements in
+   the pastoral demo rendered olive. D126 deleted the pin and all eight, and the
+   split is now impossible by construction — `--accent` is declared once, from
+   `--page-accent`, and no archetype selector may re-pin it.
 
-   1. THE ACCENT SPLIT. The rule at the top of this block pins `--accent`, but
-      `--page-accent` still carries the BOOK's palette (olive in the demo). The
-      container derives --theme-designation-color, --theme-cover-rule and
-      --theme-prompt-border from --page-accent, so each of those TOKENS resolves
-      olive while --accent resolves red. Each rule below that says
-      `color:var(--accent)` is choosing red over the book's own data — which is
-      why deleting it turns that element olive.
+   WHAT SURVIVES, and why it is not the same defect: BOOK TOKENS OUTRANK
+   PRESETS. `resolveTheme()` merges `theme.tokens` OVER the preset, and the
+   Eastern Shore demo ships its own --card-surface / --panel-secondary-surface /
+   --theme-panel-fill as GRADIENTS. Moving the fills below into pastoral's
+   preset would therefore change nothing for the demo — the book already wins
+   there — while these selectors beat both. They are fills and shadows, not the
+   accent, and no ruling has been made about them.
 
-      WHAT THE SPLIT IS NOT (re-measured 2026-08-12, Teeth T6, correcting both
-      an earlier line of this comment and D116(a)): it is not visible. Every
-      element that consumes an olive token is pinned red by a selector in this
-      block — .cover-designation, .cover-rule, .story-prompt's keyline,
-      .cipher-zone::before and the doc badges all render rgb(139,42,42), and so
-      does `.boss-proof::before`, which this comment previously called out as
-      the one olive slug beside red siblings. It is not: --theme-doc-badge-color
-      is derived from --accent, not --page-accent, exactly so that it inherits
-      the pin (see the note on that declaration in the #booklet-container
-      block). Zero elements in the pastoral demo render olive. The split is real
-      in the TOKEN layer and dead-ended at every consumer — which is the honest
-      shape of the ruling below, and the reason nothing here is a live defect.
-
-   2. BOOK TOKENS OUTRANK PRESETS. `resolveTheme()` merges `theme.tokens` OVER
-      the preset, and the Eastern Shore demo ships its own --card-surface /
-      --panel-secondary-surface / --theme-panel-fill as GRADIENTS. Moving these
-      fills into pastoral's preset therefore changes nothing for the demo — the
-      book wins — while these selectors beat both. So the fills stayed here.
-
-   FLAGGED FOR RULING (both are product decisions, not refactors): should a
-   pastoral book's authored palette and tokens drive its render, or should the
-   archetype's look win? Today the CSS wins, silently, for pastoral only. */
+   STILL FLAGGED, and NOT executed here because it is a product decision about
+   token precedence rather than an override to retire: `--highlight-surface`.
+   Every preset pins it (pastoral: rgba(139,42,42,0.07), red), and
+   resolveTheme() derives it from the authored accent ONLY when the preset
+   leaves it unset — which no preset does. So `--accent-soft` still carries the
+   archetype's accent while `--accent` now carries the book's:
+   `.boss-proof`, `.boss-branch-note` and the filled progress-clock wedges wash
+   red on an olive-accented book. Same shape as the pin, one layer down, and
+   fixing it means ruling on whether palette.accent outranks a preset token —
+   and on which alpha the derivation should use (the presets pin 0.07; the
+   generic derivation in resolveTheme uses 0.12). */
 #booklet-container[data-archetype="pastoral"] .session-card,
 #booklet-container[data-archetype="pastoral"] .fragment-doc,
 #booklet-container[data-archetype="pastoral"] .companion-component,
@@ -6908,25 +6969,19 @@ body[data-demo-view="true"] .reader-unlock{
   background:rgba(244,239,228,.72);
 }
 
-#booklet-container[data-archetype="pastoral"] .doc-label,
-#booklet-container[data-archetype="pastoral"] .fragment-doc-type,
-#booklet-container[data-archetype="pastoral"] .cipher-zone::before,
-#booklet-container[data-archetype="pastoral"] .boss-right::before,
-#booklet-container[data-archetype="pastoral"] .week-kicker{
-  color:var(--accent);
-}
-
 #booklet-container[data-archetype="pastoral"] .fragment-doc{
   background:rgba(245,240,232,.84);
 }
 
 /* The prompt's rule weight and indent are inside a measured card (the
-   session-card metrics ladder), so the whole rule stays put rather than
-   splitting its colour into a token and leaving the geometry behind. */
+   session-card metrics ladder), so the geometry stays put rather than being
+   split into a token that leaves the measurement behind. The
+   `border-left-color:var(--accent)` that sat between the width and the padding
+   carried the pin and was deleted at D126 — the base rule's
+   --theme-prompt-border now resolves to the book's own accent. */
 #booklet-container[data-archetype="pastoral"] .story-prompt{
   background:transparent;
   border-left-width:1px;
-  border-left-color:var(--accent);
   padding-left:8px;
   color:#8b8174;
 }
