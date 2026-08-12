@@ -1112,6 +1112,29 @@ export function autoRepairWeek(result, context) {
     }
   }
 
+  // Final default: if documentType is STILL missing after planned-registry
+  // alignment (the skeleton's registry entry may itself lack a type — the
+  // 2026-08-11 live run failed exactly here, 4 retries deep), default to
+  // 'report', the most neutral member of DOCUMENT_TYPE_ENUM. Deterministic
+  // derivation-as-repair (D89/D78 family): a paid week stage must never die
+  // on a field the pipeline can fill by rule. Paired with the REPAIRABLE
+  // classification in validation.js — that promise is only honest because
+  // this default exists.
+  if (result.overflowDocument && typeof result.overflowDocument === 'object' &&
+      !result.overflowDocument.documentType) {
+    result.overflowDocument.documentType = 'report';
+    if (!result._overflowRepairs) result._overflowRepairs = [];
+    result._overflowRepairs.push({
+      code: 'overflow-documenttype-defaulted',
+      severity: 'warning',
+      phase: 'reconcile',
+      message: 'Week ' + weekNum + ' overflowDocument.documentType was missing (model omitted it; planned registry carried none) — defaulted to "report"',
+      repairable: true,
+      path: 'weeks[' + weekNum + '].overflowDocument.documentType',
+      correction: '(missing) → report'
+    });
+  }
+
   // Canonicalize overflow document type aliases regardless of whether a
   // planned registry entry exists. This brings week-level ingestion into
   // parity with full-booklet assembly normalization (normalizeDocumentTypes)
@@ -1173,6 +1196,31 @@ export function normalizeCompanionComponents(week, diag) {
 // Normalize documentType aliases (e.g. 'letter' -> 'correspondence') on
 // fragments, overflow documents, and endings in place.
 export function normalizeDocumentTypes(booklet, diag) {
+  // Missing-type backstop (2026-08-11): the artifact schema REQUIRES
+  // documentType on every fragment-shaped object, so assembly must guarantee
+  // it — default 'report' (neutral enum member) with a diagnostic. Mirrors
+  // the week-level default in autoRepairWeek; keeps Ajv from failing a
+  // finished paid booklet on a fillable field.
+  (booklet.fragments || []).forEach(function (f) {
+    if (f && typeof f === 'object' && !f.documentType) {
+      f.documentType = 'report';
+      if (diag) {
+        diag.push(createDiagnostic('document-type-defaulted', 'warning', 'normalize',
+          'Fragment "' + (f.id || '?') + '" documentType was missing — defaulted to "report"',
+          { path: 'fragments[' + (f.id || '?') + '].documentType', repairable: true, correction: '(missing) → report' }));
+      }
+    }
+  });
+  (booklet.weeks || []).forEach(function (week, wi) {
+    if (week.overflowDocument && typeof week.overflowDocument === 'object' && !week.overflowDocument.documentType) {
+      week.overflowDocument.documentType = 'report';
+      if (diag) {
+        diag.push(createDiagnostic('document-type-defaulted', 'warning', 'normalize',
+          'Week ' + (wi + 1) + ' overflowDocument documentType was missing — defaulted to "report"',
+          { path: 'weeks[' + wi + '].overflowDocument.documentType', repairable: true, correction: '(missing) → report' }));
+      }
+    }
+  });
   (booklet.fragments || []).forEach(function (f) {
     if (f.documentType && DOCUMENT_TYPE_ALIASES[f.documentType]) {
       var from = f.documentType;

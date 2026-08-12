@@ -4115,6 +4115,7 @@ var REPAIRABLE_PATTERNS = [
   /Unknown visualArchetype/i,
   /interlude\.payloadType.*not supported/i,
   /overflowDocument\.id.*not present in overflowRegistry/i,
+  /overflowDocument\.documentType missing/i,
   /weeklyComponent\.type.*does not match.*weeklyComponentType/i
 ];
 
