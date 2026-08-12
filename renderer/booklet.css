@@ -427,13 +427,14 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   --theme-label-weight:var(--weight-label,400);
   --theme-label-case:var(--label-transform,uppercase);
   --theme-label-spacing:var(--label-spacing,.18em);
-  --theme-designation-color:var(--page-accent,#8b2a2a);
+  --theme-designation-color:var(--designation-ink,var(--page-accent,#8b2a2a));
   --theme-panel-fill:var(--panel-surface,rgba(241,235,224,.96));
   --theme-panel-border:var(--page-rule,#ccc5b6);
   --theme-panel-shadow:var(--surface-shadow,0 12px 24px rgba(0,0,0,.06));
   --theme-doc-fill:var(--panel-secondary-surface,rgba(232,223,200,.78));
   --theme-session-fill:var(--card-surface,rgba(236,230,216,.92));
-  --theme-session-border:var(--page-rule,#ccc5b6);
+  /* --theme-session-border is mapped in the character-axis block below, where
+     it picks up the --card-border override. One declaration, one home. */
   --theme-session-separator:var(--page-rule,#d8cfbf);
   --theme-prompt-fill:var(--callout-surface,rgba(255,255,255,.36));
   --theme-prompt-border:var(--page-accent,#8b2a2a);
@@ -459,6 +460,38 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   --theme-mono-size:var(--mono-size,6.4pt);
   --theme-grid-stroke-style:var(--grid-stroke-style,solid);
   --theme-badge-style:var(--badge-style,normal);
+  /* ── Character axes (Teeth T5) ───────────────────────────────────────────
+     The ONLY mapping layer between a preset's public token names and the
+     internal --theme-* vocabulary the rules below consume. Every axis here
+     paints and never measures: pseudo-element backgrounds, outlines and
+     box-shadows (both outside the box model), border colours, fills. Phase-1
+     estimation has no DOM and cannot resolve a custom property, so an axis
+     that moved a height would make the solver lie with nothing to catch it —
+     the D71/D105 class from a new direction. The two cover-scoped exceptions
+     (--cover-padding, --designation-padding, --cover-title-*) are safe because
+     the cover atom estimates a flat full page and models nothing inside it.
+     Authoring side + per-archetype values: renderer/modules/theme.js. */
+  --theme-page-texture:var(--page-texture,none);
+  --theme-page-texture-size:var(--page-texture-size,auto);
+  --theme-page-edge:var(--page-edge,none);
+  --theme-live-frame:var(--live-frame,none);
+  --theme-live-frame-offset:var(--live-frame-offset,0px);
+  --theme-header-shadow:var(--header-shadow,none);
+  --theme-designation-fill:var(--designation-fill,transparent);
+  --theme-designation-border:var(--designation-border,var(--rule));
+  --theme-designation-border-width:var(--designation-border-width,var(--theme-hair-width,1px));
+  --theme-designation-padding:var(--designation-padding,0);
+  /* Falls back to --accent, not --page-accent, and the difference is real:
+     --accent is the EFFECTIVE accent after any archetype pin, and one archetype
+     pins it. Reading --page-accent here would flip `.boss-proof::before` — the
+     one badge slug no pastoral selector covers — from the demo's red to the
+     book's olive, which is a baseline move disguised as a refactor. */
+  --theme-doc-badge-color:var(--badge-color,var(--accent));
+  --theme-session-border:var(--card-border,var(--page-rule,#ccc5b6));
+  --theme-doc-radius:var(--doc-radius,var(--theme-panel-radius,3px));
+  --theme-cover-padding:var(--cover-padding,8px 8px 0 8px);
+  --theme-cover-title-case:var(--cover-title-case,var(--theme-title-case,none));
+  --theme-cover-title-spacing:var(--cover-title-spacing,var(--theme-title-spacing,normal));
   --page-live-top:var(--page-margin,0.34in);
   --page-live-right:var(--page-margin,0.34in);
   --page-live-bottom:var(--page-margin,0.34in);
@@ -530,13 +563,24 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.88' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
   background-size:var(--theme-page-atmosphere-size) var(--theme-page-atmosphere-size);
 }
+/* Atmosphere layer: the archetype's paper texture over the theme underlay.
+   Two background layers, texture first — the texture carries the archetype's
+   register (security hatch, chart graticule, halftone, foxing) and the
+   underlay stays whatever the theme already painted. Deliberately NOT stacked
+   into ::before with the grain: that layer is multiplied by
+   --theme-page-noise-opacity, which several presets set near zero, and a
+   texture is not noise. A border here is the trim keyline (--theme-page-edge):
+   the pseudo-element is absolutely positioned, so both the texture and the
+   keyline are drawing with no layout footprint at all. */
 .booklet-page::after{
   content:'';
   position:absolute;
   inset:0;
   z-index:0;
   pointer-events:none;
-  background:var(--theme-page-overlay);
+  background-image:var(--theme-page-texture,none),var(--theme-page-overlay);
+  background-size:var(--theme-page-texture-size,auto),auto;
+  border:var(--theme-page-edge,none);
 }
 .booklet-page > *{
   position:relative;
@@ -551,6 +595,12 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   min-width:0;
   min-height:0;
   overflow:hidden;
+  /* The neatline. An OUTLINE, never a border: outlines sit outside the box
+     model, so an archetype can frame its live area without moving a single
+     measured pixel. The overflow diagnostic below outranks it (0,3,0 beats
+     0,2,0), so a debug outline still wins when a page is unsat. */
+  outline:var(--theme-live-frame,none);
+  outline-offset:var(--theme-live-frame-offset,0px);
 }
 
 .booklet-page[data-page-type="fragment-page"] > .page-boundary,
@@ -660,7 +710,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   display:flex;
   flex-direction:column;
   justify-content:flex-start;
-  padding:8px 8px 0 8px;
+  padding:var(--theme-cover-padding,8px 8px 0 8px);
 }
 .cover-page[data-shell-family="classified-packet"],
 .rules-left[data-shell-family="classified-packet"],
@@ -894,6 +944,95 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   padding-top:6px;
   margin-top:auto;
 }
+/* ── court-packet: the filing register (Teeth T5) ───────────────────────────
+   The eighth shell family, and until now the only one that rendered as base
+   styling. Its tell is PLEADING PAPER: the double vertical rule down the left
+   margin and the single rule down the right, drawn on the page itself so it
+   runs behind every page type without any page type knowing. That is a
+   background-image on the page element — zero layout footprint — which matters
+   more here than anywhere else in this file: NO fixture in the corpus uses
+   court-packet, so no harness would catch a geometry mistake in these rules.
+   Everything below is therefore drawing, with the single exception of the
+   cover chrome (a whole-page atom that models nothing inside itself), and the
+   double rules under headers are box-shadows rather than thicker borders for
+   exactly that reason.
+
+   Register: a caption block, all-caps and centred, over a heavy rule; a FILED
+   stamp where other shells put a classification; a certificate rule closing
+   the cover. Rules are drawn from --ink and --rule, so the shell inherits
+   whatever archetype it is wearing and stays B&W-legible in all of them. */
+/* Scoped from the CONTAINER, not the page: `applyShellAttrs(page, …)` runs in
+   the field-ops builder only, so `.booklet-page[data-shell-family]` matches on
+   some page types and silently not on others — the pleading rules would have
+   appeared on field-ops pages alone. `#booklet-container` carries the family
+   for the whole book (render.js), which is the same idiom `[data-archetype]`
+   uses. Measurement pages are built outside the container, so this rule does
+   not reach them; that is safe here BECAUSE it is a background image with no
+   layout footprint, and it would not be safe for anything else. */
+#booklet-container[data-shell-family="court-packet"] .booklet-page{
+  /* --muted, not --rule: at 1px a rule-coloured hairline is invisible against
+     the paper it is drawn on (measured — the first cut of this shell painted
+     correctly and read as nothing). Pleading rules are meant to be seen. */
+  background-image:
+    linear-gradient(90deg, transparent 0 18px, var(--muted) 18px 19px, transparent 19px 22px, var(--muted) 22px 23px, transparent 23px 100%),
+    linear-gradient(270deg, transparent 0 18px, var(--muted) 18px 19px, transparent 19px 100%);
+}
+.cover-page[data-shell-family="court-packet"] .cover-hero,
+.endings-page[data-shell-family="court-packet"] .endings-title,
+.password-assembly-page[data-shell-family="court-packet"] .password-assembly-title{
+  text-align:center;
+}
+.cover-page[data-shell-family="court-packet"] .cover-hero{
+  align-items:center;
+  max-width:none;
+}
+.cover-page[data-shell-family="court-packet"] .cover-title{
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  font-style:normal;
+}
+.cover-page[data-shell-family="court-packet"] .cover-designation{
+  display:inline-flex;
+  align-self:center;
+  padding:2px 12px;
+  border:1px solid var(--ink);
+  border-radius:0;
+  letter-spacing:.24em;
+  background:transparent;
+}
+.cover-page[data-shell-family="court-packet"] .cover-rule{
+  width:100%;
+  max-width:none;
+  height:1px;
+  box-shadow:0 3px 0 0 var(--ink);
+}
+.cover-page[data-shell-family="court-packet"] .cover-tagline{
+  text-align:center;
+  font-style:normal;
+}
+.cover-page[data-shell-family="court-packet"] .cover-colophon{
+  text-align:center;
+  border-top:1px solid var(--rule);
+  padding-top:6px;
+  margin-top:auto;
+}
+/* Double rule under every header — a box-shadow, never a heavier border: these
+   header heights are page furniture the estimates charge for. */
+.rules-left[data-shell-family="court-packet"] .rules-header,
+.gauge-log-page[data-shell-family="court-packet"] .rules-header,
+.workout-left[data-shell-family="court-packet"] .page-header,
+.fragment-page[data-shell-family="court-packet"] .page-header,
+.field-ops-right[data-shell-family="court-packet"] .rp-header,
+.boss-right[data-shell-family="court-packet"] .boss-header{
+  box-shadow:0 2px 0 -1px var(--ink);
+  text-transform:uppercase;
+}
+.fragment-block[data-shell-family="court-packet"] .fragment-doc-type,
+.field-ops-right[data-shell-family="court-packet"] .doc-label{
+  color:var(--ink);
+  font-weight:700;
+}
+
 .cover-hero{
   display:flex;
   flex-direction:column;
@@ -904,7 +1043,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   color:var(--theme-designation-color,var(--accent));
   margin-bottom:8px;
   background:var(--theme-designation-fill,transparent);
-  border:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-designation-border,transparent);
+  border:var(--theme-designation-border-width,var(--theme-hair-width,1px)) var(--theme-line-style,solid) var(--theme-designation-border,transparent);
   padding:var(--theme-designation-padding,0);
   opacity:var(--theme-designation-opacity,1);
   text-transform:var(--theme-designation-transform,uppercase);
@@ -980,6 +1119,12 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   line-height:1.05;
   color:var(--ink);
   margin-bottom:12px;
+  /* Cover-scoped title register. The case/tracking axes stop at the cover on
+     purpose: `.week-title` and `.boss-title` heights ARE modelled by the
+     week-header and boss estimates, and a transform that rewraps them would
+     detune the solver invisibly. The cover atom estimates a flat full page. */
+  text-transform:var(--theme-cover-title-case,none);
+  letter-spacing:var(--theme-cover-title-spacing,normal);
 }
 .cover-tagline{
   font-style:italic;
@@ -5815,7 +5960,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 /* Fragment document types */
 .fragment-doc{
   border:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-panel-border,var(--rule));
-  border-radius:var(--theme-panel-radius,3px);
+  border-radius:var(--theme-doc-radius,var(--theme-panel-radius,3px));
   padding:7px 11px 8px;
   flex:1;
   display:flex;
@@ -6467,6 +6612,72 @@ body[data-demo-view="true"] .reader-unlock{
   margin-top:20px;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   CHARACTER AXES — structural consumers of the archetype tokens
+   (Teeth T5, 2026-08-12)
+
+   These rules are base CSS: they apply to every archetype and read a token
+   that defaults to "no effect". An archetype gets its hand by SETTING tokens
+   in renderer/modules/theme.js, never by acquiring a selector — the Design
+   System scalability test ("a new archetype next month, tokens only") is the
+   law these rules exist to satisfy.
+
+   The axis here paints outside the box model on purpose: a `box-shadow` draws
+   the second rule of a double rule without changing the header's height, which
+   the page-furniture estimates model. If a future axis cannot be expressed
+   without a size, it does not belong here — take it to the estimate ladders
+   and change both sides together (D71/D105).
+
+   A panel-texture axis (chart ruling inside cards and documents) was built and
+   then REMOVED here. Panel fills arrive as `--theme-panel-fill` /
+   `--theme-session-fill` / `--theme-doc-fill`, and a book may supply those as
+   GRADIENTS via `theme.tokens` — in which case the fill lives in
+   background-image and any texture layered onto that property silently erases
+   it (measured: `.boss-mechanism` lost its gradient). The alternative, an
+   absolutely-positioned texture overlay, would paint on top of the panel's own
+   text. Deferred rather than shipped half-safe; the page texture below already
+   carries the archetype's register. */
+.rules-header,
+.page-header,
+.rp-header,
+.boss-header{
+  box-shadow:var(--theme-header-shadow,none);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PASTORAL — the residue, and why each survivor is still a selector
+
+   This block held 19 rules before Teeth T5. Everything that encoded
+   CHARACTER moved into pastoral's own preset tokens (--cover-padding,
+   --card-border, --doc-radius, --surface-shadow:none, and the fragment-doc
+   fill on --panel-secondary-surface), and everything that merely restated a
+   token it already set was deleted outright.
+
+   What is left is GEOMETRY: pastoral's typographic proportions and its live
+   area. It stays as a selector deliberately. Tokenising a height would hand
+   every future archetype a lever that phase-1 estimation cannot see, and
+   moving these values would move the demo — the Eastern Shore baselines are
+   this refactor's oracle, so "pastoral must not move" was the constraint the
+   whole wave was proved against.
+
+   The live-area rule below is also load-bearing in a way that is easy to miss:
+   at (1,2,0) it outranks the per-page-type insets (.26in fragments, .24in
+   field-ops/boss at (0,3,0)), so pastoral runs a uniform live area while every
+   other archetype takes the page-type overrides. That asymmetry predates this
+   wave; it is documented here rather than "fixed", because fixing it is a
+   print-artifact change and needs the author's eye, not a refactor's.
+   ══════════════════════════════════════════════════════════════ */
+
+/* NOT redundant, and not what it looks like. This does not restate the
+   pastoral preset's accent — it OVERRIDES the booklet's own
+   `theme.palette.accent`, which resolveTheme() writes onto --page-accent. The
+   Eastern Shore demo authors #6d7f4d (olive); every red rule, kicker and badge
+   in the shipped demo is this line beating that data. Deleting it turns the
+   demo olive, which is how Teeth T5 found it.
+   FLAGGED FOR RULING: CSS outranking an authored palette is backwards under
+   "theme variables are the single source of visual character", but choosing
+   between the demo's look and the author's data is a product decision, not a
+   refactor's. Kept as-is so pastoral does not move. */
 #booklet-container[data-archetype="pastoral"]{
   --accent:#8b2a2a;
 }
@@ -6475,15 +6686,11 @@ body[data-demo-view="true"] .reader-unlock{
   inset:var(--page-live-top,0.3in) var(--page-live-right,0.3in) var(--page-live-bottom,0.28in) var(--page-live-left,0.3in);
 }
 
-#booklet-container[data-archetype="pastoral"] .booklet-page{
-  box-shadow:0 18px 30px rgba(0,0,0,.12);
-}
-
-#booklet-container[data-archetype="pastoral"] .cover-page{
-  justify-content:flex-start;
-  padding:0;
-}
-
+/* Cover proportions. The designation's `border:none` is not decoration: it
+   suppresses the field-survey shell's underline, so it cannot become a
+   transparent border-colour token without the shell rule winning and the
+   demo's cover gaining a rule it has never had. `color` is likewise
+   load-bearing — see THE ACCENT SPLIT below. */
 #booklet-container[data-archetype="pastoral"] .cover-designation{
   font-size:5.75pt;
   letter-spacing:.28em;
@@ -6494,7 +6701,6 @@ body[data-demo-view="true"] .reader-unlock{
 
 #booklet-container[data-archetype="pastoral"] .cover-subtitle{
   font-size:5.7pt;
-  letter-spacing:.18em;
   color:#8c8274;
   margin-bottom:9px;
 }
@@ -6504,11 +6710,8 @@ body[data-demo-view="true"] .reader-unlock{
 }
 
 #booklet-container[data-archetype="pastoral"] .cover-title{
-  max-width:100%;
-  font-size:32pt;
   line-height:.92;
   letter-spacing:-.025em;
-  margin-bottom:12px;
 }
 
 #booklet-container[data-archetype="pastoral"] .cover-tagline{
@@ -6522,7 +6725,6 @@ body[data-demo-view="true"] .reader-unlock{
 #booklet-container[data-archetype="pastoral"] .cover-rule{
   width:44px;
   background:var(--accent);
-  margin-bottom:16px;
 }
 
 #booklet-container[data-archetype="pastoral"] .cover-colophon{
@@ -6533,6 +6735,8 @@ body[data-demo-view="true"] .reader-unlock{
   color:#8e8475;
 }
 
+/* Header proportions — these four heights are page furniture the estimates
+   charge for, which is exactly why they are not an axis. */
 #booklet-container[data-archetype="pastoral"] .rules-header,
 #booklet-container[data-archetype="pastoral"] .page-header,
 #booklet-container[data-archetype="pastoral"] .rp-header,
@@ -6547,6 +6751,31 @@ body[data-demo-view="true"] .reader-unlock{
   line-height:1.03;
 }
 
+/* ── THE ACCENT SPLIT, and the surfaces the demo's own tokens would take back
+   ─────────────────────────────────────────────────────────────────────────
+   Everything from here down looks like restatement and is not. Two mechanisms
+   make these rules load-bearing, both discovered by measuring rather than
+   reading:
+
+   1. THE ACCENT SPLIT. The rule at the top of this block pins `--accent`, but
+      `--page-accent` still carries the BOOK's palette (olive in the demo). The
+      container derives --theme-designation-color, --theme-cover-rule,
+      --theme-prompt-border and --theme-doc-badge-color from --page-accent, so
+      every one of those resolves olive while --accent resolves red. Each rule
+      below that says `color:var(--accent)` is choosing red over the book's own
+      data — which is why deleting it turns that element olive, and why the
+      badge slugs pastoral never covered (`.boss-proof::before`) ARE olive
+      today. The split is the bug; these rules are the demo's look surviving it.
+
+   2. BOOK TOKENS OUTRANK PRESETS. `resolveTheme()` merges `theme.tokens` OVER
+      the preset, and the Eastern Shore demo ships its own --card-surface /
+      --panel-secondary-surface / --theme-panel-fill as GRADIENTS. Moving these
+      fills into pastoral's preset therefore changes nothing for the demo — the
+      book wins — while these selectors beat both. So the fills stayed here.
+
+   FLAGGED FOR RULING (both are product decisions, not refactors): should a
+   pastoral book's authored palette and tokens drive its render, or should the
+   archetype's look win? Today the CSS wins, silently, for pastoral only. */
 #booklet-container[data-archetype="pastoral"] .session-card,
 #booklet-container[data-archetype="pastoral"] .fragment-doc,
 #booklet-container[data-archetype="pastoral"] .companion-component,
@@ -6558,15 +6787,6 @@ body[data-demo-view="true"] .reader-unlock{
 
 #booklet-container[data-archetype="pastoral"] .session-card{
   background:rgba(244,239,228,.72);
-  border-color:rgba(188,180,165,.8);
-}
-
-#booklet-container[data-archetype="pastoral"] .story-prompt{
-  background:transparent;
-  border-left-width:1px;
-  border-left-color:var(--accent);
-  padding-left:8px;
-  color:#8b8174;
 }
 
 #booklet-container[data-archetype="pastoral"] .doc-label,
@@ -6578,8 +6798,18 @@ body[data-demo-view="true"] .reader-unlock{
 }
 
 #booklet-container[data-archetype="pastoral"] .fragment-doc{
-  border-radius:2px;
   background:rgba(245,240,232,.84);
+}
+
+/* The prompt's rule weight and indent are inside a measured card (the
+   session-card metrics ladder), so the whole rule stays put rather than
+   splitting its colour into a token and leaving the geometry behind. */
+#booklet-container[data-archetype="pastoral"] .story-prompt{
+  background:transparent;
+  border-left-width:1px;
+  border-left-color:var(--accent);
+  padding-left:8px;
+  color:#8b8174;
 }
 
 #booklet-container[data-archetype="pastoral"] .fragment-doc.report,

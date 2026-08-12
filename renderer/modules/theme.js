@@ -4,6 +4,47 @@ import {
   DEFAULT_COMPONENT_DIALECT
 } from '../../contracts/contract-constants.mjs';
 
+/*
+ * THE CHARACTER AXES (Teeth T5, 2026-08-12)
+ * ─────────────────────────────────────────
+ * Design System law: structure lives in base CSS, character lives in tokens.
+ * An archetype that needs its own selector is an architecture failure, so the
+ * per-archetype identity below is expressed ONLY as token values. Nine of the
+ * ten archetypes carry zero `[data-archetype]` CSS; pastoral's residue is
+ * geometry (see the block at the end of booklet.css), not character.
+ *
+ * THE DRAWING LAW. Every axis added by this wave paints and never measures:
+ * background-image on a pseudo-element, an outline (outside the box model), a
+ * box-shadow (outside the box model), a border colour, a fill. Phase-1
+ * estimation has no DOM and cannot resolve a custom property — the D71/D105
+ * lesson — so a token that changed a height would make the solver's math lie
+ * with nothing to catch it. Two deliberate exceptions, both confined to the
+ * cover page, whose atom estimates a flat full page and models nothing inside
+ * it: `--cover-padding` / `--designation-padding` and `--cover-title-case` /
+ * `--cover-title-spacing`. Gate: no page may gain `data-layout-overflow`.
+ *
+ * Each axis below names its booklet.css consumer. Adding a token here without
+ * a consumer (or a consumer without a token) breaks the theme contract row in
+ * CLAUDE.md; the container's `#booklet-container` block is the only mapping
+ * layer, so grep there first.
+ *
+ *   --page-texture / --page-texture-size  → .booklet-page::after background
+ *   --page-edge                           → .booklet-page::after border (trim keyline)
+ *   --live-frame / --live-frame-offset    → .page-boundary outline (neatline)
+ *   --header-shadow                       → the four page headers' box-shadow
+ *   --designation-fill/-border/-ink       → the cover's classification stamp
+ *   --designation-border-width/-padding   → …its rule weight and box
+ *   --badge-color                         → attachment + doc badge slugs
+ *   --card-border                         → session-card border colour
+ *   --doc-radius                          → fragment-doc corner (drawing only)
+ *   --cover-padding                       → cover page live padding
+ *   --cover-title-case / -spacing         → cover title register
+ *
+ * B&W PRINT LAW: every value here reads without hue. Identity is carried by
+ * weight, pattern and structure — a hatch, a neatline, a double rule, an
+ * inverted slug — so the book survives a photocopier, which is the only
+ * printer some of these will ever meet.
+ */
 const THEME_PRESETS = {
   pastoral: {
     '--font-display': '"Playfair Display", Georgia, serif',
@@ -63,7 +104,13 @@ const THEME_PRESETS = {
     '--page-live-top': '0.3in',
     '--page-live-right': '0.3in',
     '--page-live-bottom': '0.28in',
-    '--page-live-left': '0.3in'
+    '--page-live-left': '0.3in',
+    // ── character: the demo's own look, now stated rather than special-cased.
+    // Pastoral is the refactor oracle (visual-regression baselines), so every
+    // value here is the rendered truth of the selectors it replaced.
+    '--cover-padding': '0',
+    '--card-border': 'rgba(188,180,165,0.8)',
+    '--doc-radius': '2px'
   },
   government: {
     '--font-display': '"Playfair Display", Georgia, serif',
@@ -115,7 +162,22 @@ const THEME_PRESETS = {
     '--badge-style': 'normal',
     '--callout-surface': 'rgba(218, 207, 190, 0.22)',
     '--highlight-surface': 'rgba(163, 59, 59, 0.12)',
-    '--page-margin': '0.4in'
+    '--page-margin': '0.4in',
+    // ── character: a bureaucratic instrument. Security-paper hatch, a ruled
+    // box around the live area (the book IS a form), a double rule under every
+    // header, and a classification slug stamped in the file-red. The red is
+    // authority, never warmth — cards are ruled in ink so the red stays rare.
+    '--page-texture': 'repeating-linear-gradient(45deg, rgba(17,17,17,0.035) 0 1px, transparent 1px 7px)',
+    '--live-frame': '1px solid rgba(94,90,81,0.45)',
+    '--live-frame-offset': '5px',
+    '--header-shadow': '0 2px 0 -1px rgba(94,90,81,0.6)',
+    '--card-border': 'rgba(17,17,17,0.42)',
+    '--designation-fill': 'rgba(163,59,59,0.1)',
+    '--designation-border': '#a33b3b',
+    '--designation-border-width': '1.5px',
+    '--designation-padding': '2px 8px',
+    '--cover-title-case': 'uppercase',
+    '--cover-title-spacing': '0.02em'
   },
   cyberpunk: {
     '--font-display': '"Share Tech Mono", monospace',
@@ -166,7 +228,17 @@ const THEME_PRESETS = {
     '--badge-style': 'normal',
     '--callout-surface': 'rgba(255, 0, 255, 0.1)',
     '--highlight-surface': 'rgba(0, 255, 204, 0.15)',
-    '--page-margin': '0.3in'
+    '--page-margin': '0.3in',
+    // ── character: a screen that leaked onto paper. The underlay already
+    // scans; this adds the phosphor column grid, a hard neon keyline at the
+    // trim, and a bloom under the headers. Reads in B&W as a fine vertical
+    // rule field inside a heavy black border.
+    '--page-texture': 'repeating-linear-gradient(90deg, rgba(0,255,204,0.055) 0 1px, transparent 1px 4px)',
+    '--page-edge': '1px solid rgba(0,255,204,0.55)',
+    '--header-shadow': '0 2px 0 -1px rgba(0,255,204,0.4)',
+    '--designation-fill': 'rgba(255,0,255,0.12)',
+    '--designation-border': 'rgba(255,0,255,0.6)',
+    '--designation-padding': '1px 7px'
   },
   scifi: {
     '--font-display': 'system-ui, -apple-system, sans-serif',
@@ -217,7 +289,19 @@ const THEME_PRESETS = {
     '--badge-style': 'normal',
     '--callout-surface': 'rgba(0, 102, 255, 0.06)',
     '--highlight-surface': 'rgba(0, 102, 255, 0.1)',
-    '--page-margin': '0.45in'
+    '--page-margin': '0.45in',
+    // ── character: a clinical instrument readout. Nothing is heavy; everything
+    // is registered. A measurement dot-field under the page, a hairline
+    // containment frame well inside the trim, and a pill-shaped status slug.
+    // In B&W it reads as the calmest page in the corpus — that IS the identity.
+    '--page-texture': 'radial-gradient(rgba(0,102,255,0.16) 17%, transparent 18%)',
+    '--page-texture-size': '14px 14px',
+    '--live-frame': '1px solid rgba(0,102,255,0.18)',
+    '--live-frame-offset': '7px',
+    '--designation-fill': 'rgba(0,102,255,0.08)',
+    '--designation-border': 'rgba(0,102,255,0.38)',
+    '--designation-padding': '2px 7px',
+    '--cover-title-spacing': '-0.01em'
   },
   fantasy: {
     '--font-display': '"Playfair Display", serif',
@@ -268,7 +352,19 @@ const THEME_PRESETS = {
     '--badge-style': 'italic',
     '--callout-surface': 'rgba(197, 160, 89, 0.15)',
     '--highlight-surface': 'rgba(26, 51, 34, 0.1)',
-    '--page-margin': '0.36in'
+    '--page-margin': '0.36in',
+    // ── character: an illuminated field book. Parchment mottles (three soft
+    // stains, page-sized so they never tile into wallpaper), a gilt double
+    // plate frame around the live area, and a gold hairline doubling every
+    // header rule. B&W-safe: the frame is a DOUBLE rule, not a gold one.
+    '--page-texture': 'radial-gradient(circle at 22% 18%, rgba(197,160,89,0.13) 0 7%, transparent 8%), '
+      + 'radial-gradient(circle at 78% 58%, rgba(92,107,93,0.09) 0 6%, transparent 7%), '
+      + 'radial-gradient(circle at 41% 88%, rgba(197,160,89,0.1) 0 5%, transparent 6%)',
+    '--live-frame': '3px double rgba(197,160,89,0.62)',
+    '--live-frame-offset': '5px',
+    '--header-shadow': '0 2px 0 -1px rgba(197,160,89,0.7)',
+    '--designation-border': 'rgba(197,160,89,0.8)',
+    '--designation-padding': '2px 9px'
   },
   noir: {
     '--font-display': '"Share Tech Mono", monospace',
@@ -319,7 +415,23 @@ const THEME_PRESETS = {
     '--badge-style': 'normal',
     '--callout-surface': 'rgba(0,0,0,0.08)',
     '--highlight-surface': 'rgba(0,0,0,0.15)',
-    '--page-margin': '0.35in'
+    '--page-margin': '0.35in',
+    // ── character: newsprint and stamped ink. A halftone dot screen over the
+    // whole page, a mourning-card keyline at the trim, a heavy second rule
+    // under every header, and a designation slug printed in REVERSE — solid
+    // black box, paper-coloured text. Pure structure; no hue anywhere.
+    '--page-texture': 'radial-gradient(rgba(0,0,0,0.11) 21%, transparent 22%)',
+    '--page-texture-size': '3px 3px',
+    '--page-edge': '2.5px solid #000000',
+    '--header-shadow': '0 3px 0 -1px #000000',
+    '--card-border': 'rgba(0,0,0,0.55)',
+    '--designation-fill': '#000000',
+    '--designation-ink': '#e4e4e4',
+    '--designation-border': '#000000',
+    '--designation-border-width': '1.5px',
+    '--designation-padding': '2px 9px',
+    '--cover-title-case': 'uppercase',
+    '--cover-title-spacing': '0.04em'
   },
   steampunk: {
     '--font-display': '"Playfair Display", serif',
@@ -370,7 +482,18 @@ const THEME_PRESETS = {
     '--badge-style': 'normal',
     '--callout-surface': 'rgba(184, 115, 51, 0.15)',
     '--highlight-surface': 'rgba(181, 166, 66, 0.15)',
-    '--page-margin': '0.38in'
+    '--page-margin': '0.38in',
+    // ── character: an engraved technical plate. The engraver's diagonal hatch
+    // under everything, a brass double frame, and hatched panel interiors so
+    // the boxes read as plates rather than cards. `--line-style: double`
+    // already doubles every border; this finishes the job it started.
+    '--page-texture': 'repeating-linear-gradient(-45deg, rgba(62,47,36,0.05) 0 1px, transparent 1px 5px)',
+    '--live-frame': '3px double rgba(184,115,51,0.5)',
+    '--live-frame-offset': '5px',
+    '--header-shadow': '0 2px 0 -1px rgba(184,115,51,0.6)',
+    '--designation-border': 'rgba(184,115,51,0.75)',
+    '--designation-border-width': '1.5px',
+    '--designation-padding': '2px 8px'
   },
   minimalist: {
     '--font-display': 'system-ui, -apple-system, sans-serif',
@@ -421,7 +544,21 @@ const THEME_PRESETS = {
     '--badge-style': 'normal',
     '--callout-surface': 'rgba(0,0,0,0.03)',
     '--highlight-surface': 'rgba(0,0,0,0.06)',
-    '--page-margin': '0.5in'
+    '--page-margin': '0.5in',
+    // ── character: restraint IS the identity. Everything an archetype could
+    // add, this one refuses: no texture, no frame, no doubled rule, no grain.
+    // What's left has to carry it — true black on true white, the widest
+    // margin in the corpus, a card border you can actually see (the #e0e0e0
+    // rule made cards vanish, which read as unstyled rather than austere), and
+    // ONE reversed block: the designation slug in solid ink. Swiss, not blank.
+    '--page-texture': 'none',
+    '--noise-opacity': '0',
+    '--card-border': 'rgba(0,0,0,0.24)',
+    '--designation-fill': '#000000',
+    '--designation-ink': '#ffffff',
+    '--designation-border': '#000000',
+    '--designation-padding': '2px 8px',
+    '--cover-title-spacing': '-0.03em'
   },
   nautical: {
     '--font-display': '"Playfair Display", serif',
@@ -472,7 +609,19 @@ const THEME_PRESETS = {
     '--badge-style': 'normal',
     '--callout-surface': 'rgba(51, 76, 102, 0.1)',
     '--highlight-surface': 'rgba(138, 51, 36, 0.15)',
-    '--page-margin': '0.36in'
+    '--page-margin': '0.36in',
+    // ── character: the chart room. A plotted graticule under the whole page, a
+    // double neatline around the live area exactly as a chart is bordered,
+    // logbook ruling inside every card, and badges in chart-blue so the red
+    // accent stays what it is on a chart — a correction, not a decoration.
+    '--page-texture': 'repeating-linear-gradient(90deg, rgba(0,26,51,0.055) 0 1px, transparent 1px 34px), '
+      + 'repeating-linear-gradient(180deg, rgba(0,26,51,0.055) 0 1px, transparent 1px 34px)',
+    '--live-frame': '3px double rgba(0,26,51,0.34)',
+    '--live-frame-offset': '4px',
+    '--header-shadow': '0 2px 0 -1px rgba(51,76,102,0.55)',
+    '--badge-color': '#334c66',
+    '--designation-border': 'rgba(51,76,102,0.6)',
+    '--designation-padding': '2px 8px'
   },
   occult: {
     '--font-display': '"Playfair Display", serif',
@@ -523,7 +672,22 @@ const THEME_PRESETS = {
     '--badge-style': 'italic',
     '--callout-surface': 'rgba(90, 61, 74, 0.15)',
     '--highlight-surface': 'rgba(140, 0, 26, 0.15)',
-    '--page-margin': '0.36in'
+    '--page-margin': '0.36in',
+    // ── character: a working manuscript that has been handled. Foxing stains
+    // rather than a mechanical pattern (page-sized, never tiled — repetition
+    // would read as printed decoration, and the point is damage), a grimoire's
+    // double plate frame, and a designation with no box at all: the word
+    // alone, in the blood red. The page grain is already the heaviest in the
+    // corpus at 0.22 — the stains sit on top of it, not instead of it.
+    '--page-texture': 'radial-gradient(circle at 16% 24%, rgba(90,61,74,0.12) 0 6%, transparent 7%), '
+      + 'radial-gradient(circle at 74% 62%, rgba(140,0,26,0.08) 0 5%, transparent 6%), '
+      + 'radial-gradient(circle at 46% 86%, rgba(90,61,74,0.09) 0 4%, transparent 5%), '
+      + 'radial-gradient(circle at 88% 12%, rgba(90,61,74,0.07) 0 3%, transparent 4%)',
+    '--live-frame': '3px double rgba(90,61,74,0.45)',
+    '--live-frame-offset': '6px',
+    '--badge-color': '#5a3d4a',
+    '--designation-border': 'transparent',
+    '--designation-ink': '#8c001a'
   }
 };
 
