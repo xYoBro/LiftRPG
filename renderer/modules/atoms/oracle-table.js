@@ -11,6 +11,7 @@ import { registerAtom } from '../engine/atom-registry.js';
 import { buildOracleModel } from '../field-ops-models.js';
 import { renderOracleSection } from '../field-ops-primitives.js';
 import { densityVariant } from '../engine/density-util.js';
+import { advancePx, advanceRatio, readTypeMetrics } from '../type-metrics.js';
 
 // ---------------------------------------------------------------------------
 // Ladder mirror  ⇄  booklet.css oracle blocks
@@ -55,6 +56,7 @@ const LADDER = {
     fragExtra:   8,
     fragBlock:   22.92,  // 7pt chip (14.92) + 4px margins × 2
     fragCharPx:  5.98,   // mono 7pt + .1em tracking
+    fragFsPx:    9.33,   // 7pt — the size fragCharPx was measured at
     headerPadB:  2,
     headerMB:    3,
     instrMB:     3,
@@ -69,6 +71,7 @@ const LADDER = {
     fragExtra:   8,
     fragBlock:   22.92,
     fragCharPx:  5.98,
+    fragFsPx:    9.33,   // 7pt
     headerPadB:  2,
     headerMB:    3,
     instrMB:     3,
@@ -83,6 +86,7 @@ const LADDER = {
     fragExtra:   2,      // frag-ref margins collapse to 0 at dense
     fragBlock:   11.52,  // 5.4pt chip, no margins
     fragCharPx:  4.61,
+    fragFsPx:    7.20,   // 5.4pt
     headerPadB:  2,
     headerMB:    2,
     instrMB:     2,
@@ -97,6 +101,7 @@ const LADDER = {
     fragExtra:   2,
     fragBlock:   11.52,
     fragCharPx:  4.61,
+    fragFsPx:    7.20,   // 5.4pt
     headerPadB:  1,
     headerMB:    1,
     instrMB:     1,
@@ -113,15 +118,18 @@ const ZONE_PAD_TOP_PX = 3;
 /** .oracle-case-num — mono 5pt + .04em tracking. Not on the ladder: the roll
  *  value is how a player finds their result, so it holds its size. */
 const NUM_CHAR_PX = 3.87;
+const NUM_FS_PX = 6.67;        // 5pt
 
 /** .oracle-header inherits the container's line-height, which is archetype-
  *  dependent (12.56px on some themes, 13.56px on others). The taller figure is
  *  the conservative one. Its border-bottom is ENTRY_BORDER_PX. */
 const HEADER_LINE_PX = 13.6;
 const HEADER_CHAR_PX = 6.1;    // mono 5.9pt, uppercase, .14em tracking
+const HEADER_FS_PX = 7.87;     // 5.9pt
 /** .oracle-instruction — 5.9pt italic serif at --theme-body-leading. */
 const INSTR_LINE_PX = 12.6;
 const INSTR_CHAR_PX = 4.0;
+const INSTR_FS_PX = 7.87;      // 5.9pt
 
 /**
  * Width the entry grid is modelled against.
@@ -158,9 +166,9 @@ function ladderFor(density) {
   return LADDER[densityVariant(density) || 'base'];
 }
 
-function wrappedLines(chars, widthPx, fontSizePx) {
+function wrappedLines(chars, widthPx, fontSizePx, charWidthRatio) {
   if (!chars) return 0;
-  const perLine = Math.max(1, Math.floor(widthPx / (CHAR_WIDTH_RATIO * fontSizePx)));
+  const perLine = Math.max(1, Math.floor(widthPx / (charWidthRatio * fontSizePx)));
   return Math.max(1, Math.ceil(chars / perLine));
 }
 
@@ -173,10 +181,10 @@ function wrappedLines(chars, widthPx, fontSizePx) {
  * optional `.frag-ref`. The two text columns are `flex:1`, so they split
  * whatever the fixed-width chips leave.
  */
-function entryHeight(entry, tier, entryWidthPx) {
-  const numW = String(entry.roll || '').length * NUM_CHAR_PX;
+function entryHeight(entry, tier, entryWidthPx, adv) {
+  const numW = String(entry.roll || '').length * adv.num;
   const fragChars = String(entry.fragmentRef || '').length;
-  const fragW = fragChars ? fragChars * tier.fragCharPx : 0;
+  const fragW = fragChars ? fragChars * adv.frag : 0;
 
   const columns = [String(entry.text || '')];
   if (entry.paperAction) columns.push('(' + entry.paperAction + ')');
@@ -189,7 +197,7 @@ function entryHeight(entry, tier, entryWidthPx) {
   const perColumn = available / columns.length;
 
   const textH = Math.max(...columns.map(
-    (text) => wrappedLines(text.length, perColumn, tier.textFs) * tier.textLh,
+    (text) => wrappedLines(text.length, perColumn, tier.textFs, adv.textRatio) * tier.textLh,
   ));
 
   const stack = fragChars
@@ -200,18 +208,32 @@ function entryHeight(entry, tier, entryWidthPx) {
 }
 
 /** Modelled zone height for one oracle table at one ladder tier. */
-function oracleHeightAt(oracle, tier) {
+function oracleHeightAt(oracle, tier, metrics) {
+  // THE FACE EACH ADVANCE IS ABOUT. `.oracle-case-num`, `.oracle-header` and
+  // the `.frag-ref` chip are mono; `.oracle-text` and `.oracle-instruction`
+  // read `--serif` (booklet.css 4749, 740). The classified-packet shell re-faces
+  // the text and header to mono, but that rule hangs off `.field-ops-right` —
+  // a PAGE-level container, absent from the bare bounded page this atom is
+  // measured in — so it is left unmodelled for the same reason fragment-doc
+  // leaves the `.fragment-page[…]` setters unmodelled.
+  const adv = {
+    num:       advancePx(NUM_CHAR_PX, NUM_FS_PX, 'mono', metrics),
+    header:    advancePx(HEADER_CHAR_PX, HEADER_FS_PX, 'mono', metrics),
+    instr:     advancePx(INSTR_CHAR_PX, INSTR_FS_PX, 'body', metrics),
+    frag:      advancePx(tier.fragCharPx, tier.fragFsPx, 'mono', metrics),
+    textRatio: advanceRatio(CHAR_WIDTH_RATIO, 'body', metrics),
+  };
   const entries = Array.isArray(oracle.entries) ? oracle.entries : [];
 
   let height = ZONE_BORDER_TOP_PX + ZONE_PAD_TOP_PX;
 
   const titleChars = String(oracle.title || 'Oracle').length;
-  height += Math.max(1, Math.ceil(titleChars * HEADER_CHAR_PX / ZONE_WIDTH_PX)) * HEADER_LINE_PX
+  height += Math.max(1, Math.ceil(titleChars * adv.header / ZONE_WIDTH_PX)) * HEADER_LINE_PX
     + tier.headerPadB + ENTRY_BORDER_PX + tier.headerMB;
 
   if (oracle.instruction) {
     const instrChars = String(oracle.instruction).length;
-    height += Math.max(1, Math.ceil(instrChars * INSTR_CHAR_PX / ZONE_WIDTH_PX)) * INSTR_LINE_PX
+    height += Math.max(1, Math.ceil(instrChars * adv.instr / ZONE_WIDTH_PX)) * INSTR_LINE_PX
       + tier.instrMB;
   }
 
@@ -219,7 +241,7 @@ function oracleHeightAt(oracle, tier) {
   // as tall as its taller entry — summing entries individually would over-count
   // by roughly the height of every shorter one.
   const entryWidth = (ZONE_WIDTH_PX - tier.colGap) / 2;
-  const naturals = entries.map((entry) => entryHeight(entry, tier, entryWidth));
+  const naturals = entries.map((entry) => entryHeight(entry, tier, entryWidth, adv));
   const rowCount = Math.ceil(naturals.length / 2);
   for (let row = 0; row < rowCount; row += 1) {
     height += Math.max(naturals[2 * row] || 0, naturals[2 * row + 1] || 0);
@@ -242,11 +264,12 @@ registerAtom('oracle-table', {
    * chip alone gives back 6px per entry between base and dense), narrow for a
    * table of one-line results, where the entry is already at its floor.
    */
-  estimate(data, density) {
+  estimate(data, density, context) {
+    const metrics = readTypeMetrics(context);
     const oracle = (data || {}).oracle || {};
     return {
-      minHeight:       oracleHeightAt(oracle, LADDER.tight),
-      preferredHeight: oracleHeightAt(oracle, ladderFor(density)),
+      minHeight:       oracleHeightAt(oracle, LADDER.tight, metrics),
+      preferredHeight: oracleHeightAt(oracle, ladderFor(density), metrics),
     };
   },
 

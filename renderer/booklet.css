@@ -424,6 +424,21 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   --theme-body-family:var(--font-body,'Libre Baskerville',Georgia,serif);
   --theme-body-leading:var(--body-line-height,1.6);
   --theme-label-family:var(--font-mono,'Share Tech Mono',monospace);
+  /* THE UN-FREEZE (D116(b) → D118 → landed here). These three re-declare the
+     OLD aliases ON THIS CONTAINER so they resolve against the three lines
+     above instead of against `:root`'s hardcoded pastoral literals — 175 rules
+     read them directly and had been printing pastoral's typefaces in every
+     archetype. A custom property's var() references resolve WHERE IT IS
+     DECLARED, which is the whole defect and the whole fix. It also retires the
+     three same-file collisions where a later solo rule re-stated a bare alias
+     and defeated the live `var(--theme-*-family,…)` pipe (.doc-label,
+     .oracle-header, .fragment-doc-body): bare and live now compute to the same
+     value, so which one wins stops mattering.
+     THE PRECONDITION, now met: phase-1 estimation is face-aware. See the
+     blocked-ship analysis below and modules/type-metrics.js. */
+  --mono:var(--theme-label-family,'Share Tech Mono',monospace);
+  --serif:var(--theme-body-family,'Libre Baskerville',Georgia,serif);
+  --display:var(--theme-title-family,'Playfair Display',Georgia,serif);
   --theme-label-weight:var(--weight-label,400);
   --theme-label-case:var(--label-transform,uppercase);
   --theme-label-spacing:var(--label-spacing,.18em);

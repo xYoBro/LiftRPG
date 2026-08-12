@@ -23,6 +23,7 @@
  */
 
 import { registerAtom } from '../engine/atom-registry.js';
+import { advancePx, readTypeMetrics } from '../type-metrics.js';
 import { PAGE_BUDGET } from '../engine/page-spec.js';
 import { wrappedLines } from '../utils.js';
 import { buildClockModels } from '../field-ops-models.js';
@@ -115,6 +116,7 @@ const GRID_ROW_GAP_PX = 6;
  *  atoms/map-panel.js). Measured advance 4.793. */
 const NAME_LINE_PX = 12.37;
 const NAME_CHAR_PX = 4.8;
+const NAME_FS_PX = 7.73;   // 5.8pt — the size NAME_CHAR_PX was measured at
 /** `.clock-subtext` / `.clock-consequence` — 5pt mono × 1.25 (explicit in CSS),
  *  8.3333px computed. Measured advance 3.597; 3.8 is the value that fits the
  *  corpus best. It was chosen by sweeping 3.60–3.90 against all 57 authored
@@ -126,6 +128,7 @@ const NAME_CHAR_PX = 4.8;
  *  fragment-doc reading-length curve. */
 const TEXT_LINE_PX = 8.33;
 const TEXT_CHAR_PX = 3.8;
+const TEXT_FS_PX = 6.67;   // 5pt
 /** Characters `renderGameplayClocks()` prepends to `consequenceOnFull`. */
 const CONSEQUENCE_PREFIX_CHARS = CLOCK_CONSEQUENCE_PREFIX.length;
 
@@ -137,6 +140,7 @@ const THRESHOLDS_GAP_PX = 3;
  *  advance 3.660. */
 const CHIP_LINE_PX = 10.45;
 const CHIP_CHAR_PX = 3.7;
+const CHIP_FS_PX = 6.53;   // 4.9pt
 const CHIP_PAD_Y_PX = 4;
 const CHIP_PAD_X_PX = 8;
 
@@ -150,7 +154,7 @@ const CHIP_PAD_X_PX = 8;
  * the column, so the wrap is arithmetic — the same reason the grid above has a
  * fixed column count.
  */
-function thresholdBlockHeightPx(thresholds, availWidth) {
+function thresholdBlockHeightPx(thresholds, availWidth, chipCharPx) {
   const lines = [];
   let lineWidth = 0;
   let lineHeight = 0;
@@ -163,9 +167,9 @@ function thresholdBlockHeightPx(thresholds, availWidth) {
     // text width through two floating-point steps, and `chars * CHIP_CHAR_PX /
     // (chars * CHIP_CHAR_PX + PAD - PAD)` lands at 1.0000000000000002 — which
     // ceil()s to 2, silently giving every short chip a second line.
-    const inner = Math.min(chars * CHIP_CHAR_PX, Math.max(1, availWidth - CHIP_PAD_X_PX));
+    const inner = Math.min(chars * chipCharPx, Math.max(1, availWidth - CHIP_PAD_X_PX));
     const outer = inner + CHIP_PAD_X_PX;
-    const height = wrappedLines(chars, inner, CHIP_CHAR_PX) * CHIP_LINE_PX + CHIP_PAD_Y_PX;
+    const height = wrappedLines(chars, inner, chipCharPx) * CHIP_LINE_PX + CHIP_PAD_Y_PX;
 
     const needsNewLine = lineWidth > 0 && lineWidth + THRESHOLDS_GAP_PX + outer > availWidth;
     if (needsNewLine) {
@@ -199,22 +203,22 @@ function infoWidthPx(clockCount) {
 }
 
 /** Flow height of one `.clock-item`, dial floor included. */
-function clockItemHeightPx(clock, infoWidth) {
-  let info = wrappedLines(String(clock.clockName || '').length, infoWidth, NAME_CHAR_PX) * NAME_LINE_PX;
+function clockItemHeightPx(clock, infoWidth, adv) {
+  let info = wrappedLines(String(clock.clockName || '').length, infoWidth, adv.name) * NAME_LINE_PX;
 
   const subtext = clockSubtext(clock);
   if (subtext) {
-    info += wrappedLines(subtext.length, infoWidth, TEXT_CHAR_PX) * TEXT_LINE_PX;
+    info += wrappedLines(subtext.length, infoWidth, adv.text) * TEXT_LINE_PX;
   }
 
   const thresholds = Array.isArray(clock.thresholds) ? clock.thresholds : [];
   if (thresholds.length) {
-    info += thresholdBlockHeightPx(thresholds, infoWidth);
+    info += thresholdBlockHeightPx(thresholds, infoWidth, adv.chip);
   }
 
   if (clock.consequenceOnFull) {
     const chars = CONSEQUENCE_PREFIX_CHARS + String(clock.consequenceOnFull).length;
-    info += wrappedLines(chars, infoWidth, TEXT_CHAR_PX) * TEXT_LINE_PX;
+    info += wrappedLines(chars, infoWidth, adv.text) * TEXT_LINE_PX;
   }
 
   // `align-items:center` on `.clock-item`: the row is as tall as the taller of
@@ -223,9 +227,18 @@ function clockItemHeightPx(clock, infoWidth) {
 }
 
 /** Modelled panel height. Pure over its own data at every density. */
-function panelHeightPx(data) {
+function panelHeightPx(data, metrics) {
   const clocks = buildClockModels((data || {}).clocks);
   if (!clocks.length) return 0;
+
+  // Every text class in this panel reads `--mono` (booklet.css 4522/4529/4541)
+  // and none of them is re-faced by an archetype, shell or density rule — the
+  // whole surface is one face, so one role covers it.
+  const adv = {
+    name: advancePx(NAME_CHAR_PX, NAME_FS_PX, 'mono', metrics),
+    text: advancePx(TEXT_CHAR_PX, TEXT_FS_PX, 'mono', metrics),
+    chip: advancePx(CHIP_CHAR_PX, CHIP_FS_PX, 'mono', metrics),
+  };
 
   const infoWidth = infoWidthPx(clocks.length);
   const cols = clocks.length === 1 ? 1 : GRID_COLS;
@@ -236,7 +249,7 @@ function panelHeightPx(data) {
   for (let index = 0; index < clocks.length; index += cols) {
     const row = clocks.slice(index, index + cols);
     gridHeight += row.reduce((tallest, clock) => {
-      return Math.max(tallest, clockItemHeightPx(clock, infoWidth));
+      return Math.max(tallest, clockItemHeightPx(clock, infoWidth, adv));
     }, 0);
   }
   const rowCount = Math.ceil(clocks.length / cols);
@@ -256,8 +269,8 @@ registerAtom('clocks-panel', {
    * shrink potential of zero to the solver. That is the truth: this panel has
    * nothing it can honestly give back.
    */
-  estimate(data) {
-    const height = panelHeightPx(data);
+  estimate(data, density, context) {
+    const height = panelHeightPx(data, readTypeMetrics(context));
     return { minHeight: height, preferredHeight: height };
   },
 

@@ -65,16 +65,23 @@ export const OVERFLOW_PROGRESS_EPSILON_PX = 0.5;
 /**
  * Calculate how much an atom can shrink (in px) by increasing its density.
  *
+ * Both probes take the planner's estimate context, unread, so that the shrink
+ * potential is computed in the SAME typographic world the placement's own
+ * estimate was. Passing it to one probe and not the other, or to neither while
+ * the planner used one, would make the solver reason about a book nobody is
+ * printing — the ladder-mirror failure mode, one layer up.
+ *
  * @param {object} atom — must have `.type`, `.data`
  * @param {number} currentDensity — current density (0.0–1.0)
+ * @param {object|null} [estimateContext] — opaque; forwarded to the atom
  * @returns {{ shrinkPotentialPx: number, currentHeight: number, minHeight: number }}
  */
-export function atomShrinkPotential(atom, currentDensity) {
+export function atomShrinkPotential(atom, currentDensity, estimateContext = null) {
   const def = getAtomDefinition(atom.type);
   if (!def) return { shrinkPotentialPx: 0, currentHeight: 0, minHeight: 0 };
 
-  const est    = def.estimate(atom.data, currentDensity);
-  const estMax = def.estimate(atom.data, MAX_DENSITY);
+  const est    = def.estimate(atom.data, currentDensity, estimateContext);
+  const estMax = def.estimate(atom.data, MAX_DENSITY, estimateContext);
 
   return {
     shrinkPotentialPx: Math.max(0, est.preferredHeight - estMax.minHeight),
@@ -188,7 +195,7 @@ export function resolvePageOverflow(pageAtoms, overflowPx, pageBudgetPx, options
   const potentials = pageAtoms
     .map(atom => ({
       ...atom,
-      ...atomShrinkPotential(atom, atom.density),
+      ...atomShrinkPotential(atom, atom.density, options.estimateContext || null),
     }))
     .filter(a => a.shrinkPotentialPx > 0 && a.density < MAX_DENSITY);
 

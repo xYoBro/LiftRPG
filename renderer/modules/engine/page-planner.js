@@ -88,10 +88,36 @@ export function orderAtoms(atoms, sectionOrder = DEFAULT_SECTION_ORDER) {
  *  The measurement harness refines actual sizing post-plan. */
 const ESTIMATE_DENSITY = 0.6;
 
-function estimateAtomHeight(atom, density = ESTIMATE_DENSITY, halfWidthTypes = null) {
+/**
+ * THE ESTIMATE CONTEXT IS OPAQUE TO THIS LAYER.
+ *
+ * Layer 1 forwards `estimateContext` from the caller to the atom and never
+ * reads a field of it — the same discipline `shellAttrs` and `mergeKey` are
+ * held to (Charter: the engine must not learn what a domain's payload means).
+ * What it carries today is typography: phase-1 has no DOM, so an atom that
+ * models wrapped text cannot discover which typeface it is estimating, and a
+ * per-character advance is a measurement OF a typeface (see
+ * modules/type-metrics.js). Measurement equals render only if the estimate is
+ * allowed to know what render will draw with.
+ *
+ * A missing context is legal everywhere and means "the calibration anchors" —
+ * every atom defaults through readTypeMetrics(), so an estimate called without
+ * one returns exactly the numbers it returned before this parameter existed.
+ */
+/**
+ * Build the context once per planning phase, never per atom: the planner
+ * estimates thousands of times. `null` when the caller supplied no metrics,
+ * which every atom reads as "the calibration anchors".
+ */
+function makeEstimateContext(options) {
+  const typeMetrics = options && options.typeMetrics;
+  return typeMetrics ? Object.freeze({ typeMetrics }) : null;
+}
+
+function estimateAtomHeight(atom, density = ESTIMATE_DENSITY, halfWidthTypes = null, estimateContext = null) {
   const def = getAtomDefinition(atom.type);
   if (def) {
-    const est = def.estimate(atom.data, density);
+    const est = def.estimate(atom.data, density, estimateContext);
     // Use minHeight for packing — lets more atoms fit per page.
     // The measurement harness refines actual height post-plan.
     //
@@ -167,12 +193,12 @@ function createSpread(spreadIndex, spreadType, mergeKey = null) {
 /**
  * Create an atom placement entry for a spread's left or right page.
  */
-function createPlacement(atom, density = ESTIMATE_DENSITY, halfWidthTypes = null) {
+function createPlacement(atom, density = ESTIMATE_DENSITY, halfWidthTypes = null, estimateContext = null) {
   return {
     atomId:          atom.id,
     type:            atom.type,
     density,
-    estimatedHeight: estimateAtomHeight(atom, density, halfWidthTypes),
+    estimatedHeight: estimateAtomHeight(atom, density, halfWidthTypes, estimateContext),
     measuredHeight:  null,
     data:            atom.data,
     sizeHint:        atom.sizeHint,
@@ -374,7 +400,7 @@ function findPaddingInsertIndex(spreadPlan) {
  * @param {'spread'|'page'} planningUnit
  * @returns {object[]} array of spread descriptors
  */
-function binGroupIntoSpreads(groupAtoms, startSpreadIndex, spreadType, mergeKey, planningUnit) {
+function binGroupIntoSpreads(groupAtoms, startSpreadIndex, spreadType, mergeKey, planningUnit, estimateContext = null) {
   const budget  = PAGE_BUDGET.heightPx;
 
   // ── Separate atoms by affinity ──────────────────────────────
@@ -405,7 +431,7 @@ function binGroupIntoSpreads(groupAtoms, startSpreadIndex, spreadType, mergeKey,
     const pages = [];
     let current = [];
     for (const atom of atoms) {
-      const placement = createPlacement(atom, ESTIMATE_DENSITY, halfWidthTypes);
+      const placement = createPlacement(atom, ESTIMATE_DENSITY, halfWidthTypes, estimateContext);
       const ownPage = atom.mustOwnPage || atom.sizeHint === 'full-page' || !getAtomDefinition(atom.type)?.canShare;
 
       if (ownPage) {
@@ -482,7 +508,7 @@ function binGroupIntoSpreads(groupAtoms, startSpreadIndex, spreadType, mergeKey,
   let frontierRank = -1;
 
   for (const atom of eitherAtoms) {
-    const placement = createPlacement(atom, ESTIMATE_DENSITY, rightHalfWidthTypes);
+    const placement = createPlacement(atom, ESTIMATE_DENSITY, rightHalfWidthTypes, estimateContext);
     const ownPage = atom.mustOwnPage || atom.sizeHint === 'full-page' || !getAtomDefinition(atom.type)?.canShare;
     const atomOrder = groupOrderIndex.get(atom.id) ?? -1;
     let placed = false;
@@ -567,6 +593,8 @@ export function planSpreads(atoms, options = {}) {
     paddingAtom     = DEFAULT_PADDING_ATOM,
   } = options;
 
+  const estimateContext = makeEstimateContext(options);
+
   const diag = createDiagnostics();
 
   // Phase 1: Order atoms
@@ -587,6 +615,7 @@ export function planSpreads(atoms, options = {}) {
       spreadType,
       mergeKey,
       planningUnit,
+      estimateContext,
     );
 
     // Re-index spreads
@@ -866,7 +895,7 @@ export function scanContinuationDiagnostics(spreadPlan, diagnostics) {
  *   atom is never double-flagged
  * @returns {number} revision passes applied
  */
-function runRevisionLoop(spreadPlan, stack, effectiveBudget, diagnostics, unresolvedAtomIds) {
+function runRevisionLoop(spreadPlan, stack, effectiveBudget, diagnostics, unresolvedAtomIds, estimateContext = null) {
   let revisionsApplied = 0;
 
   // Overflow measured for each page on the previous pass, so the solver can
@@ -948,7 +977,7 @@ function runRevisionLoop(spreadPlan, stack, effectiveBudget, diagnostics, unreso
             })),
             overflowPx,
             effectiveBudget,
-            { densityExhausted, stalled },
+            { densityExhausted, stalled, estimateContext },
           );
 
           // Apply density adjustments
@@ -1306,6 +1335,12 @@ function repackAfterShedStabilization(spreadPlan, stack, diagnostics) {
  * @returns {{ spreadPlan: object[], diagnostics: object }}
  */
 export function planAndMeasure(atoms, container, options = {}) {
+  // The revision loop re-estimates through the density solver, so it needs the
+  // same context the plan was built with. Built here rather than reached for
+  // out of planSpreads' scope — which is exactly the bug that shipped this
+  // function a ReferenceError the first time round.
+  const estimateContext = makeEstimateContext(options);
+
   // Step 1: Plan with estimates
   const { spreadPlan, diagnostics } = planSpreads(atoms, options);
 
@@ -1344,7 +1379,7 @@ export function planAndMeasure(atoms, container, options = {}) {
     // Step 3: Revise overflows (extracted loop — see runRevisionLoop)
     const unresolvedAtomIds = new Set();  // Track atoms already flagged
     let revisionsApplied = runRevisionLoop(
-      spreadPlan, stack, effectiveBudget, diagnostics, unresolvedAtomIds,
+      spreadPlan, stack, effectiveBudget, diagnostics, unresolvedAtomIds, estimateContext,
     );
 
     // Step 4: Compact — merge underfilled sharable pages
@@ -1437,7 +1472,7 @@ export function planAndMeasure(atoms, container, options = {}) {
       // construction, not by assumption. Bounded (≤ MAX_REVISIONS); no repack
       // follows it, so no repack↔shed cycle can form.
       revisionsApplied += runRevisionLoop(
-        spreadPlan, stack, effectiveBudget, diagnostics, unresolvedAtomIds,
+        spreadPlan, stack, effectiveBudget, diagnostics, unresolvedAtomIds, estimateContext,
       );
     }
     diagnostics.revisionPasses = revisionsApplied;

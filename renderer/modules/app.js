@@ -118,7 +118,14 @@ function bookletGeometrySignature() {
 
 function renderSettleBlocker(sample) {
   if (document.fonts && document.fonts.status !== 'loaded') return 'fonts-loading';
-  if (state.pendingFontRenderToken) return 'font-rerender-pending';
+  // Two forms of the same debt. The token says a re-render has been SCHEDULED;
+  // fontRerenderOwed() says the layout on screen was computed against fewer
+  // faces than are down now, which is true from the instant the face lands —
+  // before any event has been dispatched and before anything can schedule.
+  // Without the second, a sample taken in the gap between the FontFaceSet
+  // flipping to 'loaded' and its 'loadingdone' task running would latch
+  // `settled` on a layout that is about to be replaced.
+  if (state.pendingFontRenderToken || fontRerenderOwed()) return 'font-rerender-pending';
   if (!sample.pages) return 'no-pages';
   return '';
 }
@@ -189,6 +196,14 @@ function watchLateFontActivity() {
     beginRenderPass('late-font-load');
     watchForRenderSettled();
   });
+  // …and when the cycle ENDS, the book is re-planned against the faces that
+  // arrived. The swap alone reflows text inside the boxes it already has; only
+  // a re-render re-runs the planner, whose phase-1 estimates are per-typeface
+  // arithmetic (modules/type-metrics.js). Both events, one owner: this is the
+  // only place in the app that listens to the font set.
+  const settleDebt = () => scheduleFontAwareRerender();
+  document.fonts.addEventListener('loadingdone', settleDebt);
+  document.fonts.addEventListener('loadingerror', settleDebt);
 }
 
 function isSafariBrowser() {
@@ -361,7 +376,10 @@ function renderCurrentBooklet() {
   if (!state.data) return;
   // The single funnel for every render — load, unlock, layout-mode switch and
   // the font-aware pass all arrive here, so this is the one place the marker
-  // needs to be lowered and re-armed.
+  // needs to be lowered and re-armed, and the one place the font debt is
+  // settled. Recorded BEFORE the render, not after: a face that lands while
+  // this pass runs must still leave a debt behind it.
+  renderedFaceCount = loadedFaceCount();
   beginRenderPass();
   renderBooklet(refs, state.layoutMode, state.data, state.unlockedEnding, setStatus);
   publishAuditStatus();
@@ -379,8 +397,65 @@ function waitForFontsReady() {
   return document.fonts.ready.catch(() => {});
 }
 
+// ── THE FONT DEBT ────────────────────────────────────────────────────────────
+//
+// A render is a photograph of the faces that were down when it ran. The
+// vendored faces are `font-display: swap` (D92), so a render that happens
+// before a face arrives lays out in FALLBACK metrics and the swap reflows the
+// text underneath it — including the planner's page assignment, because
+// phase-1 estimates are per-typeface arithmetic. The re-render that repairs
+// that is a DEBT, and the only real question is how the app knows it owes one.
+//
+// It used to ask `document.fonts.status === 'loaded'` at the single instant
+// loadBooklet() ran, and schedule nothing if the answer came back 'loaded'.
+// That reads as "the fonts are down", but it is equally what an IDLE set
+// reports BEFORE its first face has been requested (D120) — and this booklet's
+// faces are requested BY the render, which has not happened yet at that point.
+// Only timing kept it honest: the toolbar's faces were usually still in
+// flight, so the guard usually fell through to scheduling. Warm the cache, or
+// resolve the toolbar's faces a beat earlier, and it returns early — the book
+// then keeps its fallback layout permanently, with nothing anywhere to say so.
+//
+// So the debt is a COMPARISON, not a status string and not an event:
+//
+//     faces loaded NOW  >  faces loaded when this layout was computed
+//
+// `document.fonts` is set-like and every FontFace carries its own status, so
+// that is directly observable at any moment, from any caller, with no reliance
+// on having been listening at the right time. It also terminates by
+// construction: the count is monotonic (a loaded face never unloads) and
+// bounded by the set, and every re-render raises the recorded count to the
+// current one — so a pass that requests no new face owes nothing and the chain
+// stops. The cap below is belt-and-braces for a pathological cascade of
+// per-glyph subset loads; if it were ever reached with a debt outstanding, the
+// debt stays visible to renderSettleBlocker() and the marker goes `stalled`
+// naming `font-rerender-pending`. Loud and wrong beats quiet and wrong.
+const MAX_FONT_AWARE_RERENDERS = 4;
+
+/** Faces the layout on screen was computed against. -1 until the first render. */
+let renderedFaceCount = -1;
+let fontAwareRerenders = 0;
+
+function loadedFaceCount() {
+  if (!document.fonts || typeof document.fonts.forEach !== 'function') return 0;
+  let count = 0;
+  document.fonts.forEach((face) => { if (face.status === 'loaded') count += 1; });
+  return count;
+}
+
+function fontRerenderOwed() {
+  return !!state.data && loadedFaceCount() > renderedFaceCount;
+}
+
 function scheduleFontAwareRerender() {
-  if (!state.data || !document.fonts || document.fonts.status === 'loaded') {
+  if (!fontRerenderOwed()) {
+    state.pendingFontRenderToken = null;
+    return;
+  }
+  if (fontAwareRerenders >= MAX_FONT_AWARE_RERENDERS) {
+    state.pendingFontRenderToken = null;
+    console.warn('[app] font-aware re-render cap reached (' + MAX_FONT_AWARE_RERENDERS
+      + '); the layout may be estimated against fewer faces than are loaded.');
     return;
   }
 
@@ -391,6 +466,11 @@ function scheduleFontAwareRerender() {
   waitForFontsReady().then(() => {
     if (state.pendingFontRenderToken !== token || !state.data) return;
     state.pendingFontRenderToken = null;
+    // `document.fonts.ready` can resolve against faces that have nothing to do
+    // with this booklet (D120), so it is a convenience here, not the pin: the
+    // debt is re-checked before spending a render on it.
+    if (!fontRerenderOwed()) return;
+    fontAwareRerenders += 1;
     renderCurrentBooklet();
   });
 }

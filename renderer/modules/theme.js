@@ -1,4 +1,5 @@
 import { alpha, mergeObjects } from './utils.js?v=48';
+import { resolveTypeMetrics } from './type-metrics.js?v=48';
 import {
   VALID_COMPONENT_DIALECTS,
   DEFAULT_COMPONENT_DIALECT
@@ -761,6 +762,12 @@ export function resolveTheme(data) {
 
   return {
     archetype,
+    // Typography metrics ride on the resolved theme for the same reason the
+    // dialect does: they are a book-wide presentation fact, decided once, from
+    // the same tokens. Nothing here is applied to the DOM — the CSS already has
+    // the stacks. This is the copy phase-1 ESTIMATION gets, because estimation
+    // has no DOM to read a font stack out of. See modules/type-metrics.js.
+    typeMetrics: resolveTypeMetrics(tokens),
     // The component dialect rides on the resolved theme because it is the same
     // KIND of thing — a book-wide presentation choice stamped once on the
     // container and read by CSS. It is NOT a token: a dialect changes drawing,

@@ -12,6 +12,7 @@ import { buildMapModel } from '../field-ops-models.js';
 import { renderMapSection } from '../field-ops-primitives.js';
 import { densityVariant } from '../engine/density-util.js';
 import { wrappedLines } from '../utils.js';
+import { advancePx, readTypeMetrics } from '../type-metrics.js';
 
 // ---------------------------------------------------------------------------
 // Ladder mirror  ⇄  booklet.css `.map-zone[data-density-variant]` blocks
@@ -49,6 +50,7 @@ const LADDER = {
     annoMT:       3,
     noteLinePx:   10.41,  // 6.1pt × 1.28
     noteCharPx:   4.05,
+    noteFsPx:     8.13,   // 6.1pt — the size noteCharPx was measured at
     noteMT:       3,
     noteHidden:   false,
     rkPadTop:     3,
@@ -61,6 +63,7 @@ const LADDER = {
     annoMT:       3,
     noteLinePx:   10.41,
     noteCharPx:   4.05,
+    noteFsPx:     8.13,   // 6.1pt
     noteMT:       3,
     noteHidden:   false,
     rkPadTop:     3,
@@ -73,6 +76,7 @@ const LADDER = {
     annoMT:       1,
     noteLinePx:   7.36,   // 4.6pt × 1.2
     noteCharPx:   3.05,
+    noteFsPx:     6.13,   // 4.6pt
     noteMT:       1,
     noteHidden:   false,
     rkPadTop:     2,
@@ -85,6 +89,7 @@ const LADDER = {
     annoMT:       1,
     noteLinePx:   0,      // .map-note{ display:none }
     noteCharPx:   3.05,
+    noteFsPx:     6.13,   // 4.6pt
     noteMT:       0,
     noteHidden:   true,
     rkPadTop:     1,
@@ -97,9 +102,11 @@ const LADDER = {
 /** .map-title — 7.5pt label at the container's inherited leading. */
 const TITLE_LINE_PX = 16;
 const TITLE_CHAR_PX = 8.6;
+const TITLE_FS_PX = 10.00;   // 7.5pt
 /** .map-annotation — 5.9pt mono italic × 1.3. */
 const ANNO_LINE_PX = 10.2;
 const ANNO_CHAR_PX = 5.0;
+const ANNO_FS_PX = 7.87;     // 5.9pt
 
 // ── Body geometry (density-invariant by construction) ──────────────────────
 /** .map-cell min-height, and the .map-grid gap between rows. */
@@ -132,6 +139,7 @@ const PLAYER_MIN_PX = 176;
 const PLAYER_PROMPT_PX = 12.44;
 const PLAYER_PROMPT_MT = 6;
 const PLAYER_PROMPT_CHAR_PX = 4.0;
+const PLAYER_PROMPT_FS_PX = 6.53;   // 4.9pt
 /** Prompts are `width:max-content; max-width:78%`. */
 const PLAYER_PROMPT_MAX_W = 0.78;
 /** .map-track-step: 4px+5px padding, 1px+1px border, 2px gaps between the
@@ -141,8 +149,10 @@ const TRACK_STEP_GAP_PX = 2;
 const TRACK_INDEX_PX = 10.25;
 const TRACK_LABEL_LINE_PX = 12.37;   // mono 5.8pt at inherited leading
 const TRACK_LABEL_CHAR_PX = 4.7;
+const TRACK_LABEL_FS_PX = 7.73;      // 5.8pt
 const TRACK_META_LINE_PX = 11.52;    // serif 5.4pt italic
 const TRACK_META_CHAR_PX = 4.46;
+const TRACK_META_FS_PX = 7.20;       // 5.4pt
 const TRACK_GAP_PX = 4;
 const TRACK_STEP_PAD_X = 8 + 2;      // horizontal padding + border
 
@@ -152,6 +162,7 @@ const RK_BORDER_TOP_PX = 1;
 const RK_LABEL_PX = 12.38;           // .doc-label, 5.8pt
 const RK_ROW_LINE_PX = 8.32;         // .map-route-key-label, 5.2pt × 1.2
 const RK_ROW_CHAR_PX = 4.16;
+const RK_ROW_FS_PX = 6.93;           // 5.2pt
 const RK_CODE_COL_PX = 18;
 const RK_CODE_GAP_PX = 5;
 const RK_COL_GAP_PX = 8;
@@ -192,7 +203,7 @@ function ladderFor(density) {
  * their defaults (a missing gridDimensions renders 6×5, a missing dimensions
  * renders 12×8) and renderPlayerMap's `.slice(0, 4)` prompt cap.
  */
-function bodyHeight(map, widthPx) {
+function bodyHeight(map, widthPx, metrics) {
   const mapType = map.mapType || 'grid';
 
   if (mapType === 'point-to-point' || mapType === 'node-graph') {
@@ -223,11 +234,13 @@ function bodyHeight(map, widthPx) {
 
     const stepHeights = positions.map((position) => {
       let h = TRACK_STEP_CHROME_PX + TRACK_INDEX_PX + TRACK_STEP_GAP_PX;
-      h += wrappedLines(String(position.label || '').length, stepInnerW, TRACK_LABEL_CHAR_PX)
+      h += wrappedLines(String(position.label || '').length, stepInnerW,
+        advancePx(TRACK_LABEL_CHAR_PX, TRACK_LABEL_FS_PX, 'mono', metrics))
         * TRACK_LABEL_LINE_PX;
       if (position.annotation) {
         h += TRACK_STEP_GAP_PX
-          + wrappedLines(String(position.annotation).length, stepInnerW, TRACK_META_CHAR_PX)
+          + wrappedLines(String(position.annotation).length, stepInnerW,
+            advancePx(TRACK_META_CHAR_PX, TRACK_META_FS_PX, 'body', metrics))
             * TRACK_META_LINE_PX;
       }
       return h;
@@ -243,7 +256,8 @@ function bodyHeight(map, widthPx) {
     const prompts = (Array.isArray(map.prompts) ? map.prompts : []).slice(0, 4);
     const flow = prompts.reduce((sum, prompt) => sum
       + PLAYER_PROMPT_MT
-      + wrappedLines(String(prompt).length, widthPx * PLAYER_PROMPT_MAX_W, PLAYER_PROMPT_CHAR_PX)
+      + wrappedLines(String(prompt).length, widthPx * PLAYER_PROMPT_MAX_W,
+        advancePx(PLAYER_PROMPT_CHAR_PX, PLAYER_PROMPT_FS_PX, 'mono', metrics))
         * PLAYER_PROMPT_PX, 0);
     return Math.max(PLAYER_MIN_PX, flow);
   }
@@ -263,7 +277,7 @@ function bodyHeight(map, widthPx) {
  * edges — renderRouteKey() returns null otherwise. Its two-column grid stretches
  * each row to the taller of the pair, exactly like the oracle's entry grid.
  */
-function routeKeyHeight(map, tier, widthPx) {
+function routeKeyHeight(map, tier, widthPx, metrics) {
   const shellFamily = String((map.artifactIdentity || {}).shellFamily || '').toLowerCase();
   const edges = Array.isArray(map.edges) ? map.edges : [];
   if (shellFamily !== 'classified-packet') return 0;
@@ -273,7 +287,8 @@ function routeKeyHeight(map, tier, widthPx) {
   const columnW = (widthPx - RK_COL_GAP_PX) / 2;
   const labelW = Math.max(12, columnW - RK_CODE_COL_PX - RK_CODE_GAP_PX);
   const rowHeights = edges.map((edge) =>
-    wrappedLines(String(edge.label || 'Route').length, labelW, RK_ROW_CHAR_PX) * RK_ROW_LINE_PX);
+    wrappedLines(String(edge.label || 'Route').length, labelW,
+      advancePx(RK_ROW_CHAR_PX, RK_ROW_FS_PX, 'mono', metrics)) * RK_ROW_LINE_PX);
 
   const gridRows = Math.ceil(rowHeights.length / 2);
   let grid = 0;
@@ -286,26 +301,29 @@ function routeKeyHeight(map, tier, widthPx) {
 }
 
 /** Modelled zone height for one map at one ladder tier. */
-function mapHeightAt(map, tier) {
+function mapHeightAt(map, tier, metrics) {
   const width = MAP_WIDTH_PX;
 
-  let height = wrappedLines(String(map.title || 'Map').length, width, TITLE_CHAR_PX)
+  let height = wrappedLines(String(map.title || 'Map').length, width,
+    advancePx(TITLE_CHAR_PX, TITLE_FS_PX, 'mono', metrics))
     * TITLE_LINE_PX + tier.titleMB;
 
-  const body = bodyHeight(map, width);
+  const body = bodyHeight(map, width, metrics);
   height += body;
   if (body) height += tier.bodyMB;
 
-  height += routeKeyHeight(map, tier, width);
+  height += routeKeyHeight(map, tier, width, metrics);
 
   if (map.floorLabel) {
     height += tier.annoMT
-      + wrappedLines(String(map.floorLabel).length, width, ANNO_CHAR_PX) * ANNO_LINE_PX;
+      + wrappedLines(String(map.floorLabel).length, width,
+        advancePx(ANNO_CHAR_PX, ANNO_FS_PX, 'mono', metrics)) * ANNO_LINE_PX;
   }
 
   if (map.mapNote && !tier.noteHidden) {
     height += tier.noteMT
-      + wrappedLines(String(map.mapNote).length, width, tier.noteCharPx) * tier.noteLinePx;
+      + wrappedLines(String(map.mapNote).length, width,
+        advancePx(tier.noteCharPx, tier.noteFsPx, 'body', metrics)) * tier.noteLinePx;
   }
 
   // Ceil, not round: the constants above are fractional pt→px conversions and
@@ -328,12 +346,13 @@ registerAtom('map-panel', {
    * meaningfully more, because a caption and a legend are the only things here
    * that can compress.
    */
-  estimate(data, density) {
+  estimate(data, density, context) {
+    const metrics = readTypeMetrics(context);
     const raw = (data || {}).map || {};
     const map = { ...raw, artifactIdentity: (data || {}).artifactIdentity || raw.artifactIdentity };
     return {
-      minHeight:       mapHeightAt(map, LADDER.tight),
-      preferredHeight: mapHeightAt(map, ladderFor(density)),
+      minHeight:       mapHeightAt(map, LADDER.tight, metrics),
+      preferredHeight: mapHeightAt(map, ladderFor(density), metrics),
     };
   },
 

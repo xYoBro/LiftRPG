@@ -168,18 +168,26 @@ function buildPagesFromSpreadPlan(spreadPlan) {
 export function renderBooklet(refs, layoutMode, data, unlockedEnding, setStatus) {
   refs.booklet.innerHTML = '';
   syncLayoutMode(refs, layoutMode);
-  applyTheme(refs.booklet, resolveTheme(data));
+  const theme = resolveTheme(data);
+  applyTheme(refs.booklet, theme);
   applyBookletMetadata(refs.booklet, data);
 
   // Step 1: Extract atoms from data via adapter
   const atoms = liftrpgAdapter.extractAtoms(data, unlockedEnding);
 
   // Step 2: Plan and measure — full pipeline with overflow resolution
+  //
+  // typeMetrics is the ONE thing the estimate phase cannot discover for itself.
+  // Measurement reads real faces out of real CSS; estimation has no DOM, so the
+  // face has to arrive as data, and it has to arrive from here — the theme is
+  // resolved three lines above, from the same booklet JSON, before a single
+  // atom is placed. See modules/type-metrics.js.
   const { spreadPlan, diagnostics } = planAndMeasure(atoms, refs.booklet, {
     sectionOrder: liftrpgAdapter.sectionOrder,
     planningUnit: 'spread',
     padToMultipleOf: 4,
     paddingAtom: { type: 'notes-grid', data: { variant: 'dot' } },
+    typeMetrics: theme.typeMetrics,
   });
 
   // Step 3: Render atoms into pages

@@ -12,6 +12,7 @@ import { buildFragmentModel } from '../document-models.js';
 import { renderFoundDocument } from '../document-primitives.js';
 import { densityVariant } from '../engine/density-util.js';
 import { wrappedLines } from '../utils.js';
+import { advancePx, advanceRatio, readTypeMetrics } from '../type-metrics.js';
 
 // ---------------------------------------------------------------------------
 // Ladder mirror  ⇄  booklet.css fragment blocks
@@ -122,6 +123,7 @@ const NO_BORDER_CLASSES = ['correspondence'];
 /** .fragment-doc-type — 5.1pt at the container's leading. */
 const TYPE_LINE_PX = 10.88;
 const TYPE_CHAR_PX = 5.2;
+const TYPE_FS_PX = 6.80;      // 5.1pt
 /** .fragment-block[data-header-style="letterhead"] adds a rule under the slug. */
 const LETTERHEAD_EXTRA_PX = 6;
 /** .fragment-doc-continuation — 5pt mono, .16em tracking, 3px margin. */
@@ -130,6 +132,7 @@ const CONTINUATION_MB = 3;
 /** .fragment-doc-header — mono 5.8pt × 1.25, one line per meta field. */
 const HEADER_LINE_PX = 9.66;
 const HEADER_CHAR_PX = 4.7;
+const HEADER_FS_PX = 7.73;    // 5.8pt
 /** .fragment-doc.memo adds a 6px pad + 1px rule under the meta box;
  *  classified-packet adds 5px + 1px. */
 const MEMO_HEADER_RULE_PX = 6 + 1;
@@ -146,6 +149,15 @@ const PACKET_HEADER_RULE_PX = 5 + 1;
  */
 const PACKET_STAMP_PX = 20.25;
 const PACKET_STAMP_CLASSES = ['form', 'report', 'inspection'];
+
+/**
+ * Documents whose BODY classified-packet re-faces to mono (booklet.css
+ * 6008–6010). The same three classes as PACKET_STAMP_CLASSES today, and a
+ * separate list on purpose: they mirror two different CSS rules, either of
+ * which can move without the other. Sharing one constant would make a change
+ * to the stamp silently re-face the body.
+ */
+const PACKET_MONO_BODY_CLASSES = ['form', 'inspection', 'report'];
 
 /**
  * SEAL BAND (schema 1.5.0 `fragment.seal`) — `.fragment-seal` and its two
@@ -176,6 +188,7 @@ const PACKET_STAMP_CLASSES = ['form', 'report', 'inspection'];
 const SEAL_CHROME_PX = 23.7;
 const SEAL_LINE_PX = 9.36;
 const SEAL_CHAR_PX = 4.57;
+const SEAL_FS_PX = 6.93;      // 5.2pt
 const SEAL_FRAME_X = 12 + 2.5;
 const SEAL_LABEL_CHARS = 7;
 
@@ -192,15 +205,18 @@ const SEAL_LABEL_CHARS = 7;
  */
 const CITE_LINE_PX = 9.72;   // .fragment-cite 5.4pt × 1.35
 const CITE_CHAR_PX = 4.75;   // 5.4pt mono advance
+const CITE_FS_PX = 7.20;     // 5.4pt
 const CITE_MT = 4;
 
 /** .fragment-doc-sig — mono 5.7pt, 1px rule above. */
 const SIG_LINE_PX = 12.14;
 const SIG_CHAR_PX = 4.6;
+const SIG_FS_PX = 7.60;      // 5.7pt
 const SIG_BORDER_PX = 1;
 /** .manifest-pointer — 5.2pt mono × 1.35, dashed frame + 1.5px filing rule. */
 const MANIFEST_LINE_PX = 9.36;
 const MANIFEST_CHAR_PX = 4.57;
+const MANIFEST_FS_PX = 6.93; // 5.2pt
 const MANIFEST_BORDER_V = 2;
 const MANIFEST_FRAME_X = 12 + 2.5;
 
@@ -224,13 +240,69 @@ const DOC_INSET_X = 24;
  */
 const BODY_CHAR_RATIO = 0.58;
 
+/**
+ * WHICH TYPEFACE EACH OF THOSE ADVANCES IS ABOUT.
+ *
+ * Every constant above was measured against pastoral's faces, because the alias
+ * freeze (D116(b)) made pastoral's faces universal. Un-frozen, a fragment can
+ * be set in any of the four vendored families, and a per-character advance is a
+ * measurement OF a family — so each constant needs the OTHER half of its
+ * measurement recorded: the size it was taken at (the `*_FS_PX` above) and the
+ * theme role whose family the CSS rule resolves to. type-metrics.js supplies
+ * the per-face difference; this function supplies the role.
+ *
+ * It is not one role per constant, because it is not one rule per class. Three
+ * things move a fragment's face, and all three are readable from the model:
+ *
+ *   `[data-primary-typeface="mono"|"serif"]` on `.fragment-block` (booklet.css
+ *   5938–5946) re-faces the BODY, HEADER and SIG together. The selector matches
+ *   those two exact strings; `designSpec.primaryTypeface` is free prose and the
+ *   corpus carries 60+ other values ('typewriter', 'courier', 'mixed', 'arial
+ *   standard'), every one of which matches neither and leaves the base rule
+ *   standing. This mirrors the selector, so it compares exactly.
+ *
+ *   `.fragment-doc.field-note` / `.transcript` set their body in mono (6215,
+ *   6227) — declared LATER than the primary-typeface block at equal
+ *   specificity, so they win it.
+ *
+ *   classified-packet sets form/inspection/report bodies in mono (6008–6010) at
+ *   higher specificity, so it wins everything. That rule hangs off
+ *   `.fragment-block[data-shell-family]` — the atom's OWN root, which
+ *   renderFoundDocument() stamps — so unlike the `.fragment-page[…]` setters
+ *   this file deliberately ignores, it IS present in the measurement harness
+ *   and must be modelled.
+ *
+ * The chrome that no rule re-faces (type slug, seal lines, citation, manifest)
+ * is mono, flatly.
+ */
+function facesFor(model, kind, isPacket, metrics) {
+  const typeface = String((model.designSpec || {}).primaryTypeface || '').trim();
+  const chromeRole = typeface === 'serif' ? 'body' : 'mono';
+
+  let bodyRole;
+  if (isPacket && PACKET_MONO_BODY_CLASSES.includes(kind)) bodyRole = 'mono';
+  else if (kind === 'field-note' || kind === 'transcript') bodyRole = 'mono';
+  else if (typeface === 'mono') bodyRole = 'mono';
+  else bodyRole = 'body';
+
+  return {
+    type:      advancePx(TYPE_CHAR_PX, TYPE_FS_PX, 'mono', metrics),
+    header:    advancePx(HEADER_CHAR_PX, HEADER_FS_PX, chromeRole, metrics),
+    seal:      advancePx(SEAL_CHAR_PX, SEAL_FS_PX, 'mono', metrics),
+    cite:      advancePx(CITE_CHAR_PX, CITE_FS_PX, 'mono', metrics),
+    sig:       advancePx(SIG_CHAR_PX, SIG_FS_PX, chromeRole, metrics),
+    manifest:  advancePx(MANIFEST_CHAR_PX, MANIFEST_FS_PX, 'mono', metrics),
+    bodyRatio: advanceRatio(BODY_CHAR_RATIO, bodyRole, metrics),
+  };
+}
+
 function ladderFor(density) {
   return LADDER[densityVariant(density) || 'base'];
 }
 
-function bodyLines(chars, widthPx, fontSizePx) {
+function bodyLines(chars, widthPx, fontSizePx, bodyRatio) {
   if (!chars) return 1;
-  const perLine = Math.max(1, Math.floor(widthPx / (BODY_CHAR_RATIO * fontSizePx)));
+  const perLine = Math.max(1, Math.floor(widthPx / (bodyRatio * fontSizePx)));
   return Math.max(1, Math.ceil(chars / perLine));
 }
 
@@ -240,9 +312,10 @@ function docKind(model) {
 }
 
 /** Modelled block height for one fragment at one ladder tier. */
-function fragmentHeightAt(model, tier, shellFamily) {
+function fragmentHeightAt(model, tier, shellFamily, metrics) {
   const kind = docKind(model);
   const isPacket = shellFamily === 'classified-packet';
+  const adv = facesFor(model, kind, isPacket, metrics);
 
   const borderV = NO_BORDER_CLASSES.includes(kind) ? 0
     : (THICK_BORDER_CLASSES.includes(kind) ? 4 : 2);
@@ -262,15 +335,15 @@ function fragmentHeightAt(model, tier, shellFamily) {
     height += SEAL_CHROME_PX;
     const sealWidth = textWidth - SEAL_FRAME_X;
     if (seal.keyHint) {
-      height += wrappedLines(seal.keyHint.length + SEAL_LABEL_CHARS, sealWidth, SEAL_CHAR_PX) * SEAL_LINE_PX;
+      height += wrappedLines(seal.keyHint.length + SEAL_LABEL_CHARS, sealWidth, adv.seal) * SEAL_LINE_PX;
     }
     if (seal.unlockCondition) {
-      height += wrappedLines(seal.unlockCondition.length + SEAL_LABEL_CHARS, sealWidth, SEAL_CHAR_PX) * SEAL_LINE_PX;
+      height += wrappedLines(seal.unlockCondition.length + SEAL_LABEL_CHARS, sealWidth, adv.seal) * SEAL_LINE_PX;
     }
   }
 
   // Document-type slug
-  height += wrappedLines(String(model.documentType || 'Document').length, textWidth, TYPE_CHAR_PX)
+  height += wrappedLines(String(model.documentType || 'Document').length, textWidth, adv.type)
     * TYPE_LINE_PX + tier.typeMB;
   if ((model.designSpec || {}).headerStyle === 'letterhead') height += LETTERHEAD_EXTRA_PX;
 
@@ -280,7 +353,7 @@ function fragmentHeightAt(model, tier, shellFamily) {
   const metaFields = [model.title, model.author, model.recipient, model.date].filter(Boolean);
   if (metaFields.length) {
     height += metaFields.reduce((sum, field) =>
-      sum + wrappedLines(String(field).length + 6, textWidth, HEADER_CHAR_PX) * HEADER_LINE_PX, 0);
+      sum + wrappedLines(String(field).length + 6, textWidth, adv.header) * HEADER_LINE_PX, 0);
     if (kind === 'memo') height += MEMO_HEADER_RULE_PX;
     else if (isPacket) height += PACKET_HEADER_RULE_PX;
     height += isPacket ? tier.packetHeaderMB : tier.headerMB;
@@ -294,7 +367,7 @@ function fragmentHeightAt(model, tier, shellFamily) {
     ? model.bodyParagraphs
     : [''];
   height += paragraphs.reduce((sum, para) =>
-    sum + bodyLines(String(para || '').length, textWidth, fontSize) * lineHeight + tier.paraMB, 0);
+    sum + bodyLines(String(para || '').length, textWidth, fontSize, adv.bodyRatio) * lineHeight + tier.paraMB, 0);
 
   // Posted manifest (schema 1.5.0). The old model charged this a flat 16px and
   // never moved it with density; it is a framed two-line chip that measures 31px
@@ -302,7 +375,7 @@ function fragmentHeightAt(model, tier, shellFamily) {
   const manifest = model.manifestPointer;
   if (manifest && manifest.postedAs) {
     height += tier.manifestMT + tier.manifestPadV + MANIFEST_BORDER_V
-      + wrappedLines(String(manifest.postedAs).length, textWidth - MANIFEST_FRAME_X, MANIFEST_CHAR_PX)
+      + wrappedLines(String(manifest.postedAs).length, textWidth - MANIFEST_FRAME_X, adv.manifest)
         * MANIFEST_LINE_PX;
   }
 
@@ -310,11 +383,11 @@ function fragmentHeightAt(model, tier, shellFamily) {
   const cite = model.citeRef;
   if (cite && cite.citedAs) {
     height += CITE_MT
-      + wrappedLines(cite.citedAs.length, textWidth, CITE_CHAR_PX) * CITE_LINE_PX;
+      + wrappedLines(cite.citedAs.length, textWidth, adv.cite) * CITE_LINE_PX;
   }
 
   height += tier.sigPadTop + SIG_BORDER_PX
-    + wrappedLines(String(model.purpose || 'END FILE').length, textWidth, SIG_CHAR_PX) * SIG_LINE_PX;
+    + wrappedLines(String(model.purpose || 'END FILE').length, textWidth, adv.sig) * SIG_LINE_PX;
 
   // Ceil, not round: the constants are fractional pt→px conversions.
   return Math.ceil(height);
@@ -333,15 +406,16 @@ registerAtom('fragment-doc', {
    * paragraph gutters, and a 10% type step), while a two-line field note is
    * nearly all frame and gives back very little — which is the truth.
    */
-  estimate(data, density) {
+  estimate(data, density, context) {
+    const metrics = readTypeMetrics(context);
     const model = buildFragmentModel(data || {});
     // Read the shell off the model, not the raw data — buildFragmentModel is
     // what renderFoundDocument() stamps `data-shell-family` from, so this is
     // the same value the CSS will match on.
     const shellFamily = String((model.artifactIdentity || {}).shellFamily || '').toLowerCase();
     return {
-      minHeight:       fragmentHeightAt(model, LADDER.tight, shellFamily),
-      preferredHeight: fragmentHeightAt(model, ladderFor(density), shellFamily),
+      minHeight:       fragmentHeightAt(model, LADDER.tight, shellFamily, metrics),
+      preferredHeight: fragmentHeightAt(model, ladderFor(density), shellFamily, metrics),
     };
   },
 
