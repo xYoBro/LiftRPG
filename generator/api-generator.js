@@ -2566,6 +2566,19 @@ async function runApiPipeline(options) {
       onProgress: onProgress,
       getTotalStages: function () { return totalStages; },
       schema: null,
+      // THE SHAPE MARKER IS `variant`, not `ending` (D128).
+      //
+      // unwrapIfNeeded(result, key) asks "does the result already carry `key`?"
+      // — not "is the result wrapped in `key`?". So the key named here is the
+      // first required field of the object this stage validates, exactly as
+      // `meta` is for the shell stage. A correct {variant, content, designSpec}
+      // passes through untouched (it carries `variant`); a single-key envelope
+      // like {"ending": {...}} unwraps to the object inside it.
+      //
+      // This is the ONE unit stage that was left without it, and a bench book
+      // died here six attempts running while thirteen paid stages sat in the
+      // checkpoint behind it.
+      unwrapKey: 'variant',
       maxAttempts: 2,
       rateLimiter: rateLimiter,
       budgetEnforce: useGeminiBudget,
@@ -3276,6 +3289,11 @@ async function runSkeletonFleshPipeline(options) {
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
       telemetryCollector: sfTelemetry,
+      // Same class as the finale stage above (D128): a freeform single-unit
+      // stage whose validator names one required key and whose config had no
+      // envelope rescue. {"rules": {"rulesSpread": {...}}} now unwraps; a
+      // correct result already carries `rulesSpread` and is returned untouched.
+      unwrapKey:        'rulesSpread',
       buildPrompt: function () {
         return builders.fleshRules(skeleton);
       },

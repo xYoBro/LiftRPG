@@ -982,11 +982,34 @@
     '- Before outputting, silently verify the response would pass JSON.parse(). If it would not, fix it first.'
   ];
 
+  // Every line here is about a field the SHELL authors — `theme` and the two
+  // `meta.password*` fields. The endings-array line that used to close this
+  // section now lives in INST_ENDINGS_PLAINTEXT below, because this section is
+  // stage-routed and that line was landing on stages that author no endings
+  // array at all (D128).
   window.INST_CONTRACT_GUARDRAILS = [
     '## Contract Guardrails',
     '- Always include a `theme` object.',
     '- Do not invent `meta.passwordEncryptedEnding`. Leave it empty or omit it; trusted tooling seals the ending later.',
-    '- Do not include `meta.passwordPlaintext` unless this is an explicit demo fixture and the user asked for it.',
+    '- Do not include `meta.passwordPlaintext` unless this is an explicit demo fixture and the user asked for it.'
+  ];
+
+  // ROUTING, not a new rule: this is the sentence lifted out of
+  // INST_CONTRACT_GUARDRAILS, put where it is true (D128).
+  //
+  // Exactly one live surface authors the plaintext `endings` ARRAY: the
+  // single-prompt whole-booklet path, which is the one that carries
+  // SCHEMA_ENDINGS. No STAGE_SCHEMA_MAP stage does — the multi-stage `ending`
+  // stage writes ONE variant per call (its own SCHEMA_SINGLE_ENDING slice says
+  // "Generate exactly ONE ending variant"), and the S+F bundled-endings builder
+  // carries FLESH_ENDINGS_BUNDLE_SPEC instead of routing through the map. So
+  // this section is joined into INSTRUCTIONS and routed to no stage.
+  //
+  // Routed to the single-ending stage, it cost a bench book six attempts: the
+  // model was told to author an array by one half of its prompt and one object
+  // by the other, and answered with an envelope that satisfied neither.
+  window.INST_ENDINGS_PLAINTEXT = [
+    '## Plaintext Endings',
     '- Author the plaintext `endings` array now. Tooling will encrypt later.'
   ];
 
@@ -2274,6 +2297,9 @@
     ['## ── TIER 3: STRUCTURAL COMPLIANCE ──', ''],
     INST_OUTPUT_RULES, [''],
     INST_CONTRACT_GUARDRAILS, [''],
+    // The whole-booklet path IS the endings-array surface — see the section's
+    // own note. It reaches no stage, and that is the routing, not an oversight.
+    INST_ENDINGS_PLAINTEXT, [''],
     INST_OUTPUT_BUDGETS, [''],
     INST_VISUAL_DIRECTION, [''],
     INST_STRUCTURAL_RULES, [''],
@@ -2362,7 +2388,16 @@
     // Fragment: story quality first
     'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'VOICE_DISCIPLINE', 'POINT_OF_USE', 'ANTI_GENERIC', 'CHARACTER_WEB', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
     // Ending: story quality first (endings are where voice failure concentrates)
-    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'CONVERGENCE_DESIGN', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'ANTI_GENERIC', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] }
+    //
+    // NO CONTRACT_GUARDRAILS here, and that omission is the fix (D128). This
+    // stage writes ONE ending object — SCHEMA_SINGLE_ENDING says so in its
+    // first line — and the guardrails section is about fields it does not
+    // author: `theme`, `meta.password*`, and (until the split) the whole
+    // `endings` ARRAY. Told to author an array and an object at once, the model
+    // answers with an envelope, which is a shape no validator here accepts.
+    // JSON hygiene reaches this stage through OUTPUT_RULES, which is where it
+    // belongs.
+    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'CONVERGENCE_DESIGN', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'ANTI_GENERIC', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] }
   };
 
   window.buildStageSchema = function(stageName) {
