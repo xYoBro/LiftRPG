@@ -299,6 +299,34 @@ function stampSpend(cp) {
   return cp;
 }
 
+// What this booklet has cost ACROSS EVERY ATTEMPT that reached disk.
+//
+// getCheckpointSpend() below reports the LIVE module counter as `thisSession`,
+// which is the right answer for a run in flight and the wrong one for the
+// reader this function exists to serve: the operator who reloaded the page.
+// A reload resets the module, so their live counter is zero while the money
+// from the interrupted session is sitting in the stored checkpoint — that is
+// exactly the "$0 spent" lie the resume surface used to tell.
+//
+// The figure returned here is priorAttempts + the STORED thisSession, which is
+// precisely what resumeCheckpointForRun() will fold into priorAttempts when the
+// resumed run opens. A surface that shows it before Build and the run meter's
+// prior-spend chip after Build therefore report the same number: the total the
+// operator watches can only go up.
+//
+// NOT for use during a live run. Mid-run the stored `thisSession` IS the live
+// session, and the run meter is already showing that money — adding it to a
+// "spent earlier" figure would count it twice.
+export function getCheckpointSpendToDate(checkpoint) {
+  var cp = checkpoint || loadCheckpoint();
+  var spend = (cp && cp.spend) || null;
+  var total = addSpend(
+    (spend && spend.priorAttempts) || zeroSpend(),
+    (spend && spend.thisSession) || zeroSpend()
+  );
+  return { calls: total.calls || 0, usd: roundUsd(total.usd), tokens: total.tokens || 0 };
+}
+
 // Read-only view for callers that want to report the ledger.
 export function getCheckpointSpend(checkpoint) {
   var cp = checkpoint || loadCheckpoint();

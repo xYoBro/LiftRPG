@@ -2075,22 +2075,34 @@ export async function callOpenAICompatStructured(apiKey, baseUrl, model, prompt,
   };
   var usageSnapshot = buildUsageSnapshot(providerId, body.model || model, body.usage, pricingRule);
 
-  if (message.parsed && typeof message.parsed === 'object') {
-    window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = JSON.stringify(message.parsed, null, 2));
-    window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = meta);
-    return {
-      result: cloneSimple(message.parsed),
-      meta: meta,
-      usage: usageSnapshot
-    };
-  }
-
-  var rawText = extractTextContent(message.content);
+  // A pre-parsed body is still a body: an adapter or SDK that hands back
+  // `message.parsed` built it out of whatever arrived, and what arrived may have
+  // been cut off mid-object. The truncation check therefore runs BEFORE either
+  // branch consumes the response, not inside one of them (D113 residue, closed
+  // Teeth T4). Latent on the raw REST path this file uses — no OpenAI-compatible
+  // endpoint returns `parsed` over the wire — but it is the one place where a
+  // truncation the transport already normalized was read and then ignored, and a
+  // silently accepted partial stage is exactly the failure the normalized
+  // contract exists to make impossible.
+  var parsedResult = (message.parsed && typeof message.parsed === 'object') ? message.parsed : null;
+  var rawText = parsedResult
+    ? JSON.stringify(parsedResult, null, 2)
+    : extractTextContent(message.content);
+  // Debug surface first, so the operator can still read what came back when the
+  // next line throws.
   window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawText);
   window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = meta);
 
   if (meta.finishReason === 'truncation') {
     throw buildTruncationError('The stage output requires more output tokens than this model provided.');
+  }
+
+  if (parsedResult) {
+    return {
+      result: cloneSimple(parsedResult),
+      meta: meta,
+      usage: usageSnapshot
+    };
   }
 
   try {

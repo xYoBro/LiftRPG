@@ -34,6 +34,7 @@ import {
   CRITIC_MAX_ROUNDS,
   CRITIC_MAX_REVISIONS_PER_ROUND,
   CRITIC_DIMENSIONS,
+  STRUCTURAL_REOPEN_SCOPES,
   STAGE_BUDGETS,
   RETRY_TIMEOUT_GROWTH,
   RETRY_TIMEOUT_CEILING_MS,
@@ -46,6 +47,8 @@ import {
 
 import {
   buildCriticDigest,
+  buildFusionFrame,
+  formatFusionFrameBlock,
   validateCriticVerdict,
   normalizeCriticVerdict,
   summarizeVerdict,
@@ -53,6 +56,7 @@ import {
   getUnit,
   setUnit,
   revisionPreservesIdentity,
+  unitFloorErrors,
   unitLabel
 } from './modules/critic.js';
 
@@ -137,6 +141,7 @@ import {
   describeResume,
   recordCheckpointSpend,
   getCheckpointSpend,
+  getCheckpointSpendToDate,
   getShelvedCheckpoint,
   clearShelvedCheckpoint,
   computeRunFingerprint
@@ -145,7 +150,8 @@ import {
 import {
   shouldRetryStageError,
   shouldSplitFragmentBatch,
-  isLikelyTruncationError
+  isLikelyTruncationError,
+  isTruncationFinishReason
 } from './modules/error-classify.js';
 
 import {
@@ -1131,6 +1137,10 @@ function describeStageFailureCause(err) {
   var errorType = (err && err.errorType) || '';
   if (errorType === 'timeout') return 'it timed out';
   if (errorType === 'truncation') return 'the answer was cut off at the length limit';
+  // A body that PARSED but stopped at the length limit reaches us wearing a
+  // validation error's clothes (see runJsonStage). The transport's normalized
+  // verdict outranks the symptom: say why it was short, not what was missing.
+  if (isTruncationFinishReason(err && err.finishReason)) return 'the answer was cut off at the length limit';
   if (errorType === 'schema') return 'the answer came back missing required parts';
   if (errorType === 'network') return 'the connection dropped';
   return 'it did not complete';
@@ -1238,6 +1248,25 @@ async function runJsonStage(settings, config) {
       var result = response.result;
       recordStageUsage(stageTelemetry, response);
 
+      // THE ATTEMPT'S FINISH REASON (D97 escalation, restored).
+      //
+      // A response that ran out of output tokens does not always arrive as a
+      // thrown truncation. When the partial body still PARSES — repaired JSON,
+      // an adapter that returns what it received rather than raising — the only
+      // thing that fails is config.validate(), and a validation error carries no
+      // errorType and no finishReason. stageBudget() then sees an ordinary
+      // schema failure and hands attempt 2 the exact ceiling that just proved
+      // too small, so the retry truncates identically and the stage dies twice
+      // at the same wall.
+      //
+      // The transport already told us how the attempt ended, on the normalized
+      // enum. Carry that verdict onto the error so it rides retryState like any
+      // other structural marker: stageBudget() raises the ceiling to
+      // MAX_OUTPUT_TOKENS and buildSmartRetryDirective() sends the Length
+      // Directive instead of a Correction Directive. No message text is read to
+      // reach that conclusion, and error-classify.js stays provider-blind.
+      var attemptFinishReason = (response.meta && response.meta.finishReason) || '';
+
       // Record API call for daily budget tracking
       if (config.budgetEnforce) {
         var totalTokens = (response.usage && response.usage.totalTokens) || 0;
@@ -1279,6 +1308,10 @@ async function runJsonStage(settings, config) {
             var err = new Error(classified.blocking.join('; '));
             err.errorType = 'schema';
             err.retryable = true;
+            // The wire's verdict on this attempt, carried structurally. Only a
+            // normalized 'truncation' changes the retry's behavior; every other
+            // value is recorded and inert.
+            err.finishReason = attemptFinishReason;
             err._failedOutput = result;
             err._blockingErrors = classified.blocking;
             throw err;
@@ -1692,7 +1725,17 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
   }
   var threshold = (settings && settings.criticThreshold) || CRITIC_SCORE_THRESHOLD;
   var maxRounds = (settings && settings.criticMaxRounds) || CRITIC_MAX_ROUNDS;
-  var report = { threshold: threshold, rounds: [], finished: false, revisedUnits: 0 };
+  var report = {
+    threshold: threshold,
+    rounds: [],
+    finished: false,
+    revisedUnits: 0,
+    // Teeth T4: shape surgery is reported as shape surgery. A reader of
+    // _criticReport must be able to see that a week's beat was re-decided, not
+    // just that "a week was revised" — the two are different operations and the
+    // eval reads them differently.
+    structuralRevisions: 0
+  };
   var meta = booklet.meta || {};
   var contextJson = JSON.stringify({
     storySpine: meta.storySpine || '',
@@ -1723,12 +1766,18 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
         return typeof finding === 'string' ? finding : String((finding && finding.message) || finding);
       })
       .filter(Boolean);
+    // The fusion frame (Teeth T4 — FUSION.md mechanism 6). Rebuilt every round
+    // for the same reason the machine findings are: an accepted revision that
+    // cut a week's prose moves the curve the next verdict grades against.
+    var fusionFrameBlock = formatFusionFrameBlock(buildFusionFrame(booklet));
     var verdictRaw;
     try {
       verdictRaw = await runJsonStage(settings, {
         stageKey: 'critic',
         stageName: 'Composition Critic — round ' + round,
-        buildPrompt: (function (dj, mf) { return function () { return window.buildCriticPrompt(dj, brief, mf); }; })(digestJson, machineFindings),
+        buildPrompt: (function (dj, mf, ff) {
+          return function () { return window.buildCriticPrompt(dj, brief, mf, ff); };
+        })(digestJson, machineFindings, fusionFrameBlock),
         maxAttempts: 2,
         validate: validateCriticVerdict,
         rateLimiter: ctx.rateLimiter || null,
@@ -1749,7 +1798,11 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
       min: summary.min,
       avg: summary.avg,
       summary: verdict.summary,
-      revised: []
+      revised: [],
+      // Refused revisions are part of the honest record: a structural revision
+      // the floors sent back is exactly what an author needs to see, and it used
+      // to exist only as a console warning nobody reads after the run.
+      rejected: []
     };
     report.rounds.push(roundRecord);
     console.log('[LiftRPG] Critic round ' + round + ': min ' + summary.min + ' avg ' + summary.avg, summary.byDimension);
@@ -1769,14 +1822,21 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
       var original = getUnit(booklet, target.unitType, target.unitRef);
       if (!original) continue;
       var label = unitLabel(target.unitType, target.unitRef);
+      var structural = !!target.structural && target.reopen.length > 0;
+      // Floor state BEFORE the revision, at the unit's own stage gate. Compared
+      // as a delta so a book that was already failing a floor (generated before
+      // D111, hand-loaded, or a fixture) can still be improved, while a revision
+      // that DROPS a surface is refused. Absolute would veto the whole loop on
+      // any pre-existing failure.
+      var floorsBefore = unitFloorErrors(target.unitType, original, booklet).length;
       var revised;
       try {
         revised = await runJsonStage(settings, {
           stageKey: 'critic-revise',
-          stageName: 'Composition Revision — ' + label,
-          buildPrompt: (function (lbl, oj, dirs) {
-            return function () { return window.buildUnitRevisionPrompt(lbl, oj, dirs, contextJson); };
-          })(label, JSON.stringify(original), target.directives),
+          stageName: (structural ? 'Structural Revision — ' : 'Composition Revision — ') + label,
+          buildPrompt: (function (lbl, oj, dirs, reopen) {
+            return function () { return window.buildUnitRevisionPrompt(lbl, oj, dirs, contextJson, reopen); };
+          })(label, JSON.stringify(original), target.directives, structural ? target.reopen : []),
           maxAttempts: 2,
           rateLimiter: ctx.rateLimiter || null,
           budgetEnforce: !!ctx.budgetEnforce,
@@ -1784,10 +1844,24 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
         });
       } catch (err) {
         console.warn('[LiftRPG] ' + label + ' revision failed — unit kept as-is:', err.message);
+        roundRecord.rejected.push({ unit: label, structural: structural, reason: 'stage-error' });
         continue;
       }
       if (!revisionPreservesIdentity(target.unitType, original, revised)) {
         console.warn('[LiftRPG] ' + label + ' revision changed identity fields — rejected.');
+        roundRecord.rejected.push({ unit: label, structural: structural, reason: 'identity-floor' });
+        continue;
+      }
+      // Validity floor, part 2 (Teeth T4): the unit's own stage validator, with
+      // the generation floors on. The assembled-booklet validator cannot hold
+      // this — a booklet with no oracle is legal (fixtures have none), so only
+      // the stage gate knows that a GENERATED week owes one. Without it, a
+      // reopened mechanical assignment could delete the surface it re-decided.
+      var floorsAfter = unitFloorErrors(target.unitType, revised, booklet).length;
+      if (floorsAfter > floorsBefore) {
+        console.warn('[LiftRPG] ' + label + ' revision dropped generation floors ('
+          + floorsBefore + ' → ' + floorsAfter + ') — rejected.');
+        roundRecord.rejected.push({ unit: label, structural: structural, reason: 'generation-floor' });
         continue;
       }
       var slot = setUnit(booklet, target.unitType, target.unitRef, revised);
@@ -1798,10 +1872,18 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
         setUnit(booklet, target.unitType, target.unitRef, slot.previous);
         console.warn('[LiftRPG] ' + label + ' revision raised validation errors ('
           + baselineErrors + ' → ' + postErrors + ') — reverted.');
+        roundRecord.rejected.push({ unit: label, structural: structural, reason: 'validity-floor' });
         continue;
       }
       report.revisedUnits += 1;
-      roundRecord.revised.push({ unit: label, dimensions: target.dimensions, directives: target.directives.length });
+      if (structural) report.structuralRevisions += 1;
+      roundRecord.revised.push({
+        unit: label,
+        dimensions: target.dimensions,
+        directives: target.directives.length,
+        structural: structural,
+        reopened: structural ? target.reopen.slice() : []
+      });
     }
     if (!roundRecord.revised.length) {
       console.warn('[LiftRPG] Critic round ' + round + ': no revision survived the floors — stopping.');
@@ -3983,6 +4065,9 @@ window.LiftRPGAPI = {
     clear: clearCheckpoint,
     stages: countResumedStages,
     spend: getCheckpointSpend,
+    // The pre-run reading: what this booklet has already cost across every
+    // attempt on disk. Survives a page reload, which `spend` cannot.
+    spendToDate: getCheckpointSpendToDate,
     fingerprint: computeRunFingerprint,
     getShelved: getShelvedCheckpoint,
     clearShelved: clearShelvedCheckpoint
@@ -4025,6 +4110,8 @@ window.LiftRPGAPI = {
     normalizeDocumentTypes: normalizeDocumentTypes,
     auditGuidedBuild: auditGuidedBuild,
     buildCriticDigest: buildCriticDigest,
+    buildFusionFrame: buildFusionFrame,
+    formatFusionFrameBlock: formatFusionFrameBlock,
     validateCriticVerdict: validateCriticVerdict,
     normalizeCriticVerdict: normalizeCriticVerdict,
     summarizeVerdict: summarizeVerdict,
@@ -4032,7 +4119,17 @@ window.LiftRPGAPI = {
     criticGetUnit: getUnit,
     criticSetUnit: setUnit,
     criticDimensions: CRITIC_DIMENSIONS,
+    structuralReopenScopes: STRUCTURAL_REOPEN_SCOPES,
     revisionPreservesIdentity: revisionPreservesIdentity,
+    unitFloorErrors: unitFloorErrors,
+    // The loop itself, exposed for gating only. It stays HERE rather than in
+    // modules/critic.js because it needs the stage runner and the validators
+    // (D66) — but the seam T4 adds, a structural verdict reaching the revise
+    // prompt as a reopened constraint, cannot be proven from the pure helpers
+    // alone, and the stub bench never revises (its canned verdict passes round
+    // one). A registered stub transport plus this handle is the only way to
+    // gate tier 3 without spending real model money on every run of the suite.
+    runCriticLoop: runCriticLoop,
     collectVoiceTicFindings: collectVoiceTicFindings,
     collectLicensedMovePlacementFindings: collectLicensedMovePlacementFindings,
     scanTerminalVoiceTics: scanTerminalVoiceTics

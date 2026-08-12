@@ -9,10 +9,22 @@
 import {
   CRITIC_DIMENSIONS,
   CRITIC_SCORE_THRESHOLD,
-  CRITIC_MAX_REVISIONS_PER_ROUND
+  CRITIC_MAX_REVISIONS_PER_ROUND,
+  STRUCTURAL_REOPEN_SCOPES
 } from './constants.js';
+import { buildWorkoutTopology } from './workout-topology.js';
+import {
+  validateWeekSchema,
+  validateFragmentsStage,
+  collectBudgetBreaches
+} from './validation.js';
 
 var VALID_UNIT_TYPES = { week: 1, fragment: 1, ending: 1, rulesSpread: 1 };
+
+var VALID_REOPEN_SCOPES = STRUCTURAL_REOPEN_SCOPES.reduce(function (acc, s) {
+  acc[s.id] = 1;
+  return acc;
+}, {});
 
 // ── Digest: the booklet as the critic sees it ────────────────────────────────
 // Strips internal `_` fields and the encrypted-ending blob, and compacts each
@@ -38,6 +50,274 @@ export function buildCriticDigest(booklet) {
     }
   }
   return digest;
+}
+
+// ── The fusion frame (Teeth T4 — FUSION.md mechanism 6, in evidence form) ────
+// The conductor's material: the per-week play-order sequence — (load, prose,
+// story labels, mechanical surfaces) — as ONE line per week.
+//
+// WHY A FRAME AT ALL. Everything below is already inside the digest, and the
+// critic could in principle derive it. It never did: in the JSON the weeks sit
+// thousands of tokens apart, so the SEQUENCE — the only thing pacing is a
+// property of — is invisible while every individual week reads fine. That is
+// the failure FUSION.md §2 names: completeness as flatness. The frame is an
+// index into the digest, not a summary of it; findings still cite the prose.
+//
+// TWO CURVES, DELIBERATELY. Load (what the body does) and prose volume (how
+// loudly the page speaks) are printed as indices against the book's own maxima,
+// so §3's law — stakes parallel the load, texture COUNTERPOINTS it — is a
+// comparison a reader can make in one pass instead of an impression. A book
+// whose two curves rise together is doubling; one whose prose curve is flat is
+// mezzo-forte for six weeks.
+//
+// The load proxy is not re-derived here: buildWorkoutTopology owns sets x reps,
+// and it is run against the ASSEMBLED BOOKLET rather than the user's raw
+// program because the critic grades the artifact that shipped — the printed
+// table is what the player will actually lift.
+var FRAME_TITLE_CAP = 40;
+var FRAME_INTERLUDE_CAP = 32;
+var FRAME_CLOCK_CAP = 3;
+
+function frameWords(text) {
+  var s = String(text == null ? '' : text).trim();
+  if (!s) return 0;
+  return s.split(/\s+/).length;
+}
+
+function frameText(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value !== 'object') return String(value);
+  return [value.body, value.text, value.content, value.finalLine]
+    .filter(function (v) { return typeof v === 'string'; })
+    .join(' ');
+}
+
+function frameClip(text, cap) {
+  var s = String(text || '').replace(/\s+/g, ' ').trim();
+  if (s.length <= cap) return s;
+  return s.slice(0, cap - 1) + '…';
+}
+
+function frameIndex(value, max) {
+  if (!max || !isFinite(max) || max <= 0) return null;
+  return Math.round((Number(value) || 0) / max * 100);
+}
+
+// Fragments are attributed to the FIRST week that references them: the player
+// reads a document once, on the session that hands it over, so counting it
+// again in a later week would inflate that week's reading load with pages
+// nobody re-reads.
+function buildFragmentIndex(booklet) {
+  var byId = {};
+  ((booklet && booklet.fragments) || []).forEach(function (f) {
+    if (!f || !f.id) return;
+    byId[String(f.id).trim().toLowerCase()] = f;
+  });
+  return byId;
+}
+
+function weekMechanics(week) {
+  var out = [];
+  var fo = (week && week.fieldOps) || {};
+  var cipher = fo.cipher;
+  if (cipher) out.push('cipher ' + (cipher.type || 'untyped'));
+  var oracle = fo.oracleTable || fo.oracle;
+  if (oracle) out.push('oracle ' + ((oracle.entries || []).length));
+  var clocks = (week && week.gameplayClocks) || [];
+  if (clocks.length) {
+    var shown = clocks.slice(0, FRAME_CLOCK_CAP).map(function (c) {
+      return frameClip((c && c.clockName) || 'clock', 24)
+        + ' ' + (Number((c || {}).startValue) || 0) + '/' + (Number((c || {}).segments) || 0);
+    });
+    if (clocks.length > FRAME_CLOCK_CAP) shown.push('+' + (clocks.length - FRAME_CLOCK_CAP) + ' more');
+    out.push('clocks ' + shown.join(' & '));
+  }
+  if (week && week.doorChoice) out.push('door');
+  var marks = 0;
+  var micro = 0;
+  ((week && week.sessions) || []).forEach(function (s) {
+    var strip = s && s.markStrip;
+    if (strip && Array.isArray(strip.targets)) marks += strip.targets.length;
+    if (s && Array.isArray(s.microLines)) micro += s.microLines.length;
+  });
+  if (marks) out.push('marks ' + marks);
+  if (micro) out.push('micro ' + micro);
+  if (week && week.reckoning) out.push('reckoning');
+  var companions = fo.companionComponents || [];
+  if (companions.length) {
+    out.push('companion ' + companions.map(function (c) { return (c && c.type) || 'untyped'; }).join('/'));
+  }
+  var mapType = (fo.mapState || {}).mapType;
+  if (mapType) out.push('map ' + mapType);
+  if (week && week.bossEncounter) out.push('boss encounter');
+  return out;
+}
+
+// The topology reads the USER'S PROGRAM, where "deload" appears in a week
+// header and means the week is light. Handing it a booklet's transcribed
+// exercise list feeds it fiction and equipment names instead, and a program
+// carrying one accessory named for a back-off set marks every week it appears
+// in as a deload — measured on the corpus, not imagined. So the frame projects
+// the booklet down to the numbers the proxy actually needs and drops the text:
+// `isDeload` is an AUTHORED field on the week, and the volume-dip inference
+// still runs on real numbers.
+function topologyInput(booklet) {
+  return {
+    weeks: ((booklet && booklet.weeks) || []).map(function (w, wi) {
+      return {
+        weekNumber: Number((w && w.weekNumber) || (wi + 1)),
+        isDeload: !!(w && w.isDeload),
+        sessions: ((w && w.sessions) || []).map(function (s) {
+          return {
+            exercises: ((s && s.exercises) || []).map(function (ex) {
+              return { sets: (ex || {}).sets, repsPerSet: (ex || {}).repsPerSet };
+            })
+          };
+        })
+      };
+    })
+  };
+}
+
+// Whether the load curve can be READ at all. The volume proxy is sets x reps,
+// so a program that progresses by adding weight — which is most strength
+// programs — is flat under it, and the weights themselves are write-in blanks
+// the player has not filled. Printing a flat index in that case does not merely
+// waste tokens: it invites the judgment "the training never changes, so the
+// story need not either", which is false about a book whose player is adding
+// five pounds a week. The frame declines to state a curve on exactly the
+// condition buildWorkoutTopology declines to name a peak.
+var READABLE_SHAPES = { linear: 1, wave: 1, peak: 1 };
+
+/**
+ * buildFusionFrame(booklet) -> { shape, loadReadable, peakWeek, rows }
+ *
+ * Pure. One row per week; rows [] when there is nothing honest to say. Row
+ * fields are machine-readable so a test can assert the curve, not the sentence.
+ */
+export function buildFusionFrame(booklet) {
+  var weeks = (booklet && booklet.weeks) || [];
+  var empty = { shape: 'unknown', loadReadable: false, peakWeek: null, rows: [] };
+  if (!weeks.length) return empty;
+
+  var topology = buildWorkoutTopology(topologyInput(booklet));
+  var loadReadable = !!READABLE_SHAPES[topology.progressionShape];
+  var loadByWeek = {};
+  (topology.weekLoads || []).forEach(function (row) {
+    loadByWeek[String(row.weekNumber)] = row;
+  });
+  var deloadSet = {};
+  (topology.deloadWeeks || []).forEach(function (n) { deloadSet[String(n)] = 1; });
+
+  var fragmentsById = buildFragmentIndex(booklet);
+  var claimedFragments = {};
+
+  var rows = weeks.map(function (week, wi) {
+    var weekNumber = Number((week && week.weekNumber) || (wi + 1));
+    var load = loadByWeek[String(weekNumber)] || {};
+    var sessions = (week && week.sessions) || [];
+
+    var words = frameWords(((week || {}).epigraph || {}).text);
+    var fragmentIds = [];
+    sessions.forEach(function (s) {
+      if (!s) return;
+      words += frameWords(s.storyPrompt);
+      var rb = s.returnBeat || {};
+      words += frameWords(rb.closingLine) + frameWords(rb.openingEcho);
+      (s.microLines || []).forEach(function (m) { words += frameWords(m && m.cue); });
+      var ref = s.fragmentRef ? String(s.fragmentRef).trim().toLowerCase() : '';
+      if (!ref || claimedFragments[ref]) return;
+      claimedFragments[ref] = 1;
+      var fragment = fragmentsById[ref];
+      if (!fragment) return;
+      fragmentIds.push(fragment.id);
+      words += frameWords(frameText(fragment.content) || frameText(fragment.contentHtml));
+    });
+    words += frameWords(((week || {}).interlude || {}).body);
+    words += frameWords(((week || {}).bossEncounter || {}).narrative);
+    if (week && week.overflowDocument) words += frameWords(frameText(week.overflowDocument.content));
+
+    return {
+      week: weekNumber,
+      isBoss: !!(week && (week.isBossWeek || week.bossEncounter)),
+      isDeload: !!(week && week.isDeload) || !!deloadSet[String(weekNumber)],
+      isPeak: topology.peakWeek != null && Number(topology.peakWeek) === weekNumber,
+      load: Number(load.volume) || 0,
+      loadIndex: null,
+      sessions: sessions.length,
+      proseWords: words,
+      proseIndex: null,
+      title: frameClip((week && week.title) || '', FRAME_TITLE_CAP),
+      interlude: frameClip((((week || {}).interlude) || {}).title || '', FRAME_INTERLUDE_CAP),
+      fragments: fragmentIds,
+      mechanics: weekMechanics(week)
+    };
+  });
+
+  var maxLoad = Math.max.apply(null, rows.map(function (r) { return r.load; }));
+  var maxWords = Math.max.apply(null, rows.map(function (r) { return r.proseWords; }));
+  rows.forEach(function (r) {
+    r.loadIndex = loadReadable ? frameIndex(r.load, maxLoad) : null;
+    r.proseIndex = frameIndex(r.proseWords, maxWords);
+  });
+  return {
+    shape: topology.progressionShape,
+    loadReadable: loadReadable,
+    peakWeek: topology.peakWeek,
+    rows: rows
+  };
+}
+
+/**
+ * formatFusionFrameBlock(frame) -> string
+ *
+ * One line per week, deliberately — prose here would cost more tokens than the
+ * digest it indexes. Returns '' when there is nothing to say, so the caller can
+ * drop the section rather than print a table of nulls (the
+ * formatWorkoutTopologyBlock idiom).
+ */
+export function formatFusionFrameBlock(frame) {
+  var rows = (frame && frame.rows) || [];
+  if (!rows.length) return '';
+  var lines = [
+    '## The Fusion Frame (measured — the play-order sequence, one line per week)',
+    'prose = words printed on this week\'s story surfaces, indexed against its wordiest week',
+    '(fragments counted in the week that hands them over). s = sessions.',
+    'These are measurements of the artifact, not judgments of it.'
+  ];
+  if (frame.loadReadable) {
+    lines.splice(1, 0, 'load = training volume as an index against this book\'s heaviest week'
+      + ' (program shape: ' + frame.shape
+      + (frame.peakWeek != null ? ', heaviest week ' + frame.peakWeek : '') + ').');
+  } else {
+    // Say what cannot be read, rather than printing a number that would be read
+    // as a fact. A flat volume proxy is what a weight-progression program looks
+    // like from inside the artifact, and the weights are blanks the player fills.
+    lines.splice(1, 0, 'load = NOT READABLE from this artifact. The volume proxy (sets x reps) is \''
+      + frame.shape + '\' across the book, which is what a program that progresses by WEIGHT'
+      + ' looks like — and the weights are write-in blanks nobody has filled yet. Do NOT read'
+      + ' this as "the training never changes". Audit the prose curve against the session'
+      + ' counts and the weeks marked DELOAD and BOSS instead.');
+  }
+  rows.forEach(function (r) {
+    var tags = [];
+    if (r.isPeak) tags.push('PEAK');
+    if (r.isDeload) tags.push('DELOAD');
+    if (r.isBoss) tags.push('BOSS');
+    var cols = [
+      'w' + r.week,
+      'load ' + (r.loadIndex == null ? '—' : r.loadIndex) + (tags.length ? ' ' + tags.join('+') : ''),
+      'prose ' + (r.proseIndex == null ? '?' : r.proseIndex),
+      's' + r.sessions,
+      '"' + r.title + '"'
+        + (r.interlude ? ' +interlude "' + r.interlude + '"' : '')
+        + (r.fragments.length ? ' +docs ' + r.fragments.join(',') : ''),
+      r.mechanics.length ? r.mechanics.join(', ') : 'no mechanical surfaces'
+    ];
+    lines.push(cols.join(' | '));
+  });
+  return lines.join('\n');
 }
 
 // ── Verdict validation (runJsonStage retry convention: '' = ok) ─────────────
@@ -76,12 +356,29 @@ export function normalizeCriticVerdict(raw, threshold) {
           && (f.unitType === 'rulesSpread' || f.unitRef !== undefined && f.unitRef !== null && f.unitRef !== '');
       })
       .map(function (f) {
+        // ── Structural scope (Teeth T4) ────────────────────────────────────
+        // The critic declares whether rewording can fix the finding, and if not,
+        // WHICH aspects of the unit's shape the reviser may re-decide. Both are
+        // closed vocabularies, so the routing is a lookup and never a reading of
+        // the directive's wording.
+        //
+        // FAIL-SAFE DEMOTION: "structure" with no valid reopen scope is a mood,
+        // not an instruction — it would hand the reviser a licence with no
+        // object, which is how a targeted revision becomes a rewrite. Such a
+        // failure still runs; it runs as a prose revision.
+        var reopen = (Array.isArray(f.reopen) ? f.reopen : [])
+          .map(function (r) { return String(r || '').trim(); })
+          .filter(function (r) { return VALID_REOPEN_SCOPES[r]; })
+          .filter(function (r, i, arr) { return arr.indexOf(r) === i; });
+        var structural = String(f.scope || '') === 'structure' && reopen.length > 0;
         return {
           dimension: dim.id,
           unitType: f.unitType,
           unitRef: f.unitType === 'rulesSpread' ? 'rulesSpread' : f.unitRef,
           issue: String(f.issue || ''),
-          directive: String(f.directive).trim()
+          directive: String(f.directive).trim(),
+          scope: structural ? 'structure' : 'prose',
+          reopen: structural ? reopen : []
         };
       });
     var clamped = false;
@@ -131,16 +428,35 @@ export function selectRevisionTargets(normalized, threshold, maxUnits) {
           unitRef: f.unitRef,
           directives: [],
           dimensions: [],
+          reopen: [],
+          structural: false,
           worstScore: dim.entry.score
         };
         order.push(key);
       }
       if (groups[key].directives.indexOf(f.directive) === -1) groups[key].directives.push(f.directive);
       if (groups[key].dimensions.indexOf(f.dimension) === -1) groups[key].dimensions.push(f.dimension);
+      // A unit reached by one structural finding is opened structurally, and the
+      // reopened scopes are the UNION across its findings — the unit is revised
+      // once, so the single revision has to carry every licence its findings
+      // need. The revision stays unit-scoped either way: the law the loop
+      // enforces is one unit per call, not one finding per call.
+      (f.reopen || []).forEach(function (r) {
+        if (groups[key].reopen.indexOf(r) === -1) groups[key].reopen.push(r);
+      });
+      if (f.scope === 'structure' && (f.reopen || []).length) groups[key].structural = true;
     });
   });
   return order
     .map(function (key) { return groups[key]; })
+    .map(function (group) {
+      // Canonical enum order, so the revise prompt for a given verdict is
+      // byte-stable regardless of which dimension named a scope first.
+      group.reopen = STRUCTURAL_REOPEN_SCOPES
+        .map(function (s) { return s.id; })
+        .filter(function (id) { return group.reopen.indexOf(id) !== -1; });
+      return group;
+    })
     .sort(function (a, b) {
       return a.worstScore - b.worstScore || b.directives.length - a.directives.length;
     })
@@ -194,16 +510,110 @@ export function setUnit(booklet, unitType, unitRef, revised) {
   return { previous: previous, index: idx };
 }
 
-// Identity fields a revision must never change; checked before acceptance.
+// ── The identity floor ───────────────────────────────────────────────────────
+// What a revision may NEVER change, checked before acceptance. This is the
+// bound that makes structural reach safe: the surgeon may reopen a week's beat,
+// its dynamics, its motif and its mechanical assignment, and still cannot touch
+// the two things the booklet is FOR — the training the player performs, and the
+// decode spine the ending is already sealed against.
+//
+// It was one line (weekNumber) while revisions could only reword, and the rest
+// was covered incidentally by the validity floor's error-count comparison. With
+// shape reopened, "incidentally" is not a floor. Every check below is stated in
+// the revision prompt's preservation laws; this is where it is enforced.
+function prescriptionSignature(session) {
+  return (((session || {}).exercises) || []).map(function (ex) {
+    return [String((ex && ex.name) || ''), String((ex && ex.sets) || ''),
+      String((ex && ex.repsPerSet) || '')].join('|');
+  }).join(' ;; ');
+}
+
+function weekIdentityPreserved(original, revised) {
+  if (Number(original.weekNumber) !== Number(revised.weekNumber)) return false;
+
+  // THE DECODE SPINE. This week's component value is one character of a password
+  // the ending was already encrypted with, weeks before the critic ran. Change
+  // it and the printed cipher stops opening the sealed page — a failure the
+  // reader meets at the end of six weeks of work.
+  var originalComponent = original.weeklyComponent;
+  if (originalComponent && originalComponent.value !== undefined && originalComponent.value !== null) {
+    var revisedComponent = revised.weeklyComponent || {};
+    if (String(revisedComponent.value) !== String(originalComponent.value)) return false;
+  }
+  var originalBoss = original.bossEncounter;
+  if (originalBoss) {
+    var revisedBoss = revised.bossEncounter || {};
+    var originalKey = originalBoss.decodingKey || {};
+    var revisedKey = revisedBoss.decodingKey || {};
+    if (JSON.stringify(originalKey.referenceTable || '') !== JSON.stringify(revisedKey.referenceTable || '')) return false;
+    if (JSON.stringify(originalBoss.componentInputs || []) !== JSON.stringify(revisedBoss.componentInputs || [])) return false;
+  }
+
+  // THE WORKOUT. The program is the user's own training block; the story is
+  // what it means, never what it is. Session count, session numbering, and every
+  // prescription survive verbatim.
+  var originalSessions = original.sessions;
+  if (Array.isArray(originalSessions)) {
+    var revisedSessions = revised.sessions;
+    if (!Array.isArray(revisedSessions) || revisedSessions.length !== originalSessions.length) return false;
+    for (var i = 0; i < originalSessions.length; i++) {
+      var a = originalSessions[i] || {};
+      var b = revisedSessions[i] || {};
+      if (a.sessionNumber !== undefined && String(a.sessionNumber) !== String(b.sessionNumber)) return false;
+      if (prescriptionSignature(a) !== prescriptionSignature(b)) return false;
+    }
+  }
+  return true;
+}
+
 export function revisionPreservesIdentity(unitType, original, revised) {
   if (!original || !revised) return false;
-  if (unitType === 'week') return Number(original.weekNumber) === Number(revised.weekNumber);
+  if (unitType === 'week') return weekIdentityPreserved(original, revised);
   if (unitType === 'fragment') return original.id === revised.id;
   if (unitType === 'ending') {
     return (original.variant === undefined || original.variant === revised.variant)
       && (original.id === undefined || original.id === revised.id);
   }
   return true; // rulesSpread has no identity key
+}
+
+// ── The validity floor, at the unit's own stage gate ─────────────────────────
+// A revision re-enters the pipeline through the same door the unit came out of:
+// its stage validator, with generationFloors ON (D111). Structural reach is
+// what makes this necessary — a reviser licensed to re-decide a week's
+// mechanical assignment can delete the oracle it decided against, and the
+// assembled-booklet validator does not demand one (fixtures and hand-authored
+// booklets legitimately have none; the FLOOR is generation policy).
+//
+// Compared as a DELTA by the caller, never as an absolute: a book generated
+// before the floors, or hand-loaded, may already be failing them, and a
+// pre-existing failure must not veto an improvement the critic asked for.
+export function unitFloorErrors(unitType, unit, booklet) {
+  if (!unit || typeof unit !== 'object') return [];
+  if (unitType === 'week') {
+    var intent = (((booklet || {}).meta) || {}).artifactIntent || {};
+    var result = validateWeekSchema(unit, !!(unit.isBossWeek || unit.bossEncounter), {
+      generationFloors: true,
+      weekNumber: unit.weekNumber,
+      currentWeekNumber: unit.weekNumber,
+      isDeload: !!unit.isDeload,
+      mechanicGrammarFamily: intent.mechanicGrammarFamily || ''
+    });
+    return (result && result.errors) || [];
+  }
+  if (unitType === 'fragment') {
+    var message = validateFragmentsStage({ fragments: [unit] }, [], { generationFloors: true });
+    return message ? [message] : [];
+  }
+  if (unitType === 'ending') {
+    // Endings have no per-unit stage validator (their stage gate is continuity,
+    // which needs the whole book). The floor that IS unit-scoped is the prose
+    // budget — the one Book 1 blew by roughly three times.
+    return collectBudgetBreaches({ endings: [unit] }).map(function (b) {
+      return 'Over budget: ' + b.message;
+    });
+  }
+  return [];
 }
 
 export function unitLabel(unitType, unitRef) {

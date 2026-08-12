@@ -2339,7 +2339,6 @@
     // to improve the training, which is the one thing it must never do.
     'canonicalize':   { schemas: [],                                            instructions: ['LIFTOSCRIPT_GRAMMAR'] },
     // Week plan: lean
-    'week-plan':      { schemas: ['WEEK_PLAN'],                                 instructions: [] },
     // Week flesh: full game design + story
     // Prose stages (week-final, fragment, ending) carry VOICE_DISCIPLINE: they
     // write storyPrompts, interludes, oracle text, documents, and endings.
@@ -2947,6 +2946,33 @@
     'detail, and material object? Zero gym metaphors in the fiction? Do interludes assign',
     'real off-session engagement (a question to weigh, a code to crack, a map to study)',
     'rather than ornamental prose breaks?',
+    'THE FUSION FRAME. Grade the SEQUENCE, not the weeks one at a time. Pacing is a property',
+    'of the whole book: every week is written to be good AS A WEEK, so every week wants to be',
+    'loud, and a book of individually strong weeks is flat. The measured frame supplied after',
+    'the digest is the play-order sequence — per week, the training load index, the printed',
+    'prose index, the story labels, and the mechanical surfaces that week actually prints.',
+    'Audit it on four counts, and cite weeks by number and index.',
+    '(a) THE LAW — stakes parallel the load, texture counterpoints it. What a week is ABOUT',
+    'rises with the training load: what is at risk, what converges, what can no longer be',
+    'postponed. How the page SPEAKS moves the other way — spare, cold, procedural exactly when',
+    'the body roars; open and human when it rests. Two curves rising together is doubling, not',
+    'harmony: the player\'s body is already the loudest instrument in the room on a peak day,',
+    'so a page that also shouts is redundant and inaudible. Audit the extremes hardest — the',
+    'peak week should carry the quietest prose at the highest stakes, the deload the warmest',
+    'prose with the longest view.',
+    '(b) DISCORD — a week whose load is high and whose beat is administrative: the body at its',
+    'limit while the page files paperwork with nothing at stake. Name the week, its load index,',
+    'and the surface that idles.',
+    '(c) FLATNESS — every week at the same dynamic. If the prose index barely moves across the',
+    'book, or every week prints the same inventory of surfaces in the same proportions, the',
+    'book is mezzo-forte for its whole length. Grade that as inert even when each week is',
+    'individually competent, and say which weeks should have been quiet.',
+    '(d) THE DELOAD IS THE EXHALE — a lighter week must carry content, not padding: the',
+    'aftermath, the arriving document, the count taken. A deload whose story idles because the',
+    'body is idling is a dropped bar, and the frame shows it as a light week whose prose index',
+    'and surface list both collapse.',
+    'Findings on these four counts are usually STRUCTURAL (see the failure contract): a week',
+    'that is loud in the wrong place cannot be fixed by retinting its sentences.',
     '',
     '### voiceDiscipline',
     'Read the prose as a cold auditor: the text and the rules, nothing else.',
@@ -3006,10 +3032,39 @@
     '  variant (string) for endings, "rulesSpread" for the rules spread.',
     '- "issue": one sentence naming what is wrong, with the evidence location.',
     '- "directive": one imperative sentence a reviser can execute inside that unit — concrete,',
-    '  targeted, preserving all ids, refs, and enum vocabulary.'
+    '  targeted, preserving all ids, refs, and enum vocabulary.',
+    '- "scope": "prose" or "structure". Default to "prose": the directive is executable by',
+    '  rewriting sentences inside the unit. Use "structure" ONLY when rewording cannot fix the',
+    '  finding because the unit\'s SHAPE is the cause — it is about the wrong thing, it is loud',
+    '  in the wrong place, it carries the wrong object, or its pressure sits on the wrong',
+    '  printed surface. A structural failure licenses the reviser to RE-DECIDE that aspect;',
+    '  a prose failure never does.',
+    '- "reopen": required when scope is "structure", omitted otherwise. An array of one or more',
+    '  of the four aspects below — name only the ones your directive actually needs reopened,',
+    '  because everything you do not name is frozen for that revision:',
+    '  - "beat": what the unit is ABOUT — its position in the arc, what is at risk in it, what',
+    '    it converges or postpones.',
+    '  - "dynamics": how loudly the unit SPEAKS — its prose volume and register against the',
+    '    training load of its week, including making it shorter.',
+    '  - "motif": which recurring object, place, or phrase the unit carries, and what that',
+    '    object means at this point in the book.',
+    '  - "mechanism": which printed surface carries the unit\'s pressure — what the clock,',
+    '    oracle, door, cipher, or mark strip is keyed to and what it answers.',
+    '  A "structure" scope with no reopen array is read as "prose", so name the aspect.',
+    'The revision runs under floors you cannot waive and must not ask for: the training itself',
+    '(sessions, exercises, sets, reps), every id and cross-reference, and the decode spine',
+    '(weekly component values, the boss decoding key) survive every revision unchanged. A',
+    'directive that requires changing any of them cannot be executed and will be discarded.'
   ];
 
-  window.buildCriticPrompt = function (bookletDigestJson, brief, machineFindings) {
+  window.buildCriticPrompt = function (bookletDigestJson, brief, machineFindings, fusionFrameBlock) {
+    // The fusion frame (Teeth T4) rides AFTER the digest, next to the machine
+    // findings, because both are measurements rather than instructions — and
+    // because the sequence has to be the last thing read before the verdict is
+    // written, not the first thing read before thirty thousand tokens of book.
+    // Built by modules/critic.js buildFusionFrame + formatFusionFrameBlock.
+    var frameBlock = (typeof fusionFrameBlock === 'string' && fusionFrameBlock.trim())
+      ? ['', fusionFrameBlock] : [];
     var machineBlock = (machineFindings && machineFindings.length) ? [
       '',
       '## Machine Findings (measured by the pipeline — these are facts, not opinions)',
@@ -3052,28 +3107,66 @@
       '',
       '## The Assembled Booklet (digest — workout exercise lists compacted)',
       bookletDigestJson
-    ], machineBlock).join('\n');
+    ], frameBlock, machineBlock).join('\n');
   };
 
   // Revision prompt: apply the critic’s directives to ONE unit, changing
   // nothing that was not directed. The validity floor is enforced client-side
   // (a revision that increases validation errors is reverted), but the prompt
   // carries the preservation laws so revisions rarely need reverting.
-  window.buildUnitRevisionPrompt = function (unitLabel, unitJson, directives, contextJson) {
+  //
+  // STRUCTURAL REACH (Teeth T4). `reopenScopes` is the closed menu from
+  // STRUCTURAL_REOPEN_SCOPES in modules/constants.js — the aspects of the unit's
+  // SHAPE this revision may re-decide. Empty (the default) means the unit's
+  // shape is fixed and only its prose moves, which is what every revision could
+  // do before this round. The licence text below is quoted from that constant;
+  // the generator tests assert the two surfaces agree.
+  window.buildUnitRevisionPrompt = function (unitLabel, unitJson, directives, contextJson, reopenScopes) {
     var directiveLines = (directives || []).map(function (d, i) { return (i + 1) + '. ' + d; });
+    var REOPEN_LICENCES = {
+      beat: 'what this unit is ABOUT may change — its position in the arc, what is at '
+        + 'risk in it, what it converges or postpones',
+      dynamics: 'how loudly this unit SPEAKS may change — its prose volume and register '
+        + 'against the training load of its week, including cutting it shorter',
+      motif: 'which recurring object, place, or phrase this unit carries may change, and '
+        + 'what that object means at this point in the book',
+      mechanism: 'which printed surface carries this unit\'s pressure may change — what the '
+        + 'clock, oracle, door, cipher, or strip is keyed to and what it answers'
+    };
+    var reopened = (reopenScopes || []).filter(function (id) { return !!REOPEN_LICENCES[id]; });
+    var reopenBlock = reopened.length ? [
+      '## Reopened Constraints — this revision may RE-DECIDE these, not merely reword them',
+      'The critic found the cause of these directives in the unit\'s shape, not its sentences.',
+      'The aspects listed here are open questions again, and answering them differently is the',
+      'point of the revision. Everything NOT listed here is frozen, including every field the',
+      'preservation laws name.'
+    ].concat(reopened.map(function (id) {
+      return '- ' + id + ': ' + REOPEN_LICENCES[id];
+    })).concat([
+      'Re-deciding is not rebuilding: the unit keeps its contractual counts and its printed',
+      'surfaces still exist. A reopened mechanical assignment re-keys a surface or swaps what it',
+      'answers; it never deletes the surface, and a week that arrives without an oracle, a',
+      'cipher, a map, a door it owed, or its micro-lines is discarded and the original kept.',
+      ''
+    ]) : [];
     return [
       '# Targeted Revision — ' + unitLabel,
       '',
       'You are revising ONE unit of an already-assembled booklet. A composition critic has',
       'issued the directives below. Apply ALL of them. Change NOTHING that a directive does',
       'not name.',
-      '',
+      ''
+    ].concat(reopenBlock, [
       '## Preservation Laws (violating any invalidates the revision)',
       '- Keep every id, fragmentRef, weekNumber, variant, and cross-reference exactly as-is.',
       '- Keep the structure: same fields, same array lengths where counts are contractual',
       '  (oracle tables keep exactly 10 entries with the same roll bands).',
       '- Keep all enum vocabulary (documentType, clock types, companion types, map types).',
-      '- Keep exercises, sets, and reps untouched — the workout is never revised.',
+      '- Keep exercises, sets, and reps untouched — the workout is never revised. Session count',
+      '  and session numbering are part of the workout.',
+      '- Keep the decode spine: weeklyComponent.value, boss componentInputs, and the boss',
+      '  decodingKey are already sealed into the ending\'s password. Changing one breaks a',
+      '  puzzle the reader only opens after six weeks.',
       '- Prose may change freely WHERE A DIRECTIVE POINTS. Adjacent prose stays.',
       '',
       '## World Context (stay inside it — no new nouns, no stray lore)',
@@ -3087,5 +3180,5 @@
       '',
       '## Output',
       'Return ONLY the complete revised unit as a JSON object. No fences, no commentary.'
-    ].join('\n');
+    ]).join('\n');
   };

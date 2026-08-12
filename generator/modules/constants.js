@@ -61,9 +61,32 @@ export var STAGE_BUDGETS = {
   campaign:   { maxTokens: 24000, timeoutMs: 600000 },
   shell:      { maxTokens: 16000, timeoutMs: 420000 },
   fragment:   { maxTokens: 24000, timeoutMs: 480000 },
-  // Critic loop (D66)
-  critic:         { maxTokens: 8000,  timeoutMs: 300000 },
-  'critic-revise': { maxTokens: 16000, timeoutMs: 360000 }
+  // Critic loop (D66). Both rows were sized before the critic had eight
+  // dimensions and machine findings, and both were the smallest rows in the
+  // ladder while doing the ladder's largest reading. Measured against real
+  // six-week books (Book 1 glassworks, Eastern Shore, what-the-soil-remembers):
+  //
+  //   critic         input  ~26-38k tokens of digest.
+  //                  output a verdict over 8 dimensions, each carrying >=2
+  //                  evidence entries (evidence law) plus one failure object
+  //                  per weakness. A PASSING verdict is ~700 tokens; the
+  //                  verdict that matters is a FAILING one, and a heavy round
+  //                  (4 evidence + 5 failures per dimension, pretty-printed as
+  //                  models emit it) measures ~6.2k tokens. 8000 gave that
+  //                  round no headroom at all — and none whatsoever on a model
+  //                  that spends part of the same ceiling thinking.
+  //   critic-revise  output is ONE COMPLETE UNIT returned whole, and the
+  //                  largest unit is a week: 5.4k tokens compact on Book 1
+  //                  (~7k as pretty-printed JSON), and a revision is usually
+  //                  longer than the thing it revises. 16000 budgeted the
+  //                  rewrite of a week BELOW the 24000 the `week` row spends
+  //                  writing one, which is incoherent — a stage may not be
+  //                  asked to reproduce an object it cannot afford to emit.
+  //
+  // Both now follow the ladder's own rule (~3-4x measured output) and pair
+  // with a timeout that reaches the ceiling at the conservative ~20 tok/s floor.
+  critic:         { maxTokens: 24000, timeoutMs: 480000 },
+  'critic-revise': { maxTokens: 24000, timeoutMs: 600000 }
 };
 
 // Retry escalation: each attempt gets more wall clock than the last, and a
@@ -235,4 +258,37 @@ export var CRITIC_DIMENSIONS = [
   // the prose laws no regex can reach — multi-hand distinctness, terminal
   // position, unlicensed genre moves. The B-class tic scan feeds it facts.
   { id: 'voiceDiscipline', name: 'Voice Discipline' }
+];
+
+// ── Structural revision reach (Teeth T4 — the surgeon) ──────────────────────
+// The three-tier fix loop is law: code derives (silent) -> stage retries
+// correct (Correction Directive) -> the critic revises (grade->revise->regrade).
+// Tier 3 used to be able to reword a unit and nothing else, so a finding whose
+// cause was the unit's SHAPE could only ever retint sentences. It was
+// commentary. A failure may now declare `scope: "structure"`, and name which
+// aspects of the unit the reviser may RE-DECIDE, from this closed menu.
+//
+// The menu is deliberately the FUSION.md mechanism vocabulary (docs/craft/
+// FUSION.md §4) rather than a list of schema fields: a reviser told "you may
+// re-decide weeks[3].gameplayClocks[0].clockType" edits a field, while one told
+// "the mechanical assignment is reopened" re-decides which surface carries the
+// week's pressure. The constitution names the moves; the surgery uses its names.
+//
+// SINGLE HOME. modules/critic.js normalizes against these ids and prompt_rules.js
+// states them to the model in TWO places — the failure contract (how to declare
+// one) and the revision prompt (what re-deciding each one licenses). Generator
+// tests assert the three surfaces agree, the same parity CRITIC_DIMENSIONS has.
+export var STRUCTURAL_REOPEN_SCOPES = [
+  { id: 'beat', name: 'the declared beat',
+    licenses: 'what this unit is ABOUT may change — its position in the arc, what is at '
+      + 'risk in it, what it converges or postpones' },
+  { id: 'dynamics', name: 'the dynamic marking',
+    licenses: 'how loudly this unit SPEAKS may change — its prose volume and register '
+      + 'against the training load of its week, including cutting it shorter' },
+  { id: 'motif', name: 'the motif carried',
+    licenses: 'which recurring object, place, or phrase this unit carries may change, and '
+      + 'what that object means at this point in the book' },
+  { id: 'mechanism', name: 'the mechanical assignment',
+    licenses: 'which printed surface carries this unit\'s pressure may change — what the '
+      + 'clock, oracle, door, cipher, or strip is keyed to and what it answers' }
 ];

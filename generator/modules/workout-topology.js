@@ -178,7 +178,16 @@ function classifyShape(volumes) {
  * @param {object|string} nw - normalizeWorkoutParam output, or raw program text.
  * @returns {{basis: string, weekCount: number|null, sessionsPerWeek: number[],
  *            sessionsPerWeekLabel: string, peakWeek: number|null,
- *            deloadWeeks: number[], progressionShape: string}}
+ *            deloadWeeks: number[], progressionShape: string,
+ *            weekLoads: Array<{weekNumber:number, sessionCount:number,
+ *                              volume:number, declaredDeload:boolean}>}}
+ *
+ * `weekLoads` is the per-week row set this function has always computed and
+ * then thrown away. It is returned rather than re-derived by every caller that
+ * needs the CURVE instead of its summary (the fusion frame, Teeth T4): the
+ * sets x reps proxy has exactly one home, here, and a second copy of it
+ * anywhere is the ladder-mirror defect class — two homes drifting until the
+ * curve one surface reads is not the curve another reads.
  */
 export function buildWorkoutTopology(nw) {
   var empty = {
@@ -188,7 +197,8 @@ export function buildWorkoutTopology(nw) {
     sessionsPerWeekLabel: 'unknown',
     peakWeek: null,
     deloadWeeks: [],
-    progressionShape: 'unknown'
+    progressionShape: 'unknown',
+    weekLoads: []
   };
   if (!nw) return empty;
 
@@ -246,7 +256,15 @@ export function buildWorkoutTopology(nw) {
     sessionsPerWeekLabel: label,
     peakWeek: peakWeek,
     deloadWeeks: deloadWeeks,
-    progressionShape: shape
+    progressionShape: shape,
+    weekLoads: weeks.map(function (w) {
+      return {
+        weekNumber: w.weekNumber,
+        sessionCount: w.sessionCount,
+        volume: w.volume,
+        declaredDeload: w.declaredDeload
+      };
+    })
   };
 }
 

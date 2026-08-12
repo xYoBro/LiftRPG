@@ -1513,7 +1513,10 @@
       border: 1px dashed var(--rule-strong);
       background: var(--ink-wash);
       font-family: var(--body);
-      font-size: var(--fs-micro);
+      /* --fs-meta, not --fs-micro: the chip carries a money value, and the
+         scale's own law says micro is never a value (D99/D113). The label
+         keeps micro — it is a caption. */
+      font-size: var(--fs-meta);
       line-height: 1.5;
       color: var(--muted);
     }
@@ -1532,6 +1535,39 @@
       font-weight: 600;
       color: var(--ink);
       white-space: nowrap;
+    }
+
+    /* A checkpoint was found on load. Reads on the SETUP surface, above the
+       provider fields, because it is the answer the reader needs before the
+       Build button and not after it. */
+    .api-resume-banner {
+      display: flex;
+      align-items: baseline;
+      gap: 9px;
+      margin-bottom: 16px;
+      padding: 11px 13px;
+      border: 1px solid var(--rule-strong);
+      border-left: 3px solid var(--ink);
+      background: var(--ink-wash);
+    }
+
+    .api-resume-banner-tag {
+      font-family: var(--mono);
+      font-size: var(--fs-micro);
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--ink);
+      white-space: nowrap;
+    }
+
+    /* --fs-meta, not --fs-micro: this line carries a money figure the reader
+       has to act on, and the type scale reserves micro for captions and
+       legends — never a value. */
+    .api-resume-banner-text {
+      font-family: var(--body);
+      font-size: var(--fs-meta);
+      line-height: 1.6;
+      color: var(--ink);
     }
 
     /* Progress is riding sessionStorage — closing the tab loses it. */
@@ -3032,6 +3068,15 @@
 
         <div class="api-panel" id="api-panel">
 
+          <!-- Saved progress found on load. This sits on the SETUP surface on
+               purpose: it is the last screen before money is spent again, and
+               "what has this book already cost me" has to be answered before
+               the Build button, not after it. -->
+          <div class="api-resume-banner" id="api-resume-banner" hidden>
+            <span class="api-resume-banner-tag">Saved Progress</span>
+            <span class="api-resume-banner-text" id="api-resume-banner-text"></span>
+          </div>
+
           <section class="api-station">
             <div class="api-station-head">
               <span class="api-station-index">Step 1</span>
@@ -4399,15 +4444,64 @@
         }
       }
 
+      // What the saved checkpoint says this booklet has ALREADY cost, before
+      // this session spends anything.
+      //
+      // This must read spendToDate, not spend().priorAttempts. The checkpoint
+      // module's live `thisSession` counter is module state: a page reload
+      // zeroes it while the interrupted session's money stays in the stored
+      // file, so priorAttempts alone reported $0 for a run the operator had
+      // already paid for — and it stayed wrong until some later pipeline event
+      // re-synced the chip. spendToDate is priorAttempts + the STORED session,
+      // which is exactly what the pipeline will fold into priorAttempts when
+      // the resumed run opens: the number never moves backwards.
+      //
+      // Correct ONLY before a run starts (page load, Build click). Mid-run the
+      // stored session is the live meter, and this would double-count it.
       function readCheckpointPriorSpend() {
         try {
           var surface = api();
-          if (!surface || !surface.checkpoint || typeof surface.checkpoint.spend !== 'function') return null;
-          var prior = (surface.checkpoint.spend() || {}).priorAttempts;
+          if (!surface || !surface.checkpoint || typeof surface.checkpoint.spendToDate !== 'function') return null;
+          var prior = surface.checkpoint.spendToDate();
           return prior && prior.calls > 0 ? prior : null;
         } catch (error) {
           return null;
         }
+      }
+
+      // One sentence for the money, in the two states it can be in. Honest per
+      // D110: never "saved so far", never "nothing lost" — an interrupted run
+      // burned real tokens on the attempt that died, and only the stages that
+      // FINISHED come back free.
+      function describePriorSpend(prior) {
+        if (!prior || !prior.calls) return '';
+        var calls = prior.calls + ' API call' + (prior.calls === 1 ? '' : 's');
+        if (Number(prior.usd) > 0) {
+          return 'Earlier work on this booklet has already cost about ' + formatUsd(prior.usd) +
+            ' across ' + calls + '.';
+        }
+        return 'Earlier work on this booklet has already made ' + calls +
+          '. LiftRPG has no pricing for that model, so it cannot say what they cost.';
+      }
+
+      function renderApiResumeBanner(stageCount, prior) {
+        var banner = document.getElementById('api-resume-banner');
+        var text = document.getElementById('api-resume-banner-text');
+        if (!banner || !text) return;
+        if (!stageCount) {
+          banner.hidden = true;
+          text.textContent = '';
+          return;
+        }
+        var lines = [
+          'A previous build of this booklet left ' + stageCount + ' finished stage' +
+          (stageCount === 1 ? '' : 's') + ' saved on this device.'
+        ];
+        var money = describePriorSpend(prior);
+        if (money) lines.push(money);
+        lines.push('Building again continues from there: the finished stages are restored without paying for them a second time. Anything that had not finished still has to be bought.');
+        banner.hidden = false;
+        text.textContent = lines.join(' ');
       }
 
       function renderApiNotices() {
@@ -5994,6 +6088,16 @@
           apiRunState.error = 'Build stopped by user.';
           apiRunState.currentStageStartedAt = 0;
           apiRunState.stream = null;
+          // The sidecard was still reading "Receiving the model's writing…"
+          // after Stop: neither branch of renderApiRunState rewrites
+          // progressCaption in the error state, so the last live heartbeat
+          // stood as the answer to "what happens now" on a run that had just
+          // been stopped. Same D110 defect class as the frozen headline, on the
+          // one state its tests did not walk. Honest per D110: the stage that
+          // was mid-flight burned tokens that are gone — only stages that
+          // FINISHED come back free.
+          apiRunState.progressCaption = 'Stopped. The stage that was still running does not come back — '
+            + 'its tokens are spent. Every stage that finished before it is saved, and building again resumes from there.';
           pushApiLog('Build stopped by user.');
           renderApiRunState();
           _apiGenerateRunning = false;
@@ -6040,6 +6144,23 @@
               sessionStorage.setItem('liftrpg_pipeline_checkpoint', JSON.stringify(data));
               var stageCount = Object.keys(data.stages).length;
               pushApiLog('Checkpoint restored: ' + stageCount + ' cached stage(s). Hit Build to resume.');
+              // Same question, same answer as the on-load resume: an uploaded
+              // file is a paid run too. Read the FILE rather than storage —
+              // upload writes the tab mirror, and a stale durable entry would
+              // otherwise supply the figure.
+              var uploadedSpend = null;
+              try {
+                var surface = api();
+                if (surface && surface.checkpoint && typeof surface.checkpoint.spendToDate === 'function') {
+                  var seen = surface.checkpoint.spendToDate(data);
+                  uploadedSpend = seen && seen.calls > 0 ? seen : null;
+                }
+              } catch (spendError) { uploadedSpend = null; }
+              if (apiRunState) apiRunState.priorSpend = uploadedSpend;
+              renderApiResumeBanner(stageCount, uploadedSpend);
+              var uploadedSpendLine = describePriorSpend(uploadedSpend);
+              if (uploadedSpendLine) pushApiLog(uploadedSpendLine);
+              renderApiRunState();
               // Restore inputs if available
               if (data.inputs) {
                 if (data.inputs.workout && workoutEl) workoutEl.value = data.inputs.workout;
@@ -7680,6 +7801,10 @@
         // pipeline re-reports this on resume; reading it here means it is on
         // screen before the first stage lands.
         apiRunState.priorSpend = readCheckpointPriorSpend();
+        // The setup surface's resume banner has done its job — from here the
+        // live panel owns the story, and a banner left behind on the surface
+        // the reader can step back to would describe a run already underway.
+        renderApiResumeBanner(0, null);
         announceShelvedCheckpoint();
         renderApiRunState();
         setGeneratorSurface('api-status', { skipFocus: true });
@@ -8039,15 +8164,28 @@
         if (inputs.model && apiModelEl) apiModelEl.value = inputs.model;
         if (!apiRunState) apiRunState = createApiRunState();
         var stageLabel = stageCount + ' cached stage' + (stageCount === 1 ? '' : 's');
+        // A reload does not refund anything. The checkpoint carries what the
+        // interrupted run spent, and this is the first frame the operator sees
+        // after one — so the money is read here rather than waiting for a
+        // pipeline event that only arrives once Build is pressed again.
+        var priorSpend = readCheckpointPriorSpend();
+        var spendLine = describePriorSpend(priorSpend);
+        apiRunState.priorSpend = priorSpend;
         apiRunState.summary = 'Resume Available';
         apiRunState.summaryCaption = 'A previous API build left ' + stageLabel + ' on this device.';
         apiRunState.target = 'Resume Build';
-        apiRunState.targetCaption = 'Review the settings, then build again to continue from the checkpoint.';
+        apiRunState.targetCaption = 'Review the settings, then build again to continue from the checkpoint.' +
+          (spendLine ? ' ' + spendLine : '');
         apiRunState.progress = stageLabel;
+        // NOT progressCaption: renderApiRunState rewrites that field for every
+        // idle state with a provider selected, so anything put there is gone by
+        // the first paint. targetCaption and the prior-spend chip both survive.
         apiRunState.progressCaption = 'Checkpoint resume is available for this booklet.';
+        renderApiResumeBanner(stageCount, priorSpend);
         setGenerationMode('api');
         setGeneratorSurface('api-config', { skipFocus: true });
         pushApiLog('Checkpoint found: ' + stageLabel + ' from a previous run. Hit "Build Booklet" to resume.');
+        if (spendLine) pushApiLog(spendLine);
         if (modal && !modal.classList.contains('is-open')) openModal();
         renderApiRunState();
         return true;
