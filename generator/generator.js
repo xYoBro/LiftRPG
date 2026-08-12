@@ -2434,8 +2434,20 @@
     if (weekPlan.componentValue !== null && weekPlan.componentValue !== undefined) {
       contextLines.push('- Component value: ' + weekPlan.componentValue + ' (fiction-native integer 1-26, NOT a letter and NOT a prose bundle)');
     }
-    if (weekPlan.overflowFragmentId) {
-      contextLines.push('- **OVERFLOW CONTRACT (BINDING):** overflowDocument.id MUST be exactly "' + weekPlan.overflowFragmentId + '" — do NOT invent a different ID');
+    // OVERFLOW: the requirement itself, not just the id constraint. The 2026-08-11
+    // live run proved the old single line ('overflowDocument.id MUST be exactly X')
+    // is vacuously satisfiable by omitting the document — the model wrote 4 sessions
+    // and stopped, three retries deep. Mirror of the multi-stage builder's
+    // 'Planned Overflow Documents (BINDING)' block in generateWeekChunkPrompt.
+    var sfSessionCount = Number(weekPlan.sessionCount) || 0;
+    if (weekPlan.overflowFragmentId || sfSessionCount > 3) {
+      contextLines.push('- **OVERFLOW CONTRACT (BINDING):** this week has ' + (sfSessionCount || 'more than 3') +
+        ' sessions, so you MUST set overflow: true AND include a complete overflowDocument. ' +
+        'It is REQUIRED — a week with 4+ sessions and no overflowDocument is invalid and will be rejected.');
+      contextLines.push('  - overflowDocument is a SELF-CONTAINED found document (id, documentType, title, content, designSpec) — a standalone Part-2 page beside the overflow sessions, NOT a continuation of session content.');
+      if (weekPlan.overflowFragmentId) {
+        contextLines.push('  - overflowDocument.id MUST be exactly "' + weekPlan.overflowFragmentId + '" — do NOT invent a different ID');
+      }
     }
     contextLines.push('- Oracle mode: ' + (weekPlan.oracleMode || 'mixed'));
     if (weekPlan.companionTypes && weekPlan.companionTypes.length > 0) {
