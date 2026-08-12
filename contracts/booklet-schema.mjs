@@ -95,6 +95,14 @@ var artifactIntentReading = {
     impliedSetting: { type: 'string' },
     emotionalArc: { type: 'string' },
     genreTemplate: { type: 'string' },
+    // The GAME-KIND signal (W4a, the ludic lens). A sibling of the six above
+    // and free-string for the same reason: enumerating what kind of game a
+    // brief wants would re-impose the house flavour the lens exists to escape.
+    // What is enum-gated is the ANSWER — playSpine.composition draws from
+    // LUDIC_LIBRARY — while this records the reading that produced it, so a
+    // composition that does not follow from the brief is a cited finding
+    // rather than a shrug.
+    ludicReading: { type: 'string' },
     // 1-2 sentences citing the brief phrases that drove the reading. This is
     // what makes a misread localizable: the critic grades the booklet against
     // the recorded reading, and a reading the brief cannot support is a cited

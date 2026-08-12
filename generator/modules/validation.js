@@ -73,7 +73,8 @@ import {
   // files so nobody "unifies" them into one home that has to know both.
   LUDIC_LIBRARY,
   SPINE_BUDGETS,
-  parseSurfaceRef
+  parseSurfaceRef,
+  VALID_DYNAMIC_MARKINGS
 } from '../../contracts/contract-constants.mjs';
 
 // Map-evolution fingerprint + companions: one implementation, shared with quality.js.
@@ -1349,6 +1350,38 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
     collectBudgetBreaches({ weeks: [budgetWeek] }).forEach(function (b) {
       errors.push('Over budget: ' + b.message);
     });
+  }
+
+  // ── Floor: the fusion score is STORED, not merely thought (W4a) ───────────
+  // FUSION §4.1 has demanded a per-week beat plus a dynamic marking since it
+  // was written, and until W4a nothing stored one — the score was G-class, the
+  // compiler asked to think in beats and the answer going nowhere. Storing it
+  // without a floor would leave it exactly as G-class, because a mid-tier model
+  // treats "optional but demanded" as "skip" (D111, the founding lesson).
+  //
+  // The marking is enum-gated rather than free text because the D114 evidence
+  // frame already measures prose volume per week against the book's own
+  // maximum: a five-step ordinal can be COMPARED to that curve, and three
+  // synonyms for quiet cannot.
+  if (floorsOn(expectedOptions)) {
+    var beat = weekObj.fusionBeat;
+    if (!beat || typeof beat !== 'object') {
+      errors.push('Week has no fusionBeat — declare how this week\'s training texture IS its story'
+        + ' texture: { beat, marking }, marking one of ' + VALID_DYNAMIC_MARKINGS.join(' | '));
+    } else {
+      if (!String(beat.beat || '').trim()) {
+        errors.push('Week fusionBeat.beat is empty — one sentence naming how the training texture and the'
+          + ' story texture are the same thing this week');
+      }
+      var marking = String(beat.marking || '').trim();
+      if (!marking) {
+        errors.push('Week fusionBeat.marking is unset — declare this week\'s prose volume: '
+          + VALID_DYNAMIC_MARKINGS.join(' | '));
+      } else if (VALID_DYNAMIC_MARKINGS.indexOf(marking) === -1) {
+        errors.push('Week fusionBeat.marking "' + marking + '" is not a dynamic marking: '
+          + VALID_DYNAMIC_MARKINGS.join(' | '));
+      }
+    }
   }
 
   // ── The closure floors that can only be checked per week (W4a) ────────────

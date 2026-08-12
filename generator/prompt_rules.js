@@ -97,7 +97,15 @@
     '- `overflowDocument` (foundDocument, REQUIRED when overflow is true): The Part 2 right-hand page. Must be a self-contained found document with all standard fragment fields (id, title, documentType, content, designSpec, etc.). This is a standalone document that appears alongside the overflow sessions — it is NOT a continuation of the session content. Treat it as another fragment, placed here for pacing.',
     '- `interlude` (object, optional): must contain { title, reason, body } and may also include payloadType, payload, spreadAware',
     '- `gameplayClocks` (array, optional): week-level progress clocks outside the oracle payload',
-    '- `isDeload` (boolean, optional): tonal flag only'
+    '- `isDeload` (boolean, optional): tonal flag only',
+    '- `fusionBeat` (object, REQUIRED): { beat, marking }. This week\'s FUSION SCORE, declared.',
+    '  `beat` is one sentence: how this week\'s TRAINING texture IS this week\'s STORY texture.',
+    '  Not what happens — how it FEELS the same. The deload is the exhale: a deload week that',
+    '  reads as filler is a defect, so its beat is the aftermath, the letter, the count taken.',
+    '  `marking` is a CLOSED five-step ordinal for prose VOLUME on this week\'s pages:',
+    '  "quiet" | "spare" | "steady" | "full" | "loud". Counterpoint, do not double: the peak',
+    '  load week wants the QUIETEST prose with the highest stakes; the deload wants the warmest',
+    '  prose and the longest view. A book whose markings track the load curve is doubling.'
   ];
 
   // The board serves the verb, never decoration (§4 of the gameplay brainstorm).
@@ -379,6 +387,14 @@
     '- `interlude` (object, optional)',
     '- `gameplayClocks` (array, optional)',
     '- `isDeload` (boolean, optional)',
+    '- `fusionBeat` (object, REQUIRED): { beat, marking }. This week\'s FUSION SCORE, declared.',
+    '  `beat` is one sentence: how this week\'s TRAINING texture IS this week\'s STORY texture.',
+    '  Not what happens — how it FEELS the same. The deload is the exhale: a deload week that',
+    '  reads as filler is a defect, so its beat is the aftermath, the letter, the count taken.',
+    '  `marking` is a CLOSED five-step ordinal for prose VOLUME on this week\'s pages:',
+    '  "quiet" | "spare" | "steady" | "full" | "loud". Counterpoint, do not double: the peak',
+    '  load week wants the QUIETEST prose with the highest stakes; the deload wants the warmest',
+    '  prose and the longest view. A book whose markings track the load curve is doubling.',
     '- `sessions[].microLines` (array, REQUIRED — at least ONE somewhere in this week, max 2 per session): { condition, cue, citeRef? }. See Point Of Use.',
     '  A week that prints no conditional micro-line is rejected. Deload weeks are exempt; every other week owes at least one.',
     '- `sessions[].returnBeat` (object, REQUIRED on EVERY session): { closingLine, openingEcho? }. See The Return Loop.',
@@ -460,8 +476,10 @@
     '  - `homePull` (string): story | game | investigation | mixed',
     '  - `convergencePattern` (string): the endgame shape — sequential-assembly | reordering | red-herring | dual-source',
     '  - `reading` (object): the recorded reading — your interpretation of the brief, written down.',
-    '    { tone, register, povFrame, impliedSetting, emotionalArc, genreTemplate, briefEvidence }',
+    '    { tone, register, povFrame, impliedSetting, emotionalArc, genreTemplate, ludicReading, briefEvidence }',
     '    All free strings in your own words; these are a record, not a menu.',
+    '    ludicReading is 1-2 sentences: what KIND OF GAME this brief wants, in your words —',
+    '    what the player is doing minute to minute, what they are spending, what they risk.',
     '    briefEvidence is 1-2 sentences naming the brief phrases that drove the reading.',
     '  - `selectionReason` (string): why the winning candidate reading beat the others.',
     '',
@@ -549,7 +567,7 @@
         // exemplar to copy (the exact bleed D47 bans).
         reading: {
           tone: '', register: '', povFrame: '', impliedSetting: '',
-          emotionalArc: '', genreTemplate: '', briefEvidence: ''
+          emotionalArc: '', genreTemplate: '', ludicReading: '', briefEvidence: ''
         },
         selectionReason: '',
         // The two candidates that lost. `axis` is a closed menu, so it is
@@ -708,9 +726,14 @@
                   impliedSetting: { type: 'string' },
                   emotionalArc: { type: 'string' },
                   genreTemplate: { type: 'string' },
+                  // The game-kind reading (W4a). Required here for the same
+                  // reason every sibling is: this literal is what a compat
+                  // transport enforces, and an optional reading is a reading
+                  // the model skips.
+                  ludicReading: { type: 'string' },
                   briefEvidence: { type: 'string' }
                 },
-                required: ['tone', 'register', 'povFrame', 'impliedSetting', 'emotionalArc', 'genreTemplate', 'briefEvidence']
+                required: ['tone', 'register', 'povFrame', 'impliedSetting', 'emotionalArc', 'genreTemplate', 'ludicReading', 'briefEvidence']
               },
               selectionReason: { type: 'string' },
               // The triptych's audit trail (Wave 2). `_x` is the schema's
@@ -1812,6 +1835,10 @@
     '- `impliedSetting`: where and when',
     '- `emotionalArc`: what changes for the protagonist by the end',
     '- `genreTemplate`: the genre conventions now in force',
+    '- `ludicReading`: what KIND OF GAME this brief wants. 1-2 sentences: what the player',
+    '  is doing minute to minute, what they spend, and what they can lose. A brief implies a',
+    '  game the way it implies a tone — "a siege that never lifts" is a pressure that only',
+    '  rises; "a season of repairs" is husbandry. Read it, do not default to it.',
     '- `briefEvidence`: 1-2 sentences naming the ACTUAL phrases in the brief that drove this',
     '  reading. Quote or name the words that are there. If the brief cannot support a claim,',
     '  do not make the claim — write what the brief actually gives you, even if that is little.',
@@ -1822,7 +1849,126 @@
     '',
     'The reading is BINDING and it is AUDITABLE. Later stages write against it, and the',
     'composition critic grades the finished booklet against this recorded reading — a reading',
-    'the brief cannot support becomes a cited finding, not a vague complaint about tone.'
+    'the brief cannot support becomes a cited finding, not a vague complaint about tone.',
+    '',
+    '### Step 11: Compose the play, do not assemble it',
+    'A book of individually good components is still a series of things to do. Fun is not a',
+    'property you can request per component — every oracle wants to be evocative and every',
+    'clock wants stakes, and none of that makes them listen to each other.',
+    '',
+    'So COMPOSE. Pick TWO to FOUR playable systems and wire them into ONE economy where each',
+    'one reads what another writes. Not a parts list: a sentence. What the marks feed, where',
+    'it banks, what the banked thing buys, what that opens, and what answers it.',
+    '',
+    'Three rules that decide whether the composition is real:',
+    '- Every spend has a destination the book DRAWS. A price with nothing on the other side',
+    '  of it is a dead sink.',
+    '- Every clock, track or counter is READ by something. A clock nothing reads is scenery',
+    '  with a number on it.',
+    '- Every fork changes something a player could point at. If the only difference between',
+    '  two branches is which adjective describes them, it is not a choice.',
+    '',
+    'The shape of the economy follows the mechanic grammar family you chose in Step 5, not a',
+    'house pattern: pressure that only rises does not bank, husbandry does not race, and a',
+    'chase does not accumulate. Two books from the same brief class must still differ in what',
+    'the player DOES, not only in what the pages say.',
+    '',
+    'And be honest when the brief wants something this engine cannot print. Say so plainly',
+    'rather than dressing an existing system up as the missing one — a tally strip called a',
+    'deck is still a tally strip, and the player finds out on page one.'
+  ];
+
+  // ── The Ludic Spine (W4a) ─────────────────────────────────────────────────
+  // Routed to the `shell` stage ONLY, because that is the stage that authors
+  // meta and therefore the only stage that can write a spine — and because the
+  // closure floors that enforce it are stage gates on the API pipelines.
+  //
+  // The single-prompt bundle deliberately does NOT carry this section: it is
+  // already the largest prompt in the system, the floors do not run on the
+  // paste path, and INST_ARTIFACT_COMPILER Step 11 is written self-contained so
+  // the paste path still gets the composition DISCIPLINE without the JSON
+  // shape. A pointer from Step 11 to this section would dangle on that surface
+  // — the exact defect Step 5c's "Read the Door Bias section" was (D111).
+  //
+  // NO WORKED SPINE, ever (D47). The family table below is a MENU of economy
+  // SHAPES, one clause each; a single filled-in example would install one house
+  // economy in every book, which is the disease this whole section exists to
+  // prevent (PLAY.md §2, "the house economy").
+  window.INST_LUDIC_SPINE = [
+    '## The Play Spine (meta.playSpine — REQUIRED)',
+    'Step 11 of the compiler said what to compose. This is where you write it down, in a',
+    'shape a machine can check. A book whose systems do not reference each other is rejected',
+    'at this stage, so declare the wiring here and then BUILD what you declared.',
+    '',
+    '### Surface refs — how the spine points at things',
+    'Every edge names a surface as `kind:id`, or one of three singletons.',
+    'Kinds: `week:W3` `session:W3.2` `markStrip:W3.2` `reckoning:W3` `clock:<clock name>`',
+    '`oracle:W4` `cipher:W2` `map:<region or board name>` `companion:<label>` `fragment:F.07`',
+    '`door:W5` `seal:<fragment id>` `ending:E2`',
+    'Singletons (no id — a book has at most one): `banked` `boss` `assembly`',
+    'Use the names you are actually giving these surfaces. A ref to a week this book does',
+    'not have, or to a fragment outside your registry, is a blocking error.',
+    '',
+    '### The seven declarations',
+    '- `composition` (array, 2-4 items): `{ entry, role }`.',
+    '  `entry` is a CLOSED menu — the systems this engine can print:',
+    '  `reckoning-economy` (marks tally, bank, price spends) · `board` (the map and its',
+    '  regions) · `decode-chain` (the weekly cipher) · `clock-bank` (fill / drain / race /',
+    '  tug-of-war) · `companion-kit` (dashboards, tracks, stats, inventories) ·',
+    '  `oracle-pull` (the d100 table) · `door-fork` (the week\\\'s posted choice) ·',
+    '  `sealed-cache` (sealed-by-honour content and its key) · `boss-convergence` (the',
+    '  endgame ceremony, assembly and locked finale) · `ledger-audit` (the body audited).',
+    '  Entries must be DISTINCT. `role` is a sentence in your own words: what this system',
+    '  does in THIS book. "It is the map" is not a role; "the map is the only place a spend',
+    '  becomes visible" is.',
+    '- `honestGaps` (string[]): what the brief wanted that the list above cannot print.',
+    '  Write it plainly. This is not a failure — it is the record that stops a tally strip',
+    '  from being described as a deck. Empty array if the brief asks for nothing missing.',
+    '- `economyGraph` (array): `{ from, to, currency? }`. Named edges, never implied.',
+    '  At least one edge must START at a tick origin (`markStrip:` / `session:` / `week:`)',
+    '  and at least one must END at a surface the book draws. Every node must be reachable',
+    '  from a source and reach a printed sink. Omit `currency` on edges that move the player',
+    '  without spending anything (a key opening a gate); do not invent one.',
+    '- `consequenceEdges` (array): `{ source, answeredBy, withinWeeks }`. Every fillable',
+    '  thing names the surface that answers it. `withinWeeks` is 0, 1 or 2 — 0 means the',
+    '  same week. An answer further out than you declare is a blocking error, and an answer',
+    '  in an EARLIER week than its question is printed before it is asked.',
+    '- `decisionLedger` (array): `{ fork, differsBy }`. One row per door, `fork` written as',
+    '  `door:W3`. `differsBy` must name a MECHANICAL surface that changes — a clock, a price,',
+    '  a region, a gate, a table. Adjectives are not differences.',
+    '- `tensionBudget` (array, one row per week): `{ week, scarce?, losable?, fallBehind? }`.',
+    '  At least ONE axis named per week. Leaving an axis out is a declaration that this week',
+    '  has none of it, which is a legitimate thing to say — a deload week often has exactly',
+    '  one. All three empty is a week with nothing at stake.',
+    '- `difficultyCurve` (object): `{ keyedToLoad, shape, perWeek }`. `keyedToLoad` is a',
+    '  boolean: true when the puzzles harden as the lifts do, false when the brief warrants',
+    '  something else. False is a real answer, not a failure — say what the curve does',
+    '  instead in `shape`, and give one clause per week in `perWeek`.',
+    '',
+    '### The economy\\\'s SHAPE follows the family (choose from this menu)',
+    'The mechanic grammar family you chose in Step 5 already decided what the world spends',
+    'against the player. The economy must move the same way, or the book says one thing and',
+    'plays another. Pick the row you chose and build that shape:',
+    '',
+    '| Family | What the economy DOES |',
+    '|--------|----------------------|',
+    '| `heat` | Rises only. Nothing the player does lowers it; spends BUY TIME, they do not reduce the number. No banking against heat — the pressure is not a currency. |',
+    '| `attrition` | Drains. The player starts with something finite and every week takes some. Spends slow the drain or convert it; the graph runs downhill. |',
+    '| `siege` | Two clocks race in opposite directions — what holds and what closes. Spends reinforce one at the cost of the other; nothing is neutral. |',
+    '| `stewardship` | Grows if tended. The player invests and the thing repays later; neglect is the only loss. The graph has loops that pay back, not just sinks. |',
+    '| `loyalty-web` | Tugs. Spending on one relationship spends against another; the same currency moves two tracks in opposite directions. |',
+    '| `evasion` | Races. Position matters more than accumulation; the player converts marks into distance or cover, and standing still costs. |',
+    '| `observance` | Accrues by discipline. Rites kept on schedule earn; a missed observance costs more than it earned. The clock is a calendar. |',
+    '| `rivalry` | Compares. Every player gain is measured against a rival\\\'s standing; the economy prints BOTH sides and the gap is the state. |',
+    '| the seven reconstruction families | Assemble. Marks buy access to gaps — a shaded cell, a decoded line, a named node — and the picture is the state. Nothing spends against the player; the scarcity is what is still unknown. |',
+    '',
+    'The row is the SHAPE, not the content. Two heat books both rise; what rises, what it',
+    'costs to hold it back, and what the number is called are yours.',
+    '',
+    '### Length',
+    'This book has as many weeks as the program does. Express the arc in FRACTIONS of that',
+    'number, never in a fixed count: the midpoint shift lands at the middle week, the boss is',
+    'the last week, and the tension budget has exactly one row per week the program has.'
   ];
 
   window.INST_ANTI_GENERIC = [
@@ -1884,6 +2030,18 @@
     'Two surfaces sit OUTSIDE the fiction and take a flat instrument register:',
     'rulesSpread (it teaches a stranger to play) and cipher extractionInstruction',
     '(an operation, not a mood). Flat is correct there, not a lapse.',
+    '',
+    '### The play kit (hard constraint on anything the page asks for)',
+    'The complete kit is THREE OBJECTS: this book, a pencil, and two ten-sided dice.',
+    'No scissors, no glue, no printer, no second sheet, no app, no screen, no other person.',
+    'Every instruction you write must be performable with those three things and nothing',
+    'else. Marking, writing, tracing, circling, crossing out, shading, tallying, folding a',
+    'corner to keep a place, and sealing by honour ("do not read this page until...") are',
+    'all in. Cutting out, folding into a shape, gluing, punching, aligning one page over',
+    'another, and assembling a component are all out — a booklet that asks for them is not',
+    'playable at a gym bench, which is where this book is opened.',
+    'This binds the PROSE, not only the mechanics: an in-world instruction to "cut along the',
+    'dotted line" is the same defect whether it is a rule or a line of fiction.',
     '',
     '### The partition',
     '- Universal bans hold in EVERY genre and can never be licensed away.',
@@ -2358,7 +2516,7 @@
     // one costs. It rides week-final and ending too — the stages that build
     // the boss page and the payoff — so the pattern is legible everywhere it
     // has consequences.
-    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
+    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
     // Knowing: the world's process particulars, authored once after the
     // skeleton/shell and consumed by every prose stage (§11 Wave 1.5). It
     // writes no prose, so it carries no VOICE_DISCIPLINE — it carries the
@@ -2384,7 +2542,14 @@
     // Book 1 (S+F) came back with zero of all three. The stage map reaches both
     // pipelines from one place and still keeps this off the single-prompt path,
     // which is hard against its 108,000-character ceiling.
-    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'MARK_SURFACE', 'PERVASIVE_PLAY', 'POINT_OF_USE', 'RETURN_LOOP', 'DOOR_BIAS', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'CONVERGENCE_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'PROGRESSION_TARGET', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] },
+    // NO CONTRACT_GUARDRAILS here either, for the same reason the `ending`
+    // stage has none (D128's second queued finding, closed in W4a). All three
+    // of its lines are about fields a week chunk does not author: `theme` and
+    // the two `meta.password*` fields live on the SHELL. Doctrine routed to a
+    // stage it is false at is worse than doctrine routed nowhere — it spends
+    // context telling a model not to do something it cannot do, and teaches it
+    // that this prompt's rules may not apply to the shape in front of it.
+    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'MARK_SURFACE', 'PERVASIVE_PLAY', 'POINT_OF_USE', 'RETURN_LOOP', 'DOOR_BIAS', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'CONVERGENCE_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'PROGRESSION_TARGET', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
     // Fragment: story quality first
     'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'VOICE_DISCIPLINE', 'POINT_OF_USE', 'ANTI_GENERIC', 'CHARACTER_WEB', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
     // Ending: story quality first (endings are where voice failure concentrates)
