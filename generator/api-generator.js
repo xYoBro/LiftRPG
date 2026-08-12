@@ -2362,7 +2362,13 @@ async function runApiPipeline(options) {
       generationFloors: true,
       weekNumber: w,
       isDeload: weekIsDeload,
-      mechanicGrammarFamily: (((shell || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || ''
+      mechanicGrammarFamily: (((shell || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || '',
+      // W4a: the spine was declared at the shell stage; the door and the clocks
+      // are authored here. The closure floors that pair them need both, so the
+      // declaration rides in the same way the family does. No spine in the
+      // options means no spine floors — a floor must never invent the
+      // declaration it is checking against.
+      playSpine: ((shell || {}).meta || {}).playSpine || null
     };
 
     progress('weeks', 'Writing Week ' + w + (isBossWeek ? ' (Boss)' : '') + '\u2026');
@@ -3417,7 +3423,8 @@ async function runSkeletonFleshPipeline(options) {
           generationFloors: true,
           weekNumber: weekNum,
           isDeload: !!weekPlan.isDeload || looksLikeDeloadWeek(weekWorkout),
-          mechanicGrammarFamily: (((skeleton || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || ''
+          mechanicGrammarFamily: (((skeleton || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || '',
+          playSpine: ((skeleton || {}).meta || {}).playSpine || null
         });
         if (vResult && typeof vResult === 'object' && !vResult.valid) {
           return (vResult.errors || []).join('; ');
