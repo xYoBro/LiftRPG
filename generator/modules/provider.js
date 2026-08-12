@@ -5,7 +5,8 @@
 //   Transport:  fetchWithTimeout, normalizeUrl
 //   Payload:    buildOpenAICompatChatPayload, buildOpenAICompatUrl,
 //               buildOpenAICompatHeaders
-//   Content:    extractTextContent
+//   Content:    extractTextContent, normalizeImageParts,
+//               buildAnthropicUserContent, buildOpenAICompatUserContent
 //   Calls:      callAnthropic, callOpenAICompat, callProvider
 //               callOpenAICompatStructured, callProviderStructured
 //   Pricing:    safeNumber, normalizeModelId, normalizeModelFamilyId, escapeRegex,
@@ -1138,16 +1139,80 @@ export function extractTextContent(content) {
   return String(content || '');
 }
 
+// ── Image content (OPTIONAL capability of the existing transports) ────────────
+//
+// D94 law: the registry is the seam and a wire FORMAT is the only code. Vision
+// is NOT a new format — it is a capability the anthropic and openai-compat
+// adapters already have on the wire, expressed here as an OPTIONAL second
+// content channel. Callers that pass no images produce byte-identical payloads
+// to the text-only path; that inertness is structural, not a promise:
+// normalizeImageParts() collapses everything falsy/malformed to [], and both
+// content builders return the bare `prompt` STRING (not a one-element array)
+// when the list is empty, so the request body is the same object it always was.
+//
+// Consumer: scripts/playthrough-audit.mjs, which calls from page context with
+// base64 page screenshots. Nothing in the generation pipeline passes images.
+
+var SUPPORTED_IMAGE_MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+
+// Accepts { mediaType, dataBase64 } (and the `media_type` / `data` spellings a
+// caller copying provider wire docs would reach for). Anything else is dropped
+// silently — a malformed image must never turn a working text call into a 400.
+export function normalizeImageParts(images) {
+  if (!Array.isArray(images) || !images.length) return [];
+  var out = [];
+  for (var i = 0; i < images.length; i++) {
+    var raw = images[i];
+    if (!raw || typeof raw !== 'object') continue;
+    var mediaType = String(raw.mediaType || raw.media_type || 'image/png').toLowerCase();
+    var data = String(raw.dataBase64 || raw.data || '');
+    if (!data) continue;
+    if (SUPPORTED_IMAGE_MEDIA_TYPES.indexOf(mediaType) === -1) continue;
+    out.push({ mediaType: mediaType, dataBase64: data });
+  }
+  return out;
+}
+
+// Anthropic Messages: image blocks precede the text block (the documented
+// ordering for multi-image prompts — the text refers back to what came before).
+export function buildAnthropicUserContent(prompt, images) {
+  var parts = normalizeImageParts(images);
+  if (!parts.length) return prompt;
+  var blocks = parts.map(function (p) {
+    return {
+      type: 'image',
+      source: { type: 'base64', media_type: p.mediaType, data: p.dataBase64 }
+    };
+  });
+  blocks.push({ type: 'text', text: prompt });
+  return blocks;
+}
+
+// OpenAI-compatible chat completions: text first, then image_url parts carrying
+// data: URIs. Gemini's compat endpoint accepts the same shape.
+export function buildOpenAICompatUserContent(prompt, images) {
+  var parts = normalizeImageParts(images);
+  if (!parts.length) return prompt;
+  var blocks = [{ type: 'text', text: prompt }];
+  parts.forEach(function (p) {
+    blocks.push({
+      type: 'image_url',
+      image_url: { url: 'data:' + p.mediaType + ';base64,' + p.dataBase64 }
+    });
+  });
+  return blocks;
+}
+
 // ── Payload builders ──────────────────────────────────────────────────────────
 
-export function buildOpenAICompatChatPayload(model, prompt, maxTokens, extra) {
+export function buildOpenAICompatChatPayload(model, prompt, maxTokens, extra, images) {
   var payload = Object.assign({
     model: model,
     // Keep the chat-completions contract conservative across OpenAI-style
     // providers. Some providers reject requests that include both legacy and
     // newer token-limit fields in the same payload.
     max_tokens: maxTokens || MAX_OUTPUT_TOKENS,
-    messages: [{ role: 'user', content: prompt }]
+    messages: [{ role: 'user', content: buildOpenAICompatUserContent(prompt, images) }]
   }, extra || {});
   return payload;
 }
@@ -1542,13 +1607,13 @@ async function readAnthropicStream(response, onActivity) {
   };
 }
 
-export async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs, pricingRule, systemPrompt) {
+export async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs, pricingRule, systemPrompt, images) {
   var resolvedMax = clampAnthropicMaxTokens(model, maxTokens || MAX_OUTPUT_TOKENS);
   var payload = {
     model: model,
     max_tokens: resolvedMax,
     stream: true,
-    messages: [{ role: 'user', content: prompt }]
+    messages: [{ role: 'user', content: buildAnthropicUserContent(prompt, images) }]
   };
 
   // Prompt caching: if a system prompt is provided, mark it ephemeral so
@@ -1628,7 +1693,7 @@ function rejectsStreamOptions(err) {
     || isStructuredOutputUnsupportedMessage(message);
 }
 
-export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens, timeoutMs, pricingRule) {
+export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens, timeoutMs, pricingRule, images) {
   var url = buildOpenAICompatUrl(baseUrl);
   var endpointKey = normalizeUrl(baseUrl);
   var headers = buildOpenAICompatHeaders(apiKey);
@@ -1636,7 +1701,7 @@ export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens
   function buildPayload(includeUsage) {
     var extra = { stream: true };
     if (includeUsage) extra.stream_options = { include_usage: true };
-    return buildOpenAICompatChatPayload(model, prompt, maxTokens, extra);
+    return buildOpenAICompatChatPayload(model, prompt, maxTokens, extra, images);
   }
 
   async function attempt(includeUsage) {
@@ -1739,6 +1804,12 @@ export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens
  *           extraction instead of sending a schema.
  * @property {boolean} systemPromptCaching
  *           Accepts a cacheable system prompt via settings._systemPrompt.
+ * @property {boolean=} vision
+ *           Accepts base64 image content blocks alongside the text prompt via
+ *           opts.images. OPTIONAL and absent-means-false: an adapter that never
+ *           declares it (including third-party ones registered at runtime) is
+ *           simply never handed images. Probe with
+ *           transportSupports(settings, 'vision') before passing any.
  */
 /**
  * @typedef {Object} TransportAdapter
@@ -1786,13 +1857,15 @@ registerTransport({
     streaming: true,
     usageInStream: 'reliable',
     structuredOutput: false,
-    systemPromptCaching: true
+    systemPromptCaching: true,
+    vision: true
   },
   call: function (settings, prompt, opts) {
     return callAnthropic(
       settings.apiKey, settings.model, prompt,
       opts.maxTokens, opts.timeoutMs,
-      settings._pricingRule, settings._systemPrompt
+      settings._pricingRule, settings._systemPrompt,
+      opts.images
     );
   }
 });
@@ -1805,12 +1878,17 @@ registerTransport({
     // Third-party and local servers frequently omit usage from streams.
     usageInStream: 'optional',
     structuredOutput: true,
-    systemPromptCaching: false
+    systemPromptCaching: false,
+    // Whether the MODEL behind a compat endpoint can see is a model question,
+    // not a format question. The wire format carries image_url parts; a
+    // text-only model behind it will say so in its own error.
+    vision: true
   },
   call: function (settings, prompt, opts) {
     return callOpenAICompat(
       settings.apiKey, settings.baseUrl, settings.model, prompt,
-      opts.maxTokens, opts.timeoutMs, settings._pricingRule
+      opts.maxTokens, opts.timeoutMs, settings._pricingRule,
+      opts.images
     );
   }
 });
@@ -1827,7 +1905,8 @@ registerTransport({
     streaming: true,
     usageInStream: 'optional',
     structuredOutput: true,
-    systemPromptCaching: false
+    systemPromptCaching: false,
+    vision: true
   },
   call: function (settings, prompt, opts) {
     return getTransport('openai').call(settings, prompt, opts);
@@ -1838,12 +1917,21 @@ registerTransport({
 // Unified dispatch used by both single-stage generate() and generateMultiStage().
 // Format branching lives in the registry lookup and nowhere else.
 
-export async function callProvider(settings, prompt, maxTokens) {
+export async function callProvider(settings, prompt, maxTokens, options) {
   var adapter = resolveTransport(settings);
-  return adapter.call(settings, prompt, {
+  var images = normalizeImageParts(options && options.images);
+  var opts = {
     maxTokens: maxTokens,
     timeoutMs: settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS
-  });
+  };
+  // `images` is added to opts ONLY when there are images AND the adapter says
+  // it can see them. Every generation-pipeline call therefore receives the same
+  // two-key opts object it always did, and a runtime-registered adapter that
+  // knows nothing about vision is never handed a key it does not understand.
+  if (images.length && adapter && adapter.capabilities && adapter.capabilities.vision) {
+    opts.images = images;
+  }
+  return adapter.call(settings, prompt, opts);
 }
 
 // Capability probe for callers that used to branch on `format === 'anthropic'`.
