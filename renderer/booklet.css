@@ -1948,6 +1948,54 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   background:transparent;
 }
 
+/* ── Progression target (Wave 5) ─────────────────────────────────────────────
+   The workout's own closing write-in: the program's advancement rule, then the
+   number the player commits to for next time. It sits immediately above
+   `.return-beat` — the workout settles its arithmetic first, the story keeps
+   the last word (see renderProgressionTarget() in workout-primitives.js).
+
+   CROSS-FILE CONTRACT: PROGRESSION_* in renderer/modules/session-card-metrics.js
+   mirrors the padding, rule, row gap, label gap and blank height below. Same
+   law as its neighbours — Phase-1 estimation has no DOM, so a number changed
+   here without its constant makes the solver lie (D71).
+
+   NO DENSITY LADDER, for the same reason the three surfaces above it have
+   none: this is read and written at the end of a session, with the set still
+   in the hands. The rule is the one line that has to survive being read tired,
+   and the blank is a pencil target held at the D89 form-field floor. */
+.progression-target{
+  flex:0 0 auto;
+  padding-top:4px;
+  border-top:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-field-rule,var(--rule));
+}
+/* Row separation is margin, not container `gap`, matching `.return-beat`. A
+   flex `gap` here would be charged in ADDITION to these margins by the browser
+   and only once by the estimate — the arithmetic has to be readable off a
+   single side of the box, and margins are the side the mirror models. */
+/* The rule is the program speaking in the world's voice, so it takes the label
+   face — this is machine-stated fact, not narration, and the contrast is what
+   keeps it from reading as another story line. */
+.progression-target-rule{
+  font-family:var(--theme-label-family,var(--mono));
+  font-size:5.9pt;
+  line-height:1.3;
+  letter-spacing:.04em;
+  color:var(--muted);
+  margin-bottom:2px;
+}
+.progression-target-label{
+  font-family:var(--serif);
+  font-size:5.9pt;
+  line-height:1.3;
+  color:var(--ink);
+  margin-bottom:3px;
+}
+.progression-target-blank{
+  height:15px;
+  border-bottom:var(--theme-rule-width,1px) var(--theme-line-style,solid) var(--theme-field-rule,var(--rule));
+  background:transparent;
+}
+
 /* Mark Strip — the Mark surface (Session 1)
    The mid-workout tick row: one box per target, printed between the exercise
    table and the notes box. Ten-second law — ticks only, nothing to read, count

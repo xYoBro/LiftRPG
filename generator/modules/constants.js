@@ -44,6 +44,12 @@ export var STAGE_BUDGETS = {
   // construction, and an explicit row rather than the silent MAX_OUTPUT_TOKENS
   // fallback a missing key would take (D97).
   knowing:    { maxTokens: 12000, timeoutMs: 300000 },
+  // Canonicalize (§11 Wave 5). Shared by both pipelines, and the only stage
+  // whose output size is set by the USER'S input rather than by the book: a
+  // six-week program with six sessions a week is a few hundred short strings.
+  // Generous on tokens because truncation here silently drops training weeks,
+  // and short on wall clock because it is transcription, not composition.
+  canonicalize: { maxTokens: 16000, timeoutMs: 300000 },
   // Skeleton+Flesh
   skeleton:   { maxTokens: 24000, timeoutMs: 600000 },
   rules:      { maxTokens: 12000, timeoutMs: 300000 },

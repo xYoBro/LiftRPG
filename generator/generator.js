@@ -2325,6 +2325,42 @@
   };
 
   /**
+   * Canonicalization prompt (§11 Wave 5): pasted Liftoscript → structure.
+   *
+   * Deliberately the thinnest prompt in the system. It carries the grammar and
+   * the program and nothing else — no brief, no identity, no voice, no world.
+   * Every one of those would be an invitation to improve the training, and the
+   * training is the one input in this product that the model does not get a
+   * vote on. The exercise fidelity law downstream (INST_WORKOUT_FUSION) is only
+   * as good as what this stage hands it.
+   */
+  window.generateCanonicalizePrompt = function (workoutText, options) {
+    options = options || {};
+    var parts = [
+      '# LiftRPG Canonicalization Stage',
+      'Read the program below into structured JSON. Transcribe only.',
+      '',
+      window.buildStageSchema('canonicalize'),
+      '',
+      '## Output shape',
+      'Return ONLY a JSON object:',
+      '{ "weeks": [ { "weekNumber": 1, "isDeload": false, "sessions": [',
+      '  { "dayLabel": "Day 1", "exercises": [',
+      '    { "name": "Bench Press", "sets": 3, "repsPerSet": "8", "weightField": "100lb", "notes": "" }',
+      '  ] } ] } ], "progressionSummary": "" }',
+      '',
+      '## The program',
+      String(workoutText || ''),
+      ''
+    ];
+    if (options.retryMode) {
+      parts.push('Retry mode: keep every value short and flat. Ensure the JSON completes cleanly.', '');
+    }
+    parts.push('Return ONLY the JSON object. No markdown fences, no commentary.');
+    return parts.join('\n');
+  };
+
+  /**
    * Flesh prompt: rules spread.
    * Input: skeleton meta + cover + artifactIdentity
    * Output: { rulesSpread: { leftPage, rightPage } }

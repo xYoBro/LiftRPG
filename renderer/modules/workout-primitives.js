@@ -160,6 +160,32 @@ function renderReturnBeat(returnBeatModel) {
   return beat;
 }
 
+/**
+ * The progression target — the program's advancement rule and the number the
+ * player commits to for next time.
+ *
+ * ORDERING RULING (§11 Wave 5): this renders immediately BEFORE the return
+ * beat, not after it. The brief asked for it "near the returnBeat close block",
+ * and before is the only side that is near without being destructive:
+ * renderReturnBeat()'s peak-end doctrine requires the closing line to stay the
+ * last thing the pencil touches, and anything appended after it demotes the
+ * note to a middle. Adjacency is satisfied either way; the doctrine is only
+ * satisfied one way.
+ *
+ * Like the return blank, the write-in is a pencil target held at the D89
+ * form-field floor — see PROGRESSION_* in session-card-metrics.js and the
+ * reciprocal note in booklet.css.
+ */
+function renderProgressionTarget(progressionTargetModel) {
+  if (!progressionTargetModel || !progressionTargetModel.rule) return null;
+
+  const box = make('div', 'progression-target');
+  box.appendChild(make('div', 'progression-target-rule', progressionTargetModel.rule));
+  box.appendChild(make('div', 'progression-target-label', progressionTargetModel.targetLabel));
+  box.appendChild(make('div', 'progression-target-blank'));
+  return box;
+}
+
 function renderBinaryChoice(binaryChoiceModel) {
   if (!binaryChoiceModel) return null;
 
@@ -230,6 +256,13 @@ export function renderWorkoutCard(cardModel) {
     const notesBox = make('div', 'notes-box');
     notesBox.style.setProperty('--notes-box-height', Math.max(12, cardModel.notesHeight || 0) + 'px');
     body.appendChild(notesBox);
+  }
+
+  // Immediately before the return beat — see renderProgressionTarget(). The
+  // workout's next number is settled first; the story gets the last word.
+  const progressionTarget = renderProgressionTarget(cardModel.progressionTarget);
+  if (progressionTarget) {
+    body.appendChild(progressionTarget);
   }
 
   // LAST — see renderReturnBeat(). The peak-end ordering is the mechanism.

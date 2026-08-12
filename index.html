@@ -624,6 +624,26 @@
       border-color: var(--ink);
     }
 
+    /* Program lookup (§11 Wave 5, tier 2). Revealed only after a successful
+       lookup — see the handler. `display` is set here rather than inline so the
+       global `[hidden]` rule keeps outranking it while the panel is closed. */
+    .program-lookup {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .program-lookup .field-label {
+      margin: 0;
+    }
+
+    .program-lookup select {
+      flex: 1 1 200px;
+      min-width: 0;
+    }
+
     /* ── Generate button (inverted) ── */
     .gen-submit {
       display: block;
@@ -2960,9 +2980,20 @@
           <div class="generator-flow-copy">Start with your workout and booklet direction only. Once those are set, LiftRPG moves you into the build flow instead of leaving the whole system open at once.</div>
         </div>
 
-        <label class="field-label" for="gen-workout">Workout Program</label>
+        <div class="field-label-row">
+          <label class="field-label" for="gen-workout">Workout Program</label>
+          <button type="button" class="brief-randomize" id="program-lookup-btn">Look up an official program</button>
+        </div>
         <textarea id="gen-workout" class="gen-input" rows="6"
           placeholder="Paste your Liftosaur Liftoscript export, or describe your program in plain text"></textarea>
+        <!-- Program lookup (§11 Wave 5, tier 2). Hidden until asked for: this
+             costs a network round-trip, and the field works without it. -->
+        <div class="program-lookup" id="program-lookup" hidden>
+          <label class="field-label" for="program-lookup-select">Official programs</label>
+          <select class="gen-input" id="program-lookup-select"></select>
+          <button type="button" class="wizard-action-btn" id="program-lookup-use">Use this program</button>
+        </div>
+        <div class="gen-tip" id="program-lookup-status" hidden></div>
         <div class="field-error" id="workout-error">A workout program is required</div>
 
         <div class="field-label-row">
@@ -5695,6 +5726,94 @@
           }
         });
       }
+      // ── Program lookup (§11 Wave 5, tier 2) ────────────────────────────────
+      // Fetches the canonical builtin from Liftosaur's public reference tier
+      // rather than trusting the model's memory of "Stronglifts 5x5". This is a
+      // generation-time network call — the same sanctioned D92 exception the
+      // LLM call itself rides. The renderer still never touches the network.
+      //
+      // The failure path is the point. D92's motivating case is a restricted or
+      // offline network, so lookup failing is EXPECTED, not exceptional, and it
+      // says so in plain language instead of leaving an empty dropdown to be
+      // read as "there are no programs".
+      var programLookupBtn = document.getElementById('program-lookup-btn');
+      var programLookupPanel = document.getElementById('program-lookup');
+      var programLookupSelect = document.getElementById('program-lookup-select');
+      var programLookupUse = document.getElementById('program-lookup-use');
+      var programLookupStatus = document.getElementById('program-lookup-status');
+
+      function setProgramLookupStatus(message) {
+        if (!programLookupStatus) return;
+        programLookupStatus.textContent = message || '';
+        programLookupStatus.hidden = !message;
+      }
+
+      // Wire-format parsing lives in generator/modules/liftosaur.js, beside the
+      // fetch that produces it — the catalogue arrives as newline-delimited
+      // `id: Name` text rather than JSON, and that fact belongs with the
+      // transport, not duplicated here where nothing tests it.
+      function extractProgramList(payload) {
+        return typeof window.liftosaurParseProgramList === 'function'
+          ? window.liftosaurParseProgramList(payload)
+          : [];
+      }
+
+      function extractProgramScript(payload) {
+        return typeof window.liftosaurExtractProgramScript === 'function'
+          ? window.liftosaurExtractProgramScript(payload)
+          : '';
+      }
+
+      if (programLookupBtn) {
+        programLookupBtn.addEventListener('click', function () {
+          if (typeof window.liftosaurListBuiltinPrograms !== 'function') {
+            setProgramLookupStatus(window.LIFTOSAUR_LOOKUP_UNAVAILABLE ||
+              'Program lookup unavailable on this network — your pasted text will be interpreted as written.');
+            return;
+          }
+          setProgramLookupStatus('Looking up official programs…');
+          window.liftosaurListBuiltinPrograms().then(function (payload) {
+            var programs = extractProgramList(payload);
+            if (!programs.length) {
+              setProgramLookupStatus(window.LIFTOSAUR_LOOKUP_UNAVAILABLE);
+              return;
+            }
+            programLookupSelect.textContent = '';
+            for (var i = 0; i < programs.length; i++) {
+              var option = document.createElement('option');
+              option.value = programs[i].id;
+              // textContent, not innerHTML: these names come off the wire.
+              option.textContent = programs[i].name;
+              programLookupSelect.appendChild(option);
+            }
+            programLookupPanel.hidden = false;
+            setProgramLookupStatus('');
+          }).catch(function (error) {
+            setProgramLookupStatus((error && error.message) || window.LIFTOSAUR_LOOKUP_UNAVAILABLE);
+          });
+        });
+      }
+
+      if (programLookupUse) {
+        programLookupUse.addEventListener('click', function () {
+          var id = programLookupSelect ? programLookupSelect.value : '';
+          if (!id || typeof window.liftosaurGetBuiltinProgram !== 'function') return;
+          setProgramLookupStatus('Fetching the program…');
+          window.liftosaurGetBuiltinProgram(id).then(function (payload) {
+            var script = extractProgramScript(payload);
+            if (!script) {
+              setProgramLookupStatus(window.LIFTOSAUR_LOOKUP_UNAVAILABLE);
+              return;
+            }
+            workoutEl.value = script;
+            programLookupPanel.hidden = true;
+            setProgramLookupStatus('Loaded the official program. Edit it freely before you build.');
+          }).catch(function (error) {
+            setProgramLookupStatus((error && error.message) || window.LIFTOSAUR_LOOKUP_UNAVAILABLE);
+          });
+        });
+      }
+
       if (manualModeBtn) {
         manualModeBtn.addEventListener('click', function () {
           setGenerationMode('manual');

@@ -431,6 +431,18 @@ const RETURN_PAD_TOP = 4;
 const RETURN_BORDER = 1.5;
 const RETURN_LABEL_GAP = 3;
 const RETURN_BLANK_PX = 15;
+// `.progression-target`, §11 Wave 5. Same 5.9pt line box as its three
+// neighbours, so it reads LINE_PX and the same 78-char wrap term rather than
+// restating either. It carries TWO text rows — the rule and the pencil prompt —
+// above one blank, which is why it has its own row gap constant and not just a
+// second RETURN_* reuse: the two rows are separately authored and separately
+// wrapped, and charging them as one row is how a two-line rule clips.
+const PROGRESSION_CHARS = 78;
+const PROGRESSION_PAD_TOP = 4;
+const PROGRESSION_BORDER = 1.5;
+const PROGRESSION_ROW_GAP = 2;
+const PROGRESSION_LABEL_GAP = 3;
+const PROGRESSION_BLANK_PX = 15;
 
 /**
  * SINGLE-CARD PAGE GEOMETRY (`data-card-count="1"`).
@@ -722,6 +734,34 @@ export function estimateReturnBeatHeight(session, density) {
   return monotoneTail((d) => rawReturnBeatHeight(beat, d), density);
 }
 
+/** `.progression-target` height, or 0 when the session carries no target. */
+function rawProgressionTargetHeight(progressionTarget, _density) {
+  const rule = String((progressionTarget && progressionTarget.rule) || '').trim();
+  const label = String((progressionTarget && progressionTarget.targetLabel) || '').trim();
+  if (!rule || !label) return 0;
+
+  return PROGRESSION_PAD_TOP + PROGRESSION_BORDER
+    + countWrappedLines(rule, PROGRESSION_CHARS) * LINE_PX
+    + PROGRESSION_ROW_GAP
+    + countWrappedLines(label, PROGRESSION_CHARS) * LINE_PX
+    + PROGRESSION_LABEL_GAP
+    + PROGRESSION_BLANK_PX;
+}
+
+/**
+ * Height of the card's progression write-in at a density.
+ *
+ * @param {object} session
+ * @param {number} density
+ * @returns {number} px, 0 when the session has no progressionTarget
+ */
+export function estimateProgressionTargetHeight(session, density) {
+  const target = session && session.progressionTarget;
+  if (!target) return 0;
+
+  return monotoneTail((d) => rawProgressionTargetHeight(target, d), density);
+}
+
 // ---------------------------------------------------------------------------
 // Card composition
 // ---------------------------------------------------------------------------
@@ -752,6 +792,12 @@ function cardComposition(session) {
   const beat = (session || {}).returnBeat;
   const hasEcho = !!(beat && String(beat.openingEcho || '').trim());
   const hasReturnClose = !!(beat && String(beat.closingLine || '').trim());
+  // Mirrors buildProgressionTargetModel(): both halves are required, so a
+  // target missing either one renders nothing and pays no gap.
+  const target = (session || {}).progressionTarget;
+  const hasProgressionTarget = !!(target
+    && String(target.rule || '').trim()
+    && String(target.targetLabel || '').trim());
   // `showNotes` mirrors buildWorkoutCardModel: explicit boolean wins, else the
   // notes box appears only when there are exercises to write against.
   const showNotes = typeof (session || {}).showNotes === 'boolean'
@@ -767,12 +813,14 @@ function cardComposition(session) {
     hasMicroLines,
     hasEcho,
     hasReturnClose,
+    hasProgressionTarget,
     showNotes,
     // header + [echo] + [prompt] + meta + body
     cardChildren: 1 + (hasEcho ? 1 : 0) + (hasPrompt ? 1 : 0) + 1 + 1,
-    // [table] + [strip] + [micro-lines] + [choice] + [notes] + [return beat]
+    // [table] + [strip] + [micro-lines] + [choice] + [notes] + [progression] + [return beat]
     bodyChildren: (hasTable ? 1 : 0) + (hasStrip ? 1 : 0) + (hasMicroLines ? 1 : 0)
-      + (hasChoice ? 1 : 0) + (showNotes ? 1 : 0) + (hasReturnClose ? 1 : 0),
+      + (hasChoice ? 1 : 0) + (showNotes ? 1 : 0) + (hasProgressionTarget ? 1 : 0)
+      + (hasReturnClose ? 1 : 0),
   };
 }
 
@@ -840,6 +888,7 @@ function rawSessionCardHeight(session, density) {
     + rawMicroLinesHeight(parts.hasMicroLines ? session.microLines : null, density)
     + (parts.hasChoice ? rawBinaryChoiceHeight(session.binaryChoice, density) : 0)
     + (parts.showNotes ? notesBoxHeight(density) : 0)
+    + rawProgressionTargetHeight(parts.hasProgressionTarget ? session.progressionTarget : null, density)
     + rawReturnBeatHeight(parts.hasReturnClose ? session.returnBeat : null, density);
 }
 
@@ -894,5 +943,6 @@ export function estimateSoloSessionCardHeight(session) {
     + rawMicroLinesHeight(parts.hasMicroLines ? session.microLines : null, 0)
     + (parts.hasChoice ? rawBinaryChoiceHeight(session.binaryChoice, 0) : 0)
     + (parts.showNotes ? SOLO_CARD.notes : 0)
+    + rawProgressionTargetHeight(parts.hasProgressionTarget ? session.progressionTarget : null, 0)
     + rawReturnBeatHeight(parts.hasReturnClose ? session.returnBeat : null, 0);
 }

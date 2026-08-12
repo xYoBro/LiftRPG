@@ -139,6 +139,26 @@ function buildReturnBeatModel(returnBeat) {
   return { closingLine, openingEcho };
 }
 
+/**
+ * The progression target (schema 1.5.0 `session.progressionTarget`): the
+ * program's own advancement rule, plus the write-in that commits to it.
+ *
+ * Both halves are required at the schema level, so unlike the return beat this
+ * model is all-or-nothing — a card either prints the pair or prints neither.
+ * Trimming still guards the null case, because a field that survives schema
+ * validation as two whitespace strings would otherwise render an empty rule
+ * over a blank nobody can answer.
+ */
+function buildProgressionTargetModel(progressionTarget) {
+  if (!progressionTarget || typeof progressionTarget !== 'object') return null;
+
+  const rule = String(progressionTarget.rule || '').trim();
+  const targetLabel = String(progressionTarget.targetLabel || '').trim();
+  if (!rule || !targetLabel) return null;
+
+  return { rule, targetLabel };
+}
+
 export function buildWorkoutCardModel(session, layoutPlan) {
   const exercises = session.exercises || [];
   const showNotes = typeof session.showNotes === 'boolean' ? session.showNotes : exercises.length > 0;
@@ -157,6 +177,7 @@ export function buildWorkoutCardModel(session, layoutPlan) {
     markStrip: buildMarkStripModel(session.markStrip),
     microLines: buildMicroLineModels(session.microLines),
     returnBeat: buildReturnBeatModel(session.returnBeat),
+    progressionTarget: buildProgressionTargetModel(session.progressionTarget),
     showNotes
   };
 }

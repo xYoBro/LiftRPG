@@ -375,6 +375,7 @@
     '- `isDeload` (boolean, optional)',
     '- `sessions[].microLines` (array, optional, max 2): { condition, cue, citeRef? }. See Point Of Use.',
     '- `sessions[].returnBeat` (object, optional): { closingLine, openingEcho? }. See The Return Loop.',
+    '- `sessions[].progressionTarget` (object, optional): { rule, targetLabel }. Both required together. See The Progression Target — omit the field when the program states no progression.',
     '- `doorChoice` (object, optional): { label?, optionA: { label, lean }, optionB: { label, lean } }. See Door Bias.'
   ];
 
@@ -834,6 +835,60 @@
       }
     },
     required: ['processParticulars']
+  };
+
+  // ── Canonical workout (§11 Wave 5) ───────────────────────────────────────
+  // The canonicalization stage's output: a pasted Liftoscript program read into
+  // the structure the pipeline already consumes. This stage writes NO prose and
+  // invents NO training — it is a transcription with a grammar behind it.
+  //
+  // The field names are load-bearing beyond this prompt: they are the shape
+  // `normalizeCanonicalWorkout()` (generator/modules/liftosaur.js) maps into
+  // the normalized-workout RICH branch, which in turn is what the topology
+  // digest reads. Renaming one here without renaming it there returns the rich
+  // branch to being decorative.
+  window.SCHEMA_CANONICAL_WORKOUT = {
+    type: 'object',
+    properties: {
+      weeks: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            weekNumber: { type: 'integer' },
+            isDeload: { type: 'boolean' },
+            sessions: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  dayLabel: { type: 'string' },
+                  notes: { type: 'string' },
+                  exercises: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        name: { type: 'string' },
+                        sets: { type: 'integer' },
+                        repsPerSet: { type: 'string' },
+                        weightField: { type: 'string' },
+                        notes: { type: 'string' }
+                      },
+                      required: ['name', 'sets', 'repsPerSet']
+                    }
+                  }
+                },
+                required: ['dayLabel', 'exercises']
+              }
+            }
+          },
+          required: ['weekNumber', 'sessions']
+        }
+      },
+      progressionSummary: { type: 'string' }
+    },
+    required: ['weeks']
   };
 
   window.SCHEMA_SPEC = [].concat(
@@ -1881,6 +1936,105 @@
     'Return ONLY the JSON object. No commentary, no markdown fences.'
   ];
 
+  // ── Liftoscript grammar (§11 Wave 5) ─────────────────────────────────────
+  // The canonicalization stage's whole reference. It is a SYNTAX summary and
+  // nothing else: no world flavor, no tone, no example that could seed a genre
+  // (D47). Exercise names in the examples are deliberately the most ordinary
+  // ones in the language.
+  //
+  // Facts verified against liftosaur.com/docs/liftoscript (2026-08-11), not
+  // recalled. Where the model would otherwise guess, the instruction is to
+  // quote instead — see the custom() rule, which is the single most important
+  // line in this section.
+  //
+  // ROUTING (the provisional split, §11 Wave 5 ruling 7): this rides the staged
+  // pipeline only, via STAGE_SCHEMA_MAP. The single-prompt path is hard against
+  // its 108,000-char ceiling and gets nothing new this wave — same reason
+  // INST_POINT_OF_USE was routed to stages in Wave 4a. One line reverses it if
+  // the ceiling moves.
+  window.INST_LIFTOSCRIPT_GRAMMAR = [
+    '## Liftoscript Syntax',
+    'The program below is written in Liftoscript, Liftosaur\'s program notation.',
+    'Read it as notation, not prose. Transcribe what it says; add nothing.',
+    '',
+    '### Structure',
+    '- `# Week 1` opens a week. `## Day 1` opens a day (one session) inside it.',
+    '- Lines under a day are exercises, one per line.',
+    '',
+    '### Exercise lines',
+    '- Shape: `Name[, Equipment] / SetsxReps [modifiers]`.',
+    '  `Bench Press / 3x8` · `Bench Press, Dumbbell / 3x5` · `Bench Press / 3x8-12`.',
+    '- Modifiers follow the sets-and-reps, space-separated: weight (`100lb`),',
+    '  percentage (`60%`), RPE (`@8`), rest timer (`90s`). Any subset, any order.',
+    '- A comma separates SET GROUPS on one line: `Bench Press / 1x12 60%, 5x5 60%`',
+    '  is one exercise with two groups, not two exercises.',
+    '- A `+` after the reps means AMRAP — the last set goes to failure',
+    '  (`1x5+`). A `+` after an RPE means log the RPE.',
+    '- `Squat / ...Bench Press` reuses another exercise\'s definition;',
+    '  `...Bench Press[2:1]` reuses it as written in week 2, day 1.',
+    '- A bracket on the NAME is a week range: `Bench Press[1-5] / 3x8` means',
+    '  the line applies in weeks 1 through 5.',
+    '- `//` starts a note meant for the lifter. `///` starts one that is not.',
+    '',
+    '### Progression',
+    '- `progress: lp(...)` linear progression — add weight on success, cut after',
+    '  repeated failure. `progress: dp(...)` double progression — climb the rep',
+    '  range first, then add weight. `progress: sum(...)` — total reps across',
+    '  sets crosses a threshold, then add weight.',
+    '- `progress: custom(...) {~ ... ~}` is a SCRIPT. Do NOT interpret it, do NOT',
+    '  summarize what you think it does, and do NOT invent a rule from it. Quote',
+    '  the line verbatim into `progressionSummary` and move on. A confidently',
+    '  wrong progression is worse than an unexplained one: the lifter cannot',
+    '  tell your guess from their plan.',
+    '',
+    '### Your job',
+    '- Emit one entry per week and one session per day, in order.',
+    '- Copy exercise names EXACTLY as written. Never rename, translate, expand an',
+    '  abbreviation, or add an exercise the program does not contain.',
+    '- Resolve `...` reuse and week ranges into the concrete week they land in,',
+    '  so every week lists its own sessions in full.',
+    '- Put weight, percentage or RPE into `weightField` as written.',
+    '- Mark a week `isDeload` only when the program says so.',
+    '- `progressionSummary`: one plain sentence naming the progression rule the',
+    '  program states, or the quoted `custom()` line, or an empty string if the',
+    '  program states none. Never infer one from the numbers.'
+  ];
+
+  // ── Progression target (§11 Wave 5) ──────────────────────────────────────
+  // The workout-side twin of tomorrow-cut-tonight. Field shape lives in
+  // SCHEMA_SINGLE_WEEK; this section is doctrine only.
+  //
+  // The whole point is the OMISSION rule. Every other optional field on the
+  // card gets better when the model reaches for it; this one gets worse,
+  // because a progression the model invented is indistinguishable in print from
+  // the one the lifter's program actually prescribes — and they will follow it.
+  // Staged-path only, same provisional split as the grammar above.
+  window.INST_PROGRESSION_TARGET = [
+    '## The Progression Target (sessions[].progressionTarget)',
+    'A printed program that never says when to add weight has handed its own',
+    'advancement back to memory. This prints the rule where the work happens,',
+    'with a blank for the number the lifter commits to before closing the book.',
+    '',
+    '- `rule`: the program\'s OWN progression, restated in the world\'s voice.',
+    '  Source it from the program itself — the `progress:` line when the program',
+    '  carries one, the stated progression text otherwise. It is a rule, not',
+    '  encouragement: it says what happens and when.',
+    '- `targetLabel`: the prompt over the write-in. It asks for ONE thing the',
+    '  lifter can write in five seconds with the set still in their hands —',
+    '  next session\'s number. Not a reflection, not a feeling, not a sentence.',
+    '',
+    '**OMIT THE FIELD ENTIRELY when the program states no progression.** Do not',
+    'derive one from the set and rep numbers, do not carry one over from a',
+    'different exercise, and do not supply a generic one. A guessed progression',
+    'is worse than none: it is printed in the same ink as the real prescription',
+    'and the lifter has no way to tell them apart. Silence is honest here.',
+    '',
+    '- Keep it to the sessions where the progression actually applies. A',
+    '  deload week advances nothing, and saying so on every card is noise.',
+    '- Both fields are required together. A rule with no blank is prose nobody',
+    '  acts on; a blank with no rule is a question nobody asked.'
+  ];
+
   window.INST_ENDING_STANDARD = [
     '## Ending Standard',
     '- The ending is a found document first, not a summary.',
@@ -2095,12 +2249,17 @@
     // brief-fidelity law instead, because a particular that drifts from the
     // brief mis-funds every stage downstream of it.
     'knowing':        { schemas: ['KNOWING'],                                   instructions: ['KNOWING', 'BRIEF_FIDELITY'] },
+    // Canonicalize: pasted Liftoscript read into structure (§11 Wave 5). It
+    // carries the grammar and NOTHING else — no voice, no world, no brief. The
+    // stage transcribes a program; a creative instruction here would license it
+    // to improve the training, which is the one thing it must never do.
+    'canonicalize':   { schemas: [],                                            instructions: ['LIFTOSCRIPT_GRAMMAR'] },
     // Week plan: lean
     'week-plan':      { schemas: ['WEEK_PLAN'],                                 instructions: [] },
     // Week flesh: full game design + story
     // Prose stages (week-final, fragment, ending) carry VOICE_DISCIPLINE: they
     // write storyPrompts, interludes, oracle text, documents, and endings.
-    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'MARK_SURFACE', 'PERVASIVE_PLAY', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'CONVERGENCE_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] },
+    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'MARK_SURFACE', 'PERVASIVE_PLAY', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'CONVERGENCE_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'PROGRESSION_TARGET', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] },
     // Fragment: story quality first
     'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'VOICE_DISCIPLINE', 'ANTI_GENERIC', 'CHARACTER_WEB', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
     // Ending: story quality first (endings are where voice failure concentrates)

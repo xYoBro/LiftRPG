@@ -163,6 +163,13 @@ import {
 // in generator.js is the single consumer, and it reads them off window.
 import './modules/workout-topology.js';
 
+// The Liftosaur seam (§11 Wave 5). The pure half is used here; the network half
+// self-registers on window for index.html's program-lookup affordance.
+import {
+  looksLikeLiftoscript,
+  normalizeCanonicalWorkout
+} from './modules/liftosaur.js';
+
 
 // ── Structured Output JSON Schemas ──────────────────────────────────────────
 // JSON Schema objects for Gemini native structured output (responseJsonSchema).
@@ -1753,6 +1760,14 @@ async function runApiPipeline(options) {
   var brief = options.brief || '';
   var weekCount = options.weekCount || (typeof window.parseWeekCount === 'function' ? window.parseWeekCount(workout) : 6);
   var totalSessions = options.totalSessions || 0;
+  // RUN IDENTITY. What the user gave, before any formatting or canonicalization
+  // this pipeline applies to it — see runCanonicalizeStage(). Defaulting to
+  // `workout` keeps every checkpoint written before Wave 5 resumable: on the
+  // paste path the two values are the same string, so the fingerprint does not
+  // move for any run that existed before canonicalization did.
+  var rawWorkout = options.rawWorkout !== undefined && options.rawWorkout !== null
+    ? options.rawWorkout
+    : workout;
 
   // Initial estimation: 4 setup (codex, campaign, shell, knowing) + weekCount
   // (single-stage per week) + endings
@@ -1771,7 +1786,7 @@ async function runApiPipeline(options) {
   // both wrote the tag 'structured' and silently resumed into each other.
   var pipelineLabel = options.pipelineLabel || 'structured';
   var resumeState = resumeCheckpointForRun({
-    workout: workout,
+    workout: rawWorkout,
     brief: brief,
     model: settings.model,
     provider: detectProviderId(settings),
@@ -1829,6 +1844,39 @@ async function runApiPipeline(options) {
       stageName: message
     });
   }
+
+  // ── STAGE 0: canonicalize the program (§11 Wave 5) ───────────────────
+  // Before anything reads the workout, because every later stage receives it
+  // through `workout` and the topology digest reads the normalized object.
+  var canonState = await runCanonicalizeStage(settings, buildCanonicalizeConfig({
+    rawWorkout: rawWorkout,
+    checkpoint: checkpoint,
+    onProgress: onProgress,
+    rateLimiter: rateLimiter,
+    budgetEnforce: useGeminiBudget,
+    trialMode: !!(options.trialMode || settings.trialMode),
+    bumpStage: function () { return ++stageNum; },
+    bumpTotal: function () { totalStages++; },
+    getTotalStages: function () { return totalStages; }
+  }));
+  checkpoint = canonState.checkpoint;
+  if (canonState.applied) {
+    workout = formatNormalizedForPrompt(canonState.nw);
+    if (canonState.nw.weekCount) {
+      totalStages += (canonState.nw.weekCount - weekCount);
+      weekCount = canonState.nw.weekCount;
+    }
+    // The shell validator checks its declared session count against this. On
+    // the paste path it has always been 0 (the raw branch counts no sessions),
+    // so the check was inert; canonicalization is the first thing that can
+    // give it a real number to hold the shell to.
+    var canonSessions = 0;
+    (canonState.nw.weeks || []).forEach(function (w) {
+      canonSessions += (w.sessions ? w.sessions.length : 0);
+    });
+    if (canonSessions > 0) totalSessions = canonSessions;
+  }
+  var workoutLifecycle = describeWorkoutLifecycle(canonState);
 
   // ── STAGES 1, 2, 3 (Shell Setup) ──────────────────────────
   // Each stage checks for a cached checkpoint before calling the API.
@@ -2310,6 +2358,7 @@ async function runApiPipeline(options) {
   enforceIdentityContract(booklet, identityContract);
   truthBoardStateMode(booklet, booklet._assemblyDiagnostics || []);
   recordSeedOnBooklet(booklet, divergenceSeed);
+  recordWorkoutLifecycle(booklet, workoutLifecycle);
 
   var validationResult = validateAssembledBooklet(booklet);
   if (validationResult.warnings && validationResult.warnings.length > 0) {
@@ -2501,6 +2550,165 @@ function formatNormalizedForPrompt(nw) {
 }
 
 
+// ── Canonicalization (§11 Wave 5) ───────────────────────────────────────────
+//
+// LIFECYCLE, and why it is shaped like the knowing stage rather than like a
+// utility call. Canonicalization is a paid API call over the user's program. It
+// therefore runs ONCE per run, at the orchestrator level, checkpointed on its
+// own key — a resumed run reuses the canonical form and never re-buys it.
+//
+// RUN IDENTITY IS THE RAW INPUT, NOT THIS OUTPUT. The checkpoint fingerprint
+// hashes what the USER GAVE. That is not a stylistic preference: this stage's
+// output changes whenever the grammar summary, the stage prompt or the model
+// changes, and if identity were computed from it, every such change would
+// orphan every checkpoint in the field and re-buy books that were already paid
+// for. The same reasoning already excludes model and provider from the
+// fingerprint (checkpoint.js, Wave A.1). Pipelines pass `rawWorkout` for
+// identity and the canonical text for prompts, and those two are deliberately
+// different values from here on.
+//
+// TIER 3 IS THE DEFAULT AND COSTS NOTHING. Freeform text never reaches this
+// stage: detection is a routing decision made before any call, so the only runs
+// that pay for canonicalization are the ones with Liftoscript to canonicalize.
+async function runCanonicalizeStage(settings, config) {
+  var rawWorkout = config.rawWorkout;
+  var rawText = typeof rawWorkout === 'string' ? rawWorkout : '';
+  var checkpoint = config.checkpoint;
+
+  // Already rich (the wizard path, or a re-entry) — nothing to canonicalize.
+  if (rawWorkout && typeof rawWorkout === 'object' && rawWorkout.source) {
+    return { applied: false, reason: 'already-structured', checkpoint: checkpoint };
+  }
+  if (!looksLikeLiftoscript(rawText)) {
+    return { applied: false, reason: 'not-liftoscript', checkpoint: checkpoint };
+  }
+
+  var cached = checkpoint && checkpoint.stages ? checkpoint.stages.workoutCanonical : null;
+  if (cached) {
+    var restored = normalizeCanonicalWorkout(rawText, cached);
+    if (restored) {
+      config.emitRestored();
+      return { applied: true, reason: 'checkpoint', nw: restored, checkpoint: checkpoint };
+    }
+    // A cached payload that no longer shapes is not a reason to re-buy the
+    // stage silently — fall through and say so through the normal stage log.
+  }
+
+  var output;
+  try {
+    output = await runJsonStage(settings, {
+      stageKey: 'canonicalize',
+      stageName: 'Reading the program',
+      stageIndex: config.stageIndex(),
+      completeMessage: 'Program read.',
+      onProgress: config.onProgress,
+      getTotalStages: config.getTotalStages,
+      maxAttempts: config.trialMode ? 1 : 2,
+      rateLimiter: config.rateLimiter,
+      budgetEnforce: config.budgetEnforce,
+      buildPrompt: function (retryState) {
+        return window.generateCanonicalizePrompt(rawText, { retryMode: retryState.attempt > 0 });
+      }
+    });
+  } catch (error) {
+    // NEVER FATAL. The program is already usable as the user typed it — that is
+    // what tier 3 has always done. Losing the book because a transcription
+    // convenience failed would be the tail wagging the dog.
+    config.emitDegraded((error && error.message) || 'the program could not be read as Liftoscript');
+    return { applied: false, reason: 'stage-failed', checkpoint: checkpoint };
+  }
+
+  var nw = normalizeCanonicalWorkout(rawText, output);
+  if (!nw) {
+    config.emitDegraded('the program came back empty when read as Liftoscript');
+    return { applied: false, reason: 'empty-result', checkpoint: checkpoint };
+  }
+
+  checkpoint = saveCheckpoint('workoutCanonical', output, checkpoint);
+  return { applied: true, reason: 'generated', nw: nw, checkpoint: checkpoint };
+}
+
+/**
+ * Adapter: pipeline-agnostic options → the config runCanonicalizeStage wants.
+ *
+ * Both pipelines count stages with their own local `stageNum` / `totalStages`
+ * variables and their own progress emitters, so the stage helper takes closures
+ * rather than reaching for either. The stage counter is bumped ONLY on the
+ * paths that actually occupy a stage slot — a run that never canonicalizes must
+ * not show a phantom step, which is the honest-progress rule the checkpoint
+ * restore events already follow.
+ */
+function buildCanonicalizeConfig(options) {
+  var emitted = false;
+  function bumpOnce() {
+    if (emitted) return;
+    emitted = true;
+    options.bumpTotal();
+  }
+  return {
+    rawWorkout: options.rawWorkout,
+    checkpoint: options.checkpoint,
+    onProgress: options.onProgress,
+    rateLimiter: options.rateLimiter,
+    budgetEnforce: options.budgetEnforce,
+    trialMode: options.trialMode,
+    getTotalStages: options.getTotalStages,
+    stageIndex: function () {
+      bumpOnce();
+      return options.bumpStage();
+    },
+    emitRestored: function () {
+      bumpOnce();
+      var index = options.bumpStage();
+      emitPipelineEvent(options.onProgress, index, options.getTotalStages(),
+        'Program reading restored from checkpoint.', {
+          phase: 'complete',
+          stageKey: 'canonicalize',
+          stageName: 'Reading the program',
+          completionSource: 'checkpoint'
+        });
+    },
+    // DEGRADATION HONESTY (D96/D99 family). The run continues on the user's text
+    // as written — but it says so. A silent fallback here would leave the
+    // operator believing their Liftoscript was parsed when it was read as prose.
+    emitDegraded: function (detail) {
+      emitPipelineEvent(options.onProgress, options.getTotalStages(), options.getTotalStages(),
+        'Could not read the program as Liftoscript — it will be interpreted as written. (' +
+        detail + ')', {
+          phase: 'start',
+          stageKey: 'canonicalize',
+          stageName: 'Reading the program',
+          noticeLevel: 'warn'
+        });
+    }
+  };
+}
+
+/**
+ * The audit line a canonicalized run records on the assembled booklet.
+ *
+ * `_x` is the declared extension namespace, and this is where the bench (and a
+ * reader) answers "was this program transcribed, and from what?" — the lifecycle
+ * has to be legible after the fact or the once-per-run claim is unfalsifiable.
+ */
+function recordWorkoutLifecycle(booklet, lifecycle) {
+  if (!booklet || !lifecycle) return;
+  if (!booklet._x || typeof booklet._x !== 'object') booklet._x = {};
+  booklet._x.workoutInput = lifecycle;
+}
+
+function describeWorkoutLifecycle(state) {
+  return {
+    tier: state.applied ? 'liftoscript' : 'freeform',
+    canonicalized: !!state.applied,
+    source: state.reason,
+    weekCount: state.nw ? state.nw.weekCount : null,
+    sessionsPerWeek: state.nw && state.nw.summary ? state.nw.summary.sessionsPerWeek : null,
+    progressionSummary: state.nw && state.nw.summary ? state.nw.summary.progression : ''
+  };
+}
+
+
 // ── Runtime pipeline entrypoints ─────────────────────────────────────────
 
 async function generateMultiStage(settings, workout, brief, onProgress) {
@@ -2511,6 +2719,7 @@ async function generateMultiStage(settings, workout, brief, onProgress) {
   return runApiPipeline({
     settings: settings,
     workout: workout,
+    rawWorkout: workout,
     brief: brief,
     pipelineLabel: 'multi-stage',
     weekCount: nw.weekCount,
@@ -2537,6 +2746,7 @@ async function generateStructured(settings, workout, brief, onProgress) {
   return runApiPipeline({
     settings: resolvedSettings,
     workout: workoutText,
+    rawWorkout: workout,
     brief: brief,
     pipelineLabel: 'structured',
     onProgress: onProgress,
@@ -2614,10 +2824,17 @@ async function runSkeletonFleshPipeline(options) {
   // warnings reach the operator through the run log.
   wireCheckpointNotices(onProgress, function () { return stageNum; }, function () { return totalStages; });
 
+  // RUN IDENTITY — see runCanonicalizeStage(). Defaults to `workout` so every
+  // pre-Wave-5 checkpoint keeps resuming: on the paste path the two are the
+  // same string.
+  var rawWorkout = options.rawWorkout !== undefined && options.rawWorkout !== null
+    ? options.rawWorkout
+    : workout;
+
   var sfResumeState = resumeCheckpointForRun({
     // Stored in full: a truncated copy corrupts both the fingerprint and the
     // workout/brief the UI restores from an uploaded checkpoint file.
-    workout: workout,
+    workout: rawWorkout,
     brief: brief || '',
     model: settings.model || '',
     provider: detectProviderId ? detectProviderId(settings) : '',
@@ -2642,6 +2859,29 @@ async function runSkeletonFleshPipeline(options) {
   function cached(key) {
     return isResume && checkpoint && checkpoint.stages ? checkpoint.stages[key] : null;
   }
+
+  // ── STAGE 0: canonicalize the program (§11 Wave 5) ──
+  var sfCanonState = await runCanonicalizeStage(settings, buildCanonicalizeConfig({
+    rawWorkout: rawWorkout,
+    checkpoint: checkpoint,
+    onProgress: onProgress,
+    rateLimiter: rateLimiter,
+    budgetEnforce: useGeminiBudget,
+    trialMode: trialMode,
+    bumpStage: function () { return ++stageNum; },
+    bumpTotal: function () { totalStages++; },
+    getTotalStages: function () { return totalStages; }
+  }));
+  checkpoint = sfCanonState.checkpoint;
+  if (sfCanonState.applied) {
+    nw = sfCanonState.nw;
+    workout = formatNormalizedForPrompt(nw);
+    if (nw.weekCount) {
+      totalStages += (nw.weekCount - weekCount);
+      weekCount = nw.weekCount;
+    }
+  }
+  var sfWorkoutLifecycle = describeWorkoutLifecycle(sfCanonState);
 
   // ── Telemetry + continuity accumulators ──
   var sfTelemetry = [];
@@ -3112,10 +3352,15 @@ async function runSkeletonFleshPipeline(options) {
   // ASSEMBLY + QUALITY GATE
   // ════════════════════════════════════════════════════════════════════
 
+  // `nw`, not `options.nw`: canonicalization reassigns the local, and assembly
+  // is the consumer that most needs the canonical form. Reading the option here
+  // would hand assembly the empty raw-branch object while every prompt upstream
+  // saw the structured one.
   var booklet = assembleSkeletonFleshBooklet(
-    skeleton, rulesOutput, weekOutputs, allFragments, allEndings, options.nw
+    skeleton, rulesOutput, weekOutputs, allFragments, allEndings, nw
   );
   recordSeedOnBooklet(booklet, divergenceSeed);
+  recordWorkoutLifecycle(booklet, sfWorkoutLifecycle);
 
   var identityContract = typeof buildIdentityContract === 'function'
     ? buildIdentityContract(skeleton, null)
@@ -3232,6 +3477,7 @@ async function generateSkeletonFlesh(settings, workout, brief, onProgress) {
   return runSkeletonFleshPipeline({
     settings:      resolvedSettings,
     workout:       workoutText,
+    rawWorkout:    workout,
     brief:         brief,
     onProgress:    onProgress,
     weekCount:     weekCount,

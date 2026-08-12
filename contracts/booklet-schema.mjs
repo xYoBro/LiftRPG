@@ -250,6 +250,36 @@ var returnBeat = {
   }
 };
 
+// ── progressionTarget (schema 1.5.0, §11 Wave 5 — the Liftosaur seam) ───────
+// The workout-side twin of tomorrow-cut-tonight. A printed program that never
+// tells the player when to add weight has outsourced its own advancement to
+// memory; this prints the advancement rule where the advancement happens.
+//
+//   rule        — the program's own progression, stated as a rule the world
+//                 would state it in. DERIVED, NEVER INVENTED: from the
+//                 program's `progress:` lines when it carries Liftoscript,
+//                 from its stated progression text otherwise. A program that
+//                 declares no progression gets no progressionTarget at all —
+//                 a guessed progression is worse than none, because the player
+//                 cannot tell the guess from the plan.
+//   targetLabel — the pencil prompt over the write-in: next session's number,
+//                 written tonight, while the set that earned it is still in
+//                 the hands.
+//
+// BOTH are required, unlike returnBeat's optional echo. The pairing IS the
+// mechanism: a rule with no write-in is prose the player reads once and
+// forgets, and a write-in with no rule is a blank asking a question nobody
+// stated. Either half alone is a weaker object than omitting the field.
+var progressionTarget = {
+  type: 'object',
+  required: ['rule', 'targetLabel'],
+  additionalProperties: false,
+  properties: {
+    rule: nonEmptyString,
+    targetLabel: nonEmptyString
+  }
+};
+
 // ── doorChoice (schema 1.5.0, §11 Wave 4a — salvage seed 3) ─────────────────
 // The weekly decision, with the bias POSTED. Two routes, identical work behind
 // either — agency lives on the reward side only, so the chance-isolation law is
@@ -648,6 +678,7 @@ export var BOOKLET_SCHEMA = {
         markStrip: markStrip,
         microLines: { type: 'array', items: microLine },
         returnBeat: returnBeat,
+        progressionTarget: progressionTarget,
         binaryChoice: {
           type: 'object',
           required: ['promptA', 'promptB'],
