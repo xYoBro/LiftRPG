@@ -191,7 +191,12 @@
       puzzleFamilies: ['symbol decoding', 'layered metapuzzle assembly', 'observational anomaly hunting', 'oracle-triggered rule mutation'],
       pressureClocks: ['Contamination', 'Witness', 'Seal Integrity'],
       currencySeeds: ['Vigil Hours', 'Lamp Oil', 'Silence Owed'],
-      scarcitySurfaces: ['stress-track', 'memory-slots', 'overlay-window'],
+      // usage-die replaced overlay-window here under D122(c) (the pencil-only
+      // law): scarcitySurfaces is a generation menu — it seeds the compiler
+      // context — so it may only name types in GENERATION_COMPANION_MENU. The
+      // profile's own currency seeds are depletion nouns (Lamp Oil, Vigil
+      // Hours), which is what a usage die tracks.
+      scarcitySurfaces: ['stress-track', 'memory-slots', 'usage-die'],
       interludePayloads: ['cipher', 'password-element', 'map'],
       documentTypes: ['anomaly', 'fieldNote', 'letter', 'transcript', 'correspondence'],
       themeHints: ['occult', 'fantasy', 'noir']

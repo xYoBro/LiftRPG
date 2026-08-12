@@ -2,7 +2,7 @@
 // Deterministic post-generation analysis: scores, warnings, weak-spot flags.
 // Does NOT modify the booklet. Stored on window.LiftRPGAPI.lastQualityReport after each call.
 
-import { VALID_MAP_TYPES, VALID_COMPANION_TYPES } from './constants.js';
+import { VALID_MAP_TYPES, VALID_COMPANION_TYPES, DEMOTED_COMPANION_TYPES } from './constants.js';
 import { normalizeId, normalizeThemeArchetype } from './assembly.js';
 import { validateAssembledBooklet } from './validation.js';
 import { buildMapEvolutionFingerprint, looksLikeFragmentRef } from './fingerprint.js';
@@ -12,6 +12,46 @@ export function extractWeekCompanionTypes(week) {
     .map(function (component) { return String((component || {}).type || '').trim(); })
     .filter(Boolean)
     .sort();
+}
+
+/**
+ * Demoted companion surfaces reaching a freshly generated booklet (D122(c)).
+ *
+ * The pencil-only law took `token-sheet` and `overlay-window` off every
+ * generation menu, and validate.mjs keeps them off. What no prompt edit can
+ * reach is a REPLAYED prompt: the paste path hands a human a block of text, and
+ * a prompt saved before the ruling still offers both types. The schema accepts
+ * them — that is the whole point of demoting rather than removing — so this
+ * must never block or score. It reports, once per occurrence, into
+ * `report.warnings`, which `buildQualityGate()` does not read.
+ *
+ * Deliberately NOT a weakSpot: weakSpot areas carry a blocking policy and feed
+ * findings counters that move the identity-variation score. A legacy-vocabulary
+ * notice is neither a quality defect nor a blocker.
+ */
+export function collectDemotedCompanionFindings(booklet) {
+  var findings = [];
+  if (!booklet || !Array.isArray(booklet.weeks)) return findings;
+
+  booklet.weeks.forEach(function (week, index) {
+    var label = 'Week ' + ((week && week.weekNumber) || index + 1);
+    var pools = [
+      { where: 'fieldOps', list: ((week || {}).fieldOps || {}).companionComponents },
+      { where: 'interlude payload', list: (((week || {}).interlude || {}).payload || {}).companionComponents }
+    ];
+    pools.forEach(function (pool) {
+      if (!Array.isArray(pool.list)) return;
+      pool.list.forEach(function (component) {
+        var type = String((component || {}).type || '').trim();
+        if (DEMOTED_COMPANION_TYPES.indexOf(type) === -1) return;
+        findings.push(label + ' ' + pool.where + ' uses companion type "' + type +
+          '" — demoted from the generation menus by the pencil-only law (D122c). ' +
+          'It still validates and renders; a fresh run producing one means a ' +
+          'pre-ruling prompt was replayed. Regenerate the prompt to get the current menu.');
+      });
+    });
+  });
+  return findings;
 }
 
 function findBossPasswordSpoiler(boss) {
@@ -241,6 +281,8 @@ export function generateQualityReport(booklet) {
   if (validatorWarnings.length > 0) {
     report.warnings = report.warnings.concat(validatorWarnings);
   }
+  // Legacy-vocabulary notice, never a score input (D122c) — see the helper.
+  report.warnings = report.warnings.concat(collectDemotedCompanionFindings(booklet));
   report.scores.schemaCompleteness = report.schemaErrors.length === 0
     ? { score: 1, label: validatorWarnings.length > 0 ? validatorWarnings.length + ' warnings' : 'clean' }
     : { score: Math.max(0, 1 - report.schemaErrors.length * 0.1), label: report.schemaErrors.length + ' errors' };

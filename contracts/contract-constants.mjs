@@ -119,6 +119,33 @@ export var VALID_COMPANION_TYPES = [
   'percentile-stat'
 ];
 
+// ── The pencil-only law: demotion, not removal (D122(c)) ────────────────────
+// The complete play kit is three objects — the book, a pencil, and two
+// ten-sided dice. Nothing a generated book prints may require cutting,
+// folding, gluing, aligning a separate sheet, or assembling a component.
+// `token-sheet` is a cuttable counter sheet and `overlay-window` is an
+// alignment surface laid over another page; both fail that test, so neither is
+// ever offered to a model again.
+//
+// DEMOTION IS NOT REMOVAL. VALID_COMPANION_TYPES above is the SCHEMA's
+// acceptance set and keeps both values forever: books generated before this
+// ruling carry them, and they must keep validating and rendering. The schema,
+// the renderer, COMPANION_COMPONENT_REGISTRY and the corpus are untouched by a
+// demotion — only the generation menus narrow.
+//
+// GENERATION_COMPANION_MENU is DERIVED, never hand-listed. A second
+// hand-written list is a second copy of an enum, and every hand-kept copy in
+// this repo has rotted. Add a type to VALID_COMPANION_TYPES and it is offered;
+// name it in DEMOTED_COMPANION_TYPES as well and it is accepted but unoffered.
+// `companionMenuParity()` in validate.mjs recomputes the derivation, holds the
+// prompt literals to the menu, and asserts DEMOTED ⊆ VALID — a demoted name
+// the schema does not accept is a dead entry, not a demotion.
+export var DEMOTED_COMPANION_TYPES = ['token-sheet', 'overlay-window'];
+
+export var GENERATION_COMPANION_MENU = VALID_COMPANION_TYPES.filter(
+  function (type) { return DEMOTED_COMPANION_TYPES.indexOf(type) === -1; }
+);
+
 // percentile-stat value bounds — a d100 roll-under target must leave room to
 // fail (1-99) and the printed track holds at most one value per week.
 export var PERCENTILE_STAT = {

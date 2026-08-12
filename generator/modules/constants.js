@@ -170,6 +170,8 @@ import {
   DEFAULT_COMPONENT_DIALECT,
   SPATIAL_GUARDRAILS,
   VALID_COMPANION_TYPES,
+  DEMOTED_COMPANION_TYPES,
+  GENERATION_COMPANION_MENU,
   VALID_CLOCK_TYPES,
   VALID_ARCHETYPES,
   THEME_ARCHETYPE_ALIASES,
@@ -202,7 +204,12 @@ export {
   VALID_COMPONENT_DIALECTS,
   DEFAULT_COMPONENT_DIALECT,
   SPATIAL_GUARDRAILS,
+  // VALID_* is the schema's acceptance set; DEMOTED/MENU is the generation
+  // axis. A menu narrowing (D122c) never touches acceptance — old books keep
+  // validating and rendering. The menu is derived in contract-constants.mjs.
   VALID_COMPANION_TYPES,
+  DEMOTED_COMPANION_TYPES,
+  GENERATION_COMPANION_MENU,
   VALID_CLOCK_TYPES,
   VALID_ARCHETYPES,
   THEME_ARCHETYPE_ALIASES,

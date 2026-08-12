@@ -198,12 +198,16 @@
     '### fieldOps.companionComponents',
     'Array of 0-3 companion components per week. Each is an object with `type` plus type-specific fields.',
     'Supported component `type` values only:',
+    // MENU SURFACE 1 of 2 (companionMenuParity() in validate.mjs): this shape
+    // list must equal GENERATION_COMPANION_MENU exactly. `token-sheet` and
+    // `overlay-window` were removed here by D122(c) — the pencil-only law. They
+    // remain in VALID_COMPANION_TYPES so old books validate and render; they
+    // are simply never offered again. Do NOT name them to the model, not even
+    // as a prohibition: a named type is a reachable type.
     '- `dashboard`: { type, label, body, rows?, cols?, subtitle?, footprint? }',
     '- `usage-die`: { type, label, body, usageDie? }',
     '- `return-box`: { type, label, body, reminder? }',
     '- `inventory-grid`: { type, label, body, rows?, cols?, tokens? }',
-    '- `token-sheet`: { type, label, body, tokens?, usageDie? }',
-    '- `overlay-window`: { type, label, body, windows?, playWindow? }',
     '- `stress-track`: { type, label, body, tracks?, conditions? }',
     '- `memory-slots`: { type, label, body, slots? }',
     '- `percentile-stat`: { type, label, body, statName, weeklyValues, advantageRule? }',
@@ -2290,7 +2294,9 @@
     '  The boss decodingKey at Week 6 converts accumulated values to letters. This is non-negotiable.',
     '- Oracle tables: d100 with exactly 10 bands (00-09, 10-19, ... 90-99). Each entry has a `text` field.',
     '  Entry types: "fragment" (includes fragmentRef) or "consequence" (includes paperAction).',
-    '- Companion component types (9): dashboard, return-box, inventory-grid, token-sheet, overlay-window, stress-track, memory-slots, usage-die, percentile-stat.',
+    // MENU SURFACE 2 of 2 (companionMenuParity() in validate.mjs): the count and
+    // the list must equal GENERATION_COMPANION_MENU. Narrowed from 9 by D122(c).
+    '- Companion component types (7): dashboard, return-box, inventory-grid, stress-track, memory-slots, usage-die, percentile-stat.',
     '  percentile-stat is the growing-stat d100: ONE per booklet, statName from the Core Noun Roster, weeklyValues (1-99) rising monotonically, rolled under on the oracle die.',
     '- Clock types (6): progress-clock, danger-clock, racing-clock, tug-of-war-clock, linked-clock, project-clock.',
     '- Mark surface: EVERY session prints a markStrip of 3-5 tick targets (labels only, 5 words max, no digits, one pencil mark each).',

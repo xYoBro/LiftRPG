@@ -1447,9 +1447,15 @@ export function normalizeInterludes(booklet, diag) {
       if (typeof interlude.payload === 'string') {
         var msg3 = weekLabel + ' interlude companion payload was string → wrapped in companionComponents';
         console.warn('[assembly] ' + msg3);
+        // `dashboard` is the neutral salvage container: it renders from body
+        // alone (blank ruled lines, no rows/cols/tokens required) and claims no
+        // mechanic the string payload never declared. It replaced
+        // `overlay-window` under D122(c) — a repair path that manufactures a
+        // demoted companion would put a cuttable surface into a book no prompt
+        // ever offered one to, which is the demotion leaking through the back.
         interlude.payload = {
           companionComponents: [{
-            type: 'overlay-window',
+            type: 'dashboard',
             title: interlude.payload,
             body: interlude.payload
           }]
