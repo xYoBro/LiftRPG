@@ -262,8 +262,9 @@
 
   // The draw is SIZED to the reason (Wave 2). An empty direction field gets
   // the full brief — there is nothing to bury, and the seed IS the choosing.
-  // A sparse brief gets the texture slice only: four texture rolls and a
-  // touchstone, no premise, no protagonist, no setting, no voice. The full
+  // A sparse brief gets the texture slice only: five texture rolls (object,
+  // dynamic, irony, motif, returning place) and a touchstone — no premise,
+  // no protagonist, no setting, no voice. The full
   // draw was ten times the mass of a five-word premise, and buildBriefChannel
   // could only ask the model to subordinate it; this makes the subordination
   // structural instead of rhetorical — the seed no longer CONTAINS a competing

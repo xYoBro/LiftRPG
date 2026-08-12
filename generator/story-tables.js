@@ -1,9 +1,18 @@
 /* story-tables.js — Random creative direction generator
- * Extracted from docs/reference/story_generator_tables.md
- * 17 tables, 1,220 entries, 20 rolls per brief
+ * Grown from docs/reference/story_generator_tables.md; register-rebalanced
+ * 2026-08-12: wonder/warmth/competition registers joined the doom, midpoints
+ * retuned to the interpretation law and darkest moments to the relational-
+ * cost law (both INST_LAYERED_ARC), THE PRESSURE table breaks THE SECRET's
+ * reconstruction monopoly (D104 sameness at the input layer), and THE
+ * RETURNING PLACE completes the story-engine checklist (object/place/motif).
+ * Second tranche same day (author-ratified "more varied — others will use
+ * it"): genre to 153 with 26 more niches, voice doubled with document-native
+ * modes, a warm dozen in THE SECRET.
+ * 22 tables, 1,872 entries, 21 rolls per brief (secret/pressure alternate)
  *
- * IIFE — exposes window.STORY_TABLES and window.randomizeBrief()
- * Consumed by index.html randomize button
+ * IIFE — exposes window.STORY_TABLES, window.randomizeBrief() and
+ * window.randomizeBriefSlice('texture') (the D101/D104 sparse seed)
+ * Consumed by index.html randomize button + generator.js drawDivergenceSeed
  */
 (function () {
   'use strict';
@@ -18,7 +27,7 @@
 
   var T = {};
 
-  // ── TABLE 1 — GENRE & TONE (99 entries, "Roll twice" excluded) ──
+  // ── TABLE 1 — GENRE & TONE (153 entries, "Roll twice" excluded) ──
 
   T.genreTone = [
     'Dustbowl literary realism \u2014 hardship, dignity, the land as antagonist',
@@ -59,8 +68,7 @@
     'Space opera \u2014 grand scale, political intrigue among stars, found family',
     'New Weird \u2014 genre blended, cities as organisms, ideology made physical',
     'Weird West \u2014 supernatural frontier, colonialism and consequence, myth made monstrous',
-    'Lovecraftian mythos \u2014 specific pantheon, fragile sanity, ancient malevolence',
-    'Delta Green / contemporary conspiracy \u2014 paranoia, government shadows, forbidden knowledge',
+    'Contemporary conspiracy \u2014 paranoia, government shadows, forbidden knowledge',
     'Historical fiction \u2014 period texture, known events as backdrop, human scale',
     'Ancient world \u2014 empire and republic, honor codes, gods in politics',
     'Medieval \u2014 feudal logic, crusade and plague, faith as power',
@@ -103,8 +111,7 @@
     'Trauma narrative \u2014 the past in the present, the body\u2019s memory, healing\u2019s ambiguity',
     'Religious/faith narrative \u2014 belief under pressure, doubt as honesty, the sacred and the human',
     'Cult narrative \u2014 seduction of belonging, ideology as trap, the exit',
-    'Occult thriller \u2014 hidden knowledge, genuine danger, the price of seeing',
-    'Paranormal investigation \u2014 the threshold between rational and not, dread building slowly',
+    'Occult investigation \u2014 hidden knowledge, the threshold between rational and not, the price of seeing',
     'Vampire \u2014 power, seduction, predation, society\u2019s shadow',
     'Werewolf/shapeshifter \u2014 identity split, the beast within, cycles',
     'Ghost story \u2014 unfinished business, the past refusing to release, grief made visible',
@@ -119,10 +126,66 @@
     'Fairy tale realism \u2014 the logic of stories applied literally to a real world',
     'Slipstream \u2014 neither genre nor literary, the uncomfortable in-between',
     'Cli-fi \u2014 climate change as protagonist, slow catastrophe, complicity',
-    'Afrofuturism \u2014 cultural inheritance forward-projected, liberation and speculation'
+    'Afrofuturism \u2014 cultural inheritance forward-projected, liberation and speculation',
+    'Expedition wonder \u2014 the blank space on the map, competence under weather, awe as a discipline',
+    'Cozy mystery with teeth \u2014 a warm community, a real crime, kindness as investigative method',
+    'Pastoral fantasy \u2014 small magics, market days, the turning year; stakes the size of a village and just as heavy',
+    'Nautical adventure \u2014 wind and rigging, close calls, the sea as a worthy opponent',
+    'Comedy of manners \u2014 social choreography, wit as weaponry, real hearts beneath the etiquette',
+    'Screwball caper \u2014 momentum, mistaken identity, love and larceny at speed',
+    'Gentle absurdism \u2014 the impossible arrives politely, the town adapts, meaning sneaks in sideways',
+    'Hopepunk \u2014 stubborn kindness under pressure, community as insurgency, joy as defiance',
+    'Frontier founding \u2014 building the town before winter, neighbors by necessity, a ledger of shared survival',
+    'Sporting rivalry \u2014 two crews, one prize, the season as story; respect earned the hard way',
+    'Craft mastery \u2014 a discipline pursued in flour, wood, or steel; the workshop as world; the work as autobiography',
+    'Wandering scholar \u2014 roads and libraries, riddles traded for supper, the world as curriculum',
+    'First contact wonder \u2014 the other arrives, translation as intimacy, curiosity outrunning fear',
+    'Restoration pastoral \u2014 after the crisis, the mending; repair as culture, grief composted into gardens',
+    'Village festival \u2014 bunting and committee politics, old rites made friendly, the prize is not the point',
+    'Antiquarian caper \u2014 book dealers, forgeries, auction nerves; erudition as skulduggery',
+    'Quiet wonder \u2014 the mundane cracked open, attention as devotion, the extraordinary hiding in routine',
+    'Romantic correspondence \u2014 two hands, one distance; what letters can carry and what they cannot',
+    'Warm heroic fantasy \u2014 found fellowship, earned victories, evil real but not total; the tavern matters',
+    'Planetary romance \u2014 strange skies, pulp momentum, honor kept among strangers',
+    'Time-slip pastoral \u2014 two eras sharing one landscape, messages across decades, the orchard remembers',
+    'Cozy-noir \u2014 rain outside, tea inside, a sleuth who likes people; the crime still cuts',
+    'Ensemble music drama \u2014 the band, the season, the sound almost found; harmony as plot and metaphor',
+    'Competent survival \u2014 skill against weather, no villain but winter, triumph measured in firewood',
+    'Fantasy of manners \u2014 guild politics, courtship, dueling etiquette; a dragon somewhere doing paperwork',
+    'Odyssey homecoming \u2014 the long way back, hospitality and monsters, home as a moving target',
+    'Naturalist\u2019s idyll \u2014 field notes and weather, patience rewarded, the ecosystem as slow reveal',
+    'Mythic games \u2014 the contest the gods watch, champions as offerings, the body as covenant',
+    'Golden-age aviation \u2014 records to break, mail to fly, weather as the entire plot',
+    'Trickster mythology \u2014 the clever against the strong, bargains with loopholes, the laugh that rebalances the world',
+    'Second-chance romance \u2014 the one who came back, the years between, the conversation that never finished',
+    'Rivals-to-partners romance \u2014 two competencies, one prize, the merger neither will propose first',
+    'Portal pastoral \u2014 the door in the hedge, two worlds trading weather, commuting between lives',
+    'Season drama \u2014 one team, one campaign, the standings as calendar; every week a fixture',
+    'Endurance epic \u2014 the long route, the body as instrument, the finish as a question of character',
+    'Neighborhood tale \u2014 one street, many doors, the year everything quietly changed',
+    'Culinary romance \u2014 courtship by course, recipes as letters, the table as stage',
+    'Wainscot fantasy \u2014 a hidden society in the walls of the ordinary, borrowed goods, small folk with big politics',
+    'Museum mystery \u2014 provenance as plot, the catalogue as character web, history misfiled on purpose',
+    'Lighthouse-and-letters \u2014 solitude with correspondence, ships as events, the log and the heart in two columns',
+    'Academic comedy \u2014 the senior common room, footnote feuds, a discovery nobody wants to be right',
+    'Alt-history playful \u2014 one hinge swung otherwise, the familiar in costume, consequences worn lightly',
+    'Expedition diary \u2014 base camps and weather windows, the summit as excuse, the team as the story',
+    'River pastoral \u2014 the slow way down, locks and landings, hospitality as episodic plot',
+    'Carnival romance \u2014 the traveling show, a town a week, belonging that folds up and moves',
+    'Clockpunk invention \u2014 workshops and patents, demonstration day, wonder built by hand',
+    'Archipelago adventure \u2014 island to island, a chart with gaps, each landfall its own tale',
+    'Harvest saga \u2014 one growing season, weather as antagonist and gift, the barn dance as finale',
+    'Observatory quiet \u2014 long exposures, patient instruments, discoveries at the speed of starlight',
+    'Brass-band drama \u2014 the competition circuit, rehearsal politics, the piece that must come together',
+    'Postal-route pastoral \u2014 the round as narrative spine, every mailbox a subplot, weather and dogs',
+    'Mercantile adventure \u2014 cargoes and wagers, ports and prices, fortune as a character',
+    'Coming-of-age, gentle \u2014 the summer that decided things, small braveries, the door out of childhood left open',
+    'Ghost story, warm \u2014 the haunting as friendship, unfinished business finished kindly, grief let go',
+    'Fable of the commons \u2014 a shared thing (a well, a bridge, a bell) and the town that must keep it, told with a fable\u2019s economy',
+    'Belle \u00c9poque exposition \u2014 invention as spectacle, the future arriving as a fairground, wonder with a ticking undercurrent'
   ];
 
-  // ── TABLE 2 — SETTING (99 entries, "Roll twice" excluded) ──
+  // ── TABLE 2 — SETTING (115 entries, "Roll twice" excluded) ──
 
   T.setting = [
     'A dying agricultural town during economic collapse',
@@ -223,10 +286,26 @@
     'A pocket reality \u2014 a space that operates by different rules',
     'A city that exists in multiple time periods simultaneously',
     'A space between places \u2014 a way station, a limbo, a waiting room',
+    'A mountain observatory where the astronomers are snowed in with their rivalries',
+    'A seed vault and its tiny devoted staff \u2014 the world\u2019s patience, banked',
+    'A traveling library serving villages by barge or wagon',
+    'A conservatory of music during audition season',
+    'A long-distance race across a changing landscape \u2014 checkpoints, weather, standings',
+    'A coastal weather station whose readings have begun to matter to someone far away',
+    'A festival town in the weeks before its once-a-generation celebration',
+    'A cliffside apiary \u2014 bees, weather, and a ledger that doesn\u2019t quite add up',
+    'A canal system and its lock-keepers \u2014 slow water, precise machinery, gossip outrunning freight',
+    'A night market that appears only when it rains',
+    'A cartography office mapping a coastline that will not hold still',
+    'A town rebuilding after the flood \u2014 the mud line on every wall, the argument over where to rebuild',
+    'A tidal island \u2014 twice a day the road exists, twice a day it doesn\u2019t',
+    'A high mountain waystation where every traveler must spend exactly one night',
+    'A printing house in a city hungry for news',
+    'A rooftop world above a dense city \u2014 gardens, pigeons, laundry lines, a parallel geography',
     'A setting that is the interior of a mind, a memory, or a dream'
   ];
 
-  // ── TABLE 3 — PROTAGONIST ARCHETYPE (99 entries, "Roll twice" excluded) ──
+  // ── TABLE 3 — PROTAGONIST ARCHETYPE (111 entries, "Roll twice" excluded) ──
 
   T.protagonist = [
     'The migrant \u2014 displaced, carrying home inside, looking for ground',
@@ -327,10 +406,22 @@
     'The last of something \u2014 the final speaker, the final practitioner',
     'The person who has already died once \u2014 relationship with mortality rewritten',
     'The person who has seen the worst truth about reality \u2014 and must keep functioning',
+    'The cartographer \u2014 draws the edge of the known, then walks past it',
+    'The lighthouse keeper \u2014 routine as devotion, the log as confession, every ship a stranger',
+    'The naturalist \u2014 patience as method, wonder as discipline, the notebook as autobiography',
+    'The courier \u2014 carries what others cannot, asks nothing, knows every road',
+    'The radio operator \u2014 a voice in the dark, connecting people who will never meet',
+    'The apprentice on the verge \u2014 the craft nearly theirs, the master fading, the test arriving',
+    'The innkeeper \u2014 everyone\u2019s confidant, no one\u2019s intimate, the hearth as observatory',
+    'The festival organizer \u2014 joy as logistics, the town\u2019s hope on a clipboard',
+    'The beekeeper \u2014 reads the hive like weather, trusted by things that sting',
+    'The navigator \u2014 stars, instruments, dead reckoning; certainty performed over doubt',
+    'The gardener of a great garden \u2014 tends what will outlive them, argues with seasons',
+    'The competitor past their prime \u2014 one more season, the body renegotiating its terms',
     'The ordinary person \u2014 no special qualification except necessity'
   ];
 
-  // ── TABLE 4 — PROTAGONIST'S CORE WANT (100 entries) ──
+  // ── TABLE 4 — PROTAGONIST'S CORE WANT (108 entries) ──
 
   T.want = [
     'To find a missing person',
@@ -432,10 +523,18 @@
     'To stop something from being forgotten',
     'To make something beautiful before the end',
     'To know whether there is anything after',
+    'To finish the great work before the season turns',
+    'To see the phenomenon once, with their own eyes',
+    'To win the wager everyone says is unwinnable',
+    'To bring the harvest in \u2014 all of it, this year, no losses',
+    'To reunite the ensemble for one last performance',
+    'To chart the unmapped stretch and come home to tell it',
+    'To earn the master\u2019s single word of praise',
+    'To host a feast the town will talk about for a generation',
     'They don\u2019t know what they want \u2014 discovering this is the story'
   ];
 
-  // ── TABLE 5 — PROTAGONIST'S CORE NEED (100 entries) ──
+  // ── TABLE 5 — PROTAGONIST'S CORE NEED (106 entries) ──
 
   T.need = [
     'To accept that the past cannot be changed',
@@ -537,10 +636,16 @@
     'To stop feeling long enough to survive',
     'To connect the fragments of themselves into something that works',
     'To accept that they may never be whole and be okay',
+    'To learn that rest is part of the work',
+    'To let the apprentice surpass them, and call it victory',
+    'To discover that the rival was never the obstacle',
+    'To accept the good thing without auditing it for the catch',
+    'To learn the difference between solitude and hiding',
+    'To celebrate \u2014 actually celebrate \u2014 a thing that went right',
     'To understand that the need and the want are the same thing \u2014 they\u2019ve been running from what they most desire'
   ];
 
-  // ── TABLE 6 — PROTAGONIST'S FATAL FLAW (100 entries) ──
+  // ── TABLE 6 — PROTAGONIST'S FATAL FLAW (105 entries) ──
 
   T.flaw = [
     'Pride \u2014 they cannot be wrong in front of others',
@@ -642,17 +747,22 @@
     'Impulsive compassion \u2014 saves people from the consequences that would teach them',
     'Rigid compassion \u2014 extends care even when it enables harm',
     'Willful ignorance \u2014 doesn\u2019t want to know, and knows it',
+    'Curiosity without brakes \u2014 every locked door is an invitation',
+    'Competitive reflex \u2014 turns gifts into contests, cannot receive without keeping score',
+    'Over-preparation \u2014 rehearses life instead of living it',
+    'Generosity as control \u2014 gives so much that no one can afford to owe them honesty',
+    'The joke reflex \u2014 deflects every true moment with wit, until the true moments stop coming',
     'Their greatest strength at its worst \u2014 the flaw is the other side of their best quality'
   ];
 
-  // ── TABLE 7 — PROTAGONIST'S WOUND (100 entries) ──
+  // ── TABLE 7 — PROTAGONIST'S WOUND (108 entries) ──
 
   T.wound = [
     'Abandoned by a parent in childhood \u2014 physically or emotionally',
     'Parent\u2019s death that they feel responsible for',
     'Witnessing violence they could not stop',
     'Being the target of violence they survived',
-    'Sexual assault \u2014 carrying it alone',
+    'Trusted the wrong protector \u2014 and learned it in a way that rewired trust itself',
     'Surviving a war, and others didn\u2019t',
     'Causing a death through negligence or choice',
     'Betrayed by their closest friend at a critical moment',
@@ -719,7 +829,7 @@
     'Witnessed their parents\u2019 marriage as a model of suffering',
     'Was protected from everything \u2014 and is helpless as a result',
     'Was given nothing and expected to build it all alone',
-    'Was a child soldier, laborer, or other inappropriate role',
+    'Worked an adult’s job as a child — something of childhood stayed unlived',
     'Had their identity (race, gender, sexuality) targeted for erasure',
     'Survived a natural disaster that claimed people they loved',
     'Survived a disease or accident that cost them something permanent',
@@ -742,15 +852,23 @@
     'Publicly humiliated someone and has never forgiven themselves',
     'Made a decision at the worst possible moment with the wrong information',
     'Made the right decision with the right information and it still went wrong',
-    'Lost someone to suicide and carries the weight of what they didn\u2019t see',
-    'Survived a suicide attempt and is still figuring out what that means',
+    'Lost someone whose last conversation with them was an argument',
+    'Watched a friend disappear into a belief system \u2014 could neither follow nor retrieve them',
     'Has something they have never told a single other person',
     'Had something done to them that they cannot name, even to themselves',
+    'The crew, band, or company dissolved on the eve of its best work \u2014 and everyone else moved on',
+    'Came second, once, in the thing that mattered \u2014 by a margin small enough to measure forever',
+    'The mentor praised everyone \u2014 except them, ever',
+    'The home town was renamed, rebuilt, or flooded \u2014 the map of childhood is now apocryphal',
+    'Gave up the craft at the moment it asked for everything \u2014 and has narrated the choice as sensible ever since',
+    'A friendship ended over one sentence \u2014 both remember it differently, neither will say it aloud',
+    'Was believed capable of more by exactly one person, who died before it could be proven',
+    'The work of years was destroyed by weather in one night \u2014 no malice, no one to blame, which is worse',
     'The wound is the same as the wound they are about to inflict on someone else \u2014 the cycle is the story',
     'There is no one wound \u2014 it was the slow accumulation of small things over years'
   ];
 
-  // ── TABLE 8 — ANTAGONIST TYPE & MOTIVATION (100 entries, columns combined with " — ") ──
+  // ── TABLE 8 — ANTAGONIST TYPE & MOTIVATION (108 entries, columns combined with " — ") ──
 
   T.antagonist = [
     'A specific person \u2014 former ally \u2014 They believe the protagonist betrayed them first',
@@ -852,10 +970,18 @@
     'The antagonist is correct \u2014 the protagonist must face this',
     'The antagonist loves the protagonist \u2014 and this is not a solution',
     'The antagonist is the protagonist from a different angle \u2014 same story, different role',
+    'The season \u2014 the harvest, the thaw, the storm window \u2014 It does not negotiate and it is never late',
+    'A rival crew \u2014 better funded, not better \u2014 They want the same prize and they started earlier',
+    'The committee \u2014 approval perpetually deferred \u2014 No one opposes anything; nothing ever advances',
+    'A specific person \u2014 the neighbor \u2014 The feud predates them both and neither remembers the cause',
+    'The record \u2014 the standing mark, the perfect season, the unbeaten name \u2014 It cannot be argued with, only attempted',
+    'A specific person \u2014 the old champion \u2014 Gracious in public, ungenerous in private, still faster on their worst day',
+    'The instrument \u2014 the vessel, the machine, the organ \u2014 Magnificent, temperamental, half-understood; it rewards devotion and punishes presumption',
+    'Distance \u2014 the miles themselves \u2014 Every plan is a negotiation with geography',
     'There is no antagonist \u2014 the conflict is entirely internal'
   ];
 
-  // ── TABLE 9 — INCITING INCIDENT (100 entries) ──
+  // ── TABLE 9 — INCITING INCIDENT (114 entries) ──
 
   T.incident = [
     'A body is discovered in a place that changes everything',
@@ -957,10 +1083,24 @@
     'The ordinary becomes strange \u2014 one detail in the daily world that cannot be explained',
     'Someone is erased \u2014 from records, from memory, from conversation',
     'The protagonist does something \u2014 thoughtlessly \u2014 that changes everything for someone else',
+    'An invitation arrives to attempt something long thought settled or impossible',
+    'A creature believed extinct is sighted \u2014 twice, by reliable people',
+    'A signal returns from an expedition thought lost \u2014 and it is not a distress call',
+    'The festival that skipped a generation is suddenly, officially, back on',
+    'A will names the protagonist custodian of something wonderful and inconvenient',
+    'The lighthouse, fountain, or great clock \u2014 dark for decades \u2014 lights itself',
+    'A letter arrives addressed to the protagonist in their own handwriting',
+    'The migration comes early, or wrong, or in numbers no one alive has seen',
+    'A stranger pays off the protagonist\u2019s debt and leaves only a request',
+    'The competition announces its final year \u2014 win now or never',
+    'Something dug up in the garden turns out to be addressed to whoever found it',
+    'An old rival extends an invitation that is either an apology or a trap',
+    'The apprenticeship letter arrives \u2014 the master chose them, and no one knows why',
+    'A door in a familiar building opens onto a room that was never on the plans',
     'Nothing happens. It is the silence that breaks them. The absence is the incident'
   ];
 
-  // ── TABLE 10 — MIDPOINT SHIFT (100 entries) ──
+  // ── TABLE 10 — MIDPOINT SHIFT (103 entries; every entry changes INTERPRETATION, not just stakes — the INST_LAYERED_ARC law) ──
 
   T.midpoint = [
     'The protagonist discovers the threat is bigger than they knew',
@@ -971,30 +1111,30 @@
     'An apparent enemy is revealed as an ally',
     'The protagonist achieves a partial victory \u2014 and it costs more than they expected',
     'The protagonist fails publicly \u2014 and it is survivable, but barely',
-    'A third party enters with their own agenda',
+    'A third party enters — and their agenda explains events the protagonist had blamed on the antagonist',
     'The mission changes \u2014 the original goal is no longer the right one',
     'The protagonist discovers what they\u2019re protecting isn\u2019t what they thought',
-    'The stakes are revealed to be much higher \u2014 not just personal but systemic',
+    'What looked like one bad actor is revealed as policy \u2014 the problem was never personal, and winning changes meaning',
     'The protagonist must choose between two things they cannot both have',
-    'An impossible deadline appears',
-    'Someone dies who wasn\u2019t supposed to die yet',
+    'The deadline was always there — everything done so far was measured against the wrong calendar',
+    'Someone dies who wasn\u2019t supposed to die yet \u2014 and the manner of it rewrites what everyone thought this was',
     'Someone who was supposed to die survives, and that is its own complication',
     'The protagonist goes undercover, changes their identity, or crosses a line',
     'A secret is revealed that makes the protagonist question the side they\u2019re on',
-    'The world changes externally \u2014 political event, catastrophe, paradigm shift',
+    'The world changes externally \u2014 and under the new order, allies and obstacles trade places',
     'The protagonist is given power they wanted \u2014 and it\u2019s not what they thought',
-    'The protagonist is stripped of their primary protection or resource',
+    'The protagonist is stripped of their primary protection — and functions anyway, which means it was doing something other than protecting',
     'A relationship the protagonist relied on is destroyed or transformed',
     'The protagonist discovers they\u2019ve been operating on false information',
     'The protagonist\u2019s past arrives in the present',
     'The protagonist must ask for help from someone they hate',
     'The protagonist has to destroy something they loved to move forward',
-    'A timeline is revealed \u2014 there is less time than anyone thought',
+    'The clocks disagree \u2014 and the trusted one has been wrong from the start',
     'The protagonist witnesses the consequence of their earlier choice',
-    'A child or innocent becomes involved',
+    'A child repeats something overheard — innocently, precisely — and it recuts every earlier conversation',
     'The protagonist has a moment of clarity \u2014 what they really want becomes visible',
     'The protagonist finally confronts the person or thing they\u2019ve been avoiding',
-    'That confrontation goes wrong',
+    'That confrontation goes wrong — in a way that proves they misread who they were confronting',
     'The protagonist wins the confrontation and feels nothing',
     'The protagonist discovers they are not the hero of this story',
     'The protagonist discovers they ARE \u2014 and the weight of that is crushing',
@@ -1006,8 +1146,8 @@
     'Someone the protagonist dismissed is revealed as essential',
     'Someone the protagonist relied on is revealed as harmful',
     'The map of the problem turns out to be wrong \u2014 they\u2019ve been solving the wrong thing',
-    'The protagonist finds proof \u2014 and losing it is immediately possible',
-    'The protagonist decides to change their approach entirely',
+    'The protagonist finds proof \u2014 and it proves slightly, crucially, the wrong thing',
+    'The protagonist changes their approach entirely — the old one, they now see, was answering the wrong question',
     'The antagonist does something that the protagonist understands, even if they can\u2019t condone it',
     'A bargain is struck that the protagonist will regret',
     'The protagonist tells the truth at great cost',
@@ -1021,7 +1161,7 @@
     'The protagonist recognizes this in themselves and is horrified',
     'The protagonist\u2019s mentor or anchor figure is removed',
     'The protagonist is revealed to others in a way they cannot control',
-    'An act of violence changes everything \u2014 the rules have changed',
+    'An act of violence lands \u2014 and reveals which rules were real and which were performance',
     'A moment of unexpected beauty or humanity in the antagonist',
     'The protagonist must watch someone suffer and cannot intervene',
     'The protagonist intervenes when they shouldn\u2019t \u2014 and it costs',
@@ -1033,8 +1173,8 @@
     'The protagonist discovers they are not who they believed themselves to be',
     'The protagonist has a genuine failure of nerve \u2014 they ran when they should have stayed',
     'The protagonist stayed when they should have run \u2014 and paid for it',
-    'Two storylines collide unexpectedly',
-    'The thing everyone feared comes to pass \u2014 earlier than expected',
+    'Two storylines collide — and turn out to have been one story told from two directions',
+    'The thing everyone feared comes to pass \u2014 and it is not what anyone feared; the dread had the wrong shape',
     'The thing no one believed possible happens',
     'A death is revealed to have been something other than what was reported',
     'The protagonist realizes love is part of this \u2014 for better or worse',
@@ -1043,9 +1183,9 @@
     'The community the protagonist belongs to is tested and fractures',
     'The community comes together against the protagonist',
     'The community comes together for the protagonist \u2014 it is not comfort',
-    'The environment itself changes \u2014 weather, infrastructure, geography',
-    'Time compresses \u2014 events accelerate beyond control',
-    'Time expands \u2014 a period of waiting where the tension is in the stillness',
+    'The environment itself changes \u2014 and the change uncovers what the old landscape had been hiding',
+    'What seemed like escalation is revealed as repetition \u2014 a cycle completing, and someone has seen it before',
+    'A forced stillness \u2014 and in the waiting, the evidence rearranges itself into a different story',
     'The protagonist realizes they have been complicit \u2014 and for how long',
     'An act of unexpected grace from an unexpected source',
     'The rules of the world are revealed to be different than understood',
@@ -1062,35 +1202,56 @@
     'The protagonist realizes the truth of their situation: they have already lost something \u2014 now the question is what they save',
     'The protagonist realizes they have been the antagonist of someone else\u2019s story',
     'Everything is stripped away \u2014 the protagonist has only themselves',
+    'The thing under investigation turns out to be benign \u2014 and the benign explanation implicates someone beloved',
+    'What they were protecting was protecting them \u2014 the direction of care reverses',
+    'The rival reveals they have been losing on purpose \u2014 and why',
     'The midpoint shift is revealed retroactively \u2014 the moment we thought was minor was the turn'
   ];
 
-  // ── TABLE 11 — DARKEST MOMENT (20 entries) ──
+  // ── TABLE 11 — DARKEST MOMENT (36 entries; every entry costs something
+  //    relational, ethical, or institutional — the INST_LAYERED_ARC law;
+  //    tactical setbacks alone don't qualify) ──
 
   T.darkestMoment = [
-    'Physical capture, imprisonment, or total loss of freedom',
+    'Captured \u2014 and the capture proves someone they trusted drew the map',
     'The death of the person or thing they were protecting',
-    'Public exposure and humiliation \u2014 their private self revealed',
-    'They discover the cause or mission was corrupt from the start',
-    'They make a choice they cannot take back',
-    'They are abandoned by everyone who supported them',
-    'They abandon someone who needed them',
-    'The antagonist wins, and visibly \u2014 the protagonist must witness it',
-    'They lose faith in the thing that sustained them \u2014 god, mission, love, self',
-    'They become the thing they were fighting',
-    'The secret they were protecting is revealed \u2014 or the lie they told',
-    'Total resource failure \u2014 no money, no allies, no plan, no time',
-    'A confrontation with mortality \u2014 theirs or someone they love',
-    'The realization that they have always been wrong about the central thing',
-    'Total isolation \u2014 no one can reach them, or they have pushed everyone away',
-    'A physical or psychological breakdown',
-    'They are given the thing they wanted \u2014 and it is ash',
-    'The door closes. The choice is gone. The moment has passed',
-    'They surrender \u2014 and discover this is the right thing, which is its own darkness',
+    'Public exposure \u2014 the private self revealed, and the people who mattered looked away',
+    'They discover the cause was corrupt from the start \u2014 and their best work made it stronger',
+    'They make a choice that cannot be unmade \u2014 and must watch someone absorb its cost without knowing it was chosen',
+    'Abandoned by everyone who supported them \u2014 and the abandonment is reasonable; that is the cut',
+    'They abandon someone who needed them \u2014 for good reasons that stopped being good the moment they left',
+    'The antagonist wins visibly \u2014 using the protagonist\u2019s own method, perfected',
+    'They lose faith in the thing that sustained them \u2014 god, mission, love, craft \u2014 and the loss is quiet, which is worse',
+    'They become the thing they were fighting \u2014 and are good at it',
+    'The secret is revealed \u2014 by the person they told to feel less alone',
+    'The resources run out \u2014 and the last ally to leave was the one they were certain of',
+    'A confrontation with mortality \u2014 theirs or someone they love\u2019s \u2014 rearranges what winning could even mean',
+    'They were wrong about the central thing \u2014 and someone paid the price of their certainty',
+    'Total isolation \u2014 they built the door themselves and locked it from inside',
+    'A breakdown \u2014 with witnesses; the composure that defined them is now a story other people tell',
+    'They get the thing they wanted \u2014 and it is ash, and the people who helped are watching them hold it',
+    'The door closes; the choice is gone \u2014 and they know the exact moment they could have taken it',
+    'They surrender \u2014 and it is right, which is its own darkness',
+    'The institution they served their whole life removes them politely, with a plaque',
+    'The apology comes out as an accusation \u2014 in front of everyone it was meant to mend things with',
+    'The festival, expedition, or performance is cancelled \u2014 the vote wasn\u2019t close, and they counted the hands',
+    'The rival wins \u2014 graciously \u2014 and the grace is unbearable',
+    'The mentor\u2019s last lesson turns out to be a warning about the protagonist themselves',
+    'They keep the promise \u2014 and keeping it breaks the person it was made to',
+    'The harvest, the archive, the work of years is lost \u2014 and the community watches them not weep',
+    'The one who believed in them recants \u2014 gently, with love, and specifics',
+    'Their protection is revealed to have been a leash \u2014 and they thank the hand that held it before they understand',
+    'The letter arrives one day too late \u2014 and it said yes',
+    'They finally speak the whole truth \u2014 and it changes nothing; the room simply moves on',
+    'The team follows their order \u2014 flawlessly \u2014 and that is how everyone learns the order was wrong',
+    'Home stops being home mid-sentence \u2014 some threshold crossed that no one announced',
+    'The cure, fix, or rescue works \u2014 for everyone but the person they did it all for',
+    'They are believed, finally \u2014 by the one audience that makes belief a burden',
+    'The account is settled, the debt paid in full \u2014 and with it goes the only reason anyone needed them',
     'The darkest moment is not an event \u2014 it is a conversation, a truth spoken between two people in a quiet room'
   ];
 
-  // ── TABLE 12 — RESOLUTION TYPE (20 entries) ──
+  // ── TABLE 12 — RESOLUTION TYPE (30 entries) ──
 
   T.resolution = [
     'Triumphant \u2014 the protagonist succeeds, and it means what they hoped',
@@ -1112,10 +1273,20 @@
     'Continuation \u2014 the protagonist goes on; the story continues beyond the frame',
     'Inversion \u2014 the antagonist was right; the protagonist\u2019s defeat is correct',
     'Collapse \u2014 everything comes down; there is space after for something new, but we don\u2019t see it',
-    'Death \u2014 literal or metaphorical \u2014 and what it leaves behind'
+    'Death \u2014 literal or metaphorical \u2014 and what it leaves behind',
+    'Restoration \u2014 the broken thing rebuilt; the rebuilding changed the builders more than the thing',
+    'Homecoming \u2014 arrival at a home that is different, because they are',
+    'The torch passed \u2014 the work continues in other hands, and letting it is the victory',
+    'Comic \u2014 the catastrophe resolves into a feast; the losses are real and so is the dancing',
+    'The record stands \u2014 they did not beat it, and the attempt made them larger than the mark would have',
+    'Quiet mastery \u2014 no audience, no medal; the thing done perfectly once, witnessed by two',
+    'The wager won \u2014 and paid out in a currency no one negotiated',
+    'Harvest \u2014 not everything planted survived, and the table is full anyway',
+    'Reunion \u2014 what was scattered regathers, changed, and holds',
+    'The map completed \u2014 the blank space filled, and a new blank space chosen'
   ];
 
-  // ── TABLE 13 — CENTRAL THEME (99 entries, "Roll twice" excluded) ──
+  // ── TABLE 13 — CENTRAL THEME (109 entries, "Roll twice" excluded) ──
 
   T.theme = [
     'Can a person outrun who they were?',
@@ -1216,10 +1387,22 @@
     'Can the world be changed by one person?',
     'What is worth dying for? What is worth living for? Are they the same?',
     'Is there anything beyond the human that we can know?',
-    'What is the cost of truth when the world prefers the lie?'
+    'What is the cost of truth when the world prefers the lie?',
+    'What do we owe the things we make?',
+    'Is wonder a discipline?',
+    'What makes a place home — and can it be made twice?',
+    'Why do we keep what we keep?',
+    'Is mastery worth what it costs the rest of a life?',
+    'What is a rival for?',
+    'Can joy be built, or only found?',
+    'What does a community owe its strangest member?',
+    'When is finishing more important than winning?',
+    'What is rest — earned, stolen, or given?'
   ];
 
-  // ── TABLE 14 — THE SECRET (100 entries) ──
+  // ── TABLE 14 — THE SECRET (112 entries; not every buried truth is a corpse —
+  //    the warm dozen near the end uncover kindnesses, and the decode plays
+  //    the same) ──
 
   T.secret = [
     'The death everyone accepted was a murder',
@@ -1318,13 +1501,74 @@
     'The addiction or illness is being used as cover for something deliberate',
     'The haunting is real \u2014 and the ghost wants something specific',
     'The haunting is psychological \u2014 and what it reveals is just as damning',
+    'The anonymous benefactor is the whole town, by rota, and has been for a century',
+    'The famous rivalry was choreographed decades ago by two friends who decided the town needed a story',
+    'The treasure was found long ago \u2014 and quietly converted into the thing everyone uses daily',
+    'The founder\u2019s lost masterpiece is hidden in plain sight, distributed piecewise through everyone\u2019s homes',
+    'The curse was invented to keep outsiders from taking something fragile and real',
+    'The champion\u2019s record is wrong in the books \u2014 it was better than recorded, and the champion is the one who altered it',
+    'The letters everyone thought were love letters were coaching \u2014 someone taught half the town to write',
+    'The recluse has been paying for every scholarship, repair, and rescue \u2014 through a foundation that does not exist',
+    'The annual accident that closes the road each spring is maintenance, done secretly, by volunteers who have never met',
+    'The heirloom is a fake \u2014 the original was sold to save someone, and the fake was made with more care than the original ever received',
+    'The ghost is a living person keeping a promise',
+    'The map\u2019s blank space is deliberate \u2014 the surveyor found something worth protecting with ignorance',
     'Everything in the story is true \u2014 and the truth, assembled, is unbearable',
     'The protagonist already knows the secret \u2014 has always known \u2014 and the story is about what they do with that',
     'There is no secret \u2014 the horror is that everything is exactly as it appears',
     'The secret is the protagonist themselves \u2014 what they are, what they\u2019ve done, or what they are about to become'
   ];
 
-  // ── TABLE 15A — THE OBJECT (20 entries) ──
+  // ── TABLE 14B — THE PRESSURE (40 entries) ──
+  // Not every engine is a buried truth. Half the composed briefs roll this
+  // table instead of THE SECRET, so random books also arrive shaped like the
+  // non-reconstruction pressures: exposure, dwindling stores, held walls,
+  // unceasing decay, competing masters, pursuit, the kept form, the race.
+
+  T.pressure = [
+    'Every purchase, crossing, and greeting is being recorded by someone who has begun to see the pattern',
+    'The protagonist\u2019s name is on a list that is getting shorter',
+    'Somebody official has started asking friendly questions in the protagonist\u2019s wake',
+    'The forged papers are good \u2014 but every checkpoint is a coin flip, and the coin is wearing out',
+    'A rumor with the protagonist\u2019s shape in it is moving through town faster than they can',
+    'The stores must last until the thaw, and arithmetic says they will not',
+    'Every day on the road costs more than the road gives back',
+    'The medicine, fuel, or seed corn is being spent faster than it can be replaced \u2014 and everyone pretends otherwise',
+    'The expedition can go forward or turn back \u2014 but the supplies no longer permit both',
+    'Each attempt costs something that does not come back; the count of remaining attempts is knowable and no one will say it',
+    'What is outside the walls tests them nightly, and the walls are honest about neither their age nor their gaps',
+    'The storm season is coming and the roof is a negotiation',
+    'They are surrounded politely \u2014 supply lines squeezed, options closing, all of it deniable',
+    'The dam, dike, or breakwater holds \u2014 today \u2014 and the water is patient',
+    'Reinforcements are promised, repeatedly, with dates',
+    'Everything in their care ages faster than it can be mended \u2014 triage is the job now, though no one has said so aloud',
+    'The orchard, archive, or engine needs one full year of attention; it gets scraps, and it is starting to show',
+    'The old knowledge lives in three people, one book, and a habit \u2014 and all four are fading',
+    'Rot has a head start \u2014 it was found late, and every repair reveals two more',
+    'The garden feeds them exactly as long as nothing goes wrong; something is going wrong',
+    'Three people the protagonist cannot refuse want three things that cannot coexist',
+    'Every favor accepted has a string, and the strings have begun to pull in different directions',
+    'The family expects one thing, the crew another, the oath a third \u2014 and all of them are calling it loyalty',
+    'Two patrons, one protagonist, and a fiction of exclusivity that cannot survive the season',
+    'The team is splitting into camps, and both camps are recruiting the protagonist as the tiebreak',
+    'Someone is following \u2014 patient, funded, and two towns behind at most',
+    'The pursuit is not fast; it is thorough \u2014 doors that were open are closing behind them',
+    'The dogs, the drones, or the debt collectors have the scent; distance is bought in hours now, not days',
+    'The hunter knows the protagonist\u2019s habits \u2014 the escape must be out of character to work',
+    'Refuge is always temporary \u2014 the question each week is who pays for the next one',
+    'The rite must be performed exactly, on schedule, without explanation \u2014 the reasons are lost while the penalties are not',
+    'The inspection is coming; the standard is absolute; the shop, ship, or shrine is not ready',
+    'One error in the ledger, liturgy, or protocol and everything built on it is void \u2014 and errors have been found before',
+    'The observance costs more each season \u2014 and skipping it once, just once, has begun to be discussed',
+    'The form must be kept in front of witnesses who want it to fail',
+    'Someone else is after the same prize, and they are ahead',
+    'The rival\u2019s lead is small, public, and growing \u2014 the standings post weekly',
+    'Two crews, one route, first arrival takes everything \u2014 and the rival knows a shortcut, or is bluffing',
+    'The old champion is defending; the protagonist is challenging; the town is betting',
+    'The deadline is a starting gun someone else fired \u2014 the race was on before the protagonist knew it was a race'
+  ];
+
+  // ── TABLE 15A — THE OBJECT (60 entries) ──
 
   T.textureObject = [
     'A photograph with someone cut out of it',
@@ -1346,10 +1590,50 @@
     'A piece of land with contested ownership',
     'A tool used for something other than its intended purpose',
     'Something alive \u2014 a plant, an animal \u2014 that has survived far too long',
+    'A seed packet labeled in a language no one local reads',
+    'A ticket stub for a performance that, by every record, never happened',
+    'A bell with its rope freshly cut',
+    'A trophy engraved with a name that has been sanded off',
+    'A pocket watch that keeps a different day\u2019s time',
+    'A ledger in which one column is always, precisely, slightly wrong',
+    'A pressed flower from a species that grows nowhere within a thousand miles',
+    'A ring of labeled keys \u2014 one label freshly changed',
+    'A tide table annotated in two hands, decades apart',
+    'A musical score with one passage crossed out \u2014 and the crossed-out version keeps turning up elsewhere',
+    'A recipe card with a single ingredient written in code',
+    'A sealed jar of river water, dated, shelved among a hundred identical others',
+    'A racing bib, folded sharp, never unpinned',
+    'A field notebook whose sketches are better than their author could draw',
+    'A lantern mended so often none of the original remains \u2014 still called by its first owner\u2019s name',
+    'A door knocker shaped like something the region has no stories about',
+    'A signal flag from a code no navy admits to using',
+    'A wheel of cheese, wax-sealed, stamped with next year\u2019s date',
+    'A prosthetic hand of beautiful workmanship, built for a task no one can identify',
+    'A survey stake driven where no survey was ever commissioned',
+    'A hymnal with penciled numbers in the margins that are not page references',
+    'A rope with knots tied at intervals that mean something',
+    'A postcard delivered to the right address eighty years late',
+    'A pair of boots by the door of a house whose owner never came back \u2014 cleaned weekly',
+    'A telescope aimed, locked, and abandoned \u2014 pointed at nothing anyone can find',
+    'A brass instrument no maker will claim, tuned to an interval that unsettles dogs',
+    'A quilt whose pattern is a map if you fold it right',
+    'A medal awarded for an action that officially never happened',
+    'A skipping stone on a desk five hundred miles from water, labeled with a date',
+    'A wax seal for a family that ended \u2014 found warm, as if recently used',
+    'A dance card, filled to the last line, all in one handwriting',
+    'A grafted tree bearing two fruits \u2014 one of them unknown',
+    'A set of scales that weighs one thing wrong, always by the same amount',
+    'A child\u2019s growth chart on a doorframe, continued into impossible heights',
+    'A message in a bottle addressed to the finder by name',
+    'A workshop broom worn down on the wrong side',
+    'A star chart with one star added by hand',
+    'An oar hung over a door in a town nowhere near water',
+    'A beekeeper\u2019s smoker, still warm, in an apiary abandoned for years',
+    'An hourglass that runs slow in one room only',
     'Something that seems ordinary until you understand what it marks'
   ];
 
-  // ── TABLE 15B — THE RELATIONSHIP DYNAMIC (20 entries) ──
+  // ── TABLE 15B — THE RELATIONSHIP DYNAMIC (60 entries) ──
 
   T.textureDynamic = [
     'They love each other and it makes them dangerous to each other',
@@ -1371,10 +1655,50 @@
     'They met at the worst moment of both their lives \u2014 that is all they are to each other',
     'One is becoming the other used to be \u2014 neither is ready for this',
     'The relationship is professional, and the emotion is inadmissible',
+    'They disagree about everything except each other',
+    'Master and apprentice — and the apprentice has surpassed; only one of them knows',
+    'Old rivals who have forgotten the feud but kept the habits',
+    'They are each other’s emergency contact and nothing else — by fierce mutual design',
+    'Pen pals of thirty years who have never met — and have begun to plan to',
+    'One keeps choosing the other first; the other keeps not noticing',
+    'They built something together once — it still stands, and neither can visit it alone',
+    'Siblings who divided the world young — you take the words, I’ll take the numbers — and now miss each other’s half',
+    'The best team in the region — who cannot be in the same room outside the work',
+    'One saved the other’s life; both have privately decided it was the other way around',
+    'They trade the same object back and forth as apology, joke, and covenant — it is currently unreturned',
+    'Neighbors who wave daily and have spoken twice in twenty years — both treasure it',
+    'One is training the other for a farewell neither will name',
+    'Two experts in the same field, cited together forever, in complete disagreement about the central question',
+    'They can only be honest by letter — in person, the performance resumes',
+    'The mentor takes credit; the student allows it; the ledger between them has a page limit',
+    'One prays for the other, secretly; the other, who believes in nothing, would be undone to know',
+    'They are the last two speakers of a private language — an argot, a joke-tongue, or the real thing',
+    'A friendship conducted entirely through work — remove the work and neither knows the way in',
+    'Each thinks they are the sidekick',
+    'One is the keeper of the other’s secret and has begun to feel the weight shift',
+    'They met as competitors and never fully stopped — love as a scoring system',
+    'One always arrives early, the other always late; between them they hold the appointment',
+    'The elder is losing the memories the younger was built from — both are curating what remains',
+    'They are bound by a promise made to a third person no longer present',
+    'One is the other’s alibi — for something neither has ever discussed',
+    'Business partners whose handshake predates the paperwork — the paperwork has finally arrived',
+    'One lies to protect; the other detects to forgive — both are getting better at it',
+    'They are the same rank, the same age, the same everything — the symmetry is becoming a question',
+    'The one who left and the one who stayed, meeting annually at the border of the old life',
+    'Rope team, doubles partners, or duet — the craft requires trust the friendship no longer has',
+    'One narrates the other’s greatness to everyone — as a way of never having to say it to them',
+    'They keep adopting things together — strays, causes, broken machines — to avoid deciding what they are',
+    'The apprentice stayed loyal to a master the whole town has turned against',
+    'They share custody of something — a boat, a bar, a bell tower — and the schedule is a treaty',
+    'One remembers everything; one remembers better — their shared history has two canons',
+    'The rescuer and the rescued, years later, meeting as equals for the first time',
+    'They correspond through marginalia in a library book neither will check out',
+    'One is becoming famous; the other is becoming necessary',
+    'They have never lost together — and are about to',
     'One of them will not survive this. The other already knows'
   ];
 
-  // ── TABLE 15C — THE IRONY IN THE PREMISE (20 entries) ──
+  // ── TABLE 15C — THE IRONY IN THE PREMISE (60 entries) ──
 
   T.textureIrony = [
     'The person trying to expose the truth is the last credible witness',
@@ -1396,10 +1720,50 @@
     'The love is real. It is also the mechanism of harm',
     'The protagonist and antagonist share the same goal \u2014 and the path is the irreconcilable difference',
     'The protagonist\u2019s greatest act will be invisible \u2014 no one will know they did it',
+    'The rescue everyone is waiting for has already happened \u2014 no one recognized it',
+    'The map is accurate \u2014 it is the territory that is lying',
+    'The prize for winning is the end of the thing they loved \u2014 the competing, not the cup',
+    'The apprentice\u2019s mistakes are the only record of the master\u2019s method',
+    'What the town calls its curse is the only thing keeping it safe',
+    'The tradition everyone resents is the only thing everyone shares',
+    'The message got through \u2014 and that is the problem',
+    'The protagonist\u2019s reputation for honesty makes them the perfect unwitting courier for a lie',
+    'The thing they practiced for never happens \u2014 the practice turns out to have been for something else',
+    'Everyone is protecting someone who is protecting them \u2014 the secret goes in a circle',
+    'The stranger knows the town better than the town does \u2014 by loving what it ignores',
+    'The forgery, the imposter, the stand-in \u2014 the fake has become better than the original',
+    'The debt was forgiven years ago; only the repayment is keeping them connected',
+    'The weakness they hide is the qualification the moment requires',
+    'The archive of failures contains the answer \u2014 filed under the wrong question',
+    'The one who never wanted the job is the only one doing it right',
+    'The celebration is sincere and the thing celebrated never happened',
+    'Their opposition is the only thing holding the opponent together',
+    'The road home runs through the place they swore never to return \u2014 and it has changed more than they have',
+    'The lie told to comfort a child has grown into the town\u2019s founding truth',
+    'The invention works \u2014 but only in the hands of the person who believes they failed',
+    'They are famous for the wrong thing \u2014 their real achievement sits unsigned',
+    'The signal fire, siren, or bell works perfectly \u2014 and everyone has forgotten what it means',
+    'The garden thrives on neglect \u2014 the care was the harm',
+    'The rival\u2019s sabotage keeps accidentally improving the work',
+    'The last one to believe is the one the miracle was for',
+    'The escape route is the scenic route \u2014 survival keeps insisting on beauty',
+    'The password is the thing they say every day without hearing it',
+    'The treasure was inventoried, taxed, and shelved \u2014 it has been public the whole time',
+    'The champion trains hardest at the thing they will never be seen doing',
+    'The feast can only be cooked in the enemy\u2019s kitchen',
+    'The cure requires the disease\u2019s cooperation',
+    'The protection is working \u2014 the protected no longer remembers what it is for',
+    'The monument to the disaster is what finally makes the town money',
+    'The one who cannot swim owns the ferry',
+    'The prophecy is public, precise, and ignored \u2014 accuracy made it boring',
+    'The team\u2019s strength is a rounding error in the record books and the entire reason they win',
+    'The love letter was never sent \u2014 and its drafts taught them to write',
+    'The wall built to keep it out is what it lives in now',
+    'The understudy knows the role better \u2014 by watching, which the lead has never done',
     'The protagonist does the right thing, and it is not enough'
   ];
 
-  // ── TABLE 15D — THE MOTIF (20 entries) ──
+  // ── TABLE 15D — THE MOTIF (40 entries) ──
 
   T.textureMotif = [
     'Water \u2014 flood, drought, river, rain, the body\u2019s own',
@@ -1421,10 +1785,79 @@
     'Names \u2014 what we are called, what we call ourselves',
     'The sky \u2014 the outside of the world, the perspective that makes humans small',
     'Children \u2014 innocence, inheritance, the future as mirror of the present',
+    'What is carried \u2014 loads, debts, names; the cost of carrying and the grace of setting down',
+    'Breath \u2014 held, counted, shared, taken away; the first and the last',
+    'Hunger and appetite \u2014 what feeds, who is fed, what it costs to be full',
+    'Repetition and ritual \u2014 the act performed daily until it becomes prayer, or prison, or both',
+    'Salt \u2014 sweat, sea, preservation; the wound and the cure',
+    'The tide \u2014 what leaves and returns, what leaves and doesn\u2019t; schedules older than clocks',
+    'Thresholds of effort \u2014 the last mile, the final verse; the door of exhaustion and what is on its other side',
+    'Light at particular hours \u2014 dawn work, lamp oil, the golden hour; who is awake and why',
+    'Knots \u2014 what binds, what slips, what can only be cut',
+    'Harvest \u2014 what was planted, what came up, the interval no one controls',
+    'Ice and thaw \u2014 what freezing preserves, what melting reveals',
+    'Maps and edges \u2014 the drawn world, the blank margin, who decides where the drawing stops',
+    'Bells \u2014 what is announced, what is mourned, what is called home',
+    'Letters and post \u2014 distance made intimate, the delay between saying and being heard',
+    'Games \u2014 the rules agreed, the stakes denied, the moment play stops being play',
+    'Gardens \u2014 what is tended, what volunteers, what returns after being pulled',
+    'Stone and weather \u2014 what endures by hardness, what endures by yielding',
+    'Sleep and waking \u2014 what the day cannot say, what the night rearranges',
+    'Thread and mending \u2014 the visible repair, the invisible one, and which is more honest',
+    'The table \u2014 who sits, who serves, who is missing; the feast and the empty chair',
     'Darkness \u2014 literal and metaphorical, what can only be understood without light'
   ];
 
-  // ── TABLE 16 — TONAL TOUCHSTONE (99 entries, "Roll twice" excluded, "Work — quality") ──
+  // ── TABLE 15E — THE RETURNING PLACE (40 entries) ──
+  // The story-engine checklist asks for a recurring object, place, and motif;
+  // this is the place. Micro-scale on purpose — a room, a threshold, a bench —
+  // never a premise-scale setting (Table 2's job). Feeds the Core Noun Roster.
+
+  T.texturePlace = [
+    'A stairwell where sound carries perfectly to exactly one other room',
+    'The back pew \u2014 or the seat nearest the door, in whatever building matters here',
+    'A jetty that drowns at the same hour every day',
+    'A greenhouse in its third year of gentle neglect',
+    'The narrow strip where two properties, parishes, or jurisdictions fail to meet',
+    'A landing halfway up \u2014 where everyone pauses and pretends it\u2019s for the view',
+    'The room kept exactly as its occupant left it \u2014 dusted weekly, entered never',
+    'A crossroads with a bench no municipality admits to installing',
+    'The kitchen after everyone leaves \u2014 warm surfaces, one lamp, the true conversations',
+    'A workshop\u2019s doorway \u2014 inside is the craft; the threshold is where the money changes',
+    'The reservoir over the drowned village \u2014 on still days, the steeple',
+    'A rooftop reached by a route only three people know',
+    'The archive\u2019s restricted aisle \u2014 restricted by a policy no one can find in writing',
+    'A ford that is passable six months a year \u2014 the region\u2019s whole calendar bends around it',
+    'The finish line, painted and repainted for a race last run decades ago',
+    'The lighthouse gallery \u2014 the one stretch of sea the keeper cannot see',
+    'The mile of road with no houses \u2014 where everyone speeds up, and no one says why',
+    'A courtyard whose acoustics turn whispers public and shouts private',
+    'The booth at the back \u2014 reserved by custom for whoever needs it worst',
+    'A cellar, cave, or hold where the temperature never changes \u2014 and things keep',
+    'The platform end beyond the awning \u2014 where farewells actually happen',
+    'A garden\u2019s oldest tree \u2014 initials at every height, a ladder of generations',
+    'The chapel of a different faith than the town\u2019s \u2014 unlocked, swept, unexplained',
+    'A stretch of shore where the sea returns what it takes \u2014 eventually, altered',
+    'The office after hours \u2014 same room, different government',
+    'A bridge\u2019s underside \u2014 the town\u2019s true bulletin board',
+    'The bell tower landing where the rope is tied off \u2014 and the knot is not the sexton\u2019s',
+    'A hot spring, bathhouse, or laundry \u2014 where rank dissolves in steam',
+    'The judges\u2019 table, the weigh station, the scrutineering shed \u2014 where the contest is actually decided',
+    'A library carrel with sixty years of pencil marginalia, all in one hand',
+    'The doorway everyone ducks through \u2014 built for a shorter century',
+    'A field that floods into a mirror every spring \u2014 the town\u2019s week of second sky',
+    'The last switchback before the pass \u2014 where loads are lightened and left',
+    'A station waiting room between trains \u2014 four hours where strangers become confessors',
+    'The town notice board \u2014 layers deep, an archaeology of announcements',
+    'An observatory dome, mid-repair \u2014 the sky visible through the wound in the roof',
+    'The seam where new cobbles meet old \u2014 the visible edge of the last disaster',
+    'A ferry\u2019s midpoint \u2014 the exact place where both shores are equally far',
+    'The champion\u2019s bench, its plaque worn illegible by weather and thumbs',
+    'A pantry, cellar, or store-room inventoried by three generations in three hands'
+  ];
+
+  // ── TABLE 16 — TONAL TOUCHSTONE (114 entries, "Roll twice" excluded, "Work — quality";
+  //    mechanism-first phrasing on purpose — name the technique, never the prose) ──
 
   T.touchstone = [
     'The Friends of Eddie Coyle \u2014 dialogue as the entire story; what people don\u2019t say in conversation; low-life dignity',
@@ -1486,8 +1919,6 @@
     'Watchers \u2014 the hunted; genetic experimentation; what intelligence costs the experimented-upon',
     'The Terror \u2014 historical horror; leadership in catastrophe; the monster as environment and as legend',
     'Black House / The Talisman \u2014 the multiverse beneath the mundane; childhood as the threshold; the heroic ordinary person',
-    'It \u2014 childhood trauma made literal; the group as unit of courage; the monster that feeds on fear',
-    'The Stand \u2014 post-plague moral alignment; the ordinary as heroic; the road novel as eschatology',
     'Annihilation \u2014 the unreliable expedition narrator; ecological horror; identity dissolving in contact with the alien',
     'City of Saints and Madmen \u2014 the city as organism; documents as horror; the author as suspect presence',
     'The Raw Shark Texts \u2014 the conceptual predator; meaning as dangerous; the chase novel where what pursues is an idea',
@@ -1521,14 +1952,33 @@
     'Picnic at Hanging Rock \u2014 the unexplained disappearance; repression and the landscape; what civilization cannot contain',
     'The Reflecting Skin \u2014 the child narrator creating monsters from trauma; rural America as Gothic space; innocence inverted',
     'Twin Peaks: The Return \u2014 the return as impossible; time as damage; the detective and the mystery as the same entity',
-    'True Detective Season 1 \u2014 philosophical nihilism as character; the case as self-examination; Southern Gothic updated',
     'Fortitude \u2014 community secret in extreme environment; the ecosystem as antagonist; forensics in a place of myth',
     'The Leftovers \u2014 grief without resolution or explanation; the absence as the presence; secular grief as theology',
     'Station Eleven \u2014 what is worth preserving after collapse; the traveling theater as civilization\u2019s argument for itself',
-    'The OA \u2014 trauma narrative as mythology; the unreliable account that may be true; community formed by shared story'
+    'The OA \u2014 trauma narrative as mythology; the unreliable account that may be true; community formed by shared story',
+    'The Goblin Emperor \u2014 kindness as competence; court intrigue survived by decency; the outsider who reads the room by caring about it',
+    'A Gentleman in Moscow \u2014 confinement as expansion; grace as a discipline; a whole world built inside a boundary',
+    'The Martian \u2014 competence as the narrative engine; problem after problem, solved with arithmetic and morale; aloneness without despair',
+    'Master and Commander \u2014 friendship as the long plot; craft and weather as the daily antagonist; the ship as a village',
+    'The Princess Bride \u2014 adventure with a wink; sincerity smuggled inside irony; the told story framing the true one',
+    'My Neighbor Totoro \u2014 wonder without an antagonist; the world alive and kindly indifferent; childhood attention as the lens',
+    'Kiki\u2019s Delivery Service \u2014 the gift that stops working; craft crisis as coming of age; a town\u2019s gentle economy of favors',
+    'Over the Garden Wall \u2014 autumnal wonder with real teeth; folk-tale logic honored in full; dread and warmth sharing the same woods',
+    'Detectorists \u2014 small obsessions held with total dignity; the land as archive; comedy that never mocks its people',
+    'Cold Comfort Farm \u2014 the doom-laden rural genre lovingly dismantled; competence versus atmosphere; tidying as heroism',
+    'Three Men in a Boat \u2014 the comic travelogue; digression as structure; mild catastrophe among friends',
+    'Spirited Away \u2014 the other world\u2019s rules learned through work; names as power; greed transformed rather than defeated',
+    'The Long Way to a Small, Angry Planet \u2014 found family in transit; low stakes held with high care; the crew as the plot',
+    'Lincoln in the Bardo \u2014 the chorus of voices; grief refracted through many speakers; the document-chorus as form',
+    'The Summer Book \u2014 a grandmother, a child, an island; wisdom without moral; the season as the only clock',
+    'Plainsong \u2014 community as quiet rescue; parallel lives braiding; kindness rendered without sentimentality',
+    'The Riddle-Master of Hed \u2014 riddles as law and inheritance; reluctance as heroism; every answer purchased with a price',
+    'Watership Down \u2014 the epic scaled to hedgerows; folklore invented in-world; leadership tested under open sky'
   ];
 
-  // ── TABLE 17 — NARRATIVE VOICE & POV MODE (20 entries, "Voice — Description") ──
+  // ── TABLE 17 — NARRATIVE VOICE & POV MODE (40 entries, "Voice — Description";
+  //    the second twenty are document-native modes — each one pushes the
+  //    fragment ecology and shell identity somewhere different) ──
 
   T.voice = [
     'Close first-person, reliable \u2014 The narrator believes what they say. The reader may see more than they do. Intimacy and limitation simultaneously.',
@@ -1550,6 +2000,26 @@
     'The naive or innocent narrator \u2014 Not necessarily a child. A person without the context to understand what they are reporting. The horror is in the gap between their account and the reader\u2019s knowledge.',
     'Non-human or posthuman POV \u2014 An AI, an animal, an alien, a god, a virus. The narrative assumes a different relationship to time, consciousness, or care. What is human becomes strange.',
     'Fragmented / non-linear \u2014 The story is told out of order. Time is not chronological. Memory, trauma, investigation, or structure requires the reader to assemble the sequence.',
+    'The ship\u2019s log \u2014 Position, weather, incident; feeling smuggled into official fields. What the log cannot say presses against its margins.',
+    'The field notebook \u2014 Observations dated and sketched. The observer keeps entering the frame and apologizing for it.',
+    'Committee minutes \u2014 Motions, seconds, actions arising. The drama is in what is minuted, what is merely "noted," and what is struck.',
+    'The annotator \u2014 The story lives in the margins of someone else\u2019s text. Two minds on one page, decades or inches apart.',
+    'The almanac \u2014 Tides, feasts, planting days. The year speaks; people are weather.',
+    'The recipe book \u2014 Instructions, yields, substitutions forced by shortage. A family\u2019s history told in what they could get.',
+    'The ledger-keeper \u2014 Debits, credits, and entries that balance only if you know the story. Money as memoir.',
+    'The oral-history transcript \u2014 [laughs], [pause], the interviewer\u2019s questions removed. An absence shaped like a second voice.',
+    'The radio log \u2014 Call signs, static, procedure words. Intimacy conducted at broadcast distance.',
+    'The museum label \u2014 Catalogue numbers, provenance, "gift of." The collection narrates; the collector emerges by implication.',
+    'The match record \u2014 Fixtures, scores, notation. A season\u2019s heartbreak legible only to those who can read the game.',
+    'The guidebook \u2014 Directions, hours, advisories. Revised editions disagree; the disagreements are the plot.',
+    'The liturgy \u2014 Versicle and response, rubrics in the margin. The congregation\u2019s pencil has altered the responses over the years.',
+    'The inventory \u2014 Item, condition, location. Something is always missing, and the list knows before anyone says it.',
+    'The correspondence archive \u2014 Both sides of the letters, filed by a third hand. The archivist\u2019s ordering is an argument.',
+    'The nature column \u2014 Weekly dispatches on weather and wings. The columnist\u2019s life leaks in through the hedgerow.',
+    'The instruction manual \u2014 Steps, warnings, exploded diagrams. Someone has underlined WARNING every time, harder each year.',
+    'The prize citation \u2014 Official praise, careful omissions. The story is reconstructed from what the judges chose not to say.',
+    'The weather log \u2014 Pressure, visibility, remarks. The remarks column slowly becomes a diary.',
+    'The double-entry \u2014 Two documents, one event. The reader is the only one who has both.',
     'The metafictional narrator \u2014 The narrator knows they are in a story and has opinions about it. Used for satire, deconstruction, or to make the reader\u2019s act of reading part of the meaning.'
   ];
 
@@ -1561,15 +2031,18 @@
   // protagonist, and voice will bury five words of real direction no matter
   // how the precedence is phrased.
   //
-  // 'texture' is the sparse slice: four texture rolls and a touchstone. It
+  // 'texture' is the sparse slice: five texture rolls and a touchstone. It
   // supplies specificity to be specific IN — objects, dynamics, ironies,
-  // motifs, a tonal reference — and deliberately no premise, no protagonist,
-  // no setting, and no voice, because those are the user's to name.
+  // motifs, a returning place, a tonal reference — and deliberately no
+  // premise, no protagonist, no setting, and no voice, because those are the
+  // user's to name. (The returning place is micro-scale by construction —
+  // a room, a bench — texture, not a competing setting.)
   var SLICES = {
     texture: function () {
       return [
         'Texture: ' + lc(roll(T.textureObject)) + '; ' + lc(roll(T.textureDynamic)) + '; '
           + lc(roll(T.textureIrony)) + '; ' + lc(roll(T.textureMotif)) + '.',
+        'Returning place: ' + lc(roll(T.texturePlace)) + '.',
         'Touchstone: ' + roll(T.touchstone) + '.'
       ].join('\n');
     }
@@ -1581,6 +2054,12 @@
   };
 
   window.randomizeBrief = function () {
+    // Half the briefs run on a buried truth, half on a live pressure —
+    // otherwise every random book arrives pre-shaped for reconstruction
+    // (the D104 sameness, reintroduced at the input layer).
+    var engine = Math.random() < 0.5
+      ? 'The secret: ' + lc(roll(T.secret))
+      : 'The pressure: ' + lc(roll(T.pressure));
     var parts = [
       roll(T.genreTone) + '. ' + roll(T.setting) + '.',
       'Protagonist: ' + roll(T.protagonist) + '. They want ' + lc(roll(T.want)) + '. They need ' + lc(roll(T.need)) + '.',
@@ -1588,9 +2067,9 @@
       'Antagonist: ' + lc(roll(T.antagonist)) + '.',
       'Inciting incident: ' + lc(roll(T.incident)) + '. Midpoint: ' + lc(roll(T.midpoint)) + '.',
       'Darkest moment: ' + lc(roll(T.darkestMoment)) + '. Resolution: ' + lc(roll(T.resolution)) + '.',
-      'Central question: ' + roll(T.theme) + ' The secret: ' + lc(roll(T.secret)) + '.',
-      'Texture: ' + lc(roll(T.textureObject)) + '; ' + lc(roll(T.textureDynamic)) + '; ' + lc(roll(T.textureIrony)) + '; ' + lc(roll(T.textureMotif)) + '.',
-      'Voice: ' + lc(roll(T.voice)) + '.',
+      'Central question: ' + roll(T.theme) + ' ' + engine + '.',
+      'Texture: ' + lc(roll(T.textureObject)) + '; ' + lc(roll(T.textureDynamic)) + '; ' + lc(roll(T.textureIrony)) + '; ' + lc(roll(T.textureMotif)) + '. Returning place: ' + lc(roll(T.texturePlace)) + '.',
+      'Voice: ' + lc(roll(T.voice)),
       'Touchstone: ' + roll(T.touchstone) + '.'
     ];
     return parts.join('\n');
