@@ -745,6 +745,14 @@
       gap: 6px;
     }
 
+    .door-steer {
+      margin-top: 8px;
+      font-family: var(--body);
+      font-size: var(--fs-meta);
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
     .generator-mode-legend-row {
       font-family: var(--body);
       font-size: var(--fs-meta);
@@ -3201,11 +3209,17 @@
              the tabs themselves always stay visible, and reading another
              door's description is one click on its tab. -->
         <div class="generator-mode-switch" role="tablist" aria-label="How do you want the booklet written?">
-          <button class="generator-mode-btn is-active" id="gen-mode-manual" type="button" role="tab" aria-selected="true">I Have A Chatbot</button>
-          <button class="generator-mode-btn" id="gen-mode-api" type="button" role="tab" aria-selected="false">I Have An API Key</button>
+          <button class="generator-mode-btn is-active" id="gen-mode-api" type="button" role="tab" aria-selected="true">I Have An API Key</button>
           <button class="generator-mode-btn" id="gen-mode-bridge" type="button" role="tab" aria-selected="false">I Have A Coding Agent</button>
+          <button class="generator-mode-btn" id="gen-mode-manual" type="button" role="tab" aria-selected="false">I Have A Chatbot</button>
         </div>
         <div class="generator-mode-copy" id="gen-mode-copy"></div>
+        <!-- The polite ranking (author, 2026-08-13). Order and default carry
+             it too: API first because it is the most reliable way to run the
+             whole build end to end; the agent door is its byte-identical twin
+             on a subscription; the chatbot door is the free universal path
+             and says so in its own sentence, one click away. -->
+        <div class="door-steer">Every door ends in the same checked book. The API door is the most reliable way to run the whole build; a coding agent equals it on your own subscription; the chatbot door is free and works everywhere — it just takes longer and asks more of you.</div>
 
         <div class="wizard-resume-banner" id="wiz-resume-banner">
           <div class="wizard-resume-copy" id="wiz-resume-copy">A saved project is available on this device.</div>
@@ -9214,7 +9228,10 @@
         );
       }, { once: true });
       apiRunState = createApiRunState();
-      setGenerationMode('manual');
+      // The default door is the recommendation (author, 2026-08-13): API is
+      // the most reliable end-to-end run. A returning reader's saved door
+      // still wins — the restore above this line re-opens it.
+      setGenerationMode('api');
       setGeneratorSurface('intake', { skipFocus: true });
       var existingWizardDraft = getWizardDraft();
       if (existingWizardDraft) {
