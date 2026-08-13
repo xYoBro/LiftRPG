@@ -5567,6 +5567,23 @@ export function validateSkeletonStage(result, weekCount, options) {
     }
   }
 
+  // ── The artifact-intent floor, the Skeleton+Flesh half (F07) ──────────────
+  // Everything above this line is an advisory, and advisories are what let two
+  // of four matrix books ship with no planning bundle at all. This stage is the
+  // S+F pipeline's compiler seat — generateSkeletonPrompt carries
+  // INST_ARTIFACT_COMPILER, so the skeleton is TOLD to author the bundle — which
+  // makes it the exact counterpart of the shell gate on the standard pipeline.
+  // A floor on one pipeline only would leave half the generated books owing a
+  // surface nobody asks them for.
+  //
+  // Same four fields, same helper, same opt-in: the menu conformance above stays
+  // advisory, and every ungated caller (the guided-build harness, the manual
+  // API) keeps its silence.
+  if (floorsOn(options)) {
+    var intentFloor = artifactIntentFloorErrors(meta, 'Skeleton');
+    if (intentFloor.length) return intentFloor.join('; ');
+  }
+
   // ── theme ──
   var theme = result.theme;
   if (!theme) return 'Skeleton → theme: missing';
