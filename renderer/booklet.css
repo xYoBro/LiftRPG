@@ -4927,6 +4927,22 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .map-maze[data-maze-density="dense"] .map-maze-label{
   font-size:2.7px;
 }
+/* Passage labels (D152 render fix): subordinate to node labels — smaller,
+   more muted, no uppercase; the paper halo keeps them legible where they
+   cross a corridor. Tokens only; B&W-safe by construction. */
+.map-maze-passage-label{
+  font-family:var(--mono);
+  font-size:2.1px;
+  letter-spacing:.03em;
+  fill:color-mix(in srgb, var(--ink) 68%, var(--muted) 32%);
+  paint-order:stroke fill;
+  stroke:color-mix(in srgb, var(--paper) 94%, white 6%);
+  stroke-width:.9px;
+  stroke-linejoin:round;
+}
+.map-maze[data-maze-density="dense"] .map-maze-passage-label{
+  font-size:1.9px;
+}
 .map-maze[data-maze-density="dense"] .map-corridor{
   stroke-width:2.6;
 }

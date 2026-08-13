@@ -887,6 +887,43 @@ function renderMazeMap(mapState) {
       bar.setAttribute('class', 'map-corridor-door');
       svg.appendChild(bar);
     }
+
+    // The corridor's name — the PTP twin's `edge.label` made maze-native
+    // (found authored-but-dropped at D151; seven labels in the tidewall
+    // fixture never printed). The label rides the LONGER leg, the door bar's
+    // own convention, and sits clear of the corridor so the pencil's trace
+    // stays unobstructed (the write-in law): middle-anchored above a
+    // horizontal leg, start/end-anchored beside a vertical one — an anchored
+    // side never spills text back across the line the player draws on. Placed
+    // best-effort on collision because the maze has no route-key surface to
+    // carry a suppressed label (the same reasoning as PTP's !hasRouteKey arm).
+    const labelText = compactRouteLabel(passage.label, tier === 'dense' ? 10 : 14);
+    if (labelText) {
+      const legH = Math.abs(to._x - from._x);
+      const legV = Math.abs(to._y - from._y);
+      const collisionR = tier === 'dense' ? 5 : 6;
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      if (legH >= legV) {
+        const midX = (from._x + to._x) / 2;
+        let ly = from._y - 3.2;
+        if (labelCollidesWithNode(midX, ly, nodes, collisionR)) ly = from._y + 3.4;
+        text.setAttribute('x', midX.toFixed(2));
+        text.setAttribute('y', ly.toFixed(2));
+        text.setAttribute('text-anchor', 'middle');
+      } else {
+        const midY = (from._y + to._y) / 2;
+        let lx = to._x + 2.2;
+        let anchor = 'start';
+        if (labelCollidesWithNode(lx, midY, nodes, collisionR)) { lx = to._x - 2.2; anchor = 'end'; }
+        text.setAttribute('x', lx.toFixed(2));
+        text.setAttribute('y', midY.toFixed(2));
+        text.setAttribute('text-anchor', anchor);
+      }
+      text.setAttribute('dominant-baseline', 'middle');
+      text.setAttribute('class', 'map-maze-passage-label');
+      text.textContent = labelText;
+      svg.appendChild(text);
+    }
   });
 
   const markerR = tier === 'dense' ? 2.4 : 3;
