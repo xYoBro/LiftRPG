@@ -5940,7 +5940,12 @@ export function validateCampaignPlanStage(result, options) {
   }
   if (Array.isArray(result.weeks)) {
     result.weeks.forEach(function (w, i) {
-      var label = 'Campaign Plan → weeks[' + i + ']';
+      // The label leads with the WEEK NUMBER, the name the plan itself uses —
+      // found on the first real run (D153 follow-on): "weeks[5] … is also
+      // assigned to week 5" reads as a contradiction when weeks[5] is week 6,
+      // and an informed retry then repairs the wrong week, twice. The index
+      // stays in parentheses for humans reading the raw array.
+      var label = 'Campaign Plan → Week ' + (w && w.weekNumber ? w.weekNumber : (i + 1)) + ' (weeks[' + i + '])';
       if (!w.weekNumber) {
         errors.push(label + ': missing weekNumber');
         return;
@@ -6119,7 +6124,8 @@ export function validateCampaignPlanStage(result, options) {
   if (Array.isArray(result.weeks)) {
     result.weeks.forEach(function (week, index) {
       if (!week || !Array.isArray(week.fragmentIds)) return;
-      var label = 'Campaign Plan → weeks[' + index + ']';
+      // Same week-number-first labeling as the loop above (D153 follow-on).
+      var label = 'Campaign Plan → Week ' + (week.weekNumber || (index + 1)) + ' (weeks[' + index + '])';
       week.fragmentIds.forEach(function (fragmentId, fragmentIndex) {
         var normalizedId = normalizeId(fragmentId);
         var registryEntry = fragmentRegistryById[normalizedId];

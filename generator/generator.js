@@ -2865,7 +2865,16 @@
       cipherVarietyLine(weekCount),
       '- Fragment IDs MUST use canonical LiftRPG format only: F.01, F.02, F.03 ... Never use placeholders like F-1A or F_01.',
       '- Every fragmentRegistry entry must have a real weekRef and must also appear in that owning week\'s fragmentIds array.',
+      // The one-owner law + the legal documentType menu (D153 follow-on):
+      // both were demanded at the gate and stated nowhere the stage could
+      // read — the first real run failed twice on exactly that. The menu
+      // arrives through options from the pipeline's import, never a quoted
+      // copy here (this file cannot import contract-constants).
+      '- Each fragment ID appears in exactly ONE week\'s fragmentIds — the week that introduces it (its weekRef). A later week, the boss week included, must NOT re-list an earlier week\'s fragment; later weeks reach earlier documents through references, never ownership.',
       '- fragmentRegistry entries must be full objects with id, title, documentType, author, revealPurpose, clueFunction, weekRef.',
+      (options && Array.isArray(options.documentTypeMenu) && options.documentTypeMenu.length
+        ? '- documentType must be one of: ' + options.documentTypeMenu.join(', ') + '.'
+        : '- documentType must be a real found-document kind, used consistently.'),
       '- overflowRegistry entries must use weekNumber and canonical IDs starting at F.30. Do not omit weekNumber.',
       '- Overflow weeks (sessionCount > 3) must set overflowFragmentId and match overflowRegistry for that same week.',
       '- Boss weeks can only consume planned fragmentIds through session.fragmentRef coverage. Do not assign more boss-week fragmentIds than the boss week has sessions.',

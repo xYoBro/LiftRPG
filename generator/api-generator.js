@@ -490,7 +490,11 @@ var STRUCTURED_SCHEMA_CAMPAIGN = {
         properties: {
           id: { type: 'string' },
           title: { type: 'string' },
-          documentType: { type: 'string' },
+          // Enum-constrained since the first real run (D153 follow-on): the
+          // diversity floor counts CANONICAL types only, and a model shown no
+          // menu wrote nine invented types that counted as zero. The other
+          // fragment schemas below already carry this enum; this one missed it.
+          documentType: { type: 'string', enum: DOCUMENT_TYPE_ENUM },
           author: { type: 'string' },
           revealPurpose: { type: 'string' },
           clueFunction: { type: 'string', enum: ['establishes', 'complicates', 'reveals'] },
@@ -1075,7 +1079,9 @@ function buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState,
     '- mapReuse cannot mean "no change": every non-boss week must declare a visibly new stateChange or unlock relative to the prior week.',
     '- Fragment IDs MUST use canonical LiftRPG format only: F.01, F.02, F.03 ... Never use placeholders like F-1A or F_01.',
     '- Every fragmentRegistry entry must have a real weekRef and must also appear in that week\'s fragmentIds array.',
+    '- Each fragment ID appears in exactly ONE week\'s fragmentIds — the week that introduces it (its weekRef). A later week, the boss week included, must NOT re-list an earlier week\'s fragment; later weeks reach earlier documents through references, never ownership.',
     '- fragmentRegistry entries must be full objects with id, title, documentType, author, revealPurpose, clueFunction, weekRef.',
+    '- documentType must be one of: ' + DOCUMENT_TYPE_ENUM.join(', ') + '.',
     '- overflowRegistry entries must use weekNumber and canonical IDs starting at F.30. Do not omit weekNumber.',
     '- Overflow weeks (sessionCount > 3) must set overflowFragmentId and match overflowRegistry for that same week.',
     '- Boss weeks can only consume planned fragmentIds through session.fragmentRef coverage. Do not assign more boss-week fragmentIds than boss-week sessions.',
@@ -2983,6 +2989,12 @@ async function runApiPipeline(options) {
             // The board geometry's GIVEN: this stage declares
             // `topology.mainMapType` and every later week reuses it (D144 W-2).
             seedAssignments: seedAssignments,
+            // The legal fragment documentType menu rides the call (D153
+            // follow-on) — generator.js is a classic script that cannot
+            // import contract-constants, and a quoted copy there would be
+            // the drift the one-home law exists to prevent. Passing the
+            // enum at call time keeps the single home by construction.
+            documentTypeMenu: DOCUMENT_TYPE_ENUM,
             identityAxes: identityAxesForStage('campaign-plan')
           });
         }
