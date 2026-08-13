@@ -205,24 +205,19 @@
     },
     {
       "path": "cover.svgArt",
-      "status": "rendered",
+      "status": "contract-debt",
       "presence": "optional",
       "warnIfPresent": false,
-      "renderer": [
-        "buildCoverPageModel",
-        "renderCover"
-      ],
-      "notes": "Optional sanitized inline SVG art rendered as a sparse cover artifact."
+      "renderer": [],
+      "notes": "RETIRED BY RULING (D142, 2026-08-13) — a deliberate retirement, not unpaid debt. renderCoverArt() and its CSS are deleted and no prompt surface offers the field; contract-debt is this file's only non-rendering class, so it carries the retirement. Schema acceptance is kept deliberately (legacy books validate forever) and warnIfPresent stays false because four corpus fixtures authored the field pre-ruling — the corpus is evidence, never retro-edited. buildCoverPageModel still copies the value onto the page model; nothing draws it."
     },
     {
       "path": "cover.coverArtCaption",
-      "status": "rendered",
+      "status": "contract-debt",
       "presence": "optional",
       "warnIfPresent": false,
-      "renderer": [
-        "buildCoverPageModel",
-        "renderCover"
-      ]
+      "renderer": [],
+      "notes": "RETIRED BY RULING (D142, 2026-08-13) alongside cover.svgArt — see that entry for the full reasoning."
     },
     {
       "path": "rulesSpread.leftPage.title",

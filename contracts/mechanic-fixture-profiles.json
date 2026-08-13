@@ -11,8 +11,7 @@
     "requiredInterludePayloadTypes": [
       "companion"
     ],
-    "requiredMapTypes": [],
-    "requireCoverArt": true
+    "requiredMapTypes": []
   },
   "content/The-Air-Gapped-Choir.json": {
     "requiredCompanionTypes": [],
@@ -23,8 +22,7 @@
       "point-to-point",
       "player-drawn",
       "grid"
-    ],
-    "requireCoverArt": false
+    ]
   },
   "content/The-Hinge.json": {
     "requiredCompanionTypes": [],
@@ -35,15 +33,13 @@
       "linear-track",
       "point-to-point",
       "player-drawn"
-    ],
-    "requireCoverArt": false
+    ]
   },
   "content/liftrpg-eastern-shore.json": {
     "requiredCompanionTypes": [],
     "requiredClockTypes": [],
     "requiredInterludePayloadTypes": [],
-    "requiredMapTypes": [],
-    "requireCoverArt": false
+    "requiredMapTypes": []
   },
   "content/the-conclave-s-legacy.json": {
     "requiredCompanionTypes": [
@@ -64,8 +60,7 @@
     ],
     "requiredMapTypes": [
       "point-to-point"
-    ],
-    "requireCoverArt": false
+    ]
   },
   "content/vale-a-record-of-orcus.json": {
     "requiredCompanionTypes": [
@@ -88,8 +83,7 @@
     ],
     "requiredMapTypes": [
       "point-to-point"
-    ],
-    "requireCoverArt": true
+    ]
   },
   "content/geometry-01-tidewall.json": {
     "requiredCompanionTypes": [],
@@ -105,7 +99,6 @@
       "maze",
       "grid",
       "point-to-point"
-    ],
-    "requireCoverArt": false
+    ]
   }
 }
