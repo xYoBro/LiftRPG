@@ -3307,10 +3307,13 @@ export function weekOwesDoor(shape) {
  *
  * FORM. The pre-flight can only match the `door:W<n>` REF form, because at plan
  * time the door has no prose label to match against. That is one form stricter
- * than the week gate, which also accepts a label match — and it is the correct
- * strictness: the ref is the form the week floor's own remedy text teaches
- * ("name the fork as `door:W1`"), and it is the only form that can be checked
- * before the door exists.
+ * than the week gate, which also accepts a label match — and it is exactly as
+ * strict as the DOCTRINE: SCHEMA_PLAY_SPINE in prompt_rules.js says "One row
+ * per door, `fork` written as `door:W3`". So a spine that followed its own
+ * prompt passes, the week gate is simply laxer than what was asked for, and a
+ * spine that did not costs one retry at the cheapest gate carrying the remedy
+ * verbatim. Checked before ruling, because a pre-flight stricter than the
+ * doctrine would block books the prompt never mis-taught.
  */
 export function collectSpinePreflightFloorErrors(spine, plan, stageLabel) {
   var errors = [];
