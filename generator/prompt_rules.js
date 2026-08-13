@@ -608,16 +608,36 @@
       // every booklet would then count in the same instrument.
       artifactIdentity: { artifactClass: '', shellFamily: '', boardStateMode: '', attachmentStrategy: '', componentDialect: '' },
       artifactIntent: {
+        // `briefMode` and `fidelityMode` stay filled, and they are the only two
+        // that do. Both CLASSIFY THE INPUT — how the brief arrived, and how
+        // literally to take it — so a sample is a worked reading of a document
+        // the model can check its own answer against. Every field below them
+        // chooses what the BOOK IS, and a sample there is an exemplar.
         briefMode: 'sparse', fidelityMode: 'interpretive',
-        arcFamily: 'slow-burn-investigation', mechanicGrammarFamily: 'survey-grid',
-        documentEcology: { dominant: ['fieldNote', 'report'], forbidden: ['transcript'] },
-        exclusions: { mechanicExclusions: ['testimony-matrix', 'profile-assembly'], documentExclusions: ['transcript'], arcExclusions: ['institutional-collapse'] },
-        homePull: 'investigation',
-        convergencePattern: 'sequential-assembly',
-        // Free strings, deliberately blank in the example: enum members are
-        // shown because they are a closed menu; the recorded reading is the
-        // model's own words and a filled-in sample would function as an
-        // exemplar to copy (the exact bleed D47 bans).
+        // ── BLANK BY RULING (D144), and this is D47's own argument applied to
+        // the fields that were exempted from it. The comment two blocks up
+        // states the rule correctly for `componentDialect`: a filled-in sample
+        // of a choice that carries the book's identity functions as an exemplar
+        // to copy. These seven were filled anyway, and the values were the
+        // measured convergence itself — `survey-grid`, `slow-burn-
+        // investigation`, `sequential-assembly`, a dominant ecology of
+        // fieldNote+report, and `grid` as the week-1 board. Every one is the
+        // default the rest of this wave exists to break, printed in the one
+        // place a freeform provider is told to IMITATE.
+        //
+        // The old rationale here claimed the opposite — "enum members are shown
+        // because they are a closed menu" — which is exactly backwards: being a
+        // closed menu is what makes a shown value an instruction. The blanks
+        // still teach the SHAPE (which keys, which arrays, how many entries),
+        // which is all an output example owes.
+        arcFamily: '', mechanicGrammarFamily: '',
+        documentEcology: { dominant: ['', ''], forbidden: [''] },
+        exclusions: { mechanicExclusions: ['', ''], documentExclusions: [''], arcExclusions: [''] },
+        homePull: '',
+        convergencePattern: '',
+        // The recorded reading is the model's own words, and a filled-in sample
+        // would function as an exemplar to copy — the same bleed, one level
+        // down.
         reading: {
           tone: '', register: '', povFrame: '', impliedSetting: '',
           emotionalArc: '', genreTemplate: '', ludicReading: '', briefEvidence: ''
@@ -636,14 +656,22 @@
     },
     theme: { visualArchetype: '', palette: { ink: '#000000', paper: '#ffffff', accent: '#000000', muted: '#888888', rule: '#cccccc', fog: '#eeeeee' } },
     cover: { title: '', designation: '', tagline: '', colophonLines: ['', '', ''] },
+    // Same ruling as the artifactIntent block above (D144). `mapType: 'grid'`,
+    // `oracleMode: 'mixed'` and `documentType: 'memo'` were each the measured
+    // default of their own menu, printed in the shape a freeform provider is
+    // told to imitate — and `memo` in particular is the document type
+    // INST_SHELL_CHOICE now names out loud as "the one the model reaches for
+    // when it has not decided". Structural values (`weekNumber`, `sessionCount`,
+    // `componentValue`, the id patterns) stay: they teach the shape, and a shape
+    // is what an output example is for.
     weekPlan: [
       { weekNumber: 1, title: '', arcBeat: '', epigraphText: '', epigraphAttribution: '',
-        mapType: 'grid', cipherType: '', componentValue: 1, isBossWeek: false, isDeload: false,
+        mapType: '', cipherType: '', componentValue: 1, isBossWeek: false, isDeload: false,
         isBinaryChoiceWeek: false, sessionCount: 5, fragmentIds: ['F.01'],
-        overflowFragmentId: null, oracleMode: 'mixed', companionTypes: [], clockNames: [], hasInterlude: false }
+        overflowFragmentId: null, oracleMode: '', companionTypes: [], clockNames: [], hasInterlude: false }
     ],
     fragmentRegistry: [
-      { id: 'F.01', documentType: 'memo', inWorldAuthor: '', inWorldRecipient: '', title: '', narrativePurpose: '' }
+      { id: 'F.01', documentType: '', inWorldAuthor: '', inWorldRecipient: '', title: '', narrativePurpose: '' }
     ],
     bossPlan: { passwordWord: '', decodingLogic: '', convergenceRequirements: '', binaryChoiceSetup: '' },
     endingVariants: ['canonical']
