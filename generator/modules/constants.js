@@ -86,7 +86,20 @@ export var STAGE_BUDGETS = {
   // Both now follow the ladder's own rule (~3-4x measured output) and pair
   // with a timeout that reaches the ceiling at the conservative ~20 tok/s floor.
   critic:         { maxTokens: 24000, timeoutMs: 480000 },
-  'critic-revise': { maxTokens: 24000, timeoutMs: 600000 }
+  'critic-revise': { maxTokens: 24000, timeoutMs: 600000 },
+  // The conductor's pass (FUSION.md §4 mechanism 6). The cheapest reading stage
+  // in the ladder BY CONSTRUCTION: its input is the score projection alone —
+  // one line per week plus a caption, roughly 1.5k tokens at twelve weeks —
+  // never the digest, because a reader handed the pages stops hearing the
+  // sequence (that is the whole failure §4.6 names). Output is one verdict
+  // sentence per week plus at most CONDUCTOR_MAX_FINDINGS findings: ~800 tokens
+  // compact at twelve weeks, ~1.5k as models pretty-print it. 12000 is the
+  // ladder's own ~3-4x rule with headroom for a model that thinks inside the
+  // same ceiling, and it pairs with the 300000ms the `rules` and `knowing` rows
+  // use — the two other short-structured-output stages. Sized deliberately
+  // BELOW `critic`: a stage that reads an index must never be budgeted like one
+  // that reads the book.
+  conductor:      { maxTokens: 12000, timeoutMs: 300000 }
 };
 
 // Retry escalation: each attempt gets more wall clock than the last, and a
@@ -366,3 +379,60 @@ export var STRUCTURAL_REOPEN_SCOPES = [
     licenses: 'what this unit asks the player to CHOOSE may change — whether it forks at all, '
       + 'and what mechanically differs across the branches' }
 ];
+
+// ── The conductor's pass (FUSION.md §4 mechanism 6) ─────────────────────────
+// "A dedicated post-draft read of ONLY the play-order sequence... auditing
+// phrasing across the whole." The constitution has named this since it was
+// written and nothing ran it: its material existed in the digest, and a general
+// read passed over it every time — which is exactly what §4.6 predicts and what
+// two real books measured (fusionPacing was the MINIMUM dimension in both).
+//
+// THIS IS THE VERDICT VOCABULARY, not a list of schema fields — the same choice
+// STRUCTURAL_REOPEN_SCOPES made and for the same reason. A reader told "score
+// the pacing" produces an impression; a reader told "name which of these nine
+// relations you heard, and cite the weeks and the curves you read it from"
+// produces a finding somebody can act on. Every id below is one of the six
+// mechanisms as HEARD, or one of the two failures §4.6 names by name:
+//
+//   score / exhale         -> mechanism 1 (the fusion score; the deload law)
+//   counterpoint / doubling-> mechanism 2 + §3 (the load-bearing law, both ways)
+//   leitmotif              -> mechanism 3
+//   echo                   -> mechanism 4
+//   unnameable             -> mechanism 5
+//   discord / flat         -> §4.6's two named failures
+//
+// Mechanism 6 is the pass itself and therefore cannot appear here: a reader
+// whose verdict is "the conductor's pass" has named its own chair.
+//
+// SINGLE HOME, same as CRITIC_DIMENSIONS and STRUCTURAL_REOPEN_SCOPES:
+// modules/conductor.js validates against these ids and prompt_rules.js states
+// them to the model once (INST_CONDUCTOR). check-generation-floors.mjs asserts
+// the mirror, because an id the pipeline accepts and the prompt never offers is
+// a verdict nobody can return.
+export var CONDUCTOR_MECHANISMS = [
+  { id: 'score',
+    reads: 'the week plays the beat and the dynamic marking it declared for itself' },
+  { id: 'counterpoint',
+    reads: 'what is at stake rises with the training load while the page speaks the other way' },
+  { id: 'doubling',
+    reads: 'both curves move together — unison, which is not harmony' },
+  { id: 'discord',
+    reads: 'a heavy week carrying an administrative beat, with nothing at risk in it' },
+  { id: 'flat',
+    reads: 'the book holds one dynamic for its whole length — every week mezzo-forte' },
+  { id: 'exhale',
+    reads: 'the lighter week carries content — the aftermath, the arriving document, the count taken' },
+  { id: 'leitmotif',
+    reads: 'a carried object means something different here than it did before the midpoint' },
+  { id: 'echo',
+    reads: 'a mechanical event and a story surface answer each other inside one week, both directions' },
+  { id: 'unnameable',
+    reads: 'what this world will not say is carried by a printed surface rather than a sentence' }
+];
+
+// At most three, and the number is the point. The conductor is a prioritizer,
+// not a second critic: a read that returns nine findings has returned a list,
+// and the loop it feeds revises CRITIC_MAX_REVISIONS_PER_ROUND units in a round
+// under floors that can refuse any of them. Three prioritized findings is what
+// one round can actually act on.
+export var CONDUCTOR_MAX_FINDINGS = 3;
