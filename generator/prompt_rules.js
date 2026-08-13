@@ -387,8 +387,6 @@
     '- `tagline` (string)',
     '- `subtitle` (string, optional): one-line diegetic subtitle',
     '- `colophonLines` (string[], 3-6 items)',
-    '- `svgArt` (string, optional): sparse line-based inline SVG only when it materially helps',
-    '- `coverArtCaption` (string, optional)',
     '',
     '## rulesSpread',
     '- `leftPage`: { title, reEntryRule, sections: [{ heading, body }] }. Each section is an object with a `heading` string and a `body` string.',

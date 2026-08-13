@@ -726,9 +726,7 @@ var STRUCTURED_SCHEMA_SHELL = {
         designation: { type: 'string' },
         subtitle: { type: 'string' },
         tagline: { type: 'string' },
-        colophonLines: { type: 'array', items: { type: 'string' } },
-        svgArt: { type: 'string' },
-        coverArtCaption: { type: 'string' }
+        colophonLines: { type: 'array', items: { type: 'string' } }
       },
       required: ['title', 'designation', 'tagline', 'colophonLines']
     },
