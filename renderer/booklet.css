@@ -528,17 +528,24 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
      THE DRAWING LAW binds all of it, and `designLanguageDrawingLaw()` in
      scripts/validate.mjs is the gate — every rule keyed to a design attribute
      is scanned for box-metric properties, exactly as the dialect rules are. */
+  /* ONLY the tokens with a real var() consumer are bridged. Four more were
+     written here first — --theme-design-intensity, --theme-design-ink-coverage,
+     --theme-design-header-bar, --theme-design-tone — and every one of them had
+     zero consumers, because their values are either read straight off the
+     container (`--design-intensity`, `--design-ink-coverage`: the carries
+     contract reads them as authored) or composed in JS before they ever reach
+     CSS (the header bar joins --header-shadow in composeDesignLanguage, since
+     a box-shadow list cannot be joined with an unset half). A bridged token
+     with no consumer is the exact defect D126 spent a wave undoing: a theme
+     contract row that is silently false. `designLanguageDrawingLaw()` now fails
+     the build on one. */
   --theme-page-filter:var(--page-filter,none);
-  --theme-design-intensity:var(--design-intensity,0);
-  --theme-design-ink-coverage:var(--design-ink-coverage,1);
-  --theme-design-header-bar:var(--design-header-bar,none);
   --theme-design-frame:var(--design-frame,none);
   --theme-design-texture-press:var(--design-texture-press,1);
-  /* The tone ladder's pattern, and the ink the design language draws its own
-     chrome in. `--design-chrome-ink` is deliberately NOT --accent: the bars,
-     frames and bands are STRUCTURE, and structure that changes hue with the
-     palette stops reading as structure. It is the book's ink, dimmed. */
-  --theme-design-tone:var(--design-tone-pattern,none);
+  /* The ink the design language draws its own chrome in. Deliberately NOT
+     --accent: the bars, frames and bands are STRUCTURE, and structure that
+     changes hue with the palette stops reading as structure. It is the book's
+     ink, dimmed. */
   --design-chrome-ink:color-mix(in srgb, var(--ink) 82%, transparent 18%);
   --theme-page-edge:var(--page-edge,none);
   --theme-live-frame:var(--live-frame,none);
@@ -8178,13 +8185,17 @@ body[data-demo-view="true"] .reader-unlock{
 }
 
 /* ── Ink discipline: one impression, not a pile of effects ─────────────────
-   `--design-ink-coverage` already scales the drawn values in theme.js. Only
-   'crushed' reaches the page filter, and it is the heaviest thing in this
-   system — which is why an author has to name it. A `filter` composites the
-   painted result; it does not reflow. */
-[data-design-language] .booklet-page{
-  filter:var(--theme-page-filter,none);
-}
+   `--design-ink-coverage` scales the drawn values in theme.js, before any of
+   them reach CSS. Only 'crushed' reaches the page filter, and it is the
+   heaviest thing in this system — which is why an author has to name it. A
+   `filter` composites the painted result; it does not reflow.
+
+   NO RULE IS NEEDED HERE. `.booklet-page` already reads `--theme-page-filter`
+   unconditionally (see PAGE FOUNDATION), and the bridge now resolves that token
+   from `--page-filter`, which composeDesignLanguage() sets for 'crushed' alone.
+   A scoped duplicate was written here first and deleted: it applied the same
+   property with the same value at higher specificity, which is a rule that
+   looks like it does something and cannot. */
 
 /* ── Semantic margins (Into the Odd, made B&W-honest) ──────────────────────
    The original signals content class with COLOUR — black for core mechanics,
