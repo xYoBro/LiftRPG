@@ -3246,7 +3246,7 @@
     '  printed surface. A structural failure licenses the reviser to RE-DECIDE that aspect;',
     '  a prose failure never does.',
     '- "reopen": required when scope is "structure", omitted otherwise. An array of one or more',
-    '  of the four aspects below — name only the ones your directive actually needs reopened,',
+    '  of the seven aspects below — name only the ones your directive actually needs reopened,',
     '  because everything you do not name is frozen for that revision:',
     '  - "beat": what the unit is ABOUT — its position in the arc, what is at risk in it, what',
     '    it converges or postpones.',
@@ -3256,6 +3256,14 @@
     '    object means at this point in the book.',
     '  - "mechanism": which printed surface carries the unit\'s pressure — what the clock,',
     '    oracle, door, cipher, or mark strip is keyed to and what it answers.',
+    '  - "economy": where the unit\'s value flows — what its marks bank into, what its spend',
+    '    buys, and which surface downstream reads the result.',
+    '  - "gate": what the unit locks and what opens it — which key the player must already',
+    '    hold, and how far ahead of the lock they can hold it.',
+    '  - "decision": what the unit asks the player to CHOOSE — whether it forks at all, and',
+    '    what mechanically differs across the branches.',
+    '  The last three are the play wiring, and they exist because a dead sink, a key that',
+    '  arrives too late, and a week that asks nothing are not fixable by re-keying a surface.',
     '  A "structure" scope with no reopen array is read as "prose", so name the aspect.',
     'The revision runs under floors you cannot waive and must not ask for: the training itself',
     '(sessions, exercises, sets, reps), every id and cross-reference, and the decode spine',
@@ -3337,7 +3345,15 @@
       motif: 'which recurring object, place, or phrase this unit carries may change, and '
         + 'what that object means at this point in the book',
       mechanism: 'which printed surface carries this unit\'s pressure may change — what the '
-        + 'clock, oracle, door, cipher, or strip is keyed to and what it answers'
+        + 'clock, oracle, door, cipher, or strip is keyed to and what it answers',
+      // The ludic scopes (W4b) — the simulated player's soft findings arrive
+      // here. Byte-quoted from STRUCTURAL_REOPEN_SCOPES like the four above.
+      economy: 'where this unit\'s value flows may change — what its marks bank into, what its '
+        + 'spend buys, and which surface downstream reads the result',
+      gate: 'what this unit locks and what opens it may change — which key the player must '
+        + 'already hold, and how far ahead of the lock they can hold it',
+      decision: 'what this unit asks the player to CHOOSE may change — whether it forks at all, '
+        + 'and what mechanically differs across the branches'
     };
     var reopened = (reopenScopes || []).filter(function (id) { return !!REOPEN_LICENCES[id]; });
     var reopenBlock = reopened.length ? [

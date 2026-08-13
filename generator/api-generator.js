@@ -54,6 +54,8 @@ import {
   buildCriticDigest,
   buildFusionFrame,
   formatFusionFrameBlock,
+  buildSpineFrame,
+  formatSpineFrameBlock,
   validateCriticVerdict,
   normalizeCriticVerdict,
   summarizeVerdict,
@@ -125,8 +127,14 @@ import {
 
 import {
   buildQualityGate,
-  generateQualityReport
+  generateQualityReport,
+  collectMotifCrossRegistrationFindings
 } from './modules/quality.js';
+
+// The walker itself, for the critic's soft-finding channel. The gate reaches it
+// through validateAssembledBooklet; the critic needs it directly because it
+// re-measures each round after accepted revisions.
+import { simulateBook, simSoftFindings } from './modules/sim-player.js';
 
 import {
   getDailyBudget,
@@ -1767,6 +1775,13 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
       .concat(collectMarkStripFindings(booklet).warnings)
       .concat(collectVoiceTicFindings(booklet).map(function (f) { return f.message; }))
       .concat(collectLicensedMovePlacementFindings(booklet).map(function (f) { return f.message; }))
+      // W4b: the simulated player's SOFT half — decision droughts, an
+      // immaterial spend spread, a declared stake nothing can take. The hard
+      // half never arrives here: soft-locks are stage-gate errors and are
+      // already blocking by the time the critic runs. Motif cross-registration
+      // rides the same channel (FUSION §6's V/B promotion, WARN-class).
+      .concat(simSoftFindings(simulateBook(booklet)))
+      .concat(collectMotifCrossRegistrationFindings(booklet))
       .map(function (finding) {
         return typeof finding === 'string' ? finding : String((finding && finding.message) || finding);
       })
@@ -1775,6 +1790,13 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
     // for the same reason the machine findings are: an accepted revision that
     // cut a week's prose moves the curve the next verdict grades against.
     var fusionFrameBlock = formatFusionFrameBlock(buildFusionFrame(booklet));
+    // The spine frame (W4b) rides beside it for the same reason and by the same
+    // rule: it ABSTAINS rather than printing nulls, so a pre-spine book's
+    // prompt is byte-identical to what it was before this landed.
+    var spineFrameBlock = formatSpineFrameBlock(buildSpineFrame(booklet));
+    var frameBlocks = [fusionFrameBlock, spineFrameBlock].filter(function (b) {
+      return typeof b === 'string' && b.trim();
+    }).join('\n\n');
     var verdictRaw;
     try {
       verdictRaw = await runJsonStage(settings, {
@@ -1782,7 +1804,7 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
         stageName: 'Composition Critic — round ' + round,
         buildPrompt: (function (dj, mf, ff) {
           return function () { return window.buildCriticPrompt(dj, brief, mf, ff); };
-        })(digestJson, machineFindings, fusionFrameBlock),
+        })(digestJson, machineFindings, frameBlocks),
         maxAttempts: 2,
         validate: validateCriticVerdict,
         rateLimiter: ctx.rateLimiter || null,
@@ -2633,7 +2655,15 @@ async function runApiPipeline(options) {
   recordSeedOnBooklet(booklet, divergenceSeed);
   recordWorkoutLifecycle(booklet, workoutLifecycle);
 
-  var validationResult = validateAssembledBooklet(booklet);
+  // generationFloors: the API path, so the simulated player's soft-locks are
+  // blocking-class errors (D111). See validateAssembledBooklet's header for the
+  // severity split and why the corpus is untouched by it.
+  var validationResult = validateAssembledBooklet(booklet, { generationFloors: true });
+  writePipelineDebris(booklet, '_simReport', validationResult.sim);
+  if (validationResult.sim && !validationResult.sim.skipped) {
+    console.log('[LiftRPG] Simulated player: ' + validationResult.sim.hard.length + ' soft-lock(s), '
+      + validationResult.sim.soft.length + ' finding(s).');
+  }
   if (validationResult.warnings && validationResult.warnings.length > 0) {
     console.warn('[LiftRPG] Validation warnings:', validationResult.warnings);
   }
@@ -3680,7 +3710,11 @@ async function runSkeletonFleshPipeline(options) {
     truthBoardStateMode(booklet, readPipelineDebris(booklet, '_assemblyDiagnostics') || []);
   }
 
-  var validationResult = validateAssembledBooklet(booklet);
+  // generationFloors: this is the API path, so the simulated player's
+  // soft-locks are blocking-class errors here (D111). The guided wizard and the
+  // corpus call the same function without the flag and get warnings.
+  var validationResult = validateAssembledBooklet(booklet, { generationFloors: true });
+  writePipelineDebris(booklet, '_simReport', validationResult.sim);
   if (validationResult.errors && validationResult.errors.length > 0) {
     console.warn('[S+F] Assembly validation errors:', validationResult.errors);
   }
@@ -4148,6 +4182,12 @@ window.LiftRPGAPI = {
     buildCriticDigest: buildCriticDigest,
     buildFusionFrame: buildFusionFrame,
     formatFusionFrameBlock: formatFusionFrameBlock,
+    // W4b — the walker and its critic projection, exposed for the same reason
+    // the fusion frame is: the browser suite is where "does this run in the
+    // door" is provable, and the sim's whole promise is that it does.
+    buildSpineFrame: buildSpineFrame,
+    formatSpineFrameBlock: formatSpineFrameBlock,
+    simulateBook: simulateBook,
     validateCriticVerdict: validateCriticVerdict,
     normalizeCriticVerdict: normalizeCriticVerdict,
     summarizeVerdict: summarizeVerdict,

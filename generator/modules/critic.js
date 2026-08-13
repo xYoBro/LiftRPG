@@ -13,6 +13,7 @@ import {
   STRUCTURAL_REOPEN_SCOPES
 } from './constants.js';
 import { buildWorkoutTopology } from './workout-topology.js';
+import { simulateBook } from './sim-player.js';
 import {
   validateWeekSchema,
   validateFragmentsStage,
@@ -317,6 +318,133 @@ export function formatFusionFrameBlock(frame) {
     ];
     lines.push(cols.join(' | '));
   });
+  return lines.join('\n');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// THE SPINE FRAME (W4b) — systemIntegration's evidence, on the D114 pattern
+// ════════════════════════════════════════════════════════════════════════════
+// `systemIntegration` has always been the dimension most exposed to feel: "do
+// the components listen to each other" is answerable by vibe, and a critic
+// grading it by vibe rewards a book whose components are individually
+// impressive. The fusion frame fixed the same problem for `fusionPacing` by
+// handing the critic a MEASUREMENT and letting it grade against numbers; this
+// is that move applied to play.
+//
+// The projection, exactly: the DECLARED spine (composition, edges, forks,
+// tension rows) beside what the simulated player found when it walked the
+// printed book. Declaration on the left, reality on the right, so a finding
+// cites rather than feels.
+//
+// ABSTENTION IS A FEATURE, not a fallback. A book with no spine gets NO frame
+// (the formatter returns '' and the caller drops the section), because the
+// alternative — printing a table of nulls — invites the critic to read
+// "nothing declared" as "nothing there", which is false about every book
+// generated before W4a. The formatWorkoutTopologyBlock idiom, third use.
+var SPINE_FRAME_ROLE_CAP = 72;
+
+function spineClip(text, cap) {
+  var s = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
+  return s.length > cap ? s.slice(0, cap - 1) + '…' : s;
+}
+
+/**
+ * buildSpineFrame(booklet) -> { declared, walked, abstain, reason }
+ *
+ * Pure. Machine-readable so a test can assert the projection rather than the
+ * sentence, exactly like buildFusionFrame's rows.
+ */
+export function buildSpineFrame(booklet) {
+  var spine = ((booklet || {}).meta || {}).playSpine;
+  var empty = { abstain: true, reason: '', declared: null, walked: null };
+  if (!spine || typeof spine !== 'object') {
+    empty.reason = 'this book declares no play spine';
+    return empty;
+  }
+  var report = simulateBook(booklet);
+  if (report.skipped) {
+    empty.reason = report.skipReason;
+    return empty;
+  }
+  return {
+    abstain: false,
+    reason: '',
+    declared: {
+      composition: (spine.composition || []).map(function (c) {
+        return { entry: String((c || {}).entry || ''), role: spineClip((c || {}).role, SPINE_FRAME_ROLE_CAP) };
+      }),
+      economyEdges: (spine.economyGraph || []).length,
+      consequenceEdges: (spine.consequenceEdges || []).length,
+      forks: (spine.decisionLedger || []).map(function (d) {
+        return { fork: String((d || {}).fork || ''), differsBy: spineClip((d || {}).differsBy, SPINE_FRAME_ROLE_CAP) };
+      }),
+      tensionRows: (spine.tensionBudget || []).map(function (t) {
+        return {
+          week: (t || {}).week,
+          scarce: spineClip((t || {}).scarce, 32),
+          losable: spineClip((t || {}).losable, 32),
+          fallBehind: spineClip((t || {}).fallBehind, 32)
+        };
+      }),
+      honestGaps: (spine.honestGaps || []).length
+    },
+    walked: {
+      bands: report.bands,
+      decisions: report.decisions,
+      softLocks: report.hard.map(function (f) { return f.code; }),
+      findings: report.soft.map(function (f) { return f.code; }),
+      measurements: report.measurements
+    }
+  };
+}
+
+/**
+ * formatSpineFrameBlock(frame) -> string
+ *
+ * One line per declaration, each answered by what the walk measured. '' when
+ * the frame abstains, so the caller drops the section entirely.
+ */
+export function formatSpineFrameBlock(frame) {
+  if (!frame || frame.abstain) return '';
+  var d = frame.declared;
+  var w = frame.walked;
+  var m = w.measurements || {};
+  var lines = [
+    '## The Spine Frame (measured — what the book DECLARED beside what a walker FOUND)',
+    'The simulated player walked this book with no dice and no DOM, at three adherence bands,',
+    'over the guaranteed economy only. These are measurements of the artifact, not judgments of',
+    'it — but systemIntegration is graded against them, so cite these rather than impressions.',
+    'declared: ' + d.composition.length + ' library entries, ' + d.economyEdges + ' economy edges, '
+      + d.consequenceEdges + ' consequence edges, ' + d.forks.length + ' fork(s), '
+      + d.tensionRows.length + ' tension row(s)'
+      + (d.honestGaps ? ', ' + d.honestGaps + ' honest gap(s)' : ''),
+    'walked:   ' + (m.graphNodes || 0) + ' nodes / ' + (m.graphEdges || 0) + ' edges ('
+      + (m.branchEdges || 0) + ' door-contingent, ' + (m.chanceEdges || 0) + ' dice-fed and excluded'
+      + ' from reachability), ' + (m.materialWindows || 0) + ' of ' + (m.spendWindows || 0)
+      + ' spend windows wide enough for stingy and greedy play to differ'
+  ];
+  d.composition.forEach(function (c) {
+    lines.push('  entry ' + c.entry + ' — "' + c.role + '"');
+  });
+  d.forks.forEach(function (f) {
+    lines.push('  fork ' + f.fork + ' — differs by "' + f.differsBy + '"');
+  });
+  w.bands.forEach(function (b) {
+    lines.push('  band ' + b.label + ': ' + b.completedSessions + ' sessions, ' + b.ticksAtEnd + ' ticks'
+      + (b.thresholdMet === null ? '' : ', reckoning threshold '
+        + (b.thresholdMet ? 'met' : 'NOT met (' + b.ticksAtThreshold + ' banked)')));
+  });
+  var thin = w.decisions.filter(function (row) { return row.decisions === 0; });
+  lines.push('  decisions per week: ' + w.decisions.map(function (r) { return 'w' + r.week + ':' + r.decisions; }).join(' ')
+    + (thin.length ? ' — ' + thin.length + ' week(s) ask nothing' : ''));
+  if (w.softLocks.length) {
+    lines.push('  SOFT-LOCKS the walker found: ' + w.softLocks.join(', ')
+      + ' — these are structural failures, not taste; systemIntegration cannot score at threshold'
+      + ' while one stands.');
+  }
+  if (w.findings.length) {
+    lines.push('  findings: ' + w.findings.join(', '));
+  }
   return lines.join('\n');
 }
 

@@ -50,7 +50,12 @@ export var EXTENSION_KEY = '_x';
 export var PIPELINE_DEBRIS_KEYS = [
   '_pipeline', '_stageTelemetry', '_qualityGate', '_qualityReport',
   '_assemblyWarnings', '_continuityWarnings', '_assemblyDiagnostics',
-  '_artifactIntentDrift', '_trialMode', '_criticReport'
+  '_artifactIntentDrift', '_trialMode', '_criticReport',
+  // W4b: the simulated player's walk. Recorded rather than only logged for the
+  // D19 reason every other report here is — a book ships with its critique
+  // attached, and "the walker found two soft-locks" belongs in the artifact a
+  // reader opens later, not in a console nobody kept.
+  '_simReport'
 ];
 
 /**

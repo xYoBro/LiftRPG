@@ -326,5 +326,27 @@ export var STRUCTURAL_REOPEN_SCOPES = [
       + 'what that object means at this point in the book' },
   { id: 'mechanism', name: 'the mechanical assignment',
     licenses: 'which printed surface carries this unit\'s pressure may change — what the '
-      + 'clock, oracle, door, cipher, or strip is keyed to and what it answers' }
+      + 'clock, oracle, door, cipher, or strip is keyed to and what it answers' },
+  // ── The ludic scopes (W4b) ───────────────────────────────────────────────
+  // The first four are the FUSION vocabulary: they let a reviser re-decide what
+  // a unit is and how it sounds. None of them can re-decide how the unit is
+  // WIRED, and that is precisely the class of finding the simulated player
+  // produces — a dead sink, a key that arrives too late, a week that asks
+  // nothing. Routing a sim finding through `mechanism` would license "re-key
+  // the clock" when the defect is "nothing reads the clock", which is a
+  // different edit on a different object.
+  //
+  // Three, not one, for the same reason there are four above rather than one
+  // "structure": the reviser is told what is open and everything else is
+  // frozen, so a scope that meant "the play is reopened" would unfreeze the
+  // whole unit on every finding.
+  { id: 'economy', name: 'the economic wiring',
+    licenses: 'where this unit\'s value flows may change — what its marks bank into, what its '
+      + 'spend buys, and which surface downstream reads the result' },
+  { id: 'gate', name: 'the gate and its key',
+    licenses: 'what this unit locks and what opens it may change — which key the player must '
+      + 'already hold, and how far ahead of the lock they can hold it' },
+  { id: 'decision', name: 'the decision offered',
+    licenses: 'what this unit asks the player to CHOOSE may change — whether it forks at all, '
+      + 'and what mechanically differs across the branches' }
 ];

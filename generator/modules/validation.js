@@ -86,6 +86,16 @@ import {
   looksLikeFragmentRef
 } from './fingerprint.js';
 
+// The simulated player (W4b). ONE-DIRECTIONAL BY DESIGN: sim-player.js imports
+// the ref grammar and one normalizer and nothing else, so it can never import
+// this file back. The walker must run in all three doors (VISION §4.5) and a
+// cycle here would surface as a load-order failure in exactly one of them.
+import {
+  simulateBook,
+  simCorrectionDirectives,
+  simSoftFindings
+} from './sim-player.js';
+
 // ── Part 1: Continuity validators ─────────────────────────────────────────────
 
 // Normalize component type strings for comparison: trim, lowercase, underscores→spaces
@@ -3718,9 +3728,41 @@ export function collectPlayLoopFindings(booklet) {
   return findings;
 }
 
-export function validateAssembledBooklet(booklet) {
+/**
+ * validateAssembledBooklet(booklet, options) -> { valid, errors, warnings, sim }
+ *
+ * `options` is additive and every existing caller omits it, which keeps their
+ * behaviour byte-identical: `options.generationFloors` is the D111 switch and
+ * nothing else reads it here.
+ *
+ * THE SIMULATED PLAYER'S SEAT (W4b). This is the only gate in the pipeline that
+ * sees a whole assembled book, which is the only object the sim can walk — the
+ * week stages see one week and the skeleton sees a plan. Severity follows D111
+ * exactly:
+ *
+ *   floors ON  (the API pipelines) — soft-locks are ERRORS. A book whose ending
+ *     is unreachable at realistic adherence is not a book with a quality
+ *     problem; it is a book that cannot be finished, and the model is told so
+ *     with the defect quoted.
+ *   floors OFF (the corpus, the guided wizard, hand-authored JSON) — the same
+ *     findings ride the WARNING channel. `npm run validate` must never fail a
+ *     sealed fixture over a gate written after it was sealed.
+ *
+ * And underneath both: a book with no `meta.playSpine` is SKIPPED by the walker
+ * itself, so every fixture in content/ is untouched either way.
+ */
+export function validateAssembledBooklet(booklet, options) {
   var errors = [];
   var warnings = []; // soft issues (stylistic, non-fatal) — attached to return value
+  var opts = options || {};
+
+  var simReport = simulateBook(booklet);
+  if (!simReport.skipped) {
+    var simHard = simCorrectionDirectives(simReport);
+    if (opts.generationFloors) simHard.forEach(function (m) { errors.push(m); });
+    else simHard.forEach(function (m) { warnings.push(m); });
+    simSoftFindings(simReport).forEach(function (m) { warnings.push(m); });
+  }
 
   collectBudgetBreaches(booklet).forEach(function (b) { warnings.push(b.message); });
   collectNounRosterFindings(booklet).forEach(function (m) { warnings.push(m); });
@@ -4194,7 +4236,23 @@ export function validateAssembledBooklet(booklet) {
   }
 
   // Return serialization-safe shape (plain object, not array-with-custom-properties)
-  return { errors: errors, warnings: warnings };
+  // `sim` rides along so a caller can report the walk without re-running it.
+  // Serialization-safe by construction: the walker's graph and holds are
+  // stripped, because they carry the node objects and this shape is written
+  // into `_x` debris and posted through structuredClone boundaries.
+  return {
+    errors: errors,
+    warnings: warnings,
+    sim: {
+      skipped: simReport.skipped,
+      skipReason: simReport.skipReason,
+      hard: simReport.hard,
+      soft: simReport.soft,
+      bands: simReport.bands,
+      decisions: simReport.decisions,
+      measurements: simReport.measurements
+    }
+  };
 }
 
 // ── Part 4: Pipeline stage validators ─────────────────────────────────────────
