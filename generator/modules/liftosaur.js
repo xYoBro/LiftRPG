@@ -235,6 +235,144 @@ export function normalizeCanonicalWorkout(rawText, output) {
   };
 }
 
+// ── Week-count ownership: the template is a pattern, not a book length ──────
+//
+// THE DEFECT THIS CLOSES (W3, 2026-08-13). The Liftosaur builtin `gzclp` is a
+// ONE-WEEK, FOUR-DAY rotating template with autoregulated stage progression —
+// verified on the live wire: weekHeaders=1, dayHeaders=4. The canonicalize
+// stage is told "transcribe only", so it correctly returns `weeks.length === 1`,
+// and `normalizeCanonicalWorkout` correctly reports `weekCount: 1`. The
+// pipeline then took that number as the BOOK'S length and shipped a one-week
+// booklet for a program the lifter will run for months. Nothing threw. The eval
+// matrix had to hand-expand the program to get a fixed-length book at all
+// (evals/w3-matrix/build-workouts.mjs states the workaround in its header).
+//
+// THE RULING. The user's requested week count owns book length. A template
+// shorter than the request REPEATS to fill it, because that is what a rotating
+// template IS — a week pattern plus a rule for continuing. Applying the
+// program's own `progress:` semantics across N weeks is TRANSCRIPTION; it is
+// the same act as transcribing the first week. Inventing exercises, loads, a
+// volume ramp, or a deload the program never declared would be IMPROVEMENT, and
+// that stays forbidden (docs/craft/WORKOUT.md; D107's whole point).
+//
+// THE ASYMMETRY IS DELIBERATE. A template LONGER than the request is left
+// alone: those weeks are written program, not a repeating pattern, and dropping
+// them would discard training the user's own file contains. So this function
+// only ever extends, never truncates — the same shape as faceDelta()'s clamp in
+// type-metrics.js, and for the same reason: move in the direction that can be
+// defended from the data, and stand still in the direction that cannot.
+//
+// HONESTY WHEN THERE IS NOTHING TO APPLY. A template with no stated progression
+// at all cannot be extended by any rule; the only honest extension is literal
+// repetition, and `note.warning` says so in words the operator reads. Never a
+// silent one-week book, and never a silent invented ramp.
+//
+// D117 MIRROR: every exercise entry copied here was already shaped (and
+// rep-target filtered) by normalizeCanonicalWorkout above. Extension copies;
+// it never constructs. The producer therefore stays stricter-than-the-validator
+// by construction, with no second copy of printableRepTarget to drift.
+
+/** Plain-JSON deep copy. The shaped week objects are JSON by construction
+ *  (normalizeCanonicalWorkout builds them from primitives), and aliasing them
+ *  across weeks would let one later mutation edit several weeks at once. */
+function cloneWeekBody(week) {
+  return JSON.parse(JSON.stringify(week));
+}
+
+/**
+ * Does this program state how it continues past the weeks it wrote out?
+ *
+ * Two independent signals, either of which is enough: the canonicalization
+ * stage's own `progressionSummary`, and a Liftoscript `progress:` line in the
+ * user's original text. The second is checked because the summary is model
+ * prose and may come back empty on a program whose script plainly carries the
+ * rule.
+ *
+ * @param {object} nw normalized workout (normalizeCanonicalWorkout output)
+ * @returns {boolean}
+ */
+export function statesProgression(nw) {
+  if (!nw || typeof nw !== 'object') return false;
+  const summary = String((nw.summary && nw.summary.progression) || '').trim();
+  if (summary) return true;
+  return PROGRESS_LINE.test(String(nw.rawText || ''));
+}
+
+/**
+ * Extend a canonical workout to the requested book length by cycling its weeks.
+ *
+ * @param {object} nw              normalizeCanonicalWorkout output (or null)
+ * @param {number} requestedWeeks  the week count the user's input asked for
+ * @returns {{nw: object|null, extended: boolean, note: object|null}}
+ *   `nw`       the workout to use downstream — the input object untouched when
+ *              no extension was needed, a new object when it was.
+ *   `extended` whether cycling happened.
+ *   `note`     operator-facing record: template length, book length, whether
+ *              the program stated a progression, and the warning text when it
+ *              did not. Null when nothing happened.
+ */
+export function extendCanonicalWorkout(nw, requestedWeeks) {
+  const unchanged = { nw: nw || null, extended: false, note: null };
+  if (!nw || typeof nw !== 'object') return unchanged;
+
+  const weeks = Array.isArray(nw.weeks) ? nw.weeks : [];
+  const template = weeks.length;
+  const wanted = Math.floor(Number(requestedWeeks));
+  if (!template || !isFinite(wanted) || wanted <= template) return unchanged;
+
+  const progression = statesProgression(nw);
+  const out = [];
+  for (let i = 0; i < wanted; i++) {
+    const source = weeks[i % template];
+    const week = cloneWeekBody(source);
+    week.weekNumber = i + 1;
+    if (i >= template) {
+      // The provenance of a repeated week, carried as data rather than as
+      // prose, so the prompt formatter can state it and the checkpoint can
+      // show it. `cycleOf` is a 1-based week number in the ORIGINAL template.
+      week.cycleOf = (i % template) + 1;
+    }
+    out.push(week);
+  }
+
+  let totalExercises = 0;
+  let maxSessions = 0;
+  out.forEach(function (week) {
+    const sessions = week.sessions || [];
+    if (sessions.length > maxSessions) maxSessions = sessions.length;
+    sessions.forEach(function (session) {
+      totalExercises += ((session && session.exercises) || []).length;
+    });
+  });
+
+  const extendedNw = {
+    source: nw.source,
+    rawText: nw.rawText,
+    weekCount: wanted,
+    weeks: out,
+    summary: {
+      sessionsPerWeek: maxSessions,
+      totalExercises: totalExercises,
+      progression: String((nw.summary && nw.summary.progression) || '')
+    }
+  };
+
+  return {
+    nw: extendedNw,
+    extended: true,
+    note: {
+      templateWeeks: template,
+      bookWeeks: wanted,
+      progressionStated: progression,
+      warning: progression ? '' : (
+        'The program is a ' + template + '-week template that states no progression rule, '
+        + 'so weeks ' + (template + 1) + '-' + wanted + ' repeat it exactly as written. '
+        + 'Nothing has been added to the training.'
+      )
+    }
+  };
+}
+
 // ── Tier 2: the public reference tier ───────────────────────────────────────
 
 export const LIFTOSAUR_MCP_ENDPOINT = 'https://www.liftosaur.com/mcp';
@@ -546,6 +684,8 @@ export function getBuiltinProgram(id, opts) {
 // import. Guarded so Node imports stay side-effect free.
 if (typeof window !== 'undefined') {
   window.looksLikeLiftoscript = looksLikeLiftoscript;
+  window.liftosaurExtendCanonicalWorkout = extendCanonicalWorkout;
+  window.liftosaurStatesProgression = statesProgression;
   window.liftosaurListBuiltinPrograms = listBuiltinPrograms;
   window.liftosaurGetBuiltinProgram = getBuiltinProgram;
   window.liftosaurParseProgramList = parseProgramList;

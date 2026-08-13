@@ -192,7 +192,8 @@ import { looksLikeDeloadWeek } from './modules/workout-topology.js';
 // self-registers on window for index.html's program-lookup affordance.
 import {
   looksLikeLiftoscript,
-  normalizeCanonicalWorkout
+  normalizeCanonicalWorkout,
+  extendCanonicalWorkout
 } from './modules/liftosaur.js';
 
 
@@ -2144,10 +2145,16 @@ async function runApiPipeline(options) {
   }));
   checkpoint = canonState.checkpoint;
   if (canonState.applied) {
+    // The user's requested length owns the book; a shorter template cycles to
+    // fill it (resolveCanonicalBookLength). Before W3 this line read
+    // `weekCount = canonState.nw.weekCount` and a one-week rotating template
+    // produced a one-week booklet.
+    var canonWeeks = resolveCanonicalBookLength(canonState, weekCount, onProgress,
+      function () { return totalStages; });
     workout = formatNormalizedForPrompt(canonState.nw);
-    if (canonState.nw.weekCount) {
-      totalStages += (canonState.nw.weekCount - weekCount);
-      weekCount = canonState.nw.weekCount;
+    if (canonWeeks) {
+      totalStages += (canonWeeks - weekCount);
+      weekCount = canonWeeks;
     }
     // The shell validator checks its declared session count against this. On
     // the paste path it has always been 0 (the raw branch counts no sessions),
@@ -2882,7 +2889,13 @@ function formatNormalizedForPrompt(nw) {
   lines.push('');
 
   nw.weeks.forEach(function (week, wi) {
-    lines.push('Week ' + (wi + 1) + ':');
+    // A cycled week says so. `cycleOf` is set by extendCanonicalWorkout when a
+    // template shorter than the book was repeated to fill it; stating it is the
+    // difference between "the program prescribes this again" (true) and "the
+    // author wrote a new week that happens to match" (false). The progression
+    // line above is what actually moves between cycles.
+    lines.push('Week ' + (wi + 1) + ':'
+      + (week.cycleOf ? '  (repeats week ' + week.cycleOf + ' of the program cycle; apply the stated progression)' : ''));
     (week.sessions || []).forEach(function (session, si) {
       var label = session.dayLabel || ('Session ' + (si + 1));
       var exList = (session.exercises || []).map(function (ex) {
@@ -3048,14 +3061,58 @@ function recordWorkoutLifecycle(booklet, lifecycle) {
 }
 
 function describeWorkoutLifecycle(state) {
+  var note = state.lengthNote || null;
   return {
     tier: state.applied ? 'liftoscript' : 'freeform',
     canonicalized: !!state.applied,
     source: state.reason,
     weekCount: state.nw ? state.nw.weekCount : null,
     sessionsPerWeek: state.nw && state.nw.summary ? state.nw.summary.sessionsPerWeek : null,
-    progressionSummary: state.nw && state.nw.summary ? state.nw.summary.progression : ''
+    progressionSummary: state.nw && state.nw.summary ? state.nw.summary.progression : '',
+    // Week-count ownership (W3 close). Present only when a template shorter
+    // than the requested book was cycled to fill it; absent means the program
+    // supplied every week itself. The audit line has to be able to answer
+    // "where did week 9 come from?" after the fact.
+    templateWeeks: note ? note.templateWeeks : null,
+    lengthPolicy: note ? 'template-cycled' : 'as-written',
+    progressionStated: note ? note.progressionStated : null
   };
+}
+
+/**
+ * WEEK-COUNT OWNERSHIP — one home, both pipelines.
+ *
+ * `extendCanonicalWorkout` holds the ruling (liftosaur.js); this holds the
+ * WIRING, and it is a function rather than two inline blocks because the two
+ * pipelines' copies of the old `weekCount = canonState.nw.weekCount` line are
+ * exactly the shape that drifts. A pipeline that resolved book length its own
+ * way would ship a different-length book from the same input.
+ *
+ * The mutation of `state.nw` is deliberate: `describeWorkoutLifecycle` reads it
+ * to write the booklet's audit line, and the audit must describe the book that
+ * was actually built, not the template it was built from. `state.lengthNote`
+ * carries the provenance so the two are distinguishable.
+ *
+ * @returns {number} the week count the pipeline should build to
+ */
+function resolveCanonicalBookLength(state, requestedWeeks, onProgress, getTotalStages) {
+  var result = extendCanonicalWorkout(state.nw, requestedWeeks);
+  state.nw = result.nw;
+  if (!result.note) return state.nw && state.nw.weekCount ? state.nw.weekCount : requestedWeeks;
+
+  state.lengthNote = result.note;
+  // DEGRADATION HONESTY, same channel and same rules as emitDegraded above: a
+  // repetition the program did not license is a thing the operator is entitled
+  // to know about before they print it.
+  if (result.note.warning) {
+    emitPipelineEvent(onProgress, getTotalStages(), getTotalStages(), result.note.warning, {
+      phase: 'start',
+      stageKey: 'canonicalize',
+      stageName: 'Reading the program',
+      noticeLevel: 'warn'
+    });
+  }
+  return result.note.bookWeeks;
 }
 
 
@@ -3224,11 +3281,14 @@ async function runSkeletonFleshPipeline(options) {
   }));
   checkpoint = sfCanonState.checkpoint;
   if (sfCanonState.applied) {
+    // Same ownership seam as the shell pipeline — see resolveCanonicalBookLength.
+    var sfCanonWeeks = resolveCanonicalBookLength(sfCanonState, weekCount, onProgress,
+      function () { return totalStages; });
     nw = sfCanonState.nw;
     workout = formatNormalizedForPrompt(nw);
-    if (nw.weekCount) {
-      totalStages += (nw.weekCount - weekCount);
-      weekCount = nw.weekCount;
+    if (sfCanonWeeks) {
+      totalStages += (sfCanonWeeks - weekCount);
+      weekCount = sfCanonWeeks;
     }
   }
   var sfWorkoutLifecycle = describeWorkoutLifecycle(sfCanonState);
