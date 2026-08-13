@@ -2783,6 +2783,167 @@
     'Do NOT invent mechanics, map types, component types, or document types outside these lists.'
   ].join('\n');
 
+  // ── The conductor's pass (FUSION.md §4 mechanism 6) ──────────────────────
+  // A dedicated post-draft read of ONLY the play-order sequence. The doctrine
+  // below is compressed from docs/craft/FUSION.md §3 (the load-bearing law) and
+  // §4 (the six mechanisms); when the two disagree, FUSION.md wins and this is
+  // regenerated from it — the VOICE.md compression rule, same seam.
+  //
+  // ROUTING: staged pipelines only, via STAGE_SCHEMA_MAP. It is deliberately
+  // absent from window.INSTRUCTIONS — the single-prompt path has no stage loop
+  // to feed and roughly 1,800 characters of headroom under its ceiling, so
+  // doctrine about a stage it cannot run would be pure cost.
+  //
+  // The mechanism ids and their one-line readings are BYTE-QUOTED from
+  // CONDUCTOR_MECHANISMS in generator/modules/constants.js, which is the single
+  // home. check-generation-floors.mjs diffs the two surfaces: an id the
+  // normalizer accepts and this prompt never offers is a verdict nobody can
+  // return, and an id offered here that the normalizer drops is a verdict that
+  // vanishes silently.
+  window.SCHEMA_CONDUCTOR = [
+    '# Conductor\'s Report Schema',
+    '',
+    'Return a single JSON object with exactly this structure. No prose outside it.',
+    '',
+    '- `reading` (string, REQUIRED): one or two sentences naming how this book is phrased AS',
+    '  A WHOLE — the shape its dynamics take from the first week to the last. Not a score, not',
+    '  a compliment, not a summary of what happens.',
+    '- `weeks` (array, REQUIRED): exactly ONE entry per week printed in the score, in order.',
+    '  - `week` (integer): the week number exactly as the score prints it.',
+    '  - `mechanism` (string): which relation you heard in this week, from the closed list in',
+    '    the instructions. One value only — the one that most explains this week\'s place in',
+    '    the sequence.',
+    '  - `verdict` (string): ONE sentence. What this week does in the sequence, and whether it',
+    '    does what its own declared marking said it would.',
+    '  - `cites` (array of strings): the measurements you read it from — week numbers with the',
+    '    curve values you compared, or the declared marking beside the printed index. "w4 load',
+    '    100, prose 96, declared loud" is a cite. "it felt flat" is not.',
+    '- `findings` (array, REQUIRED, AT MOST 3): the defects worth a revision, most damaging',
+    '  first. Return [] when the sequence is phrased and you have nothing to fix — an empty',
+    '  findings array is a real answer and a better one than three invented ones.',
+    '  - `week` (integer): the ONE week whose revision fixes this.',
+    '  - `mechanism` (string): the same closed list.',
+    '  - `issue` (string): one sentence naming what is wrong, citing the weeks and the curves.',
+    '  - `directive` (string): one imperative sentence a reviser can execute inside that week',
+    '    alone. Never a cross-week rename, never "rewrite the book".',
+    '  - `reopen` (array of strings): which aspects of that week\'s SHAPE the reviser may',
+    '    re-decide, from the closed list in the instructions. At least one, or the finding is',
+    '    read as a rewording request.'
+  ];
+
+  // Structured output schema for the conductor stage (OpenAI json_schema format,
+  // non-strict). It mirrors SCHEMA_CONDUCTOR above and adds the finding cap at
+  // the wire, where a provider that honours it costs nothing to enforce.
+  window.STRUCTURED_SCHEMA_CONDUCTOR = {
+    type: 'object',
+    properties: {
+      reading: { type: 'string' },
+      weeks: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            week: { type: 'integer' },
+            mechanism: {
+              enum: ['score', 'counterpoint', 'doubling', 'discord', 'flat', 'exhale',
+                'leitmotif', 'echo', 'unnameable']
+            },
+            verdict: { type: 'string' },
+            cites: { type: 'array', items: { type: 'string' } }
+          },
+          required: ['week', 'mechanism', 'verdict', 'cites']
+        }
+      },
+      findings: {
+        type: 'array',
+        maxItems: 3,
+        items: {
+          type: 'object',
+          properties: {
+            week: { type: 'integer' },
+            mechanism: {
+              enum: ['score', 'counterpoint', 'doubling', 'discord', 'flat', 'exhale',
+                'leitmotif', 'echo', 'unnameable']
+            },
+            issue: { type: 'string' },
+            directive: { type: 'string' },
+            reopen: {
+              type: 'array',
+              items: { enum: ['beat', 'dynamics', 'motif', 'mechanism', 'economy', 'gate', 'decision'] }
+            }
+          },
+          required: ['week', 'mechanism', 'issue', 'directive', 'reopen']
+        }
+      }
+    },
+    required: ['reading', 'weeks', 'findings']
+  };
+
+  window.INST_CONDUCTOR = [
+    '## The Conductor\'s Pass (read the score, not the pages)',
+    'You are reading a printed game book that fuses a real training program with a story. You',
+    'have NOT been given the book. You have been given its SCORE: one line per week carrying',
+    'the training load, the volume of prose the week prints, the dynamic marking the week',
+    'declared for itself, the beat it named, and the mechanical surfaces it puts on the page.',
+    'That restriction is the instrument. Phrasing is a property of the SEQUENCE, and a reader',
+    'holding thirty thousand words of individually good weeks hears individually good weeks.',
+    '',
+    '### The law you are listening for',
+    'STAKES PARALLEL THE LOAD; TEXTURE COUNTERPOINTS IT.',
+    'What a week is ABOUT rises with the training load — what is at risk, what converges, what',
+    'can no longer be postponed. How the page SPEAKS moves the other way: spare, cold and',
+    'procedural exactly when the body roars; open, expansive and human when the body rests.',
+    'UNISON IS NOT HARMONY. Two curves rising together is doubling, and doubling is the most',
+    'common way this fails, because it feels like conviction while it is written. The reader\'s',
+    'body is already the loudest instrument in the room on a peak day; a page that also shouts',
+    'is redundant AND inaudible.',
+    'THE DELOAD IS THE EXHALE. A lighter week must carry content, not padding — the aftermath,',
+    'the document that arrives, the count taken. A week whose story idles because the body is',
+    'idling is a dropped bar, and it shows in the score as a light week whose prose index and',
+    'surface list collapse together.',
+    '',
+    '### The failure this pass exists to catch',
+    'Every week was written to be good AS A WEEK, so every week wanted to be loud. A book can',
+    'carry every mechanic, pass every count, and still hold one dynamic for its whole length.',
+    'Completeness as flatness is the enemy here, and it is invisible one week at a time.',
+    '',
+    '### The nine relations — name exactly one per week',
+    'These are the only values `mechanism` accepts. Choose the one that most explains the',
+    'week\'s place in the sequence; the verdict says whether it succeeds or fails at it.',
+    '- "score": the week plays the beat and the dynamic marking it declared for itself.',
+    '- "counterpoint": what is at stake rises with the training load while the page speaks the other way.',
+    '- "doubling": both curves move together — unison, which is not harmony.',
+    '- "discord": a heavy week carrying an administrative beat, with nothing at risk in it.',
+    '- "flat": the book holds one dynamic for its whole length — every week mezzo-forte.',
+    '- "exhale": the lighter week carries content — the aftermath, the arriving document, the count taken.',
+    '- "leitmotif": a carried object means something different here than it did before the midpoint.',
+    '- "echo": a mechanical event and a story surface answer each other inside one week, both directions.',
+    '- "unnameable": what this world will not say is carried by a printed surface rather than a sentence.',
+    '',
+    '### What you may reopen',
+    'A finding names which aspects of that week\'s SHAPE a reviser may re-decide. Name only what',
+    'the fix needs; everything unnamed stays frozen.',
+    '- "beat": what the week is ABOUT — its position in the arc, what is at risk, what it converges.',
+    '- "dynamics": how loudly the week SPEAKS — its prose volume and register, including cutting it shorter.',
+    '- "motif": which recurring object, place, or phrase the week carries, and what it means here.',
+    '- "mechanism": which printed surface carries the week\'s pressure and what it answers.',
+    'The remaining three — "economy", "gate", "decision" — are the play WIRING, and a different',
+    'reader owns them. Use one only when the phrasing defect is genuinely a wiring defect: a',
+    'week that is quiet because it asks the player nothing, not a week that is quiet on purpose.',
+    '',
+    '### What this pass does NOT do',
+    '- Do not rewrite prose. You have not been shown any; a sentence you invent is a guess.',
+    '- Do not score anything. No numbers, no grades, no dimensions. Verdicts and targets only.',
+    '- Do not check whether surfaces are PRESENT. Presence is already law and already gated.',
+    '  A week printing every surface is exactly the book this pass exists to hear the flatness in.',
+    '- Do not audit the training. The program is the reader\'s real block and is never revised;',
+    '  the load curve is a fact you read against, never a thing you may ask to change.',
+    '- Do not invent measurements. If the score says the load curve is NOT READABLE, read the',
+    '  prose curve against the session counts and the DELOAD and BOSS marks, and say that you did.',
+    '- Do not manufacture findings to fill the three slots. Silence where the phrasing works is',
+    '  the honest answer and costs the book nothing.'
+  ];
+
   // ── Stage Schema Assembler ──────────────────────────────────────────────
   // Routes the right SCHEMA + INST slices to each API pipeline stage.
   // Single source of truth: modify SCHEMA_* or INST_* above, and both
@@ -2853,7 +3014,17 @@
     // answers with an envelope, which is a shape no validator here accepts.
     // JSON hygiene reaches this stage through OUTPUT_RULES, which is where it
     // belongs.
-    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'CONVERGENCE_DESIGN', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'ANTI_GENERIC', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] }
+    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'CONVERGENCE_DESIGN', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'ANTI_GENERIC', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
+    // Conductor: the dedicated read of the play-order sequence, after assembly
+    // and ahead of the critic's first round. It carries NOTHING else on
+    // purpose. No VOICE_DISCIPLINE (it writes no prose and is shown none), no
+    // OUTPUT_BUDGETS (it authors no player-facing text), no world or brief
+    // doctrine (the brief rides the prompt head separately, as the critic's
+    // does). A section routed to a stage it is false at teaches the model that
+    // this prompt's rules may not apply to the shape in front of it — the D128
+    // lesson, and this stage is small enough that one false section would be a
+    // measurable fraction of what it reads.
+    'conductor':      { schemas: ['CONDUCTOR'],                                 instructions: ['CONDUCTOR'] }
   };
 
   window.buildStageSchema = function(stageName) {
@@ -3530,6 +3701,11 @@
     'and surface list both collapse.',
     'Findings on these four counts are usually STRUCTURAL (see the failure contract): a week',
     'that is loud in the wrong place cannot be fixed by retinting its sentences.',
+    'THE CONDUCTOR\'S READ. When a "Conductor\'s Read" section is present after the frame, weigh',
+    'it as evidence rather than as opinion: it is a dedicated pass over the play-order sequence',
+    'by a reader shown the score and none of the prose, so it hears phrasing a full read passes',
+    'over every time — adopt its verdicts into your own, or cite the prose that shows a reading',
+    'is wrong. Its prioritized findings are already open failures on this dimension.',
     '',
     '### voiceDiscipline',
     'Read the prose as a cold auditor: the text and the rules, nothing else.',
@@ -3621,6 +3797,26 @@
     '(weekly component values, the boss decoding key) survive every revision unchanged. A',
     'directive that requires changing any of them cannot be executed and will be discarded.'
   ];
+
+  // The conductor's prompt. Deliberately short: its whole input is the score
+  // block plus the brief, because the read's value comes from what it is NOT
+  // shown. Doctrine and output contract come from INST_CONDUCTOR +
+  // SCHEMA_CONDUCTOR through the stage map, so this builder holds no prompt
+  // content of its own — the coupling contract, same as every other stage.
+  window.buildConductorPrompt = function (scoreBlock, brief) {
+    return [
+      '# The Conductor\'s Pass — Play-Order Sequence Review',
+      '',
+      '## The User\'s Creative Brief (the register the phrasing serves)',
+      brief || '(no brief provided — read the phrasing against the book\'s own declared markings)',
+      '',
+      window.buildStageSchema('conductor'),
+      '',
+      scoreBlock,
+      '',
+      'Return ONLY the JSON object. No fences, no commentary.'
+    ].join('\n');
+  };
 
   window.buildCriticPrompt = function (bookletDigestJson, brief, machineFindings, fusionFrameBlock) {
     // The fusion frame (Teeth T4) rides AFTER the digest, next to the machine
