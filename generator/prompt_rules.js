@@ -1594,8 +1594,18 @@
     '## Cipher And Puzzle Design',
     '- Ciphers produce fiction-native raw values, never raw letters.',
     '- Week 1 puzzle should be solvable quickly. Later weeks can deepen or recombine the grammar.',
-    '- Use at least four distinct puzzle families across a standard six-week block.',
+    // LENGTH-SAFE BY CONSTRUCTION (W7). This read "at least four distinct
+    // puzzle families across a standard six-week block" — a floor stated as a
+    // fact about a length no longer every book's. The exact number is a
+    // function of week count and lives at the planning stages, which know it;
+    // this stage authors one week and states the rule.
+    '- Give every non-boss week a puzzle family no earlier week used, for as many weeks as the list below can cover. Never fewer than three across the book.',
     '- Do not repeat the same puzzle family in consecutive non-boss weeks unless repetition is diegetic and escalating.',
+    // THE MENU. Quoted exactly from GENERATION_CIPHER_TECHNIQUES in
+    // contracts/contract-constants.mjs, in order, and asserted both
+    // directions by cipherMenuParity() in validate.mjs. Its LENGTH is also
+    // the ceiling on cipherVarietyFloor(), so a technique added here without
+    // being added there would let the gate demand a family nobody offers.
     '- Good families include constraint logic, spatial route reading, fragment cross-reference, pattern recognition, typographic anomaly, observational anomaly hunting, metapuzzle assembly, and process deduction.',
     '- **Gating logic:** Design ciphers as lock-and-key systems. Week 1 cipher output should be usable as an input or key for a later puzzle. At least one cipher should require information the player can only obtain from a specific map node or fragment — this is found/not-found gating.',
     '- The solved cipher should open access (to a route, a fragment, a map zone, or a companion function) — not just produce a number for the boss decode.'
@@ -3205,7 +3215,15 @@
       '## Cipher & Map Evolution Doctrine',
       '- Every non-boss week must declare a `cipherType` that names the actual puzzle family for that week.',
       '- No two consecutive non-boss weeks may use the same cipherType.',
-      '- Use at least ' + Math.min(Math.max(weekCount - 2, 3), Math.max(weekCount - 1, 1)) + ' distinct cipher types across the non-boss weeks.',
+      // DERIVED from cipherVarietyFloor() (validation.js, capped by
+      // GENERATION_CIPHER_TECHNIQUES), reaching this classic script through the
+      // `window` bridge api-generator.js installs. This line used to restate
+      // the formula, so the prompt and the gate were two homes for one number;
+      // at 12 weeks both demanded 10 distinct techniques against a menu of 8.
+      // With no bridge, state the rule and no number — never guess a floor.
+      (typeof window.cipherVarietyFloor === 'function')
+        ? '- Use at least ' + window.cipherVarietyFloor(weekCount) + ' distinct cipher types across the non-boss weeks.'
+        : '- Give as many non-boss weeks as possible a cipher type no earlier week used.',
       '- `mapReuse` may keep the same topology, but it may never mean "no visible change."',
       '- Every non-boss week must produce a visibly different `stateChange`: a cleared node, opened gate, rerouted path, new annotation layer, locked return, or revealed shortcut.',
       '- `stateSnapshot`, `stateChange`, and `newGateOrUnlock` cannot all describe the same board state as the prior week.',

@@ -668,6 +668,28 @@
     return parts.join('\n');
   };
 
+  /**
+   * The cipher-variety demand, as a prompt line.
+   *
+   * ONE HOME: `cipherVarietyFloor()` in generator/modules/validation.js, capped
+   * by GENERATION_CIPHER_TECHNIQUES in contract-constants.mjs. It reaches this
+   * classic-IIFE file through the `window` bridge api-generator.js installs.
+   * Two builders each carried a hand-copied `Math.min(Math.max(n - 2, 3), ...)`
+   * before W7, so the prompt and the gate could disagree — and at 12 weeks they
+   * did, both demanding 10 distinct techniques against a menu of 8.
+   *
+   * NO FALLBACK FORMULA. If the bridge is missing, the line states the rule
+   * without a number. A guessed number here would be a prompt demanding a floor
+   * the gate does not enforce, which is the failure this replaced.
+   */
+  function cipherVarietyLine(weekCount) {
+    var floor = (typeof window.cipherVarietyFloor === 'function')
+      ? window.cipherVarietyFloor(weekCount) : null;
+    return floor
+      ? '- Use at least ' + floor + ' distinct cipher types across the non-boss weeks.'
+      : '- Give as many non-boss weeks as possible a cipher type no earlier week used.';
+  }
+
   // ── Week count + chunking utilities ────────────────────────────────────────
 
   window.parseWeekCount = function (workout) {
@@ -2675,7 +2697,13 @@
       '- Every week must include sessionCount and fragmentIds. fragmentIds are the exact document IDs that week sessions/oracles will reference.',
       '- Every non-boss week must ultimately yield exactly one weekly component value: a single integer 1-26 for standard A1Z26 decode. weeklyComponentMeaning explains that number in-fiction; it must not turn into a composite reading list or prose excerpt.',
       '- Every non-boss week must declare a concrete cipherType, and no two consecutive non-boss weeks may use the same cipherType.',
-      '- Use at least ' + Math.min(Math.max(weekCount - 2, 3), Math.max(weekCount - 1, 1)) + ' distinct cipher types across the non-boss weeks.',
+      // DERIVED, never restated. cipherVarietyFloor is the one home of this
+      // number (validation.js, capped by GENERATION_CIPHER_TECHNIQUES) and it
+      // reaches this classic-IIFE file on `window`. When it is absent the line
+      // states the RULE without a number rather than guessing one — a prompt
+      // that demands a floor the gate does not enforce is worse than a prompt
+      // that demands variety in words.
+      cipherVarietyLine(weekCount),
       '- Fragment IDs MUST use canonical LiftRPG format only: F.01, F.02, F.03 ... Never use placeholders like F-1A or F_01.',
       '- Every fragmentRegistry entry must have a real weekRef and must also appear in that owning week\'s fragmentIds array.',
       '- fragmentRegistry entries must be full objects with id, title, documentType, author, revealPurpose, clueFunction, weekRef.',

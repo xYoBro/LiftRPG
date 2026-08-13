@@ -122,7 +122,14 @@ import {
   collectNounRosterFindings,
   collectVoiceTicFindings,
   collectLicensedMovePlacementFindings,
-  scanTerminalVoiceTics
+  scanTerminalVoiceTics,
+  // W7. The prompt builders live in generator.js, a classic IIFE that cannot
+  // import — so the floor reaches them the way the topology digest already
+  // does: registered on `window` as a side effect of loading this module (see
+  // the registration below). Two builders used to carry a hand-copied
+  // `Math.min(Math.max(weekCount - 2, 3), ...)` each, which is three homes for
+  // one number and exactly the drift class D91 named.
+  cipherVarietyFloor
 } from './modules/validation.js';
 
 import {
@@ -4353,4 +4360,11 @@ window.LiftRPGAPI = {
 // Notify inline scripts that the API module has loaded.
 // Because this file is type="module" (deferred), inline scripts run first
 // and may need to re-initialize once window.LiftRPGAPI is available.
+// The classic-IIFE prompt builders read this off `window` at call time — the
+// same bridge workout-topology.js uses for buildWorkoutTopology. Bare rather
+// than under LiftRPGAPI because generator.js is not an API consumer; it is a
+// prompt surface that needs one derived number and must never restate the
+// formula behind it.
+window.cipherVarietyFloor = cipherVarietyFloor;
+
 window.dispatchEvent(new Event('liftrpg-api-ready'));

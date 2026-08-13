@@ -217,6 +217,52 @@ export var GENERATION_COMPANION_MENU = VALID_COMPANION_TYPES.filter(
   function (type) { return DEMOTED_COMPANION_TYPES.indexOf(type) === -1; }
 );
 
+// ── The cipher-technique menu, and the ceiling it puts on the variety floor ─
+//
+// THE DEFECT THIS CLOSES (W3 length audit, 2026-08-13). `cipherVarietyFloor`
+// was `min(max(n-2,3), max(n-1,1))` — 4 at six weeks, which is the Teeth
+// Round's stated floor and correct there. It has no ceiling, so it scaled to 6
+// at eight weeks, 8 at ten, and 10 at twelve. The largest vocabulary any prompt
+// surface offers a model is the list below. A BLOCKING gate that demands ten
+// distinct techniques while the doctrine teaches eight is not a high standard;
+// it is a stage the model can only satisfy by inventing vocabulary the same
+// doctrine tells it not to invent, and every retry spends money to fail the
+// same way.
+//
+// SO THE FLOOR IS DERIVED-OR-STRICT: demand min(f(weeks), menu size), with the
+// size READ from this array. A literal ceiling here would be the same defect
+// one level up — a number that stops being true the first time a technique is
+// added or retired.
+//
+// ONE HOME, TWO AUDIENCES, the D124 idiom. This array is what the model is
+// OFFERED (INST_CIPHER_DESIGN quotes it exactly, both directions, asserted by
+// `cipherMenuParity()` in validate.mjs) and simultaneously what the floor may
+// demand. They cannot drift, because there is only one list.
+//
+// NOT THE SAME VOCABULARY AS `CIPHER_FAMILY_REGISTRY`, deliberately. That
+// registry (renderer/modules/mechanic-registry.js) maps machine `sourceType`
+// tokens — `substitution`, `path-tracing` — onto five RENDER-side family
+// labels for differentiation measurement, and collapses everything else to
+// `custom-cipher`. It classifies books after the fact; this menu is the
+// authoring vocabulary a model chooses from. Asserting a correspondence
+// between them would be inventing one: the two lists answer different
+// questions and are allowed to differ in length.
+export var GENERATION_CIPHER_TECHNIQUES = [
+  'constraint logic',
+  'spatial route reading',
+  'fragment cross-reference',
+  'pattern recognition',
+  'typographic anomaly',
+  'observational anomaly hunting',
+  'metapuzzle assembly',
+  'process deduction'
+];
+
+// The floor below which no book of any length drops. Three techniques is what
+// a four-week book (three non-boss weeks) can carry, and it is the number the
+// existing formula already produced there.
+export var CIPHER_VARIETY_MIN = 3;
+
 // percentile-stat value bounds — a d100 roll-under target must leave room to
 // fail (1-99) and the printed track holds at most one value per week.
 export var PERCENTILE_STAT = {

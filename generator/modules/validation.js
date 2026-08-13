@@ -82,7 +82,11 @@ import {
   GATE_STRUCTURE_SHAPES,
   VALID_LEGACY_MOVES,
   BRANCH_OPTIONS,
-  parseBranchRef
+  parseBranchRef,
+  // W7 — the cipher-variety ceiling. The floor may not demand more distinct
+  // techniques than the doctrine offers; the size is read, never written down.
+  GENERATION_CIPHER_TECHNIQUES,
+  CIPHER_VARIETY_MIN
 } from '../../contracts/contract-constants.mjs';
 
 // W5b — the Ludic Harvest, tranche 2. THE ONE LAW: no puzzle ships
@@ -848,18 +852,35 @@ function floorsOn(options) {
 /**
  * cipherVarietyFloor(weekCount) -> number
  *
- * How many distinct cipher families a book of this length owes. Six weeks (the
- * standard block) yields 4, which is the Teeth Round's stated floor; the
- * formula generalises it so a four-week book is asked for 3 rather than for
- * more families than it has non-boss weeks to carry them.
+ * How many distinct cipher techniques a book of this length owes. Six weeks
+ * (the standard block) yields 4, which is the Teeth Round's stated floor; the
+ * formula generalises it downward so a four-week book is asked for 3 rather
+ * than for more techniques than it has non-boss weeks to carry them.
  *
- * One implementation, two readers: the skeleton's cipher PLAN and the campaign
- * plan's. They used to disagree by construction — the campaign plan carried
- * this formula and the skeleton carried no check at all.
+ * DERIVED-OR-STRICT (W7, the W3 length audit). The formula had no CEILING, so
+ * it scaled to 6/8/10 at 8/10/12 weeks — past the eight techniques the
+ * doctrine offers. A blocking gate that demands more variety than any prompt
+ * surface teaches can only be satisfied by improvising vocabulary, which is
+ * the one thing the same doctrine forbids; every retry then buys the same
+ * failure. The cap READS `GENERATION_CIPHER_TECHNIQUES.length`, so adding or
+ * retiring a technique moves the ceiling by construction and no literal here
+ * can go stale. See the long note beside that array in contract-constants.mjs.
+ *
+ * The six-week answer is unchanged: min(4, 8) === 4.
+ *
+ * One implementation, three readers: the skeleton's cipher PLAN, the campaign
+ * plan's, and the two prompt surfaces that state the number to the model. They
+ * used to disagree by construction — the campaign plan carried this formula,
+ * the skeleton carried no check at all, and two prompt builders each carried a
+ * hand-copied `Math.min(Math.max(...))` of their own.
  */
 export function cipherVarietyFloor(weekCount) {
   var n = Number(weekCount) || 0;
-  return Math.min(Math.max(n - 2, 3), Math.max(n - 1, 1));
+  // `n - 2`: the boss week carries no cipher, and one repeat is allowed among
+  // the rest — the original Teeth Round derivation, unchanged. The two clamps
+  // around it are the floor and the ceiling.
+  var scaled = Math.min(Math.max(n - 2, CIPHER_VARIETY_MIN), Math.max(n - 1, 1));
+  return Math.min(scaled, GENERATION_CIPHER_TECHNIQUES.length);
 }
 
 /**
