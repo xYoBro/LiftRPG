@@ -573,6 +573,103 @@ var STRUCTURED_SCHEMA_SHELL = {
           },
           required: ['artifactClass', 'boardStateMode', 'shellFamily', 'attachmentStrategy', 'componentDialect']
         },
+        // ── The artifact planning bundle (D136's floor, transport half) ─────
+        // Found beside the design-language gap and closed with it. D136 made
+        // `meta.artifactIntent` BLOCKING at this gate (artifactIntentFloorErrors
+        // in modules/validation.js) and D137(a) landed the same floor at the
+        // skeleton gate — where STRUCTURED_SCHEMA_SKELETON has demanded the
+        // bundle since Wave 2. This literal never did. So the STANDARD pipeline
+        // has been blocking on a field its own transport schema never mentions,
+        // while the S+F pipeline asks for it properly: the W5a defect again,
+        // and this time only half of it was ever there.
+        //
+        // MIRRORS THE SKELETON BLOCK, deliberately and structurally.
+        // INST_ARTIFACT_COMPILER is routed to BOTH stages and teaches both the
+        // same bundle, so both transports demand the same bundle — including
+        // `_x.rejectedReadings`, which is the triptych's audit trail and the
+        // only machine-comparable record that three readings were actually
+        // constructed. A shape that differed between pipelines would make the
+        // pipeline the model answers under a fact about what it is asked for.
+        //
+        // TYPES, NOT MENUS, and here that is forced rather than chosen:
+        // VALID_ARC_FAMILIES, VALID_MECHANIC_GRAMMAR_FAMILIES and
+        // VALID_CONVERGENCE_PATTERNS are not re-exported through
+        // modules/constants.js, so this file cannot import them, and quoting
+        // them inline would plant a third copy in the one place no parity pass
+        // watches (validate.mjs diffs the contract against prompt_rules.js, not
+        // against this file). The menus are stated to the model in the prompt
+        // and enforced by the skeleton literal; membership stays where it
+        // already lives — the stage advisories and the artifact schema.
+        artifactIntent: {
+          type: 'object',
+          properties: {
+            briefMode: { type: 'string' },
+            fidelityMode: { type: 'string' },
+            arcFamily: { type: 'string' },
+            mechanicGrammarFamily: { type: 'string' },
+            documentEcology: {
+              type: 'object',
+              properties: {
+                dominant: { type: 'array', items: { type: 'string' } },
+                forbidden: { type: 'array', items: { type: 'string' } }
+              },
+              required: ['dominant', 'forbidden']
+            },
+            exclusions: {
+              type: 'object',
+              properties: {
+                mechanicExclusions: { type: 'array', items: { type: 'string' } },
+                documentExclusions: { type: 'array', items: { type: 'string' } },
+                arcExclusions: { type: 'array', items: { type: 'string' } }
+              },
+              required: ['mechanicExclusions', 'documentExclusions', 'arcExclusions']
+            },
+            homePull: { type: 'string' },
+            convergencePattern: { type: 'string' },
+            // `tone` and `briefEvidence` are the two the floor BLOCKS on: the
+            // tone is what the critic's register axis grades this book against,
+            // and the evidence is what makes the reading auditable at all. The
+            // other six are required for the same reason the skeleton requires
+            // them — an optional reading is a reading the model skips.
+            reading: {
+              type: 'object',
+              properties: {
+                tone: { type: 'string' },
+                register: { type: 'string' },
+                povFrame: { type: 'string' },
+                impliedSetting: { type: 'string' },
+                emotionalArc: { type: 'string' },
+                genreTemplate: { type: 'string' },
+                ludicReading: { type: 'string' },
+                briefEvidence: { type: 'string' }
+              },
+              required: ['tone', 'register', 'povFrame', 'impliedSetting', 'emotionalArc',
+                'genreTemplate', 'ludicReading', 'briefEvidence']
+            },
+            selectionReason: { type: 'string' },
+            _x: {
+              type: 'object',
+              properties: {
+                rejectedReadings: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      axis: { type: 'string' },
+                      value: { type: 'string' },
+                      oneLiner: { type: 'string' }
+                    },
+                    required: ['axis', 'value', 'oneLiner']
+                  }
+                }
+              },
+              required: ['rejectedReadings']
+            }
+          },
+          required: ['briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily',
+            'documentEcology', 'exclusions', 'homePull', 'convergencePattern', 'reading',
+            'selectionReason', '_x']
+        },
         // ── The authored design language (W6, landed with the floor) ────────
         // W6 shipped `meta.designLanguage` REQUIRED in prose — all nine axes,
         // in SCHEMA_DESIGN_LANGUAGE — and named in NO structured literal. That
@@ -616,8 +713,8 @@ var STRUCTURED_SCHEMA_SHELL = {
         liftoScript: { type: 'string' }
       },
       required: ['schemaVersion', 'blockTitle', 'worldContract', 'narrativeVoice',
-        'literaryRegister', 'structuralShape', 'artifactIdentity', 'designLanguage',
-        'weeklyComponentType']
+        'literaryRegister', 'structuralShape', 'artifactIdentity', 'artifactIntent',
+        'designLanguage', 'weeklyComponentType']
       // NOTE: `playSpine` is deliberately absent from this literal and from the
       // required list above. It is injected by withPlaySpine() below, from the
       // one copy prompt_rules.js owns. See that function.
