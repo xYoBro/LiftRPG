@@ -3154,9 +3154,10 @@
         <!-- The three doors. Labelled by what the reader HAS, not by what the
              machinery is called (D99): a person who owns a ChatGPT tab and a
              person who owns an API key are answering "which of these am I",
-             and neither of them knows what a pipeline is. All three sentences
-             stay on screen because the door choice is the most consequential
-             click on this page and it must be makeable without clicking. -->
+             and neither of them knows what a pipeline is. The legend below the
+             tabs shows the SELECTED door only (author ruling 2026-08-13):
+             the tabs themselves always stay visible, and reading another
+             door's description is one click on its tab. -->
         <div class="generator-mode-switch" role="tablist" aria-label="How do you want the booklet written?">
           <button class="generator-mode-btn is-active" id="gen-mode-manual" type="button" role="tab" aria-selected="true">I Have A Chatbot</button>
           <button class="generator-mode-btn" id="gen-mode-api" type="button" role="tab" aria-selected="false">I Have An API Key</button>
@@ -4782,13 +4783,16 @@
         else submitBtn.textContent = 'Start Guided Build →';
       }
 
-      // All three sentences stay on screen; the chosen one is inked in. A
-      // reader choosing a door has to be able to compare the doors, and a
-      // legend that only describes the button you already pressed cannot be
-      // used to press a different one.
+      // TAB BEHAVIOR (author ruling, 2026-08-13, overruling the earlier
+      // all-three-visible design): the legend describes ONLY the selected
+      // door. The doors themselves never leave the screen — comparison
+      // happens by clicking the tabs, which is what tabs are — and the
+      // legend stops being a wall of three paragraphs under every choice.
       function renderDoorLegend() {
         if (!modeCopyEl) return;
-        modeCopyEl.innerHTML = GENERATION_DOORS.map(function (door) {
+        modeCopyEl.innerHTML = GENERATION_DOORS.filter(function (door) {
+          return door.id === currentGenerationMode;
+        }).map(function (door) {
           return '<div class="generator-mode-legend-row' +
             (door.id === currentGenerationMode ? ' is-active' : '') + '">' +
             '<span class="generator-mode-legend-name">' + escapeForHtml(door.label) + '</span>' +
