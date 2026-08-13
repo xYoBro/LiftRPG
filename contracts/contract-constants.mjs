@@ -1282,6 +1282,30 @@ export var LUDIC_LIBRARY = [
   'word-hunt'           // the letter board, every word machine-verified in it
 ];
 
+// ── The harvest patterns, as an acceptance set (D144) ───────────────────────
+// The MENU is derived in contracts/ludic-library.mjs (`LUDIC_HARVEST_PATTERNS`
+// = the tier-2 entries marked `wired`), and that stays the single home of the
+// derivation. This is the same list in the one place the BROWSER can reach it,
+// for exactly the reason LUDIC_LIBRARY sits here while the registry sits there:
+// ludic-library.mjs is Node-only (nothing at runtime reads it), and both
+// booklet-schema.mjs and generator/modules/validation.js must be browser-safe.
+//
+// `ludicRegistryIntegrity()` in validate.mjs holds the two equal IN ORDER, the
+// same way it already holds LUDIC_LIBRARY equal to the registry's implemented
+// tier. Wiring a queued pattern is one flag in the registry; this list follows
+// or the build fails.
+//
+// WHY IT NEEDED A HOME AT ALL (D144): `meta.playSpine.harvestPatterns` lets a
+// book DECLARE which of these it composed with, and the adoption floor then
+// checks it BUILT what it declared. Declaring is optional — a book that uses
+// none is a legitimate book (the W5a ruling) — but a declaration nothing checks
+// is worse than no declaration, because it reads as evidence.
+export var VALID_HARVEST_PATTERNS = [
+  'gate-structure', 'hint-ladder', 'deduction-milestone', 'legacy-pencil-move',
+  'found-not-found-gating', 'branch-attributed-consequence', 'priced-spend',
+  'timed-affordance', 'book-referential-examination'
+];
+
 // The binding that makes the library non-aspirational. Keys ≡ LUDIC_LIBRARY
 // (validator-asserted); every value names atom types the LiftRPG adapter emits
 // (validator-asserted against liftrpg-adapter.js, the reachability authority —

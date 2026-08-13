@@ -780,7 +780,18 @@
           },
           required: ['move', 'printedOn']
         }
-      }
+      },
+      // Which harvest patterns this book composed with (D144). OPTIONAL like
+      // the three arrays above — declaring none is legal — but DECLARED IS
+      // BUILT: the adoption floor reads each declared pattern back off the
+      // artifact, so this list is a promise rather than a label.
+      //
+      // A plain string array rather than an enum copy, and that is `entry`'s
+      // precedent above rather than laziness: the menu is already stated to the
+      // model in the harvest table and parity-asserted both directions, a third
+      // copy here would be a third thing to drift, and the floor rejects a
+      // stray id with a message naming the whole menu.
+      harvestPatterns: { type: 'array', items: { type: 'string' } }
     },
     // The DEMANDED half. The three harvest arrays are absent on purpose: a book
     // need not carry a hint ladder, and requiring one would tax every brief for
@@ -2501,17 +2512,33 @@
     'once its object exists, because a hint with no cost and a milestone with no page are',
     'records that check as nothing.',
     '',
-    '| Pattern | Declare it as | What it costs you to get wrong |',
-    '|---------|---------------|--------------------------------|',
-    '| `gate-structure` | `gateStructure` (REQUIRED, see below) | Declaring a shape the graph does not have |',
-    '| `hint-ladder` | `hintLadders[]` | A free hint, which is a walkthrough |',
-    '| `deduction-milestone` | `milestones[]` | A theory nothing answers |',
-    '| `legacy-pencil-move` | `legacyMoves[]` | Permanence with no page it happens on |',
-    '| `branch-attributed-consequence` | `economyGraph[].branch` | A fork whose sides are two labels |',
-    '| `priced-spend` | `economyGraph[].price` | A price nobody at 60% adherence can pay |',
-    '| `timed-affordance` | `economyGraph[].closesAtWeek` | A window that shuts before it opens |',
-    '| `found-not-found-gating` | an `economyGraph` edge INTO a `seal:` | A locked page with no key |',
-    '| `book-referential-examination` | a cross-reference cipher | Citing a page this book does not print |',
+    // OUTPUTS (D144) is byte-quoted from each entry's `outputs` field in
+    // contracts/ludic-library.mjs, and `harvestOutputsParity()` in validate.mjs
+    // diffs it. The column earns its width: this table previously said what
+    // each pattern COSTS you to get wrong and never what it GIVES you, so a
+    // model reading it saw nine ways to fail and no reason to adopt one.
+    '| Pattern | Declare it as | What you get | What it costs you to get wrong |',
+    '|---------|---------------|--------------|--------------------------------|',
+    '| `gate-structure` | `gateStructure` (REQUIRED, see below) | A shape the economy graph must actually have — the floor reads the declared structure back off the graph. | Declaring a shape the graph does not have |',
+    '| `hint-ladder` | `hintLadders[]` | A player who is never hard-stuck, a threat clock that remembers they were, and a band the reader finds at the point of use. | A free hint, which is a walkthrough |',
+    '| `deduction-milestone` | `milestones[]` | A theory the player commits to in pencil, and the surface that answers it. | A theory nothing answers |',
+    '| `legacy-pencil-move` | `legacyMoves[]` | A book that is visibly a record of one campaign and cannot be replayed clean. | Permanence with no page it happens on |',
+    '| `branch-attributed-consequence` | `economyGraph[].branch` | A fork whose branches genuinely differ, and a simulated player that can walk each side. | A fork whose sides are two labels |',
+    '| `priced-spend` | `economyGraph[].price` | A budget the player plans against, and a stingy/greedy choice that is a real trade rather than a schedule. | A price nobody at 60% adherence can pay |',
+    '| `timed-affordance` | `economyGraph[].closesAtWeek` | A deadline the schedule can be measured against. | A window that shuts before it opens |',
+    '| `found-not-found-gating` | an `economyGraph` edge INTO a `seal:` | Gated content that opens exactly once the player has earned it. | A locked page with no key |',
+    '| `book-referential-examination` | a cross-reference cipher | A puzzle only a player who has actually read this artifact can solve. | Citing a page this book does not print |',
+    '',
+    'DECLARE WHAT YOU BUILT, in `harvestPatterns` (string[], optional): the ids from the first',
+    'column of the patterns you actually wired. Declaring none is legal and common. Declaring one',
+    'you did not build is not — the floors read each declared pattern back off the artifact, so',
+    'this list is a promise rather than a label.',
+    '',
+    'SEALED GATING IS PRINTED, NOT PHYSICAL. A `seal:` is a page the book asks the player not to',
+    'read until they hold the key — a printed instruction and an honour system, in the same kit as',
+    'a pencil and two dice. It is never an envelope, a glued flap, a page to cut, or anything the',
+    'reader must physically open. If the world wants a sealed thing, the seal is a line of text on',
+    'the page saying what must be true before you turn to it.',
     '',
     '- `gateStructure` (REQUIRED, one of "open" | "sequential" | "path-based"): how this book',
     '  gates. **open** — several leads run at once and one meta needs all of them (owes three',

@@ -50,6 +50,7 @@ import {
   MARK_STRIP_TARGET_KINDS,
   RECKONING_SINK_KINDS,
   LUDIC_LIBRARY,
+  VALID_HARVEST_PATTERNS,
   VALID_DYNAMIC_MARKINGS,
   SPINE_BUDGETS,
   VALID_GATE_STRUCTURES,
@@ -896,6 +897,18 @@ var playSpine = {
     // demands it and the closure floors read it back off the graph, while the
     // sealed corpus — which predates the spine entirely — stays valid.
     gateStructure: { enum: VALID_GATE_STRUCTURES },
+    // ── Which harvest patterns this book composed with (D144) ─────────────
+    // OPTIONAL, and that is the ruling rather than a soft start: W5a settled
+    // that "a book that uses none of them is a legitimate book", and a schema
+    // demanding a declaration would tax every brief for patterns most do not
+    // want. What is NOT optional is the consequence — the adoption floor reads
+    // this list back off the built artifact, so a declaration is a promise.
+    //
+    // Enum-gated because a misspelt id is silently unadoptable: the floor would
+    // find no pattern to check, report nothing, and the declaration would read
+    // as evidence of a system the book does not have. That is the failure this
+    // field exists to make impossible.
+    harvestPatterns: { type: 'array', items: { enum: VALID_HARVEST_PATTERNS } },
     hintLadders: {
       type: 'array', maxItems: SPINE_BUDGETS.hintLaddersMax, items: spineHintLadder
     },

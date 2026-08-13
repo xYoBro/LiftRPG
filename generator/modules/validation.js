@@ -79,6 +79,11 @@ import {
   // the branch grammar live with the contract, the checks that need the book
   // live here.
   VALID_GATE_STRUCTURES,
+  // D144 — the harvest adoption floor's acceptance set. The MENU is derived in
+  // contracts/ludic-library.mjs, which is Node-only; this is the same list in
+  // the one place a browser module can reach it, held equal in order by
+  // ludicRegistryIntegrity() in validate.mjs.
+  VALID_HARVEST_PATTERNS,
   GATE_STRUCTURE_SHAPES,
   VALID_LEGACY_MOVES,
   BRANCH_OPTIONS,
@@ -3029,6 +3034,55 @@ export function measureSpineGraphShape(parsedEdges) {
   return { chain: chain, convergence: convergence, leads: leads };
 }
 
+/**
+ * collectHarvestAdoptionFindings(booklet) -> string[]
+ *
+ * DECLARED IS BUILT, the arm that needs weeks (D144).
+ *
+ * `book-referential-examination` is the harvest pattern that replaced the
+ * real-world-trivia ban with something checkable: a puzzle only a player who
+ * has actually read THIS artifact can solve. Its machine trace is a cipher
+ * pointing at the book's own surfaces — `cipher.body.referenceTargets`, which
+ * the week validator already resolves against the fragment registry.
+ *
+ * WHY NOT AT THE COMPILER GATE, where the rest of the harvest floor lives: the
+ * shell stage has no weeks at all, and the skeleton's weekPlan carries a
+ * `cipherType` string and no cipher body. Checking here would be checking
+ * nothing, and a floor that cannot see its evidence reports a pass — which is
+ * the Hollow Success shape this repo has paid for twice.
+ *
+ * Severity is the caller's (D19): blocking under generationFloors, advisory on
+ * the corpus, because a hand-authored fixture that declares a pattern is
+ * stating an intention rather than failing a gate.
+ */
+export function collectHarvestAdoptionFindings(booklet) {
+  var findings = [];
+  var spine = ((booklet || {}).meta || {}).playSpine;
+  var declared = (spine && Array.isArray(spine.harvestPatterns)) ? spine.harvestPatterns : [];
+  if (!declared.length) return findings;   // not declaring is legal (W5a)
+
+  var wants = {};
+  declared.forEach(function (raw) { wants[String(raw || '').trim()] = 1; });
+
+  if (wants['book-referential-examination']) {
+    var weeks = Array.isArray((booklet || {}).weeks) ? booklet.weeks : [];
+    var carriers = weeks.filter(function (week) {
+      var targets = ((((week || {}).fieldOps || {}).cipher || {}).body || {}).referenceTargets;
+      return Array.isArray(targets) && targets.filter(function (t) {
+        return String(t || '').trim();
+      }).length > 0;
+    });
+    if (!carriers.length) {
+      findings.push('meta.playSpine.harvestPatterns declares "book-referential-examination" and no week\'s '
+        + 'cipher.body.referenceTargets names anything — that pattern IS a puzzle whose inputs live '
+        + 'elsewhere in this artifact, and the referenceTargets array is where a cipher says which pages. '
+        + 'Point at least one week\'s cipher at the book\'s own surfaces, or drop the declaration');
+    }
+  }
+
+  return findings;
+}
+
 function collectSpineHarvestFloorErrors(spine, index, parsedEdges, S) {
   var errors = [];
   var rawEdges = Array.isArray(spine.economyGraph) ? spine.economyGraph : [];
@@ -3121,6 +3175,47 @@ function collectSpineHarvestFloorErrors(spine, index, parsedEdges, S) {
         + ' is the declared side and the other is whatever is left. Give both sides an edge, or attribute neither');
     }
   });
+
+  // ── Floor 9a: DECLARED IS BUILT — the harvest adoption floor (D144) ──────
+  // W5a's ruling stands: a book that composes with none of these patterns is a
+  // legitimate book, and NOT DECLARING remains legal. What was missing is the
+  // other half. `meta.playSpine.harvestPatterns` lets a book say which patterns
+  // it used, and a declaration nothing checks is strictly worse than silence —
+  // it reads as evidence to the bench, the census and the author, and costs the
+  // model one line to produce.
+  //
+  // WHAT IS CHECKABLE HERE is what the spine itself can prove. The seal arm is
+  // spine-internal (an edge into a `seal:` either exists in the economyGraph or
+  // does not), so it belongs at the compiler gate where a retry is cheap. The
+  // `book-referential-examination` arm needs WEEKS, which do not exist at this
+  // stage on either pipeline, so it lives on the assembled booklet — see
+  // collectHarvestAdoptionFindings below. Splitting by observability rather
+  // than putting both in one place is what keeps each arm from being vacuous at
+  // the stage that runs it.
+  var declaredPatterns = Array.isArray(spine.harvestPatterns) ? spine.harvestPatterns : [];
+  var seenPatterns = {};
+  declaredPatterns.forEach(function (raw, pi) {
+    var id = String(raw || '').trim();
+    if (!id || VALID_HARVEST_PATTERNS.indexOf(id) === -1) {
+      errors.push(S + 'playSpine.harvestPatterns[' + pi + '] "' + id + '" is not a harvest pattern ('
+        + VALID_HARVEST_PATTERNS.join(' | ') + ') — a misspelt id is silently unadoptable: nothing '
+        + 'checks it, and the declaration then reads as evidence of a system this book does not have');
+      return;
+    }
+    if (seenPatterns[id]) {
+      errors.push(S + 'playSpine.harvestPatterns names "' + id + '" twice');
+    }
+    seenPatterns[id] = 1;
+  });
+  if (seenPatterns['found-not-found-gating']) {
+    var gatesASeal = parsedEdges.some(function (e) { return e.to.kind === 'seal'; });
+    if (!gatesASeal) {
+      errors.push(S + 'playSpine.harvestPatterns declares "found-not-found-gating" and the economyGraph '
+        + 'has no edge INTO a `seal:` — found/not-found gating IS that edge: something the player may or '
+        + 'may not have found opens a page that is otherwise closed. Wire the key to the seal, or drop '
+        + 'the declaration');
+    }
+  }
 
   // ── Floor 10: prices are in marks, and the endgame's gate is not for sale ─
   rawEdges.forEach(function (edge, ei) {
@@ -4963,6 +5058,12 @@ export function validateAssembledBooklet(booklet, options) {
   // revision invent two fields and still clear a floor whose promise was that a
   // revision may never make the booklet less valid.
   collectUnknownKeyFindings(booklet).forEach(function (m) {
+    if (opts.generationFloors) errors.push(m); else warnings.push(m);
+  });
+  // The harvest adoption floor's week-dependent arm (D144). Blocking on the
+  // generation path, advisory on the corpus, the D19 split — a hand-authored
+  // fixture that declares a pattern is stating an intention, not failing a gate.
+  collectHarvestAdoptionFindings(booklet).forEach(function (m) {
     if (opts.generationFloors) errors.push(m); else warnings.push(m);
   });
   collectVoiceTicFindings(booklet).forEach(function (f) { warnings.push(f.message); });
