@@ -2,7 +2,14 @@
 // Deterministic post-generation analysis: scores, warnings, weak-spot flags.
 // Does NOT modify the booklet. Stored on window.LiftRPGAPI.lastQualityReport after each call.
 
-import { VALID_MAP_TYPES, VALID_COMPANION_TYPES, DEMOTED_COMPANION_TYPES, readPipelineDebris } from './constants.js';
+import {
+  VALID_MAP_TYPES, VALID_COMPANION_TYPES, DEMOTED_COMPANION_TYPES, readPipelineDebris,
+  // The two-source law's table and readers (VISION §11). The referee asks the
+  // SAME die the prompt handed out and the floor checked — one home, three
+  // consumers — which is what lets it audit a finished book from the seed
+  // recorded on it rather than from anything it had to be told.
+  IDENTITY_AXES, drawSeedAssignments, readAxisValue, familyRefusesGeometry
+} from './constants.js';
 import { normalizeId, normalizeThemeArchetype } from './assembly.js';
 import { validateAssembledBooklet, extractRosterNouns } from './validation.js';
 import { buildMapEvolutionFingerprint, looksLikeFragmentRef } from './fingerprint.js';
@@ -306,6 +313,168 @@ export function collectIdentityVariationFindings(booklet, nonBossWeeks, fragment
   return findings;
 }
 
+// ── THE FOURTH REFEREE: the defaults audit (VISION §10.4 / §11, D146) ───────
+// "Every identity choice is audited for its source under the two-source law.
+// A choice that is neither brief-funded nor seed-assigned is a default, and
+// defaults are findings — attached to the report under the severity doctrine
+// (D19), the way a below-threshold critique ships attached rather than
+// blocking." — VISION §10, ratified 2026-08-13.
+//
+// DETERMINISTIC, NO MODEL, and that is the seat rather than a cost saving. The
+// other three referees read prose and need judgment; this one asks a question
+// with an arithmetic answer — did this value come from the die, from the brief,
+// or from nowhere? — and a model asked it would produce a plausible opinion
+// where a scan produces a fact. It is also why it can run on a finished book
+// with nothing but the book: the seed rides `_x.divergenceSeed`, the draw is a
+// pure function of the seed, so the assignments are RECOVERABLE rather than
+// remembered.
+//
+// REPORT-CLASS, per D19. The obedience floor already blocks the two compiler
+// gates where a default is cheap to fix; by the time a booklet is assembled the
+// same finding costs a whole book, and a critic that blocks delivery is the one
+// thing the severity doctrine forbids. What this adds is the audit no gate can
+// give: the geometry (whose blocking floor would be unanswerable at the stage
+// that could catch it — see seedObedienceFloorErrors' header), every axis at
+// once, and the book-level count a reader can act on.
+//
+// SKIP WITH A REASON, never a silent pass (D134's law). A book with no recorded
+// seed cannot be audited under a law that did not exist when it was written,
+// and "no findings" would be indistinguishable from "audited and clean" — which
+// is the exact failure a skipped conductor pass would have been.
+var IDENTITY_SOURCE_LABELS = {
+  'seed-assigned': 'seed-assigned',
+  'brief-funded': 'brief-funded',
+  'family-decided': 'family-decided',
+  'not-delivered': 'not-delivered',
+  'DEFAULT': 'DEFAULT'
+};
+
+function evidenceAt(booklet, dotPath) {
+  var parts = String(dotPath || '').split('.');
+  var node = booklet;
+  for (var i = 0; i < parts.length; i++) {
+    if (!node || typeof node !== 'object') return '';
+    node = node[parts[i]];
+  }
+  return typeof node === 'string' ? node : '';
+}
+
+function citationNames(evidence, value) {
+  var text = String(evidence || '').toLowerCase();
+  var needle = String(value || '').trim().toLowerCase();
+  if (!text || !needle) return false;
+  return text.indexOf(needle) !== -1 || text.indexOf(needle.replace(/-/g, ' ')) !== -1;
+}
+
+export function auditIdentitySources(booklet) {
+  var seed = (booklet && booklet._x && booklet._x.divergenceSeed) || null;
+  var seedValue = seed && seed.value;
+  if (!seedValue) {
+    return {
+      skipped: seed
+        ? 'the recorded divergence seed carries no `value` — this book predates the two-source '
+          + 'law (VISION §11), so its identity choices cannot be traced to a die that was never rolled'
+        : 'no divergence seed is recorded on this booklet (`_x.divergenceSeed`), so there are no '
+          + 'assignments to audit against — a book written before every book drew a seed',
+      seedValue: '',
+      axes: [],
+      defaults: []
+    };
+  }
+  var assignments = drawSeedAssignments(seedValue);
+  var family = String(((((booklet || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily) || '').trim();
+  var axes = [];
+  var defaults = [];
+
+  for (var i = 0; i < IDENTITY_AXES.length; i++) {
+    var axis = IDENTITY_AXES[i];
+    var assigned = assignments[axis.id];
+    var delivered = readAxisValue(booklet, axis);
+    var row = {
+      axis: axis.id,
+      label: axis.label,
+      assigned: assigned,
+      delivered: Array.isArray(delivered) ? delivered.slice() : delivered,
+      source: 'not-delivered',
+      evidence: ''
+    };
+    if (delivered === undefined) {
+      row.note = 'the book does not declare this axis, so it was never chosen — absence is a '
+        + 'different finding from a default and belongs to the floor that owns presence';
+      axes.push(row);
+      continue;
+    }
+    var chosen = Array.isArray(delivered) ? delivered : [delivered];
+    var obeyed = chosen.some(function (value) {
+      return String(value || '').trim().toLowerCase() === String(assigned).toLowerCase();
+    });
+    if (obeyed) {
+      row.source = 'seed-assigned';
+      axes.push(row);
+      continue;
+    }
+    var evidence = evidenceAt(booklet, axis.evidencePath);
+    var funded = chosen.some(function (value) { return citationNames(evidence, value); });
+    if (funded) {
+      row.source = 'brief-funded';
+      row.evidence = evidence;
+      axes.push(row);
+      continue;
+    }
+    // The geometry's one licensed departure (D144 W-2, made answerable in
+    // contract-constants). Funded by the family axis, which is itself audited
+    // on this same table — so it is a citation with a different signature, not
+    // a third source.
+    if (axis.familyDecides && familyRefusesGeometry(family, assigned)) {
+      row.source = 'family-decided';
+      row.evidence = 'mechanicGrammarFamily `' + family + '` is not served by `' + assigned + '`';
+      axes.push(row);
+      continue;
+    }
+    row.source = 'DEFAULT';
+    row.note = 'neither the die nor the brief put this here';
+    axes.push(row);
+    defaults.push(row);
+  }
+
+  return { skipped: null, seedValue: seedValue, axes: axes, defaults: defaults };
+}
+
+/**
+ * collectIdentitySourceFindings(booklet, report) -> finding count
+ *
+ * The referee's report surface. Findings are WARNINGS by construction — they
+ * are never pushed into weakSpots, so `QUALITY_BLOCKING_AREAS` can never be
+ * taught to block on them by accident.
+ */
+export function collectIdentitySourceFindings(booklet, report) {
+  var audit = auditIdentitySources(booklet);
+  report.identitySources = audit;
+  if (audit.skipped) {
+    report.warnings.push('Identity sources: SKIPPED — ' + audit.skipped);
+    return 0;
+  }
+  var counts = {};
+  audit.axes.forEach(function (row) {
+    counts[row.source] = (counts[row.source] || 0) + 1;
+  });
+  report.warnings.push('Identity sources (seed `' + audit.seedValue.slice(0, 8) + '…`): '
+    + Object.keys(IDENTITY_SOURCE_LABELS)
+      .filter(function (key) { return counts[key]; })
+      .map(function (key) { return counts[key] + ' ' + IDENTITY_SOURCE_LABELS[key]; })
+      .join(', ') + '.');
+  audit.defaults.forEach(function (row) {
+    report.warnings.push('Identity source DEFAULT: ' + row.label + ' is `'
+      + (Array.isArray(row.delivered) ? row.delivered.join('`, `') : row.delivered)
+      + '`, the system assigned `' + row.assigned + '`, and `' + IDENTITY_AXES
+        .filter(function (axis) { return axis.id === row.axis; })
+        .map(function (axis) { return axis.evidencePath; })[0]
+      + '` names neither — under the two-source law (VISION §11) a choice that is neither '
+      + 'brief-funded nor seed-assigned is a default, and defaults are findings.');
+  });
+  return audit.defaults.length;
+}
+
 export var QUALITY_BLOCKING_AREAS = {
   'artifact-monoculture': { target: 'fragments' },
   'board-monotony': { target: 'weeks' },
@@ -393,6 +562,10 @@ export function generateQualityReport(booklet) {
   }
   // Legacy-vocabulary notice, never a score input (D122c) — see the helper.
   report.warnings = report.warnings.concat(collectDemotedCompanionFindings(booklet));
+  // The fourth referee (VISION §10.4). Report-class by ruling: it writes
+  // warnings and an `identitySources` block, and never a weakSpot — so
+  // QUALITY_BLOCKING_AREAS cannot be taught to block on it by accident.
+  collectIdentitySourceFindings(booklet, report);
   report.scores.schemaCompleteness = report.schemaErrors.length === 0
     ? { score: 1, label: validatorWarnings.length > 0 ? validatorWarnings.length + ' warnings' : 'clean' }
     : { score: Math.max(0, 1 - report.schemaErrors.length * 0.1), label: report.schemaErrors.length + ' errors' };

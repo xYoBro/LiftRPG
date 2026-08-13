@@ -145,6 +145,18 @@ export var VALID_MAP_TYPES = [
   'concentric', 'maze'
 ];
 
+// What a `mapState` with no declared `mapType` renders as. Documented behaviour
+// since the first map shipped, and hard-coded as a literal in TWO renderer
+// files (`field-ops-models.js` resolveMapState, `field-ops-primitives.js`'s
+// `data-map-type` stamp). This constant exists because the two-source law's
+// reader has to answer "what geometry does this book actually have?" and
+// "absent" is the wrong answer — a board with no declared type is a GRID, which
+// is the single most common default in the corpus and the finding the fourth
+// referee exists to name. `mapDefaultParity()` in validate.mjs holds the two
+// renderer literals to this value; folding them into an import is a renderer
+// change and belongs to a renderer wave.
+export var DEFAULT_MAP_TYPE = 'grid';
+
 // ── Map variant axes (Wave 3) ────────────────────────────────────────────────
 // Two geometries got a VARIANT instead of a type, because the data model is
 // unchanged and only the drawing differs. A variant costs one enum and one CSS
@@ -1596,7 +1608,8 @@ export var IDENTITY_AXES = [
   // PLAN (`topology.mainMapType`) and realised in the weeks' mapState, which is
   // why its stage is the planner's and why its obedience is report-class this
   // wave — see the referee in quality.js for the reasoning.
-  { id: 'mapGeometry', label: 'the board geometry (mapState.mapType)', path: 'weeks[].mapState.mapType',
+  { id: 'mapGeometry', label: 'the board geometry (mapState.mapType)',
+    path: 'weeks[].fieldOps.mapState.mapType',
     menu: VALID_MAP_TYPES, kind: 'dominant',
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['campaign-plan'], familyDecides: true }
 ];
@@ -1684,8 +1697,19 @@ export function readAxisValue(booklet, axis) {
     var best;
     var bestCount = 0;
     for (var w = 0; w < weeks.length; w++) {
-      var declared = weeks[w] && weeks[w].mapState && weeks[w].mapState.mapType;
-      var type = String(declared || '').trim();
+      // `fieldOps`, not the week root. The board lives at
+      // `weeks[].fieldOps.mapState` on every booklet in the corpus, and a
+      // reader that looked one level too high would report every book's
+      // geometry as not-delivered — silently, and forever.
+      var fieldOps = (weeks[w] && weeks[w].fieldOps) || {};
+      var mapState = fieldOps.mapState;
+      if (!mapState || typeof mapState !== 'object') continue;
+      // A BOARD WITH NO DECLARED TYPE IS A GRID, and reading it as "not
+      // delivered" would hide the single most common default in the corpus
+      // behind the word "absent". `A missing mapState.mapType defaults to
+      // "grid"` is the renderer's documented behaviour, so the book HAS a
+      // geometry — it just did not choose one, which is precisely the finding.
+      var type = String(mapState.mapType || DEFAULT_MAP_TYPE).trim();
       if (!type) continue;
       tally[type] = (tally[type] || 0) + 1;
       if (tally[type] > bestCount) { bestCount = tally[type]; best = type; }
