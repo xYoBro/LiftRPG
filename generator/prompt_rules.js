@@ -1151,6 +1151,21 @@
   // and true new-affordance progression until the current prompt
   // reliably produces cohesive, render-clean booklets.
 
+  // THE DERIVATION LAW (W3 corrective wave, F05). The recorded reading SPLITS
+  // by field: `tone` and `briefEvidence` quote the brief and stay faithful,
+  // while `register` and `genreTemplate` — the two that CLASSIFY — arrived
+  // institutional on briefs that supplied no institution. The proof case is A1
+  // (evals/w3-matrix/register-table.json): a decaying repertory theatre, masks,
+  // understudies, an escape room; tone recorded as "elegant, ornate, sinister;
+  // fin-de-siecle decadence", register recorded as "institutional-formal prose"
+  // and genreTemplate as "institutional gothic mystery". Nothing in that brief
+  // supplied the word. The lens inserted it, and every document, character and
+  // mechanic chosen downstream inherited it.
+  //
+  // The law lives HERE rather than at the compiler's Step 10 because this
+  // section fixes the signals and Step 10 only writes them down; both ride the
+  // shell stage and the single-prompt bundle, in this order, so the two-word
+  // tie-ins at Step 10 always resolve against a law the model has already read.
   window.INST_BRIEF_INTERPRETATION = [
     '## Brief Interpretation (run silently before everything else)',
     'Before writing any fields or world contract, decode the creative direction brief. Do not output this step.',
@@ -1179,6 +1194,14 @@
     '- IMPLIED SETTING: where and when — specific place if named, composite if implied',
     '- EMOTIONAL ARC: what changes for the protagonist emotionally by the end',
     '- GENRE TEMPLATE: what genre conventions apply (revenge thriller, sci-fi isolation, coming-of-age, road trip, etc.)',
+    '',
+    '',
+    'DERIVATION LAW for REGISTER and GENRE TEMPLATE, the two signals that CLASSIFY: each must be',
+    'traceable to words the brief actually contains — name the phrase, silently, before you fix the',
+    'signal. Absent an institutional referent in the brief (a bureau, academy, ministry, department,',
+    'any body that runs on procedure), classifying either signal as institutional is a MISREAD, and it',
+    'misfunds every document, character and mechanic chosen downstream. A world can be formal, ornate,',
+    'sinister or rule-bound without being an institution.',
     '',
     'These extracted signals own the story. The design bias in the prompt owns the game mechanics. They do not compete.',
     'Brief interpretation overrides: storyLens, characterWeb, secretShapes, arcMoves from the design bias.',
@@ -2063,11 +2086,11 @@
     'Set `reading` to an object with all seven fields, in your own words (these are free',
     'strings — a record of how you read this brief, not a menu to pick from):',
     '- `tone`: the emotional register you committed to',
-    '- `register`: the prose style you committed to',
+    '- `register`: the prose style you committed to — under the derivation law, never defaulted',
     '- `povFrame`: who experiences this story and through what frame',
     '- `impliedSetting`: where and when',
     '- `emotionalArc`: what changes for the protagonist by the end',
-    '- `genreTemplate`: the genre conventions now in force',
+    '- `genreTemplate`: the genre conventions now in force — derived from the brief\'s own words',
     '- `ludicReading`: what KIND OF GAME this brief wants. 1-2 sentences: what the player',
     '  is doing minute to minute, what they spend, and what they can lose. A brief implies a',
     '  game the way it implies a tone — "a siege that never lifts" is a pressure that only',
