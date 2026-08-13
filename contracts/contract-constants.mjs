@@ -866,7 +866,24 @@ export function citationPinpoints(citedAs, shellFamily) {
 //     page-scale lookup, and lookups are a BETWEEN-state pleasure. Two per
 //     book keeps the flip rare enough to stay a pleasure; two weeks of lead
 //     is what makes the key feel found rather than handed over.
+//   minPointersPerWeek (1) — THE FLOOR OF PRESENCE, added by the depth wave
+//     (VISION §8: "more referenceable, cross-linked text, pages worth flipping
+//     back to"). Every number above is a ceiling, and a table of ceilings only
+//     answers "too many?" — it reads a book with ZERO pointers as perfectly
+//     within budget. Measured at the moment it was added: 19 of the 20 corpus
+//     fixtures print exactly 0 pointers across both channels and the twentieth
+//     prints 2. A book whose documents never name each other is a pile, not an
+//     archive, and D111 already caught this absence once as a prompt-routing
+//     bug rather than model laziness — which is precisely why it needs a
+//     standing instrument instead of a re-reading.
+//     Half the ceiling, deliberately: the band is 1–2 pointers a week, which
+//     for a six-week book with twelve to eighteen fragments means six to
+//     twelve — one document in two or three naming another. WARN-class like
+//     every other row here, and arbitrary until playtest in exactly the same
+//     way (§7.2). The prompt states the BAND (INST_POINT_OF_USE), and
+//     validate.mjs pointerBandParity() holds the two together.
 export var POINTER_BUDGETS = {
+  minPointersPerWeek: 1,
   maxMicroLinesPerSession: 2,
   maxCiteRefsPerSession: 1,
   pointersPerWeek: 2,

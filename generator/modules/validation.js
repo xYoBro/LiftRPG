@@ -4895,6 +4895,26 @@ export function collectPointerDensityFindings(booklet) {
       + weeks.length + ' weeks is ' + budget
       + ' — cross-reference density is a documented cost independent of how well each pointer is written');
   }
+
+  // ── The floor of presence (VISION §8, the depth wave) ─────────────────────
+  // The ceiling above can only answer "too many?". A book with no pointers at
+  // all sits inside every budget in this table and is still not the
+  // cross-linked artifact the density law asks for — 19 of 20 corpus fixtures
+  // were in exactly that state when this was written. Same ledger, same
+  // WARN-class, other direction.
+  //
+  // The finding names the CHEAP channel on purpose. The card channel
+  // (microLines[].citeRef) is capped at one per session because it is read
+  // mid-rest; the document channel costs the reader nothing at all, so a book
+  // that needs pointers should spend them on documents first.
+  var floor = POINTER_BUDGETS.minPointersPerWeek * Math.max(1, weeks.length);
+  if (total < floor) {
+    findings.push('This booklet prints ' + total + ' pointer' + (total === 1 ? '' : 's')
+      + ' across both channels (manifests + citations); the floor for '
+      + weeks.length + ' weeks is ' + floor
+      + ' — a book whose documents never name each other is a pile, not an archive.'
+      + ' Spend the band on the document channel first: a manifestPointer costs a reader nothing mid-set');
+  }
   return findings;
 }
 

@@ -1599,7 +1599,7 @@
     '- THE PINPOINT LAW. `citedAs` names what is there AND where. "The abbot\'s letter is already waiting" makes the reader guess; "the abbot\'s letter — Folio 12" does not. A citation with no pinpoint fails validation.',
     '- NEVER cite a page number — pages are numbered by the press long after you write. Cite by the booklet\'s refs ("F.07", "W4") or the shell\'s filing labels below.',
     '- THE NO-CHAIN LAW. A citeRef may not land on a surface carrying a citeRef or manifestPointer. A reader who spends the flip must arrive at the answer, not a forwarding address.',
-    '- DENSITY IS A BUDGET: about two pointers per week for the whole book, manifests and citations counted together. Cross-reference density kills a layout independently of how well each pointer is written.',
+    '- DENSITY IS A BAND, not a ceiling: 1 to 2 pointers per week for the whole book, manifests and citations counted together. Below the band the documents never name each other and the archive is a pile; above it, cross-reference density kills a layout however well each pointer is written. Spend the band on the document channel first — a manifest costs a reader nothing mid-set.',
     '- THE INTEGRATION EXCEPTION. Anything that must be read TOGETHER to make sense — a table and the roll that reads it, a diagram and its key — goes on the same spread. Pointers are for consulting to adjudicate, never for integrating to understand.',
     '',
     '**Citation grammar — one style per booklet, set by `artifactIdentity.shellFamily`.** A citation is not an instruction, it is a fact about the document, so it carries procedure with no explaining voice. Use your shell\'s labels with a number, every time:',
