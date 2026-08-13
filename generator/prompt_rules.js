@@ -404,7 +404,7 @@
     '- Array of 1-3 plaintext endings',
     '- Each item: { variant, content, designSpec }',
     '- `content`: { documentType, body, finalLine }',
-    '- `body` length: aim for 400–700 characters. The renderer splits long endings across pages automatically; extremely long endings (1500+ chars) may produce awkward page breaks. Prefer concise, emotionally dense prose.',
+    '- `body` length: see Output Length Budgets. Write in paragraphs — that is where the renderer breaks a long ending.',
     '- `finalLine`: a single closing sentence or phrase that lands on the last page. Keep it short and resonant.',
     '- These are authored now; encryption happens later in trusted tooling'
   ];
@@ -1330,17 +1330,18 @@
   // model already followed.
   window.INST_OUTPUT_BUDGETS = [
     '## Output Length Budgets',
-    'HARD CAPS, in characters. Output over a cap is rejected and costs a retry.',
+    'CAPS, in characters — the page\'s limit, not caution\'s. Fill the surface; over a cap costs a retry.',
+    'Full means SET, never crammed: a wall of text fails, and so does an empty page.',
     '- `storyPrompt`: 220 per session prompt.',
-    '- Fragment `content` (any body field): 600.',
-    '- `interlude.body`: 240.',
-    '- `ending.content.body`: 1500 max, 400–700 target — the renderer splits long endings, so anything near the cap breaks awkwardly.',
+    '- Fragment `content` (any body field): 1050 — three fill an archive page.',
+    '- `interlude.body`: 700 — it owns a page, but shares it with the payload.',
+    '- `ending.content.body`: 2400, target 1600–2200. Longer bodies split on paragraph breaks.',
     '- `markStrip` target `label`: 28 (the five-word law). Prints on ONE line: a long label truncates mid-word, it does not wrap.',
     '- `microLines[].condition`: 90. `microLines[].cue`: 120.',
     '- `returnBeat.closingLine` and `returnBeat.openingEcho`: 140 each.',
     '- `doorChoice.optionA.lean` / `optionB.lean`: 90 each.',
     '- `citeRef.citedAs`: 90. `seal.keyHint`: 120. `seal.unlockCondition`: 140.',
-    '- Prefer the minimum valid count of fragments and endings unless the brief clearly requires more.',
+    '- Depth goes into a document, never into the pile: minimum COUNTS, full length.',
     '- Avoid quoted dialogue unless it materially advances story or game state.'
   ];
 

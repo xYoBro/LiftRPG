@@ -1181,9 +1181,95 @@ export function isDoorLeaningFamily(family) {
 // corpus's only strip-bearing fixture peaks at 27, and the label overflow the
 // Playthrough Auditor flagged book-wide on Book 1 sat in the 31-36 range. The
 // word law stays the doctrine; this is the cap a machine can hold it to.
+//
+// ── THE DENSITY LAW (VISION §8, ratified D146; landed by the depth wave) ────
+// Restraint governs the SOUND of the prose, never its supply. These numbers
+// stopped being brevity-as-safety and became what the PAGE can hold: a cap is
+// the page's limit, not caution's. A wall of text is a failure; so is an empty
+// page, and every page must pass both tests at once — inviting on the surface,
+// navigable in seconds.
+//
+// THE CAP IS WHAT GETS WRITTEN, which is why the numbers and not the targets
+// are the lever. Measured over the corpus at the moment of the raise: fragment
+// bodies median 591 / p90 598 against a cap of 600; ending bodies median 1457 /
+// p90 1497 against a cap of 1500 (and a stated target of 400–700 that every
+// book ignored); interlude bodies median 228 / max 240 against a cap of 240.
+// Three surfaces, three caps, and the distribution piled against each one. The
+// model was never being terse — it was obeying.
+//
+// EVERY RAISE IS PRICED AGAINST ITS OWN SURFACE'S GEOMETRY, per field, because
+// a budget the layout cannot absorb is an overflow factory (the D71 class).
+// The arithmetic, so a later wave can argue with it rather than guess at it:
+//
+//   fragmentBody 600 → 1050. `.fragment-doc-body` at the dense tier (density
+//     0.6) is 7.88px on a 10.11px line in a 408px text column — 89 characters
+//     a line. An archive page is 741px and packs documents with a 6px gutter,
+//     so THREE documents fit at 243px each and the fourth is what breaks. That
+//     243px is a cliff, not a slope: swept over all 238 corpus fragments at
+//     their real chrome (p90 111px — meta box, type slug, signature, frame,
+//     seal band), the p90 document measures 186px at a 600-character cap (three
+//     to a page, 77% of it filled), 234px at 1050 (three to a page, 96% filled)
+//     and 246px at 1100 — where the third document no longer fits and the page
+//     drops to 67%. 1050 is the last round number under the cliff. The two
+//     instruments agree on it: the atom's estimate and the Node planner mirror
+//     in check-layout-regressions.js both put a capped document at 263px on the
+//     tidewall fixture's heaviest chrome. At 600 an archive page carried four
+//     documents in 614 of its 741px and left 127px of white on every spread —
+//     that is the empty-page complaint stated as a number, and the adapter's own
+//     calibration note had already named its cause ("post-budget-trim the corpus
+//     tops out at 600 body characters… not one corpus fragment reaches even
+//     40%. A memo does not read as a document because it is alone on a sheet").
+//     CEILING, ASSERTED: the cap must stay below STANDALONE_MIN_CHARS (2900),
+//     or the budget itself would start converting shareable documents into
+//     page-locking ones — validate.mjs proseBudgetsFitTheirPages() holds it.
+//
+//   interludeBody 240 → 700. The interlude is a FULL-PAGE atom: its estimate is
+//     PAGE_BUDGET.heightPx whatever it holds, so 240 characters bought a whole
+//     printed page for five lines of type. `.interlude-body` is 10pt on a 1.65
+//     leading (22px a line) across a 393px measure (88% of the frame) — ~50
+//     characters a line. The page spends ~105px on chrome (page header, 18pt
+//     title, the reason line) and SHARES the rest with the payload block, which
+//     is the term that bounds this one: measured at density 0.6 over the corpus,
+//     a map payload is 177px flat, a clocks payload runs 92px at the median and
+//     275px at p90, a cipher payload 231px at the median and 390px at p90. The
+//     reserve is therefore 300px, which covers every payload but a top-decile
+//     cipher. 741 − 105 − 300 = 336px = 15 lines = ~750 characters; 700 is that
+//     with a line of margin. A quiet interlude (payloadType `none`) has ~300px
+//     more than it needs, which is the right direction for a ceiling — and the
+//     prompt line names the trade, because the model chooses both terms.
+//
+//   endingBody 1500 → 2400 (target 1600–2200). Also a full-page atom, and the
+//     only one that SPLITS: splitEndingBody() measures real fit in the browser
+//     and breaks on paragraph boundaries. A single-paragraph body cannot split
+//     at all, so the cap must be a one-page number. `.endings-body` is 7pt on
+//     the 1.6 body leading (14.93px a line) across a 447px measure — 82
+//     characters a line. Worst-case chrome (wrapped 22pt title, kicker,
+//     documentType, the final line's rule) is ~178px, leaving ~563px = 37
+//     lines = ~2,950 characters on one page. 2400 keeps ~550 characters of
+//     slack against that worst case AND equals fallbackSplitEndingBody()'s
+//     PAGE_CHAR_BUDGET, which is this repo's existing statement of how much
+//     prose is one ending page. Asserted, not coincidental — see the same
+//     validate.mjs pass. Raising it further means raising that constant too,
+//     and that changes how many pages a book has on the no-DOM path.
+//
+// WHAT DID NOT MOVE, AND WHY THAT IS NOT AN OVERSIGHT. Every remaining row is
+// a SESSION-CARD surface (storyPrompt, the microLine pair, the returnBeat
+// pair, doorOptionLean, citedAs, markStripLabel), and the session card is the
+// one surface in the book whose two instruments disagree: three cards share
+// one page under a single-page group policy, and a browser-proven-clean page
+// (tests/playwright/gameplay-surfaces.spec.js, which asserts zero overflow,
+// zero clipping and zero unsat on a booklet carrying every Wave-4 surface)
+// estimates at 1134px against a ~750px live area — 1.53×. Phase-1 estimation
+// says there is no headroom at all; the browser says there is headroom nobody
+// has measured. A cap raised on a surface whose model and whose render
+// disagree by half is the D71 defect by definition, so these rows wait for a
+// measurement pass. They are also the rows the density law bears on least:
+// they are cues read in a ninety-second rest window, where point-of-use §5.2
+// budgets them HARDER than prose on purpose. The empty page was never a
+// session page.
 
 export var OUTPUT_BUDGETS = {
-  storyPrompt: 220, fragmentBody: 600, interludeBody: 240, endingBody: 1500,
+  storyPrompt: 220, fragmentBody: 1050, interludeBody: 700, endingBody: 2400,
   microLineCondition: 90, microLineCue: 120, citedAs: 90,
   returnBeatClosing: 140, returnBeatOpening: 140,
   doorOptionLean: 90, sealKeyHint: 120, sealUnlockCondition: 140,
