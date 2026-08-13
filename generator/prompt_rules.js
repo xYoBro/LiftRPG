@@ -1827,6 +1827,115 @@
     '- Avoid decorative clutter that does not support world logic or play clarity.'
   ];
 
+  // ── The authored design language (W6) ───────────────────────────────────
+  //
+  // ROUTING: staged pipelines only, via STAGE_SCHEMA_MAP → 'shell'. It is
+  // deliberately absent from window.INSTRUCTIONS and window.SCHEMA_SPEC. The
+  // single-prompt bundle measured 114,437 of its 115,000-character ceiling at
+  // D136; there is no room, and the puzzle section set the precedent at D132
+  // (routed stage-only, and the code says so). A paste-path book still renders
+  // — it renders as its archetype, which is exactly what the archetype is for.
+  //
+  // WHY THIS EXISTS AT ALL: D135 measured three of four maximally divergent
+  // briefs wearing BYTE-IDENTICAL government/classified-packet dress. The
+  // archetype menu was never the lever it looked like — ten presets cannot make
+  // two books of the same genre look like different designers' work, because
+  // ten is the number of looks the system had. This section hands the book its
+  // own design decisions, and hands them to it as MENUS with a derivation law,
+  // for the same reason D136 did it to register: a free choice converges and a
+  // cited choice cannot.
+  //
+  // THE MENUS ARE BYTE-QUOTED from contract-constants.mjs (VALID_*), and
+  // `designLanguageMenuParity()` in scripts/validate.mjs diffs them both ways —
+  // an axis value offered here that the schema rejects is a stage failure on
+  // output this prompt demanded, and a value the schema accepts that this
+  // prompt never offers is a look no book will ever wear.
+  window.SCHEMA_DESIGN_LANGUAGE = [
+    '## meta.designLanguage (REQUIRED — this book\'s own design)',
+    '',
+    'The archetype is a floor: it guarantees the book is legible and prints in black and white.',
+    'It is NOT this book\'s identity. `meta.designLanguage` is, and it is composed OVER the',
+    'archetype, so state it even when a choice agrees with the archetype you picked.',
+    '',
+    '- `layoutIntensity` (number 0.0-1.0, REQUIRED): how hard this book presses. 0.0 is a',
+    '  clinical instrument — quiet rules, nothing shouting. 1.0 is a poster on every spread.',
+    '  Most books are not at either end.',
+    '- `productionTexture` (REQUIRED): "none" | "photocopy" | "typewriter" | "risograph" |',
+    '  "mimeograph" | "letterpress" — the press this object came off.',
+    '- `toneTexture` (REQUIRED): "none" | "stipple" | "hatching" | "cross-hatch" |',
+    '  "dense-cross-hatch" | "reverse-stipple" — how a shade is made on a machine with no grey.',
+    '  The list runs light to dark.',
+    '- `typeVoice` (REQUIRED): "archetype-default" | "literary-press" | "terminal-log" |',
+    '  "field-notebook" | "typewriter-file" | "broadsheet" | "display-clash" | "plain-record".',
+    '- `documentRecipes` (REQUIRED, object): one entry per document family this book uses.',
+    '  Keys: "bureaucratic" | "hand-authored" | "personal" | "recorded" | "anomalous" |',
+    '  "custom-document". Values: "plain" | "memo-grid" | "label-borders" | "ledger-rules" |',
+    '  "stamped-file".',
+    '- `marginSemantics` (REQUIRED): "none" | "edge-band" | "tab-marks" | "rule-weight" — how',
+    '  the outer margin tells a reader what KIND of page they have opened to.',
+    '- `inkDiscipline` (REQUIRED): "light-touch" | "standard" | "heavy-press" | "crushed".',
+    '- `sealTreatment` (REQUIRED): "none" | "rubber-stamp" | "wax" | "embossed" | "perforated".',
+    '- `designEvidence` (REQUIRED, string, 1-2 sentences): the brief\'s own words that these',
+    '  choices came from, quoted, and what they made the object look like.'
+  ];
+
+  window.INST_DESIGN_LANGUAGE = [
+    '## Design Language (run after Brief Interpretation, with Visual Direction)',
+    '',
+    'Two books from the same genre must be distinguishable across a table. The archetype cannot',
+    'do that — ten archetypes is ten looks. Choose this book\'s design the way a designer hired',
+    'for THIS story would: from the object it is, not from the shelf it sits on.',
+    '',
+    'DERIVATION LAW, the same law that governs register: every axis must be traceable to words',
+    'the brief actually contains. Name the phrase to yourself before you fix the axis, and put',
+    'the phrases in `designEvidence`. A design language that cannot cite the brief is a house',
+    'style wearing the book\'s name, and it will look like the last book you made.',
+    '',
+    'HONEST WHEN LACKING. If a brief supports no reading on an axis, "none"/"archetype-default"',
+    'is the correct answer and a real one. Do not manufacture a press the world has no reason to',
+    'own. A quiet book that means its quiet beats a loud book that means nothing.',
+    '',
+    'THE PRESS IS A CLAIM ABOUT THE WORLD, not a filter over it. Ask who made this object and',
+    'on what machine:',
+    '- "photocopy" — copied, passed hand to hand, degraded by circulation',
+    '- "typewriter" — struck once, by a person, on a machine that leaves pressure',
+    '- "risograph" — printed cheaply in a small run, slightly out of register',
+    '- "mimeograph" — duplicated in bulk by an organisation that could not afford better',
+    '- "letterpress" — set with care, by someone who expected it to last',
+    '- "none" — the world has no printing story worth telling; let the archetype speak',
+    '',
+    'TYPE VOICE is who is speaking in ink:',
+    '- "literary-press" — an edition. Someone set this like a book.',
+    '- "terminal-log" — no book anywhere in it. Machines wrote it for machines.',
+    '- "field-notebook" — a working hand, with a machine only where something was stamped on later',
+    '- "typewriter-file" — one carbon copy, one machine, start to finish',
+    '- "broadsheet" — a masthead over a body: something published, for readers',
+    '- "display-clash" — a display face over a body that does not agree with it. Deliberately',
+    '  uncomfortable. Use it when the world is at war with itself, not for decoration.',
+    '- "plain-record" — the flattest register available. The document does not want to be read.',
+    '- "archetype-default" — the archetype\'s pairing is right for this world',
+    '',
+    'DOCUMENT RECIPES are per document FAMILY, so the book\'s papers do not all look alike:',
+    '"memo-grid" is an institution\'s bar-and-rule; "label-borders" is a doubled warning frame;',
+    '"ledger-rules" is ruled paper under the prose; "stamped-file" is a document that was',
+    'handled. Give different families different recipes when the world has more than one kind of',
+    'author in it — that difference IS the worldbuilding.',
+    '',
+    'MARGIN SEMANTICS answers "what kind of page is this?" before the reader has read a word:',
+    '"edge-band" bands the outer margin by page kind; "tab-marks" is a drawn thumb index;',
+    '"rule-weight" says it with the weight of the frame alone.',
+    '',
+    'DIVERGE ON PURPOSE. If a divergence seed was drawn for this run, let it push at least ONE',
+    'axis away from the obvious reading of the genre — the obvious reading is what every other',
+    'book of this genre already chose. Then check the whole set reads as ONE object: a',
+    'letterpress edition with a crushed photocopier discipline is two stories about the same',
+    'piece of paper.',
+    '',
+    'BLACK AND WHITE IS NOT A DEGRADED MODE. Every choice here has to survive a monochrome laser',
+    'printer, because that is the printer most players own. Weight, pattern and structure carry',
+    'the signal; colour never does.'
+  ];
+
   window.INST_ANTI_SAMENESS = [
     '## Anti-Sameness',
     '- Do not make every booklet about the same kinds of institutions, secrets, beats, or reveals.',
@@ -3019,7 +3128,13 @@
     // one costs. It rides week-final and ending too — the stages that build
     // the boss page and the payoff — so the pattern is legible everywhere it
     // has consequences.
-    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
+    // DESIGN_LANGUAGE rides the shell because the shell is where `theme` is
+    // authored, and the two are one decision: the archetype is the floor the
+    // design language is composed onto (W6). It is stage-only — the
+    // single-prompt bundle has no room (D136: 563 chars of headroom), and the
+    // D132 puzzle precedent is the model. A paste-path book renders as its
+    // archetype, which is what an archetype is for.
+    'shell':          { schemas: ['META', 'THEME', 'DESIGN_LANGUAGE', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
     // Knowing: the world's process particulars, authored once after the
     // skeleton/shell and consumed by every prose stage (§11 Wave 1.5). It
     // writes no prose, so it carries no VOICE_DISCIPLINE — it carries the
