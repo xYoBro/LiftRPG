@@ -736,6 +736,10 @@
           type: 'object',
           properties: {
             puzzle: { type: 'string' }, printedOn: { type: 'string' },
+            // W5b: the band's printed heading. Required HERE (generation
+            // policy) and optional in booklet-schema.mjs (the artifact
+            // contract) — the artifactIntent severity split.
+            label: { type: 'string' },
             rungs: {
               type: 'array',
               items: {
@@ -745,7 +749,7 @@
               }
             }
           },
-          required: ['puzzle', 'printedOn', 'rungs']
+          required: ['puzzle', 'printedOn', 'label', 'rungs']
         }
       },
       milestones: {
@@ -2181,13 +2185,17 @@
     '  the next question (owes a chain three edges long). **path-based** — two or more lanes',
     '  that converge (owes two leads, a three-edge chain, and a surface taking two feeders).',
     '  The floor reads this back off your economyGraph. Declare the shape you actually wired.',
-    '- `hintLadders` (array, at most 3): `{ puzzle, printedOn, rungs[] }`. `puzzle` is the ref',
-    '  the player gets stuck on; `printedOn` is where the rungs are actually printed — usually',
-    '  the same page. 2-3 rungs, each `{ cost, gives }`, in order: a nudge, then the method,',
-    '  then at most the answer. `cost` is paid in something this book already tracks (a clock',
-    '  tick, marks, a crossed-out option) and must get DEARER down the ladder. Write the rung',
-    '  text into the prose of the surface you named — this declaration is the contract, the',
-    '  page is where the player reads it.',
+    '- `hintLadders` (array, at most 3): `{ puzzle, printedOn, label, rungs[] }`. `puzzle` is the',
+    '  ref the player gets stuck on; `printedOn` is where the rungs are printed — usually the',
+    '  same page. 2-3 rungs, each `{ cost, gives }`, in order: a nudge, then the method, then',
+    '  at most the answer. `cost` is paid in something this book already tracks (a clock tick,',
+    '  marks, a crossed-out option) and must get DEARER down the ladder.',
+    '  `label` is the BAND\'S OWN HEADING, in this world\'s voice and this artifact\'s idiom — the',
+    '  words a reader sees above the rungs. Never "Hints" and never "If you are stuck": those',
+    '  are the engine talking, and nothing printed in this book is the engine talking.',
+    '  The rungs PRINT AS THEIR OWN BAND on the surface `printedOn` names. Do NOT also write',
+    '  them into that surface\'s prose — the band is where the player reads them, and saying it',
+    '  twice spends the page on a repetition.',
     '- `milestones` (array, at most 4): `{ label, at, unlocks, printedOn }`. `at` is a COUNT the',
     '  player can check against their own page (marks banked, regions opened, fragments',
     '  decoded). `unlocks` is a ref, and some consequenceEdge must mention it — a theory the',

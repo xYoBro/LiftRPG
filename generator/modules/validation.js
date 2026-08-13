@@ -2801,6 +2801,17 @@ function collectSpineHarvestFloorErrors(spine, index, parsedEdges, S) {
       errors.push(where + '.puzzle names "' + puzzle.raw + '", which is not something a player can be stuck on.'
         + ' A hint ladder hangs on a cipher, a map, an oracle, a fragment, a seal, a clock or a companion');
     }
+    // W5b: the band's own heading, and it is REQUIRED at generation (optional
+    // in booklet-schema.mjs — the artifactIntent severity split). The band is a
+    // printed surface now, and a printed surface with no authored heading gets
+    // an engine-fixed English one, which is the house-aesthetic failure the
+    // diegetic-UI law forbids outright. HAND-LOADED BOOKS ARE UNAFFECTED: the
+    // atom falls back to naming the puzzle it serves.
+    if (!String((ladder || {}).label || '').trim()) {
+      errors.push(where + ' has no label — the rungs print as their own band now, and a band needs a'
+        + ' heading in this world\'s voice. Not "Hints" and not "If you are stuck": those are the engine'
+        + ' talking, and nothing printed in this book is the engine talking');
+    }
     var rungs = Array.isArray((ladder || {}).rungs) ? ladder.rungs : [];
     if (rungs.length < SPINE_BUDGETS.hintRungsMin || rungs.length > SPINE_BUDGETS.hintRungsMax) {
       errors.push(where + '.rungs has ' + rungs.length + ' rung' + (rungs.length === 1 ? '' : 's')

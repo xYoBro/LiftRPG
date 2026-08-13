@@ -658,6 +658,19 @@ var spineHintLadder = {
     puzzle: nonEmptyString,
     // Where the rungs are actually printed. Usually the puzzle's own page.
     printedOn: nonEmptyString,
+    // ── The band's own heading (W5b) ────────────────────────────────────
+    // W5a declared the ladder; W5b gives it a printed surface, and a printed
+    // surface needs a heading the fiction can own. Diegetic UI is
+    // non-negotiable for anything on paper (CLAUDE.md, Design Principles 1),
+    // so the alternative was an engine-fixed English label — "IF YOU ARE
+    // STUCK" — on every band in every book regardless of genre, which is the
+    // house-aesthetic failure the Chameleon Lens exists to prevent.
+    //
+    // OPTIONAL HERE, REQUIRED BY GENERATION POLICY: the artifactIntent
+    // severity split. The sealed corpus predates the spine entirely and must
+    // stay valid, and a hand-loaded book without one still renders — the band
+    // falls back to naming the puzzle it serves rather than inventing chrome.
+    label: { type: 'string' },
     rungs: {
       type: 'array',
       minItems: SPINE_BUDGETS.hintRungsMin,

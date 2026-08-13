@@ -3279,6 +3279,81 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   overflow-wrap:anywhere;
 }
 
+/* ── Hint band — the costed ladder, printed (W5b) ──
+   A framed strip: an authored heading and one two-column row per rung, cost
+   first. Structure only, and it prints no English of its own — the heading and
+   both columns are the book's own text (Design Principles 1: nothing printed
+   in this book is the engine talking).
+
+   CROSS-FILE CONTRACT: every number in this block and in the three
+   `.hint-band[data-density-variant="…"]` blocks at the bottom of this file is
+   mirrored by the LADDER table in renderer/modules/atoms/hint-band.js, which
+   carries the reverse pointer. `ladderMirrorHarness()` in scripts/validate.mjs
+   parses both sides. CHANGE THEM TOGETHER (D71).
+
+   `--hband-cost-w` is a load-bearing width, not a style: the estimate divides
+   the band by it to model how each rung's two columns wrap. */
+.hint-band{
+  --hband-label-size:6.3pt;
+  --hband-label-leading:1.3;
+  --hband-label-mb:4px;
+  --hband-rung-size:5.9pt;
+  --hband-rung-leading:1.3;
+  --hband-rung-gap:3px;
+  /* DENSITY-INVARIANT, and it is a ruling rather than an oversight. A cost
+     column that narrows with density makes the cost text wrap MORE while the
+     gives text wraps less, and which of the two wins is content-dependent — so
+     a long-costed ladder measured TALLER at the tight tier than at the dense
+     one. Charter invariant 4 requires estimates to be non-increasing in
+     density or the solver loops without converging, so the column is fixed and
+     the band's shrink comes from leading, padding and the gaps. */
+  --hband-cost-w:104px;
+  --hband-col-gap:8px;
+  --hband-pad:5px;
+  border:1px solid var(--rule);
+  padding:var(--hband-pad);
+  box-sizing:border-box;
+}
+.hint-band-label{
+  font-family:var(--font-mono);
+  font-size:var(--hband-label-size);
+  line-height:var(--hband-label-leading);
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:var(--hband-label-mb);
+}
+.hint-rungs{
+  list-style:none;
+  margin:0;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  gap:var(--hband-rung-gap);
+}
+.hint-rung{
+  display:flex;
+  gap:var(--hband-col-gap);
+  align-items:baseline;
+}
+.hint-rung-cost{
+  flex:0 0 var(--hband-cost-w);
+  width:var(--hband-cost-w);
+  font-family:var(--font-mono);
+  font-size:var(--hband-rung-size);
+  line-height:var(--hband-rung-leading);
+  color:var(--ink);
+  overflow-wrap:anywhere;
+}
+.hint-rung-gives{
+  flex:1 1 auto;
+  min-width:0;
+  font-family:var(--font-body);
+  font-size:var(--hband-rung-size);
+  line-height:var(--hband-rung-leading);
+  color:var(--ink);
+}
+
 .map-zone{
   display:flex;
   flex-direction:column;
@@ -7678,6 +7753,39 @@ body[data-demo-view="true"] .reader-unlock{
   --wgrid-instr-size:5.2pt;
   --wgrid-instr-leading:1.16;
   --wgrid-block-gap:3px;
+}
+
+/* ── Hint-band density ladder (W5b) ──
+   Token resets only. NOTHING IS HIDDEN AT ANY TIER, and that is the point: a
+   band that vanished under page pressure would be a promise the spine made and
+   the page broke. The shrink is leading, padding and the cost column.
+
+   CROSS-FILE CONTRACT: every number in the three blocks below is mirrored in
+   the LADDER table of renderer/modules/atoms/hint-band.js (tier keys match
+   densityVariant()). CHANGE THEM TOGETHER. */
+.hint-band[data-density-variant="compact"]{
+  --hband-label-mb:3px;
+  --hband-pad:4px;
+}
+.hint-band[data-density-variant="dense"]{
+  --hband-label-size:5.9pt;
+  --hband-label-leading:1.24;
+  --hband-label-mb:2px;
+  --hband-rung-size:5.5pt;
+  --hband-rung-leading:1.24;
+  --hband-rung-gap:2px;
+  --hband-col-gap:6px;
+  --hband-pad:3px;
+}
+.hint-band[data-density-variant="tight"]{
+  --hband-label-size:5.6pt;
+  --hband-label-leading:1.18;
+  --hband-label-mb:2px;
+  --hband-rung-size:5.2pt;
+  --hband-rung-leading:1.18;
+  --hband-rung-gap:2px;
+  --hband-col-gap:5px;
+  --hband-pad:2px;
 }
 
 /* ── Map density ladder ──

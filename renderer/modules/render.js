@@ -23,6 +23,7 @@ import './atoms/reckoning-panel.js';
 import './atoms/map-panel.js';
 import './atoms/constrained-grid.js';
 import './atoms/word-grid.js';
+import './atoms/hint-band.js';
 import './atoms/clocks-panel.js';
 import './atoms/boss-encounter.js';
 import './atoms/interlude.js';

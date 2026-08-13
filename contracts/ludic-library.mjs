@@ -183,10 +183,10 @@ var PROMOTABLE = [
   {
     id: 'hint-ladder', label: 'Costed tiered hints', wired: true,
     surface: 'meta.playSpine.hintLadders',
-    inputs: 'A puzzle surface the player can stall on, and a cost the world can actually collect.',
-    process: 'EXIT’s three-rung ladder — nudge, then method, then answer — each rung priced in something the book already tracks (a clock tick, banked value, a crossed-out option).',
-    outputs: 'A player who is never hard-stuck, and a threat clock that remembers they were.',
-    locks: 'Rungs are ordered and each is dearer than the last; the ladder names the printed surface that carries it.'
+    inputs: 'A puzzle surface the player can stall on, a cost the world can actually collect, and a heading in the book’s own voice.',
+    process: 'EXIT’s three-rung ladder — nudge, then method, then answer — each rung priced in something the book already tracks (a clock tick, banked value, a crossed-out option). W5b gave the ladder a PRINTED SURFACE: the rungs print as their own costed band on the page `printedOn` names, rather than riding that page’s prose.',
+    outputs: 'A player who is never hard-stuck, a threat clock that remembers they were, and a band the reader finds at the point of use.',
+    locks: 'Rungs are ordered and each is dearer than the last; the ladder names the printed surface that carries it, and the seal is the ORDER — the cost prints before the thing it buys, and paying is on the player’s honour, the same ruling as the sealed cache.'
   },
   {
     id: 'deduction-milestone', label: 'Deduction milestones', wired: true,
@@ -411,14 +411,11 @@ var NEEDS_PRIMITIVE = [
     locks: 'The crossings are the lock. Nothing ships unless a solver proves the skeleton admits exactly one filling from the printed list.',
     needs: 'A crossing solver plus a blank-skeleton print surface, which is a different geometry from the word board word-grid.js draws. DEFERRED BY RULING at W5b (crisscross was licensed "only if it lands clean"; it did not — the print surface and the uniqueness proof are both new work, not a variant of the search). Dense crossword construction stays out entirely per the waves plan.'
   },
-  {
-    id: 'printed-hint-band', label: 'Printed hint band',
-    inputs: 'A declared hint ladder.',
-    process: 'The rungs print as their own costed band on the puzzle’s page rather than riding the puzzle’s prose.',
-    outputs: 'A ladder the player reads at the point of use.',
-    locks: 'Each rung is sealed by honour behind its cost.',
-    needs: 'A rendered band with its own geometry, which means an estimate term and a ladder mirror — W5b, not a schema-light promotion. The DECLARATION landed in W5a; only the dedicated printed surface is outstanding.'
-  },
+  // `printed-hint-band` LANDED IN W5b and left this tier: the band is
+  // renderer/modules/atoms/hint-band.js, with its own estimate term and its own
+  // parsed ladder mirror, and the tier-2 `hint-ladder` entry above now carries
+  // the printed half of the mechanic. It is not re-listed here as a second
+  // entry — one family, one entry, one tier.
   {
     id: 'per-session-choice', label: 'Per-session choice surface',
     inputs: 'A choice posted on the session card itself.',
