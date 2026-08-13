@@ -25,6 +25,7 @@ import {
   DEFAULT_TIMEOUT_MS,
   MAX_OUTPUT_TOKENS,
   PROVIDERS,
+  PAGE_ESTIMATE,
   RATE_WINDOW_MS,
   RATE_MAX_CALLS,
   DAILY_CALL_LIMIT,
@@ -4373,6 +4374,10 @@ function auditGuidedBuild(data) {
 
 window.LiftRPGAPI = {
   PROVIDERS: PROVIDERS,
+  // The pre-run estimate's only home (D135). index.html is a classic script and
+  // cannot import a module, so the row reaches the interface through this seam
+  // — which is what keeps the page/sheet/ceiling numbers out of the markup.
+  PAGE_ESTIMATE: PAGE_ESTIMATE,
   listProviderModels: listProviderModels,
   refreshPricing: refreshPricing,
   generate: generate,

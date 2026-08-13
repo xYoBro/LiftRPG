@@ -139,6 +139,40 @@ export var PROVIDERS = {
     modelDiscovery: 'ollama',
     noKey: true
   },
+  // ── The Code Bridge (D127) — the third door ────────────────────────────
+  // `scripts/liftrpg-bridge.mjs` serves the OpenAI-compatible surface on
+  // loopback :8090 and fulfils every request by spawning the user's own
+  // `claude` CLI, so a book costs a subscription window instead of metered
+  // tokens.
+  //
+  // THIS ROW IS THE WHOLE INTEGRATION. D127(a): the OpenAI adapter takes its
+  // URL from `settings.baseUrl` while the anthropic adapter hardcodes
+  // ANTHROPIC_MESSAGES_URL, so the bridge is reachable as pure CONFIG and
+  // needed zero client code. A provider is config (D94) — if this door ever
+  // seems to need a transport change, the change is wrong.
+  //
+  // `modelDiscovery:'openai'` is LOAD-BEARING, not decoration: listProviderModels
+  // only falls back by URL shape when the kind is empty, and that fallback reads
+  // ANY loopback base URL as Ollama. Naming the kind is what keeps the bridge's
+  // own /v1/models (OpenAI list shape) from being parsed as an Ollama tag list.
+  //
+  // `noKey` is the second belt. allowsEmptyApiKey() already exempts loopback by
+  // URL, and the flag is what makes the key field visibly not-required rather
+  // than merely tolerated — the bridge never sees a credential and must never
+  // be handed one.
+  //
+  // `defaultModel:'default'` is one of the bridge's own CLI_DEFAULT_SENTINELS:
+  // it means "whatever the subscription resolves", the one model id that cannot
+  // go stale when the alias set moves. The bridge hardcodes no model on purpose;
+  // neither does this row.
+  bridge: {
+    label: 'Claude Code (on this machine)',
+    baseUrl: 'http://127.0.0.1:8090/v1',
+    defaultModel: 'default',
+    format: 'openai',
+    modelDiscovery: 'openai',
+    noKey: true
+  },
   gemini: {
     label: 'Google Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
@@ -153,6 +187,48 @@ export var PROVIDERS = {
     format: 'openai',
     modelDiscovery: 'openai'
   }
+};
+
+// ── Book-length + spend estimate (D135) ──────────────────────────────────────
+// The pre-run answer to "how long is this book, and what will it cost me".
+//
+// SINGLE HOME, and the reason is the D97/D110 law read one surface out: a page
+// count or a minute figure written as a literal in index.html is a number the
+// reader cannot trace to the thing that produced it, and nobody ever moves it
+// when the thing that produced it moves. Every figure the interface shows is
+// derived from this row.
+//
+// pages = interceptPages + pagesPerWeek × weeks. Fitted across the W3 matrix
+// (D135; r² = 0.984). `bandPages` is NOT a confidence interval — it is half the
+// OBSERVED spread at IDENTICAL inputs (32–44 pages at six weeks), which is the
+// estimator's honest ±: two runs of the same program on the same settings land
+// that far apart, so the surface says "about" and shows a range.
+//
+// `recommendedMaxWeeks` is the ratified ceiling (D135): home-stapler
+// bindability at the fitted slope. WARN, NEVER FORBID — a longer program is the
+// user's to print, and `longReachWeeks` is where a long-reach stapler still
+// closes the fold.
+//
+// `tokensPerWeek` is anchored to ONE measured book: "The Second Sky", a
+// complete six-week booklet through the Code Bridge at 241,658 tokens with zero
+// stage retries (D127) — 241658 / 6, rounded. One point fixes a slope through
+// the origin and nothing else: the fixed cost of the plan-first stages cannot
+// be separated from the per-week cost without a second measured length, so the
+// interface says "roughly", names the one run it comes from, and shows no
+// dollar figure at all. The measured total carries no input/output split, and
+// inventing one to price it would be the prohibited lie (D96) — the money
+// question is answered by the live meter, which has real usage, and by
+// getCheckpointSpendToDate on a resume (D113).
+export var PAGE_ESTIMATE = {
+  interceptPages: 11.2,
+  pagesPerWeek: 4.4,
+  bandPages: 6,
+  pagesPerSheet: 4,        // half-letter, saddle-stitched: two spreads a sheet
+  recommendedMaxWeeks: 10,
+  longReachWeeks: 13,
+  tokensPerWeek: 40000,
+  tokenAnchorWeeks: 6,
+  tokenAnchorTotal: 241658
 };
 
 // ── Rate limiting & budget ───────────────────────────────────────────────────

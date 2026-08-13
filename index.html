@@ -700,22 +700,27 @@
       to { transform: translateX(100%); }
     }
 
+    /* Three doors, so the row is a grid of equal columns rather than a flex
+       row: "I HAVE AN API KEY" is longer than "I HAVE A CHATBOT" and equal
+       columns keep the three chips reading as three peers when the longer
+       label wraps. */
     .generator-mode-switch {
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
       gap: 8px;
       margin-top: 14px;
     }
 
     .generator-mode-btn {
-      flex: 1;
       font-family: var(--mono);
       font-size: var(--fs-meta);
-      letter-spacing: .12em;
+      letter-spacing: .08em;
+      line-height: 1.35;
       text-transform: uppercase;
       border: 1.5px solid var(--ink);
       background: none;
       color: var(--ink);
-      padding: 9px 12px;
+      padding: 9px 8px;
       cursor: pointer;
       transition: background .15s, color .15s, border-color .15s;
     }
@@ -731,13 +736,119 @@
       border-color: var(--ink);
     }
 
+    /* The door legend. --fs-meta, not --fs-micro: this is the information the
+       door choice is made from, and D99 puts an 8.5pt floor under anything
+       informational. */
     .generator-mode-copy {
       margin-top: 10px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .generator-mode-legend-row {
       font-family: var(--body);
-      font-size: var(--fs-micro);
-      line-height: 1.75;
+      font-size: var(--fs-meta);
+      line-height: 1.6;
       letter-spacing: .01em;
       color: var(--muted);
+      padding-left: 10px;
+      border-left: 1.5px solid var(--rule);
+    }
+
+    .generator-mode-legend-row.is-active {
+      color: var(--ink);
+      border-left-color: var(--ink);
+    }
+
+    .generator-mode-legend-name {
+      font-family: var(--mono);
+      font-size: var(--fs-meta);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--ink);
+      margin-right: 6px;
+    }
+
+    /* ── The pre-run estimate ─────────────────────────────────────────────
+       Informational, decision-bearing, and read immediately before a button
+       that spends money or an afternoon: --fs-meta floor throughout (D99). */
+    .book-estimate {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border: 1.5px solid var(--rule);
+      display: grid;
+      gap: 6px;
+    }
+
+    .book-estimate-headline {
+      font-family: var(--ui-mono);
+      font-size: var(--fs-label);
+      letter-spacing: .04em;
+      color: var(--ink);
+    }
+
+    .book-estimate-caption {
+      font-family: var(--body);
+      font-size: var(--fs-meta);
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    .book-estimate-warn {
+      font-family: var(--body);
+      font-size: var(--fs-meta);
+      line-height: 1.6;
+      color: var(--ink);
+      padding-left: 10px;
+      border-left: 2px solid var(--accent);
+    }
+
+    /* ── The Code Bridge door ─────────────────────────────────────────────── */
+    .api-bridge-command {
+      font-family: var(--ui-mono);
+      font-size: var(--fs-meta);
+    }
+
+    .api-bridge-ready {
+      margin-top: 10px;
+      font-family: var(--body);
+      font-size: var(--fs-meta);
+      line-height: 1.7;
+      color: var(--muted);
+    }
+
+    .api-bridge-ready-line,
+    .api-bridge-fixes code {
+      font-family: var(--ui-mono);
+      font-size: var(--fs-meta);
+      color: var(--ink);
+      overflow-wrap: anywhere;
+    }
+
+    .api-bridge-check {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
+      flex-wrap: wrap;
+    }
+
+    .api-bridge-status {
+      font-family: var(--body);
+      font-size: var(--fs-meta);
+      line-height: 1.6;
+      color: var(--muted);
+      flex: 1 1 220px;
+    }
+
+    .api-bridge-status.is-ready { color: var(--ink); }
+    .api-bridge-status.is-error { color: var(--accent); }
+
+    .api-bridge-fixes {
+      margin: 8px 0 8px 16px;
+      padding: 0;
+      display: grid;
+      gap: 6px;
     }
 
     .generator-flow-panel {
@@ -3040,11 +3151,18 @@
           placeholder="Booklet format, tone, authors/books to echo, mechanic feel, realism vs. genre, emotional stakes — or leave blank for a surprise"></textarea>
         <div class="gen-tip">Better results: mention the kind of booklet you want, the voice/style, the mechanic feel, and whether you want quiet realism or overt genre. A few words still works.</div>
 
-        <div class="generator-mode-switch">
-          <button class="generator-mode-btn is-active" id="gen-mode-manual" type="button">Guided Build</button>
-          <button class="generator-mode-btn" id="gen-mode-api" type="button">Use My API</button>
+        <!-- The three doors. Labelled by what the reader HAS, not by what the
+             machinery is called (D99): a person who owns a ChatGPT tab and a
+             person who owns an API key are answering "which of these am I",
+             and neither of them knows what a pipeline is. All three sentences
+             stay on screen because the door choice is the most consequential
+             click on this page and it must be makeable without clicking. -->
+        <div class="generator-mode-switch" role="tablist" aria-label="How do you want the booklet written?">
+          <button class="generator-mode-btn is-active" id="gen-mode-manual" type="button" role="tab" aria-selected="true">I Have A Chatbot</button>
+          <button class="generator-mode-btn" id="gen-mode-api" type="button" role="tab" aria-selected="false">I Have An API Key</button>
+          <button class="generator-mode-btn" id="gen-mode-bridge" type="button" role="tab" aria-selected="false">I Have Claude Code</button>
         </div>
-        <div class="generator-mode-copy" id="gen-mode-copy">Guided Build keeps the flow step by step and checks each part on this device before you move on.</div>
+        <div class="generator-mode-copy" id="gen-mode-copy"></div>
 
         <div class="wizard-resume-banner" id="wiz-resume-banner">
           <div class="wizard-resume-copy" id="wiz-resume-copy">A saved project is available on this device.</div>
@@ -3054,6 +3172,12 @@
           </div>
         </div>
 
+        <!-- What this program will actually produce. Sits directly above the
+             button because that is where "how long is this going to be" gets
+             asked, and it is derived entirely from LiftRPGAPI.PAGE_ESTIMATE —
+             there is no page, sheet, or week number written into this file. -->
+        <div class="book-estimate" id="gen-estimate" hidden></div>
+
         <div class="generator-flow-actions">
           <button class="gen-submit" id="gen-submit" type="button" style="margin-top:0; flex:1">Start Guided Build &rarr;</button>
         </div>
@@ -3061,9 +3185,9 @@
 
       <div class="generator-flow-panel" id="api-config-panel">
         <div class="generator-flow-head">
-          <div class="generator-flow-kicker">Use Your API</div>
-          <div class="generator-flow-title">Connect your API and start the build</div>
-          <div class="generator-flow-copy">Your workout and booklet direction are locked in. Add your API settings, then LiftRPG will run the full build here in the browser.</div>
+          <div class="generator-flow-kicker" id="api-config-kicker">Use Your API</div>
+          <div class="generator-flow-title" id="api-config-title">Connect your API and start the build</div>
+          <div class="generator-flow-copy" id="api-config-copy">Your workout and booklet direction are locked in. Add your API settings, then LiftRPG will run the full build here in the browser.</div>
         </div>
 
         <div class="api-panel" id="api-panel">
@@ -3077,14 +3201,57 @@
             <span class="api-resume-banner-text" id="api-resume-banner-text"></span>
           </div>
 
-          <section class="api-station">
+          <!-- The Code Bridge door (D127). Shown only in bridge mode. Every
+               quoted string below is the bridge's OWN output, not a paraphrase
+               of it: a readiness line the reader is told to look for has to be
+               the line the program actually prints, or the instruction is worse
+               than none. The command and the origin are written by JS from the
+               page's own location, so the flag is right wherever this is served
+               from. -->
+          <section class="api-station api-station--bridge" id="api-station-bridge" hidden>
             <div class="api-station-head">
               <span class="api-station-index">Step 1</span>
-              <span class="api-station-title">Where should LiftRPG send the work?</span>
+              <span class="api-station-title">Start the bridge on your machine</span>
             </div>
-            <div class="api-station-copy">Pick a provider from the list, or point the Base URL at any service that speaks the OpenAI API — Moonshot (Kimi), OpenRouter, Together, DeepSeek, or a model running on your own machine. Choosing a provider fills in a sensible Base URL; overwrite it whenever you are going somewhere else.</div>
-            <div class="api-config-grid">
-              <div class="api-field">
+            <div class="api-station-copy">This door uses the Claude Code you already have installed, on your own Claude subscription, instead of a metered API key. A small program on your machine — the bridge — hands LiftRPG's requests to Claude Code and hands the answers back. It never sees your login, and nothing is sent anywhere except by Claude Code itself.</div>
+            <div class="api-field">
+              <label class="field-label" for="api-bridge-command">Run this in the LiftRPG folder</label>
+              <div class="api-key-row">
+                <input class="api-input api-bridge-command" id="api-bridge-command" type="text" spellcheck="false" readonly>
+                <button class="api-key-toggle" id="api-bridge-copy" type="button">Copy</button>
+              </div>
+            </div>
+            <div class="api-field-help" id="api-bridge-origin-help"></div>
+            <div class="api-bridge-ready">
+              <span class="api-bridge-ready-label">You are ready when its first line reads</span>
+              <code class="api-bridge-ready-line" id="api-bridge-ready-line">found Claude Code, logged in, ready on :8090</code>
+            </div>
+            <div class="api-bridge-check">
+              <button class="api-inline-btn" id="api-bridge-check" type="button">Check The Bridge</button>
+              <span class="api-bridge-status" id="api-bridge-status"></span>
+            </div>
+            <details class="api-advanced api-bridge-troubles">
+              <summary>If it prints something else</summary>
+              <div class="api-advanced-body">
+                <div class="api-field-help">The bridge checks itself before it starts serving, and its first line is either the ready line above or the exact fix. These are the three it can print instead:</div>
+                <ul class="api-bridge-fixes">
+                  <li><code>Claude Code CLI not found (claude). Fix: npm install -g &#64;anthropic-ai/claude-code</code></li>
+                  <li><code>Claude Code is installed but not logged in. Fix: claude auth login</code></li>
+                  <li><code>Port 8090 is already in use. Fix: stop the other process, or run with --port &lt;n&gt;.</code></li>
+                </ul>
+                <div class="api-field-help">If you move it to another port with <code>--port</code>, change the Base URL below to match.</div>
+              </div>
+            </details>
+          </section>
+
+          <section class="api-station" id="api-station-provider">
+            <div class="api-station-head">
+              <span class="api-station-index">Step 1</span>
+              <span class="api-station-title" id="api-station-provider-title">Where should LiftRPG send the work?</span>
+            </div>
+            <div class="api-station-copy" id="api-station-provider-copy">Pick a provider from the list, or point the Base URL at any service that speaks the OpenAI API — Moonshot (Kimi), OpenRouter, Together, DeepSeek, or a model running on your own machine. Choosing a provider fills in a sensible Base URL; overwrite it whenever you are going somewhere else.</div>
+            <div class="api-config-grid" id="api-provider-grid">
+              <div class="api-field" id="api-provider-field">
                 <label class="field-label" for="api-provider">Provider</label>
                 <select class="api-select" id="api-provider"></select>
               </div>
@@ -3093,10 +3260,10 @@
                 <input class="api-input" id="api-base-url" type="text" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="https://api.openai.com/v1">
               </div>
             </div>
-            <div class="api-field-help">Running a model locally? Ollama and LM Studio both serve an OpenAI-compatible endpoint on your machine, and most local servers need no key at all.</div>
+            <div class="api-field-help" id="api-station-provider-help">Running a model locally? Ollama and LM Studio both serve an OpenAI-compatible endpoint on your machine, and most local servers need no key at all.</div>
           </section>
 
-          <section class="api-station">
+          <section class="api-station" id="api-station-model">
             <div class="api-station-head">
               <span class="api-station-index">Step 2</span>
               <span class="api-station-title">Which model writes the booklet?</span>
@@ -3117,7 +3284,7 @@
             </div>
           </section>
 
-          <section class="api-station">
+          <section class="api-station" id="api-station-key">
             <div class="api-station-head">
               <span class="api-station-index">Step 3</span>
               <span class="api-station-title">Your key</span>
@@ -3134,7 +3301,7 @@
             </div>
           </section>
 
-          <section class="api-station">
+          <section class="api-station" id="api-station-build">
             <div class="api-station-head">
               <span class="api-station-index">Step 4</span>
               <span class="api-station-title">How should it build?</span>
@@ -3185,7 +3352,8 @@
             <div class="api-note" style="margin-bottom:6px">Not every model can complete the full build pipeline. The models below have successfully generated a complete booklet on this device and are validated for use.</div>
             <table class="validated-models-table" id="validated-models-table"></table>
           </div>
-          <div class="api-note">Provider, model, base URL, build method, and any pricing you enter are saved on this device for next time. Your key never is.</div>
+          <div class="api-note" id="api-prefs-note">Provider, model, base URL, build method, and any pricing you enter are saved on this device for next time. Your key never is.</div>
+          <div class="book-estimate" id="api-estimate" hidden></div>
           <div class="generator-flow-actions">
           <button class="generator-flow-back" id="api-config-back" type="button">Back To Brief</button>
           <button class="gen-submit" id="api-submit" type="button" style="margin-top:0; flex:1">Build Booklet With My API &rarr;</button>
@@ -3517,7 +3685,27 @@
       var apiStatusPanel = document.getElementById('api-status-panel');
       var manualModeBtn = document.getElementById('gen-mode-manual');
       var apiModeBtn = document.getElementById('gen-mode-api');
+      var bridgeModeBtn = document.getElementById('gen-mode-bridge');
       var modeCopyEl = document.getElementById('gen-mode-copy');
+      var apiConfigKicker = document.getElementById('api-config-kicker');
+      var apiConfigTitle = document.getElementById('api-config-title');
+      var apiConfigCopy = document.getElementById('api-config-copy');
+      var apiStationBridge = document.getElementById('api-station-bridge');
+      var apiStationProvider = document.getElementById('api-station-provider');
+      var apiStationProviderTitle = document.getElementById('api-station-provider-title');
+      var apiStationProviderCopy = document.getElementById('api-station-provider-copy');
+      var apiStationProviderHelp = document.getElementById('api-station-provider-help');
+      var apiProviderField = document.getElementById('api-provider-field');
+      var apiProviderGrid = document.getElementById('api-provider-grid');
+      var apiStationKey = document.getElementById('api-station-key');
+      var apiBridgeCommandEl = document.getElementById('api-bridge-command');
+      var apiBridgeCopyBtn = document.getElementById('api-bridge-copy');
+      var apiBridgeOriginHelp = document.getElementById('api-bridge-origin-help');
+      var apiBridgeReadyLine = document.getElementById('api-bridge-ready-line');
+      var apiBridgeCheckBtn = document.getElementById('api-bridge-check');
+      var apiBridgeStatusEl = document.getElementById('api-bridge-status');
+      var genEstimateEl = document.getElementById('gen-estimate');
+      var apiEstimateEl = document.getElementById('api-estimate');
       var apiPanel = document.getElementById('api-panel');
       var apiConfigBackBtn = document.getElementById('api-config-back');
       var apiStatusBackBtn = document.getElementById('api-status-back');
@@ -3686,6 +3874,65 @@
         generateStructured: 'a provider-locked build.'
       };
       var API_PIPELINE_DEFAULT = 'generateSkeletonFlesh';
+
+      // ── The three doors ────────────────────────────────────────────────
+      // A door is HOW THE MODEL IS REACHED. It is deliberately NOT a row in
+      // API_PIPELINE_METHODS: every value in that table must name a real
+      // window.LiftRPGAPI method (test-asserted), and the Code Bridge is a
+      // PROVIDER — the same orchestrator, the same stages, the same gates,
+      // pointed at a different base URL. D94 states the rule and D127(a)
+      // proves it cost zero client code; putting the bridge in the pipeline
+      // table would claim a fourth pipeline that does not exist and would fail
+      // its own pin on the first run.
+      //
+      // `id` values are the machine contract (test-pinned, same rule as the
+      // pipeline keys); `label` and `sentence` are the reader's, and name what
+      // the reader HAS (D99).
+      var GENERATION_DOORS = [
+        {
+          id: 'manual',
+          label: 'A chatbot',
+          sentence: 'Free. You copy each step into ChatGPT, Claude, Gemini or any chatbot and paste the reply back here. LiftRPG checks every step on this device before you move on.'
+        },
+        {
+          id: 'api',
+          label: 'An API key',
+          sentence: 'You pay your provider per token. LiftRPG runs the whole build in this browser and shows you what it is doing and what it has cost.'
+        },
+        {
+          id: 'bridge',
+          label: 'Claude Code',
+          sentence: 'No key and no per-token bill: LiftRPG runs the same build through the Claude Code already installed on your machine, on your own subscription. You start one small program first.',
+          // The door is the preset, and nothing else.
+          providerId: 'bridge'
+        }
+      ];
+
+      function getDoor(modeId) {
+        for (var d = 0; d < GENERATION_DOORS.length; d++) {
+          if (GENERATION_DOORS[d].id === modeId) return GENERATION_DOORS[d];
+        }
+        return GENERATION_DOORS[0];
+      }
+
+      // Both paid doors land on the API config surface and run the same
+      // pipeline; only the provider differs.
+      function doorUsesApiSurface(modeId) {
+        return modeId === 'api' || modeId === 'bridge';
+      }
+
+      function doorForProvider(providerId) {
+        for (var d = 0; d < GENERATION_DOORS.length; d++) {
+          if (GENERATION_DOORS[d].providerId && GENERATION_DOORS[d].providerId === providerId) {
+            return GENERATION_DOORS[d].id;
+          }
+        }
+        return '';
+      }
+
+      function doorOwnsProvider(providerId) {
+        return !!doorForProvider(providerId);
+      }
 
       function resolveApiPipelineMethod(value) {
         var name = String(value || '');
@@ -4310,6 +4557,199 @@
         saveApiPrefs();
       }
 
+      // ── The Code Bridge door ───────────────────────────────────────────
+      // Every string the reader is told to look for is the bridge's OWN
+      // output. The ready line here is assembled the way liftrpg-bridge.mjs
+      // assembles it ('found Claude Code, logged in, ready on :' + port), and
+      // the guided-build harness asserts the two agree, because an instruction
+      // to watch for a line the program does not print is worse than silence.
+      var BRIDGE_SCRIPT_PATH = 'scripts/liftrpg-bridge.mjs';
+      var BRIDGE_DEFAULT_PORT = 8090;
+      var BRIDGE_PROBE_TIMEOUT_MS = 5000;
+      var BRIDGE_LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '::1', '[::1]'];
+
+      function bridgeReadyLine(port) {
+        return 'found Claude Code, logged in, ready on :' + port;
+      }
+
+      function currentBridgePort() {
+        var raw = apiBaseUrlEl ? apiBaseUrlEl.value.trim() : '';
+        if (!raw) return BRIDGE_DEFAULT_PORT;
+        try {
+          var parsed = new URL(raw);
+          var port = Number(parsed.port);
+          return port > 0 ? port : (parsed.protocol === 'https:' ? 443 : 80);
+        } catch (_e) {
+          return BRIDGE_DEFAULT_PORT;
+        }
+      }
+
+      function pageOriginIsLoopback() {
+        if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') return false;
+        return BRIDGE_LOOPBACK_HOSTS.indexOf(String(window.location.hostname || '').toLowerCase()) !== -1;
+      }
+
+      function bridgeStartCommand() {
+        var parts = ['node', BRIDGE_SCRIPT_PATH];
+        var port = currentBridgePort();
+        if (port !== BRIDGE_DEFAULT_PORT) parts.push('--port', String(port));
+        // The bridge allows loopback origins by construction and refuses every
+        // other origin outright (D127d). When this page is not on loopback the
+        // flag is not optional — it IS the door.
+        if (!pageOriginIsLoopback()) parts.push('--allow-origin', window.location.origin);
+        return parts.join(' ');
+      }
+
+      function refreshBridgeSetupCopy() {
+        if (apiBridgeCommandEl) apiBridgeCommandEl.value = bridgeStartCommand();
+        if (apiBridgeReadyLine) apiBridgeReadyLine.textContent = bridgeReadyLine(currentBridgePort());
+        if (apiBridgeOriginHelp) {
+          if (window.location.protocol === 'file:') {
+            apiBridgeOriginHelp.textContent = 'This page is open from a file on disk, and a browser will not let a file page talk to a program on your machine. Serve the page first — npm start, then open http://localhost:8080 — and this door will work.';
+          } else if (pageOriginIsLoopback()) {
+            apiBridgeOriginHelp.textContent = 'This page is already running on your own machine, so the bridge will answer it without any extra permission.';
+          } else {
+            apiBridgeOriginHelp.textContent = 'The bridge answers pages on your own machine automatically and refuses every other page. This page is at ' + window.location.origin + ', so it has to be named on the command line — that is what --allow-origin is for.';
+          }
+        }
+      }
+
+      function setBridgeStatus(message, tone) {
+        if (!apiBridgeStatusEl) return;
+        apiBridgeStatusEl.textContent = message || '';
+        apiBridgeStatusEl.classList.toggle('is-ready', tone === 'ready');
+        apiBridgeStatusEl.classList.toggle('is-error', tone === 'error');
+      }
+
+      var bridgeCheckRunId = 0;
+      async function runBridgeCheck() {
+        if (!api() || typeof api().listProviderModels !== 'function') {
+          setBridgeStatus('LiftRPG’s own generator code did not finish loading. Reload the page.', 'error');
+          return;
+        }
+        var runId = ++bridgeCheckRunId;
+        if (apiBridgeCheckBtn) apiBridgeCheckBtn.disabled = true;
+        setBridgeStatus('Checking…', '');
+        var port = currentBridgePort();
+        try {
+          // Deliberately the SAME call the run will make, not a cheaper probe:
+          // a check that proves a different code path proves nothing. The one
+          // override is the wait: the bridge is on loopback and either answers
+          // in milliseconds or is not there, so the discovery window (45s) is
+          // 45 seconds of "Checking…" telling the reader nothing.
+          var probe = buildApiModelDiscoverySettings();
+          probe.requestTimeoutMs = BRIDGE_PROBE_TIMEOUT_MS;
+          var result = await api().listProviderModels(probe);
+          if (runId !== bridgeCheckRunId) return;
+          var models = result && Array.isArray(result.models) ? result.models : [];
+          renderApiModelOptions(models);
+          if (!getApiModelValue() && models.length) setApiModelValue(models[0]);
+          setBridgeStatus(models.length
+            ? 'The bridge answered on port ' + port + '. Claude Code is reachable — ' + models.length + ' model option' + (models.length === 1 ? '' : 's') + ' below.'
+            : 'The bridge answered on port ' + port + ', but offered no models. Check the line it printed when it started.', models.length ? 'ready' : 'error');
+        } catch (_error) {
+          if (runId !== bridgeCheckRunId) return;
+          // A browser cannot tell "nothing is listening" from "something is
+          // listening and refused this page" — a refused request and a dead
+          // port both arrive as the same failed fetch. So this says both, and
+          // claims neither. Guessing one would send half the readers to fix
+          // the wrong thing.
+          setBridgeStatus('Nothing came back from port ' + port + '. Two things look identical from in here, so check both: the bridge may not be running yet — start it with the command above and wait for its first line — or it may be running and refusing this page, which is what the --allow-origin part of that command is for.', 'error');
+        } finally {
+          if (runId === bridgeCheckRunId && apiBridgeCheckBtn) apiBridgeCheckBtn.disabled = false;
+        }
+      }
+
+      // ── The pre-run estimate ───────────────────────────────────────────
+      // Answers "how long is this book" and "roughly what does it cost" from
+      // the program already typed above, before the button that spends the
+      // afternoon. Every figure derives from LiftRPGAPI.PAGE_ESTIMATE (D135).
+      function estimatedBookWeeks() {
+        var text = workoutEl ? String(workoutEl.value || '').trim() : '';
+        if (!text) return 0;
+        // The pipeline's own resolution order: the normalized program's week
+        // count first, the parser's reading of loose text second. Estimating
+        // any other way would be estimating a different book than the one the
+        // build will plan.
+        var normalized = null;
+        if (api() && typeof api()._normalizeWorkout === 'function') {
+          try { normalized = api()._normalizeWorkout(text); } catch (_e) { normalized = null; }
+        }
+        if (normalized && normalized.weekCount > 0) return normalized.weekCount;
+        if (typeof window.parseWeekCount === 'function') return window.parseWeekCount(text);
+        return 0;
+      }
+
+      function formatApproxTokens(tokens) {
+        return tokens >= 1000000
+          ? (Math.round(tokens / 100000) / 10) + 'M'
+          : Math.round(tokens / 1000) + 'k';
+      }
+
+      function buildBookEstimate() {
+        var spec = api() && api().PAGE_ESTIMATE ? api().PAGE_ESTIMATE : null;
+        var weeks = estimatedBookWeeks();
+        if (!spec || weeks <= 0) return null;
+        var pages = spec.interceptPages + (spec.pagesPerWeek * weeks);
+        var low = Math.max(1, Math.round(pages - spec.bandPages));
+        var high = Math.round(pages + spec.bandPages);
+        return {
+          weeks: weeks,
+          lowPages: low,
+          highPages: high,
+          lowSheets: Math.ceil(low / spec.pagesPerSheet),
+          highSheets: Math.ceil(high / spec.pagesPerSheet),
+          tokens: spec.tokensPerWeek * weeks,
+          anchorWeeks: spec.tokenAnchorWeeks,
+          overCeiling: weeks > spec.recommendedMaxWeeks,
+          recommendedMaxWeeks: spec.recommendedMaxWeeks,
+          longReachWeeks: spec.longReachWeeks
+        };
+      }
+
+      function renderBookEstimate() {
+        var estimate = buildBookEstimate();
+        [genEstimateEl, apiEstimateEl].forEach(function (el) {
+          if (!el) return;
+          if (!estimate) { el.hidden = true; el.innerHTML = ''; return; }
+          var rows = [
+            '<div class="book-estimate-headline">' +
+              escapeForHtml(estimate.weeks + ' week' + (estimate.weeks === 1 ? '' : 's') +
+                ' · about ' + estimate.lowPages + '–' + estimate.highPages + ' pages · ' +
+                (estimate.lowSheets === estimate.highSheets
+                  ? estimate.lowSheets + ' sheets'
+                  : estimate.lowSheets + '–' + estimate.highSheets + ' sheets') + ' of paper') +
+            '</div>',
+            '<div class="book-estimate-caption">' +
+              escapeForHtml('Two runs of the same program land a few pages apart, so this is a range rather than a number. Printed double-sided and folded, four booklet pages come off each sheet.') +
+            '</div>'
+          ];
+          // The token line is only meaningful where tokens are what is spent.
+          // On the chatbot door the user pays with their own patience, not a
+          // token bill, and quoting one there would answer a question nobody
+          // on that door is asking.
+          if (doorUsesApiSurface(currentGenerationMode)) {
+            rows.push('<div class="book-estimate-caption">' +
+              escapeForHtml('Roughly ' + formatApproxTokens(estimate.tokens) + ' tokens, scaled from one measured ' +
+                estimate.anchorWeeks + '-week run. Your model, and any stage that has to be retried, will move that. ' +
+                (currentGenerationMode === 'bridge'
+                  ? 'On this door those tokens come out of your Claude subscription window, not your wallet.'
+                  : 'LiftRPG shows the real total as the run goes.')) +
+              '</div>');
+          }
+          if (estimate.overCeiling) {
+            // WARN, NEVER FORBID (D135). The length is the user's.
+            rows.push('<div class="book-estimate-warn">' +
+              escapeForHtml('Longer than the ' + estimate.recommendedMaxWeeks +
+                ' weeks we recommend. Nothing stops you — the book is as long as your program — but a booklet this thick stops closing flat when you fold it, and a desk stapler stops reaching the crease at around ' +
+                estimate.longReachWeeks + ' weeks. Printing it in two halves is the usual answer.') +
+              '</div>');
+          }
+          el.innerHTML = rows.join('');
+          el.hidden = false;
+        });
+      }
+
       function initializeApiSettings() {
         clearLegacyApiPrefs();
         populateProviderOptions();
@@ -4337,30 +4777,128 @@
 
       function updatePrimaryContinueLabel() {
         if (!submitBtn) return;
-        submitBtn.textContent = currentGenerationMode === 'api'
-          ? 'Continue To API Setup →'
-          : 'Start Guided Build →';
+        if (currentGenerationMode === 'api') submitBtn.textContent = 'Continue To API Setup →';
+        else if (currentGenerationMode === 'bridge') submitBtn.textContent = 'Continue To Claude Code Setup →';
+        else submitBtn.textContent = 'Start Guided Build →';
+      }
+
+      // All three sentences stay on screen; the chosen one is inked in. A
+      // reader choosing a door has to be able to compare the doors, and a
+      // legend that only describes the button you already pressed cannot be
+      // used to press a different one.
+      function renderDoorLegend() {
+        if (!modeCopyEl) return;
+        modeCopyEl.innerHTML = GENERATION_DOORS.map(function (door) {
+          return '<div class="generator-mode-legend-row' +
+            (door.id === currentGenerationMode ? ' is-active' : '') + '">' +
+            '<span class="generator-mode-legend-name">' + escapeForHtml(door.label) + '</span>' +
+            escapeForHtml(door.sentence) +
+            '</div>';
+        }).join('');
+      }
+
+      // The station numbers are rewritten from what is actually on screen. A
+      // hidden Step 3 above a visible Step 4 is the same defect class as a
+      // control showing a state it is not in (D99).
+      function renumberApiStations() {
+        if (!apiPanel) return;
+        var index = 0;
+        Array.prototype.forEach.call(apiPanel.querySelectorAll('.api-station'), function (station) {
+          if (station.hidden) return;
+          index += 1;
+          var badge = station.querySelector('.api-station-index');
+          if (badge) badge.textContent = 'Step ' + index;
+        });
+      }
+
+      // What the bridge door changes about the API surface, and nothing more:
+      // the provider is chosen by the door, the key station is a lie on this
+      // door (there is no key), and the setup station goes first because
+      // nothing else on the page works until the bridge is running.
+      function applyDoorSurface() {
+        var isBridge = currentGenerationMode === 'bridge';
+        if (apiStationBridge) apiStationBridge.hidden = !isBridge;
+        if (apiStationKey) apiStationKey.hidden = isBridge;
+        if (apiProviderField) apiProviderField.hidden = isBridge;
+        if (apiProviderGrid) apiProviderGrid.classList.toggle('api-config-grid--single', isBridge);
+        if (apiConfigKicker) apiConfigKicker.textContent = isBridge ? 'Use Claude Code' : 'Use Your API';
+        if (apiConfigTitle) {
+          apiConfigTitle.textContent = isBridge
+            ? 'Point LiftRPG at the Claude Code on your machine'
+            : 'Connect your API and start the build';
+        }
+        if (apiConfigCopy) {
+          apiConfigCopy.textContent = isBridge
+            ? 'Your workout and booklet direction are locked in. Start the bridge, check that LiftRPG can reach it, then build. This spends your Claude subscription rather than money.'
+            : 'Your workout and booklet direction are locked in. Add your API settings, then LiftRPG will run the full build here in the browser.';
+        }
+        if (apiStationProviderTitle) {
+          apiStationProviderTitle.textContent = isBridge
+            ? 'Where the bridge is listening'
+            : 'Where should LiftRPG send the work?';
+        }
+        if (apiStationProviderCopy) {
+          apiStationProviderCopy.textContent = isBridge
+            ? 'The default matches the bridge’s own default port. Change it only if you started the bridge with --port.'
+            : 'Pick a provider from the list, or point the Base URL at any service that speaks the OpenAI API — Moonshot (Kimi), OpenRouter, Together, DeepSeek, or a model running on your own machine. Choosing a provider fills in a sensible Base URL; overwrite it whenever you are going somewhere else.';
+        }
+        if (apiStationProviderHelp) {
+          apiStationProviderHelp.textContent = isBridge
+            ? 'No key is needed or wanted here. The bridge runs on your machine, spawns your own Claude Code, and never sees your login.'
+            : 'Running a model locally? Ollama and LM Studio both serve an OpenAI-compatible endpoint on your machine, and most local servers need no key at all.';
+        }
+        if (apiSubmitBtn && !apiSubmitBtn.classList.contains('is-busy')) {
+          API_SUBMIT_IDLE_LABEL = isBridge
+            ? 'Build Booklet With Claude Code →'
+            : 'Build Booklet With My API →';
+          apiSubmitBtn.textContent = API_SUBMIT_IDLE_LABEL;
+        }
+        renumberApiStations();
       }
 
       function setGenerationMode(mode) {
-        currentGenerationMode = mode === 'api' ? 'api' : 'manual';
+        currentGenerationMode = getDoor(mode).id;
         if (manualModeBtn) manualModeBtn.classList.toggle('is-active', currentGenerationMode === 'manual');
         if (apiModeBtn) apiModeBtn.classList.toggle('is-active', currentGenerationMode === 'api');
-        if (modeCopyEl) {
-          modeCopyEl.textContent = currentGenerationMode === 'manual'
-            ? 'Guided Build keeps the flow step by step and checks each part locally before you move on.'
-            : 'Use My API runs the full booklet build in the browser and shows exactly what LiftRPG is doing.';
-        }
+        if (bridgeModeBtn) bridgeModeBtn.classList.toggle('is-active', currentGenerationMode === 'bridge');
+        [manualModeBtn, apiModeBtn, bridgeModeBtn].forEach(function (btn) {
+          if (btn) btn.setAttribute('aria-selected', btn.classList.contains('is-active') ? 'true' : 'false');
+        });
+        renderDoorLegend();
         updatePrimaryContinueLabel();
-        if (currentGenerationMode === 'api' && apiRunState === null) {
-          apiRunState = createApiRunState();
+
+        // The door owns the provider. Selecting it here rather than at Build
+        // time means every downstream read — the base URL, the key exemption,
+        // the model list, the run log's provider label — resolves through the
+        // one preset with no second code path.
+        var door = getDoor(currentGenerationMode);
+        if (apiProviderEl) {
+          if (door.providerId && getProviderPreset(door.providerId)) {
+            if (apiProviderEl.value !== door.providerId) {
+              apiProviderEl.value = door.providerId;
+              applyProviderPreset(door.providerId, {});
+            }
+          } else if (doorOwnsProvider(apiProviderEl.value)) {
+            // Leaving a door must leave its provider behind. Saved prefs
+            // outlive a session, so without this the API door can open
+            // holding the bridge's preset and instruct the reader about a key
+            // that the selected provider does not want — two doors' states in
+            // one panel, which reads as a bug and is one.
+            apiProviderEl.value = 'openai';
+            applyProviderPreset('openai', {});
+          }
         }
-        if (currentGenerationMode === 'api') {
+        applyDoorSurface();
+
+        if (doorUsesApiSurface(currentGenerationMode)) {
+          if (apiRunState === null) apiRunState = createApiRunState();
           scheduleApiModelDiscovery({ immediate: true });
         }
+        if (currentGenerationMode === 'bridge') refreshBridgeSetupCopy();
         if (currentGeneratorSurface === 'intake') {
           setGeneratorSurface('intake');
         }
+        renderBookEstimate();
         renderApiRunState();
       }
 
@@ -4382,6 +4920,14 @@
         }
         if (currentGeneratorSurface === 'api-config') {
           scheduleApiModelDiscovery({ immediate: true });
+          renderBookEstimate();
+          if (currentGenerationMode === 'bridge') {
+            refreshBridgeSetupCopy();
+            // Arriving on this surface without a verdict would leave the one
+            // question the door turns on ("is the bridge up?") unanswered
+            // until the reader thinks to ask it.
+            runBridgeCheck();
+          }
         }
 
         if (options.skipFocus) return;
@@ -5894,6 +6440,9 @@
           workoutError.classList.remove('is-visible');
           workoutEl.style.borderColor = '';
         }
+        // The estimate answers a question about the text in this box, so it
+        // moves while the box is being typed into.
+        renderBookEstimate();
         saveWizardDraft();
       });
       briefEl.addEventListener('input', saveWizardDraft);
@@ -6004,6 +6553,20 @@
           handlePrimaryContinue();
         });
       }
+      if (bridgeModeBtn) {
+        bridgeModeBtn.addEventListener('click', function () {
+          setGenerationMode('bridge');
+          handlePrimaryContinue();
+        });
+      }
+      if (apiBridgeCheckBtn) {
+        apiBridgeCheckBtn.addEventListener('click', function () { runBridgeCheck(); });
+      }
+      if (apiBridgeCopyBtn && apiBridgeCommandEl) {
+        apiBridgeCopyBtn.addEventListener('click', function () {
+          copyText(apiBridgeCommandEl.value, apiBridgeCopyBtn, 'Copy');
+        });
+      }
       if (apiProviderEl) {
         apiProviderEl.addEventListener('change', function () {
           applyProviderPreset(apiProviderEl.value);
@@ -6020,7 +6583,12 @@
           if (el === apiMethodEl) applyPipelineStageOrder(apiMethodEl.value);
           saveApiPrefs();
           resetApiRunStateForConfigChange('API configuration changed. Previous run state cleared.');
-          if (el === apiBaseUrlEl) scheduleApiModelDiscovery();
+          if (el === apiBaseUrlEl) {
+            scheduleApiModelDiscovery();
+            // The port lives in the base URL, and both the start command and
+            // the readiness line quote it.
+            if (currentGenerationMode === 'bridge') refreshBridgeSetupCopy();
+          }
           renderApiRunState();
         });
         el.addEventListener('change', function () {
@@ -7728,7 +8296,7 @@
       function handlePrimaryContinue() {
         var workout = validateWorkout();
         if (!workout) return;
-        if (currentGenerationMode === 'api') {
+        if (doorUsesApiSurface(currentGenerationMode)) {
           setGeneratorSurface('api-config');
           return;
         }
@@ -8411,6 +8979,17 @@
       window.addEventListener('liftrpg-api-ready', function () {
         initializeApiSettings();
         updateDailyBudgetDisplay();
+        // The door's provider lock and the estimate both read through
+        // LiftRPGAPI, and the module lands after this script runs, so the
+        // door is applied again here against a surface that now exists.
+        // A saved door-owned provider re-opens ITS door rather than being
+        // discarded: the pref is the record of which door was last used, and
+        // silently swapping it for openai would throw that away.
+        setGenerationMode(
+          apiProviderEl && doorOwnsProvider(apiProviderEl.value)
+            ? doorForProvider(apiProviderEl.value)
+            : currentGenerationMode
+        );
       }, { once: true });
       apiRunState = createApiRunState();
       setGenerationMode('manual');
