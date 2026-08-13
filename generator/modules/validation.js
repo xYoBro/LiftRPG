@@ -1210,8 +1210,11 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
   // printed. The reconstruction seven refuse an antagonist who spends against
   // the player, so they have no lean to post — demanding a door there would
   // manufacture the coin flip the play-loop scan already warns about.
-  if (floorsOn(expectedOptions) && !isBoss && !expectedOptions.isDeload
-    && isDoorLeaningFamily(expectedOptions.mechanicGrammarFamily) && !weekObj.doorChoice) {
+  if (floorsOn(expectedOptions) && weekOwesDoor({
+    isBoss: isBoss,
+    isDeload: expectedOptions.isDeload,
+    mechanicGrammarFamily: expectedOptions.mechanicGrammarFamily
+  }) && !weekObj.doorChoice) {
     errors.push('Week posts no doorChoice — the "' + expectedOptions.mechanicGrammarFamily
       + '" grammar prices a decision every week, so this week owes { optionA, optionB } with a lean on each side');
   }
@@ -1570,7 +1573,11 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
     collectSpineWeekFloorErrors(
       weekObj,
       expectedOptions.playSpine,
-      Number(expectedOptions.weekNumber || expectedOptions.currentWeekNumber || weekObj.weekNumber || 0)
+      Number(expectedOptions.weekNumber || expectedOptions.currentWeekNumber || weekObj.weekNumber || 0),
+      // The stage that AUTHORED the spine, so a spine defect found here routes
+      // back to the prompt that can fix it (D143). 'Shell' on the multi-stage
+      // pipeline, 'Skeleton' on S+F — the caller knows which seat it sits in.
+      expectedOptions.spineStageLabel
     ).forEach(function (msg) { errors.push(msg); });
 
     collectPuzzleFloorErrors(weekObj).forEach(function (msg) { errors.push(msg); });
@@ -1915,6 +1922,25 @@ export function validateShellSchema(shell, expectedOptions) {
     errors = errors.concat(collectSpineSkeletonFloorErrors(
       (shell.meta || {}).playSpine,
       { weekCount: Number((expectedOptions || {}).weekCount) || 0 },
+      'Shell'
+    ));
+
+    // ── The earliest-stage pre-flight (D143) ──
+    // The spine is authored HERE, and so is the family it must be wired for.
+    // The week shapes come from the campaign plan (which ran before this stage)
+    // through expectedOptions, the same way the spine itself rides into the
+    // week floors — a gate never invents the plan it is checking against, so a
+    // caller that omits `plannedWeeks` gets no pre-flight.
+    errors = errors.concat(collectSpinePreflightFloorErrors(
+      (shell.meta || {}).playSpine,
+      {
+        weeks: (expectedOptions || {}).plannedWeeks,
+        fragmentRegistry: (expectedOptions || {}).fragmentRegistry,
+        // Read off the shell UNDER TEST, not the caller: artifactIntent is
+        // floored above, so by the time this runs the family is present or the
+        // stage has already failed for its absence.
+        mechanicGrammarFamily: ((shell.meta || {}).artifactIntent || {}).mechanicGrammarFamily
+      },
       'Shell'
     ));
   }
@@ -3179,18 +3205,212 @@ function collectSpineHarvestFloorErrors(spine, index, parsedEdges, S) {
   return errors;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// REPAIR OWNERSHIP — which stage can actually fix a blocking error (D143)
+// ════════════════════════════════════════════════════════════════════════════
+// D128's law one level up: a retry must land on a prompt that can fix the
+// defect. A week gate can fail on a defect whose material lives in the spine,
+// and no number of week retries will ever mend it — M1 spent three attempts and
+// a full rebuild proving that (evals/morning-books/ledger.json).
+//
+// OWNERSHIP IS DERIVED, NEVER TAGGED. Every cross-stage error in this file
+// already opens with the owning stage's label — `Shell → `, `Skeleton → `,
+// `Campaign Plan → ` — because D129 made that label a parameter for exactly
+// this reason ("an error naming the wrong stage sends the retry to a prompt
+// that can't fix it"). So the prefix IS the ownership declaration, and reading
+// it back is the whole derivation. Hand-tagging every error string with an
+// `ownedBy` field would be a second home for a fact the prefix already carries,
+// and the two would drift the first time someone edited one (D93).
+//
+// An error with no stage prefix is owned by the stage that raised it. That is
+// the honest default: a plain `Week 3 has no fusionBeat` is the week's own
+// business, and inventing a route for it would be worse than not routing.
+var REPAIR_STAGE_LABEL_KEYS = {
+  'layer codex': 'layerBible',
+  'story plan': 'campaignPlan',
+  'campaign plan': 'campaignPlan',
+  'skeleton': 'skeleton',
+  'shell': 'shell',
+  'booklet setup': 'shell',
+  'world detail': 'knowing',
+  'knowing': 'knowing'
+};
+
 /**
- * collectSpineWeekFloorErrors(weekObj, spine, weekNumber) -> string[]
+ * repairOwnerForError(message) -> stageKey | ''
+ *
+ * The stage that owns the FIX for one blocking error, read off the stage-label
+ * prefix the floors already write. Returns '' when the message carries no
+ * recognised prefix — meaning "whoever raised this owns it", which is what the
+ * existing retry ladder already assumes.
+ *
+ * Deliberately anchored (`^`) and bounded: this reads a prefix, never a
+ * mention. `Week W2 renders clock "Shell → ..."` in the middle of a sentence is
+ * content, not a routing instruction.
+ */
+export function repairOwnerForError(message) {
+  var m = /^([A-Za-z][A-Za-z ]{0,18}?)\s*→\s/.exec(String(message || ''));
+  if (!m) return '';
+  return REPAIR_STAGE_LABEL_KEYS[m[1].trim().toLowerCase()] || '';
+}
+
+/**
+ * weekOwesDoor({ isBoss, isDeload, mechanicGrammarFamily }) -> boolean
+ *
+ * THE SINGLE HOME for "does this week owe a printed doorChoice". Read by the
+ * week gate (F4, which demands the door) and by the shell/skeleton pre-flight
+ * below (which demands the LEDGER ROW for that door). One predicate, because
+ * the two gates disagreeing about who owes a door is precisely the failure the
+ * pre-flight exists to prevent: a plan blocked at the cheap gate for a door the
+ * expensive gate would never have asked for, or waved through for one it will.
+ *
+ * Every input is a PLANNING fact — the family is declared in artifactIntent,
+ * the boss week is the last week, and the deload flag comes from the plan or
+ * the program's own text. None of it needs a written week, which is what makes
+ * the promotion legal at all.
+ */
+export function weekOwesDoor(shape) {
+  var s = shape || {};
+  if (s.isBoss || s.isBossWeek) return false;
+  if (s.isDeload) return false;
+  return isDoorLeaningFamily(s.mechanicGrammarFamily);
+}
+
+/**
+ * collectSpinePreflightFloorErrors(spine, plannedWeeks, family, stageLabel)
+ *   -> string[]
+ *
+ * THE EARLIEST-STAGE PRE-FLIGHT (D143). The static half of the doors-differ
+ * floor, promoted from the week gate to the gate that authors the spine.
+ *
+ * The founding case, measured rather than argued: M1 (lighthouse-4w) declared
+ * `mechanicGrammarFamily: "stewardship"` — a door-leaning family — over four
+ * weeks, and a decisionLedger carrying exactly one row, `door:W2`. Weeks 1 and
+ * 3 therefore owed a door the ledger could not describe, and that was true the
+ * instant the shell was written. It cost three attempts and a full rebuild to
+ * find out, because the only gate that could see it ran after every expensive
+ * prose stage. This is a pure cross-check with zero model calls: the plan knows
+ * its door weeks, the spine knows its ledger rows.
+ *
+ * WHAT IS NOT PROMOTED, and why (the sweep's honest half):
+ *   - Floor 7, no mute source. NOTHING in any planning artifact schedules a
+ *     week's gameplayClocks — not the campaign plan's week items, not the
+ *     skeleton's weekPlan. The clocks are authored with the week, so the
+ *     contradiction is genuinely unknowable here and a pre-flight would be
+ *     asserting against an empty set.
+ *   - The fusionBeat floor. `beat` and `marking` are authored per week; no plan
+ *     declares them either.
+ * Both stay at the week gate as the render-truth backstop, which is also where
+ * a VOLUNTARY door lands: a week that prints a doorChoice it was never required
+ * to print cannot be predicted from the plan, and this pre-flight deliberately
+ * does not pretend otherwise.
+ *
+ * FORM. The pre-flight can only match the `door:W<n>` REF form, because at plan
+ * time the door has no prose label to match against. That is one form stricter
+ * than the week gate, which also accepts a label match — and it is the correct
+ * strictness: the ref is the form the week floor's own remedy text teaches
+ * ("name the fork as `door:W1`"), and it is the only form that can be checked
+ * before the door exists.
+ */
+export function collectSpinePreflightFloorErrors(spine, plan, stageLabel) {
+  var errors = [];
+  if (!spine || typeof spine !== 'object') return errors;  // absence is the arity floor's business
+  var p = plan || {};
+  var weeks = Array.isArray(p.weeks) ? p.weeks : [];
+  var family = p.mechanicGrammarFamily || '';
+  if (!weeks.length) return errors;                        // no plan ⇒ nothing knowable ⇒ no floor
+  var S = (stageLabel || 'Skeleton') + ' → ';
+
+  var ledger = Array.isArray(spine.decisionLedger) ? spine.decisionLedger : [];
+  var coveredDoorWeeks = {};
+  ledger.forEach(function (row) {
+    var parsed = parseSurfaceRef((row || {}).fork);
+    if (!parsed.valid || parsed.kind !== 'door') return;
+    var n = surfaceRefWeek(parsed);
+    if (n !== null) coveredDoorWeeks[n] = row;
+  });
+
+  var owed = [];
+  weeks.forEach(function (shape) {
+    if (!weekOwesDoor(Object.assign({ mechanicGrammarFamily: family }, shape || {}))) return;
+    var n = Number((shape || {}).weekNumber);
+    if (!Number.isFinite(n) || n < 1) return;
+    owed.push(n);
+  });
+
+  var uncovered = owed.filter(function (n) { return !coveredDoorWeeks[n]; });
+  if (uncovered.length) {
+    errors.push(S + 'playSpine.decisionLedger has no row for the door'
+      + (uncovered.length === 1 ? '' : 's') + ' week' + (uncovered.length === 1 ? ' ' : 's ')
+      + uncovered.map(function (n) { return 'W' + n; }).join(', ')
+      + ' will print — the "' + String(family || '') + '" grammar prices a decision every non-deload week,'
+      + ' so ' + (uncovered.length === 1 ? 'that week owes a row naming the fork as `door:W'
+        + uncovered[0] + '`' : 'each owes a row naming the fork as `door:W<n>`')
+      + ' and saying what mechanically differs across it. A door the ledger cannot describe is'
+      + ' flavour-only by definition');
+  }
+
+  // The same promotion applied to floor 4's other half. `keys before locks`
+  // already runs here, but only for refs whose id is week-shaped: `seal:F.07`
+  // names a FRAGMENT, so surfaceRefWeek returned null and the check skipped it
+  // silently. The plan schedules every fragment to a week (fragmentRegistry[]
+  // .weekRef), so the seal's week IS knowable — the ordering was checkable all
+  // along through one more lookup.
+  var fragmentWeeks = {};
+  (Array.isArray(p.fragmentRegistry) ? p.fragmentRegistry : []).forEach(function (entry) {
+    // `weekRef` is authored as 'W3' or '3' depending on the pipeline's plan
+    // schema; both name the same week and neither is worth a migration.
+    var m = /(\d+)/.exec(String((entry || {}).weekRef || ''));
+    var key = toSlugWords((entry || {}).id);
+    if (m && key) fragmentWeeks[key] = parseInt(m[1], 10);
+  });
+  if (Object.keys(fragmentWeeks).length) {
+    (Array.isArray(spine.economyGraph) ? spine.economyGraph : []).forEach(function (edge, ei) {
+      var to = parseSurfaceRef((edge || {}).to);
+      if (!to.valid || to.kind !== 'seal') return;
+      if (surfaceRefWeek(to) !== null) return;             // week-shaped: floor 4 already holds it
+      var lockWeek = fragmentWeeks[toSlugWords(to.id)];
+      if (lockWeek === undefined) return;
+      var from = parseSurfaceRef((edge || {}).from);
+      if (!from.valid) return;
+      var keyWeek = surfaceRefWeek(from);
+      if (keyWeek === null) keyWeek = fragmentWeeks[toSlugWords(from.id)];
+      if (keyWeek === undefined || keyWeek === null) return;
+      if (keyWeek >= lockWeek) {
+        errors.push(S + 'playSpine.economyGraph[' + ei + ']: the key "' + from.raw
+          + '" is held in week ' + keyWeek + ' but the lock "' + to.raw + '" is printed in week '
+          + lockWeek + ' (the plan schedules that fragment there) — a seal whose key arrives with it'
+          + ' or after it is gated content nobody can open');
+      }
+    });
+  }
+
+  return errors;
+}
+
+/**
+ * collectSpineWeekFloorErrors(weekObj, spine, weekNumber, spineStageLabel) -> string[]
  *
  * The two floors that can only be checked as each week lands, because the door
  * and the clocks are authored in the week chunk while the spine was declared
  * back at the skeleton.
+ *
+ * Every error here is owned by the SPINE-AUTHORING stage, not by the week: each
+ * one's stated remedy is a decisionLedger row, a differsBy rewrite or an
+ * economyGraph edge, and none of those exist in a week chunk. So each carries
+ * that stage's label as its prefix — the same idiom the skeleton floors use,
+ * and what `repairOwnerForError` reads to route the repair. The label is a
+ * parameter for D129's reason: the compiler seat is `shell` on the multi-stage
+ * pipeline and `skeleton` on S+F, and an error naming the wrong one sends the
+ * repair to a prompt that cannot fix it. A caller that omits it gets the
+ * unprefixed message and no routing — floors never invent their own context.
  */
-export function collectSpineWeekFloorErrors(weekObj, spine, weekNumber) {
+export function collectSpineWeekFloorErrors(weekObj, spine, weekNumber, spineStageLabel) {
   var errors = [];
   if (!spine || typeof spine !== 'object') return errors;   // absent spine is the skeleton's floor, not this one's
   var week = weekObj || {};
   var label = 'W' + (weekNumber || week.weekNumber || '?');
+  var S = String(spineStageLabel || '').trim() ? (String(spineStageLabel).trim() + ' → ') : '';
 
   // ── Floor 6: doors differ on a named mechanical surface ──
   // "A door the ledger cannot describe is flavor-only by definition." The check
@@ -3212,11 +3432,11 @@ export function collectSpineWeekFloorErrors(weekObj, spine, weekNumber) {
       if (matchesRef || matchesLabel) { row = ledger[li]; break; }
     }
     if (!row) {
-      errors.push('Week ' + label + ' prints a doorChoice with no playSpine.decisionLedger row —'
+      errors.push(S + 'Week ' + label + ' prints a doorChoice with no playSpine.decisionLedger row —'
         + ' name the fork as `door:' + label + '` and say what mechanically differs across it,'
         + ' or the door is flavour-only by definition');
     } else if (!namesMechanicalSurface(row.differsBy)) {
-      errors.push('Week ' + label + ' decisionLedger row differsBy "' + String(row.differsBy || '')
+      errors.push(S + 'Week ' + label + ' decisionLedger row differsBy "' + String(row.differsBy || '')
         + '" names no mechanical surface — a fork whose branches read differently but PLAY identically'
         + ' is the flavour-only door. Name the clock, track, price, region, cipher or gate that changes');
     }
@@ -3248,7 +3468,7 @@ export function collectSpineWeekFloorErrors(weekObj, spine, weekNumber) {
       var slug = toSlugWords(name);
       if (readNames[slug]) return;
       if (slug && ambient.indexOf(slug) !== -1) return;
-      errors.push('Week ' + label + ' renders clock "' + name + '" that no playSpine edge reads —'
+      errors.push(S + 'Week ' + label + ' renders clock "' + name + '" that no playSpine edge reads —'
         + ' a mute source. Point an edge at `clock:' + name + '`, or declare it ambient by naming it in a'
         + ' composition role or honestGaps');
     });
@@ -5929,6 +6149,27 @@ export function validateSkeletonStage(result, weekCount, options) {
     floorErrors = floorErrors.concat(
       collectSpineSkeletonFloorErrors((result.meta || {}).playSpine, result)
     );
+
+    // ── The earliest-stage pre-flight (D143) ──
+    // Cheaper here than anywhere: this stage IS the plan, so nothing has to be
+    // passed in. The weekPlan carries isDeload and isBossWeek directly (they
+    // are in STRUCTURED_SCHEMA_SKELETON), and the family is in the same meta
+    // block the artifact-intent floor just checked.
+    floorErrors = floorErrors.concat(collectSpinePreflightFloorErrors(
+      (result.meta || {}).playSpine,
+      {
+        weeks: wp.map(function (w, i) {
+          return {
+            weekNumber: Number((w || {}).weekNumber) || (i + 1),
+            isBoss: !!(w || {}).isBossWeek,
+            isDeload: !!(w || {}).isDeload
+          };
+        }),
+        fragmentRegistry: result.fragmentRegistry,
+        mechanicGrammarFamily: ((result.meta || {}).artifactIntent || {}).mechanicGrammarFamily
+      },
+      'Skeleton'
+    ));
 
     if (floorErrors.length) return floorErrors.join('; ');
   }
