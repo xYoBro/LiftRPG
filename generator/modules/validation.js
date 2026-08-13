@@ -1925,6 +1925,29 @@ export function validateShellSchema(shell, expectedOptions) {
         + VALID_COMPONENT_DIALECTS.join(' | '));
     }
 
+    // ── The currency floor (D144) ──
+    // `meta.economy` is the one surface a whole downstream RULE is stated
+    // against: INST_MARK_SURFACE demands the week's conversion sentence name
+    // `currencyLabel` verbatim, and currencyMentionVerdict grades every week
+    // against it. Both are unsatisfiable if no label was ever authored — and
+    // when none is, deriveMarkStripEconomy synthesizes "Marks" AFTER assembly,
+    // which is far too late to help the week stage and looks, in the finished
+    // book, exactly like a choice.
+    //
+    // So the label is declared HERE, at the stage that authors meta, or the
+    // stage retries. `currencyId` is deliberately NOT floored: it is a machine
+    // handle that assembly normalizes from the label anyway, and a floor on a
+    // derivable field buys a retry for something the pipeline can fix itself.
+    var economy = (shell.meta || {}).economy;
+    var currencyLabel = String((economy && economy.currencyLabel) || '').trim();
+    if (!currencyLabel) {
+      errors.push('meta.economy.currencyLabel is unset — name the ONE thing this world\'s '
+        + 'workout pays out, in its own words. Every session markStrip earns it, every week '
+        + 'reckoning spends it, and every reckoning sentence must print this exact phrase; '
+        + 'with no label authored the pipeline invents one after the fact and grades every '
+        + 'week against a name nobody chose.');
+    }
+
     // ── The artifact-intent floor (W3 corrective wave, F07) ──
     // Same argument as the spine below: the standard pipeline runs the compiler
     // HERE, so the planning bundle is declared here or nowhere on this path.

@@ -514,6 +514,12 @@
       structuralShape:     meta.structuralShape || {},
       artifactIdentity:    meta.artifactIdentity || {},
       weeklyComponentType: meta.weeklyComponentType || '',
+      // The currency (D144). extractShellContext's twin on this pipeline, and
+      // the D103 contract row applies verbatim: both projections carry it or
+      // one pipeline's prose stages are unfunded. The flesh prompts must be
+      // SHOWN the label to print it verbatim, which is what INST_MARK_SURFACE
+      // demands and what currencyMentionVerdict grades.
+      economy:             meta.economy || null,
       // The knowing (§11 Wave 1.5). Null when the stage did not run or the
       // model returned nothing usable — every consumer must tolerate absence,
       // because a booklet generated before this wave has none.
@@ -583,7 +589,18 @@
       '- World Contract: ' + ctx.worldContract,
       '- Voice: ' + JSON.stringify(ctx.narrativeVoice),
       '- Register: ' + JSON.stringify(ctx.literaryRegister)
-    ].concat(options.extraLines || []);
+    ].concat(
+      // The currency, printed as its own line rather than buried in a JSON
+      // blob (D144). The reckoning sentence must reproduce this string
+      // CHARACTER FOR CHARACTER, so the prompt shows it that way — a label the
+      // model has to dig out of a serialized object is a label it paraphrases.
+      // Absent on any skeleton authored before the currency floor: the line is
+      // simply not emitted, and such a prompt is byte-identical to before.
+      (ctx.economy && ctx.economy.currencyLabel)
+        ? ['- Currency (print this phrase VERBATIM in every reckoning conversion): '
+            + ctx.economy.currencyLabel]
+        : []
+    ).concat(options.extraLines || []);
 
     var parts = [lines.join('\n'), ''];
     if (ctx.intentContract) parts.push(ctx.intentContract, '');
@@ -2166,7 +2183,16 @@
       narrativeVoice: shellContext.narrativeVoice || null,
       literaryRegister: shellContext.literaryRegister || null,
       structuralShape: shellContext.structuralShape || null,
-      artifactIdentity: shellContext.artifactIdentity || null
+      artifactIdentity: shellContext.artifactIdentity || null,
+      // NON-NEGOTIABLE (D144). This projection is what the week, fragment and
+      // ending prompts of the standard pipeline actually read, and
+      // INST_MARK_SURFACE demands the week's reckoning sentence print
+      // `meta.economy.currencyLabel` verbatim, whole phrase, once. A verbatim
+      // demand whose subject is not in the prompt is a rule the model can only
+      // satisfy by luck — and the measurement says it does not: F04 failed 17
+      // of 18 weeks across three books. Untruncated, deliberately: this is the
+      // one field whose value must survive character-for-character.
+      economy: shellContext.economy || null
     };
   }
 
@@ -2854,6 +2880,15 @@
       '',
       '## Booklet Setup Contract',
       compactJson(summarizeShellContractForApi(shellContext)),
+      // The currency, on its own line as well as inside the contract JSON
+      // (D144). The demand is VERBATIM reproduction, and a string a model has
+      // to dig out of a serialized object is a string it paraphrases — which is
+      // the 'modifier' verdict F04 splits out. Emitted only when a label
+      // exists, so a pre-D144 shell produces a byte-identical prompt.
+      (((shellContext || {}).economy || {}).currencyLabel)
+        ? 'CURRENCY: this booklet pays out "' + shellContext.economy.currencyLabel
+          + '". Every reckoning conversion sentence must print that phrase VERBATIM, whole, once.'
+        : null,
       '',
       formatProcessParticulars((shellContext || {}).processParticulars),
       '',

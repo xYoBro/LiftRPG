@@ -778,6 +778,16 @@ export function extractShellContext(shell) {
   // contract from the start (generator.js formatArtifactIntentContract); this
   // is the same material on the other path, rendered by the same formatter.
   if (meta.artifactIntent) { ctx.artifactIntent = meta.artifactIntent; hasContent = true; }
+  // The currency (D144), and it is D103's row again with a different field.
+  // INST_MARK_SURFACE demands every week's reckoning sentence print
+  // `meta.economy.currencyLabel` VERBATIM, and currencyMentionVerdict grades
+  // every week against it — but this projection is how the multi-stage
+  // pipeline's week prompts see the shell, and the label was not in it. The
+  // week stage was being asked to reproduce a phrase it had never been shown.
+  // Measured consequence: F04 failed 17 of 18 weeks across three pipeline
+  // books. Its S+F twin is extractSkeletonContext in generator.js; both carry
+  // it or one pipeline writes blind.
+  if (meta.economy) { ctx.economy = meta.economy; hasContent = true; }
   // The knowing (§11 Wave 1.5). This is the whole point of the shell-context
   // channel for the process particulars: week-final, fragment, and ending
   // prompts all read their world through this projection, so a particular that
@@ -1863,6 +1873,15 @@ export function deriveMarkStripEconomy(booklet, diag) {
     || coerceCurrencyId(currencyLabel)
     || MARK_STRIP_DEFAULT_CURRENCY_ID;
 
+  // THE SYNTHESIZER STAYS, AND IT IS NOW THE PASTE PATH'S FLOOR ALONE (D144).
+  // Both API pipelines block at their shell/skeleton gate on an unset
+  // currencyLabel, so a generated book reaching here without one is impossible;
+  // what reaches here without one is a pasted or hand-assembled booklet, where
+  // synthesis is the right answer because there is no stage left to retry. That
+  // is the opposite of the artifactIntent ruling (D136: deliberately NO
+  // synthesizer) and the difference is what the field IS — a fabricated READING
+  // grades as faithful and hides a misread, while a synthesized currency NAME
+  // is visibly generic and announces itself in the warning below.
   if (!authoredEconomy) {
     if (diag) {
       diag.push(createDiagnostic('mark-economy-synthesized', 'warning', 'synthesize',

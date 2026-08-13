@@ -725,13 +725,37 @@ var STRUCTURED_SCHEMA_SHELL = {
           required: ['layoutIntensity', 'productionTexture', 'toneTexture', 'typeVoice',
             'documentRecipes', 'marginSemantics', 'inkDiscipline', 'sealTreatment', 'designEvidence']
         },
+        // ── The economy, on the transport at last (D144) ────────────────────
+        // THE DEFECT: `meta.economy` is described in SCHEMA_META, demanded by
+        // INST_MARK_SURFACE ("names the currency EXACTLY as
+        // `meta.economy.currencyLabel` writes it — the whole phrase, verbatim"),
+        // enforced by currencyMentionVerdict at every week gate, synthesized by
+        // deriveMarkStripEconomy when absent — and named in NO structured
+        // literal. The W5a/D139 shape a third time: prose-demanded,
+        // gate-enforced, transport-absent.
+        //
+        // It is the load-bearing one. F04 failed 17 of 18 weeks across three
+        // pipeline books, and the reason is arithmetic rather than prose: a
+        // model told to reproduce a phrase verbatim can only do it if it has
+        // been SHOWN the phrase. Under a strict structured mode this field
+        // could be dropped before the shell ever carried it, and then
+        // deriveMarkStripEconomy would invent "Marks" and every week would be
+        // graded against a label no author chose.
+        economy: {
+          type: 'object',
+          properties: {
+            currencyId: { type: 'string' },
+            currencyLabel: { type: 'string' }
+          },
+          required: ['currencyId', 'currencyLabel']
+        },
         weeklyComponentType: { type: 'string' },
         passwordEncryptedEnding: { type: 'string' },
         liftoScript: { type: 'string' }
       },
       required: ['schemaVersion', 'blockTitle', 'worldContract', 'narrativeVoice',
         'literaryRegister', 'structuralShape', 'artifactIdentity', 'artifactIntent',
-        'designLanguage', 'weeklyComponentType']
+        'designLanguage', 'economy', 'weeklyComponentType']
       // NOTE: `playSpine` is deliberately absent from this literal and from the
       // required list above. It is injected by withPlaySpine() below, from the
       // one copy prompt_rules.js owns. See that function.
