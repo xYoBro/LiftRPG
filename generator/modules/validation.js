@@ -111,7 +111,13 @@ import {
   // procedure?". Imported rather than re-implemented: a private copy here and
   // the prompt's byte-quoted term list would answer the same question in two
   // dialects, which is D91's whole anatomy. Guarded by singleDeclarationHomes().
-  hasInstitutionalReferent
+  hasInstitutionalReferent,
+  // D148 — the two-source law's table and its readers (VISION §11). Imported
+  // for exactly the reason above: the floor must ask what the die said in the
+  // SAME dialect the prompt hands it out in, from the same accessor, or the
+  // shown set and the checked set quietly stop being the same set.
+  identityAxesForStage,
+  readAxisValue
 } from '../../contracts/contract-constants.mjs';
 
 // W5b — the Ludic Harvest, tranche 2. THE ONE LAW: no puzzle ships
@@ -1651,7 +1657,106 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
 // and a floor that fired on absence would block them for not being the
 // generation path. Absence is silence here, never a failure — the honest shape
 // for a predicate whose input is optional.
-export function artifactIntentFloorErrors(meta, where, brief) {
+// ── THE OBEDIENCE FLOOR (VISION §11, D146) ──────────────────────────────────
+// The half with teeth. W-1 drew an assignment for every identity axis and W-2
+// handed each compiler seat the ones it authors; without this, both are a
+// suggestion, and a suggestion is what the shell menu already was before D144
+// measured what it produced.
+//
+// WHAT IT CHECKS, per axis the stage authors: the delivered value EQUALS its
+// assignment, or the axis's evidence surface NAMES the value that was chosen
+// instead. Those are the law's two sources and there is no third, so an axis
+// that is neither is the default the fourth referee exists to find — caught
+// here, at the stage that can still cheaply rewrite it, rather than reported
+// after a whole book is paid for.
+//
+// THE CITATION TEST IS PER-AXIS ON PURPOSE. `selectionReason` funds nine axes
+// and `designEvidence` funds six, so "the field is non-empty" would let one
+// sentence about the shell excuse a departure on five other axes. Requiring the
+// evidence to NAME the value actually chosen is what makes each departure
+// individually funded, and it is exactly what the prompt asks for in the
+// imperative ("quote the brief phrase that required the change in the evidence
+// field named on that line" — INST_SEED_ASSIGNMENT, its other half).
+//
+// NO SEED CONTEXT ⇒ SILENT, the D144 no-brief idiom. The ungated callers (the
+// guided-build harness, window.LiftRPGAPI.manual) hand-assemble payloads and
+// draw no run seed; a floor that fired on absence would block them for not
+// being the generation path. The pairing is exact: the formatter emits no
+// GIVENS block under the same condition, so a stage is never checked against an
+// assignment it was not shown.
+//
+// ABSENCE OF THE FIELD IS ALSO SILENT, and that is a narrower arm than it might
+// look. This floor asks "did you obey?", never "did you answer?" — presence is
+// a different question with its own floors (artifactIntentFloorErrors above,
+// designLanguageFloorErrors below), and a book that omits an OPTIONAL surface
+// like `playSpine.harvestPatterns` is exercising the W5a ruling that a book
+// using none of them is a legitimate book, not disobeying a die.
+//
+// THE GEOMETRY IS NOT CHECKED HERE, by measurement rather than by preference.
+// It is authored at the campaign plan, one stage BEFORE the mechanic grammar
+// family that D144 W-2 licensed to overrule it, so the exemption
+// (familyRefusesGeometry) is unanswerable at the gate that could catch it
+// early — and a blocking floor at the assembled gate would cost a whole book
+// to enforce a rule whose exception is legitimate. The fourth referee
+// classifies it instead, report-class, where both facts are finally in hand.
+function evidenceNames(evidence, value) {
+  var text = String(evidence || '').toLowerCase();
+  var needle = String(value || '').trim().toLowerCase();
+  if (!text || !needle) return false;
+  // A prose citation may spell a hyphenated enum with spaces ("witness binder"),
+  // and refusing that would fail books for typography. Generous in the safe
+  // direction: it can accept a citation that is loosely worded, it cannot
+  // invent one that is absent.
+  return text.indexOf(needle) !== -1 || text.indexOf(needle.replace(/-/g, ' ')) !== -1;
+}
+
+function readEvidenceAt(unit, dotPath) {
+  var parts = String(dotPath || '').split('.');
+  var node = unit;
+  for (var i = 0; i < parts.length; i++) {
+    if (!node || typeof node !== 'object') return '';
+    node = node[parts[i]];
+  }
+  return typeof node === 'string' ? node : '';
+}
+
+export function seedObedienceFloorErrors(unit, where, stage, seedAssignments) {
+  if (!seedAssignments || typeof seedAssignments !== 'object') return [];
+  var axes = identityAxesForStage(stage);
+  if (!axes.length) return [];
+  var errors = [];
+  for (var i = 0; i < axes.length; i++) {
+    var axis = axes[i];
+    var assigned = seedAssignments[axis.id];
+    if (!assigned) continue;
+    var delivered = readAxisValue(unit, axis);
+    if (delivered === undefined) continue;
+
+    var obeyed = Array.isArray(delivered)
+      ? delivered.some(function (entry) {
+        return String(entry || '').trim().toLowerCase() === String(assigned).toLowerCase();
+      })
+      : String(delivered).trim().toLowerCase() === String(assigned).toLowerCase();
+    if (obeyed) continue;
+
+    var evidence = readEvidenceAt(unit, axis.evidencePath);
+    var chosen = Array.isArray(delivered) ? delivered : [delivered];
+    var funded = chosen.some(function (value) { return evidenceNames(evidence, value); });
+    if (funded) continue;
+
+    errors.push((where || 'Stage') + ' → ' + axis.label + ' is '
+      + (chosen.length ? '`' + chosen.join('`, `') + '`' : 'empty')
+      + ', but the system assigned `' + assigned + '` and `' + axis.evidencePath
+      + '` does not name what you chose instead. Under the two-source law every identity '
+      + 'choice is BRIEF-FUNDED (quote the brief phrase that requires it, in that field) or '
+      + 'SEED-ASSIGNED (write `' + assigned + '` exactly). This is neither, which makes it a '
+      + 'default. Take the assignment, or name your choice in `' + axis.evidencePath
+      + '` alongside the words in the brief that earned it.');
+  }
+  return errors;
+}
+
+export function artifactIntentFloorErrors(meta, where, brief, seedAssignments) {
   var errors = [];
   var prefix = (where || 'Stage') + ' → meta.artifactIntent';
   var intent = (meta && typeof meta === 'object') ? meta.artifactIntent : null;
@@ -1661,7 +1766,23 @@ export function artifactIntentFloorErrors(meta, where, brief) {
   var shellFamily = String(identity.shellFamily || '').trim().toLowerCase();
   var briefText = String(brief || '').trim();
   var reason = String((intent && intent.selectionReason) || '').trim();
-  if (shellFamily === 'classified-packet' && briefText && !hasInstitutionalReferent(briefText) && !reason) {
+  // ── PRECEDENCE: AN ASSIGNMENT IS A DERIVATION (VISION §11) ──
+  // The two floors must not contradict each other on one field. This one
+  // demands a sentence for a packet the brief did not earn; the obedience floor
+  // demands the assignment be transcribed. A book whose die said
+  // `classified-packet` and which transcribed it obeyed the system exactly, and
+  // owes no argument for having done so — the assignment IS the reason, and
+  // asking for a second one would teach the model that transcribing is a thing
+  // it has to apologise for.
+  //
+  // Narrow on purpose: only the packet's OWN assignment excuses it. A run whose
+  // die said `ship-logbook` and which filed a classified packet anyway is the
+  // unearned packet D144 measured, and it still owes its sentence — twice over,
+  // because the obedience floor is asking too.
+  var packetAssigned = !!(seedAssignments && typeof seedAssignments === 'object'
+    && String(seedAssignments.shellFamily || '').toLowerCase() === 'classified-packet');
+  if (shellFamily === 'classified-packet' && briefText && !packetAssigned
+      && !hasInstitutionalReferent(briefText) && !reason) {
     errors.push((where || 'Stage') + ' → meta.artifactIdentity.shellFamily is "classified-packet" '
       + 'and the brief names no bureau, ministry, agency, department or any other body that runs '
       + 'on procedure — so this is the default, not a choice, unless meta.artifactIntent.selectionReason '
@@ -1959,7 +2080,16 @@ export function validateShellSchema(shell, expectedOptions) {
     // The brief rides expectedOptions for the D144 unearned-packet arm; every
     // other arm of this helper reads meta alone, and a caller that passes no
     // brief simply does not run that arm (see the helper's header).
-    errors = errors.concat(artifactIntentFloorErrors(shell.meta, 'Shell', (expectedOptions || {}).brief));
+    errors = errors.concat(artifactIntentFloorErrors(shell.meta, 'Shell',
+      (expectedOptions || {}).brief, (expectedOptions || {}).seedAssignments));
+
+    // ── The obedience floor (VISION §11) ──
+    // The whole shell unit, not `shell.meta`: `theme.visualArchetype` is an
+    // identity axis and lives beside meta, not inside it. Silent without seed
+    // context, which is the same condition under which the stage was shown no
+    // GIVENS at all.
+    errors = errors.concat(seedObedienceFloorErrors(shell, 'Shell', 'shell',
+      (expectedOptions || {}).seedAssignments));
 
     // ── The design-language floor (W6's close) ──
     // Here and ONLY here, and the asymmetry with every floor beside it is a
@@ -6161,8 +6291,16 @@ export function validateSkeletonStage(result, weekCount, options) {
   // advisory, and every ungated caller (the guided-build harness, the manual
   // API) keeps its silence.
   if (floorsOn(options)) {
-    var intentFloor = artifactIntentFloorErrors(meta, 'Skeleton', (options || {}).brief);
+    var intentFloor = artifactIntentFloorErrors(meta, 'Skeleton', (options || {}).brief,
+      (options || {}).seedAssignments);
     if (intentFloor.length) return intentFloor.join('; ');
+
+    // The obedience floor's S+F half. `'skeleton'`, not `'shell'`: this seat
+    // authors eight of the fifteen axes and was handed exactly those eight
+    // (D148 W-2a), so it is checked against exactly those eight.
+    var obedience = seedObedienceFloorErrors(result, 'Skeleton', 'skeleton',
+      (options || {}).seedAssignments);
+    if (obedience.length) return obedience.join('; ');
   }
 
   // ── theme ──

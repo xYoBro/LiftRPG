@@ -3059,6 +3059,10 @@ async function runApiPipeline(options) {
           // D144: the unearned-packet arm of artifactIntentFloorErrors needs the
           // brief to ask whether an institution was ever in it.
           brief: brief,
+          // D148: the obedience floor's evidence. The SAME map the builder was
+          // handed above — one draw per run, shown and checked, so the gate can
+          // never demand a value the prompt did not carry.
+          seedAssignments: seedAssignments,
           // ── The earliest-stage pre-flight's inputs (D143) ──
           // The campaign plan ran two stages ago and the program is on the
           // desk; between them they know which weeks will owe a door and which
@@ -4237,7 +4241,12 @@ async function runSkeletonFleshPipeline(options) {
         // classified-packet shell over a brief that names no institution owes a
         // written selectionReason. The floor cannot ask that question without
         // the brief, and this is the only seat that has it.
-        return validateSkeletonStage(result, weekCount, { generationFloors: true, brief: brief });
+        return validateSkeletonStage(result, weekCount, {
+          generationFloors: true,
+          brief: brief,
+          // D148, this seat's half: shown eight axes above, checked on eight.
+          seedAssignments: seedAssignments
+        });
       }
     });
     recordSeedOnStage(skeleton, divergenceSeed);

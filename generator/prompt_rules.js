@@ -2488,6 +2488,12 @@
     'permitted — it is "can I quote the phrase that requires it?" If you cannot quote it, the',
     'assignment stands.',
     '',
+    'HOW A DEPARTURE IS RECORDED, because this is CHECKED and a stage fails without it: when',
+    'you take something other than the assignment, the evidence field named beside that choice',
+    'must NAME THE VALUE YOU TOOK, next to the brief words that earned it. One sentence about',
+    'the shell does not fund a different archetype, a different texture and a different pull —',
+    'each departure is written down where it happened, or it reads as a default.',
+    '',
     'ONE EXCEPTION, already law: the board geometry. The mechanic grammar family DECIDES the',
     'board — if the assigned geometry\'s `Serves` row does not name your declared family, take',
     'the family\'s board and say in `selectionReason` which verb settled it. That is not a third',
@@ -2524,8 +2530,8 @@
       '### The assignments for THIS book',
       '',
       'Drawn from this book\'s run seed, across each full menu, before you saw the brief. Each',
-      'line is a GIVEN. Write it exactly, or write something else and quote the brief phrase',
-      'that required the change in the evidence field named on that line.',
+      'line is a GIVEN. Write it exactly — or write something else and, in the evidence field',
+      'named on that line, NAME the value you took and quote the brief phrase that required it.',
       ''
     ].concat(rows).join('\n');
   };
