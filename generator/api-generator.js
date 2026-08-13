@@ -573,12 +573,51 @@ var STRUCTURED_SCHEMA_SHELL = {
           },
           required: ['artifactClass', 'boardStateMode', 'shellFamily', 'attachmentStrategy', 'componentDialect']
         },
+        // ── The authored design language (W6, landed with the floor) ────────
+        // W6 shipped `meta.designLanguage` REQUIRED in prose — all nine axes,
+        // in SCHEMA_DESIGN_LANGUAGE — and named in NO structured literal. That
+        // is the W5a defect verbatim, one wave later: the shell stage is the
+        // only stage routed the doctrine, so this is the only transport schema
+        // that can carry it, and a model answering under a compat transport was
+        // being asked in prose for a field its response schema never mentioned.
+        // The floor that now blocks on absence (designLanguageFloorErrors in
+        // modules/validation.js) makes that gap expensive rather than merely
+        // untidy, so the two land together.
+        //
+        // TYPES, NOT MENUS, and that is STRUCTURED_PLAY_SPINE's `entry`
+        // precedent rather than laziness: the menus are already stated to the
+        // model in the prose section and already parity-asserted both ways by
+        // designLanguageMenuParity() in validate.mjs. A third copy here would
+        // be a third thing to drift, and this file cannot import the W6 enums
+        // without a re-export through modules/constants.js. The floor rejects a
+        // stray value with a message naming the whole menu, which is the same
+        // division of labour the closure floors use for the spine's library.
+        designLanguage: {
+          type: 'object',
+          properties: {
+            layoutIntensity: { type: 'number' },
+            productionTexture: { type: 'string' },
+            toneTexture: { type: 'string' },
+            typeVoice: { type: 'string' },
+            documentRecipes: { type: 'object' },
+            marginSemantics: { type: 'string' },
+            inkDiscipline: { type: 'string' },
+            sealTreatment: { type: 'string' },
+            designEvidence: { type: 'string' }
+          },
+          // All nine, because the prompt marks all nine REQUIRED and the floor
+          // blocks on all nine. A transport schema that asked for fewer would
+          // be steering the model toward a shell its own stage gate refuses.
+          required: ['layoutIntensity', 'productionTexture', 'toneTexture', 'typeVoice',
+            'documentRecipes', 'marginSemantics', 'inkDiscipline', 'sealTreatment', 'designEvidence']
+        },
         weeklyComponentType: { type: 'string' },
         passwordEncryptedEnding: { type: 'string' },
         liftoScript: { type: 'string' }
       },
       required: ['schemaVersion', 'blockTitle', 'worldContract', 'narrativeVoice',
-        'literaryRegister', 'structuralShape', 'artifactIdentity', 'weeklyComponentType']
+        'literaryRegister', 'structuralShape', 'artifactIdentity', 'designLanguage',
+        'weeklyComponentType']
       // NOTE: `playSpine` is deliberately absent from this literal and from the
       // required list above. It is injected by withPlaySpine() below, from the
       // one copy prompt_rules.js owns. See that function.

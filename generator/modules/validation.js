@@ -86,7 +86,22 @@ import {
   // W7 — the cipher-variety ceiling. The floor may not demand more distinct
   // techniques than the doctrine offers; the size is read, never written down.
   GENERATION_CIPHER_TECHNIQUES,
-  CIPHER_VARIETY_MIN
+  CIPHER_VARIETY_MIN,
+  // W6 — the authored design language. The floor below decides a BLOCKING stage
+  // error, so its menus come from the contract rather than from a copy here: the
+  // prompt teaches these exact lists (designLanguageMenuParity in validate.mjs
+  // diffs them both ways), the schema accepts these exact lists, and a floor
+  // holding a third private copy would eventually reject a value the model was
+  // correctly told it could choose.
+  LAYOUT_INTENSITY_BOUNDS,
+  VALID_PRODUCTION_TEXTURES,
+  TONE_TEXTURE_LADDER,
+  VALID_TYPE_VOICES,
+  VALID_DOCUMENT_FAMILIES,
+  VALID_DOCUMENT_RECIPES,
+  VALID_MARGIN_SEMANTICS,
+  VALID_INK_DISCIPLINES,
+  VALID_SEAL_TREATMENTS
 } from '../../contracts/contract-constants.mjs';
 
 // W5b — the Ludic Harvest, tranche 2. THE ONE LAW: no puzzle ships
@@ -1633,6 +1648,156 @@ export function artifactIntentFloorErrors(meta, where) {
 }
 
 /**
+ * designLanguageFloorErrors(meta, where) -> string[]
+ *
+ * THE DESIGN-LANGUAGE FLOOR (W6's close). F07's defect shape, exactly, one wave
+ * later: D135 measured three of four maximally divergent briefs wearing
+ * BYTE-IDENTICAL government/classified-packet dress, W6 built `meta.designLanguage`
+ * to break that, and shipped it DEMANDED in prose (SCHEMA_DESIGN_LANGUAGE marks
+ * all nine axes REQUIRED) and REQUIRED BY NOTHING. A mid-tier model treats
+ * "optional but demanded" as "skip" — the Teeth Round's founding measurement —
+ * and the absence is undetectable until a reader notices the book has no look
+ * of its own, which is the same thing as noticing nothing at all.
+ *
+ * The schema is correctly additive-optional (no corpus fixture carries a design
+ * language, and requiring it in booklet-schema.mjs would break every fixture to
+ * enforce a prompt rule), so the demand can only live where generation policy
+ * lives: the stage gate, opt-in through floorsOn(). The D111 shape.
+ *
+ * WHAT BLOCKS: presence, plus the nine axes the PROMPT ITSELF marks REQUIRED —
+ * not one field more. This floor is deliberately no stricter than what the
+ * model is taught, because a gate that demands more than any prompt surface
+ * teaches can only be satisfied by improvising, and every retry then buys the
+ * same failure (the cipherVarietyFloor lesson, stated in that function above).
+ *
+ * ENUM MEMBERSHIP BLOCKS TOO, and that is the componentDialect precedent rather
+ * than a new severity: resolveDesignLanguage() in renderer/modules/theme.js
+ * DROPS an off-menu value instead of defaulting it, on purpose — so a book that
+ * authors `typeVoice: "typewriter"` (not a menu member) renders in the
+ * archetype's faces and looks entirely intentional. That is invisible
+ * misauthoring, and the stage gate is the one place a retry can still fix it
+ * cheaply. The schema rejects the same value much later, on the assembled book.
+ *
+ * "none" AND "archetype-default" ARE REAL ANSWERS and always available, on every
+ * enum axis that has them — INST_DESIGN_LANGUAGE says so under HONEST WHEN
+ * LACKING. So this floor can always be satisfied honestly; it never pushes a
+ * book to manufacture a press its world has no reason to own. What it refuses
+ * is SILENCE, which is the one answer that carries no reading of the brief.
+ *
+ * DELIBERATELY NO SYNTHESIZER, and this is the load-bearing half of the ruling.
+ * `ensureArtifactIdentity` exists and could be copied here in twenty lines. It
+ * must not be. A synthesized design language would satisfy resolveTheme(), stamp
+ * real attributes, paint real ink, and grade as AUTHORED to every instrument
+ * downstream — including the eval bench built to measure exactly this
+ * convergence. That is strictly worse than absence, because absence is
+ * detectable and a fabricated look is not. The floor causes a retry; the retry
+ * causes an author. (D136's ruling for register, applied to design.)
+ */
+export function designLanguageFloorErrors(meta, where) {
+  var errors = [];
+  var prefix = (where || 'Stage') + ' → meta.designLanguage';
+  var spec = (meta && typeof meta === 'object') ? meta.designLanguage : null;
+  if (!spec || typeof spec !== 'object') {
+    errors.push(prefix + ' is absent — the archetype is a floor, not this book\'s identity, '
+      + 'and a book that authors no design language is published in whichever of ten looks its '
+      + 'archetype happens to carry. Declare layoutIntensity, productionTexture, toneTexture, '
+      + 'typeVoice, documentRecipes, marginSemantics, inkDiscipline, sealTreatment and '
+      + 'designEvidence, deriving each from words the brief actually contains');
+    return errors;
+  }
+
+  // layoutIntensity is the one continuous axis, so it is checked as a number in
+  // range rather than as a menu member. `0` is a legitimate value (a clinical
+  // instrument that presses as little as the system allows), which is why this
+  // tests FINITENESS rather than truthiness — a truthiness test here would read
+  // the quietest legal book as an unauthored one.
+  //
+  // Booleans and arrays are excluded before the range test because Number([])
+  // and Number(true) are 0 and 1 — both in range, neither an intensity. The
+  // bounds are formatted through toFixed(1) rather than concatenated with '.0',
+  // so a future non-integer bound reads as "0.2" and not as "0.2.0".
+  var lo = Number(LAYOUT_INTENSITY_BOUNDS.min).toFixed(1);
+  var hi = Number(LAYOUT_INTENSITY_BOUNDS.max).toFixed(1);
+  var rawIntensity = spec.layoutIntensity;
+  var intensity = Number(rawIntensity);
+  if (rawIntensity === undefined || rawIntensity === null || rawIntensity === '') {
+    errors.push(prefix + '.layoutIntensity is unset — state how hard this book presses, '
+      + lo + ' (a clinical instrument) to ' + hi + ' (a poster on every spread)');
+  } else if (typeof rawIntensity === 'boolean' || Array.isArray(rawIntensity)
+    || !isFinite(intensity)
+    || intensity < LAYOUT_INTENSITY_BOUNDS.min || intensity > LAYOUT_INTENSITY_BOUNDS.max) {
+    errors.push(prefix + '.layoutIntensity "' + rawIntensity + '" is not a number between '
+      + lo + ' and ' + hi);
+  }
+
+  // The six menu axes. One table, one message shape: an unset axis and an
+  // off-menu axis fail differently because they need different corrections —
+  // "choose one" versus "that one does not exist".
+  var MENU_AXES = [
+    ['productionTexture', VALID_PRODUCTION_TEXTURES, 'the press this object came off'],
+    ['toneTexture', TONE_TEXTURE_LADDER, 'how a shade is made on a machine with no grey'],
+    ['typeVoice', VALID_TYPE_VOICES, 'who is speaking in ink'],
+    ['marginSemantics', VALID_MARGIN_SEMANTICS, 'how the outer margin says what kind of page this is'],
+    ['inkDiscipline', VALID_INK_DISCIPLINES, 'how much ink the press laid down'],
+    ['sealTreatment', VALID_SEAL_TREATMENTS, 'the seal register']
+  ];
+  for (var i = 0; i < MENU_AXES.length; i++) {
+    var axis = MENU_AXES[i][0];
+    var menu = MENU_AXES[i][1];
+    var gloss = MENU_AXES[i][2];
+    var value = String(spec[axis] === undefined || spec[axis] === null ? '' : spec[axis]).trim();
+    if (!value) {
+      errors.push(prefix + '.' + axis + ' is unset — declare ' + gloss + ': ' + menu.join(' | '));
+    } else if (menu.indexOf(value) === -1) {
+      errors.push(prefix + '.' + axis + ' "' + value + '" is not a value this engine draws, so it '
+        + 'would be dropped and the book would silently keep the archetype\'s: ' + menu.join(' | '));
+    }
+  }
+
+  // documentRecipes: at least one family, every key and value on its menu. The
+  // prompt asks for "one entry per document family this book uses", so an EMPTY
+  // object is the shape that clears a presence check and means nothing — the
+  // whole point of reading the shape rather than the key.
+  var recipes = spec.documentRecipes;
+  if (!recipes || typeof recipes !== 'object' || Array.isArray(recipes)) {
+    errors.push(prefix + '.documentRecipes is absent — give each document family this book uses a '
+      + 'recipe, so the book\'s papers do not all look alike. Keys: ' + VALID_DOCUMENT_FAMILIES.join(' | ')
+      + '. Values: ' + VALID_DOCUMENT_RECIPES.join(' | '));
+  } else {
+    var families = Object.keys(recipes);
+    if (!families.length) {
+      errors.push(prefix + '.documentRecipes is empty — an empty object is not a design decision. '
+        + 'Name at least the family this book\'s documents actually belong to. Keys: '
+        + VALID_DOCUMENT_FAMILIES.join(' | ') + '. Values: ' + VALID_DOCUMENT_RECIPES.join(' | '));
+    }
+    for (var f = 0; f < families.length; f++) {
+      var family = families[f];
+      if (VALID_DOCUMENT_FAMILIES.indexOf(family) === -1) {
+        errors.push(prefix + '.documentRecipes."' + family + '" is not a document family the '
+          + 'renderer stamps, so the recipe would draw on nothing: ' + VALID_DOCUMENT_FAMILIES.join(' | '));
+      } else if (VALID_DOCUMENT_RECIPES.indexOf(recipes[family]) === -1) {
+        errors.push(prefix + '.documentRecipes.' + family + ' "' + recipes[family] + '" is not a '
+          + 'recipe this engine draws: ' + VALID_DOCUMENT_RECIPES.join(' | '));
+      }
+    }
+  }
+
+  // THE DERIVATION LAW's evidence, and the exact counterpart of
+  // artifactIntent.reading.briefEvidence above: without it the design language
+  // is an assertion, and nothing downstream can check the assertion against
+  // what was actually asked for. A design language that cannot cite the brief
+  // is a house style wearing the book's name — which is the convergence D135
+  // measured, arriving through the machinery built to prevent it.
+  if (!String(spec.designEvidence || '').trim()) {
+    errors.push(prefix + '.designEvidence is empty — quote the brief\'s own words these choices '
+      + 'came from and say what they made the object look like; an uncited design language is a '
+      + 'house style wearing this book\'s name');
+  }
+
+  return errors;
+}
+
+/**
  * Shell structural validation. Runs after shell stage (Stage 3).
  * Returns { valid: boolean, errors: string[] }
  */
@@ -1716,6 +1881,31 @@ export function validateShellSchema(shell, expectedOptions) {
     // Same argument as the spine below: the standard pipeline runs the compiler
     // HERE, so the planning bundle is declared here or nowhere on this path.
     errors = errors.concat(artifactIntentFloorErrors(shell.meta, 'Shell'));
+
+    // ── The design-language floor (W6's close) ──
+    // Here and ONLY here, and the asymmetry with every floor beside it is a
+    // finding rather than an omission. SCHEMA_DESIGN_LANGUAGE and
+    // INST_DESIGN_LANGUAGE are routed to the 'shell' stage alone
+    // (STAGE_SCHEMA_MAP in prompt_rules.js; designLanguageMenuParity in
+    // validate.mjs asserts that routing), and generateSkeletonPrompt — the S+F
+    // pipeline's compiler seat, which carries INST_ARTIFACT_COMPILER and is
+    // therefore where the artifact-intent floor's other half lives — carries no
+    // design-language doctrine at all. It does not name the field, the axes, or
+    // the menus.
+    //
+    // So a floor at the skeleton gate would block that pipeline on a surface its
+    // own prompt never mentions, and the retry would re-fail identically: the
+    // model cannot deliver what it was never asked for, and the Correction
+    // Directive would be the only place it ever heard the field's name. That is
+    // the derived-or-strict failure cipherVarietyFloor() records above, and it
+    // is worse than the gap it would close — a blocked pipeline rather than an
+    // unenforced demand.
+    //
+    // The S+F half therefore waits on the routing, which is prompt content and
+    // a ceiling decision, not a validator one. Until then the S+F pipeline
+    // authors no design language and its books render as their archetype, which
+    // is exactly what the pre-W6 behaviour was.
+    errors = errors.concat(designLanguageFloorErrors(shell.meta, 'Shell'));
 
     // ── The closure floors (W4a) ──
     // The standard pipeline runs the compiler HERE, so the spine is declared
