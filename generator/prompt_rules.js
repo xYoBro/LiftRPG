@@ -2444,6 +2444,92 @@
     'brief decided it.'
   ];
 
+  // ── The two-source law (VISION §11, D146) ─────────────────────────────────
+  // The DOCTRINE half. The per-run assignments are values, not text, so they
+  // reach the model through `formatSeedAssignmentBlock()` below — but every
+  // SENTENCE about what to do with them lives here, in the file that owns
+  // prompt content, and the builders only ever call the formatter.
+  //
+  // WHY THIS EXISTS AT ALL, stated for the model as bluntly as it is stated in
+  // the vision: D144 gave the shell a menu and measured the result — showing a
+  // menu removes the EXCUSE for a default, not the default itself. A model
+  // handed eight equally-described shells and no reason to prefer one answers
+  // with whatever it always answers. So the die goes first.
+  //
+  // ROUTED to the compiler seats (`shell`) and to `campaign-plan`, which is the
+  // stage that declares the board geometry. NOT on the single-prompt bundle:
+  // the paste path draws no run seed, has no record to be reproducible from,
+  // and is 318 characters from its ratified ceiling.
+  window.INST_SEED_ASSIGNMENT = [
+    '## Assigned identity — the two-source law',
+    '',
+    'This book is procedurally generated, and the system owns the dice. Every identity choice',
+    'you make below has exactly TWO legitimate sources, and there is no third:',
+    '',
+    '1. BRIEF-FUNDED — the brief\'s own words earn it. You take it, and you record the words',
+    '   that earned it in the evidence field named beside that choice. The citation is checked.',
+    '2. SEED-ASSIGNED — the system already drew it, from the full menu, before you read this.',
+    '   You TRANSCRIBE it exactly. The evidence field then records the assignment, not an',
+    '   argument for it.',
+    '',
+    'A choice that is neither is a DEFAULT, and defaults are findings against this book.',
+    '',
+    'TRANSCRIBED, NEVER IMPROVED. An assignment is not a suggestion and not a starting point.',
+    'Do not move it toward something that "fits better" — fitting it is YOUR work, not the',
+    'die\'s. A seed-assigned shell, archetype or texture is a CONSTRAINT the rest of the book',
+    'is built to earn, exactly the way a constraint you were given by a client would be. Books',
+    'that are all comfortable choices are the books that come out identical.',
+    '',
+    'WHEN THE BRIEF REALLY DOES FUND A CHOICE, TAKE IT. The brief outranks the die wherever it',
+    'actually names something — a brief that says "my grandmother\'s recipe box" has chosen its',
+    'shell, and no assignment overrules the user\'s own words. What the die outranks is HABIT:',
+    'the choice you would have made because it is the one you always make. So the test for',
+    'departing from an assignment is not "does the brief permit this?" — almost anything is',
+    'permitted — it is "can I quote the phrase that requires it?" If you cannot quote it, the',
+    'assignment stands.',
+    '',
+    'ONE EXCEPTION, already law: the board geometry. The mechanic grammar family DECIDES the',
+    'board — if the assigned geometry\'s `Serves` row does not name your declared family, take',
+    'the family\'s board and say in `selectionReason` which verb settled it. That is not a third',
+    'source: the family is itself one of these choices, so a geometry the family forces is',
+    'funded by whatever funded the family.'
+  ];
+
+  /**
+   * formatSeedAssignmentBlock(assignments, axes) -> string
+   *
+   * THE PER-RUN GIVENS. `assignments` is what the die said (drawn once per run
+   * by the orchestrator, from the seed recorded on the booklet); `axes` is the
+   * stage's slice of IDENTITY_AXES, passed in because this file is a classic
+   * script and cannot import the contract module.
+   *
+   * Returns '' when there is nothing to hand over — no seed context, no
+   * assignments, no axes — so the paste path and every hand-assembled caller
+   * build the prompt they always built, byte for byte. The obedience floor is
+   * silent under exactly the same condition, and that pairing is the contract:
+   * a stage never checks an assignment it was not shown.
+   */
+  window.formatSeedAssignmentBlock = function (assignments, axes) {
+    if (!assignments || typeof assignments !== 'object') return '';
+    if (!Array.isArray(axes) || !axes.length) return '';
+    var rows = [];
+    for (var i = 0; i < axes.length; i++) {
+      var axis = axes[i];
+      var value = assignments[axis.id];
+      if (!value) continue;
+      rows.push('- ' + axis.label + ' IS `' + value + '` — evidence field: `' + axis.evidencePath + '`');
+    }
+    if (!rows.length) return '';
+    return [
+      '### The assignments for THIS book',
+      '',
+      'Drawn from this book\'s run seed, across each full menu, before you saw the brief. Each',
+      'line is a GIVEN. Write it exactly, or write something else and quote the brief phrase',
+      'that required the change in the evidence field named on that line.',
+      ''
+    ].concat(rows).join('\n');
+  };
+
   // ── The Ludic Spine (W4a) ─────────────────────────────────────────────────
   // Routed to the `shell` stage ONLY, because that is the stage that authors
   // meta and therefore the only stage that can write a spine — and because the
@@ -3346,7 +3432,11 @@
     // it (D144). Before this, the geometry table was first read at week-final —
     // three stages after the decision it governs had already been made, by a
     // stage that could not see it.
-    'campaign-plan':  { schemas: [],                                            instructions: ['WORLD_CONTRACT', 'MAP_GEOMETRY', 'PROGRESSION', 'SYSTEM_INTEGRATION', 'ANTI_PATTERNS', 'ANTI_SAMENESS'] },
+    // SEED_ASSIGNMENT rides here for one axis and one reason: the board
+    // geometry is DECLARED at this stage (`topology.mainMapType`), so this is
+    // the stage that must be handed its assignment. The doctrine travels with
+    // it because the family-decides exception is stated in the same section.
+    'campaign-plan':  { schemas: [],                                            instructions: ['WORLD_CONTRACT', 'MAP_GEOMETRY', 'SEED_ASSIGNMENT', 'PROGRESSION', 'SYSTEM_INTEGRATION', 'ANTI_PATTERNS', 'ANTI_SAMENESS'] },
     // Shell: story + world + structural
     // Shell authors meta.literaryRegister (the voiceSpec) and meta.worldContract
     // (the knowing) — VOICE_DISCIPLINE is the authoring doctrine for both.
@@ -3368,7 +3458,11 @@
     // paste path does not have to carry it (D144). Order is load-bearing: the
     // model reads Step 7 and Step 9 in the compiler, then reads the menus that
     // make them choosable, in the same sitting.
-    'shell':          { schemas: ['META', 'THEME', 'DESIGN_LANGUAGE', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'SHELL_CHOICE', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
+    // SEED_ASSIGNMENT rides directly behind SHELL_CHOICE, and the order is
+    // load-bearing the same way theirs is: the model reads the menus that make
+    // each choice choosable, then reads which of them the die already made.
+    // Reversed, the assignments read as one more menu.
+    'shell':          { schemas: ['META', 'THEME', 'DESIGN_LANGUAGE', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'SHELL_CHOICE', 'SEED_ASSIGNMENT', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
     // Knowing: the world's process particulars, authored once after the
     // skeleton/shell and consumed by every prose stage (§11 Wave 1.5). It
     // writes no prose, so it carries no VOICE_DISCIPLINE — it carries the

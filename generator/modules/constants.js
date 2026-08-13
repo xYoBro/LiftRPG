@@ -293,7 +293,16 @@ import {
   parseBranchRef,
   PIPELINE_DEBRIS_KEYS,
   readPipelineDebris,
-  writePipelineDebris
+  writePipelineDebris,
+  // The two-source law's seam (VISION §11). The axis table and the draw live
+  // in contract-constants because three consumers and two harnesses have to
+  // agree about what the die said; these re-exports only keep the import sites
+  // in this tree pointed at one path.
+  IDENTITY_AXES,
+  identityAxesForStage,
+  drawSeedAssignments,
+  readAxisValue,
+  familyRefusesGeometry
 } from '../../contracts/contract-constants.mjs';
 
 export {
@@ -364,7 +373,18 @@ export {
   // every one. write/read are the seam that makes the move total.
   PIPELINE_DEBRIS_KEYS,
   readPipelineDebris,
-  writePipelineDebris
+  writePipelineDebris,
+  // ── The two-source law (VISION §11) ────────────────────────────────────
+  // Every identity choice is brief-funded or seed-assigned; anything else is a
+  // default, and defaults are findings. The axes, the draw and the geometry
+  // exemption are ONE home — the prompt hands out what the floor checks and
+  // what the referee classifies, so a second copy would let the three drift
+  // into demanding a value nobody was ever given.
+  IDENTITY_AXES,
+  identityAxesForStage,
+  drawSeedAssignments,
+  readAxisValue,
+  familyRefusesGeometry
 };
 
 export var SUPPORTED_THEME_ARCHETYPES = VALID_ARCHETYPES.reduce(function (acc, name) {

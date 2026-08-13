@@ -54,7 +54,15 @@ import {
   // has ever allowed it. These two are the whole move — a direct
   // `booklet._foo =` is caught by pipelineDebrisHome() in validate.mjs.
   readPipelineDebris,
-  writePipelineDebris
+  writePipelineDebris,
+  // The two-source law's draw and its axis table (VISION §11). The
+  // orchestrator is the only place allowed to call the draw, once per run, for
+  // the same reason it is the only place allowed to draw the seed: a builder
+  // that drew its own assignments would hand every retry a different identity
+  // (D101). `identityAxesForStage` is what keeps the prompt's slice and the
+  // floor's slice the same slice.
+  drawSeedAssignments,
+  identityAxesForStage
 } from './modules/constants.js';
 
 import {
@@ -2805,6 +2813,10 @@ async function runApiPipeline(options) {
   // within-run incoherence the draw-once seam exists to prevent (D101).
   var divergenceSeed = resolveRepairAwareSeed(repairSeedCarry,
     (checkpoint && checkpoint.stages && checkpoint.stages.shell) || null, brief);
+  // The assignments are a pure function of the seed, so a resume and a repair
+  // recover the SAME ones with the stage they shaped — no second key on the
+  // checkpoint, and nothing to keep in sync (D98's four touchpoints stay four).
+  var seedAssignments = drawSeedAssignments(divergenceSeed && divergenceSeed.value);
   adoptRunSeedSalt(divergenceSeed);
 
   if (resumed > 0) {
@@ -2966,7 +2978,13 @@ async function runApiPipeline(options) {
           // The pipeline's resolved book length, not the builder's own parse.
           // See generateApiStage2Prompt: parseWeekCount clamps to 4-12 and the
           // pipeline does not, so a longer canonical program was planned short.
-          return builders.stage2(workout, brief, layerBible, { weekCount: weekCount });
+          return builders.stage2(workout, brief, layerBible, {
+            weekCount: weekCount,
+            // The board geometry's GIVEN: this stage declares
+            // `topology.mainMapType` and every later week reuses it (D144 W-2).
+            seedAssignments: seedAssignments,
+            identityAxes: identityAxesForStage('week')
+          });
         }
         return buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState, { weekCount: weekCount });
       }
@@ -3065,7 +3083,12 @@ async function runApiPipeline(options) {
           workout: workout,
           // Passing the run's seed is what makes retries reuse it instead of
           // drawing a fresh world on attempt 2.
-          divergenceSeed: divergenceSeed
+          divergenceSeed: divergenceSeed,
+          // The GIVENS this seat owes an answer for. Same slice the obedience
+          // floor below reads, from one accessor, because a stage checked
+          // against axes it was never shown is the derived-or-strict trap.
+          seedAssignments: seedAssignments,
+          identityAxes: identityAxesForStage('shell')
         });
       }
     });
@@ -4106,6 +4129,7 @@ async function runSkeletonFleshPipeline(options) {
   // as the standard pipeline above. The S+F seat's compiler is the SKELETON,
   // so that is the cached stage the seed rides.
   var divergenceSeed = resolveRepairAwareSeed(sfRepairSeedCarry, cached('skeleton'), brief);
+  var seedAssignments = drawSeedAssignments(divergenceSeed && divergenceSeed.value);
   adoptRunSeedSalt(divergenceSeed);
 
   if (isResume) {
@@ -4193,7 +4217,12 @@ async function runSkeletonFleshPipeline(options) {
         return builders.skeleton(workout, brief, {
           retryMode: retryState.attempt > 0,
           divergenceSeed: divergenceSeed,
-          weekCount: weekCount
+          weekCount: weekCount,
+          // This pipeline's compiler seat owes the same GIVENS the shell stage
+          // owes on the other path — D144 W-3's lesson exactly: a value
+          // demanded at a stage must be SHOWN to that stage on BOTH pipelines.
+          seedAssignments: seedAssignments,
+          identityAxes: identityAxesForStage('shell')
         });
       },
       validate: function (result) {

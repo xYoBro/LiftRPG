@@ -458,13 +458,26 @@
       ? window.formatWorkoutTopologyBlock(topology)
       : '';
 
+    // THE GIVENS (VISION §11). The assignments and the stage's axis slice
+    // arrive as DATA from the orchestrator — this file is a classic script and
+    // cannot import the contract module, and the sentences about what to do
+    // with them live in prompt_rules.js where every prompt sentence lives.
+    // Riding armCompilerContext is what reaches all three compiler seats at
+    // once: the S+F skeleton, the multi-stage shell and the structured shell
+    // are three builders and one contract, and D144 W-3's lesson is that a
+    // value demanded at a stage must be SHOWN to that stage on BOTH pipelines.
+    var assignmentBlock = (typeof window.formatSeedAssignmentBlock === 'function')
+      ? window.formatSeedAssignmentBlock(options.seedAssignments, options.identityAxes)
+      : '';
+
     return {
       briefMode: briefMode,
       fidelityMode: fidelityMode,
       divergenceSeed: seed,
       topology: topology,
       briefChannel: function (blend) { return buildBriefChannel(workout, brief, blend, seed); },
-      contextBlock: [contextLines.join('\n'), topologyBlock].filter(Boolean).join('\n\n')
+      contextBlock: [contextLines.join('\n'), topologyBlock, assignmentBlock]
+        .filter(Boolean).join('\n\n')
     };
   }
 
@@ -2336,6 +2349,13 @@
       // assembles INST_ARTIFACT_COMPILER by hand too; the pair moves together.
       window.INST_SHELL_CHOICE.join('\n'),
       '',
+      // The two-source law, hand-routed for the same reason the menus above
+      // are: this is the S+F compiler seat and it assembles its own sections.
+      // The menus and the law that governs answering them move together — a
+      // seat shown the menu and not the law would read the assignments in
+      // `armed.contextBlock` as a fourth menu rather than as givens.
+      window.INST_SEED_ASSIGNMENT.join('\n'),
+      '',
       // The skeleton authors meta.literaryRegister (the voiceSpec) and
       // meta.worldContract (the knowing) — both are prose law, so the doctrine
       // travels with the stage that writes them. Content lives in prompt_rules.
@@ -2796,11 +2816,22 @@
       ? window.formatWeekScheduleBlock(topology) : '';
     var shapeBlock = (typeof window.formatWorkoutTopologyBlock === 'function')
       ? window.formatWorkoutTopologyBlock(topology) : '';
+    // The board geometry's GIVEN (VISION §11). This stage declares
+    // `topology.mainMapType` and every later week reuses it (D144 W-2), so this
+    // is the seat that owes the assignment. The doctrine rides
+    // buildStageSchema('campaign-plan'); this is the per-run value.
+    var assignmentBlock = (typeof window.formatSeedAssignmentBlock === 'function')
+      ? window.formatSeedAssignmentBlock(options.seedAssignments, options.identityAxes)
+      : '';
     return [
       '# API Stage 2 — Story Plan',
       '',
       '## SCHEMA CONTRACT',
       window.buildStageSchema('campaign-plan'),
+      // One entry, not two: the array is `.filter(Boolean)`-ed, so an empty
+      // block would take its separator with it and the prompt would be
+      // byte-identical for callers with no seed context.
+      assignmentBlock ? '\n' + assignmentBlock : '',
       '',
       '## Output Schema',
       'Return a single JSON object with exactly this structure (fill every field, ' + weekCount + ' entries in weeks[]):',
