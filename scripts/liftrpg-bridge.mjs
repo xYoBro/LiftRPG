@@ -829,6 +829,11 @@ async function serve(port) {
         ? ', plus ' + Array.from(EXTRA_ALLOWED_ORIGINS).join(', ')
         : ' (name another with --allow-origin <origin>)'));
     log('POST http://' + HOST + ':' + port + '/v1/chat/completions  (OpenAI-compatible, streaming)');
+    // The value the LiftRPG page's Base URL field wants, printed here because
+    // the POST line above taught readers to paste the FULL endpoint into it —
+    // which the page now also forgives, but the right value should come from
+    // the program that knows it (found on the first real deployed-site run).
+    log('base URL for the LiftRPG page: http://' + HOST + ':' + port + '/v1');
     log('bench: EVAL_PROVIDER=bridge node scripts/eval-bench.mjs');
   });
   for (const sig of ['SIGINT', 'SIGTERM']) {

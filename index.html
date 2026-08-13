@@ -4692,6 +4692,24 @@
         if (apiBridgeCheckBtn) apiBridgeCheckBtn.disabled = true;
         setBridgeStatus('Checking…', '');
         var port = currentBridgePort();
+
+        // THE SAFARI WALL, named before the probe (found on the first real
+        // deployed-site run, 2026-08-13): Safari refuses to let an https page
+        // call a plain-http loopback address at all — no CORS flag on the
+        // bridge can change a request the browser never sends. Chromium
+        // exempts loopback; Safari does not. Saying "nothing came back" for
+        // a request that was never sent is the dishonest-control defect, so
+        // this arm says the true thing and the two ways out.
+        var baseFieldValue = apiBaseUrlEl ? String(apiBaseUrlEl.value || '') : '';
+        var isSafari = navigator.vendor === 'Apple Computer, Inc.';
+        if (isSafari && window.location.protocol === 'https:' && /^http:\/\//i.test(baseFieldValue)) {
+          setBridgeStatus('Safari will not let this page (https) talk to a plain-http program on your '
+            + 'machine, so the check — and the build — cannot reach the bridge from here in Safari. '
+            + 'Two ways that work: open this same page in Chrome or any Chromium browser, or run the '
+            + 'site on your machine (npm start, then open http://localhost:8080) and Safari is fine.', 'error');
+          if (apiBridgeCheckBtn) apiBridgeCheckBtn.disabled = false;
+          return;
+        }
         try {
           // Deliberately the SAME call the run will make, not a cheaper probe:
           // a check that proves a different code path proves nothing. The one

@@ -339,7 +339,18 @@ export function fetchWithTimeout(url, options, timeoutMs) {
 }
 
 export function normalizeUrl(url) {
-  return String(url || '').replace(/\/+$/, '');
+  // Forgive the full-endpoint paste (2026-08-13, found on the first real
+  // deployed-site run): the bridge's own startup line advertises
+  // "POST …/v1/chat/completions", so a reader pastes exactly that into a
+  // field that wants the base — and the models probe then requested
+  // …/v1/chat/completions/models, a path nothing serves, reported as
+  // "nothing came back". The base IS that value with the suffix removed, so
+  // both spellings are accepted here, in the ONE normalizer both the models
+  // URL and the completions URL build from — they must agree on one root.
+  return String(url || '')
+    .replace(/\/+$/, '')
+    .replace(/\/chat\/completions$/i, '')
+    .replace(/\/+$/, '');
 }
 
 // ── Pricing helpers ───────────────────────────────────────────────────────────
@@ -1218,7 +1229,10 @@ export function buildOpenAICompatChatPayload(model, prompt, maxTokens, extra, im
 }
 
 export function buildOpenAICompatUrl(baseUrl) {
-  return String(baseUrl || '').replace(/\/+$/, '') + '/chat/completions';
+  // Through the one normalizer, so a base pasted WITH /chat/completions does
+  // not become …/chat/completions/chat/completions here while the models
+  // probe strips it — the two URLs must be built from the same root.
+  return normalizeUrl(baseUrl) + '/chat/completions';
 }
 
 export function buildOpenAICompatHeaders(apiKey) {
