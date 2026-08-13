@@ -1770,17 +1770,28 @@ export var VALID_HOME_PULLS = ['story', 'game', 'investigation', 'mixed'];
 //                 the stage rejects for every real run, which is a ruling and
 //                 not a flag flip. Do not add a flag to this table without one.
 export var IDENTITY_AXES = [
+  // ── THE FIVE MANDATORY ANSWERS (author ruling, 2026-08-13 — D152) ─────────
+  // D151's anti-vacuity sweep proved these five could be STRIPPED from an
+  // otherwise-obedient shell with no gate response — the harvest dodge on core
+  // identity. Unlike the harvest, a book cannot compose without a shell, a
+  // board, an archetype, a pull or an ecology: omission here is not declining
+  // a feature, it is handing the choice to the silent normalizer, which is the
+  // default generator's third disguise. Flagged, the D151 arm demands an
+  // ANSWER: declare a value (the departure arm then checks citation-or-
+  // assignment) or decline by naming the assignment in the evidence field.
+  // The harness rows that pinned these as dodgeable struck their pins the same
+  // commit this landed (§18d-ii — a closed dodge must strike its line).
   { id: 'shellFamily', label: 'shellFamily', path: 'meta.artifactIdentity.shellFamily',
-    menu: VALID_SHELL_FAMILIES, kind: 'scalar',
+    menu: VALID_SHELL_FAMILIES, kind: 'scalar', answerRequired: true,
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'boardStateMode', label: 'boardStateMode', path: 'meta.artifactIdentity.boardStateMode',
-    menu: VALID_BOARD_STATE_MODES, kind: 'scalar',
+    menu: VALID_BOARD_STATE_MODES, kind: 'scalar', answerRequired: true,
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'componentDialect', label: 'componentDialect', path: 'meta.artifactIdentity.componentDialect',
     menu: VALID_COMPONENT_DIALECTS, kind: 'scalar',
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'visualArchetype', label: 'theme.visualArchetype', path: 'theme.visualArchetype',
-    menu: VALID_ARCHETYPES, kind: 'scalar',
+    menu: VALID_ARCHETYPES, kind: 'scalar', answerRequired: true,
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'arcFamily', label: 'arcFamily', path: 'meta.artifactIntent.arcFamily',
     menu: VALID_ARC_FAMILIES, kind: 'scalar',
@@ -1789,11 +1800,11 @@ export var IDENTITY_AXES = [
     menu: VALID_MECHANIC_GRAMMAR_FAMILIES, kind: 'scalar',
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'homePull', label: 'homePull', path: 'meta.artifactIntent.homePull',
-    menu: VALID_HOME_PULLS, kind: 'scalar',
+    menu: VALID_HOME_PULLS, kind: 'scalar', answerRequired: true,
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'documentEcologyDominant', label: 'documentEcology.dominant',
     path: 'meta.artifactIntent.documentEcology.dominant',
-    menu: DOCUMENT_TYPE_ENUM, kind: 'member',
+    menu: DOCUMENT_TYPE_ENUM, kind: 'member', answerRequired: true,
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   // THE ONE AXIS THAT CAN BE DODGED BY SILENCE AND HAS A RULING ABOUT IT.
   // `harvestPatterns` is OPTIONAL by the W5a ruling — a book that composes with
