@@ -519,6 +519,27 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
      Authoring side + per-archetype values: renderer/modules/theme.js. */
   --theme-page-texture:var(--page-texture,none);
   --theme-page-texture-size:var(--page-texture-size,auto);
+  /* ── The authored design language (W6) ────────────────────────────────────
+     The second mapping layer, and the one a BOOK writes. VISION §8: authored
+     design language wins, the archetype guarantees legibility — so every token
+     below reads an authored value and falls back to a no-op, which is what
+     makes a book with no `meta.designLanguage` byte-identical to pre-W6.
+     Authoring side: renderer/modules/theme.js composeDesignLanguage().
+     THE DRAWING LAW binds all of it, and `designLanguageDrawingLaw()` in
+     scripts/validate.mjs is the gate — every rule keyed to a design attribute
+     is scanned for box-metric properties, exactly as the dialect rules are. */
+  --theme-page-filter:var(--page-filter,none);
+  --theme-design-intensity:var(--design-intensity,0);
+  --theme-design-ink-coverage:var(--design-ink-coverage,1);
+  --theme-design-header-bar:var(--design-header-bar,none);
+  --theme-design-frame:var(--design-frame,none);
+  --theme-design-texture-press:var(--design-texture-press,1);
+  /* The tone ladder's pattern, and the ink the design language draws its own
+     chrome in. `--design-chrome-ink` is deliberately NOT --accent: the bars,
+     frames and bands are STRUCTURE, and structure that changes hue with the
+     palette stops reading as structure. It is the book's ink, dimmed. */
+  --theme-design-tone:var(--design-tone-pattern,none);
+  --design-chrome-ink:color-mix(in srgb, var(--ink) 82%, transparent 18%);
   --theme-page-edge:var(--page-edge,none);
   --theme-live-frame:var(--live-frame,none);
   --theme-live-frame-offset:var(--live-frame-offset,0px);
@@ -6329,6 +6350,22 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   position:relative;
   min-height:0;
 }
+/* The document-recipe mark layer (W6). STRUCTURE ONLY — it paints nothing
+   until an authored design language fills `--doc-mark` (see THE AUTHORED
+   DESIGN LANGUAGE at the end of this file). It lives here rather than beside
+   the recipes because `content`, `position` and `inset` are the exact property
+   class a design-attribute rule may never declare, and carving an exception
+   into that gate would be worse than the duplication. Absolutely positioned, so
+   it is out of flow and adds no height to a flex column that measures it. */
+.fragment-block::after{
+  content:'';
+  position:absolute;
+  inset:0;
+  z-index:2;
+  pointer-events:none;
+  background-repeat:no-repeat;
+  background-image:none;
+}
 .fragment-block[data-paper-tone="aged"] .fragment-doc{
   background:linear-gradient(180deg, rgba(232,223,200,.88) 0%, rgba(226,214,189,.94) 100%);
 }
@@ -7976,4 +8013,435 @@ body[data-demo-view="true"] .reader-unlock{
   .blank-page{
     background:white;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE AUTHORED DESIGN LANGUAGE (W6)
+
+   VISION §8: *authored design language wins; the archetype guarantees
+   legibility.* Everything above this block is the FLOOR. This block is what a
+   BOOK says about itself — `meta.designLanguage`, composed onto that floor by
+   renderer/modules/theme.js `composeDesignLanguage()` and stamped onto the
+   container by `applyTheme()`.
+
+   THE ONE FENCE THAT MAKES THE DEMOTION PROVABLE: every rule below is scoped
+   under `[data-design-language]`, which `applyTheme()` stamps only for a book
+   that authors one. A book with no design language therefore cannot reach any
+   of this — not "falls back correctly at each rule", which is a claim that has
+   to be re-proved after every future edit, but cannot reach it at all. Do not
+   add a W6 rule outside that scope.
+
+   THE DRAWING LAW (D115) BINDS ALL OF IT. Every declaration here paints:
+   background layers, box-shadows and outlines (both outside the box model),
+   masks, fills, colours, opacity. Nothing sets a height, a padding, a border
+   width, a font-size, a letter-spacing or a column count, because phase-1
+   estimation has no DOM, cannot resolve any of these attributes, and would keep
+   charging the old geometry while the page rendered new geometry —
+   `overflow:hidden` then eats the difference as ink (D71/D105/D118).
+   `designLanguageDrawingLaw()` in scripts/validate.mjs is the gate, and it is
+   the same property blacklist the component dialects are held to.
+
+   TWO REFUSALS, recorded here because the next engineer will want both:
+     • layoutIntensity's GEOMETRY (columns, margins, type scale). The research
+       defines half the Mothership↔Mörk Borg spectrum that way. It is refused;
+       what ships is the spectrum's ink. See THE INTENSITY SPLIT in theme.js.
+     • `newspaper-columns` as a document recipe. Real `column-rule` needs real
+       multicol, and multicol roughly HALVES a document's rendered height while
+       atoms/fragment-doc.js estimates it at full measure — a 2× estimate error
+       on the busiest surface in the book. Shipping it as a token would be the
+       D71 defect with a research citation attached. It needs an adapter-carried
+       recipe, a column-aware estimate and a ladder mirror: a Layer-1 wave.
+
+   B&W PRINT LAW: no signal below is carried by hue. Weight, pattern, and
+   inversion carry all of it, because the margin band that means "mechanics"
+   has to still mean it after a photocopier.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── The tone ladder (texture-as-tone) ─────────────────────────────────────
+   The zine tradition's answer to a printer with no grey: a VALUE is a pattern,
+   not a tint. Ordered light → dark; `TONE_TEXTURE_LADDER` in
+   contract-constants.mjs holds the same order and gen-reference publishes it
+   as an ordinal.
+
+   WHERE IT IS ALLOWED TO LAND is the whole of the design here, and it is a
+   short list on purpose: the margin band, the inverted slug, the cover
+   designation's fill, and the stamped-file mark. Every one of those is chrome
+   this system draws itself. It reaches NO gameplay-state fill (a hatch over a
+   cleared hex erases the difference between cleared and not — the D126
+   --fog-opacity refusal, which binds here) and NO surface a pencil writes on
+   (the whole book is a writing surface; a patterned one is a worse one). */
+#booklet-container[data-design-language][data-tone-texture="stipple"]{
+  --design-tone-pattern:radial-gradient(var(--design-chrome-ink) .5px, transparent .6px);
+  --design-tone-size:4px 4px;
+}
+#booklet-container[data-design-language][data-tone-texture="hatching"]{
+  --design-tone-pattern:repeating-linear-gradient(45deg,
+    var(--design-chrome-ink) 0 .5px, transparent .5px 4px);
+  --design-tone-size:auto;
+}
+#booklet-container[data-design-language][data-tone-texture="cross-hatch"]{
+  --design-tone-pattern:repeating-linear-gradient(45deg,
+      var(--design-chrome-ink) 0 .5px, transparent .5px 3.5px),
+    repeating-linear-gradient(-45deg,
+      var(--design-chrome-ink) 0 .5px, transparent .5px 3.5px);
+  --design-tone-size:auto;
+}
+#booklet-container[data-design-language][data-tone-texture="dense-cross-hatch"]{
+  --design-tone-pattern:repeating-linear-gradient(45deg,
+      var(--design-chrome-ink) 0 .5px, transparent .5px 2px),
+    repeating-linear-gradient(-45deg,
+      var(--design-chrome-ink) 0 .5px, transparent .5px 2px),
+    repeating-linear-gradient(0deg,
+      var(--design-chrome-ink) 0 .4px, transparent .4px 3px);
+  --design-tone-size:auto;
+}
+#booklet-container[data-design-language][data-tone-texture="reverse-stipple"]{
+  --design-tone-pattern:radial-gradient(var(--paper) .7px, transparent .8px),
+    linear-gradient(var(--design-chrome-ink), var(--design-chrome-ink));
+  --design-tone-size:3px 3px, auto;
+}
+
+/* ── Production technique (the press this book came off) ───────────────────
+   Procedural only — zero raster assets, per VISION §8, so these survive any
+   scale and add no bytes to a book that must run offline.
+
+   These OVERRIDE the archetype's own `--theme-page-texture`, and the nine
+   bespoke archetype textures (D115) become the FALLBACK layer: 'none' or an
+   absent axis leaves the preset's texture standing untouched. That is the
+   promotion the W0 sweep asked for — archetype-bound character becoming
+   book-authored character — rather than a replacement of it. */
+#booklet-container[data-design-language][data-production-texture="photocopy"]{
+  /* Crushed midtones and uneven toner: coarse blotching over a fine speckle.
+     The signature is unevenness, so the two layers are deliberately coprime in
+     scale and neither tiles with the other. */
+  --theme-page-texture:radial-gradient(closest-side,
+      color-mix(in srgb, var(--ink) 9%, transparent) 0%, transparent 100%),
+    radial-gradient(closest-side,
+      color-mix(in srgb, var(--ink) 6%, transparent) 0%, transparent 100%),
+    repeating-linear-gradient(97deg,
+      color-mix(in srgb, var(--ink) 5%, transparent) 0 .5px, transparent .5px 2.5px);
+  --theme-page-texture-size:37px 29px, 83px 67px, auto;
+}
+#booklet-container[data-design-language][data-production-texture="typewriter"]{
+  /* Ribbon banding — the horizontal pressure lines of a platen, plus the faint
+     vertical register of a machine that always struck in the same columns. */
+  --theme-page-texture:repeating-linear-gradient(0deg,
+      color-mix(in srgb, var(--ink) 4%, transparent) 0 .6px, transparent .6px 5px),
+    repeating-linear-gradient(90deg,
+      color-mix(in srgb, var(--ink) 2.5%, transparent) 0 .5px, transparent .5px 7px);
+  --theme-page-texture-size:auto;
+}
+#booklet-container[data-design-language][data-production-texture="risograph"]{
+  /* Misregistration: the same rule printed twice, a hair out of alignment. In
+     B&W it reads as a doubled hairline field, which is exactly what a riso
+     misregistration looks like once the colour is gone. */
+  --theme-page-texture:repeating-linear-gradient(90deg,
+      color-mix(in srgb, var(--ink) 5.5%, transparent) 0 .5px, transparent .5px 6px),
+    repeating-linear-gradient(90deg,
+      color-mix(in srgb, var(--ink) 4%, transparent) 0 .5px, transparent .5px 6px);
+  --theme-page-texture-size:auto;
+  --theme-page-texture-position:0 0, 1.5px 0;
+}
+#booklet-container[data-design-language][data-production-texture="mimeograph"]{
+  /* Fuzzy organic ink. The one place a turbulence filter earns its cost: no
+     gradient stack reproduces the soft irregular bleed of a stencil duplicator.
+     Same data-URI technique as the page grain above — an SVG that filters its
+     own rect, so nothing outside this file is needed. */
+  --theme-page-texture:url("data:image/svg+xml,%3Csvg viewBox='0 0 140 140' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.16' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 .07 0 0 0 0 .07 0 0 0 0 .07 0 0 0 -1.4 .82'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E");
+  --theme-page-texture-size:140px 140px;
+}
+#booklet-container[data-design-language][data-production-texture="letterpress"]{
+  /* Deboss: a clean plate with an impression edge. Quietest of the five by
+     design — letterpress announces itself by restraint and by the bite at the
+     plate's border, not by texture across the sheet. */
+  --theme-page-texture:linear-gradient(180deg,
+      color-mix(in srgb, var(--ink) 5%, transparent) 0 .75px, transparent .75px),
+    linear-gradient(0deg,
+      color-mix(in srgb, var(--ink) 3.5%, transparent) 0 .75px, transparent .75px),
+    radial-gradient(120% 120% at 50% 50%, transparent 62%,
+      color-mix(in srgb, var(--ink) 4%, transparent) 100%);
+  --theme-page-texture-size:auto;
+}
+
+/* The texture layer, re-declared for a design-language book so the authored
+   position and the ink-coverage press can reach it. Identical to the base rule
+   in every other respect; `opacity` composites and does not measure. */
+[data-design-language] .booklet-page::after{
+  background-position:var(--theme-page-texture-position,0 0);
+  opacity:var(--theme-design-texture-press,1);
+}
+
+/* ── Ink discipline: one impression, not a pile of effects ─────────────────
+   `--design-ink-coverage` already scales the drawn values in theme.js. Only
+   'crushed' reaches the page filter, and it is the heaviest thing in this
+   system — which is why an author has to name it. A `filter` composites the
+   painted result; it does not reflow. */
+[data-design-language] .booklet-page{
+  filter:var(--theme-page-filter,none);
+}
+
+/* ── Semantic margins (Into the Odd, made B&W-honest) ──────────────────────
+   The original signals content class with COLOUR — black for core mechanics,
+   teal for adventure, blue for tables. Hue is never load-bearing here, so the
+   signal is carried by WEIGHT and PATTERN instead, and it survives the
+   photocopier that the colour version does not.
+
+   Keyed off `data-page-type`, which page-shell.js already stamps on every page
+   — so the semantics are the page kinds the ENGINE actually has, rather than a
+   parallel vocabulary that could drift out of step with it. */
+[data-design-language][data-margin-semantics="edge-band"] .booklet-page::after{
+  background-image:var(--page-margin-band,none),
+    var(--theme-page-texture,none),var(--theme-page-overlay);
+  background-repeat:no-repeat,repeat,repeat;
+  background-size:var(--page-margin-band-size,auto),var(--theme-page-texture-size,auto),auto;
+  background-position:left top,var(--theme-page-texture-position,0 0),0 0;
+}
+/* Rules pages are the core mechanics: the heaviest band in the book. */
+[data-design-language][data-margin-semantics="edge-band"] .booklet-page[data-page-type="rules-left"],
+[data-design-language][data-margin-semantics="edge-band"] .booklet-page[data-page-type="rules-right"]{
+  --page-margin-band:linear-gradient(90deg, var(--design-chrome-ink) 0 7px, transparent 7px);
+}
+/* The session log: a solid but lighter band — this is where the pencil lives. */
+[data-design-language][data-margin-semantics="edge-band"] .booklet-page[data-page-type="workout-left"],
+[data-design-language][data-margin-semantics="edge-band"] .booklet-page[data-page-type="gauge-log"]{
+  --page-margin-band:linear-gradient(90deg,
+    color-mix(in srgb, var(--ink) 45%, transparent) 0 4px, transparent 4px);
+}
+/* Tables and boards: a dashed band, because a roll table is a different KIND
+   of page from a rule and the reader's thumb should be able to tell. */
+[data-design-language][data-margin-semantics="edge-band"] .booklet-page[data-page-type="field-ops"],
+[data-design-language][data-margin-semantics="edge-band"] .booklet-page[data-page-type="oracle-overflow"]{
+  /* A dash column: the gradient runs down the page, and the band's own width
+     comes from the size token — a 180deg gradient sized `auto` would tile the
+     whole sheet instead of the edge. */
+  --page-margin-band:repeating-linear-gradient(180deg,
+    var(--design-chrome-ink) 0 9px, transparent 9px 15px);
+  --page-margin-band-size:5px 100%;
+}
+/* Story and archive: a hairline pair — present, quiet, unmistakably not a rule. */
+[data-design-language][data-margin-semantics="edge-band"] .booklet-page[data-page-type="fragment-page"],
+[data-design-language][data-margin-semantics="edge-band"] .booklet-page[data-page-type="overflow-doc"]{
+  --page-margin-band:linear-gradient(90deg,
+    var(--design-chrome-ink) 0 1.5px, transparent 1.5px 4px,
+    var(--design-chrome-ink) 4px 5.5px, transparent 5.5px);
+}
+/* The boss: the band the book has been building toward. */
+[data-design-language][data-margin-semantics="edge-band"] .booklet-page[data-page-type="boss"]{
+  --page-margin-band:linear-gradient(90deg,
+    var(--design-chrome-ink) 0 9px, var(--paper) 9px 10.5px,
+    var(--design-chrome-ink) 10.5px 12px, transparent 12px);
+}
+
+/* Thumb index. The same semantics as a tab cut into the fore-edge of a
+   reference book, drawn instead of cut (nothing in this system is ever cut —
+   the pencil-only law). Each page kind marks a different height, so a closed
+   book shows its own structure down the edge. */
+[data-design-language][data-margin-semantics="tab-marks"] .booklet-page::after{
+  background-image:var(--page-tab-mark,none),
+    var(--theme-page-texture,none),var(--theme-page-overlay);
+  background-repeat:no-repeat,repeat,repeat;
+  background-size:var(--page-tab-size,14px 34px),var(--theme-page-texture-size,auto),auto;
+  background-position:var(--page-tab-at,right 0.9in),var(--theme-page-texture-position,0 0),0 0;
+}
+[data-design-language][data-margin-semantics="tab-marks"] .booklet-page[data-page-type="rules-left"],
+[data-design-language][data-margin-semantics="tab-marks"] .booklet-page[data-page-type="rules-right"]{
+  --page-tab-mark:linear-gradient(var(--design-chrome-ink),var(--design-chrome-ink));
+  --page-tab-at:right 0.55in;
+}
+[data-design-language][data-margin-semantics="tab-marks"] .booklet-page[data-page-type="workout-left"]{
+  --page-tab-mark:linear-gradient(var(--design-chrome-ink),var(--design-chrome-ink));
+  --page-tab-at:right 1.5in;
+}
+[data-design-language][data-margin-semantics="tab-marks"] .booklet-page[data-page-type="field-ops"],
+[data-design-language][data-margin-semantics="tab-marks"] .booklet-page[data-page-type="oracle-overflow"]{
+  --page-tab-mark:linear-gradient(var(--design-chrome-ink),var(--design-chrome-ink));
+  --page-tab-at:right 2.45in;
+}
+[data-design-language][data-margin-semantics="tab-marks"] .booklet-page[data-page-type="fragment-page"],
+[data-design-language][data-margin-semantics="tab-marks"] .booklet-page[data-page-type="overflow-doc"]{
+  --page-tab-mark:linear-gradient(var(--design-chrome-ink),var(--design-chrome-ink));
+  --page-tab-at:right 3.4in;
+}
+[data-design-language][data-margin-semantics="tab-marks"] .booklet-page[data-page-type="boss"]{
+  --page-tab-mark:linear-gradient(var(--design-chrome-ink),var(--design-chrome-ink));
+  --page-tab-at:right 4.35in;
+  --page-tab-size:18px 46px;
+}
+
+/* Rule weight. The quietest of the three margin idioms: no band at all, just a
+   live-area frame whose weight says what kind of page this is. An OUTLINE, for
+   the reason the neatline above is one — outlines sit outside the box model. */
+[data-design-language][data-margin-semantics="rule-weight"] .booklet-page[data-page-type="rules-left"] > .page-boundary,
+[data-design-language][data-margin-semantics="rule-weight"] .booklet-page[data-page-type="rules-right"] > .page-boundary,
+[data-design-language][data-margin-semantics="rule-weight"] .booklet-page[data-page-type="boss"] > .page-boundary{
+  outline:2px solid var(--design-chrome-ink);
+  outline-offset:3px;
+}
+[data-design-language][data-margin-semantics="rule-weight"] .booklet-page[data-page-type="fragment-page"] > .page-boundary,
+[data-design-language][data-margin-semantics="rule-weight"] .booklet-page[data-page-type="overflow-doc"] > .page-boundary,
+[data-design-language][data-margin-semantics="rule-weight"] .booklet-page[data-page-type="field-ops"] > .page-boundary{
+  outline:.5px solid color-mix(in srgb, var(--ink) 40%, transparent);
+  outline-offset:3px;
+}
+
+/* ── layoutIntensity: the spectrum's INK ───────────────────────────────────
+   The header bar is composed in theme.js (a box-shadow list cannot be joined
+   in CSS without an invalid `none` — see composeDesignLanguage), so the only
+   two consumers here are the live-area frame and the inverted slug. */
+[data-design-language] .booklet-page > .page-boundary{
+  box-shadow:var(--theme-design-frame,none);
+}
+/* The reversed label bar. Mothership's signature move, and paint to the last
+   declaration: a background and a colour, never a padding — padding on an
+   inline label is height its atom never charged for. */
+[data-design-language] .doc-label,
+[data-design-language] .week-kicker{
+  background-image:var(--design-slug-fill,none);
+  background-size:var(--design-tone-size,auto);
+  color:var(--design-slug-color,inherit);
+}
+
+/* ── Found-document recipes ────────────────────────────────────────────────
+   Keyed to the document FAMILY the renderer already stamps on every fragment
+   block (`data-document-family`, from renderer/modules/atom-registry.js). That
+   correspondence — container attribute ⇄ block attribute — is why this axis
+   needs no renderer change at all, and it is also why the pairs below are
+   written out rather than collapsed: CSS cannot express "these two attributes
+   agree", so the agreement is enumerated once and every recipe reads tokens
+   from it. Four token names, one generic consumer each.
+
+   `newspaper-columns` is NOT here. See the refusal at the top of this block. */
+[data-design-language][data-recipe-bureaucratic="memo-grid"] .fragment-block[data-document-family="bureaucratic"],
+[data-design-language][data-recipe-hand-authored="memo-grid"] .fragment-block[data-document-family="hand-authored"],
+[data-design-language][data-recipe-personal="memo-grid"] .fragment-block[data-document-family="personal"],
+[data-design-language][data-recipe-recorded="memo-grid"] .fragment-block[data-document-family="recorded"],
+[data-design-language][data-recipe-anomalous="memo-grid"] .fragment-block[data-document-family="anomalous"],
+[data-design-language][data-recipe-custom-document="memo-grid"] .fragment-block[data-document-family="custom-document"]{
+  /* The bureaucratic memo: a heavy bar across the top of the sheet and a rule
+     under the TO/FROM/DATE block. Both drawn INSIDE the existing box with an
+     inset shadow, so the document is exactly as tall as it was. */
+  --doc-frame:inset 0 4px 0 0 var(--design-chrome-ink);
+  --doc-header-rule:inset 0 -1.5px 0 0 var(--design-chrome-ink);
+}
+[data-design-language][data-recipe-bureaucratic="label-borders"] .fragment-block[data-document-family="bureaucratic"],
+[data-design-language][data-recipe-hand-authored="label-borders"] .fragment-block[data-document-family="hand-authored"],
+[data-design-language][data-recipe-personal="label-borders"] .fragment-block[data-document-family="personal"],
+[data-design-language][data-recipe-recorded="label-borders"] .fragment-block[data-document-family="recorded"],
+[data-design-language][data-recipe-anomalous="label-borders"] .fragment-block[data-document-family="anomalous"],
+[data-design-language][data-recipe-custom-document="label-borders"] .fragment-block[data-document-family="custom-document"]{
+  /* The prescription/warning label's double rule. The research draws it as
+     `border: 6px double`, which is 6px of box the estimate never charged for;
+     an inset ring plus an inset gap is the same drawing at zero cost. */
+  --doc-frame:inset 0 0 0 1.5px var(--design-chrome-ink),
+    inset 0 0 0 3px var(--paper),
+    inset 0 0 0 4px var(--design-chrome-ink);
+}
+[data-design-language][data-recipe-bureaucratic="ledger-rules"] .fragment-block[data-document-family="bureaucratic"],
+[data-design-language][data-recipe-hand-authored="ledger-rules"] .fragment-block[data-document-family="hand-authored"],
+[data-design-language][data-recipe-personal="ledger-rules"] .fragment-block[data-document-family="personal"],
+[data-design-language][data-recipe-recorded="ledger-rules"] .fragment-block[data-document-family="recorded"],
+[data-design-language][data-recipe-anomalous="ledger-rules"] .fragment-block[data-document-family="anomalous"],
+[data-design-language][data-recipe-custom-document="ledger-rules"] .fragment-block[data-document-family="custom-document"]{
+  /* Ruled paper under the prose. The rules are laid out in `em` against the
+     body's own leading, so they track the text at every density variant
+     instead of drifting out of register the moment the solver squeezes. */
+  --doc-body-rules:repeating-linear-gradient(180deg,
+    transparent 0,
+    transparent calc(var(--fragment-body-leading,1.31) * var(--fragment-body-leading-scale,1) * 1em - .5px),
+    color-mix(in srgb, var(--ink) 22%, transparent)
+      calc(var(--fragment-body-leading,1.31) * var(--fragment-body-leading-scale,1) * 1em - .5px),
+    color-mix(in srgb, var(--ink) 22%, transparent)
+      calc(var(--fragment-body-leading,1.31) * var(--fragment-body-leading-scale,1) * 1em));
+}
+[data-design-language][data-recipe-bureaucratic="stamped-file"] .fragment-block[data-document-family="bureaucratic"],
+[data-design-language][data-recipe-hand-authored="stamped-file"] .fragment-block[data-document-family="hand-authored"],
+[data-design-language][data-recipe-personal="stamped-file"] .fragment-block[data-document-family="personal"],
+[data-design-language][data-recipe-recorded="stamped-file"] .fragment-block[data-document-family="recorded"],
+[data-design-language][data-recipe-anomalous="stamped-file"] .fragment-block[data-document-family="anomalous"],
+[data-design-language][data-recipe-custom-document="stamped-file"] .fragment-block[data-document-family="custom-document"]{
+  /* A file that was handled: an ink ring in the corner where a stamp landed.
+     A RING and never a word — a pseudo-element with `content:"FILED"` would
+     print engine English into a book whose every other label is in the world's
+     own language (the D132 rule), and no theme layer may author diegetic text. */
+  --doc-mark:radial-gradient(closest-side, transparent 0 58%,
+      color-mix(in srgb, var(--ink) 34%, transparent) 59% 66%, transparent 67%),
+    radial-gradient(closest-side, transparent 0 40%,
+      color-mix(in srgb, var(--ink) 22%, transparent) 41% 45%, transparent 46%);
+  --doc-mark-size:44px 44px, 44px 44px;
+  --doc-mark-at:right 8px top 8px, right 8px top 8px;
+}
+
+/* The four generic consumers. `.fragment-doc` already declared `box-shadow:none`
+   outright, so reading a token here replaces a constant rather than adding a
+   property — an unset token is the same `none` it always was. */
+[data-design-language] .fragment-doc{
+  box-shadow:var(--doc-frame,none);
+}
+[data-design-language] .fragment-doc-header{
+  box-shadow:var(--doc-header-rule,none);
+}
+[data-design-language] .fragment-doc-body{
+  background-image:var(--doc-body-rules,none);
+}
+/* The stamp mark's paint. Its STRUCTURE lives in base CSS (search
+   `.fragment-block::after` above the print block) for two reasons that both
+   matter: the Design System law puts structure in base CSS and character in
+   tokens, and — the sharper one — `content`, `position` and `inset` are exactly
+   the properties a design attribute may never declare. Putting them here would
+   force an exception into `designLanguageDrawingLaw()`, and a gate with an
+   exception is a gate with a hole. The base pseudo-element paints `none` until
+   a recipe fills it, so a specless book is pixel-identical with it in place. */
+[data-design-language] .fragment-block::after{
+  background-image:var(--doc-mark,none);
+  background-size:var(--doc-mark-size,auto);
+  background-position:var(--doc-mark-at,right 8px top 8px);
+}
+
+/* ── Seals and stamps ──────────────────────────────────────────────────────
+   The seal band is a real gameplay surface (a sealed cache the player opens
+   weeks later), so every treatment here leaves its legibility alone and
+   changes only how the ink sat down. Masks and shadows, never geometry: the
+   band's own ladder is mirrored in atoms/fragment-doc.js and moving it would
+   be the D71 pair. */
+[data-design-language][data-seal-treatment="rubber-stamp"] .fragment-seal,
+[data-design-language][data-seal-treatment="rubber-stamp"] .cover-designation{
+  /* Uneven ink deposit: the mask is an SVG that filters its own rect, so the
+     edges break up the way a rubber stamp's do. The research reaches this with
+     feDisplacementMap on the source graphic; a mask gets the same read without
+     a filter reference, which `filter:url()` cannot portably resolve from CSS. */
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 80 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 -2.2 1.55'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' fill='white'/%3E%3Crect width='100%25' height='100%25' filter='url(%23d)'/%3E%3C/svg%3E");
+  mask-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 80 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 -2.2 1.55'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' fill='white'/%3E%3Crect width='100%25' height='100%25' filter='url(%23d)'/%3E%3C/svg%3E");
+}
+[data-design-language][data-seal-treatment="wax"] .fragment-seal{
+  /* A poured disc rather than a pressed mark: a radial bloom off the left edge,
+     where the seal rule already runs. */
+  background-image:radial-gradient(circle at 3% 50%,
+    color-mix(in srgb, var(--ink) 26%, transparent) 0 9px,
+    color-mix(in srgb, var(--ink) 10%, transparent) 9px 13px, transparent 13px);
+}
+[data-design-language][data-seal-treatment="embossed"] .fragment-seal,
+[data-design-language][data-seal-treatment="embossed"] .cover-designation{
+  /* Blind deboss — pressed, uninked. Two offset inset shadows are the whole
+     illusion, and both sit outside the box model. */
+  box-shadow:inset 1px 1px 0 -0.5px color-mix(in srgb, var(--ink) 30%, transparent),
+    inset -1px -1px 0 -0.5px var(--paper);
+}
+[data-design-language][data-seal-treatment="perforated"] .fragment-seal{
+  /* A tear line. Drawn, never a real perforation — nothing in a LiftRPG book
+     is ever cut or torn (the pencil-only law), so this is a document that
+     ARRIVED perforated, not an instruction to the reader. */
+  -webkit-mask-image:radial-gradient(circle at center, transparent 0 1.1px, #000 1.2px);
+  mask-image:radial-gradient(circle at center, transparent 0 1.1px, #000 1.2px);
+  -webkit-mask-size:5px 5px;
+  mask-size:5px 5px;
+  -webkit-mask-position:0 0;
+  mask-position:0 0;
+}
+
+/* The cover designation's fill takes the tone pattern, so a book's value
+   ladder reaches the first thing anyone sees. `--theme-designation-fill` is
+   still the base colour underneath; this lays the pattern over it. */
+[data-design-language][data-tone-texture] .cover-designation{
+  background-image:var(--design-tone-pattern,none);
+  background-size:var(--design-tone-size,auto);
 }

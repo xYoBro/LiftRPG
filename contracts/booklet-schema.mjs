@@ -60,7 +60,16 @@ import {
   VALID_NONOGRAM_ANSWER_MODES,
   VALID_WORD_GRID_KINDS,
   VALID_WORD_SEARCH_DIRECTIONS,
-  VALID_WORD_GRID_ANSWER_MODES
+  VALID_WORD_GRID_ANSWER_MODES,
+  LAYOUT_INTENSITY_BOUNDS,
+  VALID_PRODUCTION_TEXTURES,
+  TONE_TEXTURE_LADDER,
+  VALID_TYPE_VOICES,
+  VALID_DOCUMENT_FAMILIES,
+  VALID_DOCUMENT_RECIPES,
+  VALID_MARGIN_SEMANTICS,
+  VALID_INK_DISCIPLINES,
+  VALID_SEAL_TREATMENTS
 } from './contract-constants.mjs';
 
 var G = SPATIAL_GUARDRAILS;
@@ -154,6 +163,67 @@ var artifactIntent = {
     convergencePattern: { enum: VALID_CONVERGENCE_PATTERNS },
     reading: artifactIntentReading,
     selectionReason: { type: 'string' },
+    _x: xt
+  }
+};
+
+// ── designLanguage (W6 — the authored design language, VISION §8) ───────────
+// The book's own design decisions, composed OVER the archetype floor by
+// resolveTheme(). "Authored design language wins; the archetype guarantees
+// legibility" — the archetype is scaffolding, this is identity.
+//
+// SEVERITY: the artifactIntent split, exactly. Generation policy DEMANDS it
+// (the shell stage's structured schema requires it and the stage validator
+// blocks on absence); the ARTIFACT contract does not, because no corpus fixture
+// carries one and requiring it here would break every fixture to enforce a
+// prompt rule. A book with no designLanguage renders as its archetype, which is
+// the pre-W6 behaviour byte for byte.
+//
+// `additionalProperties: false` is the point of the block, same as artifactIntent:
+// a misnamed axis (`texture` for `productionTexture`) reads as a complete record
+// and renders as nothing at all.
+//
+// NAME: `designLanguage`, not `designSpec` — `fragments[].designSpec` and
+// `endings[].designSpec` are a live, different, PER-DOCUMENT contract. See the
+// block header in contract-constants.mjs.
+var designLanguage = {
+  type: 'object',
+  required: [],
+  additionalProperties: false,
+  properties: {
+    // The taste axis, 0.0 (clinical/Mothership) → 1.0 (maximal/Mörk Borg).
+    // NOT the solver's density; see LAYOUT_INTENSITY_BOUNDS.
+    layoutIntensity: {
+      type: 'number',
+      minimum: LAYOUT_INTENSITY_BOUNDS.min,
+      maximum: LAYOUT_INTENSITY_BOUNDS.max
+    },
+    productionTexture: { enum: VALID_PRODUCTION_TEXTURES },
+    toneTexture: { enum: TONE_TEXTURE_LADDER },
+    typeVoice: { enum: VALID_TYPE_VOICES },
+    // documentType FAMILY → recipe. Closed on both sides: the keys are the
+    // families the renderer already stamps, the values the recipes the CSS
+    // actually draws. A recipe keyed to a family that does not exist is a rule
+    // that matches nothing — the D71 silent-selector class, closed by the
+    // schema rather than discovered in a render.
+    documentRecipes: {
+      type: 'object',
+      additionalProperties: false,
+      properties: VALID_DOCUMENT_FAMILIES.reduce(function (acc, family) {
+        acc[family] = { enum: VALID_DOCUMENT_RECIPES };
+        return acc;
+      }, {})
+    },
+    marginSemantics: { enum: VALID_MARGIN_SEMANTICS },
+    inkDiscipline: { enum: VALID_INK_DISCIPLINES },
+    sealTreatment: { enum: VALID_SEAL_TREATMENTS },
+    // THE DERIVATION LAW, applied to design (D136's idiom). One or two
+    // sentences quoting the brief's own register words and saying what they
+    // made this book look like. A design language that cannot cite the brief is
+    // a house aesthetic wearing the book's name — the exact convergence this
+    // axis set exists to break. Free string: the evidence is the model's own
+    // words, and enumerating it would re-impose the flavour it exists to escape.
+    designEvidence: { type: 'string' },
     _x: xt
   }
 };
@@ -918,6 +988,12 @@ export var BOOKLET_SCHEMA = {
           }
         },
         artifactIntent: artifactIntent,
+        // The authored design language (W6). Sits beside artifactIntent rather
+        // than inside `theme` deliberately: `theme` is the palette and the
+        // archetype — the data a book states about its colours — while this is
+        // the compiled DESIGN DECISION, the same kind of thing as
+        // artifactIdentity.componentDialect, which also lives here.
+        designLanguage: designLanguage,
         processParticulars: processParticulars,
         playSpine: playSpine,
         economy: economy,

@@ -2,7 +2,15 @@ import { alpha, mergeObjects } from './utils.js?v=48';
 import { resolveTypeMetrics } from './type-metrics.js?v=48';
 import {
   VALID_COMPONENT_DIALECTS,
-  DEFAULT_COMPONENT_DIALECT
+  DEFAULT_COMPONENT_DIALECT,
+  VALID_PRODUCTION_TEXTURES,
+  TONE_TEXTURE_LADDER,
+  VALID_TYPE_VOICES,
+  VALID_DOCUMENT_FAMILIES,
+  VALID_DOCUMENT_RECIPES,
+  VALID_MARGIN_SEMANTICS,
+  VALID_INK_DISCIPLINES,
+  VALID_SEAL_TREATMENTS
 } from '../../contracts/contract-constants.mjs';
 
 /*
@@ -109,6 +117,69 @@ import {
  * weight, pattern and structure — a hatch, a neatline, a double rule, an
  * inverted slug — so the book survives a photocopier, which is the only
  * printer some of these will ever meet.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * W6 — THE AUTHORED DESIGN LANGUAGE COMPOSES OVER ALL OF THE ABOVE
+ * ═══════════════════════════════════════════════════════════════════════════
+ * VISION §8: *authored design language wins; the archetype guarantees
+ * legibility.* Everything above this line is now the FLOOR — a guarantee that
+ * any book renders coherently and prints in black and white. `meta.designLanguage`
+ * (contracts/contract-constants.mjs) is the book's own design decisions, and
+ * `composeDesignLanguage()` below presses them onto that floor.
+ *
+ * PRECEDENCE, one sentence: preset ← designLanguage ← theme.tokens, with
+ * theme.palette still winning the six colours it names. More explicit authoring
+ * outranks less explicit authoring at every step, which is the only ordering
+ * that does not surprise someone reading a book's JSON top to bottom.
+ *
+ * A BOOK WITH NO designLanguage IS BYTE-IDENTICAL TO PRE-W6. Nothing is emitted,
+ * no attribute is stamped, and every `var(--x, default)` in booklet.css falls
+ * back exactly as it did. That invariant is what makes the archetype's demotion
+ * provably harmless, and the visual suite's untouched baselines are its proof.
+ *
+ * THE INTENSITY SPLIT (a refusal, recorded — D115's Drawing Law applied to the
+ * research's flagship axis). `layoutIntensity` is the Mothership↔Mörk Borg
+ * spectrum, and the research defines that spectrum in two halves:
+ *   • ITS INK — bar weight, framing, slug inversion, ornament pressure, how
+ *     hard the texture is pushed. All paint. SHIPPED, below.
+ *   • ITS GEOMETRY — column counts, page margins, the type scale, whitespace as
+ *     structure. REFUSED. Phase-1 estimation has no DOM, cannot resolve a
+ *     custom property, and would keep charging the old height while the page
+ *     rendered a new one; `overflow:hidden` would eat the difference as ink.
+ *     That is D71/D105/D118 arriving a fifth time, and the answer is the same:
+ *     a geometry axis is admissible only when the estimate can SEE it.
+ *
+ * WHICH IS EXACTLY WHY `typeVoice` IS ADMISSIBLE AND THE OTHERS ARE NOT. A type
+ * pairing changes the face, and a face change is an advance-width change — pure
+ * geometry. It ships because D121 built the channel that measures it:
+ * `resolveTypeMetrics(tokens)` runs at the END of resolveTheme, AFTER this
+ * composition, so it reads the faces the BOOK chose and every atom estimate is
+ * corrected through `advancePx`/`advanceRatio`. typeVoice is therefore NOT a
+ * Drawing-Law axis and must never be gated as one: its gate is D121's — every
+ * face measured in FACE_ADVANCE_EM, and zero new overflow.
+ *
+ * Axis → consumer, kept complete (the same contract as the list above):
+ *
+ *   layoutIntensity   → --design-intensity (a number, for calc)
+ *                     → --design-header-bar   → .page-header box-shadow
+ *                     → --design-frame        → .page-boundary box-shadow
+ *                     → --design-slug-fill/-ink → .doc-label, .week-kicker
+ *                     → --design-texture-press → the ::after texture opacity
+ *   productionTexture → [data-production-texture] → --theme-page-texture,
+ *                       overriding the archetype's own (which stays the
+ *                       FALLBACK: 'none' or absent leaves the preset standing)
+ *   toneTexture       → --design-tone-pattern → every flat value THIS system
+ *                       lays down: the margin band, the inverted slug, the
+ *                       designation fill, the stamped-file ring. Deliberately
+ *                       NOT any gameplay-state fill and NOT any surface a
+ *                       pencil writes on — the D126 --fog-opacity refusal is
+ *                       the precedent and it binds here.
+ *   typeVoice         → --font-display/-body/-mono/-accent (see above)
+ *   documentRecipes   → [data-recipe-<family>] × .fragment-block[data-document-family]
+ *   marginSemantics   → [data-margin-semantics] → the page ::after band layer
+ *   inkDiscipline     → --design-ink-coverage, and --theme-page-filter at
+ *                       'crushed' alone
+ *   sealTreatment     → [data-seal-treatment] → .fragment-seal, .cover-designation
  */
 const THEME_PRESETS = {
   pastoral: {
@@ -797,12 +868,321 @@ function normaliseThemeArchetype(value) {
   return 'pastoral';
 }
 
+/* ═════════════════════════════════════════════════════════════════════════════
+   THE AUTHORED DESIGN LANGUAGE (W6)
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * The type pairings, composed from the FOUR VENDORED FACES AND NOTHING ELSE.
+ *
+ * Every stack here leads with a family that has a measured entry in
+ * FACE_ADVANCE_EM (type-metrics.js), which is what makes this axis legal at all:
+ * `resolveTypeMetrics()` reads the composed stacks and hands phase-1 estimation
+ * a per-role advance delta, so a book that changes its face changes its
+ * estimates with it. `typeMetricsFaceParity()` in scripts/validate.mjs scans
+ * this table with the same regex it scans the presets with — adding a fifth
+ * family here fails the build until it is vendored (D92) and measured (D121).
+ *
+ * The fallbacks after the first family are the same defensive stacks the presets
+ * use and are never what renders: the vendored file is always present offline.
+ */
+const TYPE_VOICES = {
+  // The book that was typeset. Display serif over a book serif, machine voice
+  // in the typewriter face — an edition, not a document.
+  'literary-press': {
+    '--font-display': '"Playfair Display", Georgia, serif',
+    '--font-body': '"Libre Baskerville", Georgia, serif',
+    '--font-mono': '"IBM Plex Mono", "Courier New", Courier, monospace',
+    '--font-accent': '"IBM Plex Mono", "Courier New", Courier, monospace'
+  },
+  // Everything through a machine. One voice, no book anywhere in it.
+  'terminal-log': {
+    '--font-display': '"Share Tech Mono", monospace',
+    '--font-body': '"IBM Plex Mono", "Courier New", Courier, monospace',
+    '--font-mono': '"Share Tech Mono", monospace',
+    '--font-accent': '"Share Tech Mono", monospace'
+  },
+  // A working notebook: the hand's own face throughout, the machine only where
+  // something was stamped onto it later.
+  'field-notebook': {
+    '--font-display': '"Libre Baskerville", Georgia, serif',
+    '--font-body': '"Libre Baskerville", Georgia, serif',
+    '--font-mono': '"Share Tech Mono", monospace',
+    '--font-accent': '"Share Tech Mono", monospace'
+  },
+  // A carbon copy. One typewriter, start to finish, including the title.
+  'typewriter-file': {
+    '--font-display': '"IBM Plex Mono", "Courier New", Courier, monospace',
+    '--font-body': '"IBM Plex Mono", "Courier New", Courier, monospace',
+    '--font-mono': '"IBM Plex Mono", "Courier New", Courier, monospace',
+    '--font-accent': '"IBM Plex Mono", "Courier New", Courier, monospace'
+  },
+  // A masthead over a body. This IS pastoral's own stack, named — a book may
+  // author the archetype's pairing deliberately, and saying so is not a no-op:
+  // it makes the choice legible in the JSON and immune to a preset change.
+  broadsheet: {
+    '--font-display': '"Playfair Display", Georgia, serif',
+    '--font-body': '"Libre Baskerville", Georgia, serif',
+    '--font-mono': '"Share Tech Mono", monospace',
+    '--font-accent': '"Share Tech Mono", monospace'
+  },
+  // The collision Mörk Borg is built on: a display serif with nothing beneath
+  // it that agrees. Deliberately uncomfortable, and legible anyway.
+  'display-clash': {
+    '--font-display': '"Playfair Display", Georgia, serif',
+    '--font-body': '"IBM Plex Mono", "Courier New", Courier, monospace',
+    '--font-accent': '"Share Tech Mono", monospace',
+    '--font-mono': '"Share Tech Mono", monospace'
+  },
+  // The flattest register available: a book face for the title, machine for
+  // everything a machine would have written.
+  'plain-record': {
+    '--font-display': '"Libre Baskerville", Georgia, serif',
+    '--font-body': '"IBM Plex Mono", "Courier New", Courier, monospace',
+    '--font-mono': '"IBM Plex Mono", "Courier New", Courier, monospace',
+    '--font-accent': '"IBM Plex Mono", "Courier New", Courier, monospace'
+  }
+};
+
+/**
+ * The archetype's own place on the intensity spectrum — the FLOOR a book
+ * inherits when it authors a design language but says nothing about intensity.
+ * These are readings of the presets as they already stand (minimalist's whole
+ * character is restraint; cyberpunk already paints a scan field over every
+ * page), not new opinions, and they are only ever consulted for a book that
+ * HAS a designLanguage. A specless book never reaches this table.
+ */
+const ARCHETYPE_INTENSITY = {
+  minimalist: 0.15,
+  scifi: 0.25,
+  pastoral: 0.4,
+  nautical: 0.45,
+  government: 0.55,
+  noir: 0.6,
+  occult: 0.6,
+  steampunk: 0.65,
+  fantasy: 0.65,
+  cyberpunk: 0.8
+};
+
+const DESIGN_ENUMS = {
+  productionTexture: VALID_PRODUCTION_TEXTURES,
+  toneTexture: TONE_TEXTURE_LADDER,
+  typeVoice: VALID_TYPE_VOICES,
+  marginSemantics: VALID_MARGIN_SEMANTICS,
+  inkDiscipline: VALID_INK_DISCIPLINES,
+  sealTreatment: VALID_SEAL_TREATMENTS
+};
+
+/**
+ * The authored design language, normalised — or `null` when the book has none.
+ *
+ * `null` is load-bearing and is not the same as "all defaults": a book with no
+ * design language stamps no attribute and emits no token, so it renders exactly
+ * as it did before this system existed.
+ *
+ * An off-enum value is DROPPED rather than defaulted, for the reason the schema
+ * gives `additionalProperties:false`: a value nothing draws must be absent, not
+ * silently the default, or the render looks intentional and the misauthoring is
+ * invisible. `layoutIntensity` is the one field that CLAMPS instead, because it
+ * is a continuous range rather than a menu — 1.4 is a legible intention stated
+ * out of bounds, where `producshun-texture` is not an intention at all. The
+ * schema still refuses both; this is only what the renderer does with a book
+ * that reached it anyway.
+ */
+function resolveDesignLanguage(data) {
+  const raw = (((data || {}).meta || {}).designLanguage) || null;
+  if (!raw || typeof raw !== 'object') return null;
+
+  const spec = {};
+  for (const key of Object.keys(DESIGN_ENUMS)) {
+    if (DESIGN_ENUMS[key].indexOf(raw[key]) !== -1) spec[key] = raw[key];
+  }
+
+  const intensity = Number(raw.layoutIntensity);
+  if (Number.isFinite(intensity)) {
+    spec.layoutIntensity = Math.min(1, Math.max(0, intensity));
+  }
+
+  const recipes = raw.documentRecipes;
+  if (recipes && typeof recipes === 'object') {
+    const kept = {};
+    for (const family of VALID_DOCUMENT_FAMILIES) {
+      if (VALID_DOCUMENT_RECIPES.indexOf(recipes[family]) !== -1) kept[family] = recipes[family];
+    }
+    if (Object.keys(kept).length) spec.documentRecipes = kept;
+  }
+
+  return Object.keys(spec).length ? spec : null;
+}
+
+// The ink-coverage multiplier per discipline. One number that scales every
+// drawn layer together, so a book reads as ONE impression rather than as a
+// stack of independent effects.
+const INK_COVERAGE = {
+  'light-touch': 0.6,
+  standard: 1,
+  'heavy-press': 1.45,
+  crushed: 1.7
+};
+
+/**
+ * Compose the authored design language into token overrides.
+ *
+ * EVERY VALUE RETURNED HERE PAINTS. The one exception is `typeVoice`, which
+ * returns font stacks — geometry, admissible only because resolveTypeMetrics()
+ * runs downstream of this function and hands the change to the estimate. See
+ * THE INTENSITY SPLIT in this file's header before adding anything.
+ *
+ * Returns `{}` for a null spec, which is what keeps a specless book identical.
+ */
+function composeDesignLanguage(spec, archetype, preset) {
+  if (!spec) return {};
+  const tokens = {};
+
+  // ── typeVoice: the book's own faces ─────────────────────────────────────
+  // 'archetype-default' is a real answer and deliberately emits nothing: a book
+  // may say "the archetype's pairing is right for me" without that being a
+  // silent absence.
+  if (spec.typeVoice && TYPE_VOICES[spec.typeVoice]) {
+    Object.assign(tokens, TYPE_VOICES[spec.typeVoice]);
+  }
+
+  // ── inkDiscipline: how much ink the press laid down ─────────────────────
+  const coverage = INK_COVERAGE[spec.inkDiscipline] || INK_COVERAGE.standard;
+  tokens['--design-ink-coverage'] = String(coverage);
+  // 'crushed' is the photocopier's blown midtones and is the ONLY value that
+  // touches the page filter. A filter on .booklet-page composites — it does not
+  // reflow — but it is still the heaviest thing in this system, so it is the
+  // one an author has to ask for by name.
+  if (spec.inkDiscipline === 'crushed') {
+    tokens['--page-filter'] = 'contrast(1.12) brightness(0.99)';
+  }
+
+  // ── layoutIntensity: the spectrum's INK (its geometry is refused) ───────
+  const intensity = typeof spec.layoutIntensity === 'number'
+    ? spec.layoutIntensity
+    : (ARCHETYPE_INTENSITY[archetype] !== undefined ? ARCHETYPE_INTENSITY[archetype] : 0.4);
+  tokens['--design-intensity'] = String(intensity);
+
+  // The Mothership bar. A box-shadow, so it is drawn entirely outside the box
+  // model — the header's own border-bottom (geometry) is untouched at every
+  // intensity. Scales 0 → 5px of bar, gated so a light book draws none at all.
+  //
+  // COMPOSED IN JS, NOT IN CSS, and that is not a shortcut. `box-shadow` takes a
+  // comma list in which `none` is only legal ALONE, so `var(--archetype, none),
+  // var(--book, none)` is an invalid declaration the browser drops silently
+  // whenever either side is unset — the quietest possible way to lose an
+  // archetype's header rule. Here both halves are known, so the join is made
+  // where it can be made correctly, and the CSS keeps its single consumer.
+  const barPx = Math.round(intensity * 5 * coverage * 10) / 10;
+  const bar = intensity < 0.2
+    ? ''
+    : `0 ${barPx}px 0 -0.5px var(--design-chrome-ink, currentColor)`;
+  if (bar) {
+    const inherited = (preset || {})['--header-shadow'];
+    tokens['--header-shadow'] = inherited && inherited !== 'none'
+      ? `${inherited}, ${bar}`
+      : bar;
+  }
+  tokens['--design-header-bar'] = bar || 'none';
+
+  // The live-area frame, on its own channel so it COMPOSES with the archetype's
+  // outline rather than replacing it (an archetype that frames its page and a
+  // book that presses hard should read as both, not as whichever ran last).
+  tokens['--design-frame'] = intensity < 0.55
+    ? 'none'
+    : `inset 0 0 0 ${Math.round(intensity * 2 * coverage * 10) / 10}px var(--design-chrome-ink, currentColor)`;
+
+  // The inverted slug — Mothership's reversed label bars. Paint only: a
+  // background and a colour, never padding, because padding on an inline label
+  // is height its atom never charged for.
+  if (intensity >= 0.7) {
+    tokens['--design-slug-fill'] = 'var(--design-tone-pattern, none)';
+    tokens['--design-slug-color'] = 'var(--ink)';
+  }
+
+  // How hard the page texture is pushed. Multiplies whatever texture is in
+  // play — the archetype's or the authored one.
+  tokens['--design-texture-press'] = String(
+    Math.round(Math.min(1, 0.35 + intensity * 0.65) * coverage * 100) / 100
+  );
+
+  return tokens;
+}
+
+/**
+ * The container attributes the design language drives.
+ *
+ * Attribute rather than token wherever the axis selects a DRAWING MODE rather
+ * than a value — the same call `data-component-dialect` makes, and for the same
+ * reason: a mode is not a number, and giving it a custom property invites a rule
+ * that sizes something from it. Every rule keyed to one of these attributes is
+ * held to the Drawing Law by `designLanguageDrawingLaw()` in scripts/validate.mjs.
+ */
+function designAttributes(spec) {
+  const attrs = {};
+  if (!spec) return attrs;
+  // THE PRESENCE MARKER, and the reason the demotion is provable rather than
+  // argued. EVERY W6 rule in booklet.css sits under `[data-design-language]`, so
+  // a book without one is untouched BY CONSTRUCTION — not by each rule happening
+  // to fall back correctly, which is a claim that needs re-proving after every
+  // future edit. One attribute governs the whole system; delete it and the book
+  // is its archetype again.
+  attrs['data-design-language'] = 'true';
+  if (spec.productionTexture && spec.productionTexture !== 'none') {
+    attrs['data-production-texture'] = spec.productionTexture;
+  }
+  if (spec.toneTexture && spec.toneTexture !== 'none') {
+    attrs['data-tone-texture'] = spec.toneTexture;
+  }
+  if (spec.marginSemantics && spec.marginSemantics !== 'none') {
+    attrs['data-margin-semantics'] = spec.marginSemantics;
+  }
+  if (spec.inkDiscipline) attrs['data-ink-discipline'] = spec.inkDiscipline;
+  if (spec.sealTreatment && spec.sealTreatment !== 'none') {
+    attrs['data-seal-treatment'] = spec.sealTreatment;
+  }
+  if (spec.documentRecipes) {
+    for (const family of Object.keys(spec.documentRecipes)) {
+      if (spec.documentRecipes[family] === 'plain') continue;
+      attrs['data-recipe-' + family] = spec.documentRecipes[family];
+    }
+  }
+  return attrs;
+}
+
+/**
+ * The alpha a preset asked for on `--highlight-surface` — the ONE thing the
+ * archetype keeps when the book's own accent takes the hue (D126's ruling,
+ * executed at W6). Presets pin `rgba(r,g,b,a)`; anything unparseable falls to
+ * resolveTheme()'s own generic 0.12, which is the value the derivation used
+ * before any preset pinned this token.
+ */
+function highlightAlpha(pinned) {
+  const m = /rgba?\(([^)]+)\)/.exec(String(pinned || ''));
+  if (!m) return 0.12;
+  const parts = m[1].split(/[,\s/]+/).filter(Boolean);
+  const a = parts.length > 3 ? parseFloat(parts[3]) : 1;
+  return Number.isFinite(a) ? a : 0.12;
+}
+
 export function resolveTheme(data) {
   const theme = (data && data.theme) || {};
   const archetype = normaliseThemeArchetype(theme.visualArchetype);
   const preset = THEME_PRESETS[archetype] || THEME_PRESETS.pastoral;
   const palette = theme.palette || {};
-  const tokens = mergeObjects(preset, theme.tokens || {});
+  // PRECEDENCE (W6): preset ← designLanguage ← theme.tokens, with theme.palette
+  // still winning the six colours it names below. The archetype is the floor;
+  // the book's authored design language presses onto it; an explicit
+  // `theme.tokens` entry is the most literal authoring there is and outranks
+  // both. A book with no designLanguage merges `{}` and is byte-identical to
+  // the pre-W6 render.
+  const designLanguage = resolveDesignLanguage(data);
+  const tokens = mergeObjects(
+    mergeObjects(preset, composeDesignLanguage(designLanguage, archetype, preset)),
+    theme.tokens || {}
+  );
 
   if (palette.ink) tokens['--page-ink'] = palette.ink;
   if (palette.paper) tokens['--page-paper'] = palette.paper;
@@ -822,10 +1202,37 @@ export function resolveTheme(data) {
   tokens['--page-secondary-paper'] = tokens['--page-secondary-paper'] || tokens['--page-paper'];
   tokens['--panel-secondary-surface'] = tokens['--panel-secondary-surface'] || alpha(tokens['--page-fog'], 0.28);
   tokens['--callout-surface'] = tokens['--callout-surface'] || alpha(tokens['--page-fog'], 0.2);
-  tokens['--highlight-surface'] = tokens['--highlight-surface'] || alpha(tokens['--page-accent'], 0.12);
+
+  // ── THE HIGHLIGHT SPLIT, closed (D126's flagged residue, ruled for W6) ────
+  // `--highlight-surface` becomes `--accent-soft`, which paints `.boss-proof`,
+  // `.boss-branch-note` and the filled progress-clock wedges. Every preset pins
+  // it, so the generic derivation below could never fire and `--accent-soft`
+  // went on carrying the ARCHETYPE's accent while `--accent` (D126) carries the
+  // BOOK's: an olive-accented book washed its proofs pastoral red.
+  //
+  // The ruling (VISION §8, extended to this token at W6): the authored hue
+  // outranks the preset; THE ARCHETYPE KEEPS ONLY THE ALPHA. So when a book
+  // authors `palette.accent`, the hue is the book's and the transparency is
+  // whatever the preset asked for — pastoral's restrained 0.07 stays 0.07,
+  // cyberpunk's 0.15 stays 0.15, and neither archetype loses the one thing it
+  // was actually saying with this token. An unauthored accent leaves the preset
+  // untouched, so a palette-less book is unchanged.
+  //
+  // `theme.tokens` still wins outright: it is the most literal authoring there
+  // is, and a book that names this exact token has already answered the question.
+  const pinnedHighlight = tokens['--highlight-surface'];
+  const explicitHighlight = (theme.tokens || {})['--highlight-surface'];
+  if (explicitHighlight) {
+    tokens['--highlight-surface'] = explicitHighlight;
+  } else if (palette.accent) {
+    tokens['--highlight-surface'] = alpha(palette.accent, highlightAlpha(pinnedHighlight));
+  } else {
+    tokens['--highlight-surface'] = pinnedHighlight || alpha(tokens['--page-accent'], 0.12);
+  }
 
   return {
     archetype,
+    designLanguage,
     // Typography metrics ride on the resolved theme for the same reason the
     // dialect does: they are a book-wide presentation fact, decided once, from
     // the same tokens. Nothing here is applied to the DOM — the CSS already has
@@ -855,6 +1262,21 @@ function resolveComponentDialect(data) {
 export function applyTheme(container, theme) {
   container.setAttribute('data-archetype', theme.archetype);
   container.setAttribute('data-component-dialect', theme.componentDialect || DEFAULT_COMPONENT_DIALECT);
+
+  // The design-language attributes. Cleared first for the same reason the
+  // custom properties below are: a second load in the same session must not
+  // inherit the first book's design language. Attributes are removed by prefix
+  // rather than by list because `data-recipe-*` is keyed by document family.
+  for (const attr of Array.from(container.attributes)) {
+    if (DESIGN_ATTR_PREFIXES.some((p) => attr.name.startsWith(p))) {
+      container.removeAttribute(attr.name);
+    }
+  }
+  const designAttrs = designAttributes(theme.designLanguage);
+  Object.keys(designAttrs).forEach((name) => {
+    container.setAttribute(name, designAttrs[name]);
+  });
+
   // Clear every custom property a previous applyTheme set on this container.
   // Without this, tokens that exist in one theme but not the next (preset
   // extras, booklet-supplied theme.tokens) leak across loads in one session.
@@ -868,3 +1290,12 @@ export function applyTheme(container, theme) {
     container.style.setProperty(key, theme.tokens[key]);
   });
 }
+
+// Every attribute prefix applyTheme() owns on the container. Kept beside the
+// remover, because the failure mode of a stale entry here is a book wearing the
+// previous book's design language — which looks entirely intentional.
+const DESIGN_ATTR_PREFIXES = [
+  'data-design-language', 'data-production-texture', 'data-tone-texture',
+  'data-margin-semantics', 'data-ink-discipline', 'data-seal-treatment',
+  'data-recipe-'
+];

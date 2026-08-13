@@ -431,6 +431,110 @@ export var THEME_ARCHETYPE_ALIASES = {
   literary: 'pastoral'
 };
 
+// ── The authored design language (W6, meta.designLanguage) ───────────────────
+//
+// VISION §8's law made machinery: *authored design language wins; the archetype
+// guarantees legibility.* The ten archetypes are a floor of typographic
+// coherence and print-safety. The book's own design decisions — pressed on top
+// of that floor — are what make two books of the same genre look like different
+// designers' work across a table.
+//
+// NAMING (a correction to the wave brief, recorded because the collision is
+// live): this block is `designLanguage`, NOT `designSpec`. `fragments[].designSpec`
+// and `endings[].designSpec` already exist, already render (`data-paper-tone`,
+// `data-primary-typeface`, `data-header-style`), and mean a PER-DOCUMENT
+// treatment. A second `designSpec` at book level, with an unrelated shape, is
+// the two-atom-registries collision the GLOSSARY exists to prevent. The name
+// used here is VISION §8's own ("authored design language wins").
+//
+// THE DRAWING LAW BINDS THIS BLOCK (D115). Every axis below paints and never
+// measures — background layers, outlines, box-shadows, fills, masks, opacity —
+// because phase-1 estimation has no DOM and cannot resolve a custom property.
+// ONE axis is exempt and it is exempt for a stated reason: `typeVoice` changes
+// the FACE, which changes advance widths, and it is legal only because D121
+// built the channel that measures them (`resolveTypeMetrics()` reads the
+// resolved stacks; every atom estimate is corrected through it). A geometry
+// axis is admissible when — and only when — the estimate can see it.
+//
+// REFUSED, with the refusal recorded rather than the axis quietly redesigned:
+//   • layoutIntensity's GEOMETRIC half (column counts, page margins, the type
+//     scale). The research defines the Mothership↔Mörk Borg spectrum largely in
+//     those terms and they are exactly what the estimate cannot see. What ships
+//     is the spectrum's INK: bar weight, frame, slug inversion, texture
+//     pressure. See THE INTENSITY SPLIT in renderer/modules/theme.js.
+//   • `newspaper-columns` as a document recipe. Real `column-rule` needs real
+//     multicol, and multicol reflow roughly halves a document's height while
+//     fragment-doc.js estimates it at full measure. Queued as a Layer-1 wave
+//     (adapter-carried recipe → column-aware estimate → ladder mirror), not
+//     shipped as a token.
+
+// How hard the book presses its own layout language, 0.0–1.0. The taste axis,
+// deliberately NOT called density: `density` is the 0.0–1.0 OVERFLOW SOLVER's
+// word (engine/density-util.js) and one book-authored value must never be
+// confused with the solver's per-page pressure. Absent ⇒ ARCHETYPE_INTENSITY.
+export var LAYOUT_INTENSITY_BOUNDS = { min: 0, max: 1 };
+
+// The press this book pretends to have come off. Procedural CSS only — zero
+// raster assets (VISION §8), every one legible after a monochrome photocopy.
+// 'none' is a real answer: it means the archetype's own paper texture stands,
+// which is how the nine bespoke archetype textures became a fallback layer
+// rather than dead weight.
+export var VALID_PRODUCTION_TEXTURES = [
+  'none', 'photocopy', 'typewriter', 'risograph', 'mimeograph', 'letterpress'
+];
+export var DEFAULT_PRODUCTION_TEXTURE = 'none';
+
+// Texture-as-tone: the ladder that replaces grey with pattern, so a value
+// survives a laser printer that has no grey (zine-research §"Texture-as-Tone").
+// Ordered light → dark and the ORDER IS LOAD-BEARING: the ladder is a value
+// scale, and gen-reference publishes it as one.
+export var TONE_TEXTURE_LADDER = [
+  'none', 'stipple', 'hatching', 'cross-hatch', 'dense-cross-hatch', 'reverse-stipple'
+];
+export var DEFAULT_TONE_TEXTURE = 'none';
+
+// The type pairing. THE PALETTE IS FOUR FACES AND NOT ONE MORE (D121/D92):
+// every name here composes Share Tech Mono, Libre Baskerville, IBM Plex Mono
+// and Playfair Display — the vendored set, each with a measured FACE_ADVANCE_EM.
+// A fifth face is vendor + measure work (D123 delta A2), and typeMetricsFaceParity
+// fails the build if this list ever reaches past what is measured.
+export var VALID_TYPE_VOICES = [
+  'archetype-default', 'literary-press', 'terminal-log', 'field-notebook',
+  'typewriter-file', 'broadsheet', 'display-clash', 'plain-record'
+];
+export var DEFAULT_TYPE_VOICE = 'archetype-default';
+
+// The found-document recipes, keyed by the document FAMILY the renderer already
+// stamps on every fragment block (`data-document-family`, from
+// renderer/modules/atom-registry.js). Keying on the existing attribute is why
+// this axis needs no renderer change at all.
+export var VALID_DOCUMENT_FAMILIES = [
+  'bureaucratic', 'hand-authored', 'personal', 'recorded', 'anomalous', 'custom-document'
+];
+export var VALID_DOCUMENT_RECIPES = [
+  'plain', 'memo-grid', 'label-borders', 'ledger-rules', 'stamped-file'
+];
+export var DEFAULT_DOCUMENT_RECIPE = 'plain';
+
+// Into the Odd's colour-coded margins, made B&W-honest: the signal is carried by
+// WEIGHT and PATTERN, never by hue (the standing print law). Keyed off
+// `data-page-type`, which the page factory already stamps — so the semantics are
+// the page kinds the engine actually has, not a parallel vocabulary.
+export var VALID_MARGIN_SEMANTICS = ['none', 'edge-band', 'tab-marks', 'rule-weight'];
+export var DEFAULT_MARGIN_SEMANTICS = 'none';
+
+// How much ink the press laid down. Scales the drawn layers together (texture,
+// band, stamp) so a book reads as one impression rather than a pile of effects.
+// 'crushed' is the photocopier's blown midtones and is the only value that
+// touches the page filter.
+export var VALID_INK_DISCIPLINES = ['light-touch', 'standard', 'heavy-press', 'crushed'];
+export var DEFAULT_INK_DISCIPLINE = 'standard';
+
+// The seal/stamp register. Drawn with masks and shadows — a seal that needed a
+// height would be the D105 class, so none of these has one.
+export var VALID_SEAL_TREATMENTS = ['none', 'rubber-stamp', 'wax', 'embossed', 'perforated'];
+export var DEFAULT_SEAL_TREATMENT = 'none';
+
 // ── Artifact identity ────────────────────────────────────────────────────────
 // Previously these lived only as silent coercion tables in assembly.js
 // (AUDIT finding 74). They are now enforced enums.
