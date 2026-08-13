@@ -168,7 +168,14 @@
     var payloads = mergeUnique(primary.interludePayloads, secondary && secondary.interludePayloads).slice(0, 4);
     var documents = mergeUnique(primary.documentTypes, secondary && secondary.documentTypes).slice(0, 6);
     var themes = mergeUnique(primary.themeHints, secondary && secondary.themeHints).slice(0, 4);
-    var mapTypes = mergeUnique([primary.mapType], secondary ? [secondary.mapType] : []);
+    // D144: the profiles carry a PROPOSAL SET now, not one board. Merged in
+    // proposal order and capped at four so the line stays a shortlist rather
+    // than "any of the six", which proposes nothing.
+    var mapTypes = mergeUnique(primary.mapTypes || [], (secondary && secondary.mapTypes) || []).slice(0, 4);
+    var cellShapes = mergeUnique(
+      primary.cellShape ? [primary.cellShape] : [],
+      (secondary && secondary.cellShape) ? [secondary.cellShape] : []
+    );
     var oracleModes = mergeUnique([primary.oracleMode], secondary ? [secondary.oracleMode] : []);
 
     return [
@@ -181,7 +188,9 @@
       '- Character web pressures to include: ' + cast.join('; '),
       '- Secret and contradiction shapes to favor: ' + secrets.join('; '),
       '- Arc moves to stage across the block: ' + arcs.join('; '),
-      '- Exploration surfaces to prefer: ' + mapTypes.join('; '),
+      '- Exploration geometries PROPOSED (the mechanic grammar family decides; say so in selectionReason if you overrule these): '
+        + mapTypes.join('; ')
+        + (cellShapes.length ? ' — cellShape worth considering: ' + cellShapes.join('; ') : ''),
       '- Oracle tempo to prefer: ' + oracleModes.join('; '),
       '- Pressure systems to favor: ' + clocks.join('; '),
       '- Currency-name families to draw from or beat (a label portable between briefs is the wrong label): ' + currencySeeds.join('; '),
@@ -1730,7 +1739,15 @@
       primaryProfile: primary.id || '',
       secondaryProfile: secondary ? secondary.id : '',
       storyLens: primary.storyLens || '',
-      topologyBias: mergeUnique(primary.mapType ? [primary.mapType] : [], secondary && secondary.mapType ? [secondary.mapType] : []),
+      // D144: a proposal SET, capped for the same reason formatDesignBias caps
+      // it. `cellShapeBias` rides alongside rather than inside, because hex is a
+      // variant of `grid` and folding it into the type list would offer the
+      // model a seventh map type the schema does not have.
+      topologyBias: mergeUnique(primary.mapTypes || [], (secondary && secondary.mapTypes) || []).slice(0, 4),
+      cellShapeBias: mergeUnique(
+        primary.cellShape ? [primary.cellShape] : [],
+        (secondary && secondary.cellShape) ? [secondary.cellShape] : []
+      ),
       puzzleBias: mergeUnique(primary.puzzleFamilies || [], secondary && secondary.puzzleFamilies || []).slice(0, 4),
       documentBias: mergeUnique(primary.documentTypes || [], secondary && secondary.documentTypes || []).slice(0, 4),
       themeBias: mergeUnique(primary.themeHints || [], secondary && secondary.themeHints || []).slice(0, 3)
@@ -2720,10 +2737,21 @@
       '- Boss weeks can only consume planned fragmentIds through session.fragmentRef coverage. Do not assign more boss-week fragmentIds than the boss week has sessions.',
       '- Map each mystery question, false assumption, motif payoff, and week transformation into the week plan.',
       '- mapReuse may keep the same topology, but it may never mean "no visible change." Every non-boss week needs a visibly new stateChange or unlock relative to the prior week.',
+      // D144 — the board is chosen HERE, by the stage that declares the
+      // persistent topology, not three stages later by the one told to preserve
+      // it. The geometry table rides this stage now (INST_MAP_GEOMETRY via
+      // STAGE_SCHEMA_MAP), so this line points at doctrine the model can see.
+      '- topology.mainMapType MUST be one of: grid | point-to-point | linear-track | player-drawn | concentric | maze. Choose it from the mechanic grammar family\'s verb using the "Choosing the geometry" table above — not from the design bias, which only proposes. Every non-boss week reuses this geometry.',
+      '- topology.cellShape applies to grid only: "square" (default) or "hex". Use "hex" when the player is crossing ground rather than reading a floor plan. Leave it "" for every other geometry.',
       '- Fragment registry must create clue economy: establish early, complicate mid-block, reveal late; no lore-dump placeholders.',
       '- Use at least 3 documentType values across the full fragmentRegistry once the booklet has 8+ fragments.',
       '- No single documentType may account for more than 45% of the fragmentRegistry once the booklet has 8+ fragments.',
-      '- Boss convergence must require outputs from map progression, institutional procedure, and relationship state.',
+      // D144: this line was an unbranched conjunctive institutional mandate on
+      // a stage every brief class reaches — D136's exact defect shape, on the
+      // surface D137(b) swept but did not reach. Retyped as a register menu
+      // reusing INST_LAYERED_ARC's wording, so a theatre's boss converges on a
+      // troupe's procedure rather than a ministry's.
+      '- Boss convergence must require outputs from map progression, relationship state, and the procedure of whatever body this world actually runs on — an institution, a house, a guild, a troupe, a market, a congregation, or a crew.',
       '',
       '## Layer Codex Summary',
       compactJson(summarizeLayerBibleForWeeks(layerBible)),

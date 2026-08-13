@@ -119,16 +119,21 @@
     '- `floorLabel` (string, optional): deck, floor, wing, district, sector, or stratum label when it strengthens spatial identity',
     '- `mapNote` (string, optional): footer note',
     '- Shared states: "empty" | "cleared" | "locked" | "anomaly" | "current" | "inaccessible"',
-    '- Treat the map as changing board state, not as an illustration.',
-    '- Every map should include one denied route, locked zone, or inaccessible space.',
-    '- Every map should include one likely return point, checkpoint, or remembered landmark.',
-    '- If the same space persists across weeks, show at least one changed state, altered route, updated annotation, or revised label.',
+    // COMPRESSED (D144, the compress-first rule): four lines lived here and
+    // again, near-verbatim, in INST_MAPS_BOARD — "changing board state, not an
+    // illustration", the denied-route/return-point pair, and the persist-with-a-
+    // delta rule. The two sections ALWAYS travel together (SCHEMA_SPATIAL rides
+    // week-final's `schemas` and the SCHEMA_SPEC bundle; INST_MAPS_BOARD rides
+    // week-final's `instructions` and the INSTRUCTIONS bundle), so nothing lost
+    // reach — the model was simply told the same four things twice in one
+    // prompt. 359 characters recovered against the ceiling, and no doctrine
+    // moved. If either section's routing ever diverges, restore them here.
     '',
     'GRID:',
     '- `gridDimensions`: { columns: 5-12, rows: 4-8 }',
     '- `tiles`: [{ col, row, type, label?, annotation? }] with route meaning, blocked movement, checkpoints, or discoverable annotations, not filler cells',
     '- `currentPosition`: { col, row }',
-    '- `cellShape` (optional): "square" (default) | "hex". Hex reads as surveyed ground with six-way movement — charts, wilderness traverses, dig sites. Same tiles and dimensions either way; choose hex only when six-way agency is the point.',
+    '- `cellShape` (optional): "square" (default) | "hex". Hex reads as surveyed ground with six-way movement — charts, wilderness traverses, dig sites. Same tiles and dimensions either way. Choose hex when the player is CROSSING ground, not reading a floor plan; `topology.cellShape` decides once the plan declares one.',
     '',
     'POINT-TO-POINT:',
     '- `nodes`: [{ id, label, x, y, state }] — x and y MUST be integers in range 1–12 INCLUSIVE. Zero (0) and negative values are ILLEGAL and cause nodes to stack. Use the full 1–12 range.',
@@ -1229,7 +1234,9 @@
     '',
     'These extracted signals own the story. The design bias in the prompt owns the game mechanics. They do not compete.',
     'Brief interpretation overrides: storyLens, characterWeb, secretShapes, arcMoves from the design bias.',
-    'Design bias still governs: mapType, puzzleFamilies, pressureClocks, scarcitySurfaces, documentTypes.'
+    'Design bias PROPOSES: mapType, puzzleFamilies, pressureClocks, scarcitySurfaces, documentTypes.',
+    'The map geometry is DERIVED from the mechanic grammar family — where the two disagree the family',
+    'wins, and selectionReason says so.'
   ];
 
   window.INST_OUTPUT_RULES = [
@@ -1693,26 +1700,61 @@
     '- PERSISTENT TOPOLOGY: Design ONE main facility/location map and reuse it across most non-boss weeks. The player should learn, annotate, and master this space over time. Do not create a new unrelated map for each week.',
     '- Week-to-week map evolution: new node unlocked, route closed, state change, annotation added, zone renamed, or access altered. Same topology, evolving state.',
     '- Every map should contain a denied route, locked zone, or inaccessible space plus a likely return point, checkpoint, or remembered landmark.',
-    '- If the mapType or topology truly changes for a week (zoom-in, new sector), the change must be diegetically justified and the main topology must return.',
+    // COMPRESSED (D144, compress-first). Two lines left this section and lost
+    // no reach. The zoom-in/new-sector rule MERGED into the geometry section's
+    // second-geometry clause, which says the same thing and additionally rides
+    // `campaign-plan` — so the planner now hears it too, which it did not
+    // before. The `floorLabel` usage cue was a paraphrase of SCHEMA_SPATIAL's
+    // own field definition, and the two always travel together.
     '- **Point-to-point print legibility:** Node and edge labels print at ~5pt on a half-letter page. Keep node labels to 2–3 words. Edge labels to 1–2 words. If a location has a long institutional name, abbreviate it for the map label and use the full name in prose. The map is a board, not a paragraph.',
-    '- Use `floorLabel` when layered spaces such as decks, wings, sectors, or strata matter to orientation.',
-    '- Player-drawn maps should still give enough seed markers or prompts to feel purposeful, not empty.',
-    '',
+    '- Player-drawn maps should still give enough seed markers or prompts to feel purposeful, not empty.'
+  ];
+
+  // ── Choosing the geometry (D144: hoisted out of INST_MAPS_BOARD) ──────────
+  // WHY IT MOVED. This table used to live inside INST_MAPS_BOARD, which is
+  // routed to `week-final` and the single-prompt bundle — so on the standard
+  // pipeline the geometry decision was first READ at the stage that authors
+  // week 1, three stages after the campaign plan had already declared the
+  // persistent topology every later week reuses. The stage that CHOOSES the
+  // board could not see the table, and the stage that could see it was told
+  // (correctly) to preserve what the plan had already fixed.
+  //
+  // Measured on the real prompts, 2026-08-13: `campaign-plan` contained
+  // `concentric` once, `maze` once and `hex` once — all inside the compact
+  // MECHANIC_VOCAB_BRIEF constraint list, with no guidance on when any of them
+  // is the right answer; `week-final` carried the full table. Every W3 matrix
+  // book used a square grid or point-to-point.
+  //
+  // So the table is its own section now, routed to BOTH stages plus the bundle.
+  // The rest of INST_MAPS_BOARD stays week-final-only, because the rest of it IS
+  // week material (print legibility at 5pt, weekly deltas, floorLabel) — routing
+  // that to the planner would be doctrine false at its stage, the D128 defect.
+  //
+  // THE HEX AND MAZE ROWS' `Serves` COLUMN NAMED A CLUSTER, NOT FAMILIES.
+  // Both read "reconstruction", which is the name of the seven-family cluster in
+  // FAMILY_CLUSTERS and NOT a value of VALID_MECHANIC_GRAMMAR_FAMILIES. Every
+  // other row names families. A model whose declared family is `survey-grid`
+  // therefore found itself named explicitly in the plain-`grid` row and nowhere
+  // in the hex row — so hex was unreachable for exactly the family whose whole
+  // idiom is surveyed ground. Both rows now name families.
+  window.INST_MAP_GEOMETRY = [
     '### Choosing the geometry',
-    'ONE geometry per book. Choose it because it serves the grammar family — the board serves the verb, never decoration. A second geometry in the same booklet is a topology change and needs the diegetic justification above.',
+    'ONE geometry per book. Choose it because it serves the grammar family — the board serves the verb, never decoration. A second geometry (a zoom-in, a new sector) is a topology change: it must be diegetically justified, and the main topology must return.',
     '',
     '| Geometry | Player verbs | Serves |',
     '|---|---|---|',
     '| `grid` | clear cells, annotate ground, mark position | survey-grid, ledger-board, stewardship |',
-    '| `grid` + `cellShape: "hex"` | reveal hexes, plot traverses (six-way agency) | attrition, stewardship, reconstruction |',
+    '| `grid` + `cellShape: "hex"` | reveal hexes, plot traverses across open ground (six-way agency) | survey-grid, route-tracker, attrition, stewardship |',
     '| `point-to-point` | move between nodes, open routes | node-graph, heat, stewardship |',
     '| `point-to-point` + `edgeSemantics: "relational"` | strengthen, strain, sever, redraw ties | loyalty-web, testimony-matrix |',
     '| `linear-track` | advance the line, hold ground behind you | route-tracker, timeline-reconstruction |',
     '| `concentric` | advance inward, hold or lose rings, mark breaches | siege, observance, heat |',
-    '| `maze` | trace the path, mark dead ends, unlock doors | evasion, attrition, reconstruction |',
+    '| `maze` | trace the path, mark dead ends, unlock doors | evasion, attrition, node-graph |',
     '| `player-drawn` | draw the space as you learn it | any family whose world is unmapped |',
     '',
     '- A geometry is not an aesthetic. If the family\'s verb is "hold ground while it closes", rings ARE that verb and a square grid is a translation of it. If the verb is "get out without being seen", corridors are that verb and a straight line is a summary of it.',
+    '- `grid` is the easiest DEFAULT. Before taking it, name the verb your family performs. Crossing ground rather than reading a floor plan? `cellShape: "hex"` is the same data model and the truer board.',
+    '- The DESIGN BIAS proposes geometries; the mechanic grammar family DECIDES. Where they disagree, the family wins and `selectionReason` names the verb that settled it.',
     '- The map is an in-world document with an in-world maker: it has a reason to exist, labels drawn from the world\'s own nouns, and weekly deltas someone in the fiction would name. Two booklets that both chose `concentric` must not produce the same drawing.'
   ];
 
@@ -3013,6 +3055,10 @@
     INST_CIPHER_DESIGN, [''],
     INST_CONVERGENCE_DESIGN, [''],
     INST_MAPS_BOARD, [''],
+    // D144: the geometry table left INST_MAPS_BOARD so the campaign planner
+    // could see it too. It stays on the bundle because the paste path authors
+    // every map in one call — a MOVE, not an addition (bundle delta ≈ 0).
+    INST_MAP_GEOMETRY, [''],
     INST_ORACLES_CLOCKS, [''],
     INST_COMPANIONS, [''],
     INST_PROGRESSION, [''],
@@ -3240,7 +3286,12 @@
   var STAGE_SCHEMA_MAP = {
     // Planning stages: story-first
     'layer-codex':    { schemas: [],                                            instructions: ['STORY_ENGINE', 'CHARACTER_WEB', 'LAYERED_ARC', 'ANTI_PATTERNS'] },
-    'campaign-plan':  { schemas: [],                                            instructions: ['WORLD_CONTRACT', 'PROGRESSION', 'SYSTEM_INTEGRATION', 'ANTI_PATTERNS', 'ANTI_SAMENESS'] },
+    // MAP_GEOMETRY rides the campaign plan because the plan is where the
+    // persistent topology is DECLARED and every later week is told to preserve
+    // it (D144). Before this, the geometry table was first read at week-final —
+    // three stages after the decision it governs had already been made, by a
+    // stage that could not see it.
+    'campaign-plan':  { schemas: [],                                            instructions: ['WORLD_CONTRACT', 'MAP_GEOMETRY', 'PROGRESSION', 'SYSTEM_INTEGRATION', 'ANTI_PATTERNS', 'ANTI_SAMENESS'] },
     // Shell: story + world + structural
     // Shell authors meta.literaryRegister (the voiceSpec) and meta.worldContract
     // (the knowing) — VOICE_DISCIPLINE is the authoring doctrine for both.
@@ -3295,7 +3346,7 @@
     // stage it is false at is worse than doctrine routed nowhere — it spends
     // context telling a model not to do something it cannot do, and teaches it
     // that this prompt's rules may not apply to the shape in front of it.
-    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST', 'PUZZLES'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'MARK_SURFACE', 'PERVASIVE_PLAY', 'POINT_OF_USE', 'RETURN_LOOP', 'DOOR_BIAS', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'CONVERGENCE_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'PROGRESSION_TARGET', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
+    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST', 'PUZZLES'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'MARK_SURFACE', 'PERVASIVE_PLAY', 'POINT_OF_USE', 'RETURN_LOOP', 'DOOR_BIAS', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'CONVERGENCE_DESIGN', 'MAPS_BOARD', 'MAP_GEOMETRY', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'PROGRESSION_TARGET', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
     // Fragment: story quality first
     'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'VOICE_DISCIPLINE', 'POINT_OF_USE', 'ANTI_GENERIC', 'CHARACTER_WEB', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
     // Ending: story quality first (endings are where voice failure concentrates)
@@ -3462,6 +3513,14 @@
     topology: {
       type: '',
       identity: '',
+      // D144: the BOARD, declared where the persistent topology is declared.
+      // `type` above is free prose and always was; these two are the machine
+      // fields every later week reads and preserves. Left blank for the same
+      // D47 reason componentDialect and visualArchetype are — a filled-in
+      // sample of a bounded choice functions as an exemplar to copy, and the
+      // measured symptom of that is eleven books on a square grid.
+      mainMapType: '',
+      cellShape: '',
       mainMap: '',
       zones: [],
       persistentLocks: [],

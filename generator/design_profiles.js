@@ -47,6 +47,38 @@
   // into a booklet built from a different brief is a differentiation defect —
   // the seeds exist to point away from the convergent defaults (Supply, Scrip,
   // Credits, Points), never to become the new convergent default themselves.
+  //
+  // ── `mapTypes` (D144), formerly the singular `mapType` ──────────────────────
+  // MEASURED, 2026-08-13: across all twelve profiles the singular field carried
+  // exactly four of the six geometries — `grid`, `point-to-point`,
+  // `linear-track`, `player-drawn` — and NO profile carried `concentric` or
+  // `maze`. Those two were added in Wave 3 because two grammar families had no
+  // board at all (siege had to borrow a square grid for a cordon, evasion had to
+  // spell a labyrinth as a straight line), and then nothing in the bias could
+  // ever propose either one. Seven of twelve profiles proposed `point-to-point`
+  // or `grid` and nothing else, and since the bias is drawn by keyword score
+  // with a HASH FALLBACK when no keyword hits (measured: it does, on real
+  // briefs), the board a book got was frequently a hash of the brief string.
+  //
+  // Two structural rules, asserted by `designProfileGeometryCoverage()` in
+  // scripts/validate.mjs so neither can rot back:
+  //   • every geometry in VALID_MAP_TYPES is proposed by at least one profile;
+  //   • every profile reaches at least one geometry outside {grid,
+  //     point-to-point}, so no profile can be a two-shape profile again.
+  //
+  // ORDER IS THE PROPOSAL ORDER, not a ranking with teeth. The first entry is
+  // the profile's most characteristic board; the rest are the near neighbours
+  // this world could plausibly file as. THE BIAS PROPOSES, THE FAMILY DECIDES
+  // (D144): the mechanic grammar family owns the geometry, and where the two
+  // disagree the family wins and `selectionReason` says so. A profile that
+  // could DICTATE the board would be deciding gameplay from a keyword match on
+  // the brief's nouns, which is the thing that produced eleven grid books.
+  //
+  // `cellShape: 'hex'` rides three profiles — the ones whose verb is CROSSING
+  // ground rather than reading a floor plan (a route, a frontier, a quest
+  // overland). It is a variant of `grid`, not a seventh type, so it is only
+  // meaningful on a profile that proposes `grid` at all; the validator checks
+  // that too.
   window.DESIGN_PROFILES = [
     {
       id: 'institutional-mystery',
@@ -75,7 +107,7 @@
         'reframing of what the work really does',
         'personal cost for knowing'
       ],
-      mapType: 'grid',
+      mapTypes: ['grid', 'concentric', 'maze'],
       oracleMode: 'banded-d100',
       puzzleFamilies: ['fragment cross-reference', 'grid-coordinate reading', 'observational anomaly hunting', 'process deduction'],
       pressureClocks: ['Exposure Risk', 'Evidence Chain', 'Site Integrity'],
@@ -112,7 +144,8 @@
         'route re-interpretation',
         'arrival that reveals a cost already paid'
       ],
-      mapType: 'linear-track',
+      mapTypes: ['linear-track', 'point-to-point', 'grid'],
+      cellShape: 'hex',
       oracleMode: 'banded-d100',
       puzzleFamilies: ['path tracing', 'route adjacency', 'environmental pattern recognition', 'resource clock pressure'],
       pressureClocks: ['Exposure', 'Supplies', 'Distance Remaining'],
@@ -149,7 +182,7 @@
         'midpoint allegiance fracture',
         'consequence that must be lived with publicly'
       ],
-      mapType: 'point-to-point',
+      mapTypes: ['point-to-point', 'concentric', 'grid'],
       oracleMode: 'banded-d100',
       puzzleFamilies: ['logic deduction', 'witness contradiction', 'fragment cross-reference', 'branch consequence tracking'],
       pressureClocks: ['Suspicion', 'Trust', 'Public Attention'],
@@ -186,7 +219,7 @@
         'midpoint revelation that changes the rules of reading',
         'irreversible interpretive act'
       ],
-      mapType: 'player-drawn',
+      mapTypes: ['player-drawn', 'concentric', 'maze'],
       oracleMode: 'banded-d100',
       puzzleFamilies: ['symbol decoding', 'layered metapuzzle assembly', 'observational anomaly hunting', 'oracle-triggered rule mutation'],
       pressureClocks: ['Contamination', 'Witness', 'Seal Integrity'],
@@ -228,7 +261,7 @@
         'midpoint realization about what is being contained',
         'triage under institutional pressure'
       ],
-      mapType: 'grid',
+      mapTypes: ['concentric', 'grid', 'maze'],
       oracleMode: 'banded-d100',
       puzzleFamilies: ['process deduction', 'index extraction', 'observational anomaly hunting', 'route denial'],
       pressureClocks: ['Containment Loss', 'Triage Load', 'Exposure Window'],
@@ -265,7 +298,8 @@
         'midpoint reinterpretation of threat',
         'costly arrival or stand'
       ],
-      mapType: 'point-to-point',
+      mapTypes: ['grid', 'point-to-point', 'linear-track'],
+      cellShape: 'hex',
       oracleMode: 'banded-d100',
       puzzleFamilies: ['path tracing', 'adjacency extraction', 'constraint logic', 'resource clock pressure'],
       pressureClocks: ['Weather', 'Supplies', 'Pursuit'],
@@ -302,7 +336,7 @@
         'midpoint relational reversal',
         'consequence that changes how the place can be lived in'
       ],
-      mapType: 'grid',
+      mapTypes: ['grid', 'maze', 'player-drawn'],
       oracleMode: 'banded-d100',
       puzzleFamilies: ['room-label derivation', 'fragment cross-reference', 'pattern recognition', 'logic deduction'],
       pressureClocks: ['Strain', 'Suspicion', 'Caretaking Load'],
@@ -339,7 +373,7 @@
         'midpoint systems re-interpretation',
         'manual intervention with public consequence'
       ],
-      mapType: 'point-to-point',
+      mapTypes: ['point-to-point', 'maze', 'linear-track'],
       oracleMode: 'banded-d100',
       puzzleFamilies: ['route adjacency', 'tracker-value lookup', 'process deduction', 'visual pattern'],
       pressureClocks: ['Load', 'Outage Risk', 'Public Fallout'],
@@ -376,7 +410,8 @@
         'darkest moment: the price of commitment',
         'climax that requires sacrifice, not just skill'
       ],
-      mapType: 'point-to-point',
+      mapTypes: ['point-to-point', 'linear-track', 'grid'],
+      cellShape: 'hex',
       oracleMode: 'banded-d100',
       puzzleFamilies: ['path tracing', 'route adjacency', 'constraint logic', 'resource clock pressure'],
       pressureClocks: ['Distance', 'Enemy Pursuit', 'Ally Endurance'],
@@ -413,7 +448,7 @@
         'the turn: accepting or exploiting the logic',
         'resolution that leaves the absurd world intact but transformed'
       ],
-      mapType: 'grid',
+      mapTypes: ['grid', 'maze', 'player-drawn'],
       oracleMode: 'banded-d100',
       puzzleFamilies: ['observational anomaly hunting', 'logic deduction', 'pattern recognition', 'contextual-question'],
       pressureClocks: ['Credibility', 'Chaos Level', 'Time Before Discovery'],
@@ -450,7 +485,7 @@
         'the moment someone says the thing that cannot be unsaid',
         'aftermath: a new equilibrium that costs something permanent'
       ],
-      mapType: 'point-to-point',
+      mapTypes: ['point-to-point', 'concentric', 'player-drawn'],
       oracleMode: 'banded-d100',
       puzzleFamilies: ['fragment cross-reference', 'logic deduction', 'witness contradiction', 'branch consequence tracking'],
       pressureClocks: ['Trust', 'Distance', 'Time Left'],
@@ -487,7 +522,7 @@
         'midpoint escalation or extraction failure',
         'costly exfiltration'
       ],
-      mapType: 'point-to-point',
+      mapTypes: ['point-to-point', 'maze', 'concentric'],
       oracleMode: 'banded-d100',
       puzzleFamilies: ['path tracing', 'route adjacency', 'constraint logic', 'resource clock pressure'],
       pressureClocks: ['Security Response', 'Target Escaping', 'Ammo/Supplies'],
