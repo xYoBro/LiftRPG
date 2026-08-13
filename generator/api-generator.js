@@ -2983,7 +2983,7 @@ async function runApiPipeline(options) {
             // The board geometry's GIVEN: this stage declares
             // `topology.mainMapType` and every later week reuses it (D144 W-2).
             seedAssignments: seedAssignments,
-            identityAxes: identityAxesForStage('week')
+            identityAxes: identityAxesForStage('campaign-plan')
           });
         }
         return buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState, { weekCount: weekCount });
@@ -4218,11 +4218,14 @@ async function runSkeletonFleshPipeline(options) {
           retryMode: retryState.attempt > 0,
           divergenceSeed: divergenceSeed,
           weekCount: weekCount,
-          // This pipeline's compiler seat owes the same GIVENS the shell stage
-          // owes on the other path — D144 W-3's lesson exactly: a value
-          // demanded at a stage must be SHOWN to that stage on BOTH pipelines.
+          // This pipeline's compiler seat owes the GIVENS for the axes IT
+          // authors — D144 W-3's lesson (a value demanded at a stage must be
+          // SHOWN to that stage on both pipelines) with D128's other half kept:
+          // SCHEMA_SKELETON names no designLanguage and no playSpine, so this
+          // seat is shown eight axes rather than fifteen. A given it cannot
+          // deliver would be doctrine false at its stage.
           seedAssignments: seedAssignments,
-          identityAxes: identityAxesForStage('shell')
+          identityAxes: identityAxesForStage('skeleton')
         });
       },
       validate: function (result) {

@@ -1529,57 +1529,62 @@ export var VALID_HOME_PULLS = ['story', 'game', 'investigation', 'mixed'];
 //                 the artifact's identity and `designEvidence` for the design
 //                 language (D139's derivation law). An axis whose evidence
 //                 surface is empty cannot be brief-funded, by construction.
-//   stage         the gate that can SEE this axis delivered. The obedience
-//                 floor is scoped by it, because a floor asked about a field
-//                 its stage does not author fires on absence forever.
+//   stages        every stage that AUTHORS this axis — the stages that must be
+//                 shown its assignment and are the only ones allowed to check
+//                 it. Measured, not assumed: the S+F skeleton authors eight of
+//                 these and no design language and no play spine at all
+//                 (SCHEMA_SKELETON names neither), so handing that seat a
+//                 `sealTreatment` given would be doctrine false at its stage —
+//                 D128's defect, and the same argument that keeps the
+//                 design-language floor off the skeleton gate in validation.js.
 //   familyDecides true only for the geometry. See the exemption note below.
 export var IDENTITY_AXES = [
   { id: 'shellFamily', label: 'shellFamily', path: 'meta.artifactIdentity.shellFamily',
     menu: VALID_SHELL_FAMILIES, kind: 'scalar',
-    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'boardStateMode', label: 'boardStateMode', path: 'meta.artifactIdentity.boardStateMode',
     menu: VALID_BOARD_STATE_MODES, kind: 'scalar',
-    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'componentDialect', label: 'componentDialect', path: 'meta.artifactIdentity.componentDialect',
     menu: VALID_COMPONENT_DIALECTS, kind: 'scalar',
-    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'visualArchetype', label: 'theme.visualArchetype', path: 'theme.visualArchetype',
     menu: VALID_ARCHETYPES, kind: 'scalar',
-    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'arcFamily', label: 'arcFamily', path: 'meta.artifactIntent.arcFamily',
     menu: VALID_ARC_FAMILIES, kind: 'scalar',
-    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'mechanicGrammarFamily', label: 'mechanicGrammarFamily', path: 'meta.artifactIntent.mechanicGrammarFamily',
     menu: VALID_MECHANIC_GRAMMAR_FAMILIES, kind: 'scalar',
-    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'homePull', label: 'homePull', path: 'meta.artifactIntent.homePull',
     menu: VALID_HOME_PULLS, kind: 'scalar',
-    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'documentEcologyDominant', label: 'documentEcology.dominant',
     path: 'meta.artifactIntent.documentEcology.dominant',
     menu: DOCUMENT_TYPE_ENUM, kind: 'member',
-    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'harvestPatterns', label: 'playSpine.harvestPatterns', path: 'meta.playSpine.harvestPatterns',
     menu: VALID_HARVEST_PATTERNS, kind: 'member',
-    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell'] },
   { id: 'productionTexture', label: 'designLanguage.productionTexture', path: 'meta.designLanguage.productionTexture',
     menu: VALID_PRODUCTION_TEXTURES, kind: 'scalar',
-    evidencePath: 'meta.designLanguage.designEvidence', stage: 'shell' },
+    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shell'] },
   { id: 'toneTexture', label: 'designLanguage.toneTexture', path: 'meta.designLanguage.toneTexture',
     menu: TONE_TEXTURE_LADDER, kind: 'scalar',
-    evidencePath: 'meta.designLanguage.designEvidence', stage: 'shell' },
+    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shell'] },
   { id: 'typeVoice', label: 'designLanguage.typeVoice', path: 'meta.designLanguage.typeVoice',
     menu: VALID_TYPE_VOICES, kind: 'scalar',
-    evidencePath: 'meta.designLanguage.designEvidence', stage: 'shell' },
+    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shell'] },
   { id: 'marginSemantics', label: 'designLanguage.marginSemantics', path: 'meta.designLanguage.marginSemantics',
     menu: VALID_MARGIN_SEMANTICS, kind: 'scalar',
-    evidencePath: 'meta.designLanguage.designEvidence', stage: 'shell' },
+    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shell'] },
   { id: 'inkDiscipline', label: 'designLanguage.inkDiscipline', path: 'meta.designLanguage.inkDiscipline',
     menu: VALID_INK_DISCIPLINES, kind: 'scalar',
-    evidencePath: 'meta.designLanguage.designEvidence', stage: 'shell' },
+    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shell'] },
   { id: 'sealTreatment', label: 'designLanguage.sealTreatment', path: 'meta.designLanguage.sealTreatment',
     menu: VALID_SEAL_TREATMENTS, kind: 'scalar',
-    evidencePath: 'meta.designLanguage.designEvidence', stage: 'shell' },
+    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shell'] },
   // THE GEOMETRY, AND ITS ONE EXEMPTION. D144 W-2 landed the rule that governs
   // this axis — "the DESIGN BIAS proposes geometries; the mechanic grammar
   // family DECIDES" — and that rule is not a third source: the family is itself
@@ -1587,17 +1592,21 @@ export var IDENTITY_AXES = [
   // whatever funded the family. What it is NOT is a licence to ignore the die:
   // the exemption applies only when the declared family's own Serves row
   // refuses the assignment, and `familyRefusesGeometry()` below is the single
-  // predicate both the floor and the referee ask. Delivered at the WEEKS, three
-  // stages after the assignment is handed, which is why its stage is 'week'.
+  // predicate both the floor and the referee ask. Authored at the CAMPAIGN
+  // PLAN (`topology.mainMapType`) and realised in the weeks' mapState, which is
+  // why its stage is the planner's and why its obedience is report-class this
+  // wave — see the referee in quality.js for the reasoning.
   { id: 'mapGeometry', label: 'the board geometry (mapState.mapType)', path: 'weeks[].mapState.mapType',
     menu: VALID_MAP_TYPES, kind: 'dominant',
-    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'week', familyDecides: true }
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['campaign-plan'], familyDecides: true }
 ];
 
 // The stages that own at least one axis. Derived so a new axis with a new stage
 // cannot be handed to a model and then checked by nobody.
 export var IDENTITY_AXIS_STAGES = IDENTITY_AXES.reduce(function (acc, axis) {
-  if (acc.indexOf(axis.stage) === -1) acc.push(axis.stage);
+  (axis.stages || []).forEach(function (stage) {
+    if (acc.indexOf(stage) === -1) acc.push(stage);
+  });
   return acc;
 }, []);
 
@@ -1610,7 +1619,9 @@ export var IDENTITY_AXIS_STAGES = IDENTITY_AXES.reduce(function (acc, axis) {
  */
 export function identityAxesForStage(stage) {
   var key = String(stage || '').trim();
-  return IDENTITY_AXES.filter(function (axis) { return axis.stage === key; });
+  return IDENTITY_AXES.filter(function (axis) {
+    return (axis.stages || []).indexOf(key) !== -1;
+  });
 }
 
 // FNV-1a, 32-bit. The draw's whole entropy path, and it is deliberately the
