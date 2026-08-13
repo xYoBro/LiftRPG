@@ -892,11 +892,6 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   border:1.5px solid var(--ink);
   background:rgba(0,0,0,.03);
 }
-.cover-page[data-shell-family="classified-packet"] .cover-art{
-  max-width:none;
-  margin:0 0 8px;
-  padding:6px;
-}
 .cover-page[data-shell-family="classified-packet"] .cover-hero{
   max-width:none;
 }
@@ -1228,36 +1223,10 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   color:var(--ink);
   text-transform:uppercase;
 }
-.cover-art{
-  margin:0 0 12px;
-  max-width:92%;
-  border:1px solid color-mix(in srgb, var(--theme-panel-border,var(--rule)) 62%, transparent 38%);
-  padding:8px;
-  background:color-mix(in srgb, var(--paper) 88%, white 12%);
-}
-.cover-art svg{
-  width:100%;
-  height:auto;
-  display:block;
-  stroke:var(--ink);
-  fill:none;
-}
-.cover-art-text{
-  margin:0;
-  font-family:var(--mono);
-  font-size:5.6pt;
-  line-height:1.35;
-  color:var(--ink);
-  white-space:pre-wrap;
-}
-.cover-art-caption{
-  margin-top:6px;
-  font-family:var(--mono);
-  font-size:5pt;
-  letter-spacing:.1em;
-  text-transform:uppercase;
-  color:var(--muted);
-}
+/* D142 — the `.cover-art*` rules lived here. Model-drawn cover art is retired;
+   nothing emits these classes any more, so the rules are gone rather than
+   dormant (a selector that matches nothing is silent). The cover's identity is
+   type, rule and shell chrome — VISION §8. */
 .cover-title{
   font-size:var(--theme-heading-xl,28pt);
   line-height:1.05;

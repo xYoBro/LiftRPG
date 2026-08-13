@@ -2,7 +2,7 @@ import { make } from './dom.js?v=48';
 import { splitRichText } from './booklet-models.js?v=48';
 import { buildClockModels, buildCompanionModels } from './field-ops-models.js?v=48';
 import { createBoundedPage } from './page-shell.js?v=48';
-import { sanitizeHtml, sanitizeSvg } from './utils.js?v=48';
+import { sanitizeHtml } from './utils.js?v=48';
 import {
   renderCipherSection,
   renderCompanionComponent,
@@ -51,28 +51,6 @@ function renderClassifiedSealCard(model) {
   card.appendChild(make('div', 'sealed-card-title', model.title));
   card.appendChild(make('div', 'sealed-card-note', 'Open only after the packet ledger reconciles.'));
   return card;
-}
-
-function renderCoverArt(model) {
-  const source = String(model.coverArt || '').trim();
-  if (!source) return null;
-
-  const wrap = make('div', 'cover-art');
-  if (/^\s*<svg[\s\S]*<\/svg>\s*$/i.test(source)) {
-    const safeSvg = sanitizeSvg(source);
-    if (safeSvg) {
-      wrap.innerHTML = safeSvg;
-    }
-  } else {
-    const pre = make('pre', 'cover-art-text', source);
-    wrap.appendChild(pre);
-  }
-
-  if (!wrap.childNodes.length) return null;
-  if (model.coverArtCaption) {
-    wrap.appendChild(make('div', 'cover-art-caption', model.coverArtCaption));
-  }
-  return wrap;
 }
 
 function renderFragmentRefPayload(payload) {
@@ -225,11 +203,10 @@ export function renderCoverPage(model) {
     frame.appendChild(renderClassifiedPacketCoverMeta(model));
   }
 
-  const coverArt = renderCoverArt(model);
-  if (coverArt) {
-    frame.appendChild(coverArt);
-  }
-
+  // D142 — model-drawn cover art is retired. `cover.svgArt`/`coverArtCaption`
+  // are still ACCEPTED by the schema (old books validate forever) and still
+  // reach the model via buildCoverPageModel; nothing draws them. The cover's
+  // identity is carried entirely by type, rule and shell chrome — VISION §8.
   const hero = make('div', 'cover-hero');
   hero.appendChild(make('h1', 'cover-title', model.title));
   hero.appendChild(make('p', 'cover-tagline', model.tagline));

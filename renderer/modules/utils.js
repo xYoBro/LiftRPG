@@ -221,6 +221,16 @@ export function sanitizeHtml(rawHtml) {
   return root.innerHTML.trim();
 }
 
+/**
+ * DORMANT ON THE LIFTRPG PATH (D142). Model-drawn cover art is retired, so the
+ * cover no longer passes anything through here; the one remaining importer is
+ * `atoms/image.js`, which is quarantined seed (D6) and unreachable from LiftRPG
+ * JSON. The function is KEPT deliberately: it is the named SVG security seam in
+ * bedrock's Security row, and a sanitizer is the wrong thing to delete in a
+ * cleanup — the day any surface accepts model-authored SVG again, this is the
+ * gate it must pass through, and re-deriving an allowlist under deadline is how
+ * sanitizers get written badly. Test coverage stays for the same reason.
+ */
 export function sanitizeSvg(rawSvg) {
   const content = String(rawSvg || '').trim();
   if (!content || typeof DOMParser === 'undefined') return '';
