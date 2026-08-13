@@ -769,6 +769,48 @@
       margin-right: 6px;
     }
 
+    /* The coding-agent sub-choice (author, 2026-08-13): chips inside the
+       third door's legend. Honest-state (D99): a chip for an agent that is
+       not wired yet is disabled and says so in its own label — a control may
+       never promise a state it cannot enter. */
+    .agent-chip-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .agent-chip {
+      font-family: var(--mono);
+      font-size: var(--fs-meta);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 5px 10px;
+      border: 1.5px solid var(--rule);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .agent-chip.is-active {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: var(--paper);
+    }
+
+    .agent-chip:disabled {
+      cursor: default;
+      opacity: .55;
+    }
+
+    .agent-chip-caption {
+      margin-top: 6px;
+      font-family: var(--body);
+      font-size: var(--fs-meta);
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
     /* ── The pre-run estimate ─────────────────────────────────────────────
        Informational, decision-bearing, and read immediately before a button
        that spends money or an afternoon: --fs-meta floor throughout (D99). */
@@ -3161,7 +3203,7 @@
         <div class="generator-mode-switch" role="tablist" aria-label="How do you want the booklet written?">
           <button class="generator-mode-btn is-active" id="gen-mode-manual" type="button" role="tab" aria-selected="true">I Have A Chatbot</button>
           <button class="generator-mode-btn" id="gen-mode-api" type="button" role="tab" aria-selected="false">I Have An API Key</button>
-          <button class="generator-mode-btn" id="gen-mode-bridge" type="button" role="tab" aria-selected="false">I Have Claude Code</button>
+          <button class="generator-mode-btn" id="gen-mode-bridge" type="button" role="tab" aria-selected="false">I Have A Coding Agent</button>
         </div>
         <div class="generator-mode-copy" id="gen-mode-copy"></div>
 
@@ -3902,9 +3944,13 @@
         },
         {
           id: 'bridge',
-          label: 'Claude Code',
-          sentence: 'No key and no per-token bill: LiftRPG runs the same build through the Claude Code already installed on your machine, on your own subscription. You start one small program first.',
-          // The door is the preset, and nothing else.
+          label: 'A coding agent',
+          sentence: 'No key and no per-token bill: LiftRPG runs the same build through a coding agent already installed on your machine, on your own subscription. You start one small program first.',
+          // The door is the preset, and nothing else. The id stays 'bridge'
+          // (machine contract, test-pinned) while the label generalizes
+          // (display copy, plain language — D99). Which AGENT the bridge
+          // spawns is the sub-choice rendered in the legend; Claude Code is
+          // the one wired today.
           providerId: 'bridge'
         }
       ];
@@ -4793,13 +4839,39 @@
         modeCopyEl.innerHTML = GENERATION_DOORS.filter(function (door) {
           return door.id === currentGenerationMode;
         }).map(function (door) {
+          // The coding-agent sub-choice (author, 2026-08-13). Static trusted
+          // markup — no reader data rides in it. Codex ships disabled until
+          // its bridge adapter lands (honest-state, D99); "Something Else"
+          // is a REAL button today because local and other models already
+          // run through the API door via any OpenAI-compatible endpoint.
+          var extra = '';
+          if (door.id === 'bridge') {
+            extra = '<div class="agent-chip-row" role="group" aria-label="Which coding agent?">' +
+              '<button type="button" class="agent-chip is-active" data-agent-chip="claude-code">Claude Code</button>' +
+              '<button type="button" class="agent-chip" disabled title="Queued — not wired yet">Codex — Soon</button>' +
+              '<button type="button" class="agent-chip" data-agent-chip="other">Something Else</button>' +
+              '</div>' +
+              '<div class="agent-chip-caption">Claude Code works today; Codex is queued. Anything else — ' +
+              'local models included — runs through the API door: LiftRPG speaks to any OpenAI-compatible ' +
+              'endpoint, including Ollama on this machine. Something Else takes you there.</div>';
+          }
           return '<div class="generator-mode-legend-row' +
             (door.id === currentGenerationMode ? ' is-active' : '') + '">' +
             '<span class="generator-mode-legend-name">' + escapeForHtml(door.label) + '</span>' +
             escapeForHtml(door.sentence) +
+            extra +
             '</div>';
         }).join('');
       }
+
+      // One delegated listener survives every legend re-render. The chips are
+      // rebuilt as innerHTML on each door switch, so per-chip listeners would
+      // leak or vanish; delegation on the stable container does neither.
+      if (modeCopyEl) modeCopyEl.addEventListener('click', function (ev) {
+        var chip = ev.target && ev.target.closest ? ev.target.closest('[data-agent-chip]') : null;
+        if (!chip || chip.disabled) return;
+        if (chip.getAttribute('data-agent-chip') === 'other') setGenerationMode('api');
+      });
 
       // The station numbers are rewritten from what is actually on screen. A
       // hidden Step 3 above a visible Step 4 is the same defect class as a
