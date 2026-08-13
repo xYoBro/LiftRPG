@@ -1075,8 +1075,16 @@ function composeDesignLanguage(spec, archetype, preset) {
   // whenever either side is unset — the quietest possible way to lose an
   // archetype's header rule. Here both halves are known, so the join is made
   // where it can be made correctly, and the CSS keeps its single consumer.
-  const barPx = Math.round(intensity * 5 * coverage * 10) / 10;
-  const bar = intensity < 0.2
+  // THE THRESHOLD IS A DESIGN DECISION, not a guard. An earlier cut faded the
+  // bar in from 0.2, which meant a book at 0.3 drew a 0.9px shadow: invisible
+  // on paper, undetectable to a pixel baseline, and TRUE to a carries contract
+  // — an axis that reads as present while doing nothing, which is the Hollow
+  // Success shape (D135) inside a theme token. So the low end of the spectrum
+  // draws NO bar at all, and the first bar it draws is at least a full pixel.
+  // Restraint is Mothership's whole character; a quiet book has to be able to
+  // be quiet, or the axis only has one end.
+  const barPx = Math.max(1, Math.round(intensity * 5 * coverage * 10) / 10);
+  const bar = intensity < 0.35
     ? ''
     : `0 ${barPx}px 0 -0.5px var(--design-chrome-ink, currentColor)`;
   if (bar) {

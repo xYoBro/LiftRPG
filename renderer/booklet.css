@@ -7316,17 +7316,23 @@ body[data-demo-view="true"] .reader-unlock{
    there — while these selectors beat both. They are fills and shadows, not the
    accent, and no ruling has been made about them.
 
-   STILL FLAGGED, and NOT executed here because it is a product decision about
-   token precedence rather than an override to retire: `--highlight-surface`.
-   Every preset pins it (pastoral: rgba(139,42,42,0.07), red), and
-   resolveTheme() derives it from the authored accent ONLY when the preset
-   leaves it unset — which no preset does. So `--accent-soft` still carries the
-   archetype's accent while `--accent` now carries the book's:
-   `.boss-proof`, `.boss-branch-note` and the filled progress-clock wedges wash
-   red on an olive-accented book. Same shape as the pin, one layer down, and
-   fixing it means ruling on whether palette.accent outranks a preset token —
-   and on which alpha the derivation should use (the presets pin 0.07; the
-   generic derivation in resolveTheme uses 0.12). */
+   FLAGGED AT D126, RULED AND EXECUTED AT W6: `--highlight-surface`. Every
+   preset pinned it (pastoral: rgba(139,42,42,0.07), red) and resolveTheme()
+   derived it from the authored accent ONLY when the preset left it unset —
+   which no preset did. So `--accent-soft` carried the ARCHETYPE's accent while
+   `--accent` carried the BOOK's, and `.boss-proof`, `.boss-branch-note` and the
+   filled progress-clock wedges washed red on an olive-accented book: the same
+   shape as the retired pin, one layer down.
+
+   The ruling extends VISION §8 one token further — THE AUTHORED HUE OUTRANKS
+   THE PRESET; THE ARCHETYPE KEEPS ONLY THE ALPHA. resolveTheme() now rebuilds
+   this token from `palette.accent` at whatever transparency the preset asked
+   for, so pastoral's restrained 0.07 stays 0.07 and cyberpunk's 0.15 stays
+   0.15: neither archetype loses the thing it was actually saying, and the two
+   accents can no longer disagree. A book with no authored accent is untouched,
+   including cyberpunk, whose highlight is deliberately its terminal green
+   rather than its magenta accent. `theme.tokens` still wins outright — a book
+   that names this exact token has already answered the question. */
 #booklet-container[data-archetype="pastoral"] .session-card,
 #booklet-container[data-archetype="pastoral"] .fragment-doc,
 #booklet-container[data-archetype="pastoral"] .companion-component,
@@ -8310,7 +8316,31 @@ body[data-demo-view="true"] .reader-unlock{
    agree", so the agreement is enumerated once and every recipe reads tokens
    from it. Four token names, one generic consumer each.
 
-   `newspaper-columns` is NOT here. See the refusal at the top of this block. */
+   `newspaper-columns` is NOT here. See the refusal at the top of this block.
+
+   ── THE CHANNEL CHOICE IS THE WHOLE DESIGN, and it was made by measurement ──
+   The first cut drew both frame recipes as a `box-shadow` on `.fragment-doc`,
+   and the render said no: `.fragment-block[data-shell-family="classified-packet"]
+   .fragment-doc` and devotional-manual's equivalent already pin that property,
+   at a specificity and source order that beat `[data-design-language]
+   .fragment-doc`. THREE of the five matrix books are classified-packet, so
+   memo-grid's bar and label-borders' ring were silently drawing nothing on most
+   of the corpus while the container carried the attribute and every axis
+   assertion passed. That is the Hollow Success shape (D135) inside a CSS
+   cascade, and only a "did it DRAW?" assertion could see it.
+
+   Raising the specificity to win would have been the wrong fix twice over: it
+   makes the book's recipe beat the shell's chrome, which is a PRECEDENCE RULING
+   nobody has made (the shell is pipeline-authored too — this is not the
+   archetype-vs-book question VISION §8 already answered), and it is the exact
+   move D116 named: a refactor that silently re-weights one authored thing
+   against another is a ruling nobody made.
+
+   So each recipe moved to a channel nothing else claims, and COMPOSES with the
+   shell instead of fighting it: `outline` on `.fragment-doc` (unused by any
+   fragment rule in this file, and outside the box model), and a box-shadow on
+   `.fragment-doc-type` (likewise unused). The precedence question is recorded
+   for the author, unexecuted. */
 [data-design-language][data-recipe-bureaucratic="memo-grid"] .fragment-block[data-document-family="bureaucratic"],
 [data-design-language][data-recipe-hand-authored="memo-grid"] .fragment-block[data-document-family="hand-authored"],
 [data-design-language][data-recipe-personal="memo-grid"] .fragment-block[data-document-family="personal"],
@@ -8318,9 +8348,11 @@ body[data-demo-view="true"] .reader-unlock{
 [data-design-language][data-recipe-anomalous="memo-grid"] .fragment-block[data-document-family="anomalous"],
 [data-design-language][data-recipe-custom-document="memo-grid"] .fragment-block[data-document-family="custom-document"]{
   /* The bureaucratic memo: a heavy bar across the top of the sheet and a rule
-     under the TO/FROM/DATE block. Both drawn INSIDE the existing box with an
-     inset shadow, so the document is exactly as tall as it was. */
-  --doc-frame:inset 0 4px 0 0 var(--design-chrome-ink);
+     under the TO/FROM/DATE block. The bar rides ABOVE the type slug, inside the
+     document's own 7px top padding — a shadow offset outward, which occupies no
+     space and cannot push the slug down. The header rule is inset, drawn inside
+     the header's existing box. Neither adds a pixel of height. */
+  --doc-bar:0 -5px 0 -2px var(--design-chrome-ink);
   --doc-header-rule:inset 0 -1.5px 0 0 var(--design-chrome-ink);
 }
 [data-design-language][data-recipe-bureaucratic="label-borders"] .fragment-block[data-document-family="bureaucratic"],
@@ -8330,11 +8362,12 @@ body[data-demo-view="true"] .reader-unlock{
 [data-design-language][data-recipe-anomalous="label-borders"] .fragment-block[data-document-family="anomalous"],
 [data-design-language][data-recipe-custom-document="label-borders"] .fragment-block[data-document-family="custom-document"]{
   /* The prescription/warning label's double rule. The research draws it as
-     `border: 6px double`, which is 6px of box the estimate never charged for;
-     an inset ring plus an inset gap is the same drawing at zero cost. */
-  --doc-frame:inset 0 0 0 1.5px var(--design-chrome-ink),
-    inset 0 0 0 3px var(--paper),
-    inset 0 0 0 4px var(--design-chrome-ink);
+     `border: 6px double`, which is 6px of box the estimate never charged for.
+     An OUTLINE at a negative offset is the same drawing at zero cost: outlines
+     sit outside the box model entirely, and paired with the document's own
+     existing border it reads as the doubled frame the label idiom needs. */
+  --doc-outline:1.5px solid var(--design-chrome-ink);
+  --doc-outline-offset:-4px;
 }
 [data-design-language][data-recipe-bureaucratic="ledger-rules"] .fragment-block[data-document-family="bureaucratic"],
 [data-design-language][data-recipe-hand-authored="ledger-rules"] .fragment-block[data-document-family="hand-authored"],
@@ -8371,11 +8404,14 @@ body[data-demo-view="true"] .reader-unlock{
   --doc-mark-at:right 8px top 8px, right 8px top 8px;
 }
 
-/* The four generic consumers. `.fragment-doc` already declared `box-shadow:none`
-   outright, so reading a token here replaces a constant rather than adding a
-   property — an unset token is the same `none` it always was. */
+/* The four generic consumers, each on a property nothing else in this file
+   claims for these elements — see THE CHANNEL CHOICE above. */
 [data-design-language] .fragment-doc{
-  box-shadow:var(--doc-frame,none);
+  outline:var(--doc-outline,none);
+  outline-offset:var(--doc-outline-offset,0);
+}
+[data-design-language] .fragment-doc-type{
+  box-shadow:var(--doc-bar,none);
 }
 [data-design-language] .fragment-doc-header{
   box-shadow:var(--doc-header-rule,none);
