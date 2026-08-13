@@ -20,8 +20,14 @@
     return String(Date.now()) + '-' + String(Math.random()).slice(2);
   }
 
-  window.beginLiftRpgPromptRun = function () {
-    var salt = createPromptVariantSalt();
+  // The run's variant salt. Pass the run seed's value and the salt IS the seed
+  // — which turns `deriveDesignBlend`'s keyword-miss fallback from an anonymous
+  // per-run hash into a draw reproducible from `_x.divergenceSeed` on the
+  // finished book (D144's flagged relay, closed under VISION §11). Called with
+  // no argument by the paste path, which has no run and no record to be
+  // reproducible from; that path keeps the random salt it always had.
+  window.beginLiftRpgPromptRun = function (runSeedValue) {
+    var salt = runSeedValue ? String(runSeedValue) : createPromptVariantSalt();
     window.__liftRpgVariantSalt = salt;
     return salt;
   };
@@ -260,13 +266,52 @@
   // channel is assembled from all three. It is window-exposed for
   // api-generator.js (a module, which cannot reach into this closure).
 
-  // Which classifications earn a drawn seed. `empty` is the design case; a
-  // `sparse` brief gets material to be specific IN, never material that
-  // replaces what the user said (see buildBriefChannel).
+  // ── EVERY BOOK DRAWS A SEED (VISION §11, D146) ───────────────────────────
+  // "Every book draws a seed — no brief is too rich to need one." Until this
+  // wave the seed existed only for empty and sparse briefs, which made
+  // "seeded against convergence" aspirational on every real brief: an explicit
+  // brief got no die at all, so every identity choice it did not itself fund
+  // was answered by the model's habit. The seed is now unconditional.
+  //
+  // THE SEED IS TWO THINGS AND THEY ARE SIZED DIFFERENTLY, which is the whole
+  // repair. `value` is the ENTROPY — always present, the single source every
+  // identity assignment is drawn from, and the thing recorded on the booklet so
+  // the book is reproducible. `text` is DIRECTION MATERIAL, and it stays sized
+  // to the reason exactly as before, because handing drawn premise material to
+  // a user who wrote fifteen words of their own is not the two-source law, it
+  // is the die overruling the brief — which §11 forbids in the same breath that
+  // it mandates the seed ("the brief's own words earn it"). An explicit brief
+  // therefore gets a seed and no seeded text, and its prompt is byte-identical
+  // to what it was before this wave.
+  //
+  // Which classifications earn TEXT. `empty` is the design case; a `sparse`
+  // brief gets material to be specific IN, never material that replaces what
+  // the user said (see buildBriefChannel).
   function seedReasonFor(briefMode) {
     if (briefMode === 'empty') return 'empty';
     if (briefMode === 'sparse') return 'sparse';
     return null;
+  }
+
+  // The entropy itself, and the ONLY place in the seed path that is allowed to
+  // be random. Everything downstream — every axis assignment, the design bias's
+  // keyword-miss draw — is a pure function of this string, which is what makes
+  // "same seed ⇒ same book identity" a checkable claim rather than a hope.
+  // Hex, fixed width, so the recorded value is comparable by eye across runs.
+  function drawSeedValue() {
+    if (typeof crypto !== 'undefined' && crypto && typeof crypto.getRandomValues === 'function') {
+      return Array.prototype.map.call(
+        crypto.getRandomValues(new Uint32Array(4)),
+        function (n) { return ('00000000' + n.toString(16)).slice(-8); }
+      ).join('');
+    }
+    // No Web Crypto (old sandboxes, some test contexts). Still entropy, still
+    // drawn once; the determinism guarantee is about what happens AFTER.
+    var out = '';
+    for (var i = 0; i < 4; i++) {
+      out += ('00000000' + Math.floor(Math.random() * 4294967296).toString(16)).slice(-8);
+    }
+    return out;
   }
 
   // The draw is SIZED to the reason (Wave 2). An empty direction field gets
@@ -279,21 +324,30 @@
   // structural instead of rhetorical — the seed no longer CONTAINS a competing
   // premise, so it cannot displace the user's.
   function drawDivergenceSeed(reason) {
-    if (typeof window.randomizeBrief !== 'function') return null;   // story-tables absent — signal simply removed
     var text = '';
-    try {
-      if (reason === 'sparse' && typeof window.randomizeBriefSlice === 'function') {
-        text = String(window.randomizeBriefSlice('texture') || '');
-      }
-      // Empty briefs, and any environment whose story-tables predates the
-      // slice API, fall back to the full draw.
-      if (!text.trim()) text = String(window.randomizeBrief() || '');
-    } catch (_e) { return null; }
-    if (!text.trim()) return null;
+    if (reason && typeof window.randomizeBrief === 'function') {
+      try {
+        if (reason === 'sparse' && typeof window.randomizeBriefSlice === 'function') {
+          text = String(window.randomizeBriefSlice('texture') || '');
+        }
+        // Empty briefs, and any environment whose story-tables predates the
+        // slice API, fall back to the full draw.
+        if (!text.trim()) text = String(window.randomizeBrief() || '');
+      } catch (_e) { text = ''; }
+    }
+    // Story-tables absent, or a brief that funds its own direction: the
+    // MATERIAL is simply removed. The seed itself is not — it still carries the
+    // entropy every identity assignment is drawn from, and `reason: 'identity'`
+    // records honestly that this seed exists to assign, not to direct.
     // `source` names the table set so a future second drawer is distinguishable
     // in the record. No timestamp: this object is persisted in the checkpoint
     // and compared across resumes, and a clock would make it unstable.
-    return { source: 'story-tables', reason: reason, text: text };
+    return {
+      source: 'story-tables',
+      reason: text.trim() ? reason : 'identity',
+      text: text.trim() ? text : '',
+      value: drawSeedValue()
+    };
   }
 
   // The brief CHANNEL, not the instruction channel (§10.3). A drawn seed is the
@@ -301,7 +355,9 @@
   // enters — which is what structurally satisfies D47 rather than promising to.
   function buildBriefChannel(workout, brief, blend, seed) {
     var userChannel = formatUserBrief(brief, buildDefaultBrief(workout, blend));
-    if (!seed) return userChannel;
+    // A seed with no material has nothing to say HERE. Its work is the identity
+    // assignments, which reach the model through their own stage block.
+    if (!seed || !seed.text) return userChannel;
 
     if (seed.reason === 'empty') {
       // Total substitution. buildDefaultBrief's "no direction provided" block
@@ -359,8 +415,11 @@
 
     var seed = options.divergenceSeed || null;
     if (!seed && options.drawSeed !== false) {
-      var reason = seedReasonFor(briefMode);
-      if (reason) seed = drawDivergenceSeed(reason);
+      // Unconditional as of the fourth-referee wave. The arming condition that
+      // used to sit here (`if (reason)`) is what made an explicit brief's book
+      // undiced; `seedReasonFor` survives as the sizing of the MATERIAL, which
+      // is the thing that legitimately depends on how much the user wrote.
+      seed = drawDivergenceSeed(seedReasonFor(briefMode));
     }
 
     // A drawn seed for an EMPTY brief upgrades fidelity to literal. Leaving it
@@ -382,7 +441,12 @@
       'Use these as your starting point for meta.artifactIntent. You may refine them',
       'based on your interpretation, but do not ignore them.'
     ];
-    if (seed) {
+    // Gated on the MATERIAL, not on the seed. Every book now has a seed, and
+    // this block is a note about the brief channel — telling a model with an
+    // explicit brief that "the channel below carries seeded material" when it
+    // carries none is a false sentence, and it would put every paste-path
+    // prompt over a ceiling it currently clears with 318 characters.
+    if (seed && seed.text) {
       contextLines.push(
         '- divergenceSeed: drawn (reason: ' + seed.reason + '). The creative direction channel',
         '  below carries seeded material. Record briefMode as classified above — it describes',
@@ -409,11 +473,10 @@
   // Draw-once-per-run seam. A prompt builder runs once per ATTEMPT, so a
   // builder that draws its own seed hands every retry a different world. The
   // run orchestrator calls this exactly once, then passes the result into every
-  // builder as options.divergenceSeed. Returns null when the brief does not
-  // qualify — which is most runs.
+  // builder as options.divergenceSeed. It now returns a seed on EVERY run —
+  // the null return was the arming condition, and §11 removed it.
   window.resolveDivergenceSeed = function (brief) {
-    var reason = seedReasonFor(classifyBrief(brief).briefMode);
-    return reason ? drawDivergenceSeed(reason) : null;
+    return drawDivergenceSeed(seedReasonFor(classifyBrief(brief).briefMode));
   };
 
   // ── Artifact intent contract formatter (Layer 3 planning) ──────────────

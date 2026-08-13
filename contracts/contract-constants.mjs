@@ -1464,6 +1464,281 @@ export var VALID_WORD_SEARCH_DIRECTIONS = ['E', 'S', 'SE', 'NE', 'W', 'N', 'SW',
 //   word        one entry from the list, named by 1-based index
 export var VALID_WORD_GRID_ANSWER_MODES = ['leftovers', 'word'];
 
+// ── The two-source law: seed-assigned identity (VISION §11, D146) ───────────
+//
+// "Every identity choice — shell, board, dialect, palette axis, ecology, pull,
+// every menu the compiler answers — has exactly two legitimate sources:
+// BRIEF-FUNDED (the brief's own words earn it, and the harness checks the
+// citation) or SEED-ASSIGNED (the system draws it deterministically from the
+// run seed across the full menu and hands it to the model as a given —
+// transcribed-never-improved, applied to identity, with a floor verifying
+// obedience). A choice that is neither is a DEFAULT, and defaults are
+// findings." — VISION §11, ratified 2026-08-13.
+//
+// D144 measured what a menu the prompts never show actually produces: eight
+// shell families, zero occurrences in a 77,061-character prompt, one inevitable
+// answer. W-1 gave the shell a menu. This is the other half — showing a menu
+// removes the excuse for a default, but nothing yet removed the DEFAULT ITSELF.
+// A model handed eight equally-described shells and no reason to prefer one
+// still answers with whatever its weights like, book after book, and the
+// harness cannot tell that answer apart from a considered choice.
+//
+// So the die goes first. Every axis below is pre-drawn from the run seed across
+// its FULL menu before the model ever sees the stage, and the model is told:
+// derive it from the brief with a citation, or transcribe the assignment. The
+// brief outranks the die wherever it actually funds a choice; the die outranks
+// habit everywhere else. There is no third source.
+//
+// WHY THE TABLE IS DERIVED AND NOT WRITTEN OUT. Every `menu` below is an enum
+// declared above in this file. A hand-kept axis list is the D124 defect with a
+// new name: the menu the die draws from would drift from the menu the schema
+// accepts, and the drift direction is always the same — the die keeps offering
+// a value the schema stopped taking, or stops offering one it started taking,
+// and either way the obedience floor demands something impossible. `menu` holds
+// the ARRAY REFERENCE, so an enum that gains a value gains it here in the same
+// edit, with no second list to remember.
+
+// The pull that brings a lifter back to the book on a rest day. Promoted to a
+// constant by this wave because it is an identity axis and the die must draw
+// from the same four values the three prompt surfaces offer — it was written
+// out by hand in all three (the field list, the structured literal, and the
+// compiler's Step 9) and held together by nothing. `homePullMenuParity()` in
+// validate.mjs now diffs all three against this array, both directions.
+export var VALID_HOME_PULLS = ['story', 'game', 'investigation', 'mixed'];
+
+// Every axis: where the delivered value lives, what menu it is drawn from, and
+// where a BRIEF-FUNDED choice would have written its citation.
+//
+//   id            stable identifier; the draw hashes it, so renaming an id
+//                 re-rolls that axis for every seed. Treat as a wire format.
+//   label         what the GIVEN calls it in the prompt.
+//   path          dot path to the delivered value, rooted at the booklet.
+//   menu          the full menu. THE ARRAY REFERENCE, never a copy.
+//   kind          'scalar' — the delivered value IS the choice.
+//                 'member' — the delivered value is a LIST and the assignment
+//                            must appear in it (ecology dominants, harvest
+//                            adoption: assigning one entry never forbids the
+//                            others, which is what keeps a two-document ecology
+//                            or a three-pattern harvest legal).
+//                 'dominant' — the delivered value is spread across the weeks
+//                            and the book's answer is the modal one (geometry:
+//                            "ONE geometry per book" is prompt law, and the
+//                            weeks are where it is written down).
+//   evidencePath  the surface a brief-funded choice cites FROM. Two surfaces,
+//                 because the compiler already owes two: `selectionReason` for
+//                 the artifact's identity and `designEvidence` for the design
+//                 language (D139's derivation law). An axis whose evidence
+//                 surface is empty cannot be brief-funded, by construction.
+//   stage         the gate that can SEE this axis delivered. The obedience
+//                 floor is scoped by it, because a floor asked about a field
+//                 its stage does not author fires on absence forever.
+//   familyDecides true only for the geometry. See the exemption note below.
+export var IDENTITY_AXES = [
+  { id: 'shellFamily', label: 'shellFamily', path: 'meta.artifactIdentity.shellFamily',
+    menu: VALID_SHELL_FAMILIES, kind: 'scalar',
+    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+  { id: 'boardStateMode', label: 'boardStateMode', path: 'meta.artifactIdentity.boardStateMode',
+    menu: VALID_BOARD_STATE_MODES, kind: 'scalar',
+    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+  { id: 'componentDialect', label: 'componentDialect', path: 'meta.artifactIdentity.componentDialect',
+    menu: VALID_COMPONENT_DIALECTS, kind: 'scalar',
+    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+  { id: 'visualArchetype', label: 'theme.visualArchetype', path: 'theme.visualArchetype',
+    menu: VALID_ARCHETYPES, kind: 'scalar',
+    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+  { id: 'arcFamily', label: 'arcFamily', path: 'meta.artifactIntent.arcFamily',
+    menu: VALID_ARC_FAMILIES, kind: 'scalar',
+    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+  { id: 'mechanicGrammarFamily', label: 'mechanicGrammarFamily', path: 'meta.artifactIntent.mechanicGrammarFamily',
+    menu: VALID_MECHANIC_GRAMMAR_FAMILIES, kind: 'scalar',
+    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+  { id: 'homePull', label: 'homePull', path: 'meta.artifactIntent.homePull',
+    menu: VALID_HOME_PULLS, kind: 'scalar',
+    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+  { id: 'documentEcologyDominant', label: 'documentEcology.dominant',
+    path: 'meta.artifactIntent.documentEcology.dominant',
+    menu: DOCUMENT_TYPE_ENUM, kind: 'member',
+    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+  { id: 'harvestPatterns', label: 'playSpine.harvestPatterns', path: 'meta.playSpine.harvestPatterns',
+    menu: VALID_HARVEST_PATTERNS, kind: 'member',
+    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'shell' },
+  { id: 'productionTexture', label: 'designLanguage.productionTexture', path: 'meta.designLanguage.productionTexture',
+    menu: VALID_PRODUCTION_TEXTURES, kind: 'scalar',
+    evidencePath: 'meta.designLanguage.designEvidence', stage: 'shell' },
+  { id: 'toneTexture', label: 'designLanguage.toneTexture', path: 'meta.designLanguage.toneTexture',
+    menu: TONE_TEXTURE_LADDER, kind: 'scalar',
+    evidencePath: 'meta.designLanguage.designEvidence', stage: 'shell' },
+  { id: 'typeVoice', label: 'designLanguage.typeVoice', path: 'meta.designLanguage.typeVoice',
+    menu: VALID_TYPE_VOICES, kind: 'scalar',
+    evidencePath: 'meta.designLanguage.designEvidence', stage: 'shell' },
+  { id: 'marginSemantics', label: 'designLanguage.marginSemantics', path: 'meta.designLanguage.marginSemantics',
+    menu: VALID_MARGIN_SEMANTICS, kind: 'scalar',
+    evidencePath: 'meta.designLanguage.designEvidence', stage: 'shell' },
+  { id: 'inkDiscipline', label: 'designLanguage.inkDiscipline', path: 'meta.designLanguage.inkDiscipline',
+    menu: VALID_INK_DISCIPLINES, kind: 'scalar',
+    evidencePath: 'meta.designLanguage.designEvidence', stage: 'shell' },
+  { id: 'sealTreatment', label: 'designLanguage.sealTreatment', path: 'meta.designLanguage.sealTreatment',
+    menu: VALID_SEAL_TREATMENTS, kind: 'scalar',
+    evidencePath: 'meta.designLanguage.designEvidence', stage: 'shell' },
+  // THE GEOMETRY, AND ITS ONE EXEMPTION. D144 W-2 landed the rule that governs
+  // this axis — "the DESIGN BIAS proposes geometries; the mechanic grammar
+  // family DECIDES" — and that rule is not a third source: the family is itself
+  // an axis on this table, so a geometry the family forces is funded by
+  // whatever funded the family. What it is NOT is a licence to ignore the die:
+  // the exemption applies only when the declared family's own Serves row
+  // refuses the assignment, and `familyRefusesGeometry()` below is the single
+  // predicate both the floor and the referee ask. Delivered at the WEEKS, three
+  // stages after the assignment is handed, which is why its stage is 'week'.
+  { id: 'mapGeometry', label: 'the board geometry (mapState.mapType)', path: 'weeks[].mapState.mapType',
+    menu: VALID_MAP_TYPES, kind: 'dominant',
+    evidencePath: 'meta.artifactIntent.selectionReason', stage: 'week', familyDecides: true }
+];
+
+// The stages that own at least one axis. Derived so a new axis with a new stage
+// cannot be handed to a model and then checked by nobody.
+export var IDENTITY_AXIS_STAGES = IDENTITY_AXES.reduce(function (acc, axis) {
+  if (acc.indexOf(axis.stage) === -1) acc.push(axis.stage);
+  return acc;
+}, []);
+
+/**
+ * identityAxesForStage(stage) -> axis[]
+ *
+ * SINGLE HOME (D93). The prompt asks for the axes it must show, the floor asks
+ * for the axes it may check, and the two must be the same list or the system
+ * demands a value it never handed over.
+ */
+export function identityAxesForStage(stage) {
+  var key = String(stage || '').trim();
+  return IDENTITY_AXES.filter(function (axis) { return axis.stage === key; });
+}
+
+// FNV-1a, 32-bit. The draw's whole entropy path, and it is deliberately the
+// dullest hash available: the requirement is that two draws from one seed are
+// BYTE-IDENTICAL in every runtime this repo runs in — a browser, a Node
+// harness, and a vm sandbox — not that it is hard to invert. Nothing here reads
+// a clock or a global; `drawSeedAssignments` is a pure function of its argument
+// and the table above, which is what makes a book reproducible from the seed
+// recorded on it (`_x.divergenceSeed`).
+function seedHash(text) {
+  var hash = 2166136261;
+  var str = String(text == null ? '' : text);
+  for (var i = 0; i < str.length; i += 1) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * drawSeedAssignments(seedValue) -> { axisId: assignedValue } | null
+ *
+ * THE DRAW. One value per axis, from the axis's full menu, keyed on the seed
+ * value and the axis id together so that two axes sharing a menu length do not
+ * share an answer. Returns null for an absent seed value, because "no seed
+ * context" has to be distinguishable from "assignments that happen to match the
+ * defaults" — the floor is silent on the first and blocking on the second.
+ *
+ * SINGLE HOME (D93). Consumers: api-generator.js (both pipelines, once per
+ * run), validation.js (the obedience floor), quality.js (the fourth referee),
+ * and the two harnesses. A consumer that re-implemented the draw would answer
+ * "what did the die say?" a second time in its own dialect, and the floor and
+ * the prompt would quietly stop agreeing about the same book.
+ */
+export function drawSeedAssignments(seedValue) {
+  var value = String(seedValue == null ? '' : seedValue).trim();
+  if (!value) return null;
+  var out = {};
+  for (var i = 0; i < IDENTITY_AXES.length; i++) {
+    var axis = IDENTITY_AXES[i];
+    if (!axis.menu || !axis.menu.length) continue;
+    out[axis.id] = axis.menu[seedHash(value + ' ' + axis.id) % axis.menu.length];
+  }
+  return out;
+}
+
+/**
+ * readAxisValue(booklet, axis) -> string | string[] | undefined
+ *
+ * The delivered value, by axis kind. `undefined` means the axis was not
+ * delivered on this object at all — which every caller must treat as "not my
+ * question" rather than as a miss, because a shell stage carries no weeks and a
+ * week carries no shell.
+ */
+export function readAxisValue(booklet, axis) {
+  if (!booklet || typeof booklet !== 'object' || !axis) return undefined;
+  if (axis.kind === 'dominant') {
+    var weeks = Array.isArray(booklet.weeks) ? booklet.weeks : [];
+    var tally = {};
+    var best;
+    var bestCount = 0;
+    for (var w = 0; w < weeks.length; w++) {
+      var declared = weeks[w] && weeks[w].mapState && weeks[w].mapState.mapType;
+      var type = String(declared || '').trim();
+      if (!type) continue;
+      tally[type] = (tally[type] || 0) + 1;
+      if (tally[type] > bestCount) { bestCount = tally[type]; best = type; }
+    }
+    return best;
+  }
+  var parts = String(axis.path || '').split('.');
+  var node = booklet;
+  for (var i = 0; i < parts.length; i++) {
+    if (!node || typeof node !== 'object') return undefined;
+    node = node[parts[i]];
+  }
+  if (node === undefined || node === null) return undefined;
+  if (axis.kind === 'member') return Array.isArray(node) ? node : undefined;
+  var scalar = String(node).trim();
+  return scalar ? scalar : undefined;
+}
+
+// The geometry table's `Serves` column, promoted to a constant so the exemption
+// predicate below reads the SAME relation the model was shown. This is D144
+// W-2's table — the one whose hex and maze rows named a cluster instead of
+// families and made hex structurally unreachable for survey-grid books — and
+// the whole reason it now has a home here is that the exemption has to be
+// answerable from the doctrine, not from a second relation that resembles it.
+//
+// KEYS ≡ VALID_MAP_TYPES; every value ∈ VALID_MECHANIC_GRAMMAR_FAMILIES; the
+// variant rows in the prompt (`grid` + hex, `point-to-point` + relational) fold
+// into their TYPE, because a variant is the same geometry drawn differently.
+// `geometryServesParity()` in validate.mjs diffs each row against the prompt's
+// own Serves column, both directions.
+//
+// `player-drawn` serves EVERY family on purpose — the prompt row reads "any
+// family whose world is unmapped", so the empty-refusal answer below is that
+// row, not a gap.
+export var GEOMETRY_SERVES_FAMILIES = {
+  'grid': ['survey-grid', 'ledger-board', 'stewardship', 'route-tracker', 'attrition'],
+  'point-to-point': ['node-graph', 'heat', 'stewardship', 'loyalty-web', 'testimony-matrix'],
+  'linear-track': ['route-tracker', 'timeline-reconstruction'],
+  'concentric': ['siege', 'observance', 'heat'],
+  'maze': ['evasion', 'attrition', 'node-graph'],
+  'player-drawn': VALID_MECHANIC_GRAMMAR_FAMILIES
+};
+
+/**
+ * familyRefusesGeometry(family, geometry) -> boolean
+ *
+ * D144 W-2's rule, made answerable. TRUE when the declared mechanic grammar
+ * family is not named in the assigned geometry's Serves row — the one case
+ * where a geometry may legitimately differ from its assignment with no brief
+ * citation, because the family already decided and the prompt says so in the
+ * imperative ("the family wins and `selectionReason` names the verb").
+ *
+ * An unknown family or an unknown geometry is a REMOVED SIGNAL, never a
+ * refusal: returning true there would hand every book with a mistyped family a
+ * free pass out of the floor.
+ */
+export function familyRefusesGeometry(family, geometry) {
+  var key = String(family || '').trim().toLowerCase();
+  if (VALID_MECHANIC_GRAMMAR_FAMILIES.indexOf(key) === -1) return false;
+  var serves = GEOMETRY_SERVES_FAMILIES[String(geometry || '').trim()];
+  if (!serves || !serves.length) return false;
+  return serves.indexOf(key) === -1;
+}
+
 // ── Branch refs: `door:W3/A` ────────────────────────────────────────────────
 // An economy edge may declare WHICH SIDE of a fork carries it. Before this,
 // `doorChoice` carried optionA/optionB with a label and a lean and nothing

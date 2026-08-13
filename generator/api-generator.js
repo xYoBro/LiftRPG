@@ -2795,6 +2795,18 @@ async function runApiPipeline(options) {
     return (repairPending && repairPending.to === stageKey) ? repairPending.directive : '';
   }
 
+  // ── The run seed, resolved before the first stage (the fourth-referee wave) ─
+  // It used to be resolved two stages in, immediately above the shell call,
+  // which was fine while its only consumer was the shell prompt. It has two
+  // more now: the identity assignments every compiler stage is handed, and the
+  // design bias — which is derived inside EVERY builder, including the two that
+  // run before the shell. A seed resolved late would leave those two builders
+  // drawing from a different source than the rest of the run, which is the
+  // within-run incoherence the draw-once seam exists to prevent (D101).
+  var divergenceSeed = resolveRepairAwareSeed(repairSeedCarry,
+    (checkpoint && checkpoint.stages && checkpoint.stages.shell) || null, brief);
+  adoptRunSeedSalt(divergenceSeed);
+
   if (resumed > 0) {
     var resumeLine = describeResume(resumeState);
     console.log('[LiftRPG] ' + resumeLine);
@@ -2974,10 +2986,9 @@ async function runApiPipeline(options) {
   // than none — it would block plans the week gate would have accepted.
   var plannedWeekShapes = derivePlannedWeekShapes(workout, campaignPlan, weekCount);
 
-  // The divergence seed for this run. Resolved from the cached compiler stage
-  // when resuming; drawn exactly once otherwise. See resolveRunSeed.
-  var divergenceSeed = resolveRepairAwareSeed(repairSeedCarry,
-    (checkpoint && checkpoint.stages && checkpoint.stages.shell) || null, brief);
+  // The divergence seed for this run was resolved at the top of the pipeline
+  // (see the block above repairDirectiveFor) — from the cached compiler stage
+  // when resuming, drawn exactly once otherwise. See resolveRunSeed.
 
   var shell;
   if (checkpoint && checkpoint.stages && checkpoint.stages.shell) {
@@ -3606,6 +3617,34 @@ function resolveRepairAwareSeed(carry, cachedCompilerStage, brief) {
   return resolveRunSeed(cachedCompilerStage, brief);
 }
 
+/**
+ * adoptRunSeedSalt(seed) -> void
+ *
+ * THE DESIGN BIAS STOPS BEING AN ANONYMOUS HASH (D144's flagged relay, closed
+ * by the fourth-referee wave). `deriveDesignBlend` scores the brief against the
+ * profile keywords and, when nothing hits — which D144 measured happening on
+ * real briefs — falls through to `DESIGN_PROFILES[hash % length]`, where the
+ * hash mixes in a per-run salt drawn from `crypto.getRandomValues`. Same draw,
+ * but from entropy nobody recorded: the book could not be reproduced, and the
+ * bias could not be classified as anything at all.
+ *
+ * The repair is one line of plumbing, not a new mechanism: the run's variant
+ * salt BECOMES the run seed's value, so the keyword-miss draw is a pure
+ * function of a string that rides `_x.divergenceSeed` on the finished booklet.
+ * Reproducible from the record, which is what "declared" has to mean for a
+ * deterministic draw.
+ *
+ * Called once per pipeline run, before the first builder, because every builder
+ * derives its own blend and they must all agree within a run.
+ */
+function adoptRunSeedSalt(seed) {
+  var value = seed && seed.value;
+  if (!value) return;
+  if (typeof window.beginLiftRpgPromptRun === 'function') {
+    window.beginLiftRpgPromptRun(value);
+  }
+}
+
 function resolveRunSeed(cachedCompilerStage, brief) {
   if (cachedCompilerStage) {
     // Resuming. Whatever the paid-for stage was written against is the truth —
@@ -4063,6 +4102,12 @@ async function runSkeletonFleshPipeline(options) {
     return (sfRepairPending && sfRepairPending.to === stageKey) ? sfRepairPending.directive : '';
   }
 
+  // The run seed, resolved before the first stage — same move and same reason
+  // as the standard pipeline above. The S+F seat's compiler is the SKELETON,
+  // so that is the cached stage the seed rides.
+  var divergenceSeed = resolveRepairAwareSeed(sfRepairSeedCarry, cached('skeleton'), brief);
+  adoptRunSeedSalt(divergenceSeed);
+
   if (isResume) {
     var sfResumeLine = describeResume(sfResumeState);
     console.log('[S+F] ' + sfResumeLine);
@@ -4115,8 +4160,8 @@ async function runSkeletonFleshPipeline(options) {
   // ════════════════════════════════════════════════════════════════════
 
   // Same lifecycle as the shell stage — see resolveRunSeed. The skeleton is
-  // this pipeline's compiler stage, so it is the seed's carrier here.
-  var divergenceSeed = resolveRepairAwareSeed(sfRepairSeedCarry, cached('skeleton'), brief);
+  // this pipeline's compiler stage, so it is the seed's carrier here; the seed
+  // itself was resolved at the top of the run (see sfRepairDirectiveFor).
 
   var skeleton;
   if (cached('skeleton')) {
