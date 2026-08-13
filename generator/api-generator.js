@@ -2736,9 +2736,19 @@ async function runApiPipeline(options) {
   // spend a whole replay to arrive back at the identical defect.
   var repairState = options._repairState || null;
   var repairPending = (repairState && repairState.pending) || null;
+  // THE SEED SURVIVES THE REPAIR. Dropping the compiler stage would otherwise
+  // send resolveRunSeed down its fresh-draw branch, and the re-entered stage
+  // would build a DIFFERENT WORLD from the layerBible and campaignPlan still
+  // banked beside it — D101's law exactly ("a builder that draws its own hands
+  // every retry a different world"), and silent. `undefined` means no prune
+  // happened; `null` is a real answer carried forward, because a stage written
+  // with no seed must be repaired with no seed.
+  var repairSeedCarry;
   if (options._repairPrune && checkpoint && checkpoint.stages) {
     options._repairPrune.forEach(function (key) {
       if (checkpoint.stages[key] !== undefined) {
+        var dropped = checkpoint.stages[key];
+        repairSeedCarry = repairSeedFromStage(dropped);
         delete checkpoint.stages[key];
         resumed = Math.max(0, resumed - 1);
       }
@@ -2929,7 +2939,7 @@ async function runApiPipeline(options) {
 
   // The divergence seed for this run. Resolved from the cached compiler stage
   // when resuming; drawn exactly once otherwise. See resolveRunSeed.
-  var divergenceSeed = resolveRunSeed(
+  var divergenceSeed = resolveRepairAwareSeed(repairSeedCarry,
     (checkpoint && checkpoint.stages && checkpoint.stages.shell) || null, brief);
 
   var shell;
@@ -3532,6 +3542,30 @@ async function runApiPipeline(options) {
 //     re-draw would write the back half of a book against a world the front
 //     half never saw.
 
+/**
+ * repairSeedFromStage(stage) -> seed | null
+ * resolveRepairAwareSeed(carry, cachedCompilerStage, brief) -> seed | null
+ *
+ * THE SEED SURVIVES THE REPAIR (D143). A cross-stage repair drops the compiler
+ * stage from the bank, which would otherwise send resolveRunSeed down its
+ * fresh-draw branch — and the re-entered stage would then build a DIFFERENT
+ * WORLD from the layerBible and campaignPlan still banked beside it. That is
+ * D101's law verbatim ("a builder that draws its own hands every retry a
+ * different world"), and nothing would throw.
+ *
+ * `undefined` carry means no repair pruned anything; `null` is a real answer
+ * carried forward, because a stage written with no seed must be repaired with
+ * no seed — the same distinction resolveRunSeed already makes for a resume.
+ */
+function repairSeedFromStage(stage) {
+  return (stage && stage._x && stage._x.divergenceSeed) || null;
+}
+
+function resolveRepairAwareSeed(carry, cachedCompilerStage, brief) {
+  if (carry !== undefined) return carry;
+  return resolveRunSeed(cachedCompilerStage, brief);
+}
+
 function resolveRunSeed(cachedCompilerStage, brief) {
   if (cachedCompilerStage) {
     // Resuming. Whatever the paid-for stage was written against is the truth —
@@ -3972,9 +4006,16 @@ async function runSkeletonFleshPipeline(options) {
   // made the floors' stage label a parameter rather than a constant.
   var sfRepairState = options._repairState || null;
   var sfRepairPending = (sfRepairState && sfRepairState.pending) || null;
+  var sfRepairSeedCarry;
   if (options._repairPrune && checkpoint && checkpoint.stages) {
     options._repairPrune.forEach(function (key) {
-      if (checkpoint.stages[key] !== undefined) delete checkpoint.stages[key];
+      if (checkpoint.stages[key] !== undefined) {
+        var droppedSF = checkpoint.stages[key];
+        // Same rule, same reason (D101): the repair rebuilds the world it was
+        // repairing, never a new one.
+        sfRepairSeedCarry = repairSeedFromStage(droppedSF);
+        delete checkpoint.stages[key];
+      }
     });
     isResume = Object.keys(checkpoint.stages).length > 0;
   }
@@ -4035,7 +4076,7 @@ async function runSkeletonFleshPipeline(options) {
 
   // Same lifecycle as the shell stage — see resolveRunSeed. The skeleton is
   // this pipeline's compiler stage, so it is the seed's carrier here.
-  var divergenceSeed = resolveRunSeed(cached('skeleton'), brief);
+  var divergenceSeed = resolveRepairAwareSeed(sfRepairSeedCarry, cached('skeleton'), brief);
 
   var skeleton;
   if (cached('skeleton')) {
@@ -5122,6 +5163,8 @@ window.LiftRPGAPI = {
     repairStageNames: REPAIR_STAGE_NAMES,
     maxRepairHops: MAX_REPAIR_HOPS,
     sweepStaleBankedWeeks: sweepStaleBankedWeeks,
+    repairSeedFromStage: repairSeedFromStage,
+    resolveRepairAwareSeed: resolveRepairAwareSeed,
     derivePlannedWeekShapes: derivePlannedWeekShapes,
     collectVoiceTicFindings: collectVoiceTicFindings,
     collectLicensedMovePlacementFindings: collectLicensedMovePlacementFindings,
