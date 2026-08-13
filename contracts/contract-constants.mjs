@@ -263,6 +263,24 @@ export var GENERATION_CIPHER_TECHNIQUES = [
 // existing formula already produced there.
 export var CIPHER_VARIETY_MIN = 3;
 
+// ── How long a generated book may be ────────────────────────────────────────
+//
+// `parseWeekCount()` in generator.js has clamped to these two numbers since it
+// was written; they lived only there, as literals inside a Math.max/Math.min
+// pair. Hoisted for two reasons, both W7:
+//
+//   1. `weekCountLiteralScan()` in validate.mjs needs a THRESHOLD it can
+//      defend. A prompt line that says "two weeks" is a subset quantifier and
+//      stays true at every legal length; a line that says "six weeks" is a
+//      claim about the whole book, and the whole book is not a constant. `min`
+//      is exactly the line between those two readings — no number below it can
+//      be describing the book's length, because no book is that short.
+//   2. A second copy of the clamp would drift, and the clamp is what decides
+//      whether a 16-week canonical program is planned at 16 or silently at 12.
+//
+// PARITY: validate.mjs asserts generator.js's clamp still quotes these values.
+export var BOOK_WEEK_BOUNDS = { min: 4, max: 12 };
+
 // percentile-stat value bounds — a d100 roll-under target must leave room to
 // fail (1-99) and the printed track holds at most one value per week.
 export var PERCENTILE_STAT = {
