@@ -198,6 +198,39 @@ function truthTellerShim(grid) {
   };
 }
 
+/**
+ * The sequence board, expressed as a logic grid — and here the shim is not even
+ * a metaphor. Items against slots IS a bijection, so this is a logic grid in
+ * every way except its CLUE LANGUAGE, which is ordinal and lives in its own
+ * solver. The printed object is identical: rows of items, one column per slot,
+ * the clues numbered underneath.
+ *
+ * `axisLabel` is what the band over the slot columns says — ORDER OF CALL,
+ * WATCH, SHIFT. Absent, the band prints an empty heading rather than a word the
+ * engine chose.
+ */
+function sequenceShim(grid) {
+  return {
+    subjects: asArray(grid.items),
+    categories: [{
+      name: String(grid.axisLabel || ''),
+      values: asArray(grid.slots).map(String),
+    }],
+    clues: asArray(grid.orderClues).map((clue) => ({ text: String((clue || {}).text || '') })),
+  };
+}
+
+/**
+ * The one place a kind is turned into the logic grid's shape. Both callers —
+ * estimate() and render() — go through it, so they cannot disagree about what
+ * is drawn, which is the divergence this atom cannot survive.
+ */
+function matrixShapeFor(grid) {
+  if (grid.kind === 'truth-tellers') return truthTellerShim(grid);
+  if (grid.kind === 'sequence') return sequenceShim(grid);
+  return grid;
+}
+
 // ---------------------------------------------------------------------------
 // Geometry
 // ---------------------------------------------------------------------------
@@ -325,9 +358,9 @@ function gridHeightAt(grid, tier, metrics) {
   } else if (FILLED_GRID_KINDS[grid.kind]) {
     height += filledGridHeight(grid, tier);
   } else {
-    // The logic grid, and the truth-teller board through its shim — one code
-    // path on purpose, so the two cannot drift apart in the estimate.
-    const shaped = grid.kind === 'truth-tellers' ? truthTellerShim(grid) : grid;
+    // The logic grid, and the two boards that borrow its shape — one code path
+    // on purpose, so none of the three can drift apart in the estimate.
+    const shaped = matrixShapeFor(grid);
     height += logicMatrixHeight(shaped, tier, metrics);
     const clues = cluesHeight(shaped, tier, metrics);
     if (clues) height += tier.blockGapPx + clues;
@@ -581,7 +614,7 @@ registerAtom('constrained-grid', {
     } else if (FILLED_GRID_KINDS[grid.kind]) {
       el.appendChild(renderFilledGrid(grid));
     } else {
-      const shaped = grid.kind === 'truth-tellers' ? truthTellerShim(grid) : grid;
+      const shaped = matrixShapeFor(grid);
       el.appendChild(renderLogicMatrix(shaped));
       const clues = asArray(shaped.clues);
       if (clues.length) {

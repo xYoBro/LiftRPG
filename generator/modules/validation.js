@@ -1096,6 +1096,29 @@ function collectPuzzleFloorErrors(weekObj) {
           + GX.maxCageCells + ' cells — the solver enumerates every filling of every cage, which '
           + 'grows as the board size to the power of the cage\'s cell count.');
       }
+    } else if (grid.kind === 'sequence') {
+      var GQ = SPATIAL_GUARDRAILS.sequence;
+      var things = Array.isArray(grid.items) ? grid.items.length : 0;
+      var orderClues = Array.isArray(grid.orderClues) ? grid.orderClues.length : 0;
+      if (things < GQ.minItems || things > GQ.maxItems) {
+        errors.push('fieldOps.constrainedGrid: a generated sequence must order between '
+          + GQ.minItems + ' and ' + GQ.maxItems + ' items, and this one orders ' + things + '.');
+      }
+      if (orderClues < GQ.minClues || orderClues > GQ.maxClues) {
+        errors.push('fieldOps.constrainedGrid: a generated sequence must carry between '
+          + GQ.minClues + ' and ' + GQ.maxClues + ' clues, and this one carries ' + orderClues + '.');
+      }
+      var wideLabels = [];
+      (Array.isArray(grid.items) ? grid.items : []).concat(
+        Array.isArray(grid.slots) ? grid.slots : []
+      ).forEach(function (v) {
+        if (String(v).length > GQ.labelMaxChars) wideLabels.push(String(v));
+      });
+      if (wideLabels.length) {
+        errors.push('fieldOps.constrainedGrid: item or slot label(s) longer than ' + GQ.labelMaxChars
+          + ' characters (' + wideLabels.slice(0, 3).join(', ') + ') — the board prints slots in a '
+          + 'column one cell wide, so they wrap it off the page.');
+      }
     } else if (grid.kind === 'truth-tellers') {
       var GT = SPATIAL_GUARDRAILS.truthTellers;
       var voices = Array.isArray(grid.speakers) ? grid.speakers.length : 0;

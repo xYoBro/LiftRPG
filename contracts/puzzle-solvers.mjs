@@ -2531,6 +2531,305 @@ export function solveTruthTellers(puzzle) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// SEQUENCE — routes and schedules  (the arsenal wave)
+// ════════════════════════════════════════════════════════════════════════════
+// Shape:
+//   items      : string[]   3..6 things to be ordered
+//   slots      : string[]   the ordered positions, same count as items — stops
+//                           on a route, days in a week, shifts, berths
+//   axisLabel  : string     optional band heading over the slot columns
+//   orderClues : [{ text, constraint }]   — NOT `clues`, which the logic grid
+//                           owns with a different constraint vocabulary; one
+//                           field accepting both would weaken that grid's own
+//                           validation to the union of two languages
+//   answer     : string
+//   answerFrom : { mode: 'slot', slot } | { mode: 'initials' }
+//
+// WHY THIS IS NOT A LOGIC GRID, and the answer is the exact mirror of the
+// truth-teller one. There the BOARD matched and the mathematics did not; here
+// the mathematics matches perfectly — items against slots IS a bijection, and
+// the logic grid's permutation solver would happily prove it — and what does
+// not match is the CONSTRAINT LANGUAGE. "The ledger was collected before the
+// warehouse" is an ORDINAL fact, and the logic grid's four forms (is / not /
+// same / differs) cannot express one. A grid whose clues can only say "Tuesday
+// is not the mill" is not a schedule puzzle; it is a matching puzzle whose
+// values happen to be sorted.
+//
+// So: the same board, the same permutation search, and six ordinal forms. The
+// board being shared is why this kind costs almost no rendering — see the
+// atom's shim.
+//
+// WHY IT IS NOT A MAP OVERLAY, which the wave scouted first. Routes look
+// spatial, and the corridor maze already draws labelled nodes. Two findings
+// against it: the maze's passages carry no cost or ordering dimension in the
+// schema at all, and a standing prompt ruling says a discovered dead end "never
+// costs the player anything" — so a route puzzle with stakes on the board would
+// need that ruling overturned, which is an author's call and not an
+// implementation. A schedule and a route are the same object anyway: a set of
+// things in an order, constrained. The grid says that without needing a map.
+
+export var SEQUENCE_CONSTRAINT_TYPES = ['at', 'not-at', 'before', 'after', 'adjacent', 'gap'];
+
+function sequenceShapeErrors(puzzle) {
+  var errors = [];
+  var who = label(puzzle);
+  var items = asArray(puzzle.items).map(String);
+  var slots = asArray(puzzle.slots).map(String);
+
+  if (items.length < 3) {
+    errors.push(who + ': a sequence needs at least 3 items, found ' + items.length
+      + ' — two things in an order is a single fact, not a deduction.');
+  }
+  if (items.length > 7) {
+    errors.push(who + ': ' + items.length + ' items is past what the printed board holds.');
+  }
+  if (new Set(items).size !== items.length) {
+    errors.push(who + ': two items share a name — clues address items by name, so duplicates are '
+      + 'unresolvable.');
+  }
+  if (slots.length !== items.length) {
+    errors.push(who + ': ' + slots.length + ' slots for ' + items.length + ' items — every item takes '
+      + 'exactly one slot and every slot takes exactly one item, so the counts must be equal.');
+  }
+  if (new Set(slots).size !== slots.length) {
+    errors.push(who + ': two slots share a label — the columns would be indistinguishable on the page.');
+  }
+  if (errors.length) return errors;
+
+  var clues = asArray(puzzle.orderClues);
+  if (!clues.length) {
+    errors.push(who + ': no clues — every ordering is a solution.');
+  }
+  for (var i = 0; i < clues.length; i++) {
+    var clue = clues[i] || {};
+    var k = clue.constraint || {};
+    var at = who + ': clue ' + (i + 1);
+    if (!String(clue.text || '').trim()) {
+      errors.push(at + ' has no printed text — the player reads prose, the solver reads the '
+        + 'constraint, and both must exist.');
+      continue;
+    }
+    if (SEQUENCE_CONSTRAINT_TYPES.indexOf(k.type) === -1) {
+      errors.push(at + ' has constraint type "' + String(k.type) + '", which is not one of '
+        + SEQUENCE_CONSTRAINT_TYPES.join(' | ') + '.');
+      continue;
+    }
+    if (items.indexOf(String(k.item)) === -1) {
+      errors.push(at + ' names item "' + String(k.item) + '", which is not in the item list.');
+      continue;
+    }
+    if (k.type === 'at' || k.type === 'not-at') {
+      if (slots.indexOf(String(k.slot)) === -1) {
+        errors.push(at + ' names slot "' + String(k.slot) + '", which is not in the slot list.');
+      }
+      continue;
+    }
+    if (items.indexOf(String(k.otherItem)) === -1) {
+      errors.push(at + ' names item "' + String(k.otherItem) + '", which is not in the item list.');
+      continue;
+    }
+    if (String(k.item) === String(k.otherItem)) {
+      errors.push(at + ' relates "' + String(k.item) + '" to itself, which constrains nothing.');
+      continue;
+    }
+    if (k.type === 'gap') {
+      var n = Number(k.n);
+      if (!(n >= 1 && n <= items.length - 1 && Math.floor(n) === n)) {
+        errors.push(at + ' asks for a gap of ' + String(k.n) + ' across ' + items.length
+          + ' slots — a gap is a whole number from 1 to ' + (items.length - 1) + '.');
+      }
+    }
+  }
+  return errors;
+}
+
+/** Does this ordering satisfy the constraint? `pos[i]` is item i's slot index. */
+function sequenceHolds(k, pos, items) {
+  var a = pos[items.indexOf(String(k.item))];
+  if (k.type === 'at') return a === Number(k.slotIndex);
+  if (k.type === 'not-at') return a !== Number(k.slotIndex);
+  var b = pos[items.indexOf(String(k.otherItem))];
+  if (k.type === 'before') return a < b;
+  if (k.type === 'after') return a > b;
+  if (k.type === 'adjacent') return Math.abs(a - b) === 1;
+  return Math.abs(a - b) === Number(k.n);
+}
+
+/**
+ * Count orderings, stopping at two. Exhaustive over permutations — 6 items is
+ * 720 and the render ceiling of 7 is 5040, so there is no budget here for the
+ * same reason the truth-teller solver has none.
+ */
+function enumerateSequences(puzzle, compiled) {
+  var items = asArray(puzzle.items).map(String);
+  var n = items.length;
+  var perms = permutations(n);
+  var found = [];
+  for (var p = 0; p < perms.length && found.length < 2; p++) {
+    var ok = true;
+    for (var c = 0; c < compiled.length; c++) {
+      if (!sequenceHolds(compiled[c], perms[p], items)) { ok = false; break; }
+    }
+    if (ok) found.push(perms[p]);
+  }
+  return found;
+}
+
+/**
+ * The difficulty instrument: candidate elimination over item x slot, run to a
+ * fixpoint purely to MEASURE how far pure reasoning gets. It never decides
+ * validity — enumerateSequences owns that — and it is sound but incomplete,
+ * which is exactly what a measurement of "how far can you get by thinking"
+ * should be.
+ */
+function sequenceInferenceDepth(puzzle, compiled) {
+  var items = asArray(puzzle.items).map(String);
+  var n = items.length;
+  var full = (1 << n) - 1;
+  var cand = new Array(n).fill(full);
+  var rounds = 0;
+  var changed = true;
+  while (changed && rounds < 64) {
+    changed = false;
+    rounds++;
+    for (var q = 0; q < compiled.length; q++) {
+      var k = compiled[q];
+      var ai = items.indexOf(String(k.item));
+      var before;
+      var next;
+      if (k.type === 'at') {
+        next = 1 << Number(k.slotIndex);
+      } else if (k.type === 'not-at') {
+        next = cand[ai] & ~(1 << Number(k.slotIndex));
+      } else {
+        var bi = items.indexOf(String(k.otherItem));
+        if (!cand[ai] || !cand[bi]) continue;
+        var maskFor = function (test, other) {
+          var m = 0;
+          for (var s = 0; s < n; s++) {
+            for (var t = 0; t < n; t++) {
+              if (!(other & (1 << t))) continue;
+              if (test(s, t)) { m |= (1 << s); break; }
+            }
+          }
+          return m;
+        };
+        var rel = k.type === 'before' ? function (s, t) { return s < t; }
+          : k.type === 'after' ? function (s, t) { return s > t; }
+            : k.type === 'adjacent' ? function (s, t) { return Math.abs(s - t) === 1; }
+              : function (s, t) { return Math.abs(s - t) === Number(k.n); };
+        var aNext = cand[ai] & maskFor(rel, cand[bi]);
+        var bNext = cand[bi] & maskFor(function (t, s) { return rel(s, t); }, cand[ai]);
+        if (aNext !== cand[ai]) { cand[ai] = aNext; changed = true; }
+        if (bNext !== cand[bi]) { cand[bi] = bNext; changed = true; }
+        continue;
+      }
+      if (next !== cand[ai]) { cand[ai] = next; changed = true; }
+    }
+    // Naked and hidden singles over the one bijection.
+    for (var i = 0; i < n; i++) {
+      var m = cand[i];
+      if (m && (m & (m - 1)) === 0) {
+        for (var j = 0; j < n; j++) {
+          if (j !== i && (cand[j] & m)) { cand[j] &= ~m; changed = true; }
+        }
+      }
+    }
+    for (var s2 = 0; s2 < n; s2++) {
+      var holders = 0;
+      var count = 0;
+      for (var i2 = 0; i2 < n; i2++) {
+        if (cand[i2] & (1 << s2)) { holders = i2; count++; }
+      }
+      if (count === 1 && cand[holders] !== (1 << s2)) { cand[holders] = (1 << s2); changed = true; }
+    }
+  }
+
+  var solvedByInference = true;
+  for (var z = 0; z < n; z++) {
+    if (!cand[z] || (cand[z] & (cand[z] - 1)) !== 0) { solvedByInference = false; break; }
+  }
+  return {
+    score: rounds + (solvedByInference ? 0 : 5),
+    basis: 'ordering-rounds',
+    rounds: rounds,
+    requiresGuess: !solvedByInference
+  };
+}
+
+function sequenceAnswerShapeErrors(puzzle) {
+  var errors = [];
+  var who = label(puzzle);
+  var from = puzzle.answerFrom || {};
+  var slots = asArray(puzzle.slots).map(String);
+  if (from.mode !== 'slot' && from.mode !== 'initials') {
+    errors.push(who + ': answerFrom.mode is "' + String(from.mode) + '" — a sequence reads its answer '
+      + 'as "slot" (the item that ends up in one named slot) or "initials" (the first letters of the '
+      + 'items in slot order).');
+    return errors;
+  }
+  if (from.mode === 'slot' && slots.indexOf(String(from.slot)) === -1) {
+    errors.push(who + ': answerFrom names slot "' + String(from.slot) + '", which is not in the slot list.');
+  }
+  if (!normalizeAnswer(puzzle.answer)) {
+    errors.push(who + ': the answer is empty once normalised.');
+  }
+  return errors;
+}
+
+/** solveSequence(puzzle) -> { ok, errors, solutionCount, solution, difficulty } */
+export function solveSequence(puzzle) {
+  var out = { ok: false, errors: [], solutionCount: 0, solution: null, difficulty: null };
+  var p = puzzle || {};
+  var who = label(p);
+
+  out.errors = sequenceShapeErrors(p).concat(sequenceAnswerShapeErrors(p));
+  if (out.errors.length) return out;
+
+  var items = asArray(p.items).map(String);
+  var slots = asArray(p.slots).map(String);
+  // Resolve slot NAMES to indices once, so the search compares numbers.
+  var compiled = asArray(p.orderClues).map(function (clue) {
+    var k = Object.assign({}, (clue || {}).constraint || {});
+    if (k.type === 'at' || k.type === 'not-at') k.slotIndex = slots.indexOf(String(k.slot));
+    return k;
+  });
+
+  var found = enumerateSequences(p, compiled);
+  out.solutionCount = found.length;
+  if (!found.length) {
+    out.errors.push(who + ': the clues have NO ordering — they contradict each other, so the printed '
+      + 'board cannot be completed.');
+    return out;
+  }
+  if (found.length > 1) {
+    out.errors.push(who + ': the clues admit more than one ordering — a sequence must have exactly '
+      + 'one. Add a clue that fixes an item to a slot, or one that separates the two orderings that '
+      + 'survive.');
+    return out;
+  }
+
+  var pos = found[0];
+  out.solution = new Array(items.length);
+  for (var i = 0; i < items.length; i++) out.solution[pos[i]] = items[i];
+  out.difficulty = sequenceInferenceDepth(p, compiled);
+
+  var from = p.answerFrom || {};
+  var derived = from.mode === 'slot'
+    ? out.solution[slots.indexOf(String(from.slot))]
+    : out.solution.map(function (name) { return String(name).charAt(0); }).join('');
+
+  if (normalizeAnswer(derived) !== normalizeAnswer(p.answer)) {
+    out.errors.push(who + ': the solved ordering yields "' + derived + '" but the puzzle declares the '
+      + 'answer "' + String(p.answer) + '" — the key must be what the board actually produces.');
+    return out;
+  }
+
+  out.ok = true;
+  return out;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // THE TWO ENTRY POINTS THE GATES CALL
 // ════════════════════════════════════════════════════════════════════════════
 // One per schema surface, dispatching on `kind`, so a caller never has to know
@@ -2545,6 +2844,7 @@ export function verifyConstrainedGrid(grid) {
   if (g.kind === 'kakuro') return solveKakuro(g);
   if (g.kind === 'kenken') return solveKenKen(g);
   if (g.kind === 'truth-tellers') return solveTruthTellers(g);
+  if (g.kind === 'sequence') return solveSequence(g);
   return {
     ok: false,
     errors: [label(g) + ': constrainedGrid.kind is "' + String(g.kind)

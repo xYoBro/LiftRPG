@@ -65,6 +65,8 @@ import {
   VALID_TRUTH_CLAIM_TYPES,
   VALID_TRUTH_COMPARATORS,
   VALID_TRUTH_TELLER_ANSWER_MODES,
+  VALID_SEQUENCE_CONSTRAINT_TYPES,
+  VALID_SEQUENCE_ANSWER_MODES,
   VALID_WORD_GRID_KINDS,
   VALID_WORD_SEARCH_DIRECTIONS,
   VALID_WORD_GRID_ANSWER_MODES,
@@ -1214,9 +1216,15 @@ export var BOOKLET_SCHEMA = {
               enum: VALID_LOGIC_ANSWER_MODES
                 .concat(VALID_NONOGRAM_ANSWER_MODES)
                 .concat(VALID_FILLED_GRID_ANSWER_MODES)
+                .concat(VALID_TRUTH_TELLER_ANSWER_MODES)
+                .concat(VALID_SEQUENCE_ANSWER_MODES)
+                .filter(function (v, i, all) { return all.indexOf(v) === i; })
             },
             category: { type: 'string' },
             subject: { type: 'string' },
+            // truth-tellers "initials" names a role; sequence "slot" names a slot.
+            role: { enum: VALID_TRUTH_TELLER_ROLES },
+            slot: { type: 'string' },
             // The filled grids' rule: name the cells to read and the order to
             // read them in. 1-based, and bounds-checked against the actual
             // board by the solver, which is the only reader that knows its size.
@@ -1420,6 +1428,49 @@ export var BOOKLET_SCHEMA = {
               claim: { $ref: '#/$defs/truthClaim' }
             }
           }
+        },
+
+        // ── sequence ────────────────────────────────────────────────────────
+        items: {
+          type: 'array',
+          minItems: G.sequence.minItems,
+          maxItems: G.sequence.renderMaxItems,
+          items: nonEmptyString
+        },
+        // The ordered positions the items go into. Same count as `items`, by
+        // ruling and by the solver's arithmetic: one item per slot, one slot per
+        // item. The labels carry the fiction — stops, days, shifts, watches.
+        slots: {
+          type: 'array',
+          minItems: G.sequence.minItems,
+          maxItems: G.sequence.renderMaxItems,
+          items: nonEmptyString
+        },
+        axisLabel: { type: 'string' },
+        orderClues: {
+          type: 'array',
+          minItems: G.sequence.minClues,
+          maxItems: G.sequence.maxClues,
+          items: {
+            type: 'object',
+            required: ['text', 'constraint'],
+            additionalProperties: false,
+            properties: {
+              text: nonEmptyString,
+              constraint: {
+                type: 'object',
+                required: ['type', 'item'],
+                additionalProperties: false,
+                properties: {
+                  type: { enum: VALID_SEQUENCE_CONSTRAINT_TYPES },
+                  item: nonEmptyString,
+                  otherItem: { type: 'string' },
+                  slot: { type: 'string' },
+                  n: { type: 'integer', minimum: 1 }
+                }
+              }
+            }
+          }
         }
       },
       allOf: [
@@ -1463,6 +1514,13 @@ export var BOOKLET_SCHEMA = {
           then: {
             required: ['speakers', 'roleLabels', 'statements'],
             properties: { answerFrom: { properties: { mode: { enum: VALID_TRUTH_TELLER_ANSWER_MODES } } } }
+          }
+        },
+        {
+          if: { properties: { kind: { const: 'sequence' } }, required: ['kind'] },
+          then: {
+            required: ['items', 'slots', 'orderClues'],
+            properties: { answerFrom: { properties: { mode: { enum: VALID_SEQUENCE_ANSWER_MODES } } } }
           }
         }
       ]

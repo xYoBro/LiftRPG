@@ -1406,7 +1406,7 @@ export var LUDIC_LIBRARY = [
   // W5b — the harvest's first PROMOTION. `deduction-board` was tier 3 (needs a
   // new primitive) until the constrained-grid atom and its solver landed; it is
   // named for what it plays, not for the file, exactly like every entry above.
-  'deduction-board',    // logic grid, nonogram, sudoku, truth-tellers — all proven solvable
+  'deduction-board',    // logic grid, nonogram, sudoku, truth-tellers, sequence — all proven
   'word-hunt',          // the letter board, every word machine-verified in it
   // The arsenal wave's promotion, closing W5b's one stated deferral: kakuro and
   // KenKen have their solvers. It is a SEPARATE entry from the deduction board
@@ -1575,8 +1575,28 @@ export var VALID_LEGACY_MOVES = [
 // arithmetic square are three different proofs.
 
 export var VALID_CONSTRAINED_GRID_KINDS = [
-  'logic-grid', 'nonogram', 'sudoku', 'kakuro', 'kenken', 'truth-tellers'
+  'logic-grid', 'nonogram', 'sudoku', 'kakuro', 'kenken', 'truth-tellers', 'sequence'
 ];
+
+// ── The sequence (route / schedule) vocabulary ──────────────────────────────
+// WHY IT IS NOT A LOGIC GRID is the exact mirror of the truth-teller answer.
+// There the BOARD matched and the mathematics did not; here the mathematics
+// matches perfectly — items against slots IS a bijection — and what does not
+// match is the CONSTRAINT LANGUAGE. "The ledger was collected before the
+// warehouse" is an ORDINAL fact, and the logic grid's four forms cannot express
+// one. A grid whose clues can only say "Tuesday is not the mill" is not a
+// schedule puzzle; it is a matching puzzle whose values happen to be sorted.
+//
+// A ROUTE AND A SCHEDULE ARE ONE OBJECT: a set of things in an order, under
+// constraints. The slots carry whichever fiction the book wants — stops, days,
+// shifts, berths, watches — so one kind serves both.
+export var VALID_SEQUENCE_CONSTRAINT_TYPES = [
+  'at', 'not-at', 'before', 'after', 'adjacent', 'gap'
+];
+
+//   slot       the item that ends up in one named slot
+//   initials   the first letters of the items in slot order — the classic
+export var VALID_SEQUENCE_ANSWER_MODES = ['slot', 'initials'];
 
 // ── The truth-teller (knights-and-knaves) vocabulary ────────────────────────
 // WHY IT IS NOT A LOGIC GRID, since that is the first thing anyone proposes: a
@@ -2334,6 +2354,18 @@ export var SPATIAL_GUARDRAILS = {
     minStatements: 2,
     maxStatements: 8,
     maxClaimDepth: 3,
+    labelMaxChars: 22
+  },
+  // Sequences. Exhaustive over permutations like the logic grid, so the item
+  // count is what keeps the proof free: 6 items is 720 orderings and the render
+  // ceiling of 7 is 5040. Two items in an order is a single fact, not a
+  // deduction, which is why the floor is three.
+  sequence: {
+    minItems: 3,
+    maxItems: 6,
+    renderMaxItems: 7,
+    minClues: 2,
+    maxClues: 12,
     labelMaxChars: 22
   }
 };
