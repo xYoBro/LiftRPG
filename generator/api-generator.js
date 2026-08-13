@@ -35,6 +35,8 @@ import {
   CRITIC_MAX_REVISIONS_PER_ROUND,
   CRITIC_DIMENSIONS,
   STRUCTURAL_REOPEN_SCOPES,
+  CONDUCTOR_MECHANISMS,
+  CONDUCTOR_MAX_FINDINGS,
   STAGE_BUDGETS,
   RETRY_TIMEOUT_GROWTH,
   RETRY_TIMEOUT_CEILING_MS,
@@ -142,6 +144,20 @@ import {
 // through validateAssembledBooklet; the critic needs it directly because it
 // re-measures each round after accepted revisions.
 import { simulateBook, simSoftFindings } from './modules/sim-player.js';
+
+// The third referee (FUSION §4 mechanism 6). Its pure half lives in its own
+// module for the same reason the walker's does: it is a distinct reading with
+// its own vocabulary, its own abstention rule, and its own projection of the
+// booklet — not a helper of the critic's verdict.
+import {
+  buildConductorScore,
+  formatConductorScoreBlock,
+  validateConductorReport,
+  normalizeConductorReport,
+  conductorFailures,
+  formatConductorReportBlock,
+  conductorSummaryLine
+} from './modules/conductor.js';
 
 import {
   getDailyBudget,
@@ -1789,6 +1805,80 @@ function persistLastBooklet(booklet, meta) {
 // clears the threshold or the round cap hits. Per D19 severity doctrine the
 // loop never blocks delivery — an unfinished booklet ships with its critique
 // attached in _criticReport.
+// ── The conductor's pass (FUSION.md §4 mechanism 6) ─────────────────────────
+// ONE bounded call, never a loop of its own. It runs after assembly and ahead
+// of the critic's first round, on both API pipelines, because both reach it
+// through runCriticLoop — which is also why the skip logic lives here in one
+// place rather than at two call sites.
+//
+// WHAT IT COSTS AND WHY THAT IS THE POINT. Its input is the score projection
+// alone: at twelve weeks, roughly a page. The critic's input is the digest —
+// twenty-six to thirty-eight thousand tokens. This pass is the cheapest stage
+// in the ladder that can change a book, and it is cheap for the same reason it
+// works: a reader shown only the sequence hears the sequence.
+//
+// SKIPS ARE STATED, NEVER SILENT (the D111 / W4b idiom). A book that declares
+// no fusionBeat is not read and says so, which is every fixture in content/ and
+// every book generated before W4a. A stage failure degrades the same way: the
+// pass is recorded as skipped with the reason, and the critic loop continues
+// exactly as it did before this landed. Nothing here may block delivery (D19).
+async function runConductorPass(settings, booklet, brief, ctx, stageName) {
+  ctx = ctx || {};
+  if (settings && settings.conductorPass === false) {
+    return { skipped: true, skipReason: 'the conductor\'s pass is disabled in settings' };
+  }
+  if (typeof window.buildConductorPrompt !== 'function') {
+    return { skipped: true, skipReason: 'the conductor prompt builder is unavailable' };
+  }
+  var score = buildConductorScore(booklet);
+  if (score.skipped) return { skipped: true, skipReason: score.skipReason, score: score };
+  var scoreBlock = formatConductorScoreBlock(score);
+  if (!scoreBlock) return { skipped: true, skipReason: 'the score projection printed nothing', score: score };
+
+  var raw;
+  try {
+    raw = await runJsonStage(settings, {
+      stageKey: 'conductor',
+      stageName: stageName || 'The Conductor\'s Pass',
+      buildPrompt: (function (block) {
+        return function () { return window.buildConductorPrompt(block, brief); };
+      })(scoreBlock),
+      maxAttempts: 2,
+      schema: window.STRUCTURED_SCHEMA_CONDUCTOR || null,
+      validate: (function (s) {
+        return function (result) { return validateConductorReport(result, s); };
+      })(score),
+      rateLimiter: ctx.rateLimiter || null,
+      budgetEnforce: !!ctx.budgetEnforce,
+      onProgress: ctx.onProgress,
+      telemetryCollector: ctx.telemetryCollector
+    });
+  } catch (err) {
+    console.warn('[LiftRPG] The conductor\'s pass failed — the critic runs without it:', err.message);
+    return { skipped: true, skipReason: 'the stage failed: ' + String((err && err.message) || err), score: score };
+  }
+  var report = normalizeConductorReport(raw, score);
+  console.log('[LiftRPG] ' + conductorSummaryLine(report));
+  return report;
+}
+
+// Round-one only, and that bound is a ruling rather than an economy. The report
+// is a reading of the book AS IT STOOD before any revision; carrying it into
+// round two would hand the critic a description of a page the reviser has
+// already changed, and would hold fusionPacing open for a defect that may be
+// fixed. One pass, one round, then the loop's own instruments take over.
+function seedConductorFailures(verdictRaw, conductor) {
+  var failures = conductorFailures(conductor);
+  if (!failures.length) return 0;
+  if (!verdictRaw || typeof verdictRaw !== 'object') return 0;
+  var verdict = verdictRaw.verdict;
+  if (!verdict || typeof verdict !== 'object') return 0;
+  var entry = verdict.fusionPacing;
+  if (!entry || typeof entry !== 'object') return 0;
+  entry.failures = (Array.isArray(entry.failures) ? entry.failures : []).concat(failures);
+  return failures.length;
+}
+
 async function runCriticLoop(settings, booklet, brief, ctx) {
   ctx = ctx || {};
   if (settings && settings.criticLoop === false) return null;
@@ -1810,6 +1900,12 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
     // eval reads them differently.
     structuralRevisions: 0
   };
+  // FUSION §4 mechanism 6, before the general read. One call, ahead of round
+  // one, so its findings are targets in the round that has the most rounds left
+  // to act on them.
+  var conductor = await runConductorPass(settings, booklet, brief, ctx);
+  report.conductor = conductor;
+  var revisedAnyWeek = false;
   var meta = booklet.meta || {};
   var contextJson = JSON.stringify({
     storySpine: meta.storySpine || '',
@@ -1855,7 +1951,10 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
     // rule: it ABSTAINS rather than printing nulls, so a pre-spine book's
     // prompt is byte-identical to what it was before this landed.
     var spineFrameBlock = formatSpineFrameBlock(buildSpineFrame(booklet));
-    var frameBlocks = [fusionFrameBlock, spineFrameBlock].filter(function (b) {
+    // The conductor's read rides beside them in ROUND ONE ONLY — see
+    // seedConductorFailures for why a stale reading is worse than none.
+    var conductorBlock = round === 1 ? formatConductorReportBlock(conductor) : '';
+    var frameBlocks = [fusionFrameBlock, spineFrameBlock, conductorBlock].filter(function (b) {
       return typeof b === 'string' && b.trim();
     }).join('\n\n');
     var verdictRaw;
@@ -1878,10 +1977,18 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
       report.error = String((err && err.message) || err);
       break;
     }
+    // THE PRE-SEED. The conductor's findings join the round-one verdict as
+    // fusionPacing failures BEFORE normalization, so they earn no privileges:
+    // the same validation, the same reopen-scope filtering, the same fail-safe
+    // demotion, the same union-by-unit in targeting, and the same three floors
+    // at acceptance. The clamp that follows is the evidence law the critic has
+    // always run under, applied to a failure the critic did not author.
+    var seeded = round === 1 ? seedConductorFailures(verdictRaw, conductor) : 0;
     var verdict = normalizeCriticVerdict(verdictRaw, threshold);
     var summary = summarizeVerdict(verdict);
     var roundRecord = {
       round: round,
+      conductorSeeded: seeded,
       scores: summary.byDimension,
       min: summary.min,
       avg: summary.avg,
@@ -1965,6 +2072,7 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
       }
       report.revisedUnits += 1;
       if (structural) report.structuralRevisions += 1;
+      if (target.unitType === 'week') revisedAnyWeek = true;
       roundRecord.revised.push({
         unit: label,
         dimensions: target.dimensions,
@@ -1977,6 +2085,19 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
       console.warn('[LiftRPG] Critic round ' + round + ': no revision survived the floors — stopping.');
       break;
     }
+  }
+
+  // THE RE-READ. One more bounded call, and only when a WEEK actually changed —
+  // the conductor reads a per-week sequence, so a revised fragment or ending
+  // moves nothing it can hear. It changes no decision: the loop is over and the
+  // booklet ships either way (D19). What it produces is the honest record the
+  // two-book evidence needs — did the surgery move the curve, or did the book
+  // come out the other side phrased exactly as it went in? A flatness finding
+  // that survives its own revision is the strongest signal this system can
+  // emit, and without the second read it is indistinguishable from success.
+  if (!conductor.skipped && revisedAnyWeek && !(settings && settings.conductorReread === false)) {
+    report.conductorReread = await runConductorPass(
+      settings, booklet, brief, ctx, 'The Conductor\'s Pass — re-read');
   }
 
   if (report.rounds.length) {
@@ -4325,6 +4446,18 @@ window.LiftRPGAPI = {
     criticSetUnit: setUnit,
     criticDimensions: CRITIC_DIMENSIONS,
     structuralReopenScopes: STRUCTURAL_REOPEN_SCOPES,
+    // The conductor's pure half. Exposed for the same reason the two frames
+    // are: the measured projection is the anti-vacuity half of this pass, and
+    // the browser suite is where it is provable against the real prompt
+    // surfaces the stage actually builds from.
+    buildConductorScore: buildConductorScore,
+    formatConductorScoreBlock: formatConductorScoreBlock,
+    validateConductorReport: validateConductorReport,
+    normalizeConductorReport: normalizeConductorReport,
+    conductorFailures: conductorFailures,
+    formatConductorReportBlock: formatConductorReportBlock,
+    conductorMechanisms: CONDUCTOR_MECHANISMS,
+    conductorMaxFindings: CONDUCTOR_MAX_FINDINGS,
     revisionPreservesIdentity: revisionPreservesIdentity,
     unitFloorErrors: unitFloorErrors,
     // The loop itself, exposed for gating only. It stays HERE rather than in
