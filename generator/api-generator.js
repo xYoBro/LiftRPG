@@ -133,7 +133,11 @@ import {
   // the registration below). Two builders used to carry a hand-copied
   // `Math.min(Math.max(weekCount - 2, 3), ...)` each, which is three homes for
   // one number and exactly the drift class D91 named.
-  cipherVarietyFloor
+  cipherVarietyFloor,
+  // D143. The ownership derivation and the door obligation both live in the
+  // validator because that is where the floors and their stage labels live —
+  // this file routes on the answer, it does not compute it.
+  repairOwnerForError
 } from './modules/validation.js';
 
 import {
@@ -1123,12 +1127,355 @@ function buildSmartRetryDirective(stageName, attempt, err) {
   return lines.join('\n');
 }
 
+// ── CROSS-STAGE REPAIR ROUTING (D143) ───────────────────────────────────────
+// D128 proved that doctrine routed to the wrong stage lies to the model: six
+// attempts, six identical failures, because no retry ladder saves a prompt that
+// cannot fix the defect. This is that law one level up. A stage gate can fail
+// on a defect whose material belongs to an EARLIER stage — M1's week gate died
+// three times on a missing `playSpine.decisionLedger` row, which is the shell's
+// to write and which no week prompt has ever been able to author — and the only
+// escape the system had was a full fresh rebuild of thirteen paid stages.
+//
+// The route is: re-enter the OWNING stage with the defect quoted verbatim, then
+// replay the bank forward. Everything before the owner is untouched and free
+// (D98's whole point); everything after it is re-validated against the owner's
+// new output and regenerated ONLY if it actually fails.
+//
+// TRANSPORT-BLIND BY CONSTRUCTION. Nothing in this seam reads a provider, a
+// format, a base URL, a model id or a door: it routes on the blocking-error
+// list and a stage order, both of which are the same on every transport and in
+// every pipeline. That is the same stance error-classify.js takes toward
+// provider vocabulary, asserted the same way — by scanning this seam's own
+// source (see the routing rows in scripts/check-generation-floors.mjs).
+//
+// ONE TOTAL ORDER for both pipelines. `skeleton` and `shell` are the two
+// compiler seats and never coexist in a run, so a single merged order is a
+// legal linearisation of both stage sequences and there is no per-pipeline
+// table to drift.
+var REPAIR_STAGE_ORDER = [
+  'workoutCanonical', 'canonicalize', 'layerBible', 'campaignPlan',
+  'skeleton', 'shell', 'knowing', 'rules', 'weeks', 'fragments', 'endings'
+];
+
+// A routing loop is a new failure mode, so the hops are bounded and the
+// same-wall-twice → fresh-rebuild policy stays as the outermost resort.
+var MAX_REPAIR_HOPS = 2;
+
+function repairStageRank(stageKey) {
+  var key = String(stageKey || '');
+  if (/^week_/.test(key)) key = 'weeks';
+  if (/^fragBatch_/.test(key)) key = 'fragments';
+  return REPAIR_STAGE_ORDER.indexOf(key);
+}
+
+/**
+ * planRepairRoute(err, state) -> null | { from, to, defects, defect, hop }
+ *
+ * THE ROUTING DECISION, pure and side-effect-free. Returns null — meaning "the
+ * existing ladder owns this" — far more often than it returns a route, and
+ * every refusal below is deliberate:
+ *
+ *   · no blocking errors, or no stage identity     nothing to reason about
+ *   · every owner is this stage or later           its own retry can fix it,
+ *                                                  which is what retries are
+ *   · the hop budget is spent                      bounded, by ruling
+ *   · this exact hop already ran                   a repair that did not take
+ *                                                  will not take twice
+ *
+ * When several EARLIER stages own defects, the route goes to the earliest and
+ * quotes ONLY that stage's defects. Quoting another stage's defect into this
+ * prompt would be D128's exact disease — instructing a model to fix a shape it
+ * does not author. The remaining owners resurface after the replay and get
+ * their own hop, which is what the budget is for.
+ */
+function planRepairRoute(err, state) {
+  var st = state || {};
+  if ((st.hops || 0) >= MAX_REPAIR_HOPS) return null;
+
+  var from = (err && err._stageKey) || '';
+  var fromRank = repairStageRank(from);
+  if (fromRank < 0) return null;
+
+  var blocking = (err && err._blockingErrors) || [];
+  if (!blocking.length) return null;
+
+  var byOwner = {};
+  blocking.forEach(function (message) {
+    var owner = repairOwnerForError(message);
+    if (!owner) return;                      // unprefixed: raised-by owns it
+    var rank = repairStageRank(owner);
+    if (rank < 0 || rank >= fromRank) return; // same stage or later: not a route
+    if (!byOwner[owner]) byOwner[owner] = [];
+    byOwner[owner].push(message);
+  });
+
+  var owners = Object.keys(byOwner).sort(function (a, b) {
+    return repairStageRank(a) - repairStageRank(b);
+  });
+  if (!owners.length) return null;
+
+  var to = owners[0];
+  var hopId = to + '<-' + from;
+  if (st.visited && st.visited[hopId]) return null;
+
+  return {
+    from: from,
+    to: to,
+    defects: byOwner[to].slice(),
+    defect: byOwner[to][0],
+    hop: (st.hops || 0) + 1
+  };
+}
+
+/**
+ * buildRepairDirective(route, ownerStageName, fromStageName) -> string
+ *
+ * The Correction Directive idiom, aimed one stage back. Same shape as
+ * buildSmartRetryDirective's correction half deliberately — the model has been
+ * taught to read that heading — with the one fact it needs that a same-stage
+ * retry never has to state: this output was accepted, and something downstream
+ * of it could not be built.
+ */
+function buildRepairDirective(route, ownerStageName, fromStageName) {
+  var lines = [
+    '',
+    '## Correction Directive (Cross-Stage Repair)',
+    '',
+    'Your earlier output for ' + ownerStageName + ' was accepted, but ' + fromStageName
+      + ' could not be completed because of ' + route.defects.length + ' defect(s) in it.',
+    'You are being re-run to fix exactly those defects.',
+    '',
+    '### Defects (fix ALL of these)'
+  ];
+  route.defects.forEach(function (e, i) { lines.push((i + 1) + '. ' + e); });
+  lines.push('');
+  lines.push('### Instructions');
+  lines.push('Return the CORRECTED JSON for ' + ownerStageName + ' with these issues fixed.');
+  lines.push('- Preserve all working content (names, prose, palette, mechanical values).');
+  lines.push('- Do NOT regenerate from scratch. Fix only the listed defects.');
+  lines.push('- Everything downstream that already exists was written against your previous');
+  lines.push('  output, so change as little as possible to satisfy the contract.');
+  lines.push('- Return valid JSON only. No markdown fences, no commentary.');
+  return lines.join('\n');
+}
+
+// The operator-facing name of each routable stage, so a directive and a UI card
+// can say the same word for the same seat. Keys are stage keys; the values are
+// the names the pipelines already emit on their progress events.
+var REPAIR_STAGE_NAMES = {
+  layerBible: 'Layer Codex',
+  campaignPlan: 'Story Plan',
+  skeleton: 'Skeleton',
+  shell: 'Booklet Setup',
+  knowing: 'World Detail',
+  rules: 'Rules Spread',
+  weeks: 'Week',
+  fragments: 'Fragments',
+  endings: 'Endings'
+};
+
+/**
+ * describeRepairRoute(err, fromStageName) -> null | routeShape
+ *
+ * THE CONSUMABLE SHAPE. One description of "who owns this defect and what
+ * would you say to them", stamped on every blocking stage failure and read by
+ * two different doors:
+ *
+ *   · the automatic path (runPipelineWithRepairRouting) re-enters the owning
+ *     stage and hands `directive` to its prompt builder;
+ *   · a guided/manual surface can send the operator back to the OWNING card
+ *     with the same `directive` as its repair prompt.
+ *
+ * Same validators, same defect, same route, by construction — the two doors
+ * differ in who performs the re-entry, never in where it lands.
+ */
+function describeRepairRoute(err, fromStageName) {
+  var route = planRepairRoute(err, { hops: 0, visited: {} });
+  if (!route) return null;
+  var ownerName = REPAIR_STAGE_NAMES[route.to] || route.to;
+  var fromName = fromStageName || REPAIR_STAGE_NAMES[route.from] || route.from;
+  return {
+    ownedBy: route.to,
+    ownedByStageName: ownerName,
+    from: route.from,
+    fromStageName: fromName,
+    defects: route.defects.slice(),
+    directive: buildRepairDirective(route, ownerName, fromName)
+  };
+}
+
+/**
+ * derivePlannedWeekShapes(workout, campaignPlan, weekCount) -> [{ weekNumber, isBoss, isDeload }]
+ *
+ * What the plan and the program already know about every week, before a word of
+ * it is written. Both facts were already being derived inside the week loop —
+ * this lifts them to ONE home so the shell gate's pre-flight and the week gate
+ * cannot form different opinions about the same week.
+ *
+ * The deload rule is unchanged and deliberately conservative: the multi-stage
+ * campaign plan carries no isDeload field at all, so the plan is asked first and
+ * the program's DECLARED marker second. A week that dips in volume without
+ * saying so is not excused, because the floors must fail toward demanding
+ * content.
+ */
+function derivePlannedWeekShapes(workout, campaignPlan, weekCount) {
+  var plan = campaignPlan || {};
+  var shapes = [];
+  for (var w = 1; w <= weekCount; w++) {
+    var entry = (plan.weeks || []).filter(function (pw) {
+      return Number(pw.weekNumber) === w;                              // eslint-disable-line no-loop-func
+    })[0] || {};
+    var text = (typeof window.extractWeekWorkout === 'function')
+      ? window.extractWeekWorkout(workout, [w])
+      : '';
+    shapes.push({
+      weekNumber: w,
+      isBoss: w === weekCount,
+      isDeload: !!entry.isDeload || looksLikeDeloadWeek(text)
+    });
+  }
+  return shapes;
+}
+
+/**
+ * sweepStaleBankedWeeks(checkpoint, ctx) -> string[]  (stage keys to regenerate)
+ *
+ * After a cross-stage repair rewrites an upstream stage, the weeks already in
+ * the bank were written against the OLD one. Blanket-invalidating them would
+ * throw away exactly the paid work D98 exists to protect, so each is re-asked
+ * its own gate against the NEW upstream and only the ones that actually fail
+ * come back.
+ *
+ * SCOPED TO WHAT THE RE-ENTERED STAGE COULD HAVE CHANGED — the spine, the
+ * grammar family. Continuity inputs (previousWeek's map evolution, the boss's
+ * componentInputs) are deliberately not re-asked here: a shell repair cannot
+ * have invalidated them, and asking would manufacture regeneration this repair
+ * did not cause. Anything outside that scope is still held by the real week
+ * gate if the week is ever regenerated for another reason.
+ */
+function sweepStaleBankedWeeks(checkpoint, ctx) {
+  var stale = [];
+  if (!checkpoint || !checkpoint.stages) return stale;
+  var meta = ((ctx.shell || {}).meta) || {};
+  var family = (meta.artifactIntent || {}).mechanicGrammarFamily || '';
+  var spine = meta.playSpine || null;
+  var shapes = ctx.plannedWeekShapes || [];
+  for (var w = 1; w <= ctx.weekCount; w++) {
+    var banked = checkpoint.stages['week_' + w];
+    if (!banked) continue;
+    var shape = shapes[w - 1] || {};
+    var verdict = validateWeekSchema(banked, w === ctx.weekCount, {
+      currentWeekNumber: w,
+      generationFloors: true,
+      weekNumber: w,
+      isDeload: !!shape.isDeload,
+      spineStageLabel: ctx.spineStageLabel,
+      mechanicGrammarFamily: family,
+      playSpine: spine
+    });
+    var errors = (verdict && verdict.errors) || [];
+    if (classifyValidationErrors(errors).blocking.length) stale.push('week_' + w);
+  }
+  return stale;
+}
+
+/**
+ * pruneCheckpointStages(checkpoint, keys) -> checkpoint
+ *
+ * Drop named stages from the bank so the pipeline regenerates them. Deliberately
+ * written against the EXISTING checkpoint API rather than a new one: a deletion
+ * reaches storage by re-saving a surviving stage with its own value, because
+ * saveCheckpoint persists the object it is handed. D98's four touchpoints and
+ * one storage key are unchanged, and no key is invented (a non-stage key inside
+ * `stages` would inflate stageCount and lie about how much was resumed).
+ *
+ * Best-effort by design. The in-process prune in the pipeline is the
+ * load-bearing half; this one exists so a crash mid-repair does not resurrect
+ * the stage the repair was called to rewrite.
+ */
+function pruneCheckpointStages(checkpoint, keys) {
+  var cp = checkpoint || getCheckpoint();
+  if (!cp || !cp.stages || typeof cp.stages !== 'object') return cp;
+  var dropped = 0;
+  (keys || []).forEach(function (key) {
+    if (Object.prototype.hasOwnProperty.call(cp.stages, key)) {
+      delete cp.stages[key];
+      dropped++;
+    }
+  });
+  if (!dropped) return cp;
+  var survivors = Object.keys(cp.stages);
+  // No survivor means there is nothing left to resume anyway — the pipeline's
+  // own in-process prune already guarantees the correct behaviour, and clearing
+  // storage here would throw away the spend ledger with it.
+  if (survivors.length) saveCheckpoint(survivors[0], cp.stages[survivors[0]], cp);
+  return cp;
+}
+
+/**
+ * runPipelineWithRepairRouting(pipelineFn, options) -> booklet
+ *
+ * The outermost loop of the retry economics. A pipeline that dies on a defect
+ * an earlier stage owns is re-run with that stage dropped from the bank and the
+ * defect quoted into its prompt; everything else stays banked and replays free.
+ *
+ * Bounded three ways, because a routing loop would be a worse failure than the
+ * rebuild it replaces: MAX_REPAIR_HOPS total, never the same hop twice, and any
+ * refusal by planRepairRoute falls straight through to the caller — which is
+ * the bench's same-wall-twice → fresh-rebuild policy, unchanged and still the
+ * outermost resort.
+ */
+async function runPipelineWithRepairRouting(pipelineFn, options) {
+  var opts = options || {};
+  var state = { hops: 0, visited: {}, routes: [] };
+  opts._repairState = state;
+  for (;;) {
+    try {
+      return await pipelineFn(opts);
+    } catch (err) {
+      var route = planRepairRoute(err, state);
+      if (!route) throw err;
+
+      var ownerName = REPAIR_STAGE_NAMES[route.to] || route.to;
+      var fromName = REPAIR_STAGE_NAMES[route.from] || route.from;
+      route.directive = buildRepairDirective(route, ownerName, fromName);
+
+      state.hops = route.hop;
+      state.visited[route.to + '<-' + route.from] = 1;
+      state.pending = route;
+      // THE HOP LEDGER. Every route is recorded with the defect that caused it,
+      // so a book that took two hops can be read back as two hops and not as a
+      // mysteriously cheap success.
+      state.routes.push({ from: route.from, to: route.to, defect: route.defect });
+
+      opts._repairPrune = [route.to];
+      pruneCheckpointStages(getCheckpoint(), [route.to]);
+
+      var notice = 'Repairing ' + ownerName + ': ' + fromName + ' failed on a defect that stage owns.'
+        + ' Re-running it with the defect quoted, then replaying saved work'
+        + ' (hop ' + route.hop + '/' + MAX_REPAIR_HOPS + ').';
+      console.warn('[LiftRPG] ' + notice);
+      emitPipelineEvent(opts.onProgress, 0, 0, notice, {
+        phase: 'start',
+        stageKey: route.to,
+        stageName: ownerName,
+        noticeLevel: 'warn',
+        repairRoute: { from: route.from, to: route.to, defect: route.defect }
+      });
+    }
+  }
+}
+
 // Classification markers must survive the stage-name prefix. Rebuilding a bare
 // Error here used to strip errorType / finishReason / retryable, which is how a
 // classified truncation could reach a caller as an unclassifiable 'unknown'.
+// `_stageKey` joined them for D143: the routing seam needs to know which stage
+// raised the failure, and the human-facing stage NAME is not that identity.
+// `repairRoute` joined them so the queryable shape survives to the caller.
 var STAGE_ERROR_MARKERS = [
   'errorType', 'finishReason', 'retryable', 'status',
-  'structuredUnsupported', '_failedOutput', '_blockingErrors'
+  'structuredUnsupported', '_failedOutput', '_blockingErrors', '_stageKey',
+  'repairRoute'
 ];
 
 function carryStageErrorMarkers(source, target) {
@@ -1412,6 +1759,11 @@ async function runJsonStage(settings, config) {
     var retryState = { attempt: attempt, error: lastErr };
     var prompt = config.buildPrompt(retryState);
     if (attempt > 0) prompt += buildSmartRetryDirective(config.stageName, attempt, lastErr);
+    // A cross-stage repair re-enters this stage at attempt 0, so the directive
+    // cannot ride the retry counter — it rides the config, set by the router
+    // for exactly one re-entry (D143). Appended after the retry directive so a
+    // repaired stage that then fails its OWN gate still sees both.
+    else if (config.repairDirective) prompt += config.repairDirective;
 
     // Stage budgets come from the ladder (STAGE_BUDGETS + stageBudget()) keyed
     // by stageKey. An explicit config.maxTokens / config.requestTimeoutMs still
@@ -1540,6 +1892,17 @@ async function runJsonStage(settings, config) {
             err.finishReason = attemptFinishReason;
             err._failedOutput = result;
             err._blockingErrors = classified.blocking;
+            // Which stage RAISED this. The routing seam compares it against the
+            // stage each defect is OWNED by; the human-facing stageName is a
+            // label, not an identity.
+            err._stageKey = config.stageKey || '';
+            // THE QUERYABLE ROUTING SHAPE (D143). Computed on every blocking
+            // stage failure, whether or not this run's automatic path takes the
+            // route, because the guided door runs these same validators and
+            // must be able to send the user back to the OWNING card with the
+            // same directive as its repair prompt. `null` means "this stage
+            // owns its own defect", which is a real and useful answer.
+            err.repairRoute = describeRepairRoute(err, config.stageName);
             throw err;
           }
         }
@@ -2362,6 +2725,25 @@ async function runApiPipeline(options) {
   var checkpoint = resumeState.checkpoint;
   var resumed = resumeState.resumed;
 
+  // ── Cross-stage repair: drop the owning stage from the bank (D143) ────
+  // The router already pruned storage; this is the in-process half, and it is
+  // the load-bearing one. A persist that silently failed (quota, private mode)
+  // must never resurrect the stage this run exists to rewrite — that would
+  // spend a whole replay to arrive back at the identical defect.
+  var repairState = options._repairState || null;
+  var repairPending = (repairState && repairState.pending) || null;
+  if (options._repairPrune && checkpoint && checkpoint.stages) {
+    options._repairPrune.forEach(function (key) {
+      if (checkpoint.stages[key] !== undefined) {
+        delete checkpoint.stages[key];
+        resumed = Math.max(0, resumed - 1);
+      }
+    });
+  }
+  function repairDirectiveFor(stageKey) {
+    return (repairPending && repairPending.to === stageKey) ? repairPending.directive : '';
+  }
+
   if (resumed > 0) {
     var resumeLine = describeResume(resumeState);
     console.log('[LiftRPG] ' + resumeLine);
@@ -2532,6 +2914,15 @@ async function runApiPipeline(options) {
   if (!Array.isArray(campaignPlan.fragmentRegistry)) campaignPlan.fragmentRegistry = [];
   if (!Array.isArray(campaignPlan.overflowRegistry)) campaignPlan.overflowRegistry = [];
 
+  // ── The planned week shapes (D143) ───────────────────────────────────
+  // ONE derivation, two readers: the shell gate's pre-flight (which holds the
+  // spine to the doors these weeks will owe) and the week loop's floor options
+  // (which holds each week to the same obligation as it lands). Deriving it
+  // twice is how the two gates would come to disagree about who owes a door,
+  // and a pre-flight that disagreed with the gate it protects would be worse
+  // than none — it would block plans the week gate would have accepted.
+  var plannedWeekShapes = derivePlannedWeekShapes(workout, campaignPlan, weekCount);
+
   // The divergence seed for this run. Resolved from the cached compiler stage
   // when resuming; drawn exactly once otherwise. See resolveRunSeed.
   var divergenceSeed = resolveRunSeed(
@@ -2579,11 +2970,19 @@ async function runApiPipeline(options) {
         }
         return result;
       },
+      repairDirective: repairDirectiveFor('shell'),
       validate: function(result) {
         var v = validateShellSchema(result, {
           weekCount: weekCount,
           totalSessions: totalSessions,
-          generationFloors: true   // F2: componentDialect is declared here or nowhere
+          generationFloors: true,  // F2: componentDialect is declared here or nowhere
+          // ── The earliest-stage pre-flight's inputs (D143) ──
+          // The campaign plan ran two stages ago and the program is on the
+          // desk; between them they know which weeks will owe a door and which
+          // week each fragment lands in. That is everything the spine can be
+          // held to before a single week is written.
+          plannedWeeks: plannedWeekShapes,
+          fragmentRegistry: campaignPlan.fragmentRegistry
         });
         if (!v.valid) {
           return 'Shell schema validation: ' + v.errors.join('; ');
@@ -2607,6 +3006,30 @@ async function runApiPipeline(options) {
     });
     recordSeedOnStage(shell, divergenceSeed);
     checkpoint = saveCheckpoint('shell', shell, checkpoint);
+
+    // ── Downstream sweep after a cross-stage repair (D143) ─────────────
+    // The shell has just been rewritten. Weeks already banked were written
+    // against the old one, so each is re-asked its own gate against the new
+    // spine — and only the ones that ACTUALLY fail are dropped. A blanket
+    // invalidation here would discard paid work for a defect it may not have.
+    if (repairPending && repairPending.to === 'shell') {
+      var staleWeeks = sweepStaleBankedWeeks(checkpoint, {
+        weekCount: weekCount,
+        shell: shell,
+        plannedWeekShapes: plannedWeekShapes,
+        spineStageLabel: 'Shell'
+      });
+      if (staleWeeks.length) {
+        staleWeeks.forEach(function (key) { delete checkpoint.stages[key]; });
+        checkpoint = pruneCheckpointStages(checkpoint, staleWeeks);
+        var sweptLine = 'Repair swept ' + staleWeeks.length + ' banked week(s) that no longer satisfy the'
+          + ' corrected setup: ' + staleWeeks.join(', ') + '. Everything else stays banked.';
+        console.warn('[LiftRPG] ' + sweptLine);
+        emitPipelineEvent(onProgress, stageNum, totalStages, sweptLine, {
+          phase: 'start', stageKey: 'shell', stageName: 'Booklet Setup', noticeLevel: 'warn'
+        });
+      }
+    }
   }
 
   var identityContract = buildIdentityContract(shell, campaignPlan);
@@ -2716,14 +3139,17 @@ async function runApiPipeline(options) {
     // grammar family lives at shell.meta.artifactIntent — the same place
     // assembly.js reads it. Absent family = removed signal: isDoorLeaningFamily
     // answers false and the door floor simply does not apply.
-    var weekWorkoutText = (typeof window.extractWeekWorkout === 'function')
-      ? window.extractWeekWorkout(workout, [w])
-      : '';
-    var weekIsDeload = !!campaignWeekPlan.isDeload || looksLikeDeloadWeek(weekWorkoutText);
+    // Both facts now come from derivePlannedWeekShapes, computed once above the
+    // shell gate so the pre-flight there and this gate hold the same week to
+    // the same obligation (D143). The derivation itself is unchanged.
+    var weekShape = plannedWeekShapes[w - 1] || { weekNumber: w, isBoss: isBossWeek, isDeload: false };
     var weekFloorOptions = {
       generationFloors: true,
       weekNumber: w,
-      isDeload: weekIsDeload,
+      isDeload: weekShape.isDeload,
+      // The seat that authored the spine on THIS pipeline, so a spine defect
+      // found here routes back to a prompt that can fix it (D129/D143).
+      spineStageLabel: 'Shell',
       mechanicGrammarFamily: (((shell || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || '',
       // W4a: the spine was declared at the shell stage; the door and the clocks
       // are authored here. The closure floors that pair them need both, so the
@@ -3409,7 +3835,7 @@ async function generateMultiStage(settings, workout, brief, onProgress) {
   var totalSessions = 0;
   (nw.weeks || []).forEach(function(w) { totalSessions += (w.sessions ? w.sessions.length : 0); });
 
-  return runApiPipeline({
+  return runPipelineWithRepairRouting(runApiPipeline, {
     settings: settings,
     workout: workout,
     rawWorkout: workout,
@@ -3436,7 +3862,7 @@ async function generateStructured(settings, workout, brief, onProgress) {
   var totalSessions = 0;
   (nw.weeks || []).forEach(function(w) { totalSessions += (w.sessions ? w.sessions.length : 0); });
 
-  return runApiPipeline({
+  return runPipelineWithRepairRouting(runApiPipeline, {
     settings: resolvedSettings,
     workout: workoutText,
     rawWorkout: workout,
@@ -3536,6 +3962,22 @@ async function runSkeletonFleshPipeline(options) {
   var checkpoint = sfResumeState.checkpoint;
   var isResume = sfResumeState.resumed > 0;
 
+  // ── Cross-stage repair (D143), S+F's half ────────────────────────────
+  // Same seam, different compiler seat: the spine is authored at `skeleton`
+  // here and at `shell` on the multi-stage path, which is precisely why D129
+  // made the floors' stage label a parameter rather than a constant.
+  var sfRepairState = options._repairState || null;
+  var sfRepairPending = (sfRepairState && sfRepairState.pending) || null;
+  if (options._repairPrune && checkpoint && checkpoint.stages) {
+    options._repairPrune.forEach(function (key) {
+      if (checkpoint.stages[key] !== undefined) delete checkpoint.stages[key];
+    });
+    isResume = Object.keys(checkpoint.stages).length > 0;
+  }
+  function sfRepairDirectiveFor(stageKey) {
+    return (sfRepairPending && sfRepairPending.to === stageKey) ? sfRepairPending.directive : '';
+  }
+
   if (isResume) {
     var sfResumeLine = describeResume(sfResumeState);
     console.log('[S+F] ' + sfResumeLine);
@@ -3616,6 +4058,7 @@ async function runSkeletonFleshPipeline(options) {
       rateLimiter:      rateLimiter,
       budgetEnforce:    useGeminiBudget,
       telemetryCollector: sfTelemetry,
+      repairDirective:  sfRepairDirectiveFor('skeleton'),
       buildPrompt: function (retryState) {
         return builders.skeleton(workout, brief, {
           retryMode: retryState.attempt > 0,
@@ -3847,11 +4290,21 @@ async function runSkeletonFleshPipeline(options) {
           generationFloors: true,
           weekNumber: weekNum,
           isDeload: !!weekPlan.isDeload || looksLikeDeloadWeek(weekWorkout),
+          // This pipeline's compiler seat (D129/D143) — 'Skeleton', not 'Shell'.
+          spineStageLabel: 'Skeleton',
           mechanicGrammarFamily: (((skeleton || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || '',
           playSpine: ((skeleton || {}).meta || {}).playSpine || null
         });
         if (vResult && typeof vResult === 'object' && !vResult.valid) {
-          return (vResult.errors || []).join('; ');
+          // The VERDICT OBJECT, not a joined string. extractErrorList treats a
+          // string as one error, so joining collapsed N defects with N
+          // different owners into a single unroutable blob whose only prefix is
+          // whichever error happened to sort first — and the router would then
+          // either miss the route entirely or quote a week's defects into the
+          // skeleton's prompt, which is D128's disease exactly. Returning the
+          // object is also what the multi-stage week gate already does, so the
+          // two pipelines now classify severity the same way (D19).
+          return vResult;
         }
         return '';
       }
@@ -4221,7 +4674,7 @@ async function generateSkeletonFlesh(settings, workout, brief, onProgress) {
     }
   }
 
-  return runSkeletonFleshPipeline({
+  return runPipelineWithRepairRouting(runSkeletonFleshPipeline, {
     settings:      resolvedSettings,
     workout:       workoutText,
     rawWorkout:    workout,
@@ -4622,6 +5075,24 @@ window.LiftRPGAPI = {
     // one). A registered stub transport plus this handle is the only way to
     // gate tier 3 without spending real model money on every run of the suite.
     runCriticLoop: runCriticLoop,
+    // ── The cross-stage repair seam (D143), exposed for two readers ──────
+    // GATES: the routing decision is a pure function of a blocking-error list
+    // and a stage order, so the floors harness can prove the whole policy —
+    // ownership, hop bounds, the ledger shape, transport-blindness — with no
+    // browser, no port and no model money.
+    // THE GUIDED DOOR: `describeRepairRoute(err)` is the queryable shape a
+    // surface reads to send an operator back to the OWNING card carrying
+    // `directive` as its repair prompt. The guided path runs the same
+    // validators, so the same defect routes to the same seat there; only the
+    // performer of the re-entry differs (automatic here, a card there).
+    planRepairRoute: planRepairRoute,
+    describeRepairRoute: describeRepairRoute,
+    buildRepairDirective: buildRepairDirective,
+    repairStageOrder: REPAIR_STAGE_ORDER,
+    repairStageNames: REPAIR_STAGE_NAMES,
+    maxRepairHops: MAX_REPAIR_HOPS,
+    sweepStaleBankedWeeks: sweepStaleBankedWeeks,
+    derivePlannedWeekShapes: derivePlannedWeekShapes,
     collectVoiceTicFindings: collectVoiceTicFindings,
     collectLicensedMovePlacementFindings: collectLicensedMovePlacementFindings,
     scanTerminalVoiceTics: scanTerminalVoiceTics
