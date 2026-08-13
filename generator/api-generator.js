@@ -65,6 +65,7 @@ import {
   getUnit,
   setUnit,
   revisionPreservesIdentity,
+  revisionInventsKeys,
   unitFloorErrors,
   unitLabel
 } from './modules/critic.js';
@@ -2057,6 +2058,19 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
         console.warn('[LiftRPG] ' + label + ' revision dropped generation floors ('
           + floorsBefore + ' → ' + floorsAfter + ') — rejected.');
         roundRecord.rejected.push({ unit: label, structural: structural, reason: 'generation-floor' });
+        continue;
+      }
+      // Validity floor, part 3 (W3 corrective wave, F06): the schema-filtered
+      // key diff. Checked BEFORE setUnit rather than reverted after it — the
+      // comparison needs only the two units, and a floor that never touches the
+      // booklet cannot leave it half-revised. The outcome is the one the revert
+      // produced: the unit stands as it was, and the refusal is on the record.
+      var inventedKeys = revisionInventsKeys(target.unitType, original, revised);
+      if (inventedKeys.length) {
+        console.warn('[LiftRPG] ' + label + ' revision invented ' + inventedKeys.length
+          + ' key(s) the schema rejects (' + inventedKeys.join(', ') + ') — rejected.');
+        roundRecord.rejected.push({ unit: label, structural: structural,
+          reason: 'key-invention-floor', invented: inventedKeys.slice() });
         continue;
       }
       var slot = setUnit(booklet, target.unitType, target.unitRef, revised);
@@ -4459,6 +4473,7 @@ window.LiftRPGAPI = {
     conductorMechanisms: CONDUCTOR_MECHANISMS,
     conductorMaxFindings: CONDUCTOR_MAX_FINDINGS,
     revisionPreservesIdentity: revisionPreservesIdentity,
+    revisionInventsKeys: revisionInventsKeys,
     unitFloorErrors: unitFloorErrors,
     // The loop itself, exposed for gating only. It stays HERE rather than in
     // modules/critic.js because it needs the stage runner and the validators

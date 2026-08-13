@@ -17,7 +17,8 @@ import { simulateBook } from './sim-player.js';
 import {
   validateWeekSchema,
   validateFragmentsStage,
-  collectBudgetBreaches
+  collectBudgetBreaches,
+  unknownKeyPathsForUnit
 } from './validation.js';
 
 var VALID_UNIT_TYPES = { week: 1, fragment: 1, ending: 1, rulesSpread: 1 };
@@ -703,6 +704,47 @@ export function revisionPreservesIdentity(unitType, original, revised) {
       && (original.id === undefined || original.id === revised.id);
   }
   return true; // rulesSpread has no identity key
+}
+
+// ── The key-invention floor (W3 corrective wave, F06) ───────────────────────
+// A1's post-hoc critic re-run made the booklet LESS valid: 17 real errors
+// before, 19 after, two new and zero resolved. Both new ones were invented
+// fields — `decision` on a session, `paperAction` on a cipher — and the validity
+// floor that promises "a revision may never make the booklet less valid" waved
+// them through, because it compares counts from validateAssembledBooklet, which
+// had no unknown-key check of any kind. The floor was not broken and not
+// mis-wired; its promise was simply true against the weaker of the two
+// validators in the repo, and unknown-key invention is exactly what a free-form
+// revision stage produces.
+//
+// A KEY-DIFF, FILTERED BY THE SCHEMA, and both halves are load-bearing.
+//   - The schema half is what makes it precise: the reviser may add
+//     `fieldOps.oracleTable` to a week that lacked one, because a structural
+//     revision with the mechanical assignment reopened is LICENSED to do that
+//     and the unit floor above actively rewards it. A blanket "no key the
+//     original lacked" would revert the repair the critic just asked for.
+//   - The diff half is what keeps it a delta, like every other floor here: a
+//     unit that already carried an illegal key does not get to veto every
+//     revision of itself. Only what THIS revision introduced is charged to it.
+//
+// Indices are collapsed (`sessions[1].decision` -> `sessions[].decision`)
+// because reordering or appending an array element is not the defect; inventing
+// a field is.
+function collapseIndices(path) {
+  return String(path).replace(/\[\d+\]/g, '[]');
+}
+
+export function revisionInventsKeys(unitType, original, revised) {
+  var before = {};
+  unknownKeyPathsForUnit(unitType, original).forEach(function (p) {
+    before[collapseIndices(p)] = true;
+  });
+  var invented = [];
+  unknownKeyPathsForUnit(unitType, revised).forEach(function (p) {
+    var key = collapseIndices(p);
+    if (!before[key] && invented.indexOf(key) === -1) invented.push(key);
+  });
+  return invented;
 }
 
 // ── The validity floor, at the unit's own stage gate ─────────────────────────
