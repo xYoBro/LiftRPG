@@ -424,7 +424,7 @@ var NEEDS_PRIMITIVE = [
     process: 'The player writes words into a shape whose crossings constrain each other; the marked squares spell the answer.',
     outputs: 'A word or letter string the seal wants.',
     locks: 'The crossings are the lock. Nothing ships unless a solver proves the skeleton admits exactly one filling from the printed list.',
-    needs: 'A crossing solver plus a blank-skeleton print surface, which is a different geometry from the word board word-grid.js draws. DEFERRED BY RULING at W5b (crisscross was licensed "only if it lands clean"; it did not — the print surface and the uniqueness proof are both new work, not a variant of the search). Dense crossword construction stays out entirely per the waves plan.'
+    needs: 'A crossing solver plus a blank-skeleton print surface, which is a different geometry from the word board word-grid.js draws. DEFERRED BY RULING at W5b (crisscross was licensed "only if it lands clean"; it did not — the print surface and the uniqueness proof are both new work, not a variant of the search). STILL QUEUED after the arsenal wave, but no longer on an unknown: the wave built the loom as a prototype and MEASURED what it affords, so the next attempt starts from numbers instead of hope. See LUDIC_CROSSWORD_FINDINGS below.'
   },
   // `printed-hint-band` LANDED IN W5b and left this tier: the band is
   // renderer/modules/atoms/hint-band.js, with its own estimate term and its own
@@ -479,6 +479,60 @@ var NEEDS_PRIMITIVE = [
     needs: 'NOTHING — assessed and closed as already covered. `meta.playSpine.economyGraph` plus `gateStructure` IS the dependency chart, the closure floors make disconnection a blocking failure rather than a review note, and the simulated player walks it end to end. The one gap worth naming: constrained grids are outside SURFACE_REF_KINDS, so a puzzle cannot be a spine node directly — a metapuzzle built on puzzles routes through the seals and ciphers they feed.'
   }
 ];
+
+/**
+ * LUDIC_CROSSWORD_FINDINGS — what the arsenal wave measured, so the next
+ * attempt at `interlocking-word-grid` starts from numbers.
+ *
+ * VISION §4.2 pre-authorises dense crosswords on one ratified split: THE LOOM
+ * BUILDS THE GRID, THE MODEL WRITES THE CLUES. The wave built the loom as a
+ * prototype — a deterministic multi-pass crisscross fill, no dictionary, ~120
+ * lines — and ran it against the demo booklet's own assembled vocabulary. The
+ * decisive question was never "can code fill a grid"; it was "what density does
+ * a BOOK's own words afford", and that now has an answer rather than a hope.
+ *
+ * THE HEADLINE: what a book's vocabulary affords is a CRISSCROSS, not a dense
+ * crossword — roughly half the cells filled and about one crossing per word.
+ * An American-style dense crossword is ~100% filled with every cell in two
+ * words, and reaching that needs a large dictionary this engine deliberately
+ * does not ship (and could not use brief-blind anyway). So the honest entry,
+ * when it lands, is a crisscross whose density is reported rather than promised.
+ *
+ * That is not a downgrade of the ruling. §4.2 says "density honest to what the
+ * roster affords", and this is the number that sentence was written to protect.
+ */
+export var LUDIC_CROSSWORD_FINDINGS = {
+  // The pool is far wider than the 8-12 Core Noun Roster, because the roster is
+  // prose inside `worldContract` while the assembled book is full of labels.
+  vocabularyFromAssembledBook: 99,
+  // Placed / cells filled, at three grid sizes, from that pool.
+  measured: [
+    { dim: 11, placed: 1, fillPercent: 100, crossings: 0 },
+    { dim: 13, placed: 10, fillPercent: 49, crossings: 10 },
+    { dim: 15, placed: 18, fillPercent: 51, crossings: 19 }
+  ],
+  // THE 11x11 COLLAPSE IS A HARD FLOOR, not a tuning failure: a 12-letter word
+  // cannot be crossed inside an 11-cell grid, so the first placement fills the
+  // board and nothing else fits. Any crossword surface must therefore be at
+  // least 13 on a side, and 15 is where it becomes comfortable.
+  minimumUsableDim: 13,
+  comfortableDim: 15,
+  // What remains to build, in the order the next wave would do it.
+  remaining: [
+    'The loom promoted from prototype into contracts/, with a self-test.',
+    'A schema surface: entries [{ answer, clue }] authored by the model, and a '
+      + 'derived skeleton (layout, numbering, placements) the loom writes.',
+    'The seam: the loom runs at ASSEMBLY, where derived fields are already '
+      + 'computed, so the grid is a derived field of the declared entries.',
+    'A print surface — which is now MOSTLY BUILT: the arsenal wave\'s kakuro '
+      + 'render already draws a block/white cell matrix, and a crossword '
+      + 'skeleton is that plus entry numbers.',
+    'The floor: grid valid, every declared answer placed, crossings consistent, '
+      + 'and every answer findable in the book\'s own printed text — the '
+      + 'book-referential half of the ruling, which is what stops a clue whose '
+      + 'answer the reader has no way to know.'
+  ]
+};
 
 // ── Tier 4: excluded ────────────────────────────────────────────────────────
 // Named, never silently dropped. Each entry carries the law that excluded it,
