@@ -1556,6 +1556,71 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
   return { valid: errors.length === 0, errors: errors, warnings: warnings };
 }
 
+// ── The artifact-intent floor (W3 corrective wave, F07) ─────────────────────
+// A3 shipped COMPLETE — 6 weeks, 18 sessions, 14 fragments, three critic rounds,
+// finalMin 50 — with `meta.artifactIntent` absent. Not thin, not partial: the
+// key did not exist. No reading, no selectionReason, no arcFamily, no
+// mechanicGrammarFamily. The bench's lens audit printed the diagnosis
+// ("reading=MISSING selectionReason=MISSING") and the run continued, because
+// the surface was OBSERVED by a report-only lens and REQUIRED by nothing. Two
+// of four matrix books shipped that way.
+//
+// The schema is correctly additive-optional here — no corpus fixture carries an
+// artifactIntent, and hand-authored booklets predate the compiler — so the
+// demand can only live where generation policy lives: the stage gate, opt-in
+// through floorsOn(), which is the D111 shape exactly.
+//
+// PRESENCE + MINIMUM SHAPE, and no more. Menu conformance (briefMode,
+// fidelityMode, homePull, the exclusion arrays, the rejected readings) stays
+// advisory where it already is. What BLOCKS is the four things the surface must
+// carry for anything downstream to do its job: the two families that bind the
+// arc and the board, and a reading with a tone and the evidence it was taken
+// from. `tone` is load-bearing as of this same wave — the composition critic's
+// register axis grades the artifact against those exact words, so an empty tone
+// silently disarms the instrument built to catch the misread.
+//
+// DELIBERATELY NO SYNTHESIZER. `ensureArtifactIdentity` exists; `ensureArtifactIntent`
+// appears zero times in public/, and that asymmetry is now a ruling rather than
+// an oversight. A synthesized intent would satisfy every downstream consumer
+// with a reading no model ever made — worse than absence, because absence is
+// detectable and a fabricated reading grades as faithful. The floor causes a
+// retry; the retry causes an author.
+export function artifactIntentFloorErrors(meta, where) {
+  var errors = [];
+  var prefix = (where || 'Stage') + ' → meta.artifactIntent';
+  var intent = (meta && typeof meta === 'object') ? meta.artifactIntent : null;
+  if (!intent || typeof intent !== 'object') {
+    errors.push(prefix + ' is absent — the artifact planning bundle is this stage\'s '
+      + 'binding output (reading, arcFamily, mechanicGrammarFamily); every later stage writes '
+      + 'against it, and a booklet without it was never planned, only produced');
+    return errors;
+  }
+  if (!String(intent.arcFamily || '').trim()) {
+    errors.push(prefix + '.arcFamily is unset — declare the arc family that shapes the whole '
+      + 'tension curve: ' + VALID_ARC_FAMILIES.join(' | '));
+  }
+  if (!String(intent.mechanicGrammarFamily || '').trim()) {
+    errors.push(prefix + '.mechanicGrammarFamily is unset — declare what the world spends '
+      + 'against the player: ' + VALID_MECHANIC_GRAMMAR_FAMILIES.join(' | '));
+  }
+  var reading = (intent.reading && typeof intent.reading === 'object') ? intent.reading : null;
+  if (!reading) {
+    errors.push(prefix + '.reading is absent — record the winning reading of the brief '
+      + '(tone, register, povFrame, impliedSetting, emotionalArc, genreTemplate, ludicReading, '
+      + 'briefEvidence); an unrecorded reading cannot be audited or graded against');
+    return errors;
+  }
+  if (!String(reading.tone || '').trim()) {
+    errors.push(prefix + '.reading.tone is empty — the tone is the field that quotes the brief, '
+      + 'and the field the composition critic grades this book\'s register against');
+  }
+  if (!String(reading.briefEvidence || '').trim()) {
+    errors.push(prefix + '.reading.briefEvidence is empty — name the actual phrases in the brief '
+      + 'that drove this reading; an unevidenced reading cannot be checked against what was asked for');
+  }
+  return errors;
+}
+
 /**
  * Shell structural validation. Runs after shell stage (Stage 3).
  * Returns { valid: boolean, errors: string[] }
@@ -1635,6 +1700,11 @@ export function validateShellSchema(shell, expectedOptions) {
       errors.push('meta.artifactIdentity.componentDialect "' + shellDialect + '" is not a dialect this engine draws: '
         + VALID_COMPONENT_DIALECTS.join(' | '));
     }
+
+    // ── The artifact-intent floor (W3 corrective wave, F07) ──
+    // Same argument as the spine below: the standard pipeline runs the compiler
+    // HERE, so the planning bundle is declared here or nowhere on this path.
+    errors = errors.concat(artifactIntentFloorErrors(shell.meta, 'Shell'));
 
     // ── The closure floors (W4a) ──
     // The standard pipeline runs the compiler HERE, so the spine is declared
