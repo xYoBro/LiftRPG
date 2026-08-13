@@ -4,7 +4,10 @@
 
 import { DOCUMENT_TYPE_ALIASES, SUPPORTED_THEME_ARCHETYPES, THEME_ARCHETYPE_ALIASES,
   SCHEMA_VERSION,
-  MARK_STRIP, MARK_STRIP_TARGET_KINDS, RECKONING_SINK_KINDS, RECKONING_THRESHOLD_RATIO
+  MARK_STRIP, MARK_STRIP_TARGET_KINDS, RECKONING_SINK_KINDS, RECKONING_THRESHOLD_RATIO,
+  // D128 → W4a: `_assemblyDiagnostics` is pipeline debris and belongs under
+  // `_x` like the other nine. api-generator.js reads and deletes it there.
+  writePipelineDebris
 } from './constants.js';
 import {
   isValidWorkspaceStyle,
@@ -16,6 +19,15 @@ import {
   DEFAULT_WORKSPACE_STYLE,
   VALID_COMPONENT_DIALECTS
 } from '../../contracts/contract-constants.mjs';
+
+// W5b — the difficulty instrument. The solvers measure how much work a puzzle
+// actually took to prove; this module is where a DERIVED field gets written,
+// so the stamp lives here rather than in the validator that also runs them (a
+// validator that mutates is a validator nobody can reason about).
+import {
+  verifyConstrainedGrid,
+  verifyWordGrid
+} from '../../contracts/puzzle-solvers.mjs';
 
 // ── Structured Layer 2 diagnostics ──────────────────────────────────────────
 // Machine-readable diagnostic entries for assembly/normalization repairs.
@@ -1003,11 +1015,50 @@ export function normalizeOracleEntryKeys(week) {
 // Called by runJsonStage BEFORE retry decision. Applies deterministic fixes
 // that cost zero API calls. Idempotent — safe to call multiple times.
 
+/**
+ * stampPuzzleDifficulty(week)   (W5b)
+ *
+ * Record how hard each puzzle in this week actually was, measured by the same
+ * solver that proves it — inference-chain depth for a logic grid, line-solve
+ * passes for a nonogram, scan load for a word search.
+ *
+ * MACHINE-WRITTEN, NEVER AUTHORED. The prompt does not mention `difficulty`,
+ * so a model has no reason to invent one; if one arrives anyway it is
+ * overwritten, because a number nobody measured is worse than no number. Only
+ * a puzzle that PASSES gets stamped: a failing solve has no honest score, and
+ * the week is about to be refused anyway.
+ *
+ * Nothing consumes this yet. It exists so a later wave can key puzzle hardness
+ * to the load curve (the sudoku-academy law) without re-solving the book to
+ * find out how hard it was — W5b records, and builds no curve enforcement.
+ */
+export function stampPuzzleDifficulty(week) {
+  var fo = (week || {}).fieldOps;
+  if (!fo) return;
+  if (fo.constrainedGrid) {
+    var g = verifyConstrainedGrid(fo.constrainedGrid);
+    if (g.ok && g.difficulty) {
+      fo.constrainedGrid.difficulty = { score: g.difficulty.score, basis: g.difficulty.basis };
+    } else {
+      delete fo.constrainedGrid.difficulty;
+    }
+  }
+  if (fo.wordGrid) {
+    var w = verifyWordGrid(fo.wordGrid);
+    if (w.ok && w.difficulty) {
+      fo.wordGrid.difficulty = { score: w.difficulty.score, basis: w.difficulty.basis };
+    } else {
+      delete fo.wordGrid.difficulty;
+    }
+  }
+}
+
 export function autoRepairWeek(result, context) {
   if (!result) return result;
   normalizeCompanionComponents(result);
   normalizeOracleKey(result);
   normalizeOracleEntryKeys(result);
+  stampPuzzleDifficulty(result);
   if (Array.isArray(result.sessions)) {
     result.overflow = result.sessions.length > 3;
   }
@@ -1942,7 +1993,7 @@ export function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, ending
   diagnoseIdentityPreservation(booklet, shell.meta, diag);
 
   // Attach structured diagnostics (survives JSON serialization)
-  booklet._assemblyDiagnostics = diag;
+  writePipelineDebris(booklet, '_assemblyDiagnostics', diag);
 
   return booklet;
 }
@@ -2047,7 +2098,7 @@ export function assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutp
   diagnoseIdentityPreservation(booklet, shell.meta, diag);
 
   // Attach structured diagnostics (survives JSON serialization)
-  booklet._assemblyDiagnostics = diag;
+  writePipelineDebris(booklet, '_assemblyDiagnostics', diag);
 
   return booklet;
 }
@@ -2821,7 +2872,7 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
   diagnoseCipherVariety(booklet, skeleton.weekPlan || [], diag);
 
   // Attach structured diagnostics (survives JSON serialization)
-  booklet._assemblyDiagnostics = diag;
+  writePipelineDebris(booklet, '_assemblyDiagnostics', diag);
 
   return booklet;
 }

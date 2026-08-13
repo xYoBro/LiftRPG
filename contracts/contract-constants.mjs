@@ -29,6 +29,77 @@ export var ACCEPTED_SCHEMA_VERSIONS = ['1.4.0', '1.5.0'];
 // level). The schema forbids unknown keys everywhere else.
 export var EXTENSION_KEY = '_x';
 
+// ── Pipeline debris: the keys, and the one place they may live (D128 → W4a) ──
+// The rule above is not new — the schema has said "`_x` is the ONLY place for
+// non-contract data (pipeline telemetry, migration residue)" since 1.4. The
+// pipelines were writing ten of these at TOP LEVEL anyway, where
+// `additionalProperties: false` rejects every one of them, so every booklet the
+// real API path has ever produced carried contract violations by construction
+// (D128 found six; the sweep that landed this constant found four more).
+//
+// This list is therefore the CLASS, not the six that were noticed. The failure
+// that earned the difference: `_criticReport` was missing from BOTH
+// hand-maintained debris lists (migrate-1.4.mjs DEBRIS_KEYS and index.html
+// stripInternalKeys), so it survived migration AND the user-facing JSON
+// download — the one debris field that reached a user's disk unstripped.
+//
+// The keys keep their leading underscore INSIDE `_x` (`_x._criticReport`, not
+// `_x.criticReport`). It reads redundantly and it is deliberate: one name means
+// the legacy fallback is one-to-one, the top-level scan in validate.mjs is
+// exact, and there is no second spelling for a list to drift against.
+export var PIPELINE_DEBRIS_KEYS = [
+  '_pipeline', '_stageTelemetry', '_qualityGate', '_qualityReport',
+  '_assemblyWarnings', '_continuityWarnings', '_assemblyDiagnostics',
+  '_artifactIntentDrift', '_trialMode', '_criticReport',
+  // W4b: the simulated player's walk. Recorded rather than only logged for the
+  // D19 reason every other report here is — a book ships with its critique
+  // attached, and "the walker found two soft-locks" belongs in the artifact a
+  // reader opens later, not in a console nobody kept.
+  '_simReport'
+];
+
+/**
+ * readPipelineDebris(booklet, key) -> value | undefined
+ *
+ * The one reader. Prefers the lawful home (`_x`), falls back to the legacy
+ * top-level position so every booklet generated before this landed still reads
+ * — the bench's saved runs, uploaded checkpoints, and the eval history are all
+ * pre-move documents and none of them are regenerable.
+ *
+ * SINGLE HOME (D93): four trees consume debris (eval-bench, playthrough-audit,
+ * quality.js, the landing page) and a fallback re-implemented per consumer is
+ * exactly how one of them ends up reading only the new position and reporting
+ * a clean $0 run that actually failed. Guarded by singleDeclarationHomes().
+ */
+export function readPipelineDebris(booklet, key) {
+  if (!booklet || typeof booklet !== 'object') return undefined;
+  var ext = booklet[EXTENSION_KEY];
+  if (ext && typeof ext === 'object' && ext[key] !== undefined) return ext[key];
+  return booklet[key];
+}
+
+/**
+ * writePipelineDebris(booklet, key, value) -> booklet
+ *
+ * The one writer, and the reason the move cannot half-happen: a pipeline that
+ * assigns `booklet._criticReport = x` directly is caught by the top-level scan
+ * in validate.mjs, and the only way to satisfy that scan is this function.
+ * Creates `_x` on demand; refuses keys outside the declared class so a
+ * eleventh debris field has to be declared above before it can be written.
+ */
+export function writePipelineDebris(booklet, key, value) {
+  if (!booklet || typeof booklet !== 'object') return booklet;
+  if (PIPELINE_DEBRIS_KEYS.indexOf(key) === -1) {
+    throw new Error('writePipelineDebris: "' + key + '" is not a declared debris key — '
+      + 'add it to PIPELINE_DEBRIS_KEYS in contracts/contract-constants.mjs first');
+  }
+  if (!booklet[EXTENSION_KEY] || typeof booklet[EXTENSION_KEY] !== 'object') {
+    booklet[EXTENSION_KEY] = {};
+  }
+  booklet[EXTENSION_KEY][key] = value;
+  return booklet;
+}
+
 // ── Document types ───────────────────────────────────────────────────────────
 
 export var DOCUMENT_TYPE_ENUM = [
@@ -145,6 +216,70 @@ export var DEMOTED_COMPANION_TYPES = ['token-sheet', 'overlay-window'];
 export var GENERATION_COMPANION_MENU = VALID_COMPANION_TYPES.filter(
   function (type) { return DEMOTED_COMPANION_TYPES.indexOf(type) === -1; }
 );
+
+// ── The cipher-technique menu, and the ceiling it puts on the variety floor ─
+//
+// THE DEFECT THIS CLOSES (W3 length audit, 2026-08-13). `cipherVarietyFloor`
+// was `min(max(n-2,3), max(n-1,1))` — 4 at six weeks, which is the Teeth
+// Round's stated floor and correct there. It has no ceiling, so it scaled to 6
+// at eight weeks, 8 at ten, and 10 at twelve. The largest vocabulary any prompt
+// surface offers a model is the list below. A BLOCKING gate that demands ten
+// distinct techniques while the doctrine teaches eight is not a high standard;
+// it is a stage the model can only satisfy by inventing vocabulary the same
+// doctrine tells it not to invent, and every retry spends money to fail the
+// same way.
+//
+// SO THE FLOOR IS DERIVED-OR-STRICT: demand min(f(weeks), menu size), with the
+// size READ from this array. A literal ceiling here would be the same defect
+// one level up — a number that stops being true the first time a technique is
+// added or retired.
+//
+// ONE HOME, TWO AUDIENCES, the D124 idiom. This array is what the model is
+// OFFERED (INST_CIPHER_DESIGN quotes it exactly, both directions, asserted by
+// `cipherMenuParity()` in validate.mjs) and simultaneously what the floor may
+// demand. They cannot drift, because there is only one list.
+//
+// NOT THE SAME VOCABULARY AS `CIPHER_FAMILY_REGISTRY`, deliberately. That
+// registry (renderer/modules/mechanic-registry.js) maps machine `sourceType`
+// tokens — `substitution`, `path-tracing` — onto five RENDER-side family
+// labels for differentiation measurement, and collapses everything else to
+// `custom-cipher`. It classifies books after the fact; this menu is the
+// authoring vocabulary a model chooses from. Asserting a correspondence
+// between them would be inventing one: the two lists answer different
+// questions and are allowed to differ in length.
+export var GENERATION_CIPHER_TECHNIQUES = [
+  'constraint logic',
+  'spatial route reading',
+  'fragment cross-reference',
+  'pattern recognition',
+  'typographic anomaly',
+  'observational anomaly hunting',
+  'metapuzzle assembly',
+  'process deduction'
+];
+
+// The floor below which no book of any length drops. Three techniques is what
+// a four-week book (three non-boss weeks) can carry, and it is the number the
+// existing formula already produced there.
+export var CIPHER_VARIETY_MIN = 3;
+
+// ── How long a generated book may be ────────────────────────────────────────
+//
+// `parseWeekCount()` in generator.js has clamped to these two numbers since it
+// was written; they lived only there, as literals inside a Math.max/Math.min
+// pair. Hoisted for two reasons, both W7:
+//
+//   1. `weekCountLiteralScan()` in validate.mjs needs a THRESHOLD it can
+//      defend. A prompt line that says "two weeks" is a subset quantifier and
+//      stays true at every legal length; a line that says "six weeks" is a
+//      claim about the whole book, and the whole book is not a constant. `min`
+//      is exactly the line between those two readings — no number below it can
+//      be describing the book's length, because no book is that short.
+//   2. A second copy of the clamp would drift, and the clamp is what decides
+//      whether a 16-week canonical program is planned at 16 or silently at 12.
+//
+// PARITY: validate.mjs asserts generator.js's clamp still quotes these values.
+export var BOOK_WEEK_BOUNDS = { min: 4, max: 12 };
 
 // percentile-stat value bounds — a d100 roll-under target must leave room to
 // fail (1-99) and the printed track holds at most one value per week.
@@ -842,6 +977,363 @@ export var REJECTED_READING_FIELDS = ['axis', 'value', 'oneLiner'];
 
 export var REJECTED_READING_AXES = ['mechanicGrammarFamily', 'arcFamily', 'povFrame'];
 
+// ════════════════════════════════════════════════════════════════════════════
+// THE LUDIC SPINE (VISION §4.4 · PLAY.md §3 · Wave 4a)
+// ════════════════════════════════════════════════════════════════════════════
+// Play is global — the fourth constitution. Fun cannot be requested per
+// component: every component is generated to be good AS a component, and a book
+// of competent components can still be a series of things to do. So the
+// composition is DECLARED before content exists, and the declaration is what
+// the floors can hold.
+//
+// Everything below is the vocabulary that declaration is written in. The shapes
+// live in booklet-schema.mjs (meta.playSpine, weeks[].fusionBeat); the demands
+// live in prompt_rules.js; the teeth live in validation.js under
+// generationFloors. This file owns only the closed sets, so no surface can
+// invent a sixth marking or an eleventh library entry on its own.
+
+// ── Dynamic markings (the FUSION §6 promotion) ──────────────────────────────
+// FUSION §4.1's fusion score has always demanded "a dynamic marking (which
+// weeks are loud, which sparse)"; until now nothing stored one, so the score
+// was G-class — asked for, never held. A FIVE-STEP ORDINAL rather than free
+// strings, and the reason is the D114 evidence frame: it already builds a
+// per-week prose-volume curve indexed to the book's own maximum, so a marking
+// on a comparable scale can be checked AGAINST that curve. "hushed" and
+// "muted" and "quiet" as three free strings would cost that comparison and
+// leave the marking decorative, which is what it already was.
+//
+// Ordered quiet → loud. The order is load-bearing (an ordinal is only an
+// ordinal if the index means something); never alphabetize this array.
+export var VALID_DYNAMIC_MARKINGS = ['quiet', 'spare', 'steady', 'full', 'loud'];
+
+// ── The Ludic Library: the implemented shelf ────────────────────────────────
+// PLAY.md §1 names two shelves. This is the IMPLEMENTED one — the playable
+// families a generated book can already print today — and it is deliberately
+// seeded from the atoms that exist rather than from the research menu, because
+// a composition naming something unrenderable is a promise the engine breaks
+// silently (the honest-when-lacking law exists precisely so the model says
+// "the library lacks this" instead of inventing an entry).
+//
+// Entries are named for what they PLAY, not for the file that draws them: a
+// composition reads "the spend economy wired to the decode chain", never
+// "session-card + cipher-panel". LUDIC_LIBRARY_ATOMS carries the binding, and
+// validate.mjs proves every atom named there is one the LiftRPG adapter
+// actually emits — which is what keeps this list derived from the engine
+// instead of aspirational.
+//
+// W5 (the Ludic Harvest) widens this from the researched shelf and gives each
+// entry its Inputs/Process/Outputs/Locks. Until then: ten entries, and
+// `honestGaps` is where everything else goes.
+export var LUDIC_LIBRARY = [
+  'reckoning-economy',  // markStrip ticks → tally → Banked → priced spends
+  'board',              // the map: 6 geometries under 8 board-state modes
+  'decode-chain',       // the weekly cipher and its workspace
+  'clock-bank',         // fill / drain / race / tug-of-war pressure
+  'companion-kit',      // the state-holding components (dashboards, tracks, stats)
+  'oracle-pull',        // the d100 leg of the Hook loop
+  'door-fork',          // the week's posted choice, priced on the reward side
+  'sealed-cache',       // sealed-by-honor content and the key that opens it
+  'boss-convergence',   // the convergence ceremony, assembly, and the locked finale
+  'ledger-audit',       // the body audited: first / peak / change per movement
+  // W5b — the harvest's first PROMOTION. `deduction-board` was tier 3 (needs a
+  // new primitive) until the constrained-grid atom and its solver landed; it is
+  // named for what it plays, not for the file, exactly like every entry above.
+  // What is still tier 3 is the ARITHMETIC grid (kakuro, KenKen), which needs a
+  // different solver — see contracts/ludic-library.mjs.
+  'deduction-board',    // the logic grid and the nonogram, proven solvable
+  'word-hunt'           // the letter board, every word machine-verified in it
+];
+
+// The binding that makes the library non-aspirational. Keys ≡ LUDIC_LIBRARY
+// (validator-asserted); every value names atom types the LiftRPG adapter emits
+// (validator-asserted against liftrpg-adapter.js, the reachability authority —
+// an atom that registers but is never emitted is D6-quarantined and cannot
+// carry a library entry).
+export var LUDIC_LIBRARY_ATOMS = {
+  'reckoning-economy': ['session-card', 'reckoning-panel'],
+  'board': ['map-panel'],
+  'decode-chain': ['cipher-panel'],
+  'clock-bank': ['clocks-panel'],
+  'companion-kit': ['tracker'],
+  'oracle-pull': ['oracle-table'],
+  'door-fork': ['week-header'],
+  'sealed-cache': ['fragment-doc'],
+  'boss-convergence': ['boss-encounter', 'assembly-page', 'ending'],
+  'ledger-audit': ['ledger-spread'],
+  'deduction-board': ['constrained-grid'],
+  'word-hunt': ['word-grid']
+};
+
+// ── Spine budgets ───────────────────────────────────────────────────────────
+// The arity rule is the anti-house-economy law made numeric. TWO is the floor
+// because one entry is not a composition — it is a single-family pick, which is
+// the thing §4.6 forbids by name. FOUR is the ceiling because a six-week book
+// that wires five systems teaches none of them; the tension budget has nowhere
+// to put a fifth.
+//
+// consequenceWithinWeeks is the echo law's clock: a fillable thing must be
+// answered by a surface within this many weeks. 0 means "in the same week", and
+// 2 is the ceiling because an answer three weeks out is not an echo, it is a
+// coincidence the player has stopped waiting for.
+export var SPINE_BUDGETS = {
+  compositionMin: 2,
+  compositionMax: 4,
+  consequenceWithinWeeksMax: 2,
+  consequenceWithinWeeksDefault: 1,
+  // ── The harvest budgets (W5a) ─────────────────────────────────────────────
+  // THREE RUNGS is EXIT's own ladder (clue 1 → clue 2 → solution) and the
+  // ceiling rather than the target: a fourth rung is the answer written twice.
+  // A one-rung "ladder" is a hint, not a ladder, so two is the floor.
+  hintRungsMin: 2,
+  hintRungsMax: 3,
+  // Milestones are the deduction beats a book can carry without becoming a
+  // checklist. Four is the ceiling for the same reason the composition's is:
+  // a book that unlocks five theories has taught the player none of them.
+  milestonesMax: 4,
+  // Ladders per book. One puzzle family stalls a player; five costed ladders
+  // is a walkthrough with a receipt.
+  hintLaddersMax: 3
+};
+
+// ── The harvest vocabulary (W5a — the Ludic Harvest, tranche 1) ─────────────
+// The tier-2 PATTERNS from the Ludic Library registry
+// (contracts/ludic-library.mjs) that landed a declaration surface. Every enum
+// below is quoted into INST_LUDIC_SPINE and checked both directions, the D124
+// idiom: a menu that offers what the floors reject costs a retry the model
+// cannot fix, and a floor that gates on what no menu offers fails every
+// attempt.
+
+// Nicholson's three puzzle organisations, as cited in the escape-room-as-
+// analog-computing analysis. Declared per book, and DERIVABLE from the economy
+// graph — which is the whole reason it is an enum rather than prose: the floor
+// reads the declared structure back off the graph the book actually wired.
+export var VALID_GATE_STRUCTURES = ['open', 'sequential', 'path-based'];
+
+// What each structure OWES the graph. The floor reads these; the prompt quotes
+// them. Stated as numbers rather than adjectives because "several leads" is not
+// checkable and "three feeders into one sink" is.
+//
+//   minChainLength   the longest path in edges the graph must contain
+//   minConvergence   the most distinct feeders any one node must take
+//   minLeads         how many distinct PUZZLE surfaces must sit on a path to a
+//                    sink — the count of live leads, not of source edges, so a
+//                    book cannot satisfy "open" by naming six markStrips
+//
+// THE LADDER IS DELIBERATE AND SEQUENTIAL IS THE WEAKEST CLAIM. Three edges is
+// the canonical LiftRPG pipeline — marks tally, the tally banks, the bank buys
+// something — so a book that wires only that CAN honestly say "sequential", and
+// every connected economy has at least one legal declaration. It is not free:
+// two edges is a tally that banks and never spends, which is a chain with no
+// second question. The other two claims cost real structure, because the thing
+// that distinguishes them from a pipeline is convergence: "open" is Nicholson's
+// several-leads-one-meta (three feeders into one surface) and "path-based" is
+// two lanes that meet. A book with three leads that converge nowhere can
+// declare none of the three, and that is the correct answer rather than a gap —
+// nothing the player earns reaches the finale, which is the founding defect
+// PLAY.md §2 names.
+export var GATE_STRUCTURE_SHAPES = {
+  'open': { minChainLength: 2, minConvergence: 3, minLeads: 3 },
+  'sequential': { minChainLength: 3, minConvergence: 1, minLeads: 1 },
+  'path-based': { minChainLength: 3, minConvergence: 2, minLeads: 2 }
+};
+
+// The legacy moves a pencil can perform. Daviau's permanent change, filtered by
+// the pencil-only law: every one of these is performable with graphite and
+// honour, and none of them needs a sticker, a seal, or a pair of scissors.
+//
+// SPELLING NOTE: `sealed-by-honour` carries the -our the schema comment and the
+// prompt already use ("the honour system IS the mechanism"). PLAY.md §4.2
+// spells the same idea -or in prose. The ENUM is the machine name; the prose is
+// prose. Do not "fix" one to match the other — the parity pass quotes this
+// constant, so a rename here is a rename in the prompt, and nowhere else.
+export var VALID_LEGACY_MOVES = [
+  'cross-out-forever',
+  'permanent-map-mutation',
+  'standing-rule-unlock',
+  'sealed-by-honour',
+  'session-count-gate'
+];
+
+// ── The puzzle vocabulary (W5b — the Ludic Harvest, tranche 2) ──────────────
+// Two tier-3 families promoted out of the Ludic Library registry, and the ONE
+// law that makes them different from everything else the pipeline generates:
+// NO PUZZLE SHIPS UNSOLVED-BY-MACHINE. Every enum below exists because a
+// deterministic solver (contracts/puzzle-solvers.mjs) has to dispatch on it,
+// which is also why the lists are short — a value with no solver branch is a
+// puzzle the gate cannot refuse, and an unrefusable puzzle is one the player
+// discovers is broken at the gym.
+//
+// KAKURO AND KENKEN ARE DELIBERATELY ABSENT, and so is the dense crossword.
+// The registry entries name them; this enum does not, because a family whose
+// solver has not been written is a family the schema must not accept. When one
+// lands, it is one enum value, one solver branch, and one prompt menu row.
+
+export var VALID_CONSTRAINED_GRID_KINDS = ['logic-grid', 'nonogram'];
+
+// The four clue forms a logic grid may carry. Closed, and closed on purpose:
+// each one is a propagation rule in the solver AND a way the puzzle can be
+// wrong, so a fifth form is a fifth rule and a fifth failure mode. These four
+// are what real logic-grid clues actually say — "X is Y", "X is not Y", "the
+// one who did P also did Q", "the one who did P did not do Q".
+export var VALID_LOGIC_CLUE_TYPES = ['is', 'not', 'same', 'differs'];
+
+// How a solved grid yields the code the economy reads. Every mode is a
+// machine-executable derivation from the SOLUTION — never an assertion about
+// it — because obligation (c) of the solver law is that the printed key is
+// what the puzzle actually produces.
+//
+//   cell        one subject's value in one category
+//   initials    the first letters of a category, in subject order
+export var VALID_LOGIC_ANSWER_MODES = ['cell', 'initials'];
+
+// A nonogram's only answer mode, and the reasoning is in the solver's own
+// header: a picture cannot be key-matched, a sparse grid of characters can.
+// Shade the cells, read the characters that landed inside the picture.
+export var VALID_NONOGRAM_ANSWER_MODES = ['grid-letters'];
+
+export var VALID_WORD_GRID_KINDS = ['word-search'];
+
+// The eight reading directions of a word search. Order is quiet → loud in the
+// sense the difficulty proxy uses: the first three read forwards, the rest
+// read backwards or on a diagonal and cost more to scan.
+export var VALID_WORD_SEARCH_DIRECTIONS = ['E', 'S', 'SE', 'NE', 'W', 'N', 'SW', 'NW'];
+
+//   leftovers   the uncovered cells, row by row — the classic
+//   word        one entry from the list, named by 1-based index
+export var VALID_WORD_GRID_ANSWER_MODES = ['leftovers', 'word'];
+
+// ── Branch refs: `door:W3/A` ────────────────────────────────────────────────
+// An economy edge may declare WHICH SIDE of a fork carries it. Before this,
+// `doorChoice` carried optionA/optionB with a label and a lean and nothing
+// machine-readable, so the two branches were two names for one thing: the W4b
+// simulated player could only report "reachable through a door, and the spine
+// does not say which side" and had to escalate true per-branch simulation as a
+// product decision. This is that decision, taken.
+//
+// THE GRAMMAR IS A SUFFIX, NOT A NEW KIND, and that is load-bearing. `door:W3`
+// stays one node in the gate graph — the door the player reaches — because a
+// door is TAKEN, not earned, and splitting it into two nodes would make the
+// door itself contingent on itself. The BRANCH rides on the edge instead, so
+// attributing a side never changes the topology, only which walk sees the edge.
+//
+// Exactly two sides, A and B, because `doorChoice` prints exactly two options.
+// A three-way fork is a different printed surface and would need its own.
+export var BRANCH_OPTIONS = ['A', 'B'];
+
+export var BRANCH_REF_PATTERN = '^door:\\s*\\S.*/(?:' + BRANCH_OPTIONS.join('|') + ')$';
+
+/**
+ * parseBranchRef(ref) -> { doorRef, option, valid, raw }
+ *
+ * `door:W3/A` -> { doorRef: 'door:W3', option: 'A', valid: true }.
+ *
+ * Case-insensitive on the kind and the option (the pattern carries the
+ * canonical spellings because it is quoted into prompt doctrine), and it
+ * returns the DOOR REF rather than the door id so callers can hand the result
+ * straight to parseSurfaceRef without rebuilding the string — the rebuild is
+ * where a `door: W3` with a space would have lost its match.
+ *
+ * ONE PARAMETERIZED RESOLVER (D93), same split as parseSurfaceRef above: this
+ * owns the grammar, the booklet's inventory of doors lives in validation.js and
+ * in the sim's own reader.
+ */
+export function parseBranchRef(ref) {
+  var raw = String(ref == null ? '' : ref).trim();
+  var out = { doorRef: '', option: '', valid: false, raw: raw };
+  if (!raw) return out;
+  var slash = raw.lastIndexOf('/');
+  if (slash <= 0) return out;
+  var head = raw.slice(0, slash).trim();
+  var tail = raw.slice(slash + 1).trim().toUpperCase();
+  if (BRANCH_OPTIONS.indexOf(tail) === -1) return out;
+  var parsed = parseSurfaceRef(head);
+  if (!parsed.valid || parsed.kind !== 'door') return out;
+  out.doorRef = 'door:' + parsed.id;
+  out.option = tail;
+  out.valid = true;
+  return out;
+}
+
+// ── The surface-ref grammar ─────────────────────────────────────────────────
+// Spine edges point at surfaces, and a pointer nobody can resolve is a promise
+// nobody can check. This extends the precedent the manifestPointer / citeRef
+// channels already set: a ref is a STRING with a kind prefix, so the grammar is
+// readable by a model, quotable into a prompt, and parseable by a machine.
+//
+//   kind:id   — `week:W3` `session:W3.2` `markStrip:W3.2` `reckoning:W3`
+//               `clock:Relief Ledger` `oracle:W4` `cipher:W2` `map:West Run`
+//               `companion:Standing` `fragment:F.07` `door:W5` `seal:F.07`
+//               `ending:E2`
+//   singleton — `banked` `boss` `assembly`: the three surfaces a book has at
+//               most one of, so naming an id would be noise.
+//
+// ONE PARAMETERIZED RESOLVER (D93). The split against buildSurfaceIndex in
+// validation.js is deliberate and stated so nobody "unifies" it later: this
+// function owns the GRAMMAR (is this a well-formed ref, and of what kind),
+// which is closed, dependency-free, and needed by prompt parity checks and the
+// W4b simulated player alike. The INDEX — which surfaces a given booklet
+// actually prints — owns booklet traversal and lives beside the other booklet
+// walkers in validation.js. Grammar here, inventory there.
+export var SURFACE_REF_KINDS = [
+  'week', 'session', 'markStrip', 'reckoning', 'clock', 'oracle', 'cipher',
+  'map', 'companion', 'fragment', 'door', 'seal', 'ending'
+];
+
+export var SURFACE_REF_SINGLETONS = ['banked', 'boss', 'assembly'];
+
+// Regex SOURCE (a string, not a RegExp — this file is read by Node, the
+// browser, and the prompt-parity pass), built FROM the arrays so a new kind
+// cannot land without the pattern following it.
+//
+// MATCH IT CASE-INSENSITIVELY (`new RegExp(SURFACE_REF_PATTERN, 'i')`). The
+// pattern carries the CANONICAL spellings because it is quoted into prompt
+// doctrine, where `markStrip:` is what the model should read; parseSurfaceRef
+// accepts any casing, so a case-sensitive consumer would reject refs the
+// resolver happily parses.
+export var SURFACE_REF_PATTERN =
+  '^(?:(?:' + SURFACE_REF_KINDS.join('|') + '):\\s*\\S.*|(?:'
+  + SURFACE_REF_SINGLETONS.join('|') + '))$';
+
+/**
+ * parseSurfaceRef(ref) -> { kind, id, valid, raw }
+ *
+ * `kind` is the canonical spelling from the arrays above (matching is
+ * case-insensitive so `Clock:` and `markstrip:` parse, but the canonical form
+ * is what comes back — consumers index by it). `id` is '' for singletons.
+ * `valid` false means the string is not a ref at all, which is a different
+ * finding from a ref that parses but resolves to nothing: the first is a
+ * grammar error the model can fix from the message, the second needs the book.
+ */
+export function parseSurfaceRef(ref) {
+  var raw = String(ref == null ? '' : ref).trim();
+  var out = { kind: '', id: '', valid: false, raw: raw };
+  if (!raw) return out;
+
+  var lowered = raw.toLowerCase();
+  for (var s = 0; s < SURFACE_REF_SINGLETONS.length; s++) {
+    if (lowered === SURFACE_REF_SINGLETONS[s]) {
+      out.kind = SURFACE_REF_SINGLETONS[s];
+      out.valid = true;
+      return out;
+    }
+  }
+
+  var colon = raw.indexOf(':');
+  if (colon <= 0) return out;
+  var head = raw.slice(0, colon).trim().toLowerCase();
+  var tail = raw.slice(colon + 1).trim();
+  if (!tail) return out;
+
+  for (var k = 0; k < SURFACE_REF_KINDS.length; k++) {
+    if (SURFACE_REF_KINDS[k].toLowerCase() !== head) continue;
+    out.kind = SURFACE_REF_KINDS[k];
+    out.id = tail;
+    out.valid = true;
+    return out;
+  }
+  return out;
+}
+
 /**
  * resolveShellFamily(rawShellFamily, artifactClass, themeArchetype) -> family
  *
@@ -954,7 +1446,54 @@ export var SPATIAL_GUARDRAILS = {
   linearTrack: { minPositions: 3, maxPositions: 12 },
   playerDrawn: { maxPrompts: 4, maxSeedMarkers: 3 },
   cipher: { displayTextMaxChars: 350, extractionInstructionMaxChars: 200 },
-  oracle: { entryCount: 10 }
+  oracle: { entryCount: 10 },
+  // ── The puzzle grids (W5b) ────────────────────────────────────────────────
+  // These guardrails are load-bearing in a way the map ones are not: they are
+  // what keeps the SOLVER's uniqueness proof tractable. The escalation valve
+  // for a pathological puzzle is a tighter number here, never a weaker floor —
+  // "we could not prove it" and "it is broken" are the same thing to a player
+  // holding a pencil.
+  //
+  // Two-tier where the render can honestly absorb more than generation asks
+  // for (the ptp idiom), single-tier where it cannot and the reason is stated.
+  logicGrid: {
+    // Generation policy. Five subjects is the sweet spot for a half-letter
+    // page: the grid is subjects x (subjects x categories) cells, so five by
+    // two is already 5 rows of 10 boxes.
+    minSubjects: 3,
+    maxSubjects: 5,
+    minClues: 2,
+    maxClues: 12,
+    labelMaxChars: 22,
+    // Render ceiling — one more row than generation asks for, because a
+    // six-subject grid still fits and the corpus should not reject a good
+    // hand-authored one. 6! per category is also the point where exhaustive
+    // uniqueness stays instant (720 permutations).
+    renderMaxSubjects: 6,
+    // SINGLE TIER, like concentric: two category groups is what the printed
+    // grid draws. A third group is not denser, it is a second page — and the
+    // solver's cost is (subjects!)^categories, so the ceiling is where the
+    // proof stops being free.
+    maxCategories: 2
+  },
+  nonogram: {
+    // Square-ish and small. Below 5 there is nothing to deduce; above 10 the
+    // clue gutters eat the page and line-solving starts needing search.
+    minSize: 5,
+    maxSize: 10,
+    // Render ceiling. The solver protects itself independently at 30 (32-bit
+    // line masks); this is the printable limit.
+    renderMaxSize: 15
+  },
+  wordSearch: {
+    minSize: 6,
+    maxSize: 12,
+    renderMaxSize: 15,
+    minWords: 4,
+    maxWords: 10,
+    wordMinChars: 3,
+    wordMaxChars: 12
+  }
 };
 
 // ── Crypto contract ──────────────────────────────────────────────────────────

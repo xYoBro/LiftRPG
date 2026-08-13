@@ -35,6 +35,8 @@ import {
   CRITIC_MAX_REVISIONS_PER_ROUND,
   CRITIC_DIMENSIONS,
   STRUCTURAL_REOPEN_SCOPES,
+  CONDUCTOR_MECHANISMS,
+  CONDUCTOR_MAX_FINDINGS,
   STAGE_BUDGETS,
   RETRY_TIMEOUT_GROWTH,
   RETRY_TIMEOUT_CEILING_MS,
@@ -42,13 +44,20 @@ import {
   // structured schemas below so a compat transport enforces what the stage
   // validators enforce.
   VALID_COMPONENT_DIALECTS,
-  OUTPUT_BUDGETS
+  OUTPUT_BUDGETS,
+  // D128 → W4a: pipeline debris lives under `_x`, the only home the schema
+  // has ever allowed it. These two are the whole move — a direct
+  // `booklet._foo =` is caught by pipelineDebrisHome() in validate.mjs.
+  readPipelineDebris,
+  writePipelineDebris
 } from './modules/constants.js';
 
 import {
   buildCriticDigest,
   buildFusionFrame,
   formatFusionFrameBlock,
+  buildSpineFrame,
+  formatSpineFrameBlock,
   validateCriticVerdict,
   normalizeCriticVerdict,
   summarizeVerdict,
@@ -115,13 +124,40 @@ import {
   collectNounRosterFindings,
   collectVoiceTicFindings,
   collectLicensedMovePlacementFindings,
-  scanTerminalVoiceTics
+  scanTerminalVoiceTics,
+  // W7. The prompt builders live in generator.js, a classic IIFE that cannot
+  // import — so the floor reaches them the way the topology digest already
+  // does: registered on `window` as a side effect of loading this module (see
+  // the registration below). Two builders used to carry a hand-copied
+  // `Math.min(Math.max(weekCount - 2, 3), ...)` each, which is three homes for
+  // one number and exactly the drift class D91 named.
+  cipherVarietyFloor
 } from './modules/validation.js';
 
 import {
   buildQualityGate,
-  generateQualityReport
+  generateQualityReport,
+  collectMotifCrossRegistrationFindings
 } from './modules/quality.js';
+
+// The walker itself, for the critic's soft-finding channel. The gate reaches it
+// through validateAssembledBooklet; the critic needs it directly because it
+// re-measures each round after accepted revisions.
+import { simulateBook, simSoftFindings } from './modules/sim-player.js';
+
+// The third referee (FUSION §4 mechanism 6). Its pure half lives in its own
+// module for the same reason the walker's does: it is a distinct reading with
+// its own vocabulary, its own abstention rule, and its own projection of the
+// booklet — not a helper of the critic's verdict.
+import {
+  buildConductorScore,
+  formatConductorScoreBlock,
+  validateConductorReport,
+  normalizeConductorReport,
+  conductorFailures,
+  formatConductorReportBlock,
+  conductorSummaryLine
+} from './modules/conductor.js';
 
 import {
   getDailyBudget,
@@ -179,7 +215,8 @@ import { looksLikeDeloadWeek } from './modules/workout-topology.js';
 // self-registers on window for index.html's program-lookup affordance.
 import {
   looksLikeLiftoscript,
-  normalizeCanonicalWorkout
+  normalizeCanonicalWorkout,
+  extendCanonicalWorkout
 } from './modules/liftosaur.js';
 
 
@@ -540,6 +577,9 @@ var STRUCTURED_SCHEMA_SHELL = {
       },
       required: ['schemaVersion', 'blockTitle', 'worldContract', 'narrativeVoice',
         'literaryRegister', 'structuralShape', 'artifactIdentity', 'weeklyComponentType']
+      // NOTE: `playSpine` is deliberately absent from this literal and from the
+      // required list above. It is injected by withPlaySpine() below, from the
+      // one copy prompt_rules.js owns. See that function.
     },
     cover: {
       type: 'object',
@@ -607,6 +647,50 @@ var STRUCTURED_SCHEMA_SHELL = {
   },
   required: ['meta', 'cover', 'rulesSpread', 'theme']
 };
+
+/**
+ * withPlaySpine(schema) -> schema with meta.playSpine demanded
+ *
+ * ONE STRUCTURED SPINE LITERAL, BORROWED (W5a). prompt_rules.js owns it —
+ * a stage schema is what a compat transport enforces on the model, which makes
+ * it prompt content, and the file that owns prompt content owns this too. This
+ * reaches it through the same `window` hop the skeleton stage already uses for
+ * `window.STRUCTURED_SCHEMA_SKELETON` twenty lines from here.
+ *
+ * WHY THIS EXISTS AT ALL: W4a made `meta.playSpine` required in prose and
+ * blocking at the closure floors, and put it in NEITHER structured literal. A
+ * model answering under a strict structured mode was being asked for a field
+ * its schema never mentioned — and in the strictest modes the field would have
+ * been dropped in transit, so every attempt would fail on something no model
+ * could deliver. Found on contact in W5a and fixed here.
+ *
+ * FAILS LOUD, never silently: without prompt_rules.js there is no spine literal
+ * to inject, and shipping the un-spined schema would put the pipeline right back
+ * in the state above — retrying forever against a floor it cannot satisfy. Any
+ * page or harness that reaches this line has already loaded prompt_rules for a
+ * dozen INST_ sections, so the throw is unreachable in practice and diagnostic
+ * when it is not.
+ *
+ * Copies the two levels it touches; the shared literal is never mutated, so the
+ * exported `manual.structuredSchemas.shell` stays the plain object it was.
+ */
+function withPlaySpine(schema) {
+  var spine = (typeof window !== 'undefined') && window.STRUCTURED_SCHEMA_PLAY_SPINE;
+  if (!spine) {
+    throw new Error('[LiftRPG] window.STRUCTURED_SCHEMA_PLAY_SPINE is missing — prompt_rules.js '
+      + 'has not loaded, so the shell stage would demand a spine the transport never asks for.');
+  }
+  var meta = schema.properties.meta;
+  var nextProps = Object.assign({}, meta.properties, { playSpine: spine });
+  var nextRequired = meta.required.indexOf('playSpine') === -1
+    ? meta.required.concat(['playSpine'])
+    : meta.required.slice();
+  return Object.assign({}, schema, {
+    properties: Object.assign({}, schema.properties, {
+      meta: Object.assign({}, meta, { properties: nextProps, required: nextRequired })
+    })
+  });
+}
 
 var STRUCTURED_SCHEMA_FRAGMENTS = {
   type: 'object',
@@ -759,8 +843,14 @@ function summarizeLayerBibleForCampaignRetry(layerBible) {
   };
 }
 
-function buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState) {
-  var weekCount = parseWeekCountFromWorkout(workout);
+function buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState, options) {
+  // The retry has to demand the SAME length the first attempt did. It used to
+  // re-derive it, and parseWeekCount clamps to 4-12 where the pipeline does
+  // not — so a 16-week book's retry asked for 12 and the stage could never
+  // satisfy the validator it was retrying against.
+  var weekCount = (options && options.weekCount > 0)
+    ? options.weekCount
+    : parseWeekCountFromWorkout(workout);
   var midpoint = Math.ceil(weekCount / 2);
   var lastError = retryState && retryState.error ? truncateText(retryState.error.message || retryState.error, 180) : '';
   var lastErrorLower = lastError.toLowerCase();
@@ -1715,6 +1805,80 @@ function persistLastBooklet(booklet, meta) {
 // clears the threshold or the round cap hits. Per D19 severity doctrine the
 // loop never blocks delivery — an unfinished booklet ships with its critique
 // attached in _criticReport.
+// ── The conductor's pass (FUSION.md §4 mechanism 6) ─────────────────────────
+// ONE bounded call, never a loop of its own. It runs after assembly and ahead
+// of the critic's first round, on both API pipelines, because both reach it
+// through runCriticLoop — which is also why the skip logic lives here in one
+// place rather than at two call sites.
+//
+// WHAT IT COSTS AND WHY THAT IS THE POINT. Its input is the score projection
+// alone: at twelve weeks, roughly a page. The critic's input is the digest —
+// twenty-six to thirty-eight thousand tokens. This pass is the cheapest stage
+// in the ladder that can change a book, and it is cheap for the same reason it
+// works: a reader shown only the sequence hears the sequence.
+//
+// SKIPS ARE STATED, NEVER SILENT (the D111 / W4b idiom). A book that declares
+// no fusionBeat is not read and says so, which is every fixture in content/ and
+// every book generated before W4a. A stage failure degrades the same way: the
+// pass is recorded as skipped with the reason, and the critic loop continues
+// exactly as it did before this landed. Nothing here may block delivery (D19).
+async function runConductorPass(settings, booklet, brief, ctx, stageName) {
+  ctx = ctx || {};
+  if (settings && settings.conductorPass === false) {
+    return { skipped: true, skipReason: 'the conductor\'s pass is disabled in settings' };
+  }
+  if (typeof window.buildConductorPrompt !== 'function') {
+    return { skipped: true, skipReason: 'the conductor prompt builder is unavailable' };
+  }
+  var score = buildConductorScore(booklet);
+  if (score.skipped) return { skipped: true, skipReason: score.skipReason, score: score };
+  var scoreBlock = formatConductorScoreBlock(score);
+  if (!scoreBlock) return { skipped: true, skipReason: 'the score projection printed nothing', score: score };
+
+  var raw;
+  try {
+    raw = await runJsonStage(settings, {
+      stageKey: 'conductor',
+      stageName: stageName || 'The Conductor\'s Pass',
+      buildPrompt: (function (block) {
+        return function () { return window.buildConductorPrompt(block, brief); };
+      })(scoreBlock),
+      maxAttempts: 2,
+      schema: window.STRUCTURED_SCHEMA_CONDUCTOR || null,
+      validate: (function (s) {
+        return function (result) { return validateConductorReport(result, s); };
+      })(score),
+      rateLimiter: ctx.rateLimiter || null,
+      budgetEnforce: !!ctx.budgetEnforce,
+      onProgress: ctx.onProgress,
+      telemetryCollector: ctx.telemetryCollector
+    });
+  } catch (err) {
+    console.warn('[LiftRPG] The conductor\'s pass failed — the critic runs without it:', err.message);
+    return { skipped: true, skipReason: 'the stage failed: ' + String((err && err.message) || err), score: score };
+  }
+  var report = normalizeConductorReport(raw, score);
+  console.log('[LiftRPG] ' + conductorSummaryLine(report));
+  return report;
+}
+
+// Round-one only, and that bound is a ruling rather than an economy. The report
+// is a reading of the book AS IT STOOD before any revision; carrying it into
+// round two would hand the critic a description of a page the reviser has
+// already changed, and would hold fusionPacing open for a defect that may be
+// fixed. One pass, one round, then the loop's own instruments take over.
+function seedConductorFailures(verdictRaw, conductor) {
+  var failures = conductorFailures(conductor);
+  if (!failures.length) return 0;
+  if (!verdictRaw || typeof verdictRaw !== 'object') return 0;
+  var verdict = verdictRaw.verdict;
+  if (!verdict || typeof verdict !== 'object') return 0;
+  var entry = verdict.fusionPacing;
+  if (!entry || typeof entry !== 'object') return 0;
+  entry.failures = (Array.isArray(entry.failures) ? entry.failures : []).concat(failures);
+  return failures.length;
+}
+
 async function runCriticLoop(settings, booklet, brief, ctx) {
   ctx = ctx || {};
   if (settings && settings.criticLoop === false) return null;
@@ -1736,6 +1900,12 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
     // eval reads them differently.
     structuralRevisions: 0
   };
+  // FUSION §4 mechanism 6, before the general read. One call, ahead of round
+  // one, so its findings are targets in the round that has the most rounds left
+  // to act on them.
+  var conductor = await runConductorPass(settings, booklet, brief, ctx);
+  report.conductor = conductor;
+  var revisedAnyWeek = false;
   var meta = booklet.meta || {};
   var contextJson = JSON.stringify({
     storySpine: meta.storySpine || '',
@@ -1762,6 +1932,13 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
       .concat(collectMarkStripFindings(booklet).warnings)
       .concat(collectVoiceTicFindings(booklet).map(function (f) { return f.message; }))
       .concat(collectLicensedMovePlacementFindings(booklet).map(function (f) { return f.message; }))
+      // W4b: the simulated player's SOFT half — decision droughts, an
+      // immaterial spend spread, a declared stake nothing can take. The hard
+      // half never arrives here: soft-locks are stage-gate errors and are
+      // already blocking by the time the critic runs. Motif cross-registration
+      // rides the same channel (FUSION §6's V/B promotion, WARN-class).
+      .concat(simSoftFindings(simulateBook(booklet)))
+      .concat(collectMotifCrossRegistrationFindings(booklet))
       .map(function (finding) {
         return typeof finding === 'string' ? finding : String((finding && finding.message) || finding);
       })
@@ -1770,6 +1947,16 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
     // for the same reason the machine findings are: an accepted revision that
     // cut a week's prose moves the curve the next verdict grades against.
     var fusionFrameBlock = formatFusionFrameBlock(buildFusionFrame(booklet));
+    // The spine frame (W4b) rides beside it for the same reason and by the same
+    // rule: it ABSTAINS rather than printing nulls, so a pre-spine book's
+    // prompt is byte-identical to what it was before this landed.
+    var spineFrameBlock = formatSpineFrameBlock(buildSpineFrame(booklet));
+    // The conductor's read rides beside them in ROUND ONE ONLY — see
+    // seedConductorFailures for why a stale reading is worse than none.
+    var conductorBlock = round === 1 ? formatConductorReportBlock(conductor) : '';
+    var frameBlocks = [fusionFrameBlock, spineFrameBlock, conductorBlock].filter(function (b) {
+      return typeof b === 'string' && b.trim();
+    }).join('\n\n');
     var verdictRaw;
     try {
       verdictRaw = await runJsonStage(settings, {
@@ -1777,7 +1964,7 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
         stageName: 'Composition Critic — round ' + round,
         buildPrompt: (function (dj, mf, ff) {
           return function () { return window.buildCriticPrompt(dj, brief, mf, ff); };
-        })(digestJson, machineFindings, fusionFrameBlock),
+        })(digestJson, machineFindings, frameBlocks),
         maxAttempts: 2,
         validate: validateCriticVerdict,
         rateLimiter: ctx.rateLimiter || null,
@@ -1790,10 +1977,18 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
       report.error = String((err && err.message) || err);
       break;
     }
+    // THE PRE-SEED. The conductor's findings join the round-one verdict as
+    // fusionPacing failures BEFORE normalization, so they earn no privileges:
+    // the same validation, the same reopen-scope filtering, the same fail-safe
+    // demotion, the same union-by-unit in targeting, and the same three floors
+    // at acceptance. The clamp that follows is the evidence law the critic has
+    // always run under, applied to a failure the critic did not author.
+    var seeded = round === 1 ? seedConductorFailures(verdictRaw, conductor) : 0;
     var verdict = normalizeCriticVerdict(verdictRaw, threshold);
     var summary = summarizeVerdict(verdict);
     var roundRecord = {
       round: round,
+      conductorSeeded: seeded,
       scores: summary.byDimension,
       min: summary.min,
       avg: summary.avg,
@@ -1877,6 +2072,7 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
       }
       report.revisedUnits += 1;
       if (structural) report.structuralRevisions += 1;
+      if (target.unitType === 'week') revisedAnyWeek = true;
       roundRecord.revised.push({
         unit: label,
         dimensions: target.dimensions,
@@ -1891,13 +2087,26 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
     }
   }
 
+  // THE RE-READ. One more bounded call, and only when a WEEK actually changed —
+  // the conductor reads a per-week sequence, so a revised fragment or ending
+  // moves nothing it can hear. It changes no decision: the loop is over and the
+  // booklet ships either way (D19). What it produces is the honest record the
+  // two-book evidence needs — did the surgery move the curve, or did the book
+  // come out the other side phrased exactly as it went in? A flatness finding
+  // that survives its own revision is the strongest signal this system can
+  // emit, and without the second read it is indistinguishable from success.
+  if (!conductor.skipped && revisedAnyWeek && !(settings && settings.conductorReread === false)) {
+    report.conductorReread = await runConductorPass(
+      settings, booklet, brief, ctx, 'The Conductor\'s Pass — re-read');
+  }
+
   if (report.rounds.length) {
     var last = report.rounds[report.rounds.length - 1];
     report.finalScores = last.scores;
     report.finalMin = last.min;
     report.finalAvg = last.avg;
   }
-  booklet._criticReport = report;
+  writePipelineDebris(booklet, '_criticReport', report);
   if (!report.finished) {
     console.warn('[LiftRPG] Critic loop ended below threshold ' + threshold
       + ' — delivering with critique attached (quality heuristics warn, never block — D19).');
@@ -2070,10 +2279,16 @@ async function runApiPipeline(options) {
   }));
   checkpoint = canonState.checkpoint;
   if (canonState.applied) {
+    // The user's requested length owns the book; a shorter template cycles to
+    // fill it (resolveCanonicalBookLength). Before W3 this line read
+    // `weekCount = canonState.nw.weekCount` and a one-week rotating template
+    // produced a one-week booklet.
+    var canonWeeks = resolveCanonicalBookLength(canonState, weekCount, onProgress,
+      function () { return totalStages; });
     workout = formatNormalizedForPrompt(canonState.nw);
-    if (canonState.nw.weekCount) {
-      totalStages += (canonState.nw.weekCount - weekCount);
-      weekCount = canonState.nw.weekCount;
+    if (canonWeeks) {
+      totalStages += (canonWeeks - weekCount);
+      weekCount = canonWeeks;
     }
     // The shell validator checks its declared session count against this. On
     // the paste path it has always been 0 (the raw branch counts no sessions),
@@ -2154,9 +2369,12 @@ async function runApiPipeline(options) {
       },
       buildPrompt: function (retryState) {
         if (!retryState || !retryState.attempt) {
-          return builders.stage2(workout, brief, layerBible);
+          // The pipeline's resolved book length, not the builder's own parse.
+          // See generateApiStage2Prompt: parseWeekCount clamps to 4-12 and the
+          // pipeline does not, so a longer canonical program was planned short.
+          return builders.stage2(workout, brief, layerBible, { weekCount: weekCount });
         }
-        return buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState);
+        return buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState, { weekCount: weekCount });
       }
     });
     checkpoint = saveCheckpoint('campaignPlan', campaignPlan, checkpoint);
@@ -2190,7 +2408,7 @@ async function runApiPipeline(options) {
       completeMessage: 'Booklet setup complete.',
       onProgress: onProgress,
       getTotalStages: function () { return totalStages; },
-      schema: STRUCTURED_SCHEMA_SHELL,
+      schema: withPlaySpine(STRUCTURED_SCHEMA_SHELL),
       unwrapKey: 'meta',
       maxAttempts: 2,
       rateLimiter: rateLimiter,
@@ -2357,7 +2575,13 @@ async function runApiPipeline(options) {
       generationFloors: true,
       weekNumber: w,
       isDeload: weekIsDeload,
-      mechanicGrammarFamily: (((shell || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || ''
+      mechanicGrammarFamily: (((shell || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || '',
+      // W4a: the spine was declared at the shell stage; the door and the clocks
+      // are authored here. The closure floors that pair them need both, so the
+      // declaration rides in the same way the family does. No spine in the
+      // options means no spine floors — a floor must never invent the
+      // declaration it is checking against.
+      playSpine: ((shell || {}).meta || {}).playSpine || null
     };
 
     progress('weeks', 'Writing Week ' + w + (isBossWeek ? ' (Boss)' : '') + '\u2026');
@@ -2618,11 +2842,19 @@ async function runApiPipeline(options) {
 
   var booklet = options.assemble(shell, assembledWeeksOutput, assembledFragmentsOutput, assembledEndingsOutput, campaignPlan);
   enforceIdentityContract(booklet, identityContract);
-  truthBoardStateMode(booklet, booklet._assemblyDiagnostics || []);
+  truthBoardStateMode(booklet, readPipelineDebris(booklet, '_assemblyDiagnostics') || []);
   recordSeedOnBooklet(booklet, divergenceSeed);
   recordWorkoutLifecycle(booklet, workoutLifecycle);
 
-  var validationResult = validateAssembledBooklet(booklet);
+  // generationFloors: the API path, so the simulated player's soft-locks are
+  // blocking-class errors (D111). See validateAssembledBooklet's header for the
+  // severity split and why the corpus is untouched by it.
+  var validationResult = validateAssembledBooklet(booklet, { generationFloors: true });
+  writePipelineDebris(booklet, '_simReport', validationResult.sim);
+  if (validationResult.sim && !validationResult.sim.skipped) {
+    console.log('[LiftRPG] Simulated player: ' + validationResult.sim.hard.length + ' soft-lock(s), '
+      + validationResult.sim.soft.length + ' finding(s).');
+  }
   if (validationResult.warnings && validationResult.warnings.length > 0) {
     console.warn('[LiftRPG] Validation warnings:', validationResult.warnings);
   }
@@ -2634,21 +2866,21 @@ async function runApiPipeline(options) {
 
   var report = generateQualityReport(booklet);
   var qualityGate = buildQualityGate(report);
-  booklet._qualityReport = report;
-  booklet._qualityGate = qualityGate;
-  booklet._pipeline = booklet._pipeline || 'standard';
+  writePipelineDebris(booklet, '_qualityReport', report);
+  writePipelineDebris(booklet, '_qualityGate', qualityGate);
+  writePipelineDebris(booklet, '_pipeline', readPipelineDebris(booklet, '_pipeline') || 'standard');
 
   // Persist Layer 2 assembly diagnostics (serialization-safe)
-  booklet._assemblyWarnings = {
-    diagnostics: booklet._assemblyDiagnostics || [],
+  writePipelineDebris(booklet, '_assemblyWarnings', {
+    diagnostics: readPipelineDebris(booklet, '_assemblyDiagnostics') || [],
     validationErrors: validationResult.errors,
     validationWarnings: validationResult.warnings
-  };
-  delete booklet._assemblyDiagnostics;
+  });
+  delete booklet._x._assemblyDiagnostics;
 
   // Post-assembly artifact-intent drift diagnostics (Layer 3 planning contract)
   var driftResult = compareArtifactIntentDrift(booklet);
-  booklet._artifactIntentDrift = driftResult;
+  writePipelineDebris(booklet, '_artifactIntentDrift', driftResult);
   if (driftResult.diagnostics.length > 0) {
     console.warn('[LiftRPG] Artifact intent drift:', driftResult.diagnostics.length, 'issue(s)');
   }
@@ -2677,8 +2909,8 @@ async function runApiPipeline(options) {
     // Revisions changed prose — refresh the mechanical report to match.
     report = generateQualityReport(booklet);
     qualityGate = buildQualityGate(report);
-    booklet._qualityReport = report;
-    booklet._qualityGate = qualityGate;
+    writePipelineDebris(booklet, '_qualityReport', report);
+    writePipelineDebris(booklet, '_qualityGate', qualityGate);
   }
 
   emitPipelineEvent(onProgress, totalStages, totalStages, qualityGate.passed
@@ -2794,7 +3026,13 @@ function formatNormalizedForPrompt(nw) {
   lines.push('');
 
   nw.weeks.forEach(function (week, wi) {
-    lines.push('Week ' + (wi + 1) + ':');
+    // A cycled week says so. `cycleOf` is set by extendCanonicalWorkout when a
+    // template shorter than the book was repeated to fill it; stating it is the
+    // difference between "the program prescribes this again" (true) and "the
+    // author wrote a new week that happens to match" (false). The progression
+    // line above is what actually moves between cycles.
+    lines.push('Week ' + (wi + 1) + ':'
+      + (week.cycleOf ? '  (repeats week ' + week.cycleOf + ' of the program cycle; apply the stated progression)' : ''));
     (week.sessions || []).forEach(function (session, si) {
       var label = session.dayLabel || ('Session ' + (si + 1));
       var exList = (session.exercises || []).map(function (ex) {
@@ -2960,14 +3198,58 @@ function recordWorkoutLifecycle(booklet, lifecycle) {
 }
 
 function describeWorkoutLifecycle(state) {
+  var note = state.lengthNote || null;
   return {
     tier: state.applied ? 'liftoscript' : 'freeform',
     canonicalized: !!state.applied,
     source: state.reason,
     weekCount: state.nw ? state.nw.weekCount : null,
     sessionsPerWeek: state.nw && state.nw.summary ? state.nw.summary.sessionsPerWeek : null,
-    progressionSummary: state.nw && state.nw.summary ? state.nw.summary.progression : ''
+    progressionSummary: state.nw && state.nw.summary ? state.nw.summary.progression : '',
+    // Week-count ownership (W3 close). Present only when a template shorter
+    // than the requested book was cycled to fill it; absent means the program
+    // supplied every week itself. The audit line has to be able to answer
+    // "where did week 9 come from?" after the fact.
+    templateWeeks: note ? note.templateWeeks : null,
+    lengthPolicy: note ? 'template-cycled' : 'as-written',
+    progressionStated: note ? note.progressionStated : null
   };
+}
+
+/**
+ * WEEK-COUNT OWNERSHIP — one home, both pipelines.
+ *
+ * `extendCanonicalWorkout` holds the ruling (liftosaur.js); this holds the
+ * WIRING, and it is a function rather than two inline blocks because the two
+ * pipelines' copies of the old `weekCount = canonState.nw.weekCount` line are
+ * exactly the shape that drifts. A pipeline that resolved book length its own
+ * way would ship a different-length book from the same input.
+ *
+ * The mutation of `state.nw` is deliberate: `describeWorkoutLifecycle` reads it
+ * to write the booklet's audit line, and the audit must describe the book that
+ * was actually built, not the template it was built from. `state.lengthNote`
+ * carries the provenance so the two are distinguishable.
+ *
+ * @returns {number} the week count the pipeline should build to
+ */
+function resolveCanonicalBookLength(state, requestedWeeks, onProgress, getTotalStages) {
+  var result = extendCanonicalWorkout(state.nw, requestedWeeks);
+  state.nw = result.nw;
+  if (!result.note) return state.nw && state.nw.weekCount ? state.nw.weekCount : requestedWeeks;
+
+  state.lengthNote = result.note;
+  // DEGRADATION HONESTY, same channel and same rules as emitDegraded above: a
+  // repetition the program did not license is a thing the operator is entitled
+  // to know about before they print it.
+  if (result.note.warning) {
+    emitPipelineEvent(onProgress, getTotalStages(), getTotalStages(), result.note.warning, {
+      phase: 'start',
+      stageKey: 'canonicalize',
+      stageName: 'Reading the program',
+      noticeLevel: 'warn'
+    });
+  }
+  return result.note.bookWeeks;
 }
 
 
@@ -3136,11 +3418,14 @@ async function runSkeletonFleshPipeline(options) {
   }));
   checkpoint = sfCanonState.checkpoint;
   if (sfCanonState.applied) {
+    // Same ownership seam as the shell pipeline — see resolveCanonicalBookLength.
+    var sfCanonWeeks = resolveCanonicalBookLength(sfCanonState, weekCount, onProgress,
+      function () { return totalStages; });
     nw = sfCanonState.nw;
     workout = formatNormalizedForPrompt(nw);
-    if (nw.weekCount) {
-      totalStages += (nw.weekCount - weekCount);
-      weekCount = nw.weekCount;
+    if (sfCanonWeeks) {
+      totalStages += (sfCanonWeeks - weekCount);
+      weekCount = sfCanonWeeks;
     }
   }
   var sfWorkoutLifecycle = describeWorkoutLifecycle(sfCanonState);
@@ -3185,7 +3470,8 @@ async function runSkeletonFleshPipeline(options) {
       buildPrompt: function (retryState) {
         return builders.skeleton(workout, brief, {
           retryMode: retryState.attempt > 0,
-          divergenceSeed: divergenceSeed
+          divergenceSeed: divergenceSeed,
+          weekCount: weekCount
         });
       },
       validate: function (result) {
@@ -3412,7 +3698,8 @@ async function runSkeletonFleshPipeline(options) {
           generationFloors: true,
           weekNumber: weekNum,
           isDeload: !!weekPlan.isDeload || looksLikeDeloadWeek(weekWorkout),
-          mechanicGrammarFamily: (((skeleton || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || ''
+          mechanicGrammarFamily: (((skeleton || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || '',
+          playSpine: ((skeleton || {}).meta || {}).playSpine || null
         });
         if (vResult && typeof vResult === 'object' && !vResult.valid) {
           return (vResult.errors || []).join('; ');
@@ -3665,10 +3952,14 @@ async function runSkeletonFleshPipeline(options) {
     : null;
   if (identityContract) {
     enforceIdentityContract(booklet, identityContract);
-    truthBoardStateMode(booklet, booklet._assemblyDiagnostics || []);
+    truthBoardStateMode(booklet, readPipelineDebris(booklet, '_assemblyDiagnostics') || []);
   }
 
-  var validationResult = validateAssembledBooklet(booklet);
+  // generationFloors: this is the API path, so the simulated player's
+  // soft-locks are blocking-class errors here (D111). The guided wizard and the
+  // corpus call the same function without the flag and get warnings.
+  var validationResult = validateAssembledBooklet(booklet, { generationFloors: true });
+  writePipelineDebris(booklet, '_simReport', validationResult.sim);
   if (validationResult.errors && validationResult.errors.length > 0) {
     console.warn('[S+F] Assembly validation errors:', validationResult.errors);
   }
@@ -3679,22 +3970,22 @@ async function runSkeletonFleshPipeline(options) {
   // ── Persist telemetry, continuity, and assembly diagnostics ──
   var report = generateQualityReport(booklet);
   var qualityGate = buildQualityGate(report);
-  booklet._qualityReport = report;
-  booklet._qualityGate = qualityGate;
-  booklet._pipeline = 'skeleton-flesh';
-  booklet._trialMode = trialMode;
+  writePipelineDebris(booklet, '_qualityReport', report);
+  writePipelineDebris(booklet, '_qualityGate', qualityGate);
+  writePipelineDebris(booklet, '_pipeline', 'skeleton-flesh');
+  writePipelineDebris(booklet, '_trialMode', trialMode);
 
   // Persist Layer 2 assembly diagnostics (serialization-safe, same shape as standard pipeline)
-  booklet._assemblyWarnings = {
-    diagnostics: booklet._assemblyDiagnostics || [],
+  writePipelineDebris(booklet, '_assemblyWarnings', {
+    diagnostics: readPipelineDebris(booklet, '_assemblyDiagnostics') || [],
     validationErrors: validationResult.errors,
     validationWarnings: validationResult.warnings
-  };
-  delete booklet._assemblyDiagnostics;
+  });
+  delete booklet._x._assemblyDiagnostics;
 
   // Post-assembly artifact-intent drift diagnostics (Layer 3 planning contract)
   var driftResult = compareArtifactIntentDrift(booklet);
-  booklet._artifactIntentDrift = driftResult;
+  writePipelineDebris(booklet, '_artifactIntentDrift', driftResult);
   if (driftResult.diagnostics.length > 0) {
     console.warn('[S+F] Artifact intent drift:', driftResult.diagnostics.length, 'issue(s)');
   }
@@ -3715,8 +4006,8 @@ async function runSkeletonFleshPipeline(options) {
   if (sfCriticReport && sfCriticReport.revisedUnits > 0) {
     report = generateQualityReport(booklet);
     qualityGate = buildQualityGate(report);
-    booklet._qualityReport = report;
-    booklet._qualityGate = qualityGate;
+    writePipelineDebris(booklet, '_qualityReport', report);
+    writePipelineDebris(booklet, '_qualityGate', qualityGate);
   }
 
   emitPipelineEvent(onProgress, totalStages, totalStages, qualityGate.passed
@@ -3728,7 +4019,7 @@ async function runSkeletonFleshPipeline(options) {
     completionSource: 'local'
   });
 
-  booklet._continuityWarnings = sfContinuityWarnings;
+  writePipelineDebris(booklet, '_continuityWarnings', sfContinuityWarnings);
 
   // Build stage telemetry summary
   var totalLatencyMs = 0;
@@ -3744,7 +4035,7 @@ async function runSkeletonFleshPipeline(options) {
     totalTokens += safeNumber(stUsage.totalTokens);
     totalCostUsd += safeNumber(sfTelemetry[ti].estimatedCostUsd);
   }
-  booklet._stageTelemetry = {
+  writePipelineDebris(booklet, '_stageTelemetry', {
     stages: sfTelemetry,
     summary: {
       totalStages: sfTelemetry.length,
@@ -3754,7 +4045,7 @@ async function runSkeletonFleshPipeline(options) {
       totalTokens: totalTokens,
       totalCostUsd: totalCostUsd
     }
-  };
+  });
 
   persistLastBooklet(booklet, { source: 'skeleton-flesh' });
   clearCheckpoint();
@@ -3986,7 +4277,7 @@ function auditGuidedBuild(data) {
         gate.blockers.forEach(function (b) { entry.degraded.push(b.message); });
       }
       // Artifact intent drift
-      var drift = data.assembledBooklet._artifactIntentDrift || compareArtifactIntentDrift(data.assembledBooklet);
+      var drift = readPipelineDebris(data.assembledBooklet, '_artifactIntentDrift') || compareArtifactIntentDrift(data.assembledBooklet);
       if (drift.diagnostics && drift.diagnostics.length > 0) {
         drift.diagnostics.forEach(function (d) {
           if (d.severity === 'error') entry.blocking.push('[drift] ' + d.message);
@@ -4090,9 +4381,20 @@ window.LiftRPGAPI = {
     getShelved: getShelvedCheckpoint,
     clearShelved: clearShelvedCheckpoint
   },
+  // The one debris reader, exposed so the landing page reads through the same
+  // function the pipeline writes with (D93). index.html is a classic script and
+  // cannot import contract-constants; a second inline fallback there is exactly
+  // how the new position gets read in one place and the legacy position in
+  // another (D128 → W4a).
+  readPipelineDebris: readPipelineDebris,
   manual: {
     structuredSchemas: {
-      shell: STRUCTURED_SCHEMA_SHELL
+      shell: STRUCTURED_SCHEMA_SHELL,
+      // The spine injector, exported as a FUNCTION rather than as a second
+      // pre-built schema: withPlaySpine() throws when prompt_rules.js has not
+      // loaded, and a throw at module-evaluation time would take the whole API
+      // surface down instead of the one stage that needs it.
+      withPlaySpine: withPlaySpine
     },
     ensureArtifactIdentity: ensureArtifactIdentity,
     buildIdentityContract: buildIdentityContract,
@@ -4130,6 +4432,12 @@ window.LiftRPGAPI = {
     buildCriticDigest: buildCriticDigest,
     buildFusionFrame: buildFusionFrame,
     formatFusionFrameBlock: formatFusionFrameBlock,
+    // W4b — the walker and its critic projection, exposed for the same reason
+    // the fusion frame is: the browser suite is where "does this run in the
+    // door" is provable, and the sim's whole promise is that it does.
+    buildSpineFrame: buildSpineFrame,
+    formatSpineFrameBlock: formatSpineFrameBlock,
+    simulateBook: simulateBook,
     validateCriticVerdict: validateCriticVerdict,
     normalizeCriticVerdict: normalizeCriticVerdict,
     summarizeVerdict: summarizeVerdict,
@@ -4138,6 +4446,18 @@ window.LiftRPGAPI = {
     criticSetUnit: setUnit,
     criticDimensions: CRITIC_DIMENSIONS,
     structuralReopenScopes: STRUCTURAL_REOPEN_SCOPES,
+    // The conductor's pure half. Exposed for the same reason the two frames
+    // are: the measured projection is the anti-vacuity half of this pass, and
+    // the browser suite is where it is provable against the real prompt
+    // surfaces the stage actually builds from.
+    buildConductorScore: buildConductorScore,
+    formatConductorScoreBlock: formatConductorScoreBlock,
+    validateConductorReport: validateConductorReport,
+    normalizeConductorReport: normalizeConductorReport,
+    conductorFailures: conductorFailures,
+    formatConductorReportBlock: formatConductorReportBlock,
+    conductorMechanisms: CONDUCTOR_MECHANISMS,
+    conductorMaxFindings: CONDUCTOR_MAX_FINDINGS,
     revisionPreservesIdentity: revisionPreservesIdentity,
     unitFloorErrors: unitFloorErrors,
     // The loop itself, exposed for gating only. It stays HERE rather than in
@@ -4173,4 +4493,11 @@ window.LiftRPGAPI = {
 // Notify inline scripts that the API module has loaded.
 // Because this file is type="module" (deferred), inline scripts run first
 // and may need to re-initialize once window.LiftRPGAPI is available.
+// The classic-IIFE prompt builders read this off `window` at call time — the
+// same bridge workout-topology.js uses for buildWorkoutTopology. Bare rather
+// than under LiftRPGAPI because generator.js is not an API consumer; it is a
+// prompt surface that needs one derived number and must never restate the
+// formula behind it.
+window.cipherVarietyFloor = cipherVarietyFloor;
+
 window.dispatchEvent(new Event('liftrpg-api-ready'));

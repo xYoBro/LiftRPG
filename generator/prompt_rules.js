@@ -97,7 +97,15 @@
     '- `overflowDocument` (foundDocument, REQUIRED when overflow is true): The Part 2 right-hand page. Must be a self-contained found document with all standard fragment fields (id, title, documentType, content, designSpec, etc.). This is a standalone document that appears alongside the overflow sessions — it is NOT a continuation of the session content. Treat it as another fragment, placed here for pacing.',
     '- `interlude` (object, optional): must contain { title, reason, body } and may also include payloadType, payload, spreadAware',
     '- `gameplayClocks` (array, optional): week-level progress clocks outside the oracle payload',
-    '- `isDeload` (boolean, optional): tonal flag only'
+    '- `isDeload` (boolean, optional): tonal flag only',
+    '- `fusionBeat` (object, REQUIRED): { beat, marking }. This week\'s FUSION SCORE, declared.',
+    '  `beat` is one sentence: how this week\'s TRAINING texture IS this week\'s STORY texture.',
+    '  Not what happens — how it FEELS the same. The deload is the exhale: a deload week that',
+    '  reads as filler is a defect, so its beat is the aftermath, the letter, the count taken.',
+    '  `marking` is a CLOSED five-step ordinal for prose VOLUME on this week\'s pages:',
+    '  "quiet" | "spare" | "steady" | "full" | "loud". Counterpoint, do not double: the peak',
+    '  load week wants the QUIETEST prose with the highest stakes; the deload wants the warmest',
+    '  prose and the longest view. A book whose markings track the load curve is doubling.'
   ];
 
   // The board serves the verb, never decoration (§4 of the gameplay brainstorm).
@@ -281,6 +289,56 @@
     '- The boss page reveals how raw values become letters for the first time'
   ];
 
+  // ── The puzzle grids (W5b — the Ludic Harvest, tranche 2) ─────────────────
+  // ROUTED TO week-final ONLY, and deliberately absent from SCHEMA_SPEC. The
+  // single-prompt path runs hard against its own character ceiling (the floors
+  // harness asserts it, and this section alone put it 1686 over), so this rides
+  // the stage map exactly the way POINT_OF_USE / RETURN_LOOP / DOOR_BIAS do.
+  // The consequence is stated rather than discovered: the paste path never
+  // offers a puzzle grid, which is the honest trade — an optional new surface
+  // is what a ceiling-bound prompt gives up first.
+  window.SCHEMA_PUZZLES = [
+    '### fieldOps.constrainedGrid (OPTIONAL — the deduction board)',
+    'A logic grid or a nonogram whose completed state yields a code the economy reads. Emit one only on a week that wants a deduction beat; a booklet with none is a legitimate booklet. At most one per week.',
+    '',
+    'THE REFUSAL RULE, AND IT IS ABSOLUTE: a deterministic solver reads every grid before the week is accepted. It proves the puzzle has a solution, that it has EXACTLY ONE, and that the answer you declare is what the solved grid actually yields. Fail any of the three and the week is rejected with the defect quoted back to you. Do not emit a grid you have not solved yourself first.',
+    '- `kind` (string, required): "logic-grid" | "nonogram". No other value is accepted — kakuro, KenKen and sudoku have no solver here yet and are refused.',
+    '- `title` (string, required): diegetic heading, as this world would label the surface.',
+    '- `instruction` (string, optional): one or two lines telling the player what to do and how to read the answer off the finished grid. Never state the answer.',
+    '- `answer` (string, required): the code the finished grid yields. It is NEVER printed — it is what the solver checks the puzzle against and what the seal or the assembly wants.',
+    '- `answerFrom` (object, required): the machine-readable rule that derives the answer from the solution. See each kind below.',
+    '',
+    'LOGIC-GRID:',
+    '- `subjects` (string[]): the rows — the entities being matched. **Limits: 3-5 subjects.** Distinct, and each label 22 characters or fewer.',
+    '- `categories`: [{ name, values }] — one or two column groups, and `values` MUST have exactly as many entries as there are subjects. Each category is a one-to-one match: every subject holds exactly one value and every value is held by exactly one subject.',
+    '- `clues`: [{ text, constraint }] — **2-12 clues.** `text` is the sentence the player reads, in this world\'s voice. `constraint` is the same fact in machine form, and the two MUST agree; the player solves from the text and the solver solves from the constraint.',
+    '- `constraint.type` is a CLOSED enum of four: "is" | "not" | "same" | "differs".',
+    '  "is"      { type, subject, category, value } — this subject holds this value.',
+    '  "not"     { type, subject, category, value } — this subject does not hold it.',
+    '  "same"    { type, category, value, otherCategory, otherValue } — whoever holds `value` also holds `otherValue`. Needs two categories.',
+    '  "differs" { type, category, value, otherCategory, otherValue } — whoever holds `value` does NOT hold `otherValue`. Needs two categories.',
+    '- Logic-grid `answerFrom.mode` is a CLOSED enum of two: "cell" | "initials". "cell" { mode, category, subject } reads that subject\'s value in that category; "initials" { mode, category } reads the first letters of that category\'s values down the subject list.',
+    '- Build the solution FIRST, then write clues that force it, then check that no other arrangement survives them. A grid with two answers is the commonest failure and it is always caused by writing clues before fixing the solution.',
+    '',
+    'NONOGRAM:',
+    '- `rowClues` / `colClues`: integer[][] — the run lengths for each row and each column, in order. **Limits: 5x5 to 10x10 cells.** The two clue sets describe the same picture, so their totals MUST be equal.',
+    '- `letterGrid`: string[] — one string per row, one character per cell, and "." for a cell that carries no character. SPARSE ON PURPOSE: scatter a handful of letters or digits, some inside the picture and some outside it as decoys.',
+    '- `answerFrom`: { mode: "grid-letters" } — the only mode. The answer is the characters in the SHADED cells, read left to right, top to bottom. A picture alone yields nothing a machine can check, so the letters are how a nonogram becomes a lock.',
+    '- Draw the picture first, derive both clue sets from it, then place the letters so the shaded ones spell the answer.',
+    '',
+    '### fieldOps.wordGrid (OPTIONAL — the letter hunt)',
+    'A word search whose hidden words come from this book\'s own Core Noun Roster, never from a generic word list. Optional, at most one per week, and the same REFUSAL RULE governs it: the solver reads the grid you print, checks that every declared placement genuinely spells its word there, and checks that the answer rule genuinely produces the answer you declared.',
+    '- `kind` (string, required): "word-search" is the only value; crisscross and dense crossword construction have no solver here yet and are refused.',
+    '- `title` (string, required): diegetic heading. `instruction` (string, optional): what the player does and how the answer is read.',
+    '- `grid`: string[] — one string per row, letters A-Z only, every row the same length. **Limits: 6x6 to 12x12 letters.**',
+    '- `words`: [{ word, row, col, direction }] — **4-10 words**, each 3-12 letters. `row` and `col` are 1-BASED coordinates of the word\'s FIRST letter, counting from the top-left cell.',
+    '- `direction` is one of "E" | "S" | "SE" | "NE" | "W" | "N" | "SW" | "NW". The last four read backwards or up; use them sparingly, they are what makes a board hard.',
+    '- THE PLACEMENTS ARE THE ANSWER KEY AND ARE NEVER PRINTED. The page shows the board and the word list; the coordinates exist so the gate can prove the words are really there.',
+    '- `wordGrid.answerFrom.mode` is a CLOSED enum of two: "leftovers" | "word". "leftovers" { mode } reads every letter no word covers, left to right, top to bottom. "word" { mode, index } names the 1-based position in the word list.',
+    '- Place the words first, then fill every remaining cell. In "leftovers" mode those filler letters ARE the answer, in reading order, so count the uncovered cells before you choose what they must spell.',
+    '',
+  ];
+
   // Later: do not expand document families until we prove the current
   // set can carry threaded evidence, contradiction, and character depth.
   // Favor better fragment function over more fragment categories.
@@ -379,6 +437,14 @@
     '- `interlude` (object, optional)',
     '- `gameplayClocks` (array, optional)',
     '- `isDeload` (boolean, optional)',
+    '- `fusionBeat` (object, REQUIRED): { beat, marking }. This week\'s FUSION SCORE, declared.',
+    '  `beat` is one sentence: how this week\'s TRAINING texture IS this week\'s STORY texture.',
+    '  Not what happens — how it FEELS the same. The deload is the exhale: a deload week that',
+    '  reads as filler is a defect, so its beat is the aftermath, the letter, the count taken.',
+    '  `marking` is a CLOSED five-step ordinal for prose VOLUME on this week\'s pages:',
+    '  "quiet" | "spare" | "steady" | "full" | "loud". Counterpoint, do not double: the peak',
+    '  load week wants the QUIETEST prose with the highest stakes; the deload wants the warmest',
+    '  prose and the longest view. A book whose markings track the load curve is doubling.',
     '- `sessions[].microLines` (array, REQUIRED — at least ONE somewhere in this week, max 2 per session): { condition, cue, citeRef? }. See Point Of Use.',
     '  A week that prints no conditional micro-line is rejected. Deload weeks are exempt; every other week owes at least one.',
     '- `sessions[].returnBeat` (object, REQUIRED on EVERY session): { closingLine, openingEcho? }. See The Return Loop.',
@@ -460,8 +526,10 @@
     '  - `homePull` (string): story | game | investigation | mixed',
     '  - `convergencePattern` (string): the endgame shape — sequential-assembly | reordering | red-herring | dual-source',
     '  - `reading` (object): the recorded reading — your interpretation of the brief, written down.',
-    '    { tone, register, povFrame, impliedSetting, emotionalArc, genreTemplate, briefEvidence }',
+    '    { tone, register, povFrame, impliedSetting, emotionalArc, genreTemplate, ludicReading, briefEvidence }',
     '    All free strings in your own words; these are a record, not a menu.',
+    '    ludicReading is 1-2 sentences: what KIND OF GAME this brief wants, in your words —',
+    '    what the player is doing minute to minute, what they are spending, what they risk.',
     '    briefEvidence is 1-2 sentences naming the brief phrases that drove the reading.',
     '  - `selectionReason` (string): why the winning candidate reading beat the others.',
     '',
@@ -549,7 +617,7 @@
         // exemplar to copy (the exact bleed D47 bans).
         reading: {
           tone: '', register: '', povFrame: '', impliedSetting: '',
-          emotionalArc: '', genreTemplate: '', briefEvidence: ''
+          emotionalArc: '', genreTemplate: '', ludicReading: '', briefEvidence: ''
         },
         selectionReason: '',
         // The two candidates that lost. `axis` is a closed menu, so it is
@@ -579,6 +647,148 @@
   }, null, 2);
 
   // Structured output schema for the skeleton (OpenAI json_schema format)
+  // ── The play spine, as a structured stage literal (W5a) ───────────────────
+  // ONE COPY, and the reason is a defect found on contact. W4a made the spine
+  // REQUIRED in prose and BLOCKING at the floors, and put it in neither
+  // structured literal — so a model answering under a compat transport was
+  // asked for a field the transport's schema never mentioned, and under a
+  // strict structured mode (where the transport injects additionalProperties:
+  // false) the field it did emit would have been dropped before the floor ever
+  // saw it. Every attempt would fail on a field nobody could deliver.
+  //
+  // Both pipelines reach this ONE object: STRUCTURED_SCHEMA_SKELETON below uses
+  // it directly, and api-generator.js's STRUCTURED_SCHEMA_SHELL borrows it
+  // through `window.STRUCTURED_SCHEMA_PLAY_SPINE` — the same window hop it
+  // already uses for STRUCTURED_SCHEMA_SKELETON itself. A second hand-written
+  // copy is the skeleton-triple defect with extra steps.
+  //
+  // `entry` is a plain string rather than an enum copy: the library menu is
+  // already parity-asserted in the prose section above, a third copy would be a
+  // third thing to drift, and the closure floor rejects a stray entry with a
+  // message naming the whole library.
+  var STRUCTURED_PLAY_SPINE = {
+    type: 'object',
+    properties: {
+      composition: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { entry: { type: 'string' }, role: { type: 'string' } },
+          required: ['entry', 'role']
+        }
+      },
+      honestGaps: { type: 'array', items: { type: 'string' } },
+      economyGraph: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            from: { type: 'string' }, to: { type: 'string' }, currency: { type: 'string' },
+            branch: { type: 'string' },
+            price: { type: 'integer' },
+            closesAtWeek: { type: 'integer' }
+          },
+          required: ['from', 'to']
+        }
+      },
+      consequenceEdges: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            source: { type: 'string' }, answeredBy: { type: 'string' },
+            withinWeeks: { type: 'integer' }
+          },
+          required: ['source', 'answeredBy', 'withinWeeks']
+        }
+      },
+      decisionLedger: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { fork: { type: 'string' }, differsBy: { type: 'string' } },
+          required: ['fork', 'differsBy']
+        }
+      },
+      tensionBudget: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            week: { type: 'integer' }, scarce: { type: 'string' },
+            losable: { type: 'string' }, fallBehind: { type: 'string' }
+          },
+          required: ['week']
+        }
+      },
+      difficultyCurve: {
+        type: 'object',
+        properties: {
+          keyedToLoad: { type: 'boolean' }, shape: { type: 'string' },
+          perWeek: { type: 'array', items: { type: 'string' } }
+        },
+        required: ['keyedToLoad', 'shape']
+      },
+      gateStructure: { type: 'string', enum: ['open', 'sequential', 'path-based'] },
+      hintLadders: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            puzzle: { type: 'string' }, printedOn: { type: 'string' },
+            // W5b: the band's printed heading. Required HERE (generation
+            // policy) and optional in booklet-schema.mjs (the artifact
+            // contract) — the artifactIntent severity split.
+            label: { type: 'string' },
+            rungs: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: { cost: { type: 'string' }, gives: { type: 'string' } },
+                required: ['cost', 'gives']
+              }
+            }
+          },
+          required: ['puzzle', 'printedOn', 'label', 'rungs']
+        }
+      },
+      milestones: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            label: { type: 'string' }, at: { type: 'integer' },
+            unlocks: { type: 'string' }, printedOn: { type: 'string' }
+          },
+          required: ['label', 'at', 'unlocks', 'printedOn']
+        }
+      },
+      legacyMoves: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            move: {
+              type: 'string',
+              enum: ['cross-out-forever', 'permanent-map-mutation', 'standing-rule-unlock',
+                'sealed-by-honour', 'session-count-gate']
+            },
+            printedOn: { type: 'string' }, makesPermanent: { type: 'string' }
+          },
+          required: ['move', 'printedOn']
+        }
+      }
+    },
+    // The DEMANDED half. The three harvest arrays are absent on purpose: a book
+    // need not carry a hint ladder, and requiring one would tax every brief for
+    // a pattern most do not want. `honestGaps` IS required, empty-array and all
+    // — "nothing is missing" said out loud is the record; skipping the key is
+    // not the same statement.
+    required: ['composition', 'honestGaps', 'economyGraph', 'consequenceEdges',
+      'decisionLedger', 'tensionBudget', 'difficultyCurve', 'gateStructure']
+  };
+  window.STRUCTURED_SCHEMA_PLAY_SPINE = STRUCTURED_PLAY_SPINE;
+
   window.STRUCTURED_SCHEMA_SKELETON = {
     type: 'object',
     properties: {
@@ -708,9 +918,14 @@
                   impliedSetting: { type: 'string' },
                   emotionalArc: { type: 'string' },
                   genreTemplate: { type: 'string' },
+                  // The game-kind reading (W4a). Required here for the same
+                  // reason every sibling is: this literal is what a compat
+                  // transport enforces, and an optional reading is a reading
+                  // the model skips.
+                  ludicReading: { type: 'string' },
                   briefEvidence: { type: 'string' }
                 },
-                required: ['tone', 'register', 'povFrame', 'impliedSetting', 'emotionalArc', 'genreTemplate', 'briefEvidence']
+                required: ['tone', 'register', 'povFrame', 'impliedSetting', 'emotionalArc', 'genreTemplate', 'ludicReading', 'briefEvidence']
               },
               selectionReason: { type: 'string' },
               // The triptych's audit trail (Wave 2). `_x` is the schema's
@@ -740,9 +955,10 @@
               }
             },
             required: ['briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily', 'documentEcology', 'exclusions', 'homePull', 'convergencePattern', 'reading', 'selectionReason', '_x']
-          }
+          },
+          playSpine: STRUCTURED_PLAY_SPINE
         },
-        required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'economy', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'storySpine', 'artifactIdentity', 'artifactIntent']
+        required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'economy', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'storySpine', 'artifactIdentity', 'artifactIntent', 'playSpine']
       },
       theme: {
         type: 'object',
@@ -1098,6 +1314,7 @@
     '  Midpoint: binary choice that recontextualizes prior evidence AND costs a relationship.',
     '  Late weeks: convergence, darkest moment (relational or ethical cost), escalation.',
     '  Boss week: culmination that tests spatial mastery, institutional knowledge, and relationship stakes.',
+    '  These are POSITIONS in the block, not week numbers. A short block compresses them; a long block gives each phase more weeks, and every added week still owes its own beat.',
     '- Unless the block is intentionally comic or the brief signals a lighter register, the darkest moment must cost the protagonist something they cannot recover: a relationship damaged, a belief overturned, an ethical line crossed, or an institutional protection lost.',
     '- The ending must acknowledge the binary choice, the boss outcome, and at least one relationship consequence.'
   ];
@@ -1200,8 +1417,8 @@
     'Banked currency may colour prose, open optional surfaces, and decide WHICH',
     'ending variant reads as earned. It may NEVER gate the password, the weekly',
     'component values, the decodingKey, or any link in the decode chain. A player',
-    'who trains six weeks cannot be priced out of the ending. If the economy is the',
-    'only thing standing between the player and the six-week payoff, the design is',
+    'who trains the whole block cannot be priced out of the ending. If the economy is',
+    'the only thing standing between the player and that payoff, the design is',
     'wrong — move that gate off the spine.',
     '',
     '### What tooling owns (never author these)',
@@ -1378,8 +1595,18 @@
     '## Cipher And Puzzle Design',
     '- Ciphers produce fiction-native raw values, never raw letters.',
     '- Week 1 puzzle should be solvable quickly. Later weeks can deepen or recombine the grammar.',
-    '- Use at least four distinct puzzle families across a standard six-week block.',
+    // LENGTH-SAFE BY CONSTRUCTION (W7). This read "at least four distinct
+    // puzzle families across a standard six-week block" — a floor stated as a
+    // fact about a length no longer every book's. The exact number is a
+    // function of week count and lives at the planning stages, which know it;
+    // this stage authors one week and states the rule.
+    '- Give every non-boss week a puzzle family no earlier week used, for as many weeks as the list below can cover. Never fewer than three across the book.',
     '- Do not repeat the same puzzle family in consecutive non-boss weeks unless repetition is diegetic and escalating.',
+    // THE MENU. Quoted exactly from GENERATION_CIPHER_TECHNIQUES in
+    // contracts/contract-constants.mjs, in order, and asserted both
+    // directions by cipherMenuParity() in validate.mjs. Its LENGTH is also
+    // the ceiling on cipherVarietyFloor(), so a technique added here without
+    // being added there would let the gate demand a family nobody offers.
     '- Good families include constraint logic, spatial route reading, fragment cross-reference, pattern recognition, typographic anomaly, observational anomaly hunting, metapuzzle assembly, and process deduction.',
     '- **Gating logic:** Design ciphers as lock-and-key systems. Week 1 cipher output should be usable as an input or key for a later puzzle. At least one cipher should require information the player can only obtain from a specific map node or fragment — this is found/not-found gating.',
     '- The solved cipher should open access (to a route, a fragment, a map zone, or a companion function) — not just produce a number for the boss decode.'
@@ -1465,7 +1692,7 @@
     '- HARD REQUIREMENT: `passwordRevealInstruction` MUST state the final password in exactly',
     '  the form `The password is WORD.` — one sentence, the word in capitals. The tooling that',
     '  seals the ending reads that sentence; without it the anagram gets sealed and the player',
-    '  is locked out of their own booklet after six weeks. Export redacts the sentence before',
+    '  is locked out of their own booklet at the end of the block. Export redacts the sentence before',
     '  printing, so stating it spoils nothing.',
     '- Do not choose this pattern if the true order cannot be derived from something printed.',
     '',
@@ -1474,7 +1701,7 @@
     'marks, or values — and only one is this week\\\'s component. The player must know the',
     'discriminating rule to write the right number in the box.',
     '- The discriminator is established in the fiction and CONFIRMED at the boss, which states',
-    '  the rule plainly so the player can check all six weeks against it.',
+    '  the rule plainly so the player can check every week against it.',
     '- `convergenceProof` MUST identify the decoys — at least one wrong reading per week the',
     '  player could have taken — and then show the filtered result.',
     '- The tracker still holds ONE value per week. The filtering happens where the mark is',
@@ -1517,19 +1744,23 @@
     '- Do not add companion surfaces as decorative filler.',
     '- **The growing stat (`percentile-stat`):** name it from the Core Noun Roster and make it a capability this world would actually keep a number on — standing inside a named institution, clearance against a named archive, fluency in a named record system, credit with a named faction. It must read as a line an in-world clerk would write.',
     '- Never name the stat after the body, the training block, or the player. It is not Strength, Endurance, Fitness, Level, or XP. The workout produces it; the fiction is what carries it.',
-    '- One percentile-stat per booklet, introduced by Week 2 or 3 so it has room to climb. Its `body` must say in one sentence what having a high number means inside the world.'
+    '- One percentile-stat per booklet, introduced inside the first quarter of the block so it has room to climb. Its `body` must say in one sentence what having a high number means inside the world.'
   ];
 
   window.INST_PROGRESSION = [
     '## Progression Design',
     '- Design a clear capability arc across the campaign. Week 1 should feel constrained: limited map access, simple mechanics, few nodes visible, basic companion state.',
-    '- **Mechanical Rule Ramp:** Week 1 should introduce only the core loop (map + oracle + session prompts). Add companion components starting Week 2-3. Introduce gameplay clocks by Week 3-4. Week 5+ can layer multiple mechanical surfaces simultaneously. Do not give the player every mechanical surface in Week 1 — complexity is a reward, not a starting condition.',
+    // W7: this ramp named absolute week numbers, which described a six-week
+    // block and nothing else. At twelve weeks every surface was on by week 5
+    // and seven weeks ran flat; at four weeks the clocks arrived on the boss.
+    // Positions in the block scale; week numbers do not.
+    '- **Mechanical Rule Ramp — positions in the block, never fixed week numbers:** Week 1 introduces only the core loop (map + oracle + session prompts). Companion components arrive inside the first third of the block; gameplay clocks by the end of the first half; only past the midpoint may one week layer several mechanical surfaces at once. Complexity is a reward, not a starting condition.',
     '- Each non-boss week must give the player something new: a cleared route, an unlocked node, a decoded access code, a revealed map area, a new companion function, a key that opens a previously locked gate.',
     '- By the penultimate week, the player should have enough capabilities and map knowledge to make real strategic choices about route, resource allocation, and risk.',
     '- The boss week should require the player to have MASTERED the space. The decodingKey should reference map node names, spatial relationships, clock history, or institutional knowledge gathered across the campaign — not just arithmetic on weekly component values.',
     '- Do not give the player everything in Week 1. Do not gate everything behind the boss. Distribute progression evenly, with the midpoint binary choice as the biggest single state change.',
     '- **Display floor:** if the booklet carries a `percentile-stat`, its `weeklyValues` must rise monotonically across the campaign — every value strictly greater than the one before it. The printed stat never regresses. A missed week costs the player the roll, never the number.',
-    '- Author those values; do not ask the player to compute them. Open low enough that early rolls usually fail (roughly 20-35) and close high enough that late rolls usually land (roughly 60-75). The climb between them is the character sheet the six weeks wrote.',
+    '- Author those values; do not ask the player to compute them. Open low enough that early rolls usually fail (roughly 20-35) and close high enough that late rolls usually land (roughly 60-75). The climb between them is the character sheet the block wrote.',
     '- The stat must be visible in play, not just on its own page: at least two weeks\' oracle `instruction` must state the roll-under check and the one-band upgrade it grants.',
     '- **Chance isolation:** the stat and the dice move the story only. No roll, no stat value, and no oracle result may ever change sets, reps, load, or rest. Advantage flows workout to game and never back.'
   ];
@@ -1754,7 +1985,7 @@
     '',
     '### Step 6: Choose the convergence pattern',
     'Set `convergencePattern` to one of: `sequential-assembly` | `reordering` | `red-herring` |',
-    '`dual-source`. This is the SHAPE of the endgame — how six weeks of collected values become',
+    '`dual-source`. This is the SHAPE of the endgame — how a block of collected weekly values becomes',
     'the password. The macro-genre varies the middle of the book; this varies the end. Do NOT',
     'default to `sequential-assembly` every time. Read the Convergence Design section before',
     'choosing: it states what each pattern may and may not change, and one of them carries a',
@@ -1788,8 +2019,8 @@
     '- Chose a reconstruction family? Name at least TWO of the other six — they are all siblings,',
     '  so they blur fastest of all.',
     '- Refusing a distant family is free and proves nothing. The refusal must forbid the move',
-    '  your book will actually be tempted to make in week 4, and it must hold in the built',
-    '  booklet: a `heat` book that refuses `rivalry` and then prints a rival\\\'s weekly standings',
+    '  your book will actually be tempted to make in the middle of the block, and it must hold',
+    '  in the built booklet: a `heat` book that refuses `rivalry` and then prints a rival\\\'s weekly standings',
     '  has broken its own contract.',
     '',
     '### Step 9: Name the home pull',
@@ -1812,6 +2043,10 @@
     '- `impliedSetting`: where and when',
     '- `emotionalArc`: what changes for the protagonist by the end',
     '- `genreTemplate`: the genre conventions now in force',
+    '- `ludicReading`: what KIND OF GAME this brief wants. 1-2 sentences: what the player',
+    '  is doing minute to minute, what they spend, and what they can lose. A brief implies a',
+    '  game the way it implies a tone — "a siege that never lifts" is a pressure that only',
+    '  rises; "a season of repairs" is husbandry. Read it, do not default to it.',
     '- `briefEvidence`: 1-2 sentences naming the ACTUAL phrases in the brief that drove this',
     '  reading. Quote or name the words that are there. If the brief cannot support a claim,',
     '  do not make the claim — write what the brief actually gives you, even if that is little.',
@@ -1822,7 +2057,209 @@
     '',
     'The reading is BINDING and it is AUDITABLE. Later stages write against it, and the',
     'composition critic grades the finished booklet against this recorded reading — a reading',
-    'the brief cannot support becomes a cited finding, not a vague complaint about tone.'
+    'the brief cannot support becomes a cited finding, not a vague complaint about tone.',
+    '',
+    '### Step 11: Compose the play, do not assemble it',
+    'A book of individually good components is still a series of things to do. Fun is not a',
+    'property you can request per component — every oracle wants to be evocative and every',
+    'clock wants stakes, and none of that makes them listen to each other.',
+    '',
+    'So COMPOSE. Pick TWO to FOUR playable systems and wire them into ONE economy where each',
+    'one reads what another writes. Not a parts list: a sentence. What the marks feed, where',
+    'it banks, what the banked thing buys, what that opens, and what answers it.',
+    '',
+    'Three rules that decide whether the composition is real:',
+    '- Every spend has a destination the book DRAWS. A price with nothing on the other side',
+    '  of it is a dead sink.',
+    '- Every clock, track or counter is READ by something. A clock nothing reads is scenery',
+    '  with a number on it.',
+    '- Every fork changes something a player could point at. If the only difference between',
+    '  two branches is which adjective describes them, it is not a choice.',
+    '',
+    'The shape of the economy follows the mechanic grammar family you chose in Step 5, not a',
+    'house pattern: pressure that only rises does not bank, husbandry does not race, and a',
+    'chase does not accumulate. Two books from the same brief class must still differ in what',
+    'the player DOES, not only in what the pages say.',
+    '',
+    'And be honest when the brief wants something this engine cannot print. Say so plainly',
+    'rather than dressing an existing system up as the missing one — a tally strip called a',
+    'deck is still a tally strip, and the player finds out on page one.'
+  ];
+
+  // ── The Ludic Spine (W4a) ─────────────────────────────────────────────────
+  // Routed to the `shell` stage ONLY, because that is the stage that authors
+  // meta and therefore the only stage that can write a spine — and because the
+  // closure floors that enforce it are stage gates on the API pipelines.
+  //
+  // The single-prompt bundle deliberately does NOT carry this section: it is
+  // already the largest prompt in the system, the floors do not run on the
+  // paste path, and INST_ARTIFACT_COMPILER Step 11 is written self-contained so
+  // the paste path still gets the composition DISCIPLINE without the JSON
+  // shape. A pointer from Step 11 to this section would dangle on that surface
+  // — the exact defect Step 5c's "Read the Door Bias section" was (D111).
+  //
+  // NO WORKED SPINE, ever (D47). The family table below is a MENU of economy
+  // SHAPES, one clause each; a single filled-in example would install one house
+  // economy in every book, which is the disease this whole section exists to
+  // prevent (PLAY.md §2, "the house economy").
+  window.INST_LUDIC_SPINE = [
+    '## The Play Spine (meta.playSpine — REQUIRED)',
+    'Step 11 of the compiler said what to compose. This is where you write it down, in a',
+    'shape a machine can check. A book whose systems do not reference each other is rejected',
+    'at this stage, so declare the wiring here and then BUILD what you declared.',
+    '',
+    '### Surface refs — how the spine points at things',
+    'Every edge names a surface as `kind:id`, or one of three singletons.',
+    'Kinds: `week:W3` `session:W3.2` `markStrip:W3.2` `reckoning:W3` `clock:<clock name>`',
+    '`oracle:W4` `cipher:W2` `map:<region or board name>` `companion:<label>` `fragment:F.07`',
+    '`door:W5` `seal:<fragment id>` `ending:E2`',
+    'Singletons (no id — a book has at most one): `banked` `boss` `assembly`',
+    'Use the names you are actually giving these surfaces. A ref to a week this book does',
+    'not have, or to a fragment outside your registry, is a blocking error.',
+    '',
+    '### The seven declarations',
+    '- `composition` (array, 2-4 items): `{ entry, role }`.',
+    '  `entry` is a CLOSED menu — the systems this engine can print:',
+    '  `reckoning-economy` (marks tally, bank, price spends) · `board` (the map and its',
+    '  regions) · `decode-chain` (the weekly cipher) · `clock-bank` (fill / drain / race /',
+    '  tug-of-war) · `companion-kit` (dashboards, tracks, stats, inventories) ·',
+    '  `oracle-pull` (the d100 table) · `door-fork` (the week\\\'s posted choice) ·',
+    '  `sealed-cache` (sealed-by-honour content and its key) · `boss-convergence` (the',
+    '  endgame ceremony, assembly and locked finale) · `ledger-audit` (the body audited) ·',
+    '  `deduction-board` (a logic grid or a nonogram, machine-proven solvable and unique) ·',
+    '  `word-hunt` (a letter board whose hidden words are machine-verified in it).',
+    '  Entries must be DISTINCT. `role` is a sentence in your own words: what this system',
+    '  does in THIS book. "It is the map" is not a role; "the map is the only place a spend',
+    '  becomes visible" is.',
+    '- `honestGaps` (string[]): what the brief wanted that the list above cannot print.',
+    '  Write it plainly. This is not a failure — it is the record that stops a tally strip',
+    '  from being described as a deck. Empty array if the brief asks for nothing missing.',
+    '- `economyGraph` (array): `{ from, to, currency? }`. Named edges, never implied.',
+    '  At least one edge must START at a tick origin (`markStrip:` / `session:` / `week:`)',
+    '  and at least one must END at a surface the book draws. Every node must be reachable',
+    '  from a source and reach a printed sink. Omit `currency` on edges that move the player',
+    '  without spending anything (a key opening a gate); do not invent one.',
+    '- `consequenceEdges` (array): `{ source, answeredBy, withinWeeks }`. Every fillable',
+    '  thing names the surface that answers it. `withinWeeks` is 0, 1 or 2 — 0 means the',
+    '  same week. An answer further out than you declare is a blocking error, and an answer',
+    '  in an EARLIER week than its question is printed before it is asked.',
+    '- `decisionLedger` (array): `{ fork, differsBy }`. One row per door, `fork` written as',
+    '  `door:W3`. `differsBy` must name a MECHANICAL surface that changes — a clock, a price,',
+    '  a region, a gate, a table. Adjectives are not differences.',
+    '- `tensionBudget` (array, one row per week): `{ week, scarce?, losable?, fallBehind? }`.',
+    '  At least ONE axis named per week. Leaving an axis out is a declaration that this week',
+    '  has none of it, which is a legitimate thing to say — a deload week often has exactly',
+    '  one. All three empty is a week with nothing at stake.',
+    '- `difficultyCurve` (object): `{ keyedToLoad, shape, perWeek }`. `keyedToLoad` is a',
+    '  boolean: true when the puzzles harden as the lifts do, false when the brief warrants',
+    '  something else. False is a real answer, not a failure — say what the curve does',
+    '  instead in `shape`, and give one clause per week in `perWeek`.',
+    '',
+    '### The economy\\\'s SHAPE follows the family (choose from this menu)',
+    'The mechanic grammar family you chose in Step 5 already decided what the world spends',
+    'against the player. The economy must move the same way, or the book says one thing and',
+    'plays another. Pick the row you chose and build that shape:',
+    '',
+    '| Family | What the economy DOES |',
+    '|--------|----------------------|',
+    '| `heat` | Rises only. Nothing the player does lowers it; spends BUY TIME, they do not reduce the number. No banking against heat — the pressure is not a currency. |',
+    '| `attrition` | Drains. The player starts with something finite and every week takes some. Spends slow the drain or convert it; the graph runs downhill. |',
+    '| `siege` | Two clocks race in opposite directions — what holds and what closes. Spends reinforce one at the cost of the other; nothing is neutral. |',
+    '| `stewardship` | Grows if tended. The player invests and the thing repays later; neglect is the only loss. The graph has loops that pay back, not just sinks. |',
+    '| `loyalty-web` | Tugs. Spending on one relationship spends against another; the same currency moves two tracks in opposite directions. |',
+    '| `evasion` | Races. Position matters more than accumulation; the player converts marks into distance or cover, and standing still costs. |',
+    '| `observance` | Accrues by discipline. Rites kept on schedule earn; a missed observance costs more than it earned. The clock is a calendar. |',
+    '| `rivalry` | Compares. Every player gain is measured against a rival\\\'s standing; the economy prints BOTH sides and the gap is the state. |',
+    '| the seven reconstruction families | Assemble. Marks buy access to gaps — a shaded cell, a decoded line, a named node — and the picture is the state. Nothing spends against the player; the scarcity is what is still unknown. |',
+    '',
+    'The row is the SHAPE, not the content. Two heat books both rise; what rises, what it',
+    'costs to hold it back, and what the number is called are yours.',
+    '',
+    '### The harvest patterns (optional, and strict once used)',
+    'The composition above says which SYSTEMS this book prints. These say how they are WIRED.',
+    'Take the ones the brief actually wants and leave the rest — a book that uses none of them',
+    'is a legitimate book. A book that half-declares one is not: every field below is required',
+    'once its object exists, because a hint with no cost and a milestone with no page are',
+    'records that check as nothing.',
+    '',
+    '| Pattern | Declare it as | What it costs you to get wrong |',
+    '|---------|---------------|--------------------------------|',
+    '| `gate-structure` | `gateStructure` (REQUIRED, see below) | Declaring a shape the graph does not have |',
+    '| `hint-ladder` | `hintLadders[]` | A free hint, which is a walkthrough |',
+    '| `deduction-milestone` | `milestones[]` | A theory nothing answers |',
+    '| `legacy-pencil-move` | `legacyMoves[]` | Permanence with no page it happens on |',
+    '| `branch-attributed-consequence` | `economyGraph[].branch` | A fork whose sides are two labels |',
+    '| `priced-spend` | `economyGraph[].price` | A price nobody at 60% adherence can pay |',
+    '| `timed-affordance` | `economyGraph[].closesAtWeek` | A window that shuts before it opens |',
+    '| `found-not-found-gating` | an `economyGraph` edge INTO a `seal:` | A locked page with no key |',
+    '| `book-referential-examination` | a cross-reference cipher | Citing a page this book does not print |',
+    '',
+    '- `gateStructure` (REQUIRED, one of "open" | "sequential" | "path-based"): how this book',
+    '  gates. **open** — several leads run at once and one meta needs all of them (owes three',
+    '  distinct leads and one surface taking three feeders). **sequential** — each answer is',
+    '  the next question (owes a chain three edges long). **path-based** — two or more lanes',
+    '  that converge (owes two leads, a three-edge chain, and a surface taking two feeders).',
+    '  The floor reads this back off your economyGraph. Declare the shape you actually wired.',
+    '- `hintLadders` (array, at most 3): `{ puzzle, printedOn, label, rungs[] }`. `puzzle` is the',
+    '  ref the player gets stuck on; `printedOn` is where the rungs are printed — usually the',
+    '  same page. 2-3 rungs, each `{ cost, gives }`, in order: a nudge, then the method, then',
+    '  at most the answer. `cost` is paid in something this book already tracks (a clock tick,',
+    '  marks, a crossed-out option) and must get DEARER down the ladder.',
+    '  `label` is the BAND\'S OWN HEADING, in this world\'s voice and this artifact\'s idiom — the',
+    '  words a reader sees above the rungs. Never "Hints" and never "If you are stuck": those',
+    '  are the engine talking, and nothing printed in this book is the engine talking.',
+    '  The rungs PRINT AS THEIR OWN BAND on the surface `printedOn` names. Do NOT also write',
+    '  them into that surface\'s prose — the band is where the player reads them, and saying it',
+    '  twice spends the page on a repetition.',
+    '- `milestones` (array, at most 4): `{ label, at, unlocks, printedOn }`. `at` is a COUNT the',
+    '  player can check against their own page (marks banked, regions opened, fragments',
+    '  decoded). `unlocks` is a ref, and some consequenceEdge must mention it — a theory the',
+    '  book never answers is an unpaid promise.',
+    '- `legacyMoves` (array): `{ move, printedOn, makesPermanent? }`. `move` is one of',
+    '  "cross-out-forever" | "permanent-map-mutation" | "standing-rule-unlock" |',
+    '  "sealed-by-honour" | "session-count-gate". Each kind at most once. These are the whole',
+    '  legacy vocabulary a pencil can perform: crossing out the road not taken, adding to the',
+    '  map and never removing, a rule that reads "from now on…", a page sealed by honour, a',
+    '  page that opens after N sessions. Anything needing a sticker, a seal, or scissors is',
+    '  excluded by the kit, not missing from this list.',
+    '',
+    '### Three fields on an economy edge',
+    '- `branch` — which side of a fork this edge belongs to, written `door:W3/A` or `door:W3/B`.',
+    '  Use it and the two sides of your fork become mechanically different things rather than',
+    '  two names. If you attribute ONE side, attribute the other too: a fork with one declared',
+    '  side is a fork where the player who picks the other gets whatever is left. Anything the',
+    '  book must reach must be reachable on BOTH sides.',
+    '- `price` — what a spend costs, as a whole number of MARKS. Marks, not the currency label:',
+    '  marks are what the session strips count and what the reckoning threshold is derived in,',
+    '  so a price in marks is a number the machine can check against what a player at realistic',
+    '  adherence will actually have. The page still says "two Relief"; this says how many marks',
+    '  that is. Price the edges OUT of `banked`. Never price the edge into `boss` or `assembly`',
+    '  — that gate is the derived reckoning threshold and it already has a number.',
+    '- `closesAtWeek` — the last week an affordance can be taken. Without one, nothing in a',
+    '  pencil book ever expires and hoarding costs nothing. One or two real windows is what',
+    '  makes saving a decision.',
+    '',
+    '### Book-referential examination (and the one hard ban)',
+    'When you want a puzzle that tests attention, make THIS BOOK the reference: a cross-',
+    'reference cipher whose answer is a coordinate into pages this book prints — a fragment id',
+    'and a line, a region already opened, a value already banked. Every cited surface must be',
+    'printed EARLIER than the puzzle citing it.',
+    'NEVER write real-world trivia — history, geography, science, dates, celebrity, anything',
+    'the player would have to know from outside. It is unverifiable by this engine, it ignores',
+    'the brief, and it fails outright for any player who has not read what you read. The book',
+    'is the only reference work at the bench.',
+    '',
+    '### When the brief wants something this list cannot do',
+    'Say so in `honestGaps`, by name. Card decks, cut tokens, decoder wheels, overlays and',
+    'stickers are excluded by the kit and always will be; logic grids, word grids, action',
+    'drafts, suspect matrices and faction clocks are on the shelf and not yet built. Naming one',
+    'is the record that stops a tally strip from being described as a deck. It is never a',
+    'failure — inventing an entry to cover the gap is.',
+    '',
+    '### Length',
+    'This book has as many weeks as the program does. Express the arc in FRACTIONS of that',
+    'number, never in a fixed count: the midpoint shift lands at the middle week, the boss is',
+    'the last week, and the tension budget has exactly one row per week the program has.'
   ];
 
   window.INST_ANTI_GENERIC = [
@@ -1884,6 +2321,18 @@
     'Two surfaces sit OUTSIDE the fiction and take a flat instrument register:',
     'rulesSpread (it teaches a stranger to play) and cipher extractionInstruction',
     '(an operation, not a mood). Flat is correct there, not a lapse.',
+    '',
+    '### The play kit (hard constraint on anything the page asks for)',
+    'The complete kit is THREE OBJECTS: this book, a pencil, and two ten-sided dice.',
+    'No scissors, no glue, no printer, no second sheet, no app, no screen, no other person.',
+    'Every instruction you write must be performable with those three things and nothing',
+    'else. Marking, writing, tracing, circling, crossing out, shading, tallying, folding a',
+    'corner to keep a place, and sealing by honour ("do not read this page until...") are',
+    'all in. Cutting out, folding into a shape, gluing, punching, aligning one page over',
+    'another, and assembling a component are all out — a booklet that asks for them is not',
+    'playable at a gym bench, which is where this book is opened.',
+    'This binds the PROSE, not only the mechanics: an in-world instruction to "cut along the',
+    'dotted line" is the same defect whether it is a rule or a line of fiction.',
     '',
     '### The partition',
     '- Universal bans hold in EVERY genre and can never be licensed away.',
@@ -2317,7 +2766,7 @@
     '  Grid: max 12 cols x 8 rows (cellShape square or hex). PTP: max 12 nodes, max 10 edges (edgeSemantics traversal or relational). Linear: max 12 positions. Player-drawn: canvas instructions only.',
     '  Concentric: 3-6 rings, labels max 18 chars. Maze: max 12 nodes, max 14 passages.',
     '- Ciphers: DELAYED INTERPRETATION. Weekly values are fiction-native (numbers, codes, instrument readings), NEVER raw letters.',
-    '  The boss decodingKey at Week 6 converts accumulated values to letters. This is non-negotiable.',
+    '  The boss decodingKey, on the LAST week of the block, converts accumulated values to letters. This is non-negotiable.',
     '- Oracle tables: d100 with exactly 10 bands (00-09, 10-19, ... 90-99). Each entry has a `text` field.',
     '  Entry types: "fragment" (includes fragmentRef) or "consequence" (includes paperAction).',
     // MENU SURFACE 2 of 2 (companionMenuParity() in validate.mjs): the count and
@@ -2333,6 +2782,167 @@
     '- Visual archetypes (10): government, cyberpunk, scifi, fantasy, noir, steampunk, minimalist, nautical, occult, pastoral.',
     'Do NOT invent mechanics, map types, component types, or document types outside these lists.'
   ].join('\n');
+
+  // ── The conductor's pass (FUSION.md §4 mechanism 6) ──────────────────────
+  // A dedicated post-draft read of ONLY the play-order sequence. The doctrine
+  // below is compressed from docs/craft/FUSION.md §3 (the load-bearing law) and
+  // §4 (the six mechanisms); when the two disagree, FUSION.md wins and this is
+  // regenerated from it — the VOICE.md compression rule, same seam.
+  //
+  // ROUTING: staged pipelines only, via STAGE_SCHEMA_MAP. It is deliberately
+  // absent from window.INSTRUCTIONS — the single-prompt path has no stage loop
+  // to feed and roughly 1,800 characters of headroom under its ceiling, so
+  // doctrine about a stage it cannot run would be pure cost.
+  //
+  // The mechanism ids and their one-line readings are BYTE-QUOTED from
+  // CONDUCTOR_MECHANISMS in generator/modules/constants.js, which is the single
+  // home. check-generation-floors.mjs diffs the two surfaces: an id the
+  // normalizer accepts and this prompt never offers is a verdict nobody can
+  // return, and an id offered here that the normalizer drops is a verdict that
+  // vanishes silently.
+  window.SCHEMA_CONDUCTOR = [
+    '# Conductor\'s Report Schema',
+    '',
+    'Return a single JSON object with exactly this structure. No prose outside it.',
+    '',
+    '- `reading` (string, REQUIRED): one or two sentences naming how this book is phrased AS',
+    '  A WHOLE — the shape its dynamics take from the first week to the last. Not a score, not',
+    '  a compliment, not a summary of what happens.',
+    '- `weeks` (array, REQUIRED): exactly ONE entry per week printed in the score, in order.',
+    '  - `week` (integer): the week number exactly as the score prints it.',
+    '  - `mechanism` (string): which relation you heard in this week, from the closed list in',
+    '    the instructions. One value only — the one that most explains this week\'s place in',
+    '    the sequence.',
+    '  - `verdict` (string): ONE sentence. What this week does in the sequence, and whether it',
+    '    does what its own declared marking said it would.',
+    '  - `cites` (array of strings): the measurements you read it from — week numbers with the',
+    '    curve values you compared, or the declared marking beside the printed index. "w4 load',
+    '    100, prose 96, declared loud" is a cite. "it felt flat" is not.',
+    '- `findings` (array, REQUIRED, AT MOST 3): the defects worth a revision, most damaging',
+    '  first. Return [] when the sequence is phrased and you have nothing to fix — an empty',
+    '  findings array is a real answer and a better one than three invented ones.',
+    '  - `week` (integer): the ONE week whose revision fixes this.',
+    '  - `mechanism` (string): the same closed list.',
+    '  - `issue` (string): one sentence naming what is wrong, citing the weeks and the curves.',
+    '  - `directive` (string): one imperative sentence a reviser can execute inside that week',
+    '    alone. Never a cross-week rename, never "rewrite the book".',
+    '  - `reopen` (array of strings): which aspects of that week\'s SHAPE the reviser may',
+    '    re-decide, from the closed list in the instructions. At least one, or the finding is',
+    '    read as a rewording request.'
+  ];
+
+  // Structured output schema for the conductor stage (OpenAI json_schema format,
+  // non-strict). It mirrors SCHEMA_CONDUCTOR above and adds the finding cap at
+  // the wire, where a provider that honours it costs nothing to enforce.
+  window.STRUCTURED_SCHEMA_CONDUCTOR = {
+    type: 'object',
+    properties: {
+      reading: { type: 'string' },
+      weeks: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            week: { type: 'integer' },
+            mechanism: {
+              enum: ['score', 'counterpoint', 'doubling', 'discord', 'flat', 'exhale',
+                'leitmotif', 'echo', 'unnameable']
+            },
+            verdict: { type: 'string' },
+            cites: { type: 'array', items: { type: 'string' } }
+          },
+          required: ['week', 'mechanism', 'verdict', 'cites']
+        }
+      },
+      findings: {
+        type: 'array',
+        maxItems: 3,
+        items: {
+          type: 'object',
+          properties: {
+            week: { type: 'integer' },
+            mechanism: {
+              enum: ['score', 'counterpoint', 'doubling', 'discord', 'flat', 'exhale',
+                'leitmotif', 'echo', 'unnameable']
+            },
+            issue: { type: 'string' },
+            directive: { type: 'string' },
+            reopen: {
+              type: 'array',
+              items: { enum: ['beat', 'dynamics', 'motif', 'mechanism', 'economy', 'gate', 'decision'] }
+            }
+          },
+          required: ['week', 'mechanism', 'issue', 'directive', 'reopen']
+        }
+      }
+    },
+    required: ['reading', 'weeks', 'findings']
+  };
+
+  window.INST_CONDUCTOR = [
+    '## The Conductor\'s Pass (read the score, not the pages)',
+    'You are reading a printed game book that fuses a real training program with a story. You',
+    'have NOT been given the book. You have been given its SCORE: one line per week carrying',
+    'the training load, the volume of prose the week prints, the dynamic marking the week',
+    'declared for itself, the beat it named, and the mechanical surfaces it puts on the page.',
+    'That restriction is the instrument. Phrasing is a property of the SEQUENCE, and a reader',
+    'holding thirty thousand words of individually good weeks hears individually good weeks.',
+    '',
+    '### The law you are listening for',
+    'STAKES PARALLEL THE LOAD; TEXTURE COUNTERPOINTS IT.',
+    'What a week is ABOUT rises with the training load — what is at risk, what converges, what',
+    'can no longer be postponed. How the page SPEAKS moves the other way: spare, cold and',
+    'procedural exactly when the body roars; open, expansive and human when the body rests.',
+    'UNISON IS NOT HARMONY. Two curves rising together is doubling, and doubling is the most',
+    'common way this fails, because it feels like conviction while it is written. The reader\'s',
+    'body is already the loudest instrument in the room on a peak day; a page that also shouts',
+    'is redundant AND inaudible.',
+    'THE DELOAD IS THE EXHALE. A lighter week must carry content, not padding — the aftermath,',
+    'the document that arrives, the count taken. A week whose story idles because the body is',
+    'idling is a dropped bar, and it shows in the score as a light week whose prose index and',
+    'surface list collapse together.',
+    '',
+    '### The failure this pass exists to catch',
+    'Every week was written to be good AS A WEEK, so every week wanted to be loud. A book can',
+    'carry every mechanic, pass every count, and still hold one dynamic for its whole length.',
+    'Completeness as flatness is the enemy here, and it is invisible one week at a time.',
+    '',
+    '### The nine relations — name exactly one per week',
+    'These are the only values `mechanism` accepts. Choose the one that most explains the',
+    'week\'s place in the sequence; the verdict says whether it succeeds or fails at it.',
+    '- "score": the week plays the beat and the dynamic marking it declared for itself.',
+    '- "counterpoint": what is at stake rises with the training load while the page speaks the other way.',
+    '- "doubling": both curves move together — unison, which is not harmony.',
+    '- "discord": a heavy week carrying an administrative beat, with nothing at risk in it.',
+    '- "flat": the book holds one dynamic for its whole length — every week mezzo-forte.',
+    '- "exhale": the lighter week carries content — the aftermath, the arriving document, the count taken.',
+    '- "leitmotif": a carried object means something different here than it did before the midpoint.',
+    '- "echo": a mechanical event and a story surface answer each other inside one week, both directions.',
+    '- "unnameable": what this world will not say is carried by a printed surface rather than a sentence.',
+    '',
+    '### What you may reopen',
+    'A finding names which aspects of that week\'s SHAPE a reviser may re-decide. Name only what',
+    'the fix needs; everything unnamed stays frozen.',
+    '- "beat": what the week is ABOUT — its position in the arc, what is at risk, what it converges.',
+    '- "dynamics": how loudly the week SPEAKS — its prose volume and register, including cutting it shorter.',
+    '- "motif": which recurring object, place, or phrase the week carries, and what it means here.',
+    '- "mechanism": which printed surface carries the week\'s pressure and what it answers.',
+    'The remaining three — "economy", "gate", "decision" — are the play WIRING, and a different',
+    'reader owns them. Use one only when the phrasing defect is genuinely a wiring defect: a',
+    'week that is quiet because it asks the player nothing, not a week that is quiet on purpose.',
+    '',
+    '### What this pass does NOT do',
+    '- Do not rewrite prose. You have not been shown any; a sentence you invent is a guess.',
+    '- Do not score anything. No numbers, no grades, no dimensions. Verdicts and targets only.',
+    '- Do not check whether surfaces are PRESENT. Presence is already law and already gated.',
+    '  A week printing every surface is exactly the book this pass exists to hear the flatness in.',
+    '- Do not audit the training. The program is the reader\'s real block and is never revised;',
+    '  the load curve is a fact you read against, never a thing you may ask to change.',
+    '- Do not invent measurements. If the score says the load curve is NOT READABLE, read the',
+    '  prose curve against the session counts and the DELOAD and BOSS marks, and say that you did.',
+    '- Do not manufacture findings to fill the three slots. Silence where the phrasing works is',
+    '  the honest answer and costs the book nothing.'
+  ];
 
   // ── Stage Schema Assembler ──────────────────────────────────────────────
   // Routes the right SCHEMA + INST slices to each API pipeline stage.
@@ -2358,7 +2968,7 @@
     // one costs. It rides week-final and ending too — the stages that build
     // the boss page and the payoff — so the pattern is legible everywhere it
     // has consequences.
-    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
+    'shell':          { schemas: ['META', 'THEME', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
     // Knowing: the world's process particulars, authored once after the
     // skeleton/shell and consumed by every prose stage (§11 Wave 1.5). It
     // writes no prose, so it carries no VOICE_DISCIPLINE — it carries the
@@ -2384,7 +2994,14 @@
     // Book 1 (S+F) came back with zero of all three. The stage map reaches both
     // pipelines from one place and still keeps this off the single-prompt path,
     // which is hard against its 108,000-character ceiling.
-    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'MARK_SURFACE', 'PERVASIVE_PLAY', 'POINT_OF_USE', 'RETURN_LOOP', 'DOOR_BIAS', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'CONVERGENCE_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'PROGRESSION_TARGET', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'SELF_VERIFICATION'] },
+    // NO CONTRACT_GUARDRAILS here either, for the same reason the `ending`
+    // stage has none (D128's second queued finding, closed in W4a). All three
+    // of its lines are about fields a week chunk does not author: `theme` and
+    // the two `meta.password*` fields live on the SHELL. Doctrine routed to a
+    // stage it is false at is worse than doctrine routed nowhere — it spends
+    // context telling a model not to do something it cannot do, and teaches it
+    // that this prompt's rules may not apply to the shape in front of it.
+    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST', 'PUZZLES'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'MARK_SURFACE', 'PERVASIVE_PLAY', 'POINT_OF_USE', 'RETURN_LOOP', 'DOOR_BIAS', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'CONVERGENCE_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'PROGRESSION_TARGET', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
     // Fragment: story quality first
     'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'VOICE_DISCIPLINE', 'POINT_OF_USE', 'ANTI_GENERIC', 'CHARACTER_WEB', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
     // Ending: story quality first (endings are where voice failure concentrates)
@@ -2397,7 +3014,17 @@
     // answers with an envelope, which is a shape no validator here accepts.
     // JSON hygiene reaches this stage through OUTPUT_RULES, which is where it
     // belongs.
-    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'CONVERGENCE_DESIGN', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'ANTI_GENERIC', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] }
+    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'CONVERGENCE_DESIGN', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'ANTI_GENERIC', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
+    // Conductor: the dedicated read of the play-order sequence, after assembly
+    // and ahead of the critic's first round. It carries NOTHING else on
+    // purpose. No VOICE_DISCIPLINE (it writes no prose and is shown none), no
+    // OUTPUT_BUDGETS (it authors no player-facing text), no world or brief
+    // doctrine (the brief rides the prompt head separately, as the critic's
+    // does). A section routed to a stage it is false at teaches the model that
+    // this prompt's rules may not apply to the shape in front of it — the D128
+    // lesson, and this stage is small enough that one false section would be a
+    // measurable fraction of what it reads.
+    'conductor':      { schemas: ['CONDUCTOR'],                                 instructions: ['CONDUCTOR'] }
   };
 
   window.buildStageSchema = function(stageName) {
@@ -2714,6 +3341,46 @@
       '- Stop after Stage 1.',
   ];
 
+  /**
+   * The five named arc beats, placed as fractions of the block and grouped by
+   * the week each lands on.
+   *
+   * Grouping is the whole point. Derived positions overlap at short lengths —
+   * a four-week block puts Complication and Reversal both on week 2 — and two
+   * lines demanding different things of the same week is not an arc, it is a
+   * contradiction the model has to pick a side in. Merged, week 2 is asked for
+   * "Complication + Reversal", which is exactly what a four-week story does.
+   *
+   * Positions, in order: Setup is always week 1; Complication a quarter in;
+   * Reversal at the midpoint (the binary-choice week the validators check);
+   * Deepening two from the end; Escalation the penultimate week; Boss the last.
+   */
+  function arcBeatLines(weekCount) {
+    var midpoint = Math.ceil(weekCount / 2);
+    var beats = [
+      { week: 1, name: 'Setup', text: 'establish setting, protagonist role, core tension, constrained map — most zones locked' },
+      { week: Math.max(2, Math.min(midpoint, Math.round(weekCount / 4))), name: 'Complication', text: 'new pressure, first gate opened, companion introduces tension' },
+      { week: midpoint, name: 'Reversal', text: 'binary choice recontextualizes evidence, costs a relationship, reveals that an earlier clue meant something different than assumed' },
+      { week: Math.max(weekCount - 2, midpoint), name: 'Deepening', text: 'darkest moment — relational or ethical cost, an institutional system turns against the player, a trusted document is revealed as unreliable' },
+      { week: Math.max(weekCount - 1, 2), name: 'Escalation', text: 'pressures converge, full map access, final preparation, the player can now see the pattern connecting earlier fragments' },
+      { week: weekCount, name: 'Boss', text: 'culmination — decode requires spatial mastery + institutional knowledge + relationship state from prior weeks' }
+    ];
+    var byWeek = {};
+    var order = [];
+    for (var i = 0; i < beats.length; i++) {
+      var w = beats[i].week;
+      if (!byWeek[w]) { byWeek[w] = []; order.push(w); }
+      byWeek[w].push(beats[i]);
+    }
+    order.sort(function (a, b) { return a - b; });
+    return order.map(function (w) {
+      var group = byWeek[w];
+      var names = group.map(function (b) { return b.name; }).join(' + ');
+      var texts = group.map(function (b) { return b.text; }).join('; and ');
+      return '- Week ' + w + ': ' + names + ' (' + texts + ')';
+    });
+  }
+
   window.buildStage2Doctrine = function (weekCount) {
     var midpoint = Math.ceil(weekCount / 2);
     var minReuse = Math.max(weekCount - 2, 3);
@@ -2764,22 +3431,42 @@
       '## Cipher & Map Evolution Doctrine',
       '- Every non-boss week must declare a `cipherType` that names the actual puzzle family for that week.',
       '- No two consecutive non-boss weeks may use the same cipherType.',
-      '- Use at least ' + Math.min(Math.max(weekCount - 2, 3), Math.max(weekCount - 1, 1)) + ' distinct cipher types across the non-boss weeks.',
+      // DERIVED from cipherVarietyFloor() (validation.js, capped by
+      // GENERATION_CIPHER_TECHNIQUES), reaching this classic script through the
+      // `window` bridge api-generator.js installs. This line used to restate
+      // the formula, so the prompt and the gate were two homes for one number;
+      // at 12 weeks both demanded 10 distinct techniques against a menu of 8.
+      // With no bridge, state the rule and no number — never guess a floor.
+      (typeof window.cipherVarietyFloor === 'function')
+        ? '- Use at least ' + window.cipherVarietyFloor(weekCount) + ' distinct cipher types across the non-boss weeks.'
+        : '- Give as many non-boss weeks as possible a cipher type no earlier week used.',
       '- `mapReuse` may keep the same topology, but it may never mean "no visible change."',
       '- Every non-boss week must produce a visibly different `stateChange`: a cleared node, opened gate, rerouted path, new annotation layer, locked return, or revealed shortcut.',
       '- `stateSnapshot`, `stateChange`, and `newGateOrUnlock` cannot all describe the same board state as the prior week.',
       '',
       '## Arc Beat Assignment',
-      '- Week 1: Setup (establish setting, protagonist role, core tension, constrained map — most zones locked)',
-      '- Week 2: Complication (new pressure, first gate opened, companion introduces tension)',
-      '- Week ' + midpoint + ': Reversal (binary choice recontextualizes evidence, costs a relationship,',
-      '  reveals that an earlier clue meant something different than assumed)',
-      '- Week ' + Math.max(weekCount - 2, midpoint + 1) + ': Deepening (darkest moment — relational or ethical cost,',
-      '  an institutional system turns against the player, a trusted document is revealed as unreliable)',
-      '- Week ' + (weekCount - 1) + ': Escalation (pressures converge, full map access, final preparation,',
-      '  the player can now see the pattern connecting earlier fragments)',
-      '- Week ' + weekCount + ': Boss (culmination — decode requires spatial mastery + institutional',
-      '  knowledge + relationship state from prior weeks)',
+      // W7 — DERIVED AT EVERY LENGTH, and merged rather than collided.
+      //
+      // Two defects lived here. Complication was pinned to Week 2 while every
+      // other beat was already derived, so a twelve-week block put Setup and
+      // Complication back to back and left weeks 3-5 and 7-9 with no beat at
+      // all. And at the MINIMUM legal length the derivations overlapped: a
+      // four-week block printed "Week 2: Reversal" directly under "Week 2:
+      // Complication", and "Week 3: Escalation" under "Week 3: Deepening" —
+      // four contradictory demands on two weeks, shipped since the function
+      // was written.
+      //
+      // `arcBeats()` derives every position, then groups by week so a week
+      // carrying two beats is asked for ONE compound thing it can actually do.
+      // The six-week block is byte-identical to before: round(6/4) is 2, and
+      // no two beats land on the same week there.
+      ].concat(arcBeatLines(weekCount)).concat([
+      // The weeks BETWEEN the named beats. A six-week block has one or two and
+      // they take care of themselves; a twelve-week block has six, and without
+      // this line the plan simply has nothing to say about half the book.
+      '- Every week not named above is a RUN, not filler: it continues the beat before it with a',
+      '  new capability, a new state change, and higher pressure than the week before. None may',
+      '  repeat its predecessor. A longer block has more of these, not longer ones.',
       '',
       '## Per-Week Requirements',
       '- Each week must specify all of the following:',
@@ -2833,8 +3520,8 @@
       '## Output Rules',
       '- Return compact JSON only, matching the schema below exactly.',
       '- No markdown fences, no explanation.',
-      '- Stop after Stage 2.',
-    ];
+      '- Stop after Stage 2.'
+    ]);
   };
 
   window.FLESH_RULES_SPREAD_SPEC = [
@@ -3014,6 +3701,11 @@
     'and surface list both collapse.',
     'Findings on these four counts are usually STRUCTURAL (see the failure contract): a week',
     'that is loud in the wrong place cannot be fixed by retinting its sentences.',
+    'THE CONDUCTOR\'S READ. When a "Conductor\'s Read" section is present after the frame, weigh',
+    'it as evidence rather than as opinion: it is a dedicated pass over the play-order sequence',
+    'by a reader shown the score and none of the prose, so it hears phrasing a full read passes',
+    'over every time — adopt its verdicts into your own, or cite the prose that shows a reading',
+    'is wrong. Its prioritized findings are already open failures on this dimension.',
     '',
     '### voiceDiscipline',
     'Read the prose as a cold auditor: the text and the rules, nothing else.',
@@ -3081,7 +3773,7 @@
     '  printed surface. A structural failure licenses the reviser to RE-DECIDE that aspect;',
     '  a prose failure never does.',
     '- "reopen": required when scope is "structure", omitted otherwise. An array of one or more',
-    '  of the four aspects below — name only the ones your directive actually needs reopened,',
+    '  of the seven aspects below — name only the ones your directive actually needs reopened,',
     '  because everything you do not name is frozen for that revision:',
     '  - "beat": what the unit is ABOUT — its position in the arc, what is at risk in it, what',
     '    it converges or postpones.',
@@ -3091,12 +3783,40 @@
     '    object means at this point in the book.',
     '  - "mechanism": which printed surface carries the unit\'s pressure — what the clock,',
     '    oracle, door, cipher, or mark strip is keyed to and what it answers.',
+    '  - "economy": where the unit\'s value flows — what its marks bank into, what its spend',
+    '    buys, and which surface downstream reads the result.',
+    '  - "gate": what the unit locks and what opens it — which key the player must already',
+    '    hold, and how far ahead of the lock they can hold it.',
+    '  - "decision": what the unit asks the player to CHOOSE — whether it forks at all, and',
+    '    what mechanically differs across the branches.',
+    '  The last three are the play wiring, and they exist because a dead sink, a key that',
+    '  arrives too late, and a week that asks nothing are not fixable by re-keying a surface.',
     '  A "structure" scope with no reopen array is read as "prose", so name the aspect.',
     'The revision runs under floors you cannot waive and must not ask for: the training itself',
     '(sessions, exercises, sets, reps), every id and cross-reference, and the decode spine',
     '(weekly component values, the boss decoding key) survive every revision unchanged. A',
     'directive that requires changing any of them cannot be executed and will be discarded.'
   ];
+
+  // The conductor's prompt. Deliberately short: its whole input is the score
+  // block plus the brief, because the read's value comes from what it is NOT
+  // shown. Doctrine and output contract come from INST_CONDUCTOR +
+  // SCHEMA_CONDUCTOR through the stage map, so this builder holds no prompt
+  // content of its own — the coupling contract, same as every other stage.
+  window.buildConductorPrompt = function (scoreBlock, brief) {
+    return [
+      '# The Conductor\'s Pass — Play-Order Sequence Review',
+      '',
+      '## The User\'s Creative Brief (the register the phrasing serves)',
+      brief || '(no brief provided — read the phrasing against the book\'s own declared markings)',
+      '',
+      window.buildStageSchema('conductor'),
+      '',
+      scoreBlock,
+      '',
+      'Return ONLY the JSON object. No fences, no commentary.'
+    ].join('\n');
+  };
 
   window.buildCriticPrompt = function (bookletDigestJson, brief, machineFindings, fusionFrameBlock) {
     // The fusion frame (Teeth T4) rides AFTER the digest, next to the machine
@@ -3172,7 +3892,15 @@
       motif: 'which recurring object, place, or phrase this unit carries may change, and '
         + 'what that object means at this point in the book',
       mechanism: 'which printed surface carries this unit\'s pressure may change — what the '
-        + 'clock, oracle, door, cipher, or strip is keyed to and what it answers'
+        + 'clock, oracle, door, cipher, or strip is keyed to and what it answers',
+      // The ludic scopes (W4b) — the simulated player's soft findings arrive
+      // here. Byte-quoted from STRUCTURAL_REOPEN_SCOPES like the four above.
+      economy: 'where this unit\'s value flows may change — what its marks bank into, what its '
+        + 'spend buys, and which surface downstream reads the result',
+      gate: 'what this unit locks and what opens it may change — which key the player must '
+        + 'already hold, and how far ahead of the lock they can hold it',
+      decision: 'what this unit asks the player to CHOOSE may change — whether it forks at all, '
+        + 'and what mechanically differs across the branches'
     };
     var reopened = (reopenScopes || []).filter(function (id) { return !!REOPEN_LICENCES[id]; });
     var reopenBlock = reopened.length ? [
@@ -3207,7 +3935,7 @@
       '  and session numbering are part of the workout.',
       '- Keep the decode spine: weeklyComponent.value, boss componentInputs, and the boss',
       '  decodingKey are already sealed into the ending\'s password. Changing one breaks a',
-      '  puzzle the reader only opens after six weeks.',
+      '  puzzle the reader only opens at the end of the block.',
       '- Prose may change freely WHERE A DIRECTIVE POINTS. Adjacent prose stays.',
       '',
       '## World Context (stay inside it — no new nouns, no stray lore)',

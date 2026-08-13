@@ -1988,12 +1988,38 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   justify-content:flex-end;
   gap:2px;
 }
+/* CROSS-FILE CONTRACT — `session-card-metrics.js` NAME_* constants + the
+   `exerciseNameLines()` term in `rawExerciseTableHeight()`.
+
+   THE DEFECT (W3-F02, author-witnessed, auditor-quantified 2026-08-13). This
+   rule carried `white-space: nowrap`, and the column it sits in is capped at
+   `NAME_COL_MAX_PX` by `resolveExerciseNameWidthPx()` (workout-models.js). A
+   transcribed exercise name longer than that cap could not wrap and could not
+   fit, so it ran past the cell and `overflow` ate the difference as ink.
+   Measured: "Single-Arm Dumbbell Romanian Deadlift" needs 204px inside a
+   154.3px content box. The engine reported the same pages CLEAN, because the
+   density solver resolves PAGE-level boundary overflow and has no view of an
+   element whose own text exceeds its own box.
+
+   THE FIX IS HONEST WRAPPING, not hiding. `text-overflow: ellipsis` or a
+   line-clamp would truncate a name the pipeline transcribed VERBATIM from the
+   user's program (D107), and D77 forbids the clamp outright. Shrinking the
+   type below the ladder's floors is not available either. So the name wraps,
+   and the estimate reserves the second line — see NAME_ADVANCE_EM and
+   NAME_COL_CONTENT_PX in session-card-metrics.js, which carry the reciprocal
+   pointer back here. Changing the cap, the padding, or the face without
+   changing those makes the solver's row math wrong in the confident direction
+   (the D71 class). */
 .exercise-name {
   font-family: var(--serif);
   font-weight: 700;
   font-size: 8pt;
   color: var(--ink);
-  white-space: nowrap;
+  white-space: normal;
+  /* A single token longer than the column (a hyphenless compound) still has to
+     break somewhere: `break-word` breaks it rather than letting it run out of
+     the box, which is the whole point of the rule above. */
+  overflow-wrap: break-word;
 }
 .exercise-instruction{
   font-family:var(--mono);
@@ -3046,6 +3072,314 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   --cipher-cell-size:16px;
   --cipher-cell-gap:3px;
 }
+/* ── Constrained grid — the deduction board (W5b) ──
+   Two kinds under one zone: a logic grid (subjects x category values) and a
+   nonogram (run clues above and beside a grid of characters). Structure only;
+   every colour and weight comes from a theme token, and the whole surface
+   reads in B&W because the marks are the player's, in graphite.
+
+   CROSS-FILE CONTRACT: every number in this block and in the three
+   `.cgrid-zone[data-density-variant="…"]` blocks at the bottom of this file is
+   mirrored by the LADDER table in
+   renderer/modules/atoms/constrained-grid.js, which carries the reverse
+   pointer. Phase-1 estimation has no DOM and cannot resolve a custom property,
+   so a token moved here alone makes the solver's shrink math lie (D71).
+   `ladderMirrorHarness()` in scripts/validate.mjs parses both sides.
+
+   THE CELL IS A PENCIL SURFACE AND HAS A FLOOR. `--cgrid-cell` bottoms out at
+   14px at the tight tier — the same floor the reckoning tally holds. The
+   ladder's shrink comes from the label column, the clue leading and the block
+   gaps; it does not come from taking the writing surface away. */
+.cgrid-zone{
+  --cgrid-cell:22px;
+  --cgrid-gap:2px;
+  --cgrid-label-size:5.6pt;
+  --cgrid-label-leading:1.22;
+  --cgrid-row-label-w:96px;
+  --cgrid-clue-size:6.3pt;
+  --cgrid-clue-leading:1.33;
+  --cgrid-clue-gap:3px;
+  --cgrid-instr-size:5.9pt;
+  --cgrid-instr-leading:1.3;
+  --cgrid-block-gap:6px;
+  display:flex;
+  flex-direction:column;
+}
+.cgrid-instruction{
+  font-family:var(--font-body);
+  font-size:var(--cgrid-instr-size);
+  line-height:var(--cgrid-instr-leading);
+  color:var(--muted);
+  margin-bottom:var(--cgrid-block-gap);
+}
+.cgrid-matrix,
+.ngram{
+  display:flex;
+  flex-direction:column;
+  gap:var(--cgrid-gap);
+}
+.cgrid-band,
+.cgrid-head,
+.cgrid-row,
+.ngram-band,
+.ngram-row{
+  display:flex;
+  gap:var(--cgrid-gap);
+  align-items:stretch;
+}
+.cgrid-corner{
+  flex:0 0 var(--cgrid-row-label-w);
+  width:var(--cgrid-row-label-w);
+}
+.ngram-band > .cgrid-corner,
+.ngram-row > .ngram-row-clue{
+  flex:0 0 auto;
+  width:auto;
+  min-width:var(--cgrid-cell);
+}
+.cgrid-cat{
+  /* Spans its own values: N cells plus the N gaps between and after them. */
+  flex:0 0 calc(var(--cgrid-cell) * var(--cgrid-span,1) + var(--cgrid-gap) * (var(--cgrid-span,1) - 1));
+  font-family:var(--font-mono);
+  font-size:var(--cgrid-label-size);
+  line-height:var(--cgrid-label-leading);
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--muted);
+  border-bottom:1px solid var(--rule);
+}
+.cgrid-col-label,
+.cgrid-row-label{
+  font-family:var(--font-mono);
+  font-size:var(--cgrid-label-size);
+  line-height:var(--cgrid-label-leading);
+  color:var(--ink);
+  overflow-wrap:anywhere;
+}
+.cgrid-col-label{
+  flex:0 0 var(--cgrid-cell);
+  width:var(--cgrid-cell);
+}
+.cgrid-row-label{
+  flex:0 0 var(--cgrid-row-label-w);
+  width:var(--cgrid-row-label-w);
+  display:flex;
+  align-items:center;
+}
+.cgrid-cell{
+  flex:0 0 var(--cgrid-cell);
+  width:var(--cgrid-cell);
+  height:var(--cgrid-cell);
+  border:1px solid var(--rule);
+  background:var(--paper);
+  box-sizing:border-box;
+}
+.cgrid-clues{
+  list-style:decimal;
+  margin:var(--cgrid-block-gap) 0 0;
+  padding-left:14px;
+  display:flex;
+  flex-direction:column;
+  gap:var(--cgrid-clue-gap);
+}
+.cgrid-clue{
+  font-family:var(--font-body);
+  font-size:var(--cgrid-clue-size);
+  line-height:var(--cgrid-clue-leading);
+  color:var(--ink);
+}
+/* Nonogram: run numbers stack above each column and read along each row. */
+.ngram-col-clue{
+  flex:0 0 var(--cgrid-cell);
+  width:var(--cgrid-cell);
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-end;
+  align-items:center;
+}
+.ngram-run{
+  font-family:var(--font-mono);
+  font-size:var(--cgrid-label-size);
+  line-height:var(--cgrid-label-leading);
+  color:var(--ink);
+}
+.ngram-row-clue{
+  font-family:var(--font-mono);
+  font-size:var(--cgrid-label-size);
+  line-height:var(--cgrid-label-leading);
+  color:var(--ink);
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  white-space:nowrap;
+  padding-right:3px;
+}
+/* The character a solved cell yields. Quiet on purpose: it is a hint the
+   player rings, not a label — and every unshaded one is a decoy. */
+.ngram-cell{
+  font-family:var(--font-mono);
+  font-size:var(--cgrid-label-size);
+  line-height:var(--cgrid-cell);
+  text-align:center;
+  color:var(--fog);
+}
+
+/* ── Word grid — the letter hunt (W5b) ──
+   A board of letters and the list hidden in it. Structure only; character
+   comes from the theme tokens, and the whole surface reads in B&W because the
+   only marks that matter are the player's rings.
+
+   CROSS-FILE CONTRACT: every number in this block and in the three
+   `.wgrid-zone[data-density-variant="…"]` blocks at the bottom of this file is
+   mirrored by the LADDER table in renderer/modules/atoms/word-grid.js, which
+   carries the reverse pointer. `ladderMirrorHarness()` in scripts/validate.mjs
+   parses both sides. CHANGE THEM TOGETHER — a token moved here alone makes the
+   solver's shrink math lie (D71).
+
+   THE WORD LIST IS THREE FIXED COLUMNS, and `--wgrid-word-cols` is a token so
+   the estimate can mirror it. An `auto-fill` track count would come from the
+   container width, which phase-1 estimation does not know — the same reasoning
+   that fixed the reckoning tally at ten columns.
+
+   THE LETTER SIZE CARRIES NO GEOMETRY. The cell's height is `--wgrid-cell` and
+   the glyph is centred by a line-height equal to it, so type size is look and
+   never height. That is why the ladder mirror carries no letter term. */
+.wgrid-zone{
+  --wgrid-cell:20px;
+  --wgrid-gap:1px;
+  --wgrid-letter-size:7pt;
+  --wgrid-word-size:6.3pt;
+  --wgrid-word-leading:1.33;
+  --wgrid-word-gap:3px;
+  --wgrid-word-cols:3;
+  --wgrid-instr-size:5.9pt;
+  --wgrid-instr-leading:1.3;
+  --wgrid-block-gap:6px;
+  display:flex;
+  flex-direction:column;
+}
+.wgrid-instruction{
+  font-family:var(--font-body);
+  font-size:var(--wgrid-instr-size);
+  line-height:var(--wgrid-instr-leading);
+  color:var(--muted);
+  margin-bottom:var(--wgrid-block-gap);
+}
+.wgrid-board{
+  display:flex;
+  flex-direction:column;
+  gap:var(--wgrid-gap);
+  align-self:flex-start;
+}
+.wgrid-row{
+  display:flex;
+  gap:var(--wgrid-gap);
+}
+.wgrid-cell{
+  flex:0 0 var(--wgrid-cell);
+  width:var(--wgrid-cell);
+  height:var(--wgrid-cell);
+  font-family:var(--font-mono);
+  font-size:var(--wgrid-letter-size);
+  line-height:var(--wgrid-cell);
+  text-align:center;
+  color:var(--ink);
+  box-sizing:border-box;
+}
+.wgrid-words{
+  list-style:none;
+  margin:var(--wgrid-block-gap) 0 0;
+  padding:0;
+  display:grid;
+  grid-template-columns:repeat(var(--wgrid-word-cols),1fr);
+  gap:var(--wgrid-word-gap);
+  border-top:1px solid var(--rule);
+  padding-top:var(--wgrid-word-gap);
+}
+.wgrid-word{
+  font-family:var(--font-mono);
+  font-size:var(--wgrid-word-size);
+  line-height:var(--wgrid-word-leading);
+  letter-spacing:.04em;
+  color:var(--ink);
+  overflow-wrap:anywhere;
+}
+
+/* ── Hint band — the costed ladder, printed (W5b) ──
+   A framed strip: an authored heading and one two-column row per rung, cost
+   first. Structure only, and it prints no English of its own — the heading and
+   both columns are the book's own text (Design Principles 1: nothing printed
+   in this book is the engine talking).
+
+   CROSS-FILE CONTRACT: every number in this block and in the three
+   `.hint-band[data-density-variant="…"]` blocks at the bottom of this file is
+   mirrored by the LADDER table in renderer/modules/atoms/hint-band.js, which
+   carries the reverse pointer. `ladderMirrorHarness()` in scripts/validate.mjs
+   parses both sides. CHANGE THEM TOGETHER (D71).
+
+   `--hband-cost-w` is a load-bearing width, not a style: the estimate divides
+   the band by it to model how each rung's two columns wrap. */
+.hint-band{
+  --hband-label-size:6.3pt;
+  --hband-label-leading:1.3;
+  --hband-label-mb:4px;
+  --hband-rung-size:5.9pt;
+  --hband-rung-leading:1.3;
+  --hband-rung-gap:3px;
+  /* DENSITY-INVARIANT, and it is a ruling rather than an oversight. A cost
+     column that narrows with density makes the cost text wrap MORE while the
+     gives text wraps less, and which of the two wins is content-dependent — so
+     a long-costed ladder measured TALLER at the tight tier than at the dense
+     one. Charter invariant 4 requires estimates to be non-increasing in
+     density or the solver loops without converging, so the column is fixed and
+     the band's shrink comes from leading, padding and the gaps. */
+  --hband-cost-w:104px;
+  --hband-col-gap:8px;
+  --hband-pad:5px;
+  border:1px solid var(--rule);
+  padding:var(--hband-pad);
+  box-sizing:border-box;
+}
+.hint-band-label{
+  font-family:var(--font-mono);
+  font-size:var(--hband-label-size);
+  line-height:var(--hband-label-leading);
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:var(--hband-label-mb);
+}
+.hint-rungs{
+  list-style:none;
+  margin:0;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  gap:var(--hband-rung-gap);
+}
+.hint-rung{
+  display:flex;
+  gap:var(--hband-col-gap);
+  align-items:baseline;
+}
+.hint-rung-cost{
+  flex:0 0 var(--hband-cost-w);
+  width:var(--hband-cost-w);
+  font-family:var(--font-mono);
+  font-size:var(--hband-rung-size);
+  line-height:var(--hband-rung-leading);
+  color:var(--ink);
+  overflow-wrap:anywhere;
+}
+.hint-rung-gives{
+  flex:1 1 auto;
+  min-width:0;
+  font-family:var(--font-body);
+  font-size:var(--hband-rung-size);
+  line-height:var(--hband-rung-leading);
+  color:var(--ink);
+}
+
 .map-zone{
   display:flex;
   flex-direction:column;
@@ -7370,6 +7704,115 @@ body[data-demo-view="true"] .reader-unlock{
   margin-top:2px;
 }
 .cipher-zone[data-density-variant="tight"] .cipher-family-note{ display:none; }
+
+/* ── Constrained-grid density ladder (W5b) ──
+   Token resets only, like the cipher's — no per-element rules, because a rule
+   targeting a class the renderer does not emit is silent and the promised
+   shrink is then unrealizable (the defect the cipher ladder was built out of).
+   NOTHING IS HIDDEN AT ANY TIER: the clues and the instruction ARE the puzzle,
+   so unlike the map's note or the cipher's family gloss there is no gloss here
+   to drop. The shrink is the cell's four pixels, the label column, the leading
+   and the gaps, and that is all this ladder promises.
+
+   CROSS-FILE CONTRACT: every number in the three blocks below is mirrored in
+   the LADDER table of renderer/modules/atoms/constrained-grid.js (tier keys
+   match densityVariant()). CHANGE THEM TOGETHER. */
+.cgrid-zone[data-density-variant="compact"]{
+  --cgrid-cell:20px;
+  --cgrid-row-label-w:92px;
+  --cgrid-block-gap:5px;
+}
+.cgrid-zone[data-density-variant="dense"]{
+  --cgrid-cell:17px;
+  --cgrid-label-leading:1.16;
+  --cgrid-row-label-w:84px;
+  --cgrid-clue-size:5.9pt;
+  --cgrid-clue-leading:1.24;
+  --cgrid-clue-gap:2px;
+  --cgrid-instr-size:5.5pt;
+  --cgrid-instr-leading:1.22;
+  --cgrid-block-gap:4px;
+}
+.cgrid-zone[data-density-variant="tight"]{
+  --cgrid-cell:14px;
+  --cgrid-gap:1px;
+  --cgrid-label-size:5.2pt;
+  --cgrid-label-leading:1.12;
+  --cgrid-row-label-w:72px;
+  --cgrid-clue-size:5.6pt;
+  --cgrid-clue-leading:1.18;
+  --cgrid-clue-gap:2px;
+  --cgrid-instr-size:5.2pt;
+  --cgrid-instr-leading:1.16;
+  --cgrid-block-gap:3px;
+}
+
+/* ── Word-grid density ladder (W5b) ──
+   Token resets only, same law as the cipher's and the constrained grid's. The
+   board's cell shrinks to a 14px pencil floor and stops; the rest of the
+   shrink is the word list's leading and the block gaps. The word list's COLUMN
+   COUNT never moves — an estimate that has to guess how many columns a grid
+   produced is an estimate that guesses the row count too.
+
+   CROSS-FILE CONTRACT: every number in the three blocks below is mirrored in
+   the LADDER table of renderer/modules/atoms/word-grid.js (tier keys match
+   densityVariant()). CHANGE THEM TOGETHER. */
+.wgrid-zone[data-density-variant="compact"]{
+  --wgrid-cell:18px;
+  --wgrid-block-gap:5px;
+}
+.wgrid-zone[data-density-variant="dense"]{
+  --wgrid-cell:16px;
+  --wgrid-word-size:5.9pt;
+  --wgrid-word-leading:1.24;
+  --wgrid-word-gap:2px;
+  --wgrid-instr-size:5.5pt;
+  --wgrid-instr-leading:1.22;
+  --wgrid-block-gap:4px;
+}
+.wgrid-zone[data-density-variant="tight"]{
+  --wgrid-cell:14px;
+  --wgrid-letter-size:6.4pt;
+  --wgrid-word-size:5.6pt;
+  --wgrid-word-leading:1.18;
+  --wgrid-word-gap:2px;
+  --wgrid-instr-size:5.2pt;
+  --wgrid-instr-leading:1.16;
+  --wgrid-block-gap:3px;
+}
+
+/* ── Hint-band density ladder (W5b) ──
+   Token resets only. NOTHING IS HIDDEN AT ANY TIER, and that is the point: a
+   band that vanished under page pressure would be a promise the spine made and
+   the page broke. The shrink is leading, padding and the cost column.
+
+   CROSS-FILE CONTRACT: every number in the three blocks below is mirrored in
+   the LADDER table of renderer/modules/atoms/hint-band.js (tier keys match
+   densityVariant()). CHANGE THEM TOGETHER. */
+.hint-band[data-density-variant="compact"]{
+  --hband-label-mb:3px;
+  --hband-pad:4px;
+}
+.hint-band[data-density-variant="dense"]{
+  --hband-label-size:5.9pt;
+  --hband-label-leading:1.24;
+  --hband-label-mb:2px;
+  --hband-rung-size:5.5pt;
+  --hband-rung-leading:1.24;
+  --hband-rung-gap:2px;
+  --hband-col-gap:6px;
+  --hband-pad:3px;
+}
+.hint-band[data-density-variant="tight"]{
+  --hband-label-size:5.6pt;
+  --hband-label-leading:1.18;
+  --hband-label-mb:2px;
+  --hband-rung-size:5.2pt;
+  --hband-rung-leading:1.18;
+  --hband-rung-gap:2px;
+  --hband-col-gap:5px;
+  --hband-pad:2px;
+}
 
 /* ── Map density ladder ──
    Was print-scoped. Measured effect of that scoping across the 24-zone corpus

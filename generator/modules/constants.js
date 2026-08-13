@@ -86,7 +86,20 @@ export var STAGE_BUDGETS = {
   // Both now follow the ladder's own rule (~3-4x measured output) and pair
   // with a timeout that reaches the ceiling at the conservative ~20 tok/s floor.
   critic:         { maxTokens: 24000, timeoutMs: 480000 },
-  'critic-revise': { maxTokens: 24000, timeoutMs: 600000 }
+  'critic-revise': { maxTokens: 24000, timeoutMs: 600000 },
+  // The conductor's pass (FUSION.md §4 mechanism 6). The cheapest reading stage
+  // in the ladder BY CONSTRUCTION: its input is the score projection alone —
+  // one line per week plus a caption, roughly 1.5k tokens at twelve weeks —
+  // never the digest, because a reader handed the pages stops hearing the
+  // sequence (that is the whole failure §4.6 names). Output is one verdict
+  // sentence per week plus at most CONDUCTOR_MAX_FINDINGS findings: ~800 tokens
+  // compact at twelve weeks, ~1.5k as models pretty-print it. 12000 is the
+  // ladder's own ~3-4x rule with headroom for a model that thinks inside the
+  // same ceiling, and it pairs with the 300000ms the `rules` and `knowing` rows
+  // use — the two other short-structured-output stages. Sized deliberately
+  // BELOW `critic`: a stage that reads an index must never be budgeted like one
+  // that reads the book.
+  conductor:      { maxTokens: 12000, timeoutMs: 300000 }
 };
 
 // Retry escalation: each attempt gets more wall clock than the last, and a
@@ -188,7 +201,23 @@ import {
   MARK_STRIP_TARGET_KINDS,
   RECKONING_SINK_KINDS,
   RECKONING_THRESHOLD_RATIO,
-  OUTPUT_BUDGETS
+  OUTPUT_BUDGETS,
+  LUDIC_LIBRARY,
+  LUDIC_LIBRARY_ATOMS,
+  VALID_DYNAMIC_MARKINGS,
+  SPINE_BUDGETS,
+  SURFACE_REF_KINDS,
+  SURFACE_REF_SINGLETONS,
+  parseSurfaceRef,
+  VALID_GATE_STRUCTURES,
+  GATE_STRUCTURE_SHAPES,
+  VALID_LEGACY_MOVES,
+  BRANCH_OPTIONS,
+  BRANCH_REF_PATTERN,
+  parseBranchRef,
+  PIPELINE_DEBRIS_KEYS,
+  readPipelineDebris,
+  writePipelineDebris
 } from '../../contracts/contract-constants.mjs';
 
 export {
@@ -230,7 +259,36 @@ export {
   // Prose caps (Teeth Round T1a). Hoisted to contract-constants when breaches
   // became stage-blocking: api-generator.js reads them through here to stamp
   // maxLength onto the structured schemas the compat transports enforce.
-  OUTPUT_BUDGETS
+  OUTPUT_BUDGETS,
+  // ── The Ludic Spine (W4a) ──────────────────────────────────────────────
+  // The play vocabulary and its one ref grammar. Re-exported, never
+  // re-declared: parseSurfaceRef has a single home (D93) and the floors, the
+  // prompt-parity pass, and the W4b simulated player all reach it through
+  // this seam.
+  LUDIC_LIBRARY,
+  LUDIC_LIBRARY_ATOMS,
+  VALID_DYNAMIC_MARKINGS,
+  SPINE_BUDGETS,
+  SURFACE_REF_KINDS,
+  SURFACE_REF_SINGLETONS,
+  parseSurfaceRef,
+  // ── The Ludic Harvest, tranche 1 (W5a) ────────────────────────────────
+  // The tier-2 patterns that landed a declaration surface. Same seam, same
+  // rule: parseBranchRef has one home beside parseSurfaceRef, because a
+  // second branch parser is a second answer to "which side is this".
+  VALID_GATE_STRUCTURES,
+  GATE_STRUCTURE_SHAPES,
+  VALID_LEGACY_MOVES,
+  BRANCH_OPTIONS,
+  BRANCH_REF_PATTERN,
+  parseBranchRef,
+  // ── Pipeline debris (D128) ─────────────────────────────────────────────
+  // `_x` is the only lawful home for non-contract data and always was; the
+  // pipelines wrote ten keys at top level anyway, where the schema rejects
+  // every one. write/read are the seam that makes the move total.
+  PIPELINE_DEBRIS_KEYS,
+  readPipelineDebris,
+  writePipelineDebris
 };
 
 export var SUPPORTED_THEME_ARCHETYPES = VALID_ARCHETYPES.reduce(function (acc, name) {
@@ -297,5 +355,84 @@ export var STRUCTURAL_REOPEN_SCOPES = [
       + 'what that object means at this point in the book' },
   { id: 'mechanism', name: 'the mechanical assignment',
     licenses: 'which printed surface carries this unit\'s pressure may change — what the '
-      + 'clock, oracle, door, cipher, or strip is keyed to and what it answers' }
+      + 'clock, oracle, door, cipher, or strip is keyed to and what it answers' },
+  // ── The ludic scopes (W4b) ───────────────────────────────────────────────
+  // The first four are the FUSION vocabulary: they let a reviser re-decide what
+  // a unit is and how it sounds. None of them can re-decide how the unit is
+  // WIRED, and that is precisely the class of finding the simulated player
+  // produces — a dead sink, a key that arrives too late, a week that asks
+  // nothing. Routing a sim finding through `mechanism` would license "re-key
+  // the clock" when the defect is "nothing reads the clock", which is a
+  // different edit on a different object.
+  //
+  // Three, not one, for the same reason there are four above rather than one
+  // "structure": the reviser is told what is open and everything else is
+  // frozen, so a scope that meant "the play is reopened" would unfreeze the
+  // whole unit on every finding.
+  { id: 'economy', name: 'the economic wiring',
+    licenses: 'where this unit\'s value flows may change — what its marks bank into, what its '
+      + 'spend buys, and which surface downstream reads the result' },
+  { id: 'gate', name: 'the gate and its key',
+    licenses: 'what this unit locks and what opens it may change — which key the player must '
+      + 'already hold, and how far ahead of the lock they can hold it' },
+  { id: 'decision', name: 'the decision offered',
+    licenses: 'what this unit asks the player to CHOOSE may change — whether it forks at all, '
+      + 'and what mechanically differs across the branches' }
 ];
+
+// ── The conductor's pass (FUSION.md §4 mechanism 6) ─────────────────────────
+// "A dedicated post-draft read of ONLY the play-order sequence... auditing
+// phrasing across the whole." The constitution has named this since it was
+// written and nothing ran it: its material existed in the digest, and a general
+// read passed over it every time — which is exactly what §4.6 predicts and what
+// two real books measured (fusionPacing was the MINIMUM dimension in both).
+//
+// THIS IS THE VERDICT VOCABULARY, not a list of schema fields — the same choice
+// STRUCTURAL_REOPEN_SCOPES made and for the same reason. A reader told "score
+// the pacing" produces an impression; a reader told "name which of these nine
+// relations you heard, and cite the weeks and the curves you read it from"
+// produces a finding somebody can act on. Every id below is one of the six
+// mechanisms as HEARD, or one of the two failures §4.6 names by name:
+//
+//   score / exhale         -> mechanism 1 (the fusion score; the deload law)
+//   counterpoint / doubling-> mechanism 2 + §3 (the load-bearing law, both ways)
+//   leitmotif              -> mechanism 3
+//   echo                   -> mechanism 4
+//   unnameable             -> mechanism 5
+//   discord / flat         -> §4.6's two named failures
+//
+// Mechanism 6 is the pass itself and therefore cannot appear here: a reader
+// whose verdict is "the conductor's pass" has named its own chair.
+//
+// SINGLE HOME, same as CRITIC_DIMENSIONS and STRUCTURAL_REOPEN_SCOPES:
+// modules/conductor.js validates against these ids and prompt_rules.js states
+// them to the model once (INST_CONDUCTOR). check-generation-floors.mjs asserts
+// the mirror, because an id the pipeline accepts and the prompt never offers is
+// a verdict nobody can return.
+export var CONDUCTOR_MECHANISMS = [
+  { id: 'score',
+    reads: 'the week plays the beat and the dynamic marking it declared for itself' },
+  { id: 'counterpoint',
+    reads: 'what is at stake rises with the training load while the page speaks the other way' },
+  { id: 'doubling',
+    reads: 'both curves move together — unison, which is not harmony' },
+  { id: 'discord',
+    reads: 'a heavy week carrying an administrative beat, with nothing at risk in it' },
+  { id: 'flat',
+    reads: 'the book holds one dynamic for its whole length — every week mezzo-forte' },
+  { id: 'exhale',
+    reads: 'the lighter week carries content — the aftermath, the arriving document, the count taken' },
+  { id: 'leitmotif',
+    reads: 'a carried object means something different here than it did before the midpoint' },
+  { id: 'echo',
+    reads: 'a mechanical event and a story surface answer each other inside one week, both directions' },
+  { id: 'unnameable',
+    reads: 'what this world will not say is carried by a printed surface rather than a sentence' }
+];
+
+// At most three, and the number is the point. The conductor is a prioritizer,
+// not a second critic: a read that returns nine findings has returned a list,
+// and the loop it feeds revises CRITIC_MAX_REVISIONS_PER_ROUND units in a round
+// under floors that can refuse any of them. Three prioritized findings is what
+// one round can actually act on.
+export var CONDUCTOR_MAX_FINDINGS = 3;

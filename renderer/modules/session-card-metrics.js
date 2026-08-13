@@ -1,4 +1,7 @@
 import { describeExerciseLoad, countWrappedLines } from './utils.js?v=48';
+// D121: the estimate's only knowledge of typefaces. `.exercise-name` reads
+// `--serif`, which resolves to `--theme-body-family` — the `body` role.
+import { advanceRatio } from './type-metrics.js?v=48';
 
 // ---------------------------------------------------------------------------
 // Session-card geometry model
@@ -71,6 +74,97 @@ const INSTRUCTION_GAP = 2;
  * hinted row at the median, worst case 2.
  */
 const INSTRUCTION_CHARS_PER_LINE = 16;
+
+// ---------------------------------------------------------------------------
+// EXERCISE-NAME WRAP — the W3-F02 term
+// ---------------------------------------------------------------------------
+/**
+ * CROSS-FILE CONTRACT (four-way):
+ *   booklet.css               `.exercise-name` (white-space: normal) and
+ *                             `.exercise-name-cell` padding-right
+ *   workout-models.js         `resolveExerciseNameWidthPx()` — the column cap
+ *   this file                 the wrap arithmetic below
+ *   type-metrics.js           the face correction (D121)
+ * booklet.css carries the reciprocal pointer.
+ *
+ * THE DEFECT (W3-F02, 2026-08-13). `.exercise-name` was `white-space: nowrap`
+ * inside a column capped at NAME_COL_MAX_PX, so a transcribed name longer than
+ * the cap could neither wrap nor fit and ran out of its box, where `overflow`
+ * ate it as ink. The engine reported those pages clean: the density solver
+ * resolves PAGE-level boundary overflow and has no view of an element whose own
+ * text exceeds its own box. Measurement-equals-render held at page level and
+ * failed at glyph level. The CSS now wraps; this is the term that reserves for
+ * the wrap, because a wrap the estimate does not model is a taller card the
+ * planner has not paid for.
+ *
+ * WHY THE CAP IS THE ONLY PLACE A WRAP CAN HAPPEN, exactly and not
+ * approximately. `resolveExerciseNameWidthPx()` reserves
+ * `min(max(54, longest) + 16, 168)` from the widest name on the card. Below the
+ * cap that reservation is the name's own width plus 16px, and the cell spends
+ * only NAME_CELL_PAD_PX of it on padding — so the name clears its content box
+ * with ~2px to spare and cannot wrap. AT the cap the reservation stops growing
+ * and the content box is a constant, NAME_COL_CONTENT_PX. So the wrap test is a
+ * single comparison against one measured number, with no dependence on the
+ * other names sharing the card.
+ *
+ * NAME_ADVANCE_EM is the largest per-character advance measured over real
+ * exercise names in bold Libre Baskerville (worst: "Pendlay Row" at 0.6201
+ * em/char; "Overhead Press" 0.5846, "Single-Arm Dumbbell Romanian Deadlift"
+ * 0.5988). Measured with a Range over the live element at four font sizes —
+ * the ratio is size-invariant to four decimals, which is the type-metrics model
+ * working. Fit HIGH on purpose: the line count must never come back short.
+ * A run of nothing but 'W' measures 1.23 and is not modelled; an exercise name
+ * is words, and the fit is over words.
+ */
+const NAME_COL_MAX_PX = 168;
+/** `.exercise-name-cell` padding-right (1.2ch). Measured 13.71px, and the same
+ *  at every tier — the cell's own font does not change with the variant. */
+const NAME_CELL_PAD_PX = 13.71;
+/** The wrap width at the cap: everything the glyph run actually gets. */
+const NAME_COL_CONTENT_PX = NAME_COL_MAX_PX - NAME_CELL_PAD_PX;
+const NAME_ADVANCE_EM = 0.63;
+
+/**
+ * `.exercise-name` font size and line box per tier, measured off the rendered
+ * row. `linePx` is the inherited line box (1.6x at every tier, measured, not
+ * assumed) and `fontPx` mirrors the `[data-density-variant] .exercise-name`
+ * font-size declarations in booklet.css: 8pt / 7.6pt / 7.2pt / 6.9pt.
+ *
+ * CHECK THAT PINS THIS TABLE TO CARD_LADDER: a row with a ONE-line name
+ * measures exactly `CARD_LADDER[tier].row` at all four tiers (21.11 / 19.11 /
+ * 17.34 / 14.72), because the row is `max(min-height, nameLines x linePx +
+ * 2 x padY)`. Each extra line therefore adds one `linePx`, minus a slack of at
+ * most 0.9px which is deliberately not modelled — over-reserving by under a
+ * pixel is the safe direction.
+ */
+const NAME_LADDER = {
+  base:    { fontPx: 10.6667, linePx: 17.07 },
+  compact: { fontPx: 10.1333, linePx: 16.22 },
+  dense:   { fontPx:  9.6,    linePx: 15.36 },
+  tight:   { fontPx:  9.2,    linePx: 14.72 },
+};
+
+/**
+ * How many lines this exercise name takes in the capped column.
+ *
+ * @param {string} name    the transcribed exercise name (printed verbatim, D107)
+ * @param {string} tierKey base | compact | dense | tight
+ * @param {object} metrics from readTypeMetrics() — the D121 face deltas
+ * @returns {number} 1 when the name fits, more when it wraps
+ */
+function exerciseNameLines(name, tierKey, metrics) {
+  const text = String((name === null || name === undefined) ? '' : name).trim();
+  if (!text) return 1;
+  const tier = NAME_LADDER[tierKey] || NAME_LADDER.base;
+  // Face-corrected, per the D121 contract: the constant above is a measurement
+  // of Libre Baskerville, which is the body ANCHOR — so a pastoral-faced book
+  // is bit-identical here, and a wider body face adds its own delta.
+  const advance = advanceRatio(NAME_ADVANCE_EM, 'body', metrics) * tier.fontPx;
+  const width = text.length * advance;
+  if (width <= NAME_COL_CONTENT_PX) return 1;
+  return Math.ceil(width / NAME_COL_CONTENT_PX);
+}
+
 
 // ---------------------------------------------------------------------------
 // Density variant ladder — the single source for the card's density tiers
@@ -862,12 +956,21 @@ function cardComposition(session) {
  * phantom row to every single-exercise session — 57 cards in the corpus, worth
  * 15–21px each. The renderer renders exactly what is authored.
  */
-function rawExerciseTableHeight(exercises, tier) {
+function rawExerciseTableHeight(exercises, tier, tierKey, metrics) {
   if (!exercises.length) return 0;
 
   let height = exercises.length * tier.row + (exercises.length - 1) * tier.tableGap;
 
   for (const exercise of exercises) {
+    // W3-F02: a name too long for the capped column wraps, and every line past
+    // the first grows the row. `tier.row` already carries the one-line case, so
+    // this term is zero for every name that fits — which is every name in the
+    // corpus, at every tier it renders at.
+    const nameLines = exerciseNameLines(exercise && exercise.name, tierKey, metrics);
+    if (nameLines > 1) {
+      height += (nameLines - 1) * (NAME_LADDER[tierKey] || NAME_LADDER.base).linePx;
+    }
+
     const instruction = describeExerciseLoad(exercise).instructionHint;
     if (!instruction) continue;
     height += INSTRUCTION_GAP
@@ -901,8 +1004,9 @@ function notesBoxHeight(density) {
   return sessionCardNotesHeight(density) + NOTES_MARGIN;
 }
 
-function rawSessionCardHeight(session, density) {
-  const tier = CARD_LADDER[variantKey(density)];
+function rawSessionCardHeight(session, density, metrics) {
+  const tierKey = variantKey(density);
+  const tier = CARD_LADDER[tierKey];
   const box = cardBox(density);
   const parts = cardComposition(session);
 
@@ -913,7 +1017,7 @@ function rawSessionCardHeight(session, density) {
     + (parts.hasPrompt ? rawPromptHeight(session.storyPrompt, density) : 0)
     + (session && session.fragmentRef ? tier.meta : tier.metaEmpty)
     + Math.max(0, parts.bodyChildren - 1) * tier.bodyGap
-    + rawExerciseTableHeight(parts.exercises, tier)
+    + rawExerciseTableHeight(parts.exercises, tier, tierKey, metrics)
     + rawMarkStripHeight(parts.hasStrip ? session.markStrip : null, density)
     + rawMicroLinesHeight(parts.hasMicroLines ? session.microLines : null, density)
     + (parts.hasChoice ? rawBinaryChoiceHeight(session.binaryChoice, density) : 0)
@@ -930,8 +1034,8 @@ function rawSessionCardHeight(session, density) {
  * @param {number} density — 0.0 (spacious) to 1.0 (maximum compression)
  * @returns {number} px
  */
-export function estimateSessionCardHeight(session, density) {
-  return monotoneTail((d) => rawSessionCardHeight(session, d), density);
+export function estimateSessionCardHeight(session, density, metrics) {
+  return monotoneTail((d) => rawSessionCardHeight(session, d, metrics), density);
 }
 
 /**
@@ -946,7 +1050,7 @@ export function estimateSessionCardHeight(session, density) {
  * @param {object} session
  * @returns {number} px
  */
-export function estimateSoloSessionCardHeight(session) {
+export function estimateSoloSessionCardHeight(session, metrics) {
   const parts = cardComposition(session);
   // Interior text still follows the base tier: the card-count rules restore
   // base-ish type sizes, and `.exercise-*` carries no card-count override at
@@ -970,7 +1074,7 @@ export function estimateSoloSessionCardHeight(session) {
     + prompt
     + (session && session.fragmentRef ? tier.meta : tier.metaEmpty)
     + Math.max(0, parts.bodyChildren - 1) * SOLO_CARD.bodyGap
-    + rawExerciseTableHeight(parts.exercises, tier)
+    + rawExerciseTableHeight(parts.exercises, tier, 'base', metrics)
     + rawMarkStripHeight(parts.hasStrip ? session.markStrip : null, SOLO_CARD.stripDensity)
     + rawMicroLinesHeight(parts.hasMicroLines ? session.microLines : null, 0)
     + (parts.hasChoice ? rawBinaryChoiceHeight(session.binaryChoice, 0) : 0)

@@ -298,6 +298,64 @@ export function formatWorkoutTopologyBlock(topology) {
 }
 
 /**
+ * Render the digest's PER-WEEK rows — the whole program, one line each.
+ *
+ * WHY THIS EXISTS (W3 length audit, 2026-08-13). The campaign planner is told
+ * "use exactly N weeks" and then handed the workout through
+ * `truncateText(workout, 2200)`. Measured at 12 weeks: the program is 4,871
+ * characters and the planner sees 2,194 of them — it plans weeks 6 through 12
+ * having never seen them. The truncation is not itself wrong (the raw echo has
+ * to be bounded somewhere, and the WEEK stages get their own week's text
+ * through extractWeekWorkout); what was wrong is that nothing else told the
+ * planner what those weeks contain.
+ *
+ * So the planner gets the SHAPE of every week from the digest instead. This is
+ * the cheap half of the trade: `formatWorkoutTopologyBlock` above states the
+ * block's summary in ~7 lines; this states each week in one, so a 12-week
+ * program costs ~330 characters and no week is invisible.
+ *
+ * DERIVED, NEVER AUTHORED — the same rule the summary block follows. Rows are
+ * counts and a load index. No genre, no adjective, no "therefore". The load
+ * index is the sets x reps proxy expressed against the block's own mean,
+ * because the proxy is only ever meaningful compared against itself (see the
+ * note on SETSxREPS above) and a raw number invites the model to read it as a
+ * weight.
+ *
+ * Returns '' when there is nothing honest to say, so the caller filters it out.
+ */
+export function formatWeekScheduleBlock(topology) {
+  if (!topology) return '';
+  var loads = (topology.weekLoads || []).slice();
+  if (loads.length < 2) return '';       // one row is the summary block's job
+
+  var volumes = loads.map(function (w) { return w.volume; });
+  var total = volumes.reduce(function (a, b) { return a + b; }, 0);
+  var mean = total / volumes.length;
+  // An unparseable program produces zero volumes everywhere. Reporting an
+  // index of 0 for every week would read as "the program is empty", which is a
+  // confident wrong shape — the one thing this digest refuses to give. Session
+  // counts are still real, so the rows print without the load column.
+  var hasLoad = mean > 0;
+
+  var lines = ['## Week Schedule (derived — every week, not a sample)'];
+  for (var i = 0; i < loads.length; i++) {
+    var w = loads[i];
+    var row = '- W' + w.weekNumber + ': ' + w.sessionCount + ' session'
+      + (w.sessionCount === 1 ? '' : 's');
+    if (hasLoad) row += ', load ' + Math.round((w.volume / mean) * 100);
+    if (w.declaredDeload) row += ' (declared deload)';
+    lines.push(row);
+  }
+  if (hasLoad) {
+    lines.push('Load is a sets x reps proxy indexed to this block\'s own mean (100). It');
+    lines.push('compares weeks inside this program and means nothing outside it.');
+  }
+  lines.push('These rows are the WHOLE program. The workout text below may be abbreviated;');
+  lines.push('this list is not — plan every week from it.');
+  return lines.join('\n');
+}
+
+/**
  * looksLikeDeloadWeek(text) -> boolean
  *
  * Whether a slice of program text DECLARES itself a deload. The explicit-intent
@@ -322,5 +380,6 @@ export function looksLikeDeloadWeek(text) {
 if (typeof window !== 'undefined') {
   window.buildWorkoutTopology = buildWorkoutTopology;
   window.formatWorkoutTopologyBlock = formatWorkoutTopologyBlock;
+  window.formatWeekScheduleBlock = formatWeekScheduleBlock;
   window.looksLikeDeloadWeek = looksLikeDeloadWeek;
 }

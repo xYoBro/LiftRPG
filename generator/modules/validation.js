@@ -66,8 +66,38 @@ import {
   // surfaces quote too, and validate.mjs ties every copy back to that home.
   VALID_COMPONENT_DIALECTS,
   isDoorLeaningFamily,
-  OUTPUT_BUDGETS
+  OUTPUT_BUDGETS,
+  // W4a — the Ludic Spine. The closed sets and the ref GRAMMAR live with the
+  // contract; the booklet INVENTORY (buildSurfaceIndex, below) lives here with
+  // the other booklet walkers. Grammar there, inventory here — stated in both
+  // files so nobody "unifies" them into one home that has to know both.
+  LUDIC_LIBRARY,
+  SPINE_BUDGETS,
+  parseSurfaceRef,
+  VALID_DYNAMIC_MARKINGS,
+  // W5a — the Ludic Harvest, tranche 1. Same split: the closed vocabularies and
+  // the branch grammar live with the contract, the checks that need the book
+  // live here.
+  VALID_GATE_STRUCTURES,
+  GATE_STRUCTURE_SHAPES,
+  VALID_LEGACY_MOVES,
+  BRANCH_OPTIONS,
+  parseBranchRef,
+  // W7 — the cipher-variety ceiling. The floor may not demand more distinct
+  // techniques than the doctrine offers; the size is read, never written down.
+  GENERATION_CIPHER_TECHNIQUES,
+  CIPHER_VARIETY_MIN
 } from '../../contracts/contract-constants.mjs';
+
+// W5b — the Ludic Harvest, tranche 2. THE ONE LAW: no puzzle ships
+// unsolved-by-machine. The solvers are a separate contract module because the
+// renderer must never pay for them (it draws puzzles, it does not solve them)
+// and because Node runs them too, at the floors harness. This module routes
+// severity; puzzle-solvers.mjs decides whether a puzzle is a puzzle.
+import {
+  verifyConstrainedGrid,
+  verifyWordGrid
+} from '../../contracts/puzzle-solvers.mjs';
 
 // Map-evolution fingerprint + companions: one implementation, shared with quality.js.
 // Formerly a private copy here that silently diverged from quality.js's — see D91 and
@@ -77,6 +107,16 @@ import {
   hasComparableMapState,
   looksLikeFragmentRef
 } from './fingerprint.js';
+
+// The simulated player (W4b). ONE-DIRECTIONAL BY DESIGN: sim-player.js imports
+// the ref grammar and one normalizer and nothing else, so it can never import
+// this file back. The walker must run in all three doors (VISION §4.5) and a
+// cycle here would surface as a load-order failure in exactly one of them.
+import {
+  simulateBook,
+  simCorrectionDirectives,
+  simSoftFindings
+} from './sim-player.js';
 
 // ── Part 1: Continuity validators ─────────────────────────────────────────────
 
@@ -812,18 +852,35 @@ function floorsOn(options) {
 /**
  * cipherVarietyFloor(weekCount) -> number
  *
- * How many distinct cipher families a book of this length owes. Six weeks (the
- * standard block) yields 4, which is the Teeth Round's stated floor; the
- * formula generalises it so a four-week book is asked for 3 rather than for
- * more families than it has non-boss weeks to carry them.
+ * How many distinct cipher techniques a book of this length owes. Six weeks
+ * (the standard block) yields 4, which is the Teeth Round's stated floor; the
+ * formula generalises it downward so a four-week book is asked for 3 rather
+ * than for more techniques than it has non-boss weeks to carry them.
  *
- * One implementation, two readers: the skeleton's cipher PLAN and the campaign
- * plan's. They used to disagree by construction — the campaign plan carried
- * this formula and the skeleton carried no check at all.
+ * DERIVED-OR-STRICT (W7, the W3 length audit). The formula had no CEILING, so
+ * it scaled to 6/8/10 at 8/10/12 weeks — past the eight techniques the
+ * doctrine offers. A blocking gate that demands more variety than any prompt
+ * surface teaches can only be satisfied by improvising vocabulary, which is
+ * the one thing the same doctrine forbids; every retry then buys the same
+ * failure. The cap READS `GENERATION_CIPHER_TECHNIQUES.length`, so adding or
+ * retiring a technique moves the ceiling by construction and no literal here
+ * can go stale. See the long note beside that array in contract-constants.mjs.
+ *
+ * The six-week answer is unchanged: min(4, 8) === 4.
+ *
+ * One implementation, three readers: the skeleton's cipher PLAN, the campaign
+ * plan's, and the two prompt surfaces that state the number to the model. They
+ * used to disagree by construction — the campaign plan carried this formula,
+ * the skeleton carried no check at all, and two prompt builders each carried a
+ * hand-copied `Math.min(Math.max(...))` of their own.
  */
 export function cipherVarietyFloor(weekCount) {
   var n = Number(weekCount) || 0;
-  return Math.min(Math.max(n - 2, 3), Math.max(n - 1, 1));
+  // `n - 2`: the boss week carries no cipher, and one repeat is allowed among
+  // the rest — the original Teeth Round derivation, unchanged. The two clamps
+  // around it are the floor and the ceiling.
+  var scaled = Math.min(Math.max(n - 2, CIPHER_VARIETY_MIN), Math.max(n - 1, 1));
+  return Math.min(scaled, GENERATION_CIPHER_TECHNIQUES.length);
 }
 
 /**
@@ -899,6 +956,107 @@ function describeRepTarget(value) {
   if (typeof value === 'string') return '"' + value.slice(0, 24) + '"';
   if (typeof value === 'object') return 'an object';
   return String(value);
+}
+
+/**
+ * collectPuzzleFloorErrors(weekObj) -> string[]   (W5b)
+ *
+ * THE SOLVER FLOOR. Two obligations, in this order:
+ *
+ *   1. GENERATION POLICY — the tighter half of the two-tier guardrails. The
+ *      schema accepts up to the RENDER ceiling so a hand-authored corpus book
+ *      is not rejected for being one row bigger than the prompt asks for; this
+ *      floor holds the generation numbers, and it holds them FIRST because a
+ *      grid outside them is one whose uniqueness proof may not be affordable.
+ *      The escalation valve for a pathological puzzle is a tighter number in
+ *      SPATIAL_GUARDRAILS, never a weaker floor here.
+ *
+ *   2. THE PROOF — contracts/puzzle-solvers.mjs actually solves the thing, and
+ *      its errors go straight through unedited. They are written as Correction
+ *      Directives (what is wrong, in the terms the model can fix) precisely so
+ *      that this function does not have to translate them; a floor that
+ *      paraphrases its instrument is a floor that goes stale against it.
+ *
+ * BLOCKING, and gated on generationFloors like every other floor: a hand-loaded
+ * booklet carrying a wobbly puzzle still renders, because the artifact contract
+ * is not the generation contract (D19). The refusal belongs at the stage gate,
+ * where there is still a model to hand it back to.
+ */
+function collectPuzzleFloorErrors(weekObj) {
+  var errors = [];
+  var fieldOps = (weekObj || {}).fieldOps || {};
+
+  var grid = fieldOps.constrainedGrid;
+  if (grid) {
+    var GG = SPATIAL_GUARDRAILS.logicGrid;
+    var GN = SPATIAL_GUARDRAILS.nonogram;
+    if (grid.kind === 'nonogram') {
+      var rows = Array.isArray(grid.rowClues) ? grid.rowClues.length : 0;
+      var cols = Array.isArray(grid.colClues) ? grid.colClues.length : 0;
+      if (rows < GN.minSize || rows > GN.maxSize || cols < GN.minSize || cols > GN.maxSize) {
+        errors.push('fieldOps.constrainedGrid: a generated nonogram must be between '
+          + GN.minSize + 'x' + GN.minSize + ' and ' + GN.maxSize + 'x' + GN.maxSize
+          + ', and this one is ' + rows + 'x' + cols + '.');
+      }
+    } else {
+      var subjects = Array.isArray(grid.subjects) ? grid.subjects.length : 0;
+      var cats = Array.isArray(grid.categories) ? grid.categories : [];
+      var clues = Array.isArray(grid.clues) ? grid.clues.length : 0;
+      if (subjects < GG.minSubjects || subjects > GG.maxSubjects) {
+        errors.push('fieldOps.constrainedGrid: a generated logic grid must have between '
+          + GG.minSubjects + ' and ' + GG.maxSubjects + ' subjects, and this one has ' + subjects + '.');
+      }
+      if (cats.length > GG.maxCategories) {
+        errors.push('fieldOps.constrainedGrid: a logic grid may carry at most '
+          + GG.maxCategories + ' categories, and this one carries ' + cats.length + '.');
+      }
+      if (clues < GG.minClues || clues > GG.maxClues) {
+        errors.push('fieldOps.constrainedGrid: a generated logic grid must carry between '
+          + GG.minClues + ' and ' + GG.maxClues + ' clues, and this one carries ' + clues + '.');
+      }
+      var overlong = [];
+      (Array.isArray(grid.subjects) ? grid.subjects : []).forEach(function (s) {
+        if (String(s).length > GG.labelMaxChars) overlong.push(String(s));
+      });
+      cats.forEach(function (cat) {
+        (Array.isArray((cat || {}).values) ? cat.values : []).forEach(function (v) {
+          if (String(v).length > GG.labelMaxChars) overlong.push(String(v));
+        });
+      });
+      if (overlong.length) {
+        errors.push('fieldOps.constrainedGrid: label(s) longer than ' + GG.labelMaxChars
+          + ' characters (' + overlong.slice(0, 3).join(', ') + ') — the grid prints them in a '
+          + 'column one cell wide, so they wrap the board out of the page.');
+      }
+    }
+
+    verifyConstrainedGrid(grid).errors.forEach(function (msg) {
+      errors.push('fieldOps.constrainedGrid: ' + msg);
+    });
+  }
+
+  var word = fieldOps.wordGrid;
+  if (word) {
+    var GW = SPATIAL_GUARDRAILS.wordSearch;
+    var gridRows = Array.isArray(word.grid) ? word.grid.length : 0;
+    var gridCols = gridRows ? String(word.grid[0] || '').length : 0;
+    var wordCount = Array.isArray(word.words) ? word.words.length : 0;
+    if (gridRows < GW.minSize || gridRows > GW.maxSize || gridCols < GW.minSize || gridCols > GW.maxSize) {
+      errors.push('fieldOps.wordGrid: a generated word search must be between '
+        + GW.minSize + 'x' + GW.minSize + ' and ' + GW.maxSize + 'x' + GW.maxSize
+        + ', and this one is ' + gridRows + 'x' + gridCols + '.');
+    }
+    if (wordCount < GW.minWords || wordCount > GW.maxWords) {
+      errors.push('fieldOps.wordGrid: a generated word search must hide between '
+        + GW.minWords + ' and ' + GW.maxWords + ' words, and this one hides ' + wordCount + '.');
+    }
+
+    verifyWordGrid(word).errors.forEach(function (msg) {
+      errors.push('fieldOps.wordGrid: ' + msg);
+    });
+  }
+
+  return errors;
 }
 
 /**
@@ -1344,6 +1502,54 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
     });
   }
 
+  // ── Floor: the fusion score is STORED, not merely thought (W4a) ───────────
+  // FUSION §4.1 has demanded a per-week beat plus a dynamic marking since it
+  // was written, and until W4a nothing stored one — the score was G-class, the
+  // compiler asked to think in beats and the answer going nowhere. Storing it
+  // without a floor would leave it exactly as G-class, because a mid-tier model
+  // treats "optional but demanded" as "skip" (D111, the founding lesson).
+  //
+  // The marking is enum-gated rather than free text because the D114 evidence
+  // frame already measures prose volume per week against the book's own
+  // maximum: a five-step ordinal can be COMPARED to that curve, and three
+  // synonyms for quiet cannot.
+  if (floorsOn(expectedOptions)) {
+    var beat = weekObj.fusionBeat;
+    if (!beat || typeof beat !== 'object') {
+      errors.push('Week has no fusionBeat — declare how this week\'s training texture IS its story'
+        + ' texture: { beat, marking }, marking one of ' + VALID_DYNAMIC_MARKINGS.join(' | '));
+    } else {
+      if (!String(beat.beat || '').trim()) {
+        errors.push('Week fusionBeat.beat is empty — one sentence naming how the training texture and the'
+          + ' story texture are the same thing this week');
+      }
+      var marking = String(beat.marking || '').trim();
+      if (!marking) {
+        errors.push('Week fusionBeat.marking is unset — declare this week\'s prose volume: '
+          + VALID_DYNAMIC_MARKINGS.join(' | '));
+      } else if (VALID_DYNAMIC_MARKINGS.indexOf(marking) === -1) {
+        errors.push('Week fusionBeat.marking "' + marking + '" is not a dynamic marking: '
+          + VALID_DYNAMIC_MARKINGS.join(' | '));
+      }
+    }
+  }
+
+  // ── The closure floors that can only be checked per week (W4a) ────────────
+  // The door and the clocks are authored in THIS chunk; the spine was declared
+  // back at the shell/skeleton. The spine rides in through expectedOptions the
+  // same way mechanicGrammarFamily does — a caller that omits it gets no spine
+  // floors at all, which is the honest failure (a floor with no declaration to
+  // check against must not invent one).
+  if (floorsOn(expectedOptions)) {
+    collectSpineWeekFloorErrors(
+      weekObj,
+      expectedOptions.playSpine,
+      Number(expectedOptions.weekNumber || expectedOptions.currentWeekNumber || weekObj.weekNumber || 0)
+    ).forEach(function (msg) { errors.push(msg); });
+
+    collectPuzzleFloorErrors(weekObj).forEach(function (msg) { errors.push(msg); });
+  }
+
   if (warnings.length > 0) {
     console.warn('[LiftRPG] Week advisory:', warnings.join('; '));
   }
@@ -1429,6 +1635,17 @@ export function validateShellSchema(shell, expectedOptions) {
       errors.push('meta.artifactIdentity.componentDialect "' + shellDialect + '" is not a dialect this engine draws: '
         + VALID_COMPONENT_DIALECTS.join(' | '));
     }
+
+    // ── The closure floors (W4a) ──
+    // The standard pipeline runs the compiler HERE, so the spine is declared
+    // here or nowhere on this path. The shell carries no week material, only
+    // the count — buildSurfaceIndex synthesizes the week list from it so the
+    // week-shaped refs in the spine have something to resolve against.
+    errors = errors.concat(collectSpineSkeletonFloorErrors(
+      (shell.meta || {}).playSpine,
+      { weekCount: Number((expectedOptions || {}).weekCount) || 0 },
+      'Shell'
+    ));
   }
 
   if (shell.meta) {
@@ -1939,6 +2156,834 @@ function sinkRefResolves(index, ref) {
   if (!raw) return true;              // absent ref is legal — the kind alone is a sink
   if (index.ids[normalizeId(raw)]) return true;
   return !!index.names[toSlugWords(raw)];
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// THE LUDIC SPINE — closure floors (PLAY.md §3, W4a)
+// ════════════════════════════════════════════════════════════════════════════
+// PLAY.md §2 names six failure modes and every one of them is a WIRING defect:
+// a spend with no destination, a clock nothing reads, a fork whose branches
+// differ only in flavour. D111's floors guarantee the instruments EXIST; these
+// guarantee they are pointed at each other.
+//
+// WHERE THEY RUN, and why it is not one place. A floor has to run at the stage
+// that holds its material, or it cannot be blocking:
+//
+//   SKELETON — the spine itself is authored here, beside artifactIntent, before
+//     any content exists. Everything provable from the DECLARATION plus the
+//     weekPlan runs here: arity, connectivity, dead sinks, key-before-lock
+//     ordering, and ref resolution. This is also the cheap place to fail — one
+//     skeleton retry instead of a whole book.
+//   WEEK — doors and clocks are authored per week chunk, so "this door has a
+//     ledger row" and "this clock is read by an edge" can only be checked as
+//     each week lands. The spine rides in through expectedOptions, exactly the
+//     way mechanicGrammarFamily already does.
+//
+// What is deliberately NOT here: the rendered-reality half. Whether the printed
+// page honours the declaration is the W4b simulated player's question, and it
+// answers it by walking the book rather than reading its plan. These floors
+// hold the plan to itself; the sim holds the book to the plan.
+
+/**
+ * buildSurfaceIndex(booklet) -> { weeks, kinds, has(kind, id) }
+ *
+ * What a booklet (or a weekPlan-bearing skeleton) actually offers a spine edge
+ * to point at, indexed by ref KIND. The sibling of buildSinkRefIndex above and
+ * built for the same pragmatic reason: a spine ref may name a week, a clock, a
+ * fragment, a map region or a singleton, and no one existing predicate spans
+ * those.
+ *
+ * Deliberately TOLERANT of three shapes, because three stages need it: a
+ * booklet (`weeks`), a skeleton (`weekPlan`), and a SHELL — which carries no
+ * week material at all, only the count. Without that last fallback the spine
+ * floors would run vacuously on the standard pipeline, where the compiler and
+ * the spine are authored at the shell stage and every week-shaped ref would
+ * read as "week 3 does not exist" against an empty index.
+ */
+export function buildSurfaceIndex(booklet) {
+  var doc = booklet || {};
+  var weekList = Array.isArray(doc.weeks) && doc.weeks.length
+    ? doc.weeks
+    : (Array.isArray(doc.weekPlan) ? doc.weekPlan : []);
+  if (!weekList.length && Number.isInteger(doc.weekCount) && doc.weekCount > 0) {
+    weekList = [];
+    for (var wc = 1; wc <= doc.weekCount; wc++) weekList.push({ weekNumber: wc });
+  }
+
+  var index = {
+    weeks: {},
+    kinds: {},
+    weekCount: weekList.length
+  };
+  function note(kind, value) {
+    var key = toSlugWords(value);
+    if (!key) return;
+    if (!index.kinds[kind]) index.kinds[kind] = {};
+    index.kinds[kind][key] = true;
+  }
+
+  weekList.forEach(function (week, wi) {
+    if (!week) return;
+    var n = Number(week.weekNumber);
+    if (!Number.isFinite(n) || n < 1) n = wi + 1;
+    index.weeks[n] = true;
+    note('week', 'W' + n);
+    note('reckoning', 'W' + n);
+    note('markStrip', 'W' + n);
+    var sessions = Array.isArray(week.sessions) ? week.sessions : [];
+    for (var si = 0; si < Math.max(sessions.length, Number(week.sessionCount) || 0); si++) {
+      note('session', 'W' + n + '.' + (si + 1));
+      note('markStrip', 'W' + n + '.' + (si + 1));
+    }
+    // Only AUTHORED surfaces are indexed, never PLANNED ones. `mapType: 'grid'`
+    // and `cipherType: 'index-extraction'` are decisions about what week 3 will
+    // contain; they are not the name of a region or a puzzle, and indexing them
+    // would make the kind look "authored" while holding none of the names a
+    // spine edge points at — which turns a forward promise into a false miss.
+    // See surfaceRefResolves for the rule this feeds.
+    var fo = week.fieldOps || {};
+    if (fo.oracleTable || fo.oracle) note('oracle', 'W' + n);
+    if (fo.cipher) note('cipher', 'W' + n);
+    if (week.doorChoice) note('door', 'W' + n);
+    (week.gameplayClocks || []).forEach(function (clock) {
+      if (clock) note('clock', clock.clockName);
+    });
+    var mapState = fo.mapState || {};
+    if (mapState.title) note('map', mapState.title);
+    if (mapState.title || (mapState.nodes || []).length) note('map', 'W' + n);
+    (mapState.nodes || []).forEach(function (node) { if (node) { note('map', node.label); note('map', node.id); } });
+    (mapState.tiles || []).forEach(function (tile) { if (tile) note('map', tile.label); });
+    function noteCompanions(pool) {
+      (Array.isArray(pool) ? pool : []).forEach(function (c) {
+        if (!c) return;
+        note('companion', c.title); note('companion', c.label);
+        note('companion', c.statName); note('companion', c.type);
+      });
+    }
+    noteCompanions(fo.companionComponents);
+    if (week.interlude && week.interlude.payload) noteCompanions(week.interlude.payload.companionComponents);
+    if (week.overflowDocument && week.overflowDocument.id) note('fragment', week.overflowDocument.id);
+  });
+
+  var fragments = Array.isArray(doc.fragments) ? doc.fragments
+    : (Array.isArray(doc.fragmentRegistry) ? doc.fragmentRegistry : []);
+  fragments.forEach(function (fragment) {
+    if (!fragment) return;
+    note('fragment', fragment.id);
+    note('fragment', fragment.title);
+    // A seal rides ON a fragment, so `seal:F.07` names the document that will
+    // carry it. Indexed for every fragment rather than only sealed ones: at
+    // declaration time the seal does not exist yet, and the spine is where the
+    // book says it intends to put one.
+    note('seal', fragment.id);
+  });
+
+  (Array.isArray(doc.endings) ? doc.endings : []).forEach(function (ending, ei) {
+    if (!ending) return;
+    note('ending', ending.variant || ('E' + (ei + 1)));
+    note('ending', 'E' + (ei + 1));
+  });
+  (Array.isArray(doc.endingVariants) ? doc.endingVariants : []).forEach(function (v, ei) {
+    note('ending', v); note('ending', 'E' + (ei + 1));
+  });
+
+  return index;
+}
+
+// A week-shaped id ('W3', 'W3.2') the index can place. Returns the week number
+// or null — the ordering floors need the NUMBER, not just existence.
+function surfaceRefWeek(parsed) {
+  var m = /^w\s*(\d+)/i.exec(String(parsed.id || '').trim());
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/**
+ * surfaceRefResolves(index, ref) -> { ok, reason }
+ *
+ * Two distinct findings, deliberately not collapsed (the same split as
+ * citationPinpoints' own/foreign): a ref that does not PARSE is a grammar error
+ * the model can fix from the message alone, while a ref that parses and finds
+ * nothing needs the book to explain. Collapsing them produced "invalid ref"
+ * messages that told a model nothing about which half to change.
+ *
+ * Singletons (`banked`, `boss`, `assembly`) always resolve: a book has at most
+ * one of each and the spine may name it before it is built.
+ */
+export function surfaceRefResolves(index, ref) {
+  var parsed = parseSurfaceRef(ref);
+  if (!parsed.valid) {
+    return { ok: false, reason: 'is not a surface ref (expected `kind:id`, e.g. `clock:Relief Ledger`, or one of banked / boss / assembly)' };
+  }
+  if (!parsed.id) return { ok: true, reason: '' };
+
+  var weekNo = surfaceRefWeek(parsed);
+  if (weekNo !== null && !index.weeks[weekNo]) {
+    return { ok: false, reason: 'names week ' + weekNo + ', which this book does not have' };
+  }
+  // THE PROMISE RULE. The spine is declared before content exists, so a name
+  // check has teeth exactly where the stage already knows the names:
+  //   - nothing of this kind is authored yet  -> forward promise, accept. At
+  //     the shell stage no clock has been written, so `clock:Relief Ledger` is
+  //     an intention; blocking it would make the spine undeclarable before the
+  //     content it is supposed to shape.
+  //   - some of this kind ARE authored        -> the set is knowable, so a name
+  //     outside it is a real miss. The fragment registry is the live example:
+  //     it exists at skeleton time, so `fragment:F.09` against a six-entry
+  //     registry is a defect the moment it is written.
+  //   - week-shaped ids                       -> judged by the week, above.
+  // The rendered-reality half — does the printed page carry the surface the
+  // spine named — is the W4b simulated player's question, not this one's.
+  var bucket = index.kinds[parsed.kind];
+  if (!bucket) return { ok: true, reason: '' };
+  if (bucket[toSlugWords(parsed.id)]) return { ok: true, reason: '' };
+  if (weekNo !== null) return { ok: true, reason: '' };
+  return { ok: false, reason: 'points at "' + parsed.id + '", which no ' + parsed.kind + ' in this book is called' };
+}
+
+// The tick origins: where value ENTERS the economy. An economy graph with no
+// source is a closed loop the player can never feed.
+var SPINE_SOURCE_KINDS = { markStrip: 1, session: 1, week: 1 };
+// The surfaces that PRINT an outcome — where value leaves the economy and
+// becomes something on the page.
+var SPINE_SINK_KINDS = {
+  map: 1, clock: 1, companion: 1, oracle: 1, cipher: 1, fragment: 1,
+  seal: 1, ending: 1, boss: 1, assembly: 1, door: 1
+};
+
+// `differsBy` must name a MECHANICAL surface, not an adjective. Reuses the D100
+// extraction-must-find-something idiom: the needle list is derived from the ref
+// grammar plus the mechanical nouns the schema already prints, and a scan that
+// matched nothing anywhere would itself be the defect.
+var DECISION_MECHANICAL_NEEDLES = [
+  'clock', 'track', 'map', 'node', 'region', 'cipher', 'oracle', 'companion',
+  'fragment', 'seal', 'banked', 'spend', 'price', 'tick', 'mark', 'reckoning',
+  'threshold', 'ending', 'boss', 'assembly', 'key', 'gate', 'stat', 'inventory',
+  'slot', 'die', 'dice', 'roll', 'table', 'ledger'
+];
+
+function namesMechanicalSurface(text) {
+  var hay = ' ' + toSlugWords(text) + ' ';
+  if (parseSurfaceRef(text).valid) return true;
+  for (var i = 0; i < DECISION_MECHANICAL_NEEDLES.length; i++) {
+    if (hay.indexOf(' ' + DECISION_MECHANICAL_NEEDLES[i]) !== -1) return true;
+  }
+  return false;
+}
+
+/**
+ * collectSpineSkeletonFloorErrors(spine, skeleton) -> string[]
+ *
+ * The five book-wide closure floors, checked against the DECLARATION and the
+ * weekPlan. Collected rather than early-returned for the same reason the D111
+ * skeleton floors are: a spine that misses three should cost ONE retry naming
+ * all three.
+ */
+export function collectSpineSkeletonFloorErrors(spine, skeleton, stageLabel) {
+  var errors = [];
+  // The compiler runs at `shell` on the standard pipeline and at `skeleton` on
+  // S+F, so the prefix is a parameter: an error naming the wrong stage sends
+  // the retry to a prompt that cannot fix it.
+  var S = (stageLabel || 'Skeleton') + ' \u2192 ';
+  if (!spine || typeof spine !== 'object') {
+    return [S + 'meta.playSpine is missing — every book declares its play spine before content exists'
+      + ' (composition of ' + SPINE_BUDGETS.compositionMin + '-' + SPINE_BUDGETS.compositionMax
+      + ' library entries, economyGraph, consequenceEdges, decisionLedger, tensionBudget, difficultyCurve)'];
+  }
+
+  var index = buildSurfaceIndex(skeleton || {});
+
+  // ── Floor 1: composition arity ──
+  // 2-4 entries, distinct, each with a role. One entry is not a composition; it
+  // is the single-family pick the anti-house-economy law forbids by name.
+  var composition = Array.isArray(spine.composition) ? spine.composition : [];
+  if (composition.length < SPINE_BUDGETS.compositionMin || composition.length > SPINE_BUDGETS.compositionMax) {
+    errors.push(S + 'playSpine.composition has ' + composition.length + ' entr'
+      + (composition.length === 1 ? 'y' : 'ies') + '; this book owes '
+      + SPINE_BUDGETS.compositionMin + '-' + SPINE_BUDGETS.compositionMax
+      + ' wired into one economy — a single entry is a family pick, not a composition');
+  }
+  var seenEntries = {};
+  composition.forEach(function (item, ci) {
+    var entry = String((item || {}).entry || '').trim();
+    if (!entry || LUDIC_LIBRARY.indexOf(entry) === -1) {
+      errors.push(S + 'playSpine.composition[' + ci + '].entry "' + entry
+        + '" is not in the Ludic Library (' + LUDIC_LIBRARY.join(' | ')
+        + ') — if the brief wants something the library lacks, say so in honestGaps rather than inventing an entry');
+    } else if (seenEntries[entry]) {
+      errors.push(S + 'playSpine.composition names "' + entry
+        + '" twice — a composition needs distinct systems listening to each other, not one system counted twice');
+    } else {
+      seenEntries[entry] = 1;
+    }
+    if (!String((item || {}).role || '').trim()) {
+      errors.push(S + 'playSpine.composition[' + ci + '] has no role — name what this entry does IN THIS BOOK,'
+        + ' or the composition is a parts list');
+    }
+  });
+
+  // ── Floor 2: graph connectivity ──
+  // Every node reachable from a source and reaching a sink that prints. An
+  // orphan system is a mechanic reachable from nothing and feeding nothing.
+  var edges = Array.isArray(spine.economyGraph) ? spine.economyGraph : [];
+  if (!edges.length) {
+    errors.push(S + 'playSpine.economyGraph is empty — name the edges: what ticks feed, where the tally banks,'
+      + ' what the banked value buys, what that opens. Edges are named, never implied');
+  }
+  var parsedEdges = [];
+  edges.forEach(function (edge, ei) {
+    var from = parseSurfaceRef((edge || {}).from);
+    var to = parseSurfaceRef((edge || {}).to);
+    ['from', 'to'].forEach(function (side) {
+      var res = surfaceRefResolves(index, (edge || {})[side]);
+      if (!res.ok) {
+        errors.push(S + 'playSpine.economyGraph[' + ei + '].' + side + ' "'
+          + String((edge || {})[side] || '') + '" ' + res.reason);
+      }
+    });
+    if (from.valid && to.valid) parsedEdges.push({ i: ei, from: from, to: to });
+  });
+
+  if (parsedEdges.length) {
+    var nodes = {};
+    parsedEdges.forEach(function (e) {
+      nodes[e.from.kind + ':' + e.from.id] = e.from;
+      nodes[e.to.kind + ':' + e.to.id] = e.to;
+    });
+    var hasSource = parsedEdges.some(function (e) { return SPINE_SOURCE_KINDS[e.from.kind]; });
+    if (!hasSource) {
+      errors.push(S + 'playSpine.economyGraph has no source edge — nothing enters this economy.'
+        + ' At least one edge must start at a tick origin (markStrip: / session: / week:)');
+    }
+    var hasSink = parsedEdges.some(function (e) { return SPINE_SINK_KINDS[e.to.kind]; });
+    if (!hasSink) {
+      errors.push(S + 'playSpine.economyGraph has no printing sink — nothing this economy produces reaches the page.'
+        + ' At least one edge must end at a surface the book prints');
+    }
+
+    // Reachability, forward from every source and backward from every sink.
+    var forward = {}, backward = {};
+    parsedEdges.forEach(function (e) {
+      if (SPINE_SOURCE_KINDS[e.from.kind]) forward[e.from.kind + ':' + e.from.id] = 1;
+      if (SPINE_SINK_KINDS[e.to.kind]) backward[e.to.kind + ':' + e.to.id] = 1;
+    });
+    var grew = true;
+    while (grew) {
+      grew = false;
+      parsedEdges.forEach(function (e) {
+        var a = e.from.kind + ':' + e.from.id;
+        var b = e.to.kind + ':' + e.to.id;
+        if (forward[a] && !forward[b]) { forward[b] = 1; grew = true; }
+        if (backward[b] && !backward[a]) { backward[a] = 1; grew = true; }
+      });
+    }
+    Object.keys(nodes).forEach(function (key) {
+      if (!forward[key]) {
+        errors.push(S + 'playSpine.economyGraph: "' + key + '" is reachable from no source —'
+          + ' an orphan system the player can never feed. Wire it to the tick economy or drop it');
+      } else if (!backward[key]) {
+        // A source that reaches no sink is a dead spend: value goes in and
+        // nothing on the page ever shows it.
+        errors.push(S + 'playSpine.economyGraph: "' + key + '" reaches no printing sink —'
+          + ' a dead sink (value spent with no destination the book draws)');
+      }
+    });
+  }
+
+  // ── Floor 3: consequence edges resolve, and the echo has a clock ──
+  var consequences = Array.isArray(spine.consequenceEdges) ? spine.consequenceEdges : [];
+  if (!consequences.length) {
+    errors.push(S + 'playSpine.consequenceEdges is empty — every fillable thing names the surface that answers it,'
+      + ' or the book is a set of things to fill in with nothing listening');
+  }
+  consequences.forEach(function (edge, ci) {
+    ['source', 'answeredBy'].forEach(function (side) {
+      var res = surfaceRefResolves(index, (edge || {})[side]);
+      if (!res.ok) {
+        errors.push(S + 'playSpine.consequenceEdges[' + ci + '].' + side + ' "'
+          + String((edge || {})[side] || '') + '" ' + res.reason);
+      }
+    });
+    var within = (edge || {}).withinWeeks;
+    if (within !== undefined && (!Number.isInteger(within) || within < 0 || within > SPINE_BUDGETS.consequenceWithinWeeksMax)) {
+      errors.push(S + 'playSpine.consequenceEdges[' + ci + '].withinWeeks is ' + within
+        + ' — an echo answers within 0-' + SPINE_BUDGETS.consequenceWithinWeeksMax
+        + ' weeks; further out is a coincidence the player has stopped waiting for');
+    }
+  });
+
+  // ── Floor 4: keys before locks ──
+  // Every consequence whose source and answer both name a week must run
+  // forward: an answer that lands before its question is content the player
+  // meets in the wrong order, and a key that arrives after its lock is content
+  // they can never reach at all.
+  consequences.forEach(function (edge, ci) {
+    var src = parseSurfaceRef((edge || {}).source);
+    var ans = parseSurfaceRef((edge || {}).answeredBy);
+    if (!src.valid || !ans.valid) return;
+    var sw = surfaceRefWeek(src);
+    var aw = surfaceRefWeek(ans);
+    if (sw === null || aw === null) return;
+    if (aw < sw) {
+      errors.push(S + 'playSpine.consequenceEdges[' + ci + ']: "' + ans.raw + '" answers "' + src.raw
+        + '" in an EARLIER week — the answer is printed before the question is asked');
+    }
+    var within = Number.isInteger((edge || {}).withinWeeks)
+      ? edge.withinWeeks : SPINE_BUDGETS.consequenceWithinWeeksDefault;
+    if (aw - sw > within) {
+      errors.push(S + 'playSpine.consequenceEdges[' + ci + ']: "' + ans.raw + '" answers "' + src.raw
+        + '" ' + (aw - sw) + ' weeks later but declares withinWeeks ' + within
+        + ' — either move the answer or declare the wait honestly');
+    }
+  });
+
+  // Locks: an edge INTO a seal must be fed by something the player can hold
+  // strictly before the sealed week.
+  edges.forEach(function (edge, ei) {
+    var to = parseSurfaceRef((edge || {}).to);
+    if (!to.valid || to.kind !== 'seal') return;
+    var from = parseSurfaceRef((edge || {}).from);
+    if (!from.valid) return;
+    var lockWeek = surfaceRefWeek(to);
+    var keyWeek = surfaceRefWeek(from);
+    if (lockWeek === null || keyWeek === null) return;
+    if (keyWeek >= lockWeek) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + ']: the key "' + from.raw + '" is not held before the lock "'
+        + to.raw + '" — a seal whose key arrives with it or after it is gated content nobody can open');
+    }
+  });
+
+  // ── Floor 5: the tension budget names at least one axis per week ──
+  var budget = Array.isArray(spine.tensionBudget) ? spine.tensionBudget : [];
+  var plannedWeeks = Object.keys(index.weeks).map(Number).sort(function (a, b) { return a - b; });
+  var budgetByWeek = {};
+  budget.forEach(function (row) {
+    if (row && Number.isInteger(row.week)) budgetByWeek[row.week] = row;
+  });
+  plannedWeeks.forEach(function (n) {
+    var row = budgetByWeek[n];
+    if (!row) {
+      errors.push(S + 'playSpine.tensionBudget has no row for week ' + n
+        + ' — every week declares what is scarce, what can be lost, or where the player can fall behind');
+      return;
+    }
+    var named = ['scarce', 'losable', 'fallBehind'].filter(function (axis) {
+      return String(row[axis] || '').trim();
+    });
+    if (!named.length) {
+      errors.push(S + 'playSpine.tensionBudget week ' + n
+        + ' names no axis — at least one of scarce / losable / fallBehind must be real (an absent axis is a declaration'
+        + ' that it is not present; all three absent is a week with no tension at all)');
+    }
+  });
+
+  errors.push.apply(errors, collectSpineHarvestFloorErrors(spine, index, parsedEdges, S));
+
+  return errors;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// THE HARVEST FLOORS (W5a — the Ludic Harvest, tranche 1)
+// ════════════════════════════════════════════════════════════════════════════
+// Nine tier-2 patterns from contracts/ludic-library.mjs landed a declaration
+// surface in W5a. These are their teeth. Split into its own function purely for
+// size — it runs inside the skeleton floors, at the same stage, against the
+// same index, and shares their severity: BLOCKING on the generation path,
+// silent on any book that carries no spine.
+//
+// THE SEVERITY SPLIT, stated once: `gateStructure` is DEMANDED (the structured
+// stage literal requires it and the prompt calls it required), because it costs
+// the model one enum and buys the floors a shape to check the whole graph
+// against. The other three declarations are OPTIONAL-BUT-STRICT: a book need
+// not carry a hint ladder, but a book that carries one owes ordered rungs, real
+// costs, and a printed page the player can find. Demanding all four would tax
+// every book for patterns most briefs do not want, which is how a menu becomes
+// a checklist.
+
+// A "lead" for gate-structure purposes: a puzzle surface the player works at.
+// Deliberately NOT every node — `banked`, `reckoning:` and `week:` are plumbing,
+// and counting them would let a book satisfy "open" with bookkeeping.
+var SPINE_LEAD_KINDS = { cipher: 1, map: 1, oracle: 1, fragment: 1, seal: 1, companion: 1, clock: 1 };
+
+/**
+ * measureSpineGraphShape(parsedEdges) -> { chain, convergence, leads }
+ *
+ * The three numbers GATE_STRUCTURE_SHAPES is written in. Computed by
+ * relaxation with a pass cap rather than by path enumeration: a spine graph can
+ * legitimately contain a cycle (a stewardship economy that pays back into its
+ * own source is the named example in PLAY.md §2), and a longest-simple-path
+ * search would either hang on one or need a visited-set walk whose cost is
+ * exponential. Saturating at |V| is the right answer for a cycle anyway — a
+ * loop IS a chain at least that long.
+ */
+export function measureSpineGraphShape(parsedEdges) {
+  var edges = Array.isArray(parsedEdges) ? parsedEdges : [];
+  var key = function (side) { return side.kind + ':' + side.id; };
+  var nodes = {};
+  var feeders = {};
+  var out = {};
+  edges.forEach(function (e) {
+    var a = key(e.from), b = key(e.to);
+    nodes[a] = e.from; nodes[b] = e.to;
+    if (!feeders[b]) feeders[b] = {};
+    feeders[b][a] = 1;
+    if (!out[a]) out[a] = {};
+    out[a][b] = 1;
+  });
+  var nodeKeys = Object.keys(nodes);
+  if (!nodeKeys.length) return { chain: 0, convergence: 0, leads: 0 };
+
+  var depth = {};
+  nodeKeys.forEach(function (k) { depth[k] = SPINE_SOURCE_KINDS[nodes[k].kind] ? 0 : -1; });
+  // A graph with no declared source still has a chain; seed the nodes nothing
+  // feeds so the measurement is about SHAPE and the missing source is reported
+  // by its own floor rather than swallowed here.
+  if (!nodeKeys.some(function (k) { return depth[k] === 0; })) {
+    nodeKeys.forEach(function (k) { if (!feeders[k]) depth[k] = 0; });
+  }
+  var cap = nodeKeys.length;
+  for (var pass = 0; pass < cap; pass++) {
+    var moved = false;
+    edges.forEach(function (e) {
+      var a = key(e.from), b = key(e.to);
+      if (depth[a] < 0) return;
+      var next = Math.min(depth[a] + 1, cap);
+      if (next > depth[b]) { depth[b] = next; moved = true; }
+    });
+    if (!moved) break;
+  }
+
+  var chain = 0;
+  nodeKeys.forEach(function (k) { if (depth[k] > chain) chain = depth[k]; });
+  var convergence = 0;
+  Object.keys(feeders).forEach(function (k) {
+    var count = Object.keys(feeders[k]).length;
+    if (count > convergence) convergence = count;
+  });
+  var leads = nodeKeys.filter(function (k) {
+    return SPINE_LEAD_KINDS[nodes[k].kind] && depth[k] >= 0;
+  }).length;
+  return { chain: chain, convergence: convergence, leads: leads };
+}
+
+function collectSpineHarvestFloorErrors(spine, index, parsedEdges, S) {
+  var errors = [];
+  var rawEdges = Array.isArray(spine.economyGraph) ? spine.economyGraph : [];
+  var weekCount = index.weekCount || Object.keys(index.weeks).length || 0;
+
+  // ── Floor 8: the gate structure is declared AND the graph has that shape ──
+  // Nicholson's three organisations. The declaration alone would be a label;
+  // reading it back off the graph is what makes it a floor — a book that says
+  // "path-based" and wires one chain has told the player it has choices it does
+  // not have.
+  var structure = String(spine.gateStructure || '').trim();
+  if (!structure) {
+    errors.push(S + 'playSpine.gateStructure is missing — declare how this book gates: '
+      + VALID_GATE_STRUCTURES.join(' | ')
+      + ' (open = several leads feeding one meta; sequential = each answer is the next question;'
+      + ' path-based = two or more lanes that converge)');
+  } else if (VALID_GATE_STRUCTURES.indexOf(structure) === -1) {
+    errors.push(S + 'playSpine.gateStructure "' + structure + '" is not one of '
+      + VALID_GATE_STRUCTURES.join(' | '));
+  } else if (parsedEdges.length) {
+    var want = GATE_STRUCTURE_SHAPES[structure];
+    var got = measureSpineGraphShape(parsedEdges);
+    var shortfalls = [];
+    if (got.chain < want.minChainLength) {
+      shortfalls.push('its longest chain is ' + got.chain + ' edge' + (got.chain === 1 ? '' : 's')
+        + ', not ' + want.minChainLength);
+    }
+    if (got.convergence < want.minConvergence) {
+      shortfalls.push('no surface takes ' + want.minConvergence + ' distinct feeders (the most is '
+        + got.convergence + ')');
+    }
+    if (got.leads < want.minLeads) {
+      shortfalls.push('it runs ' + got.leads + ' lead' + (got.leads === 1 ? '' : 's')
+        + ', not ' + want.minLeads);
+    }
+    if (shortfalls.length) {
+      errors.push(S + 'playSpine.gateStructure declares "' + structure
+        + '" but the economyGraph is not that shape: ' + shortfalls.join('; ')
+        + '. Either wire the structure you declared or declare the one you wired');
+    }
+  }
+
+  // ── Floor 9: branch attribution is a real side of a real door ────────────
+  rawEdges.forEach(function (edge, ei) {
+    var branch = (edge || {}).branch;
+    if (branch === undefined || branch === null || String(branch).trim() === '') return;
+    var parsed = parseBranchRef(branch);
+    if (!parsed.valid) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '].branch "' + String(branch)
+        + '" is not a branch ref — write `door:W3/' + BRANCH_OPTIONS[0] + '` or `door:W3/'
+        + BRANCH_OPTIONS[1] + '`, naming the door and the side of it this edge belongs to');
+      return;
+    }
+    var res = surfaceRefResolves(index, parsed.doorRef);
+    if (!res.ok) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '].branch names "' + parsed.doorRef
+        + '", which ' + res.reason);
+    }
+    // An attributed edge whose `from` is that same door is the normal shape,
+    // but attribution is legal on any edge the branch turns on. What is NOT
+    // legal is attributing an edge to a door while ALSO sourcing it from a
+    // different door: two forks cannot both own one edge, and the sim would
+    // have to pick.
+    var from = parseSurfaceRef((edge || {}).from);
+    if (from.valid && from.kind === 'door'
+      && ('door:' + from.id).toLowerCase() !== parsed.doorRef.toLowerCase()) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '] leaves "' + from.raw
+        + '" but is attributed to "' + parsed.doorRef
+        + '" — one edge, two forks. Attribute it to the door it leaves, or source it from the door that owns it');
+    }
+  });
+
+  // Both sides of every attributed door must carry something. A fork where the
+  // spine names only side A is the flavour-only door wearing attribution: the
+  // player who picks B gets an edge nobody declared.
+  var branchSides = {};
+  rawEdges.forEach(function (edge) {
+    var parsed = parseBranchRef((edge || {}).branch);
+    if (!parsed.valid) return;
+    var doorKey = parsed.doorRef.toLowerCase();
+    if (!branchSides[doorKey]) branchSides[doorKey] = {};
+    branchSides[doorKey][parsed.option] = 1;
+  });
+  Object.keys(branchSides).forEach(function (doorKey) {
+    var missing = BRANCH_OPTIONS.filter(function (opt) { return !branchSides[doorKey][opt]; });
+    if (missing.length) {
+      errors.push(S + 'playSpine.economyGraph attributes edges to "' + doorKey + '/'
+        + BRANCH_OPTIONS.filter(function (o) { return missing.indexOf(o) === -1; }).join('')
+        + '" only — side ' + missing.join(' and ') + ' of that fork carries no edge, so one branch'
+        + ' is the declared side and the other is whatever is left. Give both sides an edge, or attribute neither');
+    }
+  });
+
+  // ── Floor 10: prices are in marks, and the endgame's gate is not for sale ─
+  rawEdges.forEach(function (edge, ei) {
+    var price = (edge || {}).price;
+    if (price === undefined || price === null) return;
+    if (!Number.isInteger(price) || price < 1) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '].price is ' + price
+        + ' — a price is a whole number of MARKS (the unit the markStrip counts and the'
+        + ' reckoning threshold is derived in), at least 1');
+      return;
+    }
+    var to = parseSurfaceRef((edge || {}).to);
+    if (to.valid && (to.kind === 'boss' || to.kind === 'assembly')) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '] prices the edge into "' + to.raw
+        + '" at ' + price + ' — the endgame ceremony is gated by the DERIVED reckoning threshold'
+        + ' and by nothing else. A second number for the same gate is a second home for it;'
+        + ' price the spends that lead there instead');
+    }
+    var from = parseSurfaceRef((edge || {}).from);
+    if (from.valid && SPINE_SOURCE_KINDS[from.kind]) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '] prices an edge OUT OF "' + from.raw
+        + '" — the player\'s own work is not a purchase. Price the edge out of `banked`'
+        + ' (or out of the reckoning that banks it), which is where value is held');
+    }
+  });
+
+  // ── Floor 11: a window cannot close before it opens ──────────────────────
+  rawEdges.forEach(function (edge, ei) {
+    var closes = (edge || {}).closesAtWeek;
+    if (closes === undefined || closes === null) return;
+    if (!Number.isInteger(closes) || closes < 1) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '].closesAtWeek is ' + closes
+        + ' — the last week this affordance can be taken, as a whole week number');
+      return;
+    }
+    if (weekCount && closes > weekCount) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '].closesAtWeek is week ' + closes
+        + ' and this book has ' + weekCount + ' weeks — a deadline past the last page is no deadline');
+    }
+    var to = parseSurfaceRef((edge || {}).to);
+    var opensAt = to.valid ? surfaceRefWeek(to) : null;
+    if (opensAt !== null && closes < opensAt) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '] closes in week ' + closes
+        + ' but "' + to.raw + '" is not drawn until week ' + opensAt
+        + ' — the window shuts before it opens, which is content nobody can reach');
+    }
+  });
+
+  // ── Floor 12: hint ladders are ordered, costed, and printed somewhere ────
+  var ladders = Array.isArray(spine.hintLadders) ? spine.hintLadders : [];
+  ladders.forEach(function (ladder, li) {
+    var where = S + 'playSpine.hintLadders[' + li + ']';
+    ['puzzle', 'printedOn'].forEach(function (side) {
+      var res = surfaceRefResolves(index, (ladder || {})[side]);
+      if (!res.ok) {
+        errors.push(where + '.' + side + ' "' + String((ladder || {})[side] || '') + '" ' + res.reason);
+      }
+    });
+    // The ladder must hang on something the player can be STUCK on. A hint
+    // ladder attached to `banked` is help with arithmetic.
+    var puzzle = parseSurfaceRef((ladder || {}).puzzle);
+    if (puzzle.valid && !SPINE_LEAD_KINDS[puzzle.kind]) {
+      errors.push(where + '.puzzle names "' + puzzle.raw + '", which is not something a player can be stuck on.'
+        + ' A hint ladder hangs on a cipher, a map, an oracle, a fragment, a seal, a clock or a companion');
+    }
+    // W5b: the band's own heading, and it is REQUIRED at generation (optional
+    // in booklet-schema.mjs — the artifactIntent severity split). The band is a
+    // printed surface now, and a printed surface with no authored heading gets
+    // an engine-fixed English one, which is the house-aesthetic failure the
+    // diegetic-UI law forbids outright. HAND-LOADED BOOKS ARE UNAFFECTED: the
+    // atom falls back to naming the puzzle it serves.
+    if (!String((ladder || {}).label || '').trim()) {
+      errors.push(where + ' has no label — the rungs print as their own band now, and a band needs a'
+        + ' heading in this world\'s voice. Not "Hints" and not "If you are stuck": those are the engine'
+        + ' talking, and nothing printed in this book is the engine talking');
+    }
+    var rungs = Array.isArray((ladder || {}).rungs) ? ladder.rungs : [];
+    if (rungs.length < SPINE_BUDGETS.hintRungsMin || rungs.length > SPINE_BUDGETS.hintRungsMax) {
+      errors.push(where + '.rungs has ' + rungs.length + ' rung' + (rungs.length === 1 ? '' : 's')
+        + ' — a ladder is ' + SPINE_BUDGETS.hintRungsMin + '-' + SPINE_BUDGETS.hintRungsMax
+        + ' steps (a nudge, a method, and at most the answer). One rung is a hint, not a ladder');
+    }
+    rungs.forEach(function (rung, ri) {
+      if (!String((rung || {}).cost || '').trim()) {
+        errors.push(where + '.rungs[' + ri + '] has no cost — a free hint is a walkthrough.'
+          + ' Name what taking it costs in this book\'s own terms (a clock tick, marks, a crossed-out option)');
+      }
+      if (!String((rung || {}).gives || '').trim()) {
+        errors.push(where + '.rungs[' + ri + '] says nothing about what it gives');
+      }
+    });
+  });
+  if (ladders.length > SPINE_BUDGETS.hintLaddersMax) {
+    errors.push(S + 'playSpine.hintLadders has ' + ladders.length + ' ladders; at most '
+      + SPINE_BUDGETS.hintLaddersMax + ' — past that the book is a walkthrough with a receipt');
+  }
+
+  // ── Floor 13: a milestone unlocks something the book answers ─────────────
+  var milestones = Array.isArray(spine.milestones) ? spine.milestones : [];
+  var answered = {};
+  (Array.isArray(spine.consequenceEdges) ? spine.consequenceEdges : []).forEach(function (edge) {
+    var src = parseSurfaceRef((edge || {}).source);
+    if (src.valid) answered[(src.kind + ':' + src.id).toLowerCase()] = 1;
+    var ans = parseSurfaceRef((edge || {}).answeredBy);
+    if (ans.valid) answered[(ans.kind + ':' + ans.id).toLowerCase()] = 1;
+  });
+  milestones.forEach(function (milestone, mi) {
+    var where = S + 'playSpine.milestones[' + mi + ']';
+    ['unlocks', 'printedOn'].forEach(function (side) {
+      var res = surfaceRefResolves(index, (milestone || {})[side]);
+      if (!res.ok) {
+        errors.push(where + '.' + side + ' "' + String((milestone || {})[side] || '') + '" ' + res.reason);
+      }
+    });
+    var at = (milestone || {}).at;
+    if (!Number.isInteger(at) || at < 1) {
+      errors.push(where + '.at is ' + at + ' — a milestone opens at a COUNT the player can check'
+        + ' against their own page (marks banked, regions opened, fragments decoded)');
+    }
+    var unlocks = parseSurfaceRef((milestone || {}).unlocks);
+    if (unlocks.valid && !answered[(unlocks.kind + ':' + unlocks.id).toLowerCase()]) {
+      errors.push(where + ' unlocks "' + unlocks.raw + '" and no consequenceEdge mentions it —'
+        + ' a theory the book never answers is an unpaid promise. Name the surface that responds to it');
+    }
+  });
+
+  // ── Floor 14: legacy moves happen on a page ──────────────────────────────
+  var legacy = Array.isArray(spine.legacyMoves) ? spine.legacyMoves : [];
+  var seenMoves = {};
+  legacy.forEach(function (row, ri) {
+    var where = S + 'playSpine.legacyMoves[' + ri + ']';
+    var move = String((row || {}).move || '').trim();
+    if (VALID_LEGACY_MOVES.indexOf(move) === -1) {
+      errors.push(where + '.move "' + move + '" is not a pencil legacy move ('
+        + VALID_LEGACY_MOVES.join(' | ') + ') — anything needing a sticker, a seal or scissors'
+        + ' is excluded by the pencil-only law, not missing from this list');
+    } else if (seenMoves[move]) {
+      errors.push(where + ' repeats "' + move + '" — declare each kind of permanence once,'
+        + ' naming the page it happens on');
+    } else {
+      seenMoves[move] = 1;
+    }
+    var res = surfaceRefResolves(index, (row || {}).printedOn);
+    if (!res.ok) {
+      errors.push(where + '.printedOn "' + String((row || {}).printedOn || '') + '" ' + res.reason);
+    }
+  });
+
+  return errors;
+}
+
+/**
+ * collectSpineWeekFloorErrors(weekObj, spine, weekNumber) -> string[]
+ *
+ * The two floors that can only be checked as each week lands, because the door
+ * and the clocks are authored in the week chunk while the spine was declared
+ * back at the skeleton.
+ */
+export function collectSpineWeekFloorErrors(weekObj, spine, weekNumber) {
+  var errors = [];
+  if (!spine || typeof spine !== 'object') return errors;   // absent spine is the skeleton's floor, not this one's
+  var week = weekObj || {};
+  var label = 'W' + (weekNumber || week.weekNumber || '?');
+
+  // ── Floor 6: doors differ on a named mechanical surface ──
+  // "A door the ledger cannot describe is flavor-only by definition." The check
+  // is deliberately two-part: the ROW must exist, and its differsBy must name
+  // something mechanical rather than an adjective — because "the harder road"
+  // and "the safer road" is exactly the fork that passes a presence check and
+  // changes nothing on the page.
+  if (week.doorChoice) {
+    var ledger = Array.isArray(spine.decisionLedger) ? spine.decisionLedger : [];
+    var doorLabel = String(week.doorChoice.label || week.doorChoice.prompt || '').trim();
+    var row = null;
+    for (var li = 0; li < ledger.length; li++) {
+      var fork = String((ledger[li] || {}).fork || '').trim();
+      if (!fork) continue;
+      var parsed = parseSurfaceRef(fork);
+      var matchesRef = parsed.valid && parsed.kind === 'door'
+        && String(parsed.id || '').replace(/\s+/g, '').toLowerCase() === label.toLowerCase();
+      var matchesLabel = doorLabel && toSlugWords(fork) === toSlugWords(doorLabel);
+      if (matchesRef || matchesLabel) { row = ledger[li]; break; }
+    }
+    if (!row) {
+      errors.push('Week ' + label + ' prints a doorChoice with no playSpine.decisionLedger row —'
+        + ' name the fork as `door:' + label + '` and say what mechanically differs across it,'
+        + ' or the door is flavour-only by definition');
+    } else if (!namesMechanicalSurface(row.differsBy)) {
+      errors.push('Week ' + label + ' decisionLedger row differsBy "' + String(row.differsBy || '')
+        + '" names no mechanical surface — a fork whose branches read differently but PLAY identically'
+        + ' is the flavour-only door. Name the clock, track, price, region, cipher or gate that changes');
+    }
+  }
+
+  // ── Floor 7: no mute source ──
+  // Every clock this week renders is read by an edge, or declared ambient. The
+  // escape hatch is real and deliberate: a clock that exists purely as world
+  // texture is a legitimate choice, but it has to be a DECLARED one.
+  var clocks = Array.isArray(week.gameplayClocks) ? week.gameplayClocks : [];
+  if (clocks.length) {
+    var readNames = {};
+    function noteRead(ref) {
+      var parsed = parseSurfaceRef(ref);
+      if (parsed.valid && parsed.kind === 'clock') readNames[toSlugWords(parsed.id)] = 1;
+    }
+    (Array.isArray(spine.economyGraph) ? spine.economyGraph : []).forEach(function (edge) {
+      noteRead((edge || {}).from); noteRead((edge || {}).to);
+    });
+    (Array.isArray(spine.consequenceEdges) ? spine.consequenceEdges : []).forEach(function (edge) {
+      noteRead((edge || {}).source); noteRead((edge || {}).answeredBy);
+    });
+    var ambient = ' ' + (Array.isArray(spine.honestGaps) ? spine.honestGaps : [])
+      .concat((Array.isArray(spine.composition) ? spine.composition : []).map(function (c) { return (c || {}).role; }))
+      .map(function (t) { return toSlugWords(t); }).join(' ') + ' ';
+    clocks.forEach(function (clock) {
+      var name = String((clock || {}).clockName || '').trim();
+      if (!name) return;
+      var slug = toSlugWords(name);
+      if (readNames[slug]) return;
+      if (slug && ambient.indexOf(slug) !== -1) return;
+      errors.push('Week ' + label + ' renders clock "' + name + '" that no playSpine edge reads —'
+        + ' a mute source. Point an edge at `clock:' + name + '`, or declare it ambient by naming it in a'
+        + ' composition role or honestGaps');
+    });
+  }
+
+  return errors;
 }
 
 // Singular/plural tolerance for the one-currency check. Deliberately crude: it
@@ -3154,9 +4199,41 @@ export function collectPlayLoopFindings(booklet) {
   return findings;
 }
 
-export function validateAssembledBooklet(booklet) {
+/**
+ * validateAssembledBooklet(booklet, options) -> { valid, errors, warnings, sim }
+ *
+ * `options` is additive and every existing caller omits it, which keeps their
+ * behaviour byte-identical: `options.generationFloors` is the D111 switch and
+ * nothing else reads it here.
+ *
+ * THE SIMULATED PLAYER'S SEAT (W4b). This is the only gate in the pipeline that
+ * sees a whole assembled book, which is the only object the sim can walk — the
+ * week stages see one week and the skeleton sees a plan. Severity follows D111
+ * exactly:
+ *
+ *   floors ON  (the API pipelines) — soft-locks are ERRORS. A book whose ending
+ *     is unreachable at realistic adherence is not a book with a quality
+ *     problem; it is a book that cannot be finished, and the model is told so
+ *     with the defect quoted.
+ *   floors OFF (the corpus, the guided wizard, hand-authored JSON) — the same
+ *     findings ride the WARNING channel. `npm run validate` must never fail a
+ *     sealed fixture over a gate written after it was sealed.
+ *
+ * And underneath both: a book with no `meta.playSpine` is SKIPPED by the walker
+ * itself, so every fixture in content/ is untouched either way.
+ */
+export function validateAssembledBooklet(booklet, options) {
   var errors = [];
   var warnings = []; // soft issues (stylistic, non-fatal) — attached to return value
+  var opts = options || {};
+
+  var simReport = simulateBook(booklet);
+  if (!simReport.skipped) {
+    var simHard = simCorrectionDirectives(simReport);
+    if (opts.generationFloors) simHard.forEach(function (m) { errors.push(m); });
+    else simHard.forEach(function (m) { warnings.push(m); });
+    simSoftFindings(simReport).forEach(function (m) { warnings.push(m); });
+  }
 
   collectBudgetBreaches(booklet).forEach(function (b) { warnings.push(b.message); });
   collectNounRosterFindings(booklet).forEach(function (m) { warnings.push(m); });
@@ -3630,7 +4707,23 @@ export function validateAssembledBooklet(booklet) {
   }
 
   // Return serialization-safe shape (plain object, not array-with-custom-properties)
-  return { errors: errors, warnings: warnings };
+  // `sim` rides along so a caller can report the walk without re-running it.
+  // Serialization-safe by construction: the walker's graph and holds are
+  // stripped, because they carry the node objects and this shape is written
+  // into `_x` debris and posted through structuredClone boundaries.
+  return {
+    errors: errors,
+    warnings: warnings,
+    sim: {
+      skipped: simReport.skipped,
+      skipReason: simReport.skipReason,
+      hard: simReport.hard,
+      soft: simReport.soft,
+      bands: simReport.bands,
+      decisions: simReport.decisions,
+      measurements: simReport.measurements
+    }
+  };
 }
 
 // ── Part 4: Pipeline stage validators ─────────────────────────────────────────
@@ -4380,6 +5473,13 @@ export function validateSkeletonStage(result, weekCount, options) {
       floorErrors.push('Skeleton → weekPlan plans no companionTypes anywhere in the book — at least one week must'
         + ' carry a companion component for the play state to live on');
     }
+
+    // ── The closure floors (W4a) ──
+    // Collected into the same batch for the same reason: a spine with three
+    // wiring defects should cost ONE retry that names all three.
+    floorErrors = floorErrors.concat(
+      collectSpineSkeletonFloorErrors((result.meta || {}).playSpine, result)
+    );
 
     if (floorErrors.length) return floorErrors.join('; ');
   }

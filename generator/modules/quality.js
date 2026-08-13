@@ -2,10 +2,120 @@
 // Deterministic post-generation analysis: scores, warnings, weak-spot flags.
 // Does NOT modify the booklet. Stored on window.LiftRPGAPI.lastQualityReport after each call.
 
-import { VALID_MAP_TYPES, VALID_COMPANION_TYPES, DEMOTED_COMPANION_TYPES } from './constants.js';
+import { VALID_MAP_TYPES, VALID_COMPANION_TYPES, DEMOTED_COMPANION_TYPES, readPipelineDebris } from './constants.js';
 import { normalizeId, normalizeThemeArchetype } from './assembly.js';
-import { validateAssembledBooklet } from './validation.js';
+import { validateAssembledBooklet, extractRosterNouns } from './validation.js';
 import { buildMapEvolutionFingerprint, looksLikeFragmentRef } from './fingerprint.js';
+
+// ── Motif cross-registration (W4b · FUSION §6's V/B promotion) ──────────────
+// FUSION §6 has carried this as *not landed* since it was written: "motif
+// cross-registration as a machine check (V/B someday: a declared motif
+// greppable on both sides)." This is the measurement half. It stays WARN-class
+// and feeds the critic as evidence, because the gate has not earned itself yet
+// — the evidence is what earns it, which is this project's standing rule for
+// when a floor becomes blocking.
+//
+// WHAT COUNTS AS "DECLARED", stated plainly because it is a compromise. The
+// assembled booklet carries no motif list: `designLedger.motifPayoffs` is a
+// CAMPAIGN-PLAN artifact and does not survive into the book. The only declared
+// recurring-object surface that does survive is the Core Noun Roster in
+// `meta.worldContract` — a superset of the motifs, which makes this measurement
+// generous rather than strict, and generous in the safe direction: it can miss
+// a motif the roster omits, and it cannot invent one.
+//
+// THE TWO SIDES. A roster noun that appears only in prose is decoration; one
+// that appears only on a mechanical surface is furniture with no story attached.
+// The finding is the noun that lives on exactly one side — never the noun that
+// lives on neither, which is the dead-noun sweep collectNounRosterFindings
+// already owns and which this must not duplicate.
+var MOTIF_MIN_ROSTER = 3;
+
+function motifNeedle(noun) {
+  return String(noun || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function motifHit(needle, text) {
+  if (!needle) return false;
+  var hay = ' ' + String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+  return hay.indexOf(' ' + needle) !== -1;
+}
+
+/**
+ * collectMotifCrossRegistrationFindings(booklet) -> string[]
+ *
+ * Report-only. One line per motif that reaches only one side of the seam.
+ */
+export function collectMotifCrossRegistrationFindings(booklet) {
+  var findings = [];
+  var wc = booklet && booklet.meta && booklet.meta.worldContract;
+  if (!wc || typeof wc !== 'string') return findings;
+  var roster = extractRosterNouns(wc);
+  if (roster.length < MOTIF_MIN_ROSTER) return findings;  // absence is collectNounRosterFindings' finding
+
+  var mechanical = [];
+  var prose = [];
+  (booklet.weeks || []).forEach(function (week) {
+    var w = week || {};
+    var fo = w.fieldOps || {};
+    // MECHANICAL SURFACES: the labels a pencil interacts with.
+    (w.gameplayClocks || []).forEach(function (c) { mechanical.push((c || {}).clockName); });
+    (w.sessions || []).forEach(function (s) {
+      (((s || {}).markStrip || {}).targets || []).forEach(function (t) { mechanical.push((t || {}).label); });
+    });
+    if (w.reckoning) {
+      mechanical.push((w.reckoning.sink || {}).ref);
+      mechanical.push((w.reckoning.sink || {}).instruction);
+      mechanical.push(w.reckoning.conversion);
+    }
+    if (w.doorChoice) {
+      mechanical.push((w.doorChoice.optionA || {}).label);
+      mechanical.push((w.doorChoice.optionB || {}).label);
+      mechanical.push(w.doorChoice.label);
+    }
+    var mapState = fo.mapState || {};
+    mechanical.push(mapState.title);
+    (mapState.nodes || []).forEach(function (n) { mechanical.push((n || {}).label); });
+    (mapState.tiles || []).forEach(function (t) { mechanical.push((t || {}).label); });
+    (fo.companionComponents || []).forEach(function (c) {
+      mechanical.push((c || {}).title); mechanical.push((c || {}).statName);
+    });
+    if (fo.cipher) mechanical.push(fo.cipher.title);
+    ((fo.oracleTable || {}).entries || []).forEach(function (e) { mechanical.push((e || {}).text); });
+
+    // PROSE SURFACES: the sentences the reader reads.
+    prose.push((w.epigraph || {}).text);
+    prose.push(w.title);
+    (w.sessions || []).forEach(function (s) {
+      prose.push((s || {}).storyPrompt);
+      prose.push(((s || {}).returnBeat || {}).closingLine);
+      prose.push(((s || {}).returnBeat || {}).openingEcho);
+    });
+    prose.push((w.interlude || {}).body);
+    prose.push((w.bossEncounter || {}).narrative);
+  });
+  (booklet.fragments || []).forEach(function (f) {
+    prose.push((f || {}).content);
+    prose.push((f || {}).title);
+  });
+  (booklet.endings || []).forEach(function (e) { prose.push(((e || {}).content || {}).body); });
+
+  var mechanicalText = mechanical.filter(Boolean).join(' · ');
+  var proseText = prose.filter(Boolean).join(' · ');
+
+  roster.forEach(function (noun) {
+    var needle = motifNeedle(noun);
+    if (!needle || needle.length < 3) return;
+    var onMech = motifHit(needle, mechanicalText);
+    var onProse = motifHit(needle, proseText);
+    if (onMech === onProse) return;   // both sides (good) or neither (the dead-noun sweep's finding)
+    findings.push('Motif cross-registration: "' + noun + '" appears only '
+      + (onProse ? 'in PROSE — no clock, strip label, map region, companion, door, cipher or oracle'
+        + ' entry is named for it, so the world says it matters and the pencil never touches it'
+        : 'on a MECHANICAL surface — no story prompt, epigraph, fragment, interlude or ending'
+        + ' mentions it, so the player marks a thing the book never explains'));
+  });
+  return findings;
+}
 
 export function extractWeekCompanionTypes(week) {
   return ((((week || {}).fieldOps || {}).companionComponents) || [])
@@ -650,7 +760,7 @@ export function generateQualityReport(booklet) {
   }
 
   // ── Artifact intent coherence (Layer 3 variety contract drift) ────────
-  var intentDrift = (booklet._artifactIntentDrift || {}).diagnostics || [];
+  var intentDrift = (readPipelineDebris(booklet, '_artifactIntentDrift') || {}).diagnostics || [];
   var intentIssueCount = 0;
 
   if (intentDrift.length > 0) {
@@ -689,7 +799,7 @@ export function generateQualityReport(booklet) {
   }
 
   // ── S+F cross-stage continuity (surfaced from pipeline instrumentation) ──
-  var sfContinuity = booklet._continuityWarnings || [];
+  var sfContinuity = readPipelineDebris(booklet, '_continuityWarnings') || [];
   if (sfContinuity.length > 0) {
     sfContinuity.forEach(function (cw) {
       report.warnings.push('[S+F continuity/' + (cw.stage || '?') + '] ' + (cw.message || ''));

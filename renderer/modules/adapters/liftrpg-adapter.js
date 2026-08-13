@@ -14,6 +14,10 @@
 
 import { createAtom } from '../engine/atom-registry.js';
 import { PAGE_BUDGET } from '../engine/page-spec.js';
+// W5b: the surface-ref GRAMMAR, so a hint ladder's `printedOn` can be resolved
+// to the page it names. One parameterized resolver (D93) — this file must not
+// grow a second parser for a grammar contract-constants.mjs already owns.
+import { parseSurfaceRef } from '../../../contracts/contract-constants.mjs';
 import { resolveWeekMechanicProfile } from '../mechanic-registry.js';
 import {
   estimateSessionCardHeight,
@@ -216,6 +220,12 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
   // ── Weeks ───────────────────────────────────────────────────
   const weeks = data.weeks || [];
   const totalWeeks = weeks.length;
+  // W5b: where a hint band would sit for each week, recorded as the week loop
+  // resolves it. The attachment group is not derivable from outside the loop —
+  // it depends on the strategy, the shell family and the board-state mode — and
+  // recomputing it in a second place is how two callers come to disagree about
+  // which spread a surface lives on.
+  const weekSeats = [];
   const bookletTitle = (data.cover || {}).title || ((data.meta || {}).blockTitle) || 'LiftRPG';
 
   for (let wi = 0; wi < weeks.length; wi++) {
@@ -226,6 +236,12 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
     const primaryGroup = `week-${wi}-chunk-0`;
     const attachmentStrategy = resolveWeekAttachmentStrategy(artifactIdentity);
     const balancedRowGroup = isBoss ? null : resolveBalancedRowGroup(artifactIdentity, week, wi, attachmentStrategy);
+    weekSeats[wi] = {
+      sessionGroup: primaryGroup,
+      cipherGroup: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'cipher', artifactIdentity),
+      mapGroup: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'map', artifactIdentity),
+      oracleGroup: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'oracle', artifactIdentity),
+    };
 
     // Week header (kicker, title, epigraph) — before session cards
     atoms.push(createAtom({
@@ -390,6 +406,54 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
           pageAffinity: 'right',
           data: {
             map: week.fieldOps.mapState,
+            weekIndex: wi,
+            totalWeeks,
+            artifactIdentity,
+          },
+        }));
+      }
+
+      // Constrained grid — the deduction board (W5b). Full-width by
+      // footprint: a logic grid is subjects x (values x categories) cells and
+      // a nonogram carries clue gutters on two sides, so neither survives a
+      // half slot. It therefore declares no rowGroup — the engine gives it a
+      // full row, which is placement it decides and this file only enables.
+      if (week.fieldOps && week.fieldOps.constrainedGrid) {
+        atoms.push(createAtom({
+          type: 'constrained-grid',
+          id: `w${wi}-cgrid`,
+          shellAttrs,
+          group: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'cipher', artifactIdentity),
+          groupPolicy: singlePageGroupPolicy(),
+          section: 'body',
+          sequence: wi * 1000 + 103,
+          sizeHint: 'half-page',
+          pageAffinity: 'either',
+          data: {
+            grid: week.fieldOps.constrainedGrid,
+            weekIndex: wi,
+            totalWeeks,
+            artifactIdentity,
+          },
+        }));
+      }
+
+      // Word grid — the letter hunt (W5b). Full-width for the same reason the
+      // deduction board is: a letter board plus its word list does not survive
+      // a half slot.
+      if (week.fieldOps && week.fieldOps.wordGrid) {
+        atoms.push(createAtom({
+          type: 'word-grid',
+          id: `w${wi}-wgrid`,
+          shellAttrs,
+          group: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'cipher', artifactIdentity),
+          groupPolicy: singlePageGroupPolicy(),
+          section: 'body',
+          sequence: wi * 1000 + 104,
+          sizeHint: 'half-page',
+          pageAffinity: 'either',
+          data: {
+            wordGrid: week.fieldOps.wordGrid,
             weekIndex: wi,
             totalWeeks,
             artifactIdentity,
@@ -664,6 +728,94 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         artifactIdentity,
       },
     }));
+  }
+
+  // ── Hint bands (W5b) ────────────────────────────────────────
+  //
+  // THE SPINE'S FIRST PRINTED SURFACE. `meta.playSpine` has been renderer-inert
+  // since W4a — it declares things ABOUT surfaces, and is not one. A hint
+  // ladder is the exception the Ludic Library registry predicted: it promises
+  // the player will READ something, and a promise about a page nobody can find
+  // is what the `printedOn` ref exists to prevent. So the band goes where the
+  // ref points.
+  //
+  // THIS IS AFFINITY, NOT PLACEMENT. The adapter names a section, a group and a
+  // sequence — "next to the thing this ladder is about" — and the engine
+  // decides which page that becomes (Layer 1 charter, "What Adapters May NOT
+  // Decide"). A ladder whose ref resolves to nothing is skipped and warned
+  // about rather than parked somewhere arbitrary: the generation floors already
+  // block an unresolvable printedOn at the stage gate, so a book that reaches
+  // the renderer with one is hand-loaded, and inventing a seat for it would be
+  // the silent-substitution failure this project names as its founding law.
+  {
+    const ladders = (((data.meta || {}).playSpine || {}).hintLadders) || [];
+    for (let li = 0; li < ladders.length; li++) {
+      const ladder = ladders[li] || {};
+      const ref = parseSurfaceRef(ladder.printedOn);
+      let seat = null;
+
+      if (ref.valid) {
+        // A week-anchored ref (`cipher:W3`, `map:W3`, `week:W3`, `door:W3`, …)
+        // carries its week in the id. This is the common case and the one the
+        // brief names: a ladder is about a puzzle, and puzzles are weekly.
+        const weekMatch = /^W(\d+)/i.exec(String(ref.id || ''));
+        if (weekMatch) {
+          const wi = Number(weekMatch[1]) - 1;
+          const seats = weekSeats[wi];
+          if (seats) {
+            // The band shares the GROUP of the surface it is about, which is
+            // what puts it on that surface's spread. Groups are not uniform
+            // across a week: the attachment strategy can split the cipher, the
+            // map and the session cards onto different spreads, so a band that
+            // always took the session group would print a hint about a cipher
+            // the reader cannot see.
+            const group = ref.kind === 'map' ? seats.mapGroup
+              : ref.kind === 'oracle' ? seats.oracleGroup
+                : ref.kind === 'cipher' ? seats.cipherGroup
+                  : seats.sessionGroup;
+            seat = {
+              section: 'body',
+              group,
+              // After every weekly mechanic surface (cipher 100 … word-grid
+              // 104), so the band reads as a footnote to the spread rather
+              // than as a preamble to it.
+              sequence: wi * 1000 + 110 + li,
+            };
+          }
+        } else if (ref.kind === 'seal' || ref.kind === 'fragment') {
+          // A sealed cache or a found document. Its id is the fragment's own.
+          const fi = fragments.findIndex((frag) => String((frag || {}).id || '') === String(ref.id));
+          if (fi !== -1) {
+            // Half-steps keep the band immediately after its fragment without
+            // renumbering a sequence the fragment loop owns.
+            seat = { section: 'supplements', group: 'fragments', sequence: fi + 0.5 };
+          }
+        }
+      }
+
+      if (!seat) {
+        console.warn('[liftrpg-adapter] hint ladder printedOn "' + String(ladder.printedOn)
+          + '" resolves to no printed surface in this booklet — the band is not placed. '
+          + 'The generation floors block this at the stage gate; a hand-loaded book can carry it.');
+        continue;
+      }
+
+      atoms.push(createAtom({
+        type: 'hint-band',
+        id: `hint-band-${li}`,
+        shellAttrs,
+        section: seat.section,
+        group: seat.group,
+        sequence: seat.sequence,
+        sizeHint: 'minimal',
+        pageAffinity: 'either',
+        data: {
+          ladder,
+          totalWeeks,
+          artifactIdentity,
+        },
+      }));
+    }
   }
 
   // ── Assembly page ───────────────────────────────────────────

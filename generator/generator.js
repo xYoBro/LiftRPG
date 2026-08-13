@@ -668,6 +668,28 @@
     return parts.join('\n');
   };
 
+  /**
+   * The cipher-variety demand, as a prompt line.
+   *
+   * ONE HOME: `cipherVarietyFloor()` in generator/modules/validation.js, capped
+   * by GENERATION_CIPHER_TECHNIQUES in contract-constants.mjs. It reaches this
+   * classic-IIFE file through the `window` bridge api-generator.js installs.
+   * Two builders each carried a hand-copied `Math.min(Math.max(n - 2, 3), ...)`
+   * before W7, so the prompt and the gate could disagree — and at 12 weeks they
+   * did, both demanding 10 distinct techniques against a menu of 8.
+   *
+   * NO FALLBACK FORMULA. If the bridge is missing, the line states the rule
+   * without a number. A guessed number here would be a prompt demanding a floor
+   * the gate does not enforce, which is the failure this replaced.
+   */
+  function cipherVarietyLine(weekCount) {
+    var floor = (typeof window.cipherVarietyFloor === 'function')
+      ? window.cipherVarietyFloor(weekCount) : null;
+    return floor
+      ? '- Use at least ' + floor + ' distinct cipher types across the non-boss weeks.'
+      : '- Give as many non-boss weeks as possible a cipher type no earlier week used.';
+  }
+
   // ── Week count + chunking utilities ────────────────────────────────────────
 
   window.parseWeekCount = function (workout) {
@@ -2178,7 +2200,10 @@
    */
   window.generateSkeletonPrompt = function (workout, brief, options) {
     options = options || {};
-    var weekCount = window.parseWeekCount(workout);
+    // The pipeline's resolved book length when it has one; parseWeekCount is
+    // the fallback for pipeline-free callers. Same reason as
+    // generateApiStage2Prompt: parseWeekCount clamps to 4-12.
+    var weekCount = (options.weekCount > 0) ? options.weekCount : window.parseWeekCount(workout);
     var blend = deriveDesignBlend(brief, workout);
     var armed = armCompilerContext(workout, brief, options);
     return [
@@ -2639,7 +2664,24 @@
 
   window.generateApiStage2Prompt = function (workout, brief, layerBible, options) {
     options = options || {};
-    var weekCount = window.parseWeekCount(workout);
+    // AUTHORITATIVE WEEK COUNT, not a re-derivation. The pipeline already
+    // resolved book length (runApiPipeline → resolveCanonicalBookLength) and
+    // passes it; `parseWeekCount` is the fallback for callers that have no
+    // pipeline (the length probe, the guided-build harness). They differed:
+    // parseWeekCount clamps to 4-12, the pipeline does not, so a 16-week
+    // canonical program was planned as 12 weeks and built as 16.
+    var weekCount = (options.weekCount > 0) ? options.weekCount : window.parseWeekCount(workout);
+    // WHAT THE PLANNER SEES OF THE PROGRAM (W3 length audit). The raw echo
+    // below is capped at 2,200 characters, which at 12 weeks stops inside week
+    // 5 — and this stage is the one told "use exactly 12 weeks". The digest's
+    // per-week rows are the fix: every week's shape, ~330 characters, no
+    // truncation. The cap stays; the blindness does not.
+    var topology = (typeof window.buildWorkoutTopology === 'function')
+      ? window.buildWorkoutTopology(workout) : null;
+    var scheduleBlock = (typeof window.formatWeekScheduleBlock === 'function')
+      ? window.formatWeekScheduleBlock(topology) : '';
+    var shapeBlock = (typeof window.formatWorkoutTopologyBlock === 'function')
+      ? window.formatWorkoutTopologyBlock(topology) : '';
     return [
       '# API Stage 2 — Story Plan',
       '',
@@ -2655,7 +2697,13 @@
       '- Every week must include sessionCount and fragmentIds. fragmentIds are the exact document IDs that week sessions/oracles will reference.',
       '- Every non-boss week must ultimately yield exactly one weekly component value: a single integer 1-26 for standard A1Z26 decode. weeklyComponentMeaning explains that number in-fiction; it must not turn into a composite reading list or prose excerpt.',
       '- Every non-boss week must declare a concrete cipherType, and no two consecutive non-boss weeks may use the same cipherType.',
-      '- Use at least ' + Math.min(Math.max(weekCount - 2, 3), Math.max(weekCount - 1, 1)) + ' distinct cipher types across the non-boss weeks.',
+      // DERIVED, never restated. cipherVarietyFloor is the one home of this
+      // number (validation.js, capped by GENERATION_CIPHER_TECHNIQUES) and it
+      // reaches this classic-IIFE file on `window`. When it is absent the line
+      // states the RULE without a number rather than guessing one — a prompt
+      // that demands a floor the gate does not enforce is worse than a prompt
+      // that demands variety in words.
+      cipherVarietyLine(weekCount),
       '- Fragment IDs MUST use canonical LiftRPG format only: F.01, F.02, F.03 ... Never use placeholders like F-1A or F_01.',
       '- Every fragmentRegistry entry must have a real weekRef and must also appear in that owning week\'s fragmentIds array.',
       '- fragmentRegistry entries must be full objects with id, title, documentType, author, revealPurpose, clueFunction, weekRef.',
@@ -2673,7 +2721,11 @@
       compactJson(summarizeLayerBibleForWeeks(layerBible)),
       '',
       '## Inputs',
-      'Workout: ' + truncateText(workout, 2200),
+      // One entry, not two: the array is `.filter(Boolean)`-ed, so a separate
+      // blank-line element would be filtered out with the empty blocks.
+      [shapeBlock, scheduleBlock].filter(Boolean).join('\n\n'),
+      'Workout (abbreviated echo — the schedule above is the authority on length): '
+        + truncateText(workout, 2200),
       'Creative direction: ' + truncateText(brief || '', 900),
       options.retryMode ? 'Retry mode: shorten descriptions where needed, but keep clue economy and week transformations intact.' : '',
       '',

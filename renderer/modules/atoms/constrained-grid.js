@@ -1,0 +1,403 @@
+/**
+ * constrained-grid.js — the deduction board (W5b)
+ *
+ * Two kinds under one atom, because they are the same printed object: a grid
+ * of pencil cells with constraints printed beside it, whose completion yields
+ * a code the economy reads.
+ *
+ *   logic-grid  subjects x category values; the player strikes and rings cells
+ *   nonogram    run clues above and beside a grid; the player shades cells,
+ *               and the characters printed inside the shaded ones are the key
+ *
+ * Data shape: { grid, weekIndex, totalWeeks, artifactIdentity }
+ *
+ * THE ANSWER KEY IS NEVER RENDERED. `grid.answer` and `grid.answerFrom` are
+ * what contracts/puzzle-solvers.mjs checks the puzzle against at the
+ * generation gate; printing them would put the solution next to the puzzle.
+ * The only thing the page says about the answer is the authored
+ * `instruction`, which tells the player HOW to read it.
+ */
+
+import { registerAtom } from '../engine/atom-registry.js';
+import { densityVariant } from '../engine/density-util.js';
+import { make } from '../dom.js';
+import { wrappedLines } from '../utils.js';
+import { advancePx, readTypeMetrics } from '../type-metrics.js';
+
+// ---------------------------------------------------------------------------
+// Ladder mirror  ⇄  booklet.css `--cgrid-*` tokens
+// ---------------------------------------------------------------------------
+/**
+ * CROSS-FILE CONTRACT — these numbers mirror the `--cgrid-*` token ladder in
+ * renderer/booklet.css (the `.cgrid-zone` base block and the
+ * `.cgrid-zone[data-density-variant="…"]` blocks). booklet.css carries the
+ * reverse pointer, and `ladderMirrorHarness()` in scripts/validate.mjs parses
+ * BOTH SIDES and asserts equality. **Change them together or the estimate
+ * lies.**
+ *
+ * Why mirror instead of read: estimate() runs in phase 1, before any DOM
+ * exists, so it cannot resolve a custom property. A token moved on one side
+ * alone makes the solver's shrink math wrong in the confident direction — the
+ * D71 defect class, which on a puzzle page costs the player a row of the grid
+ * to `overflow:hidden`.
+ *
+ * Tier keys are exactly the variant names `densityVariant()` returns, so the
+ * tier this estimate models is always the tier render() stamps onto the DOM.
+ *
+ * pt→px conversion is ×96/72; the line figures are (font-size × leading),
+ * rounded to 0.1px exactly as the validator derives them.
+ *
+ * THE CELL HAS A PENCIL FLOOR. `--cgrid-cell` bottoms out at 14px, which is
+ * the same floor the reckoning tally holds: a box you cannot put a legible ✗
+ * in is not a saving, it is a smaller unusable box. The ladder's shrink comes
+ * from the label columns, the clue leading and the block gaps — the chrome —
+ * and from four pixels of cell, and it promises nothing more than that.
+ */
+const LADDER = {
+  //          --cgrid-cell | --cgrid-gap | label/clue/instr size × leading
+  base: {
+    cellPx:       22,     // --cgrid-cell
+    gapPx:        2,      // --cgrid-gap
+    labelLinePx:  9.1,    // 5.6pt × 1.22
+    labelFsPx:    7.47,   // 5.6pt — the size labelCharPx is measured at
+    rowLabelPx:   96,     // --cgrid-row-label-w
+    clueLinePx:   11.2,   // 6.3pt × 1.33
+    clueFsPx:     8.40,   // 6.3pt
+    clueGapPx:    3,      // --cgrid-clue-gap
+    instrLinePx:  10.2,   // 5.9pt × 1.30
+    instrFsPx:    7.87,   // 5.9pt
+    blockGapPx:   6,      // --cgrid-block-gap
+  },
+  compact: {
+    cellPx:       20,
+    gapPx:        2,
+    labelLinePx:  9.1,
+    labelFsPx:    7.47,
+    rowLabelPx:   92,
+    clueLinePx:   11.2,
+    clueFsPx:     8.40,
+    clueGapPx:    3,
+    instrLinePx:  10.2,
+    instrFsPx:    7.87,
+    blockGapPx:   5,
+  },
+  dense: {
+    cellPx:       17,
+    gapPx:        2,
+    labelLinePx:  8.7,    // 5.6pt × 1.16
+    labelFsPx:    7.47,
+    rowLabelPx:   84,
+    clueLinePx:   9.8,    // 5.9pt × 1.24
+    clueFsPx:     7.87,
+    clueGapPx:    2,
+    instrLinePx:  8.9,    // 5.5pt × 1.22
+    instrFsPx:    7.33,
+    blockGapPx:   4,
+  },
+  tight: {
+    cellPx:       14,     // the pencil floor
+    gapPx:        1,
+    labelLinePx:  7.8,    // 5.2pt × 1.12
+    labelFsPx:    6.93,
+    rowLabelPx:   72,
+    clueLinePx:   8.8,    // 5.6pt × 1.18
+    clueFsPx:     7.47,
+    clueGapPx:    2,
+    instrLinePx:  8.0,    // 5.2pt × 1.16
+    instrFsPx:    6.93,
+    blockGapPx:   3,
+  },
+};
+
+/** `.puzzle-title` — the shared cipher/oracle heading class, ~2 wrapped lines
+ *  plus its margin. Density-invariant, as it is for cipher-panel. */
+const TITLE_PX = 26;
+
+/**
+ * Modelled per-character advances, at the calibration anchor.
+ *
+ * These are NOT new measurements. They are the ratio the corpus already
+ * validated for the same faces at the same class of size — 0.60 of font-size
+ * for untracked mono (Share Tech Mono's A of 0.5401 plus the same wrap slack
+ * carried by map-panel's TRACK_LABEL_CHAR_PX 4.7/7.73 = 0.608 and
+ * RK_ROW_CHAR_PX 4.16/6.93 = 0.600), and 0.50 for body serif (map-panel's
+ * noteCharPx 4.05/8.13 = 0.498). Every one of them is corrected for the face
+ * actually in use through advancePx(), so a book on IBM Plex Mono is modelled
+ * at IBM Plex Mono's width rather than at pastoral's (D121).
+ */
+const MONO_ADVANCE_RATIO = 0.60;
+const BODY_ADVANCE_RATIO = 0.50;
+
+/** Left indent of a clue's text past its number. `.cgrid-clue` padding. */
+const CLUE_INDENT_PX = 14;
+/** `.ngram-row-clue` — width per printed run number, and its floor. */
+const RUN_NUMBER_PX = 9;
+const ROW_CLUE_MIN_PX = 18;
+
+/**
+ * Width the grid is modelled against.
+ *
+ * This atom declares `footprint: { cols: 2 }` — a deduction board needs the
+ * page. 432px is the narrowest live column the archetype ladder produces
+ * (5.5in − 2 × the 0.5in maximum `--page-margin` in theme.js), which is the
+ * conservative full-width basis and the same one map-panel calibrates on.
+ */
+const GRID_WIDTH_PX = 432;
+
+function ladderFor(density) {
+  return LADDER[densityVariant(density) || 'base'];
+}
+
+function monoAdvance(tier, fsPx, metrics) {
+  return advancePx(MONO_ADVANCE_RATIO * fsPx, fsPx, 'mono', metrics);
+}
+function bodyAdvance(fsPx, metrics) {
+  return advancePx(BODY_ADVANCE_RATIO * fsPx, fsPx, 'body', metrics);
+}
+
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+// ---------------------------------------------------------------------------
+// Geometry
+// ---------------------------------------------------------------------------
+
+/**
+ * The logic grid's matrix.
+ *
+ * CROSS-FILE CONTRACT — mirrors renderLogicMatrix() below: the category band,
+ * the column-label row, and one row per subject whose height is the greater of
+ * the cell box and the wrapped row label. When the two disagree the failure is
+ * silent clipping, not an error, so they are written adjacent on purpose.
+ */
+function logicMatrixHeight(grid, tier, metrics) {
+  const subjects = asArray(grid.subjects);
+  const cats = asArray(grid.categories);
+  if (!subjects.length || !cats.length) return 0;
+
+  const labelAdv = monoAdvance(tier, tier.labelFsPx, metrics);
+
+  // Header: one line of category band, then the column labels wrapped to a
+  // single cell's width (they are the narrowest text on the page).
+  let colLabelLines = 1;
+  cats.forEach((cat) => {
+    asArray(cat.values).forEach((value) => {
+      colLabelLines = Math.max(
+        colLabelLines,
+        wrappedLines(String(value).length, tier.cellPx, labelAdv),
+      );
+    });
+  });
+  const header = tier.labelLinePx + colLabelLines * tier.labelLinePx + tier.gapPx;
+
+  // Body: a row is at least a cell tall, and taller when its label wraps.
+  let body = 0;
+  subjects.forEach((subject) => {
+    const labelH = wrappedLines(String(subject).length, tier.rowLabelPx, labelAdv) * tier.labelLinePx;
+    body += Math.max(tier.cellPx, labelH);
+  });
+  body += Math.max(0, subjects.length - 1) * tier.gapPx;
+
+  return header + body;
+}
+
+/**
+ * The nonogram's frame. Row clues sit to the LEFT and therefore cost width,
+ * not height; only the column-clue band adds rows above the grid.
+ *
+ * CROSS-FILE CONTRACT — mirrors renderNonogram() below.
+ */
+function nonogramFrameHeight(grid, tier) {
+  const rowClues = asArray(grid.rowClues);
+  const colClues = asArray(grid.colClues);
+  if (!rowClues.length || !colClues.length) return 0;
+
+  let deepestColumn = 1;
+  colClues.forEach((clue) => {
+    deepestColumn = Math.max(deepestColumn, asArray(clue).length);
+  });
+  const band = deepestColumn * tier.labelLinePx + tier.gapPx;
+
+  const rows = rowClues.length;
+  const grid_ = rows * tier.cellPx + Math.max(0, rows - 1) * tier.gapPx;
+
+  return band + grid_;
+}
+
+/** Every clue, numbered, wrapped to the content column. */
+function cluesHeight(grid, tier, metrics) {
+  const clues = asArray(grid.clues);
+  if (!clues.length) return 0;
+  const adv = bodyAdvance(tier.clueFsPx, metrics);
+  const width = Math.max(40, GRID_WIDTH_PX - CLUE_INDENT_PX);
+  let total = 0;
+  clues.forEach((clue) => {
+    total += wrappedLines(String((clue || {}).text || '').length, width, adv) * tier.clueLinePx;
+  });
+  return total + Math.max(0, clues.length - 1) * tier.clueGapPx;
+}
+
+/** Modelled zone height for one constrained grid at one ladder tier. */
+function gridHeightAt(grid, tier, metrics) {
+  let height = TITLE_PX;
+
+  const instruction = String(grid.instruction || '');
+  if (instruction) {
+    height += wrappedLines(instruction.length, GRID_WIDTH_PX, bodyAdvance(tier.instrFsPx, metrics))
+      * tier.instrLinePx + tier.blockGapPx;
+  }
+
+  if (grid.kind === 'nonogram') {
+    height += nonogramFrameHeight(grid, tier);
+  } else {
+    height += logicMatrixHeight(grid, tier, metrics);
+    const clues = cluesHeight(grid, tier, metrics);
+    if (clues) height += tier.blockGapPx + clues;
+  }
+
+  // Ceil, not round: the constants above are fractional pt→px conversions, and
+  // rounding to nearest turns a handful of grids into sub-pixel
+  // under-estimates — which the solver spends a revision pass discovering.
+  return Math.ceil(height);
+}
+
+// ---------------------------------------------------------------------------
+// Render
+// ---------------------------------------------------------------------------
+
+function renderLogicMatrix(grid) {
+  const subjects = asArray(grid.subjects);
+  const cats = asArray(grid.categories);
+  const matrix = make('div', 'cgrid-matrix');
+
+  // Category band — one label per group, spanning its own values.
+  const band = make('div', 'cgrid-band');
+  band.appendChild(make('div', 'cgrid-corner'));
+  cats.forEach((cat) => {
+    const span = Math.max(1, asArray(cat.values).length);
+    const el = make('div', 'cgrid-cat', String((cat || {}).name || ''));
+    el.style.setProperty('--cgrid-span', String(span));
+    band.appendChild(el);
+  });
+  matrix.appendChild(band);
+
+  // Column labels.
+  const head = make('div', 'cgrid-head');
+  head.appendChild(make('div', 'cgrid-corner'));
+  cats.forEach((cat) => {
+    asArray(cat.values).forEach((value) => {
+      head.appendChild(make('div', 'cgrid-col-label', String(value)));
+    });
+  });
+  matrix.appendChild(head);
+
+  // One row per subject.
+  subjects.forEach((subject) => {
+    const row = make('div', 'cgrid-row');
+    row.appendChild(make('div', 'cgrid-row-label', String(subject)));
+    cats.forEach((cat) => {
+      asArray(cat.values).forEach(() => {
+        row.appendChild(make('div', 'cgrid-cell'));
+      });
+    });
+    matrix.appendChild(row);
+  });
+
+  return matrix;
+}
+
+function renderNonogram(grid) {
+  const rowClues = asArray(grid.rowClues);
+  const colClues = asArray(grid.colClues);
+  const letters = asArray(grid.letterGrid);
+  const frame = make('div', 'ngram');
+
+  const band = make('div', 'ngram-band');
+  band.appendChild(make('div', 'cgrid-corner'));
+  colClues.forEach((clue) => {
+    const cell = make('div', 'ngram-col-clue');
+    asArray(clue).forEach((run) => {
+      cell.appendChild(make('span', 'ngram-run', String(run)));
+    });
+    band.appendChild(cell);
+  });
+  frame.appendChild(band);
+
+  rowClues.forEach((clue, r) => {
+    const row = make('div', 'ngram-row');
+    row.appendChild(make('div', 'ngram-row-clue', asArray(clue).join(' ')));
+    const letterRow = String(letters[r] || '');
+    colClues.forEach((_col, c) => {
+      const ch = letterRow.charAt(c);
+      // `.` is the schema's "this cell carries no character" — it is a hole in
+      // the key, not a printed full stop.
+      row.appendChild(make('div', 'cgrid-cell ngram-cell', ch && ch !== '.' ? ch : ''));
+    });
+    frame.appendChild(row);
+  });
+
+  return frame;
+}
+
+registerAtom('constrained-grid', {
+  defaultSizeHint: 'half-page',
+  canShare: true,
+  pageAffinity: 'either',
+  footprint: { cols: 2 },
+
+  /**
+   * minHeight is the ladder's floor (tight); preferredHeight is the height at
+   * the density asked for. The gap between them is this grid's real shrink
+   * potential, and it is honest about being small: the cells are what the
+   * player writes in, so most of a puzzle page cannot compress. A five-subject
+   * two-category grid gives back 5 × 8px of cell plus the label and clue
+   * leading, and says so — it does not promise a flat 15%.
+   */
+  estimate(data, density, context) {
+    const metrics = readTypeMetrics(context);
+    const grid = (data || {}).grid || {};
+    return {
+      minHeight:       gridHeightAt(grid, LADDER.tight, metrics),
+      preferredHeight: gridHeightAt(grid, ladderFor(density), metrics),
+    };
+  },
+
+  render(atom, density) {
+    const data = atom.data || {};
+    const grid = data.grid || {};
+    const artifactIdentity = data.artifactIdentity || {};
+
+    const el = make('div', 'cgrid-zone');
+    el.setAttribute('data-grid-kind', String(grid.kind || 'logic-grid'));
+    el.setAttribute('data-shell-family', artifactIdentity.shellFamily || 'field-survey');
+    el.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || 'survey-grid');
+    el.setAttribute('data-attachment-strategy', artifactIdentity.attachmentStrategy || 'split-technical');
+
+    el.appendChild(make('div', 'puzzle-title', String(grid.title || 'Deduction')));
+    if (grid.instruction) {
+      el.appendChild(make('div', 'cgrid-instruction', String(grid.instruction)));
+    }
+
+    if (grid.kind === 'nonogram') {
+      el.appendChild(renderNonogram(grid));
+    } else {
+      el.appendChild(renderLogicMatrix(grid));
+      const clues = asArray(grid.clues);
+      if (clues.length) {
+        const list = make('ol', 'cgrid-clues');
+        clues.forEach((clue) => {
+          list.appendChild(make('li', 'cgrid-clue', String((clue || {}).text || '')));
+        });
+        el.appendChild(list);
+      }
+    }
+
+    const variant = densityVariant(density);
+    if (variant) el.setAttribute('data-density-variant', variant);
+
+    return el;
+  },
+});
+
+export default 'constrained-grid';

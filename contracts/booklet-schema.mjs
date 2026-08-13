@@ -48,7 +48,19 @@ import {
   VOICE_SPEC_LIMITS,
   MARK_STRIP,
   MARK_STRIP_TARGET_KINDS,
-  RECKONING_SINK_KINDS
+  RECKONING_SINK_KINDS,
+  LUDIC_LIBRARY,
+  VALID_DYNAMIC_MARKINGS,
+  SPINE_BUDGETS,
+  VALID_GATE_STRUCTURES,
+  VALID_LEGACY_MOVES,
+  VALID_CONSTRAINED_GRID_KINDS,
+  VALID_LOGIC_CLUE_TYPES,
+  VALID_LOGIC_ANSWER_MODES,
+  VALID_NONOGRAM_ANSWER_MODES,
+  VALID_WORD_GRID_KINDS,
+  VALID_WORD_SEARCH_DIRECTIONS,
+  VALID_WORD_GRID_ANSWER_MODES
 } from './contract-constants.mjs';
 
 var G = SPATIAL_GUARDRAILS;
@@ -92,6 +104,14 @@ var artifactIntentReading = {
     impliedSetting: { type: 'string' },
     emotionalArc: { type: 'string' },
     genreTemplate: { type: 'string' },
+    // The GAME-KIND signal (W4a, the ludic lens). A sibling of the six above
+    // and free-string for the same reason: enumerating what kind of game a
+    // brief wants would re-impose the house flavour the lens exists to escape.
+    // What is enum-gated is the ANSWER — playSpine.composition draws from
+    // LUDIC_LIBRARY — while this records the reading that produced it, so a
+    // composition that does not follow from the brief is a cited finding
+    // rather than a shrug.
+    ludicReading: { type: 'string' },
     // 1-2 sentences citing the brief phrases that drove the reading. This is
     // what makes a misread localizable: the critic grades the booklet against
     // the recorded reading, and a reading the brief cannot support is a cited
@@ -520,6 +540,325 @@ var processParticulars = {
   }
 };
 
+// ── playSpine (Layer 3 play contract, PLAY.md §3 / VISION §4.4) ─────────────
+// The Ludic Spine: composition with consequence, declared before content
+// exists. Play is global — the fourth constitution — and the whole reason this
+// block exists is that a property of the whole cannot be secured by asking each
+// part for it. Every component can be good and the book can still be a series
+// of things to do.
+//
+// SEVERITY: the artifactIntent split, exactly (see that block above).
+//   - The ARTIFACT contract is strict but wholly OPTIONAL (`required: []`,
+//     `additionalProperties: false`, `_x` hatch). No corpus fixture carries a
+//     spine; requiring anything here would break every fixture to enforce a
+//     prompt rule, and the sealed-corpus rule forbids editing them back green.
+//   - GENERATION POLICY demands it: the structured stage schema requires it and
+//     the closure floors BLOCK at the stage gates (D111 derived-or-strict).
+//
+// Sub-objects follow the manifestPointer idiom — optional everywhere, but when
+// an object IS present the fields that make it mean something are required. An
+// edge with a `from` and no `to` is not a half-edge; it is a typo that reads as
+// a record and checks as nothing.
+var spineComposition = {
+  type: 'array',
+  items: {
+    type: 'object',
+    // Both required by the same argument: `entry` is the machine handle the
+    // floors and the W4b sim index by, `role` is what this entry does IN THIS
+    // BOOK — the sentence that stops a composition from being a parts list.
+    required: ['entry', 'role'],
+    additionalProperties: false,
+    properties: {
+      entry: { enum: LUDIC_LIBRARY },
+      role: nonEmptyString,
+      _x: xt
+    }
+  }
+};
+
+var spineEconomyGraph = {
+  type: 'array',
+  items: {
+    type: 'object',
+    // `currency` is deliberately NOT required. Not every edge is a payment: a
+    // door gating a branch and a key opening a seal both move the player
+    // without spending anything, and demanding a currency there would make the
+    // model invent one — the silent-substitution failure this project names as
+    // its founding law.
+    required: ['from', 'to'],
+    additionalProperties: false,
+    properties: {
+      from: nonEmptyString,
+      to: nonEmptyString,
+      currency: { type: 'string' },
+      // ── The three W5a completions (the sim's contact findings) ───────────
+      // Each is optional at the artifact level and STRICT WHEN PRESENT, the
+      // manifestPointer idiom: a half-declared price is a number that reads as
+      // a record and checks as nothing.
+      //
+      // `branch` — which side of a fork carries this edge (`door:W3/A`). The
+      // W4b sim could only report "reachable through a door, and the spine does
+      // not say which side"; with attribution it walks each branch and returns
+      // a real per-branch verdict. Absence is still legal and still reported.
+      //
+      // TYPED AS A STRING, NOT PATTERN-GATED, and deliberately: `from` and `to`
+      // are plain strings here too, with the ref grammar enforced by the floors
+      // through parseSurfaceRef — which matches CASE-INSENSITIVELY. A JSON
+      // Schema `pattern` has no such flag, so pinning BRANCH_REF_PATTERN here
+      // would make the schema reject `Door:W3/a` while the resolver happily
+      // parses it: two authorities disagreeing about one grammar, which is the
+      // defect class this whole file exists to make impossible. The pattern is
+      // still the single source — the prompt quotes it and the floor derives
+      // its check from parseBranchRef.
+      branch: nonEmptyString,
+      // `price` — what this spend COSTS, IN MARKS. Marks, not the printed
+      // currency label, because the mark is the only unit the machine economy
+      // has: session markStrip targets are counted in them and the derived boss
+      // threshold is expressed in them (RECKONING_THRESHOLD_RATIO × attainable
+      // ticks). A price in "Relief" would be a second unit with no conversion
+      // anywhere in the schema, and the sim would have to guess. The page still
+      // prints the fiction's own currency; this is the machine-readable half of
+      // the sentence the reckoning panel already states in prose.
+      price: { type: 'integer', minimum: 1 },
+      // `closesAtWeek` — the last week this affordance can be taken. In a
+      // pencil book nothing expires by default (a region drawn in week 2 is
+      // still on the page in week 6), so before this the stingy schedule had
+      // exactly two real deadlines — seals and the endgame — and every other
+      // spend floored at the last week. A declared window is what makes
+      // hoarding cost something.
+      closesAtWeek: { type: 'integer', minimum: 1 },
+      _x: xt
+    }
+  }
+};
+
+// ── The harvest declarations (W5a, tranche 1) ───────────────────────────────
+// Three tier-2 patterns from the Ludic Library registry, each landing as a
+// DECLARATION rather than as printed content — which is the line this tranche
+// holds. The spine has always been renderer-inert: it declares things about
+// surfaces the book prints, it is not itself a surface. A declaration that
+// needs its own printed geometry is not schema-light, and the registry's
+// `printed-hint-band` entry records the one that therefore did not land.
+//
+// Every declaration that promises the player will READ something carries a
+// `printedOn` surface ref, and the floors resolve it against the book's own
+// index. That is what stops these from being paperwork: the model cannot
+// declare a hint ladder without naming the printed page the rungs live on, and
+// a ref that resolves to nothing blocks at the stage gate.
+
+var spineHintLadder = {
+  type: 'object',
+  // All four required when present. A rung with no cost is a free hint (which
+  // is a walkthrough), and a ladder with no printedOn is a promise about a page
+  // nobody can find.
+  required: ['puzzle', 'printedOn', 'rungs'],
+  additionalProperties: false,
+  properties: {
+    // The surface the player is stuck on — a cipher, a seal, a map, an oracle.
+    puzzle: nonEmptyString,
+    // Where the rungs are actually printed. Usually the puzzle's own page.
+    printedOn: nonEmptyString,
+    // ── The band's own heading (W5b) ────────────────────────────────────
+    // W5a declared the ladder; W5b gives it a printed surface, and a printed
+    // surface needs a heading the fiction can own. Diegetic UI is
+    // non-negotiable for anything on paper (CLAUDE.md, Design Principles 1),
+    // so the alternative was an engine-fixed English label — "IF YOU ARE
+    // STUCK" — on every band in every book regardless of genre, which is the
+    // house-aesthetic failure the Chameleon Lens exists to prevent.
+    //
+    // OPTIONAL HERE, REQUIRED BY GENERATION POLICY: the artifactIntent
+    // severity split. The sealed corpus predates the spine entirely and must
+    // stay valid, and a hand-loaded book without one still renders — the band
+    // falls back to naming the puzzle it serves rather than inventing chrome.
+    label: { type: 'string' },
+    rungs: {
+      type: 'array',
+      minItems: SPINE_BUDGETS.hintRungsMin,
+      maxItems: SPINE_BUDGETS.hintRungsMax,
+      items: {
+        type: 'object',
+        required: ['cost', 'gives'],
+        additionalProperties: false,
+        properties: {
+          // What taking this rung costs, in the book's own terms ("tick the
+          // Watch", "two marks", "cross out the western route"). Prose, because
+          // the cost is paid on a printed surface whose unit varies per book —
+          // unlike a spend price, which is always marks.
+          cost: nonEmptyString,
+          // What the rung gives: a nudge, then a method, then the answer.
+          gives: nonEmptyString,
+          _x: xt
+        }
+      }
+    },
+    _x: xt
+  }
+};
+
+var spineMilestone = {
+  type: 'object',
+  required: ['label', 'at', 'unlocks', 'printedOn'],
+  additionalProperties: false,
+  properties: {
+    label: nonEmptyString,
+    // The count that opens it, in whatever the book counts — marks banked,
+    // regions opened, fragments decoded. An integer because a milestone the
+    // player cannot check against a number is a mood.
+    at: { type: 'integer', minimum: 1 },
+    // What becomes available: a surface ref. The floor requires a consequence
+    // edge to answer it — an unlocked theory nothing responds to is the unpaid
+    // promise in miniature.
+    unlocks: nonEmptyString,
+    printedOn: nonEmptyString,
+    _x: xt
+  }
+};
+
+var spineLegacyMove = {
+  type: 'object',
+  required: ['move', 'printedOn'],
+  additionalProperties: false,
+  properties: {
+    move: { enum: VALID_LEGACY_MOVES },
+    printedOn: nonEmptyString,
+    // What the move makes permanent, in one clause. Optional: the enum already
+    // says what KIND of permanence this is, and forcing a sentence would buy a
+    // restatement of the enum in most books.
+    makesPermanent: { type: 'string' },
+    _x: xt
+  }
+};
+
+var spineConsequenceEdges = {
+  type: 'array',
+  items: {
+    type: 'object',
+    required: ['source', 'answeredBy'],
+    additionalProperties: false,
+    properties: {
+      source: nonEmptyString,
+      answeredBy: nonEmptyString,
+      // The echo law's clock. 0 = answered in the same week. The ceiling is
+      // SPINE_BUDGETS.consequenceWithinWeeksMax because an answer three weeks
+      // out is not an echo — it is a coincidence the player stopped waiting for.
+      withinWeeks: {
+        type: 'integer',
+        minimum: 0,
+        maximum: SPINE_BUDGETS.consequenceWithinWeeksMax
+      },
+      _x: xt
+    }
+  }
+};
+
+var spineDecisionLedger = {
+  type: 'array',
+  items: {
+    type: 'object',
+    required: ['fork', 'differsBy'],
+    additionalProperties: false,
+    properties: {
+      fork: nonEmptyString,
+      // What MECHANICALLY differs across the fork. A door the ledger cannot
+      // describe is flavor-only by definition (PLAY.md §2) — and the floor
+      // that holds this reads for a named surface, not an adjective.
+      differsBy: nonEmptyString,
+      _x: xt
+    }
+  }
+};
+
+var spineTensionBudget = {
+  type: 'array',
+  items: {
+    type: 'object',
+    // Only `week` is required. An absent axis is a DECLARATION that this week
+    // has nothing scarce (or nothing losable, or no way to fall behind), which
+    // is a legitimate shape — a deload week is exactly that. The floor asks for
+    // at least one named axis per week, not all three.
+    required: ['week'],
+    additionalProperties: false,
+    properties: {
+      week: { type: 'integer', minimum: 1 },
+      scarce: { type: 'string' },
+      losable: { type: 'string' },
+      fallBehind: { type: 'string' },
+      _x: xt
+    }
+  }
+};
+
+var spineDifficultyCurve = {
+  type: 'object',
+  required: [],
+  additionalProperties: false,
+  properties: {
+    // The sudoku-academy law is "where the brief warrants", never "always".
+    // `keyedToLoad: false` is a legitimate, recorded answer — a book whose
+    // difficulty runs against the load curve on purpose is not a defect, and
+    // making the field required-true would have made it one.
+    keyedToLoad: { type: 'boolean' },
+    shape: { type: 'string' },
+    perWeek: { type: 'array', items: { type: 'string' } },
+    _x: xt
+  }
+};
+
+var playSpine = {
+  type: 'object',
+  required: [],
+  additionalProperties: false,
+  properties: {
+    composition: spineComposition,
+    // What the brief wanted that the library lacks. The honest-when-lacking law
+    // made a recorded surface: "fail loudly, never silently substitute" applied
+    // to genre. A model that wants a deck-builder says so here instead of
+    // dressing the reckoning economy up as one.
+    honestGaps: { type: 'array', items: nonEmptyString },
+    economyGraph: spineEconomyGraph,
+    consequenceEdges: spineConsequenceEdges,
+    decisionLedger: spineDecisionLedger,
+    tensionBudget: spineTensionBudget,
+    difficultyCurve: spineDifficultyCurve,
+    // ── The harvest (W5a) ────────────────────────────────────────────────
+    // gateStructure is REQUIRED by generation policy and optional here, the
+    // artifactIntent severity split exactly: the structured stage literal
+    // demands it and the closure floors read it back off the graph, while the
+    // sealed corpus — which predates the spine entirely — stays valid.
+    gateStructure: { enum: VALID_GATE_STRUCTURES },
+    hintLadders: {
+      type: 'array', maxItems: SPINE_BUDGETS.hintLaddersMax, items: spineHintLadder
+    },
+    milestones: {
+      type: 'array', maxItems: SPINE_BUDGETS.milestonesMax, items: spineMilestone
+    },
+    legacyMoves: { type: 'array', items: spineLegacyMove },
+    _x: xt
+  }
+};
+
+// ── fusionBeat (FUSION §4.1's fusion score, promoted from G-class) ──────────
+// "The plan declares, per week, how this week's training texture IS this week's
+// story texture — a fusionBeat — plus a dynamic marking (which weeks are loud,
+// which sparse)." That has been doctrine since FUSION was written and nothing
+// stored it: the compiler was asked to think in beats and the answer went
+// nowhere. This is the storage.
+//
+// Both fields required when the object is present, because a marking with no
+// beat marks nothing and a beat with no marking is the prose the score was
+// supposed to shape. Optional at the artifact level like everything else added
+// after the corpus was sealed.
+var fusionBeat = {
+  type: 'object',
+  required: ['beat', 'marking'],
+  additionalProperties: false,
+  properties: {
+    beat: nonEmptyString,
+    marking: { enum: VALID_DYNAMIC_MARKINGS },
+    _x: xt
+  }
+};
+
 export var BOOKLET_SCHEMA = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   $id: 'https://liftrpg.co/contracts/booklet/v' + SCHEMA_VERSION,
@@ -580,6 +919,7 @@ export var BOOKLET_SCHEMA = {
         },
         artifactIntent: artifactIntent,
         processParticulars: processParticulars,
+        playSpine: playSpine,
         economy: economy,
         weeklyComponentType: nonEmptyString,
         weekCount: { type: 'integer', minimum: 1 },
@@ -648,6 +988,7 @@ export var BOOKLET_SCHEMA = {
         overflowDocument: { $ref: '#/$defs/fragment' },
         interlude: { $ref: '#/$defs/interlude' },
         gameplayClocks: { type: 'array', items: { $ref: '#/$defs/gameplayClock' } },
+        fusionBeat: fusionBeat,
         _x: xt
       },
       allOf: [
@@ -712,7 +1053,213 @@ export var BOOKLET_SCHEMA = {
         mapState: { $ref: '#/$defs/mapState' },
         cipher: { $ref: '#/$defs/cipher' },
         oracleTable: { $ref: '#/$defs/oracleTable' },
-        companionComponents: { type: 'array', items: { $ref: '#/$defs/companionComponent' } }
+        companionComponents: { type: 'array', items: { $ref: '#/$defs/companionComponent' } },
+        // ── The puzzle grids (W5b) ─────────────────────────────────────────
+        // ADDITIVE-OPTIONAL, the artifactIntent severity split exactly: the
+        // ARTIFACT contract accepts a week with neither (every corpus fixture
+        // predates them and the sealed-corpus rule forbids editing them green),
+        // while GENERATION POLICY offers them from the week menu and the stage
+        // gate REFUSES a puzzle the solver cannot prove.
+        constrainedGrid: { $ref: '#/$defs/constrainedGrid' },
+        wordGrid: { $ref: '#/$defs/wordGrid' }
+      }
+    },
+
+    // ── constrainedGrid (W5b) ───────────────────────────────────────────────
+    // A logic grid or a nonogram, and the FIRST content in this schema whose
+    // correctness is decidable. contracts/puzzle-solvers.mjs proves solvable,
+    // unique and key-matched at the stage gate; this block is only the shape.
+    //
+    // THE ANSWER KEY LIVES HERE AND IS NEVER PRINTED. `answer` (and, for a
+    // word grid, the placements) are what the gate checks the puzzle against —
+    // renderer-inert, the same class as meta.processParticulars (D103). An
+    // atom that renders them has printed the solution next to the puzzle.
+    //
+    // `difficulty` is MACHINE-WRITTEN. The solver measures it and assembly.js
+    // stamps it; the prompt never mentions it, so the model never authors one.
+    // It exists so a later wave can key puzzle hardness to the load curve (the
+    // sudoku-academy law) without re-solving every puzzle to find out how hard
+    // it was. W5b records it and consumes nothing.
+    constrainedGrid: {
+      type: 'object',
+      required: ['kind', 'title', 'answer', 'answerFrom'],
+      additionalProperties: false,
+      properties: {
+        kind: { enum: VALID_CONSTRAINED_GRID_KINDS },
+        title: nonEmptyString,
+        // Printed above the grid: what the player does and what the grid yields.
+        instruction: { type: 'string' },
+        answer: nonEmptyString,
+        answerFrom: {
+          type: 'object',
+          required: ['mode'],
+          additionalProperties: false,
+          properties: {
+            mode: { enum: VALID_LOGIC_ANSWER_MODES.concat(VALID_NONOGRAM_ANSWER_MODES) },
+            category: { type: 'string' },
+            subject: { type: 'string' }
+          }
+        },
+        difficulty: { $ref: '#/$defs/puzzleDifficulty' },
+
+        // ── logic-grid ──────────────────────────────────────────────────────
+        subjects: {
+          type: 'array',
+          minItems: G.logicGrid.minSubjects,
+          maxItems: G.logicGrid.renderMaxSubjects,
+          items: nonEmptyString
+        },
+        categories: {
+          type: 'array',
+          minItems: 1,
+          maxItems: G.logicGrid.maxCategories,
+          items: {
+            type: 'object',
+            required: ['name', 'values'],
+            additionalProperties: false,
+            properties: {
+              name: nonEmptyString,
+              values: {
+                type: 'array',
+                minItems: G.logicGrid.minSubjects,
+                maxItems: G.logicGrid.renderMaxSubjects,
+                items: nonEmptyString
+              }
+            }
+          }
+        },
+        clues: {
+          type: 'array',
+          minItems: G.logicGrid.minClues,
+          maxItems: G.logicGrid.maxClues,
+          items: {
+            type: 'object',
+            // BOTH required, and this is the whole design: `text` is what the
+            // player reads, `constraint` is what the solver reads, and a clue
+            // with only one of them is either unprintable or unprovable.
+            required: ['text', 'constraint'],
+            additionalProperties: false,
+            properties: {
+              text: nonEmptyString,
+              constraint: {
+                type: 'object',
+                required: ['type'],
+                additionalProperties: false,
+                properties: {
+                  type: { enum: VALID_LOGIC_CLUE_TYPES },
+                  subject: { type: 'string' },
+                  category: { type: 'string' },
+                  value: { type: 'string' },
+                  otherCategory: { type: 'string' },
+                  otherValue: { type: 'string' }
+                }
+              }
+            }
+          }
+        },
+
+        // ── nonogram ────────────────────────────────────────────────────────
+        rowClues: {
+          type: 'array',
+          minItems: 3,
+          maxItems: G.nonogram.renderMaxSize,
+          items: { type: 'array', minItems: 1, items: { type: 'integer', minimum: 1 } }
+        },
+        colClues: {
+          type: 'array',
+          minItems: 3,
+          maxItems: G.nonogram.renderMaxSize,
+          items: { type: 'array', minItems: 1, items: { type: 'integer', minimum: 1 } }
+        },
+        // One character per cell, "." for a cell that carries none. Sparse on
+        // purpose — see the solver header: lettering every cell would chain the
+        // key's length to the picture's fill count.
+        letterGrid: {
+          type: 'array',
+          minItems: 3,
+          maxItems: G.nonogram.renderMaxSize,
+          items: { type: 'string', pattern: '^[A-Za-z0-9.]+$' }
+        }
+      },
+      allOf: [
+        {
+          if: { properties: { kind: { const: 'logic-grid' } }, required: ['kind'] },
+          then: { required: ['subjects', 'categories', 'clues'] }
+        },
+        {
+          if: { properties: { kind: { const: 'nonogram' } }, required: ['kind'] },
+          then: {
+            required: ['rowClues', 'colClues', 'letterGrid'],
+            properties: { answerFrom: { properties: { mode: { enum: VALID_NONOGRAM_ANSWER_MODES } } } }
+          }
+        }
+      ]
+    },
+
+    // ── wordGrid (W5b) ──────────────────────────────────────────────────────
+    // A word search: a printed letter grid, a word list, and a declared
+    // placement per word. The placements are the ANSWER KEY — never printed —
+    // and they are what lets the gate prove every word is genuinely in the
+    // grid the player holds and that the leftover letters really do spell the
+    // key. Crisscross and the dense crossword stay in the registry's tier 3
+    // until their own solver floors can be real.
+    wordGrid: {
+      type: 'object',
+      required: ['kind', 'title', 'grid', 'words', 'answer', 'answerFrom'],
+      additionalProperties: false,
+      properties: {
+        kind: { enum: VALID_WORD_GRID_KINDS },
+        title: nonEmptyString,
+        instruction: { type: 'string' },
+        grid: {
+          type: 'array',
+          minItems: 4,
+          maxItems: G.wordSearch.renderMaxSize,
+          items: { type: 'string', pattern: '^[A-Za-z]+$' }
+        },
+        words: {
+          type: 'array',
+          minItems: 1,
+          maxItems: G.wordSearch.maxWords,
+          items: {
+            type: 'object',
+            required: ['word', 'row', 'col', 'direction'],
+            additionalProperties: false,
+            properties: {
+              word: { type: 'string', minLength: G.wordSearch.wordMinChars,
+                maxLength: G.wordSearch.wordMaxChars, pattern: '^[A-Za-z]+$' },
+              // 1-based, so the JSON reads like the printed grid's own
+              // coordinates rather than like an array index.
+              row: { type: 'integer', minimum: 1, maximum: G.wordSearch.renderMaxSize },
+              col: { type: 'integer', minimum: 1, maximum: G.wordSearch.renderMaxSize },
+              direction: { enum: VALID_WORD_SEARCH_DIRECTIONS }
+            }
+          }
+        },
+        answer: nonEmptyString,
+        answerFrom: {
+          type: 'object',
+          required: ['mode'],
+          additionalProperties: false,
+          properties: {
+            mode: { enum: VALID_WORD_GRID_ANSWER_MODES },
+            index: { type: 'integer', minimum: 1 }
+          }
+        },
+        difficulty: { $ref: '#/$defs/puzzleDifficulty' }
+      }
+    },
+
+    // Machine-written, never authored. `basis` names WHICH instrument produced
+    // the number, because a score with no unit is a number two puzzles can
+    // both call 7 while meaning different things.
+    puzzleDifficulty: {
+      type: 'object',
+      required: ['score', 'basis'],
+      additionalProperties: false,
+      properties: {
+        score: { type: 'integer', minimum: 0 },
+        basis: { type: 'string', minLength: 1 }
       }
     },
 
