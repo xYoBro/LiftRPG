@@ -159,6 +159,16 @@ function asArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+/**
+ * The kinds that print a square of digit cells. They share a render, an
+ * estimate and an answer rule; what differs is the furniture drawn inside the
+ * cells (a sudoku's box rules, a kakuro's sums, a KenKen's cage borders), and
+ * none of that furniture changes the geometry — every one of them is painted
+ * inside a cell that already has its size. That is why they need no ladder
+ * tokens of their own.
+ */
+const FILLED_GRID_KINDS = { sudoku: 1, kakuro: 1, kenken: 1 };
+
 // ---------------------------------------------------------------------------
 // Geometry
 // ---------------------------------------------------------------------------
@@ -238,6 +248,33 @@ function cluesHeight(grid, tier, metrics) {
   return total + Math.max(0, clues.length - 1) * tier.clueGapPx;
 }
 
+/**
+ * The filled grids' frame — sudoku, kakuro, KenKen.
+ *
+ * All three print the same object: a square of cells the player writes digits
+ * into, with no label column and no clue list. The height is therefore exactly
+ * the matrix, and the estimate is exact rather than modelled — there is no text
+ * to wrap. Kakuro's sums and KenKen's cage targets are drawn INSIDE cells that
+ * already have their height, so neither costs a row.
+ *
+ * CROSS-FILE CONTRACT — mirrors renderFilledGrid() below.
+ */
+function filledGridHeight(grid, tier) {
+  const rows = filledGridRowCount(grid);
+  if (!rows) return 0;
+  return rows * tier.cellPx + Math.max(0, rows - 1) * tier.gapPx;
+}
+
+/** How many rows the printed board has, per kind. */
+function filledGridRowCount(grid) {
+  if (grid.kind === 'sudoku') {
+    return Number(grid.boxWidth) * Number(grid.boxHeight) || asArray(grid.givens).length;
+  }
+  if (grid.kind === 'kakuro') return asArray(grid.layout).length;
+  if (grid.kind === 'kenken') return Number(grid.size) || 0;
+  return 0;
+}
+
 /** Modelled zone height for one constrained grid at one ladder tier. */
 function gridHeightAt(grid, tier, metrics) {
   let height = TITLE_PX;
@@ -248,8 +285,16 @@ function gridHeightAt(grid, tier, metrics) {
       * tier.instrLinePx + tier.blockGapPx;
   }
 
+  // AN EXPLICIT DISPATCH, NOT AN `else`. Until the arsenal wave this was a
+  // binary — nonogram or "the logic grid path" — and a kind the enum gained
+  // would have been modelled as a logic grid with no subjects: an estimate of
+  // zero for a board that prints. The unknown kind now contributes the title
+  // and the instruction and nothing else, which is what an atom that cannot
+  // draw the body honestly costs.
   if (grid.kind === 'nonogram') {
     height += nonogramFrameHeight(grid, tier);
+  } else if (FILLED_GRID_KINDS[grid.kind]) {
+    height += filledGridHeight(grid, tier);
   } else {
     height += logicMatrixHeight(grid, tier, metrics);
     const clues = cluesHeight(grid, tier, metrics);
@@ -340,6 +385,122 @@ function renderNonogram(grid) {
   return frame;
 }
 
+/**
+ * The operator a cage prints. Words on the wire, glyphs on the page — the enum
+ * has to survive JSON, a prompt menu and a parity scan that reads lowercase
+ * tokens, and the player has to see the sign every printed KenKen uses.
+ */
+const CAGE_GLYPH = {
+  add: '+', subtract: '−', multiply: '×', divide: '÷', fixed: ''
+};
+
+/**
+ * The filled grids — sudoku, kakuro, KenKen.
+ *
+ * CROSS-FILE CONTRACT — mirrors filledGridHeight() above: one row of cells per
+ * board row and nothing else in the vertical. Every piece of furniture here
+ * (box rules, sum numbers, cage borders and targets) is painted INSIDE a cell
+ * that already has its height, or is a border on a `box-sizing: border-box`
+ * cell, so none of it can move the geometry the estimate promised. Keep it that
+ * way: a sum printed ABOVE the grid instead of inside its block cell would be
+ * the D71 defect class with a friendly face.
+ *
+ * The cells are the same `.cgrid-cell` the logic grid uses, so the pencil floor
+ * and the write-in aperture are inherited rather than re-declared.
+ */
+function renderFilledGrid(grid) {
+  const frame = make('div', 'fgrid');
+  const rows = filledGridRowCount(grid);
+  if (!rows) return frame;
+
+  if (grid.kind === 'sudoku') {
+    const bw = Number(grid.boxWidth);
+    const bh = Number(grid.boxHeight);
+    const givens = asArray(grid.givens);
+    for (let r = 0; r < rows; r++) {
+      const line = make('div', 'fgrid-row');
+      const text = String(givens[r] || '');
+      for (let c = 0; c < rows; c++) {
+        const ch = text.charAt(c);
+        const cls = ['cgrid-cell', 'fgrid-cell'];
+        if (ch && ch !== '.') cls.push('fgrid-given');
+        if (bw && (c + 1) % bw === 0 && c !== rows - 1) cls.push('fgrid-box-r');
+        if (bh && (r + 1) % bh === 0 && r !== rows - 1) cls.push('fgrid-box-b');
+        line.appendChild(make('div', cls.join(' '), ch && ch !== '.' ? ch : ''));
+      }
+      frame.appendChild(line);
+    }
+    return frame;
+  }
+
+  if (grid.kind === 'kakuro') {
+    const layout = asArray(grid.layout).map(String);
+    const width = layout.length ? layout[0].length : 0;
+    const byCell = {};
+    asArray(grid.sums).forEach((entry) => {
+      byCell[(Number(entry.row) - 1) + ':' + (Number(entry.col) - 1)] = entry || {};
+    });
+    for (let r = 0; r < rows; r++) {
+      const line = make('div', 'fgrid-row');
+      for (let c = 0; c < width; c++) {
+        if (layout[r].charAt(c) !== '#') {
+          line.appendChild(make('div', 'cgrid-cell fgrid-cell'));
+          continue;
+        }
+        const block = make('div', 'cgrid-cell fgrid-cell fgrid-block');
+        const sum = byCell[r + ':' + c];
+        if (sum && sum.right != null) {
+          block.appendChild(make('span', 'fgrid-sum fgrid-sum-right', String(sum.right)));
+        }
+        if (sum && sum.down != null) {
+          block.appendChild(make('span', 'fgrid-sum fgrid-sum-down', String(sum.down)));
+        }
+        if (sum && (sum.right != null || sum.down != null)) block.classList.add('fgrid-block-clued');
+        line.appendChild(block);
+      }
+      frame.appendChild(line);
+    }
+    return frame;
+  }
+
+  // KenKen: a heavy border wherever a cell's neighbour belongs to another cage,
+  // and the target printed in the cage's first cell reading order.
+  const size = rows;
+  const owner = new Array(size * size).fill(-1);
+  const cages = asArray(grid.cages);
+  cages.forEach((cage, k) => {
+    asArray((cage || {}).cells).forEach((cell) => {
+      const idx = (Number(cell.row) - 1) * size + (Number(cell.col) - 1);
+      if (idx >= 0 && idx < owner.length) owner[idx] = k;
+    });
+  });
+  const anchor = {};
+  for (let i = 0; i < owner.length; i++) {
+    if (owner[i] !== -1 && anchor[owner[i]] === undefined) anchor[owner[i]] = i;
+  }
+  for (let r = 0; r < size; r++) {
+    const line = make('div', 'fgrid-row');
+    for (let c = 0; c < size; c++) {
+      const idx = r * size + c;
+      const k = owner[idx];
+      const cls = ['cgrid-cell', 'fgrid-cell'];
+      if (c === 0 || owner[idx - 1] !== k) cls.push('fgrid-cage-l');
+      if (c === size - 1 || owner[idx + 1] !== k) cls.push('fgrid-cage-r');
+      if (r === 0 || owner[idx - size] !== k) cls.push('fgrid-cage-t');
+      if (r === size - 1 || owner[idx + size] !== k) cls.push('fgrid-cage-b');
+      const cell = make('div', cls.join(' '));
+      if (k !== -1 && anchor[k] === idx) {
+        const cage = cages[k] || {};
+        cell.appendChild(make('span', 'fgrid-target',
+          String(cage.target == null ? '' : cage.target) + (CAGE_GLYPH[cage.operation] || '')));
+      }
+      line.appendChild(cell);
+    }
+    frame.appendChild(line);
+  }
+  return frame;
+}
+
 registerAtom('constrained-grid', {
   defaultSizeHint: 'half-page',
   canShare: true,
@@ -379,8 +540,14 @@ registerAtom('constrained-grid', {
       el.appendChild(make('div', 'cgrid-instruction', String(grid.instruction)));
     }
 
+    // The same explicit dispatch estimate() uses, and it has to be the same or
+    // the two disagree about which body is drawn — which is the one divergence
+    // this atom cannot survive, since measurement and render read this function
+    // and that one respectively.
     if (grid.kind === 'nonogram') {
       el.appendChild(renderNonogram(grid));
+    } else if (FILLED_GRID_KINDS[grid.kind]) {
+      el.appendChild(renderFilledGrid(grid));
     } else {
       el.appendChild(renderLogicMatrix(grid));
       const clues = asArray(grid.clues);

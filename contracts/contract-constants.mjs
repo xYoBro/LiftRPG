@@ -1406,10 +1406,13 @@ export var LUDIC_LIBRARY = [
   // W5b — the harvest's first PROMOTION. `deduction-board` was tier 3 (needs a
   // new primitive) until the constrained-grid atom and its solver landed; it is
   // named for what it plays, not for the file, exactly like every entry above.
-  // What is still tier 3 is the ARITHMETIC grid (kakuro, KenKen), which needs a
-  // different solver — see contracts/ludic-library.mjs.
-  'deduction-board',    // the logic grid and the nonogram, proven solvable
-  'word-hunt'           // the letter board, every word machine-verified in it
+  'deduction-board',    // the logic grid, the nonogram and the sudoku, proven solvable
+  'word-hunt',          // the letter board, every word machine-verified in it
+  // The arsenal wave's promotion, closing W5b's one stated deferral: kakuro and
+  // KenKen have their solvers. It is a SEPARATE entry from the deduction board
+  // because it asks a different verb — the player adds, rather than eliminates
+  // — and these entries are named for what they play.
+  'arithmetic-grid'     // kakuro and KenKen, every filling proven unique
 ];
 
 // ── The harvest patterns, as an acceptance set (D144) ───────────────────────
@@ -1452,8 +1455,13 @@ export var LUDIC_LIBRARY_ATOMS = {
   'sealed-cache': ['fragment-doc'],
   'boss-convergence': ['boss-encounter', 'assembly-page', 'ending'],
   'ledger-audit': ['ledger-spread'],
+  // Two entries, one atom, and that is correct rather than a smell: the atom is
+  // the printed object and the entry is the play. `constrained-grid` draws a
+  // matrix of pencil cells; whether the player eliminates in it or adds in it is
+  // the thing a composition is choosing between.
   'deduction-board': ['constrained-grid'],
-  'word-hunt': ['word-grid']
+  'word-hunt': ['word-grid'],
+  'arithmetic-grid': ['constrained-grid']
 };
 
 // ── Spine budgets ───────────────────────────────────────────────────────────
@@ -1555,12 +1563,38 @@ export var VALID_LEGACY_MOVES = [
 // puzzle the gate cannot refuse, and an unrefusable puzzle is one the player
 // discovers is broken at the gym.
 //
-// KAKURO AND KENKEN ARE DELIBERATELY ABSENT, and so is the dense crossword.
-// The registry entries name them; this enum does not, because a family whose
-// solver has not been written is a family the schema must not accept. When one
-// lands, it is one enum value, one solver branch, and one prompt menu row.
+// THE DENSE CROSSWORD IS DELIBERATELY ABSENT. The registry entry names it; this
+// enum does not, because a family whose solver has not been written is a family
+// the schema must not accept. When one lands, it is one enum value, one solver
+// branch, and one prompt menu row — which is exactly what the arsenal wave did
+// for the three filled grids below, closing the W5b deferral that named them.
+//
+// `sudoku`, `kakuro` and `kenken` share one printed object (a matrix the player
+// writes DIGITS into) and therefore one answer rule; they do not share a
+// solver, because a Latin square, a constrained integer partition and a caged
+// arithmetic square are three different proofs.
 
-export var VALID_CONSTRAINED_GRID_KINDS = ['logic-grid', 'nonogram'];
+export var VALID_CONSTRAINED_GRID_KINDS = [
+  'logic-grid', 'nonogram', 'sudoku', 'kakuro', 'kenken'
+];
+
+// The filled grids' only answer mode, and the reasoning is the nonogram's: a
+// solved digit rectangle has exactly one machine-executable reading — name the
+// cells and the order, and the digits found there are the key. "The main
+// diagonal" and "the third row" are special cases of that list, and each would
+// be another rule and another way to be wrong.
+export var VALID_FILLED_GRID_ANSWER_MODES = ['cells'];
+
+// KenKen's cage operations, as WORDS rather than glyphs. The printed page draws
+// the conventional + − × ÷ from the word; the wire carries the word, because
+// the enum has to survive a JSON round trip, a prompt menu, and a parity scan
+// that reads quoted lowercase tokens. `fixed` is the one-cell cage.
+//
+// MIRRORED BY `KENKEN_OPERATIONS` in contracts/puzzle-solvers.mjs, which cannot
+// import this file (it is dependency-free by construction so it can run at both
+// gates). `puzzleSolverVocabularyParity()` in validate.mjs holds the two equal,
+// along with the two older pairs that had no such guard until this wave.
+export var VALID_KENKEN_OPERATIONS = ['add', 'subtract', 'multiply', 'divide', 'fixed'];
 
 // The four clue forms a logic grid may carry. Closed, and closed on purpose:
 // each one is a propagation rule in the solver AND a way the puzzle can be
@@ -2212,6 +2246,44 @@ export var SPATIAL_GUARDRAILS = {
     maxWords: 10,
     wordMinChars: 3,
     wordMaxChars: 12
+  },
+  // ── The filled grids (the arsenal wave) ───────────────────────────────────
+  // A sudoku's side is boxWidth x boxHeight, so the printable set is 4 (2x2),
+  // 6 (3x2) and 9 (3x3). SINGLE TIER at 9: the classic grid is the ceiling of
+  // the family, not a render limit that generation is being kept under, and a
+  // 12x12 variant is a different puzzle rather than a bigger one.
+  //
+  // THE BLANK FLOOR IS THE REAL GUARDRAIL. A 9x9 printed with 60 givens is
+  // solvable, unique and key-matched — it passes every clause of the solver law
+  // and is still not a puzzle, because it is finished by reading it. Half the
+  // cells blank is the line, and it is stated as a PERCENTAGE so it means the
+  // same thing on all three board sizes.
+  sudoku: {
+    minSide: 4,
+    maxSide: 9,
+    minBlankPercent: 50
+  },
+  // Kakuro counts its clue frame: the top row and left column are block cells
+  // that carry the sums, so a 5x5 is a 4x4 of writable cells. Two-tier like ptp
+  // — the render absorbs a wider grid than generation asks for, and the corpus
+  // should not reject a good hand-authored one.
+  kakuro: {
+    minSize: 5,
+    maxSize: 9,
+    renderMaxSize: 11,
+    maxRunLength: 9
+  },
+  // KenKen's cost is the CAGE, not the board: propagation enumerates every
+  // filling of every cage each round, which is size^cells. Four cells is the
+  // ceiling for that reason and the board stops at 6 for generation. The render
+  // ceiling is 7 rather than the solver's own 9, because a 9x9 caged square is
+  // provable but not printable at half-letter — the two limits are different
+  // questions and this one is the page's.
+  kenken: {
+    minSize: 3,
+    maxSize: 6,
+    renderMaxSize: 7,
+    maxCageCells: 4
   }
 };
 

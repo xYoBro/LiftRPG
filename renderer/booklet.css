@@ -3147,6 +3147,12 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   --cgrid-instr-size:5.9pt;
   --cgrid-instr-leading:1.3;
   --cgrid-block-gap:6px;
+  /* A WEIGHT, NOT A LENGTH, and deliberately outside the parsed ladder mirror:
+     the filled grids' box and cage rules are borders on border-box cells, so
+     this cannot move a pixel of height and an estimate that ignores it is still
+     right. Every other token here is in the mirror because every other token
+     here is geometry. */
+  --cgrid-rule-heavy:2px;
   display:flex;
   flex-direction:column;
 }
@@ -3268,6 +3274,86 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   text-align:center;
   color:var(--fog);
 }
+
+/* ── The filled grids — sudoku, kakuro, KenKen (the arsenal wave) ──
+   One printed object for three kinds: a square of `.cgrid-cell`s the player
+   writes digits into. They reuse the cell wholesale, which is deliberate — the
+   pencil floor, the write-in aperture and the density ladder are inherited
+   rather than re-declared, so a fourth digit family gets them for free.
+
+   NOTHING IN THIS BLOCK MAY CHANGE A CELL'S SIZE, and that is the contract with
+   filledGridHeight() in atoms/constrained-grid.js: the estimate is
+   rows x --cgrid-cell plus the gaps, exactly, with no text term because there is
+   no text to wrap. Every rule below is a BORDER on a border-box cell or ink
+   painted inside one. `--cgrid-rule-heavy` is a weight, not a length, and is
+   outside the parsed ladder mirror for that reason — it cannot move a pixel of
+   height, so an estimate that ignored it would still be right.
+
+   The heavy rules read in B&W by weight alone (no hue is load-bearing), and
+   they sit on ONE side of each boundary, never both, so a box edge is a single
+   line rather than a doubled one. */
+.fgrid{
+  display:flex;
+  flex-direction:column;
+  gap:var(--cgrid-gap);
+}
+.fgrid-row{
+  display:flex;
+  gap:var(--cgrid-gap);
+  align-items:stretch;
+}
+.fgrid-cell{
+  position:relative;
+  font-family:var(--font-mono);
+  font-size:var(--cgrid-label-size);
+  line-height:var(--cgrid-cell);
+  text-align:center;
+  color:var(--ink);
+}
+/* A printed given is the puzzle, not the player's answer — so it is INK, and
+   the cells the pencil goes in are the empty ones. */
+.fgrid-given{
+  color:var(--ink);
+  font-weight:600;
+}
+/* Sudoku box rules: the right edge of a box's last column, the bottom edge of
+   its last row. Applied to one side only. */
+.fgrid-box-r{ border-right-width:var(--cgrid-rule-heavy); }
+.fgrid-box-b{ border-bottom-width:var(--cgrid-rule-heavy); }
+/* KenKen cage borders: every side whose neighbour is in another cage. */
+.fgrid-cage-l{ border-left-width:var(--cgrid-rule-heavy); }
+.fgrid-cage-r{ border-right-width:var(--cgrid-rule-heavy); }
+.fgrid-cage-t{ border-top-width:var(--cgrid-rule-heavy); }
+.fgrid-cage-b{ border-bottom-width:var(--cgrid-rule-heavy); }
+/* The cage target, in the cage's first cell reading order. Absolutely
+   positioned so it cannot push the cell's line box around. */
+.fgrid-target{
+  position:absolute;
+  top:0;
+  left:1px;
+  font-size:calc(var(--cgrid-label-size) * .82);
+  line-height:1.1;
+  color:var(--muted);
+}
+/* Kakuro block cells are the frame, not a writing surface: filled, and split by
+   a diagonal with the across total above it and the down total below. */
+.fgrid-block{
+  background:var(--fog);
+  overflow:hidden;
+}
+.fgrid-block-clued{
+  background-image:linear-gradient(to bottom right,
+    transparent calc(50% - .5px), var(--rule) calc(50% - .5px),
+    var(--rule) calc(50% + .5px), transparent calc(50% + .5px));
+}
+.fgrid-sum{
+  position:absolute;
+  font-size:calc(var(--cgrid-label-size) * .82);
+  line-height:1.1;
+  color:var(--ink);
+}
+.fgrid-sum-right{ top:0; right:1px; }
+.fgrid-sum-down{ bottom:0; left:1px; }
 
 /* ── Word grid — the letter hunt (W5b) ──
    A board of letters and the list hidden in it. Structure only; character

@@ -84,7 +84,25 @@ export var PUZZLE_SOLVER_BUDGETS = {
   // blows it contributes no forced cells rather than failing the run.
   nonogramLinePlacements: 50000,
   // Word search: cell comparisons the finder is allowed across all words.
-  wordSearchComparisons: 4000000
+  wordSearchComparisons: 4000000,
+  // ── The filled grids (the arsenal wave) ─────────────────────────────────
+  // Search nodes expanded across the whole uniqueness proof, one budget per
+  // family because the searches are shaped differently. A 9x9 sudoku at the
+  // guardrailed blank ratio line-solves or needs a shallow guess; 200k nodes is
+  // roughly two orders of magnitude of headroom over that, and a grid that
+  // wants more is a grid whose uniqueness the player cannot find either.
+  sudokuNodes: 200000,
+  // Kakuro searches a wider branching factor (nine digits, no givens at all),
+  // so it gets more room — but the combination propagation does most of the
+  // work and a well-formed grid rarely reaches four figures.
+  kakuroNodes: 400000,
+  // The per-run combination enumeration. C(9,4) = 126 at the widest useful run,
+  // so this is generous; a run that blows it contributes no propagation rather
+  // than failing the proof.
+  kakuroCombosPerRun: 20000,
+  // KenKen's cage enumeration is size^cells, capped by the guardrail at 6^4 =
+  // 1296 per cage per round; the node budget bounds the search around it.
+  kenkenNodes: 400000
 };
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -155,7 +173,15 @@ function permutations(n) {
 // one who took the west stair was not the one carrying the ledger"). A fifth
 // form would need a fifth propagation rule and a fifth way to be wrong.
 
-var LOGIC_CLUE_KINDS = ['is', 'not', 'same', 'differs'];
+// EXPORTED SO THE MIRROR CAN BE CHECKED. This file cannot import
+// contract-constants.mjs — it is dependency-free by construction so it can run
+// at both gates — so its closed vocabularies are unavoidably second copies of
+// enums that live there. Until the arsenal wave nothing held them equal, and
+// `puzzleSolverVocabularyParity()` in validate.mjs now does, in both
+// directions: a clue form the schema accepts and the solver cannot propagate is
+// a puzzle the gate waves through, and one the solver knows and the schema
+// rejects is a branch no book can reach.
+export var LOGIC_CLUE_KINDS = ['is', 'not', 'same', 'differs'];
 
 function indexOfCategory(puzzle, name) {
   var cats = asArray(puzzle.categories);
@@ -1112,6 +1138,1099 @@ export function verifyWordSearch(puzzle) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// THE FILLED GRIDS — sudoku, kakuro, KenKen  (the arsenal wave)
+// ════════════════════════════════════════════════════════════════════════════
+// Three families that share one printed object — a matrix of cells the player
+// writes DIGITS into — and therefore share the answer rule, the candidate
+// machinery and the shape of the proof. They were tier 3 in the Ludic Library
+// for exactly one reason, stated there: "a kakuro is a constrained integer
+// partition, which is neither [a permutation search nor a line-solve], and the
+// law is that nothing ships a puzzle a machine cannot finish." This section is
+// that missing proof.
+//
+// WHY ONE ANSWER MODE FOR ALL THREE. A solved filled grid is a rectangle of
+// digits, and the only machine-executable way to read a KEY off it is to name
+// the cells to read and the order to read them in. `answerFrom.mode` is
+// therefore `cells` everywhere here, with `cells: [{row, col}]` 1-based. Modes
+// like "the main diagonal" or "the third row" are special cases of that list
+// and would each be another rule and another way to be wrong; the list says the
+// same thing and says it in the puzzle rather than in the solver.
+//
+// THE CANDIDATE MACHINERY IS SHARED AND THE SEARCH IS NOT. All three carry a
+// bitmask of possible digits per cell, propagate to a fixpoint, then search the
+// cell with the fewest candidates first — but what propagates differs: sudoku
+// eliminates across its three unit families, kakuro intersects run-combination
+// tables, KenKen enumerates each cage. Sharing the frame keeps the uniqueness
+// proof one shape; keeping the propagators separate keeps each one obviously
+// correct, which is what a uniqueness proof has to be.
+//
+// SOUNDNESS OVER COMPLETENESS, EVERYWHERE. Every propagator here may leave work
+// undone; none may remove a digit that a real solution uses. Incomplete
+// propagation costs search nodes. Unsound propagation costs a uniqueness claim
+// that is false — the one failure mode this file exists to make impossible.
+
+/** Bitmask of digits 1..n. Bit (d-1) means digit d. */
+function digitMask(n) {
+  return (1 << n) - 1;
+}
+
+function popcount(mask) {
+  var count = 0;
+  var m = mask;
+  while (m) { m &= m - 1; count++; }
+  return count;
+}
+
+/** The single digit in a one-bit mask. Callers check popcount first. */
+function soleDigit(mask) {
+  var d = 1;
+  var m = mask;
+  while (!(m & 1)) { m >>= 1; d++; }
+  return d;
+}
+
+/**
+ * The shared answer rule: read the solved digits at the declared cells, in the
+ * order declared. `solution` is a flat digit array, row-major.
+ */
+function filledGridAnswer(solution, width, cells) {
+  var out = '';
+  for (var i = 0; i < cells.length; i++) {
+    var cell = cells[i] || {};
+    var r = Number(cell.row) - 1;
+    var c = Number(cell.col) - 1;
+    out += String(solution[r * width + c]);
+  }
+  return out;
+}
+
+/**
+ * Shape errors common to every filled grid's answer rule. Returns [] when the
+ * rule is well formed against a `height` x `width` board.
+ */
+function filledGridAnswerShapeErrors(puzzle, height, width) {
+  var errors = [];
+  var who = label(puzzle);
+  var from = puzzle.answerFrom || {};
+  if (from.mode !== 'cells') {
+    errors.push(who + ': answerFrom.mode is "' + String(from.mode)
+      + '" — a filled grid reads its answer as "cells": name the cells to read and the order '
+      + 'to read them in, and the digits found there are the key.');
+    return errors;
+  }
+  var cells = asArray(from.cells);
+  if (!cells.length) {
+    errors.push(who + ': answerFrom.cells is empty — a solved grid with no cells named yields '
+      + 'no key, so the puzzle unlocks nothing.');
+    return errors;
+  }
+  for (var i = 0; i < cells.length; i++) {
+    var cell = cells[i] || {};
+    var r = Number(cell.row);
+    var c = Number(cell.col);
+    if (!(r >= 1 && r <= height && Math.floor(r) === r)
+        || !(c >= 1 && c <= width && Math.floor(c) === c)) {
+      errors.push(who + ': answerFrom.cells[' + i + '] is row ' + String(cell.row) + ', column '
+        + String(cell.col) + ', which is outside the ' + height + 'x' + width
+        + ' grid (rows and columns are 1-based).');
+    }
+  }
+  if (!normalizeAnswer(puzzle.answer)) {
+    errors.push(who + ': the answer is empty once normalised.');
+  }
+  return errors;
+}
+
+// ── Sudoku ──────────────────────────────────────────────────────────────────
+// Shape:
+//   boxWidth   : integer   the sub-block's width
+//   boxHeight  : integer   the sub-block's height; the board is boxWidth *
+//                          boxHeight on a side, so 3x3 is the classic 9x9 and
+//                          3x2 gives the 6x6 a half-letter page likes
+//   givens     : string[]  one row per line, one character per cell, "." blank
+//   answer     : string
+//   answerFrom : { mode: 'cells', cells: [{ row, col }] }
+//
+// THERE IS NO SEPARATE SOLUTION FIELD, on purpose. The givens ARE the puzzle
+// and the solver derives everything else; a declared solution would be a second
+// source of truth for the same fact, and the first thing it would ever do is
+// disagree with the grid it was printed beside.
+
+function sudokuGeometry(puzzle) {
+  var bw = Number(puzzle.boxWidth);
+  var bh = Number(puzzle.boxHeight);
+  return { bw: bw, bh: bh, size: bw * bh };
+}
+
+/** Row, column and box unit membership for every cell. */
+function sudokuUnits(bw, bh) {
+  var size = bw * bh;
+  var units = [];
+  var r;
+  var c;
+  for (r = 0; r < size; r++) {
+    var row = [];
+    for (c = 0; c < size; c++) row.push(r * size + c);
+    units.push(row);
+  }
+  for (c = 0; c < size; c++) {
+    var col = [];
+    for (r = 0; r < size; r++) col.push(r * size + c);
+    units.push(col);
+  }
+  // Boxes are boxWidth wide and boxHeight tall, so they tile the board
+  // boxHeight across and boxWidth down.
+  for (var br = 0; br < bw; br++) {
+    for (var bc = 0; bc < bh; bc++) {
+      var box = [];
+      for (r = 0; r < bh; r++) {
+        for (c = 0; c < bw; c++) {
+          box.push((br * bh + r) * size + (bc * bw + c));
+        }
+      }
+      units.push(box);
+    }
+  }
+  return units;
+}
+
+function sudokuShapeErrors(puzzle) {
+  var errors = [];
+  var who = label(puzzle);
+  var geo = sudokuGeometry(puzzle);
+
+  if (!(geo.bw >= 2 && geo.bh >= 2 && Math.floor(geo.bw) === geo.bw && Math.floor(geo.bh) === geo.bh)) {
+    errors.push(who + ': boxWidth and boxHeight must be whole numbers of at least 2 — they are the '
+      + 'sub-block a digit may not repeat inside, and the board is boxWidth x boxHeight on a side.');
+    return errors;
+  }
+  if (geo.size > 9) {
+    errors.push(who + ': boxWidth x boxHeight is ' + geo.size + ', so the board would be ' + geo.size
+      + ' on a side — this solver and this page stop at 9, which is the classic grid.');
+    return errors;
+  }
+
+  var rows = asArray(puzzle.givens).map(function (r) { return String(r == null ? '' : r); });
+  if (rows.length !== geo.size) {
+    errors.push(who + ': givens has ' + rows.length + ' rows for a ' + geo.size + 'x' + geo.size
+      + ' board — one string per row, always.');
+    return errors;
+  }
+  var allowed = new RegExp('^[.1-' + geo.size + ']+$');
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].length !== geo.size) {
+      errors.push(who + ': givens row ' + (i + 1) + ' has ' + rows[i].length + ' characters for '
+        + geo.size + ' columns — use "." for an empty cell.');
+    }
+    if (!allowed.test(rows[i])) {
+      errors.push(who + ': givens row ' + (i + 1) + ' contains something other than "." or a digit '
+        + '1-' + geo.size + '.');
+    }
+  }
+  if (errors.length) return errors;
+
+  // A given that already breaks the rules is a different failure from an
+  // unsolvable one, and saying so names the cell rather than the search.
+  var units = sudokuUnits(geo.bw, geo.bh);
+  var unitNames = ['row', 'column', 'box'];
+  for (var u = 0; u < units.length; u++) {
+    var seen = {};
+    for (var k = 0; k < units[u].length; k++) {
+      var idx = units[u][k];
+      var ch = rows[Math.floor(idx / geo.size)].charAt(idx % geo.size);
+      if (ch === '.') continue;
+      if (seen[ch]) {
+        errors.push(who + ': the digit ' + ch + ' is printed twice in one '
+          + unitNames[Math.min(2, Math.floor(u / geo.size))] + ' — the givens break the rule before '
+          + 'the player starts.');
+      }
+      seen[ch] = true;
+    }
+  }
+  return errors;
+}
+
+/**
+ * Eliminate to a fixpoint: naked singles across every unit, then hidden
+ * singles within each unit. Returns false on contradiction.
+ */
+function sudokuPropagate(cand, units, size, counters) {
+  var changed = true;
+  var rounds = 0;
+  while (changed) {
+    changed = false;
+    rounds++;
+    if (rounds > 256) break;
+    var u;
+    var k;
+    var d;
+
+    for (u = 0; u < units.length; u++) {
+      var unit = units[u];
+      // Naked singles: a solved cell removes its digit from the rest of the unit.
+      for (k = 0; k < unit.length; k++) {
+        var mask = cand[unit[k]];
+        if (!mask) return false;
+        if (popcount(mask) !== 1) continue;
+        for (var j = 0; j < unit.length; j++) {
+          if (j === k) continue;
+          if (cand[unit[j]] & mask) {
+            cand[unit[j]] &= ~mask;
+            if (!cand[unit[j]]) return false;
+            changed = true;
+          }
+        }
+      }
+      // Hidden singles: a digit only one cell in the unit can still hold.
+      for (d = 1; d <= size; d++) {
+        var bit = 1 << (d - 1);
+        var holder = -1;
+        var count = 0;
+        for (k = 0; k < unit.length; k++) {
+          if (cand[unit[k]] & bit) { holder = unit[k]; count++; }
+        }
+        if (count === 0) return false;
+        if (count === 1 && cand[holder] !== bit) { cand[holder] = bit; changed = true; }
+      }
+    }
+  }
+  if (counters) counters.rounds = Math.max(counters.rounds, rounds);
+  return true;
+}
+
+/** Uniqueness search: MRV, counting to two. */
+function sudokuSearch(cand, units, size, counters) {
+  var solutions = [];
+  (function descend(state, depth) {
+    if (solutions.length > 1 || counters.overBudget) return;
+    counters.nodes++;
+    if (counters.nodes > PUZZLE_SOLVER_BUDGETS.sudokuNodes) { counters.overBudget = true; return; }
+    if (!sudokuPropagate(state, units, size, null)) return;
+
+    var pick = -1;
+    var best = 99;
+    for (var i = 0; i < state.length; i++) {
+      var n = popcount(state[i]);
+      if (n > 1 && n < best) { best = n; pick = i; }
+    }
+    if (pick === -1) { solutions.push(Int16Array.from(state)); return; }
+
+    counters.depth = Math.max(counters.depth, depth + 1);
+    for (var d = 1; d <= size; d++) {
+      var bit = 1 << (d - 1);
+      if (!(state[pick] & bit)) continue;
+      var branch = Int16Array.from(state);
+      branch[pick] = bit;
+      descend(branch, depth + 1);
+      if (solutions.length > 1 || counters.overBudget) return;
+    }
+  })(cand, 0);
+  return solutions;
+}
+
+/**
+ * solveSudoku(puzzle) -> { ok, errors, solutionCount, solution, difficulty }
+ *
+ * `solution` is a string[] of digit rows — the same form an answer key would be
+ * written by hand, so a human reading a failure can check it.
+ */
+export function solveSudoku(puzzle) {
+  var out = { ok: false, errors: [], solutionCount: 0, solution: null, difficulty: null };
+  var p = puzzle || {};
+  var who = label(p);
+
+  out.errors = sudokuShapeErrors(p);
+  if (out.errors.length) return out;
+
+  var geo = sudokuGeometry(p);
+  out.errors = filledGridAnswerShapeErrors(p, geo.size, geo.size);
+  if (out.errors.length) return out;
+
+  var rows = asArray(p.givens).map(String);
+  var full = digitMask(geo.size);
+  var cand = new Int16Array(geo.size * geo.size).fill(full);
+  for (var r = 0; r < geo.size; r++) {
+    for (var c = 0; c < geo.size; c++) {
+      var ch = rows[r].charAt(c);
+      if (ch !== '.') cand[r * geo.size + c] = 1 << (Number(ch) - 1);
+    }
+  }
+
+  var units = sudokuUnits(geo.bw, geo.bh);
+
+  // The difficulty instrument runs FIRST and on its own copy: it measures how
+  // far pure elimination gets, which is what "hard" means at a kitchen table.
+  var measure = { rounds: 0 };
+  var probe = Int16Array.from(cand);
+  var propagable = sudokuPropagate(probe, units, geo.size, measure);
+  if (!propagable) {
+    out.errors.push(who + ': the givens contradict each other — eliminating from them empties a cell, '
+      + 'so the printed grid cannot be completed.');
+    return out;
+  }
+  var solvedByLogic = true;
+  for (var i = 0; i < probe.length; i++) {
+    if (popcount(probe[i]) !== 1) { solvedByLogic = false; break; }
+  }
+
+  var counters = { nodes: 0, depth: 0, overBudget: false };
+  var solutions = sudokuSearch(cand, units, geo.size, counters);
+  if (counters.overBudget) {
+    out.errors.push(who + ': the uniqueness proof exceeded the solver budget after ' + counters.nodes
+      + ' search steps — print more givens until the grid can be proven, because an unprovable '
+      + 'puzzle and a broken one are the same thing to a player.');
+    return out;
+  }
+
+  out.solutionCount = solutions.length;
+  if (!solutions.length) {
+    out.errors.push(who + ': the givens admit NO completion — no arrangement of digits satisfies '
+      + 'every row, column and box.');
+    return out;
+  }
+  if (solutions.length > 1) {
+    out.errors.push(who + ': the givens admit more than one completion — a sudoku must have exactly '
+      + 'one. Print another given in the region that stayed ambiguous.');
+    return out;
+  }
+
+  var solved = solutions[0];
+  var digits = [];
+  var printed = [];
+  for (var rr = 0; rr < geo.size; rr++) {
+    var line = '';
+    for (var cc = 0; cc < geo.size; cc++) {
+      var d = soleDigit(solved[rr * geo.size + cc]);
+      digits.push(d);
+      line += String(d);
+    }
+    printed.push(line);
+  }
+  out.solution = printed;
+  out.difficulty = {
+    score: measure.rounds + 10 * counters.depth,
+    basis: 'elimination-rounds',
+    rounds: measure.rounds,
+    requiresGuess: !solvedByLogic,
+    guessDepth: counters.depth
+  };
+
+  var derived = filledGridAnswer(digits, geo.size, asArray(p.answerFrom.cells));
+  if (normalizeAnswer(derived) !== normalizeAnswer(p.answer)) {
+    out.errors.push(who + ': the named cells of the solved grid read "' + derived
+      + '" but the puzzle declares the answer "' + String(p.answer)
+      + '" — the key must be what the grid actually produces.');
+    return out;
+  }
+
+  out.ok = true;
+  return out;
+}
+
+// ── Kakuro ──────────────────────────────────────────────────────────────────
+// Shape:
+//   layout     : string[]  rows of "#" (a block cell) and "." (a white cell)
+//   sums       : [{ row, col, down?, right? }]   1-based, ON a block cell
+//   answer     : string
+//   answerFrom : { mode: 'cells', cells: [{ row, col }] }
+//
+// THE FRAME IS REQUIRED: row 1 and column 1 are all block cells, because every
+// run needs a cell to its left or above to carry the clue and the grid edge
+// cannot carry one. That is also how every printed kakuro in the world is
+// drawn, so it costs the model nothing to obey.
+//
+// EVERY RUN IS AT LEAST TWO CELLS. A one-cell run is a given wearing a sum, and
+// kakuro has no givens; permitting it would let a model produce a "puzzle" that
+// is entirely forced cells and call it a grid.
+
+function kakuroDims(puzzle) {
+  var rows = asArray(puzzle.layout).map(function (r) { return String(r == null ? '' : r); });
+  return { rows: rows, h: rows.length, w: rows.length ? rows[0].length : 0 };
+}
+
+/** Maximal runs of white cells, with the block cell that must carry each clue. */
+function kakuroRuns(rows, h, w) {
+  var runs = [];
+  var r;
+  var c;
+  var cells;
+  for (r = 0; r < h; r++) {
+    c = 0;
+    while (c < w) {
+      if (rows[r].charAt(c) !== '.') { c++; continue; }
+      cells = [];
+      var startC = c;
+      while (c < w && rows[r].charAt(c) === '.') { cells.push(r * w + c); c++; }
+      runs.push({ axis: 'right', cells: cells, clueRow: r, clueCol: startC - 1 });
+    }
+  }
+  for (c = 0; c < w; c++) {
+    r = 0;
+    while (r < h) {
+      if (rows[r].charAt(c) !== '.') { r++; continue; }
+      cells = [];
+      var startR = r;
+      while (r < h && rows[r].charAt(c) === '.') { cells.push(r * w + c); r++; }
+      runs.push({ axis: 'down', cells: cells, clueRow: startR - 1, clueCol: c });
+    }
+  }
+  return runs;
+}
+
+function kakuroShapeErrors(puzzle, dims, runs) {
+  var errors = [];
+  var who = label(puzzle);
+  var rows = dims.rows;
+
+  if (dims.h < 4 || dims.w < 4) {
+    errors.push(who + ': a kakuro needs at least 4 rows and 4 columns once the clue frame is '
+      + 'counted, found ' + dims.h + 'x' + dims.w + '.');
+    return errors;
+  }
+  for (var i = 0; i < dims.h; i++) {
+    if (rows[i].length !== dims.w) {
+      errors.push(who + ': layout row ' + (i + 1) + ' has ' + rows[i].length + ' characters but row 1 '
+        + 'has ' + dims.w + ' — the grid must be rectangular.');
+    }
+    if (/[^#.]/.test(rows[i])) {
+      errors.push(who + ': layout row ' + (i + 1) + ' contains something other than "#" or "." — '
+        + '"#" is a block cell, "." is a cell the player writes a digit in.');
+    }
+  }
+  if (errors.length) return errors;
+
+  if (/[^#]/.test(rows[0])) {
+    errors.push(who + ': layout row 1 must be all "#" — a run needs a block cell above it to carry '
+      + 'its down-sum, and the grid edge cannot carry one.');
+  }
+  for (var r = 0; r < dims.h; r++) {
+    if (rows[r].charAt(0) !== '#') {
+      errors.push(who + ': layout row ' + (r + 1) + ' starts with a white cell — column 1 must be all '
+        + '"#", because a run needs a block cell to its left to carry its right-sum.');
+      break;
+    }
+  }
+  if (errors.length) return errors;
+
+  // Index the declared sums by the block cell they sit on.
+  var declared = {};
+  var sums = asArray(puzzle.sums);
+  for (var s = 0; s < sums.length; s++) {
+    var entry = sums[s] || {};
+    var sr = Number(entry.row) - 1;
+    var sc = Number(entry.col) - 1;
+    if (!(sr >= 0 && sr < dims.h && sc >= 0 && sc < dims.w)) {
+      errors.push(who + ': sums[' + s + '] names row ' + String(entry.row) + ', column '
+        + String(entry.col) + ', which is outside the ' + dims.h + 'x' + dims.w + ' grid.');
+      continue;
+    }
+    if (rows[sr].charAt(sc) !== '#') {
+      errors.push(who + ': sums[' + s + '] sits at row ' + entry.row + ', column ' + entry.col
+        + ', which is a white cell — a sum is printed in a BLOCK cell, above or to the left of the '
+        + 'run it describes.');
+      continue;
+    }
+    declared[sr * dims.w + sc] = entry;
+  }
+  if (errors.length) return errors;
+
+  var used = {};
+  for (var k = 0; k < runs.length; k++) {
+    var run = runs[k];
+    var where = run.axis === 'right' ? 'right-sum' : 'down-sum';
+    var at = who + ': the ' + (run.axis === 'right' ? 'across' : 'down') + ' run starting at row '
+      + (Math.floor(run.cells[0] / dims.w) + 1) + ', column ' + ((run.cells[0] % dims.w) + 1);
+    if (run.cells.length < 2) {
+      errors.push(at + ' is a single cell — every kakuro run is at least two cells, or the digit is '
+        + 'simply given rather than deduced.');
+      continue;
+    }
+    if (run.cells.length > 9) {
+      errors.push(at + ' is ' + run.cells.length + ' cells long — nine distinct digits is the maximum '
+        + 'a run can hold.');
+      continue;
+    }
+    var clueIdx = run.clueRow * dims.w + run.clueCol;
+    var clue = declared[clueIdx];
+    var target = clue ? Number(run.axis === 'right' ? clue.right : clue.down) : NaN;
+    if (!(target > 0) || Math.floor(target) !== target) {
+      errors.push(at + ' has no ' + where + ' declared on the block cell at row ' + (run.clueRow + 1)
+        + ', column ' + (run.clueCol + 1) + ' — every run carries a total or the player has nothing '
+        + 'to solve against.');
+      continue;
+    }
+    used[clueIdx + ':' + run.axis] = true;
+    var len = run.cells.length;
+    var minSum = len * (len + 1) / 2;
+    var maxSum = len * (19 - len) / 2;
+    if (target < minSum || target > maxSum) {
+      errors.push(at + ' asks for ' + target + ' across ' + len + ' cells, but ' + len
+        + ' different digits total between ' + minSum + ' and ' + maxSum + ' — the run cannot be filled.');
+    }
+  }
+  // A declared sum with no run under it is a printed number the player cannot use.
+  for (var idx in declared) {
+    if (!Object.prototype.hasOwnProperty.call(declared, idx)) continue;
+    var e = declared[idx];
+    if (e.right != null && !used[idx + ':right']) {
+      errors.push(who + ': a right-sum is printed at row ' + e.row + ', column ' + e.col
+        + ' but no across run begins there — the number has nothing to describe.');
+    }
+    if (e.down != null && !used[idx + ':down']) {
+      errors.push(who + ': a down-sum is printed at row ' + e.row + ', column ' + e.col
+        + ' but no down run begins there — the number has nothing to describe.');
+    }
+  }
+  return errors;
+}
+
+var KAKURO_COMBO_CACHE = {};
+
+/** Every set of `len` distinct digits 1-9 summing to `target`, as bitmasks. */
+function kakuroCombos(target, len) {
+  var key = target + ':' + len;
+  if (KAKURO_COMBO_CACHE[key]) return KAKURO_COMBO_CACHE[key];
+  var out = [];
+  (function pick(start, remaining, sum, mask) {
+    if (out.length > PUZZLE_SOLVER_BUDGETS.kakuroCombosPerRun) return;
+    if (remaining === 0) {
+      if (sum === target) out.push(mask);
+      return;
+    }
+    for (var d = start; d <= 9; d++) {
+      if (sum + d > target) break;
+      pick(d + 1, remaining - 1, sum + d, mask | (1 << (d - 1)));
+    }
+  })(1, len, 0, 0);
+  KAKURO_COMBO_CACHE[key] = out;
+  return out;
+}
+
+/**
+ * Intersect each run's cells with the digits its surviving combinations allow.
+ * SOUND, not complete: a combination survives if it contains every digit
+ * already forced in the run, so no digit a real solution uses is ever removed.
+ */
+function kakuroPropagate(cand, runs, counters) {
+  var changed = true;
+  var rounds = 0;
+  while (changed) {
+    changed = false;
+    rounds++;
+    if (rounds > 128) break;
+    for (var k = 0; k < runs.length; k++) {
+      var run = runs[k];
+      var forced = 0;
+      var i;
+      for (i = 0; i < run.cells.length; i++) {
+        var m = cand[run.cells[i]];
+        if (!m) return false;
+        if (popcount(m) === 1) {
+          if (forced & m) return false;   // the same digit twice in one run
+          forced |= m;
+        }
+      }
+      var combos = kakuroCombos(run.target, run.cells.length);
+      var allowed = 0;
+      var any = false;
+      for (i = 0; i < combos.length; i++) {
+        if ((combos[i] & forced) !== forced) continue;
+        allowed |= combos[i];
+        any = true;
+      }
+      if (!any) return false;
+      var free = allowed & ~forced;
+      for (i = 0; i < run.cells.length; i++) {
+        var cell = run.cells[i];
+        if (popcount(cand[cell]) === 1) continue;
+        var next = cand[cell] & free;
+        if (next !== cand[cell]) {
+          cand[cell] = next;
+          if (!next) return false;
+          changed = true;
+        }
+      }
+    }
+  }
+  if (counters) counters.rounds = Math.max(counters.rounds, rounds);
+  return true;
+}
+
+function kakuroComplete(cand, runs) {
+  for (var k = 0; k < runs.length; k++) {
+    var run = runs[k];
+    var sum = 0;
+    var seen = 0;
+    for (var i = 0; i < run.cells.length; i++) {
+      var m = cand[run.cells[i]];
+      if (popcount(m) !== 1) return false;
+      if (seen & m) return false;
+      seen |= m;
+      sum += soleDigit(m);
+    }
+    if (sum !== run.target) return false;
+  }
+  return true;
+}
+
+function kakuroSearch(cand, runs, whiteCells, counters) {
+  var solutions = [];
+  (function descend(state, depth) {
+    if (solutions.length > 1 || counters.overBudget) return;
+    counters.nodes++;
+    if (counters.nodes > PUZZLE_SOLVER_BUDGETS.kakuroNodes) { counters.overBudget = true; return; }
+    if (!kakuroPropagate(state, runs, null)) return;
+
+    var pick = -1;
+    var best = 99;
+    for (var i = 0; i < whiteCells.length; i++) {
+      var n = popcount(state[whiteCells[i]]);
+      if (n > 1 && n < best) { best = n; pick = whiteCells[i]; }
+    }
+    if (pick === -1) {
+      if (kakuroComplete(state, runs)) solutions.push(Int16Array.from(state));
+      return;
+    }
+    counters.depth = Math.max(counters.depth, depth + 1);
+    for (var d = 1; d <= 9; d++) {
+      var bit = 1 << (d - 1);
+      if (!(state[pick] & bit)) continue;
+      var branch = Int16Array.from(state);
+      branch[pick] = bit;
+      descend(branch, depth + 1);
+      if (solutions.length > 1 || counters.overBudget) return;
+    }
+  })(cand, 0);
+  return solutions;
+}
+
+/** solveKakuro(puzzle) -> { ok, errors, solutionCount, solution, difficulty } */
+export function solveKakuro(puzzle) {
+  var out = { ok: false, errors: [], solutionCount: 0, solution: null, difficulty: null };
+  var p = puzzle || {};
+  var who = label(p);
+
+  var dims = kakuroDims(p);
+  if (!dims.h || !dims.w) {
+    out.errors.push(who + ': layout is empty — a kakuro is a printed grid of block and white cells.');
+    return out;
+  }
+  var runs = kakuroRuns(dims.rows, dims.h, dims.w);
+  out.errors = kakuroShapeErrors(p, dims, runs);
+  if (out.errors.length) return out;
+  out.errors = filledGridAnswerShapeErrors(p, dims.h, dims.w);
+  if (out.errors.length) return out;
+
+  // Attach each run's target now that the shape is proven.
+  var declared = {};
+  asArray(p.sums).forEach(function (entry) {
+    declared[(Number(entry.row) - 1) * dims.w + (Number(entry.col) - 1)] = entry;
+  });
+  var whiteCells = [];
+  for (var idx = 0; idx < dims.h * dims.w; idx++) {
+    if (dims.rows[Math.floor(idx / dims.w)].charAt(idx % dims.w) === '.') whiteCells.push(idx);
+  }
+  runs.forEach(function (run) {
+    var clue = declared[run.clueRow * dims.w + run.clueCol];
+    run.target = Number(run.axis === 'right' ? clue.right : clue.down);
+  });
+  var answerCell = {};
+  asArray((p.answerFrom || {}).cells).forEach(function (cell) {
+    answerCell[(Number(cell.row) - 1) * dims.w + (Number(cell.col) - 1)] = true;
+  });
+  for (var a in answerCell) {
+    if (!Object.prototype.hasOwnProperty.call(answerCell, a)) continue;
+    if (whiteCells.indexOf(Number(a)) === -1) {
+      out.errors.push(who + ': answerFrom.cells names a block cell — the key is read from cells the '
+        + 'player writes a digit in.');
+      return out;
+    }
+  }
+
+  var cand = new Int16Array(dims.h * dims.w).fill(0);
+  whiteCells.forEach(function (cell) { cand[cell] = digitMask(9); });
+
+  var measure = { rounds: 0 };
+  var probe = Int16Array.from(cand);
+  if (!kakuroPropagate(probe, runs, measure)) {
+    out.errors.push(who + ': the sums contradict each other — no run can be filled consistently, so '
+      + 'the printed grid cannot be completed.');
+    return out;
+  }
+  var solvedByLogic = whiteCells.every(function (cell) { return popcount(probe[cell]) === 1; });
+
+  var counters = { nodes: 0, depth: 0, overBudget: false };
+  var solutions = kakuroSearch(cand, runs, whiteCells, counters);
+  if (counters.overBudget) {
+    out.errors.push(who + ': the uniqueness proof exceeded the solver budget after ' + counters.nodes
+      + ' search steps — shorten the runs or shrink the grid until it can be proven. A kakuro a '
+      + 'machine cannot prove is one a player cannot finish honestly.');
+    return out;
+  }
+
+  out.solutionCount = solutions.length;
+  if (!solutions.length) {
+    out.errors.push(who + ': the sums admit NO filling — every arrangement breaks a run.');
+    return out;
+  }
+  if (solutions.length > 1) {
+    out.errors.push(who + ': the sums admit more than one filling — a kakuro must have exactly one. '
+      + 'Change a total so the ambiguous run resolves.');
+    return out;
+  }
+
+  var solved = solutions[0];
+  var digits = new Array(dims.h * dims.w).fill(0);
+  var printed = [];
+  for (var r = 0; r < dims.h; r++) {
+    var line = '';
+    for (var c = 0; c < dims.w; c++) {
+      var cell = r * dims.w + c;
+      if (dims.rows[r].charAt(c) === '#') { line += '#'; continue; }
+      var d = soleDigit(solved[cell]);
+      digits[cell] = d;
+      line += String(d);
+    }
+    printed.push(line);
+  }
+  out.solution = printed;
+  out.difficulty = {
+    score: measure.rounds + 10 * counters.depth,
+    basis: 'combination-rounds',
+    rounds: measure.rounds,
+    requiresGuess: !solvedByLogic,
+    guessDepth: counters.depth
+  };
+
+  var derived = filledGridAnswer(digits, dims.w, asArray(p.answerFrom.cells));
+  if (normalizeAnswer(derived) !== normalizeAnswer(p.answer)) {
+    out.errors.push(who + ': the named cells of the solved grid read "' + derived
+      + '" but the puzzle declares the answer "' + String(p.answer)
+      + '" — the key must be what the grid actually produces.');
+    return out;
+  }
+
+  out.ok = true;
+  return out;
+}
+
+// ── KenKen ──────────────────────────────────────────────────────────────────
+// Shape:
+//   size       : integer   the board is size x size and holds digits 1..size
+//   cages      : [{ cells: [{ row, col }], operation, target }]
+//   answer     : string
+//   answerFrom : { mode: 'cells', cells: [{ row, col }] }
+//
+// The operations are WORDS, not glyphs — "add" | "subtract" | "multiply" |
+// "divide" | "fixed" — because the enum has to survive a JSON round trip, a
+// prompt menu and a parity scan that reads quoted lowercase tokens. The printed
+// page draws the conventional + − × ÷ from the word; the wire carries the word.
+//
+// `subtract` and `divide` are TWO-CELL ONLY and order-free (the larger minus or
+// over the smaller), which is what every printed KenKen means by them. `fixed`
+// is the one-cell cage: the digit is simply given.
+
+export var KENKEN_OPERATIONS = ['add', 'subtract', 'multiply', 'divide', 'fixed'];
+
+function kenkenShapeErrors(puzzle) {
+  var errors = [];
+  var who = label(puzzle);
+  var size = Number(puzzle.size);
+  if (!(size >= 3 && size <= 9 && Math.floor(size) === size)) {
+    errors.push(who + ': size is ' + String(puzzle.size) + ' — a KenKen board is 3 to 9 on a side.');
+    return errors;
+  }
+  var cages = asArray(puzzle.cages);
+  if (!cages.length) {
+    errors.push(who + ': no cages — a KenKen with no cages is an empty Latin square with every '
+      + 'arrangement as a solution.');
+    return errors;
+  }
+
+  var owner = new Array(size * size).fill(-1);
+  for (var k = 0; k < cages.length; k++) {
+    var cage = cages[k] || {};
+    var at = who + ': cage ' + (k + 1);
+    var cells = asArray(cage.cells);
+    if (!cells.length) {
+      errors.push(at + ' has no cells.');
+      continue;
+    }
+    if (cells.length > 4) {
+      errors.push(at + ' covers ' + cells.length + ' cells — four is the ceiling, because a cage the '
+        + 'solver must enumerate grows as size to the power of its cell count.');
+      continue;
+    }
+    if (KENKEN_OPERATIONS.indexOf(cage.operation) === -1) {
+      errors.push(at + ' has operation "' + String(cage.operation) + '", which is not one of '
+        + KENKEN_OPERATIONS.join(' | ') + '.');
+      continue;
+    }
+    if (!(Number(cage.target) > 0) || Math.floor(Number(cage.target)) !== Number(cage.target)) {
+      errors.push(at + ' has target ' + String(cage.target) + ' — a cage target is a positive whole number.');
+      continue;
+    }
+    if ((cage.operation === 'subtract' || cage.operation === 'divide') && cells.length !== 2) {
+      errors.push(at + ' is "' + cage.operation + '" across ' + cells.length + ' cells — subtraction and '
+        + 'division are two-cell cages, because with three cells the result depends on an order the '
+        + 'printed page does not show.');
+      continue;
+    }
+    if (cage.operation === 'fixed' && cells.length !== 1) {
+      errors.push(at + ' is "fixed" across ' + cells.length + ' cells — a fixed cage names one cell '
+        + 'and gives its digit.');
+      continue;
+    }
+    if (cage.operation !== 'fixed' && cells.length === 1) {
+      errors.push(at + ' covers one cell but is "' + cage.operation + '" — a single-cell cage is "fixed".');
+      continue;
+    }
+    for (var i = 0; i < cells.length; i++) {
+      var r = Number(cells[i].row) - 1;
+      var c = Number(cells[i].col) - 1;
+      if (!(r >= 0 && r < size && c >= 0 && c < size)) {
+        errors.push(at + ' names row ' + String(cells[i].row) + ', column ' + String(cells[i].col)
+          + ', which is outside the ' + size + 'x' + size + ' board.');
+        continue;
+      }
+      var idx = r * size + c;
+      if (owner[idx] !== -1) {
+        errors.push(at + ' claims row ' + (r + 1) + ', column ' + (c + 1) + ', which cage '
+          + (owner[idx] + 1) + ' already holds — cages partition the board, so every cell belongs to '
+          + 'exactly one.');
+        continue;
+      }
+      owner[idx] = k;
+    }
+  }
+  if (errors.length) return errors;
+
+  var orphans = 0;
+  for (var j = 0; j < owner.length; j++) if (owner[j] === -1) orphans++;
+  if (orphans) {
+    errors.push(who + ': ' + orphans + ' cell(s) belong to no cage — the cages must cover the whole '
+      + 'board, or those cells are constrained by nothing but the Latin rule.');
+  }
+  return errors;
+}
+
+/** Does this digit multiset satisfy the cage? Order-free by construction. */
+function kenkenCageHolds(operation, target, values) {
+  var i;
+  if (operation === 'fixed') return values[0] === target;
+  if (operation === 'add') {
+    var sum = 0;
+    for (i = 0; i < values.length; i++) sum += values[i];
+    return sum === target;
+  }
+  if (operation === 'multiply') {
+    var product = 1;
+    for (i = 0; i < values.length; i++) product *= values[i];
+    return product === target;
+  }
+  var hi = Math.max(values[0], values[1]);
+  var lo = Math.min(values[0], values[1]);
+  if (operation === 'subtract') return hi - lo === target;
+  return lo > 0 && hi % lo === 0 && hi / lo === target;
+}
+
+/**
+ * Enumerate every filling of one cage consistent with the current candidates,
+ * the operation, and the Latin rule INSIDE the cage (two cells sharing a row or
+ * column must differ). Returns the per-cell union of digits that survive.
+ */
+function kenkenCageUnions(cage, cand, size, counters) {
+  var n = cage.idx.length;
+  var unions = new Array(n).fill(0);
+  var values = new Array(n);
+  var any = false;
+  (function place(i) {
+    if (counters.overBudget) return;
+    if (i === n) {
+      if (!kenkenCageHolds(cage.operation, cage.target, values)) return;
+      any = true;
+      for (var j = 0; j < n; j++) unions[j] |= (1 << (values[j] - 1));
+      return;
+    }
+    for (var d = 1; d <= size; d++) {
+      if (!(cand[cage.idx[i]] & (1 << (d - 1)))) continue;
+      var clash = false;
+      for (var k = 0; k < i; k++) {
+        if (values[k] !== d) continue;
+        if (cage.rows[k] === cage.rows[i] || cage.cols[k] === cage.cols[i]) { clash = true; break; }
+      }
+      if (clash) continue;
+      values[i] = d;
+      counters.cageWork++;
+      place(i + 1);
+      if (counters.overBudget) return;
+    }
+  })(0);
+  return any ? unions : null;
+}
+
+function kenkenPropagate(cand, cages, units, size, counters) {
+  var work = { cageWork: 0, overBudget: false };
+  var changed = true;
+  var rounds = 0;
+  while (changed) {
+    changed = false;
+    rounds++;
+    if (rounds > 128) break;
+    if (!sudokuPropagate(cand, units, size, null)) return false;
+    for (var k = 0; k < cages.length; k++) {
+      var cage = cages[k];
+      var unions = kenkenCageUnions(cage, cand, size, work);
+      if (!unions) return false;
+      for (var i = 0; i < cage.idx.length; i++) {
+        var next = cand[cage.idx[i]] & unions[i];
+        if (next !== cand[cage.idx[i]]) {
+          cand[cage.idx[i]] = next;
+          if (!next) return false;
+          changed = true;
+        }
+      }
+    }
+  }
+  if (counters) counters.rounds = Math.max(counters.rounds, rounds);
+  return true;
+}
+
+function kenkenSearch(cand, cages, units, size, counters) {
+  var solutions = [];
+  (function descend(state, depth) {
+    if (solutions.length > 1 || counters.overBudget) return;
+    counters.nodes++;
+    if (counters.nodes > PUZZLE_SOLVER_BUDGETS.kenkenNodes) { counters.overBudget = true; return; }
+    if (!kenkenPropagate(state, cages, units, size, null)) return;
+
+    var pick = -1;
+    var best = 99;
+    for (var i = 0; i < state.length; i++) {
+      var n = popcount(state[i]);
+      if (n > 1 && n < best) { best = n; pick = i; }
+    }
+    if (pick === -1) { solutions.push(Int16Array.from(state)); return; }
+
+    counters.depth = Math.max(counters.depth, depth + 1);
+    for (var d = 1; d <= size; d++) {
+      var bit = 1 << (d - 1);
+      if (!(state[pick] & bit)) continue;
+      var branch = Int16Array.from(state);
+      branch[pick] = bit;
+      descend(branch, depth + 1);
+      if (solutions.length > 1 || counters.overBudget) return;
+    }
+  })(cand, 0);
+  return solutions;
+}
+
+/** solveKenKen(puzzle) -> { ok, errors, solutionCount, solution, difficulty } */
+export function solveKenKen(puzzle) {
+  var out = { ok: false, errors: [], solutionCount: 0, solution: null, difficulty: null };
+  var p = puzzle || {};
+  var who = label(p);
+
+  out.errors = kenkenShapeErrors(p);
+  if (out.errors.length) return out;
+  var size = Number(p.size);
+  out.errors = filledGridAnswerShapeErrors(p, size, size);
+  if (out.errors.length) return out;
+
+  var cages = asArray(p.cages).map(function (cage) {
+    var cells = asArray(cage.cells);
+    return {
+      operation: cage.operation,
+      target: Number(cage.target),
+      idx: cells.map(function (cell) { return (Number(cell.row) - 1) * size + (Number(cell.col) - 1); }),
+      rows: cells.map(function (cell) { return Number(cell.row) - 1; }),
+      cols: cells.map(function (cell) { return Number(cell.col) - 1; })
+    };
+  });
+  // Rows and columns only. A KenKen has no boxes, and sudokuPropagate takes its
+  // units as data rather than deriving them — so handing it two families
+  // instead of three IS the Latin-square propagator, with no branch and no
+  // second copy of naked-and-hidden singles to drift from the first.
+  var units = [];
+  var r;
+  var c;
+  for (r = 0; r < size; r++) {
+    var row = [];
+    for (c = 0; c < size; c++) row.push(r * size + c);
+    units.push(row);
+  }
+  for (c = 0; c < size; c++) {
+    var col = [];
+    for (r = 0; r < size; r++) col.push(r * size + c);
+    units.push(col);
+  }
+
+  var cand = new Int16Array(size * size).fill(digitMask(size));
+  var measure = { rounds: 0 };
+  var probe = Int16Array.from(cand);
+  if (!kenkenPropagate(probe, cages, units, size, measure)) {
+    out.errors.push(who + ': the cages contradict each other — no digit survives in some cell, so the '
+      + 'printed grid cannot be completed.');
+    return out;
+  }
+  var solvedByLogic = true;
+  for (var i = 0; i < probe.length; i++) {
+    if (popcount(probe[i]) !== 1) { solvedByLogic = false; break; }
+  }
+
+  var counters = { nodes: 0, depth: 0, overBudget: false };
+  var solutions = kenkenSearch(cand, cages, units, size, counters);
+  if (counters.overBudget) {
+    out.errors.push(who + ': the uniqueness proof exceeded the solver budget after ' + counters.nodes
+      + ' search steps — shrink the board or tighten a cage until it can be proven.');
+    return out;
+  }
+
+  out.solutionCount = solutions.length;
+  if (!solutions.length) {
+    out.errors.push(who + ': the cages admit NO filling — no Latin square satisfies every cage.');
+    return out;
+  }
+  if (solutions.length > 1) {
+    out.errors.push(who + ': the cages admit more than one filling — a KenKen must have exactly one. '
+      + 'Split a cage or change a target so the ambiguity resolves.');
+    return out;
+  }
+
+  var solved = solutions[0];
+  var digits = [];
+  var printed = [];
+  for (var rr = 0; rr < size; rr++) {
+    var line = '';
+    for (var cc = 0; cc < size; cc++) {
+      var d = soleDigit(solved[rr * size + cc]);
+      digits.push(d);
+      line += String(d);
+    }
+    printed.push(line);
+  }
+  out.solution = printed;
+  out.difficulty = {
+    score: measure.rounds + 10 * counters.depth,
+    basis: 'cage-rounds',
+    rounds: measure.rounds,
+    requiresGuess: !solvedByLogic,
+    guessDepth: counters.depth
+  };
+
+  var derived = filledGridAnswer(digits, size, asArray(p.answerFrom.cells));
+  if (normalizeAnswer(derived) !== normalizeAnswer(p.answer)) {
+    out.errors.push(who + ': the named cells of the solved grid read "' + derived
+      + '" but the puzzle declares the answer "' + String(p.answer)
+      + '" — the key must be what the grid actually produces.');
+    return out;
+  }
+
+  out.ok = true;
+  return out;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // THE TWO ENTRY POINTS THE GATES CALL
 // ════════════════════════════════════════════════════════════════════════════
 // One per schema surface, dispatching on `kind`, so a caller never has to know
@@ -1122,6 +2241,9 @@ export function verifyConstrainedGrid(grid) {
   var g = grid || {};
   if (g.kind === 'logic-grid') return solveLogicGrid(g);
   if (g.kind === 'nonogram') return solveNonogram(g);
+  if (g.kind === 'sudoku') return solveSudoku(g);
+  if (g.kind === 'kakuro') return solveKakuro(g);
+  if (g.kind === 'kenken') return solveKenKen(g);
   return {
     ok: false,
     errors: [label(g) + ': constrainedGrid.kind is "' + String(g.kind)

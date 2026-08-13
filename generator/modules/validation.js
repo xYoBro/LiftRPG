@@ -1032,6 +1032,11 @@ function collectPuzzleFloorErrors(weekObj) {
   if (grid) {
     var GG = SPATIAL_GUARDRAILS.logicGrid;
     var GN = SPATIAL_GUARDRAILS.nonogram;
+    // AN EXPLICIT DISPATCH, NOT AN `else`. With two kinds "not a nonogram"
+    // meant "a logic grid"; with five it means nothing, and a sudoku falling
+    // into the logic-grid arm would be told it has zero of the three subjects it
+    // was never supposed to have. Every kind names itself here, and the trailing
+    // `else` is the logic grid because that is the kind whose fields it reads.
     if (grid.kind === 'nonogram') {
       var rows = Array.isArray(grid.rowClues) ? grid.rowClues.length : 0;
       var cols = Array.isArray(grid.colClues) ? grid.colClues.length : 0;
@@ -1039,6 +1044,57 @@ function collectPuzzleFloorErrors(weekObj) {
         errors.push('fieldOps.constrainedGrid: a generated nonogram must be between '
           + GN.minSize + 'x' + GN.minSize + ' and ' + GN.maxSize + 'x' + GN.maxSize
           + ', and this one is ' + rows + 'x' + cols + '.');
+      }
+    } else if (grid.kind === 'sudoku') {
+      var GS = SPATIAL_GUARDRAILS.sudoku;
+      var side = Number(grid.boxWidth) * Number(grid.boxHeight);
+      if (!(side >= GS.minSide && side <= GS.maxSide)) {
+        errors.push('fieldOps.constrainedGrid: boxWidth x boxHeight makes a board ' + side
+          + ' on a side, and a generated sudoku must be between ' + GS.minSide + 'x' + GS.minSide
+          + ' and ' + GS.maxSide + 'x' + GS.maxSide + '.');
+      } else {
+        // THE BLANK FLOOR. Solvable, unique and key-matched are the solver's
+        // three obligations and a grid can meet all of them while being
+        // finished by reading it. This is the fourth thing, and only this
+        // gate can ask it: the solver sees a legal puzzle.
+        var filled = 0;
+        (Array.isArray(grid.givens) ? grid.givens : []).forEach(function (row) {
+          filled += String(row).replace(/[^0-9]/g, '').length;
+        });
+        var cells = side * side;
+        var blankPct = cells ? Math.round(((cells - filled) / cells) * 100) : 0;
+        if (blankPct < GS.minBlankPercent) {
+          errors.push('fieldOps.constrainedGrid: the sudoku prints ' + filled + ' of ' + cells
+            + ' cells (' + blankPct + '% blank), and a generated sudoku must leave at least '
+            + GS.minBlankPercent + '% blank. A grid this full is solvable, unique and still not a '
+            + 'puzzle — the player finishes it by reading it.');
+        }
+      }
+    } else if (grid.kind === 'kakuro') {
+      var GK = SPATIAL_GUARDRAILS.kakuro;
+      var layout = Array.isArray(grid.layout) ? grid.layout : [];
+      var kh = layout.length;
+      var kw = kh ? String(layout[0]).length : 0;
+      if (kh < GK.minSize || kh > GK.maxSize || kw < GK.minSize || kw > GK.maxSize) {
+        errors.push('fieldOps.constrainedGrid: a generated kakuro must be between '
+          + GK.minSize + 'x' + GK.minSize + ' and ' + GK.maxSize + 'x' + GK.maxSize
+          + ' counting the clue frame, and this one is ' + kh + 'x' + kw + '.');
+      }
+    } else if (grid.kind === 'kenken') {
+      var GX = SPATIAL_GUARDRAILS.kenken;
+      var kkSize = Number(grid.size);
+      if (!(kkSize >= GX.minSize && kkSize <= GX.maxSize)) {
+        errors.push('fieldOps.constrainedGrid: a generated KenKen must be between ' + GX.minSize
+          + ' and ' + GX.maxSize + ' on a side, and this one is ' + String(grid.size) + '.');
+      }
+      var wide = 0;
+      (Array.isArray(grid.cages) ? grid.cages : []).forEach(function (cage) {
+        if (Array.isArray((cage || {}).cells) && cage.cells.length > GX.maxCageCells) wide++;
+      });
+      if (wide) {
+        errors.push('fieldOps.constrainedGrid: ' + wide + ' cage(s) cover more than '
+          + GX.maxCageCells + ' cells — the solver enumerates every filling of every cage, which '
+          + 'grows as the board size to the power of the cage\'s cell count.');
       }
     } else {
       var subjects = Array.isArray(grid.subjects) ? grid.subjects.length : 0;

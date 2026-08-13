@@ -138,10 +138,24 @@ var IMPLEMENTED_DETAIL = {
   },
   'deduction-board': {
     label: 'The deduction board',
-    inputs: 'A clue set and a grid of pencil cells — subjects against categories, or run lengths against a picture.',
+    inputs: 'A clue set and a grid of pencil cells — subjects against categories, run lengths against a picture, or a partly-printed square of digits.',
     process: 'The player deduces cell states from constraints; the completed grid yields a code. A deterministic solver proves every printed puzzle solvable, UNIQUE, and key-matched before the week is accepted, and refuses it with the defect quoted otherwise.',
     outputs: 'A word, a letter string or a digit string the seal, the assembly or a priced spend reads.',
     locks: 'The grid is the lock. Nothing ships that a machine cannot finish: two solutions, no solution, or an answer the grid does not yield are all refusals, not warnings.'
+  },
+  // SUDOKU LIVES HERE, NOT ON THE ARITHMETIC SHELF, and the split is by what
+  // each one PLAYS rather than by what it looks like. A sudoku contains no
+  // arithmetic at all: it is pure constraint elimination, the same verb the
+  // logic grid and the nonogram ask for. Kakuro and KenKen ask the player to
+  // ADD, and that is a different hand and a different feeling at a gym bench.
+  // Filing them together because both print a square of digits would be naming
+  // entries for the file that draws them, which this registry's header forbids.
+  'arithmetic-grid': {
+    label: 'The arithmetic grid',
+    inputs: 'A cage or run structure with target totals, and the digits 1-9.',
+    process: 'The player fills digits so every run or cage hits its total with no repeat inside it; the completed grid yields a digit code. A deterministic solver proves solvable, UNIQUE and key-matched, and refuses with the defect quoted otherwise.',
+    outputs: 'A digit string the seal, the assembly or a priced spend reads.',
+    locks: 'The totals are the lock. A budget the solver cannot finish inside is a refusal, never a pass — an unprovable puzzle and a broken one are the same thing to a player holding a pencil.'
   },
   'word-hunt': {
     label: 'The word hunt',
@@ -383,20 +397,21 @@ var PROMOTABLE = [
 // Ordered by verifiability, which is the ordering the waves plan chose on
 // purpose: nothing ships a puzzle a machine cannot check.
 var NEEDS_PRIMITIVE = [
-  // W5b PROMOTED the logic grid and the nonogram out of this tier: they are now
-  // `deduction-board` on the implemented shelf. What stayed is the ARITHMETIC
-  // half, and it stayed for one reason — the solver. A logic grid is a
-  // permutation search and a nonogram is a line-solve; a kakuro is a
-  // constrained integer partition, which is neither, and the law is that
-  // nothing ships a puzzle a machine cannot finish.
-  {
-    id: 'arithmetic-grid', label: 'Arithmetic grids (kakuro, KenKen)',
-    inputs: 'A cage or run structure with target sums, and a digit alphabet.',
-    process: 'The player fills digits so every run or cage hits its target with no repeats; the completed grid yields a digit code.',
-    outputs: 'A digit string the seal or the assembly reads.',
-    locks: 'The grid is the lock. Nothing ships unless a deterministic solver proves exactly one filling.',
-    needs: 'A third solver in contracts/puzzle-solvers.mjs — constrained integer partition with a uniqueness proof — plus one enum value in VALID_CONSTRAINED_GRID_KINDS and one branch in the constrained-grid atom, which already prints a cell matrix. DEFERRED BY RULING at W5b, not blocked: the atom and the schema surface exist, only the proof is missing, and a puzzle whose proof is missing is a puzzle that may not ship.'
-  },
+  // W5b PROMOTED the logic grid and the nonogram out of this tier and left the
+  // ARITHMETIC half behind, for one reason it stated plainly: the solver. "A
+  // logic grid is a permutation search and a nonogram is a line-solve; a kakuro
+  // is a constrained integer partition, which is neither, and the law is that
+  // nothing ships a puzzle a machine cannot finish."
+  //
+  // THE ARSENAL WAVE WROTE THE PROOF, and `arithmetic-grid` left this tier for
+  // the implemented shelf: kakuro's run-combination propagation and KenKen's
+  // cage enumeration are in contracts/puzzle-solvers.mjs, both with uniqueness
+  // and key-matching, both with a budget whose exhaustion is a refusal. Sudoku
+  // landed in the same wave but joined `deduction-board` instead — it contains
+  // no arithmetic, and these entries are named for what they play.
+  //
+  // The deferral is not re-listed as a queued entry. One family, one entry, one
+  // tier, exactly as `printed-hint-band` was handled below.
   // W5b PROMOTED the search half out of this tier — it is `word-hunt` on the
   // implemented shelf. What stayed is the INTERLOCKING half, and the reason is
   // again the solver: verifying a board that already exists is a scan, while

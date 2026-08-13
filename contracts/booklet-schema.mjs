@@ -59,6 +59,8 @@ import {
   VALID_LOGIC_CLUE_TYPES,
   VALID_LOGIC_ANSWER_MODES,
   VALID_NONOGRAM_ANSWER_MODES,
+  VALID_FILLED_GRID_ANSWER_MODES,
+  VALID_KENKEN_OPERATIONS,
   VALID_WORD_GRID_KINDS,
   VALID_WORD_SEARCH_DIRECTIONS,
   VALID_WORD_GRID_ANSWER_MODES,
@@ -1184,9 +1186,29 @@ export var BOOKLET_SCHEMA = {
           required: ['mode'],
           additionalProperties: false,
           properties: {
-            mode: { enum: VALID_LOGIC_ANSWER_MODES.concat(VALID_NONOGRAM_ANSWER_MODES) },
+            mode: {
+              enum: VALID_LOGIC_ANSWER_MODES
+                .concat(VALID_NONOGRAM_ANSWER_MODES)
+                .concat(VALID_FILLED_GRID_ANSWER_MODES)
+            },
             category: { type: 'string' },
-            subject: { type: 'string' }
+            subject: { type: 'string' },
+            // The filled grids' rule: name the cells to read and the order to
+            // read them in. 1-based, and bounds-checked against the actual
+            // board by the solver, which is the only reader that knows its size.
+            cells: {
+              type: 'array',
+              minItems: 1,
+              items: {
+                type: 'object',
+                required: ['row', 'col'],
+                additionalProperties: false,
+                properties: {
+                  row: { type: 'integer', minimum: 1 },
+                  col: { type: 'integer', minimum: 1 }
+                }
+              }
+            }
           }
         },
         difficulty: { $ref: '#/$defs/puzzleDifficulty' },
@@ -1268,6 +1290,77 @@ export var BOOKLET_SCHEMA = {
           minItems: 3,
           maxItems: G.nonogram.renderMaxSize,
           items: { type: 'string', pattern: '^[A-Za-z0-9.]+$' }
+        },
+
+        // ── sudoku ──────────────────────────────────────────────────────────
+        // The board is boxWidth x boxHeight on a side, so the sub-block shape
+        // and the board size are one declaration rather than two that can
+        // disagree. There is deliberately NO solution field: the givens are the
+        // puzzle and the solver derives the rest, so there is nothing for a
+        // declared solution to contradict.
+        boxWidth: { type: 'integer', minimum: 2, maximum: 3 },
+        boxHeight: { type: 'integer', minimum: 2, maximum: 3 },
+        givens: {
+          type: 'array',
+          minItems: G.sudoku.minSide,
+          maxItems: G.sudoku.maxSide,
+          items: { type: 'string', pattern: '^[.1-9]+$' }
+        },
+
+        // ── kakuro ──────────────────────────────────────────────────────────
+        // "#" is a block cell, "." is a cell the player writes a digit in. Row 1
+        // and column 1 are all block cells, because a run's total is printed in
+        // the cell above or to the left of it and the grid edge cannot hold one.
+        layout: {
+          type: 'array',
+          minItems: G.kakuro.minSize,
+          maxItems: G.kakuro.renderMaxSize,
+          items: { type: 'string', pattern: '^[#.]+$' }
+        },
+        sums: {
+          type: 'array',
+          minItems: 1,
+          items: {
+            type: 'object',
+            required: ['row', 'col'],
+            additionalProperties: false,
+            properties: {
+              row: { type: 'integer', minimum: 1 },
+              col: { type: 'integer', minimum: 1 },
+              down: { type: 'integer', minimum: 3 },
+              right: { type: 'integer', minimum: 3 }
+            }
+          }
+        },
+
+        // ── kenken ──────────────────────────────────────────────────────────
+        size: { type: 'integer', minimum: G.kenken.minSize, maximum: G.kenken.renderMaxSize },
+        cages: {
+          type: 'array',
+          minItems: 2,
+          items: {
+            type: 'object',
+            required: ['cells', 'operation', 'target'],
+            additionalProperties: false,
+            properties: {
+              cells: {
+                type: 'array',
+                minItems: 1,
+                maxItems: G.kenken.maxCageCells,
+                items: {
+                  type: 'object',
+                  required: ['row', 'col'],
+                  additionalProperties: false,
+                  properties: {
+                    row: { type: 'integer', minimum: 1 },
+                    col: { type: 'integer', minimum: 1 }
+                  }
+                }
+              },
+              operation: { enum: VALID_KENKEN_OPERATIONS },
+              target: { type: 'integer', minimum: 1 }
+            }
+          }
         }
       },
       allOf: [
@@ -1280,6 +1373,30 @@ export var BOOKLET_SCHEMA = {
           then: {
             required: ['rowClues', 'colClues', 'letterGrid'],
             properties: { answerFrom: { properties: { mode: { enum: VALID_NONOGRAM_ANSWER_MODES } } } }
+          }
+        },
+        // The three filled grids share one answer mode and differ only in what
+        // they must ALSO carry, which is why they are three short rows rather
+        // than one clever one.
+        {
+          if: { properties: { kind: { const: 'sudoku' } }, required: ['kind'] },
+          then: {
+            required: ['boxWidth', 'boxHeight', 'givens'],
+            properties: { answerFrom: { required: ['cells'], properties: { mode: { enum: VALID_FILLED_GRID_ANSWER_MODES } } } }
+          }
+        },
+        {
+          if: { properties: { kind: { const: 'kakuro' } }, required: ['kind'] },
+          then: {
+            required: ['layout', 'sums'],
+            properties: { answerFrom: { required: ['cells'], properties: { mode: { enum: VALID_FILLED_GRID_ANSWER_MODES } } } }
+          }
+        },
+        {
+          if: { properties: { kind: { const: 'kenken' } }, required: ['kind'] },
+          then: {
+            required: ['size', 'cages'],
+            properties: { answerFrom: { required: ['cells'], properties: { mode: { enum: VALID_FILLED_GRID_ANSWER_MODES } } } }
           }
         }
       ]
