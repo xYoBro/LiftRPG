@@ -278,6 +278,7 @@ import {
   RECKONING_SINK_KINDS,
   RECKONING_THRESHOLD_RATIO,
   OUTPUT_BUDGETS,
+  PAGE_FILL_THIN_RATIO,
   LUDIC_LIBRARY,
   LUDIC_LIBRARY_ATOMS,
   VALID_DYNAMIC_MARKINGS,
@@ -345,6 +346,9 @@ export {
   // became stage-blocking: api-generator.js reads them through here to stamp
   // maxLength onto the structured schemas the compat transports enforce.
   OUTPUT_BUDGETS,
+  // The report-class lens over those caps (the depth wave): quality.js is the
+  // only reader, and it warns rather than scoring.
+  PAGE_FILL_THIN_RATIO,
   // ── The Ludic Spine (W4a) ──────────────────────────────────────────────
   // The play vocabulary and its one ref grammar. Re-exported, never
   // re-declared: parseSurfaceRef has a single home (D93) and the floors, the

@@ -8,7 +8,11 @@ import {
   // SAME die the prompt handed out and the floor checked — one home, three
   // consumers — which is what lets it audit a finished book from the seed
   // recorded on it rather than from anything it had to be told.
-  IDENTITY_AXES, drawSeedAssignments, readAxisValue, familyRefusesGeometry
+  IDENTITY_AXES, drawSeedAssignments, readAxisValue, familyRefusesGeometry,
+  // The prose caps and the report-class lens over them (VISION §8, the depth
+  // wave). The caps have one home; this file never restates a number, it only
+  // measures against them.
+  OUTPUT_BUDGETS, PAGE_FILL_THIN_RATIO
 } from './constants.js';
 import { normalizeId, normalizeThemeArchetype } from './assembly.js';
 import { validateAssembledBooklet, extractRosterNouns } from './validation.js';
@@ -475,6 +479,134 @@ export function collectIdentitySourceFindings(booklet, report) {
   return audit.defaults.length;
 }
 
+// ── The page-fill report (VISION §8's density law; the depth wave) ──────────
+// The depth wave raised three prose caps because the surfaces they govern were
+// printing half-empty pages. A raised cap is a PERMISSION, not an outcome: the
+// model may take it or leave it, and the difference is invisible until someone
+// measures. This is the measurement.
+//
+// WHAT IT MEASURES, and what it deliberately does not. It reads authored
+// character counts against the caps in OUTPUT_BUDGETS — the caps that were
+// themselves derived from page geometry, so a surface at 95% of its budget is a
+// surface filling the page its budget was cut from. It does NOT measure pixels:
+// that needs a DOM, and the instrument for it is the browser-side overflow scan
+// (element-overflow-scan.mjs). Naming it page fill is a claim about what the
+// number is FOR, not about what it touched.
+//
+// REPORT-CLASS BY CONSTRUCTION, the D149 discipline: findings go into
+// `report.warnings` and `report.pageFill` and never into `weakSpots`, so
+// QUALITY_BLOCKING_AREAS cannot be taught to block on them by accident. The
+// density law is a direction to travel, not a bar to clear — a brief that wants
+// a spare, white book is a legitimate book, and a gate here would forbid it.
+//
+// SKIP WITH A REASON, never a silent zero (D134's law). A book with no
+// interludes has no interlude fill, and reporting that as 0% would read as the
+// worst possible result for a surface that was never in play.
+var PAGE_FILL_SURFACES = [
+  { id: 'storyPrompt', label: 'session prompts', cap: 'storyPrompt' },
+  { id: 'fragmentBody', label: 'found documents', cap: 'fragmentBody' },
+  { id: 'interludeBody', label: 'interludes', cap: 'interludeBody' },
+  { id: 'endingBody', label: 'endings', cap: 'endingBody' }
+];
+
+/** Authored lengths for one surface family, in printed order. */
+function pageFillLengths(booklet, id) {
+  var lengths = [];
+  var weeks = (booklet && booklet.weeks) || [];
+  if (id === 'storyPrompt') {
+    weeks.forEach(function (week) {
+      ((week && week.sessions) || []).forEach(function (session) {
+        var text = String((session && session.storyPrompt) || '').trim();
+        if (text) lengths.push(text.length);
+      });
+    });
+  } else if (id === 'interludeBody') {
+    weeks.forEach(function (week) {
+      var body = String(((week && week.interlude) || {}).body || '').trim();
+      if (body) lengths.push(body.length);
+    });
+  } else if (id === 'fragmentBody') {
+    ((booklet && booklet.fragments) || []).forEach(function (fragment) {
+      var raw = fragment && (fragment.content || fragment.body);
+      var text = String(typeof raw === 'string' ? raw : ((raw || {}).html || '')).trim();
+      if (text) lengths.push(text.length);
+    });
+  } else if (id === 'endingBody') {
+    ((booklet && booklet.endings) || []).forEach(function (ending) {
+      var text = String((((ending || {}).content) || {}).body || '').trim();
+      if (text) lengths.push(text.length);
+    });
+  }
+  return lengths;
+}
+
+/**
+ * auditPageFill(booklet) -> { surfaces: [...], thin: [...] }
+ *
+ * One row per budgeted prose surface: how many the book printed, the mean and
+ * the longest, and what fraction of the surface's budget that mean represents.
+ * Rows with nothing to measure carry `skipped` and a reason instead of a ratio.
+ */
+export function auditPageFill(booklet) {
+  var surfaces = [];
+  var thin = [];
+
+  PAGE_FILL_SURFACES.forEach(function (surface) {
+    var cap = OUTPUT_BUDGETS[surface.cap];
+    var lengths = pageFillLengths(booklet, surface.id);
+    if (!lengths.length) {
+      surfaces.push({
+        id: surface.id, label: surface.label, cap: cap, count: 0,
+        skipped: 'this book prints none — a surface that was never in play has no fill to report'
+      });
+      return;
+    }
+    var total = lengths.reduce(function (sum, n) { return sum + n; }, 0);
+    var mean = Math.round(total / lengths.length);
+    var row = {
+      id: surface.id, label: surface.label, cap: cap, count: lengths.length,
+      mean: mean, longest: Math.max.apply(null, lengths),
+      shortest: Math.min.apply(null, lengths),
+      fill: cap > 0 ? Math.round((mean / cap) * 100) / 100 : 0,
+      skipped: null
+    };
+    surfaces.push(row);
+    if (row.fill < PAGE_FILL_THIN_RATIO) thin.push(row);
+  });
+
+  return { surfaces: surfaces, thin: thin };
+}
+
+/**
+ * collectPageFillFindings(booklet, report) -> thin-surface count
+ *
+ * The report surface. Warnings only, by construction — see the header.
+ */
+export function collectPageFillFindings(booklet, report) {
+  var audit = auditPageFill(booklet);
+  report.pageFill = audit;
+
+  var measured = audit.surfaces.filter(function (row) { return !row.skipped; });
+  if (!measured.length) {
+    report.warnings.push('Page fill: SKIPPED — this book prints none of the budgeted prose surfaces');
+    return 0;
+  }
+  report.warnings.push('Page fill: ' + measured.map(function (row) {
+    return row.label + ' ' + Math.round(row.fill * 100) + '% of ' + row.cap
+      + ' (n=' + row.count + ', mean ' + row.mean + ')';
+  }).join(', ') + '.');
+
+  audit.thin.forEach(function (row) {
+    report.warnings.push('Page fill THIN: ' + row.label + ' average ' + row.mean
+      + ' characters against a budget of ' + row.cap + ' ('
+      + Math.round(row.fill * 100) + '%) — under the density law (VISION §8) the cap is the'
+      + ' page\'s limit, not caution\'s, and a surface running this far under it is printing'
+      + ' white space the page was measured to hold text in. Report-class: a spare book the'
+      + ' brief asked for is legitimate, and nothing here blocks delivery.');
+  });
+  return audit.thin.length;
+}
+
 export var QUALITY_BLOCKING_AREAS = {
   'artifact-monoculture': { target: 'fragments' },
   'board-monotony': { target: 'weeks' },
@@ -566,6 +698,11 @@ export function generateQualityReport(booklet) {
   // warnings and an `identitySources` block, and never a weakSpot — so
   // QUALITY_BLOCKING_AREAS cannot be taught to block on it by accident.
   collectIdentitySourceFindings(booklet, report);
+  // The density law's lens (VISION §8, the depth wave). Report-class on the
+  // same terms: warnings and a `pageFill` block, never a weakSpot, never a
+  // score input — a raised cap is a permission and this is how anyone finds
+  // out whether it was taken.
+  collectPageFillFindings(booklet, report);
   report.scores.schemaCompleteness = report.schemaErrors.length === 0
     ? { score: 1, label: validatorWarnings.length > 0 ? validatorWarnings.length + ' warnings' : 'clean' }
     : { score: Math.max(0, 1 - report.schemaErrors.length * 0.1), label: report.schemaErrors.length + ' errors' };

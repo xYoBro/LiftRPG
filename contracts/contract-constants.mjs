@@ -1285,6 +1285,21 @@ export function isDoorLeaningFamily(family) {
 // budgets them HARDER than prose on purpose. The empty page was never a
 // session page.
 
+// THE LENS THAT WATCHES THE RAISE (VISION §8; the depth wave's report axis).
+// A raised cap is a permission, not an outcome — the model can take it or leave
+// it, and the only way to know which is to measure. PAGE_FILL_THIN_RATIO is the
+// line below which a surface is reported as running thin: mean authored length
+// under half of what its page was budgeted to hold.
+//
+// REPORT-CLASS AND ARBITRARY, in the D19 sense and stated as plainly as
+// POINTER_BUDGETS states it about itself. Half is a lens, not a law: it was
+// chosen because at the moment of the raise every measured surface sat at
+// 95-99% of its OLD cap, so a book that lands under 50% of the new one has
+// changed behaviour rather than merely varied. quality.js auditPageFill() is
+// the only reader, it writes warnings and never a weakSpot, and nothing in
+// QUALITY_BLOCKING_AREAS can reach it.
+export var PAGE_FILL_THIN_RATIO = 0.5;
+
 export var OUTPUT_BUDGETS = {
   storyPrompt: 220, fragmentBody: 1050, interludeBody: 700, endingBody: 2400,
   microLineCondition: 90, microLineCue: 120, citedAs: 90,
