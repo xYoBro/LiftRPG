@@ -2222,6 +2222,14 @@
       '',
       window.INST_ARTIFACT_COMPILER.join('\n'),
       '',
+      // The compiler's Steps 7/7a/9 menus (D144). This is the S+F pipeline's
+      // compiler seat, so it owes the same three choices the shell stage owes —
+      // and the shell family, the ecology and the pull are declared HERE or
+      // nowhere on this path. Routed by hand rather than through
+      // STAGE_SCHEMA_MAP because this builder predates the stage map and
+      // assembles INST_ARTIFACT_COMPILER by hand too; the pair moves together.
+      window.INST_SHELL_CHOICE.join('\n'),
+      '',
       // The skeleton authors meta.literaryRegister (the voiceSpec) and
       // meta.worldContract (the knowing) — both are prose law, so the doctrine
       // travels with the stage that writes them. Content lives in prompt_rules.

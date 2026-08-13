@@ -45,6 +45,10 @@ import {
   // structured schemas below so a compat transport enforces what the stage
   // validators enforce.
   VALID_COMPONENT_DIALECTS,
+  // D144: the shell and the board become bounded choices on the transport, the
+  // same way the dialect already was. See STRUCTURED_SCHEMA_SHELL below.
+  VALID_SHELL_FAMILIES,
+  VALID_BOARD_STATE_MODES,
   OUTPUT_BUDGETS,
   // D128 → W4a: pipeline debris lives under `_x`, the only home the schema
   // has ever allowed it. These two are the whole move — a direct
@@ -560,14 +564,23 @@ var STRUCTURED_SCHEMA_SHELL = {
               ]
             },
             authorialMode: { type: 'string' },
-            boardStateMode: { type: 'string' },
+            // ── The shell and the board, ENUM-CONSTRAINED (D144) ────────────
+            // Measured: the real shell prompt named zero of the eight shell
+            // families, and this literal accepted any string, so nothing in the
+            // whole standard pipeline either offered a menu or refused an
+            // off-menu answer. componentDialect below has been the template
+            // since the Teeth Round; these two now match it. Imported rather
+            // than quoted — unlike prompt_rules.js, this file is a module and
+            // both enums are already re-exported through modules/constants.js,
+            // so there is no second copy to drift.
+            boardStateMode: { type: 'string', enum: VALID_BOARD_STATE_MODES },
             documentEcology: { type: 'string' },
             materialCulture: { type: 'string' },
             openingMode: { type: 'string' },
             rulesDeliveryMode: { type: 'string' },
             revealShape: { type: 'string' },
             unlockLogic: { type: 'string' },
-            shellFamily: { type: 'string' },
+            shellFamily: { type: 'string', enum: VALID_SHELL_FAMILIES },
             attachmentStrategy: { type: 'string' },
             // Teeth Round F2, mirroring STRUCTURED_SCHEMA_SKELETON's
             // artifactIdentity: the multi-stage shell is the other place a book
@@ -2990,6 +3003,9 @@ async function runApiPipeline(options) {
           weekCount: weekCount,
           totalSessions: totalSessions,
           generationFloors: true,  // F2: componentDialect is declared here or nowhere
+          // D144: the unearned-packet arm of artifactIntentFloorErrors needs the
+          // brief to ask whether an institution was ever in it.
+          brief: brief,
           // ── The earliest-stage pre-flight's inputs (D143) ──
           // The campaign plan ran two stages ago and the program is on the
           // desk; between them they know which weeks will owe a door and which
@@ -4116,7 +4132,11 @@ async function runSkeletonFleshPipeline(options) {
         // and F8 (the companion floor). The skeleton is the only stage that
         // sees the whole book at once, so it is where a book-level floor can
         // be held at all.
-        return validateSkeletonStage(result, weekCount, { generationFloors: true });
+        // `brief` rides along for the D144 unearned-packet arm: a
+        // classified-packet shell over a brief that names no institution owes a
+        // written selectionReason. The floor cannot ask that question without
+        // the brief, and this is the only seat that has it.
+        return validateSkeletonStage(result, weekCount, { generationFloors: true, brief: brief });
       }
     });
     recordSeedOnStage(skeleton, divergenceSeed);

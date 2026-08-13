@@ -544,6 +544,140 @@ export var VALID_SHELL_FAMILIES = [
   'court-packet', 'devotional-manual', 'household-archive', 'technical-manual'
 ];
 
+// ── The shell menu, with reasons (D144) ─────────────────────────────────────
+// THE DEFECT THIS CLOSES, measured 2026-08-13 on the real standard-pipeline
+// shell prompt (77,061 characters): the eight family names appeared ZERO times
+// in it. `shellFamily` appeared once, inside a field list, with no menu, no
+// guidance and no derivation demand. The compiler was asked to declare the
+// artifact's whole filing identity from a vocabulary it was never shown, so it
+// answered from the one shell every LLM already knows how to write — the
+// security packet — and D135's byte-identical government dress across four
+// maximally divergent briefs follows from that alone.
+//
+// A NAME IS NOT A MENU. `VALID_SHELL_FAMILIES` above is an acceptance set; a
+// model shown only the set still has to guess what a `household-archive`
+// refuses that a `court-packet` does not. So each family carries the two
+// clauses that make it CHOOSABLE:
+//
+//   files    — what kind of world files this way. The positive selection cue.
+//   refuses  — what the shell will not do. The discriminator, and the reason
+//              this table is not eight synonyms for "official-looking": a
+//              shell that refuses nothing is a costume.
+//
+// ONE HOME, TWO AUDIENCES (the D124 idiom, and the D106 byte-quoting standard
+// that already binds SHELL_CITATION_STYLES to INST_POINT_OF_USE). This table is
+// the single source; the Step 7a menu in prompt_rules.js quotes both clauses
+// verbatim and `shellMenuParity()` in validate.mjs diffs them both directions,
+// count included. Keys ≡ VALID_SHELL_FAMILIES ≡ SHELL_CITATION_STYLES keys —
+// asserted, because a family with a citation grammar and no reason to be chosen
+// is a family that only gets chosen by accident.
+//
+// `investigation: true` marks the four shells that can carry an INVESTIGATION
+// home pull without becoming a security packet. That flag exists because the
+// two defaults are one defect: a compiler that reads "the player assembles
+// evidence" and knows only one evidence-shaped shell will file a repertory
+// theatre as a classified packet. Four peers break the reflex. The Step 7a
+// literal names exactly these four, derived — never a second hand-kept list.
+export var SHELL_FAMILY_GUIDANCE = {
+  'field-survey': {
+    files: 'a world that goes out and measures the ground itself — sheets filled in where the work happened, stations numbered in the order they were walked',
+    refuses: 'the verdict; a survey records what was found and leaves the judging to whoever reads it later',
+    investigation: true
+  },
+  'classified-packet': {
+    files: 'a world with something to withhold and an apparatus for withholding it — compartments, clearances, a cover sheet naming who may not read on',
+    refuses: 'the personal voice; a packet is assembled by a body that outlives the people inside it',
+    investigation: false
+  },
+  'ship-logbook': {
+    files: 'a world that stands watches — the entry gets made because the hour came, whether or not anything happened in it',
+    refuses: 'hindsight; a log is written forward and does not yet know what it is recording',
+    investigation: false
+  },
+  'witness-binder': {
+    files: 'a world rebuilt out of what people said — statements taken one at a time, tabbed and cross-referenced by someone who was not there',
+    refuses: 'a single authoritative account; the binder\'s whole shape is that the accounts disagree',
+    investigation: true
+  },
+  'court-packet': {
+    files: 'a world where a claim is being decided — exhibits, schedules and recitals filed by parties who each want a different answer',
+    refuses: 'neutrality about the outcome; every document in it was filed BY someone, FOR something',
+    investigation: true
+  },
+  'devotional-manual': {
+    files: 'a world that keeps an observance — offices, rubrics and antiphons telling a practitioner what to do and when, year after year',
+    refuses: 'novelty; the manual\'s authority is that it has said the same thing for a very long time',
+    investigation: false
+  },
+  'household-archive': {
+    files: 'a world that kept its own papers without meaning to — bundles, drawers and loose leaves in no order but the order they were put down in',
+    refuses: 'the finding aid; nobody catalogued this, which is exactly why what is in it surprises the reader',
+    investigation: true
+  },
+  'technical-manual': {
+    files: 'a world that is OPERATED — figures, clauses and procedures written so a competent stranger can keep the thing running',
+    refuses: 'the story of who wrote it; a manual is addressed to whoever is holding it now',
+    investigation: false
+  }
+};
+
+// The four shells that carry an investigation without a security apparatus.
+// DERIVED (D124): flip the flag above and the menu follows. A hand-kept list
+// here would be the second copy that every hand-kept copy in this repo became.
+export var INVESTIGATION_CAPABLE_SHELLS = VALID_SHELL_FAMILIES.filter(
+  function (family) {
+    return !!(SHELL_FAMILY_GUIDANCE[family] && SHELL_FAMILY_GUIDANCE[family].investigation);
+  }
+);
+
+// ── The institutional referent (D136's law, made machine-checkable) ─────────
+// D136 ruled that absent an institutional referent in the brief, classifying
+// the register as institutional is a MISREAD. That law reached the model as
+// prose and reached no gate at all, because nothing could ANSWER "does this
+// brief contain one?" This list is the answer, and it is deliberately narrow:
+// every term names a BODY THAT RUNS ON PROCEDURE, which is what "institutional"
+// has to mean if the word is to exclude anything. A world can be formal,
+// ornate, sinister, hierarchical or rule-bound without containing one of these.
+//
+// Used by the D144 shell floor (a `classified-packet` chosen over a brief with
+// no referent owes a written reason) and byte-quoted into the Step 7a
+// anti-default, both directions, by `shellMenuParity()`.
+//
+// NOT a widening of D136's prose line, which names four of these plus the
+// catch-all "any body that runs on procedure" and stays as it is: that sentence
+// states the REGISTER law to a reader, this array answers a yes/no question for
+// a gate, and the gate is deliberately the more literal of the two.
+export var INSTITUTIONAL_REFERENT_TERMS = [
+  'bureau', 'ministry', 'agency', 'department', 'institute', 'academy',
+  'commission', 'directorate', 'authority', 'tribunal', 'constabulary',
+  'precinct', 'administration', 'secretariat', 'inspectorate'
+];
+
+/**
+ * hasInstitutionalReferent(text) -> boolean
+ *
+ * Whether a brief names a body that runs on procedure. Word-boundary matched
+ * and case-insensitive; plural forms are covered by the trailing `s?`.
+ *
+ * SINGLE HOME (D93), co-located with the list it reads, for the same reason
+ * resolveCitationStyle is: a consumer that rebuilt this predicate would answer
+ * "is this brief institutional?" a second time in its own dialect, and the two
+ * answers would diverge exactly where it mattered. Guarded by
+ * singleDeclarationHomes() in scripts/validate.mjs.
+ *
+ * Consumers: generator/modules/validation.js (the D144 shell floor).
+ */
+export function hasInstitutionalReferent(text) {
+  var haystack = String(text || '');
+  if (!haystack) return false;
+  for (var i = 0; i < INSTITUTIONAL_REFERENT_TERMS.length; i++) {
+    if (new RegExp('\\b' + INSTITUTIONAL_REFERENT_TERMS[i] + 's?\\b', 'i').test(haystack)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // ── Shell citation grammars (§11 Wave 4a) ───────────────────────────────────
 // The pointer form, per shell family. A booklet points at its own surfaces
 // constantly — a micro-line citing the rule it fires under, a fragment citing

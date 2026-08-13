@@ -101,7 +101,12 @@ import {
   VALID_DOCUMENT_RECIPES,
   VALID_MARGIN_SEMANTICS,
   VALID_INK_DISCIPLINES,
-  VALID_SEAL_TREATMENTS
+  VALID_SEAL_TREATMENTS,
+  // D144 — the single home for "does this brief name a body that runs on
+  // procedure?". Imported rather than re-implemented: a private copy here and
+  // the prompt's byte-quoted term list would answer the same question in two
+  // dialects, which is D91's whole anatomy. Guarded by singleDeclarationHomes().
+  hasInstitutionalReferent
 } from '../../contracts/contract-constants.mjs';
 
 // W5b — the Ludic Harvest, tranche 2. THE ONE LAW: no puzzle ships
@@ -1618,10 +1623,46 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
 // with a reading no model ever made — worse than absence, because absence is
 // detectable and a fabricated reading grades as faithful. The floor causes a
 // retry; the retry causes an author.
-export function artifactIntentFloorErrors(meta, where) {
+//
+// ── THE UNEARNED PACKET (D144) ──────────────────────────────────────────────
+// A third parameter, and it is the brief, because the fourth thing this floor
+// now checks cannot be answered from `meta` alone. MEASURED: the shell prompt
+// named zero of the eight shell families, so `classified-packet` was not chosen
+// over the others — it was the only one the model could name. W-1 gives it a
+// menu with peers and an anti-default; this is the half with teeth.
+//
+// DELIBERATELY THE WEAKEST FLOOR IN THE FILE, and that is the ruling rather
+// than a compromise. It does NOT forbid the packet: a customs house, a censor's
+// office and a ministry archive are all legitimately security-shaped, and a
+// gate that refused them would be trading one house aesthetic for another. It
+// demands a SENTENCE — the same `selectionReason` the compiler already owes for
+// every other choice — and only when both halves are true: the shell is the
+// packet AND the brief names no body that runs on procedure. A model that made
+// the choice on purpose writes one line; a model that defaulted has nothing to
+// write, which is exactly the signal.
+//
+// NO BRIEF ⇒ NO CHECK, on purpose. The ungated callers (the guided-build
+// harness, window.LiftRPGAPI.manual) hand-assemble payloads and pass no brief,
+// and a floor that fired on absence would block them for not being the
+// generation path. Absence is silence here, never a failure — the honest shape
+// for a predicate whose input is optional.
+export function artifactIntentFloorErrors(meta, where, brief) {
   var errors = [];
   var prefix = (where || 'Stage') + ' → meta.artifactIntent';
   var intent = (meta && typeof meta === 'object') ? meta.artifactIntent : null;
+
+  var identity = (meta && typeof meta === 'object' && meta.artifactIdentity
+    && typeof meta.artifactIdentity === 'object') ? meta.artifactIdentity : {};
+  var shellFamily = String(identity.shellFamily || '').trim().toLowerCase();
+  var briefText = String(brief || '').trim();
+  var reason = String((intent && intent.selectionReason) || '').trim();
+  if (shellFamily === 'classified-packet' && briefText && !hasInstitutionalReferent(briefText) && !reason) {
+    errors.push((where || 'Stage') + ' → meta.artifactIdentity.shellFamily is "classified-packet" '
+      + 'and the brief names no bureau, ministry, agency, department or any other body that runs '
+      + 'on procedure — so this is the default, not a choice, unless meta.artifactIntent.selectionReason '
+      + 'says what in the brief put it there. Seven other shells are on the menu, four of them carry '
+      + 'an investigation, and a world can be formal, sinister or rule-bound without being an institution.');
+  }
   if (!intent || typeof intent !== 'object') {
     errors.push(prefix + ' is absent — the artifact planning bundle is this stage\'s '
       + 'binding output (reading, arcFamily, mechanicGrammarFamily); every later stage writes '
@@ -1887,7 +1928,10 @@ export function validateShellSchema(shell, expectedOptions) {
     // ── The artifact-intent floor (W3 corrective wave, F07) ──
     // Same argument as the spine below: the standard pipeline runs the compiler
     // HERE, so the planning bundle is declared here or nowhere on this path.
-    errors = errors.concat(artifactIntentFloorErrors(shell.meta, 'Shell'));
+    // The brief rides expectedOptions for the D144 unearned-packet arm; every
+    // other arm of this helper reads meta alone, and a caller that passes no
+    // brief simply does not run that arm (see the helper's header).
+    errors = errors.concat(artifactIntentFloorErrors(shell.meta, 'Shell', (expectedOptions || {}).brief));
 
     // ── The design-language floor (W6's close) ──
     // Here and ONLY here, and the asymmetry with every floor beside it is a
@@ -5993,7 +6037,7 @@ export function validateSkeletonStage(result, weekCount, options) {
   // advisory, and every ungated caller (the guided-build harness, the manual
   // API) keeps its silence.
   if (floorsOn(options)) {
-    var intentFloor = artifactIntentFloorErrors(meta, 'Skeleton');
+    var intentFloor = artifactIntentFloorErrors(meta, 'Skeleton', (options || {}).brief);
     if (intentFloor.length) return intentFloor.join('; ');
   }
 

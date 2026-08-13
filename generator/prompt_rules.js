@@ -861,8 +861,31 @@
           artifactIdentity: {
             type: 'object',
             properties: {
-              artifactClass: { type: 'string' }, shellFamily: { type: 'string' },
-              boardStateMode: { type: 'string' }, attachmentStrategy: { type: 'string' },
+              artifactClass: { type: 'string' },
+              // ── The shell and the board, ENUM-CONSTRAINED (D144) ─────────
+              // componentDialect below is the template, and the argument is the
+              // same one: an unbounded `type: 'string'` on a closed enum lets a
+              // compat transport accept anything, so the only thing steering the
+              // answer was a menu the prompt did not carry. Now the prompt
+              // carries one (INST_SHELL_CHOICE Step 7a) and the transport
+              // enforces it, which is what makes the choice a choice rather than
+              // a default. Quoted rather than imported for the reason every enum
+              // in this file is: prompt_rules.js is a classic browser script and
+              // cannot import contract-constants.mjs. `shellMenuParity()` in
+              // validate.mjs diffs both literals against the enums, both
+              // directions, so a family added there is enforced here or the
+              // build fails.
+              shellFamily: {
+                type: 'string',
+                enum: ['field-survey', 'classified-packet', 'ship-logbook', 'witness-binder',
+                  'court-packet', 'devotional-manual', 'household-archive', 'technical-manual']
+              },
+              boardStateMode: {
+                type: 'string',
+                enum: ['survey-grid', 'node-graph', 'timeline-reconstruction', 'testimony-matrix',
+                  'ledger-board', 'route-tracker', 'profile-assembly', 'player-drawn']
+              },
+              attachmentStrategy: { type: 'string' },
               // Teeth Round F2. Required HERE by generation policy for the same
               // reason the recorded reading is: this literal is what a compat
               // transport enforces, and an optional bounded choice is a choice
@@ -1200,6 +1223,9 @@
     'any body that runs on procedure), classifying either signal as institutional is a MISREAD, and it',
     'misfunds every document, character and mechanic chosen downstream. A world can be formal, ornate,',
     'sinister or rule-bound without being an institution.',
+    'THE ONE EXCEPTION: institutional may be one DECLARED HALF of a contrast the brief\'s own words',
+    'support, when `briefEvidence` names both halves. A collision you argued for is a reading; a',
+    'classification nothing in the brief asked for is not.',
     '',
     'These extracted signals own the story. The design bias in the prompt owns the game mechanics. They do not compete.',
     'Brief interpretation overrides: storyLens, characterWeb, secretShapes, arcMoves from the design bias.',
@@ -2244,6 +2270,99 @@
     'deck is still a tally strip, and the player finds out on page one.'
   ];
 
+  // ── The three unchosen choices (D144) ─────────────────────────────────────
+  // MEASURED, not suspected. The real standard-pipeline shell prompt is 77,061
+  // characters and contains the string `field-survey` zero times — and
+  // `classified-packet`, `ship-logbook`, `witness-binder`, `court-packet`,
+  // `devotional-manual`, `household-archive` and `technical-manual` zero times
+  // each. `shellFamily` appears once, inside a field list. The compiler has been
+  // declaring the artifact's whole filing identity from a vocabulary no prompt
+  // surface ever showed it, and it answered the way anything answers an
+  // unmenued question: with the most available option. That is the mechanism
+  // under D135's byte-identical government dress, and it is not a taste problem.
+  //
+  // Three choices had the same shape and are fixed together, because they fail
+  // together: the SHELL (what kind of object this is), the DOCUMENT ECOLOGY
+  // (what it is made of) and the HOME PULL (why the reader opens it). Each now
+  // gets a menu with peers, a derivation demand in D136's exact form, and an
+  // anti-default naming the specific reflex it has to beat.
+  //
+  // ROUTING: `shell` + `skeleton`, and DELIBERATELY NOT the single-prompt
+  // bundle. Two independent reasons, and either one alone would be enough.
+  // (1) The ceiling: the real paste prompt measures 114,307 of its ratified
+  // 115,000 characters, and this section is ~4,000. Landing it there would
+  // require a compression ruling first (D136's standing condition), which is an
+  // author decision and not this wave's. (2) The precedent: DESIGN_LANGUAGE
+  // (D139) and the puzzle sections (D132) are stage-only for the same arithmetic
+  // and the paste path renders as its archetype, which is what an archetype is
+  // for. The compiler's own Steps 7 and 9 are UNCHANGED on every surface, so
+  // nothing here is pointed at from a path that lacks it — the dangling-pointer
+  // defect Step 5c earned in D111.
+  //
+  // The table's two clauses per family are BYTE-QUOTED from SHELL_FAMILY_GUIDANCE
+  // in contracts/contract-constants.mjs and diffed both directions by
+  // `shellMenuParity()` in validate.mjs, count included, along with the
+  // investigation line and the institutional-referent terms. One home, one menu
+  // (D124): a shell added there is offered here or the build fails.
+  window.INST_SHELL_CHOICE = [
+    '## Choosing the Shell, the Ecology and the Pull (compiler Steps 7, 7a, 9)',
+    'Three of the compiler\'s choices decide what this artifact IS before a word of it is',
+    'written. Each one below is a MENU, and each one is under the derivation law: the answer',
+    'must be traceable to words the brief actually contains. Name the phrase in',
+    '`selectionReason`. "It fit best" is not a derivation.',
+    '',
+    '### Step 7a: Choose the shell',
+    'Set `artifactIdentity.shellFamily` to exactly one of these eight. The shell is the KIND OF',
+    'DOCUMENT SET this book is — it decides the chrome, the citation grammar, the voice of every',
+    'label, and what the reader thinks they are holding.',
+    '',
+    '| Shell family | What kind of world files this way | What it refuses |',
+    '|---|---|---|',
+    '| `field-survey` | a world that goes out and measures the ground itself — sheets filled in where the work happened, stations numbered in the order they were walked | the verdict; a survey records what was found and leaves the judging to whoever reads it later |',
+    '| `classified-packet` | a world with something to withhold and an apparatus for withholding it — compartments, clearances, a cover sheet naming who may not read on | the personal voice; a packet is assembled by a body that outlives the people inside it |',
+    '| `ship-logbook` | a world that stands watches — the entry gets made because the hour came, whether or not anything happened in it | hindsight; a log is written forward and does not yet know what it is recording |',
+    '| `witness-binder` | a world rebuilt out of what people said — statements taken one at a time, tabbed and cross-referenced by someone who was not there | a single authoritative account; the binder\'s whole shape is that the accounts disagree |',
+    '| `court-packet` | a world where a claim is being decided — exhibits, schedules and recitals filed by parties who each want a different answer | neutrality about the outcome; every document in it was filed BY someone, FOR something |',
+    '| `devotional-manual` | a world that keeps an observance — offices, rubrics and antiphons telling a practitioner what to do and when, year after year | novelty; the manual\'s authority is that it has said the same thing for a very long time |',
+    '| `household-archive` | a world that kept its own papers without meaning to — bundles, drawers and loose leaves in no order but the order they were put down in | the finding aid; nobody catalogued this, which is exactly why what is in it surprises the reader |',
+    '| `technical-manual` | a world that is OPERATED — figures, clauses and procedures written so a competent stranger can keep the thing running | the story of who wrote it; a manual is addressed to whoever is holding it now |',
+    '',
+    'FOUR OF THESE CARRY AN INVESTIGATION without a security apparatus: `field-survey`,',
+    '`witness-binder`, `court-packet`, `household-archive`. If the player is assembling evidence,',
+    'these are your peers — a survey, a binder of statements, a filed claim and a drawer of family',
+    'papers are all evidence-shaped, and none of them needs a security apparatus to be one.',
+    '',
+    'ANTI-DEFAULT. `classified-packet` is a PEER on this list, never the default. A brief that',
+    'names no bureau, ministry, agency, department, institute, academy, commission, directorate,',
+    'authority, tribunal, constabulary, precinct, administration, secretariat or inspectorate does',
+    'not file as a security packet. Redaction bars, clearance stamps and cover sheets are the',
+    'furniture of one specific world; a theatre, a household, a ship, a congregation and a',
+    'workshop each keep records, and',
+    'none of them keeps them like that. If you choose `classified-packet` over a brief with no',
+    'such body in it, `selectionReason` must say what in the brief\'s own words put it there.',
+    '',
+    'The shell and the archetype are different questions. The archetype is how the page LOOKS;',
+    'the shell is what the object IS. A pastoral book can be a court packet; a government-styled',
+    'book can be a household archive. Do not let one choose the other.',
+    '',
+    '### Step 7 (document ecology), under the same law',
+    'Your `documentEcology.dominant` is what this artifact is MADE OF, and it follows the shell',
+    'you just chose plus the brief\'s own nouns — not a general sense of what serious documents',
+    'look like. A repertory theatre files correspondence, transcripts and fieldNotes; a ship',
+    'files fieldNotes and inspections; a household files letters and forms. `memo` and `report`',
+    'are the two the model reaches for when it has not decided, so a booklet that names both as',
+    'dominant owes a phrase from the brief that put an office in it.',
+    '',
+    '### Step 9 (home pull), under the same law',
+    '`homePull` is what brings the lifter back to the book on a rest day, and all four values',
+    'are peers: `story` | `game` | `investigation` | `mixed`. `investigation` is a real answer',
+    'for a book with no crime and no agency in it — assembling evidence is a VERB, and a season',
+    'of repairs, a rehearsal block or a shipping route can each be assembled from evidence. It',
+    'is also NOT the safe answer: choose `game` when the return is mechanical progression and',
+    '`story` when it is narrative curiosity, and say in `selectionReason` which phrase in the',
+    'brief decided it.'
+  ];
+
   // ── The Ludic Spine (W4a) ─────────────────────────────────────────────────
   // Routed to the `shell` stage ONLY, because that is the stage that authors
   // meta and therefore the only stage that can write a spine — and because the
@@ -3109,7 +3228,13 @@
   //
   // COUPLING CONTRACT:
   // - If you add a new SCHEMA section, add it here for relevant stages.
-  // - If you add a new INST section, add it here AND to the INSTRUCTIONS reassembly.
+  // - If you add a new INST section, add it here AND to the INSTRUCTIONS reassembly,
+  //   UNLESS it is stage-only by ruling — in which case it goes here, it does NOT
+  //   go in the bundle, and a validator pass asserts BOTH halves of that routing.
+  //   Stage-only today: DESIGN_LANGUAGE (D139), CONDUCTOR (D134), LUDIC_SPINE
+  //   (W4a), POINT_OF_USE / RETURN_LOOP / DOOR_BIAS (Teeth), SHELL_CHOICE (D144).
+  //   Every one of them is off the bundle for the same arithmetic: the paste
+  //   path is hard against its 115,000-character ceiling.
   // - NEVER put schema or instruction content in generator.js or api-generator.js.
 
   var STAGE_SCHEMA_MAP = {
@@ -3132,7 +3257,12 @@
     // single-prompt bundle has no room (D136: 563 chars of headroom), and the
     // D132 puzzle precedent is the model. A paste-path book renders as its
     // archetype, which is what an archetype is for.
-    'shell':          { schemas: ['META', 'THEME', 'DESIGN_LANGUAGE', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
+    // SHELL_CHOICE rides directly behind ARTIFACT_COMPILER because it IS the
+    // compiler's Steps 7/7a/9, moved out of the section only so the ceiling-bound
+    // paste path does not have to carry it (D144). Order is load-bearing: the
+    // model reads Step 7 and Step 9 in the compiler, then reads the menus that
+    // make them choosable, in the same sitting.
+    'shell':          { schemas: ['META', 'THEME', 'DESIGN_LANGUAGE', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'SHELL_CHOICE', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
     // Knowing: the world's process particulars, authored once after the
     // skeleton/shell and consumed by every prose stage (§11 Wave 1.5). It
     // writes no prose, so it carries no VOICE_DISCIPLINE — it carries the
