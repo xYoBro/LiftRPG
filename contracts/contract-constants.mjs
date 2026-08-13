@@ -970,7 +970,13 @@ export var LUDIC_LIBRARY = [
   'door-fork',          // the week's posted choice, priced on the reward side
   'sealed-cache',       // sealed-by-honor content and the key that opens it
   'boss-convergence',   // the convergence ceremony, assembly, and the locked finale
-  'ledger-audit'        // the body audited: first / peak / change per movement
+  'ledger-audit',       // the body audited: first / peak / change per movement
+  // W5b — the harvest's first PROMOTION. `deduction-board` was tier 3 (needs a
+  // new primitive) until the constrained-grid atom and its solver landed; it is
+  // named for what it plays, not for the file, exactly like every entry above.
+  // What is still tier 3 is the ARITHMETIC grid (kakuro, KenKen), which needs a
+  // different solver — see contracts/ludic-library.mjs.
+  'deduction-board'     // the logic grid and the nonogram, proven solvable
 ];
 
 // The binding that makes the library non-aspirational. Keys ≡ LUDIC_LIBRARY
@@ -988,7 +994,8 @@ export var LUDIC_LIBRARY_ATOMS = {
   'door-fork': ['week-header'],
   'sealed-cache': ['fragment-doc'],
   'boss-convergence': ['boss-encounter', 'assembly-page', 'ending'],
-  'ledger-audit': ['ledger-spread']
+  'ledger-audit': ['ledger-spread'],
+  'deduction-board': ['constrained-grid']
 };
 
 // ── Spine budgets ───────────────────────────────────────────────────────────
@@ -1080,6 +1087,54 @@ export var VALID_LEGACY_MOVES = [
   'sealed-by-honour',
   'session-count-gate'
 ];
+
+// ── The puzzle vocabulary (W5b — the Ludic Harvest, tranche 2) ──────────────
+// Two tier-3 families promoted out of the Ludic Library registry, and the ONE
+// law that makes them different from everything else the pipeline generates:
+// NO PUZZLE SHIPS UNSOLVED-BY-MACHINE. Every enum below exists because a
+// deterministic solver (contracts/puzzle-solvers.mjs) has to dispatch on it,
+// which is also why the lists are short — a value with no solver branch is a
+// puzzle the gate cannot refuse, and an unrefusable puzzle is one the player
+// discovers is broken at the gym.
+//
+// KAKURO AND KENKEN ARE DELIBERATELY ABSENT, and so is the dense crossword.
+// The registry entries name them; this enum does not, because a family whose
+// solver has not been written is a family the schema must not accept. When one
+// lands, it is one enum value, one solver branch, and one prompt menu row.
+
+export var VALID_CONSTRAINED_GRID_KINDS = ['logic-grid', 'nonogram'];
+
+// The four clue forms a logic grid may carry. Closed, and closed on purpose:
+// each one is a propagation rule in the solver AND a way the puzzle can be
+// wrong, so a fifth form is a fifth rule and a fifth failure mode. These four
+// are what real logic-grid clues actually say — "X is Y", "X is not Y", "the
+// one who did P also did Q", "the one who did P did not do Q".
+export var VALID_LOGIC_CLUE_TYPES = ['is', 'not', 'same', 'differs'];
+
+// How a solved grid yields the code the economy reads. Every mode is a
+// machine-executable derivation from the SOLUTION — never an assertion about
+// it — because obligation (c) of the solver law is that the printed key is
+// what the puzzle actually produces.
+//
+//   cell        one subject's value in one category
+//   initials    the first letters of a category, in subject order
+export var VALID_LOGIC_ANSWER_MODES = ['cell', 'initials'];
+
+// A nonogram's only answer mode, and the reasoning is in the solver's own
+// header: a picture cannot be key-matched, a sparse grid of characters can.
+// Shade the cells, read the characters that landed inside the picture.
+export var VALID_NONOGRAM_ANSWER_MODES = ['grid-letters'];
+
+export var VALID_WORD_GRID_KINDS = ['word-search'];
+
+// The eight reading directions of a word search. Order is quiet → loud in the
+// sense the difficulty proxy uses: the first three read forwards, the rest
+// read backwards or on a diagonal and cost more to scan.
+export var VALID_WORD_SEARCH_DIRECTIONS = ['E', 'S', 'SE', 'NE', 'W', 'N', 'SW', 'NW'];
+
+//   leftovers   the uncovered cells, row by row — the classic
+//   word        one entry from the list, named by 1-based index
+export var VALID_WORD_GRID_ANSWER_MODES = ['leftovers', 'word'];
 
 // ── Branch refs: `door:W3/A` ────────────────────────────────────────────────
 // An economy edge may declare WHICH SIDE of a fork carries it. Before this,
@@ -1325,7 +1380,54 @@ export var SPATIAL_GUARDRAILS = {
   linearTrack: { minPositions: 3, maxPositions: 12 },
   playerDrawn: { maxPrompts: 4, maxSeedMarkers: 3 },
   cipher: { displayTextMaxChars: 350, extractionInstructionMaxChars: 200 },
-  oracle: { entryCount: 10 }
+  oracle: { entryCount: 10 },
+  // ── The puzzle grids (W5b) ────────────────────────────────────────────────
+  // These guardrails are load-bearing in a way the map ones are not: they are
+  // what keeps the SOLVER's uniqueness proof tractable. The escalation valve
+  // for a pathological puzzle is a tighter number here, never a weaker floor —
+  // "we could not prove it" and "it is broken" are the same thing to a player
+  // holding a pencil.
+  //
+  // Two-tier where the render can honestly absorb more than generation asks
+  // for (the ptp idiom), single-tier where it cannot and the reason is stated.
+  logicGrid: {
+    // Generation policy. Five subjects is the sweet spot for a half-letter
+    // page: the grid is subjects x (subjects x categories) cells, so five by
+    // two is already 5 rows of 10 boxes.
+    minSubjects: 3,
+    maxSubjects: 5,
+    minClues: 2,
+    maxClues: 12,
+    labelMaxChars: 22,
+    // Render ceiling — one more row than generation asks for, because a
+    // six-subject grid still fits and the corpus should not reject a good
+    // hand-authored one. 6! per category is also the point where exhaustive
+    // uniqueness stays instant (720 permutations).
+    renderMaxSubjects: 6,
+    // SINGLE TIER, like concentric: two category groups is what the printed
+    // grid draws. A third group is not denser, it is a second page — and the
+    // solver's cost is (subjects!)^categories, so the ceiling is where the
+    // proof stops being free.
+    maxCategories: 2
+  },
+  nonogram: {
+    // Square-ish and small. Below 5 there is nothing to deduce; above 10 the
+    // clue gutters eat the page and line-solving starts needing search.
+    minSize: 5,
+    maxSize: 10,
+    // Render ceiling. The solver protects itself independently at 30 (32-bit
+    // line masks); this is the printable limit.
+    renderMaxSize: 15
+  },
+  wordSearch: {
+    minSize: 6,
+    maxSize: 12,
+    renderMaxSize: 15,
+    minWords: 4,
+    maxWords: 10,
+    wordMinChars: 3,
+    wordMaxChars: 12
+  }
 };
 
 // ── Crypto contract ──────────────────────────────────────────────────────────

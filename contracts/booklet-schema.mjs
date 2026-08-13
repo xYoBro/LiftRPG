@@ -53,7 +53,14 @@ import {
   VALID_DYNAMIC_MARKINGS,
   SPINE_BUDGETS,
   VALID_GATE_STRUCTURES,
-  VALID_LEGACY_MOVES
+  VALID_LEGACY_MOVES,
+  VALID_CONSTRAINED_GRID_KINDS,
+  VALID_LOGIC_CLUE_TYPES,
+  VALID_LOGIC_ANSWER_MODES,
+  VALID_NONOGRAM_ANSWER_MODES,
+  VALID_WORD_GRID_KINDS,
+  VALID_WORD_SEARCH_DIRECTIONS,
+  VALID_WORD_GRID_ANSWER_MODES
 } from './contract-constants.mjs';
 
 var G = SPATIAL_GUARDRAILS;
@@ -1033,7 +1040,213 @@ export var BOOKLET_SCHEMA = {
         mapState: { $ref: '#/$defs/mapState' },
         cipher: { $ref: '#/$defs/cipher' },
         oracleTable: { $ref: '#/$defs/oracleTable' },
-        companionComponents: { type: 'array', items: { $ref: '#/$defs/companionComponent' } }
+        companionComponents: { type: 'array', items: { $ref: '#/$defs/companionComponent' } },
+        // ── The puzzle grids (W5b) ─────────────────────────────────────────
+        // ADDITIVE-OPTIONAL, the artifactIntent severity split exactly: the
+        // ARTIFACT contract accepts a week with neither (every corpus fixture
+        // predates them and the sealed-corpus rule forbids editing them green),
+        // while GENERATION POLICY offers them from the week menu and the stage
+        // gate REFUSES a puzzle the solver cannot prove.
+        constrainedGrid: { $ref: '#/$defs/constrainedGrid' },
+        wordGrid: { $ref: '#/$defs/wordGrid' }
+      }
+    },
+
+    // ── constrainedGrid (W5b) ───────────────────────────────────────────────
+    // A logic grid or a nonogram, and the FIRST content in this schema whose
+    // correctness is decidable. contracts/puzzle-solvers.mjs proves solvable,
+    // unique and key-matched at the stage gate; this block is only the shape.
+    //
+    // THE ANSWER KEY LIVES HERE AND IS NEVER PRINTED. `answer` (and, for a
+    // word grid, the placements) are what the gate checks the puzzle against —
+    // renderer-inert, the same class as meta.processParticulars (D103). An
+    // atom that renders them has printed the solution next to the puzzle.
+    //
+    // `difficulty` is MACHINE-WRITTEN. The solver measures it and assembly.js
+    // stamps it; the prompt never mentions it, so the model never authors one.
+    // It exists so a later wave can key puzzle hardness to the load curve (the
+    // sudoku-academy law) without re-solving every puzzle to find out how hard
+    // it was. W5b records it and consumes nothing.
+    constrainedGrid: {
+      type: 'object',
+      required: ['kind', 'title', 'answer', 'answerFrom'],
+      additionalProperties: false,
+      properties: {
+        kind: { enum: VALID_CONSTRAINED_GRID_KINDS },
+        title: nonEmptyString,
+        // Printed above the grid: what the player does and what the grid yields.
+        instruction: { type: 'string' },
+        answer: nonEmptyString,
+        answerFrom: {
+          type: 'object',
+          required: ['mode'],
+          additionalProperties: false,
+          properties: {
+            mode: { enum: VALID_LOGIC_ANSWER_MODES.concat(VALID_NONOGRAM_ANSWER_MODES) },
+            category: { type: 'string' },
+            subject: { type: 'string' }
+          }
+        },
+        difficulty: { $ref: '#/$defs/puzzleDifficulty' },
+
+        // ── logic-grid ──────────────────────────────────────────────────────
+        subjects: {
+          type: 'array',
+          minItems: G.logicGrid.minSubjects,
+          maxItems: G.logicGrid.renderMaxSubjects,
+          items: nonEmptyString
+        },
+        categories: {
+          type: 'array',
+          minItems: 1,
+          maxItems: G.logicGrid.maxCategories,
+          items: {
+            type: 'object',
+            required: ['name', 'values'],
+            additionalProperties: false,
+            properties: {
+              name: nonEmptyString,
+              values: {
+                type: 'array',
+                minItems: G.logicGrid.minSubjects,
+                maxItems: G.logicGrid.renderMaxSubjects,
+                items: nonEmptyString
+              }
+            }
+          }
+        },
+        clues: {
+          type: 'array',
+          minItems: G.logicGrid.minClues,
+          maxItems: G.logicGrid.maxClues,
+          items: {
+            type: 'object',
+            // BOTH required, and this is the whole design: `text` is what the
+            // player reads, `constraint` is what the solver reads, and a clue
+            // with only one of them is either unprintable or unprovable.
+            required: ['text', 'constraint'],
+            additionalProperties: false,
+            properties: {
+              text: nonEmptyString,
+              constraint: {
+                type: 'object',
+                required: ['type'],
+                additionalProperties: false,
+                properties: {
+                  type: { enum: VALID_LOGIC_CLUE_TYPES },
+                  subject: { type: 'string' },
+                  category: { type: 'string' },
+                  value: { type: 'string' },
+                  otherCategory: { type: 'string' },
+                  otherValue: { type: 'string' }
+                }
+              }
+            }
+          }
+        },
+
+        // ── nonogram ────────────────────────────────────────────────────────
+        rowClues: {
+          type: 'array',
+          minItems: 3,
+          maxItems: G.nonogram.renderMaxSize,
+          items: { type: 'array', minItems: 1, items: { type: 'integer', minimum: 1 } }
+        },
+        colClues: {
+          type: 'array',
+          minItems: 3,
+          maxItems: G.nonogram.renderMaxSize,
+          items: { type: 'array', minItems: 1, items: { type: 'integer', minimum: 1 } }
+        },
+        // One character per cell, "." for a cell that carries none. Sparse on
+        // purpose — see the solver header: lettering every cell would chain the
+        // key's length to the picture's fill count.
+        letterGrid: {
+          type: 'array',
+          minItems: 3,
+          maxItems: G.nonogram.renderMaxSize,
+          items: { type: 'string', pattern: '^[A-Za-z0-9.]+$' }
+        }
+      },
+      allOf: [
+        {
+          if: { properties: { kind: { const: 'logic-grid' } }, required: ['kind'] },
+          then: { required: ['subjects', 'categories', 'clues'] }
+        },
+        {
+          if: { properties: { kind: { const: 'nonogram' } }, required: ['kind'] },
+          then: {
+            required: ['rowClues', 'colClues', 'letterGrid'],
+            properties: { answerFrom: { properties: { mode: { enum: VALID_NONOGRAM_ANSWER_MODES } } } }
+          }
+        }
+      ]
+    },
+
+    // ── wordGrid (W5b) ──────────────────────────────────────────────────────
+    // A word search: a printed letter grid, a word list, and a declared
+    // placement per word. The placements are the ANSWER KEY — never printed —
+    // and they are what lets the gate prove every word is genuinely in the
+    // grid the player holds and that the leftover letters really do spell the
+    // key. Crisscross and the dense crossword stay in the registry's tier 3
+    // until their own solver floors can be real.
+    wordGrid: {
+      type: 'object',
+      required: ['kind', 'title', 'grid', 'words', 'answer', 'answerFrom'],
+      additionalProperties: false,
+      properties: {
+        kind: { enum: VALID_WORD_GRID_KINDS },
+        title: nonEmptyString,
+        instruction: { type: 'string' },
+        grid: {
+          type: 'array',
+          minItems: 4,
+          maxItems: G.wordSearch.renderMaxSize,
+          items: { type: 'string', pattern: '^[A-Za-z]+$' }
+        },
+        words: {
+          type: 'array',
+          minItems: 1,
+          maxItems: G.wordSearch.maxWords,
+          items: {
+            type: 'object',
+            required: ['word', 'row', 'col', 'direction'],
+            additionalProperties: false,
+            properties: {
+              word: { type: 'string', minLength: G.wordSearch.wordMinChars,
+                maxLength: G.wordSearch.wordMaxChars, pattern: '^[A-Za-z]+$' },
+              // 1-based, so the JSON reads like the printed grid's own
+              // coordinates rather than like an array index.
+              row: { type: 'integer', minimum: 1, maximum: G.wordSearch.renderMaxSize },
+              col: { type: 'integer', minimum: 1, maximum: G.wordSearch.renderMaxSize },
+              direction: { enum: VALID_WORD_SEARCH_DIRECTIONS }
+            }
+          }
+        },
+        answer: nonEmptyString,
+        answerFrom: {
+          type: 'object',
+          required: ['mode'],
+          additionalProperties: false,
+          properties: {
+            mode: { enum: VALID_WORD_GRID_ANSWER_MODES },
+            index: { type: 'integer', minimum: 1 }
+          }
+        },
+        difficulty: { $ref: '#/$defs/puzzleDifficulty' }
+      }
+    },
+
+    // Machine-written, never authored. `basis` names WHICH instrument produced
+    // the number, because a score with no unit is a number two puzzles can
+    // both call 7 while meaning different things.
+    puzzleDifficulty: {
+      type: 'object',
+      required: ['score', 'basis'],
+      additionalProperties: false,
+      properties: {
+        score: { type: 'integer', minimum: 0 },
+        basis: { type: 'string', minLength: 1 }
       }
     },
 

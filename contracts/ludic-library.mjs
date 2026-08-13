@@ -136,6 +136,13 @@ var IMPLEMENTED_DETAIL = {
     outputs: 'The assembly page, the boss encounter, and the ending the assembled value opens.',
     locks: 'Every password element must be collectable on every branch — the finale opens with all of them or none.'
   },
+  'deduction-board': {
+    label: 'The deduction board',
+    inputs: 'A clue set and a grid of pencil cells — subjects against categories, or run lengths against a picture.',
+    process: 'The player deduces cell states from constraints; the completed grid yields a code. A deterministic solver proves every printed puzzle solvable, UNIQUE, and key-matched before the week is accepted, and refuses it with the defect quoted otherwise.',
+    outputs: 'A word, a letter string or a digit string the seal, the assembly or a priced spend reads.',
+    locks: 'The grid is the lock. Nothing ships that a machine cannot finish: two solutions, no solution, or an answer the grid does not yield are all refusals, not warnings.'
+  },
   'ledger-audit': {
     label: 'The ledger audit',
     inputs: 'The player’s own logged numbers, movement by movement.',
@@ -369,13 +376,19 @@ var PROMOTABLE = [
 // Ordered by verifiability, which is the ordering the waves plan chose on
 // purpose: nothing ships a puzzle a machine cannot check.
 var NEEDS_PRIMITIVE = [
+  // W5b PROMOTED the logic grid and the nonogram out of this tier: they are now
+  // `deduction-board` on the implemented shelf. What stayed is the ARITHMETIC
+  // half, and it stayed for one reason — the solver. A logic grid is a
+  // permutation search and a nonogram is a line-solve; a kakuro is a
+  // constrained integer partition, which is neither, and the law is that
+  // nothing ships a puzzle a machine cannot finish.
   {
-    id: 'constrained-grid', label: 'Constrained grids (logic grid, nonogram, kakuro)',
-    inputs: 'A clue set and a grid.',
-    process: 'The player deduces cell states from constraints; the completed grid yields a code.',
-    outputs: 'A coordinate, digit string, or symbol the economy reads.',
-    locks: 'The grid is the lock. Nothing ships unless a deterministic solver proves the puzzle has exactly one solution.',
-    needs: 'A constrained-grid atom with a day-one solver floor (W5b).'
+    id: 'arithmetic-grid', label: 'Arithmetic grids (kakuro, KenKen)',
+    inputs: 'A cage or run structure with target sums, and a digit alphabet.',
+    process: 'The player fills digits so every run or cage hits its target with no repeats; the completed grid yields a digit code.',
+    outputs: 'A digit string the seal or the assembly reads.',
+    locks: 'The grid is the lock. Nothing ships unless a deterministic solver proves exactly one filling.',
+    needs: 'A third solver in contracts/puzzle-solvers.mjs — constrained integer partition with a uniqueness proof — plus one enum value in VALID_CONSTRAINED_GRID_KINDS and one branch in the constrained-grid atom, which already prints a cell matrix. DEFERRED BY RULING at W5b, not blocked: the atom and the schema surface exist, only the proof is missing, and a puzzle whose proof is missing is a puzzle that may not ship.'
   },
   {
     id: 'word-grid', label: 'Word grids (search, crisscross)',

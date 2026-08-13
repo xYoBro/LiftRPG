@@ -85,6 +85,16 @@ import {
   parseBranchRef
 } from '../../contracts/contract-constants.mjs';
 
+// W5b — the Ludic Harvest, tranche 2. THE ONE LAW: no puzzle ships
+// unsolved-by-machine. The solvers are a separate contract module because the
+// renderer must never pay for them (it draws puzzles, it does not solve them)
+// and because Node runs them too, at the floors harness. This module routes
+// severity; puzzle-solvers.mjs decides whether a puzzle is a puzzle.
+import {
+  verifyConstrainedGrid,
+  verifyWordGrid
+} from '../../contracts/puzzle-solvers.mjs';
+
 // Map-evolution fingerprint + companions: one implementation, shared with quality.js.
 // Formerly a private copy here that silently diverged from quality.js's — see D91 and
 // the header of fingerprint.js. Guarded by singleFingerprintHome() in validate.mjs.
@@ -928,6 +938,107 @@ function describeRepTarget(value) {
 }
 
 /**
+ * collectPuzzleFloorErrors(weekObj) -> string[]   (W5b)
+ *
+ * THE SOLVER FLOOR. Two obligations, in this order:
+ *
+ *   1. GENERATION POLICY — the tighter half of the two-tier guardrails. The
+ *      schema accepts up to the RENDER ceiling so a hand-authored corpus book
+ *      is not rejected for being one row bigger than the prompt asks for; this
+ *      floor holds the generation numbers, and it holds them FIRST because a
+ *      grid outside them is one whose uniqueness proof may not be affordable.
+ *      The escalation valve for a pathological puzzle is a tighter number in
+ *      SPATIAL_GUARDRAILS, never a weaker floor here.
+ *
+ *   2. THE PROOF — contracts/puzzle-solvers.mjs actually solves the thing, and
+ *      its errors go straight through unedited. They are written as Correction
+ *      Directives (what is wrong, in the terms the model can fix) precisely so
+ *      that this function does not have to translate them; a floor that
+ *      paraphrases its instrument is a floor that goes stale against it.
+ *
+ * BLOCKING, and gated on generationFloors like every other floor: a hand-loaded
+ * booklet carrying a wobbly puzzle still renders, because the artifact contract
+ * is not the generation contract (D19). The refusal belongs at the stage gate,
+ * where there is still a model to hand it back to.
+ */
+function collectPuzzleFloorErrors(weekObj) {
+  var errors = [];
+  var fieldOps = (weekObj || {}).fieldOps || {};
+
+  var grid = fieldOps.constrainedGrid;
+  if (grid) {
+    var GG = SPATIAL_GUARDRAILS.logicGrid;
+    var GN = SPATIAL_GUARDRAILS.nonogram;
+    if (grid.kind === 'nonogram') {
+      var rows = Array.isArray(grid.rowClues) ? grid.rowClues.length : 0;
+      var cols = Array.isArray(grid.colClues) ? grid.colClues.length : 0;
+      if (rows < GN.minSize || rows > GN.maxSize || cols < GN.minSize || cols > GN.maxSize) {
+        errors.push('fieldOps.constrainedGrid: a generated nonogram must be between '
+          + GN.minSize + 'x' + GN.minSize + ' and ' + GN.maxSize + 'x' + GN.maxSize
+          + ', and this one is ' + rows + 'x' + cols + '.');
+      }
+    } else {
+      var subjects = Array.isArray(grid.subjects) ? grid.subjects.length : 0;
+      var cats = Array.isArray(grid.categories) ? grid.categories : [];
+      var clues = Array.isArray(grid.clues) ? grid.clues.length : 0;
+      if (subjects < GG.minSubjects || subjects > GG.maxSubjects) {
+        errors.push('fieldOps.constrainedGrid: a generated logic grid must have between '
+          + GG.minSubjects + ' and ' + GG.maxSubjects + ' subjects, and this one has ' + subjects + '.');
+      }
+      if (cats.length > GG.maxCategories) {
+        errors.push('fieldOps.constrainedGrid: a logic grid may carry at most '
+          + GG.maxCategories + ' categories, and this one carries ' + cats.length + '.');
+      }
+      if (clues < GG.minClues || clues > GG.maxClues) {
+        errors.push('fieldOps.constrainedGrid: a generated logic grid must carry between '
+          + GG.minClues + ' and ' + GG.maxClues + ' clues, and this one carries ' + clues + '.');
+      }
+      var overlong = [];
+      (Array.isArray(grid.subjects) ? grid.subjects : []).forEach(function (s) {
+        if (String(s).length > GG.labelMaxChars) overlong.push(String(s));
+      });
+      cats.forEach(function (cat) {
+        (Array.isArray((cat || {}).values) ? cat.values : []).forEach(function (v) {
+          if (String(v).length > GG.labelMaxChars) overlong.push(String(v));
+        });
+      });
+      if (overlong.length) {
+        errors.push('fieldOps.constrainedGrid: label(s) longer than ' + GG.labelMaxChars
+          + ' characters (' + overlong.slice(0, 3).join(', ') + ') — the grid prints them in a '
+          + 'column one cell wide, so they wrap the board out of the page.');
+      }
+    }
+
+    verifyConstrainedGrid(grid).errors.forEach(function (msg) {
+      errors.push('fieldOps.constrainedGrid: ' + msg);
+    });
+  }
+
+  var word = fieldOps.wordGrid;
+  if (word) {
+    var GW = SPATIAL_GUARDRAILS.wordSearch;
+    var gridRows = Array.isArray(word.grid) ? word.grid.length : 0;
+    var gridCols = gridRows ? String(word.grid[0] || '').length : 0;
+    var wordCount = Array.isArray(word.words) ? word.words.length : 0;
+    if (gridRows < GW.minSize || gridRows > GW.maxSize || gridCols < GW.minSize || gridCols > GW.maxSize) {
+      errors.push('fieldOps.wordGrid: a generated word search must be between '
+        + GW.minSize + 'x' + GW.minSize + ' and ' + GW.maxSize + 'x' + GW.maxSize
+        + ', and this one is ' + gridRows + 'x' + gridCols + '.');
+    }
+    if (wordCount < GW.minWords || wordCount > GW.maxWords) {
+      errors.push('fieldOps.wordGrid: a generated word search must hide between '
+        + GW.minWords + ' and ' + GW.maxWords + ' words, and this one hides ' + wordCount + '.');
+    }
+
+    verifyWordGrid(word).errors.forEach(function (msg) {
+      errors.push('fieldOps.wordGrid: ' + msg);
+    });
+  }
+
+  return errors;
+}
+
+/**
  * Per-week structural validation. Runs after each week is generated
  * in the pipeline, before proceeding to the next stage.
  * Returns { valid: boolean, errors: string[] }
@@ -1414,6 +1525,8 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
       expectedOptions.playSpine,
       Number(expectedOptions.weekNumber || expectedOptions.currentWeekNumber || weekObj.weekNumber || 0)
     ).forEach(function (msg) { errors.push(msg); });
+
+    collectPuzzleFloorErrors(weekObj).forEach(function (msg) { errors.push(msg); });
   }
 
   if (warnings.length > 0) {

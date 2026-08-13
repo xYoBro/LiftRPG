@@ -397,6 +397,31 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         }));
       }
 
+      // Constrained grid — the deduction board (W5b). Full-width by
+      // footprint: a logic grid is subjects x (values x categories) cells and
+      // a nonogram carries clue gutters on two sides, so neither survives a
+      // half slot. It therefore declares no rowGroup — the engine gives it a
+      // full row, which is placement it decides and this file only enables.
+      if (week.fieldOps && week.fieldOps.constrainedGrid) {
+        atoms.push(createAtom({
+          type: 'constrained-grid',
+          id: `w${wi}-cgrid`,
+          shellAttrs,
+          group: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'cipher', artifactIdentity),
+          groupPolicy: singlePageGroupPolicy(),
+          section: 'body',
+          sequence: wi * 1000 + 103,
+          sizeHint: 'half-page',
+          pageAffinity: 'either',
+          data: {
+            grid: week.fieldOps.constrainedGrid,
+            weekIndex: wi,
+            totalWeeks,
+            artifactIdentity,
+          },
+        }));
+      }
+
       // Clocks panel — see the emission below the boss branch.
 
       // Reckoning panel — see the emission below the boss branch.

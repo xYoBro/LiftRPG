@@ -3046,6 +3046,158 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   --cipher-cell-size:16px;
   --cipher-cell-gap:3px;
 }
+/* ── Constrained grid — the deduction board (W5b) ──
+   Two kinds under one zone: a logic grid (subjects x category values) and a
+   nonogram (run clues above and beside a grid of characters). Structure only;
+   every colour and weight comes from a theme token, and the whole surface
+   reads in B&W because the marks are the player's, in graphite.
+
+   CROSS-FILE CONTRACT: every number in this block and in the three
+   `.cgrid-zone[data-density-variant="…"]` blocks at the bottom of this file is
+   mirrored by the LADDER table in
+   renderer/modules/atoms/constrained-grid.js, which carries the reverse
+   pointer. Phase-1 estimation has no DOM and cannot resolve a custom property,
+   so a token moved here alone makes the solver's shrink math lie (D71).
+   `ladderMirrorHarness()` in scripts/validate.mjs parses both sides.
+
+   THE CELL IS A PENCIL SURFACE AND HAS A FLOOR. `--cgrid-cell` bottoms out at
+   14px at the tight tier — the same floor the reckoning tally holds. The
+   ladder's shrink comes from the label column, the clue leading and the block
+   gaps; it does not come from taking the writing surface away. */
+.cgrid-zone{
+  --cgrid-cell:22px;
+  --cgrid-gap:2px;
+  --cgrid-label-size:5.6pt;
+  --cgrid-label-leading:1.22;
+  --cgrid-row-label-w:96px;
+  --cgrid-clue-size:6.3pt;
+  --cgrid-clue-leading:1.33;
+  --cgrid-clue-gap:3px;
+  --cgrid-instr-size:5.9pt;
+  --cgrid-instr-leading:1.3;
+  --cgrid-block-gap:6px;
+  display:flex;
+  flex-direction:column;
+}
+.cgrid-instruction{
+  font-family:var(--font-body);
+  font-size:var(--cgrid-instr-size);
+  line-height:var(--cgrid-instr-leading);
+  color:var(--muted);
+  margin-bottom:var(--cgrid-block-gap);
+}
+.cgrid-matrix,
+.ngram{
+  display:flex;
+  flex-direction:column;
+  gap:var(--cgrid-gap);
+}
+.cgrid-band,
+.cgrid-head,
+.cgrid-row,
+.ngram-band,
+.ngram-row{
+  display:flex;
+  gap:var(--cgrid-gap);
+  align-items:stretch;
+}
+.cgrid-corner{
+  flex:0 0 var(--cgrid-row-label-w);
+  width:var(--cgrid-row-label-w);
+}
+.ngram-band > .cgrid-corner,
+.ngram-row > .ngram-row-clue{
+  flex:0 0 auto;
+  width:auto;
+  min-width:var(--cgrid-cell);
+}
+.cgrid-cat{
+  /* Spans its own values: N cells plus the N gaps between and after them. */
+  flex:0 0 calc(var(--cgrid-cell) * var(--cgrid-span,1) + var(--cgrid-gap) * (var(--cgrid-span,1) - 1));
+  font-family:var(--font-mono);
+  font-size:var(--cgrid-label-size);
+  line-height:var(--cgrid-label-leading);
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--muted);
+  border-bottom:1px solid var(--rule);
+}
+.cgrid-col-label,
+.cgrid-row-label{
+  font-family:var(--font-mono);
+  font-size:var(--cgrid-label-size);
+  line-height:var(--cgrid-label-leading);
+  color:var(--ink);
+  overflow-wrap:anywhere;
+}
+.cgrid-col-label{
+  flex:0 0 var(--cgrid-cell);
+  width:var(--cgrid-cell);
+}
+.cgrid-row-label{
+  flex:0 0 var(--cgrid-row-label-w);
+  width:var(--cgrid-row-label-w);
+  display:flex;
+  align-items:center;
+}
+.cgrid-cell{
+  flex:0 0 var(--cgrid-cell);
+  width:var(--cgrid-cell);
+  height:var(--cgrid-cell);
+  border:1px solid var(--rule);
+  background:var(--paper);
+  box-sizing:border-box;
+}
+.cgrid-clues{
+  list-style:decimal;
+  margin:var(--cgrid-block-gap) 0 0;
+  padding-left:14px;
+  display:flex;
+  flex-direction:column;
+  gap:var(--cgrid-clue-gap);
+}
+.cgrid-clue{
+  font-family:var(--font-body);
+  font-size:var(--cgrid-clue-size);
+  line-height:var(--cgrid-clue-leading);
+  color:var(--ink);
+}
+/* Nonogram: run numbers stack above each column and read along each row. */
+.ngram-col-clue{
+  flex:0 0 var(--cgrid-cell);
+  width:var(--cgrid-cell);
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-end;
+  align-items:center;
+}
+.ngram-run{
+  font-family:var(--font-mono);
+  font-size:var(--cgrid-label-size);
+  line-height:var(--cgrid-label-leading);
+  color:var(--ink);
+}
+.ngram-row-clue{
+  font-family:var(--font-mono);
+  font-size:var(--cgrid-label-size);
+  line-height:var(--cgrid-label-leading);
+  color:var(--ink);
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  white-space:nowrap;
+  padding-right:3px;
+}
+/* The character a solved cell yields. Quiet on purpose: it is a hint the
+   player rings, not a label — and every unshaded one is a decoy. */
+.ngram-cell{
+  font-family:var(--font-mono);
+  font-size:var(--cgrid-label-size);
+  line-height:var(--cgrid-cell);
+  text-align:center;
+  color:var(--fog);
+}
+
 .map-zone{
   display:flex;
   flex-direction:column;
@@ -7370,6 +7522,48 @@ body[data-demo-view="true"] .reader-unlock{
   margin-top:2px;
 }
 .cipher-zone[data-density-variant="tight"] .cipher-family-note{ display:none; }
+
+/* ── Constrained-grid density ladder (W5b) ──
+   Token resets only, like the cipher's — no per-element rules, because a rule
+   targeting a class the renderer does not emit is silent and the promised
+   shrink is then unrealizable (the defect the cipher ladder was built out of).
+   NOTHING IS HIDDEN AT ANY TIER: the clues and the instruction ARE the puzzle,
+   so unlike the map's note or the cipher's family gloss there is no gloss here
+   to drop. The shrink is the cell's four pixels, the label column, the leading
+   and the gaps, and that is all this ladder promises.
+
+   CROSS-FILE CONTRACT: every number in the three blocks below is mirrored in
+   the LADDER table of renderer/modules/atoms/constrained-grid.js (tier keys
+   match densityVariant()). CHANGE THEM TOGETHER. */
+.cgrid-zone[data-density-variant="compact"]{
+  --cgrid-cell:20px;
+  --cgrid-row-label-w:92px;
+  --cgrid-block-gap:5px;
+}
+.cgrid-zone[data-density-variant="dense"]{
+  --cgrid-cell:17px;
+  --cgrid-label-leading:1.16;
+  --cgrid-row-label-w:84px;
+  --cgrid-clue-size:5.9pt;
+  --cgrid-clue-leading:1.24;
+  --cgrid-clue-gap:2px;
+  --cgrid-instr-size:5.5pt;
+  --cgrid-instr-leading:1.22;
+  --cgrid-block-gap:4px;
+}
+.cgrid-zone[data-density-variant="tight"]{
+  --cgrid-cell:14px;
+  --cgrid-gap:1px;
+  --cgrid-label-size:5.2pt;
+  --cgrid-label-leading:1.12;
+  --cgrid-row-label-w:72px;
+  --cgrid-clue-size:5.6pt;
+  --cgrid-clue-leading:1.18;
+  --cgrid-clue-gap:2px;
+  --cgrid-instr-size:5.2pt;
+  --cgrid-instr-leading:1.16;
+  --cgrid-block-gap:3px;
+}
 
 /* ── Map density ladder ──
    Was print-scoped. Measured effect of that scoping across the 24-zone corpus

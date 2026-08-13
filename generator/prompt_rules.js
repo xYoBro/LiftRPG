@@ -289,6 +289,45 @@
     '- The boss page reveals how raw values become letters for the first time'
   ];
 
+  // ── The puzzle grids (W5b — the Ludic Harvest, tranche 2) ─────────────────
+  // ROUTED TO week-final ONLY, and deliberately absent from SCHEMA_SPEC. The
+  // single-prompt path runs hard against its own character ceiling (the floors
+  // harness asserts it, and this section alone put it 1686 over), so this rides
+  // the stage map exactly the way POINT_OF_USE / RETURN_LOOP / DOOR_BIAS do.
+  // The consequence is stated rather than discovered: the paste path never
+  // offers a puzzle grid, which is the honest trade — an optional new surface
+  // is what a ceiling-bound prompt gives up first.
+  window.SCHEMA_PUZZLES = [
+    '### fieldOps.constrainedGrid (OPTIONAL — the deduction board)',
+    'A logic grid or a nonogram whose completed state yields a code the economy reads. Emit one only on a week that wants a deduction beat; a booklet with none is a legitimate booklet. At most one per week.',
+    '',
+    'THE REFUSAL RULE, AND IT IS ABSOLUTE: a deterministic solver reads every grid before the week is accepted. It proves the puzzle has a solution, that it has EXACTLY ONE, and that the answer you declare is what the solved grid actually yields. Fail any of the three and the week is rejected with the defect quoted back to you. Do not emit a grid you have not solved yourself first.',
+    '- `kind` (string, required): "logic-grid" | "nonogram". No other value is accepted — kakuro, KenKen and sudoku have no solver here yet and are refused.',
+    '- `title` (string, required): diegetic heading, as this world would label the surface.',
+    '- `instruction` (string, optional): one or two lines telling the player what to do and how to read the answer off the finished grid. Never state the answer.',
+    '- `answer` (string, required): the code the finished grid yields. It is NEVER printed — it is what the solver checks the puzzle against and what the seal or the assembly wants.',
+    '- `answerFrom` (object, required): the machine-readable rule that derives the answer from the solution. See each kind below.',
+    '',
+    'LOGIC-GRID:',
+    '- `subjects` (string[]): the rows — the entities being matched. **Limits: 3-5 subjects.** Distinct, and each label 22 characters or fewer.',
+    '- `categories`: [{ name, values }] — one or two column groups, and `values` MUST have exactly as many entries as there are subjects. Each category is a one-to-one match: every subject holds exactly one value and every value is held by exactly one subject.',
+    '- `clues`: [{ text, constraint }] — **2-12 clues.** `text` is the sentence the player reads, in this world\'s voice. `constraint` is the same fact in machine form, and the two MUST agree; the player solves from the text and the solver solves from the constraint.',
+    '- `constraint.type` is a CLOSED enum of four: "is" | "not" | "same" | "differs".',
+    '  "is"      { type, subject, category, value } — this subject holds this value.',
+    '  "not"     { type, subject, category, value } — this subject does not hold it.',
+    '  "same"    { type, category, value, otherCategory, otherValue } — whoever holds `value` also holds `otherValue`. Needs two categories.',
+    '  "differs" { type, category, value, otherCategory, otherValue } — whoever holds `value` does NOT hold `otherValue`. Needs two categories.',
+    '- `answerFrom.mode`: "cell" { mode, category, subject } — the answer is that subject\'s value in that category. Or "initials" { mode, category } — the answer is the first letters of that category\'s values read down the subject list.',
+    '- Build the solution FIRST, then write clues that force it, then check that no other arrangement survives them. A grid with two answers is the commonest failure and it is always caused by writing clues before fixing the solution.',
+    '',
+    'NONOGRAM:',
+    '- `rowClues` / `colClues`: integer[][] — the run lengths for each row and each column, in order. **Limits: 5x5 to 10x10.** The two clue sets describe the same picture, so their totals MUST be equal.',
+    '- `letterGrid`: string[] — one string per row, one character per cell, and "." for a cell that carries no character. SPARSE ON PURPOSE: scatter a handful of letters or digits, some inside the picture and some outside it as decoys.',
+    '- `answerFrom`: { mode: "grid-letters" } — the only mode. The answer is the characters in the SHADED cells, read left to right, top to bottom. A picture alone yields nothing a machine can check, so the letters are how a nonogram becomes a lock.',
+    '- Draw the picture first, derive both clue sets from it, then place the letters so the shaded ones spell the answer.',
+    '',
+  ];
+
   // Later: do not expand document families until we prove the current
   // set can carry threaded evidence, contradiction, and character depth.
   // Favor better fragment function over more fragment categories.
@@ -2056,7 +2095,8 @@
     '  tug-of-war) · `companion-kit` (dashboards, tracks, stats, inventories) ·',
     '  `oracle-pull` (the d100 table) · `door-fork` (the week\\\'s posted choice) ·',
     '  `sealed-cache` (sealed-by-honour content and its key) · `boss-convergence` (the',
-    '  endgame ceremony, assembly and locked finale) · `ledger-audit` (the body audited).',
+    '  endgame ceremony, assembly and locked finale) · `ledger-audit` (the body audited) ·',
+    '  `deduction-board` (a logic grid or a nonogram, machine-proven solvable and unique).',
     '  Entries must be DISTINCT. `role` is a sentence in your own words: what this system',
     '  does in THIS book. "It is the map" is not a role; "the map is the only place a spend',
     '  becomes visible" is.',
@@ -2765,7 +2805,7 @@
     // stage it is false at is worse than doctrine routed nowhere — it spends
     // context telling a model not to do something it cannot do, and teaches it
     // that this prompt's rules may not apply to the shape in front of it.
-    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'MARK_SURFACE', 'PERVASIVE_PLAY', 'POINT_OF_USE', 'RETURN_LOOP', 'DOOR_BIAS', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'CONVERGENCE_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'PROGRESSION_TARGET', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
+    'week-final':     { schemas: ['SINGLE_WEEK', 'SPATIAL', 'WEEKS_POST', 'PUZZLES'],      instructions: ['SESSION_PROMPTS', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'WORKOUT_FUSION', 'MARK_SURFACE', 'PERVASIVE_PLAY', 'POINT_OF_USE', 'RETURN_LOOP', 'DOOR_BIAS', 'DIEGETIC_MECHANICS', 'SYSTEM_INTEGRATION', 'WEEKLY_COMPONENTS', 'CIPHER_DESIGN', 'CONVERGENCE_DESIGN', 'MAPS_BOARD', 'INTERLUDES', 'ORACLES_CLOCKS', 'COMPANIONS', 'PROGRESSION', 'PROGRESSION_TARGET', 'ANTI_SAMENESS', 'ANTI_GENERIC', 'ANTI_PATTERNS', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
     // Fragment: story quality first
     'fragment':       { schemas: ['SINGLE_FRAGMENT'],                           instructions: ['FOUND_DOCUMENTS', 'VOICE_DISCIPLINE', 'POINT_OF_USE', 'ANTI_GENERIC', 'CHARACTER_WEB', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
     // Ending: story quality first (endings are where voice failure concentrates)

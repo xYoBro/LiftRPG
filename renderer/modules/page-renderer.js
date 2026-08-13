@@ -44,7 +44,15 @@ const WORKOUT_PAGE_TYPES = new Set(['week-header', 'session-card']);
 // `page-clocks-panel` shell that no CSS has ever styled; with it, a solo clocks
 // page is a field-ops page with the frame, the board-state title and the week
 // footer that every other field-ops page carries.
-const MECHANIC_PAGE_TYPES = new Set(['cipher-panel', 'oracle-table', 'map-panel', 'clocks-panel', 'tracker']);
+// constrained-grid and word-grid (W5b) are listed for the same reason
+// clocks-panel is: they are full-width by footprint, so a puzzle that does not
+// share a page with a cipher or a map lands alone — and without an entry here
+// that solo page would be built as a `page-constrained-grid` shell no CSS has
+// ever styled, instead of the field-ops page it plainly is.
+const MECHANIC_PAGE_TYPES = new Set([
+  'cipher-panel', 'oracle-table', 'map-panel', 'clocks-panel', 'tracker',
+  'constrained-grid', 'word-grid'
+]);
 const BOARD_STATE_COPY = {
   'survey-grid': {
     pageTitle: 'Field Operations',
