@@ -1310,24 +1310,35 @@
     '',
     'Scale character depth to match the brief:',
     '- **Complex/serious brief:** Name 4-6 recurring characters in the Core Noun Roster. Include at least one intimate dependency, one structural betrayal, one unstable alliance, and one absent/ghostly shadow over the cast. At least 3 fragments should be authored by named ideological rivals. At least one character must radically change stance or be tragically recontextualized by the final third.',
-    '  The structural betrayal needs an ARENA, and the arena is whichever one this brief\'s own register supplies — artistic, communal, commercial, familial, scientific, spiritual, institutional, or another the brief names. Troupes, households and congregations have structures to betray too. `institutional` is one option among these peers, never the resting place: if the brief supplies no institution, betraying one is a misread of the brief.',
+    '  That betrayal has an ARENA — artistic, communal, commercial, familial, scientific, spiritual, institutional, or another this brief names. Troupes and households have structures to betray too. Take the arena the brief supplies; `institutional` is a peer on that list, never the default.',
     '- **Medium brief:** Name 2-3 recurring characters with opposing worldviews. Include at least one dependency and one betrayal or alliance. At least 2 fragments authored by named characters.',
     '- **Light/comedic/simple brief:** 1-2 characters with clear motivation and one relationship that changes. No mandatory betrayal or institutional complexity. At least 1 fragment authored by a named character.',
     '',
     '- Use named characters consistently across storyPrompts, fragments, and interludes at whatever depth the brief demands.'
   ];
 
+  // THE BOSS AXIS (W3 corrective wave, F05). The boss line's middle term was
+  // "institutional knowledge", stated CONJUNCTIVELY and on no branch at all —
+  // so it bound comedies, pastorals and household stories equally, and it rides
+  // three stages (layer-codex, week-final, ending). The darkest-moment line
+  // below already branches on register; this one did not, which is why it was
+  // the reach that survived every light-brief guard in the file.
+  //
+  // Now: the axis is TYPED by the book's own register (a menu), and the whole
+  // line branches — a light brief owes mastery of ITS world, not an
+  // institution's. Menu discipline is D47's: shapes, one clause each, no
+  // worked culmination.
   window.INST_LAYERED_ARC = [
     '## Layered Arc',
     '- Build a real arc, not just clue accumulation.',
     '- At least one week should recontextualize earlier evidence instead of merely adding another clue.',
     '- The midpoint must change interpretation, not just raise stakes.',
-    '- The darkest moment should cost the protagonist something relational, ethical, or institutional, not only tactical convenience.',
     '- Shape the tension curve explicitly:',
     '  Early weeks: establishment, constraint, first mystery, first relationship.',
     '  Midpoint: binary choice that recontextualizes prior evidence AND costs a relationship.',
     '  Late weeks: convergence, darkest moment (relational or ethical cost), escalation.',
-    '  Boss week: culmination that tests spatial mastery, institutional knowledge, and relationship stakes.',
+    '  Boss week: culmination that tests spatial mastery, deep knowledge of this world, and relationship stakes.',
+    '  TYPE that middle axis to this world\'s own register — institutional, scholastic, artisanal, communal, territorial, devotional, or whatever procedure it actually runs on. A light, comic or domestic block tests mastery of ITS world and owes no institution at all.',
     '  These are POSITIONS in the block, not week numbers. A short block compresses them; a long block gives each phase more weeks, and every added week still owes its own beat.',
     '- Unless the block is intentionally comic or the brief signals a lighter register, the darkest moment must cost the protagonist something they cannot recover: a relationship damaged, a belief overturned, an ethical line crossed, or an institutional protection lost.',
     '- The ending must acknowledge the binary choice, the boss outcome, and at least one relationship consequence.'
