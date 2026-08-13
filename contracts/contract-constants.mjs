@@ -1006,8 +1006,132 @@ export var SPINE_BUDGETS = {
   compositionMin: 2,
   compositionMax: 4,
   consequenceWithinWeeksMax: 2,
-  consequenceWithinWeeksDefault: 1
+  consequenceWithinWeeksDefault: 1,
+  // ── The harvest budgets (W5a) ─────────────────────────────────────────────
+  // THREE RUNGS is EXIT's own ladder (clue 1 → clue 2 → solution) and the
+  // ceiling rather than the target: a fourth rung is the answer written twice.
+  // A one-rung "ladder" is a hint, not a ladder, so two is the floor.
+  hintRungsMin: 2,
+  hintRungsMax: 3,
+  // Milestones are the deduction beats a book can carry without becoming a
+  // checklist. Four is the ceiling for the same reason the composition's is:
+  // a book that unlocks five theories has taught the player none of them.
+  milestonesMax: 4,
+  // Ladders per book. One puzzle family stalls a player; five costed ladders
+  // is a walkthrough with a receipt.
+  hintLaddersMax: 3
 };
+
+// ── The harvest vocabulary (W5a — the Ludic Harvest, tranche 1) ─────────────
+// The tier-2 PATTERNS from the Ludic Library registry
+// (contracts/ludic-library.mjs) that landed a declaration surface. Every enum
+// below is quoted into INST_LUDIC_SPINE and checked both directions, the D124
+// idiom: a menu that offers what the floors reject costs a retry the model
+// cannot fix, and a floor that gates on what no menu offers fails every
+// attempt.
+
+// Nicholson's three puzzle organisations, as cited in the escape-room-as-
+// analog-computing analysis. Declared per book, and DERIVABLE from the economy
+// graph — which is the whole reason it is an enum rather than prose: the floor
+// reads the declared structure back off the graph the book actually wired.
+export var VALID_GATE_STRUCTURES = ['open', 'sequential', 'path-based'];
+
+// What each structure OWES the graph. The floor reads these; the prompt quotes
+// them. Stated as numbers rather than adjectives because "several leads" is not
+// checkable and "three feeders into one sink" is.
+//
+//   minChainLength   the longest path in edges the graph must contain
+//   minConvergence   the most distinct feeders any one node must take
+//   minLeads         how many distinct PUZZLE surfaces must sit on a path to a
+//                    sink — the count of live leads, not of source edges, so a
+//                    book cannot satisfy "open" by naming six markStrips
+//
+// THE LADDER IS DELIBERATE AND SEQUENTIAL IS THE WEAKEST CLAIM. Three edges is
+// the canonical LiftRPG pipeline — marks tally, the tally banks, the bank buys
+// something — so a book that wires only that CAN honestly say "sequential", and
+// every connected economy has at least one legal declaration. It is not free:
+// two edges is a tally that banks and never spends, which is a chain with no
+// second question. The other two claims cost real structure, because the thing
+// that distinguishes them from a pipeline is convergence: "open" is Nicholson's
+// several-leads-one-meta (three feeders into one surface) and "path-based" is
+// two lanes that meet. A book with three leads that converge nowhere can
+// declare none of the three, and that is the correct answer rather than a gap —
+// nothing the player earns reaches the finale, which is the founding defect
+// PLAY.md §2 names.
+export var GATE_STRUCTURE_SHAPES = {
+  'open': { minChainLength: 2, minConvergence: 3, minLeads: 3 },
+  'sequential': { minChainLength: 3, minConvergence: 1, minLeads: 1 },
+  'path-based': { minChainLength: 3, minConvergence: 2, minLeads: 2 }
+};
+
+// The legacy moves a pencil can perform. Daviau's permanent change, filtered by
+// the pencil-only law: every one of these is performable with graphite and
+// honour, and none of them needs a sticker, a seal, or a pair of scissors.
+//
+// SPELLING NOTE: `sealed-by-honour` carries the -our the schema comment and the
+// prompt already use ("the honour system IS the mechanism"). PLAY.md §4.2
+// spells the same idea -or in prose. The ENUM is the machine name; the prose is
+// prose. Do not "fix" one to match the other — the parity pass quotes this
+// constant, so a rename here is a rename in the prompt, and nowhere else.
+export var VALID_LEGACY_MOVES = [
+  'cross-out-forever',
+  'permanent-map-mutation',
+  'standing-rule-unlock',
+  'sealed-by-honour',
+  'session-count-gate'
+];
+
+// ── Branch refs: `door:W3/A` ────────────────────────────────────────────────
+// An economy edge may declare WHICH SIDE of a fork carries it. Before this,
+// `doorChoice` carried optionA/optionB with a label and a lean and nothing
+// machine-readable, so the two branches were two names for one thing: the W4b
+// simulated player could only report "reachable through a door, and the spine
+// does not say which side" and had to escalate true per-branch simulation as a
+// product decision. This is that decision, taken.
+//
+// THE GRAMMAR IS A SUFFIX, NOT A NEW KIND, and that is load-bearing. `door:W3`
+// stays one node in the gate graph — the door the player reaches — because a
+// door is TAKEN, not earned, and splitting it into two nodes would make the
+// door itself contingent on itself. The BRANCH rides on the edge instead, so
+// attributing a side never changes the topology, only which walk sees the edge.
+//
+// Exactly two sides, A and B, because `doorChoice` prints exactly two options.
+// A three-way fork is a different printed surface and would need its own.
+export var BRANCH_OPTIONS = ['A', 'B'];
+
+export var BRANCH_REF_PATTERN = '^door:\\s*\\S.*/(?:' + BRANCH_OPTIONS.join('|') + ')$';
+
+/**
+ * parseBranchRef(ref) -> { doorRef, option, valid, raw }
+ *
+ * `door:W3/A` -> { doorRef: 'door:W3', option: 'A', valid: true }.
+ *
+ * Case-insensitive on the kind and the option (the pattern carries the
+ * canonical spellings because it is quoted into prompt doctrine), and it
+ * returns the DOOR REF rather than the door id so callers can hand the result
+ * straight to parseSurfaceRef without rebuilding the string — the rebuild is
+ * where a `door: W3` with a space would have lost its match.
+ *
+ * ONE PARAMETERIZED RESOLVER (D93), same split as parseSurfaceRef above: this
+ * owns the grammar, the booklet's inventory of doors lives in validation.js and
+ * in the sim's own reader.
+ */
+export function parseBranchRef(ref) {
+  var raw = String(ref == null ? '' : ref).trim();
+  var out = { doorRef: '', option: '', valid: false, raw: raw };
+  if (!raw) return out;
+  var slash = raw.lastIndexOf('/');
+  if (slash <= 0) return out;
+  var head = raw.slice(0, slash).trim();
+  var tail = raw.slice(slash + 1).trim().toUpperCase();
+  if (BRANCH_OPTIONS.indexOf(tail) === -1) return out;
+  var parsed = parseSurfaceRef(head);
+  if (!parsed.valid || parsed.kind !== 'door') return out;
+  out.doorRef = 'door:' + parsed.id;
+  out.option = tail;
+  out.valid = true;
+  return out;
+}
 
 // ── The surface-ref grammar ─────────────────────────────────────────────────
 // Spine edges point at surfaces, and a pointer nobody can resolve is a promise

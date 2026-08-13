@@ -597,6 +597,144 @@
   }, null, 2);
 
   // Structured output schema for the skeleton (OpenAI json_schema format)
+  // ── The play spine, as a structured stage literal (W5a) ───────────────────
+  // ONE COPY, and the reason is a defect found on contact. W4a made the spine
+  // REQUIRED in prose and BLOCKING at the floors, and put it in neither
+  // structured literal — so a model answering under a compat transport was
+  // asked for a field the transport's schema never mentioned, and under a
+  // strict structured mode (where the transport injects additionalProperties:
+  // false) the field it did emit would have been dropped before the floor ever
+  // saw it. Every attempt would fail on a field nobody could deliver.
+  //
+  // Both pipelines reach this ONE object: STRUCTURED_SCHEMA_SKELETON below uses
+  // it directly, and api-generator.js's STRUCTURED_SCHEMA_SHELL borrows it
+  // through `window.STRUCTURED_SCHEMA_PLAY_SPINE` — the same window hop it
+  // already uses for STRUCTURED_SCHEMA_SKELETON itself. A second hand-written
+  // copy is the skeleton-triple defect with extra steps.
+  //
+  // `entry` is a plain string rather than an enum copy: the library menu is
+  // already parity-asserted in the prose section above, a third copy would be a
+  // third thing to drift, and the closure floor rejects a stray entry with a
+  // message naming the whole library.
+  var STRUCTURED_PLAY_SPINE = {
+    type: 'object',
+    properties: {
+      composition: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { entry: { type: 'string' }, role: { type: 'string' } },
+          required: ['entry', 'role']
+        }
+      },
+      honestGaps: { type: 'array', items: { type: 'string' } },
+      economyGraph: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            from: { type: 'string' }, to: { type: 'string' }, currency: { type: 'string' },
+            branch: { type: 'string' },
+            price: { type: 'integer' },
+            closesAtWeek: { type: 'integer' }
+          },
+          required: ['from', 'to']
+        }
+      },
+      consequenceEdges: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            source: { type: 'string' }, answeredBy: { type: 'string' },
+            withinWeeks: { type: 'integer' }
+          },
+          required: ['source', 'answeredBy', 'withinWeeks']
+        }
+      },
+      decisionLedger: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { fork: { type: 'string' }, differsBy: { type: 'string' } },
+          required: ['fork', 'differsBy']
+        }
+      },
+      tensionBudget: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            week: { type: 'integer' }, scarce: { type: 'string' },
+            losable: { type: 'string' }, fallBehind: { type: 'string' }
+          },
+          required: ['week']
+        }
+      },
+      difficultyCurve: {
+        type: 'object',
+        properties: {
+          keyedToLoad: { type: 'boolean' }, shape: { type: 'string' },
+          perWeek: { type: 'array', items: { type: 'string' } }
+        },
+        required: ['keyedToLoad', 'shape']
+      },
+      gateStructure: { type: 'string', enum: ['open', 'sequential', 'path-based'] },
+      hintLadders: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            puzzle: { type: 'string' }, printedOn: { type: 'string' },
+            rungs: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: { cost: { type: 'string' }, gives: { type: 'string' } },
+                required: ['cost', 'gives']
+              }
+            }
+          },
+          required: ['puzzle', 'printedOn', 'rungs']
+        }
+      },
+      milestones: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            label: { type: 'string' }, at: { type: 'integer' },
+            unlocks: { type: 'string' }, printedOn: { type: 'string' }
+          },
+          required: ['label', 'at', 'unlocks', 'printedOn']
+        }
+      },
+      legacyMoves: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            move: {
+              type: 'string',
+              enum: ['cross-out-forever', 'permanent-map-mutation', 'standing-rule-unlock',
+                'sealed-by-honour', 'session-count-gate']
+            },
+            printedOn: { type: 'string' }, makesPermanent: { type: 'string' }
+          },
+          required: ['move', 'printedOn']
+        }
+      }
+    },
+    // The DEMANDED half. The three harvest arrays are absent on purpose: a book
+    // need not carry a hint ladder, and requiring one would tax every brief for
+    // a pattern most do not want. `honestGaps` IS required, empty-array and all
+    // — "nothing is missing" said out loud is the record; skipping the key is
+    // not the same statement.
+    required: ['composition', 'honestGaps', 'economyGraph', 'consequenceEdges',
+      'decisionLedger', 'tensionBudget', 'difficultyCurve', 'gateStructure']
+  };
+  window.STRUCTURED_SCHEMA_PLAY_SPINE = STRUCTURED_PLAY_SPINE;
+
   window.STRUCTURED_SCHEMA_SKELETON = {
     type: 'object',
     properties: {
@@ -763,9 +901,10 @@
               }
             },
             required: ['briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily', 'documentEcology', 'exclusions', 'homePull', 'convergencePattern', 'reading', 'selectionReason', '_x']
-          }
+          },
+          playSpine: STRUCTURED_PLAY_SPINE
         },
-        required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'economy', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'storySpine', 'artifactIdentity', 'artifactIntent']
+        required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'economy', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'storySpine', 'artifactIdentity', 'artifactIntent', 'playSpine']
       },
       theme: {
         type: 'object',
@@ -1964,6 +2103,83 @@
     '',
     'The row is the SHAPE, not the content. Two heat books both rise; what rises, what it',
     'costs to hold it back, and what the number is called are yours.',
+    '',
+    '### The harvest patterns (optional, and strict once used)',
+    'The composition above says which SYSTEMS this book prints. These say how they are WIRED.',
+    'Take the ones the brief actually wants and leave the rest — a book that uses none of them',
+    'is a legitimate book. A book that half-declares one is not: every field below is required',
+    'once its object exists, because a hint with no cost and a milestone with no page are',
+    'records that check as nothing.',
+    '',
+    '| Pattern | Declare it as | What it costs you to get wrong |',
+    '|---------|---------------|--------------------------------|',
+    '| `gate-structure` | `gateStructure` (REQUIRED, see below) | Declaring a shape the graph does not have |',
+    '| `hint-ladder` | `hintLadders[]` | A free hint, which is a walkthrough |',
+    '| `deduction-milestone` | `milestones[]` | A theory nothing answers |',
+    '| `legacy-pencil-move` | `legacyMoves[]` | Permanence with no page it happens on |',
+    '| `branch-attributed-consequence` | `economyGraph[].branch` | A fork whose sides are two labels |',
+    '| `priced-spend` | `economyGraph[].price` | A price nobody at 60% adherence can pay |',
+    '| `timed-affordance` | `economyGraph[].closesAtWeek` | A window that shuts before it opens |',
+    '| `found-not-found-gating` | an `economyGraph` edge INTO a `seal:` | A locked page with no key |',
+    '| `book-referential-examination` | a cross-reference cipher | Citing a page this book does not print |',
+    '',
+    '- `gateStructure` (REQUIRED, one of "open" | "sequential" | "path-based"): how this book',
+    '  gates. **open** — several leads run at once and one meta needs all of them (owes three',
+    '  distinct leads and one surface taking three feeders). **sequential** — each answer is',
+    '  the next question (owes a chain three edges long). **path-based** — two or more lanes',
+    '  that converge (owes two leads, a three-edge chain, and a surface taking two feeders).',
+    '  The floor reads this back off your economyGraph. Declare the shape you actually wired.',
+    '- `hintLadders` (array, at most 3): `{ puzzle, printedOn, rungs[] }`. `puzzle` is the ref',
+    '  the player gets stuck on; `printedOn` is where the rungs are actually printed — usually',
+    '  the same page. 2-3 rungs, each `{ cost, gives }`, in order: a nudge, then the method,',
+    '  then at most the answer. `cost` is paid in something this book already tracks (a clock',
+    '  tick, marks, a crossed-out option) and must get DEARER down the ladder. Write the rung',
+    '  text into the prose of the surface you named — this declaration is the contract, the',
+    '  page is where the player reads it.',
+    '- `milestones` (array, at most 4): `{ label, at, unlocks, printedOn }`. `at` is a COUNT the',
+    '  player can check against their own page (marks banked, regions opened, fragments',
+    '  decoded). `unlocks` is a ref, and some consequenceEdge must mention it — a theory the',
+    '  book never answers is an unpaid promise.',
+    '- `legacyMoves` (array): `{ move, printedOn, makesPermanent? }`. `move` is one of',
+    '  "cross-out-forever" | "permanent-map-mutation" | "standing-rule-unlock" |',
+    '  "sealed-by-honour" | "session-count-gate". Each kind at most once. These are the whole',
+    '  legacy vocabulary a pencil can perform: crossing out the road not taken, adding to the',
+    '  map and never removing, a rule that reads "from now on…", a page sealed by honour, a',
+    '  page that opens after N sessions. Anything needing a sticker, a seal, or scissors is',
+    '  excluded by the kit, not missing from this list.',
+    '',
+    '### Three fields on an economy edge',
+    '- `branch` — which side of a fork this edge belongs to, written `door:W3/A` or `door:W3/B`.',
+    '  Use it and the two sides of your fork become mechanically different things rather than',
+    '  two names. If you attribute ONE side, attribute the other too: a fork with one declared',
+    '  side is a fork where the player who picks the other gets whatever is left. Anything the',
+    '  book must reach must be reachable on BOTH sides.',
+    '- `price` — what a spend costs, as a whole number of MARKS. Marks, not the currency label:',
+    '  marks are what the session strips count and what the reckoning threshold is derived in,',
+    '  so a price in marks is a number the machine can check against what a player at realistic',
+    '  adherence will actually have. The page still says "two Relief"; this says how many marks',
+    '  that is. Price the edges OUT of `banked`. Never price the edge into `boss` or `assembly`',
+    '  — that gate is the derived reckoning threshold and it already has a number.',
+    '- `closesAtWeek` — the last week an affordance can be taken. Without one, nothing in a',
+    '  pencil book ever expires and hoarding costs nothing. One or two real windows is what',
+    '  makes saving a decision.',
+    '',
+    '### Book-referential examination (and the one hard ban)',
+    'When you want a puzzle that tests attention, make THIS BOOK the reference: a cross-',
+    'reference cipher whose answer is a coordinate into pages this book prints — a fragment id',
+    'and a line, a region already opened, a value already banked. Every cited surface must be',
+    'printed EARLIER than the puzzle citing it.',
+    'NEVER write real-world trivia — history, geography, science, dates, celebrity, anything',
+    'the player would have to know from outside. It is unverifiable by this engine, it ignores',
+    'the brief, and it fails outright for any player who has not read what you read. The book',
+    'is the only reference work at the bench.',
+    '',
+    '### When the brief wants something this list cannot do',
+    'Say so in `honestGaps`, by name. Card decks, cut tokens, decoder wheels, overlays and',
+    'stickers are excluded by the kit and always will be; logic grids, word grids, action',
+    'drafts, suspect matrices and faction clocks are on the shelf and not yet built. Naming one',
+    'is the record that stops a tally strip from being described as a deck. It is never a',
+    'failure — inventing an entry to cover the gap is.',
     '',
     '### Length',
     'This book has as many weeks as the program does. Express the arc in FRACTIONS of that',

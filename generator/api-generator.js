@@ -553,6 +553,9 @@ var STRUCTURED_SCHEMA_SHELL = {
       },
       required: ['schemaVersion', 'blockTitle', 'worldContract', 'narrativeVoice',
         'literaryRegister', 'structuralShape', 'artifactIdentity', 'weeklyComponentType']
+      // NOTE: `playSpine` is deliberately absent from this literal and from the
+      // required list above. It is injected by withPlaySpine() below, from the
+      // one copy prompt_rules.js owns. See that function.
     },
     cover: {
       type: 'object',
@@ -620,6 +623,50 @@ var STRUCTURED_SCHEMA_SHELL = {
   },
   required: ['meta', 'cover', 'rulesSpread', 'theme']
 };
+
+/**
+ * withPlaySpine(schema) -> schema with meta.playSpine demanded
+ *
+ * ONE STRUCTURED SPINE LITERAL, BORROWED (W5a). prompt_rules.js owns it —
+ * a stage schema is what a compat transport enforces on the model, which makes
+ * it prompt content, and the file that owns prompt content owns this too. This
+ * reaches it through the same `window` hop the skeleton stage already uses for
+ * `window.STRUCTURED_SCHEMA_SKELETON` twenty lines from here.
+ *
+ * WHY THIS EXISTS AT ALL: W4a made `meta.playSpine` required in prose and
+ * blocking at the closure floors, and put it in NEITHER structured literal. A
+ * model answering under a strict structured mode was being asked for a field
+ * its schema never mentioned — and in the strictest modes the field would have
+ * been dropped in transit, so every attempt would fail on something no model
+ * could deliver. Found on contact in W5a and fixed here.
+ *
+ * FAILS LOUD, never silently: without prompt_rules.js there is no spine literal
+ * to inject, and shipping the un-spined schema would put the pipeline right back
+ * in the state above — retrying forever against a floor it cannot satisfy. Any
+ * page or harness that reaches this line has already loaded prompt_rules for a
+ * dozen INST_ sections, so the throw is unreachable in practice and diagnostic
+ * when it is not.
+ *
+ * Copies the two levels it touches; the shared literal is never mutated, so the
+ * exported `manual.structuredSchemas.shell` stays the plain object it was.
+ */
+function withPlaySpine(schema) {
+  var spine = (typeof window !== 'undefined') && window.STRUCTURED_SCHEMA_PLAY_SPINE;
+  if (!spine) {
+    throw new Error('[LiftRPG] window.STRUCTURED_SCHEMA_PLAY_SPINE is missing — prompt_rules.js '
+      + 'has not loaded, so the shell stage would demand a spine the transport never asks for.');
+  }
+  var meta = schema.properties.meta;
+  var nextProps = Object.assign({}, meta.properties, { playSpine: spine });
+  var nextRequired = meta.required.indexOf('playSpine') === -1
+    ? meta.required.concat(['playSpine'])
+    : meta.required.slice();
+  return Object.assign({}, schema, {
+    properties: Object.assign({}, schema.properties, {
+      meta: Object.assign({}, meta, { properties: nextProps, required: nextRequired })
+    })
+  });
+}
 
 var STRUCTURED_SCHEMA_FRAGMENTS = {
   type: 'object',
@@ -2217,7 +2264,7 @@ async function runApiPipeline(options) {
       completeMessage: 'Booklet setup complete.',
       onProgress: onProgress,
       getTotalStages: function () { return totalStages; },
-      schema: STRUCTURED_SCHEMA_SHELL,
+      schema: withPlaySpine(STRUCTURED_SCHEMA_SHELL),
       unwrapKey: 'meta',
       maxAttempts: 2,
       rateLimiter: rateLimiter,
@@ -4144,7 +4191,12 @@ window.LiftRPGAPI = {
   readPipelineDebris: readPipelineDebris,
   manual: {
     structuredSchemas: {
-      shell: STRUCTURED_SCHEMA_SHELL
+      shell: STRUCTURED_SCHEMA_SHELL,
+      // The spine injector, exported as a FUNCTION rather than as a second
+      // pre-built schema: withPlaySpine() throws when prompt_rules.js has not
+      // loaded, and a throw at module-evaluation time would take the whole API
+      // surface down instead of the one stage that needs it.
+      withPlaySpine: withPlaySpine
     },
     ensureArtifactIdentity: ensureArtifactIdentity,
     buildIdentityContract: buildIdentityContract,

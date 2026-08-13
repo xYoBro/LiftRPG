@@ -86,29 +86,49 @@
 // patterns do not have to be simultaneously realisable by one player.
 //
 // ════════════════════════════════════════════════════════════════════════════
-// THE DOOR-BRANCH CORRECTION (stated, because the brief asked for something
-// the schema cannot support)
+// THE DOOR BRANCH — underspecified in W4b, attributable since W5a
 // ════════════════════════════════════════════════════════════════════════════
-// The brief ruled: walk every door-branch combination exhaustively (2^weeks).
-// On contact that is VACUOUS. `doorChoice` carries `optionA`/`optionB` with a
-// label and a `lean` STRING and nothing else; no field anywhere attributes an
+// W4b's brief ruled: walk every door-branch combination exhaustively. On
+// contact that was VACUOUS. `doorChoice` carried `optionA`/`optionB` with a
+// label and a `lean` STRING and nothing else; no field anywhere attributed an
 // economy edge to a branch. Enumerating 4096 combinations of a choice with no
-// machine-readable payload is 4096 identical walks.
+// machine-readable payload is 4096 identical walks. The correction shipped
+// instead: an edge whose `from` is `door:Wn` is BRANCH-CONTINGENT, reachability
+// is computed on the guaranteed subgraph, and a required node that needs a door
+// edge is reported as a named UNDERSPECIFICATION. The note ended: "true
+// per-branch simulation needs per-branch edge attribution in the schema. That
+// is a product decision and is escalated, not taken here."
 //
-// The sound equivalent, and what ships: an edge whose `from` is `door:Wn` is
-// BRANCH-CONTINGENT — the spine says a door feeds this, and does not say which
-// side. Reachability is computed on the GUARANTEED subgraph (branch-contingent
-// and chance-fed edges removed), which is exactly what "reachable on every
-// branch" reduces to when the branches are indistinguishable: reachable using
-// only what both sides are known to give. A required node that needs a door
-// edge is reported by name (H5) — it is a genuine underspecification defect,
-// not a false alarm: an ending that only exists down one branch, with nothing
-// declaring which, is a soft-lock waiting for the player who picks the other.
+// W5a took it. `economyGraph[].branch` names a side (`door:W3/A`), and this
+// walker consumes it when present:
 //
-// True per-branch simulation needs per-branch edge attribution in the schema.
-// That is a product decision and is escalated, not taken here.
+//   NO ATTRIBUTION  — unchanged. The guaranteed subgraph decides, and a target
+//     that needs a door edge is the underspecification finding it always was.
+//   ATTRIBUTION     — a real per-branch walk. One reachability pass per
+//     assignment of a side to every attributed door; a target reachable under
+//     EVERY assignment is safe even though no guaranteed path exists, and a
+//     target that dies under some assignment is a soft-lock with the branch
+//     NAMED. That last case is the one the whole feature exists for: "the
+//     player who picks the other side loses the endgame" becomes "the player
+//     who takes door:W3/B loses ending:E2".
+//
+// UNATTRIBUTED DOOR EDGES ARE EXCLUDED FROM EVERY PER-BRANCH WALK, in books
+// that attribute anything. They cannot be placed on a side, so counting them
+// would let a half-attributed spine buy a clean verdict with the half it did
+// not declare. They still feed the old underspecification finding.
+//
+// THE ENUMERATION CAP is honest rather than heroic. 2^d assignments over d
+// attributed doors is free at d ≤ 10 and the graph is tiny, but the exact
+// question ("is there an assignment under which this target dies") is
+// monotone-CNF minimisation and has no cheap closed form. Past the cap the walk
+// falls back to per-door probing — each door forced to one side while every
+// other attributed door contributes both — which catches single-door failures
+// and can MISS a failure that needs two doors to collude. The report says so in
+// a measurement rather than pretending to completeness.
 
-import { parseSurfaceRef, RECKONING_THRESHOLD_RATIO } from './constants.js';
+import {
+  parseSurfaceRef, parseBranchRef, BRANCH_OPTIONS, RECKONING_THRESHOLD_RATIO
+} from './constants.js';
 import { toSlugWords } from './assembly.js';
 
 // The three adherence bands, from VISION §4.5. Ordered strictest-last so a
@@ -125,6 +145,10 @@ export var SIM_ADHERENCE_BANDS = [
 export var SIM_HARD_BAND = 'realistic';
 
 export var SIM_SPEND_POLICIES = ['stingy', 'greedy'];
+
+// 2^10 = 1024 assignments. See the branch note in the header: past this the
+// walk probes doors one at a time and says so.
+export var SIM_BRANCH_ASSIGNMENT_CAP = 10;
 
 // A week's worth of decisions below this is a week that asks the player
 // nothing. Per-WEEK only: see the density section for why the per-session
@@ -455,8 +479,26 @@ export function buildGateGraph(spine, book) {
     var a = ensure(from, locate(from));
     var b = ensure(to, locate(to));
     if (!a || !b) return;
-    var cls = from.kind === 'oracle' ? 'chance' : (from.kind === 'door' ? 'branch' : 'guaranteed');
-    edges.push({ i: ei, from: a.key, to: b.key, cls: cls, currency: String((edge || {}).currency || '') });
+    // W5a: an ATTRIBUTED edge is branch-contingent whatever its source, which
+    // is the point of attribution — "taking door:W3/A prices the West Run at 2"
+    // is an edge out of `banked`, not out of the door. The door still decides it.
+    var branch = parseBranchRef((edge || {}).branch);
+    var cls = from.kind === 'oracle'
+      ? 'chance'
+      : ((from.kind === 'door' || branch.valid) ? 'branch' : 'guaranteed');
+    var price = Number.isInteger((edge || {}).price) && edge.price > 0 ? edge.price : 0;
+    var closes = Number.isInteger((edge || {}).closesAtWeek) && edge.closesAtWeek > 0
+      ? edge.closesAtWeek : null;
+    edges.push({
+      i: ei, from: a.key, to: b.key, cls: cls,
+      currency: String((edge || {}).currency || ''),
+      // The door this edge belongs to and the side of it, or '' when the spine
+      // did not say. '' is the W4b state and stays legal.
+      door: branch.valid ? nodeKey(parseSurfaceRef(branch.doorRef)) : '',
+      option: branch.valid ? branch.option : '',
+      price: price,
+      closesAtWeek: closes
+    });
     a.out++;
     b['in' + cls.charAt(0).toUpperCase() + cls.slice(1)]++;
   });
@@ -492,7 +534,7 @@ export function buildGateGraph(spine, book) {
  * else waits for a feeder. Relaxed to fixpoint (a spine graph has tens of
  * edges; |V| passes is free and cycles terminate correctly).
  */
-export function earliestHold(graph, classes) {
+export function earliestHold(graph, classes, allowEdge) {
   var allow = {};
   (classes || ['guaranteed']).forEach(function (c) { allow[c] = 1; });
   var hold = {};
@@ -513,6 +555,7 @@ export function earliestHold(graph, classes) {
     var moved = false;
     graph.edges.forEach(function (edge) {
       if (!allow[edge.cls]) return;
+      if (allowEdge && !allowEdge(edge)) return;
       var src = hold[edge.from];
       if (src === INFINITY_WEEK) return;
       var target = graph.nodes[edge.to];
@@ -522,6 +565,68 @@ export function earliestHold(graph, classes) {
     if (!moved) break;
   }
   return hold;
+}
+
+/**
+ * branchWalks(graph) -> { doors, walks, capped }
+ *
+ * The per-branch walks (W5a). `walks` is one entry per assignment of a side to
+ * every attributed door: `{ label, choice, hold }`, where `hold` is the
+ * earliest-hold schedule the player gets if they take exactly those sides.
+ *
+ * An assignment admits: every guaranteed edge, every edge attributed to a door
+ * on the chosen side, and NOTHING ELSE from the branch class — unattributed
+ * door edges are excluded on purpose (header, "unattributed door edges are
+ * excluded"). Chance edges stay out of every walk; a branch is a choice, a roll
+ * is not.
+ *
+ * `doors` empty means the spine attributed nothing, and the caller keeps W4b's
+ * behaviour exactly. That is the compatibility promise: a book written before
+ * this feature walks identically.
+ */
+export function branchWalks(graph) {
+  var doorSet = {};
+  graph.edges.forEach(function (e) { if (e.door) doorSet[e.door] = 1; });
+  var doors = Object.keys(doorSet).sort();
+  if (!doors.length) return { doors: doors, walks: [], capped: false };
+
+  var capped = doors.length > SIM_BRANCH_ASSIGNMENT_CAP;
+  var assignments = [];
+  if (!capped) {
+    var total = Math.pow(2, doors.length);
+    for (var mask = 0; mask < total; mask++) {
+      var choice = {};
+      for (var d = 0; d < doors.length; d++) {
+        choice[doors[d]] = BRANCH_OPTIONS[(mask >> d) & 1];
+      }
+      assignments.push(choice);
+    }
+  } else {
+    // The fallback: probe one door at a time. Every OTHER attributed door is
+    // left unconstrained (both its sides admitted), so a failure that needs two
+    // doors to collude is invisible here — reported as `branchWalkCapped`.
+    doors.forEach(function (door) {
+      BRANCH_OPTIONS.forEach(function (option) {
+        var choice = {};
+        choice[door] = option;
+        assignments.push(choice);
+      });
+    });
+  }
+
+  var walks = assignments.map(function (choice) {
+    var hold = earliestHold(graph, ['guaranteed', 'branch'], function (edge) {
+      if (edge.cls !== 'branch') return true;
+      if (!edge.door) return false;                       // unattributed: no side owns it
+      if (choice[edge.door] === undefined) return true;   // unconstrained in the capped probe
+      return choice[edge.door] === edge.option;
+    });
+    var label = Object.keys(choice).sort().map(function (door) {
+      return door + '/' + choice[door];
+    }).join(' + ');
+    return { label: label, choice: choice, hold: hold };
+  });
+  return { doors: doors, walks: walks, capped: capped };
 }
 
 /**
@@ -542,9 +647,14 @@ export function earliestHold(graph, classes) {
  *   the ENDGAME — boss, assembly, and the endings are drawn at a fixed week,
  *     and a feeder held after that arrives too late to matter.
  *
- * Everything else floors at the campaign's last week. That is not laziness: it
- * is the honest shape of an economy with no prices and no expiries, and the
- * spread this produces is what the stingy/greedy report is measuring.
+ * W5a ADDS THE THIRD: a declared `closesAtWeek` on an edge. That was the honest
+ * gap in the paragraph above — "nothing expires" was true of the schema, not of
+ * play, and it made the stingy schedule float to the last week for almost every
+ * node. A declared window pulls its source's deadline in, so hoarding finally
+ * costs something and the spread the report measures is a real one.
+ *
+ * Everything else still floors at the campaign's last week, which remains the
+ * honest shape for an affordance the book never closes.
  */
 export function latestHold(graph, earliest, book) {
   var lastPlayable = book.weekCount || 1;
@@ -565,6 +675,12 @@ export function latestHold(graph, earliest, book) {
       // A seal's key is due the week BEFORE the seal is printed; every other
       // consumer is content to be fed the same week it is met.
       var due = latest[edge.to] - (graph.nodes[edge.to].kind === 'seal' ? 1 : 0);
+      // A declared window is a harder deadline than the consumer's own: the
+      // edge cannot be TAKEN after it closes, whatever the thing it feeds is
+      // willing to wait for.
+      if (edge.closesAtWeek !== null && edge.closesAtWeek !== undefined) {
+        due = Math.min(due, edge.closesAtWeek);
+      }
       if (due < latest[edge.from]) { latest[edge.from] = due; moved = true; }
     });
     if (!moved) break;
@@ -644,10 +760,13 @@ export function simulateBook(booklet) {
   var withChance = earliestHold(graph, ['guaranteed', 'chance']);
   var withAll = earliestHold(graph, ['guaranteed', 'branch', 'chance']);
   var stingy = latestHold(graph, guaranteedHold, book);
+  var branching = branchWalks(graph);
 
   // ── The bands ────────────────────────────────────────────────────────────
+  var hardAdversary = null;
   SIM_ADHERENCE_BANDS.forEach(function (band) {
     var adv = adversarialTicksByWeek(book, band.fraction);
+    if (band.id === SIM_HARD_BAND) hardAdversary = adv;
     var row = {
       band: band.id,
       label: band.label,
@@ -680,6 +799,29 @@ export function simulateBook(booklet) {
 
   required.forEach(function (target) {
     if (holdOf(guaranteedHold, target) !== INFINITY_WEEK) return;
+
+    // H5a (W5a) — the per-branch verdict, when the spine attributed its doors.
+    // Taken BEFORE the underspecification finding because it answers the same
+    // question with evidence: a target every assignment reaches is safe even
+    // with no guaranteed path, and a target some assignment loses is a soft-lock
+    // with the losing side NAMED.
+    if (branching.walks.length) {
+      var lost = branching.walks.filter(function (walk) {
+        return holdOf(walk.hold, target) === INFINITY_WEEK;
+      });
+      if (lost.length < branching.walks.length) {
+        if (!lost.length) return;   // held on every declared branch
+        base.hard.push(finding('branch-only-path',
+          'The simulated player loses "' + target.label + '" on ' + lost.length + ' of '
+          + branching.walks.length + ' declared branch' + (branching.walks.length === 1 ? '' : 'es')
+          + ' — taking ' + lost.slice(0, 3).map(function (w) { return w.label; }).join(', ')
+          + (lost.length > 3 ? ', …' : '')
+          + ' leaves it unreachable, and nothing on the page warns the player at the fork.'
+          + ' Feed it from a surface every branch guarantees, or give the losing side its own route to it.',
+          { node: target.label, lostOn: lost.map(function (w) { return w.label; }), attributed: true }));
+        return;
+      }
+    }
 
     // H4/H5 first: naming WHY it is unreachable is the difference between a
     // directive a model can execute and a shrug.
@@ -830,6 +972,74 @@ export function simulateBook(booklet) {
     }
   }
 
+  // H9 (W5a) — the budget axis. Until prices existed the sim could only ask
+  // "can the player HOLD this, and by when"; the header said so and named the
+  // gap. `price` closes it, denominated in MARKS — the only unit the machine
+  // economy has, and the same one the derived boss threshold is expressed in.
+  //
+  // NECESSARY-CONDITION ARITHMETIC, deliberately. The adversarial prefix is
+  // ticks EARNED by the end of a week, not ticks remaining after other spends,
+  // so "price > earned-by-deadline" proves the spend is unaffordable even for a
+  // player who bought nothing else. It can never produce a false alarm; it can
+  // miss a book that is unaffordable only in aggregate, which is what the total
+  // check below catches.
+  //
+  // REQUIRED means REQUIRED, tested by deletion: an edge is required when
+  // removing it makes something the book prints unreachable. A priced side
+  // route the player can decline is a choice, and a choice they cannot afford
+  // is a design, not a defect.
+  var pricedEdges = graph.edges.filter(function (e) { return e.price > 0; });
+  base.measurements.pricedEdges = pricedEdges.length;
+  var unaffordable = [];
+  if (pricedEdges.length && hardAdversary) {
+    var reachableNow = required.filter(function (t) {
+      return holdOf(guaranteedHold, t) !== INFINITY_WEEK;
+    });
+    pricedEdges.forEach(function (edge) {
+      var without = earliestHold(graph, ['guaranteed'], function (e) { return e !== edge; });
+      var breaks = reachableNow.some(function (t) { return holdOf(without, t) === INFINITY_WEEK; });
+      if (!breaks) return;
+      var deadline = edge.closesAtWeek !== null && edge.closesAtWeek !== undefined
+        ? Math.min(edge.closesAtWeek, book.weekCount)
+        : book.weekCount;
+      var banked = hardAdversary.prefix[deadline] || 0;
+      if (edge.price > banked) {
+        unaffordable.push({ edge: edge, deadline: deadline, banked: banked });
+      }
+    });
+    unaffordable.forEach(function (row) {
+      base.hard.push(finding('unaffordable-required-spend',
+        'The spend "' + row.edge.from + ' → ' + row.edge.to + '" costs ' + row.edge.price
+        + ' marks and is required to reach the endgame, but a player at ' + hardBand.label
+        + ' adherence has banked at most ' + row.banked + ' marks by week ' + row.deadline
+        + (row.edge.closesAtWeek ? ' (when the window closes)' : ' (the last week of play)')
+        + ' — even spending on nothing else. Lower the price, widen the window, or give the'
+        + ' endgame a route that does not pass through this purchase.',
+        { from: row.edge.from, to: row.edge.to, price: row.edge.price, banked: row.banked,
+          deadline: row.deadline }));
+    });
+    // The aggregate. Only when no single spend already failed, so one defect
+    // reports once — the same discipline the mutation battery is judged by.
+    if (!unaffordable.length) {
+      var requiredTotal = 0;
+      pricedEdges.forEach(function (edge) {
+        var without = earliestHold(graph, ['guaranteed'], function (e) { return e !== edge; });
+        var breaks = reachableNow.some(function (t) { return holdOf(without, t) === INFINITY_WEEK; });
+        if (breaks) requiredTotal += edge.price;
+      });
+      base.measurements.requiredSpendTotal = requiredTotal;
+      var earned = hardAdversary.prefix[book.weekCount] || 0;
+      if (requiredTotal > earned) {
+        base.hard.push(finding('unaffordable-required-total',
+          'The spends the endgame requires cost ' + requiredTotal + ' marks in total and a player at '
+          + hardBand.label + ' adherence banks ' + earned + ' across the whole book. Every purchase is'
+          + ' individually affordable and the set is not — which the player discovers in the last week,'
+          + ' holding a wallet that was never going to be enough.',
+          { requiredTotal: requiredTotal, earned: earned, band: hardBand.label }));
+      }
+    }
+  }
+
   // ══ SOFT FINDINGS ════════════════════════════════════════════════════════
   // These route to the critic's revision machinery under the ludic reopen
   // scopes (economy / gate / decision). They are never blocking: D19 stands —
@@ -857,6 +1067,26 @@ export function simulateBook(booklet) {
       + spreads.length + ' spend surfaces opens and closes in the same week, so hoarding buys the'
       + ' player nothing and spending early costs them nothing. Give at least one spend a window —'
       + ' something worth saving for, or something worth taking now.', { windows: spreads.length }));
+  }
+
+  // S1b (W5a) — the budget axis, when the book declares one. A price the 60%
+  // band can always pay for EVERYTHING is a number on a page: it never refuses
+  // anything, so it never asks the player to choose. Reported, never blocking —
+  // a generous economy is a legitimate design, and this is the critic's to
+  // weigh.
+  if (pricedEdges.length && hardAdversary) {
+    var allPrices = pricedEdges.reduce(function (a, e) { return a + e.price; }, 0);
+    var bandEarned = hardAdversary.prefix[book.weekCount] || 0;
+    base.measurements.declaredSpendTotal = allPrices;
+    base.measurements.bandEarnedTotal = bandEarned;
+    if (allPrices <= bandEarned) {
+      base.soft.push(finding('budget-axis-immaterial',
+        'Every declared spend in the book costs ' + allPrices + ' marks in total and the '
+        + hardBand.label + ' adherence band banks ' + bandEarned + ' — so the player can buy'
+        + ' everything even at the worst adherence the book plans for, and no price ever refuses'
+        + ' them anything. Raise a price, or accept that spending is a formality here.',
+        { declared: allPrices, earned: bandEarned }));
+    }
   }
 
   // Chance-fed pools ride the spread report and never reachability (ruling 1).
@@ -957,6 +1187,15 @@ export function simulateBook(booklet) {
   base.measurements.graphEdges = graph.edges.length;
   base.measurements.branchEdges = graph.edges.filter(function (e) { return e.cls === 'branch'; }).length;
   base.measurements.chanceEdges = graph.edges.filter(function (e) { return e.cls === 'chance'; }).length;
+  // W5a. `attributedDoors: 0` is the W4b state and reads as "this book's forks
+  // are two labels"; `branchWalkCapped` says the enumeration was probed rather
+  // than exhausted, which the header warns can miss a two-door collusion.
+  base.measurements.attributedDoors = branching.doors.length;
+  base.measurements.branchWalks = branching.walks.length;
+  base.measurements.branchWalkCapped = branching.capped;
+  base.measurements.timedEdges = graph.edges.filter(function (e) {
+    return e.closesAtWeek !== null && e.closesAtWeek !== undefined;
+  }).length;
   base.book = book;
   base.graph = graph;
   // Keyed by SIM_SPEND_POLICIES so the two schedules are named the way the

@@ -196,6 +196,12 @@ import {
   SURFACE_REF_KINDS,
   SURFACE_REF_SINGLETONS,
   parseSurfaceRef,
+  VALID_GATE_STRUCTURES,
+  GATE_STRUCTURE_SHAPES,
+  VALID_LEGACY_MOVES,
+  BRANCH_OPTIONS,
+  BRANCH_REF_PATTERN,
+  parseBranchRef,
   PIPELINE_DEBRIS_KEYS,
   readPipelineDebris,
   writePipelineDebris
@@ -253,6 +259,16 @@ export {
   SURFACE_REF_KINDS,
   SURFACE_REF_SINGLETONS,
   parseSurfaceRef,
+  // ── The Ludic Harvest, tranche 1 (W5a) ────────────────────────────────
+  // The tier-2 patterns that landed a declaration surface. Same seam, same
+  // rule: parseBranchRef has one home beside parseSurfaceRef, because a
+  // second branch parser is a second answer to "which side is this".
+  VALID_GATE_STRUCTURES,
+  GATE_STRUCTURE_SHAPES,
+  VALID_LEGACY_MOVES,
+  BRANCH_OPTIONS,
+  BRANCH_REF_PATTERN,
+  parseBranchRef,
   // ── Pipeline debris (D128) ─────────────────────────────────────────────
   // `_x` is the only lawful home for non-contract data and always was; the
   // pipelines wrote ten keys at top level anyway, where the schema rejects

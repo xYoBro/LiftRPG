@@ -74,7 +74,15 @@ import {
   LUDIC_LIBRARY,
   SPINE_BUDGETS,
   parseSurfaceRef,
-  VALID_DYNAMIC_MARKINGS
+  VALID_DYNAMIC_MARKINGS,
+  // W5a — the Ludic Harvest, tranche 1. Same split: the closed vocabularies and
+  // the branch grammar live with the contract, the checks that need the book
+  // live here.
+  VALID_GATE_STRUCTURES,
+  GATE_STRUCTURE_SHAPES,
+  VALID_LEGACY_MOVES,
+  BRANCH_OPTIONS,
+  parseBranchRef
 } from '../../contracts/contract-constants.mjs';
 
 // Map-evolution fingerprint + companions: one implementation, shared with quality.js.
@@ -2431,6 +2439,324 @@ export function collectSpineSkeletonFloorErrors(spine, skeleton, stageLabel) {
       errors.push(S + 'playSpine.tensionBudget week ' + n
         + ' names no axis — at least one of scarce / losable / fallBehind must be real (an absent axis is a declaration'
         + ' that it is not present; all three absent is a week with no tension at all)');
+    }
+  });
+
+  errors.push.apply(errors, collectSpineHarvestFloorErrors(spine, index, parsedEdges, S));
+
+  return errors;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// THE HARVEST FLOORS (W5a — the Ludic Harvest, tranche 1)
+// ════════════════════════════════════════════════════════════════════════════
+// Nine tier-2 patterns from contracts/ludic-library.mjs landed a declaration
+// surface in W5a. These are their teeth. Split into its own function purely for
+// size — it runs inside the skeleton floors, at the same stage, against the
+// same index, and shares their severity: BLOCKING on the generation path,
+// silent on any book that carries no spine.
+//
+// THE SEVERITY SPLIT, stated once: `gateStructure` is DEMANDED (the structured
+// stage literal requires it and the prompt calls it required), because it costs
+// the model one enum and buys the floors a shape to check the whole graph
+// against. The other three declarations are OPTIONAL-BUT-STRICT: a book need
+// not carry a hint ladder, but a book that carries one owes ordered rungs, real
+// costs, and a printed page the player can find. Demanding all four would tax
+// every book for patterns most briefs do not want, which is how a menu becomes
+// a checklist.
+
+// A "lead" for gate-structure purposes: a puzzle surface the player works at.
+// Deliberately NOT every node — `banked`, `reckoning:` and `week:` are plumbing,
+// and counting them would let a book satisfy "open" with bookkeeping.
+var SPINE_LEAD_KINDS = { cipher: 1, map: 1, oracle: 1, fragment: 1, seal: 1, companion: 1, clock: 1 };
+
+/**
+ * measureSpineGraphShape(parsedEdges) -> { chain, convergence, leads }
+ *
+ * The three numbers GATE_STRUCTURE_SHAPES is written in. Computed by
+ * relaxation with a pass cap rather than by path enumeration: a spine graph can
+ * legitimately contain a cycle (a stewardship economy that pays back into its
+ * own source is the named example in PLAY.md §2), and a longest-simple-path
+ * search would either hang on one or need a visited-set walk whose cost is
+ * exponential. Saturating at |V| is the right answer for a cycle anyway — a
+ * loop IS a chain at least that long.
+ */
+export function measureSpineGraphShape(parsedEdges) {
+  var edges = Array.isArray(parsedEdges) ? parsedEdges : [];
+  var key = function (side) { return side.kind + ':' + side.id; };
+  var nodes = {};
+  var feeders = {};
+  var out = {};
+  edges.forEach(function (e) {
+    var a = key(e.from), b = key(e.to);
+    nodes[a] = e.from; nodes[b] = e.to;
+    if (!feeders[b]) feeders[b] = {};
+    feeders[b][a] = 1;
+    if (!out[a]) out[a] = {};
+    out[a][b] = 1;
+  });
+  var nodeKeys = Object.keys(nodes);
+  if (!nodeKeys.length) return { chain: 0, convergence: 0, leads: 0 };
+
+  var depth = {};
+  nodeKeys.forEach(function (k) { depth[k] = SPINE_SOURCE_KINDS[nodes[k].kind] ? 0 : -1; });
+  // A graph with no declared source still has a chain; seed the nodes nothing
+  // feeds so the measurement is about SHAPE and the missing source is reported
+  // by its own floor rather than swallowed here.
+  if (!nodeKeys.some(function (k) { return depth[k] === 0; })) {
+    nodeKeys.forEach(function (k) { if (!feeders[k]) depth[k] = 0; });
+  }
+  var cap = nodeKeys.length;
+  for (var pass = 0; pass < cap; pass++) {
+    var moved = false;
+    edges.forEach(function (e) {
+      var a = key(e.from), b = key(e.to);
+      if (depth[a] < 0) return;
+      var next = Math.min(depth[a] + 1, cap);
+      if (next > depth[b]) { depth[b] = next; moved = true; }
+    });
+    if (!moved) break;
+  }
+
+  var chain = 0;
+  nodeKeys.forEach(function (k) { if (depth[k] > chain) chain = depth[k]; });
+  var convergence = 0;
+  Object.keys(feeders).forEach(function (k) {
+    var count = Object.keys(feeders[k]).length;
+    if (count > convergence) convergence = count;
+  });
+  var leads = nodeKeys.filter(function (k) {
+    return SPINE_LEAD_KINDS[nodes[k].kind] && depth[k] >= 0;
+  }).length;
+  return { chain: chain, convergence: convergence, leads: leads };
+}
+
+function collectSpineHarvestFloorErrors(spine, index, parsedEdges, S) {
+  var errors = [];
+  var rawEdges = Array.isArray(spine.economyGraph) ? spine.economyGraph : [];
+  var weekCount = index.weekCount || Object.keys(index.weeks).length || 0;
+
+  // ── Floor 8: the gate structure is declared AND the graph has that shape ──
+  // Nicholson's three organisations. The declaration alone would be a label;
+  // reading it back off the graph is what makes it a floor — a book that says
+  // "path-based" and wires one chain has told the player it has choices it does
+  // not have.
+  var structure = String(spine.gateStructure || '').trim();
+  if (!structure) {
+    errors.push(S + 'playSpine.gateStructure is missing — declare how this book gates: '
+      + VALID_GATE_STRUCTURES.join(' | ')
+      + ' (open = several leads feeding one meta; sequential = each answer is the next question;'
+      + ' path-based = two or more lanes that converge)');
+  } else if (VALID_GATE_STRUCTURES.indexOf(structure) === -1) {
+    errors.push(S + 'playSpine.gateStructure "' + structure + '" is not one of '
+      + VALID_GATE_STRUCTURES.join(' | '));
+  } else if (parsedEdges.length) {
+    var want = GATE_STRUCTURE_SHAPES[structure];
+    var got = measureSpineGraphShape(parsedEdges);
+    var shortfalls = [];
+    if (got.chain < want.minChainLength) {
+      shortfalls.push('its longest chain is ' + got.chain + ' edge' + (got.chain === 1 ? '' : 's')
+        + ', not ' + want.minChainLength);
+    }
+    if (got.convergence < want.minConvergence) {
+      shortfalls.push('no surface takes ' + want.minConvergence + ' distinct feeders (the most is '
+        + got.convergence + ')');
+    }
+    if (got.leads < want.minLeads) {
+      shortfalls.push('it runs ' + got.leads + ' lead' + (got.leads === 1 ? '' : 's')
+        + ', not ' + want.minLeads);
+    }
+    if (shortfalls.length) {
+      errors.push(S + 'playSpine.gateStructure declares "' + structure
+        + '" but the economyGraph is not that shape: ' + shortfalls.join('; ')
+        + '. Either wire the structure you declared or declare the one you wired');
+    }
+  }
+
+  // ── Floor 9: branch attribution is a real side of a real door ────────────
+  rawEdges.forEach(function (edge, ei) {
+    var branch = (edge || {}).branch;
+    if (branch === undefined || branch === null || String(branch).trim() === '') return;
+    var parsed = parseBranchRef(branch);
+    if (!parsed.valid) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '].branch "' + String(branch)
+        + '" is not a branch ref — write `door:W3/' + BRANCH_OPTIONS[0] + '` or `door:W3/'
+        + BRANCH_OPTIONS[1] + '`, naming the door and the side of it this edge belongs to');
+      return;
+    }
+    var res = surfaceRefResolves(index, parsed.doorRef);
+    if (!res.ok) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '].branch names "' + parsed.doorRef
+        + '", which ' + res.reason);
+    }
+    // An attributed edge whose `from` is that same door is the normal shape,
+    // but attribution is legal on any edge the branch turns on. What is NOT
+    // legal is attributing an edge to a door while ALSO sourcing it from a
+    // different door: two forks cannot both own one edge, and the sim would
+    // have to pick.
+    var from = parseSurfaceRef((edge || {}).from);
+    if (from.valid && from.kind === 'door'
+      && ('door:' + from.id).toLowerCase() !== parsed.doorRef.toLowerCase()) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '] leaves "' + from.raw
+        + '" but is attributed to "' + parsed.doorRef
+        + '" — one edge, two forks. Attribute it to the door it leaves, or source it from the door that owns it');
+    }
+  });
+
+  // Both sides of every attributed door must carry something. A fork where the
+  // spine names only side A is the flavour-only door wearing attribution: the
+  // player who picks B gets an edge nobody declared.
+  var branchSides = {};
+  rawEdges.forEach(function (edge) {
+    var parsed = parseBranchRef((edge || {}).branch);
+    if (!parsed.valid) return;
+    var doorKey = parsed.doorRef.toLowerCase();
+    if (!branchSides[doorKey]) branchSides[doorKey] = {};
+    branchSides[doorKey][parsed.option] = 1;
+  });
+  Object.keys(branchSides).forEach(function (doorKey) {
+    var missing = BRANCH_OPTIONS.filter(function (opt) { return !branchSides[doorKey][opt]; });
+    if (missing.length) {
+      errors.push(S + 'playSpine.economyGraph attributes edges to "' + doorKey + '/'
+        + BRANCH_OPTIONS.filter(function (o) { return missing.indexOf(o) === -1; }).join('')
+        + '" only — side ' + missing.join(' and ') + ' of that fork carries no edge, so one branch'
+        + ' is the declared side and the other is whatever is left. Give both sides an edge, or attribute neither');
+    }
+  });
+
+  // ── Floor 10: prices are in marks, and the endgame's gate is not for sale ─
+  rawEdges.forEach(function (edge, ei) {
+    var price = (edge || {}).price;
+    if (price === undefined || price === null) return;
+    if (!Number.isInteger(price) || price < 1) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '].price is ' + price
+        + ' — a price is a whole number of MARKS (the unit the markStrip counts and the'
+        + ' reckoning threshold is derived in), at least 1');
+      return;
+    }
+    var to = parseSurfaceRef((edge || {}).to);
+    if (to.valid && (to.kind === 'boss' || to.kind === 'assembly')) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '] prices the edge into "' + to.raw
+        + '" at ' + price + ' — the endgame ceremony is gated by the DERIVED reckoning threshold'
+        + ' and by nothing else. A second number for the same gate is a second home for it;'
+        + ' price the spends that lead there instead');
+    }
+    var from = parseSurfaceRef((edge || {}).from);
+    if (from.valid && SPINE_SOURCE_KINDS[from.kind]) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '] prices an edge OUT OF "' + from.raw
+        + '" — the player\'s own work is not a purchase. Price the edge out of `banked`'
+        + ' (or out of the reckoning that banks it), which is where value is held');
+    }
+  });
+
+  // ── Floor 11: a window cannot close before it opens ──────────────────────
+  rawEdges.forEach(function (edge, ei) {
+    var closes = (edge || {}).closesAtWeek;
+    if (closes === undefined || closes === null) return;
+    if (!Number.isInteger(closes) || closes < 1) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '].closesAtWeek is ' + closes
+        + ' — the last week this affordance can be taken, as a whole week number');
+      return;
+    }
+    if (weekCount && closes > weekCount) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '].closesAtWeek is week ' + closes
+        + ' and this book has ' + weekCount + ' weeks — a deadline past the last page is no deadline');
+    }
+    var to = parseSurfaceRef((edge || {}).to);
+    var opensAt = to.valid ? surfaceRefWeek(to) : null;
+    if (opensAt !== null && closes < opensAt) {
+      errors.push(S + 'playSpine.economyGraph[' + ei + '] closes in week ' + closes
+        + ' but "' + to.raw + '" is not drawn until week ' + opensAt
+        + ' — the window shuts before it opens, which is content nobody can reach');
+    }
+  });
+
+  // ── Floor 12: hint ladders are ordered, costed, and printed somewhere ────
+  var ladders = Array.isArray(spine.hintLadders) ? spine.hintLadders : [];
+  ladders.forEach(function (ladder, li) {
+    var where = S + 'playSpine.hintLadders[' + li + ']';
+    ['puzzle', 'printedOn'].forEach(function (side) {
+      var res = surfaceRefResolves(index, (ladder || {})[side]);
+      if (!res.ok) {
+        errors.push(where + '.' + side + ' "' + String((ladder || {})[side] || '') + '" ' + res.reason);
+      }
+    });
+    // The ladder must hang on something the player can be STUCK on. A hint
+    // ladder attached to `banked` is help with arithmetic.
+    var puzzle = parseSurfaceRef((ladder || {}).puzzle);
+    if (puzzle.valid && !SPINE_LEAD_KINDS[puzzle.kind]) {
+      errors.push(where + '.puzzle names "' + puzzle.raw + '", which is not something a player can be stuck on.'
+        + ' A hint ladder hangs on a cipher, a map, an oracle, a fragment, a seal, a clock or a companion');
+    }
+    var rungs = Array.isArray((ladder || {}).rungs) ? ladder.rungs : [];
+    if (rungs.length < SPINE_BUDGETS.hintRungsMin || rungs.length > SPINE_BUDGETS.hintRungsMax) {
+      errors.push(where + '.rungs has ' + rungs.length + ' rung' + (rungs.length === 1 ? '' : 's')
+        + ' — a ladder is ' + SPINE_BUDGETS.hintRungsMin + '-' + SPINE_BUDGETS.hintRungsMax
+        + ' steps (a nudge, a method, and at most the answer). One rung is a hint, not a ladder');
+    }
+    rungs.forEach(function (rung, ri) {
+      if (!String((rung || {}).cost || '').trim()) {
+        errors.push(where + '.rungs[' + ri + '] has no cost — a free hint is a walkthrough.'
+          + ' Name what taking it costs in this book\'s own terms (a clock tick, marks, a crossed-out option)');
+      }
+      if (!String((rung || {}).gives || '').trim()) {
+        errors.push(where + '.rungs[' + ri + '] says nothing about what it gives');
+      }
+    });
+  });
+  if (ladders.length > SPINE_BUDGETS.hintLaddersMax) {
+    errors.push(S + 'playSpine.hintLadders has ' + ladders.length + ' ladders; at most '
+      + SPINE_BUDGETS.hintLaddersMax + ' — past that the book is a walkthrough with a receipt');
+  }
+
+  // ── Floor 13: a milestone unlocks something the book answers ─────────────
+  var milestones = Array.isArray(spine.milestones) ? spine.milestones : [];
+  var answered = {};
+  (Array.isArray(spine.consequenceEdges) ? spine.consequenceEdges : []).forEach(function (edge) {
+    var src = parseSurfaceRef((edge || {}).source);
+    if (src.valid) answered[(src.kind + ':' + src.id).toLowerCase()] = 1;
+    var ans = parseSurfaceRef((edge || {}).answeredBy);
+    if (ans.valid) answered[(ans.kind + ':' + ans.id).toLowerCase()] = 1;
+  });
+  milestones.forEach(function (milestone, mi) {
+    var where = S + 'playSpine.milestones[' + mi + ']';
+    ['unlocks', 'printedOn'].forEach(function (side) {
+      var res = surfaceRefResolves(index, (milestone || {})[side]);
+      if (!res.ok) {
+        errors.push(where + '.' + side + ' "' + String((milestone || {})[side] || '') + '" ' + res.reason);
+      }
+    });
+    var at = (milestone || {}).at;
+    if (!Number.isInteger(at) || at < 1) {
+      errors.push(where + '.at is ' + at + ' — a milestone opens at a COUNT the player can check'
+        + ' against their own page (marks banked, regions opened, fragments decoded)');
+    }
+    var unlocks = parseSurfaceRef((milestone || {}).unlocks);
+    if (unlocks.valid && !answered[(unlocks.kind + ':' + unlocks.id).toLowerCase()]) {
+      errors.push(where + ' unlocks "' + unlocks.raw + '" and no consequenceEdge mentions it —'
+        + ' a theory the book never answers is an unpaid promise. Name the surface that responds to it');
+    }
+  });
+
+  // ── Floor 14: legacy moves happen on a page ──────────────────────────────
+  var legacy = Array.isArray(spine.legacyMoves) ? spine.legacyMoves : [];
+  var seenMoves = {};
+  legacy.forEach(function (row, ri) {
+    var where = S + 'playSpine.legacyMoves[' + ri + ']';
+    var move = String((row || {}).move || '').trim();
+    if (VALID_LEGACY_MOVES.indexOf(move) === -1) {
+      errors.push(where + '.move "' + move + '" is not a pencil legacy move ('
+        + VALID_LEGACY_MOVES.join(' | ') + ') — anything needing a sticker, a seal or scissors'
+        + ' is excluded by the pencil-only law, not missing from this list');
+    } else if (seenMoves[move]) {
+      errors.push(where + ' repeats "' + move + '" — declare each kind of permanence once,'
+        + ' naming the page it happens on');
+    } else {
+      seenMoves[move] = 1;
+    }
+    var res = surfaceRefResolves(index, (row || {}).printedOn);
+    if (!res.ok) {
+      errors.push(where + '.printedOn "' + String((row || {}).printedOn || '') + '" ' + res.reason);
     }
   });
 

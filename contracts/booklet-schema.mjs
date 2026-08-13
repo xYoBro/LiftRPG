@@ -51,7 +51,9 @@ import {
   RECKONING_SINK_KINDS,
   LUDIC_LIBRARY,
   VALID_DYNAMIC_MARKINGS,
-  SPINE_BUDGETS
+  SPINE_BUDGETS,
+  VALID_GATE_STRUCTURES,
+  VALID_LEGACY_MOVES
 } from './contract-constants.mjs';
 
 var G = SPATIAL_GUARDRAILS;
@@ -582,8 +584,128 @@ var spineEconomyGraph = {
       from: nonEmptyString,
       to: nonEmptyString,
       currency: { type: 'string' },
+      // ── The three W5a completions (the sim's contact findings) ───────────
+      // Each is optional at the artifact level and STRICT WHEN PRESENT, the
+      // manifestPointer idiom: a half-declared price is a number that reads as
+      // a record and checks as nothing.
+      //
+      // `branch` — which side of a fork carries this edge (`door:W3/A`). The
+      // W4b sim could only report "reachable through a door, and the spine does
+      // not say which side"; with attribution it walks each branch and returns
+      // a real per-branch verdict. Absence is still legal and still reported.
+      //
+      // TYPED AS A STRING, NOT PATTERN-GATED, and deliberately: `from` and `to`
+      // are plain strings here too, with the ref grammar enforced by the floors
+      // through parseSurfaceRef — which matches CASE-INSENSITIVELY. A JSON
+      // Schema `pattern` has no such flag, so pinning BRANCH_REF_PATTERN here
+      // would make the schema reject `Door:W3/a` while the resolver happily
+      // parses it: two authorities disagreeing about one grammar, which is the
+      // defect class this whole file exists to make impossible. The pattern is
+      // still the single source — the prompt quotes it and the floor derives
+      // its check from parseBranchRef.
+      branch: nonEmptyString,
+      // `price` — what this spend COSTS, IN MARKS. Marks, not the printed
+      // currency label, because the mark is the only unit the machine economy
+      // has: session markStrip targets are counted in them and the derived boss
+      // threshold is expressed in them (RECKONING_THRESHOLD_RATIO × attainable
+      // ticks). A price in "Relief" would be a second unit with no conversion
+      // anywhere in the schema, and the sim would have to guess. The page still
+      // prints the fiction's own currency; this is the machine-readable half of
+      // the sentence the reckoning panel already states in prose.
+      price: { type: 'integer', minimum: 1 },
+      // `closesAtWeek` — the last week this affordance can be taken. In a
+      // pencil book nothing expires by default (a region drawn in week 2 is
+      // still on the page in week 6), so before this the stingy schedule had
+      // exactly two real deadlines — seals and the endgame — and every other
+      // spend floored at the last week. A declared window is what makes
+      // hoarding cost something.
+      closesAtWeek: { type: 'integer', minimum: 1 },
       _x: xt
     }
+  }
+};
+
+// ── The harvest declarations (W5a, tranche 1) ───────────────────────────────
+// Three tier-2 patterns from the Ludic Library registry, each landing as a
+// DECLARATION rather than as printed content — which is the line this tranche
+// holds. The spine has always been renderer-inert: it declares things about
+// surfaces the book prints, it is not itself a surface. A declaration that
+// needs its own printed geometry is not schema-light, and the registry's
+// `printed-hint-band` entry records the one that therefore did not land.
+//
+// Every declaration that promises the player will READ something carries a
+// `printedOn` surface ref, and the floors resolve it against the book's own
+// index. That is what stops these from being paperwork: the model cannot
+// declare a hint ladder without naming the printed page the rungs live on, and
+// a ref that resolves to nothing blocks at the stage gate.
+
+var spineHintLadder = {
+  type: 'object',
+  // All four required when present. A rung with no cost is a free hint (which
+  // is a walkthrough), and a ladder with no printedOn is a promise about a page
+  // nobody can find.
+  required: ['puzzle', 'printedOn', 'rungs'],
+  additionalProperties: false,
+  properties: {
+    // The surface the player is stuck on — a cipher, a seal, a map, an oracle.
+    puzzle: nonEmptyString,
+    // Where the rungs are actually printed. Usually the puzzle's own page.
+    printedOn: nonEmptyString,
+    rungs: {
+      type: 'array',
+      minItems: SPINE_BUDGETS.hintRungsMin,
+      maxItems: SPINE_BUDGETS.hintRungsMax,
+      items: {
+        type: 'object',
+        required: ['cost', 'gives'],
+        additionalProperties: false,
+        properties: {
+          // What taking this rung costs, in the book's own terms ("tick the
+          // Watch", "two marks", "cross out the western route"). Prose, because
+          // the cost is paid on a printed surface whose unit varies per book —
+          // unlike a spend price, which is always marks.
+          cost: nonEmptyString,
+          // What the rung gives: a nudge, then a method, then the answer.
+          gives: nonEmptyString,
+          _x: xt
+        }
+      }
+    },
+    _x: xt
+  }
+};
+
+var spineMilestone = {
+  type: 'object',
+  required: ['label', 'at', 'unlocks', 'printedOn'],
+  additionalProperties: false,
+  properties: {
+    label: nonEmptyString,
+    // The count that opens it, in whatever the book counts — marks banked,
+    // regions opened, fragments decoded. An integer because a milestone the
+    // player cannot check against a number is a mood.
+    at: { type: 'integer', minimum: 1 },
+    // What becomes available: a surface ref. The floor requires a consequence
+    // edge to answer it — an unlocked theory nothing responds to is the unpaid
+    // promise in miniature.
+    unlocks: nonEmptyString,
+    printedOn: nonEmptyString,
+    _x: xt
+  }
+};
+
+var spineLegacyMove = {
+  type: 'object',
+  required: ['move', 'printedOn'],
+  additionalProperties: false,
+  properties: {
+    move: { enum: VALID_LEGACY_MOVES },
+    printedOn: nonEmptyString,
+    // What the move makes permanent, in one clause. Optional: the enum already
+    // says what KIND of permanence this is, and forcing a sentence would buy a
+    // restatement of the enum in most books.
+    makesPermanent: { type: 'string' },
+    _x: xt
   }
 };
 
@@ -678,6 +800,19 @@ var playSpine = {
     decisionLedger: spineDecisionLedger,
     tensionBudget: spineTensionBudget,
     difficultyCurve: spineDifficultyCurve,
+    // ── The harvest (W5a) ────────────────────────────────────────────────
+    // gateStructure is REQUIRED by generation policy and optional here, the
+    // artifactIntent severity split exactly: the structured stage literal
+    // demands it and the closure floors read it back off the graph, while the
+    // sealed corpus — which predates the spine entirely — stays valid.
+    gateStructure: { enum: VALID_GATE_STRUCTURES },
+    hintLadders: {
+      type: 'array', maxItems: SPINE_BUDGETS.hintLaddersMax, items: spineHintLadder
+    },
+    milestones: {
+      type: 'array', maxItems: SPINE_BUDGETS.milestonesMax, items: spineMilestone
+    },
+    legacyMoves: { type: 'array', items: spineLegacyMove },
     _x: xt
   }
 };
