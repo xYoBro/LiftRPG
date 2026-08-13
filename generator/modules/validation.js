@@ -3064,26 +3064,64 @@ function singularizeToken(word) {
   return word;
 }
 
+// THE STOPLIST (W3 corrective wave, F04). A near-miss is only evidence if the
+// word that hit is DISTINCTIVE — a word that could only have come from this
+// currency's name. Function words cannot: a label like "The Iron Marks" would
+// otherwise register a near-miss on any sentence in English containing "the",
+// which would make the WARN class vacuous and the ERROR class empty. So a
+// modifier counts only when it is outside this list AND at least three
+// characters long. THREE, not four: "Ash", "Ink", "Oak", "Tin" are plausible
+// distinctive modifiers on a currency label, while two-letter words are
+// function words and the ones a label could plausibly carry are listed here.
+// The head noun is exempt — it is matched separately and is the currency's
+// name by construction.
+var CURRENCY_MODIFIER_STOPLIST = [
+  'the', 'a', 'an', 'and', 'or', 'of', 'for', 'in', 'on', 'to', 'at', 'by',
+  'with', 'from', 'per', 'each', 'every', 'one', 'two', 'this', 'that'
+];
+var CURRENCY_MODIFIER_MIN_LENGTH = 3;
+
+function haystackHas(haystack, candidate) {
+  var stem = singularizeToken(candidate);
+  return haystack.indexOf(' ' + candidate + ' ') !== -1
+    || haystack.indexOf(' ' + stem + ' ') !== -1
+    || haystack.indexOf(' ' + stem + 's ') !== -1
+    || haystack.indexOf(' ' + stem + 'es ') !== -1;
+}
+
 /**
- * Does this conversion sentence name the booklet's declared currency?
+ * How does this conversion sentence name the booklet's declared currency?
+ * Returns 'named' | 'modifier' | 'absent'.
  *
  * HEURISTIC, and stated as one: full label first, then its head noun, each
  * matched with singular/plural tolerance. It exists to catch the real failure —
  * week 1 banking "Embers" while week 4 banks "Tokens", two income currencies
  * where the amended one-per-markStrip law allows one — not to grade prose.
+ *
+ * THE SPLIT (W3 corrective wave, F04). The rule failed 17 of 18 weeks across
+ * three pipeline books, and TWO DIFFERENT DEFECTS wore one message. A2 declared
+ * "Chalk Signatures" and wrote "a further chalk mark on the ground already
+ * claimed" — the right currency, named by its modifier instead of its head
+ * noun. A1 declared "Callboard Marks" and wrote "one pencil stroke added to the
+ * standby's own line" — no shared noun at all, a genuine miss. Conflated, the
+ * count overstated the prose failure and hid how close some weeks were.
+ *
+ * Graded, 'modifier' is a polish miss (WARN) and 'absent' means what it says
+ * (ERROR). The prompt half of the same split is INST_MARK_SURFACE, which now
+ * demands the full phrase verbatim once — so the model is taught the shape
+ * instead of guessing which noun the validator scans for.
  */
-function conversionNamesCurrency(text, currencyLabel) {
+function currencyMentionVerdict(text, currencyLabel) {
   var haystack = ' ' + toSlugWords(text) + ' ';
   var words = toSlugWords(currencyLabel).split(' ').filter(Boolean);
-  if (!words.length) return false;
-  var candidates = [words.join(' '), words[words.length - 1]];
-  return candidates.some(function (candidate) {
-    var stem = singularizeToken(candidate);
-    return haystack.indexOf(' ' + candidate + ' ') !== -1
-      || haystack.indexOf(' ' + stem + ' ') !== -1
-      || haystack.indexOf(' ' + stem + 's ') !== -1
-      || haystack.indexOf(' ' + stem + 'es ') !== -1;
+  if (!words.length) return 'absent';
+  var head = words[words.length - 1];
+  if (haystackHas(haystack, words.join(' ')) || haystackHas(haystack, head)) return 'named';
+  var modifiers = words.slice(0, -1).filter(function (w) {
+    return w.length >= CURRENCY_MODIFIER_MIN_LENGTH
+      && CURRENCY_MODIFIER_STOPLIST.indexOf(w) === -1;
   });
+  return modifiers.some(function (w) { return haystackHas(haystack, w); }) ? 'modifier' : 'absent';
 }
 
 function markLabelComplaint(label) {
@@ -3189,10 +3227,20 @@ export function collectMarkStripFindings(booklet) {
     var conversion = String(reckoning.conversion || '').trim();
     if (!conversion) {
       errors.push('Week ' + weekNumber + ' reckoning has no conversion rule — the panel teaches nothing');
-    } else if (currencyLabel && !conversionNamesCurrency(conversion, currencyLabel)) {
-      errors.push('Week ' + weekNumber + ' reckoning conversion does not name the declared currency "'
-        + currencyLabel + '" ("' + conversion + '") — the markStrip economy resolves into exactly '
-        + 'one currency per booklet');
+    } else if (currencyLabel) {
+      // THE SPLIT (F04): named by its modifier is a polish miss; naming no part
+      // of the currency at all is the economy failing to resolve.
+      var mention = currencyMentionVerdict(conversion, currencyLabel);
+      if (mention === 'modifier') {
+        warnings.push('Week ' + weekNumber + ' reckoning conversion names the currency "'
+          + currencyLabel + '" by its modifier rather than the declared phrase ("' + conversion
+          + '") — the panel converts into the right thing under a slightly different name, which '
+          + 'reads as a second currency to a player counting them');
+      } else if (mention === 'absent') {
+        errors.push('Week ' + weekNumber + ' reckoning conversion does not name the declared currency "'
+          + currencyLabel + '" ("' + conversion + '") — the markStrip economy resolves into exactly '
+          + 'one currency per booklet');
+      }
     }
     var sink = (reckoning.sink && typeof reckoning.sink === 'object') ? reckoning.sink : null;
     if (!sink) {
