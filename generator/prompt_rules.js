@@ -1314,6 +1314,7 @@
     '  Midpoint: binary choice that recontextualizes prior evidence AND costs a relationship.',
     '  Late weeks: convergence, darkest moment (relational or ethical cost), escalation.',
     '  Boss week: culmination that tests spatial mastery, institutional knowledge, and relationship stakes.',
+    '  These are POSITIONS in the block, not week numbers. A short block compresses them; a long block gives each phase more weeks, and every added week still owes its own beat.',
     '- Unless the block is intentionally comic or the brief signals a lighter register, the darkest moment must cost the protagonist something they cannot recover: a relationship damaged, a belief overturned, an ethical line crossed, or an institutional protection lost.',
     '- The ending must acknowledge the binary choice, the boss outcome, and at least one relationship consequence.'
   ];
@@ -1743,13 +1744,17 @@
     '- Do not add companion surfaces as decorative filler.',
     '- **The growing stat (`percentile-stat`):** name it from the Core Noun Roster and make it a capability this world would actually keep a number on — standing inside a named institution, clearance against a named archive, fluency in a named record system, credit with a named faction. It must read as a line an in-world clerk would write.',
     '- Never name the stat after the body, the training block, or the player. It is not Strength, Endurance, Fitness, Level, or XP. The workout produces it; the fiction is what carries it.',
-    '- One percentile-stat per booklet, introduced by Week 2 or 3 so it has room to climb. Its `body` must say in one sentence what having a high number means inside the world.'
+    '- One percentile-stat per booklet, introduced inside the first quarter of the block so it has room to climb. Its `body` must say in one sentence what having a high number means inside the world.'
   ];
 
   window.INST_PROGRESSION = [
     '## Progression Design',
     '- Design a clear capability arc across the campaign. Week 1 should feel constrained: limited map access, simple mechanics, few nodes visible, basic companion state.',
-    '- **Mechanical Rule Ramp:** Week 1 should introduce only the core loop (map + oracle + session prompts). Add companion components starting Week 2-3. Introduce gameplay clocks by Week 3-4. Week 5+ can layer multiple mechanical surfaces simultaneously. Do not give the player every mechanical surface in Week 1 — complexity is a reward, not a starting condition.',
+    // W7: this ramp named absolute week numbers, which described a six-week
+    // block and nothing else. At twelve weeks every surface was on by week 5
+    // and seven weeks ran flat; at four weeks the clocks arrived on the boss.
+    // Positions in the block scale; week numbers do not.
+    '- **Mechanical Rule Ramp — positions in the block, never fixed week numbers:** Week 1 introduces only the core loop (map + oracle + session prompts). Companion components arrive inside the first third of the block; gameplay clocks by the end of the first half; only past the midpoint may one week layer several mechanical surfaces at once. Complexity is a reward, not a starting condition.',
     '- Each non-boss week must give the player something new: a cleared route, an unlocked node, a decoded access code, a revealed map area, a new companion function, a key that opens a previously locked gate.',
     '- By the penultimate week, the player should have enough capabilities and map knowledge to make real strategic choices about route, resource allocation, and risk.',
     '- The boss week should require the player to have MASTERED the space. The decodingKey should reference map node names, spatial relationships, clock history, or institutional knowledge gathered across the campaign — not just arithmetic on weekly component values.',
@@ -2014,8 +2019,8 @@
     '- Chose a reconstruction family? Name at least TWO of the other six — they are all siblings,',
     '  so they blur fastest of all.',
     '- Refusing a distant family is free and proves nothing. The refusal must forbid the move',
-    '  your book will actually be tempted to make in week 4, and it must hold in the built',
-    '  booklet: a `heat` book that refuses `rivalry` and then prints a rival\\\'s weekly standings',
+    '  your book will actually be tempted to make in the middle of the block, and it must hold',
+    '  in the built booklet: a `heat` book that refuses `rivalry` and then prints a rival\\\'s weekly standings',
     '  has broken its own contract.',
     '',
     '### Step 9: Name the home pull',
@@ -2761,7 +2766,7 @@
     '  Grid: max 12 cols x 8 rows (cellShape square or hex). PTP: max 12 nodes, max 10 edges (edgeSemantics traversal or relational). Linear: max 12 positions. Player-drawn: canvas instructions only.',
     '  Concentric: 3-6 rings, labels max 18 chars. Maze: max 12 nodes, max 14 passages.',
     '- Ciphers: DELAYED INTERPRETATION. Weekly values are fiction-native (numbers, codes, instrument readings), NEVER raw letters.',
-    '  The boss decodingKey at Week 6 converts accumulated values to letters. This is non-negotiable.',
+    '  The boss decodingKey, on the LAST week of the block, converts accumulated values to letters. This is non-negotiable.',
     '- Oracle tables: d100 with exactly 10 bands (00-09, 10-19, ... 90-99). Each entry has a `text` field.',
     '  Entry types: "fragment" (includes fragmentRef) or "consequence" (includes paperAction).',
     // MENU SURFACE 2 of 2 (companionMenuParity() in validate.mjs): the count and
@@ -3165,6 +3170,46 @@
       '- Stop after Stage 1.',
   ];
 
+  /**
+   * The five named arc beats, placed as fractions of the block and grouped by
+   * the week each lands on.
+   *
+   * Grouping is the whole point. Derived positions overlap at short lengths —
+   * a four-week block puts Complication and Reversal both on week 2 — and two
+   * lines demanding different things of the same week is not an arc, it is a
+   * contradiction the model has to pick a side in. Merged, week 2 is asked for
+   * "Complication + Reversal", which is exactly what a four-week story does.
+   *
+   * Positions, in order: Setup is always week 1; Complication a quarter in;
+   * Reversal at the midpoint (the binary-choice week the validators check);
+   * Deepening two from the end; Escalation the penultimate week; Boss the last.
+   */
+  function arcBeatLines(weekCount) {
+    var midpoint = Math.ceil(weekCount / 2);
+    var beats = [
+      { week: 1, name: 'Setup', text: 'establish setting, protagonist role, core tension, constrained map — most zones locked' },
+      { week: Math.max(2, Math.min(midpoint, Math.round(weekCount / 4))), name: 'Complication', text: 'new pressure, first gate opened, companion introduces tension' },
+      { week: midpoint, name: 'Reversal', text: 'binary choice recontextualizes evidence, costs a relationship, reveals that an earlier clue meant something different than assumed' },
+      { week: Math.max(weekCount - 2, midpoint), name: 'Deepening', text: 'darkest moment — relational or ethical cost, an institutional system turns against the player, a trusted document is revealed as unreliable' },
+      { week: Math.max(weekCount - 1, 2), name: 'Escalation', text: 'pressures converge, full map access, final preparation, the player can now see the pattern connecting earlier fragments' },
+      { week: weekCount, name: 'Boss', text: 'culmination — decode requires spatial mastery + institutional knowledge + relationship state from prior weeks' }
+    ];
+    var byWeek = {};
+    var order = [];
+    for (var i = 0; i < beats.length; i++) {
+      var w = beats[i].week;
+      if (!byWeek[w]) { byWeek[w] = []; order.push(w); }
+      byWeek[w].push(beats[i]);
+    }
+    order.sort(function (a, b) { return a - b; });
+    return order.map(function (w) {
+      var group = byWeek[w];
+      var names = group.map(function (b) { return b.name; }).join(' + ');
+      var texts = group.map(function (b) { return b.text; }).join('; and ');
+      return '- Week ' + w + ': ' + names + ' (' + texts + ')';
+    });
+  }
+
   window.buildStage2Doctrine = function (weekCount) {
     var midpoint = Math.ceil(weekCount / 2);
     var minReuse = Math.max(weekCount - 2, 3);
@@ -3229,16 +3274,28 @@
       '- `stateSnapshot`, `stateChange`, and `newGateOrUnlock` cannot all describe the same board state as the prior week.',
       '',
       '## Arc Beat Assignment',
-      '- Week 1: Setup (establish setting, protagonist role, core tension, constrained map — most zones locked)',
-      '- Week 2: Complication (new pressure, first gate opened, companion introduces tension)',
-      '- Week ' + midpoint + ': Reversal (binary choice recontextualizes evidence, costs a relationship,',
-      '  reveals that an earlier clue meant something different than assumed)',
-      '- Week ' + Math.max(weekCount - 2, midpoint + 1) + ': Deepening (darkest moment — relational or ethical cost,',
-      '  an institutional system turns against the player, a trusted document is revealed as unreliable)',
-      '- Week ' + (weekCount - 1) + ': Escalation (pressures converge, full map access, final preparation,',
-      '  the player can now see the pattern connecting earlier fragments)',
-      '- Week ' + weekCount + ': Boss (culmination — decode requires spatial mastery + institutional',
-      '  knowledge + relationship state from prior weeks)',
+      // W7 — DERIVED AT EVERY LENGTH, and merged rather than collided.
+      //
+      // Two defects lived here. Complication was pinned to Week 2 while every
+      // other beat was already derived, so a twelve-week block put Setup and
+      // Complication back to back and left weeks 3-5 and 7-9 with no beat at
+      // all. And at the MINIMUM legal length the derivations overlapped: a
+      // four-week block printed "Week 2: Reversal" directly under "Week 2:
+      // Complication", and "Week 3: Escalation" under "Week 3: Deepening" —
+      // four contradictory demands on two weeks, shipped since the function
+      // was written.
+      //
+      // `arcBeats()` derives every position, then groups by week so a week
+      // carrying two beats is asked for ONE compound thing it can actually do.
+      // The six-week block is byte-identical to before: round(6/4) is 2, and
+      // no two beats land on the same week there.
+      ].concat(arcBeatLines(weekCount)).concat([
+      // The weeks BETWEEN the named beats. A six-week block has one or two and
+      // they take care of themselves; a twelve-week block has six, and without
+      // this line the plan simply has nothing to say about half the book.
+      '- Every week not named above is a RUN, not filler: it continues the beat before it with a',
+      '  new capability, a new state change, and higher pressure than the week before. None may',
+      '  repeat its predecessor. A longer block has more of these, not longer ones.',
       '',
       '## Per-Week Requirements',
       '- Each week must specify all of the following:',
@@ -3292,8 +3349,8 @@
       '## Output Rules',
       '- Return compact JSON only, matching the schema below exactly.',
       '- No markdown fences, no explanation.',
-      '- Stop after Stage 2.',
-    ];
+      '- Stop after Stage 2.'
+    ]);
   };
 
   window.FLESH_RULES_SPREAD_SPEC = [
