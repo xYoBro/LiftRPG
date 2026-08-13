@@ -1988,12 +1988,38 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   justify-content:flex-end;
   gap:2px;
 }
+/* CROSS-FILE CONTRACT — `session-card-metrics.js` NAME_* constants + the
+   `exerciseNameLines()` term in `rawExerciseTableHeight()`.
+
+   THE DEFECT (W3-F02, author-witnessed, auditor-quantified 2026-08-13). This
+   rule carried `white-space: nowrap`, and the column it sits in is capped at
+   `NAME_COL_MAX_PX` by `resolveExerciseNameWidthPx()` (workout-models.js). A
+   transcribed exercise name longer than that cap could not wrap and could not
+   fit, so it ran past the cell and `overflow` ate the difference as ink.
+   Measured: "Single-Arm Dumbbell Romanian Deadlift" needs 204px inside a
+   154.3px content box. The engine reported the same pages CLEAN, because the
+   density solver resolves PAGE-level boundary overflow and has no view of an
+   element whose own text exceeds its own box.
+
+   THE FIX IS HONEST WRAPPING, not hiding. `text-overflow: ellipsis` or a
+   line-clamp would truncate a name the pipeline transcribed VERBATIM from the
+   user's program (D107), and D77 forbids the clamp outright. Shrinking the
+   type below the ladder's floors is not available either. So the name wraps,
+   and the estimate reserves the second line — see NAME_ADVANCE_EM and
+   NAME_COL_CONTENT_PX in session-card-metrics.js, which carry the reciprocal
+   pointer back here. Changing the cap, the padding, or the face without
+   changing those makes the solver's row math wrong in the confident direction
+   (the D71 class). */
 .exercise-name {
   font-family: var(--serif);
   font-weight: 700;
   font-size: 8pt;
   color: var(--ink);
-  white-space: nowrap;
+  white-space: normal;
+  /* A single token longer than the column (a hyphenless compound) still has to
+     break somewhere: `break-word` breaks it rather than letting it run out of
+     the box, which is the whole point of the rule above. */
+  overflow-wrap: break-word;
 }
 .exercise-instruction{
   font-family:var(--mono);

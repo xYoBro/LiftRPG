@@ -18,15 +18,23 @@ import {
   estimateSessionCardHeight, estimateSoloSessionCardHeight,
   sessionCardVariant, sessionCardNotesHeight,
 } from '../session-card-metrics.js';
+// D121: the estimate's only knowledge of typefaces. Forwarded, never read here
+// — a missing context resolves to the calibration anchors, so every estimate is
+// byte-identical without one (ATOM-IR / the render.js options.typeMetrics row).
+import { readTypeMetrics } from '../type-metrics.js';
 
 registerAtom('session-card', {
   defaultSizeHint: 'quarter-page',
   canShare: true,
   pageAffinity: 'left',
 
-  estimate(data, density) {
+  estimate(data, density, context) {
     const atomData = data || {};
     const session = atomData.session || {};
+    // W3-F02: the exercise-name wrap term is a per-character advance against a
+    // capped column, so it is face-dependent like every other wrapped-text
+    // term. See exerciseNameLines() in session-card-metrics.js.
+    const metrics = readTypeMetrics(context);
 
     // A card that OWNS its page is a different object, and the atom cannot
     // work that out for itself — it is handed a session and a density, never a
@@ -39,13 +47,13 @@ registerAtom('session-card', {
     // density-invariant, so the shrink potential really is zero, and saying so
     // is what stops the solver spending passes on a card that cannot move.
     if (atomData.ownsPage) {
-      const soloHeight = estimateSoloSessionCardHeight(session);
+      const soloHeight = estimateSoloSessionCardHeight(session, metrics);
       return { minHeight: soloHeight, preferredHeight: soloHeight };
     }
 
     return {
-      minHeight: estimateSessionCardHeight(session, 1),
-      preferredHeight: estimateSessionCardHeight(session, density),
+      minHeight: estimateSessionCardHeight(session, 1, metrics),
+      preferredHeight: estimateSessionCardHeight(session, density, metrics),
     };
   },
 
