@@ -99,6 +99,17 @@ import {
   verifyWordGrid
 } from '../../contracts/puzzle-solvers.mjs';
 
+// W3 corrective wave (F06). The canonical schema, imported rather than
+// described. The browser-side validator is hand-written and had no unknown-key
+// check of ANY kind, so its promise — "a revision may never make the booklet
+// less valid" — held only against the weaker of the two validators in the repo,
+// and unknown-key invention is precisely what a free-form revision stage
+// produces. This module now derives that one pass from the same object
+// scripts/validate.mjs runs through Ajv, so the two cannot disagree about what
+// a legal key is. booklet-schema.mjs imports only contract-constants.mjs and is
+// therefore browser-safe.
+import { BOOKLET_SCHEMA } from '../../contracts/booklet-schema.mjs';
+
 // Map-evolution fingerprint + companions: one implementation, shared with quality.js.
 // Formerly a private copy here that silently diverged from quality.js's — see D91 and
 // the header of fingerprint.js. Guarded by singleFingerprintHome() in validate.mjs.
@@ -4317,6 +4328,112 @@ export function collectPlayLoopFindings(booklet) {
   return findings;
 }
 
+// ── The unknown-key pass (W3 corrective wave, F06) ──────────────────────────
+// DERIVED FROM THE SCHEMA, never described. The canonical schema rejects
+// unknown keys everywhere outside `_x` (80 `additionalProperties: false` sites);
+// this walker reads that same object and reports the paths that violate it, so
+// the browser-side validator and Ajv cannot hold different opinions about what
+// a legal key is. A described copy would be a second, worse schema — which is
+// the failure mode contract-constants.mjs exists to prevent.
+//
+// WHAT IT UNDERSTANDS, stated plainly because a walker that silently skips a
+// construct is a gate with a hole: `$ref` into `$defs`, `properties`, `items`,
+// and `additionalProperties: false`. Allowed keys are UNIONED across `properties`
+// and any `allOf` / `if` / `then` / `else` branches, which is conservative in the
+// only direction that matters — a key the schema conditionally allows is never
+// reported. Arrays walk element-wise. `_x` subtrees are never entered, because
+// `_x` is the one place non-contract data is legal (and is where the pipeline's
+// own debris lives).
+//
+// SEVERITY IS D19. On the generation path these are ERRORS: a generated booklet
+// carrying an invented field is a booklet the canonical validator will refuse,
+// and the model can simply not invent it. On fixtures they are WARNINGS —
+// `npm run validate` must never fail a sealed fixture over a gate written after
+// it was sealed, and the corpus is evidence, not output.
+function schemaAllowedKeys(node) {
+  var allowed = {};
+  function absorb(n) {
+    if (!n || typeof n !== 'object') return;
+    if (n.properties) {
+      Object.keys(n.properties).forEach(function (k) { allowed[k] = n.properties[k]; });
+    }
+    ['if', 'then', 'else'].forEach(function (branch) { absorb(n[branch]); });
+    if (Array.isArray(n.allOf)) n.allOf.forEach(absorb);
+    if (Array.isArray(n.anyOf)) n.anyOf.forEach(absorb);
+    if (Array.isArray(n.oneOf)) n.oneOf.forEach(absorb);
+  }
+  absorb(node);
+  return allowed;
+}
+
+function resolveSchemaRef(node) {
+  var seen = 0;
+  while (node && typeof node === 'object' && typeof node.$ref === 'string' && seen++ < 8) {
+    var name = node.$ref.replace('#/$defs/', '');
+    node = (BOOKLET_SCHEMA.$defs || {})[name];
+  }
+  return node;
+}
+
+/**
+ * collectUnknownKeyPaths(value, schemaNode, path) -> string[]
+ * Every key present in `value` that the schema does not allow at that location.
+ * Exported for the critic's revision floor, which diffs unit against unit.
+ */
+export function collectUnknownKeyPaths(value, schemaNode, path) {
+  var found = [];
+  var node = resolveSchemaRef(schemaNode);
+  if (!node || typeof node !== 'object' || !value || typeof value !== 'object') return found;
+  var here = path || '';
+
+  if (Array.isArray(value)) {
+    var itemSchema = node.items;
+    if (!itemSchema) return found;
+    value.forEach(function (entry, i) {
+      found = found.concat(collectUnknownKeyPaths(entry, itemSchema, here + '[' + i + ']'));
+    });
+    return found;
+  }
+
+  var allowed = schemaAllowedKeys(node);
+  var closed = node.additionalProperties === false;
+  Object.keys(value).forEach(function (key) {
+    // `_x` is the extension namespace: legal wherever it is declared, and never
+    // walked into. A key named `_x` where the schema does not declare one is
+    // still reported by the closed-object check below, which is correct — the
+    // namespace is granted at specific levels, not universally.
+    var child = allowed[key];
+    if (!child) {
+      if (closed) found.push((here ? here + '.' : '') + key);
+      return;
+    }
+    if (key === '_x') return;
+    found = found.concat(collectUnknownKeyPaths(value[key], child, (here ? here + '.' : '') + key));
+  });
+  return found;
+}
+
+/**
+ * Unknown-key paths in one critic-revisable unit, addressed through the
+ * schema's own $defs so the unit is judged by exactly the rules it will face
+ * when the whole booklet reaches scripts/validate.mjs.
+ */
+export function unknownKeyPathsForUnit(unitType, unit) {
+  var DEFS = { week: 'week', fragment: 'fragment', ending: 'ending', rulesSpread: 'rulesSpread' };
+  var defName = DEFS[unitType];
+  if (!defName) return [];
+  var node = (BOOKLET_SCHEMA.$defs || {})[defName];
+  if (!node) return [];
+  return collectUnknownKeyPaths(unit, node, '');
+}
+
+export function collectUnknownKeyFindings(booklet) {
+  return collectUnknownKeyPaths(booklet, BOOKLET_SCHEMA, '').map(function (p) {
+    return 'Unknown key "' + p + '" — the schema rejects keys it does not declare outside the '
+      + '`_x` namespace, so this booklet cannot pass the canonical validator';
+  });
+}
+
 /**
  * validateAssembledBooklet(booklet, options) -> { valid, errors, warnings, sim }
  *
@@ -4361,6 +4478,13 @@ export function validateAssembledBooklet(booklet, options) {
   var markStripFindings = collectMarkStripFindings(booklet);
   markStripFindings.errors.forEach(function (m) { errors.push(m); });
   markStripFindings.warnings.forEach(function (m) { warnings.push(m); });
+  // The unknown-key pass (F06), on the D19 split: blocking for generated books,
+  // advisory for the corpus. This is the check whose absence let a critic
+  // revision invent two fields and still clear a floor whose promise was that a
+  // revision may never make the booklet less valid.
+  collectUnknownKeyFindings(booklet).forEach(function (m) {
+    if (opts.generationFloors) errors.push(m); else warnings.push(m);
+  });
   collectVoiceTicFindings(booklet).forEach(function (f) { warnings.push(f.message); });
   collectLicensedMovePlacementFindings(booklet).forEach(function (f) { warnings.push(f.message); });
   // Posted manifests are promises, not preferences — broken ones are errors.
