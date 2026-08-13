@@ -445,7 +445,38 @@ var NEEDS_PRIMITIVE = [
     process: 'The player locates what does not belong; its position is the answer.',
     outputs: 'A coordinate or letter.',
     locks: 'The anomaly must be machine-plantable and machine-findable, or the puzzle cannot be proven solvable.',
-    needs: 'A generated-illustration primitive the engine can both draw and audit.'
+    needs: 'A generated-illustration primitive the engine can both draw and audit. HALF OF THIS FAMILY IS ALREADY SHIPPED and the arsenal wave assessed which half: the TEXTUAL anomaly — one letterform wrong, one spacing wrong, one glitch in a document — is the `typographic-anomaly` cipher family, which prints today, and a cipher IS a planted irregularity whose location is the answer. What stays here is the PICTORIAL half, and it stays for the reason it always did: the engine draws no illustrations, so it can neither plant an anomaly in one nor audit that exactly one is there. Building a second textual anomaly surface would be a fifth cipher family wearing a puzzle\'s name.'
+  },
+  // ── The metapuzzle, assessed and closed as ALREADY COVERED ────────────────
+  // Recorded rather than dropped, per this file's own law: "a family silently
+  // dropped is a family that gets re-researched next year." The arsenal wave
+  // asked whether dependency-structured metapuzzles (the research's Gilbert
+  // charts — puzzles feeding puzzles feeding a final answer) needed a primitive,
+  // and the answer is that the Ludic Spine already IS one, with more teeth than
+  // a chart has.
+  //
+  // What a Gilbert chart draws, the spine declares and the floors enforce:
+  // `economyGraph` names the edges, `gateStructure` declares the shape they make
+  // (open / sequential / path-based, each owing a structure the floor reads back
+  // off the graph), and the closure floors block a book with a key after its
+  // lock, a dead sink, a mute source or an orphan system. The simulated player
+  // then walks the whole thing at three adherence bands. A chart is a picture of
+  // a dependency structure; this is a dependency structure that cannot ship
+  // disconnected.
+  //
+  // So there is nothing to build, and this entry exists to say so — with the
+  // one honest caveat: the CONSTRAINED GRIDS sit outside that graph. They are
+  // not in SURFACE_REF_KINDS, so a puzzle cannot yet be named as a spine node,
+  // which means a metapuzzle whose feeders are puzzles rather than surfaces is
+  // expressible only through the seals and ciphers the grids feed. That is a
+  // real edge and it is written down here rather than left to be rediscovered.
+  {
+    id: 'metapuzzle-dependency', label: 'Dependency-structured metapuzzles (Gilbert charts)',
+    inputs: 'A set of puzzles and surfaces, and the answers each one yields.',
+    process: 'Answers feed later locks; the structure of what feeds what is the design, and the final answer needs several of them.',
+    outputs: 'A convergence the player assembles from parts they earned separately.',
+    locks: 'Every key obtainable before its lock; no dead sinks, no mute sources, no orphan systems.',
+    needs: 'NOTHING — assessed and closed as already covered. `meta.playSpine.economyGraph` plus `gateStructure` IS the dependency chart, the closure floors make disconnection a blocking failure rather than a review note, and the simulated player walks it end to end. The one gap worth naming: constrained grids are outside SURFACE_REF_KINDS, so a puzzle cannot be a spine node directly — a metapuzzle built on puzzles routes through the seals and ciphers they feed.'
   }
 ];
 
