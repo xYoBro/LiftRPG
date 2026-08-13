@@ -143,6 +143,13 @@ var IMPLEMENTED_DETAIL = {
     outputs: 'A word, a letter string or a digit string the seal, the assembly or a priced spend reads.',
     locks: 'The grid is the lock. Nothing ships that a machine cannot finish: two solutions, no solution, or an answer the grid does not yield are all refusals, not warnings.'
   },
+  'word-hunt': {
+    label: 'The word hunt',
+    inputs: 'A letter board and a word list drawn from the book’s own noun roster.',
+    process: 'The player rings the words they find. A verifier proves every declared placement genuinely spells its word in the printed board, so overlaps are legal by construction, and proves the answer rule produces the declared answer.',
+    outputs: 'A word the seal or the assembly wants — either one from the list, or the letters no word covered.',
+    locks: 'Machine-verified placement; a word the board does not contain is refused, and in leftovers mode an answer the uncovered letters do not spell is refused.'
+  },
   'ledger-audit': {
     label: 'The ledger audit',
     inputs: 'The player’s own logged numbers, movement by movement.',
@@ -390,13 +397,19 @@ var NEEDS_PRIMITIVE = [
     locks: 'The grid is the lock. Nothing ships unless a deterministic solver proves exactly one filling.',
     needs: 'A third solver in contracts/puzzle-solvers.mjs — constrained integer partition with a uniqueness proof — plus one enum value in VALID_CONSTRAINED_GRID_KINDS and one branch in the constrained-grid atom, which already prints a cell matrix. DEFERRED BY RULING at W5b, not blocked: the atom and the schema surface exist, only the proof is missing, and a puzzle whose proof is missing is a puzzle that may not ship.'
   },
+  // W5b PROMOTED the search half out of this tier — it is `word-hunt` on the
+  // implemented shelf. What stayed is the INTERLOCKING half, and the reason is
+  // again the solver: verifying a board that already exists is a scan, while
+  // proving a crisscross or a crossword is fillable-and-unique is a
+  // constraint-satisfaction problem over a dictionary this engine does not
+  // ship and would have to be brief-blind to use.
   {
-    id: 'word-grid', label: 'Word grids (search, crisscross)',
-    inputs: 'A word list drawn from the book’s own noun roster.',
-    process: 'The player finds or places words; leftover letters spell the answer.',
-    outputs: 'A word the seal or the assembly wants.',
-    locks: 'Machine-verified placement; unfound words leave the answer incomplete.',
-    needs: 'A word-grid atom plus a placement solver (W5b). Dense crossword construction stays deferred until its solver floor can be real.'
+    id: 'interlocking-word-grid', label: 'Interlocking word grids (crisscross, dense crossword)',
+    inputs: 'A word list and a blank interlocking skeleton with numbered entries.',
+    process: 'The player writes words into a shape whose crossings constrain each other; the marked squares spell the answer.',
+    outputs: 'A word or letter string the seal wants.',
+    locks: 'The crossings are the lock. Nothing ships unless a solver proves the skeleton admits exactly one filling from the printed list.',
+    needs: 'A crossing solver plus a blank-skeleton print surface, which is a different geometry from the word board word-grid.js draws. DEFERRED BY RULING at W5b (crisscross was licensed "only if it lands clean"; it did not — the print surface and the uniqueness proof are both new work, not a variant of the search). Dense crossword construction stays out entirely per the waves plan.'
   },
   {
     id: 'printed-hint-band', label: 'Printed hint band',

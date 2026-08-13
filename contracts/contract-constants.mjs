@@ -976,7 +976,8 @@ export var LUDIC_LIBRARY = [
   // named for what it plays, not for the file, exactly like every entry above.
   // What is still tier 3 is the ARITHMETIC grid (kakuro, KenKen), which needs a
   // different solver — see contracts/ludic-library.mjs.
-  'deduction-board'     // the logic grid and the nonogram, proven solvable
+  'deduction-board',    // the logic grid and the nonogram, proven solvable
+  'word-hunt'           // the letter board, every word machine-verified in it
 ];
 
 // The binding that makes the library non-aspirational. Keys ≡ LUDIC_LIBRARY
@@ -995,7 +996,8 @@ export var LUDIC_LIBRARY_ATOMS = {
   'sealed-cache': ['fragment-doc'],
   'boss-convergence': ['boss-encounter', 'assembly-page', 'ending'],
   'ledger-audit': ['ledger-spread'],
-  'deduction-board': ['constrained-grid']
+  'deduction-board': ['constrained-grid'],
+  'word-hunt': ['word-grid']
 };
 
 // ── Spine budgets ───────────────────────────────────────────────────────────

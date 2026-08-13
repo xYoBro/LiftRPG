@@ -422,6 +422,29 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
         }));
       }
 
+      // Word grid — the letter hunt (W5b). Full-width for the same reason the
+      // deduction board is: a letter board plus its word list does not survive
+      // a half slot.
+      if (week.fieldOps && week.fieldOps.wordGrid) {
+        atoms.push(createAtom({
+          type: 'word-grid',
+          id: `w${wi}-wgrid`,
+          shellAttrs,
+          group: resolveAttachmentGroup(primaryGroup, wi, attachmentStrategy, 'cipher', artifactIdentity),
+          groupPolicy: singlePageGroupPolicy(),
+          section: 'body',
+          sequence: wi * 1000 + 104,
+          sizeHint: 'half-page',
+          pageAffinity: 'either',
+          data: {
+            wordGrid: week.fieldOps.wordGrid,
+            weekIndex: wi,
+            totalWeeks,
+            artifactIdentity,
+          },
+        }));
+      }
+
       // Clocks panel — see the emission below the boss branch.
 
       // Reckoning panel — see the emission below the boss branch.
