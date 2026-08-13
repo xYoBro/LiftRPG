@@ -1346,6 +1346,10 @@ function derivePlannedWeekShapes(workout, campaignPlan, weekCount) {
  * its own gate against the NEW upstream and only the ones that actually fail
  * come back.
  *
+ * `ctx.upstream` is the stage output holding meta.playSpine: the shell on the
+ * multi-stage pipeline, the SKELETON on S+F. Named for the role, not for one
+ * pipeline's word for it.
+ *
  * SCOPED TO WHAT THE RE-ENTERED STAGE COULD HAVE CHANGED — the spine, the
  * grammar family. Continuity inputs (previousWeek's map evolution, the boss's
  * componentInputs) are deliberately not re-asked here: a shell repair cannot
@@ -1356,7 +1360,7 @@ function derivePlannedWeekShapes(workout, campaignPlan, weekCount) {
 function sweepStaleBankedWeeks(checkpoint, ctx) {
   var stale = [];
   if (!checkpoint || !checkpoint.stages) return stale;
-  var meta = ((ctx.shell || {}).meta) || {};
+  var meta = ((ctx.upstream || {}).meta) || {};
   var family = (meta.artifactIntent || {}).mechanicGrammarFamily || '';
   var spine = meta.playSpine || null;
   var shapes = ctx.plannedWeekShapes || [];
@@ -3015,7 +3019,7 @@ async function runApiPipeline(options) {
     if (repairPending && repairPending.to === 'shell') {
       var staleWeeks = sweepStaleBankedWeeks(checkpoint, {
         weekCount: weekCount,
-        shell: shell,
+        upstream: shell,
         plannedWeekShapes: plannedWeekShapes,
         spineStageLabel: 'Shell'
       });
@@ -4076,6 +4080,32 @@ async function runSkeletonFleshPipeline(options) {
     });
     recordSeedOnStage(skeleton, divergenceSeed);
     checkpoint = saveCheckpoint('skeleton', skeleton, checkpoint);
+
+    // ── Downstream sweep after a cross-stage repair (D143) ─────────────
+    // S+F's half of the same rule. The pre-flight above catches the door class
+    // before any week is banked, so a route that lands here is for something it
+    // cannot see — a voluntary door, a mute clock — and those CAN leave banked
+    // weeks written against the old spine. Each is re-asked its own gate; only
+    // the actual failures come back.
+    if (sfRepairPending && sfRepairPending.to === 'skeleton') {
+      var sfStale = sweepStaleBankedWeeks(checkpoint, {
+        weekCount: weekCount,
+        upstream: skeleton,
+        spineStageLabel: 'Skeleton',
+        plannedWeekShapes: (skeleton.weekPlan || []).map(function (w, i) {
+          return {
+            weekNumber: Number((w || {}).weekNumber) || (i + 1),
+            isBoss: !!(w || {}).isBossWeek,
+            isDeload: !!(w || {}).isDeload
+          };
+        })
+      });
+      if (sfStale.length) {
+        sfStale.forEach(function (key) { delete checkpoint.stages[key]; });
+        checkpoint = pruneCheckpointStages(checkpoint, sfStale);
+        console.warn('[LiftRPG] Repair swept ' + sfStale.length + ' banked week(s): ' + sfStale.join(', '));
+      }
+    }
   }
 
   // Update stage estimate: skeleton + knowing + rules + weeks + 1 fragment call + 1 ending call
