@@ -1290,13 +1290,27 @@
     '- Give the world material specificity: one recurring smell, one recurring sound, one recurring object, one recurring bureaucratic or folk phrase.'
   ];
 
+  // THE BETRAYAL ARENA (W3 corrective wave, F05). The serious branch used to
+  // demand "one structural/institutional betrayal" — a MANDATE, on the branch
+  // most briefs land in, naming one arena. It is doctrine reach, not model
+  // habit: the register table (evals/w3-matrix/register-table.json) shows two
+  // maximally divergent briefs classified institutional in `register` and
+  // `genreTemplate` while their `tone` fields stayed faithful. A1 is the proof
+  // case — a decaying repertory theatre, masks, understudies, no institutional
+  // referent anywhere in the brief, read as "institutional gothic mystery".
+  //
+  // So the arena becomes a MENU parameterized by the brief's own register, with
+  // institutional as one option among peers. Menu, not worked example (D47): a
+  // single filled-in betrayal would install one house cast in every book, which
+  // is the disease this wave exists to treat.
   window.INST_CHARACTER_WEB = [
     '## Character Web & Ideological Contradictions',
     '- Do not define characters by functional tropes (e.g., "the hacker", "the mentor"). Define them by their emotional dependencies and ideological contradictions.',
     '- Every major NPC must have a worldview that structurally challenges or opposes the protagonist, but remains utterly sympathetic or unavoidable.',
     '',
     'Scale character depth to match the brief:',
-    '- **Complex/serious brief:** Name 4-6 recurring characters in the Core Noun Roster. Include at least one intimate dependency, one structural/institutional betrayal, one unstable alliance, and one absent/ghostly shadow over the cast. At least 3 fragments should be authored by named ideological rivals. At least one character must radically change stance or be tragically recontextualized by the final third.',
+    '- **Complex/serious brief:** Name 4-6 recurring characters in the Core Noun Roster. Include at least one intimate dependency, one structural betrayal, one unstable alliance, and one absent/ghostly shadow over the cast. At least 3 fragments should be authored by named ideological rivals. At least one character must radically change stance or be tragically recontextualized by the final third.',
+    '  The structural betrayal needs an ARENA, and the arena is whichever one this brief\'s own register supplies — artistic, communal, commercial, familial, scientific, spiritual, institutional, or another the brief names. Troupes, households and congregations have structures to betray too. `institutional` is one option among these peers, never the resting place: if the brief supplies no institution, betraying one is a misread of the brief.',
     '- **Medium brief:** Name 2-3 recurring characters with opposing worldviews. Include at least one dependency and one betrayal or alliance. At least 2 fragments authored by named characters.',
     '- **Light/comedic/simple brief:** 1-2 characters with clear motivation and one relationship that changes. No mandatory betrayal or institutional complexity. At least 1 fragment authored by a named character.',
     '',
