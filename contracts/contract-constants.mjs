@@ -1668,6 +1668,21 @@ export var VALID_HOME_PULLS = ['story', 'game', 'investigation', 'mixed'];
 //                 D128's defect, and the same argument that keeps the
 //                 design-language floor off the skeleton gate in validation.js.
 //   familyDecides true only for the geometry. See the exemption note below.
+//   answerRequired THE MANDATORY-ANSWER FLAG (D151). True on an axis where
+//                 omitting the delivered field is available as a THIRD path —
+//                 neither taking the assignment nor departing from it. Where it
+//                 is set, seedObedienceFloorErrors stops asking only "did you
+//                 obey?" and also asks "did you answer?" — see its header.
+//
+//                 IT IS SET ON ONE AXIS BECAUSE ONE RULING EXISTS, NOT BECAUSE
+//                 ONE HOLE DOES. The D151 sweep in check-generation-floors.mjs
+//                 (§18d-ii) measured the rest and found FIVE more: strip
+//                 `shellFamily`, `boardStateMode`, `theme.visualArchetype`,
+//                 `homePull` or `documentEcology.dominant` from an obedient
+//                 shell and the shell gate raises nothing. Those are recorded
+//                 and pinned there, not flagged here — closing them changes what
+//                 the stage rejects for every real run, which is a ruling and
+//                 not a flag flip. Do not add a flag to this table without one.
 export var IDENTITY_AXES = [
   { id: 'shellFamily', label: 'shellFamily', path: 'meta.artifactIdentity.shellFamily',
     menu: VALID_SHELL_FAMILIES, kind: 'scalar',
@@ -1694,8 +1709,22 @@ export var IDENTITY_AXES = [
     path: 'meta.artifactIntent.documentEcology.dominant',
     menu: DOCUMENT_TYPE_ENUM, kind: 'member',
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
+  // THE ONE AXIS THAT CAN BE DODGED BY SILENCE AND HAS A RULING ABOUT IT.
+  // `harvestPatterns` is OPTIONAL by the W5a ruling — a book that composes with
+  // none of these patterns is a legitimate book — and D149 measured what that
+  // costs once a die is drawing for the axis: the model can decline the
+  // assignment without ever saying so, by simply not writing the key. Nothing
+  // reads an absent field, so the draw evaporates and the run looks obedient.
+  //
+  // THE RULING (D151): MANDATORY ANSWER, NOT MANDATORY ADOPTION. The book either
+  // adopts and builds the assigned pattern (the declared-is-built floor then
+  // reads it back off the artifact) or DECLINES it in `selectionReason`, naming
+  // the pattern and the reason. Declining costs nothing and stays common; only
+  // silence became the error. The shape is the unearned packet's — demand a
+  // sentence, never force the thing — because forcing adoption would install a
+  // house economy on the one axis whose whole point is that a book may use none.
   { id: 'harvestPatterns', label: 'playSpine.harvestPatterns', path: 'meta.playSpine.harvestPatterns',
-    menu: VALID_HARVEST_PATTERNS, kind: 'member',
+    menu: VALID_HARVEST_PATTERNS, kind: 'member', answerRequired: true,
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell'] },
   { id: 'productionTexture', label: 'designLanguage.productionTexture', path: 'meta.designLanguage.productionTexture',
     menu: VALID_PRODUCTION_TEXTURES, kind: 'scalar',

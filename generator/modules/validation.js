@@ -1685,12 +1685,41 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
 // GIVENS block under the same condition, so a stage is never checked against an
 // assignment it was not shown.
 //
-// ABSENCE OF THE FIELD IS ALSO SILENT, and that is a narrower arm than it might
-// look. This floor asks "did you obey?", never "did you answer?" — presence is
-// a different question with its own floors (artifactIntentFloorErrors above,
-// designLanguageFloorErrors below), and a book that omits an OPTIONAL surface
-// like `playSpine.harvestPatterns` is exercising the W5a ruling that a book
-// using none of them is a legitimate book, not disobeying a die.
+// ABSENCE OF THE FIELD IS SILENT ON EVERY AXIS BUT ONE, and the exception is an
+// amendment this floor's first draft argued against. D146 wrote: "this floor
+// asks 'did you obey?', never 'did you answer?' — presence is a different
+// question with its own floors (artifactIntentFloorErrors above,
+// designLanguageFloorErrors below)". That reasoning holds wherever some floor
+// really does demand the field, because silence there is already blocked before
+// this one is asked.
+//
+// It did NOT hold for `playSpine.harvestPatterns`, and D149 measured the hole:
+// no floor demands that field — the declared-is-built floor only fires when the
+// key is present — so omitting it dodges the draw entirely. Not disobedience,
+// which this floor catches; a THIRD SOURCE, which the two-source law says does
+// not exist. A book that quietly used none of the assigned pattern and a book
+// that considered it and refused are indistinguishable at every gate.
+//
+// THE AMENDMENT (D151): on an axis marked `answerRequired`, an assignment must
+// be ANSWERED. Adopt it — and the adoption floor then reads it back off the
+// artifact — or DECLINE it on the axis's evidence rail, naming the pattern and
+// the reason. MANDATORY ANSWER, NOT MANDATORY ADOPTION: the W5a ruling survives
+// intact, because "none of these patterns" is still a legal answer; it is now a
+// SPOKEN one. The citation test is the same `evidenceNames` the departure arm
+// uses, for the same reason — a sentence naming the thing is the most a machine
+// can ask, and it is exactly what the unearned-packet floor asks.
+//
+// AN EXPLICIT EMPTY LIST IS THE SAME ANSWER AS SILENCE and is treated
+// identically on a flagged axis, because `harvestPatterns: []` and no key at all
+// say precisely the same thing to every reader. Scoping that unification to the
+// flag matters: on an unflagged member axis an empty list keeps its D146
+// departure error, so nothing widens where no ruling asked it to.
+//
+// THE FLAG IS NOT THE WHOLE HOLE. §18d-ii of the floors harness sweeps the rest
+// of the table and pins the five axes that can still be dropped in silence
+// (shellFamily, boardStateMode, visualArchetype, homePull,
+// documentEcology.dominant). Those await a ruling; this floor does not invent
+// one for them.
 //
 // THE GEOMETRY IS NOT CHECKED HERE, by measurement rather than by preference.
 // It is authored at the campaign plan, one stage BEFORE the mechanic grammar
@@ -1730,7 +1759,26 @@ export function seedObedienceFloorErrors(unit, where, stage, seedAssignments) {
     var assigned = seedAssignments[axis.id];
     if (!assigned) continue;
     var delivered = readAxisValue(unit, axis);
-    if (delivered === undefined) continue;
+
+    // ── THE MANDATORY-ANSWER ARM (D151) ──
+    // Silence, and — on a flagged axis only — an explicit empty list, which says
+    // the same thing. Unflagged axes fall through to the departure arm below
+    // exactly as they did before, so an empty `documentEcology.dominant` keeps
+    // its own error and nothing widens outside the ruling.
+    var unanswered = delivered === undefined
+      || (axis.answerRequired && Array.isArray(delivered) && !delivered.length);
+    if (unanswered) {
+      if (!axis.answerRequired) continue;
+      if (evidenceNames(readEvidenceAt(unit, axis.evidencePath), assigned)) continue;
+      errors.push((where || 'Stage') + ' → ' + axis.label + ' answers nothing: the system '
+        + 'assigned `' + assigned + '` and the book neither declares it nor says why not. '
+        + 'An assignment must be ANSWERED. Build it and name it in `' + axis.path + '`, or '
+        + 'decline it in `' + axis.evidencePath + '` — write `' + assigned + '` there with '
+        + 'the one sentence saying what this book does instead. Declining is legitimate and '
+        + 'common; a book that composes with none of them is a legitimate book. Saying nothing '
+        + 'is a third source, and under the two-source law there is no third.');
+      continue;
+    }
 
     var obeyed = Array.isArray(delivered)
       ? delivered.some(function (entry) {
