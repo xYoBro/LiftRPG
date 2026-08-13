@@ -138,7 +138,7 @@ var IMPLEMENTED_DETAIL = {
   },
   'deduction-board': {
     label: 'The deduction board',
-    inputs: 'A clue set and a grid of pencil cells — subjects against categories, run lengths against a picture, or a partly-printed square of digits.',
+    inputs: 'A clue set and a grid of pencil cells — subjects against categories, run lengths against a picture, a partly-printed square of digits, or named voices against the two kinds of speaker.',
     process: 'The player deduces cell states from constraints; the completed grid yields a code. A deterministic solver proves every printed puzzle solvable, UNIQUE, and key-matched before the week is accepted, and refuses it with the defect quoted otherwise.',
     outputs: 'A word, a letter string or a digit string the seal, the assembly or a priced spend reads.',
     locks: 'The grid is the lock. Nothing ships that a machine cannot finish: two solutions, no solution, or an answer the grid does not yield are all refusals, not warnings.'

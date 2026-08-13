@@ -1096,6 +1096,28 @@ function collectPuzzleFloorErrors(weekObj) {
           + GX.maxCageCells + ' cells — the solver enumerates every filling of every cage, which '
           + 'grows as the board size to the power of the cage\'s cell count.');
       }
+    } else if (grid.kind === 'truth-tellers') {
+      var GT = SPATIAL_GUARDRAILS.truthTellers;
+      var voices = Array.isArray(grid.speakers) ? grid.speakers.length : 0;
+      var lines = Array.isArray(grid.statements) ? grid.statements.length : 0;
+      if (voices < GT.minSpeakers || voices > GT.maxSpeakers) {
+        errors.push('fieldOps.constrainedGrid: a generated truth-teller puzzle must have between '
+          + GT.minSpeakers + ' and ' + GT.maxSpeakers + ' speakers, and this one has ' + voices + '.');
+      }
+      if (lines < GT.minStatements || lines > GT.maxStatements) {
+        errors.push('fieldOps.constrainedGrid: a generated truth-teller puzzle must carry between '
+          + GT.minStatements + ' and ' + GT.maxStatements + ' statements, and this one carries '
+          + lines + '.');
+      }
+      var longNames = [];
+      (Array.isArray(grid.speakers) ? grid.speakers : []).forEach(function (s) {
+        if (String(s).length > GT.labelMaxChars) longNames.push(String(s));
+      });
+      if (longNames.length) {
+        errors.push('fieldOps.constrainedGrid: speaker name(s) longer than ' + GT.labelMaxChars
+          + ' characters (' + longNames.slice(0, 3).join(', ') + ') — the board prints them in the '
+          + 'row-label column, so they wrap the two mark cells off the page.');
+      }
     } else {
       var subjects = Array.isArray(grid.subjects) ? grid.subjects.length : 0;
       var cats = Array.isArray(grid.categories) ? grid.categories : [];

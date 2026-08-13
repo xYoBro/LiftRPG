@@ -1406,7 +1406,7 @@ export var LUDIC_LIBRARY = [
   // W5b — the harvest's first PROMOTION. `deduction-board` was tier 3 (needs a
   // new primitive) until the constrained-grid atom and its solver landed; it is
   // named for what it plays, not for the file, exactly like every entry above.
-  'deduction-board',    // the logic grid, the nonogram and the sudoku, proven solvable
+  'deduction-board',    // logic grid, nonogram, sudoku, truth-tellers — all proven solvable
   'word-hunt',          // the letter board, every word machine-verified in it
   // The arsenal wave's promotion, closing W5b's one stated deferral: kakuro and
   // KenKen have their solvers. It is a SEPARATE entry from the deduction board
@@ -1575,8 +1575,40 @@ export var VALID_LEGACY_MOVES = [
 // arithmetic square are three different proofs.
 
 export var VALID_CONSTRAINED_GRID_KINDS = [
-  'logic-grid', 'nonogram', 'sudoku', 'kakuro', 'kenken'
+  'logic-grid', 'nonogram', 'sudoku', 'kakuro', 'kenken', 'truth-tellers'
 ];
+
+// ── The truth-teller (knights-and-knaves) vocabulary ────────────────────────
+// WHY IT IS NOT A LOGIC GRID, since that is the first thing anyone proposes: a
+// logic-grid category is a BIJECTION with its subjects — as many values as
+// subjects, each used exactly once — and four speakers can all be liars. The
+// bijection is the logic grid's engine (its solver enumerates permutations), so
+// a two-value category over four subjects is not a tight fit, it is a different
+// mathematical object.
+//
+// The roles are WIRE VALUES. What the page prints is `roleLabels`, which the
+// book authors in its own world's words — printing "TRUTH" on a page of this
+// book would be the engine talking, which the diegetic law forbids.
+export var VALID_TRUTH_TELLER_ROLES = ['truth', 'lie'];
+
+// The claim forms, closed. Each is a way a statement can constrain AND a way it
+// can be wrong, so the list is short on purpose — the same argument that keeps
+// VALID_LOGIC_CLUE_TYPES at four. `and`/`or` recurse, which is what makes six
+// forms expressive enough for real knights-and-knaves prose without a seventh.
+//
+// `not` was considered and cut: it is always expressible by flipping the role
+// on an `is`, or by De Morgan on a compound, and it was the only form that made
+// the nesting depth hard to reason about.
+export var VALID_TRUTH_CLAIM_TYPES = ['is', 'same', 'differs', 'and', 'or', 'count'];
+
+// "At least one of us is a liar" is the canonical statement of the family, so
+// counting is a first-class form rather than a pile of nested ors.
+export var VALID_TRUTH_COMPARATORS = ['exactly', 'at-least', 'at-most'];
+
+//   roles      one letter per speaker in order — T for the truthful kind, L for
+//              the other. The whole board as a key.
+//   initials   the first letters of the speakers holding one named role.
+export var VALID_TRUTH_TELLER_ANSWER_MODES = ['roles', 'initials'];
 
 // The filled grids' only answer mode, and the reasoning is the nonogram's: a
 // solved digit rectangle has exactly one machine-executable reading — name the
@@ -2284,6 +2316,25 @@ export var SPATIAL_GUARDRAILS = {
     maxSize: 6,
     renderMaxSize: 7,
     maxCageCells: 4
+  },
+  // Truth-tellers. THE ONLY GUARDRAIL HERE THAT PROTECTS A PROOF IS THE SPEAKER
+  // COUNT, and it barely needs to: the solver is exhaustive over 2^speakers, so
+  // six is 64 assignments and even the render ceiling of eight is 256. There is
+  // no budget and no propagation to be unsound in — this is the one family whose
+  // uniqueness proof needs no defending.
+  //
+  // What the numbers really bound is the PAGE and the PLAYER. Two speakers is a
+  // coin flip once either one talks; nine rows of statements is a wall of prose
+  // where a puzzle should be; a claim nested four deep is a sentence nobody can
+  // hold in their head at a gym bench.
+  truthTellers: {
+    minSpeakers: 3,
+    maxSpeakers: 6,
+    renderMaxSpeakers: 8,
+    minStatements: 2,
+    maxStatements: 8,
+    maxClaimDepth: 3,
+    labelMaxChars: 22
   }
 };
 

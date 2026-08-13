@@ -61,6 +61,10 @@ import {
   VALID_NONOGRAM_ANSWER_MODES,
   VALID_FILLED_GRID_ANSWER_MODES,
   VALID_KENKEN_OPERATIONS,
+  VALID_TRUTH_TELLER_ROLES,
+  VALID_TRUTH_CLAIM_TYPES,
+  VALID_TRUTH_COMPARATORS,
+  VALID_TRUTH_TELLER_ANSWER_MODES,
   VALID_WORD_GRID_KINDS,
   VALID_WORD_SEARCH_DIRECTIONS,
   VALID_WORD_GRID_ANSWER_MODES,
@@ -1171,6 +1175,26 @@ export var BOOKLET_SCHEMA = {
     // It exists so a later wave can key puzzle hardness to the load curve (the
     // sudoku-academy law) without re-solving every puzzle to find out how hard
     // it was. W5b records it and consumes nothing.
+    // A truth-teller claim, and the one RECURSIVE definition in this schema:
+    // `and`/`or` join claims, which is what makes six forms enough for real
+    // knights-and-knaves prose. Depth is bounded by the solver, not here — a
+    // JSON Schema cannot count how deep a $ref has gone, and a cap the schema
+    // cannot express is better refused with a sentence than pretended at.
+    truthClaim: {
+      type: 'object',
+      required: ['type'],
+      additionalProperties: false,
+      properties: {
+        type: { enum: VALID_TRUTH_CLAIM_TYPES },
+        speaker: { type: 'string' },
+        otherSpeaker: { type: 'string' },
+        role: { enum: VALID_TRUTH_TELLER_ROLES },
+        comparator: { enum: VALID_TRUTH_COMPARATORS },
+        n: { type: 'integer', minimum: 0 },
+        claims: { type: 'array', minItems: 2, items: { $ref: '#/$defs/truthClaim' } }
+      }
+    },
+
     constrainedGrid: {
       type: 'object',
       required: ['kind', 'title', 'answer', 'answerFrom'],
@@ -1361,6 +1385,41 @@ export var BOOKLET_SCHEMA = {
               target: { type: 'integer', minimum: 1 }
             }
           }
+        },
+
+        // ── truth-tellers ───────────────────────────────────────────────────
+        speakers: {
+          type: 'array',
+          minItems: G.truthTellers.minSpeakers,
+          maxItems: G.truthTellers.renderMaxSpeakers,
+          items: nonEmptyString
+        },
+        // What THIS world calls the two kinds. The board prints these two words
+        // as its column headings, and printing "TRUTH" would be the engine
+        // talking on a page of this book.
+        roleLabels: {
+          type: 'object',
+          required: ['truth', 'lie'],
+          additionalProperties: false,
+          properties: { truth: nonEmptyString, lie: nonEmptyString }
+        },
+        statements: {
+          type: 'array',
+          minItems: G.truthTellers.minStatements,
+          maxItems: G.truthTellers.maxStatements,
+          items: {
+            type: 'object',
+            // All three, and for the logic grid's reason: `text` is what the
+            // player reads, `claim` is what the solver reads, and a statement
+            // with only one of them is unprintable or unprovable.
+            required: ['speaker', 'text', 'claim'],
+            additionalProperties: false,
+            properties: {
+              speaker: nonEmptyString,
+              text: nonEmptyString,
+              claim: { $ref: '#/$defs/truthClaim' }
+            }
+          }
         }
       },
       allOf: [
@@ -1397,6 +1456,13 @@ export var BOOKLET_SCHEMA = {
           then: {
             required: ['size', 'cages'],
             properties: { answerFrom: { required: ['cells'], properties: { mode: { enum: VALID_FILLED_GRID_ANSWER_MODES } } } }
+          }
+        },
+        {
+          if: { properties: { kind: { const: 'truth-tellers' } }, required: ['kind'] },
+          then: {
+            required: ['speakers', 'roleLabels', 'statements'],
+            properties: { answerFrom: { properties: { mode: { enum: VALID_TRUTH_TELLER_ANSWER_MODES } } } }
           }
         }
       ]

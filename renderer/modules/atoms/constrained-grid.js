@@ -169,6 +169,35 @@ function asArray(value) {
  */
 const FILLED_GRID_KINDS = { sudoku: 1, kakuro: 1, kenken: 1 };
 
+/**
+ * The truth-teller board, expressed as a logic grid.
+ *
+ * It is not a logic grid MATHEMATICALLY — the roles are not a bijection with
+ * the speakers, which is why it has its own solver — but it is exactly one
+ * PRINTED: rows of names, two mark columns, and a numbered list of statements
+ * underneath. So it borrows the logic grid's renderer and the logic grid's
+ * estimate rather than growing a second pair that could disagree with each
+ * other. Nothing new to mirror, nothing new to measure, and the two-line
+ * shim below is the whole of the difference.
+ *
+ * The column headings come from `roleLabels`, which the book authors: the
+ * printed page never says "TRUTH", because nothing printed in this book is the
+ * engine talking.
+ */
+function truthTellerShim(grid) {
+  const labels = grid.roleLabels || {};
+  return {
+    subjects: asArray(grid.speakers),
+    categories: [{
+      name: String(grid.axisLabel || ''),
+      values: [String(labels.truth || ''), String(labels.lie || '')],
+    }],
+    clues: asArray(grid.statements).map((line) => ({
+      text: `${String((line || {}).speaker || '')}: ${String((line || {}).text || '')}`,
+    })),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Geometry
 // ---------------------------------------------------------------------------
@@ -296,8 +325,11 @@ function gridHeightAt(grid, tier, metrics) {
   } else if (FILLED_GRID_KINDS[grid.kind]) {
     height += filledGridHeight(grid, tier);
   } else {
-    height += logicMatrixHeight(grid, tier, metrics);
-    const clues = cluesHeight(grid, tier, metrics);
+    // The logic grid, and the truth-teller board through its shim — one code
+    // path on purpose, so the two cannot drift apart in the estimate.
+    const shaped = grid.kind === 'truth-tellers' ? truthTellerShim(grid) : grid;
+    height += logicMatrixHeight(shaped, tier, metrics);
+    const clues = cluesHeight(shaped, tier, metrics);
     if (clues) height += tier.blockGapPx + clues;
   }
 
@@ -549,8 +581,9 @@ registerAtom('constrained-grid', {
     } else if (FILLED_GRID_KINDS[grid.kind]) {
       el.appendChild(renderFilledGrid(grid));
     } else {
-      el.appendChild(renderLogicMatrix(grid));
-      const clues = asArray(grid.clues);
+      const shaped = grid.kind === 'truth-tellers' ? truthTellerShim(grid) : grid;
+      el.appendChild(renderLogicMatrix(shaped));
+      const clues = asArray(shaped.clues);
       if (clues.length) {
         const list = make('ol', 'cgrid-clues');
         clues.forEach((clue) => {

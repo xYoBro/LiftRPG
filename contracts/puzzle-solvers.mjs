@@ -2231,6 +2231,306 @@ export function solveKenKen(puzzle) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// TRUTH-TELLERS — the knights-and-knaves form  (the arsenal wave)
+// ════════════════════════════════════════════════════════════════════════════
+// Shape:
+//   speakers    : string[]   3..6 named voices
+//   roleLabels  : { truth, lie }   what THIS world calls the two kinds
+//   statements  : [{ speaker, text, claim }]
+//   answer      : string
+//   answerFrom  : { mode: 'roles' } | { mode: 'initials', role }
+//
+// WHY IT IS NOT A LOGIC GRID, which is the first thing anyone proposes. A logic
+// grid's category is a BIJECTION with its subjects — `values` must have exactly
+// as many entries as there are subjects and each is used exactly once. Four
+// speakers can all be liars. The bijection is the logic grid's whole engine (the
+// solver enumerates permutations), so a two-value category over four subjects is
+// not a tight fit for this family, it is a different mathematical object. Hence
+// a kind, a solver, and a two-column mark board rather than a matrix.
+//
+// THE PROOF IS EXHAUSTIVE AND THAT IS THE POINT. Six speakers is 64 role
+// assignments; the solver tries every one and stops at the second that survives.
+// There is no propagation to be unsound in and no budget to exceed, which makes
+// this the one family here whose uniqueness proof needs no defending.
+//
+// THE RULE, stated once because everything below is mechanical from it: a
+// speaker whose role is `truth` makes only true statements; a speaker whose role
+// is `lie` makes only false ones. So a statement CONSTRAINS: eval(claim) must
+// equal (role === truth). That is the entire semantics.
+//
+// THE ROLE LABELS ARE THE BOOK'S, NOT THE ENGINE'S. `truth` and `lie` are wire
+// values; the page prints what `roleLabels` says — SWORN and FORSWORN, SOUND and
+// TAINTED, whatever the world calls them. Printing the word "TRUTH" on a page of
+// this book would be the engine talking, which the diegetic law forbids.
+
+export var TRUTH_TELLER_ROLES = ['truth', 'lie'];
+export var TRUTH_CLAIM_TYPES = ['is', 'same', 'differs', 'and', 'or', 'count'];
+export var TRUTH_COMPARATORS = ['exactly', 'at-least', 'at-most'];
+
+/** How deep a compound claim may nest. Three is a sentence; four is a paragraph
+ *  nobody can hold in their head at a gym bench. */
+var TRUTH_MAX_CLAIM_DEPTH = 3;
+
+function truthClaimShapeErrors(claim, speakers, at, depth) {
+  var errors = [];
+  var k = claim || {};
+  if (depth > TRUTH_MAX_CLAIM_DEPTH) {
+    errors.push(at + ' nests claims more than ' + TRUTH_MAX_CLAIM_DEPTH + ' deep — past that it is '
+      + 'not a statement a player can hold in their head.');
+    return errors;
+  }
+  if (TRUTH_CLAIM_TYPES.indexOf(k.type) === -1) {
+    errors.push(at + ' has claim type "' + String(k.type) + '", which is not one of '
+      + TRUTH_CLAIM_TYPES.join(' | ') + '.');
+    return errors;
+  }
+  if (k.type === 'is') {
+    if (speakers.indexOf(String(k.speaker)) === -1) {
+      errors.push(at + ' names speaker "' + String(k.speaker) + '", who is not in the speaker list.');
+    }
+    if (TRUTH_TELLER_ROLES.indexOf(k.role) === -1) {
+      errors.push(at + ' names role "' + String(k.role) + '" — the two roles are '
+        + TRUTH_TELLER_ROLES.join(' | ') + '.');
+    }
+    return errors;
+  }
+  if (k.type === 'same' || k.type === 'differs') {
+    if (speakers.indexOf(String(k.speaker)) === -1) {
+      errors.push(at + ' names speaker "' + String(k.speaker) + '", who is not in the speaker list.');
+    }
+    if (speakers.indexOf(String(k.otherSpeaker)) === -1) {
+      errors.push(at + ' names speaker "' + String(k.otherSpeaker) + '", who is not in the speaker list.');
+    }
+    if (String(k.speaker) === String(k.otherSpeaker)) {
+      errors.push(at + ' compares "' + String(k.speaker) + '" with themselves, which is true by '
+        + 'definition for "same" and impossible for "differs" — neither constrains anything.');
+    }
+    return errors;
+  }
+  if (k.type === 'count') {
+    if (TRUTH_TELLER_ROLES.indexOf(k.role) === -1) {
+      errors.push(at + ' counts role "' + String(k.role) + '" — the two roles are '
+        + TRUTH_TELLER_ROLES.join(' | ') + '.');
+    }
+    if (TRUTH_COMPARATORS.indexOf(k.comparator) === -1) {
+      errors.push(at + ' has comparator "' + String(k.comparator) + '", which is not one of '
+        + TRUTH_COMPARATORS.join(' | ') + '.');
+    }
+    var n = Number(k.n);
+    if (!(n >= 0 && n <= speakers.length && Math.floor(n) === n)) {
+      errors.push(at + ' counts to ' + String(k.n) + ', and there are ' + speakers.length + ' speakers.');
+    }
+    return errors;
+  }
+  // and / or
+  var subs = asArray(k.claims);
+  if (subs.length < 2) {
+    errors.push(at + ' is "' + k.type + '" over ' + subs.length + ' claim(s) — joining needs at '
+      + 'least two things to join.');
+    return errors;
+  }
+  for (var i = 0; i < subs.length; i++) {
+    errors = errors.concat(truthClaimShapeErrors(subs[i], speakers, at + ' → part ' + (i + 1), depth + 1));
+  }
+  return errors;
+}
+
+/** Is the claim true under this role assignment? `roles[i]` is 'truth'|'lie'. */
+function evalTruthClaim(claim, roles, speakers) {
+  var k = claim || {};
+  var i;
+  if (k.type === 'is') {
+    return roles[speakers.indexOf(String(k.speaker))] === k.role;
+  }
+  if (k.type === 'same') {
+    return roles[speakers.indexOf(String(k.speaker))] === roles[speakers.indexOf(String(k.otherSpeaker))];
+  }
+  if (k.type === 'differs') {
+    return roles[speakers.indexOf(String(k.speaker))] !== roles[speakers.indexOf(String(k.otherSpeaker))];
+  }
+  if (k.type === 'count') {
+    var tally = 0;
+    for (i = 0; i < roles.length; i++) if (roles[i] === k.role) tally++;
+    if (k.comparator === 'exactly') return tally === Number(k.n);
+    if (k.comparator === 'at-least') return tally >= Number(k.n);
+    return tally <= Number(k.n);
+  }
+  var subs = asArray(k.claims);
+  if (k.type === 'and') {
+    for (i = 0; i < subs.length; i++) {
+      if (!evalTruthClaim(subs[i], roles, speakers)) return false;
+    }
+    return true;
+  }
+  for (i = 0; i < subs.length; i++) {
+    if (evalTruthClaim(subs[i], roles, speakers)) return true;
+  }
+  return false;
+}
+
+function truthTellerShapeErrors(puzzle) {
+  var errors = [];
+  var who = label(puzzle);
+  var speakers = asArray(puzzle.speakers).map(String);
+
+  if (speakers.length < 3) {
+    errors.push(who + ': a truth-teller puzzle needs at least 3 speakers, found ' + speakers.length
+      + ' — with two the answer is a coin flip once either one speaks.');
+  }
+  if (speakers.length > 8) {
+    errors.push(who + ': ' + speakers.length + ' speakers is past what the printed board holds.');
+  }
+  if (new Set(speakers).size !== speakers.length) {
+    errors.push(who + ': two speakers share a name — statements address speakers by name, so '
+      + 'duplicates are unresolvable.');
+  }
+  var labels = puzzle.roleLabels || {};
+  if (!String(labels.truth || '').trim() || !String(labels.lie || '').trim()) {
+    errors.push(who + ': roleLabels must name BOTH kinds as this world names them. The board prints '
+      + 'those two words as its column headings, and "TRUTH" and "LIE" would be the engine talking '
+      + 'on a page of this book.');
+  }
+  var statements = asArray(puzzle.statements);
+  if (statements.length < 2) {
+    errors.push(who + ': ' + statements.length + ' statement(s) — one voice cannot corner itself.');
+  }
+  for (var i = 0; i < statements.length; i++) {
+    var line = statements[i] || {};
+    var at = who + ': statement ' + (i + 1);
+    if (speakers.indexOf(String(line.speaker)) === -1) {
+      errors.push(at + ' is spoken by "' + String(line.speaker) + '", who is not in the speaker list.');
+      continue;
+    }
+    if (!String(line.text || '').trim()) {
+      errors.push(at + ' has no printed text — the player reads prose, the solver reads the claim, '
+        + 'and both must exist.');
+      continue;
+    }
+    errors = errors.concat(truthClaimShapeErrors(line.claim, speakers, at, 1));
+  }
+  return errors;
+}
+
+function truthTellerAnswerFrom(puzzle, roles, speakers) {
+  var from = puzzle.answerFrom || {};
+  var i;
+  if (from.mode === 'roles') {
+    var out = '';
+    for (i = 0; i < roles.length; i++) out += roles[i] === 'truth' ? 'T' : 'L';
+    return out;
+  }
+  var initials = '';
+  for (i = 0; i < speakers.length; i++) {
+    if (roles[i] === from.role) initials += speakers[i].charAt(0);
+  }
+  return initials;
+}
+
+function truthTellerAnswerShapeErrors(puzzle) {
+  var errors = [];
+  var who = label(puzzle);
+  var from = puzzle.answerFrom || {};
+  if (from.mode !== 'roles' && from.mode !== 'initials') {
+    errors.push(who + ': answerFrom.mode is "' + String(from.mode) + '" — a truth-teller puzzle reads '
+      + 'its answer as "roles" (one letter per speaker in order, T for the truthful kind and L for '
+      + 'the other) or "initials" (the first letters of the speakers holding one named role).');
+    return errors;
+  }
+  if (from.mode === 'initials' && TRUTH_TELLER_ROLES.indexOf(from.role) === -1) {
+    errors.push(who + ': answerFrom.mode "initials" must name which role to collect — '
+      + TRUTH_TELLER_ROLES.join(' | ') + '.');
+  }
+  if (!normalizeAnswer(puzzle.answer)) {
+    errors.push(who + ': the answer is empty once normalised.');
+  }
+  return errors;
+}
+
+/**
+ * solveTruthTellers(puzzle) -> { ok, errors, solutionCount, solution, difficulty }
+ *
+ * `solution` is the role list in speaker order, so a human reading a failure can
+ * check it by hand the way they would check the puzzle.
+ */
+export function solveTruthTellers(puzzle) {
+  var out = { ok: false, errors: [], solutionCount: 0, solution: null, difficulty: null };
+  var p = puzzle || {};
+  var who = label(p);
+
+  out.errors = truthTellerShapeErrors(p).concat(truthTellerAnswerShapeErrors(p));
+  if (out.errors.length) return out;
+
+  var speakers = asArray(p.speakers).map(String);
+  var statements = asArray(p.statements);
+  var n = speakers.length;
+  var found = [];
+
+  // Exhaustive over 2^n. No budget: six speakers is 64 assignments, and the
+  // guardrail is what keeps it that way.
+  for (var mask = 0; mask < (1 << n); mask++) {
+    var roles = [];
+    for (var i = 0; i < n; i++) roles.push((mask & (1 << i)) ? 'truth' : 'lie');
+    var ok = true;
+    for (var s = 0; s < statements.length; s++) {
+      var line = statements[s];
+      var speakerIsTruthful = roles[speakers.indexOf(String(line.speaker))] === 'truth';
+      if (evalTruthClaim(line.claim, roles, speakers) !== speakerIsTruthful) { ok = false; break; }
+    }
+    if (ok) {
+      found.push(roles);
+      if (found.length > 1) break;
+    }
+  }
+
+  out.solutionCount = found.length;
+  if (!found.length) {
+    out.errors.push(who + ': no assignment of the two kinds satisfies every statement — the '
+      + 'statements contradict each other, so the puzzle has no answer at all.');
+    return out;
+  }
+  if (found.length > 1) {
+    out.errors.push(who + ': more than one assignment satisfies every statement — a truth-teller '
+      + 'puzzle must have exactly one. Add a statement that separates the surviving possibilities, '
+      + 'or make an existing one say something about a speaker nobody has mentioned.');
+    return out;
+  }
+
+  out.solution = found[0];
+  // The instrument: how much STRUCTURE the statements carry. A puzzle of bare
+  // accusations is easier than one of compound claims about counts, and the
+  // claim tree's size is exactly that, measured rather than adjectival.
+  var nodes = 0;
+  statements.forEach(function (line) {
+    (function walk(claim) {
+      nodes++;
+      asArray((claim || {}).claims).forEach(walk);
+    })(line.claim);
+  });
+  out.difficulty = {
+    score: n + nodes,
+    basis: 'statement-load',
+    speakers: n,
+    claimNodes: nodes,
+    requiresGuess: false
+  };
+
+  var derived = truthTellerAnswerFrom(p, out.solution, speakers);
+  if (!normalizeAnswer(derived)) {
+    out.errors.push(who + ': the answer rule reads nothing off the solved board — in "initials" mode '
+      + 'that means no speaker holds the role you asked for, so the key is empty.');
+    return out;
+  }
+  if (normalizeAnswer(derived) !== normalizeAnswer(p.answer)) {
+    out.errors.push(who + ': the solved board yields "' + derived + '" but the puzzle declares the '
+      + 'answer "' + String(p.answer) + '" — the key must be what the board actually produces.');
+    return out;
+  }
+
+  out.ok = true;
+  return out;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // THE TWO ENTRY POINTS THE GATES CALL
 // ════════════════════════════════════════════════════════════════════════════
 // One per schema surface, dispatching on `kind`, so a caller never has to know
@@ -2244,6 +2544,7 @@ export function verifyConstrainedGrid(grid) {
   if (g.kind === 'sudoku') return solveSudoku(g);
   if (g.kind === 'kakuro') return solveKakuro(g);
   if (g.kind === 'kenken') return solveKenKen(g);
+  if (g.kind === 'truth-tellers') return solveTruthTellers(g);
   return {
     ok: false,
     errors: [label(g) + ': constrainedGrid.kind is "' + String(g.kind)
