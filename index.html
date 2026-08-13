@@ -5835,14 +5835,116 @@
           return stageFlags[key] && stageFlags[key].status ? stageFlags[key].status : fallback;
         }
 
+        // `unlocked` is canNavigateToStep, not a second predicate that agrees
+        // with it today: the wizard already owns one answer to "can this stage
+        // be worked yet", and a card that disagrees with the navigation the
+        // reader is offered is a card that lies.
+        function withCardState(item, pasted) {
+          item.cardState = resolveGuidedCardState({
+            status: item.status,
+            unlocked: canNavigateToStep(WIZARD_STAGE_KEYS.indexOf(item.key)),
+            copied: !!((wizState.copied || {})[item.key]),
+            pasted: !!pasted
+          });
+          return item;
+        }
+
+        function pastedText(slot) {
+          return !!(wizResults[slot] && wizResults[slot].value.trim());
+        }
+
         return [
-          { key: 'layerBible', label: getStageLabel('layerBible'), status: resolveStatus('layerBible', wizData.layerBible ? 'valid' : (wizResults[1] && wizResults[1].value.trim() ? 'drafted' : 'empty')), reason: stageFlags.layerBible && stageFlags.layerBible.reason || '' },
-          { key: 'campaignPlan', label: getStageLabel('campaignPlan'), status: resolveStatus('campaignPlan', wizData.campaignPlan ? 'valid' : (wizResults[2] && wizResults[2].value.trim() ? 'drafted' : 'empty')), reason: stageFlags.campaignPlan && stageFlags.campaignPlan.reason || '' },
-          { key: 'shell', label: getStageLabel('shell'), status: resolveStatus('shell', wizData.shell ? 'valid' : (wizResults[3] && wizResults[3].value.trim() ? 'drafted' : 'empty')), reason: stageFlags.shell && stageFlags.shell.reason || '' },
-          { key: 'weeks', label: getStageLabel('weeks'), status: resolveStatus('weeks', weekChunksDone > 0 && weekChunksDone === weekChunksPlanned ? 'valid' : (weekChunksDone > 0 ? 'in progress' : 'empty')), reason: stageFlags.weeks && stageFlags.weeks.reason || '' },
-          { key: 'fragments', label: getStageLabel('fragments'), status: resolveStatus('fragments', fragmentRegistryCount === 0 && wizData.campaignPlan ? 'not needed' : (fragmentBatchesDone > 0 && fragmentBatchesDone === fragmentBatchesPlanned ? 'valid' : (fragmentBatchesDone > 0 ? 'in progress' : 'empty'))), reason: stageFlags.fragments && stageFlags.fragments.reason || '' },
-          { key: 'endings', label: getStageLabel('endings'), status: resolveStatus('endings', wizData.endingsOutput ? 'valid' : (wizResults[6] && wizResults[6].value.trim() ? 'drafted' : 'empty')), reason: stageFlags.endings && stageFlags.endings.reason || '' }
+          withCardState({ key: 'layerBible', label: getStageLabel('layerBible'), status: resolveStatus('layerBible', wizData.layerBible ? 'valid' : (pastedText(1) ? 'drafted' : 'empty')), reason: stageFlags.layerBible && stageFlags.layerBible.reason || '' }, pastedText(1)),
+          withCardState({ key: 'campaignPlan', label: getStageLabel('campaignPlan'), status: resolveStatus('campaignPlan', wizData.campaignPlan ? 'valid' : (pastedText(2) ? 'drafted' : 'empty')), reason: stageFlags.campaignPlan && stageFlags.campaignPlan.reason || '' }, pastedText(2)),
+          withCardState({ key: 'shell', label: getStageLabel('shell'), status: resolveStatus('shell', wizData.shell ? 'valid' : (pastedText(3) ? 'drafted' : 'empty')), reason: stageFlags.shell && stageFlags.shell.reason || '' }, pastedText(3)),
+          withCardState({ key: 'weeks', label: getStageLabel('weeks'), status: resolveStatus('weeks', weekChunksDone > 0 && weekChunksDone === weekChunksPlanned ? 'valid' : (weekChunksDone > 0 ? 'in progress' : 'empty')), reason: stageFlags.weeks && stageFlags.weeks.reason || '' }, weekChunksDone > 0),
+          withCardState({ key: 'fragments', label: getStageLabel('fragments'), status: resolveStatus('fragments', fragmentRegistryCount === 0 && wizData.campaignPlan ? 'not needed' : (fragmentBatchesDone > 0 && fragmentBatchesDone === fragmentBatchesPlanned ? 'valid' : (fragmentBatchesDone > 0 ? 'in progress' : 'empty'))), reason: stageFlags.fragments && stageFlags.fragments.reason || '' }, fragmentBatchesDone > 0),
+          withCardState({ key: 'endings', label: getStageLabel('endings'), status: resolveStatus('endings', wizData.endingsOutput ? 'valid' : (pastedText(6) ? 'drafted' : 'empty')), reason: stageFlags.endings && stageFlags.endings.reason || '' }, pastedText(6))
         ];
+      }
+
+      // ── Guided card states (W8) ────────────────────────────────────────
+      // The ferry has five states and the wizard only ever tracked four of
+      // them, because "the prompt is sitting here waiting for you" and "you
+      // took the prompt and your chatbot is writing" looked identical from in
+      // here — both were `empty`. A reader who alt-tabs back to a board that
+      // says the same thing it said before they left cannot tell whether the
+      // page registered anything they did.
+      //
+      // The API rail keeps its OWN vocabulary and always will: its states are
+      // run states (in progress / complete / restored) and it has no `copied`
+      // — nothing is carried by hand on that door. Same cards, same order;
+      // different verbs, because the doors genuinely differ in who is doing
+      // the carrying.
+      //
+      // PURE. Every input is passed in, so the harness can drive the real
+      // resolver instead of a copy of its rules living in a test file.
+      var GUIDED_CARD_STATES = {
+        waiting: { label: 'Waiting', tone: 'is-empty' },
+        ready: { label: 'Ready To Copy', tone: 'is-drafted' },
+        copied: { label: 'With Your AI', tone: 'is-in-progress' },
+        returned: { label: 'Reply Pasted', tone: 'is-in-progress' },
+        validated: { label: 'Checked', tone: 'is-valid' },
+        'needs-repair': { label: 'Needs A Fix', tone: 'is-blocked' }
+      };
+
+      function resolveGuidedCardState(input) {
+        input = input || {};
+        var status = String(input.status || 'empty');
+        // A broken stage says so before anything else: the reader's next move
+        // is the repair prompt, not the next card.
+        if (status === 'blocked' || status === 'invalidated' || status === 'needs review') return 'needs-repair';
+        if (status === 'valid' || status === 'not needed') return 'validated';
+        // Locked behind an earlier stage. Distinguished from `ready` because
+        // "you cannot start this yet" and "start this now" are opposite
+        // instructions and used to render the same.
+        if (!input.unlocked) return 'waiting';
+        if (status === 'drafted' || status === 'in progress' || input.pasted) return 'returned';
+        if (input.copied) return 'copied';
+        return 'ready';
+      }
+
+      function formatGuidedCardState(cardState) {
+        var entry = GUIDED_CARD_STATES[cardState];
+        return entry ? entry.label : String(cardState || '');
+      }
+
+      // The harness drives THESE, not a transcription of them into a spec
+      // file. A rule that exists twice is a rule that will be true in one copy
+      // and false in the other, and the copy the reader sees is the one no
+      // test is looking at.
+      window.__liftrpgGuidedCards = {
+        states: GUIDED_CARD_STATES,
+        resolve: resolveGuidedCardState,
+        label: formatGuidedCardState,
+        tone: guidedCardTone,
+        // The live board, for asserting that the rules and the render agree.
+        board: function () {
+          return getStageHealthItems().map(function (item) {
+            return { key: item.key, label: item.label, status: item.status, cardState: item.cardState };
+          });
+        }
+      };
+
+      function guidedCardTone(cardState) {
+        var entry = GUIDED_CARD_STATES[cardState];
+        return entry ? entry.tone : 'is-empty';
+      }
+
+      // Set when the reader takes a stage prompt away. Cleared whenever the
+      // stage's answer is superseded, so a card cannot claim to be waiting on
+      // a chatbot that was asked a question the booklet has since changed.
+      function markStageCopied(stageKey) {
+        if (!stageKey) return;
+        wizState.copied = wizState.copied || {};
+        wizState.copied[stageKey] = true;
+        updateStageHealth();
+        saveWizardDraft();
+      }
+
+      function clearStageCopied(stageKey) {
+        if (!wizState.copied) return;
+        delete wizState.copied[stageKey];
       }
 
       function formatStatusLabel(status) {
@@ -5934,11 +6036,23 @@
         return item.reason || '';
       }
 
+      // The card's second line answers "what do I do about this one". It used
+      // to end on formatStatusLabel(status), which restated the chip — the one
+      // line on the card that could have told the reader their next move spent
+      // it saying the same word twice.
+      var GUIDED_CARD_NEXT_MOVE = {
+        ready: 'Your turn: copy this step’s prompt and give it to your chatbot.',
+        copied: 'You have the prompt. Paste the reply back here when your chatbot finishes.',
+        returned: 'Reply pasted, not checked yet. Use this step’s button to check it.',
+        waiting: 'Waiting on an earlier step. Nothing to do here yet.'
+      };
+
       function getStageMeta(item) {
         if (!item) return '';
         if (item.status === 'invalidated') return 'An update is required before final assembly can pass.';
         if (item.status === 'needs review') return 'Review is required because an earlier dependency changed.';
         if (item.reason) return item.reason;
+        if (GUIDED_CARD_NEXT_MOVE[item.cardState]) return GUIDED_CARD_NEXT_MOVE[item.cardState];
         if (item.key === 'weeks') {
           return 'Grouping weeks keeps fixes local and preserves earlier approved work.';
         }
@@ -6195,11 +6309,14 @@
       function renderStageLedger(items, nextAction) {
         if (!wizStageLedger) return;
         var activeKey = nextAction && nextAction.stageKey ? nextAction.stageKey : '';
+        // Grouped by the SAME card state the chip prints. Before this the
+        // column and the chip were computed from different rules, so a card
+        // could sit under Open wearing a chip that said it was your turn.
         var grouped = buildStageGroups(items, function (item) {
-          if (item.status === 'blocked' || item.status === 'invalidated' || item.status === 'needs review') return 'attention';
-          if (item.key === activeKey || item.status === 'drafted' || item.status === 'in progress') return 'current';
-          if (item.status === 'valid' || item.status === 'not needed') return 'complete';
-          return 'open';
+          if (item.cardState === 'needs-repair') return 'attention';
+          if (item.cardState === 'validated') return 'complete';
+          if (item.cardState === 'waiting') return 'open';
+          return 'current';
         });
 
         renderPipelineRail(wizPipelineRail, items.map(function (item) {
@@ -6212,18 +6329,21 @@
         }), { currentKey: activeKey });
 
         renderStageGroups(wizStageLedger, grouped, function (item) {
-          var tone = getStatusTone(item.status);
+          // The chip speaks the FERRY's vocabulary, not the run ledger's: on
+          // this door the reader is the transport, so "with your AI" is a real
+          // state and "in progress" would hide it.
+          var tone = guidedCardTone(item.cardState);
           var stageIndex = WIZARD_STAGE_KEYS.indexOf(item.key);
           var currentClass = stageIndex === wizStep ? ' is-current' : '';
           var canJump = stageIndex >= 0 ? canNavigateToStep(stageIndex) : false;
           return '' +
-            '<button type="button" class="wizard-stage-item ' + tone + currentClass + (canJump ? ' is-clickable' : '') + '" data-stage-index="' + stageIndex + '"' + (canJump ? '' : ' disabled') + (item.key === activeKey ? ' aria-current="step"' : '') + '>' +
+            '<button type="button" class="wizard-stage-item ' + tone + currentClass + (canJump ? ' is-clickable' : '') + '" data-stage-index="' + stageIndex + '" data-card-state="' + escapeForHtml(item.cardState || '') + '"' + (canJump ? '' : ' disabled') + (item.key === activeKey ? ' aria-current="step"' : '') + '>' +
               '<div class="wizard-stage-head">' +
                 '<div class="wizard-stage-head-main">' +
                   '<div class="wizard-stage-step">Step ' + (stageIndex + 1) + '</div>' +
                   '<div class="wizard-stage-name">' + escapeForHtml(item.label) + '</div>' +
                 '</div>' +
-                '<div class="wizard-status-chip ' + tone + '">' + escapeForHtml(formatStatusLabel(item.status)) + '</div>' +
+                '<div class="wizard-status-chip ' + tone + '">' + escapeForHtml(formatGuidedCardState(item.cardState)) + '</div>' +
               '</div>' +
               '<div class="wizard-stage-detail">' + escapeForHtml(getStageDetail(item)) + '</div>' +
               '<div class="wizard-stage-meta">' + escapeForHtml(getStageMeta(item)) + '</div>' +
@@ -6288,7 +6408,11 @@
           fragmentBatches: [],
           fragmentBatchIndex: 0,
           fragmentBatchOutputs: [],
-          stageFlags: {}
+          stageFlags: {},
+          // Which stage prompts have been taken to the reader's chatbot. Rides
+          // wizState, so it is already in the saved project and already in the
+          // project file — no new key, no migration.
+          copied: {}
         };
 
         Object.keys(wizResults).forEach(function (key) {
@@ -6756,7 +6880,14 @@
       }
 
       Object.keys(wizResults).forEach(function (key) {
-        wizResults[key].addEventListener('input', saveWizardDraft);
+        wizResults[key].addEventListener('input', function () {
+          // Reply Pasted is a state the board has to reach on the paste. It
+          // used to arrive only when the reader pressed Next, so the board
+          // spent the whole gap between "I pasted it" and "I pressed the
+          // button" telling the reader nothing had happened.
+          updateStageHealth();
+          saveWizardDraft();
+        });
       });
         wizClearDraftBtn.addEventListener('click', function () {
           resetWizardState({ keepDraft: true });
@@ -6879,6 +7010,11 @@
       function setStageFlag(stageKey, status, reason) {
         wizState.stageFlags = wizState.stageFlags || {};
         wizState.stageFlags[stageKey] = { status: status, reason: reason || '' };
+        // Every "this stage's earlier answer is stale" path runs through here,
+        // so this is the one place the copied mark has to be dropped. A card
+        // whose prompt has been rebuilt must not still claim the reader's
+        // chatbot is working on the old question.
+        clearStageCopied(stageKey);
       }
 
       function clearStageFlag(stageKey) {
@@ -7043,20 +7179,28 @@
         }
       }
 
-      function makeCopyHandler(textarea, button, defaultLabel) {
+      // `stageKey` is optional and only the STAGE prompts pass one. A repair
+      // prompt is a fix for a card that is already broken, and marking that
+      // card "with your AI" would overwrite the state the reader most needs
+      // to see.
+      function makeCopyHandler(textarea, button, defaultLabel, stageKey) {
         return function () {
           copyText(textarea.value, button, defaultLabel);
+          if (stageKey) markStageCopied(stageKey);
         };
       }
 
-      document.getElementById('wiz-copy-1').addEventListener('click',
-        makeCopyHandler(wizPrompts[1], document.getElementById('wiz-copy-1'), 'Copy Step Prompt'));
-      document.getElementById('wiz-copy-2').addEventListener('click',
-        makeCopyHandler(wizPrompts[2], document.getElementById('wiz-copy-2'), 'Copy Step Prompt'));
-      document.getElementById('wiz-copy-3').addEventListener('click',
-        makeCopyHandler(wizPrompts[3], document.getElementById('wiz-copy-3'), 'Copy Step Prompt'));
-      document.getElementById('wiz-copy-6').addEventListener('click',
-        makeCopyHandler(wizPrompts[6], document.getElementById('wiz-copy-6'), 'Copy Step Prompt'));
+      [
+        ['wiz-copy-1', 1, 'layerBible'],
+        ['wiz-copy-2', 2, 'campaignPlan'],
+        ['wiz-copy-3', 3, 'shell'],
+        ['wiz-copy-6', 6, 'endings']
+      ].forEach(function (entry) {
+        var button = document.getElementById(entry[0]);
+        if (!button) return;
+        button.addEventListener('click',
+          makeCopyHandler(wizPrompts[entry[1]], button, 'Copy Step Prompt', entry[2]));
+      });
 
       function fallbackFindJsonBounds(text) {
         var depth = 0;
@@ -7821,8 +7965,10 @@
             saveWizardDraft();
           });
         });
-        copyBtn.addEventListener('click', makeCopyHandler(promptEl, copyBtn, 'Copy Step Prompt'));
-        resultEl.addEventListener('input', saveWizardDraft);
+        copyBtn.addEventListener('click', makeCopyHandler(promptEl, copyBtn, 'Copy Step Prompt', 'weeks'));
+        // The card state answers "did the page notice what I just did", so it
+        // has to move on the paste, not only on the Next click.
+        resultEl.addEventListener('input', function () { updateStageHealth(); saveWizardDraft(); });
         document.getElementById('wiz-weeks-next-current').addEventListener('click', function () {
           errorEl.classList.remove('is-visible');
           var raw = resultEl.value.trim();
@@ -8041,8 +8187,8 @@
             saveWizardDraft();
           });
         });
-        copyBtn.addEventListener('click', makeCopyHandler(promptEl, copyBtn, 'Copy Step Prompt'));
-        resultEl.addEventListener('input', saveWizardDraft);
+        copyBtn.addEventListener('click', makeCopyHandler(promptEl, copyBtn, 'Copy Step Prompt', 'fragments'));
+        resultEl.addEventListener('input', function () { updateStageHealth(); saveWizardDraft(); });
         document.getElementById('wiz-fragments-next-current').addEventListener('click', function () {
           errorEl.classList.remove('is-visible');
           var raw = resultEl.value.trim();
