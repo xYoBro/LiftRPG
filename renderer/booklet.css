@@ -498,6 +498,47 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   --theme-hair-width:var(--line-width-hair,1px);
   --theme-rule-width:var(--line-width-rule,1px);
   --theme-frame-width:var(--line-width-frame,1.5px);
+  /* ── THE PENCIL FLOOR (D145) ─────────────────────────────────────────────
+     THE WRITE-IN LAW: this is a journal before it is anything else, and every
+     surface the pencil enters must be bounded by rules that RECEDE from
+     handwriting. This token is that law, made structural.
+
+     WHY IT HAD TO EXIST. `--line-width-frame` reads as page furniture and was
+     authored that way — noir and steampunk both set 4px meaning "my frames are
+     bold". But fourteen declarations consumed it and TEN of them were pencil
+     boxes, so "bold frames" rendered as 4px walls on a 15px tick box: 53.5% of
+     the box was ink, 6.95px of paper was left, and the rep box's aperture was
+     6px tall. Measured, not estimated (evals/archetype-audit). The same shape
+     reached `--theme-rule-width`, whose consumers are four headers AND three
+     write-in BLANKS — the ruled line you write your load onto was carrying the
+     weight of a section header, 3px in steampunk.
+
+     No token in this system distinguished "a line that bounds writing" from "a
+     line that decorates the page", so an archetype could not express weight
+     without spending it on the pencil. This is that distinction.
+
+     IT IS A FLOOR AND NOT A CHARACTER AXIS, and no preset declares
+     `--line-width-pencil` — deliberately, so an archetype CANNOT make a tick
+     box heavier, by construction rather than by ten careful values. That is
+     D126's ruling reaching the surface it was written for: the archetype
+     guarantees legibility; it does not get to spend it. 1px is 0.75pt at the
+     96dpi CSS reference, clear of the ~0.5pt reproduction floor, and it is what
+     every real ledger, field notebook and training log rules its boxes at.
+     Character on the countable belongs to the component dialect, which styles
+     the RIM (see the dialect block) — never the aperture.
+
+     The archetype keeps every ornamental consumer of `--theme-frame-width`:
+     `.rules-header`, `.week-door`, `.fragment-seal`, `.manifest-pointer`. Noir
+     still lays a 4px slab under its headers and down its seals, because that IS
+     noir; it just no longer lays one around the box you tick. */
+  --theme-pencil-width:var(--line-width-pencil,1px);
+  /* The paper a write-in surface offers. Flat by law: `--paper-2` resolves to
+     `--panel-surface`, which is a top-to-bottom GRADIENT in six of the ten
+     presets, so the notes zone — the largest free-writing area in the book —
+     darkened toward the bottom, exactly where the last lines get written
+     (noir ran #e4e4e4 → #c8c8c8 across the box). A tonal wash under handwriting
+     is the same defect as a heavy rule around it. */
+  --theme-pencil-fill:var(--pencil-fill,var(--paper));
   --theme-heading-xl:var(--heading-size-xl,28pt);
   --theme-heading-lg:var(--heading-size-lg,16pt);
   --theme-heading-md:var(--heading-size-md,11pt);
@@ -1570,7 +1611,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .password-log-box{
   width:28px;
   height:28px;
-  border:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
   border-radius:2px;
   background:white;
 }
@@ -1725,7 +1766,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   width:15px;
   height:15px;
   flex:0 0 auto;
-  border:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
   border-radius:2px;
   background:var(--paper);
 }
@@ -2054,7 +2095,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .exercise-load-line{
   width:100%;
   height:14px;
-  border-bottom:var(--theme-rule-width,1px) var(--theme-line-style,solid) var(--theme-field-rule,rgba(24,23,20,.42));
+  border-bottom:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-field-rule,rgba(24,23,20,.42));
   display:flex;
   align-items:flex-end;
   justify-content:flex-end;
@@ -2131,7 +2172,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   /* Ratio, not a pixel literal: the gutter has to scale with whichever tier of
      the token the card renders at (≈2px at base, 1.7px at tight). */
   padding-inline:calc(var(--rep-box-size) * 0.12);
-  border:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
   border-radius:2px;
   background:var(--paper);
   position:relative;
@@ -2268,7 +2309,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
    change with the rule weight. */
 .return-beat-blank{
   height:15px;
-  border-bottom:var(--theme-rule-width,1px) var(--theme-line-style,solid) var(--theme-field-rule,var(--rule));
+  border-bottom:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-field-rule,var(--rule));
   background:transparent;
 }
 
@@ -2316,7 +2357,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 }
 .progression-target-blank{
   height:15px;
-  border-bottom:var(--theme-rule-width,1px) var(--theme-line-style,solid) var(--theme-field-rule,var(--rule));
+  border-bottom:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-field-rule,var(--rule));
   background:transparent;
 }
 
@@ -2379,7 +2420,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
      absorbs the squeeze instead. */
   flex:0 0 auto;
   padding-top:var(--mark-strip-pad-top);
-  border-top:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-field-rule,var(--rule));
+  border-top:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-field-rule,var(--rule));
 }
 .mark-target{
   display:flex;
@@ -2392,7 +2433,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   width:var(--mark-box-size);
   height:var(--mark-box-size);
   flex:0 0 auto;
-  border:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
   border-radius:2px;
   background:var(--paper);
 }
@@ -2418,9 +2459,13 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 /* Notes Box */
 .notes-box{
   min-height:var(--notes-box-height, 30px);
-  border:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--rule));
+  border:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--rule));
   border-radius:3px;
-  background:var(--paper-2);
+  /* Flat, not `--paper-2` (D145). That token resolves to `--panel-surface`,
+     which six presets author as a top-to-bottom gradient — so the book's
+     largest free-writing zone got darker toward the bottom, under the last
+     lines written. The rule defines this box; the fill must not shade it. */
+  background:var(--theme-pencil-fill,var(--paper));
   padding:4px 8px;
   margin-top:2px;
   position:relative;
@@ -2807,9 +2852,12 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   display:flex;
   flex-direction:column;
   position:relative;
-  border:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--rule));
+  border:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--rule));
   border-radius:3px;
-  background:linear-gradient(180deg, rgba(246,242,233,.94) 0%, rgba(240,234,223,.98) 100%);
+  /* D145: flat paper. This sheet is a full page of ruled writing space and it
+     was the one surface carrying a hardcoded pastoral-tinted gradient — wrong
+     on both counts, since it shaded the writing AND ignored the book's paper. */
+  background:var(--theme-pencil-fill,var(--paper));
   box-shadow:inset 0 0 0 1px rgba(24,23,20,.03);
   overflow:hidden;
   padding:14px 14px 12px;
@@ -3433,7 +3481,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .reckoning-tally-box{
   width:var(--reckoning-box-size);
   height:var(--reckoning-box-size);
-  border:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
   border-radius:2px;
   background:var(--paper);
 }
@@ -4502,7 +4550,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .map-cell{
   min-width:27px;
   min-height:30px;
-  border:var(--theme-hair-width,1px) var(--theme-grid-stroke-style,solid) var(--rule);
+  border:var(--theme-pencil-width,1px) var(--theme-grid-stroke-style,solid) var(--rule);
   display:flex;
   align-items:center;
   justify-content:center;
@@ -4512,7 +4560,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   position:relative;
 }
 .map-cell.empty{
-  border:var(--theme-hair-width,1px) var(--theme-grid-stroke-style,solid) var(--rule);
+  border:var(--theme-pencil-width,1px) var(--theme-grid-stroke-style,solid) var(--rule);
   background:transparent;
 }
 .map-cell.cleared{
@@ -5068,17 +5116,25 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   stroke-width:3;
   stroke-linecap:round;
 }
+/* THE APERTURE IS NOT THE DIALECT'S TO SPEND (D145). This rule used to paint a
+   bar across the middle 56% of every tick box — inside the 7px of paper a
+   pencil had to work in, and drawn on EVERY box regardless of whether the
+   player had marked it. Two defects in one declaration: it left nowhere to
+   write, and it erased the difference between a counted box and an uncounted
+   one. That second half is exactly D126's `--fog-opacity` refusal ("wiring it
+   would let an archetype erase the difference between a hex the player has
+   cleared and one they have not"), and W6 restated it for `toneTexture` ("no
+   surface a pencil writes on") — the dialects predate both and were never held
+   to either.
+   `beads` is the proof that a dialect can carry identity without the aperture:
+   it is a rim shape and nothing else. Gauge follows it here — the instrument
+   reads in the RIM's tuned, softer ink, which is what a gauge bezel is. */
 [data-component-dialect="gauge"] .mark-box,
 [data-component-dialect="gauge"] .reckoning-tally-box,
 [data-component-dialect="gauge"] .companion-track-box,
 [data-component-dialect="gauge"] .companion-dashboard-box{
-  background:linear-gradient(
-    to right,
-    transparent 0 22%,
-    color-mix(in srgb, var(--ink) 34%, transparent 66%) 22% 78%,
-    transparent 78% 100%
-  );
   border-color:color-mix(in srgb, var(--ink) 52%, var(--paper) 48%);
+  border-radius:40%;
 }
 
 /* tally — a struck rim and a struck box: the countable made by hand. */
@@ -5096,16 +5152,22 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   stroke:var(--ink);
   stroke-width:4;
 }
+/* THE STRIKE IS THE PLAYER'S MARK, NOT THE BOX'S DECORATION (D145). This drew a
+   diagonal through the middle of every tick box before the player touched it,
+   so a tally book arrived pre-struck: the aperture had a line in it, and a
+   counted box was indistinguishable from an uncounted one. A hand-struck tally
+   is struck WHEN COUNTED — that is the whole meaning of the mark. The dialect's
+   own clock notch already knows this (`.progress-clock-notch[data-filled=
+   "true"]` strikes only what is filled); the boxes were the surface where the
+   pattern was not applied, because a pencil box has no filled state to key on —
+   the pencil IS the state.
+   Identity survives on the rim, which is where a hand-struck box shows its
+   hand: a dashed rule, drawn at the pencil floor so it reads as ruled-by-hand
+   rather than as a wall. */
 [data-component-dialect="tally"] .mark-box,
 [data-component-dialect="tally"] .reckoning-tally-box,
 [data-component-dialect="tally"] .companion-track-box,
 [data-component-dialect="tally"] .companion-dashboard-box{
-  background:linear-gradient(
-    to bottom right,
-    transparent calc(50% - .5px),
-    color-mix(in srgb, var(--ink) 28%, transparent 72%) calc(50% - .5px) calc(50% + .5px),
-    transparent calc(50% + .5px)
-  );
   border-style:dashed;
 }
 
@@ -5348,7 +5410,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .companion-slot-box{
   width:20px;
   height:20px;
-  border:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
   border-radius:2px;
   background:white;
 }
@@ -5381,7 +5443,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .companion-dashboard-box{
   width:28px;
   height:28px;
-  border:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
   background:rgba(255,255,255,.45);
 }
 .companion-track{
@@ -5568,7 +5630,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   text-transform:uppercase;
 }
 .companion-return-box{
-  border:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
   min-height:44px;
   position:relative;
 }
@@ -5661,7 +5723,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   display:flex;
   align-items:center;
   justify-content:center;
-  border:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
   border-radius:var(--theme-panel-radius,3px);
   background:var(--paper);
   font-family:var(--mono);
@@ -5870,7 +5932,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .boss-component-box{
   width:24px;
   height:24px;
-  border:var(--theme-frame-width,1.5px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
+  border:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
   border-radius:2px;
   background:white;
 }

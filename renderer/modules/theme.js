@@ -113,6 +113,35 @@ import {
  *   the hatch is opaque. Same finding shape as the panel-texture axis (D116):
  *   it needs a compositing design, not a token.
  *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE WRITE-IN LAW, AND THE ONE TOKEN NO PRESET MAY DECLARE (D145)
+ * ═══════════════════════════════════════════════════════════════════════════
+ * This is a journal before it is anything else. Every surface the pencil enters
+ * — mark strips, rep boxes, notes zones, workspaces, trackers, map cells — must
+ * be bounded by rules that RECEDE from handwriting.
+ *
+ * `--line-width-pencil` is that law, and it is CONSPICUOUSLY ABSENT from all
+ * ten presets below. That absence is the mechanism: `booklet.css` resolves
+ * `--theme-pencil-width: var(--line-width-pencil, 1px)`, and because no preset
+ * sets it, an archetype cannot make a tick box heavier BY CONSTRUCTION rather
+ * than by ten careful values that a future preset could quietly break. Adding
+ * it to a preset is the defect this ruling names.
+ *
+ * WHAT IT COST TO LEARN. `--line-width-frame` reads as page furniture and was
+ * authored that way — noir and steampunk both set 4px meaning "bold frames".
+ * Fourteen declarations consumed it and TEN were pencil boxes, so a 15px tick
+ * box rendered with 4px walls: 53.5% ink, 6.95px of paper left, and the rep
+ * box's writable aperture 6px tall. The same shape reached `--line-width-rule`,
+ * whose consumers are four headers AND the three write-in BLANKS — the ruled
+ * line a lifter writes their load onto was carrying a section header's weight.
+ *
+ * The archetype keeps every ORNAMENTAL consumer of `--line-width-frame`
+ * (.rules-header, .week-door, .fragment-seal, .manifest-pointer), which is
+ * where weight was always meant to go. Noir still lays a 4px slab under its
+ * headers and down its seals — it just no longer lays one around the box you
+ * tick. That is the whole of this ruling: the archetype guarantees legibility
+ * (D126); it does not get to spend it.
+ *
  * B&W PRINT LAW: every value here reads without hue. Identity is carried by
  * weight, pattern and structure — a hatch, a neatline, a double rule, an
  * inverted slug — so the book survives a photocopier, which is the only
@@ -519,7 +548,19 @@ const THEME_PRESETS = {
     '--font-body': '"IBM Plex Mono", monospace',
     '--font-mono': '"IBM Plex Mono", monospace',
     '--font-accent': '"Share Tech Mono", monospace',
-    '--weight-body': '600',
+    // WEIGHT IS A HIERARCHY, NOT A VOLUME KNOB (D145). This was 600, and
+    // `--theme-body-weight` reaches exactly one rule — ten PROSE selectors
+    // (.rules-body, .boss-narrative, .interlude-body, .fragment-doc-body, …).
+    // So noir set every narrative paragraph in the book to semibold, which cost
+    // it the two things it was trying to buy: the page went uniformly dark
+    // instead of high-contrast, and `strong` at 700 had a single weight step to
+    // work with, so emphasis stopped reading as emphasis. Noir's identity is
+    // CONTRAST — a stark display face, a 4px slab under the headers, a reversed
+    // black designation slug, a mourning keyline at the trim — and every one of
+    // those gets LOUDER against a 400 body, not quieter. IBM Plex Mono ships
+    // real 400/500/600/700 faces and is a true monospace, so the advance is
+    // identical at every weight: this is paint, and the estimate cannot see it.
+    '--weight-body': '400',
     '--weight-heading': '700',
     '--weight-label': '700',
     '--weight-emphasis': '700',
