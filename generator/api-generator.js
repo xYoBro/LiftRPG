@@ -820,8 +820,14 @@ function summarizeLayerBibleForCampaignRetry(layerBible) {
   };
 }
 
-function buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState) {
-  var weekCount = parseWeekCountFromWorkout(workout);
+function buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState, options) {
+  // The retry has to demand the SAME length the first attempt did. It used to
+  // re-derive it, and parseWeekCount clamps to 4-12 where the pipeline does
+  // not — so a 16-week book's retry asked for 12 and the stage could never
+  // satisfy the validator it was retrying against.
+  var weekCount = (options && options.weekCount > 0)
+    ? options.weekCount
+    : parseWeekCountFromWorkout(workout);
   var midpoint = Math.ceil(weekCount / 2);
   var lastError = retryState && retryState.error ? truncateText(retryState.error.message || retryState.error, 180) : '';
   var lastErrorLower = lastError.toLowerCase();
@@ -2235,9 +2241,12 @@ async function runApiPipeline(options) {
       },
       buildPrompt: function (retryState) {
         if (!retryState || !retryState.attempt) {
-          return builders.stage2(workout, brief, layerBible);
+          // The pipeline's resolved book length, not the builder's own parse.
+          // See generateApiStage2Prompt: parseWeekCount clamps to 4-12 and the
+          // pipeline does not, so a longer canonical program was planned short.
+          return builders.stage2(workout, brief, layerBible, { weekCount: weekCount });
         }
-        return buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState);
+        return buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState, { weekCount: weekCount });
       }
     });
     checkpoint = saveCheckpoint('campaignPlan', campaignPlan, checkpoint);
@@ -3333,7 +3342,8 @@ async function runSkeletonFleshPipeline(options) {
       buildPrompt: function (retryState) {
         return builders.skeleton(workout, brief, {
           retryMode: retryState.attempt > 0,
-          divergenceSeed: divergenceSeed
+          divergenceSeed: divergenceSeed,
+          weekCount: weekCount
         });
       },
       validate: function (result) {

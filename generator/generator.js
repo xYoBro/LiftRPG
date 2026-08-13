@@ -2178,7 +2178,10 @@
    */
   window.generateSkeletonPrompt = function (workout, brief, options) {
     options = options || {};
-    var weekCount = window.parseWeekCount(workout);
+    // The pipeline's resolved book length when it has one; parseWeekCount is
+    // the fallback for pipeline-free callers. Same reason as
+    // generateApiStage2Prompt: parseWeekCount clamps to 4-12.
+    var weekCount = (options.weekCount > 0) ? options.weekCount : window.parseWeekCount(workout);
     var blend = deriveDesignBlend(brief, workout);
     var armed = armCompilerContext(workout, brief, options);
     return [
@@ -2639,7 +2642,24 @@
 
   window.generateApiStage2Prompt = function (workout, brief, layerBible, options) {
     options = options || {};
-    var weekCount = window.parseWeekCount(workout);
+    // AUTHORITATIVE WEEK COUNT, not a re-derivation. The pipeline already
+    // resolved book length (runApiPipeline → resolveCanonicalBookLength) and
+    // passes it; `parseWeekCount` is the fallback for callers that have no
+    // pipeline (the length probe, the guided-build harness). They differed:
+    // parseWeekCount clamps to 4-12, the pipeline does not, so a 16-week
+    // canonical program was planned as 12 weeks and built as 16.
+    var weekCount = (options.weekCount > 0) ? options.weekCount : window.parseWeekCount(workout);
+    // WHAT THE PLANNER SEES OF THE PROGRAM (W3 length audit). The raw echo
+    // below is capped at 2,200 characters, which at 12 weeks stops inside week
+    // 5 — and this stage is the one told "use exactly 12 weeks". The digest's
+    // per-week rows are the fix: every week's shape, ~330 characters, no
+    // truncation. The cap stays; the blindness does not.
+    var topology = (typeof window.buildWorkoutTopology === 'function')
+      ? window.buildWorkoutTopology(workout) : null;
+    var scheduleBlock = (typeof window.formatWeekScheduleBlock === 'function')
+      ? window.formatWeekScheduleBlock(topology) : '';
+    var shapeBlock = (typeof window.formatWorkoutTopologyBlock === 'function')
+      ? window.formatWorkoutTopologyBlock(topology) : '';
     return [
       '# API Stage 2 — Story Plan',
       '',
@@ -2673,7 +2693,11 @@
       compactJson(summarizeLayerBibleForWeeks(layerBible)),
       '',
       '## Inputs',
-      'Workout: ' + truncateText(workout, 2200),
+      // One entry, not two: the array is `.filter(Boolean)`-ed, so a separate
+      // blank-line element would be filtered out with the empty blocks.
+      [shapeBlock, scheduleBlock].filter(Boolean).join('\n\n'),
+      'Workout (abbreviated echo — the schedule above is the authority on length): '
+        + truncateText(workout, 2200),
       'Creative direction: ' + truncateText(brief || '', 900),
       options.retryMode ? 'Retry mode: shorten descriptions where needed, but keep clue economy and week transformations intact.' : '',
       '',
