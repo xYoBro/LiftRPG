@@ -2719,6 +2719,14 @@
       // voice law says how to write; this says what the ending must DO, and
       // the default pipeline was getting neither.
       window.INST_ENDING_STANDARD.join('\n'),
+      '',
+      // The third instance of the same gap (D150). `endingBody` is BLOCKING at
+      // this stage, and this builder stated no length at all — so the default
+      // pipeline could be rejected for a cap it was never shown, which is the
+      // exact waste outputBudgetParity exists to prevent, one level up. It
+      // matters more now that the cap is a demand to FILL the page rather than
+      // a warning to stay under it. Gated by endingBuildersCarryBudgets().
+      window.INST_OUTPUT_BUDGETS.join('\n'),
       ''
     ].concat(window.buildFleshEndingSpec(variant)).filter(Boolean).join('\n');
   };
@@ -2758,6 +2766,12 @@
       window.INST_VOICE_DISCIPLINE.join('\n'),
       '',
       window.INST_ENDING_STANDARD.join('\n'),
+      '',
+      // …and the length demand, which neither ending builder carried (D150).
+      // This is the builder the pipeline calls BY DEFAULT, so it is where the
+      // raised `endingBody` cap and its "fill the surface" framing have to
+      // land or the wave reaches every path except the busiest one.
+      window.INST_OUTPUT_BUDGETS.join('\n'),
       ''
     ].concat(window.FLESH_ENDINGS_BUNDLE_SPEC).filter(Boolean).join('\n');
   };
