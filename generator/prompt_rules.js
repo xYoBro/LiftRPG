@@ -3167,6 +3167,48 @@
     '- `rulesSpread.leftPage.sections` must include a section explaining the play cadence in-world.'
   ];
 
+  // ── The shell's own last pass (D158) ────────────────────────────────────
+  // INST_SELF_VERIFICATION below is routed to week-final / fragment / ending,
+  // and every line in it is about CONTENT. The shell stage — which declares
+  // the whole play spine and every identity axis, and is the most
+  // cross-reference-dense stage in the pipeline — had no final pass at all.
+  // It showed: the author's first book failed the shell gate three times on
+  // three DIFFERENT cross-references (an unfed economy half, then unanswered
+  // milestones), each a rule the doctrine states plainly and the model
+  // satisfied everywhere except one place.
+  //
+  // These are not new rules. Every line is a floor that already blocks, written
+  // as a question to ask BEFORE answering — because the expensive failure is
+  // not being told a law, it is a whole 32,000-token payload thrown away over
+  // one missing edge. Shell + skeleton only (the two compiler seats); the
+  // ceiling-bound paste path is untouched.
+  window.INST_SHELL_SELF_CHECK = [
+    '## Before you answer: walk your own spine',
+    'Every line below is a gate that will REJECT this payload. They are cheap to check now',
+    'and expensive to miss — a single unwired edge costs the whole answer.',
+    '',
+    '1. WALK THE ECONOMY. Start at each tick origin (`markStrip:` / `session:` / `week:`) and',
+    '   follow your `economyGraph` edges. Can you REACH every node you named — including the',
+    '   later weeks, `boss`, `assembly`, and every `ending:`? Reachability does not flow from',
+    '   week to week by itself: week 3 content wired to nothing is an orphan even when week 1',
+    '   is perfect. Then walk it backwards: does every node reach a surface the book PRINTS?',
+    '2. ANSWER EVERY PROMISE. For each `milestones[].unlocks`, is there a `consequenceEdges`',
+    '   row that mentions that same ref? A theory the book never answers is an unpaid promise.',
+    '3. PRICE EVERY DOOR. Does every door your plan schedules have a `decisionLedger` row,',
+    '   written `door:W3`, naming a MECHANICAL difference — a clock, a price, a region, a gate?',
+    '4. ONE ROW PER WEEK. Does `tensionBudget` have a row for every week in the book?',
+    '5. BUILD WHAT YOU DECLARED. Every `harvestPatterns` entry must be built where it claims:',
+    '   declaring `found-not-found-gating` obliges the gate to exist in the economy.',
+    '6. ANSWER EVERY ASSIGNMENT. Each identity axis is either transcribed exactly as assigned,',
+    '   or declined in its evidence field with the assignment named and a reason from the brief.',
+    '   Silence on an assigned axis is the one answer that is never accepted.',
+    '7. DISTINCT COMPOSITION. Two to four entries, no repeats, each with a role written in your',
+    '   own words about THIS book.',
+    '',
+    'If any check fails, FIX IT NOW rather than emitting and hoping. You cannot see the',
+    'validator; these seven questions are what it is going to ask.'
+  ];
+
   window.INST_SELF_VERIFICATION = [
     '## Final Self-Verification',
     '- meta.weekCount === weeks.length',
@@ -3555,7 +3597,7 @@
     // load-bearing the same way theirs is: the model reads the menus that make
     // each choice choosable, then reads which of them the die already made.
     // Reversed, the assignments read as one more menu.
-    'shell':          { schemas: ['META', 'THEME', 'DESIGN_LANGUAGE', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'SHELL_CHOICE', 'SEED_ASSIGNMENT', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES'] },
+    'shell':          { schemas: ['META', 'THEME', 'DESIGN_LANGUAGE', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'SHELL_CHOICE', 'SEED_ASSIGNMENT', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES', 'SHELL_SELF_CHECK'] },
     // Knowing: the world's process particulars, authored once after the
     // skeleton/shell and consumed by every prose stage (§11 Wave 1.5). It
     // writes no prose, so it carries no VOICE_DISCIPLINE — it carries the

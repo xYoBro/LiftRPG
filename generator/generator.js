@@ -2402,6 +2402,13 @@
       compactJson(summarizeDesignBiasForApi(blend)),
       options.retryMode ? '\nRetry mode: keep all field values concrete and within constraints. Ensure JSON completes cleanly.' : '',
       '',
+      // The shell's last pass (D158), hand-routed for the same reason
+      // INST_SHELL_CHOICE is: this builder predates STAGE_SCHEMA_MAP and
+      // assembles by hand, so the pair moves together. LAST on purpose — it
+      // is a check over everything above it, and a checklist read before the
+      // rules it checks is just more rules.
+      window.INST_SHELL_SELF_CHECK.join('\n'),
+      '',
       'Return ONLY the JSON object matching the skeleton schema. No markdown fences, no commentary.'
     ].filter(Boolean).join('\n');
   };
