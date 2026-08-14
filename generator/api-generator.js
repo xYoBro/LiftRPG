@@ -1710,12 +1710,26 @@ function wireCheckpointNotices(onProgress, getStageIndex, getTotalStages) {
 
 // ── Validation helpers for smart retry ───────────────────────────────────────
 
+// THE THIRD SHAPE (D157, found by an outside review of this file, 2026-08-13).
+// The documented convention is '' / {valid:true} for success and a non-empty
+// string / {valid:false, errors} for failure — but the multi-stage week gate
+// returned a bare ARRAY of continuity errors, and an array is `typeof
+// 'object'` with no `.valid`, so `vr.valid === false` was false and a real
+// failure read as a PASS. Continuity errors were dropped in silence and the
+// chunk was banked to the checkpoint: no retry, no message, a book whose weeks
+// do not answer each other. Arrays are handled here rather than only fixed at
+// the call site, because the next callback to return one should fail loudly
+// instead of silently — a convention that only holds when everyone remembers
+// it is the shape this bug already had.
 function validationFailed(vr) {
-  return (typeof vr === 'string' && vr) || (vr && typeof vr === 'object' && vr.valid === false);
+  if (typeof vr === 'string') return !!vr;
+  if (Array.isArray(vr)) return vr.length > 0;
+  return !!(vr && typeof vr === 'object' && vr.valid === false);
 }
 
 function extractErrorList(vr) {
   if (typeof vr === 'string') return [vr];
+  if (Array.isArray(vr)) return vr.slice();
   if (vr && vr.errors && vr.errors.length) return vr.errors;
   return ['Schema validation failed'];
 }
@@ -3325,7 +3339,10 @@ async function runApiPipeline(options) {
           }
         );
         if (continuityErrors.length > 0) {
-          return continuityErrors;
+          // Conform to the documented convention rather than leaning on the
+          // array arm above: both halves of D157 land, so this gate is right
+          // by its own shape AND survives a future refactor of the helper.
+          return { valid: false, errors: continuityErrors };
         }
         return schemaValidation;
       },
@@ -5312,6 +5329,10 @@ window.LiftRPGAPI = {
     collectLicensedMovePlacementFindings: collectLicensedMovePlacementFindings,
     scanTerminalVoiceTics: scanTerminalVoiceTics
   },
+  // D157: exposed so the array arm is pinnable. The bug it fixes was invisible
+  // precisely because nothing could ask this function a question.
+  _validationFailed: validationFailed,
+  _extractErrorList: extractErrorList,
   _extractJson: extractJson,
   _validateSchema: validateBookletSchema,
   _validateAssembled: validateAssembledBooklet,
