@@ -51,15 +51,37 @@ export var STAGE_BUDGETS = {
   // and short on wall clock because it is transcription, not composition.
   canonicalize: { maxTokens: 16000, timeoutMs: 300000 },
   // Skeleton+Flesh
-  skeleton:   { maxTokens: 24000, timeoutMs: 600000 },
+  // The S+F pipeline's compiler seat: it writes the SAME identity bundle the
+  // multi-stage `shell` writes (D144/D149/D152 axes, citations, spine) plus a
+  // whole weekPlan, so it moves with `shell` below — one growth, both seats
+  // (D155). A stage returning a whole unit is never budgeted below the stage
+  // that writes the same unit on the other pipeline.
+  skeleton:   { maxTokens: 32000, timeoutMs: 600000 },
   rules:      { maxTokens: 12000, timeoutMs: 300000 },
   week:       { maxTokens: 24000, timeoutMs: 600000 },
   fragments:  { maxTokens: 40000, timeoutMs: 900000 },
   endings:    { maxTokens: 24000, timeoutMs: 480000 },
   // Multi-stage / structured
+  //
+  // ── THE CEILING IS A SAFETY VALVE, NOT A BUDGET (D155, 2026-08-13) ──
+  // Measured on the author's first real book: `campaign` truncated attempt 1
+  // at 24000 and completed at the escalated ceiling; `shell` truncated at
+  // 16000. Both rows were sized before D144/D149/D152 gave these stages far
+  // more to WRITE — a shell now declares fifteen identity axes with citations,
+  // six design-language axes with evidence, and a full play spine, and both
+  // stages run on models that spend part of the same ceiling thinking.
+  //
+  // Only GENERATED tokens are billed (see MAX_OUTPUT_TOKENS above), so a
+  // ceiling set too high costs nothing and a ceiling set too low costs a
+  // full-price truncated call plus its retry. The asymmetry is total, and
+  // these rows are set from what the stage must write plus thinking headroom,
+  // never from thrift. The runaway guard is unchanged: MAX_OUTPUT_TOKENS is
+  // still the hard cap, and the stage validators still reject over-budget
+  // prose (OUTPUT_BUDGETS, D150) — a ceiling has never been what keeps a
+  // stage's prose short.
   layerBible: { maxTokens: 24000, timeoutMs: 600000 },
-  campaign:   { maxTokens: 24000, timeoutMs: 600000 },
-  shell:      { maxTokens: 16000, timeoutMs: 420000 },
+  campaign:   { maxTokens: 40000, timeoutMs: 600000 },
+  shell:      { maxTokens: 32000, timeoutMs: 420000 },
   fragment:   { maxTokens: 24000, timeoutMs: 480000 },
   // Critic loop (D66). Both rows were sized before the critic had eight
   // dimensions and machine findings, and both were the smallest rows in the

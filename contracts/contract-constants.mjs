@@ -131,7 +131,8 @@ export var DOCUMENT_TYPE_ALIASES = {
   'testimony': 'transcript', 'deposition': 'transcript', 'interview': 'transcript', 'recording': 'transcript',
   'journal': 'fieldNote', 'diary': 'fieldNote', 'observation': 'fieldNote',
   'assessment': 'inspection', 'survey': 'inspection', 'audit': 'inspection',
-  'incident': 'anomaly', 'warning': 'anomaly', 'alert': 'anomaly', 'deviation': 'anomaly'
+  'incident': 'anomaly', 'warning': 'anomaly', 'alert': 'anomaly', 'deviation': 'anomaly',
+  'memorandum': 'memo', 'log': 'fieldNote', 'fieldnote': 'fieldNote'
 };
 
 // ── Mechanic vocabularies ────────────────────────────────────────────────────

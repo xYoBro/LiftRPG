@@ -6087,8 +6087,9 @@ export function validateCampaignPlanStage(result, options) {
       var label = 'Campaign Plan → fragmentRegistry[' + index + ']';
       var normalizedId = normalizeId(entry && entry.id);
       var rawDocumentType = String((entry && entry.documentType) || '').trim();
-      var canonicalDocumentType = rawDocumentType
-        ? (DOCUMENT_TYPE_ALIASES[rawDocumentType] || rawDocumentType).toLowerCase()
+      var lowerRaw = rawDocumentType ? rawDocumentType.toLowerCase() : '';
+      var canonicalDocumentType = lowerRaw
+        ? (DOCUMENT_TYPE_ALIASES[lowerRaw] || lowerRaw)
         : '';
       if (!normalizedId || !entry.weekRef || !weekByNumber[entry.weekRef]) {
         if (entry && entry.weekRef && !weekByNumber[entry.weekRef]) {
