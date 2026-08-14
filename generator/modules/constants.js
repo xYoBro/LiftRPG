@@ -56,7 +56,7 @@ export var STAGE_BUDGETS = {
   // whole weekPlan, so it moves with `shell` below — one growth, both seats
   // (D155). A stage returning a whole unit is never budgeted below the stage
   // that writes the same unit on the other pipeline.
-  skeleton:   { maxTokens: 32000, timeoutMs: 600000 },
+  skeleton:   { maxTokens: 56000, timeoutMs: 600000 },
   rules:      { maxTokens: 12000, timeoutMs: 300000 },
   week:       { maxTokens: 24000, timeoutMs: 600000 },
   fragments:  { maxTokens: 40000, timeoutMs: 900000 },
@@ -80,8 +80,16 @@ export var STAGE_BUDGETS = {
   // prose (OUTPUT_BUDGETS, D150) — a ceiling has never been what keeps a
   // stage's prose short.
   layerBible: { maxTokens: 24000, timeoutMs: 600000 },
-  campaign:   { maxTokens: 40000, timeoutMs: 600000 },
-  shell:      { maxTokens: 32000, timeoutMs: 420000 },
+  campaign:   { maxTokens: 56000, timeoutMs: 600000 },
+  // MEASURED AGAIN, one model later (D159): a Sonnet-5 shell attempt reported
+  // 28.1k output against this row's 32000 — 88% consumed — and came back with
+  // `meta.playSpine` ABSENT rather than truncated. That is the failure mode
+  // above a hard ceiling that a thinking model has to share: it does not cut
+  // the JSON off mid-token, it drops whole sections to fit. The same brief on
+  // a non-thinking model completed. Thinking is not free budget and it is not
+  // ours to disable (claude-5 rejects sampling overrides), so the ceiling has
+  // to hold BOTH the thinking and the payload.
+  shell:      { maxTokens: 56000, timeoutMs: 420000 },
   fragment:   { maxTokens: 24000, timeoutMs: 480000 },
   // Critic loop (D66). Both rows were sized before the critic had eight
   // dimensions and machine findings, and both were the smallest rows in the
