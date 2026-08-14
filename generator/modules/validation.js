@@ -3124,15 +3124,53 @@ export function collectSpineSkeletonFloorErrors(spine, skeleton, stageLabel) {
         if (backward[b] && !backward[a]) { backward[a] = 1; grew = true; }
       });
     }
+    // ── THE CASCADE, REPORTED AT ITS ROOT (D156) ──
+    // One missing edge strands everything downstream of it, and the floor used
+    // to report each stranded node as its own defect: the author's first book
+    // drew NINE orphan errors from a single unfed subgraph, and the retry went
+    // looking for nine repairs. A directive must name the repair (D154's
+    // lesson) — so the roots say what edge to add, and the nodes behind them
+    // say whose fix will free them. Every message keeps the phrase
+    // "reachable from no source" so nothing matching on it goes blind.
+    //
+    // Display form matters here too: `banked`, `boss` and `assembly` are
+    // SINGLETONS written bare in the grammar, so the internal "kind:id" key
+    // renders them "boss:" — a string the model never wrote and cannot search
+    // for. Print what the book says.
+    var refLabel = function (node) { return node.id ? node.kind + ':' + node.id : node.kind; };
+    var orphanSet = {};
+    Object.keys(nodes).forEach(function (k) { if (!forward[k]) orphanSet[k] = 1; });
+    var strandedBehind = {};
+    parsedEdges.forEach(function (e) {
+      var a = e.from.kind + ':' + e.from.id;
+      var b = e.to.kind + ':' + e.to.id;
+      if (orphanSet[a] && orphanSet[b]) strandedBehind[b] = a;
+    });
+
     Object.keys(nodes).forEach(function (key) {
       if (!forward[key]) {
-        errors.push(S + 'playSpine.economyGraph: "' + key + '" is reachable from no source —'
-          + ' an orphan system the player can never feed. Wire it to the tick economy or drop it');
+        var node = nodes[key];
+        var label = refLabel(node);
+        if (strandedBehind[key]) {
+          errors.push(S + 'playSpine.economyGraph: "' + label + '" is reachable from no source,'
+            + ' because nothing feeds "' + refLabel(nodes[strandedBehind[key]]) + '" upstream of it.'
+            + ' Fix that one first — this node comes back with it');
+          return;
+        }
+        var weekNo = surfaceRefWeek(node);
+        var feed = weekNo !== null ? 'markStrip:W' + weekNo : 'banked';
+        errors.push(S + 'playSpine.economyGraph: "' + label + '" is reachable from no source —'
+          + ' an orphan system the player can never feed. THIS IS THE ROOT: add one edge into it,'
+          + ' `{ from: "' + feed + '", to: "' + label + '" }`, or whatever genuinely feeds it'
+          + ' (a source is markStrip: / session: / week:), or drop it');
       } else if (!backward[key]) {
         // A source that reaches no sink is a dead spend: value goes in and
-        // nothing on the page ever shows it.
-        errors.push(S + 'playSpine.economyGraph: "' + key + '" reaches no printing sink —'
-          + ' a dead sink (value spent with no destination the book draws)');
+        // nothing on the page ever shows it. Same singleton-safe label as the
+        // orphan arm above — one node, one spelling, whichever arm reports it.
+        errors.push(S + 'playSpine.economyGraph: "' + refLabel(nodes[key]) + '" reaches no printing sink —'
+          + ' a dead sink (value spent with no destination the book draws).'
+          + ' Give it an edge INTO a surface the book prints (map: / clock: / oracle: / cipher: /'
+          + ' fragment: / companion: / seal: / door: / ending: / boss / assembly), or drop it');
       }
     });
   }
@@ -5423,7 +5461,11 @@ export function validateAssembledBooklet(booklet, options) {
   DOCUMENT_TYPE_ENUM.forEach(function (t) { validDocLookup[t] = true; });
   fragments.forEach(function (f) {
     if (f.documentType && !validDocLookup[f.documentType]) {
-      errors.push('Fragment "' + (f.id || '?') + '": documentType "' + f.documentType + '" not in supported list');
+      var lowerFrag = f.documentType.toLowerCase();
+      var resolved = DOCUMENT_TYPE_ALIASES[lowerFrag];
+      if (!resolved || !validDocLookup[resolved]) {
+        errors.push('Fragment "' + (f.id || '?') + '": documentType "' + f.documentType + '" not in supported list');
+      }
     }
     if (!f.designSpec || typeof f.designSpec !== 'object') {
       warnings.push('Fragment "' + (f.id || '?') + '": missing designSpec (renderer falls back to neutral defaults)');
@@ -5469,7 +5511,11 @@ export function validateAssembledBooklet(booklet, options) {
       if (!od.documentType) {
         errors.push(wn + ' overflowDocument missing documentType');
       } else if (!validDocLookup[od.documentType]) {
-        errors.push(wn + ' overflowDocument: documentType "' + od.documentType + '" not in supported list');
+        var lowerOd = od.documentType.toLowerCase();
+        var resolvedOd = DOCUMENT_TYPE_ALIASES[lowerOd];
+        if (!resolvedOd || !validDocLookup[resolvedOd]) {
+          errors.push(wn + ' overflowDocument: documentType "' + od.documentType + '" not in supported list');
+        }
       }
       if (!od.content && !od.body) {
         errors.push(wn + ' overflowDocument missing content');
