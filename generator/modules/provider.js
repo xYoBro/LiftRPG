@@ -1495,6 +1495,14 @@ async function runStreamingRequest(spec) {
       var httpError = new Error(spec.errorPrefix + errMsg);
       httpError.status = resp.status;
       if (resp.status === 429 || resp.status >= 500) httpError.retryable = true;
+      // Carry the standard Retry-After header so the backoff loop can use
+      // the provider's own estimate instead of guessing. Provider-agnostic:
+      // this is an HTTP standard, not a vendor feature.
+      if (resp.status === 429 || resp.status === 503) {
+        httpError.errorType = 'rate_limit';
+        var retryAfter = resp.headers.get('retry-after');
+        if (retryAfter) httpError.retryAfterHeader = retryAfter;
+      }
       throw httpError;
     }
 

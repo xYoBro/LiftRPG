@@ -132,7 +132,9 @@ export var DOCUMENT_TYPE_ALIASES = {
   'journal': 'fieldNote', 'diary': 'fieldNote', 'observation': 'fieldNote',
   'assessment': 'inspection', 'survey': 'inspection', 'audit': 'inspection',
   'incident': 'anomaly', 'warning': 'anomaly', 'alert': 'anomaly', 'deviation': 'anomaly',
-  'memorandum': 'memo', 'log': 'fieldNote', 'fieldnote': 'fieldNote'
+  'memorandum': 'memo', 'log': 'fieldNote', 'fieldnote': 'fieldNote',
+  'inspection report': 'inspection', 'inspection-report': 'inspection',
+  'surveillance summary': 'report', 'joint surveillance summary': 'report'
 };
 
 // ── Mechanic vocabularies ────────────────────────────────────────────────────

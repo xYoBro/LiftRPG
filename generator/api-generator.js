@@ -1803,6 +1803,20 @@ function buildStageRetryNotice(config, attempt, attemptCount, err, nextTimeoutMs
     (minutes === 1 ? '' : 's') + '. Stages that already finished are saved.';
 }
 
+// Parse the standard HTTP Retry-After header. Returns milliseconds to wait,
+// or 0 if absent/unparseable. Handles both formats:
+//   Retry-After: 120          (seconds)
+//   Retry-After: Sat, 16 Aug 2026 16:00:00 GMT   (HTTP-date)
+function parseRetryAfterHeader(err) {
+  var raw = err && err.retryAfterHeader;
+  if (!raw) return 0;
+  var seconds = Number(raw);
+  if (isFinite(seconds) && seconds > 0) return Math.ceil(seconds * 1000);
+  var date = new Date(raw);
+  if (!isNaN(date.getTime())) return Math.max(0, date.getTime() - Date.now());
+  return 0;
+}
+
 // ── Core stage runner ─────────────────────────────────────────────────────────
 
 // Authoritative API-stage discipline helper. Guided build should mirror this
@@ -1811,6 +1825,7 @@ async function runJsonStage(settings, config) {
   var attemptCount = config.maxAttempts || 2;
   var lastErr = null;
   var stageTelemetry = createStageTelemetry(config.stageKey, config.stageName);
+  var rateLimitWaits = 0;
 
   for (var attempt = 0; attempt < attemptCount; attempt++) {
     // Rate limiter: wait for slot before each API call (including retries)
@@ -1991,6 +2006,53 @@ async function runJsonStage(settings, config) {
       }
       return result;
     } catch (err) {
+      // ── Throttle backoff ───────────────────────────────────────────────
+      // A "come back later" is not a content failure. Do not consume an
+      // attempt — wait for the provider's window to reopen, then re-enter
+      // the same attempt. The provider doesn't matter: 429 is 429.
+      if (isLikelyThrottleError(err) && rateLimitWaits < THROTTLE_MAX_WAITS) {
+        rateLimitWaits++;
+        var retryAfterMs = parseRetryAfterHeader(err);
+        var backoffMs = retryAfterMs > 0
+          ? retryAfterMs
+          : Math.min(
+              THROTTLE_INITIAL_DELAY_MS * Math.pow(THROTTLE_BACKOFF_MULTIPLIER, rateLimitWaits - 1),
+              THROTTLE_MAX_DELAY_MS
+            );
+        var waitMinutes = Math.ceil(backoffMs / 60000);
+        emitPipelineEvent(config.onProgress, config.stageIndex || 0,
+          config.getTotalStages ? config.getTotalStages() : 0,
+          config.stageName + ': provider said "not now" — waiting ' + waitMinutes +
+          ' minute' + (waitMinutes === 1 ? '' : 's') +
+          ' before retrying (wait ' + rateLimitWaits + '/' + THROTTLE_MAX_WAITS +
+          '). Progress is saved.', {
+            phase: 'throttle_wait',
+            stageKey: config.stageKey || '',
+            stageName: config.stageName,
+            waitMs: backoffMs,
+            waitNumber: rateLimitWaits,
+            maxWaits: THROTTLE_MAX_WAITS
+          });
+        await sleep(backoffMs);
+        attempt--;   // for-loop will increment; net effect: same attempt index
+        continue;
+      }
+
+      // All throttle waits exhausted — exit cleanly.
+      if (isLikelyThrottleError(err)) {
+        var exhaustionErr = new Error(
+          config.stageName + ': the provider has not resumed after ' +
+          rateLimitWaits + ' waits (~' + Math.round(
+            THROTTLE_INITIAL_DELAY_MS * (Math.pow(THROTTLE_BACKOFF_MULTIPLIER, rateLimitWaits) - 1)
+            / (THROTTLE_BACKOFF_MULTIPLIER - 1) / 60000
+          ) + ' minutes). Your progress through completed stages is saved. ' +
+          'Click Build to resume from where you left off — no re-spend.'
+        );
+        exhaustionErr.errorType = 'throttle_exhaustion';
+        exhaustionErr.retryable = false;
+        throw prefixStageError(config.stageName, exhaustionErr);
+      }
+
       lastErr = err;
       stageTelemetry.retries += 1;
       stageTelemetry.errorClass = err.errorType || (err.code === 'ECONNABORTED' ? 'timeout' : 'unknown');

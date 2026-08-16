@@ -114,7 +114,8 @@ export function shouldRetryStageError(err) {
     || isLikelyNetworkTransportError(err)
     || isLikelyTruncationError(err)
     || isLikelyJsonFailure(err)
-    || isLikelySchemaFailure(err);
+    || isLikelySchemaFailure(err)
+    || isLikelyThrottleError(err);
 }
 
 export function shouldSplitWeekChunk(err, weekNumbers) {
@@ -123,4 +124,32 @@ export function shouldSplitWeekChunk(err, weekNumbers) {
 
 export function shouldSplitFragmentBatch(err, registry) {
   return registry.length > 1 && shouldRetryStageError(err);
+}
+
+// ── Throttle: provider-agnostic ──────────────────────────────────────────────
+// Every provider on the internet says "not now" with HTTP 429 or 503, or with
+// English words. This classifier reads both. It never checks which provider
+// sent the response — a 429 is a 429 whether it came from OpenAI, Anthropic,
+// DeepSeek, Groq, HuggingFace, Kimi, Ollama behind a reverse proxy, or
+// anything else with an OpenAI-compatible surface.
+export function isLikelyThrottleError(err) {
+  // Structural: HTTP status codes that universally mean "try later"
+  if (err && (err.status === 429 || err.status === 503)) return true;
+  if (err && err.errorType === 'rate_limit') return true;
+  // Text: English patterns seen across every provider. Provider-blind by
+  // construction — these are words, not vocabulary.
+  var lower = String((err && err.message) || err || '').toLowerCase();
+  return lower.indexOf('rate limit') !== -1
+    || lower.indexOf('rate_limit') !== -1
+    || lower.indexOf('usage limit') !== -1
+    || lower.indexOf('too many requests') !== -1
+    || lower.indexOf('quota exceeded') !== -1
+    || lower.indexOf('quota exhausted') !== -1
+    || lower.indexOf('throttl') !== -1
+    || lower.indexOf('overloaded') !== -1
+    || (lower.indexOf('capacity') !== -1 && lower.indexOf('at capacity') !== -1)
+    || lower.indexOf('temporarily unavailable') !== -1
+    || lower.indexOf('try again later') !== -1
+    || lower.indexOf('usage window') !== -1
+    || lower.indexOf('server_busy') !== -1;
 }

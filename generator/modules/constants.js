@@ -566,3 +566,20 @@ export var CONDUCTOR_MECHANISMS = [
 // under floors that can refuse any of them. Three prioritized findings is what
 // one round can actually act on.
 export var CONDUCTOR_MAX_FINDINGS = 3;
+
+// ── Throttle backoff (provider-agnostic) ─────────────────────────────────────
+// When a stage gets a "come back later" (429, 503, rate limit, overloaded),
+// the pipeline waits before retrying. These values are provider-blind:
+//
+//   - The Retry-After header, when present, overrides everything below.
+//     Every major provider (OpenAI, Anthropic, Google, HuggingFace) sends it.
+//   - Without the header, exponential backoff: 1m → 2m → 4m → 8m → 10m.
+//   - After THROTTLE_MAX_WAITS, the pipeline exits cleanly with checkpoint
+//     intact. The user clicks Build to resume — zero re-spend.
+//
+// These are NOT the stage's retry attempts (maxAttempts: 2). A throttle wait
+// does not consume an attempt. The two budgets are independent.
+export var THROTTLE_INITIAL_DELAY_MS = 60000;      // 1 minute
+export var THROTTLE_BACKOFF_MULTIPLIER = 2;        // double each wait
+export var THROTTLE_MAX_DELAY_MS = 600000;         // 10 minute ceiling
+export var THROTTLE_MAX_WAITS = 5;                 // ~25 min total before clean exit
