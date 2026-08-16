@@ -41,6 +41,10 @@ import {
   STAGE_BUDGETS,
   RETRY_TIMEOUT_GROWTH,
   RETRY_TIMEOUT_CEILING_MS,
+  THROTTLE_INITIAL_DELAY_MS,
+  THROTTLE_BACKOFF_MULTIPLIER,
+  THROTTLE_MAX_DELAY_MS,
+  THROTTLE_MAX_WAITS,
   // Teeth Round T1a: the dialect enum and the prose caps, both stamped onto the
   // structured schemas below so a compat transport enforces what the stage
   // validators enforce.
@@ -205,7 +209,8 @@ import {
   shouldRetryStageError,
   shouldSplitFragmentBatch,
   isLikelyTruncationError,
-  isTruncationFinishReason
+  isTruncationFinishReason,
+  isLikelyThrottleError
 } from './modules/error-classify.js';
 
 import {
@@ -2033,7 +2038,7 @@ async function runJsonStage(settings, config) {
             waitNumber: rateLimitWaits,
             maxWaits: THROTTLE_MAX_WAITS
           });
-        await sleep(backoffMs);
+        await new Promise(function(resolve) { setTimeout(resolve, backoffMs); });
         attempt--;   // for-loop will increment; net effect: same attempt index
         continue;
       }
