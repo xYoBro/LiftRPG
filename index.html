@@ -4236,7 +4236,15 @@
         return {
           status: 'idle',
           summary: 'Waiting For Settings',
-          summaryCaption: 'Choose a provider and pipeline mode to begin.',
+          // NO `summaryCaption`. There was one, written in thirteen places
+          // and rendered in none — thirteen carefully worded sentences no
+          // reader has ever seen, and a field every future edit would have
+          // maintained in the belief it was on screen. The kicker
+          // (`summary`) has exactly one caption under it and that is
+          // `targetCaption`; a second one would be a fifth sentence in a
+          // four-sentence headline. Nothing was lost by deleting the writes:
+          // each site already says the same thing in `targetCaption`, in the
+          // run log, or in `error`.
           target: 'Provider Setup',
           targetCaption: 'No request has been sent yet.',
           progress: '0 / 0 stages',
@@ -4245,6 +4253,14 @@
           model: '',
           runStartedAt: 0,
           currentStageStartedAt: 0,
+          // The PIPELINE's own counters, kept deliberately and rendered
+          // nowhere: the pipeline counts 4 + weekCount + 2 units of its own
+          // work and moves that total mid-run, while the rail draws
+          // API_STAGE_ORDER. The reader's counter is derived from the rail by
+          // formatApiStageProgress(); these two are the raw pair, for the run
+          // log's transcript and for a console reading a live run. Nothing on
+          // screen may be computed from them — that is how "Step 8" and
+          // "12 / 12 stages" ended up on the same screen.
           totalStages: 0,
           stageIndex: 0,
           currentStageKey: '',
@@ -5492,7 +5508,6 @@
         }
         apiRunState = createApiRunState();
         apiRunState.summary = 'Configuration Changed';
-        apiRunState.summaryCaption = 'Provider settings were updated after the previous run.';
         apiRunState.target = 'Start New Run';
         apiRunState.targetCaption = 'The next API generation will use the new provider configuration.';
         if (message) pushApiLog(message);
@@ -5621,6 +5636,46 @@
         }
         if (stageKey === 'quality') return 'Runs by itself in your browser once the writing stages finish — checks, repairs, and the editorial review pass. Nothing for you to do.';
         return '';
+      }
+
+      // ── THE STAGE COUNTER THE READER SEES ──────────────────────────────
+      // Two numbering systems exist and only one of them is the reader's.
+      // The pipeline counts its own work (4 + weekCount + 2 on the
+      // part-by-part build — twelve stages for a six-week book) and moves that
+      // total mid-run as batch counts firm up. The rail draws API_STAGE_ORDER:
+      // eight cards, every week collapsed onto one (normalizeApiStageKey).
+      // Printing the pipeline's raw pair beside that rail is how "Step 8" and
+      // "12 / 12 stages" ended up on the same screen, and how a mid-run frame
+      // could count past the last step on offer (live run, 2026-08-17).
+      //
+      // The headline counter is DERIVED from the rail and clamped to it: a
+      // numerator larger than the number of steps a reader can count is never
+      // a true sentence. apiRunState.totalStages keeps the pipeline's raw
+      // number for the pipeline's own arithmetic, and the run log keeps the
+      // raw pair — per-week granularity is what a transcript is for, and the
+      // rail cannot carry it (six weeks share one card).
+      function formatApiStageProgress() {
+        var total = API_STAGE_ORDER.length;
+        var ledger = (apiRunState && apiRunState.ledger) || {};
+        // TWO readings, and the answer is the FURTHER of them. The card the
+        // reader is watching is one answer; the number of cards that have
+        // landed is the other, and neither alone is true at every frame. A
+        // stale currentStageKey outlives its stage on the delivery path
+        // (markAllApiStages retires the board, markApiStageComplete only
+        // clears the key it is handed), and reading the key alone reported a
+        // finished eight-card run as "5 / 8" — the panel counting backwards at
+        // the exact moment it says the book is ready.
+        var atCard = 0;
+        var landed = 0;
+        var currentKey = apiRunState ? apiRunState.currentStageKey : '';
+        API_STAGE_ORDER.forEach(function (stage, index) {
+          if (currentKey && stage.key === currentKey) atCard = index + 1;
+          var status = ledger[stage.key];
+          if (status === 'valid' || status === 'blocked') landed++;
+        });
+        var position = Math.max(atCard, landed);
+        position = Math.max(0, Math.min(position, total));
+        return position + ' / ' + total + ' stages';
       }
 
       function buildApiStageItems() {
@@ -5759,6 +5814,32 @@
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
           });
+        }
+      }
+
+      // ── THE DELIVERY TAIL (D110) ───────────────────────────────────────
+      // ONE function, five callers: a clean delivery, a delivery the panel
+      // had already written off, the painter's own fallback, a post-delivery
+      // failure, and that failure's superseded twin. It performs the single
+      // step that is not optional once a
+      // booklet exists — put the artifact's buttons on the screen — and it
+      // runs BEFORE any sentence about the run is composed.
+      //
+      // Everything else this panel says (scores, captions, telemetry, the
+      // stage rail, the log) is presentation over an artifact the reader has
+      // already paid for. Presentation is allowed to fail. The handover is
+      // not. Every caller checks the return value only to decide what to SAY;
+      // none of them may make the handover conditional on it.
+      function deliverApiBooklet(booklet) {
+        if (!booklet || typeof booklet !== 'object') return false;
+        if (!apiRunState) apiRunState = createApiRunState();
+        apiRunState.booklet = booklet;
+        try {
+          renderApiActions();
+          return true;
+        } catch (actionsError) {
+          console.error('[LiftRPG] Delivery actions failed to render:', actionsError);
+          return false;
         }
       }
 
@@ -6930,14 +7011,19 @@
       if (apiStopBtn) {
         apiStopBtn.addEventListener('click', function () {
           if (!apiRunState || apiRunState.status !== 'running') return;
-          // Invalidate the current run — pipeline checks runId at each stage boundary
+          // Invalidate the current run. This does NOT abort it: `runId` is a
+          // local of handleApiGenerate and the pipeline is handed no signal,
+          // so the request in flight runs to completion and the promise still
+          // lands. Every downstream `runId !== activeApiRunId` check is a
+          // "should I repaint?" test and never a "did this stop?" one — a
+          // stopped build one stage from done still delivers a whole booklet,
+          // and the delivery tail hands it over rather than dropping it.
           activeApiRunId++;
           if (apiRunState.currentStageKey && apiRunState.ledger[apiRunState.currentStageKey] === 'in progress') {
             apiRunState.ledger[apiRunState.currentStageKey] = 'invalidated';
           }
           apiRunState.status = 'error';
           apiRunState.summary = 'Build Stopped';
-          apiRunState.summaryCaption = 'You stopped the build. Completed stages are cached — restarting will resume from where it left off.';
           apiRunState.target = 'Restart Or Reconfigure';
           apiRunState.targetCaption = 'Change settings or hit the build button again to resume.';
           apiRunState.error = 'Build stopped by user.';
@@ -8675,7 +8761,6 @@
           apiRunState = createApiRunState();
           apiRunState.status = 'error';
           apiRunState.summary = 'API Generator Unavailable';
-          apiRunState.summaryCaption = 'The API runtime did not load correctly. Reload the page and try again.';
           apiRunState.target = 'Reload Page';
           apiRunState.targetCaption = 'LiftRPGAPI is missing required generation methods.';
           apiRunState.progress = '0 / 0 stages';
@@ -8694,7 +8779,6 @@
           apiRunState = createApiRunState();
           apiRunState.status = 'error';
           apiRunState.summary = 'Configuration Needed';
-          apiRunState.summaryCaption = error.message || 'Fill in the provider settings before starting.';
           apiRunState.target = 'Provider Setup';
           apiRunState.targetCaption = 'Generation did not start because the provider contract is incomplete.';
           apiRunState.progress = '0 / 0 stages';
@@ -8710,7 +8794,6 @@
         apiRunState = createApiRunState();
         apiRunState.status = 'running';
         apiRunState.summary = 'Connecting To Provider';
-        apiRunState.summaryCaption = 'Requests are sent directly from this browser to ' + settings._providerLabel + '.';
         apiRunState.target = 'Initialize Pipeline';
         apiRunState.targetCaption = 'Preparing the staged generation run.';
         apiRunState.progress = '0 / 0 stages';
@@ -8795,7 +8878,6 @@
 
         try {
           apiRunState.summary = 'Connecting To Provider';
-          apiRunState.summaryCaption = 'Requests are sent directly from this browser to ' + settings._providerLabel + '.';
           apiRunState.target = 'Initialize Pipeline';
           apiRunState.targetCaption = 'Preparing the staged generation run.';
           var methodName = applyPipelineStageOrder(apiMethodEl && apiMethodEl.value);
@@ -8939,14 +9021,17 @@
             apiRunState.status = 'running';
             apiRunState.totalStages = totalStages;
             apiRunState.summary = 'Generation In Progress';
-            apiRunState.summaryCaption = 'LiftRPG is advancing one validated stage at a time.';
             apiRunState.progressCaption = settings._providerLabel + (settings.model ? ' · ' + settings.model : '') + ' · ' + formatTimeoutLabel(settings.requestTimeoutMs);
             if (phase === 'start') {
               apiRunState.stageIndex = stageIndex;
               apiRunState.target = stageKey ? (API_STAGE_ORDER.filter(function (stage) { return stage.key === stageKey; })[0] || {}).label || 'Pipeline Stage' : 'Pipeline Stage';
               apiRunState.targetCaption = message;
-              apiRunState.progress = stageIndex + ' / ' + totalStages + ' stages';
               markApiStageInProgress(stageKey);
+              // AFTER the mark, never before: the counter is derived from the
+              // rail's current card, and this call is what sets it. The log
+              // line below keeps the pipeline's own pair — a transcript can
+              // say "week 5 of 12" where the rail has one Weeks card.
+              apiRunState.progress = formatApiStageProgress();
               pushApiLog(stageIndex + '/' + totalStages + ' ' + message);
             } else if (phase === 'complete') {
               if (meta.telemetry) {
@@ -8988,14 +9073,42 @@
           // the console. Nothing below may reintroduce that failure shape.
           persistRecoverableApiBooklet(booklet, methodName);
           if (runId !== activeApiRunId) {
-            // A newer run owns the panel now. The artifact is still saved and
-            // reachable — we simply do not repaint someone else's state.
+            // THE PANEL WAS WRITTEN OFF WHILE THE BOOK WAS LANDING.
+            // Two very different things bump the run id, and the old code
+            // treated them as one: a NEWER RUN (repaint nothing — that panel
+            // belongs to someone else) and STOP (nothing owns the panel, and
+            // the stage that was in flight has just resolved with a complete
+            // booklet). The second case dropped a finished, paid-for book on
+            // the floor in silence: persisted to sessionStorage, reachable
+            // only from the console, while the panel told the reader to build
+            // again to get a book that was already on the device.
+            //
+            // The test is whether anything is LIVE here, not whose id it is.
+            if (apiRunState && apiRunState.status !== 'running') {
+              deliverApiBooklet(booklet);
+              apiRunState.status = 'success';
+              apiRunState.summary = 'Booklet Ready';
+              apiRunState.target = 'Open Or Download';
+              apiRunState.targetCaption = 'You stopped this build, but the stage that was still running '
+                + 'had already finished. The booklet is complete and saved on this device — open or '
+                + 'download it below.';
+              apiRunState.currentStageStartedAt = 0;
+              apiRunState.stream = null;
+              pushApiLog('The build you stopped had already finished its last stage. '
+                + 'The booklet is complete and saved on this device.');
+              try { renderApiRunState(); } catch (renderError) {
+                console.error('[LiftRPG] Run panel failed to render a superseded delivery:', renderError);
+              }
+            }
             return;
           }
-          apiRunState.booklet = booklet;
+          // THE FIRST PRESENTATION STEP IS THE HANDOVER. Not the summary, not
+          // the scores, not the rail — the buttons. Every line below this one
+          // can throw without costing the reader the artifact, because the
+          // artifact is already on the screen when they run.
+          deliverApiBooklet(booklet);
           apiRunState.status = 'success';
           apiRunState.summary = 'Booklet Ready';
-          apiRunState.summaryCaption = 'The build finished. Your booklet is saved on this device.';
           apiRunState.target = 'Open Or Download';
           apiRunState.targetCaption = 'Send the generated booklet to the renderer or download the JSON.';
           apiRunState.currentStageStartedAt = 0;
@@ -9019,7 +9132,6 @@
               );
               apiRunState.status = 'blocked';
               apiRunState.summary = 'Quality Gate Blocked';
-              apiRunState.summaryCaption = 'Generation finished, but the booklet needs another pass before export.';
               apiRunState.target = 'Review Quality Blockers';
               apiRunState.targetCaption = blockerMessages.join(' · ') || 'Open the review artifact and fix the blockers before export.';
               removeValidatedModel(settings.model, settings._providerLabel);
@@ -9031,11 +9143,10 @@
               );
               apiRunState.status = 'success';
               apiRunState.summary = 'Booklet Ready';
-              apiRunState.summaryCaption = 'The API pipeline completed and the booklet passed local validation.';
               apiRunState.target = 'Open Or Download';
               apiRunState.targetCaption = 'Send the generated booklet to the renderer or download the JSON.';
             }
-            apiRunState.progress = apiRunState.totalStages + ' / ' + apiRunState.totalStages + ' stages';
+            apiRunState.progress = formatApiStageProgress();
             var report = (api() && api().lastQualityReport) || null;
             apiRunState.qualityReport = report;
             apiRunState.runSignature = getApiConfigSignature();
@@ -9102,9 +9213,7 @@
             setGeneratorSurface('api-status', { skipFocus: true });
           } catch (renderError) {
             console.error('[LiftRPG] Run panel failed to render after delivery:', renderError);
-            try { renderApiActions(); } catch (actionsError) {
-              console.error('[LiftRPG] Delivery actions failed to render:', actionsError);
-            }
+            deliverApiBooklet(apiRunState.booklet || booklet);
             if (apiStateSummary) apiStateSummary.textContent = 'Booklet Ready';
             if (apiStateTargetCaption) {
               apiStateTargetCaption.textContent = 'Your booklet finished and is saved on this device. ' +
@@ -9112,7 +9221,6 @@
             }
           }
         } catch (error) {
-          if (runId !== activeApiRunId) return;
           var failureMessage = (error && error.message) ? error.message : String(error || 'Generation failed.');
           // Did the pipeline DELIVER before it fell over? The critic and the
           // post-assembly steps run after the booklet is complete and already
@@ -9122,7 +9230,29 @@
           var deliveredBooklet = (apiRunState && apiRunState.booklet)
             || (api() && api().lastBooklet)
             || null;
-          if (deliveredBooklet) apiRunState.booklet = deliveredBooklet;
+          if (runId !== activeApiRunId) {
+            // Same fork as the success path, same reason: a NEWER run owns
+            // this panel and must not be repainted, but a STOPPED run owns
+            // nothing — and a stopped run whose last stage delivered before
+            // failing still leaves a finished book on the device. The book is
+            // handed over; the failure that came after it is not this panel's
+            // headline any more.
+            if (deliveredBooklet && apiRunState && apiRunState.status !== 'running') {
+              deliverApiBooklet(deliveredBooklet);
+              apiRunState.target = 'Open Or Download';
+              apiRunState.targetCaption = 'A finished booklet was written to this device before this build '
+                + 'stopped. Open or download it below.';
+              pushApiLog('A finished booklet was saved before the build stopped — open or download it below.');
+              try { renderApiRunState(); } catch (renderError) {
+                console.error('[LiftRPG] Run panel failed to render a superseded recovery:', renderError);
+              }
+            }
+            return;
+          }
+          // Handover first here too: the panel is about to compose a failure
+          // story, and none of that story may stand between the reader and a
+          // book that already exists.
+          if (deliveredBooklet) deliverApiBooklet(deliveredBooklet);
           var failingStageKey = apiRunState.currentStageKey || inferApiStageKey(failureMessage);
           if (failingStageKey) {
             if (apiRunState.currentStageKey && apiRunState.currentStageKey !== failingStageKey && apiRunState.ledger[apiRunState.currentStageKey] === 'in progress') {
@@ -9133,12 +9263,11 @@
           }
           apiRunState.status = 'error';
           apiRunState.summary = 'Generation Stopped';
-          apiRunState.summaryCaption = failureMessage.split('\n')[0];
           apiRunState.target = failingStageKey
             ? (API_STAGE_ORDER.filter(function (stage) { return stage.key === failingStageKey; })[0] || {}).label || 'Review Failure'
             : 'Review Failure';
           apiRunState.targetCaption = 'The log below shows the last completed step and the failure reason.';
-          apiRunState.progress = apiRunState.stageIndex + ' / ' + apiRunState.totalStages + ' stages';
+          apiRunState.progress = formatApiStageProgress();
           apiRunState.progressCaption = deliveredBooklet
             ? 'A finished booklet was saved before this failure — open or download it below.'
             : 'No booklet was committed to the renderer.';
@@ -9160,6 +9289,10 @@
             setGeneratorSurface('api-status', { skipFocus: true });
           } catch (renderError) {
             console.error('[LiftRPG] Run panel failed to render after failure:', renderError);
+            // renderApiActions directly, NOT deliverApiBooklet: on this path
+            // there may be no booklet at all, and the buttons this fallback
+            // owes the reader are then the recovery pair. deliverApiBooklet
+            // renders nothing without an artifact, by design.
             try { renderApiActions(); } catch (actionsError) {
               console.error('[LiftRPG] Recovery actions failed to render:', actionsError);
             }
@@ -9210,7 +9343,6 @@
         var spendLine = describePriorSpend(priorSpend);
         apiRunState.priorSpend = priorSpend;
         apiRunState.summary = 'Resume Available';
-        apiRunState.summaryCaption = 'A previous API build left ' + stageLabel + ' on this device.';
         apiRunState.target = 'Resume Build';
         apiRunState.targetCaption = 'Review the settings, then build again to continue from the checkpoint.' +
           (spendLine ? ' ' + spendLine : '');
