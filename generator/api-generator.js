@@ -1599,6 +1599,9 @@ function stageBudget(stageKey, userTimeoutMs) {
     // two so no call site ever reaches into STAGE_BUDGETS itself (D97). '' when
     // the row is unset, which is every row today, and '' sends nothing.
     effort: String(base.effort || '').trim().toLowerCase(),
+    // The optional fourth column, same accessor law as effort: 0 when the row
+    // is unset, and 0 means "the caller's own default" — never a silent 1.
+    attempts: Number(base.attempts) > 0 ? Math.round(Number(base.attempts)) : 0,
     maxTokens: function (retryState) {
       if (retryState && retryState.attempt > 0 && isLikelyTruncationError(retryState.error)) {
         return MAX_OUTPUT_TOKENS;
@@ -1857,7 +1860,12 @@ function parseRetryAfterHeader(err) {
 // Authoritative API-stage discipline helper. Guided build should mirror this
 // behavior at paste-time rather than inventing parallel acceptance rules.
 async function runJsonStage(settings, config) {
-  var attemptCount = config.maxAttempts || 2;
+  // Attempt count, in ladder order: an explicit config.maxAttempts wins (the
+  // trial-mode call sites set one deliberately), then the STAGE_BUDGETS row,
+  // then the 2 every call site used to hand-write.
+  var attemptCount = config.maxAttempts
+    || stageBudget(config.budgetKey || config.stageKey, settings.requestTimeoutMs).attempts
+    || 2;
   var lastErr = null;
   var stageTelemetry = createStageTelemetry(config.stageKey, config.stageName);
   var rateLimitWaits = 0;
@@ -3214,7 +3222,9 @@ async function runApiPipeline(options) {
       getTotalStages: function () { return totalStages; },
       schema: withPlaySpine(STRUCTURED_SCHEMA_SHELL),
       unwrapKey: 'meta',
-      maxAttempts: 2,
+      // NO maxAttempts literal here: this stage's attempt count is a ladder row
+      // (STAGE_BUDGETS.shell.attempts), read through stageBudget() like its
+      // tokens and its timeout.
       rateLimiter: rateLimiter,
       budgetEnforce: useGeminiBudget,
       normalizeResult: function (result) {
@@ -3276,7 +3286,14 @@ async function runApiPipeline(options) {
           // floor below reads, from one accessor, because a stage checked
           // against axes it was never shown is the derived-or-strict trap.
           seedAssignments: seedAssignments,
-          identityAxes: identityAxesForStage('shell')
+          identityAxes: identityAxesForStage('shell'),
+          // The door GIVENS. THE SAME derivation the validate() above is
+          // checked against, one line up — the prompt and the floor read one
+          // array or they form different opinions about who owes a door, which
+          // is the two-algorithms defect this pipeline has paid for once
+          // already (D93). Deliberately NOT the topology digest's "lighter
+          // weeks" line: that is a second, independent deload heuristic.
+          plannedWeekShapes: plannedWeekShapes
         });
       }
     });

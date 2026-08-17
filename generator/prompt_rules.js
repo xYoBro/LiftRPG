@@ -2605,6 +2605,101 @@
     ].concat(rows).join('\n');
   };
 
+  /**
+   * formatPlannedDoorGivensBlock(plannedWeeks) -> string
+   *
+   * THE PER-RUN DOOR GIVENS. D111's derived-where-derivable law applied to the
+   * PROMPT rather than to a floor: the pipeline computes the exact week shapes
+   * (derivePlannedWeekShapes in api-generator.js) BEFORE the shell stage runs,
+   * hands them to the gate that blocks the stage, and — until now — showed the
+   * model none of it. The model was asked to infer, from a generic rule, an
+   * answer key the caller was already holding.
+   *
+   * MEASURED, not argued: the author's first live book failed the shell stage
+   * twice on the same pre-flight — "playSpine.decisionLedger has no row for the
+   * doors weeks W1, W2, W4, W5 will print" — with the blocking error quoted
+   * verbatim into the retry directive both times. The retry carried the
+   * remedy and the model still missed it, which is the D158 density class: a
+   * rule stated generically among two hundred other rules is a rule the model
+   * satisfies everywhere except one place. A GIVEN naming the four weeks is
+   * not a new rule, it is the same rule with the arithmetic already done.
+   *
+   * `plannedWeeks` is the SAME array the gate reads (one derivation, now three
+   * readers — the shell pre-flight, the week loop's floor options, and this
+   * block). It must never be re-derived here: the topology digest carries its
+   * own independent "lighter weeks" heuristic, and a prompt taught from one
+   * source while the gate checks against the other is D93's two-algorithms
+   * defect wearing a helpful face.
+   *
+   * CONDITIONAL ON THE FAMILY, because the family is declared in this same
+   * call. The block states the obligation the way the floor computes it —
+   * door-leaning family AND non-boss AND non-deload — and names no families
+   * itself: Step 5c owns that membership list and doorLeaningParity() in
+   * validate.mjs anchors on Step 5c's own sentence. A third copy here would be
+   * a list nothing checks.
+   *
+   * Returns '' when there is nothing to hand over, so every caller without a
+   * week picture (the paste path, the guided harness, the S+F seat that
+   * co-authors its weekPlan in the same call) builds the prompt it always
+   * built, byte for byte.
+   */
+  window.formatPlannedDoorGivensBlock = function (plannedWeeks) {
+    if (!Array.isArray(plannedWeeks) || !plannedWeeks.length) return '';
+    var open = [], deload = [], boss = [];
+    for (var i = 0; i < plannedWeeks.length; i++) {
+      var shape = plannedWeeks[i] || {};
+      var n = Number(shape.weekNumber);
+      if (!isFinite(n) || n < 1) continue;
+      if (shape.isBoss || shape.isBossWeek) boss.push(n);
+      else if (shape.isDeload) deload.push(n);
+      else open.push(n);
+    }
+    if (!open.length && !deload.length && !boss.length) return '';
+    var label = function (list) {
+      return list.map(function (n) { return 'W' + n; }).join(', ');
+    };
+    var lines = [
+      '### The weeks this book already has — a GIVEN',
+      '',
+      'Derived from the approved story plan and the program itself, before you were asked. This',
+      'is the same picture the gate checks your spine against. It is not an estimate, and it is',
+      'not yours to revise.',
+      ''
+    ];
+    if (boss.length) lines.push('- Boss week (owes no door): ' + label(boss));
+    if (deload.length) lines.push('- Deload week' + (deload.length === 1 ? '' : 's')
+      + ' (owe' + (deload.length === 1 ? 's' : '') + ' no door): ' + label(deload));
+    lines.push('- Every other week: ' + (open.length ? label(open) : 'none'));
+    lines.push('');
+    if (open.length) {
+      lines.push('If the `mechanicGrammarFamily` you declare is one of the eight pressure families'
+        + ' (Step 5c),');
+      lines.push('then EVERY week on that last line prints a `week.doorChoice`, and'
+        + ' `meta.playSpine.decisionLedger`');
+      lines.push('owes one row for each of them — ' + open.map(function (n) {
+        return '`door:W' + n + '`';
+      }).join(', ') + ' — ' + open.length + ' row' + (open.length === 1 ? '' : 's')
+        + ' in all. Count them');
+      lines.push('against that line before you answer: one week short is a rejected payload, and'
+        + ' it is the');
+      lines.push('most common way this stage fails. If you declare a reconstruction family instead,'
+        + ' none of');
+      lines.push('these weeks is obliged to fork and the ledger carries only the doors you actually'
+        + ' print.');
+    } else {
+      lines.push('No week in this book is both non-boss and non-deload, so no family obliges a'
+        + ' weekly door here.');
+      lines.push('The ledger carries only the doors you actually choose to print.');
+    }
+    if (boss.length || deload.length) {
+      lines.push('');
+      lines.push('The boss and deload weeks above owe nothing. Give one a row only if you are'
+        + ' deliberately');
+      lines.push('printing a door there.');
+    }
+    return lines.join('\n');
+  };
+
   // ── The Ludic Spine (W4a) ─────────────────────────────────────────────────
   // Routed to the `shell` stage ONLY, because that is the stage that authors
   // meta and therefore the only stage that can write a spine — and because the
@@ -3194,8 +3289,14 @@
     '   is perfect. Then walk it backwards: does every node reach a surface the book PRINTS?',
     '2. ANSWER EVERY PROMISE. For each `milestones[].unlocks`, is there a `consequenceEdges`',
     '   row that mentions that same ref? A theory the book never answers is an unpaid promise.',
-    '3. PRICE EVERY DOOR. Does every door your plan schedules have a `decisionLedger` row,',
-    '   written `door:W3`, naming a MECHANICAL difference — a clock, a price, a region, a gate?',
+    '3. PRICE EVERY DOOR — count them, do not eyeball them. If the `mechanicGrammarFamily` you',
+    '   declared is one of the eight pressure families (Step 5c), walk the week list you are',
+    '   working from — the GIVEN block in this prompt if you were handed one, otherwise the',
+    '   `weekPlan` you just wrote — and name every week that is neither the boss week nor a',
+    '   deload. EACH of those weeks prints a door, and EACH owes its OWN `decisionLedger` row,',
+    '   written `door:W3`, naming a MECHANICAL difference — a clock, a price, a region, a gate.',
+    '   Then count your rows against that list. One week short is a rejected payload, and it is',
+    '   the most common way this stage fails.',
     '4. ONE ROW PER WEEK. Does `tensionBudget` have a row for every week in the book?',
     '5. BUILD WHAT YOU DECLARED. Every `harvestPatterns` entry must be built where it claims:',
     '   declaring `found-not-found-gating` obliges the gate to exist in the economy.',

@@ -972,6 +972,14 @@
     // supplied by the run orchestrator — this builder's own signature has never
     // carried the program, and topology without it would be silently absent.
     var armed = armCompilerContext(options.workout || blendContext, brief, options);
+    // THE DOOR GIVENS. `options.plannedWeekShapes` is the orchestrator's ONE
+    // derivation of the week picture — the same array the shell gate's
+    // pre-flight is checked against — so the prompt and the floor cannot form
+    // different opinions about who owes a door. Empty for every caller that has
+    // no week picture, and the block is empty with it.
+    var doorGivens = (typeof window.formatPlannedDoorGivensBlock === 'function')
+      ? window.formatPlannedDoorGivensBlock(options.plannedWeekShapes)
+      : '';
     var parts = [
       '# Booklet Setup — meta, cover, rulesSpread, theme',
       '',
@@ -982,7 +990,8 @@
       '---',
       '',
       window.buildStageSchema('shell'),
-      '',
+      ''
+    ].concat(doorGivens ? [doorGivens, ''] : []).concat([
       '---',
       '',
       '## Reference Context (do not output these formats)',
@@ -1066,7 +1075,7 @@
       '---',
       '',
       INSTRUCTIONS
-    ];
+    ]);
     return parts.join('\n');
   };
 
@@ -2928,11 +2937,19 @@
     // generateShellPrompt). The '# API Stage 3' opener is load-bearing for the
     // eval bench's stub router — added context goes BELOW it, never above.
     var armed = armCompilerContext(options.workout || blendContext, brief, options);
+    // THE DOOR GIVENS, on the seat the multi-stage pipeline actually runs
+    // (`builders.shell` resolves to THIS builder). Same array the gate reads,
+    // same formatter, and one entry rather than two so the `.filter(Boolean)`
+    // below takes the separator with it when there is no week picture.
+    var doorGivens = (typeof window.formatPlannedDoorGivensBlock === 'function')
+      ? window.formatPlannedDoorGivensBlock(options.plannedWeekShapes)
+      : '';
     return [
       '# API Stage 3 — Booklet Setup',
       '',
       '## SCHEMA CONTRACT',
       window.buildStageSchema('shell'),
+      doorGivens ? '\n' + doorGivens : '',
       '',
       '## Stage Rules',
       '- worldContract is the booklet north star. It must read like a testable governing tension, not a summary.',

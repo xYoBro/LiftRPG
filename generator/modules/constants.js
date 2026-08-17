@@ -64,6 +64,19 @@ export var STREAM_MAX_OVERALL_MS = 1800000;          // 30m absolute ceiling
 // calls that share one (i.e. set it per stage, never per attempt). And it is
 // model-gated: an endpoint whose model predates the parameter answers 400, so a
 // non-empty value here is a claim about the models this pipeline runs.
+// ── THE OPTIONAL FOURTH COLUMN: attempts ─────────────────────────────────────
+//
+// How many times a stage may be re-asked before the run stops. It belongs here
+// for the same reason the other three do (D97): `maxAttempts: 2` written at a
+// stage call site is a hand-written ladder literal, and "how many tries does
+// this stage get" is not a property of the call site, it is a property of the
+// stage. Read through stageBudget() like the rest; an explicit
+// `config.maxAttempts` still wins (the trial-mode call sites depend on that),
+// and an unset row falls back to the same 2 every call site used to write.
+//
+// A row is raised on EVIDENCE of a stage that is expensive to reach and fails
+// on something a retry can actually fix — not as a general cushion. Every extra
+// attempt is a full-price call.
 export var STAGE_BUDGETS = {
   // Shared by both pipelines (§11 Wave 1.5). One structured object of short
   // strings — roughly 25-35 one-line facts. Cheaper than any prose stage by
@@ -120,7 +133,16 @@ export var STAGE_BUDGETS = {
   // sentence that claimed it has been removed rather than left standing as
   // measurement. Where a model DOES think inside this ceiling, the knob is the
   // effort column below, not a thinking budget.)
-  shell:      { maxTokens: 56000, timeoutMs: 420000 },
+  // THREE ATTEMPTS, on evidence (the door-givens wave). The author's first live
+  // book failed this stage twice in a row on ONE cross-reference floor — the
+  // decisionLedger owing a row per door week — with the blocking error quoted
+  // verbatim into the retry directive both times, and the run stopped with
+  // every upstream stage paid for. This is the most cross-reference-dense stage
+  // in the pipeline and the last cheap one before the prose stages, so the
+  // third attempt is bought against the cost of a stopped run rather than
+  // against the cost of a call. The prompt-side fix (the derived GIVENS block)
+  // is the load-bearing half; this is the cushion under it.
+  shell:      { maxTokens: 56000, timeoutMs: 420000, attempts: 3 },
   fragment:   { maxTokens: 24000, timeoutMs: 480000 },
   // Critic loop (D66). Both rows were sized before the critic had eight
   // dimensions and machine findings, and both were the smallest rows in the
