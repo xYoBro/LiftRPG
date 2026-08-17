@@ -112,6 +112,12 @@ import {
   VALID_MARGIN_SEMANTICS,
   VALID_INK_DISCIPLINES,
   VALID_SEAL_TREATMENTS,
+  // The arrangement grammar's menus and its axis table (ARRANGEMENT.md phase
+  // A). Imported for the reason every menu above it is: the floor must refuse
+  // exactly the values the renderer refuses to draw, and a private copy here
+  // would drift into failing books for a look the engine actually wears.
+  VALID_ARRANGEMENT_GRAMMARS,
+  ARRANGEMENT_AXES,
   // D144 — the single home for "does this brief name a body that runs on
   // procedure?". Imported rather than re-implemented: a private copy here and
   // the prompt's byte-quoted term list would answer the same question in two
@@ -2294,6 +2300,108 @@ export function designLanguageFloorErrors(meta, where) {
 }
 
 /**
+ * arrangementFloorErrors(meta, where) -> string[]
+ *
+ * THE ARRANGEMENT FLOOR (ARRANGEMENT.md phase A). designLanguageFloorErrors'
+ * twin, one constitution later, and the defect it exists to stop is the one
+ * VISION §8 names: *layout IS the identity, and the model authors it per book.*
+ * The first completed book passed every atom-level gate and every spread was a
+ * pile — not because a component was wrong, but because nothing in the pipeline
+ * had ever asked who composed the page.
+ *
+ * WHAT BLOCKS: presence, plus the six fields the PROMPT ITSELF marks REQUIRED —
+ * not one more. The cipherVarietyFloor lesson, restated: a gate that demands
+ * more than any prompt surface teaches can only be satisfied by improvising,
+ * and every retry then buys the same failure.
+ *
+ * ENUM MEMBERSHIP BLOCKS TOO, on the componentDialect/design-language
+ * precedent, and here it is sharper than either. `resolveArrangement()` DROPS
+ * an off-menu axis and falls back to the declared grammar's own value, so a
+ * book that authors `sectionFurniture: "reverse-bars"` renders the grammar's
+ * furniture and looks entirely deliberate. That is invisible misauthoring, and
+ * the stage gate is the last place a retry can fix it cheaply.
+ *
+ * BOTH SEATS RUN THIS, unlike the design-language floor beside it, and the
+ * asymmetry is the ROUTING rather than a preference: SCHEMA_ARRANGEMENT and
+ * INST_ARRANGEMENT reach the shell stage through STAGE_SCHEMA_MAP and the S+F
+ * compiler seat through generateSkeletonPrompt. Both seats are taught, so both
+ * may be checked; `arrangementMenuParity()` in scripts/validate.mjs asserts the
+ * teaching half, both halves of one rule.
+ *
+ * DELIBERATELY NO SYNTHESIZER, and this is the load-bearing half. A synthesized
+ * arrangement would satisfy resolveArrangement(), stamp real attributes, paint
+ * real ink and grade as AUTHORED to every instrument downstream — including the
+ * arrangement judge built to read exactly this. That is strictly worse than
+ * absence, because absence is detectable and a fabricated design is not. The
+ * floor causes a retry; the retry causes an author. (D136's ruling for
+ * register, applied a third time.)
+ *
+ * WHAT THIS FLOOR IS NOT: an aesthetic judge. It checks presence, membership
+ * and citation — conformance, in ARRANGEMENT §3.4's word. Whether the grammar
+ * is any GOOD on the page, whether the leitmotif earns its repetition, whether
+ * the spread is inviting and navigable, is referee 3's question on a rendered
+ * page and is report-only indefinitely by ruling (§7). A blocking floor on a
+ * rubric nobody has calibrated would refuse good books for confident reasons.
+ */
+export function arrangementFloorErrors(meta, where) {
+  var errors = [];
+  var prefix = (where || 'Stage') + ' → meta.arrangement';
+  var spec = (meta && typeof meta === 'object') ? meta.arrangement : null;
+  if (!spec || typeof spec !== 'object' || Array.isArray(spec)) {
+    errors.push(prefix + ' is absent — a page is authored, not accumulated, and a book that '
+      + 'declares no arrangement is published in whichever layout the engine happens to have. '
+      + 'Declare grammar, sectionFurniture, tableTreatment, annotationPattern, leitmotif and '
+      + 'arrangementEvidence, deriving each from words the brief actually contains. '
+      + 'Grammars: ' + VALID_ARRANGEMENT_GRAMMARS.join(' | '));
+    return errors;
+  }
+
+  // The grammar. Checked first and named in its own error, because it is the
+  // one field that says what KIND of object this book is — and because
+  // "ruled-journal" being a legal answer is the whole point of naming it
+  // (ARRANGEMENT §6): today's layout is a choice a book may make, never a
+  // default it inherits by saying nothing.
+  var grammar = String(spec.grammar === undefined || spec.grammar === null ? '' : spec.grammar).trim();
+  if (!grammar) {
+    errors.push(prefix + '.grammar is unset — name the family this book\'s pages belong to: '
+      + VALID_ARRANGEMENT_GRAMMARS.join(' | ') + '. "ruled-journal" is a real answer and a real '
+      + 'decision; it is the quiet ruled notebook, chosen because the story wants one');
+  } else if (VALID_ARRANGEMENT_GRAMMARS.indexOf(grammar) === -1) {
+    errors.push(prefix + '.grammar "' + grammar + '" is not a grammar this engine composes: '
+      + VALID_ARRANGEMENT_GRAMMARS.join(' | '));
+  }
+
+  // The four axes, from the one table. Iterated rather than listed so an axis
+  // added to the contract cannot be added to the schema, the prompt and the CSS
+  // and then be optional here by omission.
+  for (var i = 0; i < ARRANGEMENT_AXES.length; i++) {
+    var axis = ARRANGEMENT_AXES[i];
+    var raw = spec[axis.field];
+    var value = String(raw === undefined || raw === null ? '' : raw).trim();
+    if (!value) {
+      errors.push(prefix + '.' + axis.field + ' is unset — state it explicitly even when it '
+        + 'agrees with your grammar: ' + axis.menu.join(' | '));
+    } else if (axis.menu.indexOf(value) === -1) {
+      errors.push(prefix + '.' + axis.field + ' "' + value + '" is not a value this engine '
+        + 'draws, so it would be dropped and the book would silently wear its grammar\'s: '
+        + axis.menu.join(' | '));
+    }
+  }
+
+  // THE DERIVATION LAW's evidence, designEvidence's exact counterpart. It is
+  // also the rail the obedience floor reads when a book departs from a seed
+  // assignment (contract-constants.mjs IDENTITY_AXES), so an empty string here
+  // costs a book both checks at once.
+  if (!String(spec.arrangementEvidence || '').trim()) {
+    errors.push(prefix + '.arrangementEvidence is empty — quote the brief\'s own words these '
+      + 'choices came from, and name any assigned value you did not take; an uncited '
+      + 'arrangement is a house layout wearing this book\'s name');
+  }
+
+  return errors;
+}
+
+/**
  * Shell structural validation. Runs after shell stage (Stage 3).
  * Returns { valid: boolean, errors: string[] }
  */
@@ -2437,6 +2545,16 @@ export function validateShellSchema(shell, expectedOptions) {
     // authors no design language and its books render as their archetype, which
     // is exactly what the pre-W6 behaviour was.
     errors = errors.concat(designLanguageFloorErrors(shell.meta, 'Shell'));
+
+    // ── The arrangement floor (ARRANGEMENT.md phase A) ──
+    // BOTH seats, and the contrast with the paragraph above is the whole
+    // reason that paragraph is so long: the design language is floored here
+    // alone because it is TAUGHT here alone. The arrangement grammar is routed
+    // to the shell stage (STAGE_SCHEMA_MAP) and hand-routed into
+    // generateSkeletonPrompt, so the S+F compiler seat runs the same floor on
+    // the same surface, and neither pipeline is blocked on something its own
+    // prompt never named.
+    errors = errors.concat(arrangementFloorErrors(shell.meta, 'Shell'));
 
     // ── The closure floors (W4a) ──
     // The standard pipeline runs the compiler HERE, so the spine is declared
@@ -7361,6 +7479,15 @@ export function validateSkeletonStage(result, weekCount, options) {
     var obedience = seedObedienceFloorErrors(result, 'Skeleton', 'skeleton',
       (options || {}).seedAssignments);
     if (obedience.length) return obedience.join('; ');
+
+    // The arrangement floor's S+F half. Same surface, same helper, same opt-in
+    // — and it is legitimate at this seat only because generateSkeletonPrompt
+    // carries INST_ARRANGEMENT and SCHEMA_ARRANGEMENT (asserted by
+    // arrangementMenuParity in scripts/validate.mjs). A floor on one pipeline
+    // only would leave half the generated books composing their pages by
+    // accident, which is exactly the state ARRANGEMENT.md was written about.
+    var arrangement = arrangementFloorErrors(meta, 'Skeleton');
+    if (arrangement.length) return arrangement.join('; ');
   }
 
   // ── theme ──

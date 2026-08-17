@@ -14,7 +14,9 @@ import {
   VALID_DOCUMENT_RECIPES,
   VALID_MARGIN_SEMANTICS,
   VALID_INK_DISCIPLINES,
-  VALID_SEAL_TREATMENTS
+  VALID_SEAL_TREATMENTS,
+  ARRANGEMENT_AXES,
+  resolveArrangement
 } from '../../contracts/contract-constants.mjs';
 
 /*
@@ -1241,6 +1243,44 @@ function designAttributes(spec) {
 }
 
 /**
+ * The container attributes the ARRANGEMENT GRAMMAR drives (ARRANGEMENT.md
+ * phase A). Attributes and NOT tokens, for the reason designAttributes() gives
+ * one function up: these axes select a drawing mode rather than a value, and a
+ * custom property invites a rule that sizes something from it.
+ *
+ * THREE PROPERTIES OF THIS FUNCTION ARE LOAD-BEARING, and each is asserted
+ * rather than trusted:
+ *
+ * 1. THE PRESENCE MARKER. `data-arrangement` is stamped only for a book that
+ *    declares one, and every arrangement rule in booklet.css sits under it —
+ *    so a book with no declaration is untouched BY CONSTRUCTION, not by each
+ *    rule happening to fall back correctly (the W6 fence, third family).
+ * 2. A BASELINE VALUE STAMPS NOTHING. `hairline-kicker`, `ruled-rows`,
+ *    `inline-note` and `none` are TODAY'S BOOK, so a book that declares
+ *    `ruled-journal` and takes every baseline carries no axis attribute and
+ *    renders byte-identically to a book that declares nothing. That is what
+ *    makes ARRANGEMENT §6's demotion a property rather than a claim: today's
+ *    layout became a NAME, and naming it changed no pixel.
+ * 3. THE GRAMMAR NAME DRAWS NOTHING BY ITSELF. `data-arrangement-grammar` is
+ *    stamped for the arrangement judge and the DOM contract (D115: pixels prove
+ *    geometry, only a contract proves character) and no CSS rule may key on it
+ *    or on the bare presence marker — `arrangementPaintOnlyLaw()` asserts that,
+ *    because a rule keyed on presence alone would make choosing the default
+ *    grammar a visual event.
+ */
+function arrangementAttributes(spec) {
+  const attrs = {};
+  if (!spec) return attrs;
+  attrs['data-arrangement'] = 'true';
+  if (spec.grammar) attrs['data-arrangement-grammar'] = spec.grammar;
+  for (const axis of ARRANGEMENT_AXES) {
+    const value = spec[axis.field];
+    if (value && value !== axis.baseline) attrs[axis.attr] = value;
+  }
+  return attrs;
+}
+
+/**
  * The alpha a preset asked for on `--highlight-surface` — the ONE thing the
  * archetype keeps when the book's own accent takes the hue (D126's ruling,
  * executed at W6). Presets pin `rgba(r,g,b,a)`; anything unparseable falls to
@@ -1377,6 +1417,14 @@ export function resolveTheme(data) {
   return {
     archetype,
     designLanguage,
+    // The declared arrangement grammar, resolved through the ONE resolver
+    // (contract-constants.mjs), so the renderer and the reference emitter
+    // cannot disagree about what a partial declaration means. `null` for a book
+    // that declares none — which is not the same object as "all baselines", and
+    // the difference is the whole demotion proof (see arrangementAttributes).
+    // It contributes NO tokens: every phase-A axis paints through an attribute,
+    // so nothing here can reach the type metrics or the legibility floor.
+    arrangement: resolveArrangement((data && data.meta) ? data.meta.arrangement : null),
     // What the legibility floor found and what it cost, recorded the way every
     // other resolution on this object is recorded. `repaired: false` is the
     // normal case and means the book was already readable; a `repairs` list is
@@ -1428,6 +1476,16 @@ export function applyTheme(container, theme) {
     container.setAttribute(name, designAttrs[name]);
   });
 
+  // The arrangement grammar's attributes. Cleared by the same prefix sweep
+  // above (ARRANGEMENT_ATTR_PREFIXES is concatenated into that list) for the
+  // same reason: a second load in one session must not leave the previous
+  // book's furniture on the page, and a stale grammar looks entirely
+  // intentional.
+  const arrangementAttrs = arrangementAttributes(theme.arrangement);
+  Object.keys(arrangementAttrs).forEach((name) => {
+    container.setAttribute(name, arrangementAttrs[name]);
+  });
+
   // Clear every custom property a previous applyTheme set on this container.
   // Without this, tokens that exist in one theme but not the next (preset
   // extras, booklet-supplied theme.tokens) leak across loads in one session.
@@ -1448,5 +1506,9 @@ export function applyTheme(container, theme) {
 const DESIGN_ATTR_PREFIXES = [
   'data-design-language', 'data-production-texture', 'data-tone-texture',
   'data-margin-semantics', 'data-ink-discipline', 'data-seal-treatment',
-  'data-recipe-'
-];
+  'data-recipe-',
+  // The arrangement family, on the same sweep and for the same failure mode.
+  // Derived from ARRANGEMENT_AXES rather than hand-listed, so an axis added to
+  // the contract cannot be left behind here — the list below IS the contract.
+  'data-arrangement'
+].concat(ARRANGEMENT_AXES.map((axis) => axis.attr));

@@ -8648,3 +8648,216 @@ body[data-demo-view="true"] .reader-unlock{
   background-image:var(--design-tone-pattern,none);
   background-size:var(--design-tone-size,auto);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE ARRANGEMENT GRAMMAR — phase A (docs/craft/ARRANGEMENT.md)
+   ══════════════════════════════════════════════════════════════════════════
+   VISION §8: *layout IS the identity, and the model authors it per book.* The
+   design language above answers what press this object came off; this answers
+   who designed the page. Every rule below is keyed to `meta.arrangement`,
+   composed by resolveArrangement() in contracts/contract-constants.mjs and
+   stamped by arrangementAttributes() in renderer/modules/theme.js.
+
+   THREE FENCES, all machine-checked by `arrangementPaintOnlyLaw()` in
+   scripts/validate.mjs, and each one closes a failure that would otherwise be
+   invisible in a render:
+
+   1. PAINT ONLY. Phase-1 estimation has no DOM and cannot resolve
+      `data-section-furniture` any more than it can resolve
+      `data-component-dialect`. A box-metric property here would make every
+      estimate on the surface lie and `overflow:hidden` would eat the
+      difference as ink — D71/D105/D115/D121/D133 arriving from an eighth
+      direction. GEOMETRY IS NOT FORBIDDEN FOREVER, it is forbidden in THIS
+      channel: the variant contract (ARRANGEMENT §3) is where a form that
+      changes size goes, and it owes its own gate before anything may use it.
+   2. THE PRESENCE FENCE. Every selector sits under `[data-arrangement]`, which
+      is stamped only for a book that declares a grammar — so a book that
+      declares none is untouched by construction rather than by each rule
+      falling back correctly.
+   3. NO PRESENCE-ONLY RULE. Every selector also names an AXIS attribute, and a
+      baseline value stamps no attribute at all. That is what makes ARRANGEMENT
+      §6's demotion real: `ruled-journal` is today's book, so declaring it
+      changes nothing on the page — the name arrived, the pixels did not move.
+
+   THE WRITE-IN LAW OUTRANKS EVERY AXIS (§10). Nothing below paints on a
+   surface a pencil fills: no mark strip, no notes box, no tally box, no
+   worksheet line, no reckoning field. The surfaces here are the page header,
+   the roll table's own chrome, and the citation tokens — all of them printed
+   matter the player reads rather than writes on.
+
+   AND EVERYTHING HERE PRINTS IN BLACK AND WHITE. Weight, fill and pattern
+   carry every signal; not one rule below uses hue to say anything. */
+
+/* ── Axis 2 · Section furniture ────────────────────────────────────────────
+   How a section announces itself — the cheapest identity in the book and the
+   loudest (the guide's black bar on all nine pages). Confined to `.page-header`
+   and its page number ON PURPOSE: the design language already owns
+   `.page-header`'s box-shadow (--theme-header-shadow, which composeDesignLanguage
+   joins with the intensity bar) and `.doc-label` / `.week-kicker`'s
+   background-image. Two axes writing one property is a book wearing two
+   grammars and rendering one, so this axis paints where that one does not. */
+
+/* The reversed bar. Mothership's signature move, and paint to the last
+   declaration: a background and a colour, never a padding — padding on the
+   header is height the page never charged for. */
+[data-arrangement][data-section-furniture="reverse-bar"] .page-header{
+  background-image:linear-gradient(var(--design-chrome-ink,var(--ink)),
+    var(--design-chrome-ink,var(--ink)));
+  color:var(--paper);
+  border-bottom-color:var(--ink);
+}
+[data-arrangement][data-section-furniture="reverse-bar"] .page-header .page-num{
+  color:var(--paper);
+}
+
+/* The numbered tab. A thumb index for the page number rather than a cut tab —
+   nothing in this system is ever cut (the pencil-only law). The chip is a
+   box-shadow with spread, so it bleeds past the glyphs without a padding: an
+   inline background would hug the digits with no room to read. */
+[data-arrangement][data-section-furniture="numbered-tab"] .page-header .page-num{
+  box-shadow:0 0 0 3px var(--design-chrome-ink,var(--ink)),
+    inset 0 0 0 40px var(--design-chrome-ink,var(--ink));
+  color:var(--paper);
+}
+[data-arrangement][data-section-furniture="numbered-tab"] .page-header{
+  border-bottom-color:color-mix(in srgb, var(--ink) 45%, transparent);
+}
+
+/* The stacked rule. A second hairline riding above the header's own, drawn in
+   the background layer at a fixed distance from the bottom edge — a background
+   position cannot move a box, where a second border would. */
+[data-arrangement][data-section-furniture="rule-stack"] .page-header{
+  background-image:linear-gradient(var(--design-chrome-ink,var(--ink)),
+    var(--design-chrome-ink,var(--ink)));
+  background-repeat:no-repeat;
+  background-size:100% .5px;
+  background-position:left calc(100% - 3px);
+}
+
+/* ── Axis 4 · Table and list treatment ─────────────────────────────────────
+   How a table is DRAWN, and the treatment is what tells a reader which kind of
+   table this is: something you roll on, something you look up, something you
+   consult mid-action (the guide's pages 7, 8 and 12 are three tables that look
+   nothing alike on purpose). The oracle zone is the book's table surface — it
+   is read, never written in, so a fill here costs the pencil nothing. */
+
+/* The reversed header bar. The table announces itself the way the page does. */
+[data-arrangement][data-table-treatment="reverse-header"] .oracle-header{
+  background-image:linear-gradient(var(--design-chrome-ink,var(--ink)),
+    var(--design-chrome-ink,var(--ink)));
+  color:var(--paper);
+  border-bottom-color:transparent;
+}
+
+/* The roll number in its own column of marks, and the row rule closed up to a
+   solid — a lookup table rather than a list. `border-bottom-style` changes the
+   stroke inside a width that never moves. */
+[data-arrangement][data-table-treatment="numbered-gutter"] .oracle-case-num{
+  background-image:linear-gradient(var(--design-chrome-ink,var(--ink)),
+    var(--design-chrome-ink,var(--ink)));
+  color:var(--paper);
+}
+[data-arrangement][data-table-treatment="numbered-gutter"] .oracle-entry{
+  border-bottom-style:solid;
+}
+
+/* The framed panel. An OUTLINE, for the reason the design language's live-area
+   frame is one: outlines sit outside the box model and cannot reflow a thing. */
+[data-arrangement][data-table-treatment="boxed-panel"] .oracle-zone{
+  outline:1px solid var(--design-chrome-ink,var(--ink));
+  outline-offset:1.5px;
+  border-top-color:transparent;
+}
+
+/* ── Axis 7 · Annotation pattern ───────────────────────────────────────────
+   How the page points at itself and teaches. This is the axis that stops
+   point-of-use being a compromise: a book does not choose between "the rules
+   are on the page" and "the page is not a wall of rules" — it chooses a
+   pattern and the rules ride it. PLAY.md's teaching order (and the rulebook
+   that funds it, D178) says WHAT must be known when; this says how the page
+   says it.
+
+   Three surfaces, one gesture each, so the pattern reads as a pattern rather
+   than as a token: the citation (`.cite-ref`), the roll instruction
+   (`.oracle-instruction`) and the conditional cue on a session card
+   (`.micro-line-condition`). None of the three is a write-in surface, and the
+   micro-line is deliberately only TINTED — it is the line read while the
+   player is gassed, and reversing it would spend legibility on decoration. */
+
+/* Filled chips. The pointer is an object on the page. */
+[data-arrangement][data-annotation-pattern="pointer-chips"] .cite-ref{
+  background-image:linear-gradient(var(--design-chrome-ink,var(--ink)),
+    var(--design-chrome-ink,var(--ink)));
+  color:var(--paper);
+  border-color:transparent;
+}
+[data-arrangement][data-annotation-pattern="pointer-chips"] .oracle-instruction,
+[data-arrangement][data-annotation-pattern="pointer-chips"] .micro-line-condition{
+  background-image:linear-gradient(color-mix(in srgb, var(--ink) 12%, transparent),
+    color-mix(in srgb, var(--ink) 12%, transparent));
+}
+
+/* Brackets. The aside is fenced left and right and open top and bottom — the
+   citation's own frame, with two of its four sides painted away. */
+[data-arrangement][data-annotation-pattern="bracket-marks"] .cite-ref{
+  border-top-color:transparent;
+  border-bottom-color:transparent;
+}
+[data-arrangement][data-annotation-pattern="bracket-marks"] .oracle-instruction,
+[data-arrangement][data-annotation-pattern="bracket-marks"] .micro-line-condition{
+  background-image:linear-gradient(90deg, var(--design-chrome-ink,var(--ink)) 0 1.5px,
+    transparent 1.5px);
+  background-repeat:no-repeat;
+  background-size:100% 100%;
+}
+
+/* Filed under a rule. No box anywhere: the annotation is underlined the way a
+   clerk underlines a reference. */
+[data-arrangement][data-annotation-pattern="underline-file"] .cite-ref{
+  border-color:transparent;
+  text-decoration:underline;
+  text-underline-offset:1px;
+}
+[data-arrangement][data-annotation-pattern="underline-file"] .oracle-instruction{
+  background-image:linear-gradient(var(--design-chrome-ink,var(--ink)),
+    var(--design-chrome-ink,var(--ink)));
+  background-repeat:no-repeat;
+  background-size:100% .5px;
+  background-position:left bottom;
+}
+[data-arrangement][data-annotation-pattern="underline-file"] .micro-line-condition{
+  text-decoration:underline;
+  text-underline-offset:1px;
+}
+
+/* ── The compositional leitmotif ───────────────────────────────────────────
+   One gesture, restated everywhere. On the Mothership sheet it is the rounded
+   chip at six scales — the stat ovals, the class buttons, the credits tag, the
+   pointer chips, the panel corners — and it is most of the reason that sheet
+   reads as designed rather than assembled.
+
+   EACH GESTURE NAMES ONE SURFACE FROM EACH OF THE THREE AXES ABOVE, so
+   ARRANGEMENT §2's "at least three axes" is structural rather than hoped for:
+   `.page-header .page-num` is axis 2's surface, `.oracle-header` is axis 4's,
+   `.cite-ref` is axis 7's. `arrangementEnumParity()` counts them.
+
+   AND EACH GESTURE USES A PROPERTY NO AXIS USES — border-radius, clip-path,
+   outline. A leitmotif sharing a property with the axis it decorates would
+   clobber it in the cascade, and the book would render with one fewer axis
+   than it declared, which is a difference no gate could see. */
+[data-arrangement][data-leitmotif="rounded-chip"] .page-header .page-num,
+[data-arrangement][data-leitmotif="rounded-chip"] .oracle-header,
+[data-arrangement][data-leitmotif="rounded-chip"] .cite-ref{
+  border-radius:6px;
+}
+[data-arrangement][data-leitmotif="cut-corner"] .page-header .page-num,
+[data-arrangement][data-leitmotif="cut-corner"] .oracle-header,
+[data-arrangement][data-leitmotif="cut-corner"] .cite-ref{
+  clip-path:polygon(0 0, calc(100% - 3px) 0, 100% 3px, 100% 100%, 0 100%);
+}
+[data-arrangement][data-leitmotif="double-rule"] .page-header .page-num,
+[data-arrangement][data-leitmotif="double-rule"] .oracle-header,
+[data-arrangement][data-leitmotif="double-rule"] .cite-ref{
+  outline:.5px solid var(--design-chrome-ink,var(--ink));
+  outline-offset:1.5px;
+}

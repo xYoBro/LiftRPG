@@ -2448,9 +2448,25 @@
       // travels with the stage that writes them. Content lives in prompt_rules.
       window.INST_VOICE_DISCIPLINE.join('\n'),
       '',
+      // ── THE ARRANGEMENT GRAMMAR, hand-routed to the S+F compiler seat ──────
+      // Both halves of one rule, landed together (D136 F04's idiom): the
+      // skeleton gate runs `arrangementFloorErrors` and the obedience floor
+      // checks five arrangement axes at THIS stage, so this seat is taught the
+      // surface it is checked against. A floor at a seat whose prompt never
+      // names the field blocks the pipeline on something it was never asked
+      // for, and every retry re-fails identically — which is why the W6 design
+      // language, routed to the shell alone, is FLOORED at the shell alone.
+      // Hand-routed rather than stage-mapped for the same reason
+      // INST_SHELL_CHOICE and INST_SEED_ASSIGNMENT are: this builder predates
+      // the stage map and assembles its own sections. `arrangementMenuParity()`
+      // in scripts/validate.mjs asserts both names are here.
+      window.INST_ARRANGEMENT.join('\n'),
+      '',
       window.MECHANIC_VOCAB_BRIEF,
       '',
       window.SCHEMA_SKELETON,
+      '',
+      window.SCHEMA_ARRANGEMENT.join('\n'),
       '',
       '## Output Example',
       window.SKELETON_OUTPUT_EXAMPLE,

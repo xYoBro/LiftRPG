@@ -774,6 +774,32 @@
   // already parity-asserted in the prose section above, a third copy would be a
   // third thing to drift, and the closure floor rejects a stray entry with a
   // message naming the whole library.
+  // ONE STRUCTURED LITERAL, BORROWED (the D129/D131 idiom). Both transports
+  // reach this object: STRUCTURED_SCHEMA_SKELETON names it directly below, and
+  // api-generator.js's withArrangement() presses it onto STRUCTURED_SCHEMA_SHELL.
+  // A second hand-written copy in api-generator.js would be the skeleton-triple
+  // defect — two surfaces describing one field, drifting one at a time.
+  //
+  // TYPES, NOT MENUS, on STRUCTURED_PLAY_SPINE's precedent: the menus are
+  // already stated in the prose section and already parity-asserted both ways,
+  // and the floor rejects a stray value with a message naming the whole menu.
+  var STRUCTURED_ARRANGEMENT = {
+    type: 'object',
+    properties: {
+      grammar: { type: 'string' },
+      sectionFurniture: { type: 'string' },
+      tableTreatment: { type: 'string' },
+      annotationPattern: { type: 'string' },
+      leitmotif: { type: 'string' },
+      arrangementEvidence: { type: 'string' }
+    },
+    // All six, because the prompt marks all six REQUIRED and the floor blocks
+    // on all six. A transport schema asking for fewer steers the model toward a
+    // unit its own stage gate refuses.
+    required: ['grammar', 'sectionFurniture', 'tableTreatment', 'annotationPattern',
+      'leitmotif', 'arrangementEvidence']
+  };
+
   var STRUCTURED_PLAY_SPINE = {
     type: 'object',
     properties: {
@@ -907,6 +933,10 @@
       'decisionLedger', 'tensionBudget', 'difficultyCurve', 'gateStructure']
   };
   window.STRUCTURED_SCHEMA_PLAY_SPINE = STRUCTURED_PLAY_SPINE;
+  // The same window hop, for the same reason: api-generator.js cannot import
+  // from this file, so the ONE arrangement literal reaches the shell transport
+  // through the window rather than by being written twice.
+  window.STRUCTURED_ARRANGEMENT = STRUCTURED_ARRANGEMENT;
 
   window.STRUCTURED_SCHEMA_SKELETON = {
     type: 'object',
@@ -1098,9 +1128,16 @@
             },
             required: ['briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily', 'documentEcology', 'exclusions', 'homePull', 'convergencePattern', 'reading', 'selectionReason', '_x']
           },
-          playSpine: STRUCTURED_PLAY_SPINE
+          playSpine: STRUCTURED_PLAY_SPINE,
+          // The arrangement grammar, on the transport at BOTH seats. The shell
+          // gets the same object through withArrangement() in api-generator.js;
+          // this is the S+F half. Prose-demanded and gate-enforced but
+          // transport-absent is the W5a/D139 defect, and it costs a whole
+          // pipeline: under a strict structured mode the field is dropped
+          // before the floor that blocks on it ever sees it.
+          arrangement: STRUCTURED_ARRANGEMENT
         },
-        required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'economy', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'storySpine', 'artifactIdentity', 'artifactIntent', 'playSpine']
+        required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'economy', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'storySpine', 'artifactIdentity', 'artifactIntent', 'playSpine', 'arrangement']
       },
       theme: {
         type: 'object',
@@ -2262,6 +2299,119 @@
     'BLACK AND WHITE IS NOT A DEGRADED MODE. Every choice here has to survive a monochrome laser',
     'printer, because that is the printer most players own. Weight, pattern and structure carry',
     'the signal; colour never does.'
+  ];
+
+  // ── The arrangement grammar (ARRANGEMENT.md phase A) ────────────────────
+  //
+  // ROUTING: BOTH compiler seats, and that is the difference from the design
+  // language directly above. The shell stage gets it through STAGE_SCHEMA_MAP;
+  // the S+F skeleton seat gets it by hand inside generateSkeletonPrompt, the
+  // way INST_SHELL_CHOICE and INST_SEED_ASSIGNMENT are hand-routed there. It is
+  // deliberately absent from window.INSTRUCTIONS and window.SCHEMA_SPEC — the
+  // single-prompt bundle has no room (D136 measured 563 characters of headroom)
+  // and a paste-path book renders in the default grammar, which is what a named
+  // default is for.
+  //
+  // WHY IT REACHES BOTH SEATS WHEN THE DESIGN LANGUAGE REACHES ONE: the
+  // arrangement floor blocks at BOTH gates, and a floor at a seat whose prompt
+  // never names the field blocks a pipeline on a surface it was never asked
+  // for — the retry then re-fails identically, carrying the field\'s name in
+  // the correction directive and nowhere else. Both halves of one rule land
+  // together (D136 F04, D149): teach it where it is checked.
+  //
+  // WHY IT EXISTS: VISION §8 — *layout IS the identity, and the model authors
+  // it per book.* The design language answers what press this object came off;
+  // this answers who designed the page. The first completed book passed every
+  // atom-level gate and every spread was a pile, because nothing in the system
+  // had ever asked.
+  //
+  // THE MENUS ARE BYTE-QUOTED from contract-constants.mjs and
+  // `arrangementMenuParity()` in scripts/validate.mjs diffs them both ways,
+  // including each grammar\'s four values — a grammar taught as a name and not
+  // as its values is a mood, and a model resolves a mood into whatever it did
+  // last time.
+  window.SCHEMA_ARRANGEMENT = [
+    '## meta.arrangement (REQUIRED — how this book\'s page is put together)',
+    '',
+    'The design language is what this object is printed LIKE. This is how the page is',
+    'COMPOSED: how a section announces itself, how a table is drawn, how the page points at',
+    'itself, and the one gesture that repeats everywhere. Two books can share an archetype and',
+    'a press and still be unmistakably different objects across a table — this is where that',
+    'happens.',
+    '',
+    '- `grammar` (REQUIRED): "ruled-journal" | "field-manual" | "reference-index" | "broadside"',
+    '  — the family this book belongs to. Each one is a set of the four axes below.',
+    '- `sectionFurniture` (REQUIRED): "hairline-kicker" | "reverse-bar" | "numbered-tab" |',
+    '  "rule-stack" — how a section announces itself at the top of the page.',
+    '- `tableTreatment` (REQUIRED): "ruled-rows" | "reverse-header" | "numbered-gutter" |',
+    '  "boxed-panel" — how a roll table is drawn.',
+    '- `annotationPattern` (REQUIRED): "inline-note" | "pointer-chips" | "bracket-marks" |',
+    '  "underline-file" — how the page points at itself and teaches.',
+    '- `leitmotif` (REQUIRED): "none" | "rounded-chip" | "cut-corner" | "double-rule" — the one',
+    '  gesture that repeats across all three axes above.',
+    '- `arrangementEvidence` (REQUIRED, string, 1-2 sentences): the brief\'s own words these',
+    '  choices came from. If you departed from an assignment you were given, name the value you',
+    '  took here.',
+    '',
+    'State all four axes explicitly even when they agree with your chosen grammar. The grammar',
+    'names the family; the four fields are what this book actually wears.'
+  ];
+
+  window.INST_ARRANGEMENT = [
+    '## Arrangement (run with Design Language)',
+    '',
+    'A page is AUTHORED, not accumulated. Every component on a spread can be individually',
+    'correct and the spread can still be nobody\'s design — that is the most common way a',
+    'generated book fails, and it fails invisibly, because nothing on it is wrong.',
+    '',
+    'DERIVATION LAW, the same law that governs register and design: every axis must be',
+    'traceable to words the brief actually contains, and the phrases go in',
+    '`arrangementEvidence`. An arrangement that cannot cite the brief is a house layout wearing',
+    'the book\'s name.',
+    '',
+    'THE FOUR GRAMMARS, and what each one IS:',
+    '- "ruled-journal" — hairline-kicker furniture, ruled-rows tables, inline-note annotation,',
+    '  leitmotif none. A training journal: quiet, ruled, nothing shouting. A real answer for a',
+    '  book about private, ordinary work — and a real DECISION, not a default.',
+    '- "field-manual" — reverse-bar furniture, reverse-header tables, pointer-chips annotation,',
+    '  rounded-chip leitmotif. An issued instrument, printed by an organisation for someone who',
+    '  has to use it under load.',
+    '- "reference-index" — numbered-tab furniture, numbered-gutter tables, underline-file',
+    '  annotation, double-rule leitmotif. The thing you look things up in, opened at speed.',
+    '- "broadside" — rule-stack furniture, boxed-panel tables, bracket-marks annotation,',
+    '  cut-corner leitmotif. A printed sheet: stacked rules, framed panels, bracketed asides.',
+    '',
+    'NONE OF THESE IS THE NORMAL ONE. "ruled-journal" is what every book looked like before',
+    'this menu existed, which is exactly why it has a name now: choose it because this story',
+    'wants a quiet ruled notebook, never because it is what you would have done anyway.',
+    '',
+    'MIX ON PURPOSE, NOT BY DRIFT. You may declare one grammar and take a different value on an',
+    'axis — a field-manual that files its citations under a rule instead of chipping them is a',
+    'real object. Say why in `arrangementEvidence`. What is forbidden is drift: four axes that',
+    'answer to nothing.',
+    '',
+    'WHAT EACH AXIS SAYS, so you can choose on meaning rather than on sound:',
+    '- Section furniture is the loudest cheap identity in a book. "reverse-bar" is a solid band',
+    '  across the top of every page — an institution talking. "numbered-tab" is a thumb index:',
+    '  a book expecting to be opened mid-task. "rule-stack" is a stacked hairline: a printed',
+    '  sheet. "hairline-kicker" is a quiet rule and small capitals.',
+    '- Table treatment tells the reader what KIND of table this is: something you roll on,',
+    '  something you look up, something you consult mid-action.',
+    '- Annotation pattern is how the rules ride the page. This is what stops point-of-use being',
+    '  a compromise: the book does not choose between "the rules are on the page" and "the page',
+    '  is not a wall of rules" — it chooses a pattern and the rules ride it. Point at the',
+    '  rulebook\'s own teaching order: what has to be known first gets the loudest pointer.',
+    '- The leitmotif is one gesture restated everywhere — a rounded chip, a cut corner, a',
+    '  doubled rule. It lands on all three axes above, and it is most of the difference between',
+    '  a page that reads as designed and one that reads as assembled. "none" is a real answer',
+    '  for a book whose whole character is restraint.',
+    '',
+    'THE PENCIL OUTRANKS EVERY AXIS. No furniture, table or annotation choice may cost a',
+    'write-in surface its space or draw inside a box a pencil fills. If an axis and the pencil',
+    'collide, the pencil wins.',
+    '',
+    'BLACK AND WHITE, AGAIN. Weight, fill and pattern carry every signal here. Nothing on this',
+    'axis set may depend on colour.'
   ];
 
   window.INST_ANTI_SAMENESS = [
@@ -4297,7 +4447,13 @@
     // load-bearing the same way theirs is: the model reads the menus that make
     // each choice choosable, then reads which of them the die already made.
     // Reversed, the assignments read as one more menu.
-    'shell':          { schemas: ['META', 'THEME', 'DESIGN_LANGUAGE', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'SHELL_CHOICE', 'SEED_ASSIGNMENT', 'SURFACE_REFS', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES', 'SHELL_SELF_CHECK'] },
+    // ARRANGEMENT rides directly behind DESIGN_LANGUAGE, and the adjacency is
+    // load-bearing rather than tidy: they are one sitting of the same decision.
+    // The design language is what this object is printed LIKE; the arrangement
+    // is how its page is PUT TOGETHER (VISION §8: layout IS the identity), and
+    // a model that fixes the press and then composes the page in a different
+    // sitting writes two objects. Same stage-only ruling, same reason.
+    'shell':          { schemas: ['META', 'THEME', 'DESIGN_LANGUAGE', 'ARRANGEMENT', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'SHELL_CHOICE', 'SEED_ASSIGNMENT', 'SURFACE_REFS', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'ARRANGEMENT', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES', 'SHELL_SELF_CHECK'] },
     // Knowing: the world's process particulars, authored once after the
     // skeleton/shell and consumed by every prose stage (§11 Wave 1.5). It
     // writes no prose, so it carries no VOICE_DISCIPLINE — it carries the

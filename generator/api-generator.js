@@ -887,6 +887,40 @@ var STRUCTURED_SCHEMA_SHELL = {
  * Copies the two levels it touches; the shared literal is never mutated, so the
  * exported `manual.structuredSchemas.shell` stays the plain object it was.
  */
+/**
+ * withArrangement(schema) -> schema
+ *
+ * THE SAME BORROW, ONE SURFACE LATER (ARRANGEMENT.md phase A). The arrangement
+ * grammar has ONE structured literal, in prompt_rules.js, and both compiler
+ * seats reach it: STRUCTURED_SCHEMA_SKELETON names it directly, this presses it
+ * onto the shell. A second hand-written copy here would be the skeleton-triple
+ * defect — two surfaces describing one field, drifting one at a time, and the
+ * drift would show up as a stage failing on output the prompt itself demanded.
+ *
+ * It THROWS on a missing literal rather than degrading, for withPlaySpine's
+ * reason: the shell gate blocks on `meta.arrangement`, so a transport schema
+ * that quietly omitted it would fail every attempt of every run with the field
+ * named nowhere except the correction directive.
+ */
+function withArrangement(schema) {
+  var arrangement = (typeof window !== 'undefined') && window.STRUCTURED_ARRANGEMENT;
+  if (!arrangement) {
+    throw new Error('[LiftRPG] window.STRUCTURED_ARRANGEMENT is missing — prompt_rules.js '
+      + 'has not loaded, so the shell stage would demand an arrangement the transport never '
+      + 'asks for.');
+  }
+  var meta = schema.properties.meta;
+  var nextProps = Object.assign({}, meta.properties, { arrangement: arrangement });
+  var nextRequired = meta.required.indexOf('arrangement') === -1
+    ? meta.required.concat(['arrangement'])
+    : meta.required.slice();
+  return Object.assign({}, schema, {
+    properties: Object.assign({}, schema.properties, {
+      meta: Object.assign({}, meta, { properties: nextProps, required: nextRequired })
+    })
+  });
+}
+
 function withPlaySpine(schema) {
   var spine = (typeof window !== 'undefined') && window.STRUCTURED_SCHEMA_PLAY_SPINE;
   if (!spine) {
@@ -3989,7 +4023,7 @@ async function runApiPipeline(options) {
       completeMessage: 'Booklet setup complete.',
       onProgress: onProgress,
       getTotalStages: function () { return totalStages; },
-      schema: withPlaySpine(STRUCTURED_SCHEMA_SHELL),
+      schema: withArrangement(withPlaySpine(STRUCTURED_SCHEMA_SHELL)),
       unwrapKey: 'meta',
       // NO maxAttempts literal here: this stage's attempt count is a ladder row
       // (STAGE_BUDGETS.shell.attempts), read through stageBudget() like its
@@ -6418,7 +6452,11 @@ window.LiftRPGAPI = {
       // pre-built schema: withPlaySpine() throws when prompt_rules.js has not
       // loaded, and a throw at module-evaluation time would take the whole API
       // surface down instead of the one stage that needs it.
-      withPlaySpine: withPlaySpine
+      withPlaySpine: withPlaySpine,
+      // Same shape, same reason (see withPlaySpine above): a function, not a
+      // pre-built schema, so a missing prompt_rules.js takes one stage down
+      // rather than the whole API surface at module evaluation.
+      withArrangement: withArrangement
     },
     ensureArtifactIdentity: ensureArtifactIdentity,
     buildIdentityContract: buildIdentityContract,

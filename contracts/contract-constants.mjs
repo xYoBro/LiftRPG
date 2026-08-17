@@ -550,6 +550,201 @@ export var DEFAULT_INK_DISCIPLINE = 'standard';
 export var VALID_SEAL_TREATMENTS = ['none', 'rubber-stamp', 'wax', 'embossed', 'perforated'];
 export var DEFAULT_SEAL_TREATMENT = 'none';
 
+// ── The arrangement grammar (meta.arrangement — ARRANGEMENT.md phase A) ──────
+//
+// THE FIFTH CONSTITUTION MADE MACHINERY. docs/craft/ARRANGEMENT.md §0: *a page
+// is authored, not accumulated.* Every atom on the first finished book passed
+// its own gates and every spread was a pile, because nothing in the system ever
+// asked who designed the page. `meta.designLanguage` above answers "what is
+// this object made of and printed like"; this block answers "how is it PUT
+// TOGETHER" — and VISION §8's ruling is that the second question is the
+// identity one: *layout IS the identity.*
+//
+// PHASE A ONLY, and the boundary is a channel boundary rather than a taste one
+// (ARRANGEMENT §9). The axes here are 2 (section furniture), 4 (table and list
+// treatment) and 7 (annotation pattern), plus the compositional leitmotif and
+// the declaration surface itself. Axis 1 (type pairing) is already landed as
+// `typeVoice`. Axes 3, 5 and 6 — grid and gutters, atom form sets, spread
+// grammar — are GEOMETRY, they belong to the variant contract (§3), and they
+// owe a gate of their own that does not exist yet. Nothing here may move a box.
+//
+// THE DECORATION CHANNEL'S LAW BINDS EVERY VALUE BELOW, exactly as it binds the
+// design language: phase-1 estimation has no DOM and cannot resolve
+// `data-section-furniture` any more than it can resolve `data-tone-texture`, so
+// a rule here that changed a height would make every estimate on the surface
+// lie and `overflow:hidden` would eat the difference as ink. Enforced by
+// `arrangementPaintOnlyLaw()` in scripts/validate.mjs — the componentDialect /
+// designLanguage blacklist, a third attribute family, one law.
+//
+// REFUSED, recorded rather than quietly redesigned. ARRANGEMENT §2's example
+// values for axes 2 and 7 include three that are GEOMETRY wearing a decoration
+// name, and they are held for phase B/C rather than approximated here:
+//   • `leader-lines` — right-angle connectors from a thing to the block that
+//     describes it. Drawn connectors need placed endpoints; placement is the
+//     engine's and the estimate cannot see it.
+//   • `margin-notes` — moves content into the outer margin. That is a column
+//     count, which is the `newspaper-columns` refusal (a measured 2x estimate
+//     error) arriving through a different door.
+//   • `footnote-band` — moves the citations to the foot of the page. Same
+//     defect: a band at the foot is a row the estimate never charged for.
+// What ships is the paint half of each axis, which is most of what a stranger
+// notices across a table, and it ships with the honest name for what it is.
+
+// Axis 2 — how a section announces itself. The cheapest identity in a book and
+// the loudest (ARRANGEMENT §2): Mothership's black bar is one decision doing
+// more for that book's identity than every colour choice combined.
+// `hairline-kicker` is TODAY'S BOOK and stamps no attribute, which is what
+// makes `ruled-journal` provably byte-identical to the pre-arrangement render.
+export var VALID_SECTION_FURNITURE = [
+  'hairline-kicker', 'reverse-bar', 'numbered-tab', 'rule-stack'
+];
+export var DEFAULT_SECTION_FURNITURE = 'hairline-kicker';
+
+// Axis 4 — how a table is drawn. The treatment tells the reader what KIND of
+// table this is: something you roll on, something you look up, something you
+// consult mid-action (ARRANGEMENT §2, the guide's pages 7/8/12).
+export var VALID_TABLE_TREATMENTS = [
+  'ruled-rows', 'reverse-header', 'numbered-gutter', 'boxed-panel'
+];
+export var DEFAULT_TABLE_TREATMENT = 'ruled-rows';
+
+// Axis 7 — how the page points at itself and teaches. This is the axis that
+// stops point-of-use being a compromise: a book does not choose between "the
+// rules are on the page" and "the page is not a wall of rules", it chooses a
+// pattern and the rules ride it. PLAY.md's teaching order says WHAT must be
+// known when; this says HOW the page says it.
+export var VALID_ANNOTATION_PATTERNS = [
+  'inline-note', 'pointer-chips', 'bracket-marks', 'underline-file'
+];
+export var DEFAULT_ANNOTATION_PATTERN = 'inline-note';
+
+// The compositional leitmotif — one gesture, restated everywhere. On the
+// Mothership sheet it is the rounded chip at six scales, and it is most of the
+// reason that sheet reads as designed rather than assembled. The rule
+// (ARRANGEMENT §2) is that the gesture appears on at least THREE axes; here
+// that is structural rather than hoped for — each gesture's CSS rule names one
+// surface from each of the three axes above, and `arrangementEnumParity()`
+// asserts the count. Whether the gesture EARNS its repetition is the
+// arrangement judge's question (referee 3, report-only, §7), never a floor's.
+//
+// The three gestures use `border-radius`, `clip-path` and `outline` — three
+// properties none of the three axes use, and none of which can move a box. A
+// leitmotif that shared a property with an axis would silently clobber it in
+// the cascade, which is a book wearing three axes and rendering two.
+export var VALID_LEITMOTIF_GESTURES = [
+  'none', 'rounded-chip', 'cut-corner', 'double-rule'
+];
+export var DEFAULT_LEITMOTIF_GESTURE = 'none';
+
+// THE NAMED GRAMMARS (ARRANGEMENT §6, decider-ratified D173).
+//
+// Today's layout is not a baseline and it is not neutral. It is ONE grammar,
+// and the honest thing is to name it, write it down, and make a book CHOOSE it
+// rather than inherit it. `ruled-journal` names the object and its signature —
+// hairline rules, ruled write-in lines, no header bars — so it sits in the menu
+// as a peer with no rank. `journal-standard` was rejected because a name
+// containing "standard" does the defaulting this round exists to stop (D135's
+// measured failure as a naming bug) and `drowning-season` was rejected on
+// VISION §11: a shelf-relative name teaches the model to reason "like the demo".
+//
+// A GRAMMAR IS A FAMILY, NOT A FREE PASS. Each one declares a value on every
+// phase-A axis, so no grammar name can be a no-op: its meaning is the axes it
+// names. The book still declares all four axes explicitly (the floor demands
+// them) — this table is what those names MEAN, the resolution for a partial or
+// hand-authored book, and the definition `ruled-journal` needs in order to be
+// checkable as "today's behaviour" rather than asserted as it.
+//
+// The mapping is a bijection on purpose: every axis value is named by exactly
+// one grammar, both directions, and `arrangementEnumParity()` asserts it. An
+// axis value no grammar reaches is a value the menu offers and no family owns;
+// a grammar that named a value twice would be teaching two names for one look.
+export var ARRANGEMENT_GRAMMARS = {
+  // Today's book, named. A training journal: quiet, ruled, nothing shouting.
+  'ruled-journal': {
+    sectionFurniture: 'hairline-kicker',
+    tableTreatment: 'ruled-rows',
+    annotationPattern: 'inline-note',
+    leitmotif: 'none'
+  },
+  // The issued instrument. Reversed bars, reversed table heads, filled pointer
+  // chips — a book printed by an organisation for someone who has to use it
+  // under load.
+  'field-manual': {
+    sectionFurniture: 'reverse-bar',
+    tableTreatment: 'reverse-header',
+    annotationPattern: 'pointer-chips',
+    leitmotif: 'rounded-chip'
+  },
+  // The thing you look things up in. Numbered tabs, a roll-number gutter,
+  // citations filed under a rule — a book that expects to be opened at speed.
+  'reference-index': {
+    sectionFurniture: 'numbered-tab',
+    tableTreatment: 'numbered-gutter',
+    annotationPattern: 'underline-file',
+    leitmotif: 'double-rule'
+  },
+  // The printed sheet. Stacked rules, framed panels, bracketed asides — a book
+  // that behaves like a poster someone folded.
+  'broadside': {
+    sectionFurniture: 'rule-stack',
+    tableTreatment: 'boxed-panel',
+    annotationPattern: 'bracket-marks',
+    leitmotif: 'cut-corner'
+  }
+};
+export var VALID_ARRANGEMENT_GRAMMARS = Object.keys(ARRANGEMENT_GRAMMARS);
+export var DEFAULT_ARRANGEMENT_GRAMMAR = 'ruled-journal';
+
+// The axes a grammar names, in one place, so every reader iterates the same
+// four and a fifth axis cannot be added to the table and forgotten by the
+// resolver, the floor or the parity gate.
+export var ARRANGEMENT_AXES = [
+  { field: 'sectionFurniture', menu: VALID_SECTION_FURNITURE, attr: 'data-section-furniture',
+    baseline: DEFAULT_SECTION_FURNITURE },
+  { field: 'tableTreatment', menu: VALID_TABLE_TREATMENTS, attr: 'data-table-treatment',
+    baseline: DEFAULT_TABLE_TREATMENT },
+  { field: 'annotationPattern', menu: VALID_ANNOTATION_PATTERNS, attr: 'data-annotation-pattern',
+    baseline: DEFAULT_ANNOTATION_PATTERN },
+  { field: 'leitmotif', menu: VALID_LEITMOTIF_GESTURES, attr: 'data-leitmotif',
+    baseline: DEFAULT_LEITMOTIF_GESTURE }
+];
+
+/**
+ * resolveArrangement(spec) -> { grammar, sectionFurniture, ... } | null
+ *
+ * SINGLE HOME (D93). The renderer composes the declaration into attributes and
+ * the reference emitter publishes it; both must resolve a partial declaration
+ * the same way or a book renders as one grammar and is described as another.
+ *
+ * `null` for an absent or unreadable declaration, and that is load-bearing in
+ * exactly the way `resolveDesignLanguage()`'s null is: a book that declares no
+ * arrangement stamps NO attribute and renders byte-identically to the
+ * pre-arrangement engine. "All defaults" and "no declaration" must never be the
+ * same object, or the demotion of today's layout becomes a claim instead of a
+ * property.
+ *
+ * PRECEDENCE: the grammar's baseline ← the explicitly declared axis. The
+ * explicit field is the more literal authoring and wins, the way
+ * `theme.tokens` outranks the composed design language. An off-menu value is
+ * DROPPED rather than defaulted (the resolveDesignLanguage ruling): a value
+ * nothing draws must be absent rather than silently correct, or misauthoring
+ * renders as intention.
+ */
+export function resolveArrangement(spec) {
+  if (!spec || typeof spec !== 'object') return null;
+  var out = {};
+  var grammar = String(spec.grammar || '').trim();
+  if (VALID_ARRANGEMENT_GRAMMARS.indexOf(grammar) !== -1) out.grammar = grammar;
+  var baseline = out.grammar ? ARRANGEMENT_GRAMMARS[out.grammar] : null;
+  for (var i = 0; i < ARRANGEMENT_AXES.length; i++) {
+    var axis = ARRANGEMENT_AXES[i];
+    var declared = spec[axis.field];
+    if (axis.menu.indexOf(declared) !== -1) out[axis.field] = declared;
+    else if (baseline) out[axis.field] = baseline[axis.field];
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 // ── Artifact identity ────────────────────────────────────────────────────────
 // Previously these lived only as silent coercion tables in assembly.js
 // (AUDIT finding 74). They are now enforced enums.
@@ -2155,6 +2350,44 @@ export var IDENTITY_AXES = [
   { id: 'sealTreatment', label: 'designLanguage.sealTreatment', path: 'meta.designLanguage.sealTreatment',
     menu: VALID_SEAL_TREATMENTS, kind: 'scalar',
     evidencePath: 'meta.designLanguage.designEvidence', stages: ['shell'] },
+  // ── THE ARRANGEMENT AXES (ARRANGEMENT §8) ────────────────────────────────
+  // "The arrangement axes join the two-source law rather than getting an
+  // exemption from it — every axis needs a die, not just a list." The measured
+  // reason is one level up in this file's own history: the game-kind menus were
+  // shown IN FULL inside an 87,000-character prompt and the model still
+  // produced the default book. Showing a menu removes the excuse for a default,
+  // never the default itself.
+  //
+  // BOTH SEATS, unlike the design-language axes directly above, and the
+  // asymmetry is the routing rather than a preference: SCHEMA_ARRANGEMENT and
+  // INST_ARRANGEMENT are routed to the shell stage (STAGE_SCHEMA_MAP) AND
+  // hand-routed into generateSkeletonPrompt, so both compiler seats are taught
+  // this surface and both may therefore be checked against it. W6's design
+  // language reached only one seat and its floor is scoped to one seat for that
+  // reason; a floor at a seat whose prompt never names the field blocks a
+  // pipeline on a surface it was never asked for, and the retry re-fails
+  // identically.
+  //
+  // NO `answerRequired` FLAG, and that is the W6 shape rather than an oversight
+  // (see the flag's own note above: do not add one without a ruling). Silence
+  // is not a third path on these axes because `arrangementFloorErrors` blocks
+  // the stage on an absent field before this floor is ever asked — which is
+  // precisely the condition under which D146's original reasoning holds.
+  { id: 'arrangementGrammar', label: 'arrangement.grammar', path: 'meta.arrangement.grammar',
+    menu: VALID_ARRANGEMENT_GRAMMARS, kind: 'scalar',
+    evidencePath: 'meta.arrangement.arrangementEvidence', stages: ['shell', 'skeleton'] },
+  { id: 'sectionFurniture', label: 'arrangement.sectionFurniture', path: 'meta.arrangement.sectionFurniture',
+    menu: VALID_SECTION_FURNITURE, kind: 'scalar',
+    evidencePath: 'meta.arrangement.arrangementEvidence', stages: ['shell', 'skeleton'] },
+  { id: 'tableTreatment', label: 'arrangement.tableTreatment', path: 'meta.arrangement.tableTreatment',
+    menu: VALID_TABLE_TREATMENTS, kind: 'scalar',
+    evidencePath: 'meta.arrangement.arrangementEvidence', stages: ['shell', 'skeleton'] },
+  { id: 'annotationPattern', label: 'arrangement.annotationPattern', path: 'meta.arrangement.annotationPattern',
+    menu: VALID_ANNOTATION_PATTERNS, kind: 'scalar',
+    evidencePath: 'meta.arrangement.arrangementEvidence', stages: ['shell', 'skeleton'] },
+  { id: 'leitmotif', label: 'arrangement.leitmotif', path: 'meta.arrangement.leitmotif',
+    menu: VALID_LEITMOTIF_GESTURES, kind: 'scalar',
+    evidencePath: 'meta.arrangement.arrangementEvidence', stages: ['shell', 'skeleton'] },
   // THE GEOMETRY, AND ITS ONE EXEMPTION. D144 W-2 landed the rule that governs
   // this axis — "the DESIGN BIAS proposes geometries; the mechanic grammar
   // family DECIDES" — and that rule is not a third source: the family is itself

@@ -80,7 +80,12 @@ import {
   VALID_DOCUMENT_RECIPES,
   VALID_MARGIN_SEMANTICS,
   VALID_INK_DISCIPLINES,
-  VALID_SEAL_TREATMENTS
+  VALID_SEAL_TREATMENTS,
+  VALID_ARRANGEMENT_GRAMMARS,
+  VALID_SECTION_FURNITURE,
+  VALID_TABLE_TREATMENTS,
+  VALID_ANNOTATION_PATTERNS,
+  VALID_LEITMOTIF_GESTURES
 } from './contract-constants.mjs';
 
 var G = SPATIAL_GUARDRAILS;
@@ -235,6 +240,52 @@ var designLanguage = {
     // axis set exists to break. Free string: the evidence is the model's own
     // words, and enumerating it would re-impose the flavour it exists to escape.
     designEvidence: { type: 'string' },
+    _x: xt
+  }
+};
+
+// ── arrangement (meta.arrangement — ARRANGEMENT.md phase A) ─────────────────
+// How this book's page is PUT TOGETHER, as opposed to what it is printed like.
+// VISION §8 and the composition constitution: *layout IS the identity*, and a
+// page is authored rather than accumulated.
+//
+// SEVERITY: the designLanguage split, exactly, and for the same two reasons.
+// Generation policy DEMANDS it (both compiler seats' structured schemas require
+// it and `arrangementFloorErrors` blocks the stage on absence); the ARTIFACT
+// contract does not, because no corpus fixture carries one and requiring it
+// here would edit evidence to enforce a prompt rule. A book with no
+// `arrangement` renders byte-identically to the pre-arrangement engine — the
+// renderer stamps nothing at all (resolveArrangement returns null).
+//
+// `additionalProperties: false` for the reason artifactIntent has it: a
+// misnamed axis (`furniture` for `sectionFurniture`) reads as a complete record
+// and draws nothing.
+//
+// EVERY AXIS HERE PAINTS. Geometry — the grid, the atom form set, the spread
+// grammar — is the variant contract's channel (ARRANGEMENT §3) and owes a gate
+// this block does not have. See the refusal list in contract-constants.mjs.
+var arrangement = {
+  type: 'object',
+  required: [],
+  additionalProperties: false,
+  properties: {
+    // The named grammar this book belongs to. `ruled-journal` is today's book,
+    // named so a book must CHOOSE it (ARRANGEMENT §6) — it is a peer in the
+    // menu, never a baseline the silent path inherits.
+    grammar: { enum: VALID_ARRANGEMENT_GRAMMARS },
+    sectionFurniture: { enum: VALID_SECTION_FURNITURE },
+    tableTreatment: { enum: VALID_TABLE_TREATMENTS },
+    annotationPattern: { enum: VALID_ANNOTATION_PATTERNS },
+    // One gesture, restated across all three axes above. The ≥3-axes rule is
+    // structural in the CSS and judged (report-only) on the rendered page; it
+    // is not a schema constraint, because a schema cannot see a page.
+    leitmotif: { enum: VALID_LEITMOTIF_GESTURES },
+    // THE DERIVATION LAW, applied to arrangement (D136's idiom, designEvidence's
+    // twin). The brief's own words that chose this grammar, and — when the book
+    // departed from a seed assignment — the value it took instead. Free string:
+    // the obedience floor reads it for the assignment's name, and enumerating
+    // it would re-impose the sameness the axis exists to break.
+    arrangementEvidence: { type: 'string' },
     _x: xt
   }
 };
@@ -1152,6 +1203,11 @@ export var BOOKLET_SCHEMA = {
         // the compiled DESIGN DECISION, the same kind of thing as
         // artifactIdentity.componentDialect, which also lives here.
         designLanguage: designLanguage,
+        // How the page is composed, as opposed to how it is printed. Beside
+        // designLanguage rather than inside it: one answers "what press made
+        // this object", the other "who designed this page", and the second is
+        // the one VISION §8 calls the identity.
+        arrangement: arrangement,
         processParticulars: processParticulars,
         // THE RUDDER, and it sits above the spine deliberately: the spine is
         // this object's projection (VISION §4.0 / PLAY.md §3.2), and a reader
