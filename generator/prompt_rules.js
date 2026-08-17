@@ -500,6 +500,16 @@
     '- `isBossWeek` (boolean)',
     '- `weeklyComponent` (object): { type, value, extractionInstruction }',
     '- `sessions` (array, 3-6 items): { sessionNumber, label, exercises: [{ name, sets, repsPerSet, weightField?, notes? }], storyPrompt, fragmentRef?, markStrip, binaryChoice?: { choiceLabel, promptA, promptB } }',
+    // F9's teaching half. The floor (validateWeekSchema, D111) has refused
+    // unprintable rep targets since the Teeth Round; nothing ever ASKED for a
+    // printable one, and the measured defect was a model transcribing "3xAMRAP"
+    // as `repsPerSet: -1` in one week and `null` in another — obeying "transcribe
+    // the user\'s workout exactly" and being blocked for it. Stage-only by
+    // routing, on the D170 precedent below: SCHEMA_SINGLE_WEEK is not in
+    // SCHEMA_SPEC, so the paste path pays nothing.
+    '- `exercises[].repsPerSet` PRINTS VERBATIM INSIDE THE REP BOXES, so it must be something a player can act on:',
+    '  a positive count (`5`, `8`) or a written target in plain words (`"AMRAP"`, `"8-12"`, `"45s"`, `"to failure"`).',
+    '  Blanks, `0`, negative numbers and sentinel values are refused at this stage — write what the box should SAY.',
     '- `sessions[].markStrip` (object): { targets: [{ label }] } — 3-5 tick targets. See the session.markStrip section for the authoring law.',
     '- `reckoning` (object): { conversion, sink: { kind, ref, instruction } }. See the week.reckoning section.',
     // D170: the verbatim demand, restated on the FIELD the stage is filling.
@@ -515,7 +525,19 @@
     '- `bossEncounter` (object): replaces fieldOps if boss week',
     '- `overflow` (boolean) and `overflowDocument` (foundDocument object)',
     '- `interlude` (object, optional)',
-    '- `gameplayClocks` (array, optional)',
+    // THE MUTE-SOURCE HALF, said on the field the stage is filling. The floor
+    // fires HERE (validateWeekSchema → collectSpineWeekFloorErrors Floor 7) but
+    // is owned by the spine seat, so a week that invents a clock is blocked by a
+    // graph it was never shown. The spine's own half is in INST_LUDIC_SPINE;
+    // this is the half the week can actually act on, because the plan it is
+    // handed carries `clockNames`. STAGE-ONLY BY ROUTING, on the D170 precedent
+    // directly above: SCHEMA_SINGLE_WEEK is not in SCHEMA_SPEC, so the paste
+    // path (hard against 115,000 chars) pays nothing. Putting it on
+    // INST_ORACLES_CLOCKS instead took the bundle 417 chars over — measured.
+    '- `gameplayClocks` (array, optional): render the clocks THIS WEEK\'S PLAN NAMES, spelled the way it spells them.',
+    '  The play spine was wired before this week was written and every clock you render is checked back against it:',
+    '  a clock no spine edge reads is a mute source and this week is refused for it. Do not invent a clock here and',
+    '  do not rename one — a better clock is a change to the spine, which is a stage you are not writing.',
     '- `isDeload` (boolean, optional)',
     '- `fusionBeat` (object, REQUIRED): { beat, marking }. This week\'s FUSION SCORE, declared.',
     '  `beat` is one sentence: how this week\'s TRAINING texture IS this week\'s STORY texture.',
@@ -632,7 +654,10 @@
     '- `epigraphText` (string): epigraph quote for this week',
     '- `epigraphAttribution` (string): attribution for the epigraph',
     '- `mapType` (string): grid|point-to-point|linear-track|player-drawn|concentric|maze',
-    '- `cipherType` (string): the cipher technique name',
+    '- `cipherType` (string): the cipher technique name. ACROSS THE NON-BOSS WEEKS THESE MUST VARY:',
+    '  this stage is blocked when the schedule reuses one or two families for the whole book. Give',
+    '  each week a technique the player has to learn fresh — the count owed rises with the number',
+    '  of weeks, so schedule as many distinct techniques as the block has room for.',
     '- `componentValue` (number|null): fiction-native value for password system (null for boss week)',
     '- `isBossWeek` (boolean): true ONLY for final week',
     '- `isDeload` (boolean): tonal flag for deload weeks',
@@ -641,7 +666,10 @@
     '- `fragmentIds` (string[]): IDs of fragments referenced in this week\'s sessions/oracles',
     '- `overflowFragmentId` (string|null): ID of overflow document if sessionCount > 3',
     '- `oracleMode` (string): "fragment"|"consequence"|"mixed"',
-    '- `companionTypes` (string[]): companion component types for this week (0-3 items)',
+    '- `companionTypes` (string[]): companion component types for this week (0-3 items). A week may',
+    '  legitimately carry none, but the BOOK may not: at least one week must carry a companion',
+    '  component for the play state to live on, and this stage is blocked when the whole weekPlan',
+    '  schedules zero. Two different types across the book is the target.',
     '- `clockNames` (string[]): gameplay clock names introduced or active this week',
     '- `hasInterlude` (boolean): whether this week has an interlude page',
     '',
@@ -3247,6 +3275,32 @@
     'name the surfaces you actually intend the book to have, in the ref grammar given above, and',
     'spell them the same way twice.',
     '',
+    '### Name every KIND of surface in the ordinary word a player would use for it',
+    'The check on "nothing may appear in that graph that you did not teach" is run on KINDS, not',
+    'refs — a rulebook is written for a player who will never read `markStrip:W3.2`. For each kind',
+    'of surface your design uses, at least one of its player-facing words must appear SOMEWHERE in',
+    'your eight answers, your currency name, or your verb list. If a kind never appears in your',
+    'prose, the next stage may not wire it, and it will have to drop a system your design assumed.',
+    'These are the words that count, and they are the words a player would say anyway:',
+    '- a `week` — "week"',
+    '- a `session` — "session", "workout" or "training day"',
+    '- a `markStrip` — "mark"',
+    '- a `reckoning` — "reckoning", "tally" or "total"',
+    '- a `clock` — "clock", "track", "gauge" or "dial"',
+    '- an `oracle` — "oracle", "table" or "roll"',
+    '- a `cipher` — "cipher", "code", "decode" or "decipher"',
+    '- a `map` — "map", "board" or "region"',
+    '- a `companion` — "companion", "ally", "kit" or "dashboard"',
+    '- a `fragment` — "fragment", "document", "record" or "page"',
+    '- a `door` — "door", "choice", "fork" or "decision"',
+    '- a `seal` — "seal", "sealed" or "locked"',
+    '- an `ending` — "ending", "finale" or "last page"',
+    '- the wallet (`banked`) — "bank"',
+    '- the `boss` — "boss", "final week" or "confrontation"',
+    '- the `assembly` — "assembly", "assemble" or "password"',
+    'Your own world-names go beside these, never instead of them: call it the Tide Ledger all you',
+    'like, but say once that it is a track, or the machine cannot tell the player was ever told.',
+    '',
     'Return ONLY the JSON object. No commentary, no markdown fences.'
   ];
 
@@ -3583,10 +3637,13 @@
     '  `to` — SPELLED THE SAME WAY the rulebook spelled it. If the rules say the player decodes',
     '  on `cipher:W2`, this graph has a `cipher:W2`.',
     '- GRAPH INTO RULES. Every currency you name on an edge must be a currency the rulebook',
-    '  taught, and every KIND of surface your graph touches must be named somewhere in the',
-    '  rulebook prose in the player-facing words listed in the rulebook stage. A system in the',
-    '  machine that the player is never told about passes every other gate and no human can',
-    '  play it.',
+    '  taught, and every KIND of surface your graph touches must already be named somewhere in the',
+    '  rulebook quoted above, in the ordinary player-facing word for that kind — a clock called a',
+    '  "clock", "track", "gauge" or "dial"; a map called a "map", "board" or "region"; a cipher',
+    '  called a "cipher", "code", "decode" or "decipher", and so on for every kind you wire. A',
+    '  system in the machine that the player is never told about passes every other gate and no',
+    '  human can play it. YOU CANNOT EDIT THE RULES FROM HERE, so the repair is on this side: wire',
+    '  only the kinds those rules already name, and put anything else in `honestGaps`.',
     'If the graph you would honestly write disagrees with the rules, the RULES WIN and the graph',
     'changes to serve them. That is what rules-first means.',
     '',
@@ -3650,6 +3707,16 @@
     '  answer: start at each tick origin, follow the edges you wrote, and confirm you can',
     '  arrive at the finale (`boss`, `assembly`, every `ending:`) — those three are written',
     '  BARE or with an id exactly as shown, and they are the nodes most often left stranded.',
+    '  EVERY CLOCK THIS BOOK WILL PRINT IS READ BY AN EDGE, OR IS DECLARED AMBIENT. A later stage',
+    '  writes the weeks and renders the clocks; each one it renders is checked back against this',
+    '  graph, and a clock no edge names is a mute source that blocks that week — with the repair',
+    '  landing HERE, not there. So name the clocks you intend the book to carry as `clock:<name>`',
+    '  nodes on an economyGraph or consequenceEdges edge now. If a clock is pure world texture and',
+    '  nothing reads it, that is a legitimate choice: declare it ambient by naming it in a',
+    '  composition `role` or in `honestGaps`. Spell the name exactly as the weeks will print it.',
+    '  AN EDGE INTO A `seal:` COMES FROM A STRICTLY EARLIER WEEK. The key is held before the lock —',
+    '  a seal whose key arrives with it or after it is gated content nobody can open, and this is',
+    '  checked against both the week refs and the week each fragment is scheduled for.',
     '- `consequenceEdges` (array): `{ source, answeredBy, withinWeeks }`. Every fillable',
     '  thing names the surface that answers it. `withinWeeks` is 0, 1 or 2 — 0 means the',
     '  same week. An answer further out than you declare is a blocking error, and an answer',
@@ -3765,8 +3832,10 @@
     '  Use it and the two sides of your fork become mechanically different things rather than',
     '  two names. If you attribute ONE side, attribute the other too: a fork with one declared',
     '  side is a fork where the player who picks the other gets whatever is left. Anything the',
-    '  book must reach must be reachable on BOTH sides.',
-    '- `price` — what a spend costs, as a whole number of MARKS. Marks, not the currency label:',
+    '  book must reach must be reachable on BOTH sides. One edge belongs to ONE fork: never',
+    '  attribute an edge to one door while sourcing it `from` a different door — two forks cannot',
+    '  both own one edge, and the simulated player would have to pick.',
+    '- `price` — what a spend costs, as a whole number of MARKS, at least 1. Marks, not the currency label:',
     '  marks are what the session strips count and what the reckoning threshold is derived in,',
     '  so a price in marks is a number the machine can check against what a player at realistic',
     '  adherence will actually have. The page still says "two Relief"; this says how many marks',
