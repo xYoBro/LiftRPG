@@ -3609,7 +3609,11 @@
             how the password is earned) and everything after is written to serve them, with the
             play spine checked against those rules both ways. This guided path skips that step,
             so the game&rsquo;s shape is decided here alongside everything else and nothing checks
-            the two against each other. Use an API build mode if you want the rules-first pass.</p>
+            the two against each other. It also means the weeks, found documents and endings on this
+            path are written <em>without</em> those rules in front of them: on an API build mode every
+            one of those stages is handed the game&rsquo;s currency, its core verbs and its win
+            condition as a given, plus the week&rsquo;s own row of the tension budget &mdash; this
+            door has none of that to hand them. Use an API build mode if you want the rules-first pass.</p>
           <div class="wizard-action-grid">
             <div class="wizard-stage-card is-action">
               <div class="wizard-action-index">Step 1</div>

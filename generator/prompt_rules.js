@@ -3261,7 +3261,7 @@
    * is not read, so it is delivered as a GIVEN — not as a suggestion, and not
    * paraphrased.
    *
-   * TWO SEATS THIS WAVE, and both are named rather than assumed:
+   * THREE SEAT CLASSES, each named rather than assumed:
    *   · the SPINE seat (`shell` on the multi-stage path, `skeleton` on S+F).
    *     The spine is this object's projection and the parity floor checks both
    *     directions, so the spine seat gets the FULL rulebook: a stage checked
@@ -3270,10 +3270,39 @@
    *     subset of exactly this document. On the multi-stage path that surface
    *     is `rulesSpread`, authored at the shell — the same stage, so one
    *     delivery covers both there.
+   *   · the PROSE seats (`week-final`, `fragment`, `ending`, both pipelines) —
+   *     added by the prose-funding wave. VISION §5: the world funds the prose,
+   *     and a model with nothing true to say decorates. Measured before this
+   *     wave: the formatter had four call sites and every one of them was
+   *     PRE-CONTENT. Every week, every found document and every ending in the
+   *     system was written by a stage that had never been told what game it
+   *     was writing for — the D174 defect exactly, on the surfaces the reader
+   *     actually reads.
    *
-   * `options.compact` drops the four prose answers that the printed rules seat
-   * does not need in full, keeping the machine-facing declarations. Absent, the
-   * whole document is printed.
+   * THE PROJECTIONS:
+   *   · `options.compact` drops the answers the printed rules seat does not
+   *     need in full, keeping the machine-facing declarations.
+   *   · `options.prose` keeps the five answers a prose surface can be WRONG
+   *     about — it can name the wrong currency, invent a verb, promise a win
+   *     the rules do not contain, describe a password path that does not
+   *     exist, or threaten a failure that cannot happen. It drops the three
+   *     STRUCTURAL answers (session shape, week shape, teaching order), which
+   *     the rules page and the week plan own: a prose stage handed those reads
+   *     them as a shape to re-derive against the plan it was already given.
+   *   · Neither flag: the whole document, for the two spine seats.
+   *
+   * WHY THE PROSE DEMAND LIVES HERE AND NOT IN INST_FOUND_DOCUMENTS. Two
+   * independent reasons, and the second is the binding one:
+   *   1. The single-prompt bundle measured 114,941 of its ratified 115,000
+   *      characters at this wave — ~60 characters of headroom. INST_FOUND_
+   *      DOCUMENTS, INST_INTERLUDES and INST_VOICE_DISCIPLINE are all ON that
+   *      bundle (D132/D139/D144 arithmetic, one more time).
+   *   2. D128's law: a section routed to a stage it is FALSE at teaches the
+   *      model that this prompt's rules may not apply to the shape in front of
+   *      it. "Name the document's occasion inside the game's economy" is
+   *      unanswerable on the paste path, which runs no rulebook stage at all —
+   *      so on the bundle it would be exactly that false section. Stated here,
+   *      it arrives only where a rulebook exists to answer it, resolved.
    *
    * Returns '' for a missing or empty rulebook, so every caller without one
    * builds the prompt it always built, byte for byte.
@@ -3294,6 +3323,58 @@
       'and these rules disagree, the rules win.',
       ''
     ];
+    // THE PROSE SEATS' OWN DEMAND. Stated once, here, because it is only
+    // answerable where a rulebook exists (see the D128 note in the header).
+    if (opts.prose) {
+      lines = lines.concat([
+        'YOU ARE WRITING PROSE FOR THIS GAME, and these rules are what the prose has to be TRUE',
+        'OF. Name the currency by the name below and no other. Let the page show the verbs the',
+        'player actually performs, on the surfaces they are performed on. Never promise the',
+        'reader a win, a cost, or a way through that these rules do not contain. If a CURRENCY',
+        'given elsewhere in this prompt spells the currency differently, THAT spelling is the',
+        'one that prints — it is the same currency under a second name, and you must not widen',
+        'the drift by inventing a third.',
+        '',
+        'EVERY IN-WORLD DOCUMENT YOU WRITE ANSWERS THREE QUESTIONS BEFORE ITS FIRST SENTENCE,',
+        'and the answers are specific to THIS document, never to the book\'s genre:',
+        '- WHO WROTE IT — a named person or office inside the fiction, with a position in the',
+        '  conflict these rules describe: who they answer to, what they stand to lose, what the',
+        '  economy above costs them.',
+        '- WHO READS IT — its in-fiction addressee. A document written to no one is a lore',
+        '  drop; a document written to a named reader has something to withhold from them.',
+        '- ITS OCCASION — what event in the game\'s economy caused it to be written NOW. A mark',
+        '  spent, a clock turned, a gate refused, a component extracted.',
+        '"The harbormaster\'s third warning letter, to the pilot who ignored the first two,',
+        'written the morning after the tide clock filled" is an occasion. "Cosmic-horror prose"',
+        'is a genre label and funds nothing.',
+        '',
+        'THIS IS ALSO WHY THE HANDS DIFFER. Two documents by different named authors must be',
+        'tellable apart with the bylines removed — and the thing that makes them so is that',
+        'their writers hold DIFFERENT POSITIONS in the conflict above. They record different',
+        'facts because different facts threaten them; they omit different facts for the same',
+        'reason; they format differently because they answer to different offices. Voices that',
+        'differ only in flourish are one hand wearing several names.',
+        ''
+      ]);
+    }
+    // THE SPINE SEATS' ORDERING DEMAND (D139's compose-before-metrics idiom,
+    // applied to voice). These two seats author `meta.literaryRegister`, and
+    // they receive the rulebook already — so the ordering can be stated as a
+    // fact about the prompt in front of them rather than as a rule they must
+    // remember. Not on the compact projection (the rules page authors no
+    // voiceSpec) and not on the prose projection (those stages obey one).
+    if (!opts.compact && !opts.prose) {
+      lines = lines.concat([
+        'THE VOICE IS CHOSEN AFTER, AND FROM, THESE RULES. When you author',
+        '`meta.literaryRegister` below, derive it from the GAME the rules above declare — not',
+        'from the genre words in the brief, and not before you have read them. The narrating',
+        'voice is a fit to what the player DOES: a book whose core verb is decoding under',
+        'deadline does not sound like a book whose core verb is tending something slowly. The',
+        'same order governs `authorRegisters`: the hands differ because their writers hold',
+        'different positions in the conflict these rules describe.',
+        ''
+      ]);
+    }
     var SECTIONS = [
       ['winCondition', 'How you win'],
       ['coreVerbs', 'What the player actually does'],
@@ -3311,8 +3392,15 @@
     // failure modes, which the week stages own).
     var COMPACT_KEYS = ['winCondition', 'coreVerbs', 'economy', 'passwordPath',
       'sessionShape', 'teachingOrder'];
+    // The prose projection keeps the five answers a written page can be WRONG
+    // about and drops the three structural ones. `whatGoesBadly` is IN and it
+    // is the least obvious inclusion: a document's occasion is usually a thing
+    // that went badly, and a stage that invents its own failure modes writes
+    // threats the game cannot deliver.
+    var PROSE_KEYS = ['winCondition', 'coreVerbs', 'economy', 'passwordPath', 'whatGoesBadly'];
     SECTIONS.forEach(function (row) {
       if (opts.compact && COMPACT_KEYS.indexOf(row[0]) === -1) return;
+      if (opts.prose && PROSE_KEYS.indexOf(row[0]) === -1) return;
       var text = answerOf(row[0]);
       if (!text) return;
       lines.push('### ' + row[1]);
@@ -3354,6 +3442,96 @@
         var text = String(w || '').trim();
         if (text) lines.push('- ' + text);
       });
+      lines.push('');
+    }
+    return lines.join('\n').replace(/\n+$/, '');
+  };
+
+  /**
+   * formatWeekTensionGiven(playSpine, weekNumber, weekCount) -> string
+   *
+   * THIS WEEK'S ROW OF THE TENSION BUDGET, AND ITS PLACE ON THE CURVE.
+   *
+   * `meta.playSpine.tensionBudget` is authored one row per week at the spine
+   * seat, `difficultyCurve.perWeek` one clause per week beside it, and both are
+   * read back by the closure floors and the simulated player. Measured before
+   * the prose-funding wave: NO prompt surface under public/generator/ read
+   * either one. The week stages — the stages that write what is actually at
+   * stake in a week — were choosing this week's pressure freely while the book
+   * had already declared it, which is D170's shape (a rule that reaches the
+   * stage nowhere) applied to the seam VISION §7 exists to hold.
+   *
+   * DERIVED, NOT RESTATED. The position is stated as "week N of M" and the
+   * curve clause is quoted verbatim from `perWeek[N-1]`. It deliberately does
+   * NOT name a week "the peak": that would be a second deload/peak heuristic
+   * living beside `derivePlannedWeekShapes` and the topology digest's own, and
+   * D166's ruling on exactly that pair is that teaching from one heuristic
+   * while checking against another is D93's two-algorithms defect. If the book
+   * wants this week called the peak, the book says so in `perWeek`.
+   *
+   * Returns '' when there is no spine, no row for this week and no curve
+   * clause, so every caller without one builds the prompt it always built.
+   */
+  window.formatWeekTensionGiven = function (playSpine, weekNumber, weekCount) {
+    var spine = (playSpine && typeof playSpine === 'object') ? playSpine : null;
+    if (!spine) return '';
+    var n = Number(weekNumber);
+    if (!(n > 0)) return '';
+    var budget = Array.isArray(spine.tensionBudget) ? spine.tensionBudget : [];
+    var curve = (spine.difficultyCurve && typeof spine.difficultyCurve === 'object')
+      ? spine.difficultyCurve : {};
+    var perWeek = Array.isArray(curve.perWeek) ? curve.perWeek : [];
+    var row = budget.filter(function (r) { return Number((r || {}).week) === n; })[0] || null;
+    var clause = String(perWeek[n - 1] || '').trim();
+    var shape = String(curve.shape || '').trim();
+    if (!row && !clause && !shape) return '';
+    var total = Number(weekCount) || budget.length || perWeek.length || 0;
+    var position = total > 0 ? ('week ' + n + ' of ' + total) : ('week ' + n);
+    var lines = [
+      '### What this week has at stake — a GIVEN',
+      '',
+      'This book\'s `meta.playSpine.tensionBudget` was written before any week was, and it has a',
+      'row for ' + position + '. It is not a suggestion about mood: it is what this week must',
+      'actually put at risk, on the page, in surfaces the player marks.',
+      ''
+    ];
+    var axes = [];
+    if (row) {
+      if (String(row.scarce || '').trim()) {
+        axes.push('- SCARCE this week: ' + String(row.scarce).trim());
+      }
+      if (String(row.losable || '').trim()) {
+        axes.push('- LOSABLE this week: ' + String(row.losable).trim());
+      }
+      if (String(row.fallBehind || '').trim()) {
+        axes.push('- HOW THE PLAYER FALLS BEHIND: ' + String(row.fallBehind).trim());
+      }
+    }
+    if (axes.length) {
+      lines = lines.concat(axes);
+      // An ABSENT axis is a declaration, not a gap (the schema says so), so the
+      // block says which way rather than leaving the model to guess whether a
+      // missing line means "none" or "not yet decided".
+      if (axes.length < 3) {
+        lines.push('The axes not listed are declared EMPTY for this week — do not invent pressure on'
+          + ' them.');
+      }
+      lines.push('');
+    } else if (row) {
+      lines.push('This week\'s row names no axis at all: the book declared a week with nothing at'
+        + ' stake. Write it that way — a lull is a legitimate week — and do not manufacture a'
+        + ' threat the spine did not price.');
+      lines.push('');
+    }
+    if (clause || shape) {
+      lines.push('The difficulty curve: '
+        + (curve.keyedToLoad === true
+          ? 'this book keyed its puzzles to the training load.'
+          : curve.keyedToLoad === false
+            ? 'this book deliberately did NOT key its puzzles to the training load.'
+            : 'declared without a keying answer.'));
+      if (shape) lines.push('Its shape, as the book stated it: ' + shape);
+      if (clause) lines.push('And for ' + position + ', verbatim: ' + clause);
       lines.push('');
     }
     return lines.join('\n').replace(/\n+$/, '');

@@ -2832,6 +2832,34 @@
       contextLines.push('');
     }
 
+    // THE RULEBOOK, IN ITS PROSE PROJECTION (VISION §5 — the world funds the
+    // prose). This stage writes the week the player reads; before this wave it
+    // had never been shown the game it was writing for. `options.gameRulebook`
+    // is the explicit hand-over and the skeleton is the fallback — the same
+    // pattern generateFleshRulesPrompt uses, and one document either way.
+    var sfRulebookGiven = (typeof window.formatGameRulebookGiven === 'function')
+      ? window.formatGameRulebookGiven(
+        options.gameRulebook || ((skeleton || {}).meta || {}).gameRulebook,
+        { prose: true }
+      )
+      : '';
+    if (sfRulebookGiven) {
+      contextLines.push(sfRulebookGiven + '\n');
+    }
+
+    // THIS WEEK'S ROW OF THE TENSION BUDGET, resolved for the week being
+    // written. The spine declared it and no prompt surface read it.
+    var sfTensionGiven = (typeof window.formatWeekTensionGiven === 'function')
+      ? window.formatWeekTensionGiven(
+        options.playSpine || ((skeleton || {}).meta || {}).playSpine,
+        weekNum,
+        Array.isArray(skeleton && skeleton.weekPlan) ? skeleton.weekPlan.length : 0
+      )
+      : '';
+    if (sfTensionGiven) {
+      contextLines.push(sfTensionGiven + '\n');
+    }
+
     if (isBoss) {
       contextLines.push('## Boss Week Requirements');
       contextLines.push('- This week replaces fieldOps with bossEncounter.');
@@ -2864,6 +2892,17 @@
   window.generateFleshFragmentBatchPrompt = function (skeleton, batchEntries, weekSummaries, priorFragments, batchIndex, totalBatches, options) {
     options = options || {};
     var ctx = extractSkeletonContext(skeleton);
+    // THE RULEBOOK, PROSE PROJECTION (VISION §5). The found documents ARE the
+    // book's prose surface, and the rhetorical triple this projection demands
+    // (who wrote it, who reads it, what occasion in the economy) is only
+    // answerable by a stage that has been shown the economy. '' with no
+    // rulebook, so a pre-D178 caller builds the prompt it always built.
+    var rulebookGiven = (typeof window.formatGameRulebookGiven === 'function')
+      ? window.formatGameRulebookGiven(
+        options.gameRulebook || ((skeleton || {}).meta || {}).gameRulebook,
+        { prose: true }
+      )
+      : '';
 
     return [
       '# LiftRPG Flesh Stage — Fragment Batch ' + (batchIndex + 1) + '/' + totalBatches,
@@ -2871,6 +2910,7 @@
       'You are writing FOUND DOCUMENTS for a LiftRPG booklet.',
       'These are in-world documents discovered during play — memos, reports, field notes, etc.',
       '',
+      rulebookGiven ? rulebookGiven + '\n' : '',
       formatSkeletonIdentityBlock(ctx),
       '## Fragment Schema',
       window.buildStageSchema('fragment'),
@@ -2903,6 +2943,15 @@
     options = options || {};
     var ctx = extractSkeletonContext(skeleton);
     var boss = skeleton.bossPlan || {};
+    // THE RULEBOOK, PROSE PROJECTION (VISION §5). The ending is what the win
+    // condition and the password path were FOR; this seat had been shown
+    // neither. Its projection keeps both, verbatim.
+    var rulebookGiven = (typeof window.formatGameRulebookGiven === 'function')
+      ? window.formatGameRulebookGiven(
+        options.gameRulebook || ((skeleton || {}).meta || {}).gameRulebook,
+        { prose: true }
+      )
+      : '';
 
     return [
       '# LiftRPG Flesh Stage — Ending ("' + variant + '")',
@@ -2910,6 +2959,7 @@
       'You are writing a BOOKLET ENDING for a LiftRPG zine.',
       'This is the payoff document the player unlocks after solving the password.',
       '',
+      rulebookGiven ? rulebookGiven + '\n' : '',
       formatSkeletonIdentityBlock(ctx, {
         extraLines: ['- Resolution: ' + (ctx.structuralShape.resolution || '')]
       }),
@@ -2958,6 +3008,15 @@
     var boss = skeleton.bossPlan || {};
 
     var variantList = endingVariants.map(function (v) { return '"' + v + '"'; }).join(', ');
+    // Same given, same reason — and this is the builder the pipeline calls BY
+    // DEFAULT, so the fix has to land here or it reaches every ending path
+    // except the busiest one (the D150 lesson on this exact pair).
+    var rulebookGiven = (typeof window.formatGameRulebookGiven === 'function')
+      ? window.formatGameRulebookGiven(
+        options.gameRulebook || ((skeleton || {}).meta || {}).gameRulebook,
+        { prose: true }
+      )
+      : '';
 
     return [
       '# LiftRPG Flesh Stage — All Endings',
@@ -2966,6 +3025,7 @@
       'Each ending is a payoff document the player unlocks after solving the password.',
       'Generate one ending per variant: ' + variantList,
       '',
+      rulebookGiven ? rulebookGiven + '\n' : '',
       formatSkeletonIdentityBlock(ctx, {
         extraLines: ['- Resolution: ' + (ctx.structuralShape.resolution || '')]
       }),
@@ -3347,6 +3407,14 @@
       '',
       formatProcessParticulars((shellContext || {}).processParticulars),
       '',
+      // THE RULEBOOK, PROSE PROJECTION (VISION §5), on the multi-stage
+      // pipeline's DEFAULT fragment seat — the same seat the intent contract
+      // above had to be routed to for the same reason. The rhetorical triple
+      // the projection demands is unanswerable without the economy it names.
+      (typeof window.formatGameRulebookGiven === 'function')
+        ? window.formatGameRulebookGiven(options.gameRulebook, { prose: true })
+        : '',
+      '',
       '## Fragment Voice Packet',
       compactJson(summarizeFragmentVoicePacket(layerBible, batchRegistry || [], batchWeekSummaries, priorFragments, shellContext)),
       '',
@@ -3462,6 +3530,17 @@
         retryScaffolds.push('- If the blocking error is boss-decode-related, set bossEncounter.decodingKey.referenceTable to a plain A1Z26 string such as "1=A 2=B 3=C ... 26=Z". Do not use objects or custom codebooks.');
       }
     }
+    // Hoisted so the blank line can ride INSIDE the block: `parts` is joined
+    // through filter(Boolean), which strips a bare '' separator.
+    var msRulebookGiven = (typeof window.formatGameRulebookGiven === 'function')
+      ? window.formatGameRulebookGiven(options.gameRulebook, { prose: true })
+      : '';
+    var msTensionGiven = (typeof window.formatWeekTensionGiven === 'function')
+      ? window.formatWeekTensionGiven(
+        options.playSpine,
+        weekPlan.weekNumber,
+        (campaignPlan && Array.isArray(campaignPlan.weeks)) ? campaignPlan.weeks.length : 0)
+      : '';
     var parts = [
       '# Write Week ' + weekPlan.weekNumber,
       '',
@@ -3527,6 +3606,18 @@
         ? window.formatWeekIdentityGivenBlock(options.weekIdentityGiven)
         : '',
       '',
+      // THE RULEBOOK, PROSE PROJECTION (VISION §5 — the world funds the prose).
+      // `builders.singleWeekFinal` is the multi-stage pipeline's real week
+      // seat: 168,000 input tokens of weeks were written by a stage that had
+      // never been told what game it was writing for. Same defect class as the
+      // currency and intent givens above; the difference is that this one is
+      // the SOURCE those two are derived from.
+      msRulebookGiven ? msRulebookGiven + '\n' : '',
+      // THIS WEEK'S ROW OF THE TENSION BUDGET AND ITS PLACE ON THE CURVE. The
+      // spine authored both, the closure floors read them back, and no prompt
+      // surface printed either. Week count comes from the campaign plan, which
+      // is the same list the plan itself was built from.
+      msTensionGiven ? msTensionGiven + '\n' : '',
       continuity ? '**Continuity Rules:** ' + JSON.stringify(continuity) : '',
       isBossWeek && allComponentValues ? '**Prior Values for Boss Decode (EXACTLY ' + allComponentValues.length + ' values — do not add, remove, or reorder):** ' + JSON.stringify(allComponentValues) + '\nSet bossEncounter.componentInputs to EXACTLY this array. There are ' + allComponentValues.length + ' non-boss weeks, so there must be EXACTLY ' + allComponentValues.length + ' componentInputs.' : '',
       '',
@@ -3632,7 +3723,8 @@
     return parts.filter(Boolean).join('\n');
   };
 
-  window.generateSingleFragmentPrompt = function (layerBible, registryEntry, weekSummaries, shellContext, pastFragments, retryState) {
+  window.generateSingleFragmentPrompt = function (layerBible, registryEntry, weekSummaries, shellContext, pastFragments, retryState, options) {
+    options = options || {};
     var retryError = retryState && retryState.error && retryState.error.message
       ? String(retryState.error.message)
       : '';
@@ -3680,6 +3772,15 @@
       '',
       formatProcessParticulars(shellContext.processParticulars),
       '',
+      // THE RULEBOOK, PROSE PROJECTION (VISION §5). This is the ADAPTIVE
+      // RECOVERY seat — one entry at a time after a batch fails — and it is
+      // funded alongside the batch seat deliberately: a recovery path that
+      // writes to a different standard than the path it recovers produces a
+      // book whose worst documents are the ones the pipeline had to try twice.
+      (typeof window.formatGameRulebookGiven === 'function')
+        ? window.formatGameRulebookGiven(options.gameRulebook, { prose: true })
+        : '',
+      '',
       '**Current Timeline (Cross-Reference Support):**',
       JSON.stringify(weekSummaries || []),
       '',
@@ -3701,7 +3802,8 @@
     return parts.filter(Boolean).join('\n');
   };
 
-  window.generateSingleEndingPrompt = function (layerBible, campaignPlan, variantId, shellContext, weekSummaries) {
+  window.generateSingleEndingPrompt = function (layerBible, campaignPlan, variantId, shellContext, weekSummaries, options) {
+    options = options || {};
     var parts = [
       '# Write Ending Variant: ' + variantId,
       '',
@@ -3721,6 +3823,13 @@
       formatArtifactIntentContract(shellContext),
       '',
       formatProcessParticulars(shellContext.processParticulars),
+      '',
+      // THE RULEBOOK, PROSE PROJECTION (VISION §5). The ending is the payoff of
+      // the win condition and the password path — the two things this seat was
+      // asked to land and had never been shown.
+      (typeof window.formatGameRulebookGiven === 'function')
+        ? window.formatGameRulebookGiven(options.gameRulebook, { prose: true })
+        : '',
       '',
       '**Journey So Far:**',
       JSON.stringify(weekSummaries || []),

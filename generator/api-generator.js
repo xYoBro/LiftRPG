@@ -3017,7 +3017,8 @@ async function generateSingleFragmentAdaptive(settings, builders, config) {
         config.batchWeekSummaries,
         config.shellContext,
         config.priorFragments,
-        retryState
+        retryState,
+        { gameRulebook: config.gameRulebook || null }
       );
     }
   });
@@ -3045,6 +3046,9 @@ async function recoverFragmentBatchDeterministically(settings, builders, config,
       registry: [entry],
       batchWeekSummaries: weekSummariesForRegistry([entry], config.allWeekSummaries, config.batchWeekSummaries),
       shellContext: config.shellContext,
+      // The rulebook has to survive every rebuild of this config or the
+      // recovery seat writes unfunded (VISION §5).
+      gameRulebook: config.gameRulebook || null,
       priorFragments: stagedFragments,
       label: config.label + ' recovery ' + entry.id,
       stageKey: config.stageKey,
@@ -3106,7 +3110,12 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
           config.batchIndex,
           config.totalBatches,
           config.shellContext,
-          retryState.attempt > 0 ? { retryMode: 'tight' } : undefined
+          // The retry flag was the whole options object; the rulebook rides
+          // beside it now, so a first attempt is funded exactly as a retry is.
+          {
+            retryMode: retryState.attempt > 0 ? 'tight' : undefined,
+            gameRulebook: config.gameRulebook || null
+          }
         );
       }
     });
@@ -3141,6 +3150,7 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
       batchIndex: config.batchIndex,
       totalBatches: config.totalBatches,
       shellContext: config.shellContext,
+      gameRulebook: config.gameRulebook || null,
       label: config.label + 'A',
       stageKey: config.stageKey,
       stageIndex: config.stageIndex,
@@ -3160,6 +3170,7 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
       batchIndex: config.batchIndex,
       totalBatches: config.totalBatches,
       shellContext: config.shellContext,
+      gameRulebook: config.gameRulebook || null,
       label: config.label + 'B',
       stageKey: config.stageKey,
       stageIndex: config.stageIndex,
@@ -4387,7 +4398,18 @@ async function runApiPipeline(options) {
           retryState,
           // The GIVEN and the floor read the same row (D170); the identity
           // givens and the floor read the same OPTIONS OBJECT (D173).
-          { ludicWeekGiven: owesLudic, weekIdentityGiven: weekIdentityGiven }
+          //
+          // THE PROSE FUNDING (VISION §5). `gameRulebook` is the run's banked
+          // rulebook — the same object the shell seat was handed — and
+          // `playSpine` is read off the SAME source the week floor's own
+          // options read it from directly above, so the row the prompt states
+          // and the row the gate checks cannot be two readings.
+          {
+            ludicWeekGiven: owesLudic,
+            weekIdentityGiven: weekIdentityGiven,
+            gameRulebook: gameRulebook,
+            playSpine: weekFloorOptions.playSpine
+          }
         );
       }
     });
@@ -4464,6 +4486,12 @@ async function runApiPipeline(options) {
       batchIndex: fb,
       totalBatches: totalBatches,
       shellContext: shellContext,
+      // THE PROSE FUNDING (VISION §5). Carried on the config rather than
+      // closed over, because this config is what the recovery paths rebuild
+      // from: a rulebook the batch seat prints and the single-fragment
+      // recovery seat does not would make the retried documents the worst in
+      // the book.
+      gameRulebook: gameRulebook,
       label: batchLabel,
       stageKey: 'fragments',
       stageIndex: stageNum,
@@ -4550,7 +4578,10 @@ async function runApiPipeline(options) {
         return '';
       },
       buildPrompt: function (retryState) {
-        return builders.singleEnding(layerBible, campaignPlan, "Primary", shellContext, weekSummaries);
+        // THE PROSE FUNDING (VISION §5): the ending is the payoff of the win
+        // condition and the password path this rulebook declared.
+        return builders.singleEnding(layerBible, campaignPlan, "Primary", shellContext, weekSummaries,
+          { gameRulebook: gameRulebook });
       }
     });
     finalEndings.push(endingObj);
@@ -5699,7 +5730,13 @@ async function runSkeletonFleshPipeline(options) {
           // The GIVEN and the floor below read the same row (D170); the identity
           // givens and the floor below read the same OPTIONS OBJECT (D173).
           ludicWeekGiven: owesLudicSF,
-          weekIdentityGiven: sfWeekIdentityGiven
+          weekIdentityGiven: sfWeekIdentityGiven,
+          // THE PROSE FUNDING (VISION §5), this pipeline's twin of the
+          // multi-stage week seat. `playSpine` is read off the SAME source the
+          // week floor's own options read it from, so the row the prompt states
+          // and the row the gate checks cannot be two readings.
+          gameRulebook: sfGameRulebook,
+          playSpine: sfWeekFloorOptions.playSpine
         });
       },
       normalizeResult: function (result) {
@@ -5838,7 +5875,9 @@ async function runSkeletonFleshPipeline(options) {
           weekSummariesSF,
           [],   // no prior fragments (single call)
           0,    // batch index
-          1     // total batches
+          1,    // total batches
+          // THE PROSE FUNDING (VISION §5) — the documents ARE the prose.
+          { gameRulebook: sfGameRulebook }
         );
       },
       // THE GATE MUST JUDGE THE OBJECT THE PIPELINE BANKS (D168). `unwrapKey`
@@ -5917,11 +5956,16 @@ async function runSkeletonFleshPipeline(options) {
       telemetryCollector: sfTelemetry,
       unwrapKey:        'endings',
       buildPrompt: function () {
+        // THE PROSE FUNDING (VISION §5) on BOTH ending builders — the bundled
+        // one is the default, and D150's lesson on this exact pair is that a
+        // fix landed on the fallback alone reaches every path but the busiest.
         if (builders.fleshEndingsBundled) {
-          return builders.fleshEndingsBundled(skeleton, endingVariants, finalWeekSummary, weekSummariesSF);
+          return builders.fleshEndingsBundled(skeleton, endingVariants, finalWeekSummary, weekSummariesSF,
+            { gameRulebook: sfGameRulebook });
         }
         // Fallback: use single-ending builder for first variant (shouldn't reach here)
-        return builders.fleshEnding(skeleton, endingVariants[0], finalWeekSummary, weekSummariesSF);
+        return builders.fleshEnding(skeleton, endingVariants[0], finalWeekSummary, weekSummariesSF,
+          { gameRulebook: sfGameRulebook });
       },
       validate: function (result) {
         var endingsArray = Array.isArray(result) ? result : (result && result.endings ? result.endings : null);
