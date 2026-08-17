@@ -2435,7 +2435,7 @@ export function identityAxesForStage(stage) {
 // a clock or a global; `drawSeedAssignments` is a pure function of its argument
 // and the table above, which is what makes a book reproducible from the seed
 // recorded on it (`_x.divergenceSeed`).
-function seedHash(text) {
+export function seedHash(text) {
   var hash = 2166136261;
   var str = String(text == null ? '' : text);
   for (var i = 0; i < str.length; i += 1) {
