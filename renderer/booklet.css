@@ -4573,16 +4573,39 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   letter-spacing:.14em;
   color:color-mix(in srgb, var(--ink) 56%, var(--muted) 44%);
 }
+/* ── The track column keeps its own ink (DR-8, 2026-08-17) ──
+   `.map-track-step` is `flex:1; min-width:0`, so a 12-stop track on a 432px
+   column gives each label a 21px box. Without a break rule a label like
+   "STATION TWELVE" cannot break "STATION" (≈32px of mono at 5.8pt), so
+   `overflow-wrap:normal` painted the word straight across the 4px gap and onto
+   the NEXT step's label — 14 sibling collisions across four corpus fixtures,
+   on pages every other gate called clean (nothing CLIPS: the step has no
+   `overflow:hidden`, so D133's own-box scan cannot see it either; only D172's
+   box-over-box predicate could).
+
+   CROSS-FILE CONTRACT — this rule is what makes the estimate TRUE.
+   `renderer/modules/atoms/map-panel.js` sizes a track step with
+   `wrappedLines(label.length, stepInnerW, advancePx(…))`, a pure character-count
+   model, and a character-count model IS a break-anywhere model: it assumes every
+   column-width of glyphs starts a new line. Remove this rule and the estimate
+   goes on reserving four lines for text the renderer draws in two — measurement
+   stops equalling render in the silent direction, and the difference is not
+   clipped, it is printed on the neighbour. That file carries the reverse
+   pointer. **Change them together.** */
 .map-track-label{
   font-family:var(--mono);
   font-size:5.8pt;
   text-transform:uppercase;
+  word-break:normal;
+  overflow-wrap:break-word;
 }
 .map-track-meta{
   font-family:var(--serif);
   font-size:5.4pt;
   font-style:italic;
   color:color-mix(in srgb, var(--ink) 68%, var(--muted) 32%);
+  word-break:normal;
+  overflow-wrap:break-word;
 }
 .player-map{
   position:relative;

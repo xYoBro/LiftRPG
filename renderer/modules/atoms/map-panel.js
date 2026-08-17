@@ -143,7 +143,17 @@ const PLAYER_PROMPT_FS_PX = 6.53;   // 4.9pt
 /** Prompts are `width:max-content; max-width:78%`. */
 const PLAYER_PROMPT_MAX_W = 0.78;
 /** .map-track-step: 4px+5px padding, 1px+1px border, 2px gaps between the
- *  index line, the label, and the optional annotation. */
+ *  index line, the label, and the optional annotation.
+ *
+ *  CROSS-FILE CONTRACT (DR-8, 2026-08-17) — the label and annotation heights
+ *  below are computed with `wrappedLines()`, a pure character-count model, and
+ *  a character-count model IS a break-anywhere model: it assumes a column's
+ *  worth of glyphs always starts a new line. That is only true because
+ *  `.map-track-label` / `.map-track-meta` in booklet.css carry
+ *  `overflow-wrap:break-word`. Before that rule existed a 21px step column
+ *  could not break "STATION", so the renderer drew two lines where this model
+ *  reserved four AND painted the surplus glyphs onto the next step's label.
+ *  booklet.css carries the reverse pointer. **Change them together.** */
 const TRACK_STEP_CHROME_PX = 9 + 2;
 const TRACK_STEP_GAP_PX = 2;
 const TRACK_INDEX_PX = 10.25;
@@ -188,6 +198,25 @@ const RK_COL_GAP_PX = 8;
  * minHeight × 1.4, which still covers the widest half-width case measured, and
  * the solver's shrinkPotential (preferredHeight − minHeight) merely
  * under-promises, which costs a revision pass and never a stall.
+ *
+ * ONE BODY IS THE EXCEPTION, AND IT GOT LOUDER (DR-8, 2026-08-17). Every other
+ * body is width-invariant; a HORIZONTAL linear-track is the one whose height is
+ * inversely proportional to the column, because narrowing it divides the same
+ * label across more steps AND more lines. Measured on the four corpus tracks
+ * that render in a 238px halves cell, the rendered `.map-track` is now
+ * 1.8–2.3× this full-column model (169.5 / 132.3 / 144.7 / 134 / 213.8px against
+ * 74 / 74 / 74 / 74 / 109), where before the wrap rule landed it was 0.99–1.4×.
+ * That is the SAME model reading the same JSON: what changed is that the
+ * renderer finally wraps the way this character-count model always assumed, so
+ * the discrepancy moved out of the ink and into the arithmetic — which is the
+ * safe half of the trade, but it is not nothing. Measured consequence across the
+ * whole sealed corpus: page counts flat on all 20 fixtures, zero new
+ * unresolvedOverflow (sf-c1's 2 are pre-existing and identical either side),
+ * zero unsat — the solver measures and revises, so this costs revision passes,
+ * never correctness. Closing it properly needs the ACTUAL column width in the
+ * estimate context, which the ATOM-IR does not carry today (the engine forwards
+ * `options.typeMetrics` and nothing else); that is a Layer-1 contract decision,
+ * not a constant to nudge here.
  */
 const MAP_WIDTH_PX = 432;
 
