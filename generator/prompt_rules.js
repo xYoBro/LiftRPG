@@ -4699,3 +4699,105 @@
       'Return ONLY the complete revised unit as a JSON object. No fences, no commentary.'
     ]).join('\n');
   };
+
+  // ── DELTA REPAIR (D167) ─────────────────────────────────────────────────────
+  // THE PROMPT FOR THE SMALLEST POSSIBLE RETRY.
+  //
+  // A stage gate can fail on defects that are LOCALIZED and NAMED: N specific
+  // strings, each a few characters over its printed-space budget. The remedy
+  // the pipeline had for that was the remedy it has for everything — re-roll
+  // the whole stage — and a week stage is ~30k tokens of output. The author's
+  // first live book re-rolled Week 3 three times over four characters.
+  //
+  // This prompt asks for the four characters. It carries each failing field's
+  // current text, its exact requirement in the floor's own words, and enough of
+  // the surrounding unit to keep the voice; it demands the corrected fields and
+  // NOTHING else. The floor is unchanged — the model still has to satisfy the
+  // same budget the same way, and the same gate re-runs afterwards.
+  //
+  // THE MODEL WRITES EVERY CHARACTER (D160). Nothing in the pipeline truncates,
+  // ellipsises or synthesizes a replacement; the merge lands exactly what comes
+  // back and rejects anything that names a field nobody asked about.
+  window.STRUCTURED_SCHEMA_DELTA_REPAIR = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      fixes: {
+        type: 'array',
+        description: 'One entry per field you were asked to correct. No other fields.',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            path: {
+              type: 'string',
+              description: 'Echo the field path EXACTLY as given in the Fields table.'
+            },
+            value: {
+              type: 'string',
+              description: 'The rewritten text for that field, inside its stated budget.'
+            }
+          },
+          required: ['path', 'value']
+        }
+      }
+    },
+    required: ['fixes']
+  };
+
+  window.buildDeltaRepairPrompt = function (stageName, fields, contextJson) {
+    var rows = (fields || []).map(function (f, i) {
+      return [
+        '### ' + (i + 1) + '. `' + f.path + '`',
+        '- Requirement: ' + f.requirement,
+        '- Budget: ' + f.cap + ' characters. Yours is ' + f.length + ' — '
+          + Math.max(1, (f.length - f.cap)) + ' too many.',
+        '- Current text:',
+        '```',
+        String(f.current == null ? '' : f.current),
+        '```'
+      ].join('\n');
+    });
+    var contextBlock = (typeof contextJson === 'string' && contextJson.trim()) ? [
+      '## Surrounding Content (for voice — do NOT return any of it)',
+      'These are the neighbouring fields of the same unit. They are already accepted and',
+      'frozen. Read them so your rewrite sounds like the same hand wrote it.',
+      contextJson,
+      ''
+    ] : [];
+    return [
+      '# Delta Repair — ' + stageName,
+      '',
+      'Your previous answer for ' + stageName + ' was accepted in every respect but one: '
+        + ((fields || []).length === 1
+          ? 'one field came back longer than the printed space it has.'
+          : (fields || []).length + ' fields came back longer than the printed space they have.'),
+      'Nothing else about the answer is in question, and nothing else may change.',
+      '',
+      'These are PRINTED surfaces. The budget is the width of a line on a 5.5x8.5in page in a',
+      'reader\'s hand between two sets — past it the text is cut off by the page, not by us.',
+      ''
+    ].concat(contextBlock, [
+      '## Fields To Rewrite',
+      ''
+    ], rows, [
+      '',
+      '## How To Rewrite',
+      '- Keep the meaning, the proper nouns, and any reference or pointer the line makes.',
+      '- Rewrite the sentence shorter. Do NOT trim with an ellipsis and do NOT cut a clause',
+      '  off mid-thought — the line must read as finished prose, because it prints as prose.',
+      '- Land a few characters UNDER the budget rather than exactly on it. The check counts',
+      '  characters exactly and a single character over fails the whole stage again.',
+      '- Change nothing else. Do not rename, add, remove, reorder or "improve" any other field.',
+      '',
+      '## Output Contract',
+      'Return ONLY this object:',
+      '{ "fixes": [ { "path": "<exact path from above>", "value": "<the rewritten text>" } ] }',
+      '',
+      '- One entry per field listed above, and no entries for anything else.',
+      '- `path` must be echoed EXACTLY as written above, character for character. A path that',
+      '  was not asked for is rejected and the whole repair is discarded.',
+      '- `value` is the field\'s new text only — not the object it lives in.',
+      '- Return valid JSON only. No fences, no commentary.'
+    ]).join('\n');
+  };

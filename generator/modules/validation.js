@@ -1214,6 +1214,10 @@ function collectPuzzleFloorErrors(weekObj) {
 export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
   var errors = [];
   var warnings = [];
+  // Delta-class coordinates for the errors this gate can name exactly (D167).
+  // Always present on the verdict, empty far more often than not; a consumer
+  // reads it as "these errors, and only these, are repairable field by field".
+  var deltaTargets = [];
   expectedOptions = expectedOptions || {};
   if (!weekObj) { return { valid: false, errors: ['Week object is null'] }; }
   if (!weekObj.title) errors.push('Missing week title');
@@ -1644,7 +1648,28 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
         || weekObj.weekNumber || 0) || weekObj.weekNumber
     });
     collectBudgetBreaches({ weeks: [budgetWeek] }).forEach(function (b) {
-      errors.push('Over budget: ' + b.message);
+      var message = 'Over budget: ' + b.message;
+      errors.push(message);
+      // THE DELTA-CLASS DECLARATION (D167). The floor is unchanged — this
+      // breach still costs the stage its pass. What is added is the fact the
+      // remedy needs: the error is one named string, four characters too long,
+      // and here is where it lives. The path is re-based off the ['weeks', 0]
+      // wrapper this gate builds, so it is relative to the WEEK OBJECT the
+      // stage actually returned — the payload the merge will land on.
+      //
+      // `message` is carried verbatim so the consumer matches on identity
+      // rather than re-deriving: a blocking error is delta-class only when a
+      // target claims that exact string.
+      deltaTargets.push({
+        message: message,
+        pathParts: b.path.slice(2),
+        path: formatFieldPath(b.path.slice(2)),
+        cap: b.cap,
+        length: b.length,
+        // The floor's own sentence, so the delta prompt states the requirement
+        // in the words the gate will re-check it in.
+        requirement: b.message
+      });
     });
   }
 
@@ -1703,7 +1728,7 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
   if (warnings.length > 0) {
     console.warn('[LiftRPG] Week advisory:', warnings.join('; '));
   }
-  return { valid: errors.length === 0, errors: errors, warnings: warnings };
+  return { valid: errors.length === 0, errors: errors, warnings: warnings, deltaTargets: deltaTargets };
 }
 
 // ── The artifact-intent floor (W3 corrective wave, F07) ─────────────────────
@@ -2365,53 +2390,103 @@ export function validateShellSchema(shell, expectedOptions) {
 // §5.2). A cue that needs three lines has stopped being a cue and become the
 // rule again, which is the split the tiers exist to make.
 
+// ── THE COORDINATE HALF (D167) ──────────────────────────────────────────────
+// Every breach below is a SINGLE named string that is a few characters too
+// long. The message says so in words; `path` says so in coordinates, and the
+// two are produced HERE, together, by the code that already walked to the
+// field. Delta repair (api-generator.js) reads the coordinates to ask the model
+// for exactly those fields and to merge exactly those fields back — and it
+// never parses the message, because a parser would be a second algorithm for a
+// fact the producer already knows (D93's law at a new surface).
+//
+// `path` is an array of keys, relative to the booklet-shaped object handed in.
+// `formatFieldPath` is the ONE rendering of it — the string the model is shown
+// and the string the model must echo back. Arrays travel between the producer
+// and the merge; the string exists only for the wire, so nothing anywhere has
+// to parse a path back into keys.
+export function formatFieldPath(parts) {
+  var out = '';
+  (parts || []).forEach(function (part) {
+    if (typeof part === 'number') out += '[' + part + ']';
+    else out += (out ? '.' : '') + String(part);
+  });
+  return out;
+}
+
 export function collectBudgetBreaches(booklet) {
   var breaches = [];
   function over(text, cap) {
     var len = String(text || '').length;
     return len > cap ? len : 0;
   }
+  // One push site, so a breach can never exist without its coordinates.
+  function add(unitType, unitRef, pathParts, cap, len, message) {
+    breaches.push({
+      unitType: unitType,
+      unitRef: unitRef,
+      path: pathParts,
+      cap: cap,
+      length: len,
+      message: message
+    });
+  }
   ((booklet && booklet.weeks) || []).forEach(function (week, wi) {
     ((week && week.sessions) || []).forEach(function (session, si) {
       var len = over(session && session.storyPrompt, OUTPUT_BUDGETS.storyPrompt);
-      if (len) breaches.push({ unitType: 'week', unitRef: week.weekNumber || (wi + 1),
-        message: 'Week ' + (week.weekNumber || (wi + 1)) + ' session ' + (si + 1)
-          + ' storyPrompt is ' + len + ' chars (budget ' + OUTPUT_BUDGETS.storyPrompt + ')' });
+      if (len) add('week', week.weekNumber || (wi + 1),
+        ['weeks', wi, 'sessions', si, 'storyPrompt'], OUTPUT_BUDGETS.storyPrompt, len,
+        'Week ' + (week.weekNumber || (wi + 1)) + ' session ' + (si + 1)
+          + ' storyPrompt is ' + len + ' chars (budget ' + OUTPUT_BUDGETS.storyPrompt + ')');
     });
     var interlude = week && week.interlude;
     var ilen = over(interlude && interlude.body, OUTPUT_BUDGETS.interludeBody);
-    if (ilen) breaches.push({ unitType: 'week', unitRef: week.weekNumber || (wi + 1),
-      message: 'Week ' + (week.weekNumber || (wi + 1)) + ' interlude body is ' + ilen
-        + ' chars (budget ' + OUTPUT_BUDGETS.interludeBody + ')' });
+    if (ilen) add('week', week.weekNumber || (wi + 1),
+      ['weeks', wi, 'interlude', 'body'], OUTPUT_BUDGETS.interludeBody, ilen,
+      'Week ' + (week.weekNumber || (wi + 1)) + ' interlude body is ' + ilen
+        + ' chars (budget ' + OUTPUT_BUDGETS.interludeBody + ')');
 
     // ── Wave 4a point-of-use surfaces ────────────────────────────────────────
     var wn = week.weekNumber || (wi + 1);
-    function weekBreach(msg) { breaches.push({ unitType: 'week', unitRef: wn, message: msg }); }
+    function weekBreach(pathParts, cap, len, msg) {
+      add('week', wn, pathParts, cap, len, msg);
+    }
     ((week && week.sessions) || []).forEach(function (session, si) {
       var where = 'Week ' + wn + ' session ' + (si + 1);
       ((session && session.microLines) || []).forEach(function (line, mi) {
         var c = over(line && line.condition, OUTPUT_BUDGETS.microLineCondition);
-        if (c) weekBreach(where + ' microLine ' + (mi + 1) + ' condition is ' + c
+        if (c) weekBreach(['weeks', wi, 'sessions', si, 'microLines', mi, 'condition'],
+          OUTPUT_BUDGETS.microLineCondition, c,
+          where + ' microLine ' + (mi + 1) + ' condition is ' + c
           + ' chars (budget ' + OUTPUT_BUDGETS.microLineCondition + ')');
         var q = over(line && line.cue, OUTPUT_BUDGETS.microLineCue);
-        if (q) weekBreach(where + ' microLine ' + (mi + 1) + ' cue is ' + q
+        if (q) weekBreach(['weeks', wi, 'sessions', si, 'microLines', mi, 'cue'],
+          OUTPUT_BUDGETS.microLineCue, q,
+          where + ' microLine ' + (mi + 1) + ' cue is ' + q
           + ' chars (budget ' + OUTPUT_BUDGETS.microLineCue + ')');
         var a = over(line && line.citeRef && line.citeRef.citedAs, OUTPUT_BUDGETS.citedAs);
-        if (a) weekBreach(where + ' microLine ' + (mi + 1) + ' citeRef.citedAs is ' + a
+        if (a) weekBreach(['weeks', wi, 'sessions', si, 'microLines', mi, 'citeRef', 'citedAs'],
+          OUTPUT_BUDGETS.citedAs, a,
+          where + ' microLine ' + (mi + 1) + ' citeRef.citedAs is ' + a
           + ' chars (budget ' + OUTPUT_BUDGETS.citedAs + ')');
       });
       var rb = session && session.returnBeat;
       var rc = over(rb && rb.closingLine, OUTPUT_BUDGETS.returnBeatClosing);
-      if (rc) weekBreach(where + ' returnBeat.closingLine is ' + rc
+      if (rc) weekBreach(['weeks', wi, 'sessions', si, 'returnBeat', 'closingLine'],
+        OUTPUT_BUDGETS.returnBeatClosing, rc,
+        where + ' returnBeat.closingLine is ' + rc
         + ' chars (budget ' + OUTPUT_BUDGETS.returnBeatClosing + ')');
       var ro = over(rb && rb.openingEcho, OUTPUT_BUDGETS.returnBeatOpening);
-      if (ro) weekBreach(where + ' returnBeat.openingEcho is ' + ro
+      if (ro) weekBreach(['weeks', wi, 'sessions', si, 'returnBeat', 'openingEcho'],
+        OUTPUT_BUDGETS.returnBeatOpening, ro,
+        where + ' returnBeat.openingEcho is ' + ro
         + ' chars (budget ' + OUTPUT_BUDGETS.returnBeatOpening + ')');
     });
     var door = week && week.doorChoice;
     ['optionA', 'optionB'].forEach(function (side) {
       var lean = over(door && door[side] && door[side].lean, OUTPUT_BUDGETS.doorOptionLean);
-      if (lean) weekBreach('Week ' + wn + ' doorChoice.' + side + '.lean is ' + lean
+      if (lean) weekBreach(['weeks', wi, 'doorChoice', side, 'lean'],
+        OUTPUT_BUDGETS.doorOptionLean, lean,
+        'Week ' + wn + ' doorChoice.' + side + '.lean is ' + lean
         + ' chars (budget ' + OUTPUT_BUDGETS.doorOptionLean + ')');
     });
 
@@ -2423,35 +2498,43 @@ export function collectBudgetBreaches(booklet) {
       var targets = ((session && session.markStrip) || {}).targets;
       (Array.isArray(targets) ? targets : []).forEach(function (target, ti) {
         var l = over(target && target.label, OUTPUT_BUDGETS.markStripLabel);
-        if (l) weekBreach('Week ' + wn + ' session ' + (si + 1) + ' markStrip target ' + (ti + 1)
+        if (l) weekBreach(['weeks', wi, 'sessions', si, 'markStrip', 'targets', ti, 'label'],
+          OUTPUT_BUDGETS.markStripLabel, l,
+          'Week ' + wn + ' session ' + (si + 1) + ' markStrip target ' + (ti + 1)
           + ' label is ' + l + ' chars (budget ' + OUTPUT_BUDGETS.markStripLabel + ')');
       });
     });
   });
-  ((booklet && booklet.fragments) || []).forEach(function (frag) {
+  ((booklet && booklet.fragments) || []).forEach(function (frag, fi) {
+    // The body reads from `content` when it exists and `body` otherwise, so the
+    // coordinate must name the key the value actually came from — a path to the
+    // OTHER key would create a field rather than shorten one.
+    var bodyKey = (frag && frag.content) ? 'content' : 'body';
     var len = over(frag && (frag.content || frag.body), OUTPUT_BUDGETS.fragmentBody);
-    if (len) breaches.push({ unitType: 'fragment', unitRef: frag.id,
-      message: 'Fragment ' + (frag.id || '?') + ' body is ' + len
-        + ' chars (budget ' + OUTPUT_BUDGETS.fragmentBody + ')' });
+    if (len) add('fragment', frag.id, ['fragments', fi, bodyKey], OUTPUT_BUDGETS.fragmentBody, len,
+      'Fragment ' + (frag.id || '?') + ' body is ' + len
+        + ' chars (budget ' + OUTPUT_BUDGETS.fragmentBody + ')');
     var cited = over(frag && frag.citeRef && frag.citeRef.citedAs, OUTPUT_BUDGETS.citedAs);
-    if (cited) breaches.push({ unitType: 'fragment', unitRef: frag.id,
-      message: 'Fragment ' + (frag.id || '?') + ' citeRef.citedAs is ' + cited
-        + ' chars (budget ' + OUTPUT_BUDGETS.citedAs + ')' });
+    if (cited) add('fragment', frag.id, ['fragments', fi, 'citeRef', 'citedAs'], OUTPUT_BUDGETS.citedAs, cited,
+      'Fragment ' + (frag.id || '?') + ' citeRef.citedAs is ' + cited
+        + ' chars (budget ' + OUTPUT_BUDGETS.citedAs + ')');
     var hint = over(frag && frag.seal && frag.seal.keyHint, OUTPUT_BUDGETS.sealKeyHint);
-    if (hint) breaches.push({ unitType: 'fragment', unitRef: frag.id,
-      message: 'Fragment ' + (frag.id || '?') + ' seal.keyHint is ' + hint
-        + ' chars (budget ' + OUTPUT_BUDGETS.sealKeyHint + ')' });
+    if (hint) add('fragment', frag.id, ['fragments', fi, 'seal', 'keyHint'], OUTPUT_BUDGETS.sealKeyHint, hint,
+      'Fragment ' + (frag.id || '?') + ' seal.keyHint is ' + hint
+        + ' chars (budget ' + OUTPUT_BUDGETS.sealKeyHint + ')');
     var unlock = over(frag && frag.seal && frag.seal.unlockCondition, OUTPUT_BUDGETS.sealUnlockCondition);
-    if (unlock) breaches.push({ unitType: 'fragment', unitRef: frag.id,
-      message: 'Fragment ' + (frag.id || '?') + ' seal.unlockCondition is ' + unlock
-        + ' chars (budget ' + OUTPUT_BUDGETS.sealUnlockCondition + ')' });
+    if (unlock) add('fragment', frag.id, ['fragments', fi, 'seal', 'unlockCondition'],
+      OUTPUT_BUDGETS.sealUnlockCondition, unlock,
+      'Fragment ' + (frag.id || '?') + ' seal.unlockCondition is ' + unlock
+        + ' chars (budget ' + OUTPUT_BUDGETS.sealUnlockCondition + ')');
   });
   ((booklet && booklet.endings) || []).forEach(function (ending, ei) {
     var body = ending && ending.content && ending.content.body;
     var len = over(body, OUTPUT_BUDGETS.endingBody);
-    if (len) breaches.push({ unitType: 'ending', unitRef: (ending && (ending.variant || ending.id)) || ei,
-      message: 'Ending "' + ((ending && ending.variant) || ei) + '" body is ' + len
-        + ' chars (renderer splits awkwardly past ' + OUTPUT_BUDGETS.endingBody + ')' });
+    if (len) add('ending', (ending && (ending.variant || ending.id)) || ei,
+      ['endings', ei, 'content', 'body'], OUTPUT_BUDGETS.endingBody, len,
+      'Ending "' + ((ending && ending.variant) || ei) + '" body is ' + len
+        + ' chars (renderer splits awkwardly past ' + OUTPUT_BUDGETS.endingBody + ')');
   });
   return breaches;
 }

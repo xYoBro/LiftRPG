@@ -182,8 +182,30 @@ export var STAGE_BUDGETS = {
   // use — the two other short-structured-output stages. Sized deliberately
   // BELOW `critic`: a stage that reads an index must never be budgeted like one
   // that reads the book.
-  conductor:      { maxTokens: 12000, timeoutMs: 300000 }
+  conductor:      { maxTokens: 12000, timeoutMs: 300000 },
+  // ── DELTA REPAIR (D167) ────────────────────────────────────────────────────
+  // The smallest row in the ladder, and it must be: this stage rewrites only
+  // the fields a gate NAMED. The motivating case is two storyPrompts four
+  // characters over a 220-char budget — roughly 120 output tokens against the
+  // 24000 a whole week costs to re-roll. 4000 covers the worst realistic case
+  // (a week whose every point-of-use surface breached at once: ~20 short
+  // strings) with the ladder's usual 3-4x headroom, and the timeout is the
+  // shortest one here because there is no composition to do — the model is
+  // shortening sentences it already wrote. A row, not a literal, for the same
+  // reason every other stage has one (D97).
+  deltaRepair:    { maxTokens: 4000, timeoutMs: 180000 }
 };
+
+// ── The delta-repair round bound (D167) ──────────────────────────────────────
+// Delta rounds sit INSIDE one attempt of the stage's own ladder: the full
+// re-roll remains the escalation, and this is how many times the model may be
+// asked to shorten the same named fields before the attempt is spent. Two, by
+// ruling — one round covers the ordinary stochastic overage, a second covers a
+// model that overshot its first correction, and a third would be a model that
+// cannot count characters at all, which a re-roll does not fix either.
+// A constant, not a literal at the call site: the D97 law applied to rounds
+// the same way D166 applied it to attempts.
+export var DELTA_REPAIR_MAX_ROUNDS = 2;
 
 // Retry escalation: each attempt gets more wall clock than the last, and a
 // truncated attempt gets its token ceiling raised to MAX_OUTPUT_TOKENS.

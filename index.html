@@ -8885,6 +8885,36 @@
               return;
             }
 
+            // ── A TARGETED REPAIR IS PROGRESS, NOT SILENCE (D167) ────────────
+            // The gate named the exact fields that failed — usually a line or
+            // two a few characters over their printed budget — and the pipeline
+            // is asking the model to rewrite ONLY those, instead of re-rolling
+            // the whole stage. That is a paid call inside the current attempt,
+            // so from here it would otherwise look like a stage that stopped
+            // reporting: no stream ticks, no transition, nothing. The panel is
+            // told what is being fixed, in the same shape `retrying` uses,
+            // because a reader watching a stage stall wants the sentence, not
+            // the phase name (D165's law: an event the panel was never taught
+            // may not vanish).
+            //
+            // Returns before the transition block for the same reason a retry
+            // does: the stage has not moved and its attempt has not advanced.
+            // `rejected` present means the repair was refused by the merge
+            // guard and the ordinary re-roll is coming — that is a warning; a
+            // repair in flight is not.
+            if (phase === 'delta_repair') {
+              apiRunState.stream = null;
+              apiRunState.throttleWait = null;
+              apiRunState.status = 'running';
+              var deltaStageKey = stageKey || apiRunState.currentStageKey;
+              if (deltaStageKey && apiRunState.ledger[deltaStageKey] !== 'in progress') {
+                markApiStageInProgress(deltaStageKey);
+              }
+              applyApiNotice(meta.rejected && meta.rejected.length ? 'warn' : 'info', message, meta);
+              renderApiRunState();
+              return;
+            }
+
             // A retry is about to happen. Previously this was a console.warn
             // and nothing else, so from here a silent escalation and a hang
             // looked identical — and Stop was the only lever on offer.

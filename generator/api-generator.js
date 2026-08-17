@@ -39,6 +39,9 @@ import {
   CONDUCTOR_MECHANISMS,
   CONDUCTOR_MAX_FINDINGS,
   STAGE_BUDGETS,
+  // D167: how many times one attempt may ask the model to shorten the same
+  // named fields before the attempt is spent and the ladder escalates.
+  DELTA_REPAIR_MAX_ROUNDS,
   RETRY_TIMEOUT_GROWTH,
   RETRY_TIMEOUT_CEILING_MS,
   THROTTLE_INITIAL_DELAY_MS,
@@ -153,7 +156,11 @@ import {
   // D143. The ownership derivation and the door obligation both live in the
   // validator because that is where the floors and their stage labels live —
   // this file routes on the answer, it does not compute it.
-  repairOwnerForError
+  repairOwnerForError,
+  // D167. The ONE rendering of a field path. The gates produce coordinates as
+  // key arrays; this renders the string the model is shown and must echo. There
+  // is deliberately no parser anywhere — arrays travel, the string is wire.
+  formatFieldPath
 } from './modules/validation.js';
 
 import {
@@ -1189,6 +1196,379 @@ function buildSmartRetryDirective(stageName, attempt, err) {
   return lines.join('\n');
 }
 
+// ── DELTA REPAIR (D167) ──────────────────────────────────────────────────────
+//
+// THE FAILURE THIS EXISTS FOR (live, 2026-08-17). Week 3 failed three attempts
+// on: "Over budget: Week 3 session 1 storyPrompt is 224 chars (budget 220);
+// Week 3 session 2 storyPrompt is 223 chars (budget 220)". A ~30k-token stage
+// was re-rolled in full, three times, over seven characters — and every re-roll
+// re-rolled every OTHER budgeted string in the week too, each with its own small
+// chance of overshooting. A stage carries dozens of capped strings; P(all clean
+// on one roll) is well under 1, so a full re-roll is not merely expensive here,
+// it is the wrong shape: it re-opens every field that already passed.
+//
+// THE REMEDY'S SHAPE, and the four laws it is built from:
+//
+//   1. THE FLOOR DOES NOT MOVE. No tolerance band, no relaxed budget. The same
+//      gate, unchanged, re-runs against the merged payload and decides.
+//   2. THE MODEL WRITES EVERY CHARACTER (D160). Nothing here shortens, elides
+//      or synthesizes text. The failing fields go back to the model with their
+//      requirement quoted; the pipeline merges what comes back and nothing else.
+//      The reverted "semantic auto-salvage" is the named crime this avoids.
+//   3. THE MERGE CANNOT INVENT OR LOSE (D136's revisionInventsKeys idiom). A
+//      delta result may change ONLY the paths the gate named. A response
+//      carrying an unnamed path is discarded whole and loudly; everything
+//      outside the named paths is asserted byte-identical after the merge.
+//   4. THE LADDER IS UNCHANGED. Delta rounds are bounded and sit INSIDE one
+//      attempt. A full re-roll remains the escalation — for a persistent
+//      overage, for a rejected merge, and for every error class that is not
+//      path-named. Terminal behaviour is exactly what it was.
+//
+// CHECKPOINT/RESUME (D98/D101/D143): a delta-repaired stage banks its MERGED
+// payload under the same key with the same event shape, so resume and the run
+// fingerprint are untouched. The repair-aware seed rules (D143) deliberately do
+// NOT apply here: they exist because a re-entered stage must rebuild the world
+// it repairs from the same draw, and a delta preserves that world BY
+// CONSTRUCTION — every field except the named ones is the same bytes.
+
+// The engine key for the delta call's budget row. Named once; the ladder owns
+// the numbers (D97), and no call site below writes a token or timeout literal.
+var DELTA_REPAIR_BUDGET_KEY = 'deltaRepair';
+
+function deltaClone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function readAtPathParts(root, parts) {
+  var cur = root;
+  for (var i = 0; i < parts.length; i++) {
+    if (cur === null || typeof cur !== 'object') return undefined;
+    cur = cur[parts[i]];
+  }
+  return cur;
+}
+
+// Writes ONLY where a container already exists. A delta repair shortens a field
+// that is already there; creating a path would be inventing content, which is
+// exactly what rule 3 forbids.
+function writeAtPathParts(root, parts, value) {
+  if (!parts || !parts.length) return false;
+  var cur = root;
+  for (var i = 0; i < parts.length - 1; i++) {
+    if (cur === null || typeof cur !== 'object') return false;
+    cur = cur[parts[i]];
+  }
+  var last = parts[parts.length - 1];
+  if (cur === null || typeof cur !== 'object') return false;
+  if (!Object.prototype.hasOwnProperty.call(cur, last)) return false;
+  cur[last] = value;
+  return true;
+}
+
+/**
+ * partitionDeltaRepair(blockingErrors, deltaTargets) -> { eligible, targets, structural }
+ *
+ * THE CLASSIFIER, pure and side-effect-free. A stage takes the delta path only
+ * when EVERY blocking error is delta-class — one named field, one exact
+ * coordinate, one requirement the model can satisfy in isolation.
+ *
+ * Mixed lists take the full re-roll, deliberately: a structural failure (a
+ * missing session, a broken reference, a spine that does not close) can change
+ * what the neighbouring prose should say, so repairing a sentence beside it
+ * would be polishing a field that may not survive. The cheap remedy is only
+ * correct when the expensive one has nothing else to fix.
+ *
+ * Matching is by the error string's IDENTITY, never by parsing it: the gate
+ * that wrote the message also wrote the coordinate, and a target claims its
+ * message verbatim. An error no target claims is structural by definition —
+ * which is what makes this safe as new floors are added.
+ */
+function partitionDeltaRepair(blockingErrors, deltaTargets) {
+  var blocking = (blockingErrors || []).slice();
+  var targets = (deltaTargets || []).slice();
+  if (!blocking.length) return { eligible: false, reason: 'no-blocking-errors', targets: [], structural: [] };
+  if (!targets.length) return { eligible: false, reason: 'no-delta-targets', targets: [], structural: blocking };
+
+  var byMessage = {};
+  targets.forEach(function (t) {
+    if (t && typeof t.message === 'string' && Array.isArray(t.pathParts) && t.pathParts.length) {
+      byMessage[t.message] = t;
+    }
+  });
+
+  var matched = [];
+  var structural = [];
+  var seenPath = {};
+  blocking.forEach(function (message) {
+    var t = byMessage[message];
+    if (!t) { structural.push(message); return; }
+    // Two blocking errors naming ONE path would make "which value wins" a
+    // question, and a merge with a question in it is not a merge. Treat the
+    // whole list as structural rather than guessing.
+    if (seenPath[t.path]) { structural.push(message); return; }
+    seenPath[t.path] = true;
+    matched.push(t);
+  });
+
+  if (structural.length) {
+    return { eligible: false, reason: 'mixed-with-structural', targets: matched, structural: structural };
+  }
+  return { eligible: true, reason: '', targets: matched, structural: [] };
+}
+
+/**
+ * applyDeltaFixes(payload, targets, fixes) -> { ok, merged, applied, rejected }
+ *
+ * THE MERGE GUARD. Two refusals and one proof:
+ *
+ *   · REFUSAL — a fix naming a path no target named. The response is discarded
+ *     WHOLE (not filtered): a model that answered about a field nobody asked
+ *     about was not doing the task, and quietly keeping the rest of its answer
+ *     would be trusting the half we cannot check.
+ *   · REFUSAL — a fix whose value is not a string, or whose path does not
+ *     already exist on the payload. Delta repair shortens; it never creates.
+ *   · PROOF — after the merge, everything outside the named paths is asserted
+ *     byte-identical. Both sides are masked at the named paths and compared as
+ *     serialized JSON, so key order, arrays, numbers and every untouched string
+ *     are all in scope. A merge that moved anything else fails here rather than
+ *     shipping a silently mutated week.
+ */
+function applyDeltaFixes(payload, targets, fixes) {
+  var allowed = {};
+  (targets || []).forEach(function (t) { allowed[t.path] = t; });
+
+  var rejected = [];
+  var seen = {};
+  var normalized = [];
+  (fixes || []).forEach(function (fix) {
+    var path = fix && typeof fix.path === 'string' ? fix.path : '';
+    if (!path || !allowed[path]) {
+      rejected.push('unnamed path: ' + (path || '(missing)'));
+      return;
+    }
+    if (typeof fix.value !== 'string') {
+      rejected.push('non-string value at ' + path);
+      return;
+    }
+    if (seen[path]) { rejected.push('duplicate fix for ' + path); return; }
+    seen[path] = true;
+    normalized.push({ target: allowed[path], value: fix.value });
+  });
+  if (rejected.length) return { ok: false, merged: null, applied: [], rejected: rejected };
+  if (!normalized.length) return { ok: false, merged: null, applied: [], rejected: ['no fixes returned'] };
+
+  // ONE merged object: the one that is proven is the one that ships.
+  //
+  // The first version built the proof copy and the shipped copy separately —
+  // mask a clone, compare, then re-apply the fixes onto a fresh clone — and a
+  // mutation test killed it on the spot: a stray write into the proof copy
+  // never reached the shipped one, and a stray write into the shipped one was
+  // never proven. Two objects is two answers to "what did this merge do", which
+  // is D93's law at the smallest possible scale. The masking below therefore
+  // runs on THROWAWAY copies of the real pair.
+  var merged = deltaClone(payload);
+  var applied = [];
+  for (var i = 0; i < normalized.length; i++) {
+    var n = normalized[i];
+    if (!writeAtPathParts(merged, n.target.pathParts, n.value)) {
+      return { ok: false, merged: null, applied: [], rejected: ['path does not exist on the payload: ' + n.target.path] };
+    }
+    applied.push(n.target.path);
+  }
+
+  // The byte-identity proof. Mask EVERY named path on both sides — including
+  // ones the model declined to fix — then compare. What remains is the whole
+  // payload minus the fields the gate itself named.
+  var MASK = '\u0001delta-repair-mask\u0001';
+  var beforeMasked = deltaClone(payload);
+  var afterMasked = deltaClone(merged);
+  (targets || []).forEach(function (t) {
+    writeAtPathParts(beforeMasked, t.pathParts, MASK);
+    writeAtPathParts(afterMasked, t.pathParts, MASK);
+  });
+  if (JSON.stringify(beforeMasked) !== JSON.stringify(afterMasked)) {
+    return { ok: false, merged: null, applied: [], rejected: ['the merge changed content outside the named fields'] };
+  }
+
+  return { ok: true, merged: merged, applied: applied, rejected: [] };
+}
+
+// A model that has to shorten a sentence needs the sentences around it, or the
+// rewrite arrives in a different voice than the paragraph it lands in. This
+// hands it the failing field's SIBLING strings — accepted, frozen, and named as
+// such in the prompt — capped so the delta call stays the cheapest in the run.
+var DELTA_CONTEXT_FIELD_CHARS = 400;
+var DELTA_CONTEXT_MAX_CHARS = 4000;
+
+function buildDeltaContext(payload, targets) {
+  var context = {};
+  (targets || []).forEach(function (t) {
+    var parentParts = t.pathParts.slice(0, -1);
+    var leaf = t.pathParts[t.pathParts.length - 1];
+    var parent = readAtPathParts(payload, parentParts);
+    if (!parent || typeof parent !== 'object') return;
+    var siblings = {};
+    Object.keys(parent).forEach(function (key) {
+      if (key === leaf) return;
+      if (typeof parent[key] !== 'string' || !parent[key].trim()) return;
+      siblings[key] = truncateText(parent[key], DELTA_CONTEXT_FIELD_CHARS);
+    });
+    if (Object.keys(siblings).length) context[formatFieldPath(parentParts) || '(root)'] = siblings;
+  });
+  if (!Object.keys(context).length) return '';
+  var json = compactJsonString(context);
+  return json.length > DELTA_CONTEXT_MAX_CHARS
+    ? json.slice(0, DELTA_CONTEXT_MAX_CHARS) + '... [truncated]'
+    : json;
+}
+
+// The model may answer with the contracted envelope, a bare array, or a plain
+// path->value map. All three are path-keyed, so all three are checkable by the
+// merge guard; anything else normalizes to an empty list and is rejected there.
+function normalizeDeltaFixes(result) {
+  var raw = result;
+  if (raw && !Array.isArray(raw) && typeof raw === 'object' && Array.isArray(raw.fixes)) raw = raw.fixes;
+  if (Array.isArray(raw)) {
+    return raw.map(function (entry) {
+      if (!entry || typeof entry !== 'object') return { path: '', value: null };
+      return { path: entry.path, value: entry.value !== undefined ? entry.value : entry.text };
+    });
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.keys(raw).map(function (key) { return { path: key, value: raw[key] }; });
+  }
+  return [];
+}
+
+// The whole clause agrees, not just the noun: "1 over-budget line that ran past
+// THEIR budgetS" is the kind of sentence that tells a reader nobody read it.
+function describeDeltaFields(targets) {
+  var n = (targets || []).length;
+  return n === 1
+    ? '1 over-budget line that ran past its printed-space budget'
+    : n + ' over-budget lines that ran past their printed-space budgets';
+}
+
+/**
+ * runDeltaRepairRounds(ctx) -> { repaired, rounds, calls, usage, notes }
+ *
+ * The bounded loop. Each round: ask the model for the named fields, merge under
+ * the guard, re-run THE SAME gate. A pass returns the merged payload and the
+ * caller banks it exactly as an ordinary pass. Anything else — a rejected
+ * merge, a still-failing gate whose errors are no longer delta-class, the round
+ * budget spent — returns null, and the attempt ladder takes over unchanged.
+ */
+async function runDeltaRepairRounds(ctx) {
+  var payload = ctx.payload;
+  var targets = ctx.targets;
+  var ledger = { rounds: 0, calls: 0, inputTokens: 0, outputTokens: 0, fields: [], resolved: false };
+  var notes = [];
+
+  var builder = (typeof window !== 'undefined') && window.buildDeltaRepairPrompt;
+  var schema = (typeof window !== 'undefined') && window.STRUCTURED_SCHEMA_DELTA_REPAIR;
+  if (typeof builder !== 'function') {
+    notes.push('prompt builder unavailable');
+    return { repaired: null, ledger: ledger, notes: notes };
+  }
+
+  var budget = stageBudget(DELTA_REPAIR_BUDGET_KEY, ctx.settings.requestTimeoutMs);
+  var deltaSettings = Object.assign({}, ctx.settings, {
+    requestTimeoutMs: budget.requestTimeoutMs({ attempt: 0, error: null })
+  });
+
+  for (var round = 1; round <= DELTA_REPAIR_MAX_ROUNDS; round++) {
+    ledger.rounds = round;
+    var fields = targets.map(function (t) {
+      return {
+        path: t.path,
+        requirement: t.requirement || t.message,
+        cap: t.cap,
+        length: t.length,
+        current: readAtPathParts(payload, t.pathParts)
+      };
+    });
+    ledger.fields = fields.map(function (f) { return f.path; });
+
+    // THE PANEL MUST BE TOLD (D165). A delta repair is a new pipeline event and
+    // a paid call; without its own phase it would fall through to the
+    // unknown-phase warning — visible only in a console nobody has open.
+    ctx.emit('Repairing ' + ctx.stageName + ': rewriting ' + describeDeltaFields(targets)
+      + ' (round ' + round + ' of '
+      + DELTA_REPAIR_MAX_ROUNDS + '). The rest of the answer is kept.', {
+      phase: 'delta_repair',
+      round: round,
+      maxRounds: DELTA_REPAIR_MAX_ROUNDS,
+      fields: ledger.fields.slice(),
+      fieldCount: fields.length
+    });
+
+    var prompt = builder(ctx.stageName, fields, buildDeltaContext(payload, targets));
+    var response;
+    try {
+      response = await callProviderStructured(deltaSettings, prompt, schema || null,
+        budget.maxTokens({ attempt: 0, error: null }), ctx.stageName + ' delta repair', {});
+    } catch (err) {
+      // A delta call that fails for ANY transport reason (throttle included)
+      // hands the attempt straight back to the ladder. The delta path is the
+      // cheap optimisation, never a second place for retry policy to live.
+      notes.push('delta call failed: ' + String((err && err.message) || err || 'unknown'));
+      return { repaired: null, ledger: ledger, notes: notes };
+    }
+    ledger.calls += 1;
+    // The usage SNAPSHOT is an envelope — provider, model, pricing, cost, and
+    // the token counts one level in under `usage` (buildUsageSnapshot). Reading
+    // the counts off the envelope silently yields zero, which is exactly what
+    // the first campaign run reported: a repair that cost nothing measurable is
+    // a repair whose economics nobody can check.
+    var deltaUsage = (response && response.usage && response.usage.usage) || null;
+    if (deltaUsage) {
+      ledger.inputTokens += safeNumber(deltaUsage.inputTokens);
+      ledger.outputTokens += safeNumber(deltaUsage.outputTokens);
+    }
+    // Spend is spend: the delta call rides the stage's own usage totals so the
+    // cost meter and the checkpoint ledger stay honest (D96/D113).
+    recordStageUsage(ctx.telemetry, response);
+
+    var merge = applyDeltaFixes(payload, targets, normalizeDeltaFixes(response && response.result));
+    if (!merge.ok) {
+      // LOUD, and then the ordinary ladder. A rejected merge is a defect report
+      // about this response, not a reason to weaken the guard.
+      notes.push('merge rejected: ' + merge.rejected.join('; '));
+      ctx.emit(ctx.stageName + ': the targeted repair answered about fields nobody asked about, so it was '
+        + 'discarded and the stage will be rewritten in full (' + merge.rejected[0] + ').', {
+        phase: 'delta_repair',
+        round: round,
+        maxRounds: DELTA_REPAIR_MAX_ROUNDS,
+        rejected: merge.rejected.slice()
+      });
+      return { repaired: null, ledger: ledger, notes: notes };
+    }
+
+    var verdict = ctx.validate(merge.merged);
+    if (!validationFailed(verdict)) {
+      ledger.resolved = true;
+      notes.push('repaired ' + merge.applied.length + ' field(s) in round ' + round);
+      return { repaired: merge.merged, ledger: ledger, notes: notes };
+    }
+
+    // Still failing. Re-classify against the SAME rule: another round only if
+    // every remaining blocking error is still one named field.
+    var again = partitionDeltaRepair(
+      classifyValidationErrors(extractErrorList(verdict)).blocking,
+      (verdict && verdict.deltaTargets) || []
+    );
+    if (!again.eligible) {
+      notes.push('remaining errors are not delta-class (' + again.reason + ')');
+      return { repaired: null, ledger: ledger, notes: notes };
+    }
+    payload = merge.merged;
+    targets = again.targets;
+  }
+
+  notes.push('delta rounds exhausted (' + DELTA_REPAIR_MAX_ROUNDS + ')');
+  return { repaired: null, ledger: ledger, notes: notes };
+}
+
 // ── CROSS-STAGE REPAIR ROUTING (D143) ───────────────────────────────────────
 // D128 proved that doctrine routed to the wrong stage lies to the model: six
 // attempts, six identical failures, because no retry ladder saves a prompt that
@@ -1541,7 +1921,11 @@ async function runPipelineWithRepairRouting(pipelineFn, options) {
 var STAGE_ERROR_MARKERS = [
   'errorType', 'finishReason', 'retryable', 'status',
   'structuredUnsupported', '_failedOutput', '_blockingErrors', '_stageKey',
-  'repairRoute'
+  'repairRoute',
+  // D167: how many of the blocking errors were budget breaches. A structural
+  // count, carried for the same reason finishReason is — so the reader's
+  // sentence can name the real cause without anyone reading error prose.
+  'budgetBreachCount'
 ];
 
 function carryStageErrorMarkers(source, target) {
@@ -1662,6 +2046,12 @@ function createStageTelemetry(stageKey, stageName) {
     // Null is the normal, healthy value; a non-null one is a defect report the
     // run must surface, not a footnote (D162's recorded-open).
     structuredFallback: null,
+    // Set when the stage's gate failed on named fields and the pipeline asked
+    // for those fields alone instead of re-rolling (D167). Null is "no delta
+    // repair happened", which is most stages. The token counts here are a
+    // SUBSET of `usage` below, not an addition to it: a delta call is spend,
+    // and it rides the same meter as every other call in the run.
+    deltaRepair: null,
     usage: blankUsageTotals(),
     estimatedCostUsd: 0,
     pricing: null
@@ -1684,6 +2074,9 @@ function summarizeStageTelemetry(telemetry) {
     effort: telemetry && telemetry.effort ? telemetry.effort : '',
     structuredFallback: telemetry && telemetry.structuredFallback
       ? Object.assign({}, telemetry.structuredFallback)
+      : null,
+    deltaRepair: telemetry && telemetry.deltaRepair
+      ? Object.assign({}, telemetry.deltaRepair, { fields: (telemetry.deltaRepair.fields || []).slice() })
       : null,
     usage: {
       inputTokens: safeNumber(usage.inputTokens),
@@ -1821,7 +2214,28 @@ function describeStageFailureCause(err) {
   // validation error's clothes (see runJsonStage). The transport's normalized
   // verdict outranks the symptom: say why it was short, not what was missing.
   if (isTruncationFinishReason(err && err.finishReason)) return 'the answer was cut off at the length limit';
-  if (errorType === 'schema') return 'the answer came back missing required parts';
+  // ── THE PROVIDER'S OWN FAILURE, NAMED (D165's recorded-open) ───────────────
+  // `status` is already on the error object and was never read here, so a 500
+  // from the provider's servers was reported to the reader as "it did not
+  // complete" — indistinguishable from a model that wrote something wrong. A
+  // 5xx is not the run's fault and not the model's, and saying so is the
+  // difference between "try again" and "something I did is broken".
+  var status = Number(err && err.status);
+  if (status >= 500 && status < 600) return 'the provider\'s server failed';
+  if (errorType === 'schema') {
+    // ── OVER BUDGET IS NOT "MISSING PARTS" (D167) ───────────────────────────
+    // The live Week 3 failure said "the answer came back missing required
+    // parts" about two sentences that were four characters too long. Nothing
+    // was missing; the model wrote too much. Read structurally off the count
+    // the gate carried, never off the message text.
+    var breaches = Number(err && err.budgetBreachCount) || 0;
+    if (breaches > 0) {
+      return breaches === 1
+        ? 'it came back with 1 line over its printed-space budget'
+        : 'it came back with ' + breaches + ' lines over their printed-space budgets';
+    }
+    return 'the answer came back missing required parts';
+  }
   if (errorType === 'network') return 'the connection dropped';
   return 'it did not complete';
 }
@@ -2053,28 +2467,77 @@ async function runJsonStage(settings, config) {
             }
             // fall through to success
           } else {
-            // Blocking errors remain — throw for smart retry
-            var err = new Error(classified.blocking.join('; '));
-            err.errorType = 'schema';
-            err.retryable = true;
-            // The wire's verdict on this attempt, carried structurally. Only a
-            // normalized 'truncation' changes the retry's behavior; every other
-            // value is recorded and inert.
-            err.finishReason = attemptFinishReason;
-            err._failedOutput = result;
-            err._blockingErrors = classified.blocking;
-            // Which stage RAISED this. The routing seam compares it against the
-            // stage each defect is OWNED by; the human-facing stageName is a
-            // label, not an identity.
-            err._stageKey = config.stageKey || '';
-            // THE QUERYABLE ROUTING SHAPE (D143). Computed on every blocking
-            // stage failure, whether or not this run's automatic path takes the
-            // route, because the guided door runs these same validators and
-            // must be able to send the user back to the OWNING card with the
-            // same directive as its repair prompt. `null` means "this stage
-            // owns its own defect", which is a real and useful answer.
-            err.repairRoute = describeRepairRoute(err, config.stageName);
-            throw err;
+            // ── DELTA REPAIR BEFORE THE RE-ROLL (D167) ───────────────────────
+            // Every blocking error named one field and one coordinate? Then ask
+            // the model for those fields only, merge under the guard, and
+            // re-run THIS SAME gate. A pass falls through to the ordinary
+            // success path below — same banking, same event, same checkpoint —
+            // with the repair recorded in telemetry. Anything else throws
+            // exactly as it always did, and the attempts ladder is untouched.
+            var deltaPartition = partitionDeltaRepair(classified.blocking,
+              (validationResult && validationResult.deltaTargets) || []);
+            var deltaResolved = false;
+            if (deltaPartition.eligible) {
+              var deltaOutcome = await runDeltaRepairRounds({
+                settings: settings,
+                stageName: config.stageName,
+                payload: result,
+                targets: deltaPartition.targets,
+                validate: config.validate,
+                telemetry: stageTelemetry,
+                emit: function (message, meta) {
+                  emitPipelineEvent(config.onProgress, config.stageIndex || 0,
+                    config.getTotalStages ? config.getTotalStages() : 0, message,
+                    Object.assign({
+                      stageKey: config.stageKey || '',
+                      stageName: config.stageName,
+                      attempt: attempt,
+                      attemptCount: attemptCount
+                    }, meta));
+                }
+              });
+              stageTelemetry.deltaRepair = deltaOutcome.ledger;
+              if (deltaOutcome.repaired) {
+                result = deltaOutcome.repaired;
+                deltaResolved = true;
+                stageTelemetry.hadRepair = true;
+                console.info('[LiftRPG] ' + config.stageName + ' delta-repaired '
+                  + deltaOutcome.ledger.fields.length + ' field(s) in '
+                  + deltaOutcome.ledger.rounds + ' round(s) — no re-roll needed.');
+              } else {
+                console.warn('[LiftRPG] ' + config.stageName + ' delta repair did not resolve: '
+                  + deltaOutcome.notes.join('; '));
+              }
+            }
+            if (!deltaResolved) {
+              // Blocking errors remain — throw for smart retry
+              var err = new Error(classified.blocking.join('; '));
+              err.errorType = 'schema';
+              err.retryable = true;
+              // How many of the blocking errors were budgets, carried
+              // STRUCTURALLY so the reader's sentence can say what actually went
+              // wrong without anyone parsing an error message (D167's honesty
+              // rider). 0 on every other failure, which is the identity value.
+              err.budgetBreachCount = deltaPartition.targets.length;
+              // The wire's verdict on this attempt, carried structurally. Only a
+              // normalized 'truncation' changes the retry's behavior; every other
+              // value is recorded and inert.
+              err.finishReason = attemptFinishReason;
+              err._failedOutput = result;
+              err._blockingErrors = classified.blocking;
+              // Which stage RAISED this. The routing seam compares it against the
+              // stage each defect is OWNED by; the human-facing stageName is a
+              // label, not an identity.
+              err._stageKey = config.stageKey || '';
+              // THE QUERYABLE ROUTING SHAPE (D143). Computed on every blocking
+              // stage failure, whether or not this run's automatic path takes the
+              // route, because the guided door runs these same validators and
+              // must be able to send the user back to the OWNING card with the
+              // same directive as its repair prompt. `null` means "this stage
+              // owns its own defect", which is a real and useful answer.
+              err.repairRoute = describeRepairRoute(err, config.stageName);
+              throw err;
+            }
           }
         }
       }
@@ -5426,6 +5889,15 @@ window.LiftRPGAPI = {
     planFragmentBatchRecovery: planFragmentBatchRecovery,
     normalizeFragmentBatchResult: normalizeFragmentBatchResult,
     buildSmartRetryDirective: buildSmartRetryDirective,
+    // ── The delta-repair seam (D167), exported for the gates ────────────────
+    // Pure functions with no transport, no DOM and no window dependency, so the
+    // floors harness can hold them to their contracts with no port and no
+    // browser — the same stance the D143 routing seam takes.
+    partitionDeltaRepair: partitionDeltaRepair,
+    applyDeltaFixes: applyDeltaFixes,
+    normalizeDeltaFixes: normalizeDeltaFixes,
+    describeStageFailureCause: describeStageFailureCause,
+    deltaRepairMaxRounds: DELTA_REPAIR_MAX_ROUNDS,
     buildCompactCampaignRetryPrompt: buildCompactCampaignRetryPrompt,
     assembleSkeletonFleshBooklet: assembleSkeletonFleshBooklet,
     validateSkeletonStage: validateSkeletonStage,
