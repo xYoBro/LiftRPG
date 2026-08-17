@@ -34,6 +34,12 @@ export var STREAM_MAX_OVERALL_MS = 1800000;          // 30m absolute ceiling
 // ~7.4k bundled). Timeouts are sized so the ceiling is actually REACHABLE at a
 // conservative ~20 tok/s planning floor — the pairing the old blanket
 // 64000-tokens/120000-ms configuration could never satisfy.
+// Rows carrying their own evidence citation (skeleton/shell/campaign via
+// D155/D159/D166, critic pair via D113) have been re-derived PAST this base
+// rule since — where a row comment and this header disagree, the row wins.
+// (Provenance note, 2026-08-17 ballast audit: the §2 telemetry the base rule
+// cites was measured on real Claude runs — the doc's Gemini-Flash title
+// describes its question, not its data. The ladder was never weak-model-derived.)
 //
 // INVARIANT: retries escalate. A retry must never get less budget than the
 // attempt it is replacing (the Story Plan stage previously shrank 420s -> 300s
@@ -240,7 +246,14 @@ export var PROVIDERS = {
   anthropic: {
     label: 'Claude (Anthropic)',
     baseUrl: 'https://api.anthropic.com',
-    defaultModel: 'claude-sonnet-4-6',
+    // Refreshed 2026-08-17 (ballast audit 10a): claude-sonnet-4-6 → the current
+    // frontier Opus. NOTE for the 10c budget trials: on claude-opus-5 an omitted
+    // `thinking` parameter runs ADAPTIVE thinking (on sonnet-4-6 it meant none),
+    // and max_tokens caps thinking + text TOGETHER — the STAGE_BUDGETS ladder was
+    // sized for text alone, so truncation-shaped retries on this door are trial
+    // evidence, not noise. D162's no-thinking-config pin is unchanged (we still
+    // send no `thinking` field; the DEFAULT behind absence is what moved).
+    defaultModel: 'claude-opus-5',
     format: 'anthropic',
     modelDiscovery: 'anthropic'
   },
