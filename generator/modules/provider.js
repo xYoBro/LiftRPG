@@ -8,7 +8,8 @@
 //   Content:    extractTextContent, normalizeImageParts,
 //               buildAnthropicUserContent, buildOpenAICompatUserContent
 //   Calls:      callAnthropic, callOpenAICompat, callProvider
-//               callOpenAICompatStructured, callProviderStructured
+//               callAnthropicStructured, callOpenAICompatStructured,
+//               callProviderStructured
 //   Pricing:    safeNumber, normalizeModelId, normalizeModelFamilyId, escapeRegex,
 //               detectProviderId, resolveModelPricing, estimateUsageCostUsd,
 //               buildUsageSnapshot, blankUsageTotals, addUsageTotals,
@@ -1515,7 +1516,19 @@ async function runStreamingRequest(spec) {
     // One final, unthrottled tick from the one place every format passes
     // through — so the closing number is the true total for every transport,
     // present and future, without each consumer remembering to do it.
-    if (emitTick) emitTick(String((streamed && streamed.text) || '').length, true);
+    //
+    // A consumer that received bytes in something other than `text` reports its
+    // own total as `streamChars` (the forced-tool-call path, D160b). Absent
+    // means text-only, so every reader that predates the field — and the compat
+    // reader, which has no tool path — closes on exactly the number it always did.
+    if (emitTick) {
+      emitTick(
+        (streamed && typeof streamed.streamChars === 'number')
+          ? streamed.streamChars
+          : String((streamed && streamed.text) || '').length,
+        true
+      );
+    }
     return streamed;
   } catch (err) {
     var timeoutError = guard.toTimeoutError(err);
@@ -1617,12 +1630,24 @@ function buildTruncationError(detail) {
 //
 // There is NO "[DONE]" sentinel — message_stop ends the stream.
 //
-// Only `delta.type === 'text_delta'` contributes to the returned text.
-// `thinking_delta`, `signature_delta`, `input_json_delta`, and any future delta
-// type are skipped silently: claude-sonnet-5 and claude-opus-5 run adaptive
-// thinking by default and legitimately emit thinking blocks alongside text.
+// Only `delta.type === 'text_delta'` contributes to the returned TEXT.
+// `thinking_delta`, `signature_delta`, and any future delta type are skipped
+// silently: claude-sonnet-5 and claude-opus-5 run adaptive thinking by default
+// and legitimately emit thinking blocks alongside text.
+//
+// `input_json_delta` is the ONE exception, and it is not text. It carries the
+// arguments of a `tool_use` block, which is how callAnthropicStructured gets a
+// schema-forced stage answer (D160b): under `tool_choice: {type:'tool'}` the
+// API prefills the assistant turn, so the whole response is one tool_use block
+// and `text` stays empty for the entire stream. It accumulates into a SEPARATE
+// buffer keyed by content-block index and is never mixed into `text` — a
+// freeform call still returns exactly the string it always did.
 async function readAnthropicStream(response, onActivity, onTick) {
   var text = '';
+  // index -> { name, json }. Empty on every non-tool call, which is every
+  // prose stage and every stream this function read before D160b.
+  var toolBlocks = {};
+  var firstToolIndex = -1;
   var usage = {
     input_tokens: 0,
     output_tokens: 0,
@@ -1647,10 +1672,28 @@ async function readAnthropicStream(response, onActivity, onTick) {
       usage.output_tokens = safeNumber(startUsage.output_tokens);
       return;
     }
+    if (type === 'content_block_start') {
+      var startBlock = payload.content_block || {};
+      if (startBlock.type === 'tool_use') {
+        var startIndex = safeNumber(payload.index);
+        toolBlocks[startIndex] = { name: String(startBlock.name || ''), json: '' };
+        if (firstToolIndex === -1) firstToolIndex = startIndex;
+      }
+      return;
+    }
     if (type === 'content_block_delta') {
       var delta = payload.delta || {};
       if (delta.type === 'text_delta' && typeof delta.text === 'string') {
         text += delta.text;
+      } else if (delta.type === 'input_json_delta' && typeof delta.partial_json === 'string') {
+        var deltaIndex = safeNumber(payload.index);
+        // Tolerate a missing content_block_start (a proxy that drops it, a
+        // replayed transcript): the arguments still have to land somewhere.
+        if (!toolBlocks[deltaIndex]) {
+          toolBlocks[deltaIndex] = { name: '', json: '' };
+          if (firstToolIndex === -1) firstToolIndex = deltaIndex;
+        }
+        toolBlocks[deltaIndex].json += delta.partial_json;
       }
       return;
     }
@@ -1683,9 +1726,21 @@ async function readAnthropicStream(response, onActivity, onTick) {
   // The tick rides ACTIVITY, not text growth: adaptive thinking legitimately
   // produces minutes of `thinking_delta` frames with `text` still empty. That
   // is the exact stretch a reader needs to see is alive.
+  // Bytes the reader has actually received, whichever block type carried them.
+  // A forced tool call streams its whole answer as input_json_delta with `text`
+  // empty, so counting text alone would report "nothing back yet" for the full
+  // duration of a structured stage — a finished stage rendered as a hang, which
+  // is the defect class the heartbeat exists to prevent. Zero added chars on a
+  // freeform call, so every prose stage ticks exactly the numbers it always did.
+  function streamedChars() {
+    var total = text.length;
+    for (var key in toolBlocks) total += toolBlocks[key].json.length;
+    return total;
+  }
+
   await readSseFrames(response, function () {
     if (onActivity) onActivity();
-    if (onTick) onTick(text.length);
+    if (onTick) onTick(streamedChars());
   }, function (raw) {
     var payload = parseSseJson(raw, 'Anthropic');
     if (payload) handleEvent(payload);
@@ -1698,7 +1753,12 @@ async function readAnthropicStream(response, onActivity, onTick) {
     usage: usage,
     stopReason: stopReason,
     model: streamedModel,
-    complete: sawMessageStop
+    complete: sawMessageStop,
+    streamChars: streamedChars(),
+    toolUse: firstToolIndex === -1 ? null : {
+      name: toolBlocks[firstToolIndex].name,
+      json: toolBlocks[firstToolIndex].json
+    }
   };
 }
 
@@ -1958,7 +2018,10 @@ registerTransport({
   capabilities: {
     streaming: true,
     usageInStream: 'reliable',
-    structuredOutput: false,
+    // Forced tool use, not response_format — a CAPABILITY of this transport,
+    // reached through its own adapter entry. Nothing downstream learns that the
+    // two formats force a schema by different mechanisms (D94/D160b).
+    structuredOutput: true,
     systemPromptCaching: true,
     vision: true
   },
@@ -1968,6 +2031,14 @@ registerTransport({
       opts.maxTokens, opts.timeoutMs,
       settings._pricingRule, settings._systemPrompt,
       opts.images, opts.onStreamTick
+    );
+  },
+  callStructured: function (settings, prompt, schema, maxTokens, stageName, opts) {
+    return callAnthropicStructured(
+      settings.apiKey, settings.model, prompt, schema,
+      maxTokens, opts.timeoutMs,
+      settings._pricingRule, settings._systemPrompt,
+      stageName, opts.onStreamTick
     );
   }
 });
@@ -1992,6 +2063,12 @@ registerTransport({
       opts.maxTokens, opts.timeoutMs, settings._pricingRule,
       opts.images, opts.onStreamTick
     );
+  },
+  callStructured: function (settings, prompt, schema, maxTokens, stageName, opts) {
+    return callOpenAICompatStructured(
+      settings.apiKey, settings.baseUrl, settings.model, prompt, schema,
+      maxTokens, opts.timeoutMs, stageName, settings._pricingRule
+    );
   }
 });
 
@@ -2012,6 +2089,9 @@ registerTransport({
   },
   call: function (settings, prompt, opts) {
     return getTransport('openai').call(settings, prompt, opts);
+  },
+  callStructured: function (settings, prompt, schema, maxTokens, stageName, opts) {
+    return getTransport('openai').callStructured(settings, prompt, schema, maxTokens, stageName, opts);
   }
 });
 
@@ -2049,6 +2129,143 @@ export function transportSupports(settings, capability) {
 }
 
 // ── Structured output calls ───────────────────────────────────────────────────
+
+// THE NATIVE PATH'S SCHEMA FORCE (D160b).
+//
+// The compat transports get schema-forced output from `response_format:
+// json_schema`. The Anthropic Messages API has no such field, so until this
+// existed every structured stage on the PAID path fell back to freeform text
+// plus repair.js extraction — and a model under token pressure answers freeform
+// by DROPPING a whole required section rather than truncating (D159's measured
+// 28.1k/32000 shell attempt, `meta.playSpine` simply absent). A forced tool call
+// makes that shape impossible: the stage's own STRUCTURED_SCHEMA_* object rides
+// as the single tool's `input_schema`, `tool_choice` names that tool, and the
+// answer arrives as the tool's arguments or not at all.
+//
+// THREE THINGS THIS DELIBERATELY REUSES RATHER THAN REBUILDS:
+//
+//   1. runStreamingRequest — so the D160/D161 error shaping (read the body as
+//      text, decide on resp.ok, attach status/retryable/errorType/
+//      retryAfterHeader) is the SAME code the prose stages ride, not a second
+//      copy that can drift out of agreement with it. HTTP vocabulary only;
+//      error-classify.js still learns nothing about who answered.
+//   2. readAnthropicStream — so `stop_reason: max_tokens` normalizes to
+//      'truncation' exactly as it does for prose, and D97's ladder escalates
+//      the ceiling instead of re-rolling it. A tool call cut off mid-arguments
+//      is a truncation, not a schema failure.
+//   3. The heartbeat — a forced tool call streams, so the reader watches bytes
+//      arrive for the whole stage. The compat structured path is one-shot and
+//      cannot.
+//
+// THINKING, RULED (verified against the current API docs, 2026-08-16, not
+// assumed): forced `tool_choice` is incompatible with MANUAL extended thinking
+// (`thinking: {type:'enabled', budget_tokens:N}`) only — that combination
+// errors. Adaptive thinking, including on models where thinking is on by
+// default, supports forced tool use. This pipeline has never sent a `thinking`
+// parameter of any kind, so there is no tradeoff to take and nothing is given
+// up here. Do NOT add manual `budget_tokens` to this payload; it would break
+// the force. Effort/adaptive-thinking config remains free to add later.
+//
+// maxLength, RULED: the schemas carry OUTPUT_BUDGETS caps as `maxLength`, which
+// a tool `input_schema` treats as documentation shown to the model rather than
+// a constraint it enforces (it is NOT a rejected keyword here — `strict: true`
+// and output_config.format both reject it, which is why neither is used). So
+// the cap binds the same way it binds on a compat `strict: false` json_schema:
+// as instruction. Enforcement stays with collectBudgetBreaches at the stage
+// validator. Two readings of one OUTPUT_BUDGETS row, unchanged by this wave.
+export async function callAnthropicStructured(apiKey, model, prompt, schema, maxTokens, timeoutMs, pricingRule, systemPrompt, stageName, onStreamTick) {
+  var resolvedMax = clampAnthropicMaxTokens(model, maxTokens || MAX_OUTPUT_TOKENS);
+  var toolName = buildStructuredStageName(stageName);
+  var payload = {
+    model: model,
+    max_tokens: resolvedMax,
+    stream: true,
+    tools: [{
+      name: toolName,
+      description: 'Record the complete ' + (stageName || 'stage')
+        + ' result. Every required field must be present and fully written.',
+      input_schema: schema
+    }],
+    // `disable_parallel_tool_use` guarantees exactly one tool_use block, so the
+    // stage answer can never arrive split across two partial calls.
+    tool_choice: { type: 'tool', name: toolName, disable_parallel_tool_use: true },
+    messages: [{ role: 'user', content: buildAnthropicUserContent(prompt) }]
+  };
+
+  // Same ephemeral system-prompt caching as the freeform call — a structured
+  // stage should not silently lose the cache discount the prose stages get.
+  if (systemPrompt) {
+    payload.system = [{
+      type: 'text',
+      text: systemPrompt,
+      cache_control: { type: 'ephemeral' }
+    }];
+  }
+
+  var streamed = await runStreamingRequest({
+    label: 'Anthropic',
+    errorPrefix: 'Anthropic API error: ',
+    url: ANTHROPIC_MESSAGES_URL,
+    headers: buildAnthropicHeaders(apiKey),
+    payload: payload,
+    timeoutMs: timeoutMs,
+    onStreamTick: onStreamTick,
+    consume: readAnthropicStream
+  });
+
+  var rawJson = (streamed.toolUse && streamed.toolUse.json) || '';
+  var meta = {
+    provider: 'anthropic',
+    stop_reason: streamed.stopReason,
+    finishReason: normalizeFinishReason(streamed.stopReason),
+    model: streamed.model || model,
+    usage: streamed.usage,
+    streamed: true,
+    response_mode: 'tool_use'
+  };
+  // Debug surface first, so the operator can read what came back when the next
+  // line throws. A tool call's arguments are the raw answer here.
+  window.LiftRPGAPI && (window.LiftRPGAPI.lastRaw = rawJson || streamed.text);
+  window.LiftRPGAPI && (window.LiftRPGAPI.lastMeta = meta);
+
+  var usageSnapshot = buildUsageSnapshot('anthropic', meta.model, streamed.usage, pricingRule);
+
+  // BEFORE the shape is inspected: a run that hit the ceiling mid-arguments has
+  // partial, parseable-looking JSON, and accepting it is how a budget failure
+  // gets misread as a schema failure (D159's lesson, in the other direction).
+  if (meta.finishReason === 'truncation') {
+    throw buildTruncationError('The stage output requires more output tokens than this model provided.');
+  }
+
+  if (!streamed.toolUse) {
+    // Forced tool_choice and no tool_use block means the endpoint did not honor
+    // the force (a proxy that strips `tools`, a model that rejects forcing).
+    // The wording is load-bearing: shouldFallbackFromStructured() reads it, so
+    // this degrades to freeform + repair rather than killing the run — the same
+    // treatment the compat path gives an unexpected structured response shape.
+    var shapeError = new Error(
+      'Unexpected structured response shape: no tool_use block for ' + stageName
+      + (streamed.stopReason ? ' (stop_reason: ' + streamed.stopReason + ')' : '') + '.'
+    );
+    shapeError.finishReason = meta.finishReason;
+    throw shapeError;
+  }
+
+  try {
+    return {
+      result: JSON.parse(rawJson),
+      meta: meta,
+      usage: usageSnapshot
+    };
+  } catch (parseErr) {
+    console.warn('[LiftRPG] Tool-call arguments for ' + stageName + ' were not directly parseable; attempting JSON repair fallback');
+    return {
+      result: extractJson(rawJson),
+      meta: meta,
+      usage: usageSnapshot
+    };
+  }
+}
 
 export async function callOpenAICompatStructured(apiKey, baseUrl, model, prompt, schema, maxTokens, timeoutMs, stageName, pricingRule) {
   var resp = await fetchWithTimeout(buildOpenAICompatUrl(baseUrl), {
@@ -2177,14 +2394,14 @@ export async function callOpenAICompatStructured(apiKey, baseUrl, model, prompt,
 }
 
 export async function callProviderStructured(settings, prompt, schema, maxTokens, stageName, options) {
-  // Capability lookup, not a format check — an adapter that cannot honor a
-  // JSON-schema response format falls back to freeform extraction.
-  //
-  // The schema path itself is one-shot (no stream to tick), so a structured
-  // stage reports "nothing back yet" for its whole duration — which is the
-  // truth. Both FALLBACK paths land on callProvider, so a stage that degrades
-  // to freeform gets its heartbeat back.
-  if (!schema || !transportSupports(settings, 'structuredOutput')) {
+  // Capability lookup, not a format check — an adapter that cannot force a
+  // schema falls back to freeform extraction. HOW an adapter forces one is its
+  // own business: the compat adapter sends response_format, the anthropic
+  // adapter sends a forced tool call. Dispatch is a registry lookup, so a third
+  // wire format is one adapter entry and nothing here (D94/D160b).
+  var adapter = resolveTransport(settings);
+  if (!schema || !transportSupports(settings, 'structuredOutput')
+    || typeof (adapter && adapter.callStructured) !== 'function') {
     var unstructuredResponse = await callProvider(settings, prompt, maxTokens, options);
     return {
       result: extractJson(unstructuredResponse.text),
@@ -2193,18 +2410,19 @@ export async function callProviderStructured(settings, prompt, schema, maxTokens
     };
   }
 
+  var structuredOpts = { timeoutMs: settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS };
+  // Same absent-means-inert rule as callProvider: a one-shot structured adapter
+  // never receives a callback it cannot use, so its request payload is
+  // unchanged. A streaming one (the forced tool call) gets the heartbeat, which
+  // is why a structured stage on that path no longer reports "nothing back yet"
+  // for its whole duration.
+  if (typeof (options && options.onStreamTick) === 'function'
+    && adapter.capabilities && adapter.capabilities.streaming) {
+    structuredOpts.onStreamTick = options.onStreamTick;
+  }
+
   try {
-    return await callOpenAICompatStructured(
-      settings.apiKey,
-      settings.baseUrl,
-      settings.model,
-      prompt,
-      schema,
-      maxTokens,
-      settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS,
-      stageName,
-      settings._pricingRule
-    );
+    return await adapter.callStructured(settings, prompt, schema, maxTokens, stageName, structuredOpts);
   } catch (err) {
     if (!shouldFallbackFromStructured(err) || isLikelyTruncationError(err)) throw err;
     console.warn('[LiftRPG] Structured output unavailable for ' + stageName + '; falling back to freeform JSON repair:', err.message);

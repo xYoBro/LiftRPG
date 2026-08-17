@@ -899,12 +899,18 @@ var STRUCTURED_SCHEMA_FRAGMENTS = {
           inWorldAuthor: { type: 'string' },
           inWorldRecipient: { type: 'string' },
           inWorldPurpose: { type: 'string' },
-          // Teeth Round F6. The cap binds on the compat transports that honor
-          // json_schema; the anthropic transport declares no structured-output
-          // capability and falls back to freeform extraction, which is why the
-          // same number is ALSO enforced by collectBudgetBreaches at the stage
-          // validator. Wire schema and validator are two readings of one
-          // OUTPUT_BUDGETS row, not two policies.
+          // Teeth Round F6, amended by D160b. BOTH transports now force this
+          // schema — compat via response_format:json_schema, anthropic via a
+          // forced tool call carrying it as the tool's input_schema — so every
+          // structured stage is schema-forced on every paid path. What neither
+          // transport does is ENFORCE `maxLength`: a `strict:false` json_schema
+          // does not constrain decoding, and a tool input_schema shows the
+          // keyword to the model as documentation (adding `strict:true` or
+          // output_config.format would reject the keyword outright rather than
+          // enforce it). So the cap still reaches the model as instruction only,
+          // and the same number is ALSO enforced by collectBudgetBreaches at the
+          // stage validator. Wire schema and validator remain two readings of
+          // one OUTPUT_BUDGETS row, not two policies.
           content: { type: 'string', maxLength: OUTPUT_BUDGETS.fragmentBody },
           designSpec: DESIGN_SPEC_SCHEMA,
           authenticityChecks: AUTHENTICITY_CHECKS_SCHEMA
