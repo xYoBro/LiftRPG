@@ -1317,6 +1317,81 @@ function partitionDeltaRepair(blockingErrors, deltaTargets) {
 }
 
 /**
+ * partitionDeltaRepairOn(payload, blockingErrors, deltaTargets) -> partition
+ *
+ * THE CLASSIFIER, ASKED WHERE THE PAYLOAD IS (D168). A coordinate that does
+ * not address this stage's own payload is not a coordinate — it is a path into
+ * some other object, and repairing against it would either land nothing or
+ * land it somewhere nobody named.
+ *
+ * This is not hypothetical. One gate serves several call sites, and a call site
+ * that wraps its result before validating (a single fragment wrapped into a
+ * `{ fragments:[...] }` envelope for the gate's benefit) publishes coordinates
+ * relative to the envelope while the pipeline banks the bare object. The merge
+ * guard would catch it — writeAtPathParts refuses a path that does not exist —
+ * but only after a paid call, and the refusal would read as the model's fault.
+ * Checked HERE it costs nothing and reports the true reason.
+ */
+function partitionDeltaRepairOn(payload, blockingErrors, deltaTargets) {
+  var partition = partitionDeltaRepair(blockingErrors, deltaTargets);
+  if (!partition.eligible) return partition;
+  var unreachable = partition.targets.filter(function (t) {
+    return readAtPathParts(payload, t.pathParts) === undefined;
+  });
+  if (!unreachable.length) return partition;
+  return {
+    eligible: false,
+    reason: 'targets-not-on-payload',
+    // The claimed set SURVIVES the refusal. These errors really were budget
+    // breaches with coordinates; only the coordinates' frame is wrong, and the
+    // reader's sentence still has to say "over budget" rather than "missing
+    // required parts" (the D167 vocabulary rider does not care why the cheap
+    // remedy was declined).
+    targets: partition.targets,
+    structural: unreachable.map(function (t) {
+      return t.path + ' (no such field on this stage\'s payload)';
+    })
+  };
+}
+
+/**
+ * deltaRefusalRecord(partition) -> telemetry record
+ *
+ * THE REFUSAL, WRITTEN DOWN (D168). Before this, a stage whose blocking errors
+ * were mixed took the full re-roll and left NO trace anywhere that delta repair
+ * had even been considered: no log line, no telemetry field, nothing in the run
+ * report. The author's live Week 3 read as "it re-rolled over 4 characters"
+ * because the only visible fact was the budget count in the retry sentence.
+ *
+ * Deliberately NOT a pipeline phase. A refusal resolves instantly into the
+ * ordinary retry, and the retry line is the reader-facing event; inventing a
+ * second event for a decision that changed nothing the reader waits on would be
+ * noise. The trace belongs in the run notes and the stage's telemetry, which is
+ * where someone asking "why did it re-roll?" is already looking.
+ *
+ * The counts are zero and `fields` is empty because nothing was spent and
+ * nothing was repaired — a refusal record must never be mistakeable for a
+ * repair that happened to cost nothing.
+ */
+function deltaRefusalRecord(partition) {
+  return {
+    rounds: 0,
+    calls: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    fields: [],
+    resolved: false,
+    refused: partition.reason || 'ineligible',
+    // The blocking errors NOT claimed by any target — the reason, in the gate's
+    // own words rather than a category name.
+    structural: (partition.structural || []).slice(),
+    // The errors that WERE path-named, so a reader can see the mix rather than
+    // inferring it. Present and empty when nothing was claimed at all.
+    claimed: (partition.targets || []).map(function (t) { return t.path; })
+  };
+}
+
+/**
  * applyDeltaFixes(payload, targets, fixes) -> { ok, merged, applied, rejected }
  *
  * THE MERGE GUARD. Two refusals and one proof:
@@ -1461,8 +1536,16 @@ function describeDeltaFields(targets) {
 async function runDeltaRepairRounds(ctx) {
   var payload = ctx.payload;
   var targets = ctx.targets;
-  var ledger = { rounds: 0, calls: 0, inputTokens: 0, outputTokens: 0, fields: [], resolved: false };
   var notes = [];
+  // `notes` is the ledger's own array, not a copy (D168). Every return below
+  // pushes its reason onto it, so a repair that did not resolve carries WHY it
+  // did not resolve into stage telemetry and therefore into the run report —
+  // it used to reach a console.warn and stop there, which is a reason only a
+  // reader with devtools open ever saw.
+  var ledger = {
+    rounds: 0, calls: 0, inputTokens: 0, outputTokens: 0,
+    fields: [], resolved: false, notes: notes
+  };
 
   var builder = (typeof window !== 'undefined') && window.buildDeltaRepairPrompt;
   var schema = (typeof window !== 'undefined') && window.STRUCTURED_SCHEMA_DELTA_REPAIR;
@@ -1553,7 +1636,8 @@ async function runDeltaRepairRounds(ctx) {
 
     // Still failing. Re-classify against the SAME rule: another round only if
     // every remaining blocking error is still one named field.
-    var again = partitionDeltaRepair(
+    var again = partitionDeltaRepairOn(
+      merge.merged,
       classifyValidationErrors(extractErrorList(verdict)).blocking,
       (verdict && verdict.deltaTargets) || []
     );
@@ -1925,7 +2009,11 @@ var STAGE_ERROR_MARKERS = [
   // D167: how many of the blocking errors were budget breaches. A structural
   // count, carried for the same reason finishReason is — so the reader's
   // sentence can name the real cause without anyone reading error prose.
-  'budgetBreachCount'
+  'budgetBreachCount',
+  // D168: the TOTAL blocking count, so the reader's sentence can distinguish
+  // "only budgets" from "budgets and something else". Useless if it does not
+  // survive the stage-name prefix, exactly like the count above it.
+  'blockingCount'
 ];
 
 function carryStageErrorMarkers(source, target) {
@@ -2075,8 +2163,17 @@ function summarizeStageTelemetry(telemetry) {
     structuredFallback: telemetry && telemetry.structuredFallback
       ? Object.assign({}, telemetry.structuredFallback)
       : null,
+    // Every array here is COPIED, not referenced: a summary is a snapshot that
+    // outlives the stage object, and a shared array would keep mutating after
+    // the event carrying it was emitted. `notes` and `structural`/`claimed`
+    // joined `fields` for that reason when the refusal trace landed (D168).
     deltaRepair: telemetry && telemetry.deltaRepair
-      ? Object.assign({}, telemetry.deltaRepair, { fields: (telemetry.deltaRepair.fields || []).slice() })
+      ? Object.assign({}, telemetry.deltaRepair, {
+        fields: (telemetry.deltaRepair.fields || []).slice(),
+        notes: (telemetry.deltaRepair.notes || []).slice(),
+        structural: (telemetry.deltaRepair.structural || []).slice(),
+        claimed: (telemetry.deltaRepair.claimed || []).slice()
+      })
       : null,
     usage: {
       inputTokens: safeNumber(usage.inputTokens),
@@ -2230,9 +2327,27 @@ function describeStageFailureCause(err) {
     // the gate carried, never off the message text.
     var breaches = Number(err && err.budgetBreachCount) || 0;
     if (breaches > 0) {
-      return breaches === 1
+      // ── AND WHAT ELSE (D168) ──────────────────────────────────────────────
+      // The count above was rendered as the whole cause whenever it was
+      // non-zero, so an attempt that failed on two budgets AND a missing
+      // section was reported as an over-budget failure alone. The author read
+      // that sentence on the live run and concluded the stage had re-rolled
+      // over four characters; it had re-rolled over something structural, and
+      // the budget count was the only part of the truth being told.
+      //
+      // `blockingCount` is the total; the remainder is what the budget count
+      // does not explain. Absent (every pre-D168 error object and every
+      // hand-built one) it falls back to the breach count, which makes the
+      // remainder zero and the sentence BYTE-IDENTICAL to what it was.
+      var total = Number(err && err.blockingCount) || breaches;
+      var others = Math.max(0, total - breaches);
+      var sentence = breaches === 1
         ? 'it came back with 1 line over its printed-space budget'
         : 'it came back with ' + breaches + ' lines over their printed-space budgets';
+      if (others > 0) {
+        sentence += ' and ' + others + ' other issue' + (others === 1 ? '' : 's');
+      }
+      return sentence;
     }
     return 'the answer came back missing required parts';
   }
@@ -2474,10 +2589,30 @@ async function runJsonStage(settings, config) {
             // success path below — same banking, same event, same checkpoint —
             // with the repair recorded in telemetry. Anything else throws
             // exactly as it always did, and the attempts ladder is untouched.
-            var deltaPartition = partitionDeltaRepair(classified.blocking,
+            var deltaPartition = partitionDeltaRepairOn(result, classified.blocking,
               (validationResult && validationResult.deltaTargets) || []);
             var deltaResolved = false;
-            if (deltaPartition.eligible) {
+            if (!deltaPartition.eligible) {
+              // ── THE REFUSAL LEAVES A TRACE (D168) ─────────────────────────
+              // A decision this consequential — re-roll a whole stage rather
+              // than rewrite two sentences — may not be invisible. Both halves
+              // land: a run-note naming the reason and the unclaimed errors,
+              // and the same fact on the stage's telemetry so the run report
+              // shows delta was considered and why it was not taken. Without
+              // this, "the partition refused" and "the partition never ran"
+              // are the same picture from outside.
+              // Built once, read twice. The log line reads the RECORD rather
+              // than the telemetry slot it was just written to, so the two
+              // halves of the trace fail independently — a slot that stopped
+              // being written must not also take the log line down with it.
+              var refusal = deltaRefusalRecord(deltaPartition);
+              stageTelemetry.deltaRepair = refusal;
+              console.info('[LiftRPG] ' + config.stageName + ' targeted repair not applicable ('
+                + refusal.refused + ') — re-rolling the stage. '
+                + (refusal.structural.length
+                  ? 'Not path-named: ' + refusal.structural.join(' | ')
+                  : 'No blocking error published a field coordinate.'));
+            } else {
               var deltaOutcome = await runDeltaRepairRounds({
                 settings: settings,
                 stageName: config.stageName,
@@ -2519,6 +2654,13 @@ async function runJsonStage(settings, config) {
               // wrong without anyone parsing an error message (D167's honesty
               // rider). 0 on every other failure, which is the identity value.
               err.budgetBreachCount = deltaPartition.targets.length;
+              // And how many blocking errors there were IN TOTAL (D168). The
+              // count above was rendered as the whole story — "it came back
+              // with 4 lines over their printed-space budgets" — on attempts
+              // that also failed something structural, so the reader was told
+              // the stage re-rolled over four characters when it re-rolled over
+              // a missing section. Two numbers, one sentence, neither parsed.
+              err.blockingCount = classified.blocking.length;
               // The wire's verdict on this attempt, carried structurally. Only a
               // normalized 'truncation' changes the retry's behavior; every other
               // value is recorded and inert.
@@ -2759,8 +2901,11 @@ function planFragmentBatchRecovery(result, registry) {
     var registryEntry = registryByNorm[norm];
     if (!registryEntry || recoveredByNorm[norm]) return;
     var normalized = normalizeSingleFragmentResult(fragment, registryEntry);
+    // The gate answers in the verdict shape (D157/D168). Read through the same
+    // helper every other call site uses — a truthiness test on the object would
+    // read EVERY verdict, pass included, as a failure and salvage nothing.
     var validation = validateFragmentsStage({ fragments: normalized ? [normalized] : [] }, [registryEntry]);
-    if (!validation) {
+    if (!validationFailed(validation)) {
       recoveredByNorm[norm] = normalized;
     }
   });
@@ -5266,13 +5411,22 @@ async function runSkeletonFleshPipeline(options) {
           1     // total batches
         );
       },
+      // THE GATE MUST JUDGE THE OBJECT THE PIPELINE BANKS (D168). `unwrapKey`
+      // hands this stage a bare array, and the old validator built a throwaway
+      // `{ fragments: [...] }` wrapper around it — so the coordinates the gate
+      // publishes addressed an object that existed only inside the callback,
+      // and delta repair could not reach this pipeline at all. Normalizing to
+      // the wrapper here costs nothing (the caller below already reads either
+      // shape) and makes one gate's coordinates true on both pipelines.
+      normalizeResult: function (result) {
+        return Array.isArray(result) ? { fragments: result } : result;
+      },
       validate: function (result) {
-        var fragsArray = Array.isArray(result) ? result : (result && result.fragments ? result.fragments : null);
+        var fragsArray = result && Array.isArray(result.fragments) ? result.fragments : null;
         if (!fragsArray || fragsArray.length === 0) {
           return 'Fragments: missing or empty fragments array';
         }
-        var wrapped = Array.isArray(result) ? { fragments: result } : result;
-        return validateFragmentsStage(wrapped, fullFragRegistry, { generationFloors: true });
+        return validateFragmentsStage(result, fullFragRegistry, { generationFloors: true });
       }
     });
 
@@ -5894,6 +6048,12 @@ window.LiftRPGAPI = {
     // floors harness can hold them to their contracts with no port and no
     // browser — the same stance the D143 routing seam takes.
     partitionDeltaRepair: partitionDeltaRepair,
+    // The payload-aware wrapper and the refusal record (D168). Exported for the
+    // same reason: the decision to re-roll instead of repair is now observable,
+    // and a gate can only hold an observable decision to its contract if it can
+    // call it.
+    partitionDeltaRepairOn: partitionDeltaRepairOn,
+    deltaRefusalRecord: deltaRefusalRecord,
     applyDeltaFixes: applyDeltaFixes,
     normalizeDeltaFixes: normalizeDeltaFixes,
     describeStageFailureCause: describeStageFailureCause,

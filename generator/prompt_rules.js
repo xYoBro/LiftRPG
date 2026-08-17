@@ -1398,7 +1398,8 @@
   // model already followed.
   window.INST_OUTPUT_BUDGETS = [
     '## Output Length Budgets',
-    'CAPS, in characters — the page\'s limit, not caution\'s. Fill the surface; over a cap costs a retry.',
+    'CAPS, in characters. A cap is a hard wall: one character over costs the whole stage a retry.',
+    'You cannot count characters, so aim every capped line at roughly 85% of its cap and land UNDER it. A line at 85-95% of its budget IS the full surface; a line at 101% is a rejected answer. Riding the cap edge is how stages fail.',
     'Full means SET, never crammed: a wall of text fails, and so does an empty page.',
     '- `storyPrompt`: 220 per session prompt.',
     '- Fragment `content` (any body field): 1050 — three fill an archive page.',

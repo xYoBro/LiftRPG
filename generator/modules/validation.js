@@ -6322,9 +6322,37 @@ export function validateWeeksStage(result, expectedWeeks) {
   return '';
 }
 
+/**
+ * validateFragmentsStage(result, expectedRegistry, options) -> verdict
+ *
+ * THE VERDICT OBJECT (D157's documented shape; converted D168). This gate used
+ * to answer in strings — '' for a pass, one sentence for a failure — and its
+ * budget branch concatenated up to six breaches into that single sentence. Six
+ * coordinates were therefore thrown away at the exact gate that most needs
+ * them: the fragments stage runs LATER in every book than the weeks do, and
+ * `fragmentBody` is the largest budgeted string in the schema, so an overshoot
+ * here costs the most expensive re-roll the pipeline can order.
+ *
+ * The shape is now the week gate's: `{ valid, errors, warnings, deltaTargets }`,
+ * one error per defect, and one delta target per PATH-NAMED defect claiming its
+ * error string verbatim (D167). `validationFailed` / `extractErrorList` in
+ * api-generator.js already read this shape, so every runJsonStage call site is
+ * unchanged; the callers that read the old string directly are converted with
+ * it (there were two, plus two harnesses).
+ */
+function fragmentVerdict(errors, deltaTargets) {
+  var list = (errors || []).filter(Boolean);
+  return {
+    valid: list.length === 0,
+    errors: list,
+    warnings: [],
+    deltaTargets: (deltaTargets || []).slice()
+  };
+}
+
 export function validateFragmentsStage(result, expectedRegistry, options) {
   if (!result || !Array.isArray(result.fragments)) {
-    return 'Fragment stage validation failed: expected a { fragments:[...] } object.';
+    return fragmentVerdict(['Fragment stage validation failed: expected a { fragments:[...] } object.']);
   }
 
   // ── Floor: prose budgets cost a retry (F6) ────────────────────────────────
@@ -6332,15 +6360,42 @@ export function validateFragmentsStage(result, expectedRegistry, options) {
   // pages. Checked FIRST because a fragment that is twice as long as it may be
   // is wrong before any of its ids are, and the correction directive should
   // lead with the thing that actually blew the book up.
+  //
+  // The early return is LOAD-BEARING for the remedy, not merely for the
+  // message's emphasis: a verdict carrying budget breaches AND an id defect is
+  // mixed, and a mixed verdict takes the full re-roll by ruling (D167). Because
+  // this branch answers alone, a fragment batch whose only defect is length is
+  // delta-class by construction. Accumulating these into the checks below would
+  // silently return the whole gate to re-rolling.
+  //
+  // The old cap-at-6 is gone with the concatenation that needed it: each breach
+  // is its own error now, and truncating a list of blocking errors would drop
+  // the very coordinates the repair is made of.
   if (floorsOn(options)) {
-    var budgetBreaches = collectBudgetBreaches({ fragments: result.fragments })
-      .map(function (b) { return b.message; });
-    if (budgetBreaches.length > 0) {
-      return 'Fragment stage validation failed — over budget: ' + budgetBreaches.slice(0, 6).join('; ') + '.';
-    }
+    var budgetErrors = [];
+    var budgetTargets = [];
+    collectBudgetBreaches({ fragments: result.fragments }).forEach(function (b) {
+      // Same idiom, same words as the week gate (D167): the message is carried
+      // verbatim onto the target so the classifier matches by identity and
+      // never by parsing. The path needs NO re-basing here — this gate is
+      // handed the `{ fragments:[...] }` object the stage itself returns, which
+      // is the payload a merge lands on, so the collector's own coordinates
+      // already address it.
+      var message = 'Over budget: ' + b.message;
+      budgetErrors.push(message);
+      budgetTargets.push({
+        message: message,
+        pathParts: b.path.slice(),
+        path: formatFieldPath(b.path),
+        cap: b.cap,
+        length: b.length,
+        requirement: b.message
+      });
+    });
+    if (budgetErrors.length > 0) return fragmentVerdict(budgetErrors, budgetTargets);
   }
   var expected = (expectedRegistry || []).map(function (entry) { return normalizeId(entry.id); }).filter(Boolean);
-  if (!expected.length) return '';
+  if (!expected.length) return fragmentVerdict([]);
   var seen = {};
   var extras = [];
   var invalid = [];
@@ -6381,29 +6436,33 @@ export function validateFragmentsStage(result, expectedRegistry, options) {
   if (missingDesignSpec.length > 0) {
     console.warn('[LiftRPG] Fragments missing designSpec: ' + missingDesignSpec.join(', '));
   }
+  // Every sentence below is BYTE-IDENTICAL to the string this gate used to
+  // return; only the envelope changed. These defects name a set of ids rather
+  // than one coordinate, so none of them is delta-class and none publishes a
+  // target — which is what makes the classifier refuse them (D167).
   if (invalid.length > 0) {
-    return 'Fragment stage validation failed: missing content/body in IDs ' + invalid.slice(0, 8).join(', ') + '.';
+    return fragmentVerdict(['Fragment stage validation failed: missing content/body in IDs ' + invalid.slice(0, 8).join(', ') + '.']);
   }
   if (missingTitle.length > 0) {
     console.warn('[LiftRPG] Fragments missing title: ' + missingTitle.join(', '));
   }
   if (missingDocType.length > 0) {
-    return 'Fragment stage validation failed: missing/invalid documentType in IDs ' + missingDocType.slice(0, 8).join(', ') + '.';
+    return fragmentVerdict(['Fragment stage validation failed: missing/invalid documentType in IDs ' + missingDocType.slice(0, 8).join(', ') + '.']);
   }
   if (missingAuthor.length > 0) {
-    return 'Fragment stage validation failed: missing inWorldAuthor in IDs ' + missingAuthor.slice(0, 8).join(', ') + '.';
+    return fragmentVerdict(['Fragment stage validation failed: missing inWorldAuthor in IDs ' + missingAuthor.slice(0, 8).join(', ') + '.']);
   }
   if (pointerShape.length > 0) {
-    return 'Fragment stage validation failed: ' + pointerShape.slice(0, 4).join('; ') + '.';
+    return fragmentVerdict(['Fragment stage validation failed: ' + pointerShape.slice(0, 4).join('; ') + '.']);
   }
   var missing = expected.filter(function (id) { return !seen[id]; });
   if (missing.length > 0) {
-    return 'Fragment stage validation failed: missing IDs ' + missing.slice(0, 8).join(', ') + '.';
+    return fragmentVerdict(['Fragment stage validation failed: missing IDs ' + missing.slice(0, 8).join(', ') + '.']);
   }
   if (extras.length > 0) {
-    return 'Fragment stage validation failed: unexpected IDs ' + extras.slice(0, 8).join(', ') + '.';
+    return fragmentVerdict(['Fragment stage validation failed: unexpected IDs ' + extras.slice(0, 8).join(', ') + '.']);
   }
-  return '';
+  return fragmentVerdict([]);
 }
 
 /**

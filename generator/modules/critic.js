@@ -772,8 +772,12 @@ export function unitFloorErrors(unitType, unit, booklet) {
     return (result && result.errors) || [];
   }
   if (unitType === 'fragment') {
-    var message = validateFragmentsStage({ fragments: [unit] }, [], { generationFloors: true });
-    return message ? [message] : [];
+    // The fragments gate answers in the verdict shape (D157/D168), so the floor
+    // list is read off `.errors` rather than wrapped from a single string. A
+    // budget failure now arrives as one error per breach, which is what the
+    // revision loop wants anyway: it quotes each defect to the reviser.
+    var verdict = validateFragmentsStage({ fragments: [unit] }, [], { generationFloors: true });
+    return (verdict && verdict.errors) || [];
   }
   if (unitType === 'ending') {
     // Endings have no per-unit stage validator (their stage gate is continuity,
