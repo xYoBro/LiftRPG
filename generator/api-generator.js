@@ -2103,21 +2103,30 @@ function getApiPromptBuilders() {
     shell: window.generateApiShellPrompt || window.generateShellPrompt,
     // Shared with the Skeleton+Flesh pipeline — same builder, same head.
     knowing: window.generateKnowingPrompt,
-    weeks: window.generateApiWeekChunkPrompt || window.generateWeekChunkPrompt,
+    // `weeks`, `fragments` and `endings` rows were removed here (chip
+    // task_84c0400a, DR-5 — the audit correction to D170's phrasing). The
+    // registry offered them but nothing in this file ever dispatched
+    // `builders.weeks` / `.fragments` / `.endings` — the live seats are
+    // singleWeekFinal / fragmentBatch (clean run) + singleFragment (adaptive
+    // recovery) / singleEnding below. The underlying functions
+    // (`generateApiWeekChunkPrompt`, `generateApiFragmentsPrompt`,
+    // `generateApiEndingsPrompt`) are NOT deleted — they stay pinned directly
+    // by the D170/D173 floors rows in check-generation-floors.mjs, which call
+    // them without going through this registry — and `generateWeekChunkPrompt`
+    // / `generateEndingsPrompt` (the non-Api fallbacks these rows also named)
+    // remain live on the guided-build wizard in index.html.
     singleWeekFinal: window.generateSingleWeekFinalPrompt,
-    fragments: window.generateApiFragmentsPrompt,
     singleFragment: window.generateSingleFragmentPrompt,
     fragmentBatch: window.generateApiFragmentBatchPrompt || window.generateFragmentBatchPrompt,
-    endings: window.generateApiEndingsPrompt || window.generateEndingsPrompt,
     singleEnding: window.generateSingleEndingPrompt
   };
 }
 
 function assertApiPromptBuilders(builders) {
-  if (!builders.stage1 || !builders.stage2 || !builders.shell || !builders.knowing || !builders.weeks ||
+  if (!builders.stage1 || !builders.stage2 || !builders.shell || !builders.knowing ||
     !builders.singleWeekFinal ||
-    !builders.fragments || !builders.singleFragment ||
-    !builders.fragmentBatch || !builders.endings || !builders.singleEnding) {
+    !builders.singleFragment ||
+    !builders.fragmentBatch || !builders.singleEnding) {
     throw new Error('Pipeline generators not loaded. Please reload the page.');
   }
 }
