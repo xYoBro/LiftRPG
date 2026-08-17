@@ -3,14 +3,82 @@
 // Pure string-matching predicates — no external dependencies.
 // Used by runJsonStage to decide: retry, split, fallback from structured output.
 
-export function isStructuredOutputUnsupportedMessage(message) {
+// ── THE NARROW, LOUD HATCH (D162's recorded-open, closed here) ───────────────
+//
+// This predicate decides whether a structured stage may DEGRADE to freeform
+// text plus repair.js extraction. That degradation is correct for exactly one
+// situation — an endpoint that genuinely refuses to force a schema — and is the
+// D159 failure mode for every other: a freeform stage under token pressure
+// answers by dropping a whole required section, which is what D162 made
+// structurally impossible by forcing the shape on the wire.
+//
+// The predicate used to match the BARE words "unsupported" and "not supported"
+// anywhere in a provider message. Every schema-validation 400 phrased that way
+// — "unsupported keyword", "unsupported content block type", "value is not
+// supported" — therefore re-opened the exact door D162 closed, silently, on the
+// paid path. It matched "unknown parameter" and "invalid parameter" the same
+// way, for any parameter at all.
+//
+// So the match is now CONJUNCTIVE: a refusal word AND a subject that means
+// structured output or tool forcing. A subject term that is already unambiguous
+// on its own (`response_format`, `json_schema`) still needs the refusal word —
+// "response_format.schema is invalid" is our bug, not the endpoint's refusal.
+//
+// The reason is RETURNED rather than discarded, because the degradation has to
+// announce itself: callProviderStructured carries it onto the response, and the
+// stage runner turns it into a pipeline event and a run-report line naming the
+// stage and the provider's own words. Fail loudly, never silently substitute.
+var STRUCTURED_REFUSAL_WORDS = [
+  'unsupported',
+  'not supported',
+  'does not support',
+  "doesn't support",
+  'no support for',
+  'unknown parameter',
+  'unrecognized parameter',
+  'invalid parameter'
+];
+
+// Subjects that mean "the schema-forcing mechanism itself". Deliberately NOT
+// bare `tools`: a rejected keyword inside our own tool schema arrives as
+// "tools.0.input_schema: unsupported keyword", which is a contract defect to
+// fix, not an endpoint that cannot force. The whole-phrase forms below catch a
+// real refusal of tool use without catching that.
+var STRUCTURED_REFUSAL_SUBJECTS = [
+  'response_format',
+  'json_schema',
+  'json schema',
+  'tool_choice',
+  'tool choice',
+  'structured output',
+  'function calling',
+  'function_call',
+  'tool use',
+  'tool_use',
+  'tools are',
+  'tools is',
+  'support tools',
+  'support for tools'
+];
+
+// Returns the matched subject (a short, quotable phrase) or '' when the message
+// is not a structured-output refusal. Truthiness IS the predicate.
+export function structuredOutputRefusalReason(message) {
   var lower = String(message || '').toLowerCase();
-  return lower.indexOf('response_format') !== -1
-    || lower.indexOf('json_schema') !== -1
-    || lower.indexOf('unsupported') !== -1
-    || lower.indexOf('not supported') !== -1
-    || lower.indexOf('unknown parameter') !== -1
-    || lower.indexOf('invalid parameter') !== -1;
+  if (!lower) return '';
+  var sawRefusal = false;
+  for (var i = 0; i < STRUCTURED_REFUSAL_WORDS.length; i++) {
+    if (lower.indexOf(STRUCTURED_REFUSAL_WORDS[i]) !== -1) { sawRefusal = true; break; }
+  }
+  if (!sawRefusal) return '';
+  for (var j = 0; j < STRUCTURED_REFUSAL_SUBJECTS.length; j++) {
+    if (lower.indexOf(STRUCTURED_REFUSAL_SUBJECTS[j]) !== -1) return STRUCTURED_REFUSAL_SUBJECTS[j];
+  }
+  return '';
+}
+
+export function isStructuredOutputUnsupportedMessage(message) {
+  return !!structuredOutputRefusalReason(message);
 }
 
 export function buildStructuredStageName(stageName) {

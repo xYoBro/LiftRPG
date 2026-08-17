@@ -1595,6 +1595,10 @@ function stageBudget(stageKey, userTimeoutMs) {
   var baseTimeout = Math.max(base.timeoutMs, floor);
 
   return {
+    // The optional third column, read through the SAME accessor as the other
+    // two so no call site ever reaches into STAGE_BUDGETS itself (D97). '' when
+    // the row is unset, which is every row today, and '' sends nothing.
+    effort: String(base.effort || '').trim().toLowerCase(),
     maxTokens: function (retryState) {
       if (retryState && retryState.attempt > 0 && isLikelyTruncationError(retryState.error)) {
         return MAX_OUTPUT_TOKENS;
@@ -1647,6 +1651,14 @@ function createStageTelemetry(stageKey, stageName) {
     errorClass: null,   // last error classification seen (e.g. 'schema', 'timeout')
     provider: '',
     model: '',
+    // The ladder's effort for this stage ('' = unset = the API default), so a
+    // run report can state what each stage was asked to spend rather than
+    // leaving the reader to infer it from the table.
+    effort: '',
+    // Set when a schema-forced stage DEGRADED to freeform text plus repair.
+    // Null is the normal, healthy value; a non-null one is a defect report the
+    // run must surface, not a footnote (D162's recorded-open).
+    structuredFallback: null,
     usage: blankUsageTotals(),
     estimatedCostUsd: 0,
     pricing: null
@@ -1666,12 +1678,24 @@ function summarizeStageTelemetry(telemetry) {
     errorClass: telemetry ? (telemetry.errorClass || null) : null,
     provider: telemetry && telemetry.provider ? telemetry.provider : '',
     model: telemetry && telemetry.model ? telemetry.model : '',
+    effort: telemetry && telemetry.effort ? telemetry.effort : '',
+    structuredFallback: telemetry && telemetry.structuredFallback
+      ? Object.assign({}, telemetry.structuredFallback)
+      : null,
     usage: {
       inputTokens: safeNumber(usage.inputTokens),
       outputTokens: safeNumber(usage.outputTokens),
       cachedInputTokens: safeNumber(usage.cachedInputTokens),
+      // Cache accounting, carried per stage so a run can be judged on measured
+      // hits instead of on the assumption that a `cache_control` marker worked.
+      // A marker on a prefix below the model's minimum is silently inert: it
+      // reports zero writes AND zero reads, which is exactly what these two
+      // numbers reading 0/0 across a whole run means.
       cacheWriteTokens: safeNumber(usage.cacheWriteTokens),
       cacheReadTokens: safeNumber(usage.cacheReadTokens),
+      // Thinking spend, where the transport reports it. The Anthropic Messages
+      // API does not: thinking is billed inside outputTokens with no separate
+      // count, so 0 here means UNREPORTED on that path, never "did not think".
       reasoningTokens: safeNumber(usage.reasoningTokens),
       totalTokens: safeNumber(usage.totalTokens)
     },
@@ -1873,9 +1897,18 @@ async function runJsonStage(settings, config) {
     var resolvedTimeoutMs = typeof timeoutSpec === 'function'
       ? timeoutSpec(retryState)
       : (timeoutSpec || settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS);
+    // The effort column, from the ladder and nowhere else. Absent on every row
+    // today, so this branch never fires and `stageSettings` is the object it
+    // always was — the byte-identity the gates assert. When a row IS set, the
+    // value rides settings for the transport that can use it; every other
+    // adapter ignores the key and its payload is unchanged.
+    var stageEffort = budget.effort || '';
     var stageSettings = resolvedTimeoutMs === (settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS)
       ? settings
       : Object.assign({}, settings, { requestTimeoutMs: resolvedTimeoutMs });
+    if (stageEffort) {
+      stageSettings = Object.assign({}, stageSettings, { _effort: stageEffort });
+    }
 
     stageTelemetry.attempts += 1;
 
@@ -1920,6 +1953,41 @@ async function runJsonStage(settings, config) {
         })();
       var result = response.result;
       recordStageUsage(stageTelemetry, response);
+      stageTelemetry.effort = stageEffort;
+
+      // ── A LOST SCHEMA FORCE IS AN EVENT, NOT A CONSOLE LINE ─────────────────
+      // callProviderStructured degrades a stage to freeform when the endpoint
+      // refuses to force a schema. That is the right move for a genuine refusal
+      // and re-opens D159's dropped-section failure for everything else, so the
+      // run has to SAY it happened, name the stage, and quote the provider —
+      // once, on the attempt it happened on, through the same channel every
+      // other stage fact rides. It does not fail the stage: the answer may be
+      // perfectly good, and the loudness is so a bad one is attributable.
+      var lostForce = response.meta && response.meta.structuredFallback;
+      if (lostForce && !stageTelemetry.structuredFallback) {
+        stageTelemetry.structuredFallback = {
+          stageName: lostForce.stageName || config.stageName || '',
+          reason: lostForce.reason || '',
+          providerMessage: lostForce.providerMessage || ''
+        };
+        emitPipelineEvent(config.onProgress, config.stageIndex || 0,
+          config.getTotalStages ? config.getTotalStages() : 0,
+          config.stageName + ': the provider refused schema-forced output, so this stage '
+          + 'answered as freeform text and may drop a required section. Provider said: '
+          + (lostForce.providerMessage || 'no message'), {
+            phase: 'structured_fallback',
+            // Rides the NOTICE channel, and the empty stageKey is required by
+            // it: a notice must not pin itself onto a stage card (the comment
+            // at that branch in index.html says so). The stage is named in the
+            // message instead, and the machine-readable copy reaches the card
+            // through this stage's own telemetry summary a moment later.
+            noticeLevel: 'warn',
+            stageKey: '',
+            stageName: config.stageName,
+            reason: lostForce.reason || '',
+            providerMessage: lostForce.providerMessage || ''
+          });
+      }
 
       // THE ATTEMPT'S FINISH REASON (D97 escalation, restored).
       //

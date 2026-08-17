@@ -33,6 +33,7 @@ import { cloneSimple } from './assembly.js';
 import {
   buildStructuredStageName,
   isStructuredOutputUnsupportedMessage,
+  structuredOutputRefusalReason,
   isLikelyTruncationError,
   isLikelyJsonFailure,
   shouldFallbackFromStructured
@@ -459,6 +460,17 @@ function normalizeUsageMetrics(providerId, usage) {
       cachedInputTokens: 0,
       cacheWriteTokens: anthropicCacheWrite,
       cacheReadTokens: anthropicCacheRead,
+      // ZERO IS THE TRUTH HERE, NOT A PLUMBING GAP (verified against the docs
+      // 2026-08-16). Thinking tokens are billed as OUTPUT tokens and the
+      // Messages API reports no separate count for them: `usage` carries
+      // input/output and the two cache figures and nothing else. So a per-stage
+      // reasoning number cannot be measured on the paid Anthropic path at all —
+      // it is inside outputTokens, unlabelled. The non-zero readings this field
+      // gets come from OpenAI-compatible endpoints that report
+      // completion_tokens_details.reasoning_tokens, which includes the local
+      // bridge (it maps the CLI's own thinking count into that field). Any
+      // surface reporting thinking spend must say which transport measured it;
+      // "0" from here means UNREPORTED, never "the model did not think".
       reasoningTokens: 0,
       totalTokens: safeNumber(usage.total_tokens) || (anthropicInput + anthropicOutput + anthropicCacheWrite + anthropicCacheRead)
     };
@@ -1279,6 +1291,99 @@ export function buildAnthropicHeaders(apiKey) {
   };
 }
 
+// ── Anthropic prompt caching: one placement, stated arithmetic ───────────────
+//
+// THE PREFIX LAW. The API builds cache prefixes in the order `tools` → `system`
+// → `messages`, and a prefix is a PREFIX: the first byte that varies between
+// two calls ends the shareable region. Everything after a varying byte is
+// uncacheable no matter where the breakpoint sits (docs verified 2026-08-16).
+//
+// What that means for this pipeline, measured rather than assumed:
+//
+//   tools    — present only on the D162 schema-forced path, and byte-stable per
+//              stage (the stage's own STRUCTURED_SCHEMA_* object). The most
+//              stable content in any request we send, and until now the only
+//              one with no breakpoint on it. It gets one here.
+//   system   — `settings._systemPrompt`, set once per run and therefore stable
+//              across every call in a phase. Correct placement, wrong SIZE: it
+//              is ~200 tokens of world contract against a 1,024-token minimum
+//              cacheable prefix on claude-sonnet-4-6, so the marker that has
+//              been on it has been silently inert (a short prefix does not
+//              error — it reports cache_creation_input_tokens: 0).
+//   messages — every stage builder in generator.js opens with a per-call
+//              varying line ("# Write Week 3") and only then concatenates its
+//              ~24k tokens of stable SCHEMA_*/INST_* doctrine. So the doctrine
+//              sits BEHIND a varying byte and cannot be cached from here at
+//              any breakpoint. Moving it into `system` is the only placement
+//              that would pay, and that is a prompt-order change in builders
+//              this transport does not own. Escalated, not forced.
+//
+// A marker on a below-minimum prefix costs nothing, so both markers below are
+// safe on every stage and pay on the ones that clear the floor.
+//
+// TTL, chosen with the arithmetic shown. Writes cost 1.25x base input at the
+// 5-minute default and 2x at "1h"; reads cost 0.1x either way. For N calls
+// sharing a prefix with hit probability p under the short TTL:
+//     5m  cost = 1.25*(1 + (N-1)*(1-p)) + 0.1*(N-1)*p
+//     1h  cost = 2.0 + 0.1*(N-1)
+// At N=6 (the week stages) those are equal at p = 0.87 — so "1h" wins unless
+// almost every same-stage call lands inside five minutes, and the audit
+// measured 5-6 minutes between them. But that comparison only applies to a
+// prefix that IS shared across those calls, which today's is not: the sharing
+// that actually exists is retry- and repair-scoped, seconds apart, where a
+// single re-read makes 5m cost 1.35 against 1h's 2.1. Hence the default TTL
+// (5 minutes) and no `ttl` key on the wire — the shape that is right for the
+// reuse this pipeline actually has. Revisit this constant IN THE SAME COMMIT as
+// any change that puts stage doctrine into a shared prefix; the two are one
+// decision, and 1h is the answer the moment cross-call sharing is real.
+var ANTHROPIC_CACHE_CONTROL = { type: 'ephemeral' };
+
+function anthropicCacheControl() {
+  // Fresh object per call: a payload must never share a mutable node with a
+  // module-level constant that a future edit might stamp a ttl onto in place.
+  return { type: ANTHROPIC_CACHE_CONTROL.type };
+}
+
+// The system block, built in ONE place for both call paths. Given a plain
+// string it emits exactly the single cache-anchored text block both paths built
+// inline before this existed — byte-identical, gate-asserted — and given
+// nothing it emits nothing.
+export function buildAnthropicSystemBlocks(systemPrompt) {
+  if (!systemPrompt) return null;
+  return [{
+    type: 'text',
+    text: systemPrompt,
+    cache_control: anthropicCacheControl()
+  }];
+}
+
+// ── The effort knob (adaptive-effort class, NOT manual thinking) ─────────────
+//
+// `output_config.effort` is the current, GA parameter for trading response
+// thoroughness against token spend: values low | medium | high | xhigh | max,
+// no beta header, supported on every model this pipeline can reach including
+// claude-sonnet-4-6 (docs verified 2026-08-16). It affects ALL response tokens
+// — prose, tool arguments, and thinking where thinking is active — which is why
+// it is the right knob here and `thinking.budget_tokens` is not: manual
+// budget_tokens is removed on the current models AND is the one thinking
+// configuration incompatible with D162's forced `tool_choice`. This function
+// can never emit it, and both gates pin that.
+//
+// "high" is documented to be exactly equivalent to omitting the parameter, so
+// the identity value is ABSENCE and absence is what an unset ladder row sends.
+export var VALID_STAGE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+export function buildAnthropicOutputConfig(effort) {
+  var value = String(effort || '').trim().toLowerCase();
+  if (!value) return null;
+  if (VALID_STAGE_EFFORTS.indexOf(value) === -1) {
+    console.warn('[LiftRPG] Ignoring unknown stage effort "' + effort + '" — expected one of '
+      + VALID_STAGE_EFFORTS.join(', ') + '.');
+    return null;
+  }
+  return { effort: value };
+}
+
 // ── Shared streaming guard ───────────────────────────────────────────────────
 // Wall-clock is the WRONG failure signal for a stream: a healthy 24k-token
 // completion runs for many minutes, while a dead socket produces no bytes at
@@ -1762,7 +1867,7 @@ async function readAnthropicStream(response, onActivity, onTick) {
   };
 }
 
-export async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs, pricingRule, systemPrompt, images, onStreamTick) {
+export async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs, pricingRule, systemPrompt, images, onStreamTick, effort) {
   var resolvedMax = clampAnthropicMaxTokens(model, maxTokens || MAX_OUTPUT_TOKENS);
   var payload = {
     model: model,
@@ -1771,15 +1876,16 @@ export async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs,
     messages: [{ role: 'user', content: buildAnthropicUserContent(prompt, images) }]
   };
 
-  // Prompt caching: if a system prompt is provided, mark it ephemeral so
-  // subsequent calls in the same session get cache hits (~90% cheaper input).
-  if (systemPrompt) {
-    payload.system = [{
-      type: 'text',
-      text: systemPrompt,
-      cache_control: { type: 'ephemeral' }
-    }];
-  }
+  // Prompt caching: one placement, shared with the structured path. Reads at
+  // ~0.1x base input when the prefix clears the model's minimum; silently inert
+  // and free when it does not.
+  var systemBlocks = buildAnthropicSystemBlocks(systemPrompt);
+  if (systemBlocks) payload.system = systemBlocks;
+
+  // The effort knob. Absent by default and therefore absent from the wire —
+  // an unset ladder row leaves this payload byte-identical to a pre-knob one.
+  var outputConfig = buildAnthropicOutputConfig(effort);
+  if (outputConfig) payload.output_config = outputConfig;
 
   var streamed = await runStreamingRequest({
     label: 'Anthropic',
@@ -1842,11 +1948,21 @@ function detectOpenAICompatProvider(baseUrl) {
 // report as unknown, which is honest \u2014 never an error.
 var STREAM_OPTIONS_UNSUPPORTED = {};
 
+// SELF-CONTAINED ON PURPOSE. This used to borrow
+// isStructuredOutputUnsupportedMessage(), which then matched the bare words
+// "unsupported" / "unknown parameter" and so happened to cover a server that
+// refuses `stream_options`. That predicate is now narrow and conjunctive (it
+// only speaks about schema forcing), so this one states its own subject: a 400
+// that names stream_options, or names include_usage, or refuses an unknown
+// parameter outright. Nothing here decides whether a SCHEMA can be forced.
 function rejectsStreamOptions(err) {
   if (!err || err.status !== 400) return false;
-  var message = String(err.message || '');
-  return message.toLowerCase().indexOf('stream_options') !== -1
-    || isStructuredOutputUnsupportedMessage(message);
+  var message = String(err.message || '').toLowerCase();
+  return message.indexOf('stream_options') !== -1
+    || message.indexOf('include_usage') !== -1
+    || message.indexOf('unknown parameter') !== -1
+    || message.indexOf('unrecognized parameter') !== -1
+    || message.indexOf('invalid parameter') !== -1;
 }
 
 export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens, timeoutMs, pricingRule, images, onStreamTick) {
@@ -1967,6 +2083,13 @@ export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens
  *           declares it (including third-party ones registered at runtime) is
  *           simply never handed images. Probe with
  *           transportSupports(settings, 'vision') before passing any.
+ * @property {boolean=} effortControl
+ *           Honors the STAGE_BUDGETS effort column via settings._effort. Same
+ *           absent-means-false rule as vision: `output_config.effort` is an
+ *           Anthropic Messages field, so an adapter that does not declare this
+ *           simply ignores the key and its payload is unchanged. Every row
+ *           ships unset today, so the key is absent from settings entirely on
+ *           every call this pipeline currently makes.
  */
 /**
  * @typedef {Object} TransportAdapter
@@ -2023,6 +2146,11 @@ registerTransport({
     // two formats force a schema by different mechanisms (D94/D160b).
     structuredOutput: true,
     systemPromptCaching: true,
+    // `output_config.effort` is an Anthropic Messages field. A compat endpoint
+    // handed one would reject it as an unknown parameter, so the knob is a
+    // CAPABILITY of this transport and the ladder's effort column reaches the
+    // wire here and nowhere else — every other adapter stays byte-identical.
+    effortControl: true,
     vision: true
   },
   call: function (settings, prompt, opts) {
@@ -2030,7 +2158,7 @@ registerTransport({
       settings.apiKey, settings.model, prompt,
       opts.maxTokens, opts.timeoutMs,
       settings._pricingRule, settings._systemPrompt,
-      opts.images, opts.onStreamTick
+      opts.images, opts.onStreamTick, settings._effort
     );
   },
   callStructured: function (settings, prompt, schema, maxTokens, stageName, opts) {
@@ -2038,7 +2166,7 @@ registerTransport({
       settings.apiKey, settings.model, prompt, schema,
       maxTokens, opts.timeoutMs,
       settings._pricingRule, settings._systemPrompt,
-      stageName, opts.onStreamTick
+      stageName, opts.onStreamTick, settings._effort
     );
   }
 });
@@ -2173,7 +2301,7 @@ export function transportSupports(settings, capability) {
 // the cap binds the same way it binds on a compat `strict: false` json_schema:
 // as instruction. Enforcement stays with collectBudgetBreaches at the stage
 // validator. Two readings of one OUTPUT_BUDGETS row, unchanged by this wave.
-export async function callAnthropicStructured(apiKey, model, prompt, schema, maxTokens, timeoutMs, pricingRule, systemPrompt, stageName, onStreamTick) {
+export async function callAnthropicStructured(apiKey, model, prompt, schema, maxTokens, timeoutMs, pricingRule, systemPrompt, stageName, onStreamTick, effort) {
   var resolvedMax = clampAnthropicMaxTokens(model, maxTokens || MAX_OUTPUT_TOKENS);
   var toolName = buildStructuredStageName(stageName);
   var payload = {
@@ -2184,7 +2312,13 @@ export async function callAnthropicStructured(apiKey, model, prompt, schema, max
       name: toolName,
       description: 'Record the complete ' + (stageName || 'stage')
         + ' result. Every required field must be present and fully written.',
-      input_schema: schema
+      input_schema: schema,
+      // The tools block renders FIRST and is byte-stable per stage, which makes
+      // it the only genuinely shared prefix this transport can anchor without
+      // reordering a prompt (see the prefix law above). Free where the schema
+      // is under the model's minimum; a ~0.1x re-read of the whole schema on
+      // every retry and repair re-entry where it is not.
+      cache_control: anthropicCacheControl()
     }],
     // `disable_parallel_tool_use` guarantees exactly one tool_use block, so the
     // stage answer can never arrive split across two partial calls.
@@ -2192,15 +2326,18 @@ export async function callAnthropicStructured(apiKey, model, prompt, schema, max
     messages: [{ role: 'user', content: buildAnthropicUserContent(prompt) }]
   };
 
-  // Same ephemeral system-prompt caching as the freeform call — a structured
-  // stage should not silently lose the cache discount the prose stages get.
-  if (systemPrompt) {
-    payload.system = [{
-      type: 'text',
-      text: systemPrompt,
-      cache_control: { type: 'ephemeral' }
-    }];
-  }
+  // Same system-prompt anchor as the freeform call, from the same builder — a
+  // structured stage must not silently lose the cache discount prose gets, and
+  // two copies of one placement is how they drift apart.
+  var systemBlocks = buildAnthropicSystemBlocks(systemPrompt);
+  if (systemBlocks) payload.system = systemBlocks;
+
+  // The effort knob, on the same terms as the freeform path: absent by default,
+  // never a manual thinking budget. `output_config.effort` is compatible with
+  // forced tool_choice; `thinking.budget_tokens` is the one that is not, and
+  // this payload can never acquire it (D162's pin, still asserted both ways).
+  var outputConfig = buildAnthropicOutputConfig(effort);
+  if (outputConfig) payload.output_config = outputConfig;
 
   var streamed = await runStreamingRequest({
     label: 'Anthropic',
@@ -2425,11 +2562,33 @@ export async function callProviderStructured(settings, prompt, schema, maxTokens
     return await adapter.callStructured(settings, prompt, schema, maxTokens, stageName, structuredOpts);
   } catch (err) {
     if (!shouldFallbackFromStructured(err) || isLikelyTruncationError(err)) throw err;
-    console.warn('[LiftRPG] Structured output unavailable for ' + stageName + '; falling back to freeform JSON repair:', err.message);
+    // ── THE DEGRADATION ANNOUNCES ITSELF (D162's recorded-open) ──────────────
+    // Dropping a stage from a forced schema to freeform text plus repair
+    // re-opens the D159 dropped-section failure for that stage. It is the right
+    // move when an endpoint genuinely cannot force a schema and the wrong move
+    // every other time, so it may never be a silent one: the reason travels
+    // back on the response as structured data, and the stage runner turns it
+    // into a pipeline event and a run-report line naming the stage and the
+    // provider's own words. Fail loudly, never silently substitute.
+    var providerMessage = String((err && err.message) || 'unknown provider error');
+    console.warn('[LiftRPG] SCHEMA FORCING LOST for ' + stageName
+      + ' — this stage now answers freeform and may drop a required section. Provider said: '
+      + providerMessage);
     var fallbackResponse = await callProvider(settings, prompt, maxTokens, options);
+    var fallbackMeta = Object.assign({}, fallbackResponse.meta, {
+      response_mode: 'freeform_fallback',
+      structuredFallback: {
+        stageName: stageName || '',
+        // The narrow matcher's own verdict when it fired, so the report can say
+        // WHICH refusal was read rather than just that something was.
+        reason: structuredOutputRefusalReason(providerMessage)
+          || (err && err.structuredUnsupported ? 'provider flagged structuredUnsupported' : 'unusable structured response'),
+        providerMessage: providerMessage.slice(0, 500)
+      }
+    });
     return {
       result: extractJson(fallbackResponse.text),
-      meta: fallbackResponse.meta,
+      meta: fallbackMeta,
       usage: fallbackResponse.usage
     };
   }

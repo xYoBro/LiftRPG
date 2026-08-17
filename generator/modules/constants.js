@@ -38,6 +38,32 @@ export var STREAM_MAX_OVERALL_MS = 1800000;          // 30m absolute ceiling
 // INVARIANT: retries escalate. A retry must never get less budget than the
 // attempt it is replacing (the Story Plan stage previously shrank 420s -> 300s
 // on retry, which is how a slow-but-healthy generation got killed twice).
+// ── THE OPTIONAL THIRD COLUMN: effort ────────────────────────────────────────
+//
+// Every row below may carry an OPTIONAL `effort` alongside its (maxTokens,
+// timeoutMs) pair — one of VALID_STAGE_EFFORTS ('low' | 'medium' | 'high' |
+// 'xhigh' | 'max'). It rides this table for the same reason the other two do
+// (D97): a hand-written effort literal at a stage call site is a defect, and a
+// second home for "how hard should this stage work" is how one table becomes
+// two answers. stageBudget() is the one accessor; the anthropic transport is
+// the one place it reaches the wire (`output_config.effort`), because it is an
+// Anthropic Messages field and a compat endpoint would reject it.
+//
+// EVERY ROW SHIPS UNSET, AND THAT IS THE POINT. An absent value sends no
+// parameter at all, which the API documents as exactly equivalent to the
+// default ('high'), so an unset ladder makes a request byte-identical to a
+// pre-knob one — asserted in both gates. Do NOT set a non-default effort on any
+// stage here without evidence: what effort costs and buys on THIS pipeline's
+// stages has not been measured, and the vendor's own recommendation for the
+// default model (medium on claude-sonnet-4-6) is guidance, not a measurement of
+// our books. Tuning these rows is a future evidence-based ruling — a bench
+// sweep per stage, judged on book quality, not a value copied from a doc.
+//
+// Two constraints for whoever does that sweep. Effort is rendered into the
+// prompt, so CHANGING it invalidates cache prefixes — hold it constant across
+// calls that share one (i.e. set it per stage, never per attempt). And it is
+// model-gated: an endpoint whose model predates the parameter answers 400, so a
+// non-empty value here is a claim about the models this pipeline runs.
 export var STAGE_BUDGETS = {
   // Shared by both pipelines (§11 Wave 1.5). One structured object of short
   // strings — roughly 25-35 one-line facts. Cheaper than any prose stage by
@@ -81,14 +107,19 @@ export var STAGE_BUDGETS = {
   // stage's prose short.
   layerBible: { maxTokens: 24000, timeoutMs: 600000 },
   campaign:   { maxTokens: 56000, timeoutMs: 600000 },
-  // MEASURED AGAIN, one model later (D159): a Sonnet-5 shell attempt reported
-  // 28.1k output against this row's 32000 — 88% consumed — and came back with
-  // `meta.playSpine` ABSENT rather than truncated. That is the failure mode
-  // above a hard ceiling that a thinking model has to share: it does not cut
-  // the JSON off mid-token, it drops whole sections to fit. The same brief on
-  // a non-thinking model completed. Thinking is not free budget and it is not
-  // ours to disable (claude-5 rejects sampling overrides), so the ceiling has
-  // to hold BOTH the thinking and the payload.
+  // MEASURED AGAIN, one model later (D159): a shell attempt reported 28.1k
+  // output against this row's 32000 — 88% consumed — and came back with
+  // `meta.playSpine` ABSENT rather than truncated. Above a tight ceiling a
+  // model does not always cut the JSON off mid-token; it drops whole required
+  // sections to fit, and the result surfaces as a schema failure with the
+  // budget problem hidden underneath. The raise stands on that 28.1k/32000
+  // number alone. (D159's first version attributed the drop to thinking
+  // consuming the shared ceiling and named the wrong model; the author
+  // WITHDREW that explanation the same evening and the ledger records the
+  // correction. Nothing about thinking is established by this row — the
+  // sentence that claimed it has been removed rather than left standing as
+  // measurement. Where a model DOES think inside this ceiling, the knob is the
+  // effort column below, not a thinking budget.)
   shell:      { maxTokens: 56000, timeoutMs: 420000 },
   fragment:   { maxTokens: 24000, timeoutMs: 480000 },
   // Critic loop (D66). Both rows were sized before the critic had eight
