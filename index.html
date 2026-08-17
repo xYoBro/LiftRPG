@@ -4275,6 +4275,12 @@
           // event: { stageKey, received, chars, approxTokens, elapsedMs,
           // budgetMs, attempt, attemptCount, final }.
           stream: null,
+          // The provider's rate limit is holding the current call (D160).
+          // Null whenever the build is not parked on a throttle wait. Shape:
+          // { stageKey, waitNumber, maxWaits, until }. ONE field, two readers
+          // (the headline caption and the stage card), so the two cannot
+          // disagree about whether the build is waiting or working.
+          throttleWait: null,
           ledger: ledger,
           booklet: null,
           error: '',
@@ -4315,6 +4321,36 @@
         if (!stream || !Number(stream.budgetMs)) return '';
         var minutes = Math.max(1, Math.round(Number(stream.budgetMs) / 60000));
         return 'This step can take up to ' + minutes + ' minute' + (minutes === 1 ? '' : 's') + '.';
+      }
+
+      // ── The rate-limit wait ───────────────────────────────────────────────
+      //
+      // A provider that answers "not now" produces a THIRD kind of pause, and
+      // the panel knew only two: working, and retrying. The pipeline announces
+      // this one in full — how long, which wait of how many, and that it does
+      // not consume a retry attempt (D160) — and then sleeps for up to ten
+      // minutes. Nothing here read that event, so the caption fell through to
+      // "Still waiting on provider response": an explained, bounded, saved wait
+      // rendered as an unexplained silence, which is the D161 shape judged
+      // straight off the no-context law.
+      //
+      // Guarded on `running` so a terminal state can never inherit a stale
+      // wait, and keyed on the stage so a wait can never describe a different
+      // card than the one it belongs to.
+      function describeThrottleWait(stageKey) {
+        if (!apiRunState || apiRunState.status !== 'running') return '';
+        var wait = apiRunState.throttleWait;
+        if (!wait || !stageKey || wait.stageKey !== stageKey) return '';
+        var remaining = Math.max(0, Number(wait.until || 0) - Date.now());
+        var countdown = remaining > 0
+          ? 'Trying again in about ' + formatApiElapsed(remaining)
+          : 'Trying again now';
+        var which = wait.maxWaits
+          ? ' (wait ' + wait.waitNumber + ' of ' + wait.maxWaits + ')'
+          : '';
+        return 'the provider’s rate limit is holding this call. ' + countdown + which +
+          '. This wait does not use up an attempt, and every stage that already ' +
+          'finished is saved.';
       }
 
       function getActiveStreamFor(stageKey) {
@@ -5544,6 +5580,11 @@
       function formatApiStageDetail(stageKey, status, metrics) {
         metrics = metrics || createApiStageMetrics();
         if (status === 'in progress') {
+          // A stage the provider has parked is not working, and its heartbeat,
+          // its elapsed clock and its attempt count all describe the call that
+          // was refused. Say what is actually happening instead.
+          var throttleDetail = describeThrottleWait(stageKey);
+          if (throttleDetail) return 'Paused — ' + throttleDetail;
           var baseDetail = stageKey === 'quality'
             ? 'Assembling and checking the booklet locally on this device.'
             : (apiRunState.targetCaption || 'Working…');
@@ -5734,17 +5775,26 @@
           var activeStageLabel = getStageLabel(apiRunState.currentStageKey) || 'current stage';
           var elapsed = formatApiElapsed(Date.now() - apiRunState.currentStageStartedAt);
           var timeoutLabel = formatTimeoutLabel(apiRunState.requestTimeoutMs || (apiTimeoutEl ? Number(apiTimeoutEl.value || 600000) : 600000));
-          apiRunState.progressCaption = 'Waiting on ' + activeStageLabel + ' for ' + elapsed + '. ' + timeoutLabel + '.';
-          // "Still waiting on provider response" was the whole story after 90
-          // seconds, and it is the sentence that made a healthy 6-minute stage
-          // read as a hang. When the heartbeat has something better to say, it
-          // replaces it; when it does not, the honest fallback stands.
-          var headlineStream = getActiveStreamFor(apiRunState.currentStageKey);
-          var headlineBeat = formatStreamHeartbeat(headlineStream);
-          if (headlineBeat) {
-            apiRunState.progressCaption += ' ' + headlineBeat;
-          } else if ((Date.now() - apiRunState.currentStageStartedAt) >= 90000) {
-            apiRunState.progressCaption += ' Still waiting on provider response.';
+          // A parked build gets its own headline, not a suffix on the working
+          // one: the elapsed clock and the request timeout are both facts about
+          // a call the provider already refused, and reading them beside a rate
+          // limit is how a wait gets mistaken for a hang.
+          var headlineThrottle = describeThrottleWait(apiRunState.currentStageKey);
+          if (headlineThrottle) {
+            apiRunState.progressCaption = 'Paused on ' + activeStageLabel + ' — ' + headlineThrottle;
+          } else {
+            apiRunState.progressCaption = 'Waiting on ' + activeStageLabel + ' for ' + elapsed + '. ' + timeoutLabel + '.';
+            // "Still waiting on provider response" was the whole story after 90
+            // seconds, and it is the sentence that made a healthy 6-minute stage
+            // read as a hang. When the heartbeat has something better to say, it
+            // replaces it; when it does not, the honest fallback stands.
+            var headlineStream = getActiveStreamFor(apiRunState.currentStageKey);
+            var headlineBeat = formatStreamHeartbeat(headlineStream);
+            if (headlineBeat) {
+              apiRunState.progressCaption += ' ' + headlineBeat;
+            } else if ((Date.now() - apiRunState.currentStageStartedAt) >= 90000) {
+              apiRunState.progressCaption += ' Still waiting on provider response.';
+            }
           }
         }
         if (apiStateSummary) apiStateSummary.textContent = apiRunState.summary || 'Waiting For Settings';
@@ -8772,6 +8822,8 @@
             // target, bump the stage counter, or push a log line (they arrive
             // twice a second). It reports one thing — this stage is alive.
             if (phase === 'streaming') {
+              // Bytes are arriving, so whatever wait was on is over.
+              apiRunState.throttleWait = null;
               if (stageKey) {
                 // Work is demonstrably in flight, so the card says so. This is
                 // also the self-correction for a stage that emits more than one
@@ -8798,11 +8850,47 @@
               return;
             }
 
+            // ── A RATE-LIMIT WAIT IS A STATE, NOT A GAP (D160 · the D161 family) ──
+            // The provider said "not now". The pipeline announces the whole
+            // wait — its length, its number, and the fact that it does NOT
+            // consume a retry attempt — and then sleeps for up to ten minutes.
+            // No branch matched `throttle_wait`, so the event fell through to
+            // the stage-transition block below: the message was never logged,
+            // the heartbeat was cleared, and renderApiRunState rewrote the
+            // caption to "Still waiting on provider response." A known,
+            // explained, resumable wait rendered as an unexplained silence.
+            //
+            // Returns before the transition block for the same reason
+            // `retrying` does: a wait is not a stage transition. It must not
+            // move the stage counter, and it must not advance the attempt
+            // count — the pipeline re-enters the SAME attempt afterwards.
+            if (phase === 'throttle_wait') {
+              // The refused call's beat must not stand: nothing is arriving.
+              apiRunState.stream = null;
+              apiRunState.status = 'running';
+              // `stageKey: config.stageKey || ''` is the pipeline's shape, so
+              // the key can arrive empty. The wait happens INSIDE the running
+              // stage's own runner, so the current stage is the throttled one
+              // by construction — falling back to it is what keeps a wait with
+              // no key from rendering as an ordinary silence.
+              var throttleStageKey = stageKey || apiRunState.currentStageKey;
+              apiRunState.throttleWait = throttleStageKey ? {
+                stageKey: throttleStageKey,
+                waitNumber: Number(meta.waitNumber || 0),
+                maxWaits: Number(meta.maxWaits || 0),
+                until: Date.now() + Number(meta.waitMs || 0)
+              } : null;
+              applyApiNotice('warn', message, meta);
+              renderApiRunState();
+              return;
+            }
+
             // A retry is about to happen. Previously this was a console.warn
             // and nothing else, so from here a silent escalation and a hang
             // looked identical — and Stop was the only lever on offer.
             if (phase === 'retrying') {
               apiRunState.stream = null;
+              apiRunState.throttleWait = null;
               if (stageKey) {
                 var retryMetrics = apiRunState.stageMetrics[stageKey] || createApiStageMetrics();
                 apiRunState.stageMetrics[stageKey] = retryMetrics;
@@ -8815,7 +8903,9 @@
 
             // Any stage transition retires the previous heartbeat — a count
             // from the call that just ended must never sit under the next one.
+            // Same for a rate-limit wait: the build moved, so it is not parked.
             apiRunState.stream = null;
+            apiRunState.throttleWait = null;
             apiRunState.status = 'running';
             apiRunState.totalStages = totalStages;
             apiRunState.summary = 'Generation In Progress';
@@ -8838,6 +8928,19 @@
               if (meta.telemetry) {
                 applyApiStageTelemetry(stageKey, meta.telemetry, meta.error || message, meta);
               }
+            } else {
+              // AN EVENT THE PANEL WAS NEVER TAUGHT MAY NOT VANISH.
+              // Every branch above either returns or claims its phase; anything
+              // else used to fall out of this chain having quietly rewritten the
+              // run-wide fields and said nothing at all — so a legitimate new
+              // pipeline event was indistinguishable from no event. That is how
+              // `throttle_wait` stayed invisible from the day it shipped. The
+              // panel cannot infer a state it was never told about (D161), so
+              // the minimum is both directions: the phase name for whoever is
+              // reading the console, the pipeline's own sentence for the reader.
+              console.warn('[LiftRPG] Run panel received an unrecognized pipeline phase: ' + phase, meta);
+              if (message) apiRunState.targetCaption = message;
+              pushApiLog(message || ('The pipeline reported a step this page does not recognize (' + phase + ').'));
             }
             renderApiRunState();
           });
@@ -8909,11 +9012,25 @@
             apiRunState.currentStageStartedAt = 0;
             apiRunState.stream = null;
             var aggregateScore = report && report.scores && report.scores.aggregate ? report.scores.aggregate.score : '';
+            // ── THE EDITORIAL REVIEW'S OWN VERDICT (D19 · the D163 family) ────
+            // The critic never blocks delivery, and it must not start. But a
+            // loop that ends BELOW its threshold ships a book with a critique
+            // attached, and that fact reached the reader through a console.warn
+            // and nothing else — on the path that PAID for up to three revision
+            // rounds. The guided assembly surface has printed this verdict since
+            // the critic landed; the API panel dropped it. Same words on both
+            // surfaces, so they cannot disagree about the same book.
+            var criticReport = readBookletDebris(booklet, '_criticReport');
+            var criticVerdict = criticReport && typeof criticReport.finalMin === 'number'
+              ? 'editorial review ' + criticReport.finalMin + '/' + criticReport.threshold
+                + (criticReport.finished ? ' — composed' : ' — critique attached')
+              : '';
             apiRunState.progressCaption = isQualityBlocked
               ? (blockerMessages.length ? blockerMessages.length + ' blockers' : 'Quality blocked') + (aggregateScore ? ' · score ' + aggregateScore : '') + ' · ' + settings._providerLabel
               : aggregateScore
                 ? 'Quality score ' + aggregateScore + ' · ' + settings._providerLabel
                 : settings._providerLabel + (settings.model ? ' · ' + settings.model : '');
+            if (criticVerdict) apiRunState.progressCaption += ' · ' + criticVerdict;
             apiRunState.costCaption = (apiRunState.pricingLabel ? 'Estimated from ' + apiRunState.pricingLabel + '. ' : '') +
               'Run total: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + '.';
             pushApiLog(
@@ -8921,6 +9038,16 @@
                 ? 'Generation finished, but export is blocked by the quality gate. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.'
                 : 'Generation complete. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.'
             );
+            // The verdict gets its own line only when it fell short — a review
+            // that met its bar is already said in the caption, and repeating a
+            // pass in the log teaches the reader to skip the line that matters.
+            if (criticReport && criticReport.finished === false && typeof criticReport.finalMin === 'number') {
+              var criticRounds = Array.isArray(criticReport.rounds) ? criticReport.rounds.length : 0;
+              pushApiLog('The editorial review ended below its bar (' + criticReport.finalMin + '/'
+                + criticReport.threshold + ') after ' + criticRounds + ' round'
+                + (criticRounds === 1 ? '' : 's')
+                + '. The booklet is finished and yours — the critique is attached to it, and rebuilding costs another run.');
+            }
             if (isQualityBlocked) {
               pushApiLog('Quality blockers: ' + summarizeQualityGateBlockers(qualityGate.blockers).join(' · '));
             } else {
