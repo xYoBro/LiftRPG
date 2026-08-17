@@ -2066,17 +2066,50 @@ export async function callOpenAICompatStructured(apiKey, baseUrl, model, prompt,
     }))
   }, timeoutMs);
 
-  var body = await resp.json();
-  var errObj = Array.isArray(body) ? body[0] : body;
+  // \u2500\u2500 THE ERROR PATH, SHAPED LIKE THE STREAMING HARNESS'S (D160's second half)
+  //
+  // Two things used to go wrong here, and the fault campaign measured both.
+  //
+  // (1) The body was PARSED BEFORE `resp.ok` was checked. A 429 with an empty
+  //     body \u2014 what gateways, proxies and load balancers actually return \u2014 threw
+  //     "Failed to execute 'json' on 'Response'" and reached the stage runner as
+  //     an unclassifiable failure. It burned an attempt against a closed door,
+  //     which is the exact defect D160's backoff was written to end; it simply
+  //     never reached the five structured stages.
+  //
+  // (2) The error carried no `status` and no `retryAfterHeader`, so a throttle
+  //     survived only if the provider happened to write the words "rate limit"
+  //     into its message, and the provider's own Retry-After estimate was
+  //     discarded on every structured stage.
+  //
+  // Read the body as TEXT first, then decide. Provider-agnostic by construction:
+  // `status` and `Retry-After` are HTTP, not vendor vocabulary, and
+  // error-classify.js still learns nothing about who sent the response.
   if (!resp.ok) {
-    var errMsg = (errObj.error && errObj.error.message)
-      || (errObj.error && errObj.error.status && (errObj.error.status + ': ' + JSON.stringify(errObj.error)))
-      || errObj.message
-      || ('HTTP ' + resp.status + ' \u2014 ' + JSON.stringify(body).slice(0, 500));
+    var errorText = '';
+    try { errorText = await resp.text(); } catch (readErr) { errorText = ''; }
+    var parsedError = null;
+    try { parsedError = errorText ? JSON.parse(errorText) : null; } catch (jsonErr) { parsedError = null; }
+    var errEnvelope = Array.isArray(parsedError) ? parsedError[0] : parsedError;   // Gemini returns array errors
+    var errMsg = (errEnvelope && errEnvelope.error && errEnvelope.error.message)
+      || (errEnvelope && errEnvelope.error && errEnvelope.error.status
+        && (errEnvelope.error.status + ': ' + JSON.stringify(errEnvelope.error)))
+      || (errEnvelope && errEnvelope.message)
+      || (errorText ? errorText.slice(0, 500) : '')
+      || ('HTTP ' + resp.status);
     var err = new Error('API error: ' + errMsg);
+    err.status = resp.status;
+    if (resp.status === 429 || resp.status >= 500) err.retryable = true;
+    if (resp.status === 429 || resp.status === 503) {
+      err.errorType = 'rate_limit';
+      var retryAfter = resp.headers.get('retry-after');
+      if (retryAfter) err.retryAfterHeader = retryAfter;
+    }
     if (isStructuredOutputUnsupportedMessage(errMsg)) err.structuredUnsupported = true;
     throw err;
   }
+
+  var body = await resp.json();
 
   if (!body.choices || !body.choices[0] || !body.choices[0].message) {
     throw new Error('Unexpected structured response shape. Check the console.');

@@ -2055,6 +2055,23 @@ async function runJsonStage(settings, config) {
         );
         exhaustionErr.errorType = 'throttle_exhaustion';
         exhaustionErr.retryable = false;
+        // SAY WHICH STAGE DIED. Every other terminal path through this function
+        // emits phase:'failed' before it throws, and the panel's stage ledger is
+        // driven by that event: without it the exhausted stage is left rendered
+        // as still in progress while the run has already ended, so the reader
+        // sees a hang where there is a finished, resumable failure. Found by the
+        // fault campaign's exhaustion arm, 2026-08-16 (the D110 family: a stage
+        // nobody claims is a UI lie).
+        emitPipelineEvent(config.onProgress, config.stageIndex || 0,
+          config.getTotalStages ? config.getTotalStages() : 0,
+          config.stageName + ' failed', {
+            phase: 'failed',
+            stageKey: config.stageKey || '',
+            stageName: config.stageName,
+            error: String(exhaustionErr.message || ''),
+            errorType: 'throttle_exhaustion',
+            telemetry: summarizeStageTelemetry(stageTelemetry)
+          });
         throw prefixStageError(config.stageName, exhaustionErr);
       }
 
