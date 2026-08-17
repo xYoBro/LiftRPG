@@ -7351,11 +7351,28 @@
         return JSON.parse(stripped.slice(bounds[0], bounds[1] + 1));
       }
 
+      // THE GUIDED DOOR'S READER IS THE API DOOR'S READER. `_extractJson` is
+      // generator/modules/repair.js — fences, preambles, doubled JSON, trailing
+      // commas, raw control characters, Python literals — so a reply the API
+      // pipeline survives, a paste survives too. Every guided ingest point calls
+      // through here; there is no second parser.
+      //
+      // fallbackExtractJson below is the LAST RESORT, reached only when the
+      // module never loaded (opened from disk over file://, or a load error):
+      // it finds a JSON object but repairs nothing. That downgrade must not be
+      // silent — a reply the real reader would have repaired dies here, and
+      // blaming the model for it sends the reader to fix something that is not
+      // broken. So the failure is TAGGED and the message says which reader ran.
       function extractJson(text) {
         if (api() && typeof api()._extractJson === 'function') {
           return api()._extractJson(text);
         }
-        return fallbackExtractJson(text);
+        try {
+          return fallbackExtractJson(text);
+        } catch (err) {
+          err.basicReader = true;
+          throw err;
+        }
       }
 
       function escapeForHtml(str) {
@@ -7438,14 +7455,39 @@
         '</div>';
       }
 
+      // Every one of these says what was wrong AND what to do next, because the
+      // reader has no context but the sentence in front of them.
+      //
+      // BOTH CASES ARE NAMED AND NEITHER IS CLAIMED (the D153 lesson). A reply
+      // that ran out of output tokens is INDISTINGUISHABLE here from one that
+      // was never the step data: an EOF-truncated paste arrives as either "No
+      // JSON object found" (nothing had closed yet) or "Malformed JSON:
+      // Expected ',' or '}'…" (something had), and never as repair.js's own
+      // truncation diagnosis — that branch reads damage in the MIDDLE of a
+      // block, and a reply cut at the end has no bytes after the wound.
+      // (Measured, 2026-08-16, both shapes.) The old copy answered both with
+      // "ask your AI to return only the structured result", which sends a
+      // reader whose reply WAS only that, and simply stopped, to fix a
+      // formatting problem they do not have. "Send this step again in full" is
+      // true and actionable either way.
       function formatFriendlyParseError(error) {
         var message = error && error.message ? error.message : 'LiftRPG could not read that response yet.';
         var lower = message.toLowerCase();
-        if (lower.indexOf('no json object found') !== -1) {
-          return 'LiftRPG could not find the step data in that response. Ask your AI to return only the structured result, then paste it again.';
+        // The last-resort reader ran: the reply may be fine and the PAGE is the
+        // thing to fix. Answered first, because its advice replaces all of the
+        // below.
+        if (error && error.basicReader) {
+          return 'LiftRPG\'s full response reader did not load, so only a basic check ran on that paste. '
+            + 'Reload the page (serve it over http://, not opened straight from a file), then paste again.';
         }
-        if (lower.indexOf('unexpected token') !== -1 || lower.indexOf('unterminated') !== -1 || lower.indexOf('json') !== -1) {
-          return 'LiftRPG could not read that response yet. Ask your AI to return only the structured result, then paste it again.';
+        if (lower.indexOf('no json object found') !== -1) {
+          return 'LiftRPG could not find the step data in that reply — it may be cut off, or it may not be the step data at all. '
+            + 'Ask your AI to send this step again in full, structured result only, then paste the whole reply.';
+        }
+        if (lower.indexOf('unexpected token') !== -1 || lower.indexOf('unterminated') !== -1
+            || lower.indexOf('cut off') !== -1 || lower.indexOf('json') !== -1) {
+          return 'LiftRPG could not read that reply — it may be cut off, or it may carry more than the step data. '
+            + 'Ask your AI to send this step again in full, then paste the whole reply.';
         }
         return message;
       }
