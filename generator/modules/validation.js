@@ -4088,6 +4088,75 @@ export function weekOwesDoor(shape) {
 }
 
 /**
+ * deriveWeekIdentityGiven(expectedOptions, isBoss) -> object | null
+ *
+ * THE WEEK GATE'S OWN OPTIONS, READ BACK AS PROMPT GIVENS (D173).
+ *
+ * THE MEASURED DEFECT (the runtime-surface audit, 2026-08-17). Two blocking
+ * week floors read planning values the week prompt printed ZERO times:
+ *
+ *   - F4 (`weekOwesDoor`, above) blocks a doorless week when the booklet's
+ *     `mechanicGrammarFamily` is one of the eight pressure families. The
+ *     doctrine states that demand as a CONDITIONAL — "if this booklet's
+ *     mechanicGrammarFamily is heat, attrition, …" — over a value the week
+ *     prompt never showed. The model was asked to read a conditional and
+ *     supply its own antecedent.
+ *   - the citation-pinpoint floor (D170) blocks a `citeRef.citedAs` filed in
+ *     another shell's grammar, keyed to `artifactIdentity.shellFamily`. The
+ *     doctrine prints an EIGHT-ROW table of grammars and neither week builder
+ *     printed the key that selects the row.
+ *
+ * Neither is a capability question at any model tier: the antecedent was not in
+ * the prompt. Both values were already computed at the call site and handed to
+ * the gate alone — D166's and D170's shape exactly, funded teaching pointed at
+ * the wrong seat.
+ *
+ * WHY IT TAKES THE GATE'S OPTIONS OBJECT rather than a shell or a skeleton.
+ * `validateWeekSchema(week, isBoss, options)` and this function read ONE object,
+ * so the values the prompt teaches cannot drift from the values the gate reads —
+ * not because two derivations agree today, but because there is only one. A
+ * caller that adds a field to the gate's row adds it here for free; a caller
+ * that reads the shell twice would be D93's two-algorithms defect wearing a
+ * helpful face (the same warning `formatPlannedDoorGivensBlock` carries).
+ *
+ * `owesDoor` is `weekOwesDoor`'s own answer, never a re-reading of the family
+ * against a second membership list. `citationLabels` come from
+ * `resolveCitationStyle` — the table `citationPinpoints` matches against — so
+ * the labels offered and the labels accepted are the same four strings.
+ *
+ * Returns null when the gate holds neither value, so a caller with no compiler
+ * context builds the prompt it always built, byte for byte — and each floor is
+ * silent under exactly the condition that drops its half of the block.
+ *
+ * Consumers: api-generator.js (both week loops) → formatWeekIdentityGivenBlock.
+ */
+export function deriveWeekIdentityGiven(expectedOptions, isBoss) {
+  var o = expectedOptions || {};
+  var family = String(o.mechanicGrammarFamily || '').trim();
+  var shellFamily = String(o.shellFamily || '').trim();
+  if (!family && !shellFamily) return null;
+  var given = {};
+  if (family) {
+    given.mechanicGrammarFamily = family;
+    given.owesDoor = weekOwesDoor({
+      isBoss: isBoss,
+      isDeload: o.isDeload,
+      mechanicGrammarFamily: family
+    });
+    // WHICH exemption, when there is one. "This week owes no door" is true of a
+    // deload week in a pressure family and of every week of a reconstruction
+    // book, and those are different sentences to a writer: one is a local
+    // exemption, the other is what the book is made of.
+    given.doorExemption = isBoss ? 'boss' : (o.isDeload ? 'deload' : '');
+  }
+  if (shellFamily) {
+    given.shellFamily = shellFamily;
+    given.citationLabels = resolveCitationStyle(shellFamily).labelVocabulary.slice();
+  }
+  return given;
+}
+
+/**
  * collectSpinePreflightFloorErrors(spine, plannedWeeks, family, stageLabel)
  *   -> string[]
  *

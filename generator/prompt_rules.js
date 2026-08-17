@@ -2758,6 +2758,100 @@
     ].join('\n');
   };
 
+  /**
+   * formatWeekIdentityGivenBlock(given) -> string
+   *
+   * THE TWO GATE-READ IDENTITY VALUES, PRINTED AT THE POINT OF USE (D173).
+   *
+   * `given` is `deriveWeekIdentityGiven(weekFloorOptions, isBoss)` in
+   * validation.js — the week gate's OWN options object read back. It must never
+   * be rebuilt from a shell or a skeleton here: the whole claim of this block is
+   * that the prompt's demand and the gate's verdict come from one object, and a
+   * second read is a second answer to "does this week owe a door".
+   *
+   * WHAT IT REPLACES, in both halves:
+   *
+   *   - Door Bias states the demand as a conditional over
+   *     `mechanicGrammarFamily`, a value the week prompt printed zero times. The
+   *     block resolves the conditional FOR THIS WEEK, and says which way — a
+   *     week that owes a door is told so in the imperative, and a week that owes
+   *     none is told that too, because "no obligation" is also an answer the
+   *     model was previously left to guess at.
+   *   - Point Of Use prints eight citation grammars and says borrowing another
+   *     shell's labels fails validation. Seven of those eight rows are another
+   *     book's. The block names the row, and the labels come from the table the
+   *     floor matches against, so the vocabulary offered IS the vocabulary
+   *     accepted.
+   *
+   * NO FAMILY MEMBERSHIP LIST HERE, deliberately. `owesDoor` arrives already
+   * decided by `weekOwesDoor` → `isDoorLeaningFamily`; INST_DOOR_BIAS and
+   * INST_ARTIFACT_COMPILER Step 5c own the membership prose and
+   * `doorLeaningParity()` anchors on Step 5c. A third copy here would be a list
+   * nothing checks — and the negative branch is phrased against the eight the
+   * doctrine names rather than asserting a class, so an unrecognised family is
+   * described truthfully instead of being called a reconstruction family.
+   *
+   * Returns '' when there is nothing to hand over, so every caller without a
+   * compiler context builds the prompt it always built, byte for byte.
+   */
+  window.formatWeekIdentityGivenBlock = function (given) {
+    if (!given || typeof given !== 'object') return '';
+    var blocks = [];
+    var family = String(given.mechanicGrammarFamily || '').trim();
+    if (family) {
+      var head = [
+        '### The grammar this book runs on — a GIVEN',
+        '',
+        'This booklet declared `meta.artifactIntent.mechanicGrammarFamily: ' + family + '`. That is',
+        'not a menu to re-open, and it is the value the Door Bias section\'s conditional is asking',
+        'about — already resolved, for this week, below.',
+        '',
+        ''
+      ].join('\n');
+      if (given.owesDoor) {
+        blocks.push(head + [
+          '`' + family + '` is one of the eight pressure families that section names, and this week is',
+          'neither the boss week nor a deload. So the conditional has fired: this week MUST print',
+          '`week.doorChoice` with `optionA` and `optionB`, each carrying a posted `lean`. Do not',
+          'weigh whether it applies — it applies. A week of this book with no door is a rejected',
+          'payload.'
+        ].join('\n'));
+      } else if (given.doorExemption) {
+        blocks.push(head + [
+          'This is ' + (given.doorExemption === 'boss' ? 'the BOSS week' : 'a DELOAD week')
+            + ', which owes no `week.doorChoice` whatever `' + family + '`',
+          'prices elsewhere in the book. Print one only if this week genuinely forks; never print an',
+          'empty one to fill the field.'
+        ].join('\n'));
+      } else {
+        blocks.push(head + [
+          '`' + family + '` is not one of the eight pressure families that section names, so no week of',
+          'this book is obliged to print a `week.doorChoice`. Print one where the week genuinely',
+          'forks and you can post an honest lean on both sides; never print an empty one to fill',
+          'the field.'
+        ].join('\n'));
+      }
+    }
+    var shellFamily = String(given.shellFamily || '').trim();
+    var labels = Array.isArray(given.citationLabels) ? given.citationLabels : [];
+    if (shellFamily && labels.length) {
+      blocks.push([
+        '### The filing labels this book cites in — a GIVEN',
+        '',
+        'This booklet\'s `meta.artifactIdentity.shellFamily` is `' + shellFamily + '`. The Point Of Use',
+        'section prints eight citation grammars; seven of them belong to other books. Yours is the',
+        'one row that matters:',
+        '',
+        '- ' + labels.join(' / ') + ' — plus a number ("' + labels[0] + ' 4").',
+        '',
+        'Every `citeRef.citedAs` you write names WHAT is there and WHERE to look, filed in that',
+        'vocabulary, or by the booklet\'s own refs ("F.07", "W4"). A `citedAs` with no pinpoint is',
+        'rejected at this stage, and so is one borrowing another shell\'s labels.'
+      ].join('\n'));
+    }
+    return blocks.join('\n\n');
+  };
+
   // ── The Ludic Spine (W4a) ─────────────────────────────────────────────────
   // Routed to the `shell` stage ONLY, because that is the stage that authors
   // meta and therefore the only stage that can write a spine — and because the

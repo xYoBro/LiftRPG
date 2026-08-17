@@ -2679,6 +2679,22 @@
       contextLines.push('');
     }
 
+    // The two gate-read identity values (D173) — this pipeline's twin of the
+    // multi-stage week seat. The S+F week gate reads `mechanicGrammarFamily` and
+    // `shellFamily` exactly as its multi-stage sibling does, and this builder
+    // printed neither: the identity block above carries the family INSIDE the
+    // intent contract as a planning fact, which is not the same as resolving the
+    // door conditional for this week, and carries no citation grammar at all. A
+    // given landed on one pipeline and not its twin widens the funding gap the
+    // audit recorded — and the DEFAULT pipeline is this one.
+    var sfIdentityGiven = (typeof window.formatWeekIdentityGivenBlock === 'function')
+      ? window.formatWeekIdentityGivenBlock(options.weekIdentityGiven)
+      : '';
+    if (sfIdentityGiven) {
+      contextLines.push(sfIdentityGiven);
+      contextLines.push('');
+    }
+
     if (isBoss) {
       contextLines.push('## Boss Week Requirements');
       contextLines.push('- This week replaces fieldOps with bossEncounter.');
@@ -3075,6 +3091,13 @@
       // exists, so a pre-D144 shell produces a byte-identical prompt.
       formatCurrencyGiven((shellContext || {}).economy) || null,
       '',
+      // The intent contract (D173). Same rule as the currency line above, and
+      // held to it for the same reason: this builder is wired as
+      // `builders.weeks`, it authors weeks, and summarizeShellContractForApi
+      // carries no artifactIntent — a decision buried in a serialized blob is a
+      // decision the model paraphrases, so the contract prints as a block.
+      formatArtifactIntentContract(shellContext),
+      '',
       formatProcessParticulars((shellContext || {}).processParticulars),
       '',
       '## Layer Codex Slice',
@@ -3125,6 +3148,10 @@
       '## Booklet Setup Contract',
       compactJson(summarizeShellContractForApi(shellContext)),
       '',
+      // The intent contract (D173) — the document ecology's dominant AND
+      // forbidden types live here and nowhere else this stage can see.
+      formatArtifactIntentContract(shellContext),
+      '',
       formatProcessParticulars((shellContext || {}).processParticulars),
       '',
       '## Fragment Voice Packet',
@@ -3160,6 +3187,16 @@
       '',
       '## Booklet Setup Contract',
       compactJson(summarizeShellContractForApi(shellContext)),
+      '',
+      // THE INTENT CONTRACT, ON THE MULTI-STAGE PIPELINE'S DEFAULT FRAGMENT SEAT
+      // (D173). The audit named `generateSingleFragmentPrompt` as the live seat;
+      // measured against the dispatch, that builder is the ADAPTIVE RECOVERY
+      // path — `generateSingleFragmentAdaptive` runs one entry at a time only
+      // after a batch fails. `builders.fragmentBatch` is what every fragment on
+      // a clean run is written by. Funding the recovery seat and not this one
+      // would have reproduced the exact defect this wave exists to fix, on the
+      // busiest fragment surface in the pipeline.
+      formatArtifactIntentContract(shellContext),
       '',
       formatProcessParticulars((shellContext || {}).processParticulars),
       '',
@@ -3198,6 +3235,10 @@
       '',
       '## Booklet Setup Contract',
       compactJson(summarizeShellContractForApi(shellContext)),
+      '',
+      // The intent contract (D173) — the arc family and the convergence pattern
+      // this ending has to land. Wired as `builders.endings`.
+      formatArtifactIntentContract(shellContext),
       '',
       formatProcessParticulars((shellContext || {}).processParticulars),
       '',
@@ -3300,6 +3341,22 @@
       // completed book renamed the currency in 6 of 6 weeks as a result.
       formatCurrencyGiven(shellContext.economy) || '',
       '',
+      // THE ARTIFACT INTENT CONTRACT, on the seat that writes 168,000 input
+      // tokens of weeks (D173). Same defect class as the currency given two
+      // lines up and ten times the scope: the compiler committed to an arc
+      // family, a mechanic grammar, a home pull, a convergence pattern, a
+      // document ecology with FORBIDDEN types, two exclusion lists and its own
+      // recorded reading of the brief — and `builders.singleWeekFinal`, the
+      // builder the multi-stage pipeline actually runs for every week, printed
+      // none of it. extractShellContext has carried `artifactIntent` "for
+      // exactly this reason" since Wave 2; only the wizard-only builders and the
+      // S+F twins ever printed it. Measured: the first completed book read as
+      // one-note (D171) while every planning decision that would have made it
+      // otherwise sat unread in the checkpoint. Same formatter as the S+F seat,
+      // same position in the order (identity, currency, intent, knowing), and
+      // '' when no compiler ran — so a pre-contract shell is byte-identical.
+      formatArtifactIntentContract(shellContext),
+      '',
       formatProcessParticulars(shellContext.processParticulars),
       '',
       '**Week Workout:** ' + weekWorkout,
@@ -3310,6 +3367,17 @@
       // `owesLudicEntry`. '' when this week owes nothing.
       (typeof window.formatLudicWeekGivenBlock === 'function')
         ? window.formatLudicWeekGivenBlock(options.ludicWeekGiven)
+        : '',
+      '',
+      // The two GATE-READ identity values (D173), resolved for this week. Both
+      // floors — F4's door and the citation-pinpoint promotion — read planning
+      // values this prompt printed zero times, so the model was asked to read a
+      // conditional and supply its own antecedent, and to pick one of eight
+      // citation grammars with the key withheld. `options.weekIdentityGiven` is
+      // the week gate's own options object read back by deriveWeekIdentityGiven;
+      // '' when the pipeline holds neither value.
+      (typeof window.formatWeekIdentityGivenBlock === 'function')
+        ? window.formatWeekIdentityGivenBlock(options.weekIdentityGiven)
         : '',
       '',
       continuity ? '**Continuity Rules:** ' + JSON.stringify(continuity) : '',
@@ -3455,6 +3523,14 @@
       '**World Contract:** ' + (shellContext.worldContract || ''),
       '**Artifact Identity:** ' + JSON.stringify(shellContext.artifactIdentity || {}),
       '',
+      // The intent contract (D173). This stage authors the document ecology's
+      // actual documents, and the contract is the only surface that states the
+      // FORBIDDEN types and the dominant ones — a fragment stage without it is
+      // choosing a document type from a list it was never shown. The S+F twin
+      // (generateFleshFragmentBatchPrompt, through formatSkeletonIdentityBlock)
+      // has printed it since Wave 2; this is the live multi-stage seat.
+      formatArtifactIntentContract(shellContext),
+      '',
       formatProcessParticulars(shellContext.processParticulars),
       '',
       '**Current Timeline (Cross-Reference Support):**',
@@ -3490,6 +3566,12 @@
       '## Context',
       '**World Contract:** ' + (shellContext.worldContract || ''),
       '**Narrative Voice:** ' + JSON.stringify(shellContext.narrativeVoice || {}),
+      '',
+      // The intent contract (D173). The ending is the constitution's own named
+      // highest-failure surface, and this seat had no arc family, no convergence
+      // pattern and no recorded reading — it was asked to land an arc it was
+      // never told the shape of. Both S+F ending builders carry it.
+      formatArtifactIntentContract(shellContext),
       '',
       formatProcessParticulars(shellContext.processParticulars),
       '',

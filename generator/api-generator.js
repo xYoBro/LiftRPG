@@ -160,6 +160,11 @@ import {
   // validator because that is where the floors and their stage labels live —
   // this file routes on the answer, it does not compute it.
   repairOwnerForError,
+  // D173. Same rule, applied to a PROMPT: the week gate's own options object,
+  // read back as the two identity GIVENS the week prompt was missing. This file
+  // hands the derivation the object it already built for the gate and forwards
+  // the result — it does not decide what a week owes.
+  deriveWeekIdentityGiven,
   // D167. The ONE rendering of a field path. The gates produce coordinates as
   // key arrays; this renders the string the model is shown and must echo. There
   // is deliberately no parser anywhere — arrays travel, the string is wire.
@@ -4097,6 +4102,13 @@ async function runApiPipeline(options) {
       // artifact uses; absent family, no check — the same law as above.
       shellFamily: (((shell || {}).meta || {}).artifactIdentity || {}).shellFamily || ''
     };
+    // THE GATE'S OWN ROW, READ BACK AS PROMPT GIVENS (D173). The two blocking
+    // floors above read `mechanicGrammarFamily` and `shellFamily`; the prompt
+    // printed neither, so the door demand arrived as a conditional with no
+    // antecedent and the citation grammar as eight rows with no key. Derived
+    // FROM weekFloorOptions rather than from the shell again, so the values the
+    // model is taught cannot drift from the values it is checked against.
+    var weekIdentityGiven = deriveWeekIdentityGiven(weekFloorOptions, isBossWeek);
 
     progress('weeks', 'Writing Week ' + w + (isBossWeek ? ' (Boss)' : '') + '\u2026');
     var weekObject = await runJsonStage(settings, {
@@ -4178,8 +4190,9 @@ async function runApiPipeline(options) {
           continuityPacket,
           allComponentValues,
           retryState,
-          // The GIVEN and the floor read the same row (D170).
-          { ludicWeekGiven: owesLudic }
+          // The GIVEN and the floor read the same row (D170); the identity
+          // givens and the floor read the same OPTIONS OBJECT (D173).
+          { ludicWeekGiven: owesLudic, weekIdentityGiven: weekIdentityGiven }
         );
       }
     });
@@ -5295,6 +5308,42 @@ async function runSkeletonFleshPipeline(options) {
 
     progress(ckKey, 'Writing week ' + weekNum + (isBoss ? ' (boss)\u2026' : '\u2026'));
 
+    // ── The week gate's floor context, HOISTED (D173) ─────────────────────
+    // It was built inline inside `validate` below, which made it unreachable
+    // from the prompt — so this pipeline's identity givens would have had to
+    // re-read the skeleton, i.e. a second answer to what the gate asks. Hoisted
+    // unchanged: every input is fixed for the whole week iteration
+    // (allComponentValuesSF and weekOutputs are appended only after this stage
+    // returns), so the object the validator receives is byte-identical to the
+    // one it built for itself on every attempt.
+    var sfWeekFloorOptions = {
+      componentInputs: isBoss ? allComponentValuesSF.map(String) : undefined,
+      approvedFragmentIds: weekPlan.fragmentIds || [],
+      currentWeekNumber: weekNum,
+      previousWeek: !isBoss && weekOutputs.length ? weekOutputs[weekOutputs.length - 1] : null,
+      // ── Generation-floor context (Teeth Round T1a) ──────────────────
+      // Unlike the multi-stage plan, the skeleton's weekPlan DOES carry
+      // isDeload (it is in STRUCTURED_SCHEMA_SKELETON), so the plan is the
+      // first source and the program text is the corroborating one.
+      generationFloors: true,
+      weekNumber: weekNum,
+      isDeload: !!weekPlan.isDeload || looksLikeDeloadWeek(weekWorkout),
+      // This pipeline's compiler seat (D129/D143) — 'Skeleton', not 'Shell'.
+      spineStageLabel: 'Skeleton',
+      mechanicGrammarFamily: (((skeleton || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || '',
+      playSpine: ((skeleton || {}).meta || {}).playSpine || null,
+      // The arsenal row this week owes, if any — the same object the
+      // prompt states as a GIVEN (D170).
+      owesLudicEntry: owesLudicSF,
+      // The currency, for the conversion floor — this pipeline's twin of
+      // the multi-stage weekFloorOptions row. Both carry it or one pipeline
+      // writes its reckoning sentences ungated.
+      currencyLabel: (((skeleton || {}).meta || {}).economy || {}).currencyLabel || '',
+      // This pipeline's twin of the multi-stage shellFamily row (D170).
+      shellFamily: (((skeleton || {}).meta || {}).artifactIdentity || {}).shellFamily || ''
+    };
+    var sfWeekIdentityGiven = deriveWeekIdentityGiven(sfWeekFloorOptions, isBoss);
+
     var weekResult = await runJsonStage(settings, {
       stageKey:        ckKey,
       stageName:        'Week ' + weekNum + (isBoss ? ' (Boss)' : ''),
@@ -5310,8 +5359,10 @@ async function runSkeletonFleshPipeline(options) {
       buildPrompt: function (retryState) {
         return builders.fleshWeek(skeleton, weekPlan, weekWorkout, weekSummariesSF, allComponentValuesSF, {
           retryMode: retryState.attempt > 0,
-          // The GIVEN and the floor below read the same row (D170).
-          ludicWeekGiven: owesLudicSF
+          // The GIVEN and the floor below read the same row (D170); the identity
+          // givens and the floor below read the same OPTIONS OBJECT (D173).
+          ludicWeekGiven: owesLudicSF,
+          weekIdentityGiven: sfWeekIdentityGiven
         });
       },
       normalizeResult: function (result) {
@@ -5347,32 +5398,9 @@ async function runSkeletonFleshPipeline(options) {
         if (!Array.isArray(result.sessions) || result.sessions.length === 0) {
           return 'Week ' + weekNum + ': missing or empty sessions';
         }
-        var vResult = validateWeekSchema(result, isBoss, {
-          componentInputs: isBoss ? allComponentValuesSF.map(String) : undefined,
-          approvedFragmentIds: weekPlan.fragmentIds || [],
-          currentWeekNumber: weekNum,
-          previousWeek: !isBoss && weekOutputs.length ? weekOutputs[weekOutputs.length - 1] : null,
-          // ── Generation-floor context (Teeth Round T1a) ──────────────────
-          // Unlike the multi-stage plan, the skeleton's weekPlan DOES carry
-          // isDeload (it is in STRUCTURED_SCHEMA_SKELETON), so the plan is the
-          // first source and the program text is the corroborating one.
-          generationFloors: true,
-          weekNumber: weekNum,
-          isDeload: !!weekPlan.isDeload || looksLikeDeloadWeek(weekWorkout),
-          // This pipeline's compiler seat (D129/D143) — 'Skeleton', not 'Shell'.
-          spineStageLabel: 'Skeleton',
-          mechanicGrammarFamily: (((skeleton || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || '',
-          playSpine: ((skeleton || {}).meta || {}).playSpine || null,
-          // The arsenal row this week owes, if any — the same object the
-          // prompt above states as a GIVEN (D170).
-          owesLudicEntry: owesLudicSF,
-          // The currency, for the conversion floor — this pipeline's twin of
-          // the multi-stage weekFloorOptions row. Both carry it or one pipeline
-          // writes its reckoning sentences ungated.
-          currencyLabel: (((skeleton || {}).meta || {}).economy || {}).currencyLabel || '',
-          // This pipeline's twin of the multi-stage shellFamily row (D170).
-          shellFamily: (((skeleton || {}).meta || {}).artifactIdentity || {}).shellFamily || ''
-        });
+        // The hoisted object above (D173) — one row, two readers: this gate and
+        // the identity GIVENS the prompt printed.
+        var vResult = validateWeekSchema(result, isBoss, sfWeekFloorOptions);
         if (vResult && typeof vResult === 'object' && !vResult.valid) {
           // The VERDICT OBJECT, not a joined string. extractErrorList treats a
           // string as one error, so joining collapsed N defects with N
