@@ -1303,12 +1303,146 @@ export function isDoorLeaningFamily(family) {
 // QUALITY_BLOCKING_AREAS can reach it.
 export var PAGE_FILL_THIN_RATIO = 0.5;
 
+// ── THE RULEBOOK BAND (VISION §4.0 / PLAY.md §3.1, ratified D173) ───────────
+// Every row above is a CHARACTER CEILING on a surface the book PRINTS. This one
+// row is neither: it is a WORD BAND with a floor as well as a ceiling, on a
+// surface that never prints at all. It lives here because the doctrine put it
+// here by name ("the band's home when it lands is OUTPUT_BUDGETS like every
+// other prose cap"), and it is NESTED rather than flat for the reason that
+// naming makes obvious the moment the two are side by side: every scalar row
+// above is consumed by `over(text, cap)` in collectBudgetBreaches and by
+// `maxLength` in the structured schemas, both of which count CHARACTERS. A flat
+// `gameRulebookWinCondition: 120` would be read by the next person as 120
+// characters and enforced as a ceiling — the exact inversion of what it says.
+// A nested object cannot be read by either consumer (both index scalar keys by
+// name), so the mistake is structural rather than a comment nobody reads.
+//
+// THE FLOOR FORBIDS HAND-WAVING and the CEILING FORBIDS HIDING — the two halves
+// share one ledger, which is D150's law for POINTER_BUDGETS applied to the one
+// surface where the floor is the load-bearing half. A one-line answer to "how
+// is the password earned" is the silent-failure case wearing a tick-box: the
+// only rule in the book that can fail without anyone noticing until the last
+// page, which is why the four load-bearing questions cost twice the rest.
+//
+// THE NUMBERS ARE THE DOCTRINE'S, unchanged. PLAY.md §3.1 proposed them "from
+// the eight questions' real needs, to be ratified as constants in the code wave
+// that lands the surface"; this is that wave, and nothing here re-argues them.
+// They are arbitrary in exactly the way POINTER_BUDGETS says its own rows are —
+// a first playtest is what moves them, not a second opinion.
+//
+// WORDS, NOT CHARACTERS, and that is also the doctrine's choice: the eight
+// answers are ordinary prose a stranger has to understand, and a character cap
+// on ordinary prose rewards short words. `countRulebookWords` below is the
+// single home of the count, because a floor the model is told in one unit and
+// measured in another is D144's W-3 defect with arithmetic on top.
+export var GAME_RULEBOOK_BUDGETS = {
+  loadBearingMinWords: 120,
+  supportingMinWords: 60,
+  maxTotalWords: 1800
+};
+
 export var OUTPUT_BUDGETS = {
   storyPrompt: 220, fragmentBody: 1050, interludeBody: 700, endingBody: 2400,
   microLineCondition: 90, microLineCue: 120, citedAs: 90,
   returnBeatClosing: 140, returnBeatOpening: 140,
   doorOptionLean: 90, sealKeyHint: 120, sealUnlockCondition: 140,
-  markStripLabel: 28
+  markStripLabel: 28,
+  // See the long note above. Nested BY CONSTRUCTION: this is a word band with a
+  // floor, and every other row here is a character ceiling.
+  gameRulebook: GAME_RULEBOOK_BUDGETS
+};
+
+// ── The eight questions (PLAY.md §3.1) ──────────────────────────────────────
+// THE SINGLE HOME of what the rulebook must answer, and of which answers are
+// load-bearing. Three readers that cannot see each other:
+//
+//   generator/prompt_rules.js        SCHEMA_GAME_RULEBOOK + INST_GAME_RULEBOOK —
+//                                    states the questions and the band to the
+//                                    model (literals, parity-asserted)
+//   generator/modules/validation.js  validateGameRulebookStage — measures them
+//   contracts/booklet-schema.mjs     the artifact surface's property names
+//
+// `key` is the schema field. `load` is which half of the band the answer owes,
+// and it is a RULING, not a size hint: the four load-bearing questions are the
+// four whose failure is invisible until the book is played (how you win, what
+// the economy is, how the password is earned, what a session looks like at the
+// table). The other four fail visibly on the first read.
+//
+// `question` is the model-facing phrasing, byte-quoted into the prompt. It is
+// here rather than in prompt_rules.js because the floor's error text quotes it
+// too — a floor that named a question differently from the prompt that asked it
+// would send a retry to fix an answer the model never knew it was giving.
+export var GAME_RULEBOOK_ANSWERS = [
+  { key: 'winCondition',  load: 'load-bearing', question: 'How you win' },
+  { key: 'coreVerbs',     load: 'supporting',   question: 'What you actually do' },
+  { key: 'economy',       load: 'load-bearing', question: 'The economy, in plain words' },
+  // ASCII ONLY, and deliberately phrased around the apostrophe rather than
+  // through it: every question below is byte-quoted into prompt_rules.js, which
+  // is a classic script where an entity ships as literal text to the model and
+  // a curly quote is one more byte for a parity scan to disagree about.
+  { key: 'passwordPath',  load: 'load-bearing', question: 'How the password for the sealed ending is earned' },
+  { key: 'sessionShape',  load: 'load-bearing', question: 'What one session looks like at the table' },
+  { key: 'weekShape',     load: 'supporting',   question: 'What one week looks like' },
+  { key: 'whatGoesBadly', load: 'supporting',   question: 'What can go badly' },
+  { key: 'teachingOrder', load: 'supporting',   question: 'The teaching order' }
+];
+
+// THREE TO FIVE VERBS, and the ceiling is the load-bearing half. §3.1: "if two
+// of the verbs are the same verb with different labels, there are fewer verbs
+// than the model thinks." Two verbs is not a game; six is a parts list wearing
+// a verb list's coat, and the player has to hold all of them at the gym.
+export var GAME_RULEBOOK_VERBS_MIN = 3;
+export var GAME_RULEBOOK_VERBS_MAX = 5;
+
+/**
+ * countRulebookWords(text) -> integer
+ *
+ * THE SINGLE HOME of the rulebook's unit. Whitespace-separated runs, which is
+ * what a person means by "words" and what a model approximates when told to
+ * write 120 of them. Deliberately NOT a locale-aware tokenizer: the band's
+ * whole job is to separate a paragraph from a tick-box, and every candidate
+ * definition agrees at that resolution while disagreeing at the fifth decimal.
+ *
+ * Consumers: generator/modules/validation.js (the band floor) and
+ * scripts/check-generation-floors.mjs (its gate). Guarded by
+ * singleDeclarationHomes() in scripts/validate.mjs.
+ */
+export function countRulebookWords(text) {
+  var s = String(text === undefined || text === null ? '' : text).trim();
+  if (!s) return 0;
+  return s.split(/\s+/).length;
+}
+
+// ── The graph→rules vocabulary (PLAY.md §3.2, the second direction) ─────────
+// A surface KIND in the ref grammar is a machine word (`markStrip`, `citeRef`).
+// A rulebook is written for a player, who will never read the word `markStrip`.
+// This table is what lets the graph→rules direction be checked at all: for each
+// kind the economy graph can name, the player-facing words that count as having
+// TAUGHT it. The prompt quotes this table, so the model is told exactly which
+// words satisfy the floor — the D136 two-halves idiom, because a floor that
+// scanned for undisclosed synonyms would be a riddle rather than a rule.
+//
+// Matched case-insensitively as substrings, so "marks", "marking" and "marked"
+// all satisfy `markStrip` off the stem `mark`. Stems are deliberately short and
+// generous: this floor exists to catch a system the rules NEVER MENTION, not to
+// grade the phrasing of one they do.
+export var RULEBOOK_KIND_WORDS = {
+  week: ['week'],
+  session: ['session', 'workout', 'training day'],
+  markStrip: ['mark'],
+  reckoning: ['reckoning', 'tally', 'total'],
+  clock: ['clock', 'track', 'gauge', 'dial'],
+  oracle: ['oracle', 'table', 'roll'],
+  cipher: ['cipher', 'code', 'decode', 'decipher'],
+  map: ['map', 'board', 'region'],
+  companion: ['companion', 'ally', 'kit', 'dashboard'],
+  fragment: ['fragment', 'document', 'record', 'page'],
+  door: ['door', 'choice', 'fork', 'decision'],
+  seal: ['seal', 'sealed', 'locked'],
+  ending: ['ending', 'finale', 'last page'],
+  banked: ['bank'],
+  boss: ['boss', 'final week', 'confrontation'],
+  assembly: ['assembly', 'assemble', 'password']
 };
 
 // ── Convergence patterns (Wave 2; the March 2026 convergence-variants design) ─

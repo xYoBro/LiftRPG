@@ -122,7 +122,17 @@ import {
   // SAME dialect the prompt hands it out in, from the same accessor, or the
   // shown set and the checked set quietly stop being the same set.
   identityAxesForStage,
-  readAxisValue
+  readAxisValue,
+  // D173 — the rudder. The eight questions, the word band, the verb arity, the
+  // count itself and the player-facing word table the graph→rules direction
+  // matches on. All imported, none re-declared: the prompt states these numbers
+  // as literals (validate.mjs gameRulebookPromptParity diffs them), so a
+  // private copy here would fail books for a band the model was told differently.
+  GAME_RULEBOOK_ANSWERS,
+  GAME_RULEBOOK_VERBS_MIN,
+  GAME_RULEBOOK_VERBS_MAX,
+  RULEBOOK_KIND_WORDS,
+  countRulebookWords
 } from '../../contracts/contract-constants.mjs';
 
 // W5b — the Ludic Harvest, tranche 2. THE ONE LAW: no puzzle ships
@@ -2439,6 +2449,19 @@ export function validateShellSchema(shell, expectedOptions) {
       'Shell'
     ));
 
+    // ── The rulebook⇄spine parity floor (D173) ──
+    // The spine is the rulebook's PROJECTION (PLAY.md §3.2), so the check runs
+    // at the seat that authors the spine and is handed the rulebook the seat's
+    // PROMPT was handed — one document, one stage, shown and checked. The
+    // errors carry THIS seat's label rather than the rulebook's, and that is the
+    // rules-first ruling made operational: when the graph and the rules
+    // disagree, the graph is what changes.
+    errors = errors.concat(collectRulebookSpineParityErrors(
+      (expectedOptions || {}).gameRulebook,
+      (shell.meta || {}).playSpine,
+      'Shell'
+    ));
+
     // ── The earliest-stage pre-flight (D143) ──
     // The spine is authored HERE, and so is the family it must be wired for.
     // The week shapes come from the campaign plan (which ran before this stage)
@@ -3254,6 +3277,315 @@ function namesMechanicalSurface(text) {
  * skeleton floors are: a spine that misses three should cost ONE retry naming
  * all three.
  */
+// ── THE RULEBOOK FLOORS (VISION §4.0 / PLAY.md §3.1-§3.2, D173) ────────────
+// Two instruments, two seats, and the split is the whole design:
+//
+//   validateGameRulebookStage        runs at the rulebook's OWN stage. Presence,
+//                                    shape, the word band both ways, the verb
+//                                    arity and ref-grammar validity. Everything
+//                                    checkable about the document ALONE.
+//   collectRulebookSpineParityErrors runs at the SPINE seat (`shell` on the
+//                                    multi-stage path, `skeleton` on S+F),
+//                                    because a parity check needs both sides
+//                                    and the graph does not exist yet at the
+//                                    earlier seat.
+//
+// CLASS (PLAY.md §3.4). The band is a LAW: "did you answer the question at all"
+// is a property of any book, not of this book's declaration. The parity floor
+// is the CONFORMANCE archetype — it asks nothing about what game this is and
+// only whether the machine and the rules describe the same one. Both block, and
+// under §3.4's tie-break they would block anyway: AMBIGUITY DEFAULTS TO LAW.
+//
+// EVERY PARITY ERROR QUOTES THE DEFECT. A floor that says "the rules and the
+// graph disagree" sends a retry to re-read two documents; a floor that says
+// which currency, which verb, which ref sends it to one line.
+
+/**
+ * rulebookAnswerText(rulebook, key) -> string
+ * One reader for "what did the model actually write for question N", so the
+ * band floor, the parity floor and the prompt formatter cannot disagree about
+ * what counts as an answer.
+ */
+function rulebookAnswerText(rulebook, key) {
+  var node = (rulebook || {})[key];
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return '';
+  return String(node.answer === undefined || node.answer === null ? '' : node.answer).trim();
+}
+
+/**
+ * rulebookTaughtText(rulebook) -> string
+ * Everything the rulebook TEACHES, as one lower-cased haystack: the eight
+ * answers plus the currency name. This is what the graph→rules direction is
+ * matched against — a system the player is told about ANYWHERE in the rules is
+ * taught, and it is not this floor's business which paragraph did it.
+ */
+function rulebookTaughtText(rulebook) {
+  var parts = [];
+  GAME_RULEBOOK_ANSWERS.forEach(function (row) {
+    parts.push(rulebookAnswerText(rulebook, row.key));
+  });
+  parts.push(String(((rulebook || {}).economy || {}).currency || ''));
+  // THE VERB LIST IS TAUGHT MATERIAL, not machine plumbing, and this line is a
+  // correction made on contact rather than a convenience. The first version of
+  // this floor read the eight prose answers alone and immediately reported a
+  // book that declares `{ verb: 'tick', on: 'clock:the tide' }` as containing a
+  // clock "the player is never told about" — which is false: the verb list is
+  // exactly the part of the rulebook the point-of-use pages print, so a surface
+  // a declared verb is performed on IS taught. Including the ref also means the
+  // kind word arrives with it, which is the right answer for the same reason.
+  var verbs = ((rulebook || {}).coreVerbs || {}).verbs;
+  (Array.isArray(verbs) ? verbs : []).forEach(function (item) {
+    parts.push(String((item || {}).verb || ''));
+    parts.push(String((item || {}).on || ''));
+  });
+  return parts.join('\n').toLowerCase();
+}
+
+/**
+ * validateGameRulebookStage(result, options) -> string
+ *
+ * The rulebook stage's own gate. Returns '' on success and a single joined
+ * error string on failure, the shape runJsonStage expects.
+ *
+ * COLLECTED, NOT EARLY-RETURNED, for the D111 reason: a rulebook thin on three
+ * answers should cost ONE retry naming all three. The only early return is a
+ * missing object, because everything below it would then report the same fact
+ * eight times.
+ */
+export function validateGameRulebookStage(result, options) {
+  var S = 'Game Rulebook → ';
+  if (!result || typeof result !== 'object' || Array.isArray(result)) {
+    return S + 'not an object';
+  }
+  var rulebook = result.gameRulebook;
+  if (!rulebook || typeof rulebook !== 'object' || Array.isArray(rulebook)) {
+    return S + 'gameRulebook is missing — this stage exists to decide what the game IS,'
+      + ' and every stage after it is written to serve what it says';
+  }
+
+  var band = OUTPUT_BUDGETS.gameRulebook;
+  var errors = [];
+  var totalWords = 0;
+
+  GAME_RULEBOOK_ANSWERS.forEach(function (row) {
+    var node = rulebook[row.key];
+    if (!node || typeof node !== 'object' || Array.isArray(node)) {
+      errors.push(S + 'gameRulebook.' + row.key + ' is missing — "' + row.question
+        + '" is one of the eight questions this stage owes, and a book cannot be written to serve an answer nobody gave');
+      return;
+    }
+    var text = rulebookAnswerText(rulebook, row.key);
+    var words = countRulebookWords(text);
+    totalWords += words;
+    var floor = row.load === 'load-bearing' ? band.loadBearingMinWords : band.supportingMinWords;
+    if (words < floor) {
+      errors.push(S + 'gameRulebook.' + row.key + '.answer is ' + words + ' word'
+        + (words === 1 ? '' : 's') + ' against a floor of ' + floor + ' ("' + row.question
+        + '"). The floor is the load-bearing half of this band: a one-line answer here is'
+        + ' a tick-box, and the failures it hides do not surface until the book is played');
+    }
+  });
+
+  if (totalWords > band.maxTotalWords) {
+    errors.push(S + 'the eight answers total ' + totalWords + ' words against a ceiling of '
+      + band.maxTotalWords + '. This is a design document, not a chapter — it should be'
+      + ' shorter than one week of the book\'s prose, and a rulebook long enough to hide'
+      + ' in is a rulebook nobody checked');
+  }
+
+  // ── The verbs: arity, and DISTINCTNESS ──
+  // §3.1: "if two of the verbs are the same verb with different labels, there
+  // are fewer verbs than the model thinks." Checked on the verb word alone,
+  // case-folded — the surface may repeat (two things marked on one strip is a
+  // real design), the verb may not.
+  var verbs = ((rulebook.coreVerbs || {}).verbs) || [];
+  if (!Array.isArray(verbs) || verbs.length < GAME_RULEBOOK_VERBS_MIN
+    || verbs.length > GAME_RULEBOOK_VERBS_MAX) {
+    errors.push(S + 'gameRulebook.coreVerbs.verbs has '
+      + (Array.isArray(verbs) ? verbs.length : 0) + ' entr'
+      + ((Array.isArray(verbs) ? verbs.length : 0) === 1 ? 'y' : 'ies') + '; this book owes '
+      + GAME_RULEBOOK_VERBS_MIN + '-' + GAME_RULEBOOK_VERBS_MAX
+      + ' — fewer is not a game, more is a list the player has to hold at the gym');
+  }
+  var seenVerbs = {};
+  (Array.isArray(verbs) ? verbs : []).forEach(function (item, vi) {
+    var verb = String((item || {}).verb || '').trim().toLowerCase();
+    var on = String((item || {}).on || '').trim();
+    if (!verb) {
+      errors.push(S + 'gameRulebook.coreVerbs.verbs[' + vi + '] has no verb');
+    } else if (seenVerbs[verb]) {
+      errors.push(S + 'gameRulebook.coreVerbs.verbs names "' + verb
+        + '" twice — the same verb with two labels is one verb, so name the third thing'
+        + ' the player actually does instead');
+    } else {
+      seenVerbs[verb] = 1;
+    }
+    if (!on) {
+      errors.push(S + 'gameRulebook.coreVerbs.verbs[' + vi + '] ("' + (verb || '?')
+        + '") names no surface — a verb with nowhere to happen is a word');
+    } else if (!parseSurfaceRef(on).valid) {
+      errors.push(S + 'gameRulebook.coreVerbs.verbs[' + vi + '].on "' + on
+        + '" is not a surface ref — write it in the `kind:id` grammar from the Surface refs'
+        + ' section, or the next stage cannot wire the verb to anything');
+    }
+  });
+
+  // ── The two ref lists ──
+  // GRAMMAR ONLY at this seat, deliberately, and this is the placement ruling
+  // made honest: this stage runs before any week, fragment or board exists, so
+  // a ref cannot be resolved against an index that has nothing in it. What a
+  // ref written here BECOMES is a demand on the spine — the parity floor at the
+  // spine seat requires it to appear as a node, and the spine's own closure
+  // floors resolve that node against the book. Transitive, and each half is
+  // checked where its evidence lives.
+  [['winCondition', 'requires', 'the win condition'],
+    ['passwordPath', 'elements', 'the password path']].forEach(function (row) {
+    var list = ((rulebook[row[0]] || {})[row[1]]) || [];
+    if (!Array.isArray(list) || !list.length) {
+      errors.push(S + 'gameRulebook.' + row[0] + '.' + row[1]
+        + ' is empty — ' + row[2] + ' must land as structured data as well as prose, or the'
+        + ' simulated player has nothing to aim at: it walks the graph and cannot read a paragraph');
+      return;
+    }
+    list.forEach(function (ref, ri) {
+      var raw = String(ref || '').trim();
+      if (!parseSurfaceRef(raw).valid) {
+        errors.push(S + 'gameRulebook.' + row[0] + '.' + row[1] + '[' + ri + '] "' + raw
+          + '" is not a surface ref — write it in the `kind:id` grammar from the Surface refs section');
+      }
+    });
+  });
+
+  if (!String(((rulebook.economy || {}).currency) || '').trim()) {
+    errors.push(S + 'gameRulebook.economy.currency is empty — the economy owes the name this'
+      + ' world calls its currency, because that exact phrase is what the book prints and'
+      + ' what the graph is checked against');
+  }
+
+  if (options && options.collect) return errors;
+  return errors.length ? errors.join('; ') : '';
+}
+
+/**
+ * collectRulebookSpineParityErrors(rulebook, spine, stageLabel) -> string[]
+ *
+ * THE TWO-WAY PARITY FLOOR (PLAY.md §3.2). The spine is the rulebook's
+ * projection, and one direction alone has never held in this project:
+ *
+ *   RULES → GRAPH  catches "the book explains a system the machine has never
+ *                  heard of". Nothing validates it, nothing simulates it, and
+ *                  it silently does not exist.
+ *   GRAPH → RULES  catches "the machine contains a system the player is never
+ *                  told about". It passes every gate and no human can play it.
+ *
+ * NO RULEBOOK ⇒ NO CHECK, and that is the honest failure rather than a hole:
+ * the absence is blocked at the rulebook's own stage, and a caller that never
+ * ran that stage (the guided wizard, the manual surface, a hand-built replay)
+ * owes nothing here. A floor that invented a rulebook to check against would be
+ * checking the book against itself.
+ */
+export function collectRulebookSpineParityErrors(rulebook, spine, stageLabel) {
+  if (!rulebook || typeof rulebook !== 'object') return [];
+  if (!spine || typeof spine !== 'object') return [];
+  var S = (stageLabel || 'Skeleton') + ' → ';
+  var errors = [];
+
+  var edges = Array.isArray(spine.economyGraph) ? spine.economyGraph : [];
+  // Node identity is the ref STRING, case-folded — parseSurfaceRef matches
+  // case-insensitively, so the floor must too or `Cipher:W2` and `cipher:W2`
+  // would be two nodes to the gate and one to every other reader.
+  var nodes = {};
+  edges.forEach(function (edge) {
+    ['from', 'to'].forEach(function (side) {
+      var raw = String((edge || {})[side] || '').trim();
+      if (raw) nodes[raw.toLowerCase()] = raw;
+    });
+  });
+  var hasNode = function (ref) {
+    return Object.prototype.hasOwnProperty.call(nodes, String(ref || '').trim().toLowerCase());
+  };
+
+  // ── RULES → GRAPH ──────────────────────────────────────────────────────
+  // 1. the currency the rules name is priced on an edge
+  var currency = String(((rulebook.economy || {}).currency) || '').trim();
+  if (currency) {
+    var priced = edges.some(function (edge) {
+      return String((edge || {}).currency || '').trim().toLowerCase() === currency.toLowerCase();
+    });
+    if (!priced) {
+      errors.push(S + 'the rulebook teaches the currency "' + currency
+        + '" and no `playSpine.economyGraph` edge carries it. The player would be taught an'
+        + ' economy the machine has never heard of — add the edges that move it, spelled the'
+        + ' way the rulebook spelled it');
+    }
+  }
+  // 2. every verb happens on a surface the graph touches
+  var verbs = ((rulebook.coreVerbs || {}).verbs) || [];
+  (Array.isArray(verbs) ? verbs : []).forEach(function (item) {
+    var verb = String((item || {}).verb || '').trim();
+    var on = String((item || {}).on || '').trim();
+    if (!on || hasNode(on)) return;
+    errors.push(S + 'the rulebook teaches the player to "' + (verb || 'act') + '" on `' + on
+      + '`, and no `playSpine.economyGraph` edge names that surface. A verb performed on a'
+      + ' node no edge touches is a system nothing validates and nothing simulates');
+  });
+  // 3-4. the win condition and the password path reach the graph
+  [['winCondition', 'requires', 'the win condition requires'],
+    ['passwordPath', 'elements', 'the password is assembled from']].forEach(function (row) {
+    var list = ((rulebook[row[0]] || {})[row[1]]) || [];
+    (Array.isArray(list) ? list : []).forEach(function (ref) {
+      var raw = String(ref || '').trim();
+      if (!raw || hasNode(raw)) return;
+      errors.push(S + 'the rulebook says ' + row[2] + ' `' + raw
+        + '`, and no `playSpine.economyGraph` edge names it. The simulated player walks the'
+        + ' graph and cannot read the rulebook, so a node it never sees is a claim nothing'
+        + ' can prove — wire it or change the rule');
+    });
+  });
+
+  // ── GRAPH → RULES ──────────────────────────────────────────────────────
+  var taught = rulebookTaughtText(rulebook);
+  // 5. every currency on an edge is a currency the rules taught
+  var seenCurrency = {};
+  edges.forEach(function (edge) {
+    var label = String((edge || {}).currency || '').trim();
+    if (!label) return;                       // an unpriced edge names no currency
+    var key = label.toLowerCase();
+    if (seenCurrency[key]) return;
+    seenCurrency[key] = 1;
+    if (taught.indexOf(key) === -1) {
+      errors.push(S + '`playSpine.economyGraph` moves a currency called "' + label
+        + '" and the rulebook never mentions it. The machine would contain a system the'
+        + ' player is never told about: it passes every other gate and no human can play it');
+    }
+  });
+  // 6. every KIND of surface the graph touches is named in the rules, in the
+  //    player-facing words the rulebook stage was shown. Kinds, not refs: a
+  //    rulebook is written for a player who will never read `markStrip:W3.2`,
+  //    and demanding the ref would demand machine vocabulary on a page meant
+  //    for a person.
+  var seenKind = {};
+  Object.keys(nodes).forEach(function (key) {
+    var parsed = parseSurfaceRef(nodes[key]);
+    if (!parsed.valid) return;                // the closure floors own bad refs
+    var kind = String(parsed.kind || '').trim();
+    if (!kind || seenKind[kind]) return;
+    seenKind[kind] = 1;
+    var words = RULEBOOK_KIND_WORDS[kind];
+    if (!words || !words.length) return;      // a kind with no player word owes nothing
+    var named = words.some(function (word) { return taught.indexOf(word) !== -1; });
+    if (!named) {
+      errors.push(S + '`playSpine.economyGraph` wires a `' + kind
+        + '` and the rulebook never mentions one (it would have said '
+        + words.map(function (w) { return '"' + w + '"'; }).join(' or ')
+        + '). Either teach it in the rules or take it out of the graph — a system the rules'
+        + ' skip is one the player cannot use');
+    }
+  });
+
+  return errors;
+}
+
 export function collectSpineSkeletonFloorErrors(spine, skeleton, stageLabel) {
   var errors = [];
   // The compiler runs at `shell` on the standard pipeline and at `skeleton` on
@@ -4044,7 +4376,12 @@ var REPAIR_STAGE_LABEL_KEYS = {
   'shell': 'shell',
   'booklet setup': 'shell',
   'world detail': 'knowing',
-  'knowing': 'knowing'
+  'knowing': 'knowing',
+  // D173. The rulebook stage's own floors carry this prefix, so a defect found
+  // in the document itself routes back to the stage that wrote it. Parity
+  // defects deliberately do NOT carry it: they are labelled with the spine seat,
+  // because rules-first means the projection changes to serve the source.
+  'game rulebook': 'gameRulebook'
 };
 
 /**
@@ -7181,6 +7518,18 @@ export function validateSkeletonStage(result, weekCount, options) {
     floorErrors = floorErrors.concat(
       collectSpineSkeletonFloorErrors((result.meta || {}).playSpine, result)
     );
+
+    // ── The rulebook⇄spine parity floor (D173), S+F's half ──
+    // Same document, same check, different seat. The rulebook rides in through
+    // options for the same reason the spine rides into the week floors: a gate
+    // never invents the plan it is checking against, so a caller with no
+    // rulebook (the wizard, the manual surface, a hand-built replay) gets no
+    // parity check rather than a fabricated one.
+    floorErrors = floorErrors.concat(collectRulebookSpineParityErrors(
+      (options || {}).gameRulebook,
+      (result.meta || {}).playSpine,
+      'Skeleton'
+    ));
 
     // ── The earliest-stage pre-flight (D143) ──
     // Cheaper here than anywhere: this stage IS the plan, so nothing has to be

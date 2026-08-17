@@ -53,6 +53,8 @@ import {
   VALID_HARVEST_PATTERNS,
   VALID_DYNAMIC_MARKINGS,
   SPINE_BUDGETS,
+  GAME_RULEBOOK_VERBS_MIN,
+  GAME_RULEBOOK_VERBS_MAX,
   VALID_GATE_STRUCTURES,
   VALID_LEGACY_MOVES,
   VALID_CONSTRAINED_GRID_KINDS,
@@ -619,6 +621,141 @@ var processParticulars = {
   }
 };
 
+// ── gameRulebook (VISION §4.0 / PLAY.md §3.1, ratified D173) ────────────────
+// THE RUDDER. Before the model writes a page of content it writes the game's
+// rulebook — how you win, what you do, what the currency is, how the password
+// is earned, what a session and a week look like, what can go badly, and in
+// what order the player is taught. Everything downstream is then written to
+// serve it, and `playSpine` below stops being the thing the model invents and
+// becomes this surface's PROJECTION (§3.2, and the two-way parity floor in
+// validation.js is what makes that sentence true rather than aspirational).
+//
+// SEVERITY: the processParticulars precedent exactly (D103), which the doctrine
+// names by hand. Additive-optional in the ARTIFACT contract — no corpus fixture
+// carries one and the sealed-corpus rule forbids editing them back green — and
+// REQUIRED at the generation stage gate, where the band and the parity floor
+// both block. `additionalProperties: false` with the `_x` hatch throughout.
+//
+// RENDERER-INERT, AND NONE OF IT PRINTS IN FULL ANYWHERE. What reaches the page
+// is the subset the player needs where they need it, printed at the point of
+// use and shaped as a form — the existing rules-block and point-of-use
+// machinery, which this surface FUNDS and does not replace. A renderer that
+// learned to print this object would have turned a design document into a
+// chapter, which is the failure §4.0 names by name.
+//
+// WHY THE ANSWERS ARE PROSE AND THE COMPANIONS ARE STRUCTURE. D103's shape
+// discipline says short strings, not paragraphs, because "selection is the
+// point; a wall of text cannot be selected from". That rule is right for
+// PARTICULARS, which prose stages select from, and wrong here: the eight
+// answers are a designer explaining a game in ordinary words, and §3.1's whole
+// floor is that each one owes SUBSTANCE. So each answer is one prose field with
+// a word FLOOR — and every claim a machine has to check gets a structured
+// companion beside it, because §3.2 is explicit that "the win condition must
+// land as structured data, not only as prose. The simulated player walks the
+// graph — it has no eyes and cannot read the rulebook."
+//
+// The companions are exactly four, and each exists because a floor reads it:
+//   winCondition.requires  the nodes the player must reach to have won. Every
+//                          one must be a node in the economy graph, which is
+//                          what makes "the graph states it in a form the walker
+//                          can evaluate" a checkable claim rather than a hope.
+//   coreVerbs.verbs        {verb, on}. `on` is the surface the verb is
+//                          PERFORMED on, and it must appear in the graph: a
+//                          verb the player is taught to do on a surface no edge
+//                          touches is §3.2's rules→graph failure exactly — the
+//                          book explains a system the machine never heard of.
+//   economy.currency       the name, so the graph→rules direction has a string
+//                          to diff. A currency on an edge that this rulebook
+//                          never mentions is a system the player is never told
+//                          about.
+//   passwordPath.elements  where the pieces come from. §3.1: the single most
+//                          important rule in the book, because it is the only
+//                          one that can fail silently and take the whole ending
+//                          with it.
+// Questions 5-8 carry no companion and that is a ruling, not a gap: a session's
+// shape, a week's shape, what can go badly and the teaching order are read by
+// people, and a structured mirror of them would be paperwork no floor reads.
+//
+// Refs are PLAIN STRINGS here for D129's reason, stated once at spineEconomyGraph
+// below and true for the same grammar: parseSurfaceRef matches
+// case-insensitively and a JSON Schema `pattern` cannot, so pinning the pattern
+// here would make the schema reject a ref the resolver happily parses — two
+// authorities disagreeing about one grammar.
+var rulebookProseAnswer = {
+  type: 'object',
+  required: ['answer'],
+  additionalProperties: false,
+  properties: { answer: nonEmptyString, _x: xt }
+};
+
+var gameRulebook = {
+  type: 'object',
+  required: [],
+  additionalProperties: false,
+  properties: {
+    winCondition: {
+      type: 'object',
+      // Both required when the object is present — the manifestPointer idiom.
+      // A win condition with no `requires` is the prose-only half §3.2 forbids.
+      required: ['answer', 'requires'],
+      additionalProperties: false,
+      properties: {
+        answer: nonEmptyString,
+        requires: { type: 'array', items: nonEmptyString },
+        _x: xt
+      }
+    },
+    coreVerbs: {
+      type: 'object',
+      required: ['answer', 'verbs'],
+      additionalProperties: false,
+      properties: {
+        answer: nonEmptyString,
+        verbs: {
+          type: 'array',
+          minItems: GAME_RULEBOOK_VERBS_MIN,
+          maxItems: GAME_RULEBOOK_VERBS_MAX,
+          items: {
+            type: 'object',
+            required: ['verb', 'on'],
+            additionalProperties: false,
+            properties: { verb: nonEmptyString, on: nonEmptyString, _x: xt }
+          }
+        },
+        _x: xt
+      }
+    },
+    economy: {
+      type: 'object',
+      required: ['answer', 'currency'],
+      additionalProperties: false,
+      properties: { answer: nonEmptyString, currency: nonEmptyString, _x: xt }
+    },
+    passwordPath: {
+      type: 'object',
+      required: ['answer', 'elements'],
+      additionalProperties: false,
+      properties: {
+        answer: nonEmptyString,
+        elements: { type: 'array', items: nonEmptyString },
+        _x: xt
+      }
+    },
+    sessionShape: rulebookProseAnswer,
+    weekShape: rulebookProseAnswer,
+    whatGoesBadly: rulebookProseAnswer,
+    teachingOrder: rulebookProseAnswer,
+    // What the brief wanted that this system cannot print. The honest-when-
+    // lacking law at the design level: §4.0 says a rulebook that wanted an
+    // implement the arsenal lacks SAYS SO, the gap is recorded rather than
+    // faked, and the gap becomes the next arsenal entry. `playSpine.honestGaps`
+    // is the same law one layer down (what the LIBRARY lacks); this is what the
+    // PRINTABLE VOCABULARY lacks, and the two are not the same question.
+    unprintableWants: { type: 'array', items: nonEmptyString },
+    _x: xt
+  }
+};
+
 // ── playSpine (Layer 3 play contract, PLAY.md §3 / VISION §4.4) ─────────────
 // The Ludic Spine: composition with consequence, declared before content
 // exists. Play is global — the fourth constitution — and the whole reason this
@@ -1016,6 +1153,10 @@ export var BOOKLET_SCHEMA = {
         // artifactIdentity.componentDialect, which also lives here.
         designLanguage: designLanguage,
         processParticulars: processParticulars,
+        // THE RUDDER, and it sits above the spine deliberately: the spine is
+        // this object's projection (VISION §4.0 / PLAY.md §3.2), and a reader
+        // who meets the projection first learns the wrong causal order.
+        gameRulebook: gameRulebook,
         playSpine: playSpine,
         economy: economy,
         weeklyComponentType: nonEmptyString,

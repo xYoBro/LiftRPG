@@ -3590,6 +3590,26 @@
 
         <div class="wizard-pane" id="wiz-pane-3">
           <p class="wizard-hint">This step sets the title, cover, rules, and theme before the content pages begin.</p>
+          <!-- THE PIPELINE-SYNC LAW's stated gap (D173). The two API doors run a
+               GAME RULEBOOK stage before anything else: the model writes how you
+               win, what you do, what the currency is and how the password is
+               earned, and the play spine written here is then checked against it
+               in both directions. This door has no such step — its panes are a
+               fixed six-slot index (panes, rail numbers, labels, prompt/result/
+               error/repair maps, the draft restore and the invalidation chain all
+               key off the same numbering), and a seventh inserted at the front
+               renumbers every one of them. That is work this wave did not do, not
+               a thing the door cannot hold, and saying so is the law's own
+               requirement: a door that quietly does less is the failure, not the
+               gap itself. Pinned by scripts/check-generation-floors.mjs so it
+               cannot be deleted without the claim being re-made. -->
+          <p class="wizard-hint" id="wiz-rulebook-gap"><strong>What this door does not do:</strong>
+            the API build modes run a <em>game design</em> step before anything else — the
+            model writes the game&rsquo;s rules (how you win, what you do, what the currency is,
+            how the password is earned) and everything after is written to serve them, with the
+            play spine checked against those rules both ways. This guided path skips that step,
+            so the game&rsquo;s shape is decided here alongside everything else and nothing checks
+            the two against each other. Use an API build mode if you want the rules-first pass.</p>
           <div class="wizard-action-grid">
             <div class="wizard-stage-card is-action">
               <div class="wizard-action-index">Step 1</div>
@@ -3877,6 +3897,12 @@
       var WIZARD_DRAFT_SCHEMA_VERSION = 2;
       var WIZARD_STAGE_KEYS = ['layerBible', 'campaignPlan', 'shell', 'weeks', 'fragments', 'endings'];
       var STAGE_LABELS = {
+        // D173 plain language: this stage decides what the GAME is before any
+        // content exists. The reader is told what it produces ("Game Design"),
+        // never the internal pipeline name (`gameRulebook`, the stageKey below)
+        // — and deliberately never "Rules", which is the S+F card three rows
+        // down that writes the printed rules spread. Two different things.
+        gameRulebook: 'Game Design',
         layerBible: 'Foundation',
         campaignPlan: 'Booklet Plan',
         shell: 'Identity',
@@ -3895,6 +3921,7 @@
       // Multi-stage and structured share a shape; Skeleton+Flesh has its own.
       var API_STAGE_ORDER_BY_PIPELINE = {
         generateMultiStage: [
+          { key: 'gameRulebook', label: STAGE_LABELS.gameRulebook },
           { key: 'layerBible', label: STAGE_LABELS.layerBible },
           { key: 'campaign', label: STAGE_LABELS.campaignPlan },
           { key: 'shell', label: STAGE_LABELS.shell },
@@ -3908,6 +3935,7 @@
           // Keys are the pipeline's stageKey contract. Labels are what the
           // reader sees on the rail, so they name booklet parts, not
           // internal pipeline stages.
+          { key: 'gameRulebook', label: STAGE_LABELS.gameRulebook },
           { key: 'skeleton', label: 'Book Plan' },
           { key: 'knowing', label: STAGE_LABELS.knowing },
           { key: 'rules', label: 'Rules Spread' },

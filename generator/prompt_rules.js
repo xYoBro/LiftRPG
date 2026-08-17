@@ -1223,6 +1223,150 @@
     required: ['processParticulars']
   };
 
+  // ── Game Rulebook Schema (the rules-first stage — VISION §4.0, D173) ──────
+  // THE RUDDER'S OUTPUT SHAPE. The eight questions PLAY.md §3.1 ratified, the
+  // four structured companions that make three of them machine-checkable, and
+  // the word band both ways.
+  //
+  // NOT TO BE CONFUSED WITH THE PRINTED RULES. The Skeleton+Flesh pipeline has
+  // a stage named `rules` that writes `rulesSpread` — the pages a player reads.
+  // This is upstream of that and of everything else: a DESIGN DOCUMENT that
+  // never prints in full anywhere. Every name on this surface says so
+  // (`gameRulebook`, `SCHEMA_GAME_RULEBOOK`, stage key `gameRulebook`, stage
+  // name "Game Rulebook", rail card "Game Design") precisely so the two cannot
+  // be conflated by anyone reading either one in isolation.
+  //
+  // PARITY: the eight keys and their load class are GAME_RULEBOOK_ANSWERS in
+  // contracts/contract-constants.mjs; the three numbers are
+  // OUTPUT_BUDGETS.gameRulebook; the verb arity is GAME_RULEBOOK_VERBS_MIN/MAX.
+  // validate.mjs (gameRulebookPromptParity) anchors this surface and
+  // STRUCTURED_SCHEMA_GAME_RULEBOOK below on all three, and on the artifact
+  // schema's own property names — three prompt surfaces and a contract, the
+  // skeleton-triple shape, so a field renamed on one is an ERROR rather than a
+  // silent hole.
+  //
+  // NO WORKED RULEBOOK, EVER (D47), and this is the surface where that rule
+  // matters most in the whole system. One filled-in example of "how you win"
+  // would install one game in every book generated after it — the house economy
+  // failure (PLAY.md §2) at the level of the game itself rather than its
+  // economy. What is shown below is the SHAPE and the questions; every answer
+  // is the model's.
+  window.SCHEMA_GAME_RULEBOOK = [
+    '# Game Rulebook Schema',
+    '',
+    'Return a single JSON object with exactly this structure. Prose fields are ordinary',
+    'English sentences — this is a designer explaining a game, not a data entry form.',
+    '',
+    '## gameRulebook (object) — all eight answers required',
+    '',
+    '- `winCondition` (object)',
+    '  - `answer` (string): how you win, in ordinary words.',
+    '  - `requires` (array of surface refs): the surfaces the player must reach or hold to have',
+    '    won. These become nodes in the economy graph a later stage writes.',
+    '- `coreVerbs` (object)',
+    '  - `answer` (string): what the player physically does with a pencil in this book.',
+    '  - `verbs` (array, 3-5 items): `{ verb, on }`. `verb` is one word or a short phrase',
+    '    ("cross out", "trace"). `on` is the surface ref that verb is performed on.',
+    '- `economy` (object)',
+    '  - `answer` (string): what the training earns, what it buys, what it costs, what happens',
+    '    when the player runs out.',
+    '  - `currency` (string): what it is CALLED in this world. This exact name must appear on',
+    '    an edge of the economy graph a later stage writes, and it is the phrase the book prints.',
+    '- `passwordPath` (object)',
+    '  - `answer` (string): how the password to the sealed ending is earned.',
+    '  - `elements` (array of surface refs): where the pieces come from, one ref per source.',
+    '- `sessionShape` (object) — `answer` (string) only.',
+    '- `weekShape` (object) — `answer` (string) only.',
+    '- `whatGoesBadly` (object) — `answer` (string) only.',
+    '- `teachingOrder` (object) — `answer` (string) only.',
+    '- `unprintableWants` (array of strings, may be empty): anything this design wanted that this',
+    '  system cannot print. Say it plainly rather than substituting something printable and',
+    '  calling it the same thing.',
+    '',
+    '## Length is a BAND — a floor as well as a ceiling',
+    '- At least 120 words each: `winCondition.answer`, `economy.answer`, `passwordPath.answer`,',
+    '  `sessionShape.answer`. These four fail silently when they are thin.',
+    '- At least 60 words each: `coreVerbs.answer`, `weekShape.answer`, `whatGoesBadly.answer`,',
+    '  `teachingOrder.answer`.',
+    '- At most 1800 words across all eight answers combined. This is a design document, not a',
+    '  chapter: it should be shorter than one week of the book\'s prose.',
+    'Both bounds are enforced and both cost a retry. A one-line answer is the failure this floor',
+    'exists to catch; a rulebook long enough to hide in is a rulebook nobody checked.'
+  ];
+
+  // Structured output schema for the game rulebook stage (OpenAI json_schema /
+  // Anthropic tool-input format). ONE literal, borrowed by both transports —
+  // the shape the D129/D131 spine literal already holds.
+  //
+  // NO `maxLength` ANYWHERE, and that is a ruling rather than an omission: the
+  // band is in WORDS and `maxLength` counts characters, so a maxLength here
+  // would be a second, wrong statement of the same rule on the one surface that
+  // is measured in the other unit (D162's finding that maxLength is instruction
+  // on every transport applies doubly when the unit disagrees). The stage
+  // validator is the enforcement, as it is for every other budget.
+  window.STRUCTURED_SCHEMA_GAME_RULEBOOK = {
+    type: 'object',
+    properties: {
+      gameRulebook: {
+        type: 'object',
+        properties: {
+          winCondition: {
+            type: 'object',
+            properties: {
+              answer: { type: 'string' },
+              requires: { type: 'array', items: { type: 'string' } }
+            },
+            required: ['answer', 'requires']
+          },
+          coreVerbs: {
+            type: 'object',
+            properties: {
+              answer: { type: 'string' },
+              verbs: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: { verb: { type: 'string' }, on: { type: 'string' } },
+                  required: ['verb', 'on']
+                }
+              }
+            },
+            required: ['answer', 'verbs']
+          },
+          economy: {
+            type: 'object',
+            properties: { answer: { type: 'string' }, currency: { type: 'string' } },
+            required: ['answer', 'currency']
+          },
+          passwordPath: {
+            type: 'object',
+            properties: {
+              answer: { type: 'string' },
+              elements: { type: 'array', items: { type: 'string' } }
+            },
+            required: ['answer', 'elements']
+          },
+          sessionShape: {
+            type: 'object', properties: { answer: { type: 'string' } }, required: ['answer']
+          },
+          weekShape: {
+            type: 'object', properties: { answer: { type: 'string' } }, required: ['answer']
+          },
+          whatGoesBadly: {
+            type: 'object', properties: { answer: { type: 'string' } }, required: ['answer']
+          },
+          teachingOrder: {
+            type: 'object', properties: { answer: { type: 'string' } }, required: ['answer']
+          },
+          unprintableWants: { type: 'array', items: { type: 'string' } }
+        },
+        required: ['winCondition', 'coreVerbs', 'economy', 'passwordPath',
+          'sessionShape', 'weekShape', 'whatGoesBadly', 'teachingOrder']
+      }
+    },
+    required: ['gameRulebook']
+  };
+
   // ── Canonical workout (§11 Wave 5) ───────────────────────────────────────
   // The canonicalization stage's output: a pasted Liftoscript program read into
   // the structure the pipeline already consumes. This stage writes NO prose and
@@ -2868,20 +3012,255 @@
   // SHAPES, one clause each; a single filled-in example would install one house
   // economy in every book, which is the disease this whole section exists to
   // prevent (PLAY.md §2, "the house economy").
-  window.INST_LUDIC_SPINE = [
-    '## The Play Spine (meta.playSpine — REQUIRED)',
-    'Step 11 of the compiler said what to compose. This is where you write it down, in a',
-    'shape a machine can check. A book whose systems do not reference each other is rejected',
-    'at this stage, so declare the wiring here and then BUILD what you declared.',
+  // ── The Game Rulebook (VISION §4.0 / PLAY.md §3.1, ratified D173) ────────
+  // THE RUDDER. The pipeline used to ask the model for parts and it got parts:
+  // sessions, clocks, oracle tables, a boss. Every part was checked; nothing
+  // ever decided what the GAME was, and the first finished book played as one
+  // note (D171). The author's ruling: "the LLM should have to write the rules of
+  // the game before it creates all the text on how to play… it will give the
+  // game a shape."
+  //
+  // ROUTING: the `game-rulebook` stage ONLY, and the stage runs FIRST on both
+  // API pipelines. It is deliberately OFF the single-prompt bundle, on the
+  // KNOWING and DESIGN_LANGUAGE precedent: that surface is hard against its
+  // ceiling (D136 measured 563 characters of headroom; a legal empty-brief
+  // fixture measured 115,182 against a 115,000 ceiling at HEAD, DR-3), the
+  // floors do not run on the paste path, and a whole design document is the
+  // largest thing anyone has proposed adding to it. The paste path keeps
+  // getting its composition discipline from INST_ARTIFACT_COMPILER Step 11,
+  // which is written self-contained for exactly this reason.
+  //
+  // NO WORKED EXAMPLE, NO SAMPLE ANSWER, NO CLOSED MENU (D47/D144). This is the
+  // one stage in the system whose entire job is to decide what the game is; a
+  // shown answer here is not an illustration, it is the answer.
+  window.INST_GAME_RULEBOOK = [
+    '## Write the rules of the game — before anything else exists',
+    'You are the game designer. Nothing of this book has been written yet: no weeks, no',
+    'documents, no ending, no board. Before any of that, you decide what the GAME is, and',
+    'everything written afterwards is written to serve what you decide here.',
     '',
-    '### Surface refs — how the spine points at things',
-    'Every edge names a surface as `kind:id`, or one of three singletons.',
+    'This is a design document. It never prints in full anywhere. What eventually reaches the',
+    'page is the small part the player needs at the moment they need it, printed as a form at',
+    'the point of use — so write for a designer who has to build this, not for a reader.',
+    '',
+    '### The kit you are designing for, and it is the whole kit',
+    'The player has the book, a pencil, and two ten-sided dice. Nothing is cut, folded, glued,',
+    'aligned or assembled, ever. Randomness is two d10 read as a percentile, roll-under: the',
+    'probability IS the number printed on the page. Design inside that and the book can be',
+    'built; design outside it and it cannot.',
+    '',
+    '### The eight questions. Answer all eight, in ordinary words.',
+    '',
+    '1. HOW YOU WIN. One claim a stranger understands. Not "advance the narrative" — what state',
+    '   must the book be in, on the last page, for the player to have won? If there is more than',
+    '   one ending, what distinguishes them, and what does a player do differently to reach each?',
+    '2. WHAT YOU ACTUALLY DO. The three to five things a player physically does with a pencil in',
+    '   this book. If two of your verbs are the same verb with different labels, you have fewer',
+    '   verbs than you think — merge them and find the real third.',
+    '3. THE ECONOMY, IN PLAIN WORDS. What the training earns, what it is called in this world,',
+    '   what it buys, what it costs, and what happens when the player runs out. If it cannot be',
+    '   said in a paragraph, the player will never understand it either.',
+    '4. HOW THE PASSWORD IS EARNED. Which pieces of the sealed ending\'s password exist, where',
+    '   each comes from, how a player KNOWS they have found one, and what a player who missed',
+    '   sessions does. This is the single most important rule in the book: it is the only one',
+    '   that can fail silently and take the whole ending with it.',
+    '5. WHAT ONE SESSION LOOKS LIKE AT THE TABLE. From opening the book at the gym to closing it.',
+    '   What is read first, what is marked, when the dice come out, what is written, and what is',
+    '   deliberately left unfinished for next time.',
+    '6. WHAT ONE WEEK LOOKS LIKE. How the sessions add up, what happens at the end of a week, and',
+    '   what decision the week ends on.',
+    '7. WHAT CAN GO BADLY. What is scarce. What can be lost. Where a player can fall behind, how',
+    '   they would notice, and how they can recover. A game where nothing can go wrong is a',
+    '   worksheet.',
+    '8. THE TEACHING ORDER. What the player must know before their first set, what can wait until',
+    '   week two, and what should only be explained at the moment it is needed.',
+    '',
+    '### Where the design comes from',
+    'Your own knowledge of games — board games, video games, escape rooms, puzzle books, solo',
+    'journalling games, legacy campaigns — remixed for THIS brief and this training program.',
+    'There is no house template and no default game. Two books from the same brief must still',
+    'differ in their verbs, their economy shape, their decision texture and their tension source.',
+    'The program is the clock: heavy weeks are pressure, light weeks are the exhale, and the',
+    'game should feel different in each because the training is.',
+    '',
+    '### Say what you cannot have',
+    'This system prints on paper and a player marks it with a pencil. If your design wants',
+    'something it cannot print — a deck to shuffle, a wheel to turn, a component to cut out —',
+    'do not quietly substitute something printable and call it the same thing. Name the want in',
+    '`unprintableWants` and design the best version you can without it. An honest gap is a',
+    'record; a silent substitution is a book that describes a game it is not.',
+    '',
+    '### What happens to these answers',
+    'The next stage turns them into a machine-readable graph and is checked against you in both',
+    'directions: every currency, verb surface, win-condition ref and password element you name',
+    'must appear in that graph, and nothing may appear in that graph that you did not teach. So',
+    'name the surfaces you actually intend the book to have, in the ref grammar given above, and',
+    'spell them the same way twice.',
+    '',
+    'Return ONLY the JSON object. No commentary, no markdown fences.'
+  ];
+
+  /**
+   * formatGameRulebookGiven(rulebook, options) -> string
+   *
+   * THE RULEBOOK, HANDED TO THE STAGES THAT MUST SERVE IT (D173/D174 idiom).
+   *
+   * D174's measured lesson was that a surface can be authored, funded and
+   * formatted and still reach the seats that need it nowhere. The rulebook is
+   * the most expensive thing in the ladder to author and the most useless if it
+   * is not read, so it is delivered as a GIVEN — not as a suggestion, and not
+   * paraphrased.
+   *
+   * TWO SEATS THIS WAVE, and both are named rather than assumed:
+   *   · the SPINE seat (`shell` on the multi-stage path, `skeleton` on S+F).
+   *     The spine is this object's projection and the parity floor checks both
+   *     directions, so the spine seat gets the FULL rulebook: a stage checked
+   *     against a document it was never shown is the derived-or-strict trap.
+   *   · the PRINTED RULES seat (`rules`, S+F). What prints is the point-of-use
+   *     subset of exactly this document. On the multi-stage path that surface
+   *     is `rulesSpread`, authored at the shell — the same stage, so one
+   *     delivery covers both there.
+   *
+   * `options.compact` drops the four prose answers that the printed rules seat
+   * does not need in full, keeping the machine-facing declarations. Absent, the
+   * whole document is printed.
+   *
+   * Returns '' for a missing or empty rulebook, so every caller without one
+   * builds the prompt it always built, byte for byte.
+   */
+  window.formatGameRulebookGiven = function (rulebook, options) {
+    if (!rulebook || typeof rulebook !== 'object') return '';
+    var opts = options || {};
+    var answerOf = function (key) {
+      var node = rulebook[key];
+      if (!node || typeof node !== 'object') return '';
+      return String(node.answer || '').trim();
+    };
+    var lines = [
+      '## THE GAME RULEBOOK (written before this stage — a GIVEN, not a proposal)',
+      '',
+      'This book\'s game was designed before any of its content existed. What follows is that',
+      'design, verbatim. It is the SOURCE: what you write now serves it. Where your instinct',
+      'and these rules disagree, the rules win.',
+      ''
+    ];
+    var SECTIONS = [
+      ['winCondition', 'How you win'],
+      ['coreVerbs', 'What the player actually does'],
+      ['economy', 'The economy'],
+      ['passwordPath', 'How the password is earned'],
+      ['sessionShape', 'One session at the table'],
+      ['weekShape', 'One week'],
+      ['whatGoesBadly', 'What can go badly'],
+      ['teachingOrder', 'The teaching order']
+    ];
+    // The compact projection keeps every answer whose absence would let a
+    // printed teaching surface contradict the design — how you win, what you
+    // do, the economy, the password, the session, and the teaching order — and
+    // drops the two a rules page does not print (the week's shape and the
+    // failure modes, which the week stages own).
+    var COMPACT_KEYS = ['winCondition', 'coreVerbs', 'economy', 'passwordPath',
+      'sessionShape', 'teachingOrder'];
+    SECTIONS.forEach(function (row) {
+      if (opts.compact && COMPACT_KEYS.indexOf(row[0]) === -1) return;
+      var text = answerOf(row[0]);
+      if (!text) return;
+      lines.push('### ' + row[1]);
+      lines.push(text);
+      lines.push('');
+    });
+
+    var declared = [];
+    var currency = String(((rulebook.economy || {}).currency) || '').trim();
+    if (currency) declared.push('- The currency is called: ' + currency);
+    var verbs = ((rulebook.coreVerbs || {}).verbs) || [];
+    if (Array.isArray(verbs) && verbs.length) {
+      declared.push('- The core verbs and the surfaces they are performed on: '
+        + verbs.map(function (v) {
+          return String((v || {}).verb || '').trim() + ' on `' + String((v || {}).on || '').trim() + '`';
+        }).join(' · '));
+    }
+    var requires = ((rulebook.winCondition || {}).requires) || [];
+    if (Array.isArray(requires) && requires.length) {
+      declared.push('- Winning requires reaching: ' + requires.map(function (r) {
+        return '`' + String(r).trim() + '`';
+      }).join(' '));
+    }
+    var elements = ((rulebook.passwordPath || {}).elements) || [];
+    if (Array.isArray(elements) && elements.length) {
+      declared.push('- The password pieces come from: ' + elements.map(function (r) {
+        return '`' + String(r).trim() + '`';
+      }).join(' '));
+    }
+    if (declared.length) {
+      lines.push('### The declarations this book is held to');
+      lines = lines.concat(declared);
+      lines.push('');
+    }
+    var wants = rulebook.unprintableWants;
+    if (Array.isArray(wants) && wants.length) {
+      lines.push('### Declared as unbuildable on paper (do not quietly substitute)');
+      wants.forEach(function (w) {
+        var text = String(w || '').trim();
+        if (text) lines.push('- ' + text);
+      });
+      lines.push('');
+    }
+    return lines.join('\n').replace(/\n+$/, '');
+  };
+
+  // ── The surface-ref grammar (extracted, D173 rules-first wave) ────────────
+  // ONE HOME, TWO STAGE READERS. The grammar used to live inside the Play Spine
+  // section, which was correct while the spine was the only surface that
+  // pointed at anything. The rulebook stage now points too — its win condition
+  // names the nodes a player must reach, its verbs name the surfaces they are
+  // performed on, its password path names where the pieces come from — and it
+  // runs BEFORE the spine, so it cannot read a section routed to a later stage.
+  //
+  // The alternative was a second copy in the rulebook's own schema, which is
+  // the drift D93 exists to make impossible: a kind added here and not there
+  // would be a ref the floors resolve and one prompt never taught. Extracted
+  // instead, and routed to both seats through STAGE_SCHEMA_MAP.
+  //
+  // validate.mjs (ludicSpinePromptParity, tooth 2) anchors the SURFACE_REF_KINDS
+  // and SURFACE_REF_SINGLETONS parity on THIS section rather than on the spine's.
+  window.INST_SURFACE_REFS = [
+    '## Surface refs — how this book points at its own parts',
+    'Every reference to a printed surface is written as `kind:id`, or as one of three singletons.',
     'Kinds: `week:W3` `session:W3.2` `markStrip:W3.2` `reckoning:W3` `clock:<clock name>`',
     '`oracle:W4` `cipher:W2` `map:<region or board name>` `companion:<label>` `fragment:F.07`',
     '`door:W5` `seal:<fragment id>` `ending:E2`',
     'Singletons (no id — a book has at most one): `banked` `boss` `assembly`',
     'Use the names you are actually giving these surfaces. A ref to a week this book does',
-    'not have, or to a fragment outside your registry, is a blocking error.',
+    'not have, or to a fragment outside your registry, is a blocking error.'
+  ];
+
+  window.INST_LUDIC_SPINE = [
+    '## The Play Spine (meta.playSpine — REQUIRED)',
+    'Step 11 of the compiler said what to compose. This is where you write it down, in a',
+    'shape a machine can check. A book whose systems do not reference each other is rejected',
+    'at this stage, so declare the wiring here and then BUILD what you declared.',
+    'Refs are written in the `kind:id` grammar given in the Surface refs section above.',
+    '',
+    '### THE SPINE IS A PROJECTION OF THE RULEBOOK, NOT A SECOND DESIGN',
+    'The game rulebook was written before this stage and is quoted to you above as a GIVEN.',
+    'It is the SOURCE. You are not designing the game here — you already did — you are writing',
+    'down, in a machine-checkable shape, the game those rules describe. Every currency, verb,',
+    'win-condition node and password element in the rules must turn up in the graph below, and',
+    'nothing may turn up in the graph that the rules never taught. Both directions are checked',
+    'and both block:',
+    '- RULES INTO GRAPH. The currency the rules name must appear as a `currency` on at least one',
+    '  `economyGraph` edge. Every surface a core verb is performed `on`, every ref the win',
+    '  condition `requires`, and every password element must appear as a node — a `from` or a',
+    '  `to` — SPELLED THE SAME WAY the rulebook spelled it. If the rules say the player decodes',
+    '  on `cipher:W2`, this graph has a `cipher:W2`.',
+    '- GRAPH INTO RULES. Every currency you name on an edge must be a currency the rulebook',
+    '  taught, and every KIND of surface your graph touches must be named somewhere in the',
+    '  rulebook prose in the player-facing words listed in the rulebook stage. A system in the',
+    '  machine that the player is never told about passes every other gate and no human can',
+    '  play it.',
+    'If the graph you would honestly write disagrees with the rules, the RULES WIN and the graph',
+    'changes to serve them. That is what rules-first means.',
     '',
     '### The seven declarations',
     '- `composition` (array, 2-4 items): `{ entry, role }`.',
@@ -3863,6 +4242,24 @@
   // - NEVER put schema or instruction content in generator.js or api-generator.js.
 
   var STAGE_SCHEMA_MAP = {
+    // ── THE RULEBOOK: the first authored stage on both API pipelines (D173) ──
+    // It carries the ref grammar (its companions point at surfaces), the play
+    // kit (it is designing for a pencil and two d10s and must not design past
+    // them), the brief-fidelity law (a game designed for a different brief
+    // mis-funds every stage downstream of it, the knowing's argument one level
+    // up), and its own doctrine. NOTHING ELSE, on D128's rule: this stage
+    // authors no prose, no theme, no weeks and no meta, so VOICE_DISCIPLINE,
+    // OUTPUT_BUDGETS and CONTRACT_GUARDRAILS would all be false at it — and a
+    // section routed to a stage it is false at teaches the model that this
+    // prompt's rules may not apply to the shape in front of it.
+    //
+    // THE PLAY KIT IS STATED INLINE rather than routed, and that is the same
+    // ruling INST_ARTIFACT_COMPILER Step 11 carries for the paste path: the kit
+    // lives inside INST_VOICE_DISCIPLINE, which is a PROSE section this stage
+    // writes none of. Routing the whole section to import one constraint is the
+    // D128 defect; restating the constraint where it binds is not, and the
+    // floors row asserts the kit reaches this stage either way.
+    'game-rulebook':  { schemas: ['GAME_RULEBOOK'],                             instructions: ['GAME_RULEBOOK', 'SURFACE_REFS', 'BRIEF_FIDELITY'] },
     // Planning stages: story-first
     'layer-codex':    { schemas: [],                                            instructions: ['STORY_ENGINE', 'CHARACTER_WEB', 'LAYERED_ARC', 'ANTI_PATTERNS'] },
     // MAP_GEOMETRY rides the campaign plan because the plan is where the
@@ -3900,7 +4297,7 @@
     // load-bearing the same way theirs is: the model reads the menus that make
     // each choice choosable, then reads which of them the die already made.
     // Reversed, the assignments read as one more menu.
-    'shell':          { schemas: ['META', 'THEME', 'DESIGN_LANGUAGE', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'SHELL_CHOICE', 'SEED_ASSIGNMENT', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES', 'SHELL_SELF_CHECK'] },
+    'shell':          { schemas: ['META', 'THEME', 'DESIGN_LANGUAGE', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'SHELL_CHOICE', 'SEED_ASSIGNMENT', 'SURFACE_REFS', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES', 'SHELL_SELF_CHECK'] },
     // Knowing: the world's process particulars, authored once after the
     // skeleton/shell and consumed by every prose stage (§11 Wave 1.5). It
     // writes no prose, so it carries no VOICE_DISCIPLINE — it carries the

@@ -141,6 +141,10 @@ import {
   validateFragmentsStage,
   validateSkeletonStage,
   validateKnowingStage,
+  // D173 — the rudder's own gate. The parity floor is imported by the two spine
+  // gates inside validation.js and never called from here: a pipeline that
+  // called it directly would be a second opinion about a stage's verdict.
+  validateGameRulebookStage,
   classifyValidationErrors,
   collectBudgetBreaches,
   collectPercentileStatFindings,
@@ -1687,7 +1691,12 @@ async function runDeltaRepairRounds(ctx) {
 // legal linearisation of both stage sequences and there is no per-pipeline
 // table to drift.
 var REPAIR_STAGE_ORDER = [
-  'workoutCanonical', 'canonicalize', 'layerBible', 'campaignPlan',
+  // `gameRulebook` sits after canonicalization and before every compiler seat,
+  // which is where the stage actually runs on both pipelines (D173). Its rank
+  // matters even though no floor currently routes TO it: an error carrying its
+  // label at a later stage would otherwise rank -1 and be silently unroutable,
+  // and a stage missing from this table is a stage whose repairs vanish.
+  'workoutCanonical', 'canonicalize', 'gameRulebook', 'layerBible', 'campaignPlan',
   'skeleton', 'shell', 'knowing', 'rules', 'weeks', 'fragments', 'endings'
 ];
 
@@ -1797,6 +1806,7 @@ function buildRepairDirective(route, ownerStageName, fromStageName) {
 // can say the same word for the same seat. Keys are stage keys; the values are
 // the names the pipelines already emit on their progress events.
 var REPAIR_STAGE_NAMES = {
+  gameRulebook: 'Game Rulebook',
   layerBible: 'Layer Codex',
   campaignPlan: 'Story Plan',
   skeleton: 'Skeleton',
@@ -2098,6 +2108,10 @@ function stageBudget(stageKey, userTimeoutMs) {
 
 function getApiPromptBuilders() {
   return {
+    // D173 — the rules-first stage. Shared with Skeleton+Flesh: same builder,
+    // same head, same document, so the parity floor at the two different spine
+    // seats is checking the same thing twice rather than two things once.
+    gameRulebook: window.generateGameRulebookPrompt,
     stage1: window.generateApiStage1Prompt || window.generateStage1Prompt,
     stage2: window.generateApiStage2Prompt || window.generateStage2Prompt,
     shell: window.generateApiShellPrompt || window.generateShellPrompt,
@@ -2123,7 +2137,8 @@ function getApiPromptBuilders() {
 }
 
 function assertApiPromptBuilders(builders) {
-  if (!builders.stage1 || !builders.stage2 || !builders.shell || !builders.knowing ||
+  if (!builders.gameRulebook ||
+    !builders.stage1 || !builders.stage2 || !builders.shell || !builders.knowing ||
     !builders.singleWeekFinal ||
     !builders.singleFragment ||
     !builders.fragmentBatch || !builders.singleEnding) {
@@ -3500,6 +3515,81 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
 // checkpoint (saved BEFORE this ran) never carries particulars. Resume
 // therefore re-applies them here from the knowing checkpoint. The merge is
 // idempotent for exactly that reason.
+// ── The rulebook's plumbing (VISION §4.0, D173) ─────────────────────────────
+// The rudder is authored before anything else and then has to reach two places:
+// the stages that must SERVE it (through their prompt builders, as a GIVEN) and
+// the finished artifact (so a reader, the bench and the auditor can see what
+// game this book was designed to be). This is the second half.
+//
+// Stamped onto the compiler stage's `meta` exactly the way the knowing is,
+// because that object BECOMES `booklet.meta` — no new assembly seam, no new
+// checkpoint key, and a booklet whose rulebook stage never ran is byte-identical
+// to one built before this existed.
+function applyGameRulebook(target, rulebookOutput) {
+  if (!target || !rulebookOutput) return null;
+  var rulebook = rulebookOutput.gameRulebook;
+  if (!rulebook || typeof rulebook !== 'object' || Array.isArray(rulebook)) return null;
+  target.meta = target.meta || {};
+  target.meta.gameRulebook = rulebook;
+  return rulebook;
+}
+
+// Freeform providers return the payload one level flatter than asked often
+// enough that the knowing stage already carries this exact repair. Same shape
+// mistake, same answer: rewrap rather than spend a call to be told the same
+// thing again. Anchored on the four questions a bare payload would show at its
+// root, never on one — a single key is a coincidence, four is a shape.
+function normalizeGameRulebookShape(result) {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
+  if (result.gameRulebook) return result;
+  var KEYS = ['winCondition', 'coreVerbs', 'economy', 'passwordPath',
+    'sessionShape', 'weekShape', 'whatGoesBadly', 'teachingOrder'];
+  var present = KEYS.filter(function (k) { return result[k] && typeof result[k] === 'object'; });
+  if (present.length < 4) return result;
+  console.warn('[LiftRPG] Game rulebook stage returned a bare document — rewrapping');
+  var wrapped = {};
+  KEYS.forEach(function (k) { if (result[k] !== undefined) wrapped[k] = result[k]; });
+  if (Array.isArray(result.unprintableWants)) wrapped.unprintableWants = result.unprintableWants;
+  return { gameRulebook: wrapped };
+}
+
+// One-line run-log summary. The operator's question about this stage is "what
+// game did it decide on", and the currency plus the verbs answer it in one
+// line — the two declarations every later stage is held to.
+function describeGameRulebook(rulebook) {
+  if (!rulebook) return 'no game rulebook authored';
+  var currency = String(((rulebook.economy || {}).currency) || '').trim();
+  var verbs = ((rulebook.coreVerbs || {}).verbs) || [];
+  var verbList = (Array.isArray(verbs) ? verbs : []).map(function (v) {
+    return String((v || {}).verb || '').trim();
+  }).filter(Boolean);
+  var parts = [];
+  if (currency) parts.push('currency "' + currency + '"');
+  if (verbList.length) parts.push('verbs: ' + verbList.join(', '));
+  var wants = rulebook.unprintableWants;
+  if (Array.isArray(wants) && wants.length) parts.push(wants.length + ' declared unprintable want(s)');
+  return parts.length ? 'Game rulebook: ' + parts.join('; ') + '.' : 'game rulebook authored (no declarations)';
+}
+
+// THE EARLIEST BANKED SEED CARRIER (D101/D143, extended by D173).
+//
+// The seed used to ride the COMPILER stage alone, because the compiler was the
+// first stage that could carry one. The rulebook now runs before it, and that
+// moves the hazard rather than removing it: a run that banks the rulebook and
+// dies before the shell would, on resume, find no compiler stage, draw a FRESH
+// seed, and hand the shell a different world from the one the banked rulebook
+// was designed for. Nothing would throw — the run would simply build a book
+// whose rules and whose identity came from two different draws.
+//
+// Varargs in RUN ORDER; the first stage actually present wins, and "present
+// with no seed" is still a real answer (resolveRunSeed's own distinction).
+function earliestSeedCarrier() {
+  for (var i = 0; i < arguments.length; i++) {
+    if (arguments[i]) return arguments[i];
+  }
+  return null;
+}
+
 function applyProcessParticulars(target, knowingOutput) {
   if (!target || !knowingOutput) return null;
   var particulars = knowingOutput.processParticulars;
@@ -3559,9 +3649,11 @@ async function runApiPipeline(options) {
     ? options.rawWorkout
     : workout;
 
-  // Initial estimation: 4 setup (codex, campaign, shell, knowing) + weekCount
-  // (single-stage per week) + endings
-  var totalStages = 4 + weekCount + 2;
+  // Initial estimation: 5 setup (rulebook, codex, campaign, shell, knowing)
+  // + weekCount (single-stage per week) + endings. The rulebook joined the
+  // count in the same change that added the stage — a rail that draws one more
+  // card than the counter knows about is the D110 UI lie in miniature.
+  var totalStages = 5 + weekCount + 2;
   var stageNum = 0;
   var onProgress = options.onProgress;
 
@@ -3622,8 +3714,16 @@ async function runApiPipeline(options) {
   // run before the shell. A seed resolved late would leave those two builders
   // drawing from a different source than the rest of the run, which is the
   // within-run incoherence the draw-once seam exists to prevent (D101).
+  // EARLIEST BANKED CARRIER, not the compiler stage (D173). The rulebook now
+  // runs before the shell, so a resume that finds a banked rulebook and no
+  // shell must reuse the rulebook's seed — otherwise the shell is built from a
+  // fresh draw against a rulebook designed under the old one, and nothing
+  // throws. See earliestSeedCarrier().
   var divergenceSeed = resolveRepairAwareSeed(repairSeedCarry,
-    (checkpoint && checkpoint.stages && checkpoint.stages.shell) || null, brief);
+    earliestSeedCarrier(
+      (checkpoint && checkpoint.stages && checkpoint.stages.gameRulebook) || null,
+      (checkpoint && checkpoint.stages && checkpoint.stages.shell) || null
+    ), brief);
   // The assignments are a pure function of the seed, so a resume and a repair
   // recover the SAME ones with the stage they shaped — no second key on the
   // checkpoint, and nothing to keep in sync (D98's four touchpoints stay four).
@@ -3718,6 +3818,43 @@ async function runApiPipeline(options) {
     if (canonSessions > 0) totalSessions = canonSessions;
   }
   var workoutLifecycle = describeWorkoutLifecycle(canonState);
+
+  // ── STAGE 0.5: THE GAME RULEBOOK (VISION §4.0, D173) ─────────────────
+  // Before the codex, before the plan, before anything. See
+  // runGameRulebookStage for why FIRST is the ruling and not a convenience.
+  var rulebookState = await runGameRulebookStage(settings, {
+    cached: (checkpoint && checkpoint.stages && checkpoint.stages.gameRulebook) || null,
+    checkpoint: checkpoint,
+    onProgress: onProgress,
+    rateLimiter: rateLimiter,
+    budgetEnforce: useGeminiBudget,
+    trialMode: !!(options.trialMode || settings.trialMode),
+    divergenceSeed: divergenceSeed,
+    repairDirective: repairDirectiveFor('gameRulebook'),
+    progress: progress,
+    getStageIndex: function () { return stageNum; },
+    getTotalStages: function () { return totalStages; },
+    emitRestored: function () {
+      stageNum++;
+      console.log('[LiftRPG] Resumed: Game Rulebook (cached)');
+      emitPipelineEvent(onProgress, stageNum, totalStages, 'Game rulebook restored from checkpoint.', {
+        phase: 'complete',
+        stageKey: 'gameRulebook',
+        stageName: 'Game Rulebook',
+        completionSource: 'checkpoint'
+      });
+    },
+    buildPrompt: function (retryState) {
+      return builders.gameRulebook(workout, brief, {
+        retryMode: retryState.attempt > 0,
+        weekCount: weekCount,
+        divergenceSeed: divergenceSeed
+      });
+    }
+  });
+  checkpoint = rulebookState.checkpoint;
+  var gameRulebook = (rulebookState.rulebook || {}).gameRulebook || null;
+  console.log('[LiftRPG] ' + describeGameRulebook(gameRulebook));
 
   // ── STAGES 1, 2, 3 (Shell Setup) ──────────────────────────
   // Each stage checks for a cached checkpoint before calling the API.
@@ -3895,7 +4032,11 @@ async function runApiPipeline(options) {
           // week each fragment lands in. That is everything the spine can be
           // held to before a single week is written.
           plannedWeeks: plannedWeekShapes,
-          fragmentRegistry: campaignPlan.fragmentRegistry
+          fragmentRegistry: campaignPlan.fragmentRegistry,
+          // D173 — the rulebook⇄spine parity floor's evidence. THE SAME object
+          // the builder below is handed, so the gate can never demand a
+          // projection of a document the prompt did not carry.
+          gameRulebook: gameRulebook
         });
         if (!v.valid) {
           return 'Shell schema validation: ' + v.errors.join('; ');
@@ -3925,7 +4066,11 @@ async function runApiPipeline(options) {
           // is the two-algorithms defect this pipeline has paid for once
           // already (D93). Deliberately NOT the topology digest's "lighter
           // weeks" line: that is a second, independent deload heuristic.
-          plannedWeekShapes: plannedWeekShapes
+          plannedWeekShapes: plannedWeekShapes,
+          // THE RULEBOOK (D173). This seat authors the spine — the rulebook's
+          // projection — and `rulesSpread`, which prints its point-of-use
+          // subset. Shown here and checked one block up, one object.
+          gameRulebook: gameRulebook
         });
       }
     });
@@ -3956,6 +4101,13 @@ async function runApiPipeline(options) {
       }
     }
   }
+
+  // THE RULEBOOK REACHES THE ARTIFACT (D173). Stamped after the shell exists —
+  // from the checkpoint or from the call — because `shell.meta` becomes
+  // `booklet.meta`, exactly the way the knowing is applied below. Outside the
+  // `else` on purpose: a RESUMED shell must carry it too, or a resumed book
+  // ships with no record of the game it was designed to be.
+  applyGameRulebook(shell, rulebookState.rulebook);
 
   var identityContract = buildIdentityContract(shell, campaignPlan);
 
@@ -4731,6 +4883,81 @@ async function runCanonicalizeStage(settings, config) {
  * not show a phantom step, which is the honest-progress rule the checkpoint
  * restore events already follow.
  */
+/**
+ * runGameRulebookStage(settings, config) -> { rulebook, checkpoint }
+ *
+ * THE RULES-FIRST STAGE (VISION §4.0 / PLAY.md §3.1, D173), shared by both API
+ * pipelines and IDENTICAL on each. One stage runner rather than two copies, for
+ * the reason `generateKnowingPrompt` is one builder: the stage's inputs are the
+ * two threads and nothing else, so there is nothing for a per-pipeline copy to
+ * differ about except by accident.
+ *
+ * PLACEMENT: FIRST, on both pipelines, immediately after canonicalization.
+ *
+ *   multi-stage:  canonicalize → RULEBOOK → codex → plan → shell(spine) → …
+ *   skeleton+flesh: canonicalize → RULEBOOK → skeleton(spine) → knowing → rules → …
+ *
+ * The placement is the ruling and it is worth stating why, because the cheaper
+ * option was available and is wrong. Putting the rulebook AFTER the campaign
+ * plan on the multi-stage path would let it name the world's proper nouns —
+ * and would make it a DESCRIPTION of decisions already taken (the topology, the
+ * progression, the boss), which is the component-supplier pipeline §4.0 exists
+ * to end. It would also make the two pipelines asymmetric: S+F's compiler seat
+ * authors the registry and the spine in ONE call, so there is no seat between
+ * "the world exists" and "the spine is written" on that path at all. First on
+ * both, from the same inputs, is the only placement where the rulebook is the
+ * SOURCE on both doors and the parity floor is checking the same thing twice.
+ *
+ * The cost is real and is the design: the rulebook names surfaces before the
+ * book has them. That is what makes it a rudder — a ref written here becomes a
+ * DEMAND on the spine, and the parity floor at the spine seat is what collects
+ * it. The rulebook's own gate therefore checks ref GRAMMAR and never ref
+ * RESOLUTION: at this seat there is no index to resolve against, and a floor
+ * that pretended otherwise would fail every book for not yet existing.
+ *
+ * THE SEED RIDES THIS STAGE (D101/D143). It is now the earliest banked stage,
+ * so it is the earliest seed carrier; see earliestSeedCarrier() for the resume
+ * hazard that creates and how the two pipelines resolve it. No new checkpoint
+ * key: the seed rides `_x` on the stage output, which the checkpoint stores
+ * verbatim (D98's four touchpoints stay four).
+ */
+async function runGameRulebookStage(settings, config) {
+  var cached = config.cached;
+  if (cached) {
+    config.emitRestored();
+    return { rulebook: cached, checkpoint: config.checkpoint };
+  }
+  config.progress('gameRulebook', 'Designing the game…');
+  var output = await runJsonStage(settings, {
+    stageKey: 'gameRulebook',
+    stageName: 'Game Rulebook',
+    // READ AFTER `progress` INCREMENTS IT, which is why it is a getter and not
+    // a number: every other stage in this file reads `stageNum` on the line
+    // after its own progress() call, and a value captured before that call
+    // labels the stage with the previous stage's index.
+    stageIndex: config.getStageIndex(),
+    completeMessage: 'Game rulebook complete.',
+    onProgress: config.onProgress,
+    getTotalStages: config.getTotalStages,
+    schema: window.STRUCTURED_SCHEMA_GAME_RULEBOOK || null,
+    // NO maxAttempts LITERAL (D97/D166): the row is STAGE_BUDGETS.gameRulebook
+    // and its attempts column is unset, which stageBudget() reads as 2. Trial
+    // mode still wins explicitly, the way every other stage lets it.
+    maxAttempts: config.trialMode ? 1 : undefined,
+    rateLimiter: config.rateLimiter,
+    budgetEnforce: config.budgetEnforce,
+    telemetryCollector: config.telemetryCollector,
+    normalizeResult: normalizeGameRulebookShape,
+    repairDirective: config.repairDirective || '',
+    validate: function (result) { return validateGameRulebookStage(result); },
+    buildPrompt: function (retryState) {
+      return config.buildPrompt(retryState);
+    }
+  });
+  recordSeedOnStage(output, config.divergenceSeed);
+  return { rulebook: output, checkpoint: saveCheckpoint('gameRulebook', output, config.checkpoint) };
+}
+
 function buildCanonicalizeConfig(options) {
   var emitted = false;
   function bumpOnce() {
@@ -4902,6 +5129,10 @@ async function generateStructured(settings, workout, brief, onProgress) {
 
 function getSkeletonFleshBuilders() {
   return {
+    // D173 — shared with the multi-stage pipeline. One builder, one prompt
+    // head, and the stage's only inputs are the two threads, so there is
+    // nothing for a second copy to differ about except by accident.
+    gameRulebook:          window.generateGameRulebookPrompt          || null,
     skeleton:              window.generateSkeletonPrompt              || null,
     // Shared with the multi-stage pipeline — one builder, one prompt head.
     knowing:               window.generateKnowingPrompt               || null,
@@ -4914,7 +5145,7 @@ function getSkeletonFleshBuilders() {
 }
 
 function assertSkeletonFleshBuilders(builders) {
-  var required = ['skeleton', 'knowing', 'fleshRules', 'fleshWeek', 'fleshFragmentBatch', 'fleshEnding'];
+  var required = ['gameRulebook', 'skeleton', 'knowing', 'fleshRules', 'fleshWeek', 'fleshFragmentBatch', 'fleshEnding'];
   for (var i = 0; i < required.length; i++) {
     if (typeof builders[required[i]] !== 'function') {
       throw new Error('Skeleton+Flesh pipeline: missing prompt builder "' + required[i] + '". Reload the page.');
@@ -4945,8 +5176,9 @@ async function runSkeletonFleshPipeline(options) {
   var useGeminiBudget = isGeminiProvider(settings);
   var rateLimiter = useGeminiBudget ? createRateLimiter(RATE_MAX_CALLS, RATE_WINDOW_MS) : null;
 
-  // Estimate total stages (updated after skeleton provides fragment/ending counts)
-  var totalStages = 1 + 1 + weekCount + 2 + 1;
+  // Estimate total stages (updated after skeleton provides fragment/ending
+  // counts). The leading 1 is the rulebook (D173) — first on this pipeline too.
+  var totalStages = 1 + 1 + 1 + weekCount + 2 + 1;
   var stageNum = 0;
 
   function progress(stageKey, message) {
@@ -5006,7 +5238,11 @@ async function runSkeletonFleshPipeline(options) {
   // The run seed, resolved before the first stage — same move and same reason
   // as the standard pipeline above. The S+F seat's compiler is the SKELETON,
   // so that is the cached stage the seed rides.
-  var divergenceSeed = resolveRepairAwareSeed(sfRepairSeedCarry, cached('skeleton'), brief);
+  // Earliest banked carrier, D173's half of the same hazard — see
+  // earliestSeedCarrier(). S+F's compiler seat is the SKELETON, and the
+  // rulebook now runs before it.
+  var divergenceSeed = resolveRepairAwareSeed(sfRepairSeedCarry,
+    earliestSeedCarrier(cached('gameRulebook'), cached('skeleton')), brief);
   var seedAssignments = drawSeedAssignments(divergenceSeed && divergenceSeed.value);
   adoptRunSeedSalt(divergenceSeed);
 
@@ -5057,6 +5293,45 @@ async function runSkeletonFleshPipeline(options) {
   var sfTelemetry = [];
   var sfContinuityWarnings = [];
 
+  // ══════════════════════════════════════════════════════════════════════
+  // STAGE 0.5: THE GAME RULEBOOK (VISION §4.0, D173)
+  // ══════════════════════════════════════════════════════════════════════
+  // Same runner, same builder, same placement as the multi-stage path: FIRST.
+  // The one thing that differs is which seat downstream is the spine's, and
+  // that difference is why the parity floor takes its label as a parameter.
+  var sfRulebookState = await runGameRulebookStage(settings, {
+    cached: cached('gameRulebook'),
+    checkpoint: checkpoint,
+    onProgress: onProgress,
+    rateLimiter: rateLimiter,
+    budgetEnforce: useGeminiBudget,
+    trialMode: trialMode,
+    telemetryCollector: sfTelemetry,
+    divergenceSeed: divergenceSeed,
+    repairDirective: sfRepairDirectiveFor('gameRulebook'),
+    progress: progress,
+    getStageIndex: function () { return stageNum; },
+    getTotalStages: function () { return totalStages; },
+    emitRestored: function () {
+      console.log('[S+F] Resuming — game rulebook loaded from checkpoint');
+      progress('gameRulebook', 'Game rulebook restored from checkpoint.');
+      emitPipelineEvent(onProgress, stageNum, totalStages, 'Game rulebook restored from checkpoint.', {
+        phase: 'complete', stageKey: 'gameRulebook', stageName: 'Game Rulebook',
+        completionSource: 'checkpoint'
+      });
+    },
+    buildPrompt: function (retryState) {
+      return builders.gameRulebook(workout, brief, {
+        retryMode: retryState.attempt > 0,
+        weekCount: weekCount,
+        divergenceSeed: divergenceSeed
+      });
+    }
+  });
+  checkpoint = sfRulebookState.checkpoint;
+  var sfGameRulebook = (sfRulebookState.rulebook || {}).gameRulebook || null;
+  console.log('[S+F] ' + describeGameRulebook(sfGameRulebook));
+
   // ════════════════════════════════════════════════════════════════════
   // STAGE 1: SKELETON
   // ════════════════════════════════════════════════════════════════════
@@ -5103,7 +5378,10 @@ async function runSkeletonFleshPipeline(options) {
           // seat is shown eight axes rather than fifteen. A given it cannot
           // deliver would be doctrine false at its stage.
           seedAssignments: seedAssignments,
-          identityAxes: identityAxesForStage('skeleton')
+          identityAxes: identityAxesForStage('skeleton'),
+          // THE RULEBOOK (D173). This is S+F's spine seat, so the document the
+          // spine projects is shown here and checked in the same call.
+          gameRulebook: sfGameRulebook
         });
       },
       validate: function (result) {
@@ -5119,7 +5397,10 @@ async function runSkeletonFleshPipeline(options) {
           generationFloors: true,
           brief: brief,
           // D148, this seat's half: shown eight axes above, checked on eight.
-          seedAssignments: seedAssignments
+          seedAssignments: seedAssignments,
+          // D173 — the parity floor's evidence, the same object the builder
+          // above is handed.
+          gameRulebook: sfGameRulebook
         });
       }
     });
@@ -5153,10 +5434,18 @@ async function runSkeletonFleshPipeline(options) {
     }
   }
 
-  // Update stage estimate: skeleton + knowing + rules + weeks + 1 fragment call + 1 ending call
+  // THE RULEBOOK REACHES THE ARTIFACT (D173), S+F's half. `skeleton.meta`
+  // becomes `booklet.meta` on this pipeline, so the stamp goes here — outside
+  // the cached/uncached branch above, because a resumed skeleton must carry the
+  // record too. It also means `generateFleshRulesPrompt` can read it off the
+  // skeleton as its fallback, one document either way.
+  applyGameRulebook(skeleton, sfRulebookState.rulebook);
+
+  // Update stage estimate: rulebook + skeleton + knowing + rules + weeks
+  // + 1 fragment call + 1 ending call
   var endingVariants = skeleton.endingVariants || ['canonical'];
   var fullFragRegistry = skeleton.fragmentRegistry || [];
-  totalStages = 1 + 1 + 1 + (skeleton.weekPlan || []).length + 1 + 1;
+  totalStages = 1 + 1 + 1 + 1 + (skeleton.weekPlan || []).length + 1 + 1;
 
   // Prompt caching: set system prompt from skeleton identity when the
   // resolved transport advertises support (capability, not format).
@@ -5248,7 +5537,12 @@ async function runSkeletonFleshPipeline(options) {
       // correct result already carries `rulesSpread` and is returned untouched.
       unwrapKey:        'rulesSpread',
       buildPrompt: function () {
-        return builders.fleshRules(skeleton);
+        // THE RULEBOOK, COMPACT (D173). This stage writes the pages the
+        // player is TAUGHT from, and §4.0's ruling is that what prints is the
+        // point-of-use subset OF THIS DOCUMENT. Passed explicitly rather than
+        // left to the builder's skeleton fallback, so the hand-over is visible
+        // at the call site where a future reader looks for it.
+        return builders.fleshRules(skeleton, { gameRulebook: sfGameRulebook });
       },
       validate: function (result) {
         if (!result || !result.rulesSpread) return 'Rules: missing rulesSpread';

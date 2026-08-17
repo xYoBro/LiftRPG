@@ -1017,6 +1017,15 @@
     var doorGivens = (typeof window.formatPlannedDoorGivensBlock === 'function')
       ? window.formatPlannedDoorGivensBlock(options.plannedWeekShapes)
       : '';
+    // THE RULEBOOK GIVEN (D173). This seat authors `meta.playSpine`, which is
+    // the rulebook's PROJECTION, and `rulesSpread`, which prints the
+    // point-of-use subset of it. Both are checked against the rulebook at this
+    // stage's gate, so the document is SHOWN here — a stage checked against a
+    // design it was never handed is the derived-or-strict trap. Empty for every
+    // caller with no rulebook, and the block is empty with it.
+    var rulebookGiven = (typeof window.formatGameRulebookGiven === 'function')
+      ? window.formatGameRulebookGiven(options.gameRulebook)
+      : '';
     var parts = [
       '# Booklet Setup — meta, cover, rulesSpread, theme',
       '',
@@ -1025,10 +1034,11 @@
       'Do NOT output weeks, fragments, or endings — those come in later stages.',
       '',
       '---',
-      '',
+      ''
+    ].concat(rulebookGiven ? [rulebookGiven, '', '---', ''] : []).concat([
       window.buildStageSchema('shell'),
       ''
-    ].concat(doorGivens ? [doorGivens, ''] : []).concat([
+    ]).concat(doorGivens ? [doorGivens, ''] : []).concat([
       '---',
       '',
       '## Reference Context (do not output these formats)',
@@ -2371,9 +2381,17 @@
     var weekCount = (options.weekCount > 0) ? options.weekCount : window.parseWeekCount(workout);
     var blend = deriveDesignBlend(brief, workout);
     var armed = armCompilerContext(workout, brief, options);
+    // THE RULEBOOK GIVEN (D173) — S+F's spine seat. This builder authors
+    // `meta.playSpine`, which is the rulebook's projection, and the two-way
+    // parity floor runs on this stage's gate. Same formatter and same document
+    // as the multi-stage shell seat: one rulebook, two seats, one check.
+    var rulebookGiven = (typeof window.formatGameRulebookGiven === 'function')
+      ? window.formatGameRulebookGiven(options.gameRulebook)
+      : '';
     return [
       '# LiftRPG Booklet Skeleton',
       '',
+      rulebookGiven ? rulebookGiven + '\n' : '',
       'You are planning the STRUCTURAL SKELETON of a LiftRPG print-and-play booklet.',
       'This booklet fuses a real workout program with a branching narrative TTRPG.',
       'The workout IS the story clock. The story IS the workout meaning-making system.',
@@ -2401,6 +2419,29 @@
       // seat shown the menu and not the law would read the assignments in
       // `armed.contextBlock` as a fourth menu rather than as givens.
       window.INST_SEED_ASSIGNMENT.join('\n'),
+      '',
+      // ── THE SPINE DOCTRINE, hand-routed to the seat that writes it (D173) ──
+      // FOUND ON CONTACT, and it is a defect this wave inherited rather than
+      // introduced: `STRUCTURED_SCHEMA_SKELETON` REQUIRES `meta.playSpine`, and
+      // `collectSpineSkeletonFloorErrors` BLOCKS this stage on its shape — while
+      // the Play Spine section was routed to the `shell` stage alone. Measured
+      // on the assembled prompt before the fix: this builder's output contained
+      // "## The Play Spine" zero times, "## Surface refs" zero times, and the
+      // string `playSpine` zero times. The only spine material reaching this
+      // seat was INST_SHELL_SELF_CHECK's walk-your-own-spine checklist — a
+      // checklist over fields the prompt never named, which is D174's shape
+      // exactly: the model was asked to satisfy a contract it was shown the
+      // audit for and not the contract.
+      //
+      // The rules-first wave is what makes that unpayable rather than merely
+      // expensive: the parity floor now blocks this seat on the spine being a
+      // faithful projection of the rulebook, and a floor whose rule reaches the
+      // stage nowhere fails every attempt. So both sections land here, in the
+      // same order and for the same reason they sit together on the shell —
+      // the grammar the refs are written in, then the declarations that use it.
+      window.INST_SURFACE_REFS.join('\n'),
+      '',
+      window.INST_LUDIC_SPINE.join('\n'),
       '',
       // The skeleton authors meta.literaryRegister (the voiceSpec) and
       // meta.worldContract (the knowing) — both are prose law, so the doctrine
@@ -2457,6 +2498,65 @@
       '',
       'Return ONLY the JSON object matching the skeleton schema. No markdown fences, no commentary.'
     ].filter(Boolean).join('\n');
+  };
+
+  /**
+   * Game rulebook prompt: the rules-first stage (VISION §4.0 / PLAY.md §3.1).
+   *
+   * THE FIRST AUTHORED STAGE ON BOTH API PIPELINES. Nothing of the book exists
+   * when this runs — no codex, no plan, no skeleton, no shell — and that is the
+   * whole ruling rather than a convenience. §4.0: "Before the model writes a
+   * single page of content, it writes the game's rulebook… Everything else in
+   * the book is then written to serve those rules." A rulebook authored after a
+   * campaign plan would be a description of decisions already taken, which is
+   * the component-supplier pipeline this stage exists to end.
+   *
+   * ITS ONLY INPUTS ARE THE TWO THREADS: the user's program and the creative
+   * brief, plus the run's divergence seed and the program's topology digest —
+   * everything armCompilerContext derives, and nothing downstream of it. That
+   * also makes the stage IDENTICAL on both pipelines: one builder, one prompt
+   * head, and the parity floor at the two different spine seats is checking the
+   * same document against the same kind of graph.
+   *
+   * THE SEED IS PASSED, NEVER DRAWN HERE. This is now the earliest builder in
+   * the run, so it is the first place D101's law bites: a builder that draws
+   * its own seed hands every retry a different game, and the game is the one
+   * thing the whole book is then written to serve.
+   *
+   * Input: workout + brief (+ divergenceSeed, seedAssignments, identityAxes)
+   * Output: { gameRulebook: { …the eight answers… } }
+   */
+  window.generateGameRulebookPrompt = function (workout, brief, options) {
+    options = options || {};
+    var armed = armCompilerContext(workout, brief, options);
+    var blend = deriveDesignBlend(brief, workout);
+
+    var parts = [
+      '# LiftRPG Game Rulebook Stage — design the game before anything is written',
+      '',
+      armed.contextBlock,
+      '',
+      window.buildStageSchema('game-rulebook'),
+      '',
+      '## The training program (the book\'s clock)',
+      // The program is the one input this stage cannot design around: session
+      // count, week count and the load curve decide what a session and a week
+      // can possibly look like at the table (questions 5 and 6). Capped at the
+      // compiler seats' own budget for the same reason they cap it — a full
+      // twelve-week Liftoscript dump would crowd out the brief.
+      truncateText(String(workout || ''), 3000),
+      '',
+      '## Creative Direction (the brief)',
+      armed.divergenceSeed
+        ? capText(armed.briefChannel(blend), 3200)
+        : truncateText(armed.briefChannel(blend), 2000),
+      '',
+      options.retryMode
+        ? 'Retry mode: keep every answer to plain declarative sentences and make sure the JSON completes cleanly. Do not shorten below the word floors — a thin answer is what failed.\n'
+        : '',
+      'Return ONLY the JSON object. No markdown fences, no commentary.'
+    ];
+    return parts.filter(Boolean).join('\n');
   };
 
   /**
@@ -2585,12 +2685,33 @@
   window.generateFleshRulesPrompt = function (skeleton, options) {
     options = options || {};
     var ctx = extractSkeletonContext(skeleton);
+    // THE RULEBOOK GIVEN (D173), in its COMPACT projection. This stage writes
+    // the pages the player is taught from, and VISION §4.0 is explicit that
+    // what prints is "the subset the player needs where they need it" — a
+    // subset OF THIS DOCUMENT. Writing the teaching surface without the design
+    // it teaches is how a book explains a game it does not have.
+    //
+    // Compact rather than whole: this seat does not print the week's shape or
+    // the failure modes (the week stages own those), and a rules page handed
+    // the entire design document reads it as a source to transcribe. The
+    // compact projection is exactly what a rules page can legitimately draw on.
+    //
+    // The skeleton also carries `meta.gameRulebook` by now (the pipeline stamps
+    // it after the skeleton gate), so `options.gameRulebook` is the explicit
+    // hand-over and the skeleton is the fallback — one document either way.
+    var rulebookGiven = (typeof window.formatGameRulebookGiven === 'function')
+      ? window.formatGameRulebookGiven(
+        options.gameRulebook || ((skeleton || {}).meta || {}).gameRulebook,
+        { compact: true }
+      )
+      : '';
     return [
       '# LiftRPG Flesh Stage — Rules Spread',
       '',
       'You are writing the RULES SPREAD for a LiftRPG booklet.',
       'This is two pages: leftPage teaches the game rules in-world, rightPage provides tracking instructions.',
       '',
+      rulebookGiven ? rulebookGiven + '\n' : '',
       formatSkeletonIdentityBlock(ctx, {
         extraLines: ['- Artifact: ' + JSON.stringify(ctx.artifactIdentity)],
         includeKnowing: false
@@ -3007,9 +3128,19 @@
     var doorGivens = (typeof window.formatPlannedDoorGivensBlock === 'function')
       ? window.formatPlannedDoorGivensBlock(options.plannedWeekShapes)
       : '';
+    // THE RULEBOOK GIVEN (D173) — the live multi-stage seat. `builders.shell`
+    // resolves to THIS builder, so a rulebook threaded only into
+    // generateShellPrompt above would reach the wizard and never the pipeline:
+    // D174's measured defect, reproduced by inattention rather than by design.
+    // Placed directly under the opener and above the schema, because it is the
+    // SOURCE the schema's `playSpine` and `rulesSpread` are written to serve.
+    var rulebookGiven = (typeof window.formatGameRulebookGiven === 'function')
+      ? window.formatGameRulebookGiven(options.gameRulebook)
+      : '';
     return [
       '# API Stage 3 — Booklet Setup',
       '',
+      rulebookGiven ? rulebookGiven + '\n' : '',
       '## SCHEMA CONTRACT',
       window.buildStageSchema('shell'),
       doorGivens ? '\n' + doorGivens : '',

@@ -78,6 +78,28 @@ export var STREAM_MAX_OVERALL_MS = 1800000;          // 30m absolute ceiling
 // on something a retry can actually fix — not as a general cushion. Every extra
 // attempt is a full-price call.
 export var STAGE_BUDGETS = {
+  // ── THE RULEBOOK (VISION §4.0, D173) ──────────────────────────────────────
+  // Shared by both pipelines and the FIRST authored stage on each. Its output
+  // is bounded in the one place a stage's output is ever bounded from above by
+  // doctrine rather than by geometry: OUTPUT_BUDGETS.gameRulebook caps the
+  // whole document at 1,800 WORDS, which is ~2,400 tokens of prose and ~3,000
+  // once a model pretty-prints the JSON around it. 16000 is the ladder's own
+  // ~3-4x rule with headroom for a model that thinks inside the same ceiling.
+  //
+  // NOT SIZED LIKE A COMPILER STAGE, deliberately, and the asymmetry is the
+  // point: `shell` and `skeleton` cost 56000 because they write a whole
+  // identity bundle plus a spine plus (on S+F) a week plan. This stage writes
+  // eight paragraphs and four short lists. A generous ceiling here would buy
+  // nothing except permission to exceed a band the floor then rejects.
+  //
+  // The timeout is the 300000 the other short-structured-output stages use
+  // (`knowing`, `rules`, `conductor`) — this is the same class of work: one
+  // bounded object, no per-week fan-out, no book to read first.
+  //
+  // ATTEMPTS UNSET (= 2). Raised only on evidence, per this table's own law.
+  // The failures this stage can have are a thin answer and a band breach, both
+  // of which a retry with the blocking error quoted can genuinely fix.
+  gameRulebook: { maxTokens: 16000, timeoutMs: 300000 },
   // Shared by both pipelines (§11 Wave 1.5). One structured object of short
   // strings — roughly 25-35 one-line facts. Cheaper than any prose stage by
   // construction, and an explicit row rather than the silent MAX_OUTPUT_TOKENS
