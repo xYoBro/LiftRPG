@@ -653,6 +653,44 @@
     ].concat(blocks).join('\n');
   }
 
+  /**
+   * formatCurrencyGiven(economy) -> string ('' when no label is authored)
+   *
+   * THE ONE HOME for the currency GIVEN (D144, corrected). The demand is
+   * VERBATIM reproduction — `week.reckoning.conversion` must print
+   * `meta.economy.currencyLabel` character for character — and a model can only
+   * reproduce a phrase it has been SHOWN. So every prompt whose stage authors a
+   * conversion sentence prints the label on a line of its own.
+   *
+   * WHY A FUNCTION AND NOT THREE STRINGS, which is the whole defect this
+   * replaces. D144 landed the given as an inline expression in
+   * generateApiWeekChunkPrompt and a second, differently-worded one inside
+   * formatSkeletonIdentityBlock. It missed generateSingleWeekFinalPrompt — and
+   * that is the builder the multi-stage pipeline ACTUALLY calls for every week
+   * (`builders.singleWeekFinal`, api-generator.js). generateApiWeekChunkPrompt
+   * is reachable from no live pipeline path at all, so the given was added to a
+   * builder nothing runs and to the S+F twin, and the default pipeline went on
+   * writing every week blind. Measured cost: the first completed book renamed
+   * the currency in 6 of 6 weeks, each one a book-level ERROR found after every
+   * paid prose stage had already run.
+   *
+   * One function, three callers, one floors row that asserts the label reaches
+   * each of them. A fourth week builder added later either calls this or fails
+   * that row.
+   *
+   * Returns '' when no label is authored, so a pre-D144 skeleton or shell
+   * produces a byte-identical prompt.
+   */
+  function formatCurrencyGiven(economy) {
+    var label = String(((economy || {}).currencyLabel) || '').trim();
+    if (!label) return '';
+    return 'CURRENCY (a GIVEN — this booklet pays out "' + label + '"): every '
+      + 'week.reckoning.conversion sentence must print that phrase VERBATIM, whole, once. '
+      + 'Not a synonym, not the modifier alone, not a second name for the same thing — '
+      + 'the player counts one currency and it is spelled exactly this way.';
+  }
+  window.formatCurrencyGiven = formatCurrencyGiven;
+
   // Shared identity header for the Skeleton+Flesh flesh builders. `extraLines`
   // are the per-stage additions (component type, resolution, artifact shape);
   // `includeKnowing` is false for the rules spread, which is deliberately
@@ -672,10 +710,9 @@
       // model has to dig out of a serialized object is a label it paraphrases.
       // Absent on any skeleton authored before the currency floor: the line is
       // simply not emitted, and such a prompt is byte-identical to before.
-      (ctx.economy && ctx.economy.currencyLabel)
-        ? ['- Currency (print this phrase VERBATIM in every reckoning conversion): '
-            + ctx.economy.currencyLabel]
-        : []
+      // Wording now comes from formatCurrencyGiven — the one home, so the three
+      // week builders cannot drift apart again (see that function's header).
+      formatCurrencyGiven(ctx.economy) ? ['- ' + formatCurrencyGiven(ctx.economy)] : []
     ).concat(options.extraLines || []);
 
     var parts = [lines.join('\n'), ''];
@@ -2632,6 +2669,16 @@
     contextLines.push('- Epigraph: "' + (weekPlan.epigraphText || '') + '" — ' + (weekPlan.epigraphAttribution || ''));
     contextLines.push('');
 
+    // The arsenal's week GIVEN (D170). '' when this week owes nothing, so a
+    // caller with no schedule builds the prompt it always built, byte for byte.
+    var sfLudicGiven = (typeof window.formatLudicWeekGivenBlock === 'function')
+      ? window.formatLudicWeekGivenBlock(options.ludicWeekGiven)
+      : '';
+    if (sfLudicGiven) {
+      contextLines.push(sfLudicGiven);
+      contextLines.push('');
+    }
+
     if (isBoss) {
       contextLines.push('## Boss Week Requirements');
       contextLines.push('- This week replaces fieldOps with bossEncounter.');
@@ -3026,10 +3073,7 @@
       // to dig out of a serialized object is a string it paraphrases — which is
       // the 'modifier' verdict F04 splits out. Emitted only when a label
       // exists, so a pre-D144 shell produces a byte-identical prompt.
-      (((shellContext || {}).economy || {}).currencyLabel)
-        ? 'CURRENCY: this booklet pays out "' + shellContext.economy.currencyLabel
-          + '". Every reckoning conversion sentence must print that phrase VERBATIM, whole, once.'
-        : null,
+      formatCurrencyGiven((shellContext || {}).economy) || null,
       '',
       formatProcessParticulars((shellContext || {}).processParticulars),
       '',
@@ -3170,7 +3214,8 @@
 
   // ── NEW SINGLE-UNIT PROMPT BUILDERS (Unit-Level Engine Refactor) ───────
 
-  window.generateSingleWeekFinalPrompt = function (workout, brief, layerBible, campaignPlan, weekPlan, shellContext, continuity, allComponentValues, retryState) {
+  window.generateSingleWeekFinalPrompt = function (workout, brief, layerBible, campaignPlan, weekPlan, shellContext, continuity, allComponentValues, retryState, options) {
+    options = options || {};
     var isBossWeek = campaignPlan && campaignPlan.weeks && weekPlan.weekNumber === campaignPlan.weeks.length;
     var weekWorkout = window.extractWeekWorkout(workout, [weekPlan.weekNumber]);
     var overflowRegistry = (campaignPlan && campaignPlan.overflowRegistry) || [];
@@ -3246,12 +3291,26 @@
       '**World Contract:** ' + (shellContext.worldContract || ''),
       '**Narrative Voice:** ' + JSON.stringify(shellContext.narrativeVoice || {}),
       '**Literary Register:** ' + JSON.stringify(shellContext.literaryRegister || {}),
+      // THE CURRENCY GIVEN, on the seat the multi-stage pipeline actually runs.
+      // `builders.singleWeekFinal` resolves to THIS builder, and this is the
+      // stage that authors week.reckoning.conversion — so a verbatim demand
+      // that lands anywhere else is a demand the writing model never reads.
+      // D144 put the given on generateApiWeekChunkPrompt (which no live path
+      // calls) and on the S+F identity block, and missed this one; the first
+      // completed book renamed the currency in 6 of 6 weeks as a result.
+      formatCurrencyGiven(shellContext.economy) || '',
       '',
       formatProcessParticulars(shellContext.processParticulars),
       '',
       '**Week Workout:** ' + weekWorkout,
       '',
       planAnchors.length ? '## Planned Week Anchors\n' + planAnchors.join('\n') : '',
+      '',
+      // The arsenal's week GIVEN (D170) — the same row the week gate reads as
+      // `owesLudicEntry`. '' when this week owes nothing.
+      (typeof window.formatLudicWeekGivenBlock === 'function')
+        ? window.formatLudicWeekGivenBlock(options.ludicWeekGiven)
+        : '',
       '',
       continuity ? '**Continuity Rules:** ' + JSON.stringify(continuity) : '',
       isBossWeek && allComponentValues ? '**Prior Values for Boss Decode (EXACTLY ' + allComponentValues.length + ' values — do not add, remove, or reorder):** ' + JSON.stringify(allComponentValues) + '\nSet bossEncounter.componentInputs to EXACTLY this array. There are ' + allComponentValues.length + ' non-boss weeks, so there must be EXACTLY ' + allComponentValues.length + ' componentInputs.' : '',

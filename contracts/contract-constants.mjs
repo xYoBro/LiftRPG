@@ -1467,6 +1467,161 @@ export var LUDIC_LIBRARY_ATOMS = {
   'arithmetic-grid': ['constrained-grid']
 };
 
+// ── THE FURNITURE AND THE INSTRUMENTS (D170) ────────────────────────────────
+// MEASURED, not argued. The first completed book declared a four-entry
+// composition — `reckoning-economy`, `decode-chain`, `clock-bank`,
+// `boss-convergence` — and passed the arity floor with room to spare. Three of
+// those four are printed by EVERY generated book by construction: the week
+// gate refuses a non-boss week with no cipher and no oracle, `meta.economy` is
+// required at the shell gate (so the ledger spread always emits), and there is
+// no book without a boss. A composition assembled out of those is not a
+// choice; it is a DESCRIPTION of the default book wearing the vocabulary of a
+// choice — VISION §12's "acceptance set the prompts never show is a default
+// generator", one layer up.
+//
+// So the library splits on one question: DOES A BOOK GET THIS WITHOUT ASKING?
+//
+// STRUCTURAL is the hand-declared half, and it is hand-declared because it is
+// a CLAIM about the rest of the system (these six are gate-required or
+// schema-required elsewhere), not a derivation from this file. It is short,
+// checkable by reading the week gate, and pinned by validate.mjs.
+// DISCRETIONARY is DERIVED from it — never a second list (D124) — so promoting
+// a new entry into LUDIC_LIBRARY makes it an instrument automatically, which
+// is the safe direction: a new entry is discretionary until someone proves the
+// engine prints it unasked.
+export var LUDIC_STRUCTURAL_ENTRIES = [
+  'reckoning-economy',  // every session prints a markStrip; every week a reckoning
+  'board',              // validateWeekSchema: a non-boss week owes fieldOps.mapState
+  'decode-chain',       // validateWeekSchema: a non-boss week owes fieldOps.cipher
+  'oracle-pull',        // validateWeekSchema: 'Non-boss week missing fieldOps.oracleTable'
+  'boss-convergence',   // there is no book without a boss week
+  'ledger-audit'        // the adapter emits the spread iff meta.economy, which the shell gate requires
+];
+
+export var LUDIC_DISCRETIONARY_ENTRIES = LUDIC_LIBRARY.filter(function (entry) {
+  return LUDIC_STRUCTURAL_ENTRIES.indexOf(entry) === -1;
+});
+
+// ── The arsenal, and the field each entry has to print (D170) ───────────────
+// VISION §4.2: "the model must compose from a shelf wide enough to contain the
+// appropriate implement, not merely the available one." These are the entries
+// whose implement is a PUZZLE the engine draws — the constraint grids and the
+// word grids — and the one thing that makes them checkable is that each lands
+// in exactly one optional week field. DERIVED from LUDIC_LIBRARY_ATOMS: an
+// entry is arsenal iff one of its atoms is a puzzle atom, so the arsenal grows
+// when the shelf does and no list here can go stale.
+export var LUDIC_PUZZLE_ATOM_FIELDS = {
+  'constrained-grid': 'constrainedGrid',
+  'word-grid': 'wordGrid'
+};
+
+export var LUDIC_ARSENAL_ENTRIES = LUDIC_LIBRARY.filter(function (entry) {
+  return (LUDIC_LIBRARY_ATOMS[entry] || []).some(function (atom) {
+    return Object.prototype.hasOwnProperty.call(LUDIC_PUZZLE_ATOM_FIELDS, atom);
+  });
+});
+
+/**
+ * ludicArsenalWeekField(entry) -> 'constrainedGrid' | 'wordGrid' | ''
+ *
+ * The week surface an arsenal entry has to print. One home, three readers: the
+ * week GIVEN in the prompt, the week floor that blocks a week that owes one and
+ * skipped it, and the assembled-gate adoption finding.
+ */
+export function ludicArsenalWeekField(entry) {
+  var atoms = LUDIC_LIBRARY_ATOMS[String(entry || '').trim()] || [];
+  for (var i = 0; i < atoms.length; i++) {
+    if (LUDIC_PUZZLE_ATOM_FIELDS[atoms[i]]) return LUDIC_PUZZLE_ATOM_FIELDS[atoms[i]];
+  }
+  return '';
+}
+
+/**
+ * compositionDiscretionaryFloor(n) -> number
+ *
+ * How many of a composition's N entries must be INSTRUMENTS rather than
+ * furniture. Half, rounded up, floored at one — so a two-entry composition may
+ * still name one structural system as its spine, and a four-entry one owes two
+ * real choices.
+ *
+ * WHY HALF AND NOT ALL (the conservative reading, pending an author ruling):
+ * naming `reckoning-economy` in a composition is not always description — a
+ * book whose whole game is the tally genuinely composes with it, and forcing
+ * every entry to be discretionary would ban that book to cure a different one.
+ * Half is the smallest rule that rejects the measured defect (one instrument in
+ * four) without legislating the shape of a legitimate depth-composition
+ * (VISION §4.4: the spine must not become a house economy).
+ *
+ * SINGLE HOME (D93). The prompt states this number, the shell floor enforces
+ * it, and compositionFloorParity() in validate.mjs holds the two together.
+ */
+export function compositionDiscretionaryFloor(n) {
+  var count = Number(n) || 0;
+  if (count <= 0) return 0;
+  return Math.max(1, Math.ceil(count / 2));
+}
+
+/**
+ * deriveLudicWeekAssignments(spine, plannedWeeks) -> [{ weekNumber, entry, field }]
+ *
+ * THE PER-WEEK BOARD/PUZZLE PICTURE, computed by the pipeline and handed over
+ * as a GIVEN — D166's cure applied to the arsenal. A book that DECLARES
+ * `deduction-board` in its composition and then prints no grid has declared a
+ * game it does not play; before this, nothing connected the declaration at the
+ * shell stage to the week stages that would have had to build it, and the week
+ * prompt's own puzzle section says in as many words that "a booklet with none
+ * is a legitimate booklet" — true in general, false for a book that just said
+ * otherwise.
+ *
+ * ONE DERIVATION, TWO READERS (the D166 idiom): the week prompt's GIVEN block
+ * and the week gate's floor. Re-deriving it on either side is D93's
+ * two-algorithms defect, and here it would be invisible — the model would build
+ * a grid in week 3 and the gate would demand one in week 4.
+ *
+ * THE SCHEDULE, and why it is not random: arsenal entries go to the LATEST
+ * non-boss weeks, one per week, in composition order. The Mechanical Rule Ramp
+ * (INST_PROGRESSION) says week one introduces only the core loop and
+ * "complexity is a reward, not a starting condition", so a puzzle grid in week
+ * one would be a given fighting a doctrine. The boss week is excluded because
+ * its own doctrine is that it asks nothing new.
+ *
+ * Returns [] when there is nothing to hand over — no spine, no arsenal entry
+ * declared, no week picture — so every caller without one builds the prompt it
+ * always built, byte for byte, and the floor stays silent under exactly the
+ * same condition.
+ */
+export function deriveLudicWeekAssignments(spine, plannedWeeks) {
+  if (!spine || typeof spine !== 'object') return [];
+  if (!Array.isArray(plannedWeeks) || !plannedWeeks.length) return [];
+
+  var declared = [];
+  (Array.isArray(spine.composition) ? spine.composition : []).forEach(function (item) {
+    var entry = String((item || {}).entry || '').trim();
+    if (LUDIC_ARSENAL_ENTRIES.indexOf(entry) === -1) return;
+    if (declared.indexOf(entry) === -1) declared.push(entry);
+  });
+  if (!declared.length) return [];
+
+  var open = [];
+  plannedWeeks.forEach(function (shape) {
+    var n = Number((shape || {}).weekNumber);
+    if (!isFinite(n) || n < 2) return;              // week one is core loop only
+    if (shape.isBoss || shape.isBossWeek) return;   // the boss asks nothing new
+    open.push(n);
+  });
+  if (!open.length) return [];
+  open.sort(function (a, b) { return a - b; });
+
+  // Latest weeks first, then read back in week order so the block prints
+  // ascending. One entry per week: two grids on one page is a worksheet.
+  var seats = open.slice(-declared.length);
+  var out = [];
+  for (var i = 0; i < declared.length && i < seats.length; i++) {
+    out.push({ weekNumber: seats[i], entry: declared[i], field: ludicArsenalWeekField(declared[i]) });
+  }
+  return out;
+}
+
 // ── Spine budgets ───────────────────────────────────────────────────────────
 // The arity rule is the anti-house-economy law made numeric. TWO is the floor
 // because one entry is not a composition — it is a single-family pick, which is
@@ -1826,6 +1981,28 @@ export var IDENTITY_AXES = [
   { id: 'harvestPatterns', label: 'playSpine.harvestPatterns', path: 'meta.playSpine.harvestPatterns',
     menu: VALID_HARVEST_PATTERNS, kind: 'member', answerRequired: true,
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell'] },
+  // THE INSTRUMENT (D170). The ludic lens's own axis, and the last one to get
+  // a die — which is why the first completed book's composition was four
+  // pieces of furniture. VISION §4.6 asks the compiler for a COMPOSITION
+  // "never a single-family pick", and §4.2 built the arsenal precisely so a
+  // book could reach past what it gets for free; neither had a source. Under
+  // the two-source law that made every composition a DEFAULT: nothing in the
+  // brief names `word-hunt`, so if the die does not either, the model picks
+  // the systems already in front of it. Measured: 87,341 characters of shell
+  // prompt name `deduction-board`, `word-hunt` and `arithmetic-grid` exactly
+  // once each, inside a thirteen-item menu, which is §12's density class.
+  //
+  // The menu is the DISCRETIONARY half only — assigning `decode-chain` would
+  // be the die telling the book to do what it cannot avoid, which teaches the
+  // model that assignments are ceremonial.
+  //
+  // ANSWER-REQUIRED, NOT ADOPTION-REQUIRED — the harvest axis's shape (D151),
+  // and for the same reason: forcing adoption would install a house economy on
+  // the one axis whose whole point is that the game-kind is authored per book
+  // (VISION §4.4). Declining is legitimate and costs one sentence.
+  { id: 'ludicInstrument', label: 'playSpine.composition[].entry', path: 'meta.playSpine.composition',
+    menu: LUDIC_DISCRETIONARY_ENTRIES, kind: 'objectMember', itemKey: 'entry', answerRequired: true,
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell'] },
   { id: 'productionTexture', label: 'designLanguage.productionTexture', path: 'meta.designLanguage.productionTexture',
     menu: VALID_PRODUCTION_TEXTURES, kind: 'scalar',
     evidencePath: 'meta.designLanguage.designEvidence', stages: ['shell'] },
@@ -1971,6 +2148,18 @@ export function readAxisValue(booklet, axis) {
   }
   if (node === undefined || node === null) return undefined;
   if (axis.kind === 'member') return Array.isArray(node) ? node : undefined;
+  // `objectMember` is `member` for an array of OBJECTS: the composition is
+  // `[{entry, role}]`, and the axis is about the entries. Projecting here — one
+  // line, in the single reader — is what lets the obedience floor, the referee
+  // and the GIVENS block treat this axis exactly like `harvestPatterns` without
+  // any of them learning the spine's shape (D170).
+  if (axis.kind === 'objectMember') {
+    if (!Array.isArray(node)) return undefined;
+    var key = axis.itemKey || 'entry';
+    return node.map(function (item) {
+      return item && typeof item === 'object' ? String(item[key] == null ? '' : item[key]).trim() : '';
+    }).filter(Boolean);
+  }
   var scalar = String(node).trim();
   return scalar ? scalar : undefined;
 }

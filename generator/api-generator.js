@@ -69,7 +69,10 @@ import {
   // (D101). `identityAxesForStage` is what keeps the prompt's slice and the
   // floor's slice the same slice.
   drawSeedAssignments,
-  identityAxesForStage
+  identityAxesForStage,
+  // The arsenal's week schedule (D170) — one derivation, two readers per
+  // pipeline: the week prompt's GIVEN and the week gate's floor.
+  deriveLudicWeekAssignments
 } from './modules/constants.js';
 
 import {
@@ -3765,7 +3768,14 @@ async function runApiPipeline(options) {
       // hand-built plans and owe no generation policy (see floorsOn in
       // validation.js).
       validate: function (result) {
-        return validateCampaignPlanStage(result, { generationFloors: true });
+        // seedAssignments rides the gate for exactly the axis this stage was
+        // SHOWN (identityAxesForStage('campaign-plan')): a stage checked
+        // against an assignment its prompt never carried is the derived-or-
+        // strict trap, and this is the same object the builder below is handed.
+        return validateCampaignPlanStage(result, {
+          generationFloors: true,
+          seedAssignments: seedAssignments
+        });
       },
       buildPrompt: function (retryState) {
         if (!retryState || !retryState.attempt) {
@@ -3997,6 +4007,16 @@ async function runApiPipeline(options) {
     ].join('\n');
   }
 
+  // ── The arsenal's week schedule (D170) ────────────────────────────────────
+  // Derived once, from the spine the shell just declared and the SAME week
+  // shapes the door givens are built from. Two readers below: the week prompt's
+  // GIVEN block and the week gate's `owesLudicEntry`. Re-deriving on either
+  // side would put the grid in one week and demand it in another (D93/D166).
+  var ludicWeekAssignments = deriveLudicWeekAssignments(
+    ((shell || {}).meta || {}).playSpine,
+    plannedWeekShapes
+  );
+
   // ── TARGETED UNIT GENERATION: WEEKS ──────────────────────────
   var finalWeeks = [];
   var allComponentValues = [];
@@ -4044,6 +4064,13 @@ async function runApiPipeline(options) {
     // shell gate so the pre-flight there and this gate hold the same week to
     // the same obligation (D143). The derivation itself is unchanged.
     var weekShape = plannedWeekShapes[w - 1] || { weekNumber: w, isBoss: isBossWeek, isDeload: false };
+    // The arsenal row this week owes (D170). Derived ONCE above the loop from
+    // the shell's own composition and the same week shapes the door givens use;
+    // the prompt builder and the floor below both read this object, so a grid
+    // can never be taught in one week and demanded in another.
+    var owesLudic = ludicWeekAssignments.filter(function (row) {
+      return Number(row.weekNumber) === w;
+    })[0] || null;
     var weekFloorOptions = {
       generationFloors: true,
       weekNumber: w,
@@ -4057,7 +4084,18 @@ async function runApiPipeline(options) {
       // declaration rides in the same way the family does. No spine in the
       // options means no spine floors — a floor must never invent the
       // declaration it is checking against.
-      playSpine: ((shell || {}).meta || {}).playSpine || null
+      playSpine: ((shell || {}).meta || {}).playSpine || null,
+      owesLudicEntry: owesLudic,
+      // The currency, for the week gate's conversion floor. Declared at the
+      // shell stage, printed by THIS stage, and until now graded only after
+      // assembly — which is why the first completed book renamed it in 6 of 6
+      // weeks and every one of those was a book-level error with no cheap
+      // remedy. Same law as playSpine directly above: absent label, no check.
+      currencyLabel: (((shell || {}).meta || {}).economy || {}).currencyLabel || '',
+      // The shell family, for the week gate's citation-pinpoint floor (D170).
+      // citationPinpoints needs the family to know which filing labels this
+      // artifact uses; absent family, no check — the same law as above.
+      shellFamily: (((shell || {}).meta || {}).artifactIdentity || {}).shellFamily || ''
     };
 
     progress('weeks', 'Writing Week ' + w + (isBossWeek ? ' (Boss)' : '') + '\u2026');
@@ -4139,7 +4177,9 @@ async function runApiPipeline(options) {
           shellContext,
           continuityPacket,
           allComponentValues,
-          retryState
+          retryState,
+          // The GIVEN and the floor read the same row (D170).
+          { ludicWeekGiven: owesLudic }
         );
       }
     });
@@ -5206,11 +5246,25 @@ async function runSkeletonFleshPipeline(options) {
   var allComponentValuesSF = [];
   var actualWeekCount = (skeleton.weekPlan || []).length;
 
+  // ── The arsenal's week schedule (D170) ────────────────────────────────────
+  // ONE derivation, two readers — this pipeline's twin of the multi-stage row
+  // above the week loop. The skeleton's weekPlan already carries weekNumber and
+  // isBossWeek, so the shapes are the plan itself.
+  var ludicWeeksSF = deriveLudicWeekAssignments(
+    ((skeleton || {}).meta || {}).playSpine,
+    (skeleton.weekPlan || []).map(function (wp, i) {
+      return { weekNumber: Number((wp || {}).weekNumber) || (i + 1), isBoss: !!(wp || {}).isBossWeek };
+    })
+  );
+
   for (var wSF = 0; wSF < actualWeekCount; wSF++) {
     var weekPlan = skeleton.weekPlan[wSF];
     var weekNum = weekPlan.weekNumber || (wSF + 1);
     var isBoss = !!weekPlan.isBossWeek;
     var ckKey = 'week_' + weekNum;
+    var owesLudicSF = ludicWeeksSF.filter(function (row) {
+      return Number(row.weekNumber) === Number(weekNum);
+    })[0] || null;
 
     if (cached(ckKey)) {
       var cachedWeekSF = checkpoint.stages[ckKey];
@@ -5255,7 +5309,9 @@ async function runSkeletonFleshPipeline(options) {
       telemetryCollector: sfTelemetry,
       buildPrompt: function (retryState) {
         return builders.fleshWeek(skeleton, weekPlan, weekWorkout, weekSummariesSF, allComponentValuesSF, {
-          retryMode: retryState.attempt > 0
+          retryMode: retryState.attempt > 0,
+          // The GIVEN and the floor below read the same row (D170).
+          ludicWeekGiven: owesLudicSF
         });
       },
       normalizeResult: function (result) {
@@ -5306,7 +5362,16 @@ async function runSkeletonFleshPipeline(options) {
           // This pipeline's compiler seat (D129/D143) — 'Skeleton', not 'Shell'.
           spineStageLabel: 'Skeleton',
           mechanicGrammarFamily: (((skeleton || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || '',
-          playSpine: ((skeleton || {}).meta || {}).playSpine || null
+          playSpine: ((skeleton || {}).meta || {}).playSpine || null,
+          // The arsenal row this week owes, if any — the same object the
+          // prompt above states as a GIVEN (D170).
+          owesLudicEntry: owesLudicSF,
+          // The currency, for the conversion floor — this pipeline's twin of
+          // the multi-stage weekFloorOptions row. Both carry it or one pipeline
+          // writes its reckoning sentences ungated.
+          currencyLabel: (((skeleton || {}).meta || {}).economy || {}).currencyLabel || '',
+          // This pipeline's twin of the multi-stage shellFamily row (D170).
+          shellFamily: (((skeleton || {}).meta || {}).artifactIdentity || {}).shellFamily || ''
         });
         if (vResult && typeof vResult === 'object' && !vResult.valid) {
           // The VERDICT OBJECT, not a joined string. extractErrorList treats a

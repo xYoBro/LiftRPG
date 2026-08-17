@@ -408,7 +408,16 @@ import {
   identityAxesForStage,
   drawSeedAssignments,
   readAxisValue,
-  familyRefusesGeometry
+  familyRefusesGeometry,
+  // The ludic lens's own seam (D170). The arsenal split and the week schedule
+  // live beside the axis table for the same reason: the prompt hands out what
+  // the floor checks.
+  LUDIC_STRUCTURAL_ENTRIES,
+  LUDIC_DISCRETIONARY_ENTRIES,
+  LUDIC_ARSENAL_ENTRIES,
+  ludicArsenalWeekField,
+  compositionDiscretionaryFloor,
+  deriveLudicWeekAssignments
 } from '../../contracts/contract-constants.mjs';
 
 export {
@@ -493,7 +502,13 @@ export {
   identityAxesForStage,
   drawSeedAssignments,
   readAxisValue,
-  familyRefusesGeometry
+  familyRefusesGeometry,
+  LUDIC_STRUCTURAL_ENTRIES,
+  LUDIC_DISCRETIONARY_ENTRIES,
+  LUDIC_ARSENAL_ENTRIES,
+  ludicArsenalWeekField,
+  compositionDiscretionaryFloor,
+  deriveLudicWeekAssignments
 };
 
 export var SUPPORTED_THEME_ARCHETYPES = VALID_ARCHETYPES.reduce(function (acc, name) {

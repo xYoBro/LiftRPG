@@ -72,6 +72,11 @@ import {
   // the other booklet walkers. Grammar there, inventory here — stated in both
   // files so nobody "unifies" them into one home that has to know both.
   LUDIC_LIBRARY,
+  LUDIC_STRUCTURAL_ENTRIES,
+  LUDIC_DISCRETIONARY_ENTRIES,
+  LUDIC_ARSENAL_ENTRIES,
+  ludicArsenalWeekField,
+  compositionDiscretionaryFloor,
   SPINE_BUDGETS,
   parseSurfaceRef,
   VALID_DYNAMIC_MARKINGS,
@@ -1203,6 +1208,39 @@ function collectPuzzleFloorErrors(weekObj) {
 }
 
 /**
+ * collectLudicWeekOwedErrors(weekObj, owed) -> string[]   (D170)
+ *
+ * THE DECLARED IMPLEMENT ACTUALLY PRINTS. The other half of the arsenal fix,
+ * and the half that puts ink on a page: the composition is declared at the
+ * shell stage, and until now nothing carried that declaration forward to the
+ * week stages that would have had to build it. The week prompt's own puzzle
+ * section says "a booklet with none is a legitimate booklet" — true of a book
+ * in general, false of a book that just declared `deduction-board` — so the
+ * model read a permission where its own spine had written an obligation.
+ *
+ * `owed` is one row of deriveLudicWeekAssignments() (contract-constants), the
+ * SAME derivation the week prompt states as a GIVEN. Never re-derived here:
+ * two derivations would put the grid in week three and demand it in week four,
+ * and the model would be told nothing useful either time (D93/D166).
+ *
+ * Silent without a row, exactly like every other spine floor — a gate that
+ * invents the declaration it checks against is not checking anything.
+ */
+function collectLudicWeekOwedErrors(weekObj, owed) {
+  if (!owed || typeof owed !== 'object') return [];
+  var entry = String(owed.entry || '').trim();
+  var field = String(owed.field || '').trim();
+  if (!entry || !field) return [];
+  var fieldOps = (weekObj || {}).fieldOps || {};
+  if (fieldOps[field] && typeof fieldOps[field] === 'object') return [];
+  return ['fieldOps.' + field + ' is missing, and this week owes it: '
+    + 'meta.playSpine.composition declares `' + entry + '`, and this book\'s week schedule '
+    + 'puts that implement here. A composition entry is a promise the weeks pay — build the '
+    + 'grid on this week, to the shape and the guardrails the puzzle section states. '
+    + '(If the book should not carry one at all, the spine is what is wrong, not this week.)'];
+}
+
+/**
  * Per-week structural validation. Runs after each week is generated
  * in the pipeline, before proceeding to the next stage.
  * Returns { valid: boolean, errors: string[] }
@@ -1673,6 +1711,103 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
     });
   }
 
+  // ── Floor: the week resolves into the currency the book DECLARED ──────────
+  // THE DEFECT THIS CLOSES, measured on the first completed book: every one of
+  // its six weeks converted its ticks into a name the book never declared —
+  // "Cred", "Pull", "beads" — against a `meta.economy.currencyLabel` of
+  // "Favors Owed". Six for six.
+  //
+  // The rule itself is old (D136/D144): INST_MARK_SURFACE demands the
+  // conversion sentence print the label verbatim, and currencyMentionVerdict
+  // grades it. What was missing is a gate at the stage that WRITES the
+  // sentence. Until now the only reader of that verdict was
+  // collectMarkStripFindings, which runs inside validateAssembledBooklet —
+  // after every week, every fragment and every ending has been paid for. So a
+  // defect a single week could have fixed for the price of one week became a
+  // book-level ERROR with no cheap remedy, six times over.
+  //
+  // Same predicate, same split as the assembled gate, deliberately: 'absent' is
+  // an ERROR (the economy resolved into something else) and 'modifier' is a
+  // WARNING (the right currency under a slightly different name). Two gates
+  // reading one predicate with two different severities would be two rules.
+  //
+  // SILENT WITHOUT THE LABEL. `currencyLabel` rides expectedOptions from the
+  // pipeline that read it off the shell/skeleton; a caller that passes none —
+  // the guided-build wizard, the manual API, every hand-assembled replay —
+  // gets no check at all. A floor must never invent the declaration it is
+  // checking against, which is the same law playSpine is held to above.
+  if (floorsOn(expectedOptions)) {
+    var weekCurrencyLabel = String(expectedOptions.currencyLabel || '').trim();
+    var weekConversion = String(((weekObj.reckoning || {}).conversion) || '').trim();
+    if (weekCurrencyLabel && weekConversion) {
+      var weekMention = currencyMentionVerdict(weekConversion, weekCurrencyLabel);
+      if (weekMention === 'absent') {
+        errors.push('reckoning.conversion does not name the declared currency "'
+          + weekCurrencyLabel + '" ("' + weekConversion + '") — this booklet resolves into '
+          + 'exactly one currency, and the conversion sentence must print that phrase '
+          + 'VERBATIM, whole, once. Not a synonym and not a second name for the same thing.');
+      } else if (weekMention === 'modifier') {
+        warnings.push('reckoning.conversion names the currency "' + weekCurrencyLabel
+          + '" by its modifier rather than the declared phrase ("' + weekConversion
+          + '") — print the whole phrase, or a player counting them reads two currencies');
+      }
+    }
+  }
+
+  // ── Floor: a citation names WHERE, at the stage that writes it (D170) ─────
+  // THE MEASURED DEFECT: three of the first completed book's citeRefs carried
+  // no pinpoint — "the Vault Night flyer — Station Five pinboard" tells the
+  // reader what is there and not where to look. All three were authored at this
+  // stage, in `sessions[].microLines[].citeRef`, and all three were caught by
+  // collectCiteRefFindings inside validateAssembledBooklet.
+  //
+  // PROMOTED BECAUSE THE PREDICATE IS LOCAL. citationPinpoints reads exactly two
+  // things: the `citedAs` string and the shell family. Both exist here — the
+  // family is declared at the shell/skeleton and rides the floor options the way
+  // the currency and the spine already do. Nothing about the rest of the book is
+  // consulted, so this is the same answer the assembled gate gives, given
+  // several expensive stages earlier.
+  //
+  // WHAT IS DELIBERATELY LEFT BEHIND, and it is not an oversight: the NO-CHAIN
+  // law ("a pointer may not point at another pointer") and REF RESOLUTION both
+  // need the whole booklet. The fourth defect in this book was a week-6 microLine
+  // citing F.15 — a fragment authored two stages LATER, in a fragment batch that
+  // does not exist while week 6 is being written. That check cannot move, and
+  // pretending otherwise would be a floor asserting against an empty set.
+  //
+  // Both laws are already TAUGHT (INST_POINT_OF_USE: THE PINPOINT LAW and THE
+  // NO-CHAIN LAW, with the per-shell label table). This wave adds no doctrine —
+  // only the gate, at the stage that can still fix it cheaply.
+  if (floorsOn(expectedOptions) && Array.isArray(weekObj.sessions)) {
+    var weekShellFamily = String(expectedOptions.shellFamily || '').trim();
+    if (weekShellFamily) {
+      var weekCiteStyle = resolveCitationStyle(weekShellFamily);
+      weekObj.sessions.forEach(function (s, si) {
+        var lines = (s && Array.isArray(s.microLines)) ? s.microLines : [];
+        lines.forEach(function (line, mi) {
+          var ref = line && line.citeRef;
+          if (!ref || typeof ref !== 'object' || Array.isArray(ref)) return;
+          var citedAs = String(ref.citedAs || '').trim();
+          if (!citedAs) return;   // the shape check above already owns absence
+          var pin = citationPinpoints(citedAs, weekShellFamily);
+          if (pin.own) return;
+          var at = 'Session ' + (s.sessionNumber || (si + 1)) + ' microLine ' + (mi + 1);
+          if (pin.foreign.length) {
+            errors.push(at + ': citeRef.citedAs "' + citedAs + '" cites in the ' + pin.foreign[0]
+              + ' grammar, but this booklet is a ' + weekShellFamily
+              + ' — one citation style per artifact ('
+              + weekCiteStyle.labelVocabulary.join(' / ') + ')');
+          } else {
+            errors.push(at + ': citeRef.citedAs "' + citedAs
+              + '" carries no pinpoint — a citation names what is there AND where. File the '
+              + 'destination as this ' + weekShellFamily + ' would ('
+              + weekCiteStyle.labelVocabulary.join(' / ') + ' + a number), or cite the ref itself');
+          }
+        });
+      });
+    }
+  }
+
   // ── Floor: the fusion score is STORED, not merely thought (W4a) ───────────
   // FUSION §4.1 has demanded a per-week beat plus a dynamic marking since it
   // was written, and until W4a nothing stored one — the score was G-class, the
@@ -1723,6 +1858,9 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
     ).forEach(function (msg) { errors.push(msg); });
 
     collectPuzzleFloorErrors(weekObj).forEach(function (msg) { errors.push(msg); });
+
+    collectLudicWeekOwedErrors(weekObj, expectedOptions.owesLudicEntry)
+      .forEach(function (msg) { errors.push(msg); });
   }
 
   if (warnings.length > 0) {
@@ -3081,6 +3219,13 @@ var SPINE_SINK_KINDS = {
   seal: 1, ending: 1, boss: 1, assembly: 1, door: 1
 };
 
+// The ENDGAME surfaces: the payoff the whole six weeks is for. A strict subset
+// of the sinks above, and the distinction is the point — a clock or a map is a
+// surface the economy may legitimately gate, while these four are what VISION
+// §4.5 says a lifter at 60% adherence must never be locked out of. Read by
+// Floor 11a, and the same set the simulated player calls `book.endgame`.
+var SPINE_ENDGAME_KINDS = { boss: 1, assembly: 1, ending: 1, seal: 1 };
+
 // `differsBy` must name a MECHANICAL surface, not an adjective. Reuses the D100
 // extraction-must-find-something idiom: the needle list is derived from the ref
 // grammar plus the mechanical nouns the schema already prints, and a scan that
@@ -3151,6 +3296,47 @@ export function collectSpineSkeletonFloorErrors(spine, skeleton, stageLabel) {
         + ' or the composition is a parts list');
     }
   });
+
+  // ── Floor 1b: the composition is a CHOICE, not a description (D170) ──
+  // Arity alone was satisfiable with furniture. The first completed book
+  // declared four entries and three of them are printed by every book by
+  // construction — the week gate refuses a non-boss week with no map, cipher
+  // or oracle, and `meta.economy` is required at this very stage — so the
+  // composition described the default book in the vocabulary of a choice, and
+  // passed. VISION §4.6 asks for a composition "never a single-family pick";
+  // a composition of things you could not have avoided is that pick with the
+  // furniture counted as company.
+  //
+  // The number is DERIVED (compositionDiscretionaryFloor, contract-constants),
+  // never a literal here, and the prompt states the same rule in the same
+  // words — compositionFloorParity() in validate.mjs holds the two together.
+  // Landing one alone either fails books for an unasked shape or asks for a
+  // shape nothing checks (the D136 F04 idiom).
+  var legalEntries = composition
+    .map(function (item) { return String((item || {}).entry || '').trim(); })
+    .filter(function (entry) { return LUDIC_LIBRARY.indexOf(entry) !== -1; });
+  var uniqueEntries = [];
+  legalEntries.forEach(function (entry) {
+    if (uniqueEntries.indexOf(entry) === -1) uniqueEntries.push(entry);
+  });
+  if (uniqueEntries.length >= SPINE_BUDGETS.compositionMin) {
+    var instruments = uniqueEntries.filter(function (entry) {
+      return LUDIC_DISCRETIONARY_ENTRIES.indexOf(entry) !== -1;
+    });
+    var owed = compositionDiscretionaryFloor(uniqueEntries.length);
+    if (instruments.length < owed) {
+      var furniture = uniqueEntries.filter(function (entry) {
+        return LUDIC_STRUCTURAL_ENTRIES.indexOf(entry) !== -1;
+      });
+      errors.push(S + 'playSpine.composition names ' + uniqueEntries.length + ' entries and only '
+        + instruments.length + ' of them is something this book had to choose'
+        + (furniture.length ? ' — `' + furniture.join('`, `') + '` print in every book whether a spine names them or not' : '')
+        + '. A composition of ' + uniqueEntries.length + ' owes at least ' + owed
+        + ' from the INSTRUMENTS half of the menu (' + LUDIC_DISCRETIONARY_ENTRIES.join(' | ')
+        + '). Replace the furniture with the systems that make THIS book a different game, '
+        + 'or keep it and say in its `role` what it does here that it does not do everywhere');
+    }
+  }
 
   // ── Floor 2: graph connectivity ──
   // Every node reachable from a source and reaching a sink that prints. An
@@ -3663,6 +3849,69 @@ function collectSpineHarvestFloorErrors(spine, index, parsedEdges, S) {
         + ' — the window shuts before it opens, which is content nobody can reach');
     }
   });
+
+  // ── Floor 11a: the endgame is not routed THROUGH the boss reckoning ───────
+  // THE PROMOTION (D170). The simulated player already catches this as H7
+  // (`threshold-gated-endgame`) — but only after assembly, which is after every
+  // week, fragment and ending has been paid for. The first completed book was
+  // failed by it: `reckoning:W6 → boss` put the boss and both endings behind
+  // the derived threshold, and a player at realistic adherence reaches the last
+  // week to find the endgame was arithmetically closed.
+  //
+  // WHY THIS IS PROMOTABLE, and the whole argument is arithmetic that is
+  // decided by two constants rather than by any one book:
+  //   - the boss threshold is round(RECKONING_THRESHOLD_RATIO * attainable),
+  //     with the ratio 0.75 (assembly.js);
+  //   - the hard band the sim judges at is 0.6 (SIM_HARD_BAND, VISION §4.5),
+  //     and it banks AT MOST 0.6 * attainable — adversarially, rather less.
+  // 0.6 < 0.75 for every book, so the 60% band NEVER clears the threshold. The
+  // sim's H7 therefore reduces to its structural half — "does the spine route
+  // anything required through the boss reckoning" — and that half is a pure
+  // reachability question over the DECLARED economyGraph. No ticks, no printed
+  // weeks, no assembled book. The premise is asserted as its own harness row:
+  // if the ratio ever drops below the band, this floor's justification dies and
+  // that row goes red rather than this check going quietly wrong.
+  //
+  // NOT A DUPLICATE OF FLOOR 10. That floor forbids a PRICE on an edge into
+  // boss/assembly — a second number for a gate that already has one. This book
+  // priced nothing; it simply drew the edge. An unpriced edge into the endgame
+  // out of the boss reckoning is the same soft-lock and sailed straight through.
+  //
+  // The threshold is a printed TARGET, never a lock (RECKONING_THRESHOLD_RATIO's
+  // own doctrine: the economy may never own the six-week payoff). This floor is
+  // that sentence, enforced.
+  if (parsedEdges.length && weekCount) {
+    var bossReckoningKey = ('reckoning:w' + weekCount);
+    var spineAdj = {};
+    parsedEdges.forEach(function (e) {
+      var a = (e.from.kind + ':' + e.from.id).toLowerCase();
+      var b = (e.to.kind + ':' + e.to.id).toLowerCase();
+      (spineAdj[a] || (spineAdj[a] = [])).push({ key: b, ref: e.to });
+    });
+    var seenFromGate = {};
+    var behindThreshold = [];
+    var walk = [bossReckoningKey];
+    while (walk.length) {
+      var here = walk.pop();
+      (spineAdj[here] || []).forEach(function (next) {
+        if (seenFromGate[next.key]) return;
+        seenFromGate[next.key] = 1;
+        if (SPINE_ENDGAME_KINDS[next.ref.kind]) behindThreshold.push(next.ref.raw);
+        walk.push(next.key);
+      });
+    }
+    if (behindThreshold.length) {
+      errors.push(S + 'playSpine.economyGraph routes ' + behindThreshold.join(', ')
+        + ' through "reckoning:W' + weekCount + '" — the final week\'s reckoning is where the DERIVED'
+        + ' threshold sits, and that number is a printed TARGET, not a lock. A player at the 60%'
+        + ' adherence this book must survive banks well under it (the threshold is '
+        + Math.round(RECKONING_THRESHOLD_RATIO * 100) + '% of the attainable ticks), so anything'
+        + ' required that sits behind that reckoning is unreachable for them: they train the whole'
+        + ' block, reach the last week, and find the ending was closed since week one. Feed the'
+        + ' endgame from a surface the player\'s own work reaches directly — a cipher, an assembly,'
+        + ' a seal keyed earlier — and let the threshold reward rather than gate');
+    }
+  }
 
   // ── Floor 12: hint ladders are ordered, costed, and printed somewhere ────
   var ladders = Array.isArray(spine.hintLadders) ? spine.hintLadders : [];
@@ -6299,6 +6548,47 @@ export function validateCampaignPlanStage(result, options) {
       return 'Campaign Plan → weeks schedule only ' + have + ' distinct cipherType value'
         + (have === 1 ? '' : 's') + ' across ' + nonBossTypes.length + ' non-boss weeks; this book owes '
         + needed + ' — give each week a technique the player has to learn fresh';
+    }
+  }
+
+  // ── Floor: a geometry departure NAMES THE VALUE IT DEPARTED FROM (D170) ──
+  // The one arm of the obedience law that IS answerable at this stage, and the
+  // only gate that ever sees this decision. The geometry axis is deliberately
+  // not held to the full floor here (see the long note beside
+  // seedObedienceFloorErrors): the family that D144 W-2 licensed to overrule
+  // the die is declared one stage LATER, so "was this departure legitimate?"
+  // has no answer yet. "Did this departure quote the assignment it departed
+  // from?" has one, right now, and it is the half that caught nothing.
+  //
+  // MEASURED. The first completed book was handed `the board geometry
+  // (mapState.mapType) IS `concentric`` verbatim in this stage's GIVENS block,
+  // and wrote back "DEPARTURE RECORDED: the seed assigned `grid`" — a value no
+  // die ever produced — then argued the exemption from a mechanic grammar
+  // family the shell stage did not go on to declare. Every downstream reader
+  // took the departure at its word, because the referee only ever asks whether
+  // the family refuses the ASSIGNED geometry, never whether the sentence is
+  // about the assignment at all. Five of five non-boss weeks then printed the
+  // same board.
+  //
+  // NARROW BY CONSTRUCTION: silent when no assignment rode the call (the
+  // guided harness, the manual API, every replay), and silent when the plan
+  // simply obeys. It cannot judge the departure — only refuse an unquoted one.
+  if (floorsOn(options) && result && result.topology) {
+    var assignedGeometry = String(((options.seedAssignments || {}).mapGeometry) || '').trim();
+    var plannedGeometry = String(result.topology.mainMapType || '').trim();
+    if (assignedGeometry && plannedGeometry
+      && plannedGeometry.toLowerCase() !== assignedGeometry.toLowerCase()) {
+      var identityText = String(result.topology.identity || '').toLowerCase();
+      if (identityText.indexOf(assignedGeometry.toLowerCase()) === -1) {
+        return 'Campaign Plan → topology.mainMapType is "' + plannedGeometry
+          + '" and the system assigned `' + assignedGeometry + '`, but topology.identity never '
+          + 'mentions `' + assignedGeometry + '`. A departure has to name the value it departed '
+          + 'from, or nothing downstream can tell a considered exemption from a mis-remembered '
+          + 'assignment. Write `' + assignedGeometry + '` in topology.identity beside the reason '
+          + 'you took "' + plannedGeometry + '" instead — the mechanic grammar family whose Serves '
+          + 'row refuses `' + assignedGeometry + '` and names "' + plannedGeometry + '", or the '
+          + 'brief phrase that required it. If neither is true, take the assignment.';
+      }
     }
   }
 

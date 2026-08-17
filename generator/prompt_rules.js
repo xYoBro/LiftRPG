@@ -502,6 +502,15 @@
     '- `sessions` (array, 3-6 items): { sessionNumber, label, exercises: [{ name, sets, repsPerSet, weightField?, notes? }], storyPrompt, fragmentRef?, markStrip, binaryChoice?: { choiceLabel, promptA, promptB } }',
     '- `sessions[].markStrip` (object): { targets: [{ label }] } — 3-5 tick targets. See the session.markStrip section for the authoring law.',
     '- `reckoning` (object): { conversion, sink: { kind, ref, instruction } }. See the week.reckoning section.',
+    // D170: the verbatim demand, restated on the FIELD the stage is filling.
+    // INST_MARK_SURFACE states the law and the prompt head carries the label as
+    // a GIVEN, but the first completed book renamed the currency in 6 of 6
+    // weeks — so it is also said here, where the model is looking when it fills
+    // this field. STAGE-ONLY BY ROUTING: SCHEMA_SINGLE_WEEK is not in
+    // SCHEMA_SPEC, so this costs the paste path (hard against 115,000 chars)
+    // exactly nothing. Putting it on SCHEMA_WEEKS_POST instead took the bundle
+    // 297 chars over its ceiling — measured, not guessed.
+    '- `reckoning.conversion` MUST print the currency label given to you in this prompt VERBATIM — the whole phrase, once, no synonym. This field is checked against it at this stage.',
     '- `fieldOps` (object): mapState, cipher, oracleTable, companionComponents',
     '- `bossEncounter` (object): replaces fieldOps if boss week',
     '- `overflow` (boolean) and `overflowDocument` (foundDocument object)',
@@ -2568,7 +2577,15 @@
     'board — if the assigned geometry\'s `Serves` row does not name your declared family, take',
     'the family\'s board and say in `selectionReason` which verb settled it. That is not a third',
     'source: the family is itself one of these choices, so a geometry the family forces is',
-    'funded by whatever funded the family.'
+    'funded by whatever funded the family.',
+    '',
+    'THE EXCEPTION LICENSES LEAVING, NOT LANDING. A family that decides has decided ON',
+    'something: the geometry you take instead must be one your declared family\'s own `Serves`',
+    'row NAMES. Departing from an assigned board onto a second board the same family also',
+    'refuses is not the exemption — it is a default with an argument attached, and it is',
+    'recorded as one. And whichever way you go, WRITE THE ASSIGNED VALUE DOWN, exactly as it',
+    'was given to you. A departure that misquotes the assignment it departed from cannot be',
+    'told apart from one that never read it; this is checked, and the stage fails without it.'
   ];
 
   /**
@@ -2701,6 +2718,46 @@
     return lines.join('\n');
   };
 
+  /**
+   * formatLudicWeekGivenBlock(owed) -> string
+   *
+   * THE ARSENAL'S WEEK GIVEN (D170). D166's cure — hand the model the
+   * arithmetic instead of a rule to remember — applied to the one obligation
+   * that reaches this stage from two stages back.
+   *
+   * `owed` is one row of deriveLudicWeekAssignments() in contract-constants,
+   * computed once above the week loop and handed to BOTH readers: this block
+   * and the week gate's `owesLudicEntry`. It must never be re-derived here.
+   *
+   * IT NAMES THE PERMISSION IT OVERRIDES, on purpose. The puzzle section this
+   * prompt also carries says "a booklet with none is a legitimate booklet" —
+   * a true sentence that is false for this week, and doctrine that contradicts
+   * a given without saying so teaches the model that this prompt's rules are
+   * negotiable (the D128 lesson).
+   *
+   * Returns '' when this week owes nothing, so every week without a row builds
+   * the prompt it always built, byte for byte — and the floor is silent under
+   * exactly the same condition.
+   */
+  window.formatLudicWeekGivenBlock = function (owed) {
+    if (!owed || typeof owed !== 'object') return '';
+    var entry = String(owed.entry || '').trim();
+    var field = String(owed.field || '').trim();
+    if (!entry || !field) return '';
+    return [
+      '### The implement this week owes — a GIVEN',
+      '',
+      'This book\'s `meta.playSpine.composition` declares `' + entry + '`, and the schedule',
+      'puts it HERE. Author `fieldOps.' + field + '` on this week, to the shape and the',
+      'guardrails the puzzle section below states, and wire what it yields into the economy',
+      'the spine already declared.',
+      '',
+      'This overrides the puzzle section\'s standing permission: "a booklet with none is a',
+      'legitimate booklet" is true of books in general and false of this one, because this',
+      'one said otherwise. A week that owes this and skips it is a rejected payload.'
+    ].join('\n');
+  };
+
   // ── The Ludic Spine (W4a) ─────────────────────────────────────────────────
   // Routed to the `shell` stage ONLY, because that is the stage that authors
   // meta and therefore the only stage that can write a spine — and because the
@@ -2734,21 +2791,40 @@
     '',
     '### The seven declarations',
     '- `composition` (array, 2-4 items): `{ entry, role }`.',
-    '  `entry` is a CLOSED menu — the systems this engine can print:',
+    '  `entry` is a CLOSED menu, and it comes in TWO HALVES. Read the halves before you pick.',
+    '',
+    '  THE FURNITURE — every book prints these whether it composes with them or not. The week',
+    '  gate refuses a non-boss week with no map, no cipher or no oracle; `meta.economy` is',
+    '  required of you on this very stage; there is no book without a boss. Naming them is',
+    '  therefore a DESCRIPTION of the default book, not a choice:',
     '  `reckoning-economy` (marks tally, bank, price spends) · `board` (the map and its',
-    '  regions) · `decode-chain` (the weekly cipher) · `clock-bank` (fill / drain / race /',
-    '  tug-of-war) · `companion-kit` (dashboards, tracks, stats, inventories) ·',
-    '  `oracle-pull` (the d100 table) · `door-fork` (the week\\\'s posted choice) ·',
-    '  `sealed-cache` (sealed-by-honour content and its key) · `boss-convergence` (the',
-    '  endgame ceremony, assembly and locked finale) · `ledger-audit` (the body audited) ·',
+    '  regions) · `decode-chain` (the weekly cipher) · `oracle-pull` (the d100 table) ·',
+    '  `boss-convergence` (the endgame ceremony, assembly and locked finale) ·',
+    '  `ledger-audit` (the body audited).',
+    '',
+    '  THE INSTRUMENTS — none of these appears unless a book asks for it. This half is where',
+    '  the book becomes a particular game rather than a competent one:',
+    '  `clock-bank` (fill / drain / race / tug-of-war pressure) · `companion-kit` (dashboards,',
+    '  tracks, stats, inventories) · `door-fork` (the week\\\'s posted choice) ·',
+    '  `sealed-cache` (sealed-by-honour content and its key) ·',
     '  `deduction-board` (a logic grid, a nonogram, a sudoku, a truth-teller board or a sequence —',
     '  machine-proven solvable and unique) ·',
     '  `word-hunt` (a letter board whose hidden words are machine-verified in it) ·',
     '  `arithmetic-grid` (a kakuro or a KenKen: the player ADDS rather than eliminates, and every',
     '  filling is machine-proven unique).',
+    '',
+    '  AT LEAST HALF YOUR ENTRIES, ROUNDED UP, MUST COME FROM THE INSTRUMENTS — one of two,',
+    '  two of three, two of four. This is checked and the stage fails without it. A composition',
+    '  of four in which three are furniture reads as a choice and is not one: it describes what',
+    '  the engine was going to print anyway. If you want the tally or the map to be a real',
+    '  composed system rather than the floor everything stands on, say so in `role` and spend',
+    '  one of your remaining seats on it.',
     '  Entries must be DISTINCT. `role` is a sentence in your own words: what this system',
     '  does in THIS book. "It is the map" is not a role; "the map is the only place a spend',
     '  becomes visible" is.',
+    '  A declared `deduction-board`, `word-hunt` or `arithmetic-grid` is a PROMISE the week',
+    '  stages are held to: a specific week will be told it owes that grid, and will be blocked',
+    '  if it does not print one. Declare the implement you actually want built.',
     '- `honestGaps` (string[]): what the brief wanted that the list above cannot print.',
     '  Write it plainly. This is not a failure — it is the record that stops a tally strip',
     '  from being described as a deck. Empty array if the brief asks for nothing missing.',
@@ -2887,6 +2963,37 @@
     '- `closesAtWeek` — the last week an affordance can be taken. Without one, nothing in a',
     '  pencil book ever expires and hoarding costs nothing. One or two real windows is what',
     '  makes saving a decision.',
+    '',
+    // D170. Both of these are soft-locks the simulated player already catches
+    // AFTER assembly — which is after every prose stage has been paid for. The
+    // first completed book committed both. The first now has a blocking floor
+    // at this stage (a floor whose doctrine is in nobody's prompt is three
+    // failed attempts and a dead run), and the second is stated here because it
+    // was taught NOWHERE and caught only post-hoc.
+    '### The last week is the payoff, not a tollgate',
+    'The final week\'s reckoning is where the DERIVED threshold sits, and that number is a',
+    'printed TARGET the player aims at — never a lock. A lifter at 60% adherence banks well',
+    'under it, and this book must be finishable by that lifter. So:',
+    '- NEVER draw an edge from the final week\'s reckoning into `boss`, `assembly`, an',
+    '  `ending:` or a `seal:` — with or without a price. Anything required that sits behind',
+    '  that reckoning is content a realistic player reaches the last page and cannot open.',
+    '  This is checked; an edge like `{ from: "reckoning:W6", to: "boss" }` is refused.',
+    '- Feed the endgame from what the player\'s own work reaches directly: the weekly ciphers',
+    '  into `assembly`, a seal keyed weeks earlier, a component the sessions produce.',
+    '- The threshold may still REWARD. `reckoning:W6` into a clock, a map region or an',
+    '  optional page is exactly what the panel is for. It just may not own the ending.',
+    '',
+    '### The bank needs a counter open as long as it takes deposits',
+    'If the player is still banking value in week 6 and the last thing they could SPEND it on',
+    'closed in week 4, the pencil is doing work for nothing — and they can feel it. Check the',
+    'two dates against each other before you finish the graph:',
+    '- the last week any edge feeds `banked`, and',
+    '- the last week any edge OUT of `banked` is still open (its `closesAtWeek`, or the week',
+    '  the surface it buys is drawn).',
+    'The second must not be earlier than the first. Give the late weeks a sink — a spend that',
+    'stays open to the end, a price on something the finale wants — or move the affordances',
+    'inside the window the income actually covers. A week that earns currency with nothing left',
+    'to buy is a week whose strip the player stops ticking.',
     '',
     '### Book-referential examination (and the one hard ban)',
     'When you want a puzzle that tests attention, make THIS BOOK the reference: a cross-',

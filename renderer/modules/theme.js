@@ -1,6 +1,10 @@
 import { alpha, mergeObjects } from './utils.js?v=48';
 import { resolveTypeMetrics } from './type-metrics.js?v=48';
 import {
+  applyAuthoredPaper,
+  enforceLegibilityFloor
+} from './legibility.mjs?v=48';
+import {
   VALID_COMPONENT_DIALECTS,
   DEFAULT_COMPONENT_DIALECT,
   VALID_PRODUCTION_TEXTURES,
@@ -353,24 +357,58 @@ const THEME_PRESETS = {
     '--weight-heading': '600',
     '--weight-label': '600',
     '--weight-emphasis': '700',
-    '--page-ink': '#00ffcc',
-    '--page-paper': '#0a0a0a',
-    '--page-accent': '#ff00ff',
-    '--page-muted': '#008866',
-    '--page-rule': '#00ffcc',
-    '--page-fog': '#111111',
-    '--page-surface': 'linear-gradient(180deg, #0a0a0a 0%, #111111 100%)',
-    '--page-underlay': 'repeating-linear-gradient(180deg, rgba(0,255,204,0.06) 0 2px, transparent 2px 4px)',
-    '--panel-surface': 'linear-gradient(180deg, rgba(10,10,10,0.95) 0%, rgba(17,17,17,0.92) 100%)',
-    '--panel-secondary-surface': 'linear-gradient(180deg, rgba(0,255,204,0.1) 0%, transparent 100%)',
-    '--card-surface': 'rgba(17,17,17,0.8)',
+    // ── THE PRINT LAW, APPLIED (2026-08-17) ───────────────────────────────
+    // This preset shipped `--page-paper: #0a0a0a` with `--page-ink: #00ffcc`:
+    // cyan on black, the only inverted pair in the ten. Its contrast ratio was
+    // fine (15.25:1) and it was still unshippable, because contrast is not the
+    // only thing paper has to do. A book on this palette printed forty solid
+    // black pages on a home laser printer — a spent toner cartridge, an
+    // unreadable object, and a page no pencil can mark. That breaks VISION §8
+    // ("every design must read on a monochrome laser printer"; "hue is never
+    // load-bearing") and it breaks THE WRITE-IN LAW above, which is the older
+    // and more important of the two: this is a journal before it is anything
+    // else, and a journal you cannot write in is not a journal.
+    //
+    // THE RULE THIS PRESET NOW OBEYS: paper is the LIGHT side of the pair,
+    // always. `legibilityFloor()` in scripts/validate.mjs refuses a preset that
+    // inverts it, and enforceLegibilityFloor() inverts an authored palette that
+    // does, so this is the last time an archetype can reach paper this way.
+    //
+    // WHAT SURVIVES, and why the identity is not lost with the black field.
+    // Cyberpunk's character was never the darkness — VISION §8 is explicit that
+    // there is no illustration budget, so identity is carried by type, rule
+    // weight, texture and layout. All of that is untouched: Share Tech Mono
+    // over IBM Plex Mono, the scan-line underlay, the phosphor column grid, the
+    // hard keyline at the trim, the bloom under the headers, the magenta
+    // designation slug. What changed is the direction the light goes. The paper
+    // is cold thermal-stock white rather than pastoral's cream or scifi's pure
+    // white; the ink is near-black with a teal cast; the scan field and column
+    // grid now draw in ink rather than in phosphor, so they read as a printout
+    // OF a screen instead of as a screen. In B&W — the only rendering some of
+    // these books will ever get — it reads exactly as it always claimed to:
+    // a fine vertical rule field inside a heavy border.
+    //
+    // The magenta is dropped from #ff00ff to #a3007a for the same reason and
+    // measured to keep its weight: 6.32:1 against the new paper versus 6.31:1
+    // against the old black. The accent is exactly as loud as it was.
+    '--page-ink': '#0b1a17',
+    '--page-paper': '#eaeeec',
+    '--page-accent': '#a3007a',
+    '--page-muted': '#4d5f5a',
+    '--page-rule': '#1e4f47',
+    '--page-fog': '#d5dcd9',
+    '--page-surface': 'linear-gradient(180deg, #eaeeec 0%, #dfe5e2 100%)',
+    '--page-underlay': 'repeating-linear-gradient(180deg, rgba(11,26,23,0.05) 0 2px, transparent 2px 4px)',
+    '--panel-surface': 'linear-gradient(180deg, rgba(234,238,236,0.98) 0%, rgba(223,229,226,0.92) 100%)',
+    '--panel-secondary-surface': 'linear-gradient(180deg, rgba(30,79,71,0.1) 0%, transparent 100%)',
+    '--card-surface': 'rgba(223,229,226,0.8)',
     '--line-style': 'solid',
     '--line-width-hair': '1px',
     '--line-width-rule': '1px',
     '--line-width-frame': '2px',
     '--surface-radius': '0px',
-    '--surface-shadow': '0 0px 20px rgba(0, 255, 204, 0.2)',
-    '--page-shadow': '0 24px 50px rgba(0,0,0,0.6)',
+    '--surface-shadow': '0 0px 20px rgba(30, 79, 71, 0.2)',
+    '--page-shadow': '0 24px 50px rgba(0,0,0,0.35)',
     '--noise-opacity': '0.2',
     '--fog-opacity': '0.3',
     '--rule-opacity': '1',
@@ -388,21 +426,22 @@ const THEME_PRESETS = {
     '--mono-size': '8pt',
     '--grid-stroke-style': 'dotted',
     '--grid-dot-opacity': '0.5',
-    '--grid-fill': 'rgba(0, 255, 204, 0.1)',
-    '--track-fill': 'rgba(0, 255, 204, 0.2)',
+    '--grid-fill': 'rgba(30, 79, 71, 0.1)',
+    '--track-fill': 'rgba(30, 79, 71, 0.2)',
     '--badge-style': 'normal',
-    '--callout-surface': 'rgba(255, 0, 255, 0.1)',
-    '--highlight-surface': 'rgba(0, 255, 204, 0.15)',
+    '--callout-surface': 'rgba(163, 0, 122, 0.1)',
+    '--highlight-surface': 'rgba(30, 79, 71, 0.15)',
     '--page-margin': '0.3in',
-    // ── character: a screen that leaked onto paper. The underlay already
-    // scans; this adds the phosphor column grid, a hard neon keyline at the
-    // trim, and a bloom under the headers. Reads in B&W as a fine vertical
-    // rule field inside a heavy black border.
-    '--page-texture': 'repeating-linear-gradient(90deg, rgba(0,255,204,0.055) 0 1px, transparent 1px 4px)',
-    '--page-edge': '1px solid rgba(0,255,204,0.55)',
-    '--header-shadow': '0 2px 0 -1px rgba(0,255,204,0.4)',
-    '--designation-fill': 'rgba(255,0,255,0.12)',
-    '--designation-border': 'rgba(255,0,255,0.6)',
+    // ── character: a printout OF a screen, which is what it always claimed to
+    // read as in B&W. The underlay already scans; this adds the phosphor column
+    // grid, a hard keyline at the trim, and a bloom under the headers — all now
+    // drawn in ink rather than in phosphor, because the field beneath them is
+    // paper. Reads as a fine vertical rule field inside a heavy border.
+    '--page-texture': 'repeating-linear-gradient(90deg, rgba(11,26,23,0.07) 0 1px, transparent 1px 4px)',
+    '--page-edge': '1px solid rgba(30,79,71,0.55)',
+    '--header-shadow': '0 2px 0 -1px rgba(30,79,71,0.5)',
+    '--designation-fill': 'rgba(163,0,122,0.12)',
+    '--designation-border': 'rgba(163,0,122,0.6)',
     '--designation-padding': '1px 7px'
   },
   scifi: {
@@ -1235,20 +1274,76 @@ export function resolveTheme(data) {
 
   if (palette.ink) tokens['--page-ink'] = palette.ink;
   if (palette.paper) tokens['--page-paper'] = palette.paper;
-  if (palette.paper && !theme.tokens) tokens['--page-secondary-paper'] = palette.paper;
   if (palette.accent) tokens['--page-accent'] = palette.accent;
   if (palette.muted) tokens['--page-muted'] = palette.muted;
   if (palette.rule) tokens['--page-rule'] = palette.rule;
   if (palette.fog) tokens['--page-fog'] = palette.fog;
 
-  if (palette.paper && !theme.tokens) {
-    tokens['--page-surface'] = 'linear-gradient(180deg, ' + palette.paper + ' 0%, ' + alpha(palette.paper, 0.92) + ' 100%)';
-    tokens['--panel-surface'] = 'linear-gradient(180deg, ' + alpha(palette.paper, 0.98) + ' 0%, ' + alpha(palette.paper, 0.9) + ' 100%)';
-    tokens['--card-surface'] = tokens['--panel-surface'];
-  }
+  // ── AN AUTHORED PAPER CARRIES ITS FIELDS, ALWAYS (the 2026-08-17 defect) ──
+  // This block used to read `if (palette.paper && !theme.tokens)`, and that
+  // single conjunct made the author's first completed book unreadable.
+  //
+  // WHAT WENT WRONG, precisely. `--page-paper` and `--page-ink` were taken from
+  // the authored palette UNCONDITIONALLY — correct, and the law (D126: authored
+  // palette wins). But the OPAQUE FIELDS keyed to that paper were re-derived
+  // only when the book shipped no `theme.tokens` AT ALL. A cyberpunk book that
+  // authored a light paper (#f2f4f1) and a dark ink (#101418) therefore kept
+  // the preset's `--page-surface: linear-gradient(#0a0a0a, #111111)`, and
+  // booklet.css paints the page with `var(--page-surface, var(--paper))`. Ink
+  // #101418 on field #0a0a0a: contrast 1.02:1. Every exercise name in the book
+  // was invisible. Two halves of one decision, two different homes — D93's
+  // defect wearing CSS.
+  //
+  // AND THE GUARD WAS WRONG TWICE OVER. `theme.tokens` is a deliberately open
+  // object (booklet-schema.mjs: `tokens: { type: 'object' }`), and models put
+  // PROSE in it — the book that broke shipped `{edgeBand: "outer-margin band
+  // keyed by ring…", routingStamp: …, beadString: …}`, three descriptive
+  // strings and not one CSS custom property. So the whole derivation was
+  // disarmed by an object that authored nothing this function could use.
+  //
+  // THE FIX IS PER-TOKEN, which is what the precedence comment above already
+  // promised: `theme.tokens` outranks the derivation for the tokens it ACTUALLY
+  // NAMES, and for nothing else. `--page-fog` joins the set because fog is the
+  // paper's own shadow — it hatches map cells and fills tracks OPAQUELY, so a
+  // preset fog keyed to a different paper hides marks the same way a preset
+  // surface hides words; a book that authors `palette.fog` has answered that
+  // question itself and keeps its answer.
+  //
+  // The formulas live in legibility.mjs (`derivePaperFields`) rather than here
+  // because the validator needs the same derivation in Node and cannot import
+  // this file. They are byte-for-byte the three that were inline, so every
+  // corpus book that already took this path renders pixel-identical.
+  applyAuthoredPaper(tokens, palette, theme.tokens);
 
   tokens['--page-underlay'] = tokens['--page-underlay'] || 'none';
   tokens['--page-secondary-paper'] = tokens['--page-secondary-paper'] || tokens['--page-paper'];
+
+  // ── THE LEGIBILITY FLOOR (VISION §8, made structural) ─────────────────────
+  // Everything above is authoring. This is the guarantee underneath it: no book
+  // reaches paper with an ink/field relationship a human cannot read, whatever
+  // the archetype says and whatever the palette says. The archetype is a floor,
+  // not an identity (D126) — and legibility is the floor it exists to be.
+  //
+  // The repair moves LIGHTNESS and never hue (paper goes light first, because
+  // the print law says paper is the light side of the pair; ink goes dark only
+  // when paper has run out of room), and falls back to the archetype's own pair
+  // only when a palette cannot be made legible by lightness alone. A theme that
+  // already passes is not touched, so every book that was fine is byte-identical.
+  // Mechanism, and the argument for 4.5:1 on 8pt print, in legibility.mjs.
+  const legibility = enforceLegibilityFloor(tokens, {
+    fallback: { ink: preset['--page-ink'], paper: preset['--page-paper'] }
+  });
+  if (legibility.repaired && typeof console !== 'undefined' && console.warn) {
+    console.warn('[LiftRPG] legibility floor repaired this theme: worst contrast '
+      + (legibility.ratioBefore === null ? 'unreadable' : legibility.ratioBefore.toFixed(2))
+      + ':1 → ' + (legibility.ratio === null ? 'unreadable' : legibility.ratio.toFixed(2))
+      + ':1 (floor ' + legibility.floor + ':1) — '
+      + legibility.repairs.map((r) => r.token + ' ' + r.reason).join(', '));
+  }
+
+  // The tints below are derived from `--page-fog` AFTER the floor has run, so a
+  // repaired fog carries them with it. Both are translucent by construction and
+  // cannot themselves hide a word — which is why they are not field tokens.
   tokens['--panel-secondary-surface'] = tokens['--panel-secondary-surface'] || alpha(tokens['--page-fog'], 0.28);
   tokens['--callout-surface'] = tokens['--callout-surface'] || alpha(tokens['--page-fog'], 0.2);
 
@@ -1282,6 +1377,13 @@ export function resolveTheme(data) {
   return {
     archetype,
     designLanguage,
+    // What the legibility floor found and what it cost, recorded the way every
+    // other resolution on this object is recorded. `repaired: false` is the
+    // normal case and means the book was already readable; a `repairs` list is
+    // the audit trail for a palette that was not, naming each token, its
+    // before/after and the reason. Report-only on this object — the REFUSAL
+    // half lives in scripts/validate.mjs, which runs the same module in Node.
+    legibility,
     // Typography metrics ride on the resolved theme for the same reason the
     // dialect does: they are a book-wide presentation fact, decided once, from
     // the same tokens. Nothing here is applied to the DOM — the CSS already has

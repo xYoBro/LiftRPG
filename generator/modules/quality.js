@@ -429,10 +429,33 @@ export function auditIdentitySources(booklet) {
     // contract-constants). Funded by the family axis, which is itself audited
     // on this same table — so it is a citation with a different signature, not
     // a third source.
+    //
+    // BOTH HALVES, as of D170. The exemption is "the family DECIDES the board",
+    // and until now this asked only whether the family refuses the ASSIGNED
+    // geometry — which licensed the departure and said nothing about where it
+    // landed. The first completed book departed from an assignment its declared
+    // family refuses and took a geometry that same family also refuses, and was
+    // classified `family-decided`: a clean bill for a board no family chose.
+    // A family that decides has to have decided ON something, so the delivered
+    // geometry must be one its own Serves row names.
     if (axis.familyDecides && familyRefusesGeometry(family, assigned)) {
-      row.source = 'family-decided';
-      row.evidence = 'mechanicGrammarFamily `' + family + '` is not served by `' + assigned + '`';
+      var landed = chosen.filter(function (value) {
+        return !familyRefusesGeometry(family, value);
+      });
+      if (landed.length) {
+        row.source = 'family-decided';
+        row.evidence = 'mechanicGrammarFamily `' + family + '` is not served by `' + assigned
+          + '` and is served by `' + landed.join('`, `') + '`';
+        axes.push(row);
+        continue;
+      }
+      row.source = 'DEFAULT';
+      row.note = 'the family `' + family + '` refuses the assigned `' + assigned
+        + '` AND refuses what this book took instead — the exemption licences leaving the '
+        + 'assignment, never landing anywhere; a board no declared family serves was chosen by '
+        + 'neither the die, the brief, nor the family';
       axes.push(row);
+      defaults.push(row);
       continue;
     }
     row.source = 'DEFAULT';
