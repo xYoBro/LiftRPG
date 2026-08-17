@@ -1752,16 +1752,117 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
   // the guided-build wizard, the manual API, every hand-assembled replay —
   // gets no check at all. A floor must never invent the declaration it is
   // checking against, which is the same law playSpine is held to above.
+  // ── Floor: the week carries its Resolve surface at all (R3) ──────────────
+  // THE GAP THIS CLOSES. `week.reckoning` is where a week's ticked marks turn
+  // into the book's currency and get spent — the Resolve half of the mark
+  // economy. collectMarkStripFindings has always ERRORED on a week without one
+  // ("marks are banked but never resolved"), but it runs inside
+  // validateAssembledBooklet: after every week, every fragment and every ending
+  // has been paid for. A week that simply omitted the panel therefore passed
+  // its own stage gate, banked, and failed the book several stages later, with
+  // no remedy short of regenerating the week. The same shape of defect the
+  // currency floor below was promoted to catch, one level further out: the
+  // conversion sentence was gated at this stage while the OBJECT THAT HOLDS IT
+  // was not.
+  //
+  // GENERATION-GATED, and the measurement is why. 21 of 22 corpus fixtures
+  // carry no `week.reckoning` on any week (and no `meta.economy` either) — they
+  // are books from before the Resolve surface existed, and they are evidence,
+  // not output. An artifact-level demand would fail the sealed corpus wholesale
+  // to catch a defect only a generating pipeline can commit. The assembled
+  // check stays exactly where it is as the second net (D19's severity split
+  // applied to placement rather than to level).
+  //
+  // FOUR ERRORS, ONE ROUND, BY DESIGN. Each missing leaf claims its own error
+  // and its own delta target because the classifier matches errors to targets
+  // by message IDENTITY, one to one. This is not the D156 cascade — there is no
+  // root here whose repair frees the others; all of them are the repair, and
+  // the delta machinery asks for all of them in a single call. What it costs is
+  // one small structured response instead of a ~30k-token week re-roll, which
+  // is the whole of R2's economics.
+  //
+  // SCOPE IS THE ASSEMBLED GATE'S ERROR SET, exactly. conversion, sink.kind and
+  // sink.instruction are what validateAssembledBooklet ERRORS on; `sink.ref` is
+  // a WARNING there, and `reckoning.threshold` is DERIVED by assembly from
+  // RECKONING_THRESHOLD_RATIO. Promoting a check is moving where it fires, not
+  // raising what it demands — so neither is added here.
+  if (floorsOn(expectedOptions)) {
+    var wkReckoning = (weekObj.reckoning && typeof weekObj.reckoning === 'object')
+      ? weekObj.reckoning : null;
+    var wkSink = (wkReckoning && wkReckoning.sink && typeof wkReckoning.sink === 'object')
+      ? wkReckoning.sink : null;
+    var wkCurrency = String((expectedOptions || {}).currencyLabel || '').trim();
+    var panelMissing = !wkReckoning ? ' This week has no `reckoning` object at all.' : '';
+
+    var owePresence = function (parts, requirement) {
+      var message = 'Week reckoning is missing `' + formatFieldPath(parts) + '` — ' + requirement;
+      errors.push(message);
+      // THE PRESENCE-CLASS DECLARATION (R2/R3). `presence: true` is the floor's
+      // LICENSE for the merge to create this path; without it the merge refuses
+      // to write a field that is not already there, which is the no-invent law
+      // and stays the default everywhere else. The license is narrow on purpose:
+      // it names one exact path, and the merge creates that path and nothing
+      // deeper or wider.
+      deltaTargets.push({
+        message: message,
+        pathParts: parts.slice(),
+        path: formatFieldPath(parts),
+        presence: true,
+        requirement: requirement
+      });
+    };
+
+    if (!String((wkReckoning || {}).conversion || '').trim()) {
+      owePresence(['reckoning', 'conversion'],
+        'one sentence telling the player what this week\'s ticked marks convert into.'
+        + (wkCurrency
+          ? ' It must print the declared currency phrase "' + wkCurrency
+            + '" VERBATIM, whole, once — not a synonym and not a second name for it.'
+          : ' Name the book\'s declared currency in it, whole, once.')
+        + ' This is the rule the player reads at the end of the week.' + panelMissing);
+    }
+    if (!String((wkSink || {}).kind || '').trim()) {
+      owePresence(['reckoning', 'sink', 'kind'],
+        'the KIND of surface this week\'s converted marks are spent on. Exactly one of: '
+        + RECKONING_SINK_KINDS.join(', ') + ' — a sink must reference vocabulary this booklet'
+        + ' already renders.' + panelMissing);
+    }
+    if (!String((wkSink || {}).instruction || '').trim()) {
+      owePresence(['reckoning', 'sink', 'instruction'],
+        'one instruction telling the player what to DO with the converted marks on that surface'
+        + ' (how much fills what, and with which pencil mark). Without it the player is told'
+        + ' where the marks go but not what to do there.' + panelMissing);
+    }
+  }
+
   if (floorsOn(expectedOptions)) {
     var weekCurrencyLabel = String(expectedOptions.currencyLabel || '').trim();
     var weekConversion = String(((weekObj.reckoning || {}).conversion) || '').trim();
     if (weekCurrencyLabel && weekConversion) {
       var weekMention = currencyMentionVerdict(weekConversion, weekCurrencyLabel);
       if (weekMention === 'absent') {
-        errors.push('reckoning.conversion does not name the declared currency "'
+        // THE DELTA-CLASS DECLARATION AT THE CURRENCY FLOOR (R2). The Crown
+        // Job's named case: six weeks, six conversions naming a currency the
+        // book never declared, and the remedy for each was a full week re-roll
+        // over one sentence. The floor is unchanged — this still costs the
+        // stage its pass — but the sentence has one exact coordinate and one
+        // requirement statable in the floor's own words, which is the whole
+        // test for delta-class. Text-class, not presence-class: the field is
+        // there and wrong, so nothing needs creating.
+        var currencyMessage = 'reckoning.conversion does not name the declared currency "'
           + weekCurrencyLabel + '" ("' + weekConversion + '") — this booklet resolves into '
           + 'exactly one currency, and the conversion sentence must print that phrase '
-          + 'VERBATIM, whole, once. Not a synonym and not a second name for the same thing.');
+          + 'VERBATIM, whole, once. Not a synonym and not a second name for the same thing.';
+        errors.push(currencyMessage);
+        deltaTargets.push({
+          message: currencyMessage,
+          pathParts: ['reckoning', 'conversion'],
+          path: formatFieldPath(['reckoning', 'conversion']),
+          requirement: 'Rewrite this conversion sentence so it prints the declared currency phrase "'
+            + weekCurrencyLabel + '" VERBATIM, whole, and once — not a synonym, not a shortened'
+            + ' form, and not a second name for the same thing. Keep the mark arithmetic and the'
+            + ' surface it names exactly as they are; only the currency phrase is wrong.'
+        });
       } else if (weekMention === 'modifier') {
         warnings.push('reckoning.conversion names the currency "' + weekCurrencyLabel
           + '" by its modifier rather than the declared phrase ("' + weekConversion
@@ -3892,6 +3993,60 @@ export function collectSpineSkeletonFloorErrors(spine, skeleton, stageLabel) {
           + ' fragment: / companion: / seal: / door: / ending: / boss / assembly), or drop it');
       }
     });
+
+    // ── Floor 2b: the wallet is fed in EVERY week that prints (R1) ──────────
+    // THE RULING THIS ENFORCES (author, 2026-08-17): a spine declares an income
+    // edge for every printing week. Declaration-literal, because WHICH WEEKS
+    // PAY is exactly the thing a representative edge cannot represent.
+    //
+    // The defect it closes is not in the book — it is in what the book let the
+    // machine assume. A spine that wired `markStrip:W1 → reckoning:W1 → banked`
+    // and stopped was read by the simulated player as banking every week
+    // through the finale, because the walk traced the chain and dated income to
+    // the last week on any hit. That inference was load-bearing for exactly one
+    // finding (H8, the dead-end economy), and it made the finding a statement
+    // about a book nobody wrote: income in weeks 2-6 that no edge declares.
+    //
+    // The sim now reads the wallet's feeders literally (sim-player.js H8), and
+    // this floor is what keeps that reading complete rather than merely honest.
+    // ONE RELATION, TWO READERS (D93): an edge whose `to` is the wallet, dated
+    // by its source's print week. The sim credits exactly that; this demands
+    // exactly that. Changing either alone is the two-algorithms defect.
+    //
+    // SCOPED TO BOOKS THAT HAVE A WALLET. A spine may route marks straight into
+    // a printing sink with no `banked` node at all — a legitimate economy, and
+    // one this floor must not invent a wallet for. The guard mirrors the sim's
+    // own (`bankedKey`): no wallet, no demand.
+    //
+    // GENERATION-GATED BY CONSTRUCTION, not by an option. Both call sites sit
+    // inside their pipeline's floors block, and no assembled-artifact path
+    // reaches here — the sealed corpus carries no `meta.playSpine` at all, so
+    // this floor cannot reach a fixture even in principle (measured: 0 of 22).
+    var walletFed = parsedEdges.some(function (e) { return e.to.kind === 'banked'; });
+    var printingWeeks = Number(index.weekCount) || 0;
+    if (walletFed && printingWeeks > 0) {
+      var paidWeeks = {};
+      parsedEdges.forEach(function (e) {
+        if (e.to.kind !== 'banked') return;
+        var payWeek = surfaceRefWeek(e.from);
+        if (payWeek !== null) paidWeeks[payWeek] = 1;
+      });
+      var unpaidWeeks = [];
+      for (var pw = 1; pw <= printingWeeks; pw++) {
+        if (!paidWeeks[pw]) unpaidWeeks.push(pw);
+      }
+      if (unpaidWeeks.length) {
+        errors.push(S + 'playSpine.economyGraph banks value but declares no income edge for week'
+          + (unpaidWeeks.length === 1 ? ' ' : 's ') + unpaidWeeks.join(', ')
+          + ' — the wallet is fed only in week' + (Object.keys(paidWeeks).length === 1 ? ' ' : 's ')
+          + (Object.keys(paidWeeks).sort(function (a, b) { return a - b; }).join(', ') || '(none)')
+          + '. One representative edge cannot say which weeks pay, and every reader of this graph'
+          + ' takes it literally: a week with no income edge is a week the player banks nothing.'
+          + ' Add one edge per unfed week — `{ from: "reckoning:W' + unpaidWeeks[0]
+          + '", to: "banked" }` and its like — or, if those weeks genuinely pay nothing, that is a'
+          + ' book where the pencil stops earning and the spine should say so somewhere else');
+      }
+    }
   }
 
   // ── Floor 3: consequence edges resolve, and the echo has a clock ──
@@ -4020,6 +4175,37 @@ var SPINE_LEAD_KINDS = { cipher: 1, map: 1, oracle: 1, fragment: 1, seal: 1, com
  * exponential. Saturating at |V| is the right answer for a cycle anyway — a
  * loop IS a chain at least that long.
  */
+/**
+ * isWeeklyConversionEdge(from, to) -> boolean
+ *
+ * THE BOOK'S METRONOME, named once (R1, 2026-08-17).
+ *
+ * `reckoning:Wn → banked` is the weekly conversion: the player's ticked marks
+ * becoming the book's currency. Since the declaration-literal income law (Floor
+ * 2b) every printing week declares one, so it is now the single most common
+ * edge in any spine — and it is the one edge that carries no design
+ * information at all. It gates nothing (it is the panel doing its job), it
+ * decides nothing (it happens whether the player wants it or not), and it
+ * converges nothing (six copies of one conversion are one lane drawn six
+ * times).
+ *
+ * THREE FLOORS ASK A QUESTION THIS EDGE ANSWERS FALSELY, and before the income
+ * law each of them was wrong about exactly one edge per book, which is invisible:
+ *   · Floor 8's convergence — every wallet takes weekCount feeders;
+ *   · Floor 11a's threshold walk — the boss week's conversion makes the whole
+ *     economy formally "behind" the threshold;
+ *   · sim-player.js H7 and its decision-density count — same two mistakes on
+ *     the assembled book.
+ * One predicate, so a future floor asking a fourth question inherits the answer
+ * rather than rediscovering it. sim-player.js mirrors this deliberately rather
+ * than importing it, for the same reason SIM_SOURCE_KINDS mirrors
+ * SPINE_SOURCE_KINDS: the sim walks printed books and must not pull a grammar
+ * validator in behind it.
+ */
+function isWeeklyConversionEdge(from, to) {
+  return !!(from && to && from.kind === 'reckoning' && to.kind === 'banked');
+}
+
 export function measureSpineGraphShape(parsedEdges) {
   var edges = Array.isArray(parsedEdges) ? parsedEdges : [];
   var key = function (side) { return side.kind + ':' + side.id; };
@@ -4029,8 +4215,23 @@ export function measureSpineGraphShape(parsedEdges) {
   edges.forEach(function (e) {
     var a = key(e.from), b = key(e.to);
     nodes[a] = e.from; nodes[b] = e.to;
-    if (!feeders[b]) feeders[b] = {};
-    feeders[b][a] = 1;
+    // CONVERGENCE IS LANES MEETING, NOT THE METRONOME TICKING (R1 rider).
+    // Under the income law a spine declares `reckoning:Wn → banked` for every
+    // printing week, so the wallet takes weekCount distinct feeders in every
+    // lawful book — and `minConvergence` for path-based is 2. Counted naively,
+    // the convergence half of Floor 8 could never fail again on any book with a
+    // wallet and two weeks: the gate-structure floor would grade one shape and
+    // approve all three. Six copies of one weekly conversion arriving at the
+    // wallet is ONE lane drawn six times, which is precisely what "two or more
+    // lanes that converge" is not.
+    //
+    // Excluded from the FEEDER map only. The chain through the wallet is real
+    // work — earn, convert, bank, spend, finish — so these edges keep their
+    // place in the depth relaxation above and `chain` is unchanged.
+    if (!isWeeklyConversionEdge(e.from, e.to)) {
+      if (!feeders[b]) feeders[b] = {};
+      feeders[b][a] = 1;
+    }
     if (!out[a]) out[a] = {};
     out[a][b] = 1;
   });
@@ -4330,10 +4531,32 @@ function collectSpineHarvestFloorErrors(spine, index, parsedEdges, S) {
   // The threshold is a printed TARGET, never a lock (RECKONING_THRESHOLD_RATIO's
   // own doctrine: the economy may never own the six-week payoff). This floor is
   // that sentence, enforced.
+  // THE CONVERSION EDGE IS NOT A GATE (R1 rider, 2026-08-17), and this rider is
+  // load-bearing rather than tidy. Floor 2b now requires a generated spine that
+  // owns a wallet to declare an income edge for EVERY printing week — including
+  // the boss week, whose `reckoning:W{last} → banked` is the ordinary weekly
+  // conversion. Walked naively, that single edge puts the wallet, and therefore
+  // everything the wallet buys, "behind" the threshold in every lawful book:
+  // this floor would block every spine the new law demands, at the shell gate,
+  // before a word of prose was written.
+  //
+  // The finding's actual meaning is unchanged: content is behind the threshold
+  // when the spine routes it through the boss reckoning by some route OTHER
+  // than the ordinary conversion. So the walk refuses exactly one edge —
+  // reckoning → banked — and traverses everything else, including every route
+  // the measured defect took (`reckoning:W6 → boss`, and the transitive
+  // `reckoning:W6 → cipher:W5 → assembly`). Both are still blocked, and their
+  // rows still fire.
+  //
+  // ONE EXEMPTION, TWO READERS (D93): sim-player.js H7 refuses the same edge on
+  // the assembled book. They must move together — a floor blocking a shape the
+  // sim approves, or approving one the sim reports, is two answers to the same
+  // question at two different prices.
   if (parsedEdges.length && weekCount) {
     var bossReckoningKey = ('reckoning:w' + weekCount);
     var spineAdj = {};
     parsedEdges.forEach(function (e) {
+      if (isWeeklyConversionEdge(e.from, e.to)) return;
       var a = (e.from.kind + ':' + e.from.id).toLowerCase();
       var b = (e.to.kind + ':' + e.to.id).toLowerCase();
       (spineAdj[a] || (spineAdj[a] = [])).push({ key: b, ref: e.to });

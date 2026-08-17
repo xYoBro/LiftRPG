@@ -1297,18 +1297,61 @@ function readAtPathParts(root, parts) {
 // Writes ONLY where a container already exists. A delta repair shortens a field
 // that is already there; creating a path would be inventing content, which is
 // exactly what rule 3 forbids.
-function writeAtPathParts(root, parts, value) {
+//
+// THE ONE LICENSED EXCEPTION (decider ruling, 2026-08-17 — R2/R3). `allowCreate`
+// is passed for a delta target the FLOOR declared presence-class, and the
+// floor's declaration is the entire license. The no-invent law otherwise stands
+// verbatim: a target that did not declare itself presence-class cannot create
+// anything, and the harness still pins that.
+//
+// What "creates exactly the declared path and nothing deeper or wider" means
+// mechanically, and each clause is a refusal below:
+//   · only the containers ON the declared path, never a sibling;
+//   · only PLAIN OBJECTS — a missing step is `{}`, never a guess at a shape;
+//   · never into or through an array, and never a numeric step. Growing an
+//     array would mean inventing a session, a week, an entry — that is content,
+//     not a container, and no floor can license it.
+function writeAtPathParts(root, parts, value, allowCreate) {
   if (!parts || !parts.length) return false;
   var cur = root;
   for (var i = 0; i < parts.length - 1; i++) {
     if (cur === null || typeof cur !== 'object') return false;
-    cur = cur[parts[i]];
+    var step = parts[i];
+    if (!Object.prototype.hasOwnProperty.call(cur, step)) {
+      if (!allowCreate || typeof step !== 'string' || Array.isArray(cur)) return false;
+      cur[step] = {};
+    }
+    cur = cur[step];
   }
   var last = parts[parts.length - 1];
   if (cur === null || typeof cur !== 'object') return false;
-  if (!Object.prototype.hasOwnProperty.call(cur, last)) return false;
+  if (!Object.prototype.hasOwnProperty.call(cur, last)) {
+    if (!allowCreate || typeof last !== 'string' || Array.isArray(cur)) return false;
+  }
   cur[last] = value;
   return true;
+}
+
+// Key-order-insensitive serialization for the merge's byte-identity proof.
+//
+// WHY THIS IS NOT A WEAKENING. The proof compares the payload before and after
+// the merge with every named path masked out on both sides. Nothing in this
+// pipeline can REORDER a key — the merge clones and writes in place — so the
+// only thing that ever moves key order is a presence-class CREATION, which is
+// licensed and therefore must not read as tampering. Every fact the proof was
+// ever protecting is still in scope: a changed value, an added key, a removed
+// key, an array's contents and order all survive canonicalisation. Only the
+// insertion order of object keys does not, and it carries no meaning to the
+// schema, the renderer or the reader.
+function stableStringify(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return '[' + value.map(stableStringify).join(',') + ']';
+  }
+  var keys = Object.keys(value).sort();
+  return '{' + keys.map(function (k) {
+    return JSON.stringify(k) + ':' + stableStringify(value[k]);
+  }).join(',') + '}';
 }
 
 /**
@@ -1382,6 +1425,17 @@ function partitionDeltaRepairOn(payload, blockingErrors, deltaTargets) {
   var partition = partitionDeltaRepair(blockingErrors, deltaTargets);
   if (!partition.eligible) return partition;
   var unreachable = partition.targets.filter(function (t) {
+    // PRESENCE-CLASS INVERTS THE QUESTION (R2/R3). For an ordinary target,
+    // "not on the payload" means the coordinate is in the wrong frame. For a
+    // presence target, absence IS the defect being repaired — asking whether it
+    // is already there would refuse every repair of the only thing it repairs.
+    // What must still be true is that the path is REACHABLE: the merge has to
+    // be able to create it without inventing an array element or writing
+    // through a string. Probed with the merge's own writer on a throwaway
+    // clone, so there is one answer to "can this path be created", not two.
+    if (t.presence) {
+      return !writeAtPathParts(deltaClone(payload), t.pathParts, 'probe', true);
+    }
     return readAtPathParts(payload, t.pathParts) === undefined;
   });
   if (!unreachable.length) return partition;
@@ -1395,7 +1449,9 @@ function partitionDeltaRepairOn(payload, blockingErrors, deltaTargets) {
     // remedy was declined).
     targets: partition.targets,
     structural: unreachable.map(function (t) {
-      return t.path + ' (no such field on this stage\'s payload)';
+      return t.path + (t.presence
+        ? ' (this stage\'s payload has no place to put it)'
+        : ' (no such field on this stage\'s payload)');
     })
   };
 }
@@ -1456,7 +1512,8 @@ function deltaRefusalRecord(partition) {
  */
 function applyDeltaFixes(payload, targets, fixes) {
   var allowed = {};
-  (targets || []).forEach(function (t) { allowed[t.path] = t; });
+  var targetOrder = {};
+  (targets || []).forEach(function (t, ti) { allowed[t.path] = t; targetOrder[t.path] = ti; });
 
   var rejected = [];
   var seen = {};
@@ -1473,8 +1530,15 @@ function applyDeltaFixes(payload, targets, fixes) {
     }
     if (seen[path]) { rejected.push('duplicate fix for ' + path); return; }
     seen[path] = true;
-    normalized.push({ target: allowed[path], value: fix.value });
+    normalized.push({ target: allowed[path], value: fix.value, order: targetOrder[path] });
   });
+  // Applied in the GATE's order, never the model's. For text repairs this is
+  // cosmetic; for presence-class repairs it is load-bearing — the order the
+  // fixes land in is the order created containers appear in, and the proof
+  // below masks in this same order on both sides. Letting the response's
+  // ordering decide would make the payload's shape a function of something
+  // nobody specified.
+  normalized.sort(function (a, b) { return a.order - b.order; });
   if (rejected.length) return { ok: false, merged: null, applied: [], rejected: rejected };
   if (!normalized.length) return { ok: false, merged: null, applied: [], rejected: ['no fixes returned'] };
 
@@ -1491,23 +1555,38 @@ function applyDeltaFixes(payload, targets, fixes) {
   var applied = [];
   for (var i = 0; i < normalized.length; i++) {
     var n = normalized[i];
-    if (!writeAtPathParts(merged, n.target.pathParts, n.value)) {
-      return { ok: false, merged: null, applied: [], rejected: ['path does not exist on the payload: ' + n.target.path] };
+    // `presence` is the floor's license and the ONLY thing that unlocks
+    // creation. An ordinary target still refuses a path that is not already
+    // there — delta repair shortens what exists.
+    if (!writeAtPathParts(merged, n.target.pathParts, n.value, !!n.target.presence)) {
+      return {
+        ok: false, merged: null, applied: [],
+        rejected: [(n.target.presence
+          ? 'path could not be created on the payload: '
+          : 'path does not exist on the payload: ') + n.target.path]
+      };
     }
     applied.push(n.target.path);
   }
 
-  // The byte-identity proof. Mask EVERY named path on both sides — including
-  // ones the model declined to fix — then compare. What remains is the whole
-  // payload minus the fields the gate itself named.
+  // The identity proof. Mask EVERY named path on both sides — including ones
+  // the model declined to fix — then compare. What remains is the whole payload
+  // minus the fields the gate itself named.
+  //
+  // Presence targets are masked WITH creation on both sides, so a path the
+  // floor licensed reads as masked rather than as an appearance out of nowhere,
+  // and the comparison is canonical for the same reason (stableStringify, and
+  // the note on its definition for why that loses no coverage). A presence
+  // target the model declined to answer is masked into existence on BOTH copies
+  // and therefore still proves that nothing else moved.
   var MASK = '\u0001delta-repair-mask\u0001';
   var beforeMasked = deltaClone(payload);
   var afterMasked = deltaClone(merged);
   (targets || []).forEach(function (t) {
-    writeAtPathParts(beforeMasked, t.pathParts, MASK);
-    writeAtPathParts(afterMasked, t.pathParts, MASK);
+    writeAtPathParts(beforeMasked, t.pathParts, MASK, !!t.presence);
+    writeAtPathParts(afterMasked, t.pathParts, MASK, !!t.presence);
   });
-  if (JSON.stringify(beforeMasked) !== JSON.stringify(afterMasked)) {
+  if (stableStringify(beforeMasked) !== stableStringify(afterMasked)) {
     return { ok: false, merged: null, applied: [], rejected: ['the merge changed content outside the named fields'] };
   }
 
@@ -1563,11 +1642,27 @@ function normalizeDeltaFixes(result) {
 
 // The whole clause agrees, not just the noun: "1 over-budget line that ran past
 // THEIR budgetS" is the kind of sentence that tells a reader nobody read it.
+//
+// AND IT MUST NAME THE ACTUAL DEFECT (R2). This sentence reaches the run panel,
+// so when delta repair widened past prose budgets the hardcoded "over-budget"
+// wording became a run-log lie: a week regenerating a missing reckoning would
+// have reported itself as trimming a long line. The class is read off the
+// targets rather than assumed, and a mixed set says the true general thing
+// rather than the vivid wrong one.
 function describeDeltaFields(targets) {
-  var n = (targets || []).length;
-  return n === 1
-    ? '1 over-budget line that ran past its printed-space budget'
-    : n + ' over-budget lines that ran past their printed-space budgets';
+  var list = targets || [];
+  var n = list.length;
+  if (!n) return 'nothing';
+  var missing = list.filter(function (t) { return t && t.presence; }).length;
+  if (missing === n) {
+    return n === 1 ? '1 field the week left out' : n + ' fields the week left out';
+  }
+  if (missing === 0) {
+    return n === 1
+      ? '1 over-budget line that ran past its printed-space budget'
+      : n + ' over-budget lines that ran past their printed-space budgets';
+  }
+  return n + ' fields that did not meet their requirements (' + missing + ' missing outright)';
 }
 
 /**
@@ -1613,6 +1708,10 @@ async function runDeltaRepairRounds(ctx) {
         requirement: t.requirement || t.message,
         cap: t.cap,
         length: t.length,
+        // Presence-class travels to the prompt, which must ask for a field that
+        // is MISSING in different words than one that is too long — "current
+        // text: (empty)" under a budget heading reads as a bug report about us.
+        presence: !!t.presence,
         current: readAtPathParts(payload, t.pathParts)
       };
     });
@@ -6534,6 +6633,12 @@ window.LiftRPGAPI = {
     deltaRefusalRecord: deltaRefusalRecord,
     applyDeltaFixes: applyDeltaFixes,
     normalizeDeltaFixes: normalizeDeltaFixes,
+    // R2 — the reader-facing sentence for a repair. Exported because it reaches
+    // the run panel: a wave that widened delta repair past prose budgets and
+    // left this describing every repair as an over-budget line would have
+    // shipped a run-log lie, and a lie in the log is only catchable by a gate
+    // that can call the thing writing it.
+    describeDeltaFields: describeDeltaFields,
     describeStageFailureCause: describeStageFailureCause,
     deltaRepairMaxRounds: DELTA_REPAIR_MAX_ROUNDS,
     buildCompactCampaignRetryPrompt: buildCompactCampaignRetryPrompt,

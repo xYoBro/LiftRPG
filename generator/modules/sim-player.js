@@ -161,6 +161,24 @@ export var SIM_DECISION_FLOOR_PER_WEEK = 1;
 // and unifying them would put a booklet walker inside a grammar check.
 var SIM_SOURCE_KINDS = { markStrip: 1, session: 1, week: 1 };
 
+// Ref kinds that CONVERT value rather than offer it. The weekly reckoning is
+// the book's own arithmetic: it happens whether the player wants it to or not,
+// it takes no side, and it refuses nothing. It is therefore neither a source
+// (it originates no value — the marks did) nor a spend (nothing is chosen).
+//
+// WHY THIS TABLE EXISTS AT ALL, and it is a defect R1 exposed rather than
+// created: before the declaration-literal income law, a spine declared ONE
+// representative conversion edge, so exactly one `reckoning:` node existed in
+// the graph and the miscategorisation below cost one phantom decision in one
+// week — invisible. Under the law every printing week declares its own income
+// edge, so every week gained a `reckoning:Wn` node, and the miscategorisation
+// became a phantom decision in EVERY week: the per-week decision floor could
+// no longer fire on any book, and the spend-window report counted six
+// conversions as six things to decide. A "spend surface" that every book has
+// in every week is the D100 anti-vacuity failure exactly — a needle matching
+// everything looks like a working floor from one side and can never fire.
+var SIM_CONVERSION_KINDS = { reckoning: 1 };
+
 // The endgame: what a book must be able to finish. Nothing else is "required",
 // because a book is allowed to have optional content the player never reaches.
 var SIM_ENDGAME_KINDS = { ending: 1, boss: 1, assembly: 1, seal: 1 };
@@ -906,8 +924,35 @@ export function simulateBook(booklet) {
   // clear is exactly the soft-lock VISION §4.5 names.
   if (book.threshold && hardBand && hardBand.thresholdMet === false) {
     var gateKey = 'reckoning:' + toSlugWords('W' + book.threshold.week);
+    // THE CONVERSION EDGE IS NOT A GATE (R1 rider, 2026-08-17). The boss week's
+    // reckoning banks its marks like every other week's — and under the
+    // declaration-literal income law it MUST, because a spine now owes an
+    // income edge for every printing week. That edge makes the wallet, and
+    // therefore everything the wallet buys, formally reachable from the
+    // threshold node; walked naively, H7 would report the endgame as
+    // threshold-gated in every lawful book ever generated. A hard finding that
+    // fires on every compliant book is not a floor, it is noise with teeth.
+    //
+    // The distinction the finding actually means: content is BEHIND the
+    // threshold when the spine routes it through the boss reckoning by some
+    // route other than the ordinary weekly conversion. So the walk refuses one
+    // edge — reckoning → wallet — and traverses everything else. The mutation
+    // this check exists for (`reckoning:W6 → boss`) is untouched by the refusal
+    // and still fires; the clean book, whose only outgoing boss-week edge is the
+    // conversion, correctly says nothing.
+    //
+    // Whether the endgame is affordable once banked is a DIFFERENT question with
+    // its own findings (H8's dead end, H9's budget axis). This one asks only
+    // whether the 60% band can pass a gate, and a conversion gates nothing.
+    var skipConversionToWallet = function (e) {
+      var fromNode = graph.nodes[e.from];
+      var toNode = graph.nodes[e.to];
+      return !!(fromNode && toNode && SIM_CONVERSION_KINDS[fromNode.kind] && toNode.kind === 'banked');
+    };
     var behind = required.filter(function (target) {
-      return target.aliases.some(function (a) { return reachesFrom(graph, gateKey, a); });
+      return target.aliases.some(function (a) {
+        return reachesFrom(graph, gateKey, a, skipConversionToWallet);
+      });
     }).map(function (target) { return target.label; });
     if (behind.length) {
       base.hard.push(finding('threshold-gated-endgame',
@@ -932,24 +977,44 @@ export function simulateBook(booklet) {
   // conjunction is the state where the pencil keeps working for nothing.
   var bankedKey = graph.nodes['banked'] ? 'banked' : null;
   if (bankedKey && guaranteedHold[bankedKey] !== INFINITY_WEEK) {
-    // Income runs to the last week iff the player's own work reaches the wallet
-    // at all — traced TRANSITIVELY, because a spine names one representative
-    // edge (`markStrip:W1 → reckoning:W1 → banked`) for a conversion the book
-    // repeats every week. Reading only the direct feeder would date the last
-    // deposit to week 1 and make this check unfireable.
+    // THE DECLARATION-LITERAL READING (author ruling, 2026-08-17). The last
+    // DECLARED income edge into the wallet dates the last deposit. Nothing
+    // else does — not a chain, not an inference, not a convention.
+    //
+    // WHAT THIS REPLACES, AND WHY IT WAS WRONG. The first version traced every
+    // source to the wallet TRANSITIVELY and, on any hit at all, dated income to
+    // `book.weekCount`, reasoning that a spine names one representative edge
+    // (`markStrip:W1 → reckoning:W1 → banked`) for a conversion the book
+    // repeats every week. That reasoning turns a week-1 DECLARATION into a
+    // week-6 FACT. WHICH WEEKS PAY IS EXACTLY THE THING A REPRESENTATIVE EDGE
+    // CANNOT REPRESENT: a spine that banks in week 1 and never again is, under
+    // the old reading, byte-indistinguishable from one that banks every week —
+    // and the old reading called both "income through the final week", which is
+    // an invented deposit, in the confident direction, on the one axis this
+    // check exists to measure.
+    //
+    // THE FIREABILITY IS NOW BOUGHT BY DECLARATION, NOT INFERENCE. The comment
+    // this replaces was right that the literal reading alone would date most
+    // spines to week 1 and leave H8 unfireable. The answer is not to guess the
+    // missing weeks — it is to require them: the income-edge floor
+    // (validation.js, collectSpineSkeletonFloorErrors Floor 2b) fails any
+    // GENERATED spine that owns a wallet and does not declare an income edge
+    // for every printing week. On a book this pipeline wrote, the literal and
+    // transitive readings therefore agree; where they can still disagree — a
+    // hand-authored or pre-floor book — the literal one is the only one reading
+    // something a human actually wrote.
+    //
+    // ONE RELATION, TWO READERS (D93). The floor and this walk must read the
+    // same thing: an edge whose `to` is the wallet, dated by its source's print
+    // week. Moving one without the other is the two-algorithms defect — the
+    // floor would demand a shape the sim does not credit, or credit one the
+    // floor never asked for.
     var lastIncome = 0;
-    Object.keys(graph.nodes).forEach(function (key) {
-      var node = graph.nodes[key];
-      if (!SIM_SOURCE_KINDS[node.kind]) return;
-      if (reachesFrom(graph, key, bankedKey)) lastIncome = book.weekCount;
+    graph.edges.forEach(function (e) {
+      if (e.to !== bankedKey || e.cls !== 'guaranteed') return;
+      var src = graph.nodes[e.from];
+      if (src && src.printWeek !== null) lastIncome = Math.max(lastIncome, src.printWeek);
     });
-    if (!lastIncome) {
-      graph.edges.forEach(function (e) {
-        if (e.to !== bankedKey || e.cls !== 'guaranteed') return;
-        var src = graph.nodes[e.from];
-        if (src && src.printWeek !== null) lastIncome = Math.max(lastIncome, src.printWeek);
-      });
-    }
     var sinkWeeks = graph.edges
       .filter(function (e) { return e.from === bankedKey && e.cls === 'guaranteed'; })
       .map(function (e) {
@@ -1049,8 +1114,15 @@ export function simulateBook(booklet) {
   // S1 — the stingy/greedy spread. With no prices the difference is scheduling
   // (see header); a book where every node's window is a single week is a book
   // where the spend policy is a formality.
+  // The spend surfaces: everything the player can reach that is neither the
+  // work that earns (sources) nor the arithmetic that converts it
+  // (SIM_CONVERSION_KINDS). Both exclusions answer the same question — "does
+  // this surface ask the player anything?" — and a reckoning does not: it is
+  // the same conversion, in the same direction, every week the book prints.
   var optional = Object.keys(graph.nodes).filter(function (key) {
-    return guaranteedHold[key] !== INFINITY_WEEK && !SIM_SOURCE_KINDS[graph.nodes[key].kind];
+    var kind = graph.nodes[key].kind;
+    return guaranteedHold[key] !== INFINITY_WEEK
+      && !SIM_SOURCE_KINDS[kind] && !SIM_CONVERSION_KINDS[kind];
   });
   var spreads = optional.map(function (key) {
     var e = guaranteedHold[key];
@@ -1210,7 +1282,11 @@ export function simulateBook(booklet) {
 // Can `target` be reached from `source` over guaranteed edges? Used by the
 // threshold gate: the question is not "is the threshold high" but "does
 // anything the book needs sit behind it".
-function reachesFrom(graph, sourceKey, targetKey) {
+// `skipEdge` is an optional predicate: return true to refuse to TRAVERSE an
+// edge without removing it from the graph. One caller uses it (H7), and the
+// reason it is a parameter rather than a graph filter is that the edge in
+// question is real everywhere else — see the note at H7.
+function reachesFrom(graph, sourceKey, targetKey, skipEdge) {
   if (!graph.nodes[sourceKey] || !graph.nodes[targetKey]) return false;
   var seen = {}; seen[sourceKey] = 1;
   var frontier = [sourceKey];
@@ -1220,6 +1296,7 @@ function reachesFrom(graph, sourceKey, targetKey) {
     graph.edges.forEach(function (e) {
       if (e.from !== cur || e.cls !== 'guaranteed') return;
       if (seen[e.to]) return;
+      if (typeof skipEdge === 'function' && skipEdge(e)) return;
       seen[e.to] = 1; frontier.push(e.to);
     });
   }

@@ -459,7 +459,22 @@ export function auditIdentitySources(booklet) {
       continue;
     }
     row.source = 'DEFAULT';
-    row.note = 'neither the die nor the brief put this here';
+    // FLOOR-ROLE AXES ARE REPORTED AS FLOORS, NOT AS IDENTITY (directive 9,
+    // 2026-08-17). Since the composition amendment the archetype is a
+    // legibility and print-safety BASELINE, not a register the book expresses
+    // itself in — ARRANGEMENT.md's "layout IS the identity". Calling an
+    // uncited archetype "an identity default" told the reader the book failed
+    // to have a personality, when what actually happened is that it took the
+    // safe floor without saying why. Different sentence, different repair.
+    //
+    // Still a finding, and still the same finding severity: it lands in
+    // `defaults` exactly as before, so the count, the report and D19's
+    // report-class ruling are all untouched. Only the words change.
+    row.role = axis.role || 'identity';
+    row.note = axis.role === 'floor'
+      ? 'the floor was taken without a citation — neither the die nor the brief put this here, '
+        + 'and a floor chosen silently is still a choice nobody recorded'
+      : 'neither the die nor the brief put this here';
     axes.push(row);
     defaults.push(row);
   }
@@ -491,11 +506,26 @@ export function collectIdentitySourceFindings(booklet, report) {
       .map(function (key) { return counts[key] + ' ' + IDENTITY_SOURCE_LABELS[key]; })
       .join(', ') + '.');
   audit.defaults.forEach(function (row) {
+    var evidencePath = IDENTITY_AXES
+      .filter(function (axis) { return axis.id === row.axis; })
+      .map(function (axis) { return axis.evidencePath; })[0];
+    // Two sentences for two kinds of axis (directive 9). A floor taken without
+    // a citation is not a book with no identity — it is a book that inherited
+    // the safe baseline and never said so. Reporting both as "identity DEFAULT"
+    // sent a reader looking for a personality problem in the one axis that is
+    // no longer where personality lives.
+    if (row.role === 'floor') {
+      report.warnings.push('Identity FLOOR chosen without citation: ' + row.label + ' is `'
+        + (Array.isArray(row.delivered) ? row.delivered.join('`, `') : row.delivered)
+        + '`, the system assigned `' + row.assigned + '`, and `' + evidencePath
+        + '` names neither. This axis is a legibility and print-safety FLOOR rather than a '
+        + 'register the book expresses itself in (layout is the identity) — so the finding is '
+        + 'that the baseline was inherited silently, not that the book has no character.');
+      return;
+    }
     report.warnings.push('Identity source DEFAULT: ' + row.label + ' is `'
       + (Array.isArray(row.delivered) ? row.delivered.join('`, `') : row.delivered)
-      + '`, the system assigned `' + row.assigned + '`, and `' + IDENTITY_AXES
-        .filter(function (axis) { return axis.id === row.axis; })
-        .map(function (axis) { return axis.evidencePath; })[0]
+      + '`, the system assigned `' + row.assigned + '`, and `' + evidencePath
       + '` names neither — under the two-source law (VISION §11) a choice that is neither '
       + 'brief-funded nor seed-assigned is a default, and defaults are findings.');
   });

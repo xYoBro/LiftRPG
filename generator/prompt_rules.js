@@ -5668,7 +5668,14 @@
             },
             value: {
               type: 'string',
-              description: 'The rewritten text for that field, inside its stated budget.'
+              // Generalised with the prompt (R2). The requirement is stated per
+              // field in the Fields table; a budget is one requirement shape
+              // among several, so the wire schema names the requirement rather
+              // than one instance of it. Still a STRING on every path: the
+              // merge writes scalar leaves only, which is what keeps a
+              // presence-class repair "exactly the declared path and nothing
+              // deeper or wider" rather than a licence to post an object.
+              description: 'The text for that field, meeting the requirement stated for it.'
             }
           },
           required: ['path', 'value']
@@ -5678,18 +5685,53 @@
     required: ['fixes']
   };
 
+  // THE GENERAL ONE-FIELD REMEDY (author ruling, 2026-08-17 — R2). This prompt
+  // was born for one floor: a prose string a few characters past its printed
+  // budget. Every sentence in it said so — the header framing, the budget row,
+  // the rewriting advice. That made the machinery below it a lie by omission:
+  // the classifier and the merge guard have always been generic (they match on
+  // error identity, not on error kind), so any floor could declare a delta
+  // target, and the only thing stopping one was a prompt that could describe a
+  // single defect.
+  //
+  // The generalisation: EVERY target states its REQUIREMENT, in the floor's own
+  // words, and the budget breach becomes one requirement SHAPE among others
+  // rather than the frame the whole page is written in. A target carrying
+  // cap/length still gets its arithmetic, verbatim; a presence-class target
+  // says the field is missing and asks for it; anything else states its
+  // requirement and nothing more. The candidate loop's economics depend on
+  // this — a one-field remedy that only knows one field is a one-floor remedy.
   window.buildDeltaRepairPrompt = function (stageName, fields, contextJson) {
-    var rows = (fields || []).map(function (f, i) {
-      return [
+    var list = fields || [];
+    var hasBudget = function (f) {
+      return typeof f.cap === 'number' && typeof f.length === 'number' && f.cap > 0;
+    };
+    var anyBudget = list.some(hasBudget);
+    var rows = list.map(function (f, i) {
+      var row = [
         '### ' + (i + 1) + '. `' + f.path + '`',
-        '- Requirement: ' + f.requirement,
-        '- Budget: ' + f.cap + ' characters. Yours is ' + f.length + ' — '
-          + Math.max(1, (f.length - f.cap)) + ' too many.',
-        '- Current text:',
-        '```',
-        String(f.current == null ? '' : f.current),
-        '```'
-      ].join('\n');
+        '- Requirement: ' + f.requirement
+      ];
+      if (hasBudget(f)) {
+        row.push('- Budget: ' + f.cap + ' characters. Yours is ' + f.length + ' — '
+          + Math.max(1, (f.length - f.cap)) + ' too many.');
+      }
+      if (f.presence) {
+        // No "current text" block, deliberately: there is no current text, and
+        // an empty fenced block under that heading invites the model to read
+        // its own answer as having been erased.
+        row.push('- This field is MISSING from your answer. Write it now, at exactly this path.');
+      } else {
+        row.push('- Current text:');
+        row.push('```');
+        row.push(String(f.current == null ? '' : f.current));
+        row.push('```');
+      }
+      // The trailing blank is structural, not cosmetic: a `###` heading with no
+      // blank line above it is not a heading in any markdown reader, and the
+      // budget rows only got away without one because they ended in a fence.
+      row.push('');
+      return row.join('\n');
     });
     var contextBlock = (typeof contextJson === 'string' && contextJson.trim()) ? [
       '## Surrounding Content (for voice — do NOT return any of it)',
@@ -5698,29 +5740,46 @@
       contextJson,
       ''
     ] : [];
+    var anyPresence = list.some(function (f) { return !!f.presence; });
+    var headline = list.length === 1
+      ? 'was accepted in every respect but one: one field did not meet its requirement.'
+      : 'was accepted except for ' + list.length
+        + ' fields, which did not meet their requirements.';
+    var budgetNote = anyBudget ? [
+      'Where a budget is stated below, it is real estate, not style: these are PRINTED surfaces,',
+      'and the budget is the width of a line on a 5.5x8.5in page in a reader\'s hand between two',
+      'sets — past it the text is cut off by the page, not by us.',
+      ''
+    ] : [];
     return [
       '# Delta Repair — ' + stageName,
       '',
-      'Your previous answer for ' + stageName + ' was accepted in every respect but one: '
-        + ((fields || []).length === 1
-          ? 'one field came back longer than the printed space it has.'
-          : (fields || []).length + ' fields came back longer than the printed space they have.'),
+      'Your previous answer for ' + stageName + ' ' + headline,
       'Nothing else about the answer is in question, and nothing else may change.',
-      '',
-      'These are PRINTED surfaces. The budget is the width of a line on a 5.5x8.5in page in a',
-      'reader\'s hand between two sets — past it the text is cut off by the page, not by us.',
+      'Each field below states the requirement it has to meet, in the words it will be',
+      're-checked in. Meet that requirement exactly; do not solve a different problem.',
       ''
-    ].concat(contextBlock, [
-      '## Fields To Rewrite',
+    ].concat(budgetNote, contextBlock, [
+      '## Fields To Fix',
       ''
     ], rows, [
-      '',
-      '## How To Rewrite',
-      '- Keep the meaning, the proper nouns, and any reference or pointer the line makes.',
-      '- Rewrite the sentence shorter. Do NOT trim with an ellipsis and do NOT cut a clause',
-      '  off mid-thought — the line must read as finished prose, because it prints as prose.',
-      '- Land a few characters UNDER the budget rather than exactly on it. The check counts',
-      '  characters exactly and a single character over fails the whole stage again.',
+      '## How To Write These',
+      '- Keep the meaning, the proper nouns, and any reference or pointer the line makes.'
+    ], (contextBlock.length ? [
+      '- Match the voice of the surrounding fields exactly. This is the same book, same hand.'
+    ] : []), [
+      '- Every field must read as finished prose or a finished instruction — never a stub, a',
+      '  placeholder, or a clause cut off mid-thought. It prints exactly as you write it.'
+    ], (anyBudget ? [
+      '- Where a budget is stated: rewrite the sentence SHORTER. Do NOT trim with an ellipsis',
+      '  and do NOT cut a clause off mid-thought. Land a few characters UNDER the budget rather',
+      '  than exactly on it — the check counts characters exactly and one character over fails',
+      '  the whole stage again.'
+    ] : []), (anyPresence ? [
+      '- Where a field is marked MISSING: write it fresh, satisfying its stated requirement,',
+      '  consistent with everything the answer already says. Do not restate a neighbouring',
+      '  field and do not invent a surface the book has not already named.'
+    ] : []), [
       '- Change nothing else. Do not rename, add, remove, reorder or "improve" any other field.',
       '',
       '## Output Contract',

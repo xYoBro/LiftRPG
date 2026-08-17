@@ -2277,8 +2277,28 @@ export var IDENTITY_AXES = [
   { id: 'componentDialect', label: 'componentDialect', path: 'meta.artifactIdentity.componentDialect',
     menu: VALID_COMPONENT_DIALECTS, kind: 'scalar',
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
+  // THE ONE AXIS THAT IS A FLOOR RATHER THAN A REGISTER (round directive 9,
+  // 2026-08-17). Every other row here names something the book DECIDES about
+  // itself — its shell, its board, its pull, its ecology. Since the composition
+  // amendment the archetype is not that: ARRANGEMENT.md makes layout the
+  // identity and demotes the archetype to a legibility and print-safety FLOOR,
+  // the baseline a book inherits when it authors nothing.
+  //
+  // `answerRequired` STAYS, and the reason is D152's, unchanged by the
+  // demotion: silence here does not decline a feature, it hands the choice to
+  // the silent normalizer. A floor still has to be CHOSEN — the demotion
+  // changes what the choice means, not whether one was made.
+  //
+  // `role` is what changed. It carries no gate and narrows no menu; its single
+  // reader is auditIdentitySources, which reports a floor chosen without
+  // citation in floor-selection words rather than calling it an identity
+  // default. Report-class either way (D19 — warnings only, never a weakSpot),
+  // so this changes the SENTENCE a reader gets and nothing a pipeline does.
+  // identityAxesForStage and drawSeedAssignments read `id`, `menu` and
+  // `stages`, none of which move: the die offers the same faces and every stage
+  // is shown the same slice.
   { id: 'visualArchetype', label: 'theme.visualArchetype', path: 'theme.visualArchetype',
-    menu: VALID_ARCHETYPES, kind: 'scalar', answerRequired: true,
+    menu: VALID_ARCHETYPES, kind: 'scalar', answerRequired: true, role: 'floor',
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'arcFamily', label: 'arcFamily', path: 'meta.artifactIntent.arcFamily',
     menu: VALID_ARC_FAMILIES, kind: 'scalar',
