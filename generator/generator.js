@@ -2576,6 +2576,57 @@
   };
 
   /**
+   * Economy-graph prompt: the week axis of the declared graph (§4.11).
+   *
+   * A NARROW SEAT, AND THE NARROWNESS IS THE POINT. It receives the rulebook's
+   * five wrong-able answers, the graph the compiler seat declared, the program's
+   * shape and the week count — and nothing else. The graph used to be authored
+   * inside the shell stage's ~108,000-character payload, answering the economy
+   * question alongside the shell, theme, arrangement, voice, orientation and
+   * disclosure questions; D158's density class predicts exactly the shallow,
+   * implied-not-named edges the corpus shows.
+   *
+   * THE GRAPH IS PRINTED AS JSON, verbatim, because this stage's job is to
+   * return the same edges enriched. Paraphrasing it into prose would invite the
+   * model to re-derive the edges instead of copying them, which is the one thing
+   * the annotate-only ruling forbids (author decision 4).
+   */
+  window.generateEconomyGraphPrompt = function (shell, options) {
+    options = options || {};
+    var graph = Array.isArray(options.economyGraph) ? options.economyGraph : [];
+    var rulebookGiven = (typeof window.formatGameRulebookGiven === 'function')
+      ? window.formatGameRulebookGiven(options.gameRulebook, { prose: true })
+      : '';
+    var weekCount = Number(options.weekCount) || 0;
+
+    var parts = [
+      '# LiftRPG Economy Pacing Stage — how often is each edge taken?',
+      '',
+      rulebookGiven,
+      '',
+      window.buildStageSchema('economy-graph'),
+      '',
+      '## The economy graph this book declared',
+      'These are the edges. Return all of them, in this order, with the same `from` and `to`.',
+      '```json',
+      JSON.stringify(graph, null, 2),
+      '```',
+      '',
+      weekCount > 0
+        ? '## The book\'s length\nThis book has ' + weekCount + ' weeks, numbered 1 to ' + weekCount
+          + '. Every `introWeek` and `closesAtWeek` you write must fall inside that range — a'
+          + ' surface that arrives after the last week never arrives.'
+        : '',
+      '',
+      options.retryMode
+        ? 'Retry mode: return every edge you were given, unchanged in `from` and `to`, and make sure each `cadence` carries the fields its mode requires.\n'
+        : '',
+      'Return ONLY the JSON object. No markdown fences, no commentary.'
+    ];
+    return parts.filter(Boolean).join('\n');
+  };
+
+  /**
    * Knowing prompt: the world's process particulars (§11 Wave 1.5).
    *
    * Shared by BOTH API pipelines — Skeleton+Flesh passes the skeleton,
@@ -3557,6 +3608,15 @@
         weekPlan.weekNumber,
         (campaignPlan && Array.isArray(campaignPlan.weeks)) ? campaignPlan.weeks.length : 0)
       : '';
+    // THE CADENCE FLOOR'S TAUGHT HALF (§4.11, D187). cadenceConformanceFloorErrors
+    // BLOCKS this week for a surface its own book declared weekly or
+    // late-arriving; a floor whose demand no prompt states blocks a model that
+    // obeyed its prompt perfectly. Derived per week and EMPTY for a week that
+    // owes nothing, so a book with no cadence declarations builds the prompt it
+    // always built, byte for byte.
+    var msCadenceGiven = (typeof window.formatWeekCadenceGiven === 'function')
+      ? window.formatWeekCadenceGiven(options.playSpine, weekPlan.weekNumber)
+      : '';
 
     // D186's shape at the unit seats (found live - the finale death): the one
     // section stating every prose cap WITH its aim-under target rode only the
@@ -3648,6 +3708,7 @@
       // surface printed either. Week count comes from the campaign plan, which
       // is the same list the plan itself was built from.
       msTensionGiven ? msTensionGiven + '\n' : '',
+      msCadenceGiven ? msCadenceGiven + '\n' : '',
       continuity ? '**Continuity Rules:** ' + JSON.stringify(continuity) : '',
       isBossWeek && allComponentValues ? '**Prior Values for Boss Decode (EXACTLY ' + allComponentValues.length + ' values — do not add, remove, or reorder):** ' + JSON.stringify(allComponentValues) + '\nSet bossEncounter.componentInputs to EXACTLY this array. There are ' + allComponentValues.length + ' non-boss weeks, so there must be EXACTLY ' + allComponentValues.length + ' componentInputs.' : '',
       '',

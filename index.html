@@ -3854,6 +3854,22 @@
             one of those stages is handed the game&rsquo;s currency, its core verbs and its win
             condition as a given, plus the week&rsquo;s own row of the tension budget &mdash; this
             door has none of that to hand them. Use an API build mode if you want the rules-first pass.</p>
+          <!-- §4.11's half of the same law, and a SEPARATE statement rather than a
+               clause bolted onto the one above: the two gaps have different
+               consequences for the reader, and merging them would let a reader who
+               skims the first sentence miss the second entirely. The API doors also
+               run an ECONOMY PACING step, which is what makes a weekly loop
+               checkable week by week. Pinned by scripts/check-generation-floors.mjs.
+               NOTE: full guided parity is separately ratified round work; this is
+               the honest interim, not the final state. -->
+          <p class="wizard-hint" id="wiz-economy-gap"><strong>And one more:</strong> the API build
+            modes run an <em>economy pacing</em> step after the identity step, where the model says
+            <em>how often</em> the player touches each part of the economy &mdash; every week, once,
+            inside a window that closes, or arriving later on purpose. Each week is then checked
+            against that promise as it is written, so a gauge the rules feed <em>every week</em> and
+            the pages print in one week of six is refused rather than delivered. This door has no
+            such step and no such check, so a surface the rules assume from session one can simply
+            be missing from a week and nothing will notice.</p>
           <div class="wizard-action-grid">
             <div class="wizard-stage-card is-action">
               <div class="wizard-action-index">Step 1</div>
@@ -4187,6 +4203,11 @@
         // pipeline name ("knowing"), which is the stageKey below and stays
         // out of the interface.
         knowing: 'World Detail',
+        // §4.11 plain language: this stage decides how often the player touches
+        // each part of the economy. The reader is told what it produces
+        // ("Economy Pacing"), never the internal pipeline name (`economyGraph`,
+        // the stageKey below).
+        economyGraph: 'Economy Pacing',
         weeks: 'Weeks',
         fragments: 'Extras',
         endings: 'Ending',
@@ -4202,6 +4223,7 @@
           { key: 'campaign', label: STAGE_LABELS.campaignPlan },
           { key: 'shell', label: STAGE_LABELS.shell },
           { key: 'knowing', label: STAGE_LABELS.knowing },
+          { key: 'economyGraph', label: STAGE_LABELS.economyGraph },
           { key: 'weeks', label: STAGE_LABELS.weeks },
           { key: 'fragments', label: STAGE_LABELS.fragments },
           { key: 'endings', label: STAGE_LABELS.endings },
@@ -7971,6 +7993,10 @@
         knowing: {
           does: 'Authors the world’s working detail — its instruments, procedures, ranks and vocabulary — so the weeks, documents and ending all reach for the same particulars instead of inventing their own.',
           limit: 'It is world knowledge, not printed pages: none of it appears in the book by itself. It appears because the prose steps after it are given it.'
+        },
+        economyGraph: {
+          does: 'Takes the play graph the book just declared and says how often each part of it is used: every week, once, inside a window that closes, or arriving later on purpose. It adds that pacing to the graph; it never adds or removes a connection.',
+          limit: 'It paces the economy, it does not draw the pages. Whether each week actually prints the surfaces this pacing promises is checked as each week is written — and a week that breaks the promise is rewritten rather than delivered.'
         },
         weeks: {
           does: 'Writes one week per call: the sessions, the marking strip you fill in with a pencil, the week’s field work, and the boss week last. Each week is handed the game’s currency, verbs and win condition, and its own row of the tension budget.',

@@ -151,6 +151,8 @@ import {
   // gates inside validation.js and never called from here: a pipeline that
   // called it directly would be a second opinion about a stage's verdict.
   validateGameRulebookStage,
+  validateEconomyGraphStage,
+  deriveWeeklySurfaceLedger,
   classifyValidationErrors,
   collectBudgetBreaches,
   collectPercentileStatFindings,
@@ -1913,8 +1915,15 @@ var REPAIR_STAGE_ORDER = [
   // matters even though no floor currently routes TO it: an error carrying its
   // label at a later stage would otherwise rank -1 and be silently unroutable,
   // and a stage missing from this table is a stage whose repairs vanish.
+  // `economyGraph` sits directly after the compiler seats and before the weeks,
+  // which is where it runs (§4.11) — it annotates the spine those seats declare.
+  // Its rank is load-bearing for a reason the rulebook's note only anticipates:
+  // the cadence floor blocks at the WEEK gate and names this stage's own
+  // declarations, so a cadence defect found in week 4 must route BACKWARD past
+  // three banked weeks to the seat that wrote the cadence. A stage missing from
+  // this table ranks -1 and its repairs vanish.
   'workoutCanonical', 'canonicalize', 'gameRulebook', 'layerBible', 'campaignPlan',
-  'skeleton', 'shell', 'knowing', 'rules', 'weeks', 'fragments', 'endings'
+  'skeleton', 'shell', 'knowing', 'economyGraph', 'rules', 'weeks', 'fragments', 'endings'
 ];
 
 // A routing loop is a new failure mode, so the hops are bounded and the
@@ -2024,6 +2033,7 @@ function buildRepairDirective(route, ownerStageName, fromStageName) {
 // the names the pipelines already emit on their progress events.
 var REPAIR_STAGE_NAMES = {
   gameRulebook: 'Game Rulebook',
+  economyGraph: 'Economy Pacing',
   layerBible: 'Layer Codex',
   campaignPlan: 'Story Plan',
   skeleton: 'Skeleton',
@@ -2340,6 +2350,9 @@ function getApiPromptBuilders() {
     shell: window.generateApiShellPrompt || window.generateShellPrompt,
     // Shared with the Skeleton+Flesh pipeline — same builder, same head.
     knowing: window.generateKnowingPrompt,
+    // §4.11 — the economy graph's week axis. Staged pipelines only: S+F is
+    // retired (D189) and never reaches this registry.
+    economyGraph: window.generateEconomyGraphPrompt,
     // `weeks`, `fragments` and `endings` rows were removed here (chip
     // task_84c0400a, DR-5 — the audit correction to D170's phrasing). The
     // registry offered them but nothing in this file ever dispatched
@@ -2360,7 +2373,7 @@ function getApiPromptBuilders() {
 }
 
 function assertApiPromptBuilders(builders) {
-  if (!builders.gameRulebook ||
+  if (!builders.gameRulebook || !builders.economyGraph ||
     !builders.stage1 || !builders.stage2 || !builders.shell || !builders.knowing ||
     !builders.singleWeekFinal ||
     !builders.singleFragment ||
@@ -4216,11 +4229,14 @@ async function runApiPipeline(options) {
     ? options.rawWorkout
     : workout;
 
-  // Initial estimation: 5 setup (rulebook, codex, campaign, shell, knowing)
-  // + weekCount (single-stage per week) + endings. The rulebook joined the
-  // count in the same change that added the stage — a rail that draws one more
-  // card than the counter knows about is the D110 UI lie in miniature.
-  var totalStages = 5 + weekCount + 2;
+  // Initial estimation: 6 setup (rulebook, codex, campaign, shell, knowing,
+  // economyGraph) + weekCount (single-stage per week) + endings. The rulebook
+  // joined the count in the same change that added the stage, and economyGraph
+  // joined it in the same change that added ITS stage (§4.11) — a rail that
+  // draws one more card than the counter knows about is the D110 UI lie in
+  // miniature. BOTH assignments move together: this one and the mid-run
+  // recompute below, which is an ASSIGNMENT and silently overwrites this.
+  var totalStages = 6 + weekCount + 2;
   var stageNum = 0;
   // Whether the canonicalize stage counted itself (0 or 1). It bumps
   // `totalStages` when it runs — and the mid-run recompute below is an
@@ -4773,6 +4789,58 @@ async function runApiPipeline(options) {
   var msParticulars = applyProcessParticulars(shell, knowingOutput);
   console.log('[LiftRPG] ' + describeProcessParticulars(msParticulars));
 
+  // ── THE ECONOMY GRAPH'S WEEK AXIS (§4.11) ────────────────────────────
+  // Between the compiler seat and the first week, which is the only window
+  // where the graph exists to be paced and no week has been written against an
+  // unpaced one. See runEconomyGraphStage for why it is its own call.
+  //
+  // THE PRIOR GRAPH IS CAPTURED BEFORE THE CALL and handed to both the builder
+  // and the gate — one array, shown and checked, so the no-invent floor can
+  // never accuse the model of dropping an edge it was never shown (D149's
+  // shown-and-checked idiom).
+  var declaredGraph = (((shell || {}).meta || {}).playSpine || {}).economyGraph || null;
+  var economyState = await runEconomyGraphStage(settings, {
+    cached: (checkpoint && checkpoint.stages && checkpoint.stages.economyGraph) || null,
+    checkpoint: checkpoint,
+    onProgress: onProgress,
+    rateLimiter: rateLimiter,
+    budgetEnforce: useGeminiBudget,
+    trialMode: !!(options.trialMode || settings.trialMode),
+    divergenceSeed: divergenceSeed,
+    repairDirective: repairDirectiveFor('economyGraph'),
+    priorGraph: declaredGraph,
+    weekCount: weekCount,
+    progress: progress,
+    getStageIndex: function () { return stageNum; },
+    getTotalStages: function () { return totalStages; },
+    emitRestored: function () {
+      stageNum++;
+      console.log('[LiftRPG] Resumed: Economy Pacing (cached)');
+      emitPipelineEvent(onProgress, stageNum, totalStages, 'Economy pacing restored from checkpoint.', {
+        phase: 'complete',
+        stageKey: 'economyGraph',
+        stageName: 'Economy Pacing',
+        completionSource: 'checkpoint'
+      });
+    },
+    buildPrompt: function (retryState) {
+      return builders.economyGraph(shell, {
+        retryMode: retryState.attempt > 0,
+        weekCount: weekCount,
+        gameRulebook: gameRulebook,
+        economyGraph: declaredGraph,
+        workout: workout
+      });
+    }
+  });
+  checkpoint = economyState.checkpoint;
+  // OUTSIDE ANY else, exactly as applyGameRulebook is and for the same reason: a
+  // RESUMED shell must carry the annotation too. The shell was banked before this
+  // stage ran, so its checkpoint copy never holds the paced graph — re-applying
+  // here is what makes resume and first-run produce the same book.
+  var pacedGraph = applyEconomyGraph(shell, economyState.output, declaredGraph);
+  console.log('[LiftRPG] ' + describeEconomyGraph(pacedGraph));
+
   var shellContext = extractShellContext(shell);
 
   // ── PROMPT CACHING ────────────────────────────────────────────
@@ -4865,7 +4933,10 @@ async function runApiPipeline(options) {
       // declaration rides in the same way the family does. No spine in the
       // options means no spine floors — a floor must never invent the
       // declaration it is checking against.
-      playSpine: ((shell || {}).meta || {}).playSpine || null,
+      // Also the cadence floor's ONLY evidence (§4.11): the declarations it
+      // holds this week to ride the spine's economyGraph edges, so this one
+      // option arms both the closure floors and cadence conformance.
+      playSpine: ((shell || {}).meta || {}).playSpine || null,   // W3-ARM week-cadence
       owesLudicEntry: owesLudic,
       // The currency, for the week gate's conversion floor. Declared at the
       // shell stage, printed by THIS stage, and until now graded only after
@@ -5041,18 +5112,23 @@ async function runApiPipeline(options) {
   // Update totalStages now that we know the batch count.
   //
   // THE DENOMINATOR IS THE LIST OF STAGES THAT ACTUALLY BUMP `stageNum`, and
-  // nothing else. In order: canonicalize (0 or 1, above), then the five that
-  // always run — gameRulebook, layerBible, campaign, shell, knowing — then one
-  // per week, one per fragment batch, and the finale. The quality stage emits
-  // at `totalStages / totalStages` and never increments, so it is deliberately
-  // NOT counted here.
+  // nothing else. In order: canonicalize (0 or 1, above), then the six that
+  // always run — gameRulebook, layerBible, campaign, shell, knowing,
+  // economyGraph — then one per week, one per fragment batch, and the finale.
+  // The quality stage emits at `totalStages / totalStages` and never
+  // increments, so it is deliberately NOT counted here.
   //
   // The old line was `4 + weekCount + totalBatches + 1`: four setup stages
   // where five run, and an assignment that discarded canonicalize's own bump.
   // Two missing seats, one counter, and a log line that read 15/14 on a run
   // whose rail was correct the whole time (the reader's rail is clamped by
   // D175; this was always the log path alone).
-  totalStages = canonicalizeStages + 5 + weekCount + totalBatches + 1;
+  //
+  // §4.11 made it six. THIS LINE IS AN ASSIGNMENT, so it silently replaces the
+  // initial estimate above rather than adjusting it — which is exactly how the
+  // 15/14 defect happened. A stage added to the pipeline and to the estimate
+  // but not to this line is the same bug with a new seat's name on it.
+  totalStages = canonicalizeStages + 6 + weekCount + totalBatches + 1;
 
   for (var fb = 0; fb < fragmentBatches.length; fb++) {
     var batch = fragmentBatches[fb];
@@ -5249,6 +5325,12 @@ async function runApiPipeline(options) {
   // severity split and why the corpus is untouched by it.
   var validationResult = validateAssembledBooklet(booklet, { generationFloors: true });
   writePipelineDebris(booklet, '_simReport', validationResult.sim);
+  // §4.11's derived half, recorded as telemetry. NOT the blocking cadence
+  // floor's evidence — that floor lives at the week gate and reads the single
+  // week it was handed. This is the book-scope measurement the `once` arm and
+  // DR-32's oracle arm ask for, and it is recomputed from the booklet rather
+  // than read back from debris, so nothing can author it into being wrong.
+  writePipelineDebris(booklet, '_weeklySurfaceLedger', deriveWeeklySurfaceLedger(booklet));
   if (validationResult.sim && !validationResult.sim.skipped) {
     console.log('[LiftRPG] Simulated player: ' + validationResult.sim.hard.length + ' soft-lock(s), '
       + validationResult.sim.soft.length + ' finding(s).');
@@ -5674,6 +5756,141 @@ async function runGameRulebookStage(settings, config) {
   });
   recordSeedOnStage(output, config.divergenceSeed);
   return { rulebook: output, checkpoint: saveCheckpoint('gameRulebook', output, config.checkpoint) };
+}
+
+/**
+ * runEconomyGraphStage(settings, config) -> { output, checkpoint }
+ *
+ * THE ECONOMY GRAPH'S WEEK AXIS (§4.11), shared by both API pipelines and
+ * IDENTICAL on each — one stage runner rather than two copies, for the reason
+ * runGameRulebookStage above is one: this stage's inputs are the rulebook, the
+ * declared graph and the program's shape, and there is nothing for a
+ * per-pipeline copy to differ about except by accident.
+ *
+ * PLACEMENT: after the compiler seat that declares the spine, before the first
+ * week. That is the only window where both facts it needs are true — the graph
+ * exists to be annotated, and no week has been written against an unpaced one.
+ *
+ * WHY A SEPARATE CALL AT ALL. The graph was previously authored inside the shell
+ * stage's ~108,000-character payload, alongside the shell, theme, arrangement,
+ * voice, orientation and disclosure questions. D158's density class predicts the
+ * shallow, implied-not-named edges the corpus shows, and the first delivered book
+ * had them: a clock the rules fed "each week", printed in one week of six. The
+ * cost is one more paid call per book and it is the ratified trade (decision 1).
+ *
+ * IT IS NOT THE EARLIEST SEED CARRIER and must never become one. It banks AFTER
+ * the shell, so earliestSeedCarrier()'s order (gameRulebook → shell) is
+ * untouched by its existence; a resume that finds this stage banked has by
+ * construction found the shell banked too.
+ *
+ * NO NEW CHECKPOINT KEY BEYOND ITS OWN BANK SLOT, and the seed rides `_x` on the
+ * stage output exactly as every other stage's does, so a repair re-entering this
+ * stage rebuilds the world it repairs (D101/D143).
+ */
+async function runEconomyGraphStage(settings, config) {
+  var cached = config.cached;
+  if (cached) {
+    config.emitRestored();
+    return { output: cached, checkpoint: config.checkpoint };
+  }
+  config.progress('economyGraph', 'Pacing the economy…');
+  var output = await runJsonStage(settings, {
+    stageKey: 'economyGraph',
+    stageName: 'Economy Pacing',
+    stageIndex: config.getStageIndex(),
+    completeMessage: 'Economy pacing complete.',
+    onProgress: config.onProgress,
+    getTotalStages: config.getTotalStages,
+    schema: window.STRUCTURED_SCHEMA_ECONOMY_GRAPH || null,
+    // NO maxAttempts LITERAL (D97/D166): the row is STAGE_BUDGETS.economyGraph
+    // and its attempts column is unset, which stageBudget() reads as 2.
+    maxAttempts: config.trialMode ? 1 : undefined,
+    rateLimiter: config.rateLimiter,
+    budgetEnforce: config.budgetEnforce,
+    telemetryCollector: config.telemetryCollector,
+    repairDirective: config.repairDirective || '',
+    // The unit this stage writes is the spine's economyGraph, judged against the
+    // same sub-schema the canonical validator will use (D197). Scoped to the
+    // array it returns, so an invented sibling key on an edge is a blocking
+    // stage failure with the path quoted rather than a death at the end of a
+    // paid run.
+    unknownKeyScopes: [
+      { from: 'economyGraph', schemaPath: 'meta.playSpine.economyGraph',
+        label: 'meta.playSpine.economyGraph' }
+    ],
+    validate: function (result) {
+      return validateEconomyGraphStage(result, {
+        // THE NO-INVENT ARM'S EVIDENCE (author decision 4). The same array the
+        // builder was handed, so the gate can never accuse the model of dropping
+        // an edge it was never shown.
+        priorGraph: config.priorGraph,
+        weekCount: config.weekCount
+      });
+    },
+    buildPrompt: function (retryState) {
+      return config.buildPrompt(retryState);
+    }
+  });
+  recordSeedOnStage(output, config.divergenceSeed);
+  return { output: output, checkpoint: saveCheckpoint('economyGraph', output, config.checkpoint) };
+}
+
+/**
+ * applyEconomyGraph(target, output, priorGraph) -> array | null
+ *
+ * THE ANNOTATED GRAPH REACHES THE ARTIFACT. Stamped onto the compiler stage's
+ * `meta.playSpine`, the object that BECOMES `booklet.meta.playSpine` — the same
+ * seam applyGameRulebook uses, so there is no new assembly step and a booklet
+ * whose economy-graph stage never ran is byte-identical to one built before this
+ * existed (the demotion proof).
+ *
+ * IT REPLACES ONLY THE EDGE ARRAY, never the spine around it, and it refuses an
+ * output whose edge SET differs from the one it was given. The stage gate
+ * already checked that — this is the second lock, and it is here because this
+ * function also runs on the RESUME path, where the banked output was validated
+ * by a gate that ran in a different process against a graph this run has not
+ * compared it to.
+ */
+function applyEconomyGraph(target, output, priorGraph) {
+  if (!target || !output) return null;
+  var graph = output.economyGraph;
+  if (!Array.isArray(graph) || !graph.length) return null;
+  var spine = ((target.meta || {}).playSpine) || null;
+  if (!spine || !Array.isArray(spine.economyGraph)) return null;
+  var keyOf = function (edge) {
+    return String((edge || {}).from || '').trim().toLowerCase() + ' -> '
+      + String((edge || {}).to || '').trim().toLowerCase();
+  };
+  var prior = Array.isArray(priorGraph) ? priorGraph : spine.economyGraph;
+  var priorKeys = prior.map(keyOf).sort().join('|');
+  var returnedKeys = graph.map(keyOf).sort().join('|');
+  if (priorKeys !== returnedKeys) {
+    console.warn('[LiftRPG] Economy-graph stage returned a different edge SET than it was given —'
+      + ' keeping the declared graph. The stage may annotate edges, never add or remove them.');
+    return null;
+  }
+  spine.economyGraph = graph;
+  return graph;
+}
+
+// One-line run-log summary. The operator's question about this stage is "did it
+// actually pace anything", and a cadence tally answers it without printing the
+// graph back at them.
+function describeEconomyGraph(graph) {
+  if (!Array.isArray(graph) || !graph.length) return 'no economy pacing applied';
+  var byMode = {};
+  var priced = 0;
+  graph.forEach(function (edge) {
+    var mode = String((((edge || {}).cadence) || {}).mode || '').trim();
+    if (mode) byMode[mode] = (byMode[mode] || 0) + 1;
+    if (Number((edge || {}).price) > 0) priced++;
+  });
+  var modes = Object.keys(byMode).map(function (m) { return m + ' ' + byMode[m]; });
+  var parts = [];
+  parts.push(graph.length + ' edge(s)');
+  parts.push(modes.length ? 'cadence: ' + modes.join(', ') : 'no cadence declared');
+  if (priced) parts.push(priced + ' priced');
+  return 'Economy pacing: ' + parts.join('; ') + '.';
 }
 
 function buildCanonicalizeConfig(options) {
@@ -6356,7 +6573,7 @@ async function runSkeletonFleshPipeline(options) {
       // This pipeline's compiler seat (D129/D143) — 'Skeleton', not 'Shell'.
       spineStageLabel: 'Skeleton',
       mechanicGrammarFamily: (((skeleton || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || '',
-      playSpine: ((skeleton || {}).meta || {}).playSpine || null,
+      playSpine: ((skeleton || {}).meta || {}).playSpine || null,   // W3-ARM week-sf-cadence
       // The arsenal row this week owes, if any — the same object the
       // prompt states as a GIVEN (D170).
       owesLudicEntry: owesLudicSF,

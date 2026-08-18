@@ -55,7 +55,15 @@ export var PIPELINE_DEBRIS_KEYS = [
   // D19 reason every other report here is — a book ships with its critique
   // attached, and "the walker found two soft-locks" belongs in the artifact a
   // reader opens later, not in a console nobody kept.
-  '_simReport'
+  '_simReport',
+  // §4.11's weekly surface ledger: which economy surfaces each week actually
+  // PRINTS, derived at assembly from the week payloads. Debris rather than
+  // contract surface because it is a MEASUREMENT — no prompt offers this shape
+  // and nothing in the pipeline may author it. It is recorded for the same D19
+  // reason the sim's walk is: a book ships with its critique attached, and
+  // "week 3 printed no clock at all" belongs in the artifact a reader opens
+  // later rather than in a console nobody kept.
+  '_weeklySurfaceLedger'
 ];
 
 /**
@@ -2162,6 +2170,57 @@ export function countRulebookWords(text) {
   if (!s) return 0;
   return s.split(/\s+/).length;
 }
+
+// ── EDGE CADENCE: the economy graph projected onto the week axis (§4.11) ────
+//
+// THE DEFECT CLASS THIS EXISTS FOR. An edge like `clock:RootClock → seal:W6` is
+// true at BOOK scope and silently false at WEEK scope: the first delivered book
+// fed that clock "each week" in its rules and printed it in one week of six. The
+// closure floors checked the graph against itself and passed, because the graph
+// WAS closed — the pages were what was incomplete. Cadence is the missing axis:
+// the book states, per edge, how often the player is meant to touch it, and the
+// week gate then checks the pages against the book's own promise (VISION §4.0's
+// conformance law — did you build what YOU declared?).
+//
+// WHY AUTHORED AND NOT DERIVED. Every other half of this feature is derived on
+// purpose (see deriveWeekSurfaces in generator/modules/validation.js — a walker
+// can read which surfaces a week prints, so nothing asks the model for it). This
+// one cannot be: "the gauge arrives in week 2 and that is the design" and "the
+// gauge was forgotten in week 1" produce IDENTICAL page data. Intent is not
+// inferable, and inferring it would be the silent substitution this project
+// names as its founding failure. So the model declares it and the floor holds it
+// to the declaration.
+//
+// THE FOUR MODES, and what each one licenses the floor to demand per week:
+//   weekly  — present in every week from `introWeek` (default 1) onward.
+//   late    — ABSENT before `introWeek`, present from it. `introWeek` is
+//             REQUIRED here and schema-enforced (see booklet-schema.mjs): a
+//             `late` with no intro week is a declaration that checks as nothing,
+//             the manifestPointer idiom.
+//   window  — bounded by the edge's existing `closesAtWeek`, and not referenced
+//             after it closes. Requires `closesAtWeek` for the same reason
+//             `late` requires `introWeek`.
+//   once    — taken a single time, at no fixed week. NOT per-week decidable, so
+//             it is the one mode the week gate cannot judge; its arm is
+//             report-class at book scope (see collectCadenceOnceFindings).
+//
+// SEVERITY: the first three arms BLOCK at the WEEK gate. That location is a
+// correction to this feature's own design doc, which specified the assembled
+// gate — a gate that does not block (api-generator.js logs its errors and
+// delivers the booklet regardless), and is excluded from the two-halves registry
+// by that registry's own written law. Blocking where blocking is real also
+// catches the defect at the seat that can repair one week with a delta instead
+// of after every week is paid for. Decider ruling, 2026-08-18.
+export var VALID_EDGE_CADENCES = ['weekly', 'once', 'window', 'late'];
+
+// The modes whose declaration is incomplete without a companion number, and the
+// field each one owes. Derived from, never a second copy of, the enum above —
+// the floor, the schema's conditional and the prompt all read this one table, so
+// a fifth mode cannot arrive with its arithmetic left implicit.
+export var EDGE_CADENCE_REQUIRED_FIELDS = {
+  late: 'introWeek',
+  window: 'closesAtWeek'
+};
 
 // ── The graph→rules vocabulary (PLAY.md §3.2, the second direction) ─────────
 // A surface KIND in the ref grammar is a machine word (`markStrip`, `citeRef`).

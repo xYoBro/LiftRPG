@@ -87,7 +87,8 @@ import {
   VALID_ANNOTATION_PATTERNS,
   VALID_LEITMOTIF_GESTURES,
   VALID_FORM_PLANS,
-  ATOM_FORM_FAMILIES
+  ATOM_FORM_FAMILIES,
+  VALID_EDGE_CADENCES
 } from './contract-constants.mjs';
 
 var G = SPATIAL_GUARDRAILS;
@@ -935,6 +936,52 @@ var spineEconomyGraph = {
       // spend floored at the last week. A declared window is what makes
       // hoarding cost something.
       closesAtWeek: { type: 'integer', minimum: 1 },
+      // ── `cadence` — the week-axis projection (§4.11) ──────────────────────
+      // The three fields above complete an edge at BOOK scope. This one is the
+      // only thing on the edge that says anything about WEEKS, and it exists
+      // because a graph can be perfectly closed while the pages are not: the
+      // first delivered book's rules fed a clock "each week" and printed it in
+      // one week of six, and every closure floor passed, correctly, because the
+      // graph it was checking was closed.
+      //
+      // ONE OBJECT FIELD, not a scalar plus a sibling integer, and that is the
+      // manifestPointer idiom rather than a style preference: `late` means
+      // nothing without the week it arrives in, and `mode: 'late'` sitting
+      // beside an `introWeek` the model forgot to write is a declaration that
+      // reads as a record and checks as nothing. Nested, the two cannot be
+      // separated by an omission — and the `allOf` on this node makes the
+      // conditional the SCHEMA's, so a half-declared cadence is refused before
+      // any floor is consulted.
+      //
+      // `window` owes `closesAtWeek` by the same argument, but that field is a
+      // SIBLING here (it predates this and is meaningful without a cadence), so
+      // its conditional cannot live on this node. The week gate carries that arm
+      // instead, reading EDGE_CADENCE_REQUIRED_FIELDS — one table, both checks.
+      //
+      // Enum by reference (D93/D149): VALID_EDGE_CADENCES is the home, and a
+      // copied menu drifts one way — the schema keeps accepting what the prompt
+      // stopped offering.
+      cadence: {
+        type: 'object',
+        required: ['mode'],
+        additionalProperties: false,
+        properties: {
+          mode: { enum: VALID_EDGE_CADENCES },
+          // The week the edge's surface starts appearing. Required for `late`
+          // (below); optional for `weekly`, where absence means week 1 — which
+          // is a real default rather than a guess, because an edge declared
+          // weekly with no start IS an edge the player touches from the first
+          // week the book has.
+          introWeek: { type: 'integer', minimum: 1 },
+          _x: xt
+        },
+        allOf: [
+          {
+            if: { properties: { mode: { const: 'late' } }, required: ['mode'] },
+            then: { required: ['mode', 'introWeek'] }
+          }
+        ]
+      },
       _x: xt
     }
   }

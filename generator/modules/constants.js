@@ -114,6 +114,27 @@ export var STAGE_BUDGETS = {
   // construction, and an explicit row rather than the silent MAX_OUTPUT_TOKENS
   // fallback a missing key would take (D97).
   knowing:    { maxTokens: 12000, timeoutMs: 600000 },
+  // ── THE ECONOMY GRAPH'S WEEK AXIS (§4.11) ─────────────────────────────────
+  // Shared by both pipelines, between the shell and the first week. It COPIES a
+  // graph it was given and annotates each edge — so its output size is bounded
+  // by the input's edge count (SPINE_BUDGETS caps the graph), not by anything it
+  // invents. A spine's economyGraph is a handful of edges of two short refs and
+  // three optional scalars; 12000 is the same short-structured-output shelf
+  // `knowing` sits on, with room for a model that thinks inside the ceiling.
+  //
+  // NOT SIZED LIKE THE SHELL, and the asymmetry is the whole reason this stage
+  // exists: the graph used to be authored inside that stage's ~108k payload,
+  // where it was one question among a dozen. A narrow seat with a narrow budget
+  // is the fix (D158's density class).
+  //
+  // The timeout matches `knowing` for the same reason stated on that row: this
+  // is a short structured stage running early on doors whose frontier default
+  // thinks before writing, and a timeout loss at the front of the run is waste.
+  //
+  // ATTEMPTS UNSET (= 2), per this table's own law — raised only on evidence.
+  // Its failure modes are a dropped edge and a half-declared cadence, both of
+  // which a retry with the blocking error quoted can genuinely fix.
+  economyGraph: { maxTokens: 12000, timeoutMs: 600000 },
   // Canonicalize (§11 Wave 5). Shared by both pipelines, and the only stage
   // whose output size is set by the USER'S input rather than by the book: a
   // six-week program with six sessions a week is a few hundred short strings.

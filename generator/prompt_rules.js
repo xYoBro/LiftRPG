@@ -1494,6 +1494,98 @@
     required: ['gameRulebook']
   };
 
+  // ── THE ECONOMY GRAPH'S WEEK AXIS (§4.11) ────────────────────────────────
+  // The sub-stage that annotates the spine's economyGraph after the shell has
+  // declared it. ANNOTATE ONLY — it adds cadence, price and branch to edges that
+  // already exist and may never add or remove one (author-ratified, decision 4).
+  // The graph's SHAPE stays the rulebook projection's; this stage is asked only
+  // how often each existing edge is taken.
+  //
+  // THE CADENCE MENU IS QUOTED FROM VALID_EDGE_CADENCES and parity-asserted both
+  // directions by edgeCadenceMenuParity() in validate.mjs. A copied menu drifts
+  // one way (D124/D149): the die keeps offering what the transport stopped
+  // taking, or here, the prompt keeps offering a mode the floor stopped knowing.
+  window.SCHEMA_ECONOMY_GRAPH = [
+    '# Economy Graph Schema — the week axis',
+    '',
+    'Return a single JSON object: `{ "economyGraph": [ ...edges... ] }`.',
+    '',
+    'You are given the graph this book already declared. Return THE SAME EDGES, in the same',
+    'order, each one enriched. You may not add an edge and you may not remove one: the shape of',
+    'this graph was decided when the rules were written, and your job is to say how each edge is',
+    'PACED, not to redesign the economy.',
+    '',
+    '## Each edge (object)',
+    '- `from` (string) — copy verbatim from the given graph.',
+    '- `to` (string) — copy verbatim from the given graph.',
+    '- `currency` (string, optional) — copy if present.',
+    '- `branch` (string, optional) — which side of a fork carries this edge (`door:W3/A`).',
+    '- `price` (integer ≥ 1, optional) — what this edge costs, IN MARKS.',
+    '- `closesAtWeek` (integer ≥ 1, optional) — the last week this edge can be taken.',
+    '- `cadence` (object, optional but strongly wanted) — how often the player takes this edge.',
+    '  - `mode` (string): exactly one of `weekly`, `once`, `window`, `late`.',
+    '  - `introWeek` (integer ≥ 1): the week the edge\'s surface starts appearing.',
+    '',
+    '## What each cadence PROMISES, and what is then checked against your pages',
+    'A cadence is not a label. It is a promise about which weeks print the surface this edge',
+    'names, and every week of this book is checked against it. Choose the one that is true.',
+    '- `weekly` — the player touches this every week from `introWeek` (default week 1). Every',
+    '  week from then on must print the surface, under exactly the name this edge uses.',
+    '- `late` — the surface is DELIBERATELY absent until `introWeek`, and present from it.',
+    '  `introWeek` is REQUIRED. This is how a book says "the gauge arrives in week 2 and that',
+    '  is the design" rather than leaving it indistinguishable from having forgotten week 1.',
+    '- `window` — the edge can be taken up to a deadline, and the surface must stop appearing',
+    '  after it closes. `closesAtWeek` is REQUIRED with this mode. A deadline the player cannot',
+    '  feel because the surface is still on the page is not a deadline.',
+    '- `once` — taken a single time, at no fixed week. Use this when no week owns the edge.',
+    '',
+    'DECLARE THE CADENCE YOU ACTUALLY BUILT. `weekly` on a surface the book prints twice is a',
+    'promise the pages break, and it is checked week by week — it will be refused, and the week',
+    'that refuses it is the week you will have to rewrite. If a surface genuinely appears in some',
+    'weeks and not others on no schedule, that is `once` or a `late` with the right week, not a',
+    '`weekly` you hope nobody counts.'
+  ];
+
+  // Structured-output twin. ONE literal, borrowed by both transports — the same
+  // shape STRUCTURED_SCHEMA_GAME_RULEBOOK above holds.
+  //
+  // THE ENUM IS A LITERAL HERE BECAUSE THIS FILE HAS NO IMPORTS (it is a classic
+  // IIFE by design, D124's idiom): every closed menu in this file is quoted and
+  // held to its contract home by a validate.mjs parity pass rather than by a
+  // reference. edgeCadenceMenuParity() reads BOTH this literal and the prose
+  // menu above against VALID_EDGE_CADENCES, in both directions — a mode added to
+  // the contract and not here would be a mode the floor knows and the model is
+  // never offered, which is a verdict nobody can return (D134's shape).
+  window.STRUCTURED_SCHEMA_ECONOMY_GRAPH = {
+    type: 'object',
+    properties: {
+      economyGraph: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            from: { type: 'string' },
+            to: { type: 'string' },
+            currency: { type: 'string' },
+            branch: { type: 'string' },
+            price: { type: 'integer' },
+            closesAtWeek: { type: 'integer' },
+            cadence: {
+              type: 'object',
+              properties: {
+                mode: { type: 'string', enum: ['weekly', 'once', 'window', 'late'] },
+                introWeek: { type: 'integer' }
+              },
+              required: ['mode']
+            }
+          },
+          required: ['from', 'to']
+        }
+      }
+    },
+    required: ['economyGraph']
+  };
+
   // ── Canonical workout (§11 Wave 5) ───────────────────────────────────────
   // The canonicalization stage's output: a pasted Liftoscript program read into
   // the structure the pipeline already consumes. This stage writes NO prose and
@@ -3465,6 +3557,49 @@
   // NO WORKED EXAMPLE, NO SAMPLE ANSWER, NO CLOSED MENU (D47/D144). This is the
   // one stage in the system whose entire job is to decide what the game is; a
   // shown answer here is not an illustration, it is the answer.
+  // ── THE ECONOMY GRAPH'S OWN SEAT (§4.11) ─────────────────────────────────
+  // WHY THIS STAGE EXISTS AT ALL. The graph used to be authored inside the shell
+  // stage's ~108,000-character payload, where the model was answering the economy
+  // question while also answering the shell, theme, arrangement, voice,
+  // orientation and disclosure questions. The density class (D158) predicts
+  // exactly the shallow, implied-not-named edges the corpus shows, and the first
+  // delivered book had them. This is a NARROW seat: the rulebook, the graph, the
+  // topology and the week plan, and nothing else.
+  //
+  // ANNOTATE ONLY (author-ratified, decision 4). The no-invent discipline is
+  // D136's revisionInventsKeys idiom scoped to one unit, and it is stated to the
+  // model as the first thing it reads rather than left to a floor to punish.
+  window.INST_ECONOMY_GRAPH = [
+    '## Pace the economy you already designed',
+    'This book\'s rules are written and its economy graph is declared. You are not designing a',
+    'new economy and you are not adding to this one. You are answering one question about each',
+    'edge that already exists: HOW OFTEN does the player take it?',
+    '',
+    'Return every edge you were given, in the order you were given them, with the same `from`',
+    'and the same `to`. Adding an edge or dropping one is the one thing this stage may never do —',
+    'the shape of this graph came from the rules, and changing it here would mean the book has',
+    'two different economies depending on which page you read.',
+    '',
+    '### Why the cadence matters more than it looks',
+    'An edge like `clock:Root Clock → seal:W6` is TRUE for the book and can still be false for',
+    'every week in it: if week 3 never prints that clock, the player has an economy they were',
+    'told about and cannot touch. That exact defect shipped — a clock the rules fed "each week",',
+    'printed in one week of six, with every check green, because nothing had ever compared what',
+    'the machine says the week DOES against what the page gives the player to do it ON.',
+    '',
+    'Your cadence is what closes that. It is checked, week by week, against the surfaces each',
+    'week actually prints. So the cadence you declare has to be the cadence the book will have.',
+    '',
+    '### Price and branch, while you are here',
+    'Where an edge is a SPEND, give it a `price` in marks — marks, not the fiction\'s currency',
+    'name, because the mark is the only unit the machine economy has. Where an edge belongs to',
+    'one side of a fork, say which with `branch` (`door:W3/A`). Both are optional and both are',
+    'better answered here than guessed later.',
+    '',
+    'Leave a field out rather than inventing a value for it. An edge with no price is an edge',
+    'that costs nothing, and that is a legitimate answer.'
+  ];
+
   window.INST_GAME_RULEBOOK = [
     '## Write the rules of the game — before anything else exists',
     'You are the game designer. Nothing of this book has been written yet: no weeks, no',
@@ -3791,6 +3926,106 @@
         var text = String(w || '').trim();
         if (text) lines.push('- ' + text);
       });
+      lines.push('');
+    }
+    return lines.join('\n').replace(/\n+$/, '');
+  };
+
+  /**
+   * formatWeekCadenceGiven(playSpine, weekNumber) -> string
+   *
+   * THIS WEEK'S CADENCE OBLIGATIONS — the taught half of the blocking cadence
+   * floor (§4.11, D187's two-halves law).
+   *
+   * THE FLOOR IT TEACHES: cadenceConformanceFloorErrors() in validation.js
+   * blocks a week that does not print a surface its own book declared weekly (or
+   * late-arriving, or window-closed). A floor whose demand no prompt states
+   * blocks a model that obeyed its prompt perfectly — that is an ambush, and it
+   * is the defect D186 learned live, on the author, on the proving run.
+   *
+   * DERIVED, AND DELIBERATELY TINY. It prints only the edges that bear on THIS
+   * week, resolved from the same `cadence` declarations the floor reads, so the
+   * model is told exactly what it will be held to and nothing else. A week with
+   * no cadence obligations gets '' and its prompt is byte-identical to the one it
+   * always built — which is what keeps this off the ceiling of every week that
+   * does not need it (DR-35 is live; the shell payload is still the largest
+   * prompt in the system and this seat is the second).
+   *
+   * IT NAMES THE SURFACE, NOT THE RULE. The model is not asked to reason about
+   * cadence vocabulary here — that reasoning happened at the economy-graph seat
+   * that WROTE the declarations. This seat is told, in imperative English, which
+   * named surfaces this week owes and which it must not print yet. Two seats, two
+   * halves of one rule.
+   */
+  window.formatWeekCadenceGiven = function (playSpine, weekNumber) {
+    var spine = (playSpine && typeof playSpine === 'object') ? playSpine : null;
+    if (!spine) return '';
+    var n = Number(weekNumber);
+    if (!(n > 0)) return '';
+    var graph = Array.isArray(spine.economyGraph) ? spine.economyGraph : [];
+    if (!graph.length) return '';
+
+    var owes = [];
+    var withhold = [];
+    var seen = {};
+    graph.forEach(function (edge) {
+      if (!edge || typeof edge !== 'object') return;
+      var cadence = edge.cadence;
+      if (!cadence || typeof cadence !== 'object') return;
+      var mode = String(cadence.mode || '').trim();
+      var introWeek = Number(cadence.introWeek) > 0 ? Number(cadence.introWeek) : 1;
+      var closesAtWeek = Number(edge.closesAtWeek) > 0 ? Number(edge.closesAtWeek) : 0;
+      // The same endpoint rule the floor uses: a surface named by NAME, never a
+      // week-shaped ref (which belongs to its own week and cannot be owed here).
+      ['from', 'to'].forEach(function (side) {
+        var raw = String(edge[side] || '').trim();
+        var m = /^([A-Za-z]+)\s*:\s*(.+)$/.exec(raw);
+        if (!m) return;
+        var kind = m[1];
+        var id = m[2].trim();
+        if (['clock', 'companion', 'map'].indexOf(kind) === -1) return;
+        if (/^w\s*\d+/i.test(id)) return;
+        var label = '`' + kind + ':' + id + '`';
+        var dedupe = mode + '::' + label;
+        if (seen[dedupe]) return;
+        seen[dedupe] = true;
+        if (mode === 'weekly' && n >= introWeek) {
+          owes.push('- ' + label + ' — declared WEEKLY'
+            + (introWeek > 1 ? ' from week ' + introWeek : '') + '.');
+        } else if (mode === 'late' && n >= introWeek) {
+          owes.push('- ' + label + ' — declared LATE, arriving in week ' + introWeek + '.');
+        } else if (mode === 'late' && n < introWeek) {
+          withhold.push('- ' + label + ' — declared LATE, and does not arrive until week '
+            + introWeek + '.');
+        } else if (mode === 'window' && closesAtWeek && n > closesAtWeek) {
+          withhold.push('- ' + label + ' — its window CLOSED at week ' + closesAtWeek + '.');
+        }
+      });
+    });
+    if (!owes.length && !withhold.length) return '';
+
+    var lines = [
+      '### The surfaces this week owes — a GIVEN, and it is checked',
+      '',
+      'This book declared how often the player touches each part of its economy, before any week',
+      'was written. Week ' + n + ' is held to those declarations, and a week that breaks one is',
+      'refused and sent back.',
+      ''
+    ];
+    if (owes.length) {
+      lines.push('MUST APPEAR IN THIS WEEK, under exactly the name shown:');
+      lines = lines.concat(owes);
+      lines.push('Print each one as a real, markable surface in this week\'s payload — a clock in'
+        + ' `gameplayClocks`, a companion component, a named map region. The name must match'
+        + ' exactly; a renamed surface is a missing surface to the machine and to the player'
+        + ' following the rules page.');
+      lines.push('');
+    }
+    if (withhold.length) {
+      lines.push('MUST NOT APPEAR IN THIS WEEK — the book declared these deliberately absent here:');
+      lines = lines.concat(withhold);
+      lines.push('This is design, not omission. Printing one early makes the book\'s own'
+        + ' declaration false.');
       lines.push('');
     }
     return lines.join('\n').replace(/\n+$/, '');
@@ -5322,6 +5557,15 @@
     // sentence cannot become false by a reorder. It is the ONE addition — D128's
     // negatives above are unchanged and still asserted.
     'game-rulebook':  { schemas: ['GAME_RULEBOOK'],                             instructions: ['ARSENAL', 'GAME_RULEBOOK', 'SURFACE_REFS', 'BRIEF_FIDELITY'] },
+    // ── The economy graph's week axis (§4.11) ──────────────────────────────
+    // Doctrine-minimal on D128's rule, and the negatives are the same ones the
+    // rulebook seat carries: this stage authors no prose, no theme, no weeks and
+    // no meta, so VOICE_DISCIPLINE, OUTPUT_BUDGETS and CONTRACT_GUARDRAILS would
+    // all be FALSE at it. SURFACE_REFS is the one import and it is load-bearing
+    // rather than habitual: every edge this stage copies is a pair of surface
+    // refs, and a stage that re-emits a grammar it was never taught will
+    // normalise `clock:Root Clock` into something the floors no longer resolve.
+    'economy-graph':  { schemas: ['ECONOMY_GRAPH'],                             instructions: ['ECONOMY_GRAPH', 'SURFACE_REFS'] },
     // Planning stages: story-first
     'layer-codex':    { schemas: [],                                            instructions: ['STORY_ENGINE', 'CHARACTER_WEB', 'LAYERED_ARC', 'ANTI_PATTERNS'] },
     // MAP_GEOMETRY rides the campaign plan because the plan is where the

@@ -92,6 +92,8 @@ import {
   SPINE_BUDGETS,
   parseSurfaceRef,
   VALID_DYNAMIC_MARKINGS,
+  VALID_EDGE_CADENCES,
+  EDGE_CADENCE_REQUIRED_FIELDS,
   // W5a — the Ludic Harvest, tranche 1. Same split: the closed vocabularies and
   // the branch grammar live with the contract, the checks that need the book
   // live here.
@@ -1455,6 +1457,15 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
     warnings = warnings.concat(clockReachabilityWarnings(weekObj,
       expectedOptions.weekNumber || expectedOptions.currentWeekNumber,
       expectedOptions.playSpine, expectedOptions.gameRulebook));
+
+    // ── Cadence conformance: the book's own promise, per week (§4.11) ──
+    // A NEW AXIS beside the arm above, not a rewrite of it: that one asks
+    // whether a clock this week FEEDS is a clock this week PRINTS; this one
+    // asks whether the pages match the cadence the book declared for itself.
+    // Same evidence rule — no spine, no check.
+    errors = errors.concat(cadenceConformanceFloorErrors(weekObj,
+      expectedOptions.weekNumber || expectedOptions.currentWeekNumber,
+      expectedOptions.playSpine));
   }
 
   if (!Array.isArray(weekObj.sessions) || weekObj.sessions.length === 0) {
@@ -3039,6 +3050,208 @@ export function clockReachabilityWarnings(weekObj, weekNumber, playSpine, gameRu
 }
 
 /**
+ * collectCadenceConformanceFindings(weekObj, weekNumber, playSpine) -> [message]
+ *
+ * ── DID YOU BUILD WHAT YOU DECLARED? (VISION §4.0, §4.11) ───────────────────
+ *
+ * D199's arm above asks whether a clock this week FEEDS is a clock this week
+ * PRINTS. This asks the next question: the book stated, per edge, how often the
+ * player touches it — so do the pages match the book's own promise?
+ *
+ * BLOCKING, AT THE WEEK GATE. The design doc specified the assembled gate; that
+ * was its own error and the decider corrected it (2026-08-18). The assembled
+ * gate does not block — api-generator.js logs its errors and delivers the
+ * booklet ("whole-booklet patching is disabled by policy") — so a floor there is
+ * telemetry wearing a gate's name, which is worse than no gate. Here it blocks,
+ * it fires at the seat that can repair one week with a delta, and it is eligible
+ * for the two-halves registry that the assembled gate is excluded from by that
+ * registry's own written law.
+ *
+ * IT READS ONLY MACHINE DATA, D199's discipline exactly: a declared cadence, a
+ * declared surface name, and the surfaces this week's own payload prints. No
+ * prose is parsed and nothing is guessed. A book that declares no cadence is
+ * asked for nothing — absence stays legal (the sealed corpus predates all of
+ * this and is silent here by the D144 ungated-caller idiom, not by an exemption).
+ *
+ * WHICH ENDPOINTS ARE CHECKABLE, and why the answer is narrow. An endpoint
+ * qualifies when it names a SURFACE BY NAME (`clock:Root Clock`) rather than by
+ * week (`markStrip:W3.1`). A week-shaped ref is bound to its own week by its own
+ * id, so a weekly cadence demand on it would ask week 5 to print week 3's mark
+ * strip — a false miss the moment it fired. The three kinds that carry names are
+ * clock, companion and map; oracle, cipher and door are indexed by week ordinal
+ * only, so every ref to them is week-shaped and skipped by the same rule.
+ */
+var CADENCE_NAMED_SURFACE_KINDS = ['clock', 'companion', 'map'];
+
+function cadenceCheckableEndpoints(edge) {
+  var out = [];
+  ['from', 'to'].forEach(function (side) {
+    var parsed = parseSurfaceRef(edge[side]);
+    if (!parsed.valid || !parsed.id) return;
+    if (CADENCE_NAMED_SURFACE_KINDS.indexOf(parsed.kind) === -1) return;
+    // Week-shaped ids belong to their own week and cannot carry a cross-week
+    // cadence demand. See the header.
+    if (/^w\s*\d+/i.test(String(parsed.id).trim())) return;
+    out.push({ kind: parsed.kind, id: parsed.id, key: toSlugWords(parsed.id) });
+  });
+  return out;
+}
+
+function weekPrintsSurface(surfaces, kind, key) {
+  var bucket = surfaces.kinds[kind];
+  return !!(bucket && bucket[key]);
+}
+
+// Does D199's arm already own this miss? Its scope is exactly: an edge whose
+// `from` names THIS week and whose `to` is a clock. Reporting the same absent
+// clock twice would spend two errors of a retry's budget on one fix.
+function clockArmAlreadyOwns(edge, kind, wk) {
+  if (kind !== 'clock') return false;
+  var to = parseSurfaceRef(edge.to);
+  if (!to.valid || to.kind !== 'clock') return false;
+  var from = parseSurfaceRef(edge.from);
+  if (!from.valid || !from.id) return false;
+  var m = /^w(\d+)/i.exec(String(from.id));
+  return !!m && Number(m[1]) === wk;
+}
+
+export function cadenceConformanceFloorErrors(weekObj, weekNumber, playSpine) {
+  var errors = [];
+  var wk = Number(weekNumber);
+  if (!weekObj || typeof weekObj !== 'object' || !wk) return errors;
+  var graph = (playSpine && Array.isArray(playSpine.economyGraph)) ? playSpine.economyGraph : null;
+  if (!graph) return errors;
+
+  var surfaces = deriveWeekSurfaces(weekObj, wk);
+
+  graph.forEach(function (edge) {
+    if (!edge || typeof edge !== 'object') return;
+    var cadence = edge.cadence;
+    if (!cadence || typeof cadence !== 'object' || Array.isArray(cadence)) return;
+    var mode = String(cadence.mode || '').trim();
+    if (VALID_EDGE_CADENCES.indexOf(mode) === -1) return;
+
+    var edgeLabel = '`' + String(edge.from || '?') + '` → `' + String(edge.to || '?') + '`';
+
+    // ── The half-declaration arm (the manifestPointer idiom) ────────────────
+    // A mode whose companion number is missing is a declaration that reads as a
+    // record and checks as nothing. The schema catches `late` without an
+    // introWeek; `window` owes `closesAtWeek`, which is a SIBLING of cadence and
+    // so cannot be conditioned on the schema node. Both read one table.
+    var owed = EDGE_CADENCE_REQUIRED_FIELDS[mode];
+    if (owed) {
+      var owedValue = owed === 'introWeek' ? cadence.introWeek : edge[owed];
+      if (!(Number(owedValue) > 0)) {
+        errors.push('Week ' + wk + ' → the economy-graph edge ' + edgeLabel + ' declares '
+          + '`cadence.mode: "' + mode + '"` and does not carry `' + owed + '`. That cadence is '
+          + 'a promise about WHICH WEEKS the player touches this edge, and without `' + owed + '` '
+          + 'it names no week — it reads as a declaration and checks as nothing. Give it '
+          + '`' + owed + '`, or use a cadence that does not need one.');
+        return;
+      }
+    }
+
+    var introWeek = Number(cadence.introWeek) > 0 ? Number(cadence.introWeek) : 1;
+    var closesAtWeek = Number(edge.closesAtWeek) > 0 ? Number(edge.closesAtWeek) : 0;
+
+    cadenceCheckableEndpoints(edge).forEach(function (ep) {
+      var present = weekPrintsSurface(surfaces, ep.kind, ep.key);
+      var named = '`' + ep.kind + ':' + ep.id + '`';
+
+      if (mode === 'weekly') {
+        if (wk < introWeek || present) return;
+        if (clockArmAlreadyOwns(edge, ep.kind, wk)) return;
+        errors.push('Week ' + wk + ' → the economy-graph edge ' + edgeLabel + ' is declared '
+          + '`cadence.mode: "weekly"`' + (introWeek > 1 ? ' from week ' + introWeek : '')
+          + ', and this week does not print ' + named + '. Weekly is the book\'s own promise that '
+          + 'the player touches this surface every week from ' + (introWeek > 1 ? 'week ' + introWeek : 'week 1')
+          + ' — so either print it in this week under exactly the name the graph uses, or change '
+          + 'the cadence to the one this book actually has. A weekly loop the page provides in '
+          + 'some weeks and not others is an economy the reader is told about and cannot touch.');
+        return;
+      }
+
+      if (mode === 'late') {
+        if (wk < introWeek && present) {
+          errors.push('Week ' + wk + ' → the economy-graph edge ' + edgeLabel + ' is declared '
+            + '`cadence.mode: "late"` arriving in week ' + introWeek + ', and this week prints '
+            + named + ' already. Late means the surface is DELIBERATELY absent until week '
+            + introWeek + '; printing it earlier makes the declaration false. Either move the '
+            + 'surface out of this week, or set `introWeek` to the week it really starts.');
+          return;
+        }
+        if (wk >= introWeek && !present) {
+          if (clockArmAlreadyOwns(edge, ep.kind, wk)) return;
+          errors.push('Week ' + wk + ' → the economy-graph edge ' + edgeLabel + ' is declared '
+            + '`cadence.mode: "late"` arriving in week ' + introWeek + ', and this week is at or '
+            + 'past that and does not print ' + named + '. A late arrival still has to arrive. '
+            + 'Print it under exactly the name the graph uses, or correct `introWeek`.');
+        }
+        return;
+      }
+
+      if (mode === 'window') {
+        if (closesAtWeek && wk > closesAtWeek && present) {
+          errors.push('Week ' + wk + ' → the economy-graph edge ' + edgeLabel + ' is declared '
+            + '`cadence.mode: "window"` closing at week ' + closesAtWeek + ', and this week still '
+            + 'prints ' + named + '. A window that is still on the page after it closes is not a '
+            + 'window — it is a deadline the player has no way to feel. Either stop printing the '
+            + 'surface after week ' + closesAtWeek + ', or extend `closesAtWeek` to the truth.');
+        }
+      }
+      // `once` is book-scope and cannot be judged from one week — see
+      // collectCadenceOnceFindings, which reports it after assembly.
+    });
+  });
+
+  return errors;
+}
+
+/**
+ * collectCadenceOnceFindings(booklet) -> [{ message }]
+ *
+ * THE ONE ARM THE WEEK GATE CANNOT CARRY (§4.11). `once` says the player takes
+ * this edge a single time at no fixed week, so no single week's payload can
+ * confirm or deny it — only the whole book can, and only weakly: the honest
+ * question at book scope is whether the surface is printed ANYWHERE.
+ *
+ * REPORT-CLASS, and labelled as telemetry rather than as a gate. It runs inside
+ * validateAssembledBooklet, whose errors do not block delivery, so a blocking
+ * severity here would be a claim the mechanism cannot honour (D19, and the
+ * floor-teaching registry's own scope note). It carries no registry row for
+ * exactly that reason — the registry admits blocking generation-stage floors
+ * only, and pretending otherwise would put a row in a table whose law excludes it.
+ */
+export function collectCadenceOnceFindings(booklet) {
+  var findings = [];
+  var doc = booklet || {};
+  var spine = ((doc.meta || {}).playSpine) || null;
+  var graph = (spine && Array.isArray(spine.economyGraph)) ? spine.economyGraph : null;
+  if (!graph) return findings;
+  var ledger = deriveWeeklySurfaceLedger(doc);
+  if (!ledger.length) return findings;
+
+  graph.forEach(function (edge) {
+    if (!edge || typeof edge !== 'object') return;
+    var cadence = edge.cadence;
+    if (!cadence || typeof cadence !== 'object') return;
+    if (String(cadence.mode || '').trim() !== 'once') return;
+    cadenceCheckableEndpoints(edge).forEach(function (ep) {
+      var anywhere = ledger.some(function (row) {
+        return weekPrintsSurface(row, ep.kind, ep.key);
+      });
+      if (anywhere) return;
+      findings.push({ message: 'The economy-graph edge `' + String(edge.from || '?') + '` → `'
+        + String(edge.to || '?') + '` is declared `cadence.mode: "once"`, and `' + ep.kind + ':'
+        + ep.id + '` is printed in no week of this book. A once-only affordance still has to be '
+        + 'somewhere the player can reach it. Reported, not refused: this is measured after '
+        + 'assembly, where nothing blocks.' });
+    });
+  });
+  return findings;
+}
+
+/**
  * collectOracleWriteTargetFindings(booklet) -> [{ message }]
  *
  * ── DR-32: THE ORACLE'S WRITE TARGET, REPORT-CLASS ──────────────────────────
@@ -4530,6 +4743,110 @@ function sinkRefResolves(index, ref) {
 // hold the plan to itself; the sim holds the book to the plan.
 
 /**
+ * deriveWeekSurfaces(week, fallbackNumber) -> { weekNumber, kinds }
+ *
+ * WHAT ONE WEEK ACTUALLY PRINTS, by surface kind (§4.11). `kinds` maps a ref
+ * kind to a set of slugged ids, the same slugging buildSurfaceIndex has always
+ * used, so a name written one way in the graph and another way on the page still
+ * matches exactly where it always did.
+ *
+ * THE VOCABULARY'S SOURCE, stated because the honest answer matters more than
+ * the tidy one. This function IS the vocabulary — it was extracted verbatim from
+ * buildSurfaceIndex's per-week loop, which is the floors' own long-standing
+ * inventory, and buildSurfaceIndex now calls it rather than keeping a second
+ * copy. So there is exactly one home and two readers (D93): the book-scope index
+ * and the week-scope ledger.
+ *
+ * WHAT THAT DOES NOT BUY. This reads the BOOKLET JSON, not the adapter's
+ * emissions, so it knows the surfaces the schema names and not, independently,
+ * the surfaces the renderer draws. A surface family the adapter learns to emit
+ * without a schema field to carry it would be invisible here — the DR-40 shape.
+ * Deriving from the adapter was considered and is not feasible in this wave: the
+ * adapter is a browser ES module in the renderer tree that consumes an assembled
+ * booklet and returns layout atoms, so "which economy surfaces does week 3 have"
+ * is not a question it answers without running a layout pass. The mitigation is
+ * that both readers share this one list, so the ledger can never be more ignorant
+ * than the floors already are.
+ *
+ * ONLY AUTHORED SURFACES, never PLANNED ones. `mapType: 'grid'` and
+ * `cipherType: 'index-extraction'` are decisions about what week 3 will contain;
+ * they are not the name of a region or a puzzle, and counting them would make a
+ * kind look authored while holding none of the names a spine edge points at —
+ * which turns a forward promise into a false miss. See surfaceRefResolves.
+ */
+export function deriveWeekSurfaces(week, fallbackNumber) {
+  var out = { weekNumber: Number(fallbackNumber) || 1, kinds: {} };
+  if (!week || typeof week !== 'object') return out;
+  var n = Number(week.weekNumber);
+  if (!Number.isFinite(n) || n < 1) n = Number(fallbackNumber) || 1;
+  out.weekNumber = n;
+
+  function note(kind, value) {
+    var key = toSlugWords(value);
+    if (!key) return;
+    if (!out.kinds[kind]) out.kinds[kind] = {};
+    out.kinds[kind][key] = true;
+  }
+
+  note('week', 'W' + n);
+  note('reckoning', 'W' + n);
+  note('markStrip', 'W' + n);
+  var sessions = Array.isArray(week.sessions) ? week.sessions : [];
+  for (var si = 0; si < Math.max(sessions.length, Number(week.sessionCount) || 0); si++) {
+    note('session', 'W' + n + '.' + (si + 1));
+    note('markStrip', 'W' + n + '.' + (si + 1));
+  }
+  var fo = week.fieldOps || {};
+  if (fo.oracleTable || fo.oracle) note('oracle', 'W' + n);
+  if (fo.cipher) note('cipher', 'W' + n);
+  if (week.doorChoice) note('door', 'W' + n);
+  (week.gameplayClocks || []).forEach(function (clock) {
+    if (clock) note('clock', clock.clockName);
+  });
+  var mapState = fo.mapState || {};
+  if (mapState.title) note('map', mapState.title);
+  if (mapState.title || (mapState.nodes || []).length) note('map', 'W' + n);
+  (mapState.nodes || []).forEach(function (node) { if (node) { note('map', node.label); note('map', node.id); } });
+  (mapState.tiles || []).forEach(function (tile) { if (tile) note('map', tile.label); });
+  function noteCompanions(pool) {
+    (Array.isArray(pool) ? pool : []).forEach(function (c) {
+      if (!c) return;
+      note('companion', c.title); note('companion', c.label);
+      note('companion', c.statName); note('companion', c.type);
+    });
+  }
+  noteCompanions(fo.companionComponents);
+  if (week.interlude && week.interlude.payload) noteCompanions(week.interlude.payload.companionComponents);
+  if (week.overflowDocument && week.overflowDocument.id) note('fragment', week.overflowDocument.id);
+  return out;
+}
+
+/**
+ * deriveWeeklySurfaceLedger(booklet) -> [{ weekNumber, kinds }]
+ *
+ * THE WEEKLY SURFACE LEDGER (§4.11's derived half) — the economy graph's week
+ * axis, measured rather than declared. One row per week, each row the output of
+ * deriveWeekSurfaces above.
+ *
+ * TELEMETRY, NOT A GATE'S EVIDENCE, and the distinction is deliberate. The
+ * blocking cadence arms live at the WEEK gate and read the single week they were
+ * handed — they never consult this. This exists for the two book-scope readers
+ * that genuinely need every week at once: the `once` cadence arm and DR-32's
+ * oracle write-target arm, both report-class. It is also written to `_x` so a
+ * delivered book carries the measurement a reader can check its own pages
+ * against.
+ *
+ * A MEASUREMENT, NEVER MODEL-WRITABLE: nothing in any prompt or stage schema
+ * offers this shape, and it is recomputed from the booklet every time it is
+ * asked for rather than read back from debris.
+ */
+export function deriveWeeklySurfaceLedger(booklet) {
+  var doc = booklet || {};
+  var weeks = Array.isArray(doc.weeks) ? doc.weeks : [];
+  return weeks.map(function (week, wi) { return deriveWeekSurfaces(week, wi + 1); });
+}
+
+/**
  * buildSurfaceIndex(booklet) -> { weeks, kinds, has(kind, id) }
  *
  * What a booklet (or a weekPlan-bearing skeleton) actually offers a spine edge
@@ -4572,42 +4889,18 @@ export function buildSurfaceIndex(booklet) {
     var n = Number(week.weekNumber);
     if (!Number.isFinite(n) || n < 1) n = wi + 1;
     index.weeks[n] = true;
-    note('week', 'W' + n);
-    note('reckoning', 'W' + n);
-    note('markStrip', 'W' + n);
-    var sessions = Array.isArray(week.sessions) ? week.sessions : [];
-    for (var si = 0; si < Math.max(sessions.length, Number(week.sessionCount) || 0); si++) {
-      note('session', 'W' + n + '.' + (si + 1));
-      note('markStrip', 'W' + n + '.' + (si + 1));
-    }
-    // Only AUTHORED surfaces are indexed, never PLANNED ones. `mapType: 'grid'`
-    // and `cipherType: 'index-extraction'` are decisions about what week 3 will
-    // contain; they are not the name of a region or a puzzle, and indexing them
-    // would make the kind look "authored" while holding none of the names a
-    // spine edge points at — which turns a forward promise into a false miss.
-    // See surfaceRefResolves for the rule this feeds.
-    var fo = week.fieldOps || {};
-    if (fo.oracleTable || fo.oracle) note('oracle', 'W' + n);
-    if (fo.cipher) note('cipher', 'W' + n);
-    if (week.doorChoice) note('door', 'W' + n);
-    (week.gameplayClocks || []).forEach(function (clock) {
-      if (clock) note('clock', clock.clockName);
-    });
-    var mapState = fo.mapState || {};
-    if (mapState.title) note('map', mapState.title);
-    if (mapState.title || (mapState.nodes || []).length) note('map', 'W' + n);
-    (mapState.nodes || []).forEach(function (node) { if (node) { note('map', node.label); note('map', node.id); } });
-    (mapState.tiles || []).forEach(function (tile) { if (tile) note('map', tile.label); });
-    function noteCompanions(pool) {
-      (Array.isArray(pool) ? pool : []).forEach(function (c) {
-        if (!c) return;
-        note('companion', c.title); note('companion', c.label);
-        note('companion', c.statName); note('companion', c.type);
+    // ONE VOCABULARY, FOLDED INTO THE BOOK-SCOPE INDEX (§4.11). Everything this
+    // loop used to note inline now comes from deriveWeekSurfaces above, so the
+    // book-scope index and the week-scope ledger cannot form different opinions
+    // about what a week prints — the D93 two-algorithms defect, pre-empted. The
+    // authored-not-planned rule and its reasoning moved into that function.
+    var derivedSurfaces = deriveWeekSurfaces(week, n);
+    Object.keys(derivedSurfaces.kinds).forEach(function (kind) {
+      Object.keys(derivedSurfaces.kinds[kind]).forEach(function (slug) {
+        if (!index.kinds[kind]) index.kinds[kind] = {};
+        index.kinds[kind][slug] = true;
       });
-    }
-    noteCompanions(fo.companionComponents);
-    if (week.interlude && week.interlude.payload) noteCompanions(week.interlude.payload.companionComponents);
-    if (week.overflowDocument && week.overflowDocument.id) note('fragment', week.overflowDocument.id);
+    });
   });
 
   var fragments = Array.isArray(doc.fragments) ? doc.fragments
@@ -4798,6 +5091,117 @@ function rulebookTaughtText(rulebook) {
     parts.push(String((item || {}).on || ''));
   });
   return parts.join('\n').toLowerCase();
+}
+
+/**
+ * validateEconomyGraphStage(result, options) -> string
+ *
+ * The economy-graph sub-stage's own gate (§4.11). Returns '' on success and a
+ * single joined error string on failure, the shape runJsonStage expects.
+ *
+ * ANNOTATE ONLY — THE FLOOR THAT MAKES THE RULING REAL (author decision 4). The
+ * stage may add cadence, price and branch to edges that exist; it may never add
+ * or remove one. That is D136's revisionInventsKeys idiom scoped to this unit,
+ * and it is checked as a SET COMPARISON on `from → to` pairs against the graph
+ * the stage was handed, because "same length" is not the same claim: a model
+ * that drops one edge and invents another passes a count and has silently
+ * rewritten the economy.
+ *
+ * `options.priorGraph` is the evidence and, per the D144 ungated-caller idiom,
+ * its absence disarms only the no-invent arm — the cadence-shape arms below read
+ * the unit they were handed and stay live regardless.
+ */
+export function validateEconomyGraphStage(result, options) {
+  var S = 'Economy Graph → ';
+  if (!result || typeof result !== 'object' || Array.isArray(result)) {
+    return S + 'not an object';
+  }
+  var graph = result.economyGraph;
+  if (!Array.isArray(graph)) {
+    return S + 'economyGraph is missing or not an array — this stage exists to pace the edges'
+      + ' the book already declared, and it must return all of them';
+  }
+
+  var errors = [];
+  var opts = options || {};
+  var edgeKey = function (edge) {
+    return toSlugWords(String((edge || {}).from || '')) + ' -> '
+      + toSlugWords(String((edge || {}).to || ''));
+  };
+
+  // ── The no-invent arm ────────────────────────────────────────────────────
+  var prior = Array.isArray(opts.priorGraph) ? opts.priorGraph : null;
+  if (prior) {
+    var priorKeys = {};
+    prior.forEach(function (edge) { priorKeys[edgeKey(edge)] = String((edge || {}).from || '') + ' → ' + String((edge || {}).to || ''); });
+    var returnedKeys = {};
+    graph.forEach(function (edge) { returnedKeys[edgeKey(edge)] = true; });
+    Object.keys(priorKeys).forEach(function (key) {
+      if (!returnedKeys[key]) {
+        errors.push(S + 'the edge `' + priorKeys[key] + '` was in the graph you were given and is'
+          + ' not in what you returned. This stage may not remove an edge — the shape of this'
+          + ' graph came from the rules, and dropping one here would mean the book has two'
+          + ' different economies depending on which page you read. Return every edge, in order,'
+          + ' with the same `from` and `to`.');
+      }
+    });
+    graph.forEach(function (edge) {
+      var key = edgeKey(edge);
+      if (!priorKeys[key]) {
+        errors.push(S + 'the edge `' + String((edge || {}).from || '?') + ' → '
+          + String((edge || {}).to || '?') + '` is not in the graph you were given. This stage may'
+          + ' not add an edge — it paces the economy the rules declared, it does not extend it.');
+      }
+    });
+  }
+
+  // ── The cadence-shape arms (strict when present, the manifestPointer idiom) ─
+  graph.forEach(function (edge, i) {
+    if (!edge || typeof edge !== 'object') {
+      errors.push(S + 'economyGraph[' + i + '] is not an object');
+      return;
+    }
+    var label = '`' + String(edge.from || '?') + ' → ' + String(edge.to || '?') + '`';
+    if (!String(edge.from || '').trim() || !String(edge.to || '').trim()) {
+      errors.push(S + 'economyGraph[' + i + '] is missing `from` or `to` — copy both verbatim'
+        + ' from the graph you were given');
+    }
+    var cadence = edge.cadence;
+    if (cadence === undefined || cadence === null) return;
+    if (typeof cadence !== 'object' || Array.isArray(cadence)) {
+      errors.push(S + label + ' has a `cadence` that is not an object — it is'
+        + ' `{ "mode": ..., "introWeek": ... }`');
+      return;
+    }
+    var mode = String(cadence.mode || '').trim();
+    if (!mode) {
+      errors.push(S + label + ' has a `cadence` with no `mode` — a cadence with no mode is a'
+        + ' record that checks as nothing');
+      return;
+    }
+    if (VALID_EDGE_CADENCES.indexOf(mode) === -1) {
+      errors.push(S + label + ' declares `cadence.mode: "' + mode + '"`, which is not one of: '
+        + VALID_EDGE_CADENCES.join(', ') + '. Use exactly one of those.');
+      return;
+    }
+    var owed = EDGE_CADENCE_REQUIRED_FIELDS[mode];
+    if (owed) {
+      var owedValue = owed === 'introWeek' ? cadence.introWeek : edge[owed];
+      if (!(Number(owedValue) > 0)) {
+        errors.push(S + label + ' declares `cadence.mode: "' + mode + '"` and carries no `'
+          + owed + '`. That cadence is a promise about which weeks the player touches this edge,'
+          + ' and without `' + owed + '` it names no week. Supply `' + owed + '`, or use a'
+          + ' cadence that does not need one.');
+      }
+    }
+    var weekCount = Number(opts.weekCount) || 0;
+    if (weekCount > 0 && Number(cadence.introWeek) > weekCount) {
+      errors.push(S + label + ' declares `introWeek: ' + cadence.introWeek + '` and this book has '
+        + weekCount + ' weeks. A surface that arrives after the last week never arrives.');
+    }
+  });
+
+  return errors.length ? errors.join('; ') : '';
 }
 
 /**
@@ -7859,6 +8263,14 @@ export function validateAssembledBooklet(booklet, options) {
   // uses that idiom and prints the surface. A fuzzy arm warns. Promotion owes
   // a corpus with the positive case in it, and is an author call.
   collectOracleWriteTargetFindings(booklet).forEach(function (f) { warnings.push(f.message); });
+  // §4.11's book-scope arm, and the ONLY cadence arm that lives here. The other
+  // three block at the WEEK gate, where blocking is real; `once` names no week,
+  // so no week's payload can judge it and this is the only seat that can ask the
+  // question at all. Report-class on BOTH paths with no D19 split, because this
+  // function does not block on either one — api-generator.js logs these and
+  // delivers the booklet. Labelling it an error would be a claim the mechanism
+  // cannot honour.
+  collectCadenceOnceFindings(booklet).forEach(function (f) { warnings.push(f.message); });
   collectLicensedMovePlacementFindings(booklet).forEach(function (f) { warnings.push(f.message); });
   // Posted manifests are promises, not preferences — broken ones are errors.
   collectManifestPointerErrors(booklet).forEach(function (m) { errors.push(m); });
