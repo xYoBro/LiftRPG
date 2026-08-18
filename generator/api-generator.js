@@ -172,8 +172,19 @@ import {
   // D167. The ONE rendering of a field path. The gates produce coordinates as
   // key arrays; this renders the string the model is shown and must echo. There
   // is deliberately no parser anywhere — arrays travel, the string is wire.
-  formatFieldPath
+  formatFieldPath,
+  // W2. DERIVE, DON'T DESCRIBE (D136). The unknown-key sweep at the stage gates
+  // reads the SAME walker the critic's revision floor and the assembled-booklet
+  // pass read; there is no second description of what a legal key is anywhere
+  // in this file. See unknownKeyErrorsForStage below.
+  collectUnknownKeyPaths
 } from './modules/validation.js';
+
+// The anchor the walker above resolves against. Imported here for exactly one
+// purpose — addressing a stage's own unit inside the canonical schema — and
+// never read for its rules: a rule read out of this object in this file would
+// be the second schema copy D136 exists to prevent.
+import { BOOKLET_SCHEMA } from '../contracts/booklet-schema.mjs';
 
 import {
   buildQualityGate,
@@ -2559,6 +2570,119 @@ function parseRetryAfterHeader(err) {
 
 // Authoritative API-stage discipline helper. Guided build should mirror this
 // behavior at paste-time rather than inventing parallel acceptance rules.
+// ── THE UNKNOWN-KEY SWEEP AT THE STAGE GATES (W2) ────────────────────────────
+//
+// THE DEFECT THIS EXISTS FOR. A model answered the rulebook stage with four
+// fields the schema does not declare (`answer_length_note` among them). Every
+// stage validator passed — they check the fields they were told to check, and a
+// field nobody declared is a field nobody looks for. The booklet was assembled,
+// paid for, delivered, and only `npm run validate` refused it: the one reader
+// that walks the schema instead of a checklist, and the one that runs after
+// every dollar is spent.
+//
+// The fix is to ask that same question at the seat where it is still free: the
+// stage gate, where the model is right there and a retry costs one call with
+// the offending paths quoted back at it.
+//
+// DERIVE, DON'T DESCRIBE (D136). `collectUnknownKeyPaths` is the walker the
+// critic's revision floor and the assembled-booklet pass already use; this adds
+// an ADDRESS (which schema node this stage's unit is), never a rule. `_x` stays
+// exempt everywhere the walker exempts it (D129) — that is the namespace's
+// whole job and the sweep does not get an opinion about it.
+//
+// A scope is declared on the stage config, not inferred, because "which part of
+// the booklet did this stage just write" is knowledge the stage has and the
+// runner does not — and inferring it wrong would fail books for the wrong
+// reason.
+
+function resolveSchemaRefHop(node) {
+  var hops = 0;
+  while (node && typeof node === 'object' && typeof node.$ref === 'string' && hops++ < 8) {
+    node = (BOOKLET_SCHEMA.$defs || {})[node.$ref.replace('#/$defs/', '')];
+  }
+  return node;
+}
+
+/**
+ * `'$defs:week'` addresses a named definition; anything else is a dotted path
+ * of PROPERTY names from the booklet root (`'meta.gameRulebook'`, `'fragments'`).
+ */
+function resolveSchemaNodeAt(schemaPath) {
+  var spec = String(schemaPath || '');
+  if (!spec) return null;
+  if (spec.indexOf('$defs:') === 0) {
+    return (BOOKLET_SCHEMA.$defs || {})[spec.slice(6)] || null;
+  }
+  var node = BOOKLET_SCHEMA;
+  var parts = spec.split('.');
+  for (var i = 0; i < parts.length; i++) {
+    node = resolveSchemaRefHop(node);
+    node = node && node.properties ? node.properties[parts[i]] : null;
+    if (!node) return null;
+  }
+  return resolveSchemaRefHop(node);
+}
+
+function readStageUnitAt(result, from) {
+  if (!from) return result;
+  var node = result;
+  var parts = String(from).split('.');
+  for (var i = 0; i < parts.length && node && typeof node === 'object'; i++) {
+    node = node[parts[i]];
+  }
+  return node;
+}
+
+function joinUnknownKeyPath(label, path) {
+  if (!label) return path;
+  if (!path) return label;
+  return path.charAt(0) === '[' ? label + path : label + '.' + path;
+}
+
+function unknownKeyErrorsForStage(config, result) {
+  var scopes = config && config.unknownKeyScopes;
+  if (!Array.isArray(scopes) || scopes.length === 0) return [];
+  var errors = [];
+  scopes.forEach(function (scope) {
+    var node = resolveSchemaNodeAt(scope.schemaPath);
+    if (!node) {
+      // ANTI-VACUITY. A scope naming a location the schema does not have is a
+      // defect in THIS file — it would make the sweep silently check nothing,
+      // which is the failure mode a gate must never have. Loud, and never
+      // charged to the model.
+      console.error('[LiftRPG] Unknown-key scope "' + scope.schemaPath
+        + '" does not resolve in booklet-schema.mjs — this stage is UNSWEPT.');
+      return;
+    }
+    var unit = readStageUnitAt(result, scope.from);
+    if (!unit || typeof unit !== 'object') return;
+    var label = scope.label || scope.from || '';
+    collectUnknownKeyPaths(unit, node, '').forEach(function (p) {
+      // ── OUR DEBRIS IS NOT THE MODEL'S DEFECT ─────────────────────────────
+      // This gate runs AFTER config.autoRepair, and autoRepairWeek writes
+      // `_overflowRepairs` onto the week it repairs (assembly.js) — transient
+      // pipeline debris that `collectOverflowRepairs` harvests and clears at
+      // assembly, and which the week schema therefore never declares. Without
+      // this filter, every week that took a repair would then be failed for a
+      // field WE wrote, on an attempt that had just been fixed — an
+      // intermittent, expensive, and completely wrong stage failure.
+      //
+      // The class this gate exists to kill is `answer_length_note`: a plainly
+      // named field the model invented beside the ones it was asked for. An
+      // underscore-prefixed key is ours by convention everywhere in this tree,
+      // and the two readers that see the booklet AFTER the debris is cleaned —
+      // the assembled-booklet unknown-key pass and scripts/validate.mjs — still
+      // refuse any that survive. Nothing is un-checked; it is checked later, by
+      // the reader that can tell our debris from the model's invention.
+      if (String(p).split(/[.[]/).some(function (seg) { return seg.charAt(0) === '_'; })) return;
+      errors.push('Unknown key "' + joinUnknownKeyPath(label, p)
+        + '" — the booklet schema rejects any key it does not declare outside the `_x` '
+        + 'namespace. Remove the field, or move it under `_x` if it is genuinely extra.');
+    });
+  });
+  return errors;
+}
+
 async function runJsonStage(settings, config) {
   // Attempt count, in ladder order: an explicit config.maxAttempts wins (the
   // trial-mode call sites set one deliberately), then the STAGE_BUDGETS row,
@@ -2854,6 +2978,31 @@ async function runJsonStage(settings, config) {
           }
         }
       }
+      // ── THE UNKNOWN-KEY GATE ────────────────────────────────────────────
+      // Runs AFTER the stage's own validator has passed, and deliberately
+      // outside the delta-repair machinery above: an invented field is not a
+      // budget breach with a coordinate to shorten, it is a field that should
+      // not exist, and the remedy is "delete it" — which the model can do on a
+      // re-roll with the paths quoted. Shaped exactly like the blocking throw
+      // above so every downstream reader (retry directive, repair routing, the
+      // panel's rejection line) treats it as the schema failure it is.
+      var unknownKeyErrors = unknownKeyErrorsForStage(config, result);
+      if (unknownKeyErrors.length > 0) {
+        var keyErr = new Error(unknownKeyErrors.join('; '));
+        keyErr.errorType = 'schema';
+        keyErr.retryable = true;
+        // Not a budget breach, and the honesty rider (D168) says so with the
+        // identity value rather than by omission.
+        keyErr.budgetBreachCount = 0;
+        keyErr.blockingCount = unknownKeyErrors.length;
+        keyErr.finishReason = attemptFinishReason;
+        keyErr._failedOutput = result;
+        keyErr._blockingErrors = unknownKeyErrors;
+        keyErr._stageKey = config.stageKey || '';
+        keyErr.repairRoute = describeRepairRoute(keyErr, config.stageName);
+        throw keyErr;
+      }
+
       var summary = summarizeStageTelemetry(stageTelemetry);
       // Single choke point for every paid call in every pipeline (critic rounds
       // included) — the cross-session spend ledger is fed from here and only here.
@@ -3130,6 +3279,11 @@ async function generateSingleFragmentAdaptive(settings, builders, config) {
     maxAttempts: 2,
     rateLimiter: config.rateLimiter || null,
     budgetEnforce: config.budgetEnforce || false,
+    // W2: the single-fragment recovery seat writes ONE document, so it is
+    // swept against `$defs/fragment` directly. The batch seat above and this
+    // one must not disagree about what a legal key is — a recovered document
+    // held to a looser bar is the D181 stale-mirror class in miniature.
+    unknownKeyScopes: [{ from: '', schemaPath: '$defs:fragment', label: 'fragment' }],
     normalizeResult: function (result) {
       return normalizeSingleFragmentResult(result, registryEntry);
     },
@@ -3221,6 +3375,10 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
       maxAttempts: 2,
       rateLimiter: config.rateLimiter || null,
       budgetEnforce: config.budgetEnforce || false,
+      // W2: the batch's unit is `fragments[]`, addressed at the booklet's own
+      // array property so the walker reads its `items` and judges every
+      // document in the batch against `$defs/fragment`.
+      unknownKeyScopes: [{ from: 'fragments', schemaPath: 'fragments', label: 'fragments' }],
       normalizeResult: function (result) {
         return normalizeFragmentBatchResult(result, config.registry);
       },
@@ -3801,6 +3959,27 @@ function describeProcessParticulars(particulars) {
   return parts.length ? 'World detail: ' + parts.join(', ') + '.' : 'no process particulars authored';
 }
 
+// ── THE NORMALIZATION NOTE (W2) ──────────────────────────────────────────────
+// A repair the tooling performs silently is indistinguishable from a repair it
+// forgot to perform. The literal-`\n` sweep in assembly.js rewrites printed
+// prose; the run says so, with the count, in the reader's own log. It never
+// blocks — this is the D21 class, tooling owns the repair — but it is never
+// invisible either.
+function emitAssemblyNormalizationNotes(onProgress, booklet, stageIndex, totalStages) {
+  var diagnostics = readPipelineDebris(booklet, '_assemblyDiagnostics') || [];
+  var escaped = diagnostics.filter(function (entry) {
+    return entry && entry.code === 'escaped-whitespace-normalized';
+  })[0];
+  if (!escaped) return;
+  emitPipelineEvent(onProgress, stageIndex, totalStages, escaped.message, {
+    phase: 'run_note',
+    stageKey: '',
+    stageName: 'Assembly',
+    noticeLevel: 'info',
+    noteCode: escaped.code
+  });
+}
+
 async function runApiPipeline(options) {
   if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
 
@@ -3827,6 +4006,12 @@ async function runApiPipeline(options) {
   // card than the counter knows about is the D110 UI lie in miniature.
   var totalStages = 5 + weekCount + 2;
   var stageNum = 0;
+  // Whether the canonicalize stage counted itself (0 or 1). It bumps
+  // `totalStages` when it runs — and the mid-run recompute below is an
+  // ASSIGNMENT, so before W2 it silently threw that bump away along with the
+  // rulebook's seat. Two stages the counter had already met, deleted from the
+  // denominator, is how the run log printed "15/14".
+  var canonicalizeStages = 0;
   var onProgress = options.onProgress;
 
   // ── Checkpoint: resume from last completed stage if available ────
@@ -3963,7 +4148,7 @@ async function runApiPipeline(options) {
     budgetEnforce: useGeminiBudget,
     trialMode: !!(options.trialMode || settings.trialMode),
     bumpStage: function () { return ++stageNum; },
-    bumpTotal: function () { totalStages++; },
+    bumpTotal: function () { totalStages++; canonicalizeStages = 1; },
     getTotalStages: function () { return totalStages; }
   }));
   checkpoint = canonState.checkpoint;
@@ -4471,6 +4656,11 @@ async function runApiPipeline(options) {
       maxAttempts: 3,
       rateLimiter: rateLimiter,
       budgetEnforce: useGeminiBudget,
+      // W2: the unit this stage writes is one week, judged against the same
+      // `$defs/week` the canonical validator will use. Runs after
+      // normalizeResult has unwrapped any `{weeks:[…]}` envelope, so the object
+      // swept is the object banked.
+      unknownKeyScopes: [{ from: '', schemaPath: '$defs:week', label: 'week' }],
       normalizeResult: function (result) {
         if (result && Array.isArray(result.weeks) && result.weeks.length > 0) {
           console.warn('[LiftRPG] Week stage returned weeks[] wrapper — unwrapping');
@@ -4593,8 +4783,21 @@ async function runApiPipeline(options) {
   var fragmentBatches = buildFragmentBatches(registry, weekSummaries);
   var totalBatches = fragmentBatches.length;
 
-  // Update totalStages now that we know batch count instead of individual count
-  totalStages = 4 + weekCount + totalBatches + 1;
+  // Update totalStages now that we know the batch count.
+  //
+  // THE DENOMINATOR IS THE LIST OF STAGES THAT ACTUALLY BUMP `stageNum`, and
+  // nothing else. In order: canonicalize (0 or 1, above), then the five that
+  // always run — gameRulebook, layerBible, campaign, shell, knowing — then one
+  // per week, one per fragment batch, and the finale. The quality stage emits
+  // at `totalStages / totalStages` and never increments, so it is deliberately
+  // NOT counted here.
+  //
+  // The old line was `4 + weekCount + totalBatches + 1`: four setup stages
+  // where five run, and an assignment that discarded canonicalize's own bump.
+  // Two missing seats, one counter, and a log line that read 15/14 on a run
+  // whose rail was correct the whole time (the reader's rail is clamped by
+  // D175; this was always the log path alone).
+  totalStages = canonicalizeStages + 5 + weekCount + totalBatches + 1;
 
   for (var fb = 0; fb < fragmentBatches.length; fb++) {
     var batch = fragmentBatches[fb];
@@ -4704,6 +4907,9 @@ async function runApiPipeline(options) {
       maxAttempts: 2,
       rateLimiter: rateLimiter,
       budgetEnforce: useGeminiBudget,
+      // W2: this stage writes one ending, judged against `$defs/ending` —
+      // which is `additionalProperties:false` all the way down into `content`.
+      unknownKeyScopes: [{ from: '', schemaPath: '$defs:ending', label: 'ending' }],
       validate: function (result) {
         if (!result) return 'Ending object is null.';
         if (!result.variant) return 'Ending missing variant.';
@@ -4772,6 +4978,7 @@ async function runApiPipeline(options) {
   console.log('[LiftRPG] Assembling booklet from ' + finalWeeks.length + ' weeks, ' + finalFragments.length + ' fragments, ' + finalEndings.length + ' endings.');
 
   var booklet = options.assemble(shell, assembledWeeksOutput, assembledFragmentsOutput, assembledEndingsOutput, campaignPlan);
+  emitAssemblyNormalizationNotes(onProgress, booklet, totalStages, totalStages);
   enforceIdentityContract(booklet, identityContract);
   truthBoardStateMode(booklet, readPipelineDebris(booklet, '_assemblyDiagnostics') || []);
   recordSeedOnBooklet(booklet, divergenceSeed);
@@ -5187,6 +5394,14 @@ async function runGameRulebookStage(settings, config) {
     telemetryCollector: config.telemetryCollector,
     normalizeResult: normalizeGameRulebookShape,
     repairDirective: config.repairDirective || '',
+    // THE SEAT THAT EARNED THE SWEEP (W2). The first delivered book carried
+    // four invented rulebook fields — `answer_length_note` among them — past
+    // every stage gate and died at the canonical validator, after the whole
+    // run was paid for. This addresses the stage's own unit inside the schema
+    // that will judge it later.
+    unknownKeyScopes: [
+      { from: 'gameRulebook', schemaPath: 'meta.gameRulebook', label: 'meta.gameRulebook' }
+    ],
     validate: function (result) { return validateGameRulebookStage(result); },
     buildPrompt: function (retryState) {
       return config.buildPrompt(retryState);
@@ -6710,6 +6925,13 @@ window.LiftRPGAPI = {
     planFragmentBatchRecovery: planFragmentBatchRecovery,
     normalizeFragmentBatchResult: normalizeFragmentBatchResult,
     buildSmartRetryDirective: buildSmartRetryDirective,
+    // ── The unknown-key sweep (W2), exported for the gates ──────────────────
+    // Pure: a stage config and a payload in, error strings out. No transport,
+    // no DOM, no window — the same stance the D167 delta seam and the D143
+    // routing seam take, and the reason a browser shard can hold this to its
+    // contract (including its `_x` exemption and its anti-vacuity behaviour)
+    // without driving a paid stage.
+    unknownKeyErrorsForStage: unknownKeyErrorsForStage,
     // ── The delta-repair seam (D167), exported for the gates ────────────────
     // Pure functions with no transport, no DOM and no window dependency, so the
     // floors harness can hold them to their contracts with no port and no

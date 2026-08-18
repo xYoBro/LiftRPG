@@ -1349,6 +1349,136 @@ export function normalizeDocumentTypes(booklet, diag) {
   });
 }
 
+// ── THE LITERAL `\n` SWEEP (the D21 tooling-owned-repair precedent) ─────────
+//
+// A model that is asked for JSON sometimes answers with a string containing
+// the two CHARACTERS backslash and n where it meant a line break. The JSON is
+// valid, every schema check passes, every gate is green — and the printed page
+// carries the glyphs `\n` in the middle of a cipher instruction. Week 4 of the
+// first delivered book printed exactly that.
+//
+// This is a normalization, not a validation: the same class as schemaVersion
+// (D21) — tooling owns the repair, the model is never blocked for it, and the
+// count is REPORTED so a silent rewrite is impossible.
+//
+// THE DENYLIST IS THE WHOLE SAFETY ARGUMENT. A conversion is only ever
+// applied to prose/content fields. Identifiers, cross-references, URLs, hex
+// colours, ciphertext and enum tokens are skipped by KEY NAME, because in
+// those a backslash is either impossible (so the sweep is a no-op) or
+// load-bearing (so the sweep would corrupt it). Skipping too much costs a
+// missed repair; skipping too little corrupts a booklet — the asymmetry
+// decides the default.
+//
+// `_x` is skipped wholesale: pipeline debris is machine-written, never
+// printed, and carries base64 and serialized payloads.
+// Matched on WORDS, not substrings, so the camelCase tail of `fragmentId`,
+// `weekRef`, `accentColor` and `mapType` is seen while `typewriterBody` and
+// `keystoneScene` are not falsely caught by `type` / `key`.
+var ESCAPED_WHITESPACE_SKIP_WORDS = {
+  id: 1, ids: 1, ref: 1, refs: 1, url: 1, urls: 1, href: 1, link: 1,
+  color: 1, colors: 1, colour: 1, colours: 1, hex: 1,
+  // NOT `cipherText`: that is the printed puzzle, it is prose to this sweep,
+  // and it is the field week 4 of the first delivered book got wrong. The
+  // crypto blob is caught by `password` / `encrypted` instead.
+  password: 1, encrypted: 1, hash: 1, salt: 1,
+  key: 1, keys: 1, slug: 1, token: 1, seed: 1, fingerprint: 1,
+  type: 1, types: 1, family: 1, archetype: 1, dialect: 1, style: 1,
+  mode: 1, variant: 1, version: 1, path: 1, paths: 1
+};
+
+function escapedWhitespaceKeyWords(key) {
+  return String(key || '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[^A-Za-z0-9]+/g, ' ')
+    .trim()
+    .toLowerCase()
+    .split(' ');
+}
+
+function skipsEscapedWhitespace(key) {
+  var name = String(key || '');
+  if (name.charAt(0) === '_') return true;
+  var words = escapedWhitespaceKeyWords(name);
+  for (var i = 0; i < words.length; i++) {
+    if (ESCAPED_WHITESPACE_SKIP_WORDS[words[i]]) return true;
+  }
+  return false;
+}
+
+function convertEscapedWhitespace(value) {
+  // Only the two-character sequences. A real newline already in the string is
+  // untouched, and `\\n` (an author's deliberate escaped backslash) is left
+  // alone because the backslash before it is consumed by the alternation.
+  return value.replace(/\\\\|\\n|\\t/g, function (match) {
+    if (match === '\\n') return '\n';
+    if (match === '\\t') return '\t';
+    return match;
+  });
+}
+
+/**
+ * normalizeEscapedWhitespace(booklet, diag) -> number
+ *
+ * Walks every string in the assembled booklet and converts literal `\n` / `\t`
+ * two-character sequences into the real characters. Returns the number of
+ * STRINGS changed (not the number of sequences), which is the number the run
+ * note reports.
+ */
+export function normalizeEscapedWhitespace(booklet, diag) {
+  var converted = 0;
+  var paths = [];
+
+  function convertAt(container, slot, here) {
+    var value = container[slot];
+    if (value.indexOf('\\n') === -1 && value.indexOf('\\t') === -1) return;
+    var next = convertEscapedWhitespace(value);
+    if (next === value) return;
+    container[slot] = next;
+    converted++;
+    if (paths.length < 12) paths.push(here);
+  }
+
+  // An array inherits its OWN key's verdict: `sections[].lines` is prose and is
+  // swept, `fragmentIds` is not, because the denylist already answered at the
+  // key that owns the array. Without this inheritance every prose list in the
+  // book (rules lines, oracle rows, clue stacks) would be silently exempt.
+  function walk(node, path, eligible) {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      node.forEach(function (entry, i) {
+        var here = path + '[' + i + ']';
+        if (typeof entry === 'string') {
+          if (eligible) convertAt(node, i, here);
+          return;
+        }
+        walk(entry, here, eligible);
+      });
+      return;
+    }
+    Object.keys(node).forEach(function (key) {
+      if (skipsEscapedWhitespace(key)) return;
+      var value = node[key];
+      var here = path ? path + '.' + key : key;
+      if (typeof value === 'string') {
+        convertAt(node, key, here);
+        return;
+      }
+      walk(value, here, true);
+    });
+  }
+
+  walk(booklet, '', false);
+
+  if (converted > 0 && Array.isArray(diag)) {
+    diag.push(createDiagnostic('escaped-whitespace-normalized', 'warning', 'normalize',
+      'Converted literal \\n / \\t sequences into real line breaks in ' + converted
+      + ' field' + (converted === 1 ? '' : 's')
+      + ' — the model wrote the escape as text. First: ' + paths.slice(0, 6).join(', ') + '.',
+      { repairable: true }));
+  }
+  return converted;
+}
+
 // Normalize cipher workspace styles to the canonical enum in place.
 //
 // Two outcomes, two diagnostics (D19: neither is an error — an unrenderable
@@ -1972,6 +2102,10 @@ export function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, ending
     booklet.weeks = booklet.weeks.concat(chunk.weeks || []);
   });
 
+  // Literal `\n` before anything reads the strings — every later normalizer,
+  // every estimate and every gate should see the text the reader will see.
+  normalizeEscapedWhitespace(booklet, diag);
+
   // Normalize data shapes that models commonly get wrong
   booklet.weeks.forEach(function (week) { normalizeCompanionComponents(week, diag); });
   booklet.weeks.forEach(normalizeOracleKey);
@@ -2039,6 +2173,10 @@ export function assembleStructuredBooklet(shell, weekChunkOutputs, fragmentsOutp
   weekChunkOutputs.forEach(function (chunk) {
     booklet.weeks = booklet.weeks.concat(chunk.weeks || []);
   });
+
+  // Literal `\n` before anything reads the strings — every later normalizer,
+  // every estimate and every gate should see the text the reader will see.
+  normalizeEscapedWhitespace(booklet, diag);
 
   // Normalize data shapes that models commonly get wrong
   booklet.weeks.forEach(function (week) { normalizeCompanionComponents(week, diag); });
@@ -2847,6 +2985,9 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
       }
     }
   }
+
+  // -- Literal `\n` sweep, same seat as the other two assemblers --
+  normalizeEscapedWhitespace(booklet, diag);
 
   // -- Normalize document types (alias resolution) --
   normalizeDocumentTypes(booklet, diag);

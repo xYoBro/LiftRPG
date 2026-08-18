@@ -526,6 +526,73 @@
       color: var(--ink);
     }
 
+    /* The stage-detail modal opens ON TOP of the generator modal, so it needs
+       its own stacking rung. Everything else is inherited from .modal-overlay
+       / .modal-panel / .modal-close — one modal vocabulary, two instances. */
+    .wizard-stage-modal {
+      z-index: 1100;
+    }
+
+    .wizard-stage-modal-panel {
+      max-width: 640px;
+    }
+
+    .wizard-stage-modal-title {
+      font-family: var(--mono);
+      font-size: var(--fs-title);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--ink);
+      margin: 10px 0 4px;
+    }
+
+    .wizard-stage-modal-state {
+      font-family: var(--ui-mono);
+      font-size: var(--fs-meta);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .wizard-stage-modal-body {
+      font-family: var(--body);
+      font-size: var(--fs-body);
+      line-height: 1.6;
+      color: var(--ink);
+    }
+
+    .wizard-stage-modal-row {
+      padding: 10px 0;
+      border-top: 1px solid var(--rule-faint);
+    }
+
+    .wizard-stage-modal-row-label {
+      display: block;
+      font-family: var(--mono);
+      font-size: var(--fs-micro);
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+
+    .wizard-stage-modal-gap {
+      margin-top: 14px;
+      padding: 12px 13px;
+      border: 1px solid var(--rule-strong);
+      border-left: 3px solid var(--accent);
+      background: var(--surface-sunken);
+      font-size: var(--fs-meta);
+      line-height: 1.55;
+    }
+
+    /* A step number the reader can press has to look pressable. */
+    .wizard-num,
+    .wizard-step-label {
+      cursor: pointer;
+    }
+
     /* [hidden] is a CONTRACT, not a hint. Author display rules below
        (.generator-flow-back is display:inline-flex) outrank the UA
        [hidden] rule, which is how #api-stop-btn stayed on screen through
@@ -1916,13 +1983,110 @@
       overflow-wrap: anywhere;
     }
 
+    /* ── THE DELIVERY BLOCK ───────────────────────────────────────
+       The one moment on this screen that is not a status readout: the
+       artifact exists and here it is. It gets a heading, a border it
+       does not share with anything, and an accent bar, because the
+       previous version — two bare buttons in the same strip as the
+       checkpoint recovery pair — was read as chrome and missed. */
+    .api-delivery-block {
+      margin-bottom: 14px;
+      padding: 16px 17px 15px;
+      border: 2px solid var(--ink);
+      border-left: 6px solid var(--accent);
+      background: linear-gradient(180deg, rgba(255, 252, 247, .98), rgba(250, 244, 233, .86));
+    }
+
+    .api-delivery-block[hidden] {
+      display: none;
+    }
+
+    .api-delivery-head {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .api-delivery-tag {
+      font-family: var(--mono);
+      font-size: var(--fs-micro);
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    .api-delivery-title {
+      font-family: var(--mono);
+      font-size: var(--fs-lead);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+
+    .api-delivery-copy {
+      font-family: var(--body);
+      font-size: var(--fs-body);
+      line-height: 1.5;
+      color: var(--muted);
+      margin: 7px 0 12px;
+    }
+
+    .api-delivery-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .api-delivery-actions button {
+      flex: 1 1 200px;
+      font-family: var(--mono);
+      font-size: var(--fs-body);
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 12px 16px;
+      cursor: pointer;
+      border: 1.5px solid var(--ink);
+      transition: background .15s, color .15s;
+      background: var(--field-surface);
+      color: var(--ink);
+    }
+
+    .api-delivery-actions button:first-child {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    .api-delivery-actions button:hover:not(:disabled) {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--paper);
+    }
+
+    .api-delivery-actions button:disabled {
+      opacity: .45;
+      cursor: default;
+    }
+
     /* ── Completion actions ───────────────────────────────────────
-       These used to sit dead last, roughly 1,700px down a finished run,
-       under the ledger AND the checkpoint row. The booklet being ready
-       is the whole point of the screen; it gets announced where the eye
-       already is. */
+       Now the RECOVERY strip only: retry-from-checkpoint and start-fresh.
+       The delivered booklet moved into its own block above, because these
+       two families of button answer opposite questions and sharing one
+       unlabelled container made the answer to "is my book here?" invisible. */
     .api-run-actions:empty {
       display: none;
+    }
+
+    .api-run-actions-label {
+      flex: 0 0 100%;
+      font-family: var(--mono);
+      font-size: var(--fs-micro);
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 2px;
     }
 
     .api-run-actions {
@@ -3477,8 +3641,27 @@
               </div>
             </div>
           </div>
-          <!-- The payoff sits directly under the headline state, above the
-               ledger. A finished booklet should never need a scroll to find. -->
+          <!-- ── THE DELIVERY BLOCK (W2) ──────────────────────────────────
+               The payoff sits directly under the headline state, above the
+               ledger. A finished booklet should never need a scroll to find.
+
+               It is its OWN block, with its own heading, and it is never
+               painted into a slot something else already owns. Before this the
+               two Open/Download buttons rendered into the same unlabelled
+               strip as the checkpoint recovery pair, so on a run that had both
+               they read as more run chrome — the author looked at a finished
+               book and concluded no download existed. D175 is unchanged: one
+               delivery home, painted by renderApiActions, reached by all five
+               callers, and the handover still precedes every sentence about
+               the run. -->
+          <div class="api-delivery-block" id="api-delivery-block" hidden>
+            <div class="api-delivery-head">
+              <span class="api-delivery-tag" id="api-delivery-tag">Finished</span>
+              <span class="api-delivery-title" id="api-delivery-title">Your book is ready</span>
+            </div>
+            <div class="api-delivery-copy" id="api-delivery-copy">Open it in the renderer to read and print, or download the JSON to keep.</div>
+            <div class="api-delivery-actions" id="api-delivery-actions"></div>
+          </div>
           <div class="api-run-actions" id="api-run-actions"></div>
           <div class="api-run-legend" aria-label="Run state legend">
             <div class="api-run-legend-item"><span class="api-run-legend-chip is-complete">Complete</span><span>finished with a live API call in this run</span></div>
@@ -3710,6 +3893,29 @@
 
     </div>
   </div>
+
+  <!-- ── THE STAGE-DETAIL MODAL (W2) ─────────────────────────────────────
+       The guided door's numbered step strip was a decoration: six numbers, a
+       title attribute nobody hovers, and no way to ask "what IS this step,
+       and where am I in it?" This is that answer, one click deep, and it is
+       also where this door states the mechanisms it structurally cannot carry
+       (the pipeline-sync law: the gap is stated to the user in the door
+       itself, never silent).
+
+       It reuses #generator-modal's own overlay/panel/close classes rather
+       than growing a second modal vocabulary; only the stacking context is
+       new, because it opens ON TOP of the generator modal. -->
+  <div class="modal-overlay wizard-stage-modal" id="wizard-stage-modal" role="dialog" aria-modal="true" aria-labelledby="wizard-stage-modal-title" hidden>
+    <div class="modal-panel wizard-stage-modal-panel">
+      <button class="modal-close" id="wizard-stage-modal-close" type="button" aria-label="Close">&times;</button>
+      <div class="kicker" id="wizard-stage-modal-kicker">Step</div>
+      <div class="rule"></div>
+      <h2 class="wizard-stage-modal-title" id="wizard-stage-modal-title">Step</h2>
+      <div class="wizard-stage-modal-state" id="wizard-stage-modal-state"></div>
+      <div class="wizard-stage-modal-body" id="wizard-stage-modal-body"></div>
+    </div>
+  </div>
+
   <script src="generator/story-tables.js"></script>
   <script src="generator/author_profiles.js"></script>
   <script src="generator/design_profiles.js"></script>
@@ -3827,6 +4033,13 @@
       var apiStageLedger = document.getElementById('api-stage-ledger');
       var apiRunLog = document.getElementById('api-run-log');
       var apiRunActions = document.getElementById('api-run-actions');
+      // The delivery block (W2). Its own container, its own heading, never
+      // painted into a slot the checkpoint/recovery UI already owns.
+      var apiDeliveryBlock = document.getElementById('api-delivery-block');
+      var apiDeliveryActions = document.getElementById('api-delivery-actions');
+      var apiDeliveryTag = document.getElementById('api-delivery-tag');
+      var apiDeliveryTitle = document.getElementById('api-delivery-title');
+      var apiDeliveryCopy = document.getElementById('api-delivery-copy');
       var workoutEl = document.getElementById('gen-workout');
       var briefEl = document.getElementById('gen-brief');
       var briefRandomizeBtn = document.getElementById('brief-randomize');
@@ -4252,6 +4465,12 @@
           // total. Rendered on the stage card while the retry is in flight.
           lastBlockingErrors: [],
           lastBlockingCount: 0,
+          // Wall clock, recorded at completion (W2). `durationMs` is this
+          // stage's own call; `runElapsedMs` is the whole run to that point.
+          // Both stay 0 for a restored or locally-finished stage — inventing a
+          // duration there would price checkpoint reuse as paid work.
+          durationMs: 0,
+          runElapsedMs: 0,
           completionSource: '',
           completedLocally: false,
           restoredFromCheckpoint: false
@@ -5769,7 +5988,11 @@
       }
 
       function renderApiActions() {
-        if (!apiRunActions) return;
+        // D175's guard, split. The delivery block and the recovery strip are
+        // now two elements, and the handover may not be made conditional on
+        // the OTHER one existing: a missing recovery strip must never be able
+        // to cost the reader their book.
+        if (!apiRunActions && !apiDeliveryBlock) return;
         // A failed run offers recovery. It used to offer ONLY recovery — the
         // early return below sat above the booklet buttons, so a run that
         // DELIVERED and then fell over on a later step showed no way to reach
@@ -5778,8 +6001,13 @@
         // If a booklet exists, its buttons render no matter what the run
         // status says; the recovery pair is appended, not substituted.
         var isErrorState = !!(apiRunState && apiRunState.status === 'error');
+        // The recovery pair now renders into its OWN strip, labelled, and the
+        // delivered booklet never shares a container with it. These two answer
+        // opposite questions — "is my book here?" and "how do I try again?" —
+        // and one unlabelled row of four buttons answered neither.
         var recoveryHtml = isErrorState
-          ? '<button type="button" id="api-retry-checkpoint" style="margin-right:8px">Retry From Checkpoint</button>' +
+          ? '<span class="api-run-actions-label">Recovery</span>' +
+            '<button type="button" id="api-retry-checkpoint" style="margin-right:8px">Retry From Checkpoint</button>' +
             '<button type="button" id="api-start-fresh">Start Fresh</button>'
           : '';
 
@@ -5796,33 +6024,44 @@
           });
         }
 
-        if (!apiRunState || !apiRunState.booklet) {
+        // ── ORDER IS THE CONTRACT (D175) ────────────────────────────────
+        // The handover is painted FIRST and the recovery strip second, so no
+        // failure while drawing recovery can ever cost the reader their book.
+        // The recovery paint is deferred into a closure and run at the tail of
+        // every path out of this function, delivered or not.
+        function paintRecoveryStrip() {
+          if (!apiRunActions) return;
           apiRunActions.innerHTML = recoveryHtml;
           wireRecoveryButtons();
+        }
+
+        if (!apiDeliveryBlock || !apiDeliveryActions || !apiRunState || !apiRunState.booklet) {
+          if (apiDeliveryBlock) {
+            apiDeliveryBlock.hidden = true;
+            if (apiDeliveryActions) apiDeliveryActions.innerHTML = '';
+          }
+          paintRecoveryStrip();
           return;
         }
         var blockedForQuality = apiRunState.status === 'blocked';
-        apiRunActions.innerHTML = '' +
-          '<button type="button" id="api-open-renderer">' + (blockedForQuality ? 'Open Booklet For Review' : 'Open Booklet In Renderer') + '</button>' +
-          '<button type="button" id="api-download-json" style="margin-right:8px">' + (blockedForQuality ? 'Download Review JSON' : 'Download JSON') + '</button>' +
-          recoveryHtml;
-        wireRecoveryButtons();
-
-        // Strip by CLASS, not by list (D128 -> W4a). The hand-kept list this
-        // replaces was missing `_criticReport` from the day the critic landed,
-        // so the file a user downloaded carried a top-level key the schema
-        // rejects — the download failed `npm run validate` and nobody saw it.
-        // Every lawful top-level key is a plain name (meta, theme, weeks,
-        // fragments, cover, rulesSpread, endings); everything underscored is
-        // ours, including `_x`, which the old list already deleted.
-        function stripInternalKeys(booklet) {
-          if (!booklet || typeof booklet !== 'object') return booklet;
-          var clean = JSON.parse(JSON.stringify(booklet));
-          Object.keys(clean).forEach(function (key) {
-            if (key.charAt(0) === '_') delete clean[key];
-          });
-          return clean;
+        // The block SAYS which of the two deliveries this is. A booklet the
+        // quality gate blocked is still the reader's booklet and is still
+        // handed over (D110) — it is just not the same sentence.
+        if (apiDeliveryTag) apiDeliveryTag.textContent = blockedForQuality ? 'For Review' : 'Finished';
+        if (apiDeliveryTitle) {
+          apiDeliveryTitle.textContent = blockedForQuality
+            ? 'Your book is ready to review'
+            : 'Your book is ready';
         }
+        if (apiDeliveryCopy) {
+          apiDeliveryCopy.textContent = blockedForQuality
+            ? 'Local checks flagged issues, listed below. The book is saved and yours either way — open it to read the problem pages, or download the JSON.'
+            : 'Open it in the renderer to read and print, or download the JSON to keep.';
+        }
+        apiDeliveryBlock.hidden = false;
+        apiDeliveryActions.innerHTML = '' +
+          '<button type="button" id="api-open-renderer">' + (blockedForQuality ? 'Open Booklet For Review' : 'Open Booklet In Renderer') + '</button>' +
+          '<button type="button" id="api-download-json">' + (blockedForQuality ? 'Download Review JSON' : 'Download JSON') + '</button>';
 
         var openRendererBtn = document.getElementById('api-open-renderer');
         var downloadBtn = document.getElementById('api-download-json');
@@ -5867,6 +6106,9 @@
             URL.revokeObjectURL(url);
           });
         }
+
+        // Last, and only now: the book is on screen and wired.
+        paintRecoveryStrip();
       }
 
       // ── THE DELIVERY TAIL (D110) ───────────────────────────────────────
@@ -7446,11 +7688,164 @@
         setStageFlag('endings', 'invalidated', reason);
       }
 
+      // ── THE STAGE-DETAIL MODAL (W2) ──────────────────────────────────────
+      //
+      // The numbered strip used to be a jump target and nothing else: six
+      // numerals with a `title` attribute nobody hovers. A reader on this door
+      // could not answer "what is this step for, where am I in it, and what is
+      // this door NOT doing for me" without reading the whole pane.
+      //
+      // Clicking a step now opens its card. Navigation is not lost — it is the
+      // modal's primary button — and the card is the only place on this door
+      // where the API doors' missing mechanisms are stated in the reader's own
+      // words. The pipeline-sync law: a gap between the doors is stated in the
+      // door itself, never silent.
+      //
+      // WHAT THIS DOOR CANNOT DO, per step. Written as facts about mechanism,
+      // not apologies, and each one names what the reader does instead.
+      var WIZARD_STAGE_EXPLAINERS = {
+        layerBible: {
+          does: 'Sets the world: who runs it, what is true in it, and the design logic every later step reads. Nothing else can be written until this is checked.',
+          gap: 'The API doors write the game\u2019s rules first \u2014 how you win, what you do each session, what the currency is \u2014 and hand those rules to every step after. This door has no rules step, so the game\u2019s shape gets decided here alongside the world, and nothing checks the two against each other.'
+        },
+        campaignPlan: {
+          does: 'Plans the block: the week-by-week arc, which bonus documents exist and what they are called, and how the ending is reached.',
+          gap: 'On the API doors this plan is written against the game rules and the read program\u2019s real week shape. Here it is written from the brief alone.'
+        },
+        shell: {
+          does: 'Fixes the booklet\u2019s identity: title, cover, the printed rules page, the theme, and the shell the whole artifact is dressed as.',
+          gap: 'The API doors check this step against the game rules both ways \u2014 rules to play spine and back. This door checks the shape of the answer, not its agreement with a rulebook it never asked for.'
+        },
+        weeks: {
+          does: 'Writes the weeks themselves: sessions, the marking strip you fill in with a pencil, the week\u2019s field work, and the boss week.',
+          gap: 'On the API doors every week is handed the game\u2019s currency, its core verbs and its win condition before it is written, and a failed check is retried automatically with the failure attached. Here the weeks are written without those in front of them, and a retry is you: the failed checks are listed and a repair prompt is built for you to paste back.'
+        },
+        fragments: {
+          does: 'Writes the found documents \u2014 the letters, reports and scraps that carry the story between weeks.',
+          gap: 'The API doors write these in batches that can see the weeks and the rulebook, and recover a failed batch document by document. This door writes them from the plan and the world, and a failed batch is repaired by hand from the checks shown here.'
+        },
+        endings: {
+          does: 'Writes the payoff the password unlocks, and is the last step before the booklet is assembled and checked on this device.',
+          gap: 'On the API doors the ending is written knowing the win condition and the password path the rulebook declared. Here it is written from the plan, and the editorial review the API doors run after assembly does not happen on this door.'
+        }
+      };
+
+      var wizardStageModal = document.getElementById('wizard-stage-modal');
+      var wizardStageModalClose = document.getElementById('wizard-stage-modal-close');
+      var wizardStageModalKicker = document.getElementById('wizard-stage-modal-kicker');
+      var wizardStageModalTitle = document.getElementById('wizard-stage-modal-title');
+      var wizardStageModalState = document.getElementById('wizard-stage-modal-state');
+      var wizardStageModalBody = document.getElementById('wizard-stage-modal-body');
+
+      function wizardStageModalRow(label, value) {
+        if (!value) return '';
+        return '<div class="wizard-stage-modal-row">' +
+          '<span class="wizard-stage-modal-row-label">' + escapeForHtml(label) + '</span>' +
+          escapeForHtml(value) +
+          '</div>';
+      }
+
+      // The prompt/paste status this door actually knows, said plainly. Never
+      // guessed: `copied` is recorded when the reader presses Copy, `pasted` is
+      // whether the textarea has content, and "checked" is the stage flag.
+      function describeGuidedHandoff(item, stepIndex) {
+        var slot = stepIndex + 1;
+        var pasted = !!(wizResults[slot] && wizResults[slot].value.trim());
+        var copied = !!((wizState.copied || {})[item.key]);
+        if (item.status === 'valid' || item.status === 'not needed') {
+          return 'Checked and accepted. The prompt for this step is still available if you want to redo it.';
+        }
+        if (item.cardState === 'needs-repair') {
+          return 'The pasted reply failed a check. Open the step for the failed items and the repair prompt built from them.';
+        }
+        if (pasted) return 'A reply is pasted but not checked yet. Open the step and press its check button.';
+        if (copied) return 'You copied this step\u2019s prompt. Paste your chatbot\u2019s reply back on the step when it finishes.';
+        if (item.cardState === 'waiting') return 'The prompt for this step is not ready yet \u2014 it is built from the step before it.';
+        return 'The prompt is ready to copy. Nothing has been pasted back yet.';
+      }
+
+      function openWizardStageModal(stepIndex) {
+        if (!wizardStageModal) return;
+        var items = getStageHealthItems();
+        var item = items[stepIndex];
+        if (!item) return;
+        var explainer = WIZARD_STAGE_EXPLAINERS[item.key] || { does: '', gap: '' };
+        var canJump = canNavigateToStep(stepIndex);
+
+        wizardStageModalKicker.textContent = 'Step ' + (stepIndex + 1) + ' of ' + items.length;
+        wizardStageModalTitle.textContent = item.label;
+        wizardStageModalState.textContent = formatGuidedCardState(item.cardState);
+
+        wizardStageModalBody.innerHTML = '' +
+          wizardStageModalRow('What this step does', explainer.does) +
+          wizardStageModalRow('Where it stands', getStageDetail(item)) +
+          wizardStageModalRow('Your handoff', describeGuidedHandoff(item, stepIndex)) +
+          wizardStageModalRow('Next move', getStageMeta(item)) +
+          // TIMING IS NOT INVENTED. This door has no clock on a step — the
+          // reader is the transport and the wait is their chatbot's, not ours —
+          // and saying so is more useful than a fabricated number.
+          wizardStageModalRow('Time on this step', 'Not tracked on this door \u2014 you set the pace. The API doors time each step because they are the ones waiting.') +
+          (explainer.gap
+            ? '<div class="wizard-stage-modal-gap"><strong>What this door does not do:</strong> ' + escapeForHtml(explainer.gap) + '</div>'
+            : '') +
+          '<div class="result-actions" style="margin-top:16px">' +
+            '<button type="button" class="result-btn-primary" id="wizard-stage-modal-goto"' + (canJump ? '' : ' disabled') + '>' +
+              (canJump ? 'Go To This Step' : 'Locked Until Earlier Steps Are Checked') +
+            '</button>' +
+          '</div>';
+
+        var gotoBtn = document.getElementById('wizard-stage-modal-goto');
+        if (gotoBtn && canJump) {
+          gotoBtn.addEventListener('click', function () {
+            closeWizardStageModal();
+            jumpToStep(stepIndex);
+          });
+        }
+
+        // `hidden` is the state and `.is-open` is the layout, because the
+        // global `[hidden] { display:none !important }` rule outranks the
+        // overlay's own display (D99). Both move together, always.
+        wizardStageModal.hidden = false;
+        wizardStageModal.classList.add('is-open');
+        if (wizardStageModalClose) wizardStageModalClose.focus();
+      }
+
+      function closeWizardStageModal() {
+        if (!wizardStageModal) return;
+        wizardStageModal.classList.remove('is-open');
+        wizardStageModal.hidden = true;
+      }
+
+      if (wizardStageModalClose) wizardStageModalClose.addEventListener('click', closeWizardStageModal);
+      if (wizardStageModal) {
+        wizardStageModal.addEventListener('click', function (e) {
+          if (e.target === wizardStageModal) closeWizardStageModal();
+        });
+      }
+      // Ahead of the generator modal's own Escape handler in document
+      // order, and it stops there: one Escape closes one modal, the top one.
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && wizardStageModal && !wizardStageModal.hidden) {
+          e.stopImmediatePropagation();
+          closeWizardStageModal();
+        }
+      }, true);
+
       wizNums.forEach(function (num, index) {
-        num.addEventListener('click', function () { jumpToStep(index); });
+        num.setAttribute('role', 'button');
+        num.setAttribute('tabindex', '0');
+        num.addEventListener('click', function () { openWizardStageModal(index); });
+        num.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openWizardStageModal(index); }
+        });
       });
       wizLabels.forEach(function (label, index) {
-        label.addEventListener('click', function () { jumpToStep(index); });
+        label.setAttribute('role', 'button');
+        label.setAttribute('tabindex', '0');
+        label.addEventListener('click', function () { openWizardStageModal(index); });
+        label.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openWizardStageModal(index); }
+        });
       });
 
       function copyText(text, button, defaultLabel) {
@@ -7888,6 +8283,31 @@
           if (boss.convergenceProof) boss.convergenceProof = sanitize(boss.convergenceProof);
           if (boss.passwordRevealInstruction) boss.passwordRevealInstruction = sanitize(boss.passwordRevealInstruction);
         });
+      }
+
+      // ── ONE STRIP, BOTH DOORS (DR-24) ──────────────────────────────────
+      // Strip by CLASS, not by list (D128 -> W4a). The hand-kept list this
+      // replaces was missing `_criticReport` from the day the critic landed,
+      // so the file a user downloaded carried a top-level key the schema
+      // rejects — the download failed `npm run validate` and nobody saw it.
+      // Every lawful top-level key is a plain name (meta, theme, weeks,
+      // fragments, cover, rulesSpread, endings); everything underscored is
+      // ours, including `_x`, which the old list already deleted.
+      //
+      // It used to live INSIDE renderApiActions, which meant it was the API
+      // door's strip and the guided door had none: the same booklet, exported
+      // through the two doors, produced two different files, and the guided
+      // one failed the canonical validator. The strip is not a property of a
+      // door — it is a property of the export — so it lives out here and both
+      // doors call it. Applied AFTER prepareAssemblyExport, because sealing
+      // the ending is what writes the last of the fields worth stripping.
+      function stripInternalKeys(booklet) {
+        if (!booklet || typeof booklet !== 'object') return booklet;
+        var clean = JSON.parse(JSON.stringify(booklet));
+        Object.keys(clean).forEach(function (key) {
+          if (key.charAt(0) === '_') delete clean[key];
+        });
+        return clean;
       }
 
       async function prepareAssemblyExport(data, options) {
@@ -8691,11 +9111,16 @@
           '</div>';
         assemblyResultEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
+        // DR-24: the guided door ships the SAME file the API door ships. Both
+        // handovers are prepareAssemblyExport followed by stripInternalKeys,
+        // in that order, through the one shared strip — before this the guided
+        // download carried `_x`, `_qualityReport` and `_criticReport` into a
+        // file the canonical validator refuses.
         assemblyResultEl.querySelector('.assembly-open-btn').addEventListener('click', function (event) {
           var button = event.currentTarget;
           setActionBusy(button, 'Preparing…', async function () {
             assemblyResultEl._assembledData = await prepareAssemblyExport(assemblyResultEl._assembledData);
-            sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(assemblyResultEl._assembledData));
+            sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(stripInternalKeys(assemblyResultEl._assembledData)));
             window.open('renderer/?source=session', '_blank');
           });
         });
@@ -8704,7 +9129,7 @@
           var button = event.currentTarget;
           setActionBusy(button, 'Sealing…', async function () {
             assemblyResultEl._assembledData = await prepareAssemblyExport(assemblyResultEl._assembledData);
-            var blob = new Blob([JSON.stringify(assemblyResultEl._assembledData, null, 2)], { type: 'application/json' });
+            var blob = new Blob([JSON.stringify(stripInternalKeys(assemblyResultEl._assembledData), null, 2)], { type: 'application/json' });
             var url = URL.createObjectURL(blob);
             var a = document.createElement('a');
             a.href = url;
@@ -9080,6 +9505,21 @@
               return;
             }
 
+            // ── A TOOLING-OWNED REPAIR IS A FACT, NOT A SILENCE (W2) ─────────
+            // The pipeline repaired something on the user's behalf — today the
+            // literal-`\n` sweep in assembly.js, which rewrites printed prose
+            // without blocking anything (the D21 class). A repair nobody is
+            // told about is indistinguishable from a repair that never ran, so
+            // it lands in the run notes with its count.
+            //
+            // Returns before the transition block for the same reason a retry
+            // does: no stage moved, no counter advanced, no card changed hands.
+            if (phase === 'run_note') {
+              applyApiNotice(meta.noticeLevel === 'warn' ? 'warn' : 'info', message, meta);
+              renderApiRunState();
+              return;
+            }
+
             // Any stage transition retires the previous heartbeat — a count
             // from the call that just ended must never sit under the next one.
             // Same for a rate-limit wait: the build moved, so it is not parked.
@@ -9108,11 +9548,35 @@
               apiRunState.progress = formatApiStageProgress();
               pushApiLog(stageIndex + '/' + totalStages + ' ' + message);
             } else if (phase === 'complete') {
+              // ── HOW LONG THIS ONE TOOK, AND HOW LONG THE RUN HAS TAKEN ────
+              // Read BEFORE markApiStageComplete, which clears the stage clock.
+              // "Which step is eating the wall clock" was answerable only by
+              // subtracting log timestamps by eye; now the line says it. A
+              // restored or locally-finished stage has no start time and gets
+              // no stage figure — the run figure still lands, because the run
+              // clock is real either way.
+              var stageDurationMs = (apiRunState.currentStageKey === stageKey && apiRunState.currentStageStartedAt)
+                ? Math.max(0, Date.now() - apiRunState.currentStageStartedAt)
+                : 0;
+              var runElapsedMs = apiRunState.runStartedAt
+                ? Math.max(0, Date.now() - apiRunState.runStartedAt)
+                : 0;
               if (meta.telemetry) {
                 applyApiStageTelemetry(stageKey, meta.telemetry, message, meta);
               }
               markApiStageComplete(stageKey, message, meta);
-              pushApiLog(getApiCompletionLabel(stageKey, meta) + ' complete · ' + (meta.telemetry ? formatTokenSummary(meta.telemetry.usage) : 'No token data') + (meta.telemetry && meta.telemetry.estimatedCostUsd ? ' · ' + formatUsd(meta.telemetry.estimatedCostUsd) + ' est' : ''));
+              if (stageKey && apiRunState.stageMetrics[stageKey]) {
+                apiRunState.stageMetrics[stageKey].durationMs = stageDurationMs;
+                apiRunState.stageMetrics[stageKey].runElapsedMs = runElapsedMs;
+              }
+              var completionTiming = '';
+              if (stageDurationMs > 0) {
+                completionTiming = ' · stage ' + formatApiElapsed(stageDurationMs)
+                  + (runElapsedMs > 0 ? ' · run ' + formatApiElapsed(runElapsedMs) : '');
+              } else if (runElapsedMs > 0) {
+                completionTiming = ' · run ' + formatApiElapsed(runElapsedMs);
+              }
+              pushApiLog(getApiCompletionLabel(stageKey, meta) + ' complete · ' + (meta.telemetry ? formatTokenSummary(meta.telemetry.usage) : 'No token data') + (meta.telemetry && meta.telemetry.estimatedCostUsd ? ' · ' + formatUsd(meta.telemetry.estimatedCostUsd) + ' est' : '') + completionTiming);
             } else if (phase === 'failed') {
               if (meta.telemetry) {
                 applyApiStageTelemetry(stageKey, meta.telemetry, meta.error || message, meta);
