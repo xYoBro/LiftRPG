@@ -124,7 +124,12 @@ const LADDER = {
 /** The same rungs on a `classified-packet`, whose body is `columns:2`. */
 const PACKET_LADDER = {
   standard: { padX: 6, titlePt: 16, titleLh: 1.15, titleMb: 10, bodyPt: 6.8, bodyLh: 1.36, paraMb: 6, h3Mt: 0, h3Mb: 3, sectionMb: 7 },
-  compact:  { padX: 5, titlePt: 16, titleLh: 1.15, titleMb: 10, bodyPt: 7.6, bodyLh: 1.56, paraMb: 6, h3Mt: 0, h3Mb: 3, sectionMb: 7 },
+  // compact's body was 7.6/1.56 — the variant rule BEATING the packet's own
+  // 6.8pt at equal specificity, a non-monotone render the round-close battery
+  // caught (Charter inv. 4: The-Hinge estimate ROSE 566.7→707.6px at the 0.3
+  // boundary). booklet.css now carries a packet-scoped compact rule at these
+  // values — the resolved truth, between standard and dense on every axis.
+  compact:  { padX: 5, titlePt: 16, titleLh: 1.15, titleMb: 10, bodyPt: 6.6, bodyLh: 1.32, paraMb: 6, h3Mt: 0, h3Mb: 3, sectionMb: 7 },
   dense:    { padX: 4, titlePt: 12.8, titleLh: 1.15, titleMb: 5, bodyPt: 6.3, bodyLh: 1.28, paraMb: 6, h3Mt: 8, h3Mb: 3, sectionMb: 7 },
   packed:   { padX: 4, titlePt: 11.6, titleLh: 1.15, titleMb: 4, bodyPt: 5.9, bodyLh: 1.22, paraMb: 4, h3Mt: 6, h3Mb: 2, sectionMb: 4 },
 };

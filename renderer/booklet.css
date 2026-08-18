@@ -1501,6 +1501,19 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .rules-left[data-layout-variant="compact"] .rules-body p{
   margin-bottom:6px;
 }
+/* THE PACKET'S COMPACT RUNG (Charter inv. 4, round-close battery 2026-08-18).
+   Without this rule the compact variant's 7.6pt body BEATS the packet's own
+   6.8pt at equal specificity, so a classified-packet's rules page grows LARGER
+   type as density rises past 0.3 — a non-monotone render the honest estimate
+   faithfully exposed (The-Hinge, 566.7px → 707.6px at 0.299→0.3). Resolved
+   values sit between the packet's standard (6.8/1.36) and dense (6.3/1.28)
+   rungs so every rung boundary shrinks. CROSS-FILE CONTRACT:
+   PACKET_LADDER.compact in atoms/rules-block.js states these same numbers —
+   move them together or the estimate lies (D71). */
+.rules-left[data-shell-family="classified-packet"][data-layout-variant="compact"] .rules-body{
+  font-size:6.6pt;
+  line-height:1.32;
+}
 .rules-left[data-layout-variant="dense"]{
   padding:2px 4px 0 4px;
 }
