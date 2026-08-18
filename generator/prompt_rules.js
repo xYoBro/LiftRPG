@@ -1488,6 +1488,20 @@
   // the normalized-workout RICH branch, which in turn is what the topology
   // digest reads. Renaming one here without renaming it there returns the rich
   // branch to being decorative.
+  //
+  // THE `example` ANNOTATIONS (DR-39). Each leaf carries the worked value that
+  // illustrates it, ON THE PROPERTY NODE ITSELF. Until this wave the stage
+  // taught its shape from a hand-written JSON example in generator.js while
+  // this block reached no model at all — two descriptions of one shape,
+  // agreeing on the day they were written, with nothing keeping them agreeing.
+  // Annotating the node rather than keeping a parallel sample table is what
+  // makes the pair undriftable: a renamed field carries its own example with
+  // it, and there is no second list to forget.
+  //
+  // D47 (no closed-menu values in a worked example) is satisfied BY
+  // CONSTRUCTION here, not by vigilance: not one property below is an enum —
+  // these are structural transcription fields, so no example can ship an
+  // enum member disguised as an instruction.
   window.SCHEMA_CANONICAL_WORKOUT = {
     type: 'object',
     properties: {
@@ -1496,25 +1510,29 @@
         items: {
           type: 'object',
           properties: {
-            weekNumber: { type: 'integer' },
-            isDeload: { type: 'boolean' },
+            weekNumber: { type: 'integer', example: 1 },
+            isDeload: { type: 'boolean', example: false },
             sessions: {
               type: 'array',
               items: {
                 type: 'object',
                 properties: {
-                  dayLabel: { type: 'string' },
-                  notes: { type: 'string' },
+                  dayLabel: { type: 'string', example: 'Day 1' },
+                  notes: { type: 'string', example: '' },
                   exercises: {
                     type: 'array',
                     items: {
                       type: 'object',
                       properties: {
-                        name: { type: 'string' },
-                        sets: { type: 'integer' },
-                        repsPerSet: { type: 'string' },
-                        weightField: { type: 'string' },
-                        notes: { type: 'string' }
+                        name: { type: 'string', example: 'Bench Press' },
+                        sets: { type: 'integer', example: 3 },
+                        // The string quotes are the teaching, not decoration:
+                        // `printableRepTarget` accepts rep TARGETS like "8+"
+                        // or "5-8", so this field is a string that often
+                        // looks like a number (liftosaur.js's own note).
+                        repsPerSet: { type: 'string', example: '8' },
+                        weightField: { type: 'string', example: '100lb' },
+                        notes: { type: 'string', example: '' }
                       },
                       required: ['name', 'sets', 'repsPerSet']
                     }
@@ -1527,10 +1545,66 @@
           required: ['weekNumber', 'sessions']
         }
       },
-      progressionSummary: { type: 'string' }
+      progressionSummary: { type: 'string', example: '' }
     },
     required: ['weeks']
   };
+
+  // THE ROUTED PROJECTION (DR-39). The object above is the authority on field
+  // names; this is the only thing the canonicalize stage prints, and it is
+  // GENERATED from that object rather than written beside it. One home, two
+  // readings — the `normalizeCanonicalWorkout()` contract and the prompt.
+  //
+  // Why a second name rather than routing the object: `buildStageSchema` joins
+  // SCHEMA_* sections as arrays of lines (`schemaArr.join('\n')`). Handing it
+  // this object throws `join is not a function` — the object was never a
+  // prompt section, which is exactly why the reachability census found it
+  // dead. The projection is the array; the object stays the schema.
+  window.SCHEMA_CANONICAL_WORKOUT_SPEC = (function (schema) {
+    var typeOf = function (node) { return (node && node.type) ? String(node.type) : 'value'; };
+
+    // The field spec, walked off the schema — never restated.
+    function specLines(node, indent, out) {
+      var props = (node && node.properties) || {};
+      var required = (node && node.required) || [];
+      Object.keys(props).forEach(function (key) {
+        var child = props[key] || {};
+        var type = typeOf(child);
+        out.push(indent + '- `' + key + '` (' + type
+          + (required.indexOf(key) !== -1 ? ', REQUIRED' : '') + ')');
+        if (type === 'object') specLines(child, indent + '  ', out);
+        if (type === 'array' && child.items) specLines(child.items, indent + '  ', out);
+      });
+      return out;
+    }
+
+    // The worked example, from the same walk. A leaf with no annotation prints
+    // a loud marker rather than vanishing from the example: a field that
+    // silently disappears from the teaching is the failure mode this whole
+    // derivation exists to end, and it must not be reintroduced by omission.
+    function example(node) {
+      var type = typeOf(node);
+      if (type === 'object') {
+        var obj = {};
+        var props = (node && node.properties) || {};
+        Object.keys(props).forEach(function (k) { obj[k] = example(props[k]); });
+        return obj;
+      }
+      if (type === 'array') return [example((node && node.items) || {})];
+      return Object.prototype.hasOwnProperty.call(node || {}, 'example')
+        ? node.example
+        : '<<NO EXAMPLE DECLARED FOR THIS FIELD>>';
+    }
+
+    return [].concat(
+      ['## Output shape',
+       'Field names are exact — copy them verbatim. Emit no fields beyond these.'],
+      specLines(schema, '', []),
+      ['',
+       'Return ONLY a JSON object of this shape:'],
+      JSON.stringify(example(schema), null, 2).split('\n')
+    );
+  })(SCHEMA_CANONICAL_WORKOUT);
 
   window.SCHEMA_SPEC = [].concat(
     SCHEMA_HEADER, [''],
@@ -4693,8 +4767,6 @@
     '- If any document, oracle entry, or story prompt feels transplantable to a different booklet, it is generic. Rewrite with Core Noun Roster references.'
   ];
 
-  window.INST_POSTWRITING_GATE = [];
-
   window.INST_RULES_TEACH = [
     '## Rules Page Requirements',
     'The rulesSpread leftPage MUST teach the player how to play the game.',
@@ -5124,7 +5196,12 @@
     // carries the grammar and NOTHING else — no voice, no world, no brief. The
     // stage transcribes a program; a creative instruction here would license it
     // to improve the training, which is the one thing it must never do.
-    'canonicalize':   { schemas: [],                                            instructions: ['LIFTOSCRIPT_GRAMMAR'] },
+    // The output shape is a SCHEMA row here (DR-39) and not a hand-written
+    // block in the builder: the shape the stage must emit is derived from
+    // SCHEMA_CANONICAL_WORKOUT, the same object whose field names
+    // normalizeCanonicalWorkout() maps. Routing it is what makes that object
+    // the taught shape instead of a second, unread description of it.
+    'canonicalize':   { schemas: ['CANONICAL_WORKOUT_SPEC'],                    instructions: ['LIFTOSCRIPT_GRAMMAR'] },
     // Week plan: lean
     // Week flesh: full game design + story
     // Prose stages (week-final, fragment, ending) carry VOICE_DISCIPLINE: they

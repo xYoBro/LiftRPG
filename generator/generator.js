@@ -2662,6 +2662,19 @@
    * training is the one input in this product that the model does not get a
    * vote on. The exercise fidelity law downstream (INST_WORKOUT_FUSION) is only
    * as good as what this stage hands it.
+   *
+   * THE OUTPUT SHAPE IS NOT WRITTEN HERE (DR-39). It used to be: a hand-written
+   * JSON example lived in this builder while SCHEMA_CANONICAL_WORKOUT — the
+   * block whose own comment calls its field names load-bearing for
+   * normalizeCanonicalWorkout() — reached no model at all. The two agreed on
+   * the day they were written and nothing checked them afterwards. The shape
+   * now rides the stage table as SCHEMA_CANONICAL_WORKOUT_SPEC, GENERATED from
+   * that object, so `buildStageSchema('canonicalize')` below carries it. Adding
+   * a shape block back here would rebuild the second home.
+   *
+   * The first line is load-bearing beyond the model: the stub transport
+   * (scripts/eval-bench.mjs) and the fault injector (scripts/fault-injector.mjs)
+   * both route this stage by the '# LiftRPG Canonicalization Stage' prefix.
    */
   window.generateCanonicalizePrompt = function (workoutText, options) {
     options = options || {};
@@ -2670,13 +2683,6 @@
       'Read the program below into structured JSON. Transcribe only.',
       '',
       window.buildStageSchema('canonicalize'),
-      '',
-      '## Output shape',
-      'Return ONLY a JSON object:',
-      '{ "weeks": [ { "weekNumber": 1, "isDeload": false, "sessions": [',
-      '  { "dayLabel": "Day 1", "exercises": [',
-      '    { "name": "Bench Press", "sets": 3, "repsPerSet": "8", "weightField": "100lb", "notes": "" }',
-      '  ] } ] } ], "progressionSummary": "" }',
       '',
       '## The program',
       String(workoutText || ''),
