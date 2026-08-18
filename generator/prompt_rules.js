@@ -5991,6 +5991,10 @@
       ''
     ], rows, [
       '## How To Write These',
+      '- Where a character cap is stated, DO NOT LAND ON IT: aim for roughly 85% of the',
+      '  cap. The proving run\'s finale returned 2521 against 2400 twice, then trimmed to',
+      '  just under and failed a third count elsewhere - a rewrite that grazes its cap is',
+      '  a coin flip you are re-rolling with the whole stage as the stake.',
       '- Keep the meaning, the proper nouns, and any reference or pointer the line makes.'
     ], (contextBlock.length ? [
       '- Match the voice of the surrounding fields exactly. This is the same book, same hand.'

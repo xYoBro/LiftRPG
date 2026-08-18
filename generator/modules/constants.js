@@ -130,7 +130,11 @@ export var STAGE_BUDGETS = {
   rules:      { maxTokens: 12000, timeoutMs: 300000 },
   week:       { maxTokens: 24000, timeoutMs: 900000 },
   fragments:  { maxTokens: 40000, timeoutMs: 900000 },
-  endings:    { maxTokens: 24000, timeoutMs: 720000 },
+  // THREE ATTEMPTS on evidence (the proving run, 2026-08-17): the finale is
+  // the most expensive-to-reach stage in the book - the whole run stands
+  // behind it - and it died at attempts=2 on a budget breach, a failure a
+  // retry genuinely fixes (D166's law, same reasoning as shell's row).
+  endings:    { maxTokens: 24000, timeoutMs: 720000, attempts: 3 },
   // Multi-stage / structured
   //
   // ── THE CEILING IS A SAFETY VALVE, NOT A BUDGET (D155, 2026-08-13) ──

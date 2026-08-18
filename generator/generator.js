@@ -3551,6 +3551,15 @@
         weekPlan.weekNumber,
         (campaignPlan && Array.isArray(campaignPlan.weeks)) ? campaignPlan.weeks.length : 0)
       : '';
+
+    // D186's shape at the unit seats (found live - the finale death): the one
+    // section stating every prose cap WITH its aim-under target rode only the
+    // retired paste bundle; the live seats write budgeted surfaces and were
+    // never told the budgets (D150's law, unrouted). Included verbatim; the
+    // section is already parity-gated against OUTPUT_BUDGETS.
+    var outputBudgetsBlock = (typeof window.INST_OUTPUT_BUDGETS !== 'undefined' && window.INST_OUTPUT_BUDGETS)
+      ? window.INST_OUTPUT_BUDGETS.join('\n')
+      : '';
     var parts = [
       '# Write Week ' + weekPlan.weekNumber,
       '',
@@ -3596,6 +3605,11 @@
       formatProcessParticulars(shellContext.processParticulars),
       '',
       '**Week Workout:** ' + weekWorkout,
+      '',
+      // THE BUDGETS, on the seat that pays for breaching them (D150's law,
+      // finally routed here - the proving run burned week retries on caps
+      // this prompt never printed).
+      outputBudgetsBlock,
       '',
       planAnchors.length ? '## Planned Week Anchors\n' + planAnchors.join('\n') : '',
       '',
@@ -3850,6 +3864,15 @@
       '- JSON only.'
     ];
 
+    // Same routing defect as the week seat, found at THIS seat live: the
+    // finale died twice against endingBody's 2400 cap, which no line of this
+    // prompt stated. The budgets section carries the cap AND the aim-under
+    // target (1600-2200).
+    var endingBudgetsBlock = (typeof window.INST_OUTPUT_BUDGETS !== 'undefined' && window.INST_OUTPUT_BUDGETS)
+      ? window.INST_OUTPUT_BUDGETS.join('\n')
+      : '';
+
+    if (endingBudgetsBlock) parts.push('', endingBudgetsBlock);
     return parts.filter(Boolean).join('\n');
   };
 
