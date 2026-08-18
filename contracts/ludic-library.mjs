@@ -45,8 +45,18 @@
 
 import {
   LUDIC_LIBRARY,
-  LUDIC_LIBRARY_ATOMS
+  LUDIC_LIBRARY_ATOMS,
+  LUDIC_ARSENAL_ENTRIES,
+  VALID_MAP_TYPES,
+  VALID_CONSTRAINED_GRID_KINDS,
+  VALID_WORD_GRID_KINDS,
+  SPATIAL_GUARDRAILS
 } from './contract-constants.mjs';
+// The solver shelf. puzzle-solvers.mjs is dependency-free by ruling (D151), so
+// this import cannot cycle. Used by the arsenal audit below to prove — rather
+// than assert — that every puzzle kind the schema names has a machine that
+// finishes it.
+import * as PUZZLE_SOLVERS from './puzzle-solvers.mjs';
 
 // ── The tiers ───────────────────────────────────────────────────────────────
 // Ordered from nearest to furthest from the page. The order is load-bearing:
@@ -677,3 +687,393 @@ export var LUDIC_HARVEST_PATTERNS = ludicEntriesByTier('promotable-with-existing
 export var LUDIC_UNCOMPOSABLE = LUDIC_LIBRARY_REGISTRY
   .filter(function (entry) { return entry.tier !== 'implemented' && !entry.wired; })
   .map(function (entry) { return entry.id; });
+
+// ════════════════════════════════════════════════════════════════════════════
+// THE ARSENAL AUDIT (gameplay round W1 · VISION §4.2 · §12)
+// ════════════════════════════════════════════════════════════════════════════
+// "The arsenal is bedrock, not backlog" (§4.2) and "an acceptance set the
+// prompts never show is not a menu — it is a default generator" (§12). This
+// block grades every implement on the shelf against five gates and compiles
+// the digest the rulebook seat will be taught from. ONE compilation, four
+// readers: the published page (docs/reference/generated/arsenal.md), the
+// parity gate to come, the prompt literal to come, and the author.
+//
+// THE DERIVATION LAW (author directive, 2026-08-18): every grade cell is
+// DERIVED from a named source — a registry field, a file scan, a vm-evaluated
+// schema — and where a gate cannot be derived the cell says `unknown` and why.
+// A hand-list of verdicts anywhere in this block would be the D202
+// two-descriptions defect. The five gates:
+//
+//   renderable     — atom/geometry exists: the entry's LUDIC_LIBRARY_ATOMS
+//                    binding intersected with the engine's live atoms
+//                    (parameter: the atoms/ scan minus the D6 quarantine).
+//   playable       — pencil-only (tier membership under the law that filters
+//                    this shelf), machine-solved for the arsenal entries
+//                    (puzzle-solvers.mjs exports, imported above), and
+//                    chance-isolated where the entry's own locks state D37.
+//   taught         — a text scan of every evaluated INST_/SCHEMA_ prompt
+//                    section for the backticked id, joined to the stage(s)
+//                    STAGE_SCHEMA_MAP routes that section to. Graded WITH its
+//                    stage: named at `shell` is one stage after the rules are
+//                    written, and the seat that matters is `game-rulebook`.
+//   gated          — a reader scan of the floor sources (validation.js,
+//                    validate.mjs — comment-stripped by the caller) for the
+//                    declaration surface's own key: does a floor read the
+//                    declaration back?
+//   transport-real — a walk of the vm-evaluated STRUCTURED_SCHEMA_PLAY_SPINE
+//                    at the declared path: does the structured transport
+//                    carry the surface, and is the closed choice
+//                    enum-constrained there (the F04 class)?
+//
+// HONESTY CAVEATS, stated here because the page repeats them: a text hit
+// proves an id is NAMED at a stage, not taught-with-a-reason — reading the
+// section is the check no scan performs. A reader scan proves a floor source
+// mentions the key on a code line, not that the floor blocks — the floors
+// harness owns that proof. Both scans are presence instruments, and the page
+// labels them as such.
+//
+// Inputs that live outside contracts/ (the atom scan, the prompt routing, the
+// floor sources, the renderer's map registry) are PARAMETERS passed in by
+// scripts/gen-reference.mjs — this module stays free of fs and renderer
+// imports, per the same reasoning as the file header's.
+
+var SOLVER_EXPORTS = Object.keys(PUZZLE_SOLVERS)
+  .filter(function (k) { return typeof PUZZLE_SOLVERS[k] === 'function'; })
+  .sort();
+var SOLVER_BUDGET_KEYS = Object.keys(PUZZLE_SOLVERS.PUZZLE_SOLVER_BUDGETS);
+
+// Name normalization for the puzzle/geometry lookups. `point-to-point` is the
+// one key whose guardrail group is not its camelization; the alias is a
+// derivation spec, existence-checked below, never a verdict.
+var GUARDRAIL_KEY_BY_MAP_TYPE = { 'point-to-point': 'ptp' };
+
+function camelKind(kind) {
+  return String(kind).replace(/-(\w)/g, function (m, c) { return c.toUpperCase(); });
+}
+function pascalKind(kind) {
+  return String(kind).replace(/(?:^|-)(\w)/g, function (m, c) { return c.toUpperCase(); });
+}
+
+function requireEvidence(evidence, key) {
+  var v = evidence ? evidence[key] : null;
+  var empty = v == null
+    || (Array.isArray(v) && !v.length)
+    || (typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length);
+  if (empty) {
+    throw new Error('buildArsenalAudit: evidence.' + key + ' is missing or empty — '
+      + 'an audit over vacuous evidence reports a pass forever; fix the caller, never default');
+  }
+  return v;
+}
+
+/** Every evaluated prompt section whose text names the backticked id, with its
+ *  routed stage(s). Sorted for determinism; a section with no stage row is
+ *  reported as builder-routed rather than dropped. */
+function scanTaught(id, evidence) {
+  var needle = '`' + id + '`';
+  var hits = [];
+  Object.keys(evidence.sectionTexts).sort().forEach(function (name) {
+    if (String(evidence.sectionTexts[name]).indexOf(needle) === -1) return;
+    var stages = evidence.sectionStages[name];
+    hits.push({ section: name, stages: Array.isArray(stages) ? stages.slice() : [] });
+  });
+  return hits;
+}
+
+var TAUGHT_HIT_CAP = 4;
+
+function taughtText(hits) {
+  var shown = hits.slice(0, TAUGHT_HIT_CAP).map(function (h) {
+    return h.section + ' → ' + (h.stages.length ? h.stages.join('/') : '(builder-routed, no stage row)');
+  });
+  var more = hits.length - shown.length;
+  return shown.join(' · ') + (more > 0 ? ' (+' + more + ' more sections)' : '');
+}
+
+function gradeRenderable(entry, evidence) {
+  if (entry.tier === 'excluded-physical') {
+    return { v: 'na', text: 'excluded — see the ruling column' };
+  }
+  if (entry.tier === 'needs-new-primitive') {
+    return { v: 'no', text: 'NO — blocked on a primitive (see the build queue)' };
+  }
+  if (entry.tier === 'implemented') {
+    var dead = entry.atoms.filter(function (a) {
+      return evidence.liveAtoms.indexOf(a) === -1;
+    });
+    return dead.length
+      ? { v: 'no', text: 'NO — bound atoms not live: ' + dead.join(', ') }
+      : { v: 'yes', text: 'yes — ' + entry.atoms.join(' + ') + ' (live)' };
+  }
+  return { v: 'na', text: 'pattern — no atom of its own; wires systems that already print' };
+}
+
+function gradePlayable(entry) {
+  if (entry.law) {
+    return { v: 'no', text: 'NO — excluded by `' + entry.law + '`' };
+  }
+  if (entry.tier === 'needs-new-primitive') {
+    return { v: 'yes', text: 'pencil-only by shelf admission; nothing printable to prove yet' };
+  }
+  var text = 'yes — pencil-only by shelf admission';
+  if (LUDIC_ARSENAL_ENTRIES.indexOf(entry.id) !== -1) {
+    text += '; machine-solved (' + SOLVER_EXPORTS.length
+      + ' solvers/verifiers in puzzle-solvers.mjs, budget-exceeded refuses — D132)';
+  }
+  if (entry.locks && entry.locks.indexOf('Chance isolation') !== -1) {
+    text += '; chance-isolated (D37, stated in its own locks)';
+  }
+  return { v: 'yes', text: text };
+}
+
+function gradeTaught(entry, evidence) {
+  var hits = scanTaught(entry.id, evidence);
+  if (!hits.length) {
+    return { v: 'no', atRulebook: false, hits: hits, text: 'NO — not named in any prompt section' };
+  }
+  var atRulebook = hits.some(function (h) { return h.stages.indexOf('game-rulebook') !== -1; });
+  return { v: atRulebook ? 'yes' : 'partial', atRulebook: atRulebook, hits: hits, text: taughtText(hits) };
+}
+
+/** The key a floor would have to mention to be reading this declaration back.
+ *  A parenthetical backtick on the surface (`seal:`, `cross-reference`) wins;
+ *  otherwise the path's terminal segment. */
+function declarationNeedle(entry) {
+  var paren = /\(([^)]*)\)/.exec(entry.surface || '');
+  if (paren) {
+    var tick = /`([^`]+)`/.exec(paren[1]);
+    if (tick) return tick[1];
+  }
+  var clean = String(entry.surface || '').replace(/\s*\(.*$/, '');
+  var segs = clean.split('.');
+  return segs[segs.length - 1].replace(/\[\]$/, '');
+}
+
+function gradeGated(entry, evidence) {
+  if (entry.tier === 'excluded-physical') return { v: 'na', text: '—' };
+  if (entry.tier === 'needs-new-primitive') {
+    return { v: 'no', text: 'no — nothing declarable yet' };
+  }
+  if (entry.tier === 'implemented') {
+    var v = evidence.floorSources['public/generator/modules/validation.js'] || '';
+    if (v.indexOf('playSpine.composition[') === -1 || v.indexOf('LUDIC_LIBRARY') === -1) {
+      return { v: 'unknown', text: 'unknown — the composition floor was not found in validation.js' };
+    }
+    var text = 'yes — composition floors (validation.js): entry enum-gated against '
+      + 'LUDIC_LIBRARY, arity/distinctness/role floored';
+    if (LUDIC_ARSENAL_ENTRIES.indexOf(entry.id) !== -1
+        && v.indexOf('playSpine.composition declares') !== -1) {
+      text += '; a declared implement is scheduled onto a week that blocks without it';
+    }
+    return { v: 'yes', text: text };
+  }
+  if (!entry.wired) {
+    return { v: 'no', text: 'no — queued: no declaration surface to read back' };
+  }
+  var needle = declarationNeedle(entry);
+  var readers = Object.keys(evidence.floorSources).sort().filter(function (p) {
+    return evidence.floorSources[p].indexOf(needle) !== -1;
+  });
+  return readers.length
+    ? { v: 'yes', text: 'yes — `' + needle + '` read by ' + readers.join(' + ') }
+    : { v: 'unknown', text: 'unknown — no reader of `' + needle + '` found in the scanned floor sources' };
+}
+
+function collectSubtreeEnumKeys(node, keyName, out) {
+  if (!node || typeof node !== 'object') return out;
+  if (Array.isArray(node.enum) && keyName) out.push(keyName);
+  var props = node.properties || {};
+  Object.keys(props).sort().forEach(function (k) {
+    collectSubtreeEnumKeys(props[k], k, out);
+  });
+  if (node.items) collectSubtreeEnumKeys(node.items, keyName, out);
+  return out;
+}
+
+function gradeTransport(entry, evidence) {
+  if (entry.tier === 'excluded-physical' || entry.tier === 'needs-new-primitive') {
+    return { v: 'na', text: '—' };
+  }
+  if (!entry.surface) return { v: 'no', text: 'no — no declaration surface' };
+  var clean = String(entry.surface).replace(/\s*\(.*$/, '');
+  var prefix = 'meta.playSpine.';
+  if (clean.indexOf(prefix) !== 0) {
+    return {
+      v: 'unknown',
+      text: 'unknown — declared at `' + clean + '`, outside the spine transport this audit walks'
+    };
+  }
+  var node = evidence.spineSchema;
+  var segs = clean.slice(prefix.length).split('.');
+  for (var i = 0; i < segs.length; i++) {
+    var isArr = /\[\]$/.test(segs[i]);
+    var key = segs[i].replace(/\[\]$/, '');
+    node = node && node.properties ? node.properties[key] : null;
+    if (isArr) node = node && node.items ? node.items : null;
+    if (!node) break;
+  }
+  if (!node) {
+    return { v: 'no', text: 'NO — the structured transport does not carry `' + clean + '`' };
+  }
+  if (Array.isArray(node.enum)) {
+    return { v: 'yes', text: 'YES — enum-constrained on the transport (' + node.enum.length + ' values)' };
+  }
+  if (entry.tier === 'implemented') {
+    return {
+      v: 'no',
+      text: 'NO — `composition[].entry` is a bare string on the transport; the acceptance set '
+        + '(LUDIC_LIBRARY) never reaches it. The F04 class.'
+    };
+  }
+  var enumKeys = collectSubtreeEnumKeys(node, null, []);
+  return enumKeys.length
+    ? { v: 'carried', text: 'carried — shape on the transport; enum on ' + enumKeys.map(function (k) { return '`' + k + '`'; }).join(', ') }
+    : { v: 'carried', text: 'carried — field on the transport, no enum (the floor is the enforcement)' };
+}
+
+/**
+ * buildArsenalAudit(evidence) -> { entries, composable, rulebookSeat,
+ *                                  geometries, puzzles }
+ *
+ * Pure: a function of this registry, the contracts imported above, and the
+ * evidence parameters. Throws on vacuous evidence rather than grading air.
+ *
+ * evidence:
+ *   liveAtoms     string[]                       atoms/ scan minus the D6 quarantine
+ *   sectionTexts  { section: text }              evaluated INST_/SCHEMA_ sections
+ *   sectionStages { section: stage[] }           STAGE_SCHEMA_MAP, text-parsed
+ *   spineSchema   object                         evaluated STRUCTURED_SCHEMA_PLAY_SPINE
+ *   floorSources  { relPath: text }              comment-stripped floor sources
+ *   mapRegistry   { family: {label, sourceType} } renderer MAP_FAMILY_REGISTRY, parsed
+ */
+export function buildArsenalAudit(evidence) {
+  ['liveAtoms', 'sectionTexts', 'sectionStages', 'spineSchema', 'floorSources', 'mapRegistry']
+    .forEach(function (key) { requireEvidence(evidence, key); });
+  if (!evidence.spineSchema.properties) {
+    throw new Error('buildArsenalAudit: evidence.spineSchema has no properties — '
+      + 'the transport walk would report every surface missing');
+  }
+
+  var entries = LUDIC_LIBRARY_REGISTRY.map(function (entry) {
+    return {
+      id: entry.id,
+      label: entry.label,
+      tier: entry.tier,
+      wired: entry.wired,
+      surface: entry.surface,
+      law: entry.law,
+      note: entry.note,
+      renderable: gradeRenderable(entry, evidence),
+      playable: gradePlayable(entry),
+      taught: gradeTaught(entry, evidence),
+      gated: gradeGated(entry, evidence),
+      transport: gradeTransport(entry, evidence)
+    };
+  });
+
+  // The composable shelf: what a book can actually name today — the
+  // implemented systems plus the wired patterns. The rulebook-seat verdict is
+  // measured over exactly this set, because these are the implements the
+  // stage that designs the game would need to be shown.
+  var composable = entries.filter(function (e) {
+    return e.tier === 'implemented'
+      || (e.tier === 'promotable-with-existing-atoms' && e.wired);
+  });
+  var rulebookSeat = {
+    stage: 'game-rulebook',
+    taught: composable.filter(function (e) { return e.taught.atRulebook; })
+      .map(function (e) { return e.id; }),
+    total: composable.length
+  };
+
+  var geometries = VALID_MAP_TYPES.map(function (type) {
+    var family = Object.keys(evidence.mapRegistry).filter(function (f) {
+      return evidence.mapRegistry[f].sourceType === type;
+    })[0];
+    if (!family) {
+      throw new Error('buildArsenalAudit: no map family claims sourceType "' + type
+        + '" — the geometry table would grade a board nobody draws');
+    }
+    var gk = GUARDRAIL_KEY_BY_MAP_TYPE[type] || camelKind(type);
+    var rail = SPATIAL_GUARDRAILS[gk];
+    var hits = scanTaught(type, evidence);
+    return {
+      type: type,
+      family: family,
+      label: evidence.mapRegistry[family].label || family,
+      renderable: 'yes — family `' + family + '` in the renderer registry',
+      taught: hits.length ? taughtText(hits) : 'NO — not named in any prompt section',
+      taughtHits: hits,
+      guardrails: rail
+        ? 'yes — `SPATIAL_GUARDRAILS.' + gk + '` (' + Object.keys(rail).length + ' keys)'
+        : 'NONE'
+    };
+  });
+
+  var puzzles = VALID_CONSTRAINED_GRID_KINDS
+    .map(function (k) { return { kind: k, atom: 'constrained-grid' }; })
+    .concat(VALID_WORD_GRID_KINDS.map(function (k) { return { kind: k, atom: 'word-grid' }; }))
+    .map(function (row) {
+      // Case-insensitive match: export style capitalizes internal words the
+      // kind's hyphenation cannot predict (`kenken` -> solveKenKen), so the
+      // candidate is compared flattened. The first emitted page shipped
+      // "NONE — no solver export matches" for kenken while solveKenKen
+      // existed — the audit lying in the damning direction.
+      var flat = String(row.kind).replace(/-/g, '').toLowerCase();
+      var solver = SOLVER_EXPORTS.filter(function (n) {
+        var ln = n.toLowerCase();
+        return ln === 'solve' + flat || ln === 'verify' + flat;
+      })[0] || null;
+      var budgets = SOLVER_BUDGET_KEYS.filter(function (b) {
+        return b.indexOf(camelKind(row.kind)) === 0;
+      });
+      var gk = camelKind(row.kind);
+      return {
+        kind: row.kind,
+        atom: row.atom,
+        solver: solver ? '`' + solver + '()`' : 'NONE — no solver export matches',
+        solverOk: !!solver,
+        budgets: budgets.length ? budgets.map(function (b) { return '`' + b + '`'; }).join(' ') : 'none named',
+        guardrail: SPATIAL_GUARDRAILS[gk] ? '`SPATIAL_GUARDRAILS.' + gk + '`' : 'NONE'
+      };
+    });
+
+  return {
+    entries: entries,
+    composable: composable.map(function (e) { return e.id; }),
+    rulebookSeat: rulebookSeat,
+    geometries: geometries,
+    puzzles: puzzles
+  };
+}
+
+/**
+ * buildArsenalDigest() -> string
+ *
+ * The compressed shelf, in the D144 Inputs/Process/Outputs/Locks form, one
+ * line per implement — COMPILED from the registry, never research prose. This
+ * is what the rulebook seat will be taught from (Wave 2 quotes it into the
+ * `game-rulebook` prompt): the systems a composition can name and the wired
+ * patterns a spine can declare, each with what it gives and what locks it.
+ * Pure function of the registry; the published page prints it verbatim so the
+ * author reads exactly what the model will.
+ */
+export function buildArsenalDigest() {
+  var lines = [];
+  lines.push('THE IMPLEMENTED SYSTEMS — the composition menu. '
+    + 'Each line: what feeds it, what it does, what it yields, what locks it.');
+  ludicEntriesByTier('implemented').forEach(function (e) {
+    lines.push('- `' + e.id + '` (' + e.label + ') — IN: ' + e.inputs
+      + ' DOES: ' + e.process + ' GIVES: ' + e.outputs + ' LOCKS: ' + e.locks);
+  });
+  lines.push('');
+  lines.push('THE WIRED PATTERNS — the harvest menu. '
+    + 'Declared on the surface each line names; a floor reads every declaration back.');
+  ludicEntriesByTier('promotable-with-existing-atoms')
+    .filter(function (e) { return e.wired; })
+    .forEach(function (e) {
+      lines.push('- `' + e.id + '` (declare: `' + e.surface + '`) — GIVES: '
+        + e.outputs + ' LOCKS: ' + e.locks);
+    });
+  return lines.join('\n');
+}
