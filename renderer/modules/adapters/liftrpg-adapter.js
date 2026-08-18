@@ -17,7 +17,14 @@ import { PAGE_BUDGET } from '../engine/page-spec.js';
 // W5b: the surface-ref GRAMMAR, so a hint ladder's `printedOn` can be resolved
 // to the page it names. One parameterized resolver (D93) — this file must not
 // grow a second parser for a grammar contract-constants.mjs already owns.
-import { parseSurfaceRef } from '../../../contracts/contract-constants.mjs';
+// THE FORM CHANNEL'S DECLARATION SURFACE (ARRANGEMENT §2 axis 5 / §3).
+// `resolveAtomForms` reads `meta.arrangement.atomForms`; `sessionCardFormForWeek`
+// applies THE SHEDDING LAW — the declared form through `shedAfterWeek`, `bare`
+// after it. Both live in contract-constants for the reason every resolver does
+// (D93): the adapter is one reader, not the owner.
+import {
+  parseSurfaceRef, resolveAtomForms, sessionCardFormForWeek,
+} from '../../../contracts/contract-constants.mjs';
 import { resolveWeekMechanicProfile } from '../mechanic-registry.js';
 import {
   estimateSessionCardHeight,
@@ -177,6 +184,12 @@ function resolveTrackerGroup(primaryGroup, weekIndex, attachmentStrategy, artifa
 export function extractLiftRPGAtoms(data, unlockedEnding = null) {
   const atoms = [];
   const artifactIdentity = resolveArtifactIdentity(data);
+  // Resolved once per BOOK: the declaration is `meta.arrangement.atomForms` and
+  // it does not vary by week — what varies is the shed, applied per week below.
+  // `null` for a book that declares nothing, which resolves to `bare`
+  // everywhere and renders byte-identically to the pre-form engine.
+  const atomForms = resolveAtomForms((data.meta || {}).arrangement
+    ? data.meta.arrangement.atomForms : null);
   const shellFamily = artifactIdentity.shellFamily || 'field-survey';
   const shellAttrs = {
     'shell-family': artifactIdentity.shellFamily || 'field-survey',
@@ -232,7 +245,27 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
     const week = weeks[wi];
     const isBoss = !!week.isBossWeek;
     const profile = resolveWeekMechanicProfile(week);
-    const sessionChunks = chunkWeekSessions(week.sessions || [], week);
+    // ── THE FORM, RESOLVED ONCE PER WEEK ────────────────────────────────────
+    // Declared here, where the seating is decided, and carried on every card of
+    // the week — the `ownsPage` idiom exactly (D117), and for the same reason:
+    // the estimate side has no booklet and the renderer has no shed schedule,
+    // so both must be handed the SAME answer rather than each deriving one.
+    // Resolving it inside the loop is what makes the shedding law visible: the
+    // form is a function of the week's own position in the book.
+    //
+    // THE RENDERER AUTHORS NOTHING. `markInstruction` is the week's own
+    // reckoning conversion — the one-sentence rule the book already wrote for
+    // this week's marks — printed a second time beside the strip it governs,
+    // which is INST_POINT_OF_USE's whole claim (rules live where they fire).
+    // `rulesPointer` is the economy's authored noun. Both are strings the BOOK
+    // wrote; a renderer that composed its own would print the same teaching in
+    // every book, which is the sameness these axes exist to break.
+    const cardFormSpec = {
+      form: sessionCardFormForWeek(atomForms, week.weekNumber),
+      markInstruction: (week.reckoning && week.reckoning.conversion) || '',
+      rulesPointer: ((data.meta || {}).economy || {}).currencyLabel || '',
+    };
+    const sessionChunks = chunkWeekSessions(week.sessions || [], week, 3, cardFormSpec);
     const primaryGroup = `week-${wi}-chunk-0`;
     const attachmentStrategy = resolveWeekAttachmentStrategy(artifactIdentity);
     const balancedRowGroup = isBoss ? null : resolveBalancedRowGroup(artifactIdentity, week, wi, attachmentStrategy);
@@ -285,6 +318,13 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
             profile,
             totalWeeks,
             ownsPage,
+            // THE ONE CHANNEL (ARRANGEMENT §3 clause 3). `data` is the field
+            // BOTH routes carry: estimate() is handed `atom.data` alone, render
+            // is handed the descriptor. A sibling field beside `data` would
+            // reach render and not the estimate — a divergence built in.
+            formVariant: cardFormSpec.form,
+            markInstruction: cardFormSpec.markInstruction,
+            rulesPointer: cardFormSpec.rulesPointer,
           },
         }));
       }
@@ -1213,7 +1253,12 @@ function weekSeatsBossPanelsLeft(week) {
  * @param {number} [maxSessionsPerPage]
  * @returns {{startIndex: number, sessions: object[]}[]}
  */
-function chunkWeekSessions(sessions, weekMeta = null, maxSessionsPerPage = 3) {
+// `formSpec` rides in for one reason: the chunker scores partitions with the
+// SAME estimate the atom will report, and a chunker blind to the form would
+// seat a taught week as if its cards were bare — cards that then print taller
+// than the partition it chose. One form, one estimate, both callers (the D117
+// ownsPage idiom applied to the form channel).
+function chunkWeekSessions(sessions, weekMeta = null, maxSessionsPerPage = 3, formSpec = null) {
   const list = Array.isArray(sessions) ? sessions : [];
   if (!list.length) return [{ startIndex: 0, sessions: [] }];
   if (list.length <= maxSessionsPerPage) {
@@ -1257,9 +1302,10 @@ function chunkWeekSessions(sessions, weekMeta = null, maxSessionsPerPage = 3) {
       // boss panels is a NORMAL card, priced on the density ladder — which is
       // also the only reason the solver has a shrink path on those pages.
       const cardsLoadPx = sessionChunkOwnsPage(weekMeta, index, sizes.length, size)
-        ? estimateSoloSessionCardHeight(chunk[0])
+        ? estimateSoloSessionCardHeight(chunk[0], undefined, formSpec)
         : chunk.reduce(
-          (sum, session) => sum + estimateSessionCardHeight(session, SESSION_CHUNK_DENSITY),
+          (sum, session) => sum
+            + estimateSessionCardHeight(session, SESSION_CHUNK_DENSITY, undefined, formSpec),
           0,
         ) + (size - 1) * cardsGap;
 

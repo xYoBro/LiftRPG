@@ -8,6 +8,12 @@ import {
 // — a citeRef on a micro-line and a citeRef on a found document are the same
 // grammar, and two normalizers would be the D91 defect class.
 import { normalizeCiteRef } from './document-models.js?v=48';
+// THE ONE HOME for the session card's form set (ARRANGEMENT §3, the variant
+// contract). The form name is resolved HERE and nowhere else on the render
+// path, so the model, the stylesheet and the estimate cannot disagree about
+// what "taught" means. Bare `.mjs`, no cache-bust query — Node imports the same
+// file (the legibility.mjs idiom, D172).
+import { resolveSessionCardForm } from './form-metrics/session-card-forms.mjs';
 
 let textMeasureContext = null;
 
@@ -159,12 +165,41 @@ function buildProgressionTargetModel(progressionTarget) {
   return { rule, targetLabel };
 }
 
-export function buildWorkoutCardModel(session, layoutPlan) {
+/**
+ * THE FORM DECLARATION, as a model (ARRANGEMENT §2 axis 5 / §3).
+ *
+ * `formSpec` is the third parameter and it is OPTIONAL: absent, malformed or
+ * `bare` all resolve to the same thing — `form: 'bare'` with no teaching text —
+ * and `renderWorkoutCard()` then builds byte-identical DOM to the pre-form
+ * engine. That is the whole demotion proof on the render side, and it is why
+ * the two existing call sites in tests/playwright that pass `(session, {})`
+ * keep working unchanged.
+ *
+ * THE RENDERER AUTHORS NO TEACHING PROSE. `markInstruction` and `rulesPointer`
+ * are strings the ADAPTER hands down from authored booklet fields. A renderer
+ * that composed its own instruction sentence would be D198's derived-data-
+ * prints defect wearing a helpful face, and it would print the same sentence in
+ * every book — the sameness the arrangement axes exist to break. Empty in,
+ * nothing out.
+ */
+function buildFormModel(formSpec) {
+  const spec = (formSpec && typeof formSpec === 'object') ? formSpec : {};
+  const form = resolveSessionCardForm(spec.form);
+  if (form === 'bare') return { form: 'bare', markInstruction: '', rulesPointer: '' };
+  return {
+    form,
+    markInstruction: String(spec.markInstruction || '').trim(),
+    rulesPointer: String(spec.rulesPointer || '').trim()
+  };
+}
+
+export function buildWorkoutCardModel(session, layoutPlan, formSpec) {
   const exercises = session.exercises || [];
   const showNotes = typeof session.showNotes === 'boolean' ? session.showNotes : exercises.length > 0;
   const continuationLabel = String(session.continuationLabel || '').trim();
 
   return {
+    form: buildFormModel(formSpec),
     flexWeight: layoutPlan && layoutPlan.flexWeight ? layoutPlan.flexWeight : 1,
     notesHeight: layoutPlan && typeof layoutPlan.notesHeight === 'number' ? layoutPlan.notesHeight : 12,
     sessionLabel: typeof session.label === 'string' ? session.label : 'Session',

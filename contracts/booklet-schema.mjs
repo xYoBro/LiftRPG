@@ -85,7 +85,8 @@ import {
   VALID_SECTION_FURNITURE,
   VALID_TABLE_TREATMENTS,
   VALID_ANNOTATION_PATTERNS,
-  VALID_LEITMOTIF_GESTURES
+  VALID_LEITMOTIF_GESTURES,
+  VALID_SESSION_CARD_FORMS
 } from './contract-constants.mjs';
 
 var G = SPATIAL_GUARDRAILS;
@@ -261,9 +262,22 @@ var designLanguage = {
 // misnamed axis (`furniture` for `sectionFurniture`) reads as a complete record
 // and draws nothing.
 //
-// EVERY AXIS HERE PAINTS. Geometry — the grid, the atom form set, the spread
-// grammar — is the variant contract's channel (ARRANGEMENT §3) and owes a gate
-// this block does not have. See the refusal list in contract-constants.mjs.
+// EVERY AXIS HERE PAINTS — every axis being `grammar`, `sectionFurniture`,
+// `tableTreatment`, `annotationPattern` and `leitmotif`. Geometry — the grid,
+// the atom form set, the spread grammar — is the variant contract's channel
+// (ARRANGEMENT §3). See the refusal list in contract-constants.mjs.
+//
+// `atomForms` IS THAT OTHER CHANNEL, and it is nested here rather than hung off
+// `meta` because the seven axes are one system and a book should declare its
+// arrangement in one place. It is NOT an `ARRANGEMENT_AXES` row and never
+// becomes one: the axes table feeds `arrangementAttributes()` and the paint-only
+// law, which check the property this channel is licensed to change. The form
+// channel travels on its own attribute (`data-form-variant`), out of its own
+// resolver (`resolveAtomForms`), with its own arithmetic
+// (renderer/modules/form-metrics/session-card-forms.mjs) and its own gate
+// (scripts/check-form-variants.mjs) — ARRANGEMENT §3's four clauses, one per
+// surface. When this block said geometry "owes a gate this block does not
+// have", this is that gate arriving; the sentence was a debt, not a boundary.
 var arrangement = {
   type: 'object',
   required: [],
@@ -286,6 +300,34 @@ var arrangement = {
     // the obedience floor reads it for the assignment's name, and enumerating
     // it would re-impose the sameness the axis exists to break.
     arrangementEvidence: { type: 'string' },
+    // ── Axis 5, the FORM channel (ARRANGEMENT §2 axis 5 / §3) ───────────────
+    // Additive-optional, like every other arrangement surface: no declaration
+    // means every session card takes `bare`, which is today's exact card. The
+    // SHEDDING LAW rides here too — `shedAfterWeek` is the last 1-based week
+    // that keeps the declared form, after which the card sheds to `bare`.
+    // Absent means the form holds for the whole book. The shed point is an
+    // authored decision under the two-source law (§8), which is why it is a
+    // number the book states and not a constant the engine picks.
+    atomForms: {
+      type: 'object',
+      required: [],
+      additionalProperties: false,
+      properties: {
+        sessionCard: {
+          type: 'object',
+          // `form` required when the object is present — the manifestPointer
+          // idiom. A shed schedule with no form is a rule about nothing.
+          required: ['form'],
+          additionalProperties: false,
+          properties: {
+            form: { enum: VALID_SESSION_CARD_FORMS },
+            shedAfterWeek: { type: 'integer', minimum: 0 },
+            _x: xt
+          }
+        },
+        _x: xt
+      }
+    },
     _x: xt
   }
 };

@@ -2,6 +2,19 @@ import { describeExerciseLoad, countWrappedLines } from './utils.js?v=48';
 // D121: the estimate's only knowledge of typefaces. `.exercise-name` reads
 // `--serif`, which resolves to `--theme-body-family` — the `body` role.
 import { advanceRatio } from './type-metrics.js?v=48';
+// ── THE FORM CHANNEL (ARRANGEMENT §3 — the variant contract) ────────────────
+// Every other cross-file number in this file is a HAND-MAINTAINED MIRROR of a
+// booklet.css declaration, kept in step by reciprocal comments and a human's
+// attention. That idiom is why D71 exists, and D105, D115, D118, D121, D133 and
+// D145 after it. For a NAMED VARIANT it is forbidden: the constants below are
+// imported from the module that also EMITS the stylesheet
+// (public/renderer/form-variants.css, written by scripts/gen-reference.mjs and
+// byte-diffed by npm run validate). There is no second copy to drift, because
+// the stylesheet is not authored — it is derived from the numbers this import
+// brings in.
+import {
+  resolveSessionCardForm, taughtChromeHeightPx, noteLineCount,
+} from './form-metrics/session-card-forms.mjs';
 
 // ---------------------------------------------------------------------------
 // Session-card geometry model
@@ -1004,13 +1017,49 @@ function notesBoxHeight(density) {
   return sessionCardNotesHeight(density) + NOTES_MARGIN;
 }
 
-function rawSessionCardHeight(session, density, metrics) {
+/**
+ * THE TAUGHT FORM'S ADDED HEIGHT (ARRANGEMENT §2 axis 5 / §3 clause 2).
+ *
+ * *Every named variant arrives with its own height arithmetic. If you add the
+ * form, you add the estimate, in the same change.* This is that arithmetic, and
+ * it is the whole reason the form may exist at all: a form that lived only in
+ * CSS is forbidden, because phase-1 estimation has no DOM and would keep
+ * predicting the bare card's height while a taller one printed — the D71 defect
+ * arriving through the arrangement door.
+ *
+ * MIRRORS renderWorkoutCard() EXACTLY (workout-primitives.js `appendTaughtStep`):
+ * one marker per body child, in render order, and the marking instruction on
+ * the mark strip's marker ONLY. Both halves matter. Charging a note when the
+ * card carries no strip would bill for a marker the DOM never draws; charging
+ * the pointer chip would bill for height the CSS explicitly refuses to take
+ * (it is sized strictly under the head row and centred in it).
+ *
+ * Zero for the bare form, and that zero is the dormancy guarantee: every
+ * fixture in the corpus predates the form set, so this term must contribute
+ * nothing at all to their totals — not a rounding difference, not a gap.
+ *
+ * @param {object} parts cardComposition() output — bodyChildren is the step count
+ * @param {object} session
+ * @param {object} formSpec { form, markInstruction }
+ * @param {number} bodyGapPx `.session-body` row-gap at this density
+ */
+function rawTaughtChromeHeight(parts, session, formSpec, bodyGapPx) {
+  const spec = (formSpec && typeof formSpec === 'object') ? formSpec : {};
+  if (resolveSessionCardForm(spec.form) !== 'taught') return 0;
+  // The note prints inside the mark strip's marker, so a card with no strip
+  // charges nothing for it however much instruction was handed down.
+  const noteLines = parts.hasStrip ? noteLineCount(spec.markInstruction) : 0;
+  return taughtChromeHeightPx(parts.bodyChildren, bodyGapPx, noteLines);
+}
+
+function rawSessionCardHeight(session, density, metrics, formSpec) {
   const tierKey = variantKey(density);
   const tier = CARD_LADDER[tierKey];
   const box = cardBox(density);
   const parts = cardComposition(session);
 
-  return box.padY
+  return rawTaughtChromeHeight(parts, session, formSpec, tier.bodyGap)
+    + box.padY
     + box.gap * (parts.cardChildren - 1)
     + tier.header
     + rawOpeningEchoHeight(parts.hasEcho ? session.returnBeat : null, density)
@@ -1032,10 +1081,15 @@ function rawSessionCardHeight(session, density, metrics) {
  *
  * @param {object} session — a schema session object
  * @param {number} density — 0.0 (spacious) to 1.0 (maximum compression)
+ * @param {object} metrics — readTypeMetrics() output (D121)
+ * @param {object} [formSpec] — { form, markInstruction }, the atom's
+ *   `data.formVariant` / `data.markInstruction` (ARRANGEMENT §3 clause 3: one
+ *   channel to measurement and render). Absent means `bare`, which is
+ *   byte-identical to the pre-form estimate — the corpus proves it.
  * @returns {number} px
  */
-export function estimateSessionCardHeight(session, density, metrics) {
-  return monotoneTail((d) => rawSessionCardHeight(session, d, metrics), density);
+export function estimateSessionCardHeight(session, density, metrics, formSpec) {
+  return monotoneTail((d) => rawSessionCardHeight(session, d, metrics, formSpec), density);
 }
 
 /**
@@ -1050,7 +1104,7 @@ export function estimateSessionCardHeight(session, density, metrics) {
  * @param {object} session
  * @returns {number} px
  */
-export function estimateSoloSessionCardHeight(session, metrics) {
+export function estimateSoloSessionCardHeight(session, metrics, formSpec) {
   const parts = cardComposition(session);
   // Interior text still follows the base tier: the card-count rules restore
   // base-ish type sizes, and `.exercise-*` carries no card-count override at
@@ -1067,7 +1121,11 @@ export function estimateSoloSessionCardHeight(session, metrics) {
   // through the same raw terms rather than repeating their constants is the
   // point (a copied constant here is the D71 drift hazard, a MISSING term is
   // the D79 one — the unmodelled solo notes box cost 194px).
-  return SOLO_CARD.padY
+  // The taught form costs the same chrome on a page-owning card: the markers
+  // are body children there too, and the solo block overrides no `.session-body`
+  // gap, so the term reads SOLO_CARD.bodyGap and nothing else changes.
+  return rawTaughtChromeHeight(parts, session, formSpec, SOLO_CARD.bodyGap)
+    + SOLO_CARD.padY
     + SOLO_CARD.gap * (parts.cardChildren - 1)
     + tier.header
     + rawOpeningEchoHeight(parts.hasEcho ? session.returnBeat : null, 0)

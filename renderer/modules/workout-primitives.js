@@ -212,8 +212,87 @@ function renderBinaryChoice(binaryChoiceModel) {
   return choice;
 }
 
+/**
+ * THE TAUGHT FORM'S STEP MARKER (ARRANGEMENT §2 axis 5 — the atom form set).
+ *
+ * Mothership ships two versions of its character sheet. The Basic one is
+ * covered in teaching — numbered steps walking you box to box, the dice
+ * instruction printed inside or beside the very field it fills, small pointers
+ * sending you to the page where the detail lives. The Advanced one has all of
+ * that stripped out: clean labelled panels and more room to write. Same data.
+ * Two forms. One teaches; one gets out of the way. That is this pair.
+ *
+ * WHAT IS STRUCTURE AND WHAT IS AUTHORED, because the distinction is the reason
+ * this is safe to print in a book about anything. The NUMERAL is structure: the
+ * caller counts the steps the card actually built and numbers them in render
+ * order, so no step can be numbered that does not exist and no word is
+ * invented. The note and the pointer print AUTHORED strings or nothing — see
+ * buildFormModel() in workout-models.js.
+ *
+ * NULL-GUARD, the renderBinaryChoice pattern exactly: the bare form calls this
+ * zero times, so a bare card builds byte-identical DOM to the pre-form engine.
+ *
+ * GEOMETRY. Every height here is declared in
+ * form-metrics/session-card-forms.mjs and emitted into form-variants.css from
+ * those same constants; session-card-metrics.js charges for them out of the
+ * same module. One number, three readers — variant-contract clause 3. The
+ * marker is `flex:0 0 auto` in that stylesheet for the absorption law's reason
+ * (D198): a marker that could be squeezed would print at a height the estimate
+ * did not predict, and the planner would never see it.
+ *
+ * Text goes in through make()'s textContent, never innerHTML.
+ */
+function renderStepMarker(index, note, pointer) {
+  const marker = make('div', 'session-step-marker');
+
+  const head = make('div', 'session-step-head');
+  head.appendChild(make('span', 'session-step-index', String(index)));
+  head.appendChild(make('span', 'session-step-rule'));
+  if (pointer) head.appendChild(make('span', 'session-step-pointer', pointer));
+  marker.appendChild(head);
+
+  // The instruction rides INSIDE the marker rather than beside it. As a sibling
+  // it would be one more `.session-body` child and would buy one more body gap
+  // the estimate would have to model separately; inside, the marker's height is
+  // head + note and the arithmetic stays one term.
+  if (note) marker.appendChild(make('div', 'session-step-note', note));
+
+  return marker;
+}
+
+/**
+ * Append a body child, preceded by its numbered marker when the card is in the
+ * taught form.
+ *
+ * `steps` is a mutable counter object rather than a return value so the call
+ * sites below read as a list of appends and cannot silently skip a number —
+ * a gap in the numbering is exactly the failure a reader would notice first.
+ *
+ * The mark strip is the one step that carries the marking instruction, because
+ * it is the field that instruction fills. Every other step gets the numeral
+ * alone. The pointer chip prints once, on the first marker, and costs no height
+ * at all (it is sized strictly under the head row) — which is why the estimate
+ * has no pointer term.
+ */
+function appendTaughtStep(body, child, ctx, isMarkStrip) {
+  if (ctx.form === 'taught') {
+    ctx.index += 1;
+    const note = isMarkStrip ? ctx.markInstruction : '';
+    const pointer = ctx.index === 1 ? ctx.rulesPointer : '';
+    body.appendChild(renderStepMarker(ctx.index, note, pointer));
+  }
+  body.appendChild(child);
+}
+
 export function renderWorkoutCard(cardModel) {
   const card = make('article', 'session-card');
+  const formModel = cardModel.form || { form: 'bare', markInstruction: '', rulesPointer: '' };
+  const stepCtx = {
+    form: formModel.form,
+    index: 0,
+    markInstruction: formModel.markInstruction || '',
+    rulesPointer: formModel.rulesPointer || ''
+  };
 
   const headerText = cardModel.continuationLabel
     ? (cardModel.sessionLabel + ' · ' + cardModel.continuationLabel)
@@ -239,45 +318,59 @@ export function renderWorkoutCard(cardModel) {
 
   const body = make('div', 'session-body');
   if (cardModel.exerciseRows.length) {
-    body.appendChild(renderExerciseTable(cardModel));
+    appendTaughtStep(body, renderExerciseTable(cardModel), stepCtx, false);
   }
 
   const markStrip = renderMarkStrip(cardModel.markStrip);
   if (markStrip) {
-    body.appendChild(markStrip);
+    appendTaughtStep(body, markStrip, stepCtx, true);
   }
 
   // Micro-lines sit after the strip and before the route decision: they are
   // read once the marking that answers them has been done.
   const microLines = renderMicroLines(cardModel.microLines);
   if (microLines) {
-    body.appendChild(microLines);
+    appendTaughtStep(body, microLines, stepCtx, false);
   }
 
   const binaryChoice = renderBinaryChoice(cardModel.binaryChoice);
   if (binaryChoice) {
-    body.appendChild(binaryChoice);
+    appendTaughtStep(body, binaryChoice, stepCtx, false);
   }
 
   if (cardModel.showNotes) {
     const notesBox = make('div', 'notes-box');
     notesBox.style.setProperty('--notes-box-height', Math.max(12, cardModel.notesHeight || 0) + 'px');
-    body.appendChild(notesBox);
+    appendTaughtStep(body, notesBox, stepCtx, false);
   }
 
   // Immediately before the return beat — see renderProgressionTarget(). The
   // workout's next number is settled first; the story gets the last word.
   const progressionTarget = renderProgressionTarget(cardModel.progressionTarget);
   if (progressionTarget) {
-    body.appendChild(progressionTarget);
+    appendTaughtStep(body, progressionTarget, stepCtx, false);
   }
 
   // LAST — see renderReturnBeat(). The peak-end ordering is the mechanism.
   const returnBeat = renderReturnBeat(cardModel.returnBeat);
   if (returnBeat) {
-    body.appendChild(returnBeat);
+    appendTaughtStep(body, returnBeat, stepCtx, false);
   }
 
   card.appendChild(body);
+
+  // THE FORM ATTRIBUTE, STAMPED HERE AND NOWHERE ELSE. It selects geometry, so
+  // the one place it can be stamped safely is the place that just built the
+  // chrome it selects — stamping it in the atom would let a card carry the
+  // attribute without the DOM, or the DOM without the attribute, and either way
+  // the estimate would be measuring a card the renderer did not build.
+  //
+  // `bare` STAMPS NOTHING. That is the D179 demotion idiom on the form channel:
+  // no attribute means no rule in form-variants.css can match, so a card in the
+  // default form is byte-identical to the pre-form render — provably, not
+  // asserted. It is also why the emitted stylesheet carries no `[data-form-
+  // variant="bare"]` block: there is no such attribute to select.
+  if (stepCtx.form !== 'bare') card.setAttribute('data-form-variant', stepCtx.form);
+
   return card;
 }

@@ -23,6 +23,30 @@ import {
 // byte-identical without one (ATOM-IR / the render.js options.typeMetrics row).
 import { readTypeMetrics } from '../type-metrics.js';
 
+/**
+ * THE FORM CHANNEL, in one place (ARRANGEMENT §3 clause 3 — one channel).
+ *
+ * The variant contract's third clause is that the chosen variant reaches the
+ * measuring step and the drawing step BY THE SAME ROUTE, so the two can never
+ * disagree. That route is `atom.data`, and it is the one field both halves
+ * already carry: `estimate()` is handed `atom.data` alone (page-planner.js and
+ * density-solver.js both call it that way) while `render()` receives the whole
+ * descriptor. A sibling field on the descriptor would be visible to render and
+ * invisible to the estimate — which is precisely the divergence the prime
+ * invariant forbids, built in on purpose.
+ *
+ * So both functions below project the SAME three fields out of `data` through
+ * this one helper. The engine learns nothing: `formVariant` is an opaque string
+ * to it, exactly as `ownsPage` is an opaque boolean.
+ */
+function formSpecOf(data) {
+  return {
+    form: data.formVariant,
+    markInstruction: data.markInstruction,
+    rulesPointer: data.rulesPointer,
+  };
+}
+
 registerAtom('session-card', {
   defaultSizeHint: 'quarter-page',
   canShare: true,
@@ -46,14 +70,16 @@ registerAtom('session-card', {
     // min === preferred is not a shortcut: every rule in the solo CSS block is
     // density-invariant, so the shrink potential really is zero, and saying so
     // is what stops the solver spending passes on a card that cannot move.
+    const formSpec = formSpecOf(atomData);
+
     if (atomData.ownsPage) {
-      const soloHeight = estimateSoloSessionCardHeight(session, metrics);
+      const soloHeight = estimateSoloSessionCardHeight(session, metrics, formSpec);
       return { minHeight: soloHeight, preferredHeight: soloHeight };
     }
 
     return {
-      minHeight: estimateSessionCardHeight(session, 1, metrics),
-      preferredHeight: estimateSessionCardHeight(session, density, metrics),
+      minHeight: estimateSessionCardHeight(session, 1, metrics, formSpec),
+      preferredHeight: estimateSessionCardHeight(session, density, metrics, formSpec),
     };
   },
 
@@ -73,7 +99,10 @@ registerAtom('session-card', {
       cards: [{ flexWeight: 1, notesHeight }],
     };
 
-    const cardModel = buildWorkoutCardModel(session, layoutPlan);
+    // The same projection the estimate reads, three lines above. The form
+    // attribute itself is stamped by renderWorkoutCard(), beside the chrome it
+    // selects — see the note there on why it cannot be stamped here.
+    const cardModel = buildWorkoutCardModel(session, layoutPlan, formSpecOf(data));
     const card = renderWorkoutCard(cardModel);
     const variant = sessionCardVariant(normalizedDensity);
     if (variant) card.setAttribute('data-density-variant', variant);

@@ -889,6 +889,98 @@ export function resolveArrangement(spec) {
   return Object.keys(out).length ? out : null;
 }
 
+// ── Axis 5 — the atom form set (ARRANGEMENT §2 axis 5, phase B) ──────────────
+//
+// THE OTHER CHANNEL. Everything above this line is the DECORATION channel: it
+// paints and may never move a box, and `arrangementPaintOnlyLaw()` enforces
+// that with a property blacklist. This block is the FORM channel, and its law
+// is the opposite one — ARRANGEMENT §3 clause 4, in the constitution's own
+// words: *paint may not measure; form must.*
+//
+// So this is deliberately NOT another `ARRANGEMENT_AXES` row. A form is not an
+// attribute the theme stamps and a stylesheet draws; it is a named variant that
+// arrives WITH ITS OWN ARITHMETIC, and the two travel to measurement and render
+// by one route. Adding it to the axes table would hand it to
+// `arrangementAttributes()` and `arrangementPaintOnlyLaw()`, which would then
+// check the wrong property and pass a geometry change as decoration — the D71
+// defect with a constitution quoted over it.
+//
+//   the vocabulary + the declaration resolver  live here (every closed menu does)
+//   the geometry + the emitted CSS             live in
+//     public/renderer/modules/form-metrics/session-card-forms.mjs
+//   the gate                                   is scripts/check-form-variants.mjs
+//
+// THE FORM SET LAW (ARRANGEMENT §2 axis 5, ratified 2026-08-17): two forms per
+// atom by default — taught and bare — because two is the Mothership answer and
+// a third invites a fourth that nobody chooses. Growth follows the arsenal's
+// rule (VISION §4.2): a book that reached for a form it did not have names the
+// gap, and the gap becomes the next form. HARD CAP FOUR; a fifth is a design
+// conversation, not a wave. `ATOM_FORM_SET_CAP` is that cap with a reader.
+export var ATOM_FORM_SET_CAP = 4;
+
+// `bare` is TODAY'S EXACT CARD and stamps no attribute, which is what makes the
+// pre-form render provably unchanged (the D179 demotion idiom: declaring
+// nothing — and declaring the default — moves no pixel). `taught` is the
+// Mothership Basic sheet's form: numbered steps, the marking instruction
+// printed beside the field it fills, a pointer to where the rules live.
+export var VALID_SESSION_CARD_FORMS = ['bare', 'taught'];
+export var DEFAULT_SESSION_CARD_FORM = 'bare';
+
+/**
+ * resolveAtomForms(spec) -> { sessionCard: { form, shedAfterWeek? } } | null
+ *
+ * SINGLE HOME (D93) for `meta.arrangement.atomForms`. The adapter resolves the
+ * declaration once per book and stamps the answer on every session-card atom,
+ * so phase-1 estimation and the renderer read the SAME answer — variant
+ * contract clause 3 (one channel).
+ *
+ * `null` for an absent or unreadable declaration, and it is load-bearing in
+ * exactly the way `resolveArrangement()`'s null is: no declaration means every
+ * card takes `bare`, which is byte-identical to the pre-form engine. An
+ * off-menu form is DROPPED rather than defaulted-with-a-shed, because a book
+ * that misauthored the form name must not silently acquire a shed schedule.
+ */
+export function resolveAtomForms(spec) {
+  if (!spec || typeof spec !== 'object') return null;
+  var declared = spec.sessionCard;
+  if (!declared || typeof declared !== 'object') return null;
+  var form = String(declared.form || '').trim();
+  if (VALID_SESSION_CARD_FORMS.indexOf(form) === -1) return null;
+  var out = { form: form };
+  var shed = declared.shedAfterWeek;
+  if (typeof shed === 'number' && isFinite(shed) && shed >= 0 && Math.floor(shed) === shed) {
+    out.shedAfterWeek = shed;
+  }
+  return { sessionCard: out };
+}
+
+/**
+ * THE SHEDDING LAW (ARRANGEMENT §2 axis 5, ratified 2026-08-17), as arithmetic.
+ *
+ * *Form varies across the book's own timeline.* Week one carries the taught
+ * form and by mid-book the same component sheds all of it, because by then the
+ * player knows the game. It is a teaching device and a pacing device at once,
+ * and it pairs with the seam law (§5): teach while the load is light; get out
+ * of the way when the week is heavy.
+ *
+ * A pure function of the declaration and the week's ordinal, so the chunker,
+ * the estimate and the renderer cannot reach three answers. `weekNumber` is
+ * 1-based (the schema's own `week.weekNumber`). No `shedAfterWeek` means the
+ * declared form holds for the whole book — the shed point is an AUTHORED
+ * decision under the two-source law (§8), never a constant this file guesses.
+ *
+ * @param {object|null} atomForms output of resolveAtomForms()
+ * @param {number} weekNumber 1-based
+ * @returns {string} a member of VALID_SESSION_CARD_FORMS
+ */
+export function sessionCardFormForWeek(atomForms, weekNumber) {
+  var declared = atomForms && atomForms.sessionCard;
+  if (!declared || !declared.form) return DEFAULT_SESSION_CARD_FORM;
+  if (typeof declared.shedAfterWeek !== 'number') return declared.form;
+  var n = (typeof weekNumber === 'number' && isFinite(weekNumber)) ? weekNumber : 1;
+  return n > declared.shedAfterWeek ? DEFAULT_SESSION_CARD_FORM : declared.form;
+}
+
 // ── Artifact identity ────────────────────────────────────────────────────────
 // Previously these lived only as silent coercion tables in assembly.js
 // (AUDIT finding 74). They are now enforced enums.
