@@ -4398,6 +4398,32 @@ async function runApiPipeline(options) {
       // tokens and its timeout.
       rateLimiter: rateLimiter,
       budgetEnforce: useGeminiBudget,
+      // ── THE SHELL SEAT'S UNKNOWN-KEY SCOPE (W3, closing W2's named gap) ──
+      // W2 swept five seats and left this one, which is the biggest single
+      // stage output in the pipeline: four top-level booklet surfaces, and the
+      // one that carries every identity declaration a later floor reads. An
+      // invented key here is worse than one in a week — it is a declaration
+      // nobody is holding this book to, on the object the whole book is
+      // written against.
+      //
+      // FOUR SCOPES, NOT ONE, because the shell writes four SIBLING booklet
+      // properties rather than one unit: there is no `$defs:shell` to address
+      // and inventing one would be a second, worse schema (D136 — derive,
+      // don't describe). Each scope names a real property node in
+      // booklet-schema.mjs; `resolveSchemaNodeAt` shouts if one stops
+      // resolving, so a renamed surface reports UNSWEPT instead of passing.
+      //
+      // MEASURED BEFORE WIRING, against two real books (the delivered proving
+      // run and the demo): zero findings on cover, rulesSpread and theme in
+      // both, zero on the demo's meta, and on the delivered book's meta exactly
+      // the four `answer_length_note` keys that reached the canonical validator
+      // after the money was spent. No surface was guessed at.
+      unknownKeyScopes: [
+        { from: 'meta', schemaPath: 'meta', label: 'meta' },
+        { from: 'cover', schemaPath: 'cover', label: 'cover' },
+        { from: 'rulesSpread', schemaPath: 'rulesSpread', label: 'rulesSpread' },
+        { from: 'theme', schemaPath: 'theme', label: 'theme' }
+      ],
       normalizeResult: function (result) {
         if (result && result.meta && Array.isArray(result.weeks)) {
           delete result.weeks; delete result.fragments; delete result.endings;
