@@ -3288,8 +3288,13 @@ async function generateSingleFragmentAdaptive(settings, builders, config) {
       return normalizeSingleFragmentResult(result, registryEntry);
     },
     validate: function (result) {
+      // `config.brief` arms W1's brief-transcription floor (W3). The two
+      // fragment seats read the brief from the SAME config property for the
+      // same reason the unknown-key scopes above match: a recovered document
+      // held to a looser bar is the stale-mirror class in miniature.
       return validateFragmentsStage({ fragments: result ? [result] : [] },
-        registryEntry ? [registryEntry] : [], { generationFloors: true });
+        registryEntry ? [registryEntry] : [],
+        { generationFloors: true, brief: config.brief || '' });   // W3-ARM fragment-single
     },
     buildPrompt: function (retryState) {
       return builders.singleFragment(
@@ -3330,6 +3335,13 @@ async function recoverFragmentBatchDeterministically(settings, builders, config,
       // The rulebook has to survive every rebuild of this config or the
       // recovery seat writes unfunded (VISION §5).
       gameRulebook: config.gameRulebook || null,
+      // The brief rides the same rail for the mirrored reason (W3): a document
+      // the batch seat is checked for copying and the recovery seat is not
+      // would make the retried documents the only unchecked prose in the book.
+      // Kept BELOW the rulebook deliberately — the floors harness asserts the
+      // rulebook sits within a proximity window of this config's head, and
+      // that row caught this comment pushing it out.
+      brief: config.brief || '',
       priorFragments: stagedFragments,
       label: config.label + ' recovery ' + entry.id,
       stageKey: config.stageKey,
@@ -3383,7 +3395,8 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
         return normalizeFragmentBatchResult(result, config.registry);
       },
       validate: function (result) {
-        return validateFragmentsStage(result, config.registry, { generationFloors: true });
+        return validateFragmentsStage(result, config.registry,
+          { generationFloors: true, brief: config.brief || '' });   // W3-ARM fragment-batch
       },
       buildPrompt: function (retryState) {
         return builders.fragmentBatch(
@@ -3436,6 +3449,7 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
       totalBatches: config.totalBatches,
       shellContext: config.shellContext,
       gameRulebook: config.gameRulebook || null,
+      brief: config.brief || '',
       label: config.label + 'A',
       stageKey: config.stageKey,
       stageIndex: config.stageIndex,
@@ -3456,6 +3470,7 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
       totalBatches: config.totalBatches,
       shellContext: config.shellContext,
       gameRulebook: config.gameRulebook || null,
+      brief: config.brief || '',
       label: config.label + 'B',
       stageKey: config.stageKey,
       stageIndex: config.stageIndex,
@@ -4634,7 +4649,15 @@ async function runApiPipeline(options) {
       // The shell family, for the week gate's citation-pinpoint floor (D170).
       // citationPinpoints needs the family to know which filing labels this
       // artifact uses; absent family, no check — the same law as above.
-      shellFamily: (((shell || {}).meta || {}).artifactIdentity || {}).shellFamily || ''
+      shellFamily: (((shell || {}).meta || {}).artifactIdentity || {}).shellFamily || '',
+      // THE BRIEF, AS EVIDENCE (W3, arming W1's landed-but-inert floor).
+      // briefTranscriptionFloorErrors has been in validation.js since W1 and
+      // has never once fired on a real run, because no pipeline put a `brief`
+      // on the options and the floor is correctly silent without one. A floor
+      // whose evidence never arrives is indistinguishable at every gate from a
+      // floor that does not exist — the same law as playSpine and
+      // currencyLabel directly above, read in the other direction.
+      brief: brief   // W3-ARM week-staged
     };
     // THE GATE'S OWN ROW, READ BACK AS PROMPT GIVENS (D173). The two blocking
     // floors above read `mechanicGrammarFamily` and `shellFamily`; the prompt
@@ -4838,6 +4861,7 @@ async function runApiPipeline(options) {
       // recovery seat does not would make the retried documents the worst in
       // the book.
       gameRulebook: gameRulebook,
+      brief: brief,   // W3-ARM fragment-config
       label: batchLabel,
       stageKey: 'fragments',
       stageIndex: stageNum,
@@ -6100,7 +6124,11 @@ async function runSkeletonFleshPipeline(options) {
       // writes its reckoning sentences ungated.
       currencyLabel: (((skeleton || {}).meta || {}).economy || {}).currencyLabel || '',
       // This pipeline's twin of the multi-stage shellFamily row (D170).
-      shellFamily: (((skeleton || {}).meta || {}).artifactIdentity || {}).shellFamily || ''
+      shellFamily: (((skeleton || {}).meta || {}).artifactIdentity || {}).shellFamily || '',
+      // The brief, arming W1's transcription floor (W3). Both pipelines carry
+      // it or one pipeline writes its epigraphs ungated — the same sentence
+      // the currencyLabel row above earned.
+      brief: brief || ''   // W3-ARM week-sf
     };
     var sfWeekIdentityGiven = deriveWeekIdentityGiven(sfWeekFloorOptions, isBoss);
 
@@ -6287,7 +6315,8 @@ async function runSkeletonFleshPipeline(options) {
         if (!fragsArray || fragsArray.length === 0) {
           return 'Fragments: missing or empty fragments array';
         }
-        return validateFragmentsStage(result, fullFragRegistry, { generationFloors: true });
+        return validateFragmentsStage(result, fullFragRegistry,
+          { generationFloors: true, brief: brief || '' });   // W3-ARM fragment-sf
       }
     });
 
