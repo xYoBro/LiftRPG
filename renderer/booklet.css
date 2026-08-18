@@ -2841,16 +2841,17 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 
    CROSS-FILE CONTRACT: renderer/modules/atoms/ledger-spread.js mirrors every
    number here (HEADER_PX / LEDE_PX / HEAD_ROW_PX / ROW_GAP_PX / ROW_MIN_PX /
-   ROW_MAX_PX) and carries the reverse pointer. Phase-1 estimation has no DOM.
-   Change them together (D71).
+   ROW_MAX_PX / ROW_GROWTH_CAP_PX) and carries the reverse pointer. Phase-1
+   estimation has no DOM. Change them together (D71).
 
-   THE ROW HEIGHT IS NOT WRITTEN HERE. `--ledger-row-height` is computed by
-   ledgerRowHeightPx() and stamped onto `.ledger-table` by render(), because it
-   depends on how many movements the book has — a four-movement program gets
-   generous bands, a twenty-movement one compacts to the pencil floor. One
-   function serves both the estimate and the render, so the page cannot print
-   at a height the model did not predict. A row height declared in this file
-   would be a second author for the same number.
+   NEITHER ROW HEIGHT IS WRITTEN HERE. `--ledger-row-height` (the floor) and
+   `--ledger-row-max` (the growth ceiling) are computed by ledgerRowHeightPx()
+   and ledgerRowPrintedHeightPx() and stamped onto `.ledger-table` by render(),
+   because both depend on how many movements the book has — a four-movement
+   program gets generous bands, a twenty-movement one compacts to the pencil
+   floor. One function serves both the estimate and the render for each number,
+   so the page cannot print at a height the model did not predict. A row height
+   declared in this file would be a second author for the same number.
 
    Density-invariant: no `[data-density-variant]` rule reaches these elements.
    Every cell is a place a pencil has to land, and a row too short to write a
@@ -2902,11 +2903,21 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 /* `min-height`, not `height`: the row takes the modelled band as its floor and
    `.ledger-table`'s own `flex:1` shares out whatever the page has left over —
    the same stretch `.fragment-doc{flex:1}` applies to a document that
-   estimated shorter than its share. The estimate models the floor, so the
-   printed row is never SHORTER than predicted, which is the direction that
-   matters. */
+   estimated shorter than its share.
+
+   `max-height` is the other half, and it was missing (W5). A `min-height`
+   cannot stop a flex item from GROWING, so on a five-movement roster the rows
+   took the whole writing budget: 34px modelled, ~136px printed, every movement
+   label dropped ~130px below its column head by `.ledger-name`'s bottom
+   alignment. Both numbers are still authored in ledger-spread.js —
+   ledgerRowHeightPx() stamps `--ledger-row-height` and
+   ledgerRowPrintedHeightPx() stamps `--ledger-row-max` — because a row height
+   written in this file would be a second author for the same number. The
+   fallbacks are the raw ROW_MIN_PX / ROW_GROWTH_CAP_PX constants and exist
+   only for a row that somehow renders outside `.ledger-table`. */
 .ledger-row{
   min-height:var(--ledger-row-height, 18px);
+  max-height:var(--ledger-row-max, 68px);
   flex:1 1 auto;
   border-bottom:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-field-rule,var(--rule));
 }
@@ -3149,12 +3160,42 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 }
 
 /* ── rp-content: flex-column row container ──────────────────────────── */
+/* THE ABSORPTION LAW (W5) — a flex column MUST NOT absorb its own overflow.
+   `.rp-content` is a flex column and every flex item defaults to
+   `flex-shrink: 1`, so when the rows on a field-ops page came to more than the
+   frame had, the browser SQUASHED each row instead of letting the stack run
+   long. The rows' children are `overflow: visible`, so they kept their own
+   height and simply painted over the row below — and because nothing exceeded
+   the frame by as much as it should have, the planner was told a smaller
+   number than the truth. Measured on the proving-run book
+   (evals/proving-run/delivered-book.json), with `flex-shrink: 0` applied live:
+   p.10 page-frame overflow 0 → 103px, p.15 0 → 18px, p.23 25 → 162px, and all
+   of p.10's collisions disappeared because the rows stopped overlapping. That
+   is the CHARTER's prime invariant — measurement equals render — failing in
+   the confident direction: silent, and always UNDER.
+
+   Written as `> *`, not as a list of child classes, deliberately: the law
+   belongs to the container. `.rp-content`'s children are rows, the
+   `.companion-zone`, and whatever supplement a shell decorator appends, and an
+   enumerated list would go stale the first time a decorator grows a new one.
+
+   SCREEN rule, never inside `@media print` — measurement runs on screen
+   (D71/D72). Inert on any page that already fits: with no negative free space
+   flex-shrink never engages, so a page under budget lays out byte-identically.
+
+   The one exception below (`[data-solo-surface="map-panel"] .rp-row--full`)
+   out-specifies this on purpose: a solo map GROWS to fill the page, and with
+   `flex-basis: 0` its shrink factor can never engage anyway. */
 .rp-content {
   display: flex;
   flex-direction: column;
   flex: 1 1 0;
   min-height: 0;
   gap: 5px;
+}
+
+.rp-content > * {
+  flex-shrink: 0;
 }
 
 .rp-row {
@@ -3738,6 +3779,13 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   background:transparent;
 }
 
+/* THE ABSORPTION LAW, second site (W5). `.companion-zone` is the other flex
+   column on a field-ops page whose children are `.rp-row`s, and it squashed
+   them the same way `.rp-content` did: measured on the proving-run book,
+   p.23's companion row was laid out 44.4px shorter than its own content, which
+   is how `.clock-consequence` came to print over the "Companion Surface"
+   label. Same law, same reason it is written `> *` — see the block at
+   `.rp-content` above for the full statement and the measured numbers. */
 .companion-zone{
   border-top:1px solid var(--rule);
   padding-top:6px;
@@ -3745,6 +3793,9 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   flex-direction:column;
   gap:6px;
   min-height:0;
+}
+.companion-zone > *{
+  flex-shrink:0;
 }
 .field-ops-right[data-shell-family="classified-packet"] .rp-header{
   border-bottom-width:2px;
@@ -5655,6 +5706,14 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   border:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
   background:rgba(255,255,255,.45);
 }
+/* CROSS-FILE CONTRACT — the ruled line and the gap below are the two halves of
+   RETURN_BOX_LINE_PX (24) in renderer/modules/atoms/tracker.js, which prices a
+   return-box companion as `80 + lineCount × 24` and carries the reverse
+   pointer. 18 is this height, 6 is `.companion-dashboard`'s gap; the 80px base
+   covers `.companion-return-box`'s 44px framed slot plus the sibling gap
+   `.companion-component` puts above the dashboard. Move the line height or the
+   gap and that figure moves with them, or phase-1 estimation under-prices
+   every return box on the page (D71). */
 .companion-dash-line{
   height:18px;
   border-bottom:1px dashed var(--rule);
@@ -5860,6 +5919,9 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   font-size:4.9pt;
   text-transform:uppercase;
 }
+/* CROSS-FILE CONTRACT — the 44px floor is the framed-slot half of the
+   return-box estimate's 80px base in renderer/modules/atoms/tracker.js (see the
+   `.companion-dash-line` block above for the ruled-line half). */
 .companion-return-box{
   border:var(--theme-pencil-width,1px) var(--theme-line-style,solid) var(--theme-box-border,var(--ink));
   min-height:44px;
@@ -6486,20 +6548,15 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   width:20px;
   height:20px;
 }
-/* The value is what the player copied out of a week's cipher — the decode
-   anchor. It inherits 7pt from .boss-component-item at base; the tiers below
-   set the real type size instead of the clamps that used to stand in for one.
-   Dense had NO component rule at all before, only clamp:4, so 6.2pt is this
-   tier's first honest saving here (measured on vale, whose five values are
-   authored as whole sentences: 198px of "dense shrink" was pure truncation). */
-.boss-right[data-layout-variant="dense"] .boss-component-value{
-  font-size:6.2pt;
-  line-height:1.26;
-}
-.boss-right[data-layout-variant="tight"] .boss-component-value{
-  font-size:5pt;
-  line-height:1.22;
-}
+/* `.boss-component-value` USED TO LIVE HERE, at 6.2pt dense / 5pt tight. The
+   element is gone — renderBossPage() in field-ops-primitives.js now emits only
+   `.boss-component-week` and `.boss-component-box` per row, so both rules had
+   stopped matching anything and the ladder was quietly two tiers thinner than
+   its own comment claimed. A selector that matches nothing is silent (the
+   density-variant law), which is why it is deleted rather than left as
+   documentation: the history it carried is preserved in the TRUNCATION LAW
+   block at the head of this ladder, and the shrink the ladder really delivers
+   is re-measured in atoms/boss-encounter.js BOSS_MAX_SHRINK. */
 
 /* ══════════════════════════════════════════════════════════════
    OVERFLOW PAGES

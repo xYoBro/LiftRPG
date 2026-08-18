@@ -59,9 +59,8 @@ import { PAGE_BUDGET } from '../engine/page-spec.js';
  *               margin-bottom 4.
  *   ROW_MIN_PX  the pencil floor: a 15px writing zone plus the row's 3px of
  *               padding. Below this the column is unusable in a gym.
- *   ROW_MAX_PX  the ceiling. Rows stop growing here and `.ledger-table`'s own
- *               `flex:1` absorbs whatever is left, exactly as `.fragment-doc`
- *               stretches a document that estimated shorter than its share.
+ *   ROW_MAX_PX  the modelled band — what the row asks for as its `min-height`.
+ *   ROW_GROWTH_CAP_PX  how tall flex growth may then take that row. See below.
  */
 const HEADER_PX = 16.6;
 const LEDE_PX = 27.6;      // 2 × 10.8 + 6
@@ -69,6 +68,37 @@ const HEAD_ROW_PX = 14.8;  // 6.8 + 3 + 1 + 4
 const ROW_GAP_PX = 4;
 const ROW_MIN_PX = 18;
 const ROW_MAX_PX = 34;
+
+/**
+ * THE ROW GROWTH CEILING (W5 — decider ruling, author-overturnable).
+ *
+ * `.ledger-row` is `flex: 1 1 auto` inside a `.ledger-table` that is `flex: 1`,
+ * so before this constant existed the rows did not stop at ROW_MAX_PX at all —
+ * they shared out the ENTIRE writing budget. Measured on the proving-run book,
+ * whose roster is five movements: the modelled band is 34px and the rows
+ * printed at ~136px each, with `.ledger-name`'s `align-items: flex-end`
+ * dropping every movement label roughly 130px below the column head it belongs
+ * to. The documented intent ("a four-movement program does not print four
+ * hotel-register bands") was already written into ledgerRowHeightPx(); the CSS
+ * simply never honoured it, because a `min-height` cannot stop a flex item from
+ * GROWING — only a `max-height` can.
+ *
+ * That was also a measurement-equals-render break in this atom's own numbers:
+ * estimate() priced five rows at 34px and the page printed them at 136px.
+ *
+ * The ruling caps growth at twice the modelled band. Two constants, one
+ * author: ledgerRowHeightPx() is the floor the row asks for and
+ * ledgerRowPrintedHeightPx() is what it prints at, and render() stamps BOTH as
+ * custom properties so booklet.css never writes either number itself.
+ *
+ * WHAT THE CAP COSTS, stated rather than hidden: a short roster no longer
+ * fills the sheet. Five movements at 68px use 356 of the 682px writing budget,
+ * so ~326px of the ledger page is now trailing white space. That is the write-in
+ * law winning over the fill law, which is the ruling, not an accident — if the
+ * author would rather have the full-bleed bands back, this one constant is the
+ * whole rewind seam.
+ */
+const ROW_GROWTH_CAP_PX = ROW_MAX_PX * 2;
 
 /** Everything above the first movement row. */
 const LEDGER_CHROME_PX = HEADER_PX + LEDE_PX + HEAD_ROW_PX;
@@ -128,12 +158,35 @@ if (LEDGER_ROWS_PER_PAGE !== DERIVED_ROWS_PER_PAGE) {
  * @returns {number} px
  */
 export function ledgerRowHeightPx(rowCount) {
+  return clampFairShare(rowCount, ROW_MAX_PX);
+}
+
+/**
+ * The height one movement row actually PRINTS at on a page carrying
+ * `rowCount` of them — the modelled band grown by `.ledger-row`'s `flex:1 1
+ * auto` and stopped by ROW_GROWTH_CAP_PX.
+ *
+ * This is the number estimate() must price, because it is the number the page
+ * renders. Same fair-share arithmetic as the floor above, different ceiling:
+ * one function, two ceilings, so the floor and the printed height can never be
+ * derived by two different rules.
+ *
+ * @param {number} rowCount
+ * @returns {number} px
+ */
+export function ledgerRowPrintedHeightPx(rowCount) {
+  return clampFairShare(rowCount, ROW_GROWTH_CAP_PX);
+}
+
+/** The shared arithmetic: an equal share of the writing budget, floored at the
+ *  pencil minimum and capped at whichever ceiling the caller is asking about. */
+function clampFairShare(rowCount, ceilingPx) {
   const rows = Number.isFinite(rowCount) ? Math.max(0, Math.floor(rowCount)) : 0;
   if (rows <= 0) return ROW_MIN_PX;
 
   const available = LEDGER_BODY_BUDGET_PX - (rows - 1) * ROW_GAP_PX;
   const fair = Math.floor(available / rows);
-  return Math.max(ROW_MIN_PX, Math.min(ROW_MAX_PX, fair));
+  return Math.max(ROW_MIN_PX, Math.min(ceilingPx, fair));
 }
 
 /** The printed roster for this page — trimmed, blanks dropped. */
@@ -146,8 +199,11 @@ function movementsOf(data) {
 function ledgerHeightAt(rows) {
   if (rows <= 0) return Math.round(LEDGER_CHROME_PX);
 
+  // The PRINTED height, not the modelled floor: the rows grow past their
+  // min-height up to the growth cap, and pricing the floor here is what let a
+  // five-movement page estimate at 245px and print at 741px.
   const height = LEDGER_CHROME_PX
-    + rows * ledgerRowHeightPx(rows)
+    + rows * ledgerRowPrintedHeightPx(rows)
     + (rows - 1) * ROW_GAP_PX;
 
   // The adapter's chunking keeps this under the budget; the clamp is the belt
@@ -207,9 +263,12 @@ registerAtom('ledger-spread', {
 
     const table = make('div', 'ledger-table');
     table.setAttribute('data-row-count', String(movements.length));
-    // One number, computed once, stamped where the CSS can use it. render()
-    // does not get its own formula — that is how the two sides stay one model.
+    // Two numbers, computed once each, stamped where the CSS can use them.
+    // render() does not get its own formula — that is how the two sides stay
+    // one model. `--ledger-row-height` is the row's floor (min-height),
+    // `--ledger-row-max` is the ceiling flex growth may take it to.
     table.style.setProperty('--ledger-row-height', ledgerRowHeightPx(movements.length) + 'px');
+    table.style.setProperty('--ledger-row-max', ledgerRowPrintedHeightPx(movements.length) + 'px');
 
     const head = make('div', 'ledger-head');
     COLUMN_HEADS.forEach((label, index) => {
