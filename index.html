@@ -1504,6 +1504,29 @@
       min-width: 0;
     }
 
+    /* The rail node as a control. Both rails render the SAME component, so the
+       drill-down is one behaviour in one place — the API rail's card and the
+       guided rail's card open the same modal with their own door's text. The
+       button reset is here rather than at the call site because the element is
+       a <button> only when the rail is selectable. */
+    button.pipeline-stage-node {
+      font: inherit;
+      color: inherit;
+      text-align: left;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    button.pipeline-stage-node:hover {
+      border-color: var(--rule-strong);
+      background: var(--surface-hover, var(--surface-raised));
+    }
+
+    button.pipeline-stage-node:focus-visible {
+      outline: 2px solid var(--rule-strong);
+      outline-offset: 2px;
+    }
+
     .pipeline-stage-node::before {
       content: '';
       position: absolute;
@@ -3138,6 +3161,19 @@
       letter-spacing: .04em;
       margin-bottom: 10px;
     }
+    /* The tooling-owned repair note (DR-38c). --fs-meta, not the 6pt this block
+       uses elsewhere: it is informational text about a change made to the
+       reader's prose, and the 8.5pt floor covers exactly that. (The rest of
+       this block predates the type tokens and sits under the floor — a
+       separate finding, not this rule's to fix.) */
+    .assembly-success .result-note {
+      font-size: var(--fs-meta);
+      line-height: 1.5;
+      color: var(--ink);
+      border-left: 2px solid var(--rule-strong);
+      padding-left: 8px;
+      margin-bottom: 10px;
+    }
     .assembly-success .result-next {
       font-size: 6.5pt;
       color: var(--ink);
@@ -3727,6 +3763,19 @@
 
         <div class="wizard-pane is-visible" id="wiz-pane-1">
           <p class="wizard-hint">This step sets the tone, mechanics, and core structure for the rest of the booklet.</p>
+          <!-- PLACEMENT IS PART OF THE STATEMENT (§2.7 audit). The full
+               rules-first gap is stated on pane 3 (#wiz-rulebook-gap, pinned by
+               scripts/check-generation-floors.mjs) because that is the pane whose
+               own step the missing stage would have preceded. But a reader starts
+               HERE, and a difference they can still act on — by choosing another
+               door — has to reach them before they have done two steps of work.
+               This is the short form and the pointer; the full statement, and the
+               gate that holds it, stay where they are. -->
+          <p class="wizard-hint"><strong>Before you start:</strong> the API build modes run a
+            <em>game design</em> step ahead of this one, and every step after it is written to
+            serve those rules. This door has no such step. It is stated in full at the Identity
+            step, and each step&rsquo;s card (click any step above) says what this door does not
+            do for that step.</p>
           <div class="wizard-action-grid">
             <div class="wizard-stage-card is-action">
               <div class="wizard-action-index">Step 1</div>
@@ -4244,6 +4293,37 @@
         return !!doorForProvider(providerId);
       }
 
+      function doorExists(modeId) {
+        for (var d = 0; d < GENERATION_DOORS.length; d++) {
+          if (GENERATION_DOORS[d].id === modeId) return true;
+        }
+        return false;
+      }
+
+      // ── THE DOOR IS A SETTING, NOT A DERIVATION ────────────────────────────
+      // A reader who picked a door and refreshed used to land somewhere else.
+      // The door was never persisted; it was INFERRED from the saved provider,
+      // and the inference is wrong twice over:
+      //
+      //   1. It cannot see the chatbot door at all. That door owns no provider,
+      //      so "which door was I in?" had no answer for one door in three, and
+      //      a returning chatbot reader was moved to the API door every time.
+      //   2. Even for the bridge it did not survive page load. `setGenerationMode`
+      //      applies "leaving a door leaves its provider behind" — correct when a
+      //      reader LEAVES a door, and false at load, where nobody left anything.
+      //      It ran first, rewrote the saved 'bridge' to 'openai', and
+      //      applyProviderPreset PERSISTED that rewrite, so the restore that ran
+      //      later on `liftrpg-api-ready` re-read a pref its own page had already
+      //      destroyed — taking the bridge's port and model with it.
+      //
+      // So the door is stored as itself. `provider` goes back to meaning what it
+      // says (which provider is selected), and the two questions stop sharing
+      // one answer. This is a SETTING, never a key — same contract as baseUrl.
+      function restoreDoorPref() {
+        var prefs = loadApiPrefs() || {};
+        return doorExists(prefs.door) ? prefs.door : '';
+      }
+
       function resolveApiPipelineMethod(value) {
         var name = String(value || '');
         return API_PIPELINE_METHODS[name] ? name : API_PIPELINE_DEFAULT;
@@ -4271,7 +4351,16 @@
       var wizStep = 0;
       var wizData = {};
       var wizState = {};
-      var currentGenerationMode = 'manual';
+      // Read once, before anything can overwrite it (see restoreDoorPref). The
+      // captured value is also what the bottom-of-file boot uses, so the restore
+      // and the default live on one line each instead of racing.
+      var restoredDoorPref = restoreDoorPref();
+      var currentGenerationMode = restoredDoorPref || 'manual';
+      // The provider the API DOOR was last set to. `provider` alone cannot hold
+      // this: a trip through the coding-agent door parks 'bridge' there, and the
+      // reader's own choice (anthropic, a local endpoint, whatever they picked)
+      // was silently replaced by 'openai' when they came back.
+      var lastApiDoorProvider = 'openai';
       var currentGeneratorSurface = 'intake';
       var activeApiRunId = 0;
       // THE RUN'S CANCELLATION (DR-23). `activeApiRunId` answers "should I
@@ -4697,6 +4786,11 @@
         try {
           localStorage.setItem(API_PREFS_KEY, JSON.stringify({
             provider: apiProviderEl ? apiProviderEl.value : 'openai',
+            // The door the reader is standing in, stored as itself rather than
+            // inferred from `provider` — see restoreDoorPref for what the
+            // inference could not answer.
+            door: currentGenerationMode,
+            apiDoorProvider: lastApiDoorProvider,
             method: apiMethodEl ? resolveApiPipelineMethod(apiMethodEl.value) : API_PIPELINE_DEFAULT,
             model: getApiModelValue(),
             baseUrl: apiBaseUrlEl ? apiBaseUrlEl.value.trim() : '',
@@ -4706,6 +4800,22 @@
             priceInputPerMillion: apiPriceInputEl ? apiPriceInputEl.value.trim() : '',
             priceOutputPerMillion: apiPriceOutputEl ? apiPriceOutputEl.value.trim() : ''
           }));
+        } catch (error) {}
+      }
+
+      // The door alone, read-modify-write. saveApiPrefs() is a full overwrite of
+      // every API setting from the live fields, and it is NOT safe to call from
+      // setGenerationMode: the first door is applied before api-generator.js has
+      // landed, when the provider select is empty and the base URL field is
+      // blank — a full write there would persist those blanks over the reader's
+      // saved model and endpoint. That is the exact defect this wave came to
+      // fix, one field over. So the door gets its own writer, and it touches
+      // nothing else on the record.
+      function saveDoorPref() {
+        try {
+          var prefs = loadApiPrefs() || {};
+          prefs.door = currentGenerationMode;
+          localStorage.setItem(API_PREFS_KEY, JSON.stringify(prefs));
         } catch (error) {}
       }
 
@@ -4728,12 +4838,23 @@
         } catch (e) { return []; }
       }
 
+      // A row's identity is the MODEL AND THE PROVIDER, on both sides. This
+      // function keyed on the model alone while removeValidatedModel() keys on
+      // the pair, so the same model id served by two providers — the ordinary
+      // case for an OpenAI-compatible endpoint, a reseller, or a local server —
+      // overwrote one row with the other and a provider the reader had proven
+      // silently vanished from the table. Two functions, one identity.
+      function sameValidatedModel(a, b) {
+        return String(a.model || '') === String(b.model || '')
+          && String(a.provider || '') === String(b.provider || '');
+      }
+
       function saveValidatedModel(entry) {
         var models = loadValidatedModels();
-        // Update existing entry for same model or add new
+        // Update existing entry for same model + provider, or add new
         var existing = -1;
         for (var i = 0; i < models.length; i++) {
-          if (models[i].model === entry.model) { existing = i; break; }
+          if (sameValidatedModel(models[i], entry)) { existing = i; break; }
         }
         if (existing >= 0) {
           models[existing] = entry; // overwrite with latest run
@@ -4747,6 +4868,9 @@
       function removeValidatedModel(model, provider) {
         var models = loadValidatedModels();
         var filtered = models.filter(function (entry) {
+          // Unchanged: the provider guard already makes this the (model,
+          // provider) pair, and it deliberately still matches a legacy row that
+          // carries no provider at all.
           if (provider && entry.provider && entry.provider !== provider) return true;
           return entry.model !== model;
         });
@@ -4947,6 +5071,11 @@
             : 'Paste your key for this session';
           if (preset.noKey) apiKeyEl.value = '';
         }
+        // Every provider selection lands here — the change handler, the door's
+        // own lock, and the restore. A provider a DOOR owns is the door's
+        // choice, not the reader's, so only the others are remembered as "what
+        // the API door was set to".
+        if (!doorOwnsProvider(providerId)) lastApiDoorProvider = providerId;
         saveApiPrefs();
       }
 
@@ -5166,6 +5295,14 @@
         populateProviderOptions();
         var prefs = loadApiPrefs() || {};
         var providerId = getProviderPreset(prefs.provider) ? prefs.provider : 'openai';
+        // Restored BEFORE the select is touched: applyProviderPreset below will
+        // rewrite this for any non-door provider, and on the bridge door it must
+        // already hold the reader's API-door choice or the trip back loses it.
+        if (getProviderPreset(prefs.apiDoorProvider) && !doorOwnsProvider(prefs.apiDoorProvider)) {
+          lastApiDoorProvider = prefs.apiDoorProvider;
+        } else if (!doorOwnsProvider(providerId)) {
+          lastApiDoorProvider = providerId;
+        }
         if (apiProviderEl) apiProviderEl.value = providerId;
         if (apiMethodEl) apiMethodEl.value = resolveApiPipelineMethod(prefs.method);
         applyPipelineStageOrder(apiMethodEl ? apiMethodEl.value : API_PIPELINE_DEFAULT);
@@ -5324,8 +5461,15 @@
             // holding the bridge's preset and instruct the reader about a key
             // that the selected provider does not want — two doors' states in
             // one panel, which reads as a bug and is one.
-            apiProviderEl.value = 'openai';
-            applyProviderPreset('openai', {});
+            //
+            // What it comes back TO is the reader's own last API-door provider,
+            // not a hardcoded 'openai': the door borrowed the select, and
+            // handing it back with someone else's value in it is the same
+            // forgotten-setting defect one layer down. First visit, no
+            // remembered choice, `lastApiDoorProvider` is 'openai' — unchanged.
+            var backToProvider = getProviderPreset(lastApiDoorProvider) ? lastApiDoorProvider : 'openai';
+            apiProviderEl.value = backToProvider;
+            applyProviderPreset(backToProvider, {});
           }
         }
         applyDoorSurface();
@@ -5340,6 +5484,10 @@
         }
         renderBookEstimate();
         renderApiRunState();
+        // Choosing a door IS the setting. Without this the chatbot door was
+        // still lost on refresh even with the pref in place, because that door
+        // touches no provider and therefore reached no writer at all.
+        saveDoorPref();
       }
 
       function setGeneratorSurface(surface, options) {
@@ -6226,7 +6374,8 @@
             meta: formatApiStageStatusLabel(item.status, item.metrics)
           };
         }), {
-          currentKey: apiRunState.currentStageKey || (apiRunState.status === 'blocked' ? 'quality' : '')
+          currentKey: apiRunState.currentStageKey || (apiRunState.status === 'blocked' ? 'quality' : ''),
+          selectable: true
         });
         var groupedApiStages = buildStageGroups(apiStageItems, function (item) {
           if (item.status === 'blocked' || item.status === 'invalidated') return 'attention';
@@ -6792,6 +6941,12 @@
         items = Array.isArray(items) ? items : [];
         options = options || {};
         var currentKey = options.currentKey || '';
+        // A rail node that only draws a number answers "where am I" and nothing
+        // else. Selectable rails make each node a control that opens the stage's
+        // card — what the step does, where it stands, and what this door does
+        // NOT do for it. The rail markup is otherwise unchanged, so the class
+        // names every reader and gate keys off stay put.
+        var selectable = !!options.selectable;
         targetEl.innerHTML = items.map(function (item, index) {
           var isCurrent = item.key === currentKey;
           var nodeState = getPipelineNodeState(item.status, isCurrent);
@@ -6803,15 +6958,21 @@
                 ? 'Attention'
                 : 'Open';
           var meta = item.meta || item.reason || '';
+          var openTag = selectable
+            ? '<button type="button" class="pipeline-stage-node ' + nodeState + '"' +
+                ' data-stage-key="' + escapeForHtml(String(item.key || '')) + '"' +
+                ' data-stage-index="' + index + '"' +
+                ' aria-label="' + escapeForHtml(item.label + ' — ' + statusText + '. Open step detail.') + '">'
+            : '<div class="pipeline-stage-node ' + nodeState + '">';
           return '' +
-            '<div class="pipeline-stage-node ' + nodeState + '">' +
+            openTag +
               '<div class="pipeline-stage-node-top">' +
                 '<div class="pipeline-stage-node-dot">' + escapeForHtml(String(index + 1)) + '</div>' +
                 '<div class="pipeline-stage-node-status">' + escapeForHtml(statusText) + '</div>' +
               '</div>' +
               '<div class="pipeline-stage-node-title">' + escapeForHtml(item.label) + '</div>' +
               '<div class="pipeline-stage-node-meta">' + escapeForHtml(meta) + '</div>' +
-            '</div>';
+            (selectable ? '</button>' : '</div>');
         }).join('');
       }
 
@@ -6880,7 +7041,7 @@
             status: item.key === activeKey ? 'in progress' : item.status,
             meta: getStageMeta(item)
           };
-        }), { currentKey: activeKey });
+        }), { currentKey: activeKey, selectable: true });
 
         renderStageGroups(wizStageLedger, grouped, function (item) {
           // The chip speaks the FERRY's vocabulary, not the run ledger's: on
@@ -7765,7 +7926,7 @@
         },
         weeks: {
           does: 'Writes the weeks themselves: sessions, the marking strip you fill in with a pencil, the week\u2019s field work, and the boss week.',
-          gap: 'On the API doors every week is handed the game\u2019s currency, its core verbs and its win condition before it is written, and a failed check is retried automatically with the failure attached. Here the weeks are written without those in front of them, and a retry is you: the failed checks are listed and a repair prompt is built for you to paste back.'
+          gap: 'On the API doors every week is handed the game\u2019s currency, its core verbs and its win condition before it is written, and a failed check is retried automatically with the failure attached. Here the weeks are written without those in front of them, and a retry is you: the failed checks are listed and a repair prompt is built for you to paste back. The API doors also run a separate world-detail step before the weeks \u2014 the instruments, procedures, ranks and vocabulary the world uses \u2014 and hand those to every step that writes prose. This door has no such step, so the weeks, the found documents and the ending each invent that detail as they go, and nothing holds them to one another.'
         },
         fragments: {
           does: 'Writes the found documents \u2014 the letters, reports and scraps that carry the story between weeks.',
@@ -7773,7 +7934,59 @@
         },
         endings: {
           does: 'Writes the payoff the password unlocks, and is the last step before the booklet is assembled and checked on this device.',
-          gap: 'On the API doors the ending is written knowing the win condition and the password path the rulebook declared. Here it is written from the plan, and the editorial review the API doors run after assembly does not happen on this door.'
+          gap: 'On the API doors the ending is written knowing the win condition and the password path the rulebook declared. Here it is written from the plan, and the editorial review the API doors run after assembly does not happen on this door. The checks are also held to a different bar: every step of an API build is checked against what the generator DEMANDS — the pencil surfaces, the doors out of a week, the variety, and a play-through by a simulated player that has to be able to finish — and a step that misses is sent back automatically. The checks on this door are the ones a printable booklet must pass. A step can be accepted here that an API build would have rewritten.'
+        }
+      };
+
+      // ── THE API DOORS' OWN STAGE CARDS (DR-38b) ──────────────────────────
+      //
+      // The guided door's numbered strip got a drill-down; the API rail did not,
+      // and the API rail is the surface a reader watches for twenty minutes
+      // while a stage they cannot name spends their money. "Knowing", "Layer
+      // Codex" and "Shell" are pipeline words; the rail shows the plain labels
+      // (STAGE_LABELS) and, until now, nothing else.
+      //
+      // `does` is what the step produces. `limit` is what the step does NOT
+      // decide — the honest edge of a stage that is running correctly, not a
+      // door gap and not an apology. Both are facts about mechanism, and
+      // deliberately carry NO numbers: attempt counts and budgets live in
+      // STAGE_BUDGETS, and a count copied into prose is a mirror nobody gates.
+      var API_STAGE_EXPLAINERS = {
+        gameRulebook: {
+          does: 'Writes the game before any of the book exists: how you win, what you do in a session, what the currency is, how the password is earned, and what going badly looks like. Every step after this one is handed those answers.',
+          limit: 'It decides the rules, not the pages. Whether the printed book actually delivers them is checked at Identity, where the rules and the machine-readable play graph are compared both ways — and when those two disagree, the graph is what changes.'
+        },
+        layerBible: {
+          does: 'Builds the world the book is set in from your program and your brief — who runs it, what is true in it, and the design logic every later step reads.',
+          limit: 'Nothing is scheduled here. Which week does what, and which documents exist, is the next step’s work.'
+        },
+        campaign: {
+          does: 'Plans the block week by week against your real program: the arc, the found documents and their names, and the route to the ending.',
+          limit: 'It plans; it writes no week and no document. A plan that promises a document is only kept because the later steps are checked against this list.'
+        },
+        shell: {
+          does: 'Fixes the artifact: title, cover, the printed rules spread, the theme and the shell the book is dressed as — and checks the printed rules against the game rules in both directions.',
+          limit: 'This is where a disagreement between the rulebook and the book is caught, so a failure here is usually about the rules, not the cover.'
+        },
+        knowing: {
+          does: 'Authors the world’s working detail — its instruments, procedures, ranks and vocabulary — so the weeks, documents and ending all reach for the same particulars instead of inventing their own.',
+          limit: 'It is world knowledge, not printed pages: none of it appears in the book by itself. It appears because the prose steps after it are given it.'
+        },
+        weeks: {
+          does: 'Writes one week per call: the sessions, the marking strip you fill in with a pencil, the week’s field work, and the boss week last. Each week is handed the game’s currency, verbs and win condition, and its own row of the tension budget.',
+          limit: 'Weeks are written in order and each is checked on its own before the next is paid for. A week that fails its checks is rewritten automatically with the failures attached; a week that passes is banked, and a later failure never re-buys it.'
+        },
+        fragments: {
+          does: 'Writes the found documents — letters, reports, scraps — in batches that can see the weeks that are already written.',
+          limit: 'A batch that fails is recovered document by document rather than rewritten whole, so one bad scrap does not cost the batch.'
+        },
+        endings: {
+          does: 'Writes the payoff the password unlocks, knowing the win condition and the password path the rulebook declared.',
+          limit: 'It is the last paid writing step. Everything after it — assembly, the checks, the editorial pass — happens with the book already bought and banked.'
+        },
+        quality: {
+          does: 'Assembles the book on this device, runs the schema and play checks, plays it through with a simulated player, and then runs the editorial pass that can rewrite weak units.',
+          limit: 'It never withholds your book. The book is saved before the editorial pass spends anything, and quality findings are reported, never a reason to refuse delivery — so a run that ends with warnings still ends with a finished book you can open and print.'
         }
       };
 
@@ -7811,6 +8024,109 @@
         return 'The prompt is ready to copy. Nothing has been pasted back yet.';
       }
 
+      // ONE MODAL, TWO DOORS. The overlay, its rows, its closing note and its
+      // escape/backdrop behaviour are the same component whichever rail opened
+      // it; only the rows differ, because only the doors differ. A second modal
+      // would be a second place for the "what this does not do" note to drift.
+      function openStageModal(spec) {
+        if (!wizardStageModal) return;
+        wizardStageModalKicker.textContent = spec.kicker || '';
+        wizardStageModalTitle.textContent = spec.title || '';
+        wizardStageModalState.textContent = spec.state || '';
+
+        wizardStageModalBody.innerHTML =
+          (spec.rows || []).map(function (row) {
+            return wizardStageModalRow(row[0], row[1]);
+          }).join('') +
+          (spec.note
+            ? '<div class="wizard-stage-modal-gap"><strong>' + escapeForHtml(spec.noteLabel || '') + '</strong> ' +
+                escapeForHtml(spec.note) + '</div>'
+            : '') +
+          (spec.actionHtml || '');
+
+        if (typeof spec.wireActions === 'function') spec.wireActions();
+
+        // `hidden` is the state and `.is-open` is the layout, because the
+        // global `[hidden] { display:none !important }` rule outranks the
+        // overlay's own display (D99). Both move together, always.
+        wizardStageModal.hidden = false;
+        wizardStageModal.classList.add('is-open');
+        if (wizardStageModalClose) wizardStageModalClose.focus();
+      }
+
+      // The API rail's own drill-down (DR-38b). Same component, different door:
+      // there is no "go to this step" here — the reader is not the transport and
+      // cannot jump a running pipeline — so the card answers what the step is,
+      // where it stands, what it cost and how long it took, from the metrics the
+      // run already records. Nothing is invented: a restored or locally-finished
+      // stage carries no duration, and none is printed for it.
+      function describeApiStageSpend(metrics) {
+        metrics = metrics || createApiStageMetrics();
+        if (metrics.restoredFromCheckpoint) {
+          return 'Nothing — this stage came back from saved progress and was not paid for again.';
+        }
+        if (metrics.completedLocally) {
+          return 'Nothing — this step runs on this device, not at your provider.';
+        }
+        var usage = metrics.usage || {};
+        var parts = [];
+        if (Number(usage.inputTokens || 0) > 0) parts.push(formatCompactTokens(usage.inputTokens) + ' tokens in');
+        if (Number(usage.outputTokens || 0) > 0) parts.push(formatCompactTokens(usage.outputTokens) + ' tokens out');
+        if (Number(metrics.estimatedCostUsd || 0) > 0) parts.push(formatUsd(metrics.estimatedCostUsd) + ' estimated');
+        if (Number(metrics.retries || 0) > 0) {
+          parts.push(metrics.retries + ' rewrite' + (metrics.retries === 1 ? '' : 's') + ' after a failed check');
+        } else if (Number(metrics.attempts || 0) > 1) {
+          parts.push(metrics.attempts + ' calls');
+        }
+        if (!parts.length) return 'Nothing yet.';
+        return parts.join(' · ') + '.';
+      }
+
+      function describeApiStageClock(metrics) {
+        metrics = metrics || createApiStageMetrics();
+        if (metrics.restoredFromCheckpoint) return 'Not timed — restored, not run.';
+        if (Number(metrics.durationMs || 0) > 0) {
+          var line = 'Took ' + formatApiElapsed(metrics.durationMs);
+          if (Number(metrics.runElapsedMs || 0) > 0) {
+            line += ', at ' + formatApiElapsed(metrics.runElapsedMs) + ' into the run';
+          }
+          return line + '.';
+        }
+        return 'Not finished yet, so there is no duration to report.';
+      }
+
+      function openApiStageModal(stageKey) {
+        if (!wizardStageModal) return;
+        var items = buildApiStageItems();
+        var index = -1;
+        for (var i = 0; i < items.length; i++) {
+          if (items[i].key === stageKey) { index = i; break; }
+        }
+        if (index === -1) return;
+        var item = items[index];
+        var explainer = API_STAGE_EXPLAINERS[item.key] || { does: '', limit: '' };
+
+        openStageModal({
+          kicker: 'Step ' + (index + 1) + ' of ' + items.length,
+          title: item.label,
+          state: formatApiStageStatusLabel(item.status, item.metrics),
+          rows: [
+            ['What this step does', explainer.does],
+            // formatApiStageDetail() returns '' for a stage that has not run —
+            // right for the card, which already carries a status chip, and
+            // wrong here, where an absent row reads as a question the door
+            // refused to answer. A reader who opens a step nothing has touched
+            // is owed the sentence "nothing has touched it".
+            ['Where it stands', formatApiStageDetail(item.key, item.status, item.metrics)
+              || 'Not started. The build works through these in order, and this one has not come up yet.'],
+            ['What it has cost', describeApiStageSpend(item.metrics)],
+            ['Time on this step', describeApiStageClock(item.metrics)]
+          ],
+          noteLabel: 'What this step does not decide:',
+          note: explainer.limit
+        });
+      }
+
       function openWizardStageModal(stepIndex) {
         if (!wizardStageModal) return;
         var items = getStageHealthItems();
@@ -7819,42 +8135,37 @@
         var explainer = WIZARD_STAGE_EXPLAINERS[item.key] || { does: '', gap: '' };
         var canJump = canNavigateToStep(stepIndex);
 
-        wizardStageModalKicker.textContent = 'Step ' + (stepIndex + 1) + ' of ' + items.length;
-        wizardStageModalTitle.textContent = item.label;
-        wizardStageModalState.textContent = formatGuidedCardState(item.cardState);
-
-        wizardStageModalBody.innerHTML = '' +
-          wizardStageModalRow('What this step does', explainer.does) +
-          wizardStageModalRow('Where it stands', getStageDetail(item)) +
-          wizardStageModalRow('Your handoff', describeGuidedHandoff(item, stepIndex)) +
-          wizardStageModalRow('Next move', getStageMeta(item)) +
-          // TIMING IS NOT INVENTED. This door has no clock on a step — the
-          // reader is the transport and the wait is their chatbot's, not ours —
-          // and saying so is more useful than a fabricated number.
-          wizardStageModalRow('Time on this step', 'Not tracked on this door \u2014 you set the pace. The API doors time each step because they are the ones waiting.') +
-          (explainer.gap
-            ? '<div class="wizard-stage-modal-gap"><strong>What this door does not do:</strong> ' + escapeForHtml(explainer.gap) + '</div>'
-            : '') +
-          '<div class="result-actions" style="margin-top:16px">' +
+        openStageModal({
+          kicker: 'Step ' + (stepIndex + 1) + ' of ' + items.length,
+          title: item.label,
+          state: formatGuidedCardState(item.cardState),
+          rows: [
+            ['What this step does', explainer.does],
+            ['Where it stands', getStageDetail(item)],
+            ['Your handoff', describeGuidedHandoff(item, stepIndex)],
+            ['Next move', getStageMeta(item)],
+            // TIMING IS NOT INVENTED. This door has no clock on a step — the
+            // reader is the transport and the wait is their chatbot's, not ours —
+            // and saying so is more useful than a fabricated number.
+            ['Time on this step', 'Not tracked on this door \u2014 you set the pace. The API doors time each step because they are the ones waiting.']
+          ],
+          noteLabel: 'What this door does not do:',
+          note: explainer.gap,
+          actionHtml: '<div class="result-actions" style="margin-top:16px">' +
             '<button type="button" class="result-btn-primary" id="wizard-stage-modal-goto"' + (canJump ? '' : ' disabled') + '>' +
               (canJump ? 'Go To This Step' : 'Locked Until Earlier Steps Are Checked') +
             '</button>' +
-          '</div>';
-
-        var gotoBtn = document.getElementById('wizard-stage-modal-goto');
-        if (gotoBtn && canJump) {
-          gotoBtn.addEventListener('click', function () {
-            closeWizardStageModal();
-            jumpToStep(stepIndex);
-          });
-        }
-
-        // `hidden` is the state and `.is-open` is the layout, because the
-        // global `[hidden] { display:none !important }` rule outranks the
-        // overlay's own display (D99). Both move together, always.
-        wizardStageModal.hidden = false;
-        wizardStageModal.classList.add('is-open');
-        if (wizardStageModalClose) wizardStageModalClose.focus();
+          '</div>',
+          wireActions: function () {
+            var gotoBtn = document.getElementById('wizard-stage-modal-goto');
+            if (gotoBtn && canJump) {
+              gotoBtn.addEventListener('click', function () {
+                closeWizardStageModal();
+                jumpToStep(stepIndex);
+              });
+            }
+          }
+        });
       }
 
       function closeWizardStageModal() {
@@ -7893,6 +8204,26 @@
         label.addEventListener('keydown', function (e) {
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openWizardStageModal(index); }
         });
+      });
+
+      // The rails redraw their whole innerHTML on every state change, so the
+      // handler lives on the container and is registered exactly once. Both
+      // rails are the same component; each hands its own door's modal the key
+      // the node was drawn from.
+      function wireRailDrillDown(railEl, open) {
+        if (!railEl) return;
+        railEl.addEventListener('click', function (e) {
+          var node = e.target && e.target.closest ? e.target.closest('.pipeline-stage-node') : null;
+          if (!node || !railEl.contains(node)) return;
+          open(node);
+        });
+      }
+
+      wireRailDrillDown(apiPipelineRail, function (node) {
+        openApiStageModal(node.getAttribute('data-stage-key') || '');
+      });
+      wireRailDrillDown(wizPipelineRail, function (node) {
+        openWizardStageModal(Number(node.getAttribute('data-stage-index')));
       });
 
       function copyText(text, button, defaultLabel) {
@@ -9144,12 +9475,30 @@
             + (criticReport.finished ? ' ✓ composed' : ' — critique attached');
         }
 
+        // ── A TOOLING-OWNED REPAIR IS A FACT ON THIS DOOR TOO (DR-38c) ───────
+        // The literal-`\n` sweep runs inside assembleBooklet, so it has ALWAYS
+        // run on this door — it rewrites printed prose here exactly as it does
+        // on the API doors. Only the telling was missing: the API doors emit it
+        // as a run note (emitAssemblyNormalizationNotes) and this door dropped
+        // the same diagnostic on the floor. A repair nobody is told about is
+        // indistinguishable from a repair that never ran, and it is the SAME
+        // diagnostic object, so the two doors cannot word it differently.
+        var assemblyNotes = (readBookletDebris(data, '_assemblyDiagnostics') || [])
+          .filter(function (entry) { return entry && entry.code === 'escaped-whitespace-normalized'; })
+          .map(function (entry) { return String(entry.message || ''); })
+          .filter(Boolean);
+
         assemblyResultEl._assembledData = data;
         assemblyResultEl._filename = 'liftrpg-' + slug + '.json';
         assemblyResultEl.innerHTML =
           '<div class="assembly-success">' +
             '<div class="result-title">' + escapeForHtml(title) + '</div>' +
             '<div class="result-meta">' + escapeForHtml(qualityMeta) + '</div>' +
+            assemblyNotes.map(function (note) {
+              return '<div class="result-note" id="assembly-run-note">' +
+                '<strong>LiftRPG repaired this for you:</strong> ' + escapeForHtml(note) +
+                '</div>';
+            }).join('') +
             '<div class="result-next">Your booklet is ready. Open it in the renderer to preview and print.</div>' +
             '<div class="result-actions">' +
               '<button type="button" class="result-btn-primary assembly-open-btn">Open in Renderer</button>' +
@@ -10179,22 +10528,23 @@
         initializeApiSettings();
         updateDailyBudgetDisplay();
         // The door's provider lock and the estimate both read through
-        // LiftRPGAPI, and the module lands after this script runs, so the
-        // door is applied again here against a surface that now exists.
-        // A saved door-owned provider re-opens ITS door rather than being
-        // discarded: the pref is the record of which door was last used, and
-        // silently swapping it for openai would throw that away.
-        setGenerationMode(
-          apiProviderEl && doorOwnsProvider(apiProviderEl.value)
-            ? doorForProvider(apiProviderEl.value)
-            : currentGenerationMode
-        );
+        // LiftRPGAPI, and the module lands after this script runs, so the door
+        // is applied again here against a surface that now exists.
+        //
+        // It re-applies the door the reader is ALREADY in — the same value the
+        // boot below selected. It used to try to recover that door from
+        // `apiProviderEl.value`, which by then held whatever the synchronous
+        // boot had written over it; the comment claimed a restore the code had
+        // already lost. The door is now its own pref, so there is nothing left
+        // to reconstruct here.
+        setGenerationMode(currentGenerationMode);
       }, { once: true });
       apiRunState = createApiRunState();
       // The default door is the recommendation (author, 2026-08-13): API is
-      // the most reliable end-to-end run. A returning reader's saved door
-      // still wins — the restore above this line re-opens it.
-      setGenerationMode('api');
+      // the most reliable end-to-end run. A returning reader's saved door still
+      // wins — and now actually does: `restoredDoorPref` was read at the top of
+      // this script, before any code could overwrite the pref it came from.
+      setGenerationMode(restoredDoorPref || 'api');
       setGeneratorSurface('intake', { skipFocus: true });
       var existingWizardDraft = getWizardDraft();
       if (existingWizardDraft) {
