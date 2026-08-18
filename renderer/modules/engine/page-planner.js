@@ -970,6 +970,83 @@ export function scanContinuationDiagnostics(spreadPlan, diagnostics) {
 }
 
 // ---------------------------------------------------------------------------
+// Re-measurement after a composition change
+// ---------------------------------------------------------------------------
+
+/**
+ * Re-measure every placement on a page AT THE WIDTH ITS CURRENT PAGE GIVES IT.
+ *
+ * ── THE DEFECT THIS CLOSES (DR-48, ruled at D207) ──────────────────────────
+ * A placement's slot width is not a property of the placement. It is a
+ * property of the PAGE COMPOSITION it sits in: a cipher alone on a page is
+ * full-width, and the same cipher beside a map is a 232px halves cell. Every
+ * measurement therefore expires the moment the planner moves anything.
+ *
+ * Three steps move things. The repack pass already refreshed (and said why);
+ * COMPACTION AND SHEDDING DID NOT, and both change exactly the composition
+ * that decides width:
+ *
+ *   - compaction merges a whole page into the one before it, which is how a
+ *     lone cipher page and a lone map page become a `balanced` pair;
+ *   - a shed splices the tail off a page onto a new spread, which is how a
+ *     pair stops being a pair.
+ *
+ * Measured on the corpus before this landed (22 fixtures, 1866 placements):
+ * 74 placements — every one a cipher or a map on a field-ops page — carried a
+ * height measured at a width their final page does not give them. The worst,
+ * geometry-01's w0-map, was cached at 527.5px against a printed 313.9px: a
+ * full-column measurement for an atom that prints in a halves cell, 213.6px of
+ * a 741px page reserved for nothing. sf-haiku45's w2-map errs the other way
+ * (147 cached, 275.7 real) — the silent, confident direction, which is the
+ * shape of the defect the absorption law was written for (D198).
+ *
+ * The MERGE DECISION itself was never wrong: compaction's fit oracle is
+ * `measurePlacementsPage`, which renders the real merged page. Only the
+ * per-placement cache went stale — and that cache is what the density solver
+ * reads for shrink potential, what the split path ranks by, and what the
+ * unresolved-overflow culprit is chosen with. A page whose atoms all report
+ * heights from a page that no longer exists is solved against a fiction.
+ *
+ * ONE HOME. Every call site that was `measureAtom(stack, p.atom, p.density,
+ * getMechanicSlotWidthPx(p, page))` is now this function. The idiom written
+ * out four times is four chances to move a placement and forget the width;
+ * the two that forgot are the two above.
+ *
+ * @param {HTMLElement} stack — measurement stack
+ * @param {Array} placements — one page side's placements (mutated in place)
+ * @param {object} [onMeasured] — optional per-placement callback for diagnostics
+ */
+function refreshPageMeasurements(stack, placements, onMeasured = null) {
+  for (const placement of placements) {
+    const result = measureAtPageWidth(stack, placement, placements);
+    if (onMeasured) onMeasured(placement, result);
+  }
+}
+
+/**
+ * The primitive the function above is built from: measure ONE placement at the
+ * width ITS page gives it, and write the answer back.
+ *
+ * `pagePlacements` is not optional and is never the placement on its own — a
+ * placement measured against a page of one is measured full-width by
+ * definition, which is the wrong answer for exactly the atoms this whole
+ * mechanism exists for.
+ *
+ * @param {HTMLElement} stack — measurement stack
+ * @param {object} placement — mutated: `.measuredHeight` is written
+ * @param {Array} pagePlacements — the page side the placement currently sits on
+ * @returns {{ measuredHeight: number, measuredWidth: number, overflowHeight: number }}
+ */
+function measureAtPageWidth(stack, placement, pagePlacements) {
+  const result = measureAtom(
+    stack, placement.atom, placement.density,
+    getMechanicSlotWidthPx(placement, pagePlacements),
+  );
+  placement.measuredHeight = result.measuredHeight;
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Revision loop — measure pages, resolve overflow, shed when density is spent
 // ---------------------------------------------------------------------------
 
@@ -1093,12 +1170,8 @@ function runRevisionLoop(spreadPlan, stack, effectiveBudget, diagnostics, unreso
               );
               placement.density = adj.newDensity;
 
-              // Re-measure adjusted atom
-              const remeasure = measureAtom(
-                stack, placement.atom, placement.density,
-                getMechanicSlotWidthPx(placement, placements),
-              );
-              placement.measuredHeight = remeasure.measuredHeight;
+              // Re-measure adjusted atom — at the width its page gives it.
+              measureAtPageWidth(stack, placement, placements);
             }
           }
 
@@ -1130,6 +1203,13 @@ function runRevisionLoop(spreadPlan, stack, effectiveBudget, diagnostics, unreso
               // Insert after current spread
               const currentIdx = spreadPlan.indexOf(spread);
               spreadPlan.splice(currentIdx + 1, 0, newSpread);
+
+              // BOTH compositions just changed, so both sets of measurements
+              // expired (see refreshPageMeasurements). The page that kept the
+              // head may have lost a halves partner; the page that received
+              // the tail is a composition that has never been measured at all.
+              refreshPageMeasurements(stack, placements);
+              refreshPageMeasurements(stack, removed);
               // Every moved atom is recorded — scanContinuationDiagnostics reads
               // this set to tell "the engine moved it" from "it was authored
               // that way", and passengers moved as much as the break atom did.
@@ -1401,14 +1481,7 @@ function repackAfterShedStabilization(spreadPlan, stack, diagnostics) {
     // Refresh per-placement measurements in the new page context — width
     // resolution depends on page composition (measurement equals render).
     for (let wi = 0; wi < newPages.length; wi++) {
-      const pagePlacements = placementsOf(win[wi]);
-      for (const placement of pagePlacements) {
-        const remeasure = measureAtom(
-          stack, placement.atom, placement.density,
-          getMechanicSlotWidthPx(placement, pagePlacements),
-        );
-        placement.measuredHeight = remeasure.measuredHeight;
-      }
+      refreshPageMeasurements(stack, placementsOf(win[wi]));
     }
 
     windowsRepacked++;
@@ -1459,19 +1532,13 @@ export function planAndMeasure(atoms, container, options = {}) {
     // Measure all atoms
     for (const spread of spreadPlan) {
       for (const side of ['left', 'right']) {
-        for (const placement of spread[side]) {
-          const result = measureAtom(
-            stack, placement.atom, placement.density,
-            getMechanicSlotWidthPx(placement, spread[side]),
-          );
-          placement.measuredHeight = result.measuredHeight;
-
+        refreshPageMeasurements(stack, spread[side], (placement, result) => {
           recordAtomMetrics(
             diagnostics, placement.atomId, placement.type,
             placement.estimatedHeight, result.measuredHeight,
             placement.density, side, spread.spreadIndex,
           );
-        }
+        });
       }
     }
 
@@ -1543,6 +1610,15 @@ export function planAndMeasure(atoms, container, options = {}) {
           candidatePlacements.length = 0;
           compactions++;
           cursor = nextIdx;
+
+          // The merged page is a NEW composition, so every per-placement
+          // measurement on it expired — including the ones already here. A
+          // lone cipher page merging with a lone map page is exactly how two
+          // full-column measurements come to describe two atoms that will
+          // print in halves cells (DR-48/D207; refreshPageMeasurements carries
+          // the corpus numbers). The merge DECISION above is unaffected — its
+          // oracle renders the real merged page.
+          refreshPageMeasurements(stack, placements);
         } else {
           break;  // Won't fit, stop looking
         }

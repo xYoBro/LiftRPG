@@ -2,9 +2,10 @@ import { make } from './dom.js';
 import { createBoundedPage } from './page-shell.js';
 import { getAtomDefinition } from './engine/atom-registry.js';
 import {
-  resolveLayoutVariant,
-  buildMechanicSurfaceRows,
   resolveShellAttrs,
+  resolvePageRowPlan,
+  isWorkoutPlacement,
+  isMechanicPlacement,
 } from './mechanic-layout.js';
 import { getShellDecorator } from './shell-decorator-registry.js';
 
@@ -13,46 +14,17 @@ import { getShellDecorator } from './shell-decorator-registry.js';
 // (including the measurement harness) also gets decorator registration.
 import './decorators/index.js';
 
-// A page is a session log because it carries session content, NOT because it
-// carries a week footer. The footer is a page-structural band the renderer
-// positions (ZONE-ASSIGNMENT-DESIGN §6) and appendWeeklyFooter() synthesises
-// one on any page that needs it — so a footer is evidence of which WEEK a page
-// belongs to, never of what is on it.
-//
-// It was listed here until the clocks panel produced the first page whose only
-// workout-typed placement was a footer: a boss week's clocks, pushed off a full
-// card page, arrived as a `page-workout-left` shell with `data-card-count="0"`
-// and a session-log boundary — which is what the diagnostics gate 'session
-// cards exist on workout pages' caught. Measured across the corpus, no page
-// before the clocks panel had a footer without a header or a card, so this
-// narrowing reclassifies those pages and nothing else.
-const WORKOUT_PAGE_TYPES = new Set(['week-header', 'session-card']);
-// reckoning-panel is deliberately NOT a mechanic page type: on non-boss weeks
-// it shares field-ops pages that cipher/oracle already classify, and on boss
-// weeks it shares the final session-chunk page, which routes as a workout page
-// regardless (renderPageFromPlacements tests workout content first). Listing
-// it here would only change the one case where it lands alone on a page —
-// giving that page a mechanic frame and a week footer it does not ask for.
-//
-// It is NOT what inverted the panel against the cards in Session 1: that was
-// the type partition in renderWorkoutPage(), fixed there.
-//
-// clocks-panel IS listed: unlike the reckoning panel it has no workout-page
-// fallback seat, so the one case that matters is the opposite one — a week
-// whose clocks are pushed onto a page of their own. Without an entry here that
-// page would fall through to the generic branch and be built as a
-// `page-clocks-panel` shell that no CSS has ever styled; with it, a solo clocks
-// page is a field-ops page with the frame, the board-state title and the week
-// footer that every other field-ops page carries.
-// constrained-grid and word-grid (W5b) are listed for the same reason
-// clocks-panel is: they are full-width by footprint, so a puzzle that does not
-// share a page with a cipher or a map lands alone — and without an entry here
-// that solo page would be built as a `page-constrained-grid` shell no CSS has
-// ever styled, instead of the field-ops page it plainly is.
-const MECHANIC_PAGE_TYPES = new Set([
-  'cipher-panel', 'oracle-table', 'map-panel', 'clocks-panel', 'tracker',
-  'constrained-grid', 'word-grid'
-]);
+// THE PAGE-KIND PARTITION AND THE ROW GROUPING MOVED TO mechanic-layout.js
+// (D207 / DR-48). Both are now read by two parties, not one: this file builds
+// the DOM from `resolvePageRowPlan()` and the measurement side picks its slot
+// width from the same plan, so the width a page is MEASURED at and the width
+// it is PRINTED at cannot come apart. `WORKOUT_PAGE_TYPES`,
+// `MECHANIC_PAGE_TYPES`, `isWorkoutPlacement`, `isMechanicPlacement`,
+// `isCompanionPlacement` (now `isCompanionItem`) and
+// `groupPlacementsIntoRows()` live there with the defects that shaped them;
+// they are imported back here unchanged, and the DOM this file produces is
+// byte-identical.
+
 const BOARD_STATE_COPY = {
   'survey-grid': {
     pageTitle: 'Field Operations',
@@ -75,14 +47,6 @@ const BOARD_STATE_COPY = {
     companionLabel: 'Case Surface',
   },
 };
-
-function isWorkoutPlacement(placement) {
-  return WORKOUT_PAGE_TYPES.has(placement.type);
-}
-
-function isMechanicPlacement(placement) {
-  return placement.type === 'boss-encounter' || MECHANIC_PAGE_TYPES.has(placement.type);
-}
 
 function workoutCompactionLevel(placements) {
   const maxDensity = placements.reduce((max, placement) => {
@@ -127,90 +91,6 @@ function applyShellAttrs(element, attrs) {
 
 function resolveMechanicCopy(shellAttrs) {
   return BOARD_STATE_COPY[shellAttrs['board-state-mode']] || BOARD_STATE_COPY['survey-grid'];
-}
-
-/**
- * Group a flat placement list into rows based on footprint.cols and rowGroup.
- *
- * When atoms declare a `rowGroup` on their atom descriptor, atoms with the
- * same rowGroup and `footprint.cols === 1` are paired into halves rows
- * regardless of adjacency. Atoms without rowGroup fall back to the legacy
- * adjacency-based pairing (two consecutive cols:1 → halves row). Atoms with
- * rowGroup never pair with atoms without rowGroup, and atoms with different
- * rowGroup values never pair with each other.
- *
- * @param {Array} placements
- * @returns {Array<{ type: 'halves'|'full', placements: Array }>}
- */
-function groupPlacementsIntoRows(placements) {
-  const rows = [];
-  const consumed = new Set();
-
-  // Phase 1: Pre-compute rowGroup-based pairs.
-  // For each rowGroup, collect cols:1 members and pair them in list order.
-  const paired = new Map(); // index → partner index
-  const byRowGroup = new Map();
-  for (let idx = 0; idx < placements.length; idx++) {
-    const rg = placements[idx].atom && placements[idx].atom.rowGroup;
-    if (!rg) continue;
-    if (!byRowGroup.has(rg)) byRowGroup.set(rg, []);
-    byRowGroup.get(rg).push(idx);
-  }
-  for (const indices of byRowGroup.values()) {
-    const halfIndices = indices.filter(function (idx) {
-      const def = getAtomDefinition(placements[idx].type);
-      return ((def && def.footprint && def.footprint.cols) || 2) === 1;
-    });
-    for (let k = 0; k + 1 < halfIndices.length; k += 2) {
-      paired.set(halfIndices[k], halfIndices[k + 1]);
-      paired.set(halfIndices[k + 1], halfIndices[k]);
-    }
-  }
-
-  // Phase 2: Walk placements in order, forming rows.
-  let i = 0;
-  while (i < placements.length) {
-    if (consumed.has(i)) { i++; continue; }
-
-    const p = placements[i];
-    const def = getAtomDefinition(p.type);
-    const cols = (def && def.footprint && def.footprint.cols) || 2;
-    const partner = paired.get(i);
-
-    // rowGroup-based halves row
-    if (partner !== undefined && !consumed.has(partner)) {
-      rows.push({ type: 'halves', placements: [p, placements[partner]] });
-      consumed.add(i);
-      consumed.add(partner);
-      i++;
-      continue;
-    }
-
-    // Legacy adjacency fallback — only for atoms WITHOUT rowGroup
-    const hasRowGroup = !!(p.atom && p.atom.rowGroup);
-    if (!hasRowGroup && cols === 1 && i + 1 < placements.length && !consumed.has(i + 1)) {
-      const next = placements[i + 1];
-      const nextHasRowGroup = !!(next.atom && next.atom.rowGroup);
-      if (!nextHasRowGroup) {
-        const nextDef = getAtomDefinition(next.type);
-        const nextCols = (nextDef && nextDef.footprint && nextDef.footprint.cols) || 2;
-        if (nextCols === 1) {
-          rows.push({ type: 'halves', placements: [p, next] });
-          consumed.add(i);
-          consumed.add(i + 1);
-          i += 2;
-          continue;
-        }
-      }
-    }
-
-    // Full-width row
-    consumed.add(i);
-    rows.push({ type: 'full', placements: [p] });
-    i++;
-  }
-
-  return rows;
 }
 
 /**
@@ -397,26 +277,18 @@ function renderWorkoutPage(placements, planIndex) {
   return page;
 }
 
-// resolveLayoutVariant and buildMechanicSurfaceRows are imported from
-// mechanic-layout.js — the single source of truth for mechanic row templates.
-
-function isCompanionPlacement(placement) {
-  // Primary signal: explicit zone declaration from the adapter.
-  // Fallback: type === 'tracker' for atoms emitted before zone adoption.
-  const zone = placement.atom?.zone ?? null;
-  return zone === 'companion' || (zone == null && placement.type === 'tracker');
-}
+// The row plan — surface template, companion grouping, shell attrs and layout
+// variant — comes from mechanic-layout.js's resolvePageRowPlan(), the single
+// source of truth this file and the measurement side both read (D207).
 
 function renderMechanicPage(placements, planIndex) {
-  const shellAttrs = resolveShellAttrs(placements);
+  const rowPlan = resolvePageRowPlan(placements);
+  const { shellAttrs, layoutVariant, surfacePlacements, companionPlacements } = rowPlan;
   const shellFamily = shellAttrs['shell-family'] || 'field-survey';
   const copy = resolveMechanicCopy(shellAttrs);
-  const surfacePlacements = placements.filter((placement) => !isCompanionPlacement(placement) && placement.type !== 'week-footer');
-  const companionPlacements = placements.filter(isCompanionPlacement);
   const surfaceTypes = new Set(surfacePlacements.map((placement) => placement.type));
   const isSoloSurface = surfacePlacements.length === 1 && companionPlacements.length === 0;
   const isSoloCompanion = surfacePlacements.length === 0 && companionPlacements.length === 1;
-  const layoutVariant = resolveLayoutVariant(shellAttrs, surfacePlacements);
 
   // Build page facts once — passed to decorator hooks.
   const pageFacts = {
@@ -465,7 +337,7 @@ function renderMechanicPage(placements, planIndex) {
   }
 
   frame.setAttribute('data-layout-variant', layoutVariant);
-  buildMechanicSurfaceRows(surfacePlacements, layoutVariant).forEach((row) => renderRowInto(content, row));
+  rowPlan.surfaceRows.forEach((row) => renderRowInto(content, row));
 
   // Decorator: solo-surface supplement (worksheet, etc.)
   if (isSoloSurface) {
@@ -479,7 +351,7 @@ function renderMechanicPage(placements, planIndex) {
     content.setAttribute('data-has-companion', 'true');
     const companionZone = make('section', 'companion-zone');
     companionZone.appendChild(make('div', 'doc-label', copy.companionLabel || 'Companion Surface'));
-    groupPlacementsIntoRows(companionPlacements).forEach((row) => renderRowInto(companionZone, row));
+    rowPlan.companionRows.forEach((row) => renderRowInto(companionZone, row));
     content.appendChild(companionZone);
 
     // Decorator: companion-only supplement (worksheet, etc.)
