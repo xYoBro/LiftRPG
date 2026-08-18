@@ -98,19 +98,22 @@ export var STAGE_BUDGETS = {
   // eight paragraphs and four short lists. A generous ceiling here would buy
   // nothing except permission to exceed a band the floor then rejects.
   //
-  // The timeout is the 300000 the other short-structured-output stages use
-  // (`knowing`, `rules`, `conductor`) — this is the same class of work: one
-  // bounded object, no per-week fan-out, no book to read first.
+  // The timeout moved 300000 → 600000 in the D192 schedule with `knowing`:
+  // both are short-structured-output stages, but both run first-in-line on a
+  // door whose frontier default thinks before writing (D184/D191's mechanism),
+  // and a timeout loss at the front of the run is pure waste. `conductor` and
+  // `rules` keep 300000 — they read projections, not briefs, and have never
+  // shown a slow attempt.
   //
   // ATTEMPTS UNSET (= 2). Raised only on evidence, per this table's own law.
   // The failures this stage can have are a thin answer and a band breach, both
   // of which a retry with the blocking error quoted can genuinely fix.
-  gameRulebook: { maxTokens: 16000, timeoutMs: 300000 },
+  gameRulebook: { maxTokens: 16000, timeoutMs: 600000 },
   // Shared by both pipelines (§11 Wave 1.5). One structured object of short
   // strings — roughly 25-35 one-line facts. Cheaper than any prose stage by
   // construction, and an explicit row rather than the silent MAX_OUTPUT_TOKENS
   // fallback a missing key would take (D97).
-  knowing:    { maxTokens: 12000, timeoutMs: 300000 },
+  knowing:    { maxTokens: 12000, timeoutMs: 600000 },
   // Canonicalize (§11 Wave 5). Shared by both pipelines, and the only stage
   // whose output size is set by the USER'S input rather than by the book: a
   // six-week program with six sessions a week is a few hundred short strings.
@@ -123,11 +126,11 @@ export var STAGE_BUDGETS = {
   // whole weekPlan, so it moves with `shell` below — one growth, both seats
   // (D155). A stage returning a whole unit is never budgeted below the stage
   // that writes the same unit on the other pipeline.
-  skeleton:   { maxTokens: 56000, timeoutMs: 600000 },
+  skeleton:   { maxTokens: 56000, timeoutMs: 900000 },  // moves with `shell` (its own law above); dormant but the pairing holds
   rules:      { maxTokens: 12000, timeoutMs: 300000 },
-  week:       { maxTokens: 24000, timeoutMs: 600000 },
+  week:       { maxTokens: 24000, timeoutMs: 900000 },
   fragments:  { maxTokens: 40000, timeoutMs: 900000 },
-  endings:    { maxTokens: 24000, timeoutMs: 480000 },
+  endings:    { maxTokens: 24000, timeoutMs: 720000 },
   // Multi-stage / structured
   //
   // ── THE CEILING IS A SAFETY VALVE, NOT A BUDGET (D155, 2026-08-13) ──
@@ -153,7 +156,7 @@ export var STAGE_BUDGETS = {
   // full 10 minutes on every loss. First ladder row re-derived from frontier
   // evidence per directive 10c; the others move only when a run shows theirs.
   layerBible: { maxTokens: 24000, timeoutMs: 900000 },
-  campaign:   { maxTokens: 56000, timeoutMs: 600000 },
+  campaign:   { maxTokens: 56000, timeoutMs: 900000 },
   // MEASURED AGAIN, one model later (D159): a shell attempt reported 28.1k
   // output against this row's 32000 — 88% consumed — and came back with
   // `meta.playSpine` ABSENT rather than truncated. Above a tight ceiling a
@@ -176,8 +179,8 @@ export var STAGE_BUDGETS = {
   // third attempt is bought against the cost of a stopped run rather than
   // against the cost of a call. The prompt-side fix (the derived GIVENS block)
   // is the load-bearing half; this is the cushion under it.
-  shell:      { maxTokens: 56000, timeoutMs: 420000, attempts: 3 },
-  fragment:   { maxTokens: 24000, timeoutMs: 480000 },
+  shell:      { maxTokens: 56000, timeoutMs: 900000, attempts: 3 },
+  fragment:   { maxTokens: 24000, timeoutMs: 720000 },
   // Critic loop (D66). Both rows were sized before the critic had eight
   // dimensions and machine findings, and both were the smallest rows in the
   // ladder while doing the ladder's largest reading. Measured against real
@@ -202,8 +205,8 @@ export var STAGE_BUDGETS = {
   //
   // Both now follow the ladder's own rule (~3-4x measured output) and pair
   // with a timeout that reaches the ceiling at the conservative ~20 tok/s floor.
-  critic:         { maxTokens: 24000, timeoutMs: 480000 },
-  'critic-revise': { maxTokens: 24000, timeoutMs: 600000 },
+  critic:         { maxTokens: 24000, timeoutMs: 720000 },
+  'critic-revise': { maxTokens: 24000, timeoutMs: 900000 },
   // The conductor's pass (FUSION.md §4 mechanism 6). The cheapest reading stage
   // in the ladder BY CONSTRUCTION: its input is the score projection alone —
   // one line per week plus a caption, roughly 1.5k tokens at twelve weeks —
