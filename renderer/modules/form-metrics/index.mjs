@@ -33,6 +33,10 @@ import {
   emitFragmentDocFormCss,
   FORM_ROOT_SELECTOR as FRAGMENT_DOC_ROOT
 } from './fragment-doc-forms.mjs';
+import {
+  emitLedgerSpreadFormCss,
+  FORM_ROOT_SELECTOR as LEDGER_SPREAD_ROOT
+} from './ledger-spread-forms.mjs';
 
 /**
  * Where the emitted stylesheet lives, repo-relative. Declared here so the
@@ -50,7 +54,8 @@ export const FORM_VARIANTS_CSS_PATH = 'public/renderer/form-variants.css';
 const SECTION_EMITTERS = {
   sessionCard: emitSessionCardFormCss,
   oracleTable: emitOracleTableFormCss,
-  fragmentDoc: emitFragmentDocFormCss
+  fragmentDoc: emitFragmentDocFormCss,
+  ledgerSpread: emitLedgerSpreadFormCss
 };
 
 /**
@@ -63,7 +68,8 @@ const SECTION_EMITTERS = {
 export const FORM_ROOT_SELECTORS = {
   sessionCard: SESSION_CARD_ROOT,
   oracleTable: ORACLE_TABLE_ROOT,
-  fragmentDoc: FRAGMENT_DOC_ROOT
+  fragmentDoc: FRAGMENT_DOC_ROOT,
+  ledgerSpread: LEDGER_SPREAD_ROOT
 };
 
 const GENERATED_BANNER =

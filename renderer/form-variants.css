@@ -215,3 +215,34 @@
   overflow:hidden;
   max-width:40%;
 }
+
+/* ── THE REGISTER FORM — ledger, ARRANGEMENT.md §2 axis 5 ──────────────
+   The ledger drawn as a register: the movement label at the TOP of its
+   band, against the rule that opens it, and the bands sharing the whole
+   sheet. The bare form bottom-aligns the label and caps the band, and
+   stamps no attribute. D198's recorded dissent, ruled in at D200-4. */
+
+/* The label moves to the head of its own band. This is the change the cap
+   existed to compensate for — a bottom-aligned label in a tall band prints
+   far from its column head; a top-aligned one never does. */
+.ledger-table[data-form-variant="register"] .ledger-name{
+  align-items:flex-start;
+  padding-top:2px;
+  padding-bottom:0px;
+}
+
+/* The rule opens the band instead of closing it, so every label has a line
+   directly above it. One rule either way — this replaces, never adds, so
+   the row's measured height is identical to the bare form's at the same
+   band size and the estimate needs no term for it. */
+.ledger-table[data-form-variant="register"] .ledger-row{
+  border-bottom:0;
+  border-top:1px var(--theme-line-style,solid) var(--theme-field-rule,var(--rule));
+}
+
+/* The last band would otherwise print unclosed. The table carries the
+   closing rule so no row needs a :last-child exception the estimate would
+   have to know about. */
+.ledger-table[data-form-variant="register"]{
+  border-bottom:1px var(--theme-line-style,solid) var(--theme-field-rule,var(--rule));
+}

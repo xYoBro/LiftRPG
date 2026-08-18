@@ -136,6 +136,7 @@ import {
   // adapter stamps. Both are derived from these two, never listed here.
   VALID_FORM_PLANS,
   ATOM_FORM_FAMILIES,
+  formPlansFor,
   // D144 — the single home for "does this brief name a body that runs on
   // procedure?". Imported rather than re-implemented: a private copy here and
   // the prompt's byte-quoted term list would answer the same question in two
@@ -2674,7 +2675,8 @@ export function arrangementFloorErrors(meta, where) {
       + 'Declare grammar, sectionFurniture, tableTreatment, annotationPattern, leitmotif, '
       + 'atomForms and arrangementEvidence, deriving each from words the brief actually '
       + 'contains. Grammars: ' + VALID_ARRANGEMENT_GRAMMARS.join(' | ')
-      + '. Form plans: ' + VALID_FORM_PLANS.join(' | '));
+      + '. Form plans: ' + VALID_FORM_PLANS.join(' | ')
+      + ' (singleton families — the ledger — offer the throughout plans only)');
     return errors;
   }
 
@@ -2731,9 +2733,9 @@ export function arrangementFloorErrors(meta, where) {
   var forms = spec.atomForms;
   if (!forms || typeof forms !== 'object' || Array.isArray(forms)) {
     errors.push(prefix + '.atomForms is absent — say how each component TEACHES itself and '
-      + 'when it stops. One plan per family (' + ATOM_FORM_FAMILIES.map(function (f) {
-        return f.id;
-      }).join(', ') + '), each one of: ' + VALID_FORM_PLANS.join(' | ')
+      + 'when it stops. One plan per family: ' + ATOM_FORM_FAMILIES.map(function (f) {
+        return f.id + ' (' + formPlansFor(f).join(' | ') + ')';
+      }).join('; ')
       + '. A book that declares none prints every component in its bare form, which is a real '
       + 'answer but never an unmade decision');
   } else {
@@ -2741,14 +2743,19 @@ export function arrangementFloorErrors(meta, where) {
       var famRow = ATOM_FORM_FAMILIES[fi];
       var raw = forms[famRow.id];
       var plan = String(raw === undefined || raw === null ? '' : raw).trim();
+      // The menu is PER-FAMILY (formPlansFor): a singleton family is never
+      // offered a shed plan, so a shed plan on it is off-menu and refused with
+      // the narrowed menu quoted — never accepted into a rhythm nothing can
+      // perform.
+      var famMenu = formPlansFor(famRow);
       if (!plan) {
         errors.push(prefix + '.atomForms.' + famRow.id + ' is unset — state the ' + famRow.label
           + '\'s form plan explicitly, even when it is "bare-throughout": '
-          + VALID_FORM_PLANS.join(' | '));
-      } else if (VALID_FORM_PLANS.indexOf(plan) === -1) {
+          + famMenu.join(' | '));
+      } else if (famMenu.indexOf(plan) === -1) {
         errors.push(prefix + '.atomForms.' + famRow.id + ' "' + plan + '" is not a plan this '
-          + 'engine resolves, so it would be dropped and the ' + famRow.label + ' would silently '
-          + 'print bare while the book read as having chosen: ' + VALID_FORM_PLANS.join(' | '));
+          + 'family resolves, so it would be dropped and the ' + famRow.label + ' would silently '
+          + 'print bare while the book read as having chosen: ' + famMenu.join(' | '));
       }
     }
   }

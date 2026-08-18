@@ -23,6 +23,10 @@ import { registerAtom } from '../engine/atom-registry.js';
 import { make } from '../dom.js';
 import { createBoundedPage } from '../page-shell.js';
 import { PAGE_BUDGET } from '../engine/page-spec.js';
+// THE FORM SET'S ONE HOME (the variant contract, ARRANGEMENT §3): the ceiling
+// policy and the label alignment that goes with it are declared once, there,
+// and the emitted stylesheet is written from the same file.
+import { resolveLedgerSpreadForm, formCapsRowGrowth } from '../form-metrics/ledger-spread-forms.mjs';
 
 // ---------------------------------------------------------------------------
 // Geometry  ⇄  booklet.css `.ledger-*` blocks
@@ -171,11 +175,23 @@ export function ledgerRowHeightPx(rowCount) {
  * one function, two ceilings, so the floor and the printed height can never be
  * derived by two different rules.
  *
+ * THE FORM CHOOSES THE CEILING (D200-4). `bare` keeps `ROW_GROWTH_CAP_PX`,
+ * because `bare` keeps the bottom-aligned label the cap exists to protect.
+ * `register` top-aligns the label, which is the whole reason a tall band is
+ * legal there — so its ceiling is the fair share itself and the bands take the
+ * sheet. `formCapsRowGrowth()` is the single reader of that pairing; a caller
+ * that flipped the ceiling here without the alignment in the form module would
+ * reprint the exact defect W5 capped.
+ *
  * @param {number} rowCount
+ * @param {string} [form] — a member of VALID_LEDGER_SPREAD_FORMS
  * @returns {number} px
  */
-export function ledgerRowPrintedHeightPx(rowCount) {
-  return clampFairShare(rowCount, ROW_GROWTH_CAP_PX);
+export function ledgerRowPrintedHeightPx(rowCount, form) {
+  return clampFairShare(
+    rowCount,
+    formCapsRowGrowth(form) ? ROW_GROWTH_CAP_PX : Infinity,
+  );
 }
 
 /** The shared arithmetic: an equal share of the writing budget, floored at the
@@ -195,15 +211,17 @@ function movementsOf(data) {
   return raw.map((name) => String(name || '').trim()).filter(Boolean);
 }
 
-/** Modelled page height for a roster of `rows` movements. */
-function ledgerHeightAt(rows) {
+/** Modelled page height for a roster of `rows` movements, in one form. */
+function ledgerHeightAt(rows, form) {
   if (rows <= 0) return Math.round(LEDGER_CHROME_PX);
 
   // The PRINTED height, not the modelled floor: the rows grow past their
   // min-height up to the growth cap, and pricing the floor here is what let a
-  // five-movement page estimate at 245px and print at 741px.
+  // five-movement page estimate at 245px and print at 741px. In `register`
+  // there is no cap, so this resolves to the whole writing budget — the page is
+  // full BY ARITHMETIC, not by hoping the flex box fills it.
   const height = LEDGER_CHROME_PX
-    + rows * ledgerRowPrintedHeightPx(rows)
+    + rows * ledgerRowPrintedHeightPx(rows, form)
     + (rows - 1) * ROW_GAP_PX;
 
   // The adapter's chunking keeps this under the budget; the clamp is the belt
@@ -236,7 +254,10 @@ registerAtom('ledger-spread', {
    * STRIP_LADDER refuses to tell about the tick box.
    */
   estimate(data, _density) {
-    const height = ledgerHeightAt(movementsOf(data).length);
+    const height = ledgerHeightAt(
+      movementsOf(data).length,
+      resolveLedgerSpreadForm((data || {}).formVariant),
+    );
     return { minHeight: height, preferredHeight: height };
   },
 
@@ -263,12 +284,18 @@ registerAtom('ledger-spread', {
 
     const table = make('div', 'ledger-table');
     table.setAttribute('data-row-count', String(movements.length));
+    // THE FORM (D200-4). `bare` stamps NOTHING — the presence fence (D179) —
+    // so a book that declares no form draws today's exact page and no rule in
+    // form-variants.css can reach it.
+    const form = resolveLedgerSpreadForm(data.formVariant);
+    if (form !== 'bare') table.setAttribute('data-form-variant', form);
     // Two numbers, computed once each, stamped where the CSS can use them.
     // render() does not get its own formula — that is how the two sides stay
     // one model. `--ledger-row-height` is the row's floor (min-height),
     // `--ledger-row-max` is the ceiling flex growth may take it to.
     table.style.setProperty('--ledger-row-height', ledgerRowHeightPx(movements.length) + 'px');
-    table.style.setProperty('--ledger-row-max', ledgerRowPrintedHeightPx(movements.length) + 'px');
+    table.style.setProperty('--ledger-row-max',
+      ledgerRowPrintedHeightPx(movements.length, form) + 'px');
 
     const head = make('div', 'ledger-head');
     COLUMN_HEADS.forEach((label, index) => {

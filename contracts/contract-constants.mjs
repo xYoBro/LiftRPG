@@ -931,6 +931,33 @@ export var DEFAULT_ORACLE_TABLE_FORM = 'bare';
 export var VALID_FRAGMENT_DOC_FORMS = ['bare', 'taught'];
 export var DEFAULT_FRAGMENT_DOC_FORM = 'bare';
 
+// THE LEDGER'S FORM SET (D198's recorded dissent, folded in — D200 ruling 4).
+//
+// The second form is NOT called `taught`, and that is the finding rather than a
+// naming preference. The other three families' second form ADDS teaching
+// chrome. The ledger's does not: it is the same four columns, drawn the way a
+// register is drawn — the movement label at the TOP of its band, under the rule
+// that opens the band, and the bands sharing the whole sheet.
+//
+// THE DISSENT IT IMPLEMENTS, verbatim in effect: the dissenting engineer held
+// that `.ledger-name`'s `align-items:flex-end` is the ROOT CAUSE of the
+// row-growth pathology W5 capped, and that `ROW_GROWTH_CAP_PX` trades a
+// legibility debt for a whitespace debt. Both halves measured on the delivered
+// book (five movements, evals/proving-run): capped, the page prints 422.8px of
+// ink into a 733.2px sheet — 57.7% full, 310px of trailing white on the book's
+// closing spread, against §8's "full, never sparse". Uncapped WITH the labels
+// still bottom-aligned is the ~136px band that dropped every label 130px below
+// its column head. Uncapped with the labels at the TOP is neither: the label
+// sits against its own rule at every band height, so the cap has nothing left
+// to prevent.
+//
+// The cap therefore stays as `bare`'s property — `bare` is today's exact page
+// and keeps bottom alignment — and is simply not applied in `register`, where
+// the alignment that earned it is gone. `ROW_GROWTH_CAP_PX` remains the rewind
+// seam D198 named it.
+export var VALID_LEDGER_SPREAD_FORMS = ['bare', 'register'];
+export var DEFAULT_LEDGER_SPREAD_FORM = 'bare';
+
 /**
  * THE FORM FAMILIES — every atom family that has a form set, with the unit its
  * shed is measured in.
@@ -956,7 +983,15 @@ export var ATOM_FORM_FAMILIES = [
   { id: 'oracleTable', label: 'oracle table', atomType: 'oracle-table',
     forms: VALID_ORACLE_TABLE_FORMS, defaultForm: DEFAULT_ORACLE_TABLE_FORM, unit: 'week' },
   { id: 'fragmentDoc', label: 'found document', atomType: 'fragment-doc',
-    forms: VALID_FRAGMENT_DOC_FORMS, defaultForm: DEFAULT_FRAGMENT_DOC_FORM, unit: 'fragment' }
+    forms: VALID_FRAGMENT_DOC_FORMS, defaultForm: DEFAULT_FRAGMENT_DOC_FORM, unit: 'fragment' },
+  // A SINGLETON FAMILY. The ledger is the closing spread: one instance per book
+  // (the adapter emits a second page only for a roster longer than one sheet,
+  // and those pages are one surface continued, not a second showing). There is
+  // no shedding arc to declare, so `singleton: true` — read by `formPlansFor()`
+  // below and by the gate — and `unit: 'book'`.
+  { id: 'ledgerSpread', label: 'ledger', atomType: 'ledger-spread',
+    forms: VALID_LEDGER_SPREAD_FORMS, defaultForm: DEFAULT_LEDGER_SPREAD_FORM,
+    unit: 'book', singleton: true }
 ];
 
 /**
@@ -987,6 +1022,38 @@ export var VALID_FORM_PLANS = [
   'bare-throughout', 'taught-shed-early', 'taught-shed-mid', 'taught-throughout'
 ];
 export var DEFAULT_FORM_PLAN = 'bare-throughout';
+
+/**
+ * formPlansFor(family) -> the plan menu THIS family may declare.
+ *
+ * A `singleton: true` family (the ledger — one closing spread per book) has no
+ * timeline to shed across, so the shed plans are not offered: a shed plan must
+ * PRINT BOTH FORMS (resolveFormPlan's clamp + the gate's own assertion), and a
+ * single instance structurally cannot — a model declaring `taught-shed-mid`
+ * for the ledger would be declaring a rhythm nothing can perform. AMBIGUITY
+ * DEFAULTS TO LAW: the menu is narrowed at the source, and every reader (the
+ * floor, the die row, the resolver, the prompt, the structured schema) takes
+ * it from here rather than from VALID_FORM_PLANS directly. Accepts a family id
+ * or a family row.
+ *
+ * BOTH RETURN VALUES ARE THE EXPORTED ARRAYS THEMSELVES, never copies — the
+ * D124 by-reference tooth in validate.mjs checks IDENTITY_AXES menus against
+ * this file's exported enums by identity, which is exactly the discipline that
+ * keeps a die's menu from drifting off the transport's acceptance set.
+ */
+export var VALID_FORM_PLANS_SINGLETON = VALID_FORM_PLANS.filter(function (p) {
+  return p.indexOf('shed') === -1;
+});
+
+export function formPlansFor(family) {
+  var row = family;
+  if (typeof family === 'string') {
+    for (var i = 0; i < ATOM_FORM_FAMILIES.length; i++) {
+      if (ATOM_FORM_FAMILIES[i].id === family) { row = ATOM_FORM_FAMILIES[i]; break; }
+    }
+  }
+  return (row && row.singleton) ? VALID_FORM_PLANS_SINGLETON : VALID_FORM_PLANS;
+}
 
 /**
  * What each plan MEANS, byte-quoted into the prompt (the D124 idiom) and read
@@ -1053,7 +1120,11 @@ export function resolveAtomForms(spec) {
   for (var i = 0; i < ATOM_FORM_FAMILIES.length; i++) {
     var family = ATOM_FORM_FAMILIES[i].id;
     var plan = String(spec[family] == null ? '' : spec[family]).trim();
-    if (VALID_FORM_PLANS.indexOf(plan) === -1) continue;
+    // Membership is per-family (formPlansFor): a shed plan on a singleton is
+    // off-menu HERE too, so it is dropped like any other misauthored name —
+    // the family prints bare rather than silently acquiring a rhythm nothing
+    // can perform. The floor refuses it with the narrowed menu quoted.
+    if (formPlansFor(ATOM_FORM_FAMILIES[i]).indexOf(plan) === -1) continue;
     if (!out) out = {};
     out[family] = plan;
   }
@@ -1068,6 +1139,21 @@ export function resolveAtomForms(spec) {
  * reach three answers. `position` is 1-based in the family's own unit (the
  * week's `weekNumber`, or the fragment's printed ordinal).
  *
+ * THE PLAN NAMES POSITIONS, NOT FORMS. `resolveFormPlan` answers in the
+ * vocabulary the PLAN MENU is written in — `bare` and `taught` — because a plan
+ * describes a rhythm ("carry the extra form early, drop it later") and the
+ * rhythm is the same whatever the family calls its two forms. Three families do
+ * call the second one `taught`; the ledger's is `register`, because it adds no
+ * teaching chrome and re-draws the same four columns (D200-4).
+ *
+ * So the plan's answer is TRANSLATED here, through the family's own row, and
+ * this is the only place the two vocabularies meet. Returning `resolveFormPlan`'s
+ * literal was correct while every family used the same two words and silently
+ * wrong the moment one did not: `resolveLedgerSpreadForm('taught')` finds no
+ * such member and falls back to `bare`, so a book that declared
+ * `taught-throughout` on the ledger printed today's page and nothing said so —
+ * Hollow Success, caught by check-form-variants.mjs's own new ledger arm.
+ *
  * @returns {string} a member of the family's own form menu
  */
 export function atomFormForPosition(atomForms, family, position, span) {
@@ -1076,12 +1162,21 @@ export function atomFormForPosition(atomForms, family, position, span) {
     if (ATOM_FORM_FAMILIES[i].id === family) { row = ATOM_FORM_FAMILIES[i]; break; }
   }
   if (!row) return DEFAULT_SESSION_CARD_FORM;
+  // The family's own name for the form a plan calls `taught`: DERIVED from its
+  // menu (the one member that is not the default), never a second list.
+  var second = row.defaultForm;
+  for (var f = 0; f < row.forms.length; f++) {
+    if (row.forms[f] !== row.defaultForm) { second = row.forms[f]; break; }
+  }
+  var translate = function (planForm) {
+    return planForm === 'bare' ? row.defaultForm : second;
+  };
   var plan = atomForms && atomForms[family];
   if (!plan) return row.defaultForm;
   var resolved = resolveFormPlan(plan, span);
-  if (resolved.form === 'bare' || resolved.shedAfter === null) return resolved.form;
+  if (resolved.form === 'bare' || resolved.shedAfter === null) return translate(resolved.form);
   var n = (typeof position === 'number' && isFinite(position)) ? position : 1;
-  return n > resolved.shedAfter ? row.defaultForm : resolved.form;
+  return n > resolved.shedAfter ? row.defaultForm : translate(resolved.form);
 }
 
 // ── Artifact identity ────────────────────────────────────────────────────────
@@ -3068,7 +3163,10 @@ export var IDENTITY_AXES = [
     id: 'atomForm' + family.id.charAt(0).toUpperCase() + family.id.slice(1),
     label: 'arrangement.atomForms.' + family.id,
     path: 'meta.arrangement.atomForms.' + family.id,
-    menu: VALID_FORM_PLANS,
+    // Per-family menu (formPlansFor): the die must never assign a singleton a
+    // shed plan the resolver would drop and the floor would refuse — a menu
+    // wider than the family's own is an assignment nobody can obey.
+    menu: formPlansFor(family),
     kind: 'scalar',
     evidencePath: 'meta.arrangement.arrangementEvidence',
     stages: ['shell', 'skeleton']

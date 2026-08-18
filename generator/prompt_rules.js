@@ -872,9 +872,10 @@
         properties: {
           sessionCard: { type: 'string' },
           oracleTable: { type: 'string' },
-          fragmentDoc: { type: 'string' }
+          fragmentDoc: { type: 'string' },
+          ledgerSpread: { type: 'string' }
         },
-        required: ['sessionCard', 'oracleTable', 'fragmentDoc']
+        required: ['sessionCard', 'oracleTable', 'fragmentDoc', 'ledgerSpread']
       },
       arrangementEvidence: { type: 'string' }
     },
@@ -2569,12 +2570,18 @@
     '- `leitmotif` (REQUIRED): "none" | "rounded-chip" | "cut-corner" | "double-rule" — the one',
     '  gesture that repeats across all three axes above.',
     '- `atomForms` (REQUIRED, object): the FORM PLAN for each component the player writes on —',
-    '  how much teaching chrome it carries, and when it stops carrying it. Three keys, all',
-    '  REQUIRED: `sessionCard`, `oracleTable`, `fragmentDoc`. Each value is exactly one of:',
+    '  how much teaching chrome it carries, and when it stops carrying it. Four keys, all',
+    '  REQUIRED: `sessionCard`, `oracleTable`, `fragmentDoc`, `ledgerSpread`. For the first',
+    '  three, each value is exactly one of:',
     '  "bare-throughout" | "taught-shed-early" | "taught-shed-mid" | "taught-throughout".',
     '  The shed point is worked out from the length of YOUR book — you choose the rhythm, not',
     '  the week number, so one plan reads correctly whatever the block length turns out to be.',
-    '  State all three explicitly, including every "bare-throughout".',
+    '  `ledgerSpread` is ONE closing spread, so it has no timeline to shed across — its value is',
+    '  "bare-throughout" | "taught-throughout" only. Its taught form is not teaching chrome: it',
+    '  is the REGISTER drawing — movement labels top-aligned against the rule that opens each band,',
+    '  the bands sharing the whole page — the ledger drawn as a ledger rather than a table with',
+    '  leftover space. Choose it when the book\'s paperwork would keep a real register.',
+    '  State all four explicitly, including every "bare-throughout".',
     '- `arrangementEvidence` (REQUIRED, string, 1-2 sentences): the brief\'s own words these',
     '  choices came from. If you departed from an assignment you were given, name the value you',
     '  took here.',

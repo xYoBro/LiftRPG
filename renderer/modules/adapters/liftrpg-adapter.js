@@ -49,6 +49,10 @@ import { WEEK_FOOTER_HEIGHT_PX } from '../atoms/week-footer.js';
 // chunk size below and the atom's height model are one piece of arithmetic —
 // an over-long roster cannot become an unsat page.
 import { LEDGER_ROWS_PER_PAGE } from '../atoms/ledger-spread.js';
+// Same idiom for the teaching page (DR-37): the chunker is the atom's own
+// height model asked a different question, so the adapter cannot split at a
+// boundary the estimate would price differently.
+import { chunkRulesLeftBlocks } from '../atoms/rules-block.js';
 import {
   buildUnlockedEndingPageModel,
   resolveArtifactIdentity,
@@ -212,15 +216,43 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
   }));
 
   // ── Rules spread ────────────────────────────────────────────
-  atoms.push(createAtom({
-    type: 'rules-block', id: 'rules-left', group: 'rules',
-    section: 'front-matter', sequence: 0,
-    sizeHint: 'full-page', pageAffinity: 'left',
-    data: { side: 'left', data },
-  }));
+  //
+  // THE TEACHING PAGE'S SPLIT PATH (DR-37). `chunkRulesLeftBlocks()` returns
+  // ONE slice for every book whose procedure fits the page at the densest rung
+  // — which is every fixture in the corpus — so the single-chunk case emits
+  // exactly the atom this adapter always emitted, with `blocks` stamped and
+  // nothing else changed. The chunker only ever splits what shrinking provably
+  // cannot save; the arithmetic is the atom's own, imported rather than
+  // re-derived (the LEDGER_ROWS_PER_PAGE idiom).
+  //
+  // AFFINITY IS THE ORDER. Spreads pair `leftPages[i]` with `rightPages[i]` and
+  // print left before right, so a continuation with affinity `left` would land
+  // on the NEXT spread's left page and print AFTER the sealed page — the
+  // procedure's second half filed behind its own ceremony. Chunk 0 takes the
+  // left page and every continuation takes a right page, which puts them on
+  // consecutive PRINTED pages (empty page sides are not printed) with the
+  // sealed page last. That consecutiveness is what makes `'required'` the
+  // honest adjacency here rather than the ledger's `'ordered'`: a movement
+  // table can be read from either sheet, a procedure read out of sequence is a
+  // comprehension failure, and `'required'` is the only mode that reports one.
+  const rulesChunks = chunkRulesLeftBlocks(data);
+  rulesChunks.forEach((blocks, ci) => {
+    atoms.push(createAtom({
+      type: 'rules-block',
+      id: ci === 0 ? 'rules-left' : `rules-left-${ci}`,
+      group: 'rules',
+      section: 'front-matter', sequence: ci,
+      sizeHint: 'full-page',
+      pageAffinity: ci === 0 ? 'left' : 'right',
+      continuationOf: ci === 0 ? null : (ci === 1 ? 'rules-left' : `rules-left-${ci - 1}`),
+      continuationOrigin: ci === 0 ? null : 'adapter',
+      continuationAdjacency: ci === 0 ? null : 'required',
+      data: { side: 'left', data, blocks, continuation: ci > 0 },
+    }));
+  });
   atoms.push(createAtom({
     type: 'rules-block', id: 'rules-right', group: 'rules',
-    section: 'front-matter', sequence: 1,
+    section: 'front-matter', sequence: rulesChunks.length,
     sizeHint: 'full-page', pageAffinity: 'right',
     data: { side: 'right', data },
   }));
@@ -989,6 +1021,13 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
             partCount: ledgerPageCount,
             continuationLabel: li > 0 ? 'Continued' : '',
             economy,
+            // A SINGLETON FAMILY (ATOM_FORM_FAMILIES): the ledger is one
+            // surface per book, so there is no shedding arc and every page of a
+            // chunked roster wears the same form. Position 1 of span 1 — the
+            // resolver's own clamp then makes a declared shed rhythm resolve to
+            // its opening form, which is the arithmetic answer to "shed at the
+            // midpoint of a one-instance span", not a special case here.
+            formVariant: atomFormForPosition(atomForms, 'ledgerSpread', 1, 1),
           },
         }));
       }

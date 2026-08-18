@@ -1524,6 +1524,60 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   margin-bottom:5px;
 }
 
+/* ── THE PACKED RUNG (DR-37) ──────────────────────────────────────────────
+   THE RUNG BELOW THE STARTING RUNG. Every placement is created at density 0.6
+   (page-planner.js ESTIMATE_DENSITY) and the solver only ever RAISES density,
+   so `dense` above is where every book begins — which meant the ladder had no
+   room left and `atomShrinkPotential()` was zero for this atom whatever its
+   estimate said. This rung is the room.
+
+   REACHED ONLY BY THE SOLVER, at density ≥ 0.85, and only on a page that
+   measured over budget: no book starts here, so nothing that fits today moves
+   a pixel. It is a floor of last resort against a clip, and that trade is the
+   whole point — 6.6pt of procedure the reader can read beats 7.2pt with 49px
+   of it cut off the bottom of the page (measured, delivered book).
+
+   LADDER MIRROR — every number here is a row of `LADDER.packed` in
+   renderer/modules/atoms/rules-block.js, which carries the reverse pointer and
+   the derivation. Move one alone and phase-1 prices a rung the page does not
+   draw. */
+.rules-left[data-layout-variant="packed"]{
+  padding:2px 4px 0 4px;
+}
+.rules-left[data-layout-variant="packed"] .rules-title{
+  font-size:12.5pt;
+  margin-bottom:6px;
+}
+.rules-left[data-layout-variant="packed"] .rules-body{
+  font-size:6.6pt;
+  line-height:1.36;
+}
+.rules-left[data-layout-variant="packed"] .rules-body h3{
+  margin:6px 0 2px;
+}
+.rules-left[data-layout-variant="packed"] .rules-body p{
+  margin-bottom:4px;
+}
+.rules-left[data-layout-variant="packed"] .rules-section{
+  margin-bottom:5px;
+}
+.rules-left[data-layout-variant="packed"] .rules-orientation{
+  margin-bottom:7px;
+  padding-bottom:6px;
+}
+.rules-left[data-shell-family="classified-packet"][data-layout-variant="packed"] .rules-body{
+  font-size:5.9pt;
+  line-height:1.22;
+  column-gap:13px;
+}
+.rules-left[data-shell-family="classified-packet"][data-layout-variant="packed"] .rules-section{
+  margin-bottom:4px;
+}
+.rules-left[data-shell-family="classified-packet"][data-layout-variant="packed"] .rules-title{
+  font-size:11.6pt;
+  margin-bottom:4px;
+}
+
 /* Password Record (rules right) */
 .rules-right{
   padding:8px 8px 4px 8px;

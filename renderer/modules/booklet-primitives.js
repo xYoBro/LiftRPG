@@ -295,11 +295,18 @@ export function renderRulesLeftPage(model) {
   frame.setAttribute('data-shell-family', model.artifactIdentity && model.artifactIdentity.shellFamily || 'field-survey');
 
   const header = make('header', 'rules-header');
-  header.appendChild(make('span', '', 'Orientation'));
+  // `headerLabel` is how a CHUNKED rules page says it is the same document
+  // (DR-37). Absent on every unchunked page, so the string below is unchanged
+  // for every book that does not split.
+  header.appendChild(make('span', '', model.headerLabel || 'Orientation'));
   header.appendChild(make('span', 'page-num', ''));
   frame.appendChild(header);
 
-  frame.appendChild(make('h2', 'rules-title', model.title));
+  // A continuation page carries no title. Emitting an EMPTY h2 rather than none
+  // would still print its 10px margin and its line box — chrome the estimate
+  // did not charge for, which is the measurement-equals-render break this
+  // atom's whole DR-37 fix exists to close.
+  if (model.title) frame.appendChild(make('h2', 'rules-title', model.title));
 
   if (model.artifactIdentity && model.artifactIdentity.shellFamily === 'classified-packet') {
     frame.appendChild(renderClassifiedRulesCallout(model));
