@@ -3110,8 +3110,13 @@
     // `topology.mainMapType` and every later week reuses it (D144 W-2), so this
     // is the seat that owes the assignment. The doctrine rides
     // buildStageSchema('campaign-plan'); this is the per-run value.
+    // The evidence field this stage's one axis names (`meta.artifactIntent.
+    // selectionReason`) is on a surface this stage's schema does not contain —
+    // the campaign plan authors no `meta`. Said plainly, rather than printing a
+    // path the model cannot write beside a sentence saying it is checked.
     var assignmentBlock = (typeof window.formatSeedAssignmentBlock === 'function')
-      ? window.formatSeedAssignmentBlock(options.seedAssignments, options.identityAxes)
+      ? window.formatSeedAssignmentBlock(options.seedAssignments, options.identityAxes,
+        'the departure is recorded later, at the identity stage that authors `meta`')
       : '';
     return [
       '# API Stage 2 — Story Plan',
@@ -3229,9 +3234,14 @@
       '- Every rulesSpread.leftPage.sections entry MUST be exactly { heading, body } with both fields present and non-empty.',
       '- rulesSpread.rightPage MUST include title and instruction; do not rename them to heading/body/text.',
       '- passwordEncryptedEnding stays blank; trusted tooling seals it later.',
-      '- meta.weekCount MUST exactly equal ' + weekCount + '.',
-      '- meta.passwordLength MUST exactly equal ' + Math.max(0, weekCount - 1) + '.',
-      (options.totalSessions ? '- meta.totalSessions MUST exactly equal ' + options.totalSessions + '.' : ''),
+      // TOOLING-OWNED, SAID SO (2026-08-17). These three read as authoring
+      // demands — "MUST exactly equal 6" — for fields SCHEMA_META tells the
+      // same stage not to output, and which normalization writes and auto-fixes
+      // regardless (D21). A model reading both either emits them and is told
+      // off by the schema, or ignores a line that says MUST. Stated as what
+      // they are: numbers this stage should design against and not write.
+      '- meta.weekCount, meta.passwordLength and meta.totalSessions are injected by the tooling — do NOT output them. For your own planning: this book is ' + weekCount + ' weeks, its password is ' + Math.max(0, weekCount - 1) + ' characters'
+        + (options.totalSessions ? ', and it has ' + options.totalSessions + ' sessions' : '') + '. Design to those numbers; writing them is not your job.',
       '',
       '## Layer Codex Summary',
       compactJson(summarizeLayerBibleForShell(layerBible)),

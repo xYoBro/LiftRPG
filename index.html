@@ -3363,13 +3363,21 @@
               <span class="api-station-index">Step 4</span>
               <span class="api-station-title">How should it build?</span>
             </div>
-            <div class="api-station-copy">The default plans the whole booklet first, then writes each part against that plan — the most consistent result on most models. The timeout is how long LiftRPG waits before giving up on a single request; slow stages are allowed to take longer than this.</div>
+            <div class="api-station-copy">The default writes the book one part at a time, checking each part before it pays for the next — the most consistent result on most models. The timeout is how long LiftRPG waits before giving up on a single request; slow stages are allowed to take longer than this.</div>
             <div class="api-config-grid">
               <div class="api-field api-field--wide">
                 <label class="field-label" for="api-method">Build Method</label>
+                <!-- SKELETON+FLESH LEFT THE PRODUCT PATH (author-ratified, 2026-08-17).
+                     `generateSkeletonFlesh` is no longer offered and no longer sits in
+                     API_PIPELINE_METHODS, so nothing can dispatch it. The pipeline CODE
+                     is still in api-generator.js and still tested; excision is a
+                     scheduled follow-up wave. Why it left: it is the pipeline whose
+                     compiler seat carries no design-language doctrine, whose skeleton
+                     prompt omits demands its own gates enforce, and which the proving
+                     run does not use. Keeping it selectable meant maintaining two
+                     divergent seats and shipping the weaker one as the default. -->
                 <select class="api-select" id="api-method">
-                  <option value="generateSkeletonFlesh" selected>Plan the whole book first, then write it (recommended)</option>
-                  <option value="generateMultiStage">Write it straight through, part by part</option>
+                  <option value="generateMultiStage" selected>Write it part by part, checking as it goes (recommended)</option>
                   <option value="generateStructured">Let the provider lock the format</option>
                 </select>
               </div>
@@ -3904,8 +3912,10 @@
         // D173 plain language: this stage decides what the GAME is before any
         // content exists. The reader is told what it produces ("Game Design"),
         // never the internal pipeline name (`gameRulebook`, the stageKey below)
-        // — and deliberately never "Rules", which is the S+F card three rows
-        // down that writes the printed rules spread. Two different things.
+        // — and deliberately never "Rules", which was S+F's printed-rules-spread
+        // card. That rail retired with the pipeline (2026-08-17); the naming
+        // rule stays, because the two stages are still two different things and
+        // the S+F code is dormant, not deleted.
         gameRulebook: 'Game Design',
         layerBible: 'Foundation',
         campaignPlan: 'Booklet Plan',
@@ -3935,19 +3945,9 @@
           { key: 'endings', label: STAGE_LABELS.endings },
           { key: 'quality', label: STAGE_LABELS.quality }
         ],
-        generateSkeletonFlesh: [
-          // Keys are the pipeline's stageKey contract. Labels are what the
-          // reader sees on the rail, so they name booklet parts, not
-          // internal pipeline stages.
-          { key: 'gameRulebook', label: STAGE_LABELS.gameRulebook },
-          { key: 'skeleton', label: 'Book Plan' },
-          { key: 'knowing', label: STAGE_LABELS.knowing },
-          { key: 'rules', label: 'Rules Spread' },
-          { key: 'weeks', label: STAGE_LABELS.weeks },
-          { key: 'fragments', label: STAGE_LABELS.fragments },
-          { key: 'endings', label: STAGE_LABELS.endings },
-          { key: 'quality', label: STAGE_LABELS.quality }
-        ]
+        // generateSkeletonFlesh's rail retired with the option itself
+        // (2026-08-17). A rail for a pipeline nothing can select is a node that
+        // can never light up, which is the UI lie this table exists to prevent.
       };
       API_STAGE_ORDER_BY_PIPELINE.generateStructured = API_STAGE_ORDER_BY_PIPELINE.generateMultiStage;
 
@@ -3957,12 +3957,16 @@
       // API method names and are the contract — never rename a key. Labels
       // describe what the build does; the internal pipeline codenames stay
       // out of the interface (author directive, 2026-08-11).
+      // `generateSkeletonFlesh` left this table on 2026-08-17 with its option.
+      // The table is the DISPATCH SET, not an inventory of methods that exist:
+      // resolveApiMethod() falls back to the default for any value not keyed
+      // here, so a stale saved selection lands on multi-stage rather than
+      // reaching a pipeline the interface no longer offers.
       var API_PIPELINE_METHODS = {
-        generateSkeletonFlesh: 'a plan-first build.',
         generateMultiStage: 'a part-by-part build.',
         generateStructured: 'a provider-locked build.'
       };
-      var API_PIPELINE_DEFAULT = 'generateSkeletonFlesh';
+      var API_PIPELINE_DEFAULT = 'generateMultiStage';
 
       // ── The three doors ────────────────────────────────────────────────
       // A door is HOW THE MODEL IS REACHED. It is deliberately NOT a row in
@@ -4244,6 +4248,10 @@
           pricing: null,
           lastStageName: '',
           lastDetail: '',
+          // The blocking defects the last retry was triggered by, and the true
+          // total. Rendered on the stage card while the retry is in flight.
+          lastBlockingErrors: [],
+          lastBlockingCount: 0,
           completionSource: '',
           completedLocally: false,
           restoredFromCheckpoint: false
@@ -5652,6 +5660,18 @@
           var expectation = formatStreamExpectation(stageStream);
           var line = parts.join(' · ') + '.';
           if (expectation) line += ' ' + expectation;
+          // WHAT THE LAST ATTEMPT GOT WRONG. The card said a stage was on
+          // attempt 2 of 3 and nothing about why, so the operator's only real
+          // lever — stop, or let it spend — was pulled blind. Shown only while
+          // the retry is the current state of this card, and never invented:
+          // a transport failure records no defects and this stays silent.
+          var blocking = metrics.lastBlockingErrors || [];
+          if (blocking.length) {
+            var shown = blocking.length;
+            var total = Number(metrics.lastBlockingCount) || shown;
+            line += ' Last attempt was rejected for: ' + blocking.join(' · ')
+              + (total > shown ? ' (and ' + (total - shown) + ' more).' : '.');
+          }
           return line;
         }
         if (status === 'invalidated') {
@@ -9039,6 +9059,21 @@
                 var retryMetrics = apiRunState.stageMetrics[stageKey] || createApiStageMetrics();
                 apiRunState.stageMetrics[stageKey] = retryMetrics;
                 retryMetrics.lastStageName = meta.stageName || retryMetrics.lastStageName;
+                // WHAT FAILED, WHILE IT IS STILL RETRYING. Without this the
+                // reader watched a stage go quiet and escalate with no idea
+                // whether to stop it — the defect list only ever arrived after
+                // the run died, which is after every remaining attempt is paid
+                // for. Recorded only when the event carried one: a transport
+                // failure has no defect list, and an empty list is left empty
+                // rather than filled with a guess.
+                if (Array.isArray(meta.blockingErrors) && meta.blockingErrors.length) {
+                  retryMetrics.lastBlockingErrors = meta.blockingErrors.slice();
+                  retryMetrics.lastBlockingCount = Number(meta.blockingCount)
+                    || meta.blockingErrors.length;
+                } else {
+                  retryMetrics.lastBlockingErrors = [];
+                  retryMetrics.lastBlockingCount = 0;
+                }
               }
               applyApiNotice('warn', message, meta);
               renderApiRunState();
@@ -9056,6 +9091,13 @@
             apiRunState.progressCaption = settings._providerLabel + (settings.model ? ' · ' + settings.model : '') + ' · ' + formatTimeoutLabel(settings.requestTimeoutMs);
             if (phase === 'start') {
               apiRunState.stageIndex = stageIndex;
+              // A fresh stage owns no previous stage's rejections. Same rule as
+              // the heartbeat two lines up: a fact from the call that just
+              // ended must never sit under the next one.
+              if (stageKey && apiRunState.stageMetrics[stageKey]) {
+                apiRunState.stageMetrics[stageKey].lastBlockingErrors = [];
+                apiRunState.stageMetrics[stageKey].lastBlockingCount = 0;
+              }
               apiRunState.target = stageKey ? (API_STAGE_ORDER.filter(function (stage) { return stage.key === stageKey; })[0] || {}).label || 'Pipeline Stage' : 'Pipeline Stage';
               apiRunState.targetCaption = message;
               markApiStageInProgress(stageKey);

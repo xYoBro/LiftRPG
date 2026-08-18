@@ -36,6 +36,7 @@
     '- `economy` (object): { currencyId, currencyLabel }. The single thing the workout pays out. Declared once here; every session markStrip earns it and every week reckoning spends it. Nothing else in the booklet is a tick currency.',
     '  * `currencyId` (string): the machine slug — lowercase, hyphen-separated, stable for the life of the booklet. Never printed on any page. Tooling cross-references it.',
     '  * `currencyLabel` (string): the printed name, in the world\'s own accounting language. It should be a noun this trade, house, office, watch, or congregation already counts — an operational residue with a ledger behind it, the same family of thing as `weeklyComponentType` but spendable. Never a game term bolted onto the fiction.',
+    '  * THE RULEBOOK\'S CURRENCY IS THIS BOOK\'S CURRENCY. If the rules given to you above name a currency, `currencyLabel` MUST be that phrase VERBATIM — character for character, no rewording, no expansion, no shortening. This is a blocking check. The rules teach the player one word and then every reckoning line in the book prints this field; two different words means the player is taught a currency they never see again. You are not choosing the name here, you are carrying it. Invent a label ONLY when the rules named none.',
     '  * ANTI-SAMENESS: the label must derive from THIS brief. A currency that could be lifted unchanged into any other booklet — Supply, Scrip, Credits, Points, Resolve, Favor — is a differentiation defect, not a safe default. If two booklets built from different briefs could plausibly share the name, it is the wrong name for both.',
     '- `structuralShape` (object): { resolution, temporalOrder, narratorReliability, promptFragmentRelationship, shapeRationale }.',
     '  * Resolution: "closed" (mystery solved), "open" (ambiguity persists), "shifted" (question changed), "costly" (resolved at a price), "full" (complete resolution), "partial" (some threads resolved), "ambiguous" (deliberately unclear).',
@@ -191,7 +192,16 @@
     '  - Never put instructions, worked examples, or prose in `style`. Those belong in `extractionInstruction` or `characterDerivationProof`.',
     '  - `referenceTargets`: array of fragment IDs or map labels for cross-reference puzzles',
     '- `extractionInstruction`: **HARD LIMIT: 200 characters maximum.** One or two sentences only.',
-    '- `type` should name a specific technique such as substitution, reverse-alphabet, grid-filter, index-extraction, fragment-cross-reference, path-tracing, typographic-anomaly, numeric-sequence, contextual-question, or room-label-derivation',
+    // ONE VOCABULARY (2026-08-17). This line offered ten hyphenated
+    // technique NAMES; the planning stage that SCHEDULES the week's cipherType
+    // and the floor that counts distinct techniques both work in the FAMILY
+    // framing (constraint logic, spatial route reading, fragment
+    // cross-reference, pattern recognition, typographic anomaly, observational
+    // anomaly hunting, metapuzzle assembly, process deduction). Two vocabularies
+    // for one field is how a plan that scheduled six distinct families arrives
+    // as six weeks the variety floor cannot tell apart. The keep-the-family
+    // instruction is unchanged: the plan decides, this stage executes.
+    '- `type` names the cipher technique, in the SAME family vocabulary the plan used: constraint logic, spatial route reading, fragment cross-reference, pattern recognition, typographic anomaly, observational anomaly hunting, metapuzzle assembly, or process deduction. If the plan assigned this week a technique, KEEP IT — the variety floor counts families across the whole book and one week drifting to another family can put the book under its floor.',
     '- Ciphers yield fiction-native values only. The boss page handles value-to-letter decoding.',
     '- Cipher body displayText should present the puzzle cleanly — no "thinking out loud" about the method, no self-referential explanations of how to solve it.',
     '',
@@ -1644,19 +1654,37 @@
     '- The design bias is a structural scaffold. The brief is the voice. Never let the scaffold drown the voice.'
   ];
 
+  // TWO HALVES, ONE PER SEAT (2026-08-17). This section rides the CAMPAIGN PLAN
+  // and the identity stage, and its first line said "write `meta.worldContract`
+  // before anything else" — at the campaign plan, which runs BEFORE the identity
+  // stage exists and whose output carries no `meta`. Unfollowable there, and it
+  // sat above the roster discipline that IS true there, so the true half read as
+  // conditional on the impossible one.
+  //
+  // Split by what each seat can actually do: the ROSTER DISCIPLINE binds at
+  // planning (the plan is where the nouns are committed to and every later stage
+  // reuses them); the FIELD is written at the one stage that authors meta.
   window.INST_WORLD_CONTRACT = [
     '## World Contract & Core Noun Roster',
-    '- Write `meta.worldContract` before anything else. This is your bible.',
-    '- Inside the `worldContract` string, you MUST define a **Core Noun Roster**: a list of 8-12 fiercely specific people, places, departments, and objects.',
+    '- THE ROSTER, at every stage that plans or writes: define a **Core Noun Roster** — 8-12 fiercely specific people, places, departments and objects — and work from it. This is your bible whether or not this stage is the one that writes it down.',
     '- EVERY single cipher, map node, fragment, boss mechanism, and oracle entry MUST explicitly reference at least one item from the Core Noun Roster.',
     '- Do not invent stray lore later. If a noun is important enough to be a puzzle solution or a map endpoint, it must be established in the roster.',
-    '- This creates extreme holistic continuity. The world must feel airtight and relentlessly cross-referenced.'
+    '- This creates extreme holistic continuity. The world must feel airtight and relentlessly cross-referenced.',
+    '- THE FIELD, at the identity stage only: `meta.worldContract` is where the contract and its roster are written down, before anything else in that stage. If this stage\'s output schema has no `meta`, it does not write that field — carry the roster in the world material this stage DOES author, and do not invent a `meta` key your schema will reject.'
   ];
 
   window.INST_STORY_ENGINE = [
     '## Story Engine First, Then JSON',
     '- Before writing fields, determine your story engine: genre/tone, layered setting, protagonist role, core want, core need, flaw, wound, relationship web, antagonist pressure, secret, midpoint shift, darkest moment, resolution mode, recurring object, recurring place, recurring motif.',
-    '- Capture the essential arc in `meta.storySpine` (5 sentences max: premise, protagonist drive, central tension, midpoint shift, final cost). This is your anchor — refer back to it when writing every session prompt, fragment, and ending.',
+    // STAGE-CONDITIONAL (2026-08-17). This line named `meta.storySpine` flatly,
+    // and this section rides TWO stages: the identity stage (which authors
+    // `meta`) and the layer codex (whose output schema is
+    // storyLayer/gameLayer/governingLayer and contains no `meta` at all). At
+    // the codex the instruction was unfollowable — obey and emit a key the
+    // schema rejects, or ignore a line that reads as mandatory.
+    '- Capture the essential arc in five sentences max: premise, protagonist drive, central tension, midpoint shift, final cost. This is your anchor — refer back to it when writing every session prompt, fragment, and ending.',
+    '  * If this stage\'s schema has `meta`, that arc goes in `meta.storySpine`.',
+    '  * If it does not — the layer-codex stage authors `storyLayer` and no `meta` — the arc IS `storyLayer.premise` plus the protagonist and midpoint fields around it. Write it there. Never add a `meta` key your output schema does not contain; it will be rejected.',
     '- The week prompts, fragments, rules spread, boss page, and endings must all feel like consequences of the same story engine.'
   ];
 
@@ -2924,9 +2952,24 @@
    * silent under exactly the same condition, and that pairing is the contract:
    * a stage never checks an assignment it was not shown.
    */
-  window.formatSeedAssignmentBlock = function (assignments, axes) {
+  // `deferEvidenceTo` (optional): where the departure is recorded when THIS
+  // stage cannot write the evidence field itself.
+  //
+  // THE DEFECT IT CLOSES (2026-08-17). The mapGeometry axis names
+  // `meta.artifactIntent.selectionReason` as its evidence field and is dealt at
+  // the CAMPAIGN PLAN — a stage whose output schema contains no `meta` at all.
+  // So the block printed "evidence field: meta.artifactIntent.selectionReason"
+  // into a prompt for a stage physically unable to write it, above a paragraph
+  // saying the citation is CHECKED and a stage fails without it. A model that
+  // believed it had two moves: obey and be unable to comply, or invent a `meta`
+  // key its schema rejects. Both cost a retry, and the honest instruction — the
+  // departure is recorded downstream, at the seat that authors meta — was never
+  // given. The axis row is untouched: the evidence field is right, the SEAT for
+  // writing it is what differs.
+  window.formatSeedAssignmentBlock = function (assignments, axes, deferEvidenceTo) {
     if (!assignments || typeof assignments !== 'object') return '';
     if (!Array.isArray(axes) || !axes.length) return '';
+    var deferred = String(deferEvidenceTo || '').trim();
     var rows = [];
     for (var i = 0; i < axes.length; i++) {
       var axis = axes[i];
@@ -2935,14 +2978,23 @@
       rows.push('- ' + axis.label + ' IS `' + value + '` — evidence field: `' + axis.evidencePath + '`');
     }
     if (!rows.length) return '';
-    return [
+    var head = [
       '### The assignments for THIS book',
       '',
       'Drawn from this book\'s run seed, across each full menu, before you saw the brief. Each',
       'line is a GIVEN. Write it exactly — or write something else and, in the evidence field',
-      'named on that line, NAME the value you took and quote the brief phrase that required it.',
-      ''
-    ].concat(rows).join('\n');
+      'named on that line, NAME the value you took and quote the brief phrase that required it.'
+    ];
+    if (deferred) {
+      head = head.concat([
+        '',
+        'THIS STAGE DOES NOT WRITE THOSE EVIDENCE FIELDS — its output schema has no place for',
+        'them, so do not try to add one. Take the assignment, or depart from it; ' + deferred + '.',
+        'What is asked of you here is the VALUE. If you depart, say why in the field this',
+        'stage does have for saying why, and the departure will be recorded where it belongs.'
+      ]);
+    }
+    return head.concat(['']).concat(rows).join('\n');
   };
 
   /**
@@ -3252,6 +3304,47 @@
     '   worksheet.',
     '8. THE TEACHING ORDER. What the player must know before their first set, what can wait until',
     '   week two, and what should only be explained at the moment it is needed.',
+    '',
+    // ── THE DESIGNER'S SEAT LEARNS THE LAWS (2026-08-17) ──────────────────
+    // THE RUN-KILLER THIS CLOSES. This stage runs FIRST and everything after it
+    // is built to serve what it ratifies — but it was taught none of the laws
+    // the LATER seats are floored on. So it could ratify, in ordinary prose, a
+    // threshold-gated win condition; the spine seat would then be forbidden by
+    // Floor 11a to wire the design it had been handed, parity would demand it
+    // wire it anyway, and the repair router would send the fix to a stage
+    // already banked. That is a dead end, not a retry, and it is what the
+    // proving run hit.
+    //
+    // Stated in the GATES' OWN TERMS and aimed at Q1 and Q4, which is where the
+    // designs that break them are written. This is the two-halves law applied
+    // one seat EARLIER than usual: the floors still live at the spine seat, but
+    // the seat that can still avoid them is this one.
+    '### THE LAWS YOUR DESIGN MUST OBEY',
+    'These are not style notes. Every one is enforced by a blocking check on the stage that turns',
+    'your answers into the machine\'s graph, so a design that breaks one cannot be built — the next',
+    'stage will be forbidden to wire what you ratified here, and it cannot come back and ask you to',
+    'change it. Answers 1 and 4 are where these bite.',
+    '',
+    '1. THE TALLY PICKS WHICH ENDING, NEVER WHETHER. The player\'s final total may decide which',
+    '   ending they reach and what state they carry into it. It may never decide whether the sealed',
+    '   ending opens, whether the last week happens, or whether the password can be assembled at',
+    '   all. A win condition that reads "reach N and the finale unlocks" is refused. Write it as',
+    '   "reach N and you finish THIS way; short of it you finish ANOTHER way" — at least one ending',
+    '   must be reachable without clearing the threshold.',
+    '2. THE BOOK MUST BE WINNABLE AT 60% ADHERENCE. Assume a player who completes six of every ten',
+    '   prescribed sessions, in the worst pattern of misses. That player must still finish the book',
+    '   and open the sealed ending. Everything you price, gate or require has to be affordable on',
+    '   that budget. Design for the player who has a life, not the one who never misses.',
+    '3. THE ENDGAME IS A TARGET, NEVER A PURCHASE. The last week, the confrontation and the password',
+    '   assembly are what the book aims at. They are never bought, never priced, never behind a',
+    '   toll. Price the things that LEAD there instead.',
+    '4. FAILURE ONLY ADDS. A missed session, a failed roll or a wrong guess may add pressure, add a',
+    '   complication, or close one route while opening another. It may never take away what the',
+    '   player already earned, and it may never make the ending unreachable. A pencil book has no',
+    '   undo, and a player who cannot recover stops playing.',
+    '5. THE DICE NEVER TOUCH THE TRAINING. Randomness decides what the world does — never what the',
+    '   player lifts, how many sets they owe, or whether the work they did counted. The training is',
+    '   the one thing in this book that is not a die roll, which is why marking it means anything.',
     '',
     '### Where the design comes from',
     'Your own knowledge of games — board games, video games, escape rooms, puzzle books, solo',
@@ -3726,8 +3819,13 @@
     '  a region, a gate, a table. Adjectives are not differences.',
     '- `tensionBudget` (array, one row per week): `{ week, scarce?, losable?, fallBehind? }`.',
     '  At least ONE axis named per week. Leaving an axis out is a declaration that this week',
-    '  has none of it, which is a legitimate thing to say — a deload week often has exactly',
-    '  one. All three empty is a week with nothing at stake.',
+    '  has none of it, which is a legitimate thing to say. All three empty is a week with',
+    '  nothing at stake — and is rejected on every week EXCEPT a planned deload.',
+    '  THE DELOAD IS THE EXHALE, NEVER FILLER. On a week the program plans as a deload, all',
+    '  three axes empty is the correct answer when the training removed the pressure: the',
+    '  emptiness is the declaration, and the row is still written. Never invent a scarcity a',
+    '  deload does not have in order to fill the row — a fabricated axis tells the player to',
+    '  feel pressure in the one week the program deliberately took it away.',
     '- `difficultyCurve` (object): `{ keyedToLoad, shape, perWeek }`. `keyedToLoad` is a',
     '  boolean: true when the puzzles harden as the lifts do, false when the brief warrants',
     '  something else. False is a real answer, not a failure — say what the curve does',
@@ -3840,7 +3938,9 @@
     '  so a price in marks is a number the machine can check against what a player at realistic',
     '  adherence will actually have. The page still says "two Relief"; this says how many marks',
     '  that is. Price the edges OUT of `banked`. Never price the edge into `boss` or `assembly`',
-    '  — that gate is the derived reckoning threshold and it already has a number.',
+    '  — the endgame is a TARGET the player aims at, never a lock they buy through. WHETHER the',
+    '  boss happens and the assembly completes is not for sale, and the reckoning threshold does',
+    '  not gate it either: it decides WHICH ending. Price the spends that LEAD there.',
     '- `closesAtWeek` — the last week an affordance can be taken. Without one, nothing in a',
     '  pencil book ever expires and hoarding costs nothing. One or two real windows is what',
     '  makes saving a decision.',
@@ -3966,7 +4066,19 @@
     '',
     '### The play kit (hard constraint on anything the page asks for)',
     'The complete kit is THREE OBJECTS: this book, a pencil, and two ten-sided dice.',
-    'No scissors, no glue, no printer, no second sheet, no app, no screen, no other person.',
+    'No scissors, no glue, no printer, no second sheet, no other person.',
+    // THE DICE ARE FUNGIBLE; THE SYSTEM IS NOT (VISION §3, ratified 2026-08-13).
+    // This sentence used to read "no app, no screen" as an absolute, which
+    // directly contradicted INST_RULES_TEACH twelve hundred lines down —
+    // that section MANDATES the rules spread tell a player without dice to ask
+    // for a d100. One of the two had to be wrong and the vision says which:
+    // two d10s are the canonical INSTRUMENT, never an equipment requirement.
+    // No purchase stands between a printed book and the first session.
+    'ONE EXCEPTION, AND ONLY THIS ONE: the randomness source may be a screen. Two d10 are the',
+    'canonical instrument, not a purchase the player must make — saying "roll a d100" to any',
+    'assistant, or tapping any dice app, is the same engine and most players will play exactly',
+    'that way. Everything ELSE the page asks for must be performable with the book and the',
+    'pencil alone. The book itself never requires a screen; the randomness source may be one.',
     'Every instruction you write must be performable with those three things and nothing',
     'else. Marking, writing, tracing, circling, crossing out, shading, tallying, folding a',
     'corner to keep a place, and sealing by honour ("do not read this page until...") are',
@@ -4304,14 +4416,30 @@
     'validator; these seven questions are what it is going to ask.'
   ];
 
+  // ── SCOPED TO THE STAGES THAT ACTUALLY RUN IT (2026-08-17) ───────────────
+  // ROUTING: `week-final`, `fragment`, `ending` — three UNIT stages. Each is
+  // handed one week, one batch of documents, or one ending, and each returns
+  // exactly that. It never sees the assembled booklet.
+  //
+  // Five checks were deleted here, not reworded, because there is no longer any
+  // surface where they are true. They were BOOK-LEVEL cardinality and
+  // TOOLING-OWNED meta fields:
+  //   meta.weekCount === weeks.length          — `weeks` does not exist at a unit stage
+  //   meta.totalSessions equals the total       — same, and SCHEMA_META forbids
+  //   exactly one boss week exists and is final — a unit cannot count the book
+  //   theme.visualArchetype is a supported value — authored at the identity stage
+  // Normalization owns weekCount/totalSessions and auto-fixes them (D21), so
+  // even a stage that COULD emit them is told not to. They survived because the
+  // retired single-prompt bundle wrote the whole booklet in one call and they
+  // were true there; that surface is gone, and a check nobody can run teaches a
+  // model that this list is decorative — which is how the checks that DO bind
+  // get skimmed.
   window.INST_SELF_VERIFICATION = [
     '## Final Self-Verification',
-    '- meta.weekCount === weeks.length',
-    '- meta.totalSessions equals the actual session total',
-    '- theme.visualArchetype is one supported renderer value',
-    '- weeklyComponent.type matches meta.weeklyComponentType on non-boss weeks',
-    '- exactly one boss week exists and it is final',
-    '- exactly one binaryChoice exists and it is at the midpoint week',
+    'Every line below is about the unit you are writing NOW — this week, these documents, this',
+    'ending. Check them against your own output before you emit it.',
+    '- weeklyComponent.type matches the weeklyComponentType you were given, on a non-boss week',
+    '- if this week is the midpoint, it carries the book\'s one binaryChoice; if it is not, it carries none',
     '- interludes, if present, include title, reason, and body',
     '- overflow weeks include overflowDocument',
     '- documentType values come only from the supported list',
@@ -4329,7 +4457,12 @@
     '- story prompts contain zero gym/exercise metaphors — the workout is real, the fiction is fiction',
     '- boss decodingKey requires spatial or institutional knowledge, not simple arithmetic on weekly values',
     '- story voices are distinct across prompts and fragments',
-    '- the setting has public, working, hidden, and historical layers',
+    // BRANCHED FOR THE LIGHT BRIEF (the D135 class). The flat demand for four
+    // layers is an unbranched conjunctive mandate on a doctrine surface that
+    // reaches every brief class — and INST_ENVIRONMENT, twelve hundred lines
+    // up, explicitly licenses two layers for a light or comedic brief. A model
+    // reading both obeys the one that sounds like a check.
+    '- the setting carries the layer depth this brief warrants — four (public, working, hidden, historical) for a complex or serious brief, three for a medium one, two for a light, comedic or simple one. Forcing institutional depth a light brief did not ask for is a failure, not thoroughness',
     '- at least one scarcity surface persists across all non-boss weeks',
     '- the booklet includes at least one meaningful re-entry, revisitation, or changed-access payoff',
     '- at least three fragments have distinct linked functions: action-changing, interpretation-changing, and character-deepening',
@@ -4381,7 +4514,12 @@
     'Required sections (minimum 4):',
     '- Play cadence: what the player does each training session (workout -> oracle pull -> execute consequences -> read fragment -> mark board)',
     '- Map/board usage: how to annotate, what marks mean, when to update',
-    '- Oracle access: what triggers a pull, how to read results, how to execute consequence tags. Include: "All oracle tables use d100. No dice? Google roll d100."',
+    // Re-voiced to VISION §3's own words (2026-08-17). The old line named one
+    // vendor ("Google roll d100"), which reads as a product instruction inside
+    // the fiction and is narrower than the ratified law: ANY assistant or app
+    // is the same engine. The play-kit section above now carries the matching
+    // exception, so the two surfaces teach one rule instead of contradicting.
+    '- Oracle access: what triggers a pull, how to read results, how to execute consequence tags. Include, in the world\'s own voice: all oracle tables use d100 — no dice? say "roll a d100" to any assistant, or tap any dice app.',
     '- Clocks/trackers: what they are, when they advance, what happens when they fill or empty',
     'If the booklet carries a `percentile-stat` companion, one section MUST also teach it, in the world\'s own voice:',
     '- circle this week\'s value on the stat box before you roll',
@@ -5244,7 +5382,11 @@
       '',
       '## Fragment Registry — Clue Economy',
       '- Assign fragment IDs (F.01, F.02, ...) for every found document the booklet needs.',
-      '- Each entry: { id, title, documentType, author, revealPurpose, clueFunction, weekRef, sessionRef }.',
+      // `sessionRef` dropped 2026-08-17: no schema on either pipeline has ever
+      // carried that key, so the model was told to emit a field that does not
+      // exist. (The only `sessionRef` in the tree is a local variable in
+      // validation.js about session.fragmentRef — a different relation entirely.)
+      '- Each entry: { id, title, documentType, author, revealPurpose, clueFunction, weekRef }.',
       '- `clueFunction` is one of: "establishes" (baseline fact), "complicates" (contradicts or adds nuance),',
       '  "reveals" (answers a question or recontextualizes earlier evidence).',
       '- At least 3 fragments must be authored by named characters from the relationship web.',

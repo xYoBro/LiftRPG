@@ -80,8 +80,44 @@
 //                                                   # repeatable; loopback is
 //                                                   # always allowed anyway
 //
+// ── The inactivity watchdog ──────────────────────────────────────────────────
+// A hung child stalls a pipeline stage for as long as the client's own ceiling
+// allows, and on the streaming path the bridge itself hides the hang: the SSE
+// keepalive fires on a timer, not on child activity, so the client's 120s idle
+// guard (STREAM_IDLE_TIMEOUT_MS) is re-armed forever by a bridge whose child
+// has said nothing since it spawned. The only place that silence is visible is
+// here.
+//
+// The cap is on SILENCE, never on wall clock: a prose stage legitimately runs
+// many minutes, and a wall-clock cap would kill the healthy long runs this
+// transport exists to make affordable. Any byte from the child — stdout or
+// stderr — re-arms the window.
+//
+// One window covers BOTH request shapes, because the client's `stream` flag
+// changes only how the BRIDGE relays: the child is always spawned with
+// `--output-format stream-json --verbose --include-partial-messages`
+// (BASE_CLI_ARGS), so a one-shot request's child streams the same NDJSON frames
+// a streaming request's does — message_start, the deltas, message_delta,
+// result. Even the --json-schema path, which produces no TEXT deltas, emits
+// frames the bridge already counts as activity (input_json_delta and friends;
+// see handleFrame). A one-shot child that has said nothing for the whole window
+// is therefore hung, not working quietly.
+//
+// The default is deliberately generous — it fires on HUNG, never on slow. Raise
+// it with LIFTRPG_BRIDGE_IDLE_MS if a local CLI is ever seen backing off
+// silently for longer (its own upstream retries are the one plausible source of
+// a long silent gap); 0 disables the watchdog entirely. A kill is loud and
+// named either way, never a silent truncation.
+//
+// The failure is shaped as HTTP 502, chosen rather than 503: the client treats
+// 429/503 as a THROTTLE and waits without consuming a retry attempt (D160), and
+// a hung CLI is not a closed door — it is a retryable server fault that should
+// consume an attempt and escalate the stage budget like any other. 502 is
+// already retryable (`status >= 500` in runStreamingRequest), and the message
+// carries none of the throttle vocabulary isLikelyThrottleError scans for.
+//
 // Env: LIFTRPG_BRIDGE_PORT, LIFTRPG_BRIDGE_CLAUDE_BIN (path to the CLI; the
-// self-test points it at a fake), LIFTRPG_BRIDGE_VERBOSE=1.
+// self-test points it at a fake), LIFTRPG_BRIDGE_IDLE_MS, LIFTRPG_BRIDGE_VERBOSE=1.
 //
 // Ports: 8080 http-server · 8081 eval bench · 8082 playthrough auditor · 8090
 // is this bridge's, and it must stay out of the other three's way.
@@ -102,6 +138,23 @@ const VERBOSE = process.env.LIFTRPG_BRIDGE_VERBOSE === '1';
 // a fake CLI after the module has loaded, and a const here would silently spend
 // real subscription tokens during a test that claims to spend none.
 function claudeBin() { return process.env.LIFTRPG_BRIDGE_CLAUDE_BIN || 'claude'; }
+
+// How long the child may say NOTHING before the bridge stops it. Read at call
+// time for the same reason claudeBin() is: the self-test drives the real
+// watchdog through the real env knob rather than a copy of it.
+const DEFAULT_IDLE_MS = 300000;                 // 5 minutes of total silence
+// Grace between SIGTERM and SIGKILL. The CLI gets a chance to exit cleanly; a
+// child that ignores the signal still dies, because the whole point is that
+// nothing is left spending the subscription with nobody reading its output.
+const KILL_GRACE_MS = 2000;
+
+function idleWatchdogMs() {
+  const raw = process.env.LIFTRPG_BRIDGE_IDLE_MS;
+  if (raw === undefined || raw === '') return DEFAULT_IDLE_MS;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_IDLE_MS;
+  return parsed;                                 // 0 = disabled, on purpose
+}
 
 // Model ids the local CLI can resolve, and the ids /v1/models advertises.
 //
@@ -218,11 +271,37 @@ function originAllowed(origin) {
 // stripped from the CHILD's env: with one set, the CLI would bill the API
 // account instead of the subscription and the wave's premise would silently
 // evaporate. Reported at preflight rather than done quietly.
-function childEnv() {
+// ── THE STAGE'S OUTPUT CEILING REACHES THE CLI (2026-08-17) ──────────────────
+// THE DEFECT: `maxTokens` is the load-bearing half of every STAGE_BUDGETS row
+// (D97) — the ladder that escalates on a truncation retry, the reason a stage
+// that returns a whole unit can never be budgeted below the stage that wrote
+// it. The client sends it as `max_tokens` on every request. This bridge read
+// the body, used `messages`, `response_format`, `model` and `stream`, and
+// dropped `max_tokens` on the floor. So on the bridge door — the door the
+// proving run uses — the entire budget ladder was inert: every stage got
+// whatever ceiling the CLI defaults to, and a truncation retry "escalated" to
+// the identical ceiling that had just truncated.
+//
+// THE MECHANISM. The installed CLI (2.1.233) exposes NO --max-tokens flag; the
+// ceiling is an environment variable, CLAUDE_CODE_MAX_OUTPUT_TOKENS, which the
+// binary does read (verified against the installed binary, not from memory).
+// So it rides childEnv rather than BASE_CLI_ARGS. If a future CLI grows a flag,
+// move it — a flag is visible in the spawn line and an env var is not.
+//
+// NOT a silent default: `maxTokens` unset means the caller expressed no ceiling
+// and the CLI's own default is the honest answer. Only a real number is
+// forwarded, and a non-positive one is ignored rather than passed through as a
+// ceiling of zero.
+function childEnv(maxOutputTokens) {
   const env = Object.assign({}, process.env);
+  // Subscription auth is the whole point (see the note above this function).
   delete env.ANTHROPIC_API_KEY;
   delete env.ANTHROPIC_AUTH_TOKEN;
   delete env.CLAUDE_CODE_OAUTH_TOKEN;
+  const ceiling = Number(maxOutputTokens);
+  if (Number.isFinite(ceiling) && ceiling > 0) {
+    env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = String(Math.floor(ceiling));
+  }
   return env;
 }
 
@@ -383,6 +462,19 @@ function rateLimitFromResult(frame, stderr) {
 // Anthropic stop_reason -> OpenAI finish_reason. The client normalizes from
 // there (FINISH_REASON_MAP), so 'length' is what makes a truncated stage
 // classify as truncation on the compat path.
+// ── THE ABSENT SIGNAL IS NOT A SUCCESS SIGNAL (2026-08-17) ──────────────────
+// '' maps to 'stop', which is the only defensible default: the client's
+// FINISH_REASON_MAP has no "unknown", and inventing 'length' would make every
+// missing frame look like a truncation and escalate a budget for no reason.
+//
+// But it is a GUESS, and it is the guess that hides the expensive failure. If
+// the CLI produced text and never emitted a stop_reason, a genuinely truncated
+// answer normalizes to success: the stage validator sees a short-but-parseable
+// body, classifies it as an ordinary schema failure, and stageBudget() hands
+// attempt 2 the exact ceiling that just truncated — the D97 wall, twice, at
+// full price. We cannot invent a signal the CLI did not send; what we can do is
+// refuse to be quiet about having guessed. `noteMissingStopReason` below is the
+// loud half.
 function toOpenAIFinishReason(stopReason) {
   switch (String(stopReason || '').toLowerCase()) {
     case 'max_tokens': return 'length';
@@ -393,6 +485,22 @@ function toOpenAIFinishReason(stopReason) {
     case '': return 'stop';
     default: return 'stop';
   }
+}
+
+// Text with no stop_reason is the masked-truncation case. Reported on stderr,
+// where the operator running the bridge in its own terminal will see it beside
+// the request line, and NOT shaped as an error: the response is still the best
+// answer available and refusing it would turn a suspicion into a dead stage.
+function noteMissingStopReason(stopReason, text, ctx) {
+  if (String(stopReason || '').trim()) return;
+  if (!String(text || '').length) return;
+  console.error('[bridge] WARNING: the CLI returned '
+    + String(text).length + ' chars with NO stop_reason'
+    + (ctx ? ' (' + ctx + ')' : '')
+    + '. Reporting finish_reason="stop" because there is no other honest default — but a '
+    + 'TRUNCATED answer is indistinguishable from a complete one here. If the stage that '
+    + 'made this call fails on schema shape, suspect truncation first: its retry will get '
+    + 'the same token ceiling, not an escalated one.');
 }
 
 function toOpenAIUsage(usage) {
@@ -416,7 +524,7 @@ function toOpenAIUsage(usage) {
 // Resolves { text, usage, stopReason, model, costUsd } or rejects with an Error
 // carrying `.rateLimited` / `.status` so the HTTP layer can shape it.
 
-function generate({ prompt, system, schema, model, onDelta, onActivity, onModel, onSpawn }) {
+function generate({ prompt, system, schema, model, maxTokens, onDelta, onActivity, onModel, onSpawn }) {
   return new Promise((resolve, reject) => {
     const args = BASE_CLI_ARGS.slice();
     const modelArgs = resolveModelArgs(model);
@@ -431,7 +539,9 @@ function generate({ prompt, system, schema, model, onDelta, onActivity, onModel,
 
     let child;
     try {
-      child = spawn(claudeBin(), args, { env: childEnv(), cwd: os.tmpdir() });
+      // The stage's own output ceiling (STAGE_BUDGETS, D97) rides the child's
+      // environment — see childEnv's header for why it is not a CLI flag.
+      child = spawn(claudeBin(), args, { env: childEnv(maxTokens), cwd: os.tmpdir() });
     } catch (err) {
       const spawnErr = new Error('Bridge could not spawn the Claude Code CLI: ' + (err && err.message));
       spawnErr.status = 503;
@@ -454,10 +564,55 @@ function generate({ prompt, system, schema, model, onDelta, onActivity, onModel,
     function finishError(message, extra) {
       if (settled) return;
       settled = true;
+      clearWatchdog();
       const err = new Error(message);
       Object.assign(err, extra || {});
       reject(err);
     }
+
+    // ── The inactivity watchdog (see the header) ──────────────────────────────
+    // Armed at spawn, re-armed by every byte the child writes on either pipe,
+    // cleared the moment this call settles. A window of 0 means "no watchdog".
+    const idleMs = idleWatchdogMs();
+    let idleTimer = null;
+    function clearWatchdog() {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = null;
+    }
+    function armWatchdog() {
+      if (settled || !idleMs) return;
+      clearWatchdog();
+      idleTimer = setTimeout(onSilence, idleMs);
+    }
+    function onSilence() {
+      idleTimer = null;
+      if (settled) return;
+      // Report the window the way it was configured: a sub-second window
+      // (the self-test's) rounds to "0s" and reads like a bug in the report.
+      const windowLabel = idleMs >= 1000 ? Math.round(idleMs / 1000) + 's' : idleMs + 'ms';
+      log('no output from the Claude Code CLI for ' + windowLabel + ' — stopping it');
+      // Kill FIRST, answer second: the caller must never be told the call is
+      // over while a paid child is still running.
+      try { child.kill('SIGTERM'); } catch (_e) { /* already gone */ }
+      const hard = setTimeout(() => {
+        try { if (child.exitCode === null) child.kill('SIGKILL'); } catch (_e) { /* gone */ }
+      }, KILL_GRACE_MS);
+      if (hard.unref) hard.unref();
+      // Wording matters as much as the status. 'stalled' makes this retryable
+      // even on a path that loses the status code, and NOTHING here is throttle
+      // vocabulary ('rate limit', 'usage window', 'try again later', …) or
+      // truncation vocabulary — a stall is neither, and being read as either
+      // would send the pipeline down the wrong recovery.
+      finishError(
+        'Bridge: the Claude Code CLI produced no output for ' + windowLabel + ' and was stopped '
+        + '(the run stalled). Raise LIFTRPG_BRIDGE_IDLE_MS if this machine legitimately '
+        + 'needs longer.',
+        { status: 502, stalled: true }
+      );
+    }
+    // Armed from the spawn, so a child that never says a word at all is covered
+    // by the same window as one that goes quiet halfway through.
+    armWatchdog();
 
     function handleFrame(frame) {
       if (onActivity) onActivity();
@@ -510,7 +665,8 @@ function generate({ prompt, system, schema, model, onDelta, onActivity, onModel,
     }
 
     child.stdout.on('data', (chunk) => {
-      stdoutBuf += chunk;
+      armWatchdog();                 // BYTES are the liveness signal, not frames:
+      stdoutBuf += chunk;            // a half-written line is still a live child.
       let nl;
       while ((nl = stdoutBuf.indexOf('\n')) !== -1) {
         const line = stdoutBuf.slice(0, nl).trim();
@@ -519,12 +675,13 @@ function generate({ prompt, system, schema, model, onDelta, onActivity, onModel,
         try { handleFrame(JSON.parse(line)); } catch (_e) { debug('unparseable CLI line:', line.slice(0, 160)); }
       }
     });
-    child.stderr.on('data', (d) => { stderr += d; });
+    child.stderr.on('data', (d) => { armWatchdog(); stderr += d; });
     child.on('error', (err) => finishError(
       'Bridge could not run the Claude Code CLI: ' + (err && err.message), { status: 503 }
     ));
 
     child.on('close', (code) => {
+      clearWatchdog();
       if (settled) return;
       if (!rateLimit) rateLimit = rateLimitFromResult(resultFrame, stderr);
       if (rateLimit) {
@@ -558,6 +715,10 @@ function generate({ prompt, system, schema, model, onDelta, onActivity, onModel,
         return finishError('Claude Code CLI returned no text content.', { status: 502 });
       }
       settled = true;
+      // The masked-truncation warning, at the one point both facts are in hand.
+      noteMissingStopReason(stopReason, text,
+        (maxTokens ? 'ceiling ' + maxTokens + ' tokens' : 'no ceiling requested')
+        + (schema ? ', schema-forced' : ''));
       resolve({
         text,
         usage: toOpenAIUsage(usage),
@@ -675,6 +836,10 @@ async function handleChatCompletions(req, res) {
   const rf = body.response_format || {};
   const schema = (rf.type === 'json_schema' && rf.json_schema && rf.json_schema.schema) || null;
   const wantsStream = !!body.stream;
+  // THE STAGE'S OUTPUT CEILING, honored rather than dropped. Every request the
+  // client makes carries the STAGE_BUDGETS row's maxTokens here; before this it
+  // was read by nothing, so the D97 ladder did not exist on this door.
+  const maxTokens = Number(body.max_tokens) > 0 ? Number(body.max_tokens) : 0;
   const id = 'bridge-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
   const created = Math.floor(Date.now() / 1000);
   let child = null;
@@ -688,7 +853,7 @@ async function handleChatCompletions(req, res) {
 
   if (!wantsStream) {
     try {
-      const out = await generate({ prompt, system, schema, model: body.model, onSpawn });
+      const out = await generate({ prompt, system, schema, model: body.model, maxTokens, onSpawn });
       return sendJson(req, res, 200, {
         id,
         object: 'chat.completion',
@@ -736,7 +901,7 @@ async function handleChatCompletions(req, res) {
   try {
     openStream();
     const out = await generate({
-      prompt, system, schema, model: body.model, onSpawn,
+      prompt, system, schema, model: body.model, maxTokens, onSpawn,
       onActivity: touch,
       onModel: (resolved) => { model = resolved; },
       onDelta: (delta) => frame({
@@ -868,6 +1033,40 @@ process.stdin.on('end', () => {
     w({ type: 'result', subtype: 'success', is_error: false, result: modelArg, stop_reason: 'end_turn', usage: {} });
     process.exit(0);
   }
+  // ── The watchdog scenarios ───────────────────────────────────────────────
+  // 'hang' says nothing at all and never exits — the one-shot shape of a hung
+  // child, and the case no client-side guard can see (the bridge's own SSE
+  // keepalive re-arms the client's idle window forever).
+  if (s === 'hang') {
+    setTimeout(() => process.exit(0), 120000);
+    return;
+  }
+  // 'hang-mid' speaks, then goes silent forever: the watchdog must re-arm on
+  // real bytes and still fire on the silence that follows them.
+  if (s === 'hang-mid') {
+    w({ type: 'stream_event', event: { type: 'message_start', message: { model: 'claude-fake-1' } } });
+    w({ type: 'stream_event', event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: '{"partial":' } } });
+    setTimeout(() => process.exit(0), 120000);
+    return;
+  }
+  // 'slow-stream' is the arm that keeps the watchdog honest: a child that takes
+  // far longer than the window overall, but never goes quiet inside it, must
+  // finish untouched. This is the "long prose stage" a wall-clock cap kills.
+  if (s === 'slow-stream') {
+    let n = 0;
+    const iv = setInterval(() => {
+      n++;
+      w({ type: 'stream_event', event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'x' } } });
+      if (n >= 10) {
+        clearInterval(iv);
+        w({ type: 'stream_event', event: { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { input_tokens: 2, output_tokens: 10 } } });
+        w({ type: 'result', subtype: 'success', is_error: false, result: 'ignored', stop_reason: 'end_turn',
+            usage: { input_tokens: 2, output_tokens: 10 } });
+        process.exit(0);
+      }
+    }, 120);
+    return;
+  }
   w({ type: 'stream_event', event: { type: 'message_start', message: { model: 'claude-fake-1' } } });
   // Text-only exhaustion: no rate_limit_event at all, only the CLI's prose.
   // This scenario is what proves the fallback, so it must NOT emit the
@@ -925,7 +1124,22 @@ async function selfTest() {
   fs.chmodSync(fake, 0o755);
   process.env.LIFTRPG_BRIDGE_CLAUDE_BIN = fake;
 
-  const classify = await import('../public/generator/modules/error-classify.js');
+  // ONE FILE, TWO HOMES (D189): this script ships byte-identical in the private
+  // repo (scripts/, beside public/) and the public repo (scripts/, beside
+  // generator/) — build:gold-disk copies it verbatim. Probe both layouts so the
+  // copy needs no path rewrite; a rewrite step is how the copies drifted a
+  // whole watchdog apart.
+  const classifyCandidates = [
+    '../public/generator/modules/error-classify.js',
+    '../generator/modules/error-classify.js'
+  ];
+  let classify = null;
+  for (const candidate of classifyCandidates) {
+    try { classify = await import(candidate); break; } catch (e) {
+      if (e && e.code !== 'ERR_MODULE_NOT_FOUND') throw e;
+    }
+  }
+  if (!classify) throw new Error('self-test cannot locate error-classify.js from either repo layout');
 
   const server = createServer();
   await new Promise((r) => server.listen(0, HOST, r));
@@ -1147,6 +1361,183 @@ async function selfTest() {
   }
   ok('a full claude-* id reaches the CLI verbatim',
     (await echoModel('claude-sonnet-4-5')) === 'claude-sonnet-4-5');
+
+  // 10. THE INACTIVITY WATCHDOG. A hung child is the failure with no other
+  // reader: the client's idle guard is re-armed by the bridge's own keepalive,
+  // and the one-shot path has nothing but the stage's wall-clock ceiling. Every
+  // request below is bounded by its own abort signal, so a watchdog that never
+  // fires FAILS here rather than hanging the self-test.
+  const priorIdle = process.env.LIFTRPG_BRIDGE_IDLE_MS;
+  process.env.LIFTRPG_BRIDGE_IDLE_MS = '400';
+  // The whole exchange — request AND body read — is inside the bound, because
+  // a stream's headers land immediately and only the BODY hangs: bounding the
+  // fetch alone would let a broken watchdog throw past the assertions instead
+  // of failing them.
+  const bounded = async (label, body, scenario) => {
+    process.env.BRIDGE_TEST_SCENARIO = scenario;
+    try {
+      const res = await fetch(base + '/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(8000)
+      });
+      return { status: res.status, text: await res.text() };
+    } catch (err) {
+      ok(label, false, 'never answered: ' + (err && err.message));
+      return null;
+    }
+  };
+  const sseFrames = (text) => text.split('\n')
+    .filter((l) => l.startsWith('data: ') && l.indexOf('[DONE]') === -1)
+    .map((l) => JSON.parse(l.slice(6)));
+
+  // 10a. One-shot: a child that says nothing at all.
+  const hung = await bounded('a hung one-shot child is stopped and answered',
+    { model: 'default', messages: msg }, 'hang');
+  if (hung) {
+    const hungBody = JSON.parse(hung.text);
+    const hungMessage = (hungBody.error || {}).message || '';
+    ok('a hung one-shot child is stopped and answered', hung.status === 502, 'got ' + hung.status);
+    ok('the stall answer names the silence and the knob',
+      /no output for \d+(?:ms|s)\b/.test(hungMessage) && /LIFTRPG_BRIDGE_IDLE_MS/.test(hungMessage),
+      hungMessage);
+    // The shaping, read by the real classifier. A stall must be RETRYABLE (the
+    // stage burns an attempt and escalates) and must NOT be a throttle — 503
+    // here would make the pipeline sit in a backoff wait for a door that is not
+    // closed, consuming no attempt and never converging.
+    const stallErr = new Error('API error: ' + hungMessage);
+    stallErr.status = hung.status;
+    if (hung.status === 429 || hung.status >= 500) stallErr.retryable = true;
+    ok('a stall classifies as retryable', classify.shouldRetryStageError(stallErr) === true);
+    ok('a stall is NOT classified as a throttle', classify.isLikelyThrottleError(stallErr) === false,
+      'a throttle waits without consuming an attempt — a hung CLI must consume one');
+    ok('a stall is NOT classified as truncation', classify.isLikelyTruncationError(stallErr) === false);
+    ok('a stall does NOT send the stage to the freeform fallback',
+      classify.shouldFallbackFromStructured(stallErr) === false);
+  }
+  // Nothing may be left spending the subscription after the answer.
+  for (let i = 0; i < 60 && liveChildren.size; i++) await new Promise((r) => setTimeout(r, 50));
+  ok('the stopped child is really dead', liveChildren.size === 0, liveChildren.size + ' still live');
+
+  // 10b. Streaming, silent from the start: the failure rides an error frame,
+  // which readOpenAICompatStream already marks retryable.
+  const hungStream = await bounded('a hung streaming child emits an error frame',
+    { model: 'default', messages: msg, stream: true }, 'hang');
+  if (hungStream) {
+    const hungSse = hungStream.text;
+    const hungFrame = sseFrames(hungSse).find((p) => p.error);
+    ok('a hung streaming child emits an error frame', !!hungFrame, hungSse.slice(0, 120));
+    ok('the streamed stall is not dressed as a rate limit',
+      !!hungFrame && hungFrame.error.type === 'bridge_error',
+      hungFrame ? hungFrame.error.type : 'no frame');
+  }
+
+  // 10c. Streaming that spoke and then went quiet — the watchdog re-arms on
+  // real bytes, so this proves it fires on silence AFTER activity, not merely
+  // on a child that never started.
+  const midHang = await bounded('a stream that goes silent mid-response is stopped',
+    { model: 'default', messages: msg, stream: true }, 'hang-mid');
+  if (midHang) {
+    const midHangSse = midHang.text;
+    const midHangFrame = sseFrames(midHangSse).find((p) => p.error);
+    ok('a stream that goes silent mid-response is stopped', !!midHangFrame,
+      midHangSse.slice(0, 160));
+    ok('the partial text it did send still reached the client',
+      midHangSse.includes('{\\"partial\\":') || midHangSse.includes('{"partial":'));
+  }
+
+  // 10d. THE ANTI-VACUITY ARM. A watchdog that kills healthy long runs is worse
+  // than none: this child takes ~1.2s against a 400ms window and must survive,
+  // because it never goes quiet for a whole window. This is the assertion that
+  // fails if the timer stops being re-armed by child bytes.
+  const slow = await bounded('a slow but talking child is NOT killed',
+    { model: 'default', messages: msg, stream: true }, 'slow-stream');
+  if (slow) {
+    const slowSse = slow.text;
+    const slowFrames = sseFrames(slowSse);
+    const slowText = slowFrames.map((d) => ((d.choices || [])[0] || {}).delta)
+      .filter(Boolean).map((d) => d.content || '').join('');
+    ok('a slow but talking child is NOT killed', !slowFrames.some((f) => f.error),
+      JSON.stringify(slowFrames.find((f) => f.error) || null));
+    ok('the slow child\'s whole answer arrives', slowText === 'xxxxxxxxxx', slowText);
+    ok('the slow child finishes normally',
+      slowFrames.some((d) => ((d.choices || [])[0] || {}).finish_reason === 'stop')
+      && slowSse.trimEnd().endsWith('data: [DONE]'));
+  }
+
+  // 10e. THE KILL ITSELF, asserted at the source rather than over HTTP. The
+  // request path also kills the child when the response closes, which means an
+  // HTTP-level assertion stays green even if the watchdog answers and walks
+  // away leaving a paid child running (mutation-tested: removing the SIGTERM is
+  // invisible from the wire). This one calls generate() directly and reads the
+  // child the moment the promise settles.
+  process.env.BRIDGE_TEST_SCENARIO = 'hang';
+  let watched = null;
+  let stallError = null;
+  try {
+    await generate({ prompt: 'stage prompt', onSpawn: (c) => { watched = c; } });
+  } catch (err) { stallError = err; }
+  ok('generate() rejects a stalled call at the source', !!stallError && stallError.status === 502,
+    stallError ? 'status ' + stallError.status : 'it resolved');
+  ok('the stall is flagged as a stall, not a generic CLI failure',
+    !!stallError && stallError.stalled === true);
+  ok('the child is signalled BEFORE the caller is answered',
+    !!watched && (watched.killed === true || watched.exitCode !== null),
+    watched ? 'killed=' + watched.killed + ' exitCode=' + watched.exitCode : 'never spawned');
+  for (let i = 0; i < 60 && liveChildren.size; i++) await new Promise((r) => setTimeout(r, 50));
+  ok('a directly-driven stall leaves nothing running', liveChildren.size === 0,
+    liveChildren.size + ' still live');
+
+  // 10f. The knob, and its off switch — both read at CALL time, so a serve
+  // process never has to restart to change them.
+  process.env.LIFTRPG_BRIDGE_IDLE_MS = '';
+  ok('an unset window falls back to the generous default', idleWatchdogMs() === DEFAULT_IDLE_MS);
+  process.env.LIFTRPG_BRIDGE_IDLE_MS = '0';
+  ok('LIFTRPG_BRIDGE_IDLE_MS=0 disables the watchdog', idleWatchdogMs() === 0);
+  process.env.LIFTRPG_BRIDGE_IDLE_MS = 'not-a-number';
+  ok('a nonsense window falls back to the default rather than disabling itself',
+    idleWatchdogMs() === DEFAULT_IDLE_MS);
+  if (priorIdle === undefined) delete process.env.LIFTRPG_BRIDGE_IDLE_MS;
+  else process.env.LIFTRPG_BRIDGE_IDLE_MS = priorIdle;
+
+  // 10g. THE STAGE'S OUTPUT CEILING REACHES THE CHILD (2026-08-17).
+  // The failure this pins is SILENT by construction: a dropped max_tokens
+  // changes nothing observable on the wire — the request succeeds, the answer
+  // comes back, and the only symptom is that the D97 budget ladder does not
+  // exist on this door and a truncation retry escalates to the same ceiling
+  // that just truncated. Asserted on childEnv() itself, which is the one place
+  // the ceiling can be seen leaving.
+  process.env.ANTHROPIC_API_KEY = 'sk-should-be-stripped';
+  const budgeted = childEnv(48000);
+  ok('a requested ceiling reaches the child as CLAUDE_CODE_MAX_OUTPUT_TOKENS',
+    budgeted.CLAUDE_CODE_MAX_OUTPUT_TOKENS === '48000',
+    'got ' + JSON.stringify(budgeted.CLAUDE_CODE_MAX_OUTPUT_TOKENS));
+  ok('the ceiling does not resurrect the stripped API key',
+    budgeted.ANTHROPIC_API_KEY === undefined);
+  // The negative half. A default that ships a ceiling nobody asked for is the
+  // same defect pointing the other way, and it would be equally invisible.
+  ok('no ceiling requested means no ceiling sent',
+    childEnv().CLAUDE_CODE_MAX_OUTPUT_TOKENS === undefined
+      && childEnv(0).CLAUDE_CODE_MAX_OUTPUT_TOKENS === undefined
+      && childEnv('nonsense').CLAUDE_CODE_MAX_OUTPUT_TOKENS === undefined);
+  delete process.env.ANTHROPIC_API_KEY;
+
+  // 10h. The absent stop_reason is guessed LOUDLY. `noteMissingStopReason` is
+  // the only thing standing between a masked truncation and a silent one, so a
+  // version of it that returns without printing must fail here.
+  {
+    const said = [];
+    const realErr = console.error;
+    console.error = (...a) => said.push(a.join(' '));
+    try {
+      noteMissingStopReason('', 'some text the CLI produced', 'ceiling 1000 tokens');
+      noteMissingStopReason('end_turn', 'some text');   // a real signal says nothing
+      noteMissingStopReason('', '');                    // no text is not a truncation
+    } finally { console.error = realErr; }
+    ok('text with no stop_reason warns about masked truncation',
+      said.length === 1 && /NO stop_reason/.test(said[0]), said.length + ' line(s)');
+  }
 
   await new Promise((r) => server.close(r));
   fs.rmSync(dir, { recursive: true, force: true });

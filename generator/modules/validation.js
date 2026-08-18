@@ -2509,7 +2509,11 @@ export function arrangementFloorErrors(meta, where) {
 export function validateShellSchema(shell, expectedOptions) {
   var errors = [];
   var warnings = [];
-  if (!shell) { return { valid: false, errors: ['Shell is null'] }; }
+  // THE VERDICT CARRIES ITS OWN REMEDIES (the week gate's shape, D167). A floor
+  // that can name one field and one coordinate publishes them here so the stage
+  // can rewrite that field instead of re-rolling the whole shell.
+  var deltaTargets = [];
+  if (!shell) { return { valid: false, errors: ['Shell is null'], deltaTargets: [] }; }
   normalizeShellShape(shell);
   // Hard failures: match pre-restructure checks exactly
   if (!shell.meta) errors.push('Missing meta');
@@ -2605,6 +2609,52 @@ export function validateShellSchema(shell, expectedOptions) {
         + 'week against a name nobody chose.');
     }
 
+    // ── THE CURRENCY HAS TWO HOMES AND THEY MUST BE ONE (2026-08-17) ───────
+    // `gameRulebook.economy.currency` is what the DESIGNER named the currency,
+    // floored at the rulebook stage. `meta.economy.currencyLabel` is what the
+    // BOOK prints, floored ten lines up, and it is the string every week's
+    // reckoning sentence must reproduce verbatim (INST_MARK_SURFACE ⇄
+    // currencyMentionVerdict). Nothing had ever compared them.
+    //
+    // That is the Crown Job's exact defect class and it was still constructible
+    // with every gate green: a rulebook teaching the player they earn "Favour",
+    // a shell paying out "Marks", six weeks of conversion sentences printing
+    // the shell's word, and a parity floor that only ever asked whether the
+    // graph carried SOME currency the rulebook mentioned. The player reads the
+    // rules, then never sees that word again.
+    //
+    // BYTE EQUALITY AFTER TRIM, and deliberately no fuzzy match: a currency is
+    // a proper noun the book prints in two places, and "close enough" is how a
+    // book ends up with two names for one thing.
+    //
+    // ANTI-VACUITY / SCOPE: fires only when BOTH exist. A caller with no
+    // rulebook (the wizard, a hand-built replay) gets no check rather than a
+    // fabricated one, and a missing currencyLabel is already the floor above —
+    // stacking a second error on it would spend a retry saying one thing twice.
+    var rulebookCurrency = String(
+      ((((expectedOptions || {}).gameRulebook) || {}).economy || {}).currency || ''
+    ).trim();
+    if (currencyLabel && rulebookCurrency && currencyLabel !== rulebookCurrency) {
+      var currencyMismatch = 'meta.economy.currencyLabel is "' + currencyLabel
+        + '" but the rulebook you were given names the currency "' + rulebookCurrency
+        + '" — the rulebook\'s currency IS this book\'s currency, and the shell must carry it'
+        + ' VERBATIM. The player is taught one word in the rules and then reads a different'
+        + ' word on every reckoning line for the rest of the book. Set'
+        + ' meta.economy.currencyLabel to "' + rulebookCurrency + '" exactly, or say why the'
+        + ' rules were wrong — the rules do not change here.';
+      errors.push(currencyMismatch);
+      // DELTA-CLASS (D167): one named field, one coordinate, one requirement
+      // satisfiable in isolation. Re-rolling an entire shell over a proper noun
+      // is the exact waste the delta path exists to stop.
+      deltaTargets.push({
+        message: currencyMismatch,
+        pathParts: ['meta', 'economy', 'currencyLabel'],
+        path: formatFieldPath(['meta', 'economy', 'currencyLabel']),
+        requirement: 'meta.economy.currencyLabel must be exactly "' + rulebookCurrency
+          + '" — the currency the rulebook named, character for character.'
+      });
+    }
+
     // ── The artifact-intent floor (W3 corrective wave, F07) ──
     // Same argument as the spine below: the standard pipeline runs the compiler
     // HERE, so the planning bundle is declared here or nowhere on this path.
@@ -2665,7 +2715,11 @@ export function validateShellSchema(shell, expectedOptions) {
     errors = errors.concat(collectSpineSkeletonFloorErrors(
       (shell.meta || {}).playSpine,
       { weekCount: Number((expectedOptions || {}).weekCount) || 0 },
-      'Shell'
+      'Shell',
+      // The SAME array the pre-flight floor below is handed — derivePlannedWeekShapes'
+      // output (D166's one deload derivation). It funds the deload exhale exemption
+      // on the tension floor; a caller with no plan gets no exemption.
+      (expectedOptions || {}).plannedWeeks
     ));
 
     // ── The rulebook⇄spine parity floor (D173) ──
@@ -2745,7 +2799,12 @@ export function validateShellSchema(shell, expectedOptions) {
   if (warnings.length > 0) {
     console.warn('[LiftRPG] Shell advisory:', warnings.join('; '));
   }
-  return { valid: errors.length === 0, errors: errors };
+  return {
+    valid: errors.length === 0,
+    errors: errors,
+    warnings: warnings,
+    deltaTargets: deltaTargets
+  };
 }
 
 // Validates the assembled booklet. Returns array of human-readable errors.
@@ -3811,8 +3870,24 @@ export function collectRulebookSpineParityErrors(rulebook, spine, stageLabel) {
   return errors;
 }
 
-export function collectSpineSkeletonFloorErrors(spine, skeleton, stageLabel) {
+export function collectSpineSkeletonFloorErrors(spine, skeleton, stageLabel, plannedWeeks) {
   var errors = [];
+  // ── THE DELOAD EXHALE'S EVIDENCE (2026-08-17) ────────────────────────────
+  // `plannedWeeks` is derivePlannedWeekShapes()' output — the ONE deload
+  // derivation (D166), the same array the pre-flight floor already consumes,
+  // handed here as a fourth parameter rather than re-derived from whichever
+  // shape the caller happens to hold. A second deload heuristic beside the
+  // first is D93's two-algorithms defect, and it is exactly the mistake the
+  // "lighter weeks" line in the topology digest already represents.
+  //
+  // A CALLER THAT PASSES NOTHING GETS NO EXEMPTION. A gate never invents the
+  // plan it is checking against: with no shapes in hand every week is treated
+  // as a working week and the tension floor blocks precisely as it did before.
+  var deloadWeeks = {};
+  (Array.isArray(plannedWeeks) ? plannedWeeks : []).forEach(function (w) {
+    var n = Number((w || {}).weekNumber);
+    if (Number.isInteger(n) && (w || {}).isDeload) deloadWeeks[n] = true;
+  });
   // The compiler runs at `shell` on the standard pipeline and at `skeleton` on
   // S+F, so the prefix is a parameter: an error naming the wrong stage sends
   // the retry to a prompt that cannot fix it.
@@ -4135,10 +4210,25 @@ export function collectSpineSkeletonFloorErrors(spine, skeleton, stageLabel) {
     var named = ['scarce', 'losable', 'fallBehind'].filter(function (axis) {
       return String(row[axis] || '').trim();
     });
-    if (!named.length) {
+    // ── THE DELOAD IS THE EXHALE, NEVER FILLER (FUSION's seam law) ─────────
+    // This floor demanded an axis on EVERY planned week, which made a deload
+    // week owe a tension it is defined by not having. The model's only legal
+    // moves were to invent a scarcity the training does not create, or to be
+    // blocked — and the first is worse, because a fabricated axis on a deload
+    // is the book telling the player to feel pressure in the week the program
+    // deliberately removed it.
+    //
+    // The exemption is NARROW and it is EVIDENCE-GATED: only a week the ONE
+    // deload derivation marks (derivePlannedWeekShapes, D166) may declare all
+    // three axes absent, and it must do so by declaring the row — a missing
+    // row still blocks above, on every week. On any other week this is byte
+    // for byte the floor it always was.
+    if (!named.length && !deloadWeeks[n]) {
       errors.push(S + 'playSpine.tensionBudget week ' + n
         + ' names no axis — at least one of scarce / losable / fallBehind must be real (an absent axis is a declaration'
-        + ' that it is not present; all three absent is a week with no tension at all)');
+        + ' that it is not present; all three absent is a week with no tension at all).'
+        + ' Only a planned DELOAD week may declare all three absent: there the emptiness IS'
+        + ' the exhale, and week ' + n + ' is not one');
     }
   });
 
@@ -4472,10 +4562,23 @@ function collectSpineHarvestFloorErrors(spine, index, parsedEdges, S) {
     }
     var to = parseSurfaceRef((edge || {}).to);
     if (to.valid && (to.kind === 'boss' || to.kind === 'assembly')) {
+      // D188 CORRECTED THIS SENTENCE'S REASONING, not its predicate. The old
+      // text said the endgame "is gated by the DERIVED reckoning threshold and
+      // by nothing else" — which taught the threshold as a LOCK twelve lines
+      // from the floor (harvest-endgame-not-tollgate) that forbids it being
+      // one. A model that believed this sentence built exactly the design the
+      // neighbouring floor then refused, which is what killed three shell
+      // attempts on the proving run.
+      //
+      // The ratified law (acceptance package item 4, 2026-08-17): the tally may
+      // shape WHICH ending and what state you carry into it, never WHETHER the
+      // seal opens or the ceremony happens. So the endgame edge is unpriceable
+      // because it is a TARGET, not because a different number already gates it.
       errors.push(S + 'playSpine.economyGraph[' + ei + '] prices the edge into "' + to.raw
-        + '" at ' + price + ' — the endgame ceremony is gated by the DERIVED reckoning threshold'
-        + ' and by nothing else. A second number for the same gate is a second home for it;'
-        + ' price the spends that lead there instead');
+        + '" at ' + price + ' — the endgame is a TARGET the player aims at, never a lock they'
+        + ' buy through. WHETHER the boss happens and the assembly completes is not for sale,'
+        + ' and the derived reckoning threshold does not gate it either; it decides WHICH'
+        + ' ending. Price the spends that LEAD to the endgame instead');
     }
     var from = parseSurfaceRef((edge || {}).from);
     if (from.valid && SPINE_SOURCE_KINDS[from.kind]) {
@@ -7920,11 +8023,23 @@ export function validateSkeletonStage(result, weekCount, options) {
         + ' carry a companion component for the play state to live on');
     }
 
+    // The week shapes, derived ONCE and read by both the closure floors (the
+    // deload exhale exemption on the tension budget) and the pre-flight below.
+    // Same fields derivePlannedWeekShapes emits on the staged path, because it
+    // is the same question and there is only ever one answer to it (D166).
+    var sfPlannedWeeks = wp.map(function (w, i) {
+      return {
+        weekNumber: Number((w || {}).weekNumber) || (i + 1),
+        isBoss: !!(w || {}).isBossWeek,
+        isDeload: !!(w || {}).isDeload
+      };
+    });
+
     // ── The closure floors (W4a) ──
     // Collected into the same batch for the same reason: a spine with three
     // wiring defects should cost ONE retry that names all three.
     floorErrors = floorErrors.concat(
-      collectSpineSkeletonFloorErrors((result.meta || {}).playSpine, result)
+      collectSpineSkeletonFloorErrors((result.meta || {}).playSpine, result, 'Skeleton', sfPlannedWeeks)
     );
 
     // ── The rulebook⇄spine parity floor (D173), S+F's half ──
@@ -7947,13 +8062,7 @@ export function validateSkeletonStage(result, weekCount, options) {
     floorErrors = floorErrors.concat(collectSpinePreflightFloorErrors(
       (result.meta || {}).playSpine,
       {
-        weeks: wp.map(function (w, i) {
-          return {
-            weekNumber: Number((w || {}).weekNumber) || (i + 1),
-            isBoss: !!(w || {}).isBossWeek,
-            isDeload: !!(w || {}).isDeload
-          };
-        }),
+        weeks: sfPlannedWeeks,
         fragmentRegistry: result.fragmentRegistry,
         mechanicGrammarFamily: ((result.meta || {}).artifactIntent || {}).mechanicGrammarFamily
       },

@@ -2153,6 +2153,12 @@ async function runPipelineWithRepairRouting(pipelineFn, options) {
 // `_stageKey` joined them for D143: the routing seam needs to know which stage
 // raised the failure, and the human-facing stage NAME is not that identity.
 // `repairRoute` joined them so the queryable shape survives to the caller.
+// How many blocking defects ride the mid-run `retrying` event. Enough to see
+// the SHAPE of the failure at a glance without turning a stage card into a
+// validator transcript; the exact total travels beside them as a count, and the
+// full list is in the run log either way.
+var RETRY_NOTICE_ERROR_LIMIT = 3;
+
 var STAGE_ERROR_MARKERS = [
   'errorType', 'finishReason', 'retryable', 'status',
   'structuredUnsupported', '_failedOutput', '_blockingErrors', '_stageKey',
@@ -2946,17 +2952,39 @@ async function runJsonStage(settings, config) {
       var nextTimeoutMs = typeof timeoutSpec === 'function'
         ? timeoutSpec({ attempt: attempt + 1, error: err })
         : resolvedTimeoutMs;
+      // ── WHAT FAILED, WHILE IT IS STILL RETRYING ────────────────────────────
+      // The retry notice said a stage was being retried and how long the next
+      // attempt gets. It never said WHAT the model got wrong, so the only way
+      // to learn that was to let the run die and read the final error — after
+      // paying for every remaining attempt. The operator watching a paid run
+      // needs the defect list while the decision to stop is still worth making.
+      //
+      // Carried STRUCTURALLY off the error the gate already built (D167/D168's
+      // idiom): `_blockingErrors` is the classified list, so nothing is parsed
+      // and nothing is re-derived. Absent on transport failures — a timeout has
+      // no defect list — and the field is simply omitted there rather than
+      // filled with a guess (the run-log accuracy directive: never claim more
+      // than is known).
+      var blockingErrors = (err && Array.isArray(err._blockingErrors)) ? err._blockingErrors : null;
+      var retryMeta = {
+        phase: 'retrying',
+        stageKey: config.stageKey || '',
+        stageName: config.stageName,
+        attempt: attempt,
+        attemptCount: attemptCount,
+        errorClass: stageTelemetry.errorClass,
+        streamPhase: (err && err.streamPhase) || '',
+        nextTimeoutMs: nextTimeoutMs
+      };
+      if (blockingErrors && blockingErrors.length) {
+        // First few in full; the count is the honest total. A panel that shows
+        // three of nine and says "3" is a smaller lie than one that shows three
+        // and says nothing, but both are avoidable.
+        retryMeta.blockingErrors = blockingErrors.slice(0, RETRY_NOTICE_ERROR_LIMIT);
+        retryMeta.blockingCount = blockingErrors.length;
+      }
       emitPipelineEvent(config.onProgress, config.stageIndex || 0, config.getTotalStages ? config.getTotalStages() : 0,
-        buildStageRetryNotice(config, attempt, attemptCount, err, nextTimeoutMs), {
-          phase: 'retrying',
-          stageKey: config.stageKey || '',
-          stageName: config.stageName,
-          attempt: attempt,
-          attemptCount: attemptCount,
-          errorClass: stageTelemetry.errorClass,
-          streamPhase: (err && err.streamPhase) || '',
-          nextTimeoutMs: nextTimeoutMs
-        });
+        buildStageRetryNotice(config, attempt, attemptCount, err, nextTimeoutMs), retryMeta);
     }
   }
 
@@ -4183,7 +4211,23 @@ async function runApiPipeline(options) {
           gameRulebook: gameRulebook
         });
         if (!v.valid) {
-          return 'Shell schema validation: ' + v.errors.join('; ');
+          // ── THE VERDICT OBJECT, NOT A JOINED STRING ────────────────────────
+          // THE BYPASS THIS KILLS. extractErrorList() treats a string as ONE
+          // error, so `v.errors.join('; ')` handed classifyValidationErrors a
+          // single blob. That classifier tests REPAIRABLE_PATTERNS against each
+          // element — and one element containing "Unknown visualArchetype"
+          // anywhere in it classified the WHOLE blob as repairable. blocking
+          // became empty, the stage was ACCEPTED, and every blocking floor in
+          // the blob — a missing playSpine, an unwired currency, a threshold
+          // tollgate — was silently disarmed by one cosmetic defect sitting
+          // beside it. That is the strongest gate in the pipeline, defeatable
+          // by an unrelated typo.
+          //
+          // The S+F week gate was converted for this exact reason; this is the
+          // same fix at the seat that authors the spine. Returning the object
+          // also publishes deltaTargets, so a one-field defect (the currency
+          // parity floor) takes the 4k delta path instead of re-rolling a shell.
+          return v;
         }
         if (result && result.weeks) { delete result.weeks; }
         if (result && result.fragments) { delete result.fragments; }
@@ -4669,10 +4713,40 @@ async function runApiPipeline(options) {
         if (!content.documentType) return 'Ending missing content.documentType.';
         if (!result.designSpec || typeof result.designSpec !== 'object') return 'Ending missing designSpec object.';
         // F6, the multi-stage twin of the S+F endings gate above.
-        var endingBreaches = collectBudgetBreaches({ endings: [result] })
-          .map(function (b) { return b.message; });
+        //
+        // THE VERDICT OBJECT, WITH ITS COORDINATES (D167 applied at the finale).
+        // Joined into one string this failure was un-routable AND un-repairable:
+        // extractErrorList saw one error, no target claimed it, the partition
+        // reported `no-delta-targets`, and the stage paid for a whole new ending
+        // because a body was a few characters long. Worse, the reader was told
+        // "the answer came back missing required parts" — describeStageFailureCause
+        // reads budgetBreachCount off the delta partition, which was always 0
+        // here, so the one failure it has a truthful sentence for was the one
+        // failure it mislabelled.
+        //
+        // Paths are re-based off the `['endings', 0]` wrapper this gate builds,
+        // so they address the ENDING OBJECT the stage actually returns — the
+        // payload the merge lands on. partitionDeltaRepairOn re-checks that
+        // against the real payload before spending anything.
+        var endingBreaches = collectBudgetBreaches({ endings: [result] });
         if (endingBreaches.length > 0) {
-          return 'Over budget: ' + endingBreaches.join('; ');
+          return {
+            valid: false,
+            errors: endingBreaches.map(function (b) { return 'Over budget: ' + b.message; }),
+            deltaTargets: endingBreaches.map(function (b) {
+              var parts = b.path.slice(2);
+              return {
+                // Claimed VERBATIM: the partition matches on the message's
+                // identity, never by parsing it.
+                message: 'Over budget: ' + b.message,
+                pathParts: parts,
+                path: formatFieldPath(parts),
+                cap: b.cap,
+                length: b.length,
+                requirement: b.message
+              };
+            })
+          };
         }
         return '';
       },
@@ -5538,9 +5612,12 @@ async function runSkeletonFleshPipeline(options) {
           // This pipeline's compiler seat owes the GIVENS for the axes IT
           // authors — D144 W-3's lesson (a value demanded at a stage must be
           // SHOWN to that stage on both pipelines) with D128's other half kept:
-          // SCHEMA_SKELETON names no designLanguage and no playSpine, so this
-          // seat is shown eight axes rather than fifteen. A given it cannot
-          // deliver would be doctrine false at its stage.
+          // SCHEMA_SKELETON names no designLanguage, so this seat is shown 13 of
+          // the 22 axes rather than all of them. A given it cannot deliver would
+          // be doctrine false at its stage. (The counts were written as "eight"
+          // and "fifteen" and went stale as axes were added — they are derived
+          // by identityAxesForStage(), never by this comment; corrected
+          // 2026-08-17 so a reader is not misled about which is authoritative.)
           seedAssignments: seedAssignments,
           identityAxes: identityAxesForStage('skeleton'),
           // THE RULEBOOK (D173). This is S+F's spine seat, so the document the
@@ -5560,7 +5637,8 @@ async function runSkeletonFleshPipeline(options) {
         return validateSkeletonStage(result, weekCount, {
           generationFloors: true,
           brief: brief,
-          // D148, this seat's half: shown eight axes above, checked on eight.
+          // D148, this seat's half: shown identityAxesForStage('skeleton')
+          // above, checked on exactly that slice. One accessor, two readers.
           seedAssignments: seedAssignments,
           // D173 — the parity floor's evidence, the same object the builder
           // above is handed.
@@ -6283,18 +6361,28 @@ async function generateSkeletonFlesh(settings, workout, brief, onProgress) {
 }
 
 
-// ── Single-pass generation (Standard mode) ────────────────────────────────────
-
-async function generate(settings, workout, brief) {
-  if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
-  if (typeof window.generatePrompt !== 'function') {
-    throw new Error('Prompt generator not loaded. Please reload the page.');
-  }
-
-  var prompt = window.generatePrompt(workout, brief);
-  var rawResponse = await callProvider(settings, prompt);
-  return extractJson(rawResponse.text);
-}
+// ── Single-pass generation (Standard mode) — RETIRED 2026-08-17 ──────────────
+//
+// THE PASTE DOOR IS GONE. `generate()` built the whole booklet from one
+// window.generatePrompt() bundle and handed the raw text to extractJson. It was
+// never one of the three values #api-method offers (generateSkeletonFlesh,
+// generateMultiStage, generateStructured), so no product path ever dispatched
+// it — the door it belonged to stopped existing before it did.
+//
+// WHY DELETING IT MATTERS RATHER THAN JUST BEING TIDY: this method ran ZERO
+// generation floors. Every blocking gate in validation.js fires from a STAGE
+// validator, and a single-pass build has no stages. A run through this door
+// produced a booklet nothing had checked, on a pipeline whose entire recent
+// history is about making the gates unavoidable. Its 115,000-character prompt
+// ceiling retired with it (tests/playwright/generator/prompt-structure.spec.js,
+// scripts/check-generation-floors.mjs) — that budget had become the standing
+// reason for refusing to teach a stage anything.
+//
+// window.generatePrompt() itself STAYS. It is no longer a door; it is the
+// observation surface the floors harness and four Playwright specs use to
+// measure the shared builders (the seeded brief channel, the design/author bias
+// draw, the arrangement routing) end to end. Removing it would delete that
+// coverage to retire a caller that is already gone.
 
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -6562,7 +6650,9 @@ window.LiftRPGAPI = {
   PAGE_ESTIMATE: PAGE_ESTIMATE,
   listProviderModels: listProviderModels,
   refreshPricing: refreshPricing,
-  generate: generate,
+  // `generate` (single-pass) retired 2026-08-17 with the paste door — it ran no
+  // generation floors and no UI value dispatched it. See the note at its former
+  // definition above.
   generateMultiStage: generateMultiStage,
   generateStructured: generateStructured,
   generateSkeletonFlesh: generateSkeletonFlesh,
