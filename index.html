@@ -5991,7 +5991,7 @@
         }
         if (metrics.completedLocally) {
           if (status === 'blocked') {
-            return '<strong>Local quality gate</strong> Export is blocked until these issues are resolved.';
+            return '<strong>Local quality gate</strong> Your booklet is delivered with these issues attached — fix and rebuild, or use it as is (DR-58: the book always ships; the review rides along).';
           }
           return '<strong>On this device</strong> LiftRPG finished this step locally after generation.';
         }
@@ -10071,13 +10071,13 @@
             if (isQualityBlocked) {
               markApiStageBlocked(
                 'quality',
-                'Local quality gate blocked export for this booklet.',
+                'Quality review found blockers — the booklet is delivered with its review attached (DR-58).',
                 { completionSource: 'local' }
               );
               apiRunState.status = 'blocked';
-              apiRunState.summary = 'Quality Gate Blocked';
-              apiRunState.target = 'Review Quality Blockers';
-              apiRunState.targetCaption = blockerMessages.join(' · ') || 'Open the review artifact and fix the blockers before export.';
+              apiRunState.summary = 'Quality Review: Issues Found';
+              apiRunState.target = 'Review Quality Findings';
+              apiRunState.targetCaption = blockerMessages.join(' · ') || 'The booklet is yours either way — these are the issues the review found.';
               removeValidatedModel(settings.model, settings._providerLabel);
             } else {
               markApiStageComplete(
@@ -10120,7 +10120,7 @@
               'Run total: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + '.';
             pushApiLog(
               isQualityBlocked
-                ? 'Generation finished, but export is blocked by the quality gate. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.'
+                ? 'Generation finished below the quality bar — the booklet is delivered with its review attached. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.'
                 : 'Generation complete. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.'
             );
             // The verdict gets its own line only when it fell short — a review
