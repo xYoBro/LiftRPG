@@ -1510,7 +1510,7 @@ function partitionDeltaRepairOn(payload, blockingErrors, deltaTargets) {
     // through a string. Probed with the merge's own writer on a throwaway
     // clone, so there is one answer to "can this path be created", not two.
     if (t.presence) {
-      return !writeAtPathParts(deltaClone(payload), t.pathParts, 'probe', true);
+      return !writeAtPathParts(deltaClone(payload), t.pathParts, '\u0001probe\u0001', true);
     }
     return readAtPathParts(payload, t.pathParts) === undefined;
   });

@@ -3241,7 +3241,7 @@ export function collectOracleWriteTargetFindings(booklet) {
         // One finding per (week, surface name): a book that repeats the same
         // unreachable target across ten rolls has ONE defect, and ten copies
         // of one sentence is how a report-class channel gets ignored.
-        var key = wk + ' ' + toSlugWords(hit.target);
+        var key = wk + '\x00' + toSlugWords(hit.target);
         if (seen[key]) return;
         seen[key] = true;
         findings.push({
