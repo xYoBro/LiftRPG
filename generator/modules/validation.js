@@ -137,6 +137,12 @@ import {
   GAME_RULEBOOK_ANSWERS,
   GAME_RULEBOOK_VERBS_MIN,
   GAME_RULEBOOK_VERBS_MAX,
+  // W1 — the plain-stakes band. Imported for the reason every number above it
+  // is: SCHEMA_SINGLE_WEEK states these two integers to the model as literals,
+  // and a private copy here would fail weeks for a band the model was told
+  // differently.
+  WEEK_STAKES_MIN_CHARS,
+  WEEK_STAKES_MAX_CHARS,
   RULEBOOK_KIND_WORDS,
   countRulebookWords
 } from '../../contracts/contract-constants.mjs';
@@ -1282,6 +1288,65 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
   } else {
     if (!weekObj.epigraph.text) errors.push('Week epigraph missing text');
     if (!weekObj.epigraph.attribution) errors.push('Week epigraph missing attribution');
+  }
+
+  // ── THE PLAIN-STAKES LINE (W1, 2026-08-18) ────────────────────────────────
+  // The epigraph is the week's MOOD and is allowed to be oblique. Nothing on a
+  // week's opening page has ever said, in words a stranger can act on, what is
+  // actually at stake — and the author's verdict on the first delivered book
+  // was "most of the time I don't know what is being said".
+  //
+  // BLOCKING AT THE GATE, OPTIONAL IN THE ARTIFACT SCHEMA — D111's
+  // derived-or-strict split, the shape playSpine already carries. The corpus
+  // predates the field and must keep validating; generation must deliver it.
+  //
+  // SAFE TO BLOCK HERE, and that is a measured claim rather than a hope: the
+  // week stage sends `schema: null` (api-generator.js), so its prose schema IS
+  // its transport. This is exactly the condition D144 found missing for
+  // `meta.economy` — prose-demanded, gate-enforced, transport-absent — and the
+  // reason the establishment surface's floor is NOT landed beside this one.
+  //
+  // THE BAND IS THE DEMAND. Presence alone would be satisfiable with "Things
+  // are difficult this week", which is the sentence this field exists to
+  // replace; the low bound buys a real clause and the high bound keeps it one
+  // sentence rather than a second epigraph.
+  if (floorsOn(expectedOptions)) {
+    var stakes = String(weekObj.stakesLine || '').trim();
+    if (!stakes) {
+      errors.push('Week missing stakesLine — one flat sentence, second person, present tense, '
+        + 'naming what is scarce, threatened or wanted THIS week, and carrying either a number '
+        + 'or the name of a printed surface (a clock, a track, a strip, a board, a table). It '
+        + 'prints under the epigraph and it is the line that tells a reader who understood '
+        + 'nothing else what this week is about.');
+    } else if (stakes.length < WEEK_STAKES_MIN_CHARS || stakes.length > WEEK_STAKES_MAX_CHARS) {
+      var stakesMessage = 'Week stakesLine is ' + stakes.length + ' characters; it must be '
+        + WEEK_STAKES_MIN_CHARS + '-' + WEEK_STAKES_MAX_CHARS + '. Shorter than that is a mood '
+        + 'label, not stakes; longer is a second epigraph. One sentence naming the scarce or '
+        + 'threatened thing, with a number or a printed surface in it.';
+      errors.push(stakesMessage);
+      // DELTA-CLASS (D167): one named field, one coordinate, satisfiable in
+      // isolation. Re-rolling a whole week over one sentence is the waste the
+      // delta path exists to stop.
+      deltaTargets.push({
+        message: stakesMessage,
+        pathParts: ['stakesLine'],
+        path: formatFieldPath(['stakesLine']),
+        requirement: 'week.stakesLine must be ' + WEEK_STAKES_MIN_CHARS + '-'
+          + WEEK_STAKES_MAX_CHARS + ' characters — one flat sentence naming what is scarce, '
+          + 'threatened or wanted this week, with a number or a printed surface named in it.'
+      });
+    }
+  }
+
+  // ── The brief-transcription ban, week seat (W1) ──
+  // Epigraph and interlude body are the week's authored prose. Silent with no
+  // brief on the options — see the floor's own header for why that is the
+  // honest condition and not a hole.
+  if (floorsOn(expectedOptions)) {
+    errors = errors.concat(briefTranscriptionFloorErrors([
+      { label: 'epigraph.text', text: (weekObj.epigraph || {}).text },
+      { label: 'interlude.body', text: (weekObj.interlude || {}).body }
+    ], expectedOptions.brief, 'Week'));
   }
 
   if (!Array.isArray(weekObj.sessions) || weekObj.sessions.length === 0) {
@@ -2503,6 +2568,176 @@ export function arrangementFloorErrors(meta, where) {
 }
 
 /**
+ * teachingText(rulesSpread) -> string
+ *
+ * Everything the rules spread actually PRINTS as teaching, flattened. One
+ * reader today (the vocabulary floor below); it exists as a named function
+ * because "what counts as the teaching" is a definition, and a definition
+ * inlined at its single call site is a definition that gets quietly widened
+ * the second time someone needs it.
+ */
+function rulesTeachingText(rulesSpread) {
+  var spread = (rulesSpread && typeof rulesSpread === 'object') ? rulesSpread : {};
+  var left = (spread.leftPage && typeof spread.leftPage === 'object') ? spread.leftPage : {};
+  var right = (spread.rightPage && typeof spread.rightPage === 'object') ? spread.rightPage : {};
+  var parts = [left.title, right.title, right.instruction];
+  // reEntryRule is typed `['string','object']` by the artifact schema, so a
+  // reader that assumed string would silently contribute nothing on the object
+  // form — the failure mode this whole floor exists to catch, one level down.
+  if (typeof left.reEntryRule === 'string') parts.push(left.reEntryRule);
+  else if (left.reEntryRule && typeof left.reEntryRule === 'object') {
+    Object.keys(left.reEntryRule).forEach(function (k) {
+      if (typeof left.reEntryRule[k] === 'string') parts.push(left.reEntryRule[k]);
+    });
+  }
+  var orientation = (spread.orientation && typeof spread.orientation === 'object')
+    ? spread.orientation : {};
+  parts.push(orientation.situation);
+  (Array.isArray(orientation.cast) ? orientation.cast : []).forEach(function (entry) {
+    if (!entry || typeof entry !== 'object') return;
+    parts.push(entry.name, entry.role, entry.note);
+  });
+  (Array.isArray(left.sections) ? left.sections : []).forEach(function (section) {
+    if (!section || typeof section !== 'object') return;
+    parts.push(section.heading, section.body, section.text);
+  });
+  return parts.filter(function (p) { return typeof p === 'string'; }).join('\n');
+}
+
+/**
+ * teachingNormalize(text) -> string
+ *
+ * Case-folded, punctuation-flattened, whitespace-collapsed. GENEROUS IN THE
+ * SAFE DIRECTION, the evidenceNames idiom directly above: it can accept a term
+ * the page spelled loosely (a hyphen written as a space, a capital dropped, a
+ * possessive apostrophe), it cannot invent a term the page never printed.
+ */
+function teachingNormalize(text) {
+  return String(text == null ? '' : text)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * rulesTeachingFloorErrors(rulesSpread, gameRulebook, where) -> string[]
+ *
+ * ── THE RULES PAGE TEACHES THE GAME THE RULEBOOK DESIGNED (W1, 2026-08-18) ──
+ *
+ * The author's verdict on the first delivered book: "most of the time I don't
+ * know what is being said... I still don't know how to play the game." The
+ * rules page had four sections, passed every gate, and named neither what the
+ * training pays out nor what the player physically does with the pencil.
+ *
+ * THE CHECKABLE HALF of the register split. The register itself — flat,
+ * imperative, every term defined at first use — is taught in INST_RULES_TEACH
+ * and is not machine-checkable without prose parsing, which is a different
+ * wave's work and a worse instrument. What IS checkable, exactly, is the
+ * VOCABULARY: the rulebook declares one currency and three-to-five core verbs,
+ * the shell seat is shown both verbatim (formatGameRulebookGiven's "The
+ * declarations this book is held to"), and a rules page that prints neither is
+ * teaching a game other than the one this book plays.
+ *
+ * ONE DIRECTION ONLY, and the omission is deliberate. The reverse question —
+ * "is every world-word on this page defined here?" — needs prose comprehension
+ * to answer and would fail books for typography. Presence of the declared
+ * vocabulary is the half a machine can hold without lying about what it knows.
+ *
+ * NO RULEBOOK ⇒ SILENT (the D144 ungated-caller idiom). The wizard and the
+ * manual API hand-assemble shells with no rulebook riding the options; a floor
+ * that fired on absence would block them for not being the generation path,
+ * and — worse — would be checking a page against a design nobody wrote.
+ */
+export function rulesTeachingFloorErrors(rulesSpread, gameRulebook, where) {
+  var errors = [];
+  if (!gameRulebook || typeof gameRulebook !== 'object') return errors;
+  if (!rulesSpread || typeof rulesSpread !== 'object') return errors;
+  var prefix = (where || 'Stage') + ' → rulesSpread';
+  var taught = teachingNormalize(rulesTeachingText(rulesSpread));
+  if (!taught) return errors;
+
+  var currency = String(((gameRulebook.economy || {}).currency) || '').trim();
+  var currencyNeedle = teachingNormalize(currency);
+  if (currencyNeedle && taught.indexOf(currencyNeedle) === -1) {
+    errors.push(prefix + ' never prints the currency this game runs on. The rulebook you were '
+      + 'given names it "' + currency + '" and the rules page is where a player learns that '
+      + 'word — every session earns it and every reckoning spends it for the rest of the book. '
+      + 'Teach it by name, and define it in the same breath: what one of them IS, and what '
+      + 'filling the box means.');
+  }
+
+  var verbs = ((gameRulebook.coreVerbs || {}).verbs) || [];
+  var missing = (Array.isArray(verbs) ? verbs : []).map(function (entry) {
+    return String((entry && entry.verb) || '').trim();
+  }).filter(function (verb) {
+    if (!verb) return false;
+    var needle = teachingNormalize(verb);
+    return needle && taught.indexOf(needle) === -1;
+  });
+  if (missing.length) {
+    errors.push(prefix + ' never prints ' + (missing.length === 1 ? 'the core verb' : 'the core verbs')
+      + ' "' + missing.join('", "') + '" — the rulebook declares '
+      + 'that as something the player physically does with a pencil in this book, and a verb '
+      + 'the rules page never names is a verb no player performs. Every core verb gets a '
+      + 'sentence on this page saying what you do, on which printed surface, and when.');
+  }
+  return errors;
+}
+
+/**
+ * briefTranscriptionFloorErrors(units, brief, where) -> string[]
+ *
+ * ── THE BRIEF IS INPUT, NEVER COPY (W1, 2026-08-18) ─────────────────────────
+ *
+ * The author read the first delivered book's prose as pretentious. Part of that
+ * is invention; part of it is not invention at all — the brief's own phrasing
+ * coming back as printed prose, so the book reads like a restatement of its own
+ * commission. A brief is the thing the prose is built to SATISFY. Quoting it
+ * back is the pitch wearing the artifact's clothes.
+ *
+ * SIX CONSECUTIVE WORDS, verbatim after case-folding and punctuation-flattening.
+ * Six is chosen against collision rather than against taste: five-word runs
+ * ("at the end of the") occur by chance in ordinary English; six of the brief's
+ * OWN words in order do not.
+ *
+ * NO BRIEF ⇒ SILENT (the D144 ungated-caller idiom, and the honest condition
+ * here): a stage gate that was handed no brief cannot know what was copied, and
+ * a floor that invented its own evidence would be worse than absent.
+ */
+function wordTokens(text) {
+  var normalized = teachingNormalize(text);
+  return normalized ? normalized.split(' ') : [];
+}
+
+export var BRIEF_TRANSCRIPTION_RUN = 6;
+
+export function briefTranscriptionFloorErrors(units, brief, where) {
+  var errors = [];
+  var briefWords = wordTokens(brief);
+  if (briefWords.length < BRIEF_TRANSCRIPTION_RUN) return errors;
+  var runs = {};
+  for (var i = 0; i + BRIEF_TRANSCRIPTION_RUN <= briefWords.length; i++) {
+    runs[briefWords.slice(i, i + BRIEF_TRANSCRIPTION_RUN).join(' ')] = true;
+  }
+  (Array.isArray(units) ? units : []).forEach(function (unit) {
+    if (!unit || errors.length >= 3) return;
+    var words = wordTokens(unit.text);
+    for (var j = 0; j + BRIEF_TRANSCRIPTION_RUN <= words.length; j++) {
+      var run = words.slice(j, j + BRIEF_TRANSCRIPTION_RUN).join(' ');
+      if (!runs[run]) continue;
+      errors.push((where || 'Stage') + ' → ' + String(unit.label || 'prose')
+        + ' copies a run of ' + BRIEF_TRANSCRIPTION_RUN + ' words straight out of the brief: "'
+        + run + '". The brief is input, never copy — it is the commission this book answers, '
+        + 'not material to quote back at the reader. Say the thing this world would say '
+        + 'instead, in its own words and out of its own particulars.');
+      return;
+    }
+  });
+  return errors;
+}
+
+/**
  * Shell structural validation. Runs after shell stage (Stage 3).
  * Returns { valid: boolean, errors: string[] }
  */
@@ -2671,6 +2906,14 @@ export function validateShellSchema(shell, expectedOptions) {
     // GIVENS at all.
     errors = errors.concat(seedObedienceFloorErrors(shell, 'Shell', 'shell',
       (expectedOptions || {}).seedAssignments));
+
+    // ── The rules page teaches THIS game's vocabulary (W1) ──
+    // Same options rail the currency-parity floor above reads, and the same
+    // anti-vacuity law: no rulebook in the options, no check. The shell seat is
+    // SHOWN this rulebook (generateShellPrompt's rulebookGiven), so the demand
+    // is answerable at the seat it is asked of.
+    errors = errors.concat(rulesTeachingFloorErrors(shell.rulesSpread,
+      (expectedOptions || {}).gameRulebook, 'Shell'));
 
     // ── The design-language floor (W6's close) ──
     // Here and ONLY here, and the asymmetry with every floor beside it is a
@@ -7591,6 +7834,20 @@ export function validateFragmentsStage(result, expectedRegistry, options) {
       });
     });
     if (budgetErrors.length > 0) return fragmentVerdict(budgetErrors, budgetTargets);
+
+    // ── The brief-transcription ban, fragment seat (W1) ──
+    // The body reads from `content` when it exists and `body` otherwise — the
+    // same two-key rule collectBudgetBreaches applies eight screens up, and for
+    // the same reason: a reader that assumed one key would report every book
+    // clean on the other. Silent with no brief on the options (D144 idiom).
+    var copiedBrief = briefTranscriptionFloorErrors(
+      result.fragments.map(function (frag) {
+        return {
+          label: 'fragment ' + ((frag && frag.id) || '?') + ' body',
+          text: frag && (frag.content || frag.body)
+        };
+      }), (options || {}).brief, 'Fragments');
+    if (copiedBrief.length > 0) return fragmentVerdict(copiedBrief);
   }
   var expected = (expectedRegistry || []).map(function (entry) { return normalizeId(entry.id); }).filter(Boolean);
   if (!expected.length) return fragmentVerdict([]);

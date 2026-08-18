@@ -474,7 +474,14 @@
     '## rulesSpread',
     '- `leftPage`: { title, reEntryRule, sections: [{ heading, body }] }. Each section is an object with a `heading` string and a `body` string.',
     '- `rightPage`: { title, instruction }',
-    '- One leftPage section must explain the play cadence in-world'
+    '- One leftPage section must explain the play cadence in-world',
+    // THE ESTABLISHMENT SURFACE (W1). Additive-optional in the artifact schema
+    // so every existing book still validates; described here because this is
+    // the shape surface the shell stage authors rulesSpread from.
+    '- `orientation` (object): { situation, cast }. The plain-words establishing shot —',
+    '  `situation` is 2-6 sentences (200-700 chars) saying what is happening here, and `cast`',
+    '  is 3-8 entries of { name, role, note } naming the people this book is about. Written',
+    '  flat, outside the fiction\'s voice. See the Rules Page Requirements for the full demand.'
   ];
 
   window.SCHEMA_ENDINGS = [
@@ -507,6 +514,17 @@
     '- `weekNumber` (integer): 1-indexed',
     '- `title` (string): chapter title inside the world',
     '- `epigraph` (object): { text, attribution }',
+    // THE PLAIN-STAKES LINE (W1, 2026-08-18). The epigraph is the week's MOOD
+    // and is allowed to be oblique; nothing on the week's opening page has ever
+    // said, in words a stranger can act on, what is actually at stake. This
+    // field is that sentence, and it prints directly under the epigraph in the
+    // flat instrument face.
+    '- `stakesLine` (string, 40-240 chars): ONE flat sentence, second person, present tense,',
+    '  naming what is scarce, threatened or wanted THIS week. It must contain either a NUMBER',
+    '  or the name of a printed surface (a clock, a track, a strip, a board, a table). Not a',
+    '  mood and not a tease: "Three cells on the tide clock are already filled; fill the last',
+    '  four and the causeway closes for good." Flat register, like the rules page — this is the',
+    '  line that tells a reader who understood nothing else what this week is about.',
     '- `isBossWeek` (boolean)',
     '- `weeklyComponent` (object): { type, value, extractionInstruction }',
     '- `sessions` (array, 3-6 items): { sessionNumber, label, exercises: [{ name, sets, repsPerSet, weightField?, notes? }], storyPrompt, fragmentRef?, markStrip, binaryChoice?: { choiceLabel, promptA, promptB } }',
@@ -4108,6 +4126,17 @@
     '- Typography as mood: lowercase styling, dropped punctuation, spaced letters.',
     '  Standard capitalization and punctuation in every register; format',
     '  conventions belong to the document, never to the mood.',
+    // THE BRIEF-TRANSCRIPTION BAN (W1, 2026-08-18). The measured failure the
+    // author reads as pretension is often not invention at all: the brief's own
+    // phrases come back as printed prose, so the book sounds like its own
+    // pitch. A brief is a COMMISSION — the thing the prose is built to satisfy,
+    // never material to quote back.
+    '- Brief transcription: the brief is input, never copy. No run of six or more',
+    '  consecutive words from the brief may appear verbatim in any printed prose —',
+    '  not in an epigraph, a fragment, an interlude, an oracle entry or an ending.',
+    '  Its ideas are yours to build; its sentences are not yours to print. A phrase',
+    '  you find yourself reaching for twice is almost always the brief\'s, not the',
+    '  world\'s. This one is measured.',
     '- Emotion summary: naming the feeling instead of recording what showed.',
     '  Posture, omission, and action carry it; a stated emotion replaces it.',
     '- Gym metaphor in the fiction: the workout is real and the story is fiction.',
@@ -4526,7 +4555,55 @@
     '- roll under it on the oracle d100 and read the entry one band above the one you rolled',
     '- complete every prescribed set in the session before rolling and you may re-roll once — the only thing training changes is your standing, never the sets themselves',
     'The rightPage contains the password/convergence tracker and unlock instructions.',
-    'Both pages must be comprehensible to a player who has never seen the booklet before.'
+    'Both pages must be comprehensible to a player who has never seen the booklet before.',
+    '',
+    // ── THE REGISTER SPLIT (W1, 2026-08-18) ──────────────────────────────────
+    // Not new doctrine: PLAY.md's rules-block law already reads "flat voice,
+    // designed form (VISION §4.2)" and INST_VOICE_DISCIPLINE already exempts
+    // this surface from the fiction's register. What was missing is the DEMAND
+    // — the exemption told the model flatness was permitted here; nothing told
+    // it flatness was required. The author's verdict on the first delivered
+    // book was "most of the time I don't know what is being said... I still
+    // don't know how to play the game."
+    '### The register of this page: flat, not literary',
+    'This is the one surface where the book stops performing and starts instructing. It is',
+    'law, not permission (PLAY.md, the rules-block register: FLAT VOICE, DESIGNED FORM):',
+    '- Second person, present tense, imperative. "Roll two d10." Never "one rolls", never',
+    '  "the initiate may find that rolling is called for".',
+    '- One instruction per sentence. A sentence that carries two steps is two sentences.',
+    '- Concrete nouns the player can point at on a page: the box, the strip, the row, the',
+    '  circle, the table. Never "the apparatus", "the working", "the observance".',
+    '- DEFINE EVERY GAME TERM AT FIRST USE, in the same breath, in ordinary words. "Spend a',
+    '  Tally — a Tally is one filled box on the strip at the foot of a session card."',
+    '  A world-word used in a teaching sentence and defined nowhere on this page is the',
+    '  defect this section exists to stop: the player reads a rule they cannot perform.',
+    '- No metaphor, no atmosphere, no withholding. The fiction is everywhere else in this',
+    '  book; here the reader is a stranger holding a pencil who wants to start.',
+    '',
+    '### PRINT THE GAME\'S OWN WORDS ON THIS PAGE',
+    'The rulebook you were given above names the currency and the three-to-five core verbs.',
+    'Those exact words MUST appear in the rules teaching, spelled the way the rulebook',
+    'spells them. A player taught "Favour" and then shown "Marks" for every week of the',
+    'block has been taught nothing; a player never shown a verb never performs it. Checked.',
+    '',
+    // ── THE ESTABLISHMENT SURFACE (W1, 2026-08-18) ───────────────────────────
+    // The other half of "I don't know what is being said": the book opens in
+    // medias res into a world with no situation and no named people, and the
+    // rules page teaches procedure against a fiction the reader has not been
+    // given. Orientation is where the reader is told, in plain words, what is
+    // happening and who is in it — before the first document performs.
+    '### rulesSpread.orientation — who and what, in plain words',
+    'Before the procedure, establish the situation. This is NOT a teaser and NOT atmosphere:',
+    'it is the paragraph a reader needs to understand every document that follows.',
+    '- `situation` (string, 2-6 sentences, 200-700 characters): what is happening here, in',
+    '  plain words, in the present tense. Where we are, what has gone wrong or is at stake,',
+    '  and what the reader is doing about it over the coming weeks. A stranger who reads',
+    '  only this paragraph can follow the whole book. Withhold the ANSWERS, never the SETUP.',
+    '- `cast` (array, 3-8 items): the people, offices or bodies named in this book.',
+    '  Each item: { `name` (as it is printed everywhere else in the book), `role` (2-6',
+    '  words, what they are), `note` (optional, at most 12 words: what they want, or what',
+    '  they are hiding) }. Every in-world author of a document belongs here. Names must',
+    '  match the spelling used in the weeks and fragments exactly.'
   ];
 
   window.INSTRUCTIONS = [].concat(

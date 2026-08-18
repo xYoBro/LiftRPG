@@ -45,6 +45,35 @@ const META_LINE = 12.8;       // `.week-meta` (epigraph attribution)
 const META_MARGIN = 8;
 const META_CHARS = 85;        // fit ≤86
 
+/**
+ * THE PLAIN-STAKES LINE (W1, 2026-08-18) — `.week-stakes`.
+ *
+ * One flat sentence under the epigraph naming what is scarce, threatened or
+ * wanted this week (schema `week.stakesLine`, floored 40-240 chars at the week
+ * stage gate). The epigraph is the week's MOOD and is allowed to be oblique;
+ * this is the line that tells a reader who understood nothing else what the
+ * week is about, which is why it prints in the instrument face at full --ink.
+ *
+ * DERIVED, NOT FITTED — stated plainly because every other constant in this
+ * file was measured against 47 rendered headers and no fixture yet carries a
+ * stakes line. 6.5pt mono with an explicit 1.35 line-height gives 11.7px; 12.0
+ * is taken. The character fit is derived from `.week-meta`'s measured 85 at
+ * 6pt-plus-.1em-tracking (≈476px of column), re-solved for a 6.5pt mono advance
+ * inside a column narrowed by this element's 6px padding and 1.5px rule: ≈90.
+ * 80 is taken instead — CONSERVATIVE ON PURPOSE, the direction this whole file
+ * insists on, because the estimate is also what the adapter's session chunker
+ * charges and an under-estimate re-chunks the page. Refit against rendered
+ * headers once a fixture carries one.
+ *
+ * ZERO WITHOUT THE FIELD, which is the dormancy guarantee the door term above
+ * carries for the same reason: no corpus fixture has a stakesLine, so this term
+ * must contribute nothing at all to their week headers or every book in the
+ * suite re-chunks.
+ */
+const STAKES_LINE = 12.0;
+const STAKES_MARGIN = 8;
+const STAKES_CHARS = 80;
+
 const DEFAULT_WEEK_TITLE = 'Training Record';
 
 /**
@@ -167,6 +196,14 @@ export function estimateWeekHeaderHeight(weekMeta, isFirstChunk) {
     }
   }
 
+  // The stakes line rides the epigraph's chunk rule: it frames the week, and a
+  // week's framing prints once, at the top, with the door. render() gates it on
+  // the same flag — one condition, two readers (D71's whole class).
+  var stakes = String(week.stakesLine || '').trim();
+  if (stakes && isFirstChunk !== false) {
+    height += countWrappedLines(stakes, STAKES_CHARS) * STAKES_LINE + STAKES_MARGIN;
+  }
+
   // The door prints on the first chunk only, with the rest of the week's
   // framing — render() gates it on the same flag.
   if (isFirstChunk !== false) height += doorHeight(week);
@@ -209,6 +246,15 @@ registerAtom('week-header', {
       if (epigraph.attribution) {
         wrap.appendChild(make('div', 'week-meta', epigraph.attribution));
       }
+    }
+
+    // The plain-stakes line — under the epigraph, in the instrument face.
+    // Presence-guarded on the same flag the epigraph uses, mirroring
+    // estimateWeekHeaderHeight() exactly: a book with no stakesLine prints
+    // byte-identically to the way it printed before this field existed.
+    var stakesText = String(week.stakesLine || '').trim();
+    if (stakesText && data.isFirstChunk !== false) {
+      wrap.appendChild(make('div', 'week-stakes', stakesText));
     }
 
     // The door — posted with the week's framing, on the first chunk only.

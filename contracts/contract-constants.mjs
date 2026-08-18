@@ -1547,6 +1547,25 @@ export var OUTPUT_BUDGETS = {
   gameRulebook: GAME_RULEBOOK_BUDGETS
 };
 
+// ── THE PLAIN-STAKES BAND (W1, 2026-08-18) ──────────────────────────────────
+// `week.stakesLine` is one flat sentence under the epigraph naming what is
+// scarce, threatened or wanted this week. The band is its whole definition:
+// below the floor the field is satisfiable with a mood label ("A hard week"),
+// which is the sentence it exists to replace; above the ceiling it stops being
+// one sentence and becomes a second epigraph in the flat face.
+//
+// DELIBERATELY NOT AN `OUTPUT_BUDGETS` ROW, and the reason is routing rather
+// than taste — the same ruling `gameRulebook` carries one screen up.
+// INST_OUTPUT_BUDGETS is a CEILING list ("do not exceed"), stated to four
+// stages; this is a two-sided band belonging to one field on one stage, and it
+// is stated where that stage reads it (SCHEMA_SINGLE_WEEK, routed to
+// week-final). Its prompt/constant parity is asserted behaviourally in
+// check-generation-floors.mjs against the BUILT prompt, which is the stronger
+// half of the D124 idiom: a number in a section that reaches no stage would
+// pass a source scan and fail a reader.
+export var WEEK_STAKES_MIN_CHARS = 40;
+export var WEEK_STAKES_MAX_CHARS = 240;
+
 // ── The eight questions (PLAY.md §3.1) ──────────────────────────────────────
 // THE SINGLE HOME of what the rulebook must answer, and of which answers are
 // load-bearing. Three readers that cannot see each other:

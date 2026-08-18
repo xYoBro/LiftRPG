@@ -1261,6 +1261,18 @@ export var BOOKLET_SCHEMA = {
           additionalProperties: false,
           properties: { text: { type: 'string' }, attribution: { type: 'string' } }
         },
+        // ── stakesLine (schema 1.5.0, additive — W1, 2026-08-18) ────────────
+        // THE PLAIN-STAKES LINE. The epigraph carries the week's mood and is
+        // allowed to be oblique; nothing on a week's opening page ever said in
+        // flat words what was actually at stake, and the author's verdict on
+        // the first delivered book was that he did not know what was being
+        // said. One sentence, flat register, printed under the epigraph.
+        //
+        // Additive-optional here and BLOCKING at the week stage gate — the
+        // D111 derived-or-strict split, the same shape playSpine carries.
+        // Length is floored at the gate (40-240) rather than here: the schema
+        // is what a document may be, the floor is what generation must deliver.
+        stakesLine: { type: 'string' },
         isBossWeek: { type: 'boolean' },
         isDeload: { type: 'boolean' },
         weeklyComponent: {
@@ -2196,6 +2208,41 @@ export var BOOKLET_SCHEMA = {
       required: ['leftPage', 'rightPage'],
       additionalProperties: false,
       properties: {
+        // ── orientation (schema 1.5.0, additive — W1, 2026-08-18) ───────────
+        // THE ESTABLISHMENT SURFACE. The first delivered book taught procedure
+        // against a fiction the reader was never given: documents performed at
+        // a reader who did not know where he was or who anyone was. This is the
+        // plain-words setup — situation and cast — printed above the procedure.
+        //
+        // ADDITIVE-OPTIONAL by the D103/D178 precedent: absent from every book
+        // in the corpus, so requiring it here would fail the whole corpus to
+        // enforce a generation rule. Generation policy demands it at its stage;
+        // the artifact contract only says what a well-formed one looks like.
+        // The renderer is presence-guarded, so a book without it prints exactly
+        // as it did before.
+        orientation: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            situation: { type: 'string' },
+            cast: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['name', 'role'],
+                additionalProperties: false,
+                properties: {
+                  name: nonEmptyString,
+                  role: nonEmptyString,
+                  // What they want, or what they are hiding. Optional: a cast
+                  // entry that is only a name and a role is still a legible
+                  // row, and a demanded note is how a table fills with filler.
+                  note: { type: 'string' }
+                }
+              }
+            }
+          }
+        },
         leftPage: {
           type: 'object',
           required: ['sections'],

@@ -1378,6 +1378,80 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   text-transform:uppercase;
   color:var(--accent);
 }
+/* ── The establishment surface (W1, 2026-08-18) ─────────────────────────────
+   `rulesSpread.orientation` — the plain-words situation, then the named-persons
+   table, printed above the procedure. The reader gets WHO and WHAT before HOW.
+
+   Designed form, flat voice (PLAY.md's rules-block law). The cast is a real
+   table rather than a paragraph of names because a table is scannable in
+   seconds (VISION §8) and a paragraph of proper nouns is the thing this surface
+   exists to replace. Three columns on one grid so every name aligns down the
+   page and the eye can travel one column instead of re-reading rows.
+
+   Every value here is a theme token or a structural constant — no hardcoded
+   colour, weight or opacity, so a new archetype dresses this block for free
+   (the scalability rule). The note column recedes to --muted because it is
+   gloss; the name does not, because it is the word the rest of the book uses.
+
+   NO BOX METRICS UNDER ANY DIALECT OR ARRANGEMENT SELECTOR — this block is
+   plain page furniture and takes the decoration channels' paint like anything
+   else on the page. */
+.rules-orientation{
+  margin:0 0 10px;
+  padding-bottom:8px;
+  border-bottom:1px var(--theme-line-style,solid)
+    color-mix(in srgb, var(--theme-panel-border,var(--rule)) 70%, transparent 30%);
+}
+.rules-orientation-situation{
+  font-family:var(--theme-body-family,var(--serif));
+  font-size:var(--theme-body-size,8pt);
+  line-height:1.5;
+  color:var(--ink);
+  margin:0 0 8px;
+}
+.rules-orientation-label{
+  font-family:var(--theme-label-family,var(--mono));
+  font-size:5.2pt;
+  letter-spacing:var(--theme-label-spacing,.18em);
+  text-transform:var(--theme-label-case,uppercase);
+  color:var(--accent);
+  margin-bottom:3px;
+}
+.rules-orientation-cast{
+  display:grid;
+  grid-template-columns:auto auto 1fr;
+  column-gap:8px;
+  row-gap:2px;
+  align-items:baseline;
+}
+.rules-orientation-label{
+  grid-column:1 / -1;
+}
+.rules-orientation-row{
+  display:contents;
+}
+.rules-orientation-name{
+  /* Every name starts a row. `display:contents` flattens the rows into the
+     grid, so auto-placement alone would let a short row push the next name
+     sideways; the atom also always emits the third cell, and the two guards
+     are deliberately both present because this misalignment is silent. */
+  grid-column-start:1;
+  font-family:var(--theme-label-family,var(--mono));
+  font-size:6.2pt;
+  color:var(--ink);
+  white-space:nowrap;
+}
+.rules-orientation-role{
+  font-family:var(--mono);
+  font-size:6pt;
+  color:var(--ink);
+}
+.rules-orientation-note{
+  font-family:var(--theme-body-family,var(--serif));
+  font-size:6.4pt;
+  font-style:italic;
+  color:var(--muted);
+}
 .rules-body{
   font-size:var(--theme-body-size,8pt);
   color:var(--ink);
@@ -1714,6 +1788,38 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   color:var(--muted);
   letter-spacing:.1em;
   display:block;
+  margin-bottom:8px;
+}
+
+/* ── The plain-stakes line (W1, 2026-08-18) ─────────────────────────────────
+   One flat sentence under the epigraph naming what is scarce, threatened or
+   wanted this week. It is deliberately NOT dressed like the epigraph above it:
+   the epigraph is the week's mood and wears the serif italic in --muted, and
+   this is the instrument register — mono, full --ink, ruled off at the left
+   like every other thing in this book a player is meant to ACT on.
+
+   --ink RATHER THAN --muted, and that is the whole point of the element: the
+   line exists because a reader could not tell what was being said, so it is
+   the one piece of week furniture that may not recede.
+
+   CROSS-FILE CONTRACT: renderer/modules/atoms/week-header.js mirrors these
+   numbers as STAKES_LINE / STAKES_MARGIN / STAKES_CHARS, and that estimate is
+   ALSO what the adapter's session chunker charges for week furniture — so a
+   value moved here alone does not merely detune the solver, it changes how
+   many session cards the planner believes fit on the page. Change them
+   together (D71).
+
+   Density-invariant, like the rest of this header: no [data-density-variant]
+   or [data-page-compaction] rule reaches it, so the estimate reports one
+   number at every tier. */
+.week-stakes{
+  font-family:var(--mono);
+  font-size:6.5pt;
+  line-height:1.35;
+  color:var(--ink);
+  display:block;
+  border-left:1.5px var(--theme-line-style,solid) var(--theme-panel-border,var(--rule));
+  padding-left:6px;
   margin-bottom:8px;
 }
 
