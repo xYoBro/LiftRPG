@@ -4744,7 +4744,12 @@ async function runApiPipeline(options) {
       // whose evidence never arrives is indistinguishable at every gate from a
       // floor that does not exist — the same law as playSpine and
       // currencyLabel directly above, read in the other direction.
-      brief: brief   // W3-ARM week-staged
+      brief: brief,   // W3-ARM week-staged
+      // The rulebook, for the clock-reachability floor's report-class prose arm
+      // (W3). The blocking arm reads the spine above and needs nothing here;
+      // this is what lets the week gate notice that the rules describe a clock
+      // as weekly and the page does not print it.   // W3-ARM week-rulebook
+      gameRulebook: gameRulebook
     };
     // THE GATE'S OWN ROW, READ BACK AS PROMPT GIVENS (D173). The two blocking
     // floors above read `mechanicGrammarFamily` and `shellFamily`; the prompt
@@ -6215,7 +6220,8 @@ async function runSkeletonFleshPipeline(options) {
       // The brief, arming W1's transcription floor (W3). Both pipelines carry
       // it or one pipeline writes its epigraphs ungated — the same sentence
       // the currencyLabel row above earned.
-      brief: brief || ''   // W3-ARM week-sf
+      brief: brief || '',   // W3-ARM week-sf
+      gameRulebook: sfGameRulebook   // W3-ARM week-sf-rulebook
     };
     var sfWeekIdentityGiven = deriveWeekIdentityGiven(sfWeekFloorOptions, isBoss);
 

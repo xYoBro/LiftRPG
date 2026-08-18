@@ -1348,6 +1348,17 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
       { label: 'epigraph.text', text: (weekObj.epigraph || {}).text },
       { label: 'interlude.body', text: (weekObj.interlude || {}).body }
     ], expectedOptions.brief, 'Week'));
+
+    // ── A clock this week feeds is a clock this week prints (W3) ──
+    // The spine rides these options already (the closure floors read it); the
+    // rulebook is armed alongside it for the report-class prose arm. No spine,
+    // no check — a floor never invents the declaration it checks against.
+    errors = errors.concat(clockReachabilityFloorErrors(weekObj,
+      expectedOptions.weekNumber || expectedOptions.currentWeekNumber,
+      expectedOptions.playSpine, expectedOptions.gameRulebook));
+    warnings = warnings.concat(clockReachabilityWarnings(weekObj,
+      expectedOptions.weekNumber || expectedOptions.currentWeekNumber,
+      expectedOptions.playSpine, expectedOptions.gameRulebook));
   }
 
   if (!Array.isArray(weekObj.sessions) || weekObj.sessions.length === 0) {
@@ -2721,6 +2732,119 @@ export function rulesTeachingFloorErrors(rulesSpread, gameRulebook, where) {
       + 'sentence on this page saying what you do, on which printed surface, and when.');
   }
   return errors;
+}
+
+/**
+ * collectClockReachabilityFindings(weekObj, weekNumber, playSpine, gameRulebook)
+ *
+ * ── A CLOCK THE WEEK FEEDS MUST BE A CLOCK THE WEEK PRINTS (W3) ─────────────
+ *
+ * The read's defect 8, and the most expensive kind of defect this system can
+ * produce: the first delivered book's rules said "at each week's reckoning,
+ * shade as many bands as your two strips totalled", and the Root Clock existed
+ * in the data of week six only. The book's second economy loop had no surface
+ * for 83% of the game. Every gate was green, because no gate had ever compared
+ * what the machine says the week DOES against what the page gives the player to
+ * do it ON. That is measurement-equals-render, applied to the play graph.
+ *
+ * THE BLOCKING ARM IS EXACT AND READS ONLY MACHINE DATA. The spine's economy
+ * graph declares edges; an edge whose source resolves to THIS week and whose
+ * target is `clock:<name>` is the machine saying, in its own words, that this
+ * week's play writes into that clock. The clock must then appear in this week's
+ * `gameplayClocks` by name. Both sides are strings the BOOK declared — nothing
+ * is parsed out of prose, nothing is guessed, and a book whose spine feeds no
+ * clock from this week is asked for nothing.
+ *
+ * Measured before it shipped, across the whole corpus plus the demo plus the
+ * delivered book: exactly ONE finding, and it is the defect above (the
+ * proving-run book's week 1 owing the Root Clock). Zero findings everywhere
+ * else. The corpus predates the spine entirely, so it is silent there by the
+ * D144 ungated-caller idiom rather than by an exemption.
+ *
+ * THE FUZZY ARM WARNS AND NEVER BLOCKS (the decider's standing exception to
+ * ambiguity-defaults-to-law). The rulebook's `weekShape` answer is prose, and
+ * prose that names a clock is claiming the player touches it EVERY week — which
+ * is how the Drought Gauge came to be armed from session one and absent from
+ * week one. But "the prose names it" is a substring test against a proper noun,
+ * and a substring test can be wrong in a way an edge cannot. So it reports.
+ * Promotion is an author ruling on measured evidence.
+ */
+function normalizeClockName(name) {
+  return teachingNormalize(name);
+}
+
+function collectClockReachabilityFindings(weekObj, weekNumber, playSpine, gameRulebook) {
+  var findings = [];
+  var wk = Number(weekNumber);
+  if (!weekObj || typeof weekObj !== 'object' || !wk) return findings;
+  var graph = (playSpine && Array.isArray(playSpine.economyGraph)) ? playSpine.economyGraph : null;
+  if (!graph) return findings;
+
+  var printed = {};
+  (Array.isArray(weekObj.gameplayClocks) ? weekObj.gameplayClocks : []).forEach(function (clock) {
+    var key = normalizeClockName(clock && clock.clockName);
+    if (key) printed[key] = true;
+  });
+
+  // Every clock the graph names anywhere, and the subset this week FEEDS.
+  var allClocks = {};
+  var owedHere = {};
+  graph.forEach(function (edge) {
+    if (!edge || typeof edge !== 'object') return;
+    var to = parseSurfaceRef(edge.to);
+    if (!to.valid || to.kind !== 'clock' || !to.id) return;
+    var key = normalizeClockName(to.id);
+    if (!key) return;
+    allClocks[key] = to.id;
+    var from = parseSurfaceRef(edge.from);
+    if (!from.valid || !from.id) return;
+    // `reckoning:W3`, `markStrip:W3.1`, `door:W3` — the week is the first
+    // number after the W, and a source with no week (`banked`, `assembly`) is
+    // a book-level source that owes no particular week anything.
+    var m = /^w(\d+)/i.exec(String(from.id));
+    if (!m || Number(m[1]) !== wk) return;
+    owedHere[key] = to.id;
+  });
+
+  Object.keys(owedHere).forEach(function (key) {
+    if (printed[key]) return;
+    findings.push({ reportOnly: false, message: 'Week ' + wk + ' → the play spine feeds `clock:'
+      + owedHere[key] + '` from this week (an economyGraph edge out of week ' + wk + '), and this '
+      + 'week\'s `gameplayClocks` does not carry it. The machine says the player marks that clock '
+      + 'here; the page gives them nothing to mark. Either print the clock in this week\'s '
+      + 'gameplayClocks under exactly the name the graph uses, or the edge is describing a loop '
+      + 'this book never gives the player a surface for — which is a whole economy the reader '
+      + 'is told about and can never touch.' });
+  });
+
+  // The prose arm. Report-class, and scoped to clocks the graph already names,
+  // so a substring hit can never invent a clock that does not exist.
+  var weekShape = teachingNormalize((((gameRulebook || {}).weekShape) || {}).answer);
+  if (weekShape) {
+    Object.keys(allClocks).forEach(function (key) {
+      if (printed[key] || owedHere[key]) return;
+      if (weekShape.indexOf(key) === -1) return;
+      findings.push({ reportOnly: true, message: 'Week ' + wk + ' → the rulebook\'s weekShape '
+        + 'answer describes what happens EVERY week and it names `' + allClocks[key] + '`, which '
+        + 'this week does not print. If the player touches that clock every week, it belongs in '
+        + 'every week\'s gameplayClocks; if it arrives later, weekShape should say from which '
+        + 'week. Reported, not refused: this reads a proper noun out of prose, and prose can be '
+        + 'read wrong in a way a graph edge cannot.' });
+    });
+  }
+  return findings;
+}
+
+export function clockReachabilityFloorErrors(weekObj, weekNumber, playSpine, gameRulebook) {
+  return collectClockReachabilityFindings(weekObj, weekNumber, playSpine, gameRulebook)
+    .filter(function (f) { return !f.reportOnly; })
+    .map(function (f) { return f.message; });
+}
+
+export function clockReachabilityWarnings(weekObj, weekNumber, playSpine, gameRulebook) {
+  return collectClockReachabilityFindings(weekObj, weekNumber, playSpine, gameRulebook)
+    .filter(function (f) { return f.reportOnly; })
+    .map(function (f) { return f.message; });
 }
 
 /**

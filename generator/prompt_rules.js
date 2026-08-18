@@ -291,6 +291,20 @@
     '- Each clock: { clockName, segments, clockType, startValue?, direction?, linkedClockName?, opposedClockName?, thresholds?, consequenceOnFull }',
     '- Supported `clockType` values only:',
     '  "progress-clock" | "danger-clock" | "racing-clock" | "tug-of-war-clock" | "linked-clock" | "project-clock"',
+    // ── THE TAUGHT HALF of clockReachabilityFloorErrors (W3, D186 idiom) ────
+    // The floor reads the spine's own edges; this is the sentence that tells
+    // the model what those edges oblige it to print. Landed in the same edit
+    // as the floor, and the registry row `week-clock-reachable` holds them
+    // together.
+    '- A clock this week FEEDS is a clock this week PRINTS. If the play spine has an edge',
+    '  out of this week (`reckoning:W<n>`, `markStrip:W<n>.x`, `door:W<n>`) into a',
+    '  `clock:<name>`, that clock belongs in THIS week\'s gameplayClocks, spelled exactly as',
+    '  the spine spells it. A week whose play writes into a clock the page never prints is a',
+    '  loop the player is told about and given no surface to touch — the reader marks nothing,',
+    '  and the economy exists only in the rules.',
+    '- If the rules describe a clock as something the player touches every week, it belongs in',
+    '  every week. A clock that only arrives later should say from which week in the rulebook\'s',
+    '  weekShape answer.',
     '',
     '### bossEncounter',
     '- Shape: { title, narrative, mechanismDescription, componentInputs, decodingKey, convergenceProof, passwordRevealInstruction, binaryChoiceAcknowledgement?: { ifA, ifB } }',
