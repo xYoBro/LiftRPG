@@ -3886,6 +3886,117 @@
     return lines.join('\n').replace(/\n+$/, '');
   };
 
+  // ── THE ARSENAL AT THE DESIGNER'S SEAT (D217 W2, author directive 2026-08-18) ──
+  //
+  // VISION §4.0: the model is the game designer, and what the book may print is
+  // bounded by the renderable vocabulary — *the boundary is stated rather than
+  // faked*. VISION §12: an acceptance set the prompts never show is not a menu,
+  // it is a default generator. The arsenal audit
+  // (docs/reference/generated/arsenal.md) measured this seat and convicted it:
+  // ZERO of the 22 composable implements were named at `game-rulebook`. The whole
+  // shelf was taught one stage LATER, at `shell`, after the rules were already
+  // written — so the stage whose entire job is deciding what the game IS designed
+  // it blind, and a blind designer designs the default game.
+  //
+  // THE AMENDMENT THIS MAKES. The rulebook stage is doctrine-minimal by ruling
+  // (D128; §22e of check-generation-floors.mjs pins the negatives — no prose
+  // budgets, nothing false at this seat). That ruling STANDS, with one addition:
+  // the shelf. Doctrine-minimal never meant "and no menu of what can be printed".
+  //
+  // THE DIGEST IS EMITTED, NEVER WRITTEN. `buildArsenalDigest()` in
+  // contracts/ludic-library.mjs compiles the shelf from the registry in the D144
+  // IN/DOES/GIVES/LOCKS form, one line per implement. This file is a browser IIFE
+  // with zero imports, so the digest arrives as a quoted literal — kept honest by
+  // `arsenalDigestParity()` in scripts/validate.mjs, which byte-compares the
+  // evaluated `window.ARSENAL_DIGEST` against the function's live output in BOTH
+  // directions (a literal that drifts, and a registry change the literal does not
+  // carry). Never edit a digest line in place. Re-emit the block:
+  //   node -e "import('./public/contracts/ludic-library.mjs').then(m=>process.stdout.write(m.buildArsenalDigest()))"
+  // and re-quote each line, one array element per digest line, in order.
+  //
+  // CHOOSE-WITH-A-REASON, NOT A PARTS LIST. The audit's `taught` gate asks for a
+  // menu WITH a reason to choose each row, and the registry's `outputs` (GIVES) IS
+  // that reason — so the framing points AT the clause instead of paraphrasing it. A
+  // paraphrase would be a second, worse copy of the argument for adoption (D144 5b,
+  // where the harvest menu offered nine ways to fail and no reason to adopt).
+  //
+  // NO SECOND MENU, deliberately. The furniture/instruments split (D170,
+  // LUDIC_STRUCTURAL_ENTRIES) is NOT restated here, and not only for the D93 copy
+  // reason: teaching "six of these print anyway, spend your choices elsewhere" at
+  // THIS seat would invite a rulebook that never names the map, the cipher, the
+  // oracle or the tally in ordinary words — and the spine may only wire kinds the
+  // rules already named, while the week gate requires all four. The distinction is
+  // true at the seat that writes `composition` (INST_LUDIC_SPINE teaches it there)
+  // and would cause failures here.
+  //
+  // THE HONEST GAP IS `unprintableWants`, NOT `honestGaps`. Two laws one layer
+  // apart, and booklet-schema.mjs says so at meta.gameRulebook.unprintableWants:
+  // this seat records what the PRINTABLE VOCABULARY lacks; `playSpine.honestGaps`
+  // records what the LIBRARY lacks, one stage later. `honestGaps` is not a key this
+  // stage may write — `meta.gameRulebook` is additionalProperties:false and
+  // unknownKeyErrorsForStage blocks the unit — so naming it here would teach a
+  // blocking defect.
+  window.ARSENAL_DIGEST = [
+    'THE IMPLEMENTED SYSTEMS — the composition menu. Each line: what feeds it, what it does, what it yields, what locks it.',
+    '- `reckoning-economy` (The reckoning economy) — IN: Session markStrip ticks; the week’s reckoning conversion; the derived boss threshold. DOES: Ticks tally at the week’s Reckoning, convert to the named currency, and bank; banked value prices every spend the spine declares. GIVES: A filled strip, a tallied panel, a running Banked figure, and whatever the spend opens. LOCKS: Nothing spends before its first Reckoning; the boss threshold gates the endgame ceremony only when the spine routes required content through it.',
+    '- `board` (The board) — IN: Banked value or a key; the region or node the player names. DOES: Marking the map opens a region permanently — six geometries under eight board-state modes, add-only in every one. GIVES: A mutated map the player returns to every week; new regions legal to reference in prose. LOCKS: A region is unreachable until an edge feeds it; the map never un-marks, so an opened region cannot be spent twice.',
+    '- `decode-chain` (The decode chain) — IN: The week’s cipher body plus the extraction instruction; prior play state for the cross-reference families. DOES: The player performs the extraction with a pencil; the result is a word, coordinate, or index the book reads back. GIVES: A decoded value that feeds a seal, a password element, or the boss assembly. LOCKS: A cipher whose key is a fragment the player has not met yet cannot be solved — keys land strictly before locks.',
+    '- `clock-bank` (The clock bank) — IN: Outcomes, spends, misses, and the passage of weeks. DOES: Segments tick on fill, drain, race, or tug-of-war clocks; a full clock fires its declared consequence. GIVES: Visible pressure the player reads at a glance, and the state change a filled clock triggers. LOCKS: A clock nothing reads is a mute source and blocks at the week floor; ambient clocks must be declared ambient.',
+    '- `companion-kit` (The companion kit) — IN: Play state the player chooses to record — items held, memories kept, stats moved. DOES: State-holding components (dashboards, tracks, stat blocks, inventories, memory slots) take pencil marks between sessions. GIVES: A carried position the later weeks can read and the endgame can require. LOCKS: Slot limits force discards; a component the economy never feeds holds nothing.',
+    '- `oracle-pull` (The oracle pull) — IN: Two ten-sided dice, read as roll-under percentile. DOES: The d100 leg of the Hook loop: ten bands, each mapping to a concrete state change rather than atmosphere. GIVES: A rolled outcome that ticks something, grants something, or opens something. LOCKS: Chance isolation (D37): dice never touch sets, reps, load, or rest, and an outcome the endgame requires can never sit behind a roll.',
+    '- `door-fork` (The door fork) — IN: The week’s posted choice and whatever the player has banked when they reach it. DOES: The player takes one side and crosses out the other; the decision ledger names what mechanically differs. GIVES: A branch-attributed change to the economy — a price, a clock, a region, a table. LOCKS: A door with no edge leaving it is flavour-only; content reachable down one branch alone is a soft-lock.',
+    '- `sealed-cache` (The sealed cache) — IN: A key the player recognises — a decoded word, a filled clock, a named region. DOES: Sealed by honour: the page states its key and its unlock condition and the player chooses when to turn to it. GIVES: A late document that pays an early promise. LOCKS: The key is held strictly before the sealed page is printed; you cannot open what you have not yet found.',
+    '- `boss-convergence` (The boss convergence) — IN: The weekly component values, the assembly instruction, and the boss componentInputs. DOES: The endgame ceremony assembles the season’s collected values into the finale’s key. GIVES: The assembly page, the boss encounter, and the ending the assembled value opens. LOCKS: Every password element must be collectable on every branch — the finale opens with all of them or none.',
+    '- `ledger-audit` (The ledger audit) — IN: The player’s own logged numbers, movement by movement. DOES: First / peak / change per movement, audited across the block — the body read as evidence. GIVES: A printed ledger spread the player fills and the ending can cite. LOCKS: Emitted only when the book declares an economy; nothing gates it.',
+    '- `deduction-board` (The deduction board) — IN: A clue set and a grid of pencil cells — subjects against categories, run lengths against a picture, a partly-printed square of digits, named voices against the two kinds of speaker, or things against the order they went in. DOES: The player deduces cell states from constraints; the completed grid yields a code. A deterministic solver proves every printed puzzle solvable, UNIQUE, and key-matched before the week is accepted, and refuses it with the defect quoted otherwise. GIVES: A word, a letter string or a digit string the seal, the assembly or a priced spend reads. LOCKS: The grid is the lock. Nothing ships that a machine cannot finish: two solutions, no solution, or an answer the grid does not yield are all refusals, not warnings.',
+    '- `word-hunt` (The word hunt) — IN: A letter board and a word list drawn from the book’s own noun roster. DOES: The player rings the words they find. A verifier proves every declared placement genuinely spells its word in the printed board, so overlaps are legal by construction, and proves the answer rule produces the declared answer. GIVES: A word the seal or the assembly wants — either one from the list, or the letters no word covered. LOCKS: Machine-verified placement; a word the board does not contain is refused, and in leftovers mode an answer the uncovered letters do not spell is refused.',
+    '- `arithmetic-grid` (The arithmetic grid) — IN: A cage or run structure with target totals, and the digits 1-9. DOES: The player fills digits so every run or cage hits its total with no repeat inside it; the completed grid yields a digit code. A deterministic solver proves solvable, UNIQUE and key-matched, and refuses with the defect quoted otherwise. GIVES: A digit string the seal, the assembly or a priced spend reads. LOCKS: The totals are the lock. A budget the solver cannot finish inside is a refusal, never a pass — an unprovable puzzle and a broken one are the same thing to a player holding a pencil.',
+    '',
+    'THE WIRED PATTERNS — the harvest menu. Declared on the surface each line names; a floor reads every declaration back.',
+    '- `gate-structure` (declare: `meta.playSpine.gateStructure`) — GIVES: A shape the economy graph must actually have — the floor reads the declared structure back off the graph. LOCKS: Sequential owes a chain; path-based owes two lanes and a convergence; open owes several independent feeders into one sink.',
+    '- `hint-ladder` (declare: `meta.playSpine.hintLadders`) — GIVES: A player who is never hard-stuck, a threat clock that remembers they were, and a band the reader finds at the point of use. LOCKS: Rungs are ordered and each is dearer than the last; the ladder names the printed surface that carries it, and the seal is the ORDER — the cost prints before the thing it buys, and paying is on the player’s honour, the same ruling as the sealed cache.',
+    '- `deduction-milestone` (declare: `meta.playSpine.milestones`) — GIVES: A theory the player commits to in pencil, and the surface that answers it. LOCKS: The unlock is unavailable below the count, and the milestone must be answered by a consequence edge — an unanswered theory is an unpaid promise.',
+    '- `legacy-pencil-move` (declare: `meta.playSpine.legacyMoves`) — GIVES: A book that is visibly a record of one campaign and cannot be replayed clean. LOCKS: Each move names the printed surface it happens on; nothing is ever un-marked.',
+    '- `found-not-found-gating` (declare: `meta.playSpine.economyGraph (edges into `seal:`)`) — GIVES: Gated content that opens exactly once the player has earned it. LOCKS: A sealed surface with no inbound edge is unreachable; a key that lands with or after its lock blocks.',
+    '- `branch-attributed-consequence` (declare: `meta.playSpine.economyGraph[].branch`) — GIVES: A fork whose branches genuinely differ, and a simulated player that can walk each side. LOCKS: An endgame reachable on one branch only is a soft-lock; unattributed door edges are reported as underspecified.',
+    '- `priced-spend` (declare: `meta.playSpine.economyGraph[].price`) — GIVES: A budget the player plans against, and a stingy/greedy choice that is a real trade rather than a schedule. LOCKS: A spend is unavailable below its price; the endgame’s own gate stays the derived threshold and may never be re-priced here.',
+    '- `timed-affordance` (declare: `meta.playSpine.economyGraph[].closesAtWeek`) — GIVES: A deadline the schedule can be measured against. LOCKS: Nothing may close before it opens; a required surface behind a closed window is a soft-lock.',
+    '- `book-referential-examination` (declare: `weeks[].fieldOps.cipher (the `cross-reference` family)`) — GIVES: A puzzle only a player who has actually read this artifact can solve. LOCKS: Every cited surface must be printed EARLIER than the puzzle that cites it.'
+  ].join('\n');
+
+  window.INST_ARSENAL = [
+    '## The arsenal — what this engine can actually print',
+    'Read the shelf before you answer the eight questions. Every implement below is BUILT: the',
+    'engine draws it, a floor reads it back, and a player works it with a pencil on paper. The',
+    'shelf is the boundary of what your design can become an actual book.',
+    '',
+    'IT IS NOT WHERE THE IDEAS COME FROM. Those still come from your own knowledge of games,',
+    'remixed for THIS brief — the shelf is what an idea has to be BUILT OUT OF once you have it.',
+    'Two designers handed this same shelf and different briefs should produce different games. If',
+    'the shelf is deciding your game, you are reading it as a template, and it is not one.',
+    '',
+    'THE REASON TO CHOOSE ONE IS ON ITS OWN LINE. Each entry says what feeds it (IN), what it',
+    'does (DOES), what the player gets out of it (GIVES) and what breaks if it is wired wrong',
+    '(LOCKS). GIVES is the argument for the implement; LOCKS is its price. Choose the implements',
+    'whose GIVES is the game you are describing — not the ones that are familiar, and not the',
+    'ones that come first in the list.',
+    '',
+    window.ARSENAL_DIGEST,
+    '',
+    'THIS IS A SHELF, NOT A CHECKLIST. Naming all of it is not designing — a game is as much',
+    'what you left off as what you kept. A later stage writes the composition down, and it',
+    'writes it FROM your answers, so let your answers WANT particular implements and say what',
+    'each one is FOR in this book. A design that gestures at everything leaves the choosing to a',
+    'stage that cannot read your intent, and that is how two books from different briefs end up',
+    'the same game.',
+    '',
+    'IF THE SHELF LACKS WHAT YOUR DESIGN WANTS, SAY SO. Do not rename something on it and call',
+    'it the thing you wanted. Name the want in `unprintableWants`, in plain words, and design',
+    'the best version you can with what is here. That record is how this shelf grows — the gap',
+    'you write down is the next implement built. A silent substitution is a book that describes',
+    'a game it is not.'
+  ];
+
   // ── The surface-ref grammar (extracted, D173 rules-first wave) ────────────
   // ONE HOME, TWO STAGE READERS. The grammar used to live inside the Play Spine
   // section, which was correct while the spine was the only surface that
@@ -5171,9 +5282,14 @@
   //   UNLESS it is stage-only by ruling — in which case it goes here, it does NOT
   //   go in the bundle, and a validator pass asserts BOTH halves of that routing.
   //   Stage-only today: DESIGN_LANGUAGE (D139), CONDUCTOR (D134), LUDIC_SPINE
-  //   (W4a), POINT_OF_USE / RETURN_LOOP / DOOR_BIAS (Teeth), SHELL_CHOICE (D144).
-  //   Every one of them is off the bundle for the same arithmetic: the paste
-  //   path is hard against its 115,000-character ceiling.
+  //   (W4a), POINT_OF_USE / RETURN_LOOP / DOOR_BIAS (Teeth), SHELL_CHOICE (D144),
+  //   GAME_RULEBOOK + ARSENAL (D173 / D217 W2 — the paste path has no rulebook
+  //   stage at all). This roster is a hand-kept convenience, NOT the reader:
+  //   `promptSectionReachability()` in validate.mjs is what fails a build on an
+  //   unrouted section. The original arithmetic — the paste path hard against a
+  //   115,000-character ceiling — retired with the paste door itself (D189); the
+  //   live reason a stage-only section stays off the bundle is that no product
+  //   path builds the bundle, and doctrine belongs at the seat that can obey it.
   // - NEVER put schema or instruction content in generator.js or api-generator.js.
 
   var STAGE_SCHEMA_MAP = {
@@ -5194,7 +5310,18 @@
     // writes none of. Routing the whole section to import one constraint is the
     // D128 defect; restating the constraint where it binds is not, and the
     // floors row asserts the kit reaches this stage either way.
-    'game-rulebook':  { schemas: ['GAME_RULEBOOK'],                             instructions: ['GAME_RULEBOOK', 'SURFACE_REFS', 'BRIEF_FIDELITY'] },
+    //
+    // AMENDED (D217 W2, author directive 2026-08-18): doctrine-minimal PLUS THE
+    // SHELF. The arsenal audit measured this seat and found ZERO of the 22
+    // composable implements named at it — the whole shelf was taught one stage
+    // later, at `shell`, after the rules were already written. A designer
+    // unshown the shelf designs the default game (VISION §12: an acceptance set
+    // the prompts never show is not a menu, it is a default generator). ARSENAL
+    // is FIRST in the list on purpose: its own text says to read the shelf
+    // before answering the eight questions, and §22e pins that ordering so the
+    // sentence cannot become false by a reorder. It is the ONE addition — D128's
+    // negatives above are unchanged and still asserted.
+    'game-rulebook':  { schemas: ['GAME_RULEBOOK'],                             instructions: ['ARSENAL', 'GAME_RULEBOOK', 'SURFACE_REFS', 'BRIEF_FIDELITY'] },
     // Planning stages: story-first
     'layer-codex':    { schemas: [],                                            instructions: ['STORY_ENGINE', 'CHARACTER_WEB', 'LAYERED_ARC', 'ANTI_PATTERNS'] },
     // MAP_GEOMETRY rides the campaign plan because the plan is where the
