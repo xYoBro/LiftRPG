@@ -2982,6 +2982,230 @@ export function clockReachabilityWarnings(weekObj, weekNumber, playSpine, gameRu
 }
 
 /**
+ * collectOracleWriteTargetFindings(booklet) -> [{ message }]
+ *
+ * ── DR-32: THE ORACLE'S WRITE TARGET, REPORT-CLASS ──────────────────────────
+ *
+ * The clock arm above asks the same question from the machine side: a play
+ * spine's `economyGraph` edge names `clock:X` out of week 3, so week 3 owes a
+ * printed clock called X. That arm has a graph to read, and it BLOCKS.
+ *
+ * This arm has only prose. An oracle entry's `paperAction` is a free string,
+ * and the corpus's 652 of them carry ZERO surface-ref grammar — the schema's
+ * `oracleTable.entries[].clockTarget` is declared, populated in none of 1065
+ * corpus entries, and read by no code in this repo. So the only way to ask
+ * "does the book print the thing this action tells the player to mark?" is to
+ * read a surface name out of an instruction sentence, which is a guess about
+ * English. It therefore WARNS and never blocks — the D199 conservatism
+ * precedent, applied to a matcher with even less to stand on.
+ *
+ * MEASURED BEFORE ARMED (scripts/measure-oracle-write-targets.mjs, run on the
+ * 21-book corpus 2026-08-18). The broad verb-phrase grammar the measurement
+ * swept is NOT precise enough to ship: over 350 prepositional captures it
+ * resolved 18% exactly, and its misses were dominated by page furniture the
+ * inventory structurally cannot hold ("mission journal", "survey grid", "the
+ * nearest open margin", "the DOCUMENT DATES field"). Two slices survived:
+ *
+ *   · `advance <Named Surface>` / `reduce <Named Surface>` — 174 of 195 direct
+ *     captures resolved exactly. This is the ANTI-VACUITY half: it proves the
+ *     matcher can say yes, which an arm built only on the failing idiom could
+ *     never demonstrate.
+ *   · `add <quantity> to <Named Surface>` — 133 captures, 124 unresolved, and
+ *     ALL 124 came from four books that print no clock and no component by the
+ *     name the action uses (spot-verified by hand: variety-04-cargo tells the
+ *     player eleven times to add to a "Suspicion track" it never prints).
+ *
+ * WHAT THIS ARM CANNOT PROVE, stated because the number is zero: no book in
+ * the corpus uses the `add … to X` idiom AND prints X, so the corpus contains
+ * no true negative for that half. Its false-positive rate on a well-formed
+ * book is UNMEASURED. That is the honest reason it is report-class, and the
+ * reason a promotion to blocking owes a corpus that contains the positive case
+ * first.
+ *
+ * BOOK-LEVEL BY NECESSITY, not by preference. A week-3 oracle may legitimately
+ * point at a companion printed in week 1, so a week-seat version of this check
+ * would report misses that are not misses — a gate that cannot see its
+ * evidence reports the wrong thing (D200-3b, in the other direction).
+ *
+ * The inventory is `buildSurfaceIndex` below — the floors' own index, not a
+ * second one (D93).
+ */
+
+// Direct object IS the surface: these two verbs act on a named quantity.
+var WRITE_TARGET_DIRECT_VERBS = ['advance', 'reduce'];
+// Direct object is the written VALUE; the surface arrives after "to".
+var WRITE_TARGET_ADD_VERBS = ['add'];
+
+// An instruction starts a clause. Without this the noun readings win: "The log
+// shows the tape was calibrated on Day 1" would extract a write to "Day 1".
+var WRITE_TARGET_CLAUSE_HEAD = /(?:^|[.;:!?,—–()"'“”]\s*|\b(?:and|or|then|also|but)\s+)$/i;
+var WRITE_TARGET_STOP = {
+  by: 1, as: 1, with: 1, to: 1, at: 1, on: 1, in: 1, and: 1, or: 1, for: 1,
+  from: 1, if: 1, when: 1, per: 1, using: 1, under: 1, the: 1, a: 1, an: 1,
+  this: 1, that: 1, your: 1, its: 1, their: 1, onto: 1, into: 1, beside: 1,
+  against: 1, until: 1, then: 1, but: 1, now: 1, no: 1, not: 1, of: 1, is: 1,
+  was: 1, are: 1, were: 1, next: 1, alongside: 1, adjacent: 1, above: 1,
+  below: 1, each: 1, both: 1
+};
+var WRITE_TARGET_DEICTIC = /^(it|them|this|that|these|those|here|there|one|each|both|him|her|us|me|you|all|level\s+\d+|\d+[a-z]*)$/i;
+// A capture made only of these names the paper, not a designed surface.
+var WRITE_TARGET_FURNITURE = {
+  map: 1, margin: 1, grid: 1, journal: 1, log: 1, logbook: 1, page: 1,
+  sheet: 1, form: 1, track: 1, box: 1, boxes: 1, line: 1, field: 1, column: 1,
+  note: 1, notes: 1, table: 1, chart: 1, tracker: 1, ledger: 1, card: 1,
+  slot: 1, slots: 1, space: 1, section: 1, row: 1, header: 1, footer: 1,
+  panel: 1, strip: 1, book: 1, booklet: 1, record: 1, records: 1, sidebar: 1,
+  blank: 1, entry: 1, my: 1, our: 1, current: 1
+};
+// The prose adds these to a printed surface's own name, on either side: the
+// clock called "Suspicion" is written "the Suspicion track", and the map node
+// called "N4" is written "node N4". One retry per side — never both at once,
+// because stripping from both ends of a two-token capture leaves nothing and
+// an empty slug matches everything.
+var WRITE_TARGET_NAME_SUFFIXES = {
+  track: 1, clock: 1, tracker: 1, meter: 1, gauge: 1, dial: 1, log: 1,
+  bar: 1, counter: 1, strip: 1
+};
+var WRITE_TARGET_NAME_PREFIXES = {
+  node: 1, tile: 1, cell: 1, edge: 1, zone: 1, sector: 1, ring: 1, panel: 1,
+  box: 1, slot: 1, column: 1, row: 1, track: 1, clock: 1, square: 1
+};
+var WRITE_TARGET_MAX_TOKENS = 4;
+
+var WRITE_TARGET_DIRECT_RE = new RegExp(
+  '\\b(' + WRITE_TARGET_DIRECT_VERBS.join('|') + ')\\s+(?:the\\s+|your\\s+)?'
+  + '([A-Za-z0-9][^.;:!?,()]{0,60})', 'gi');
+var WRITE_TARGET_ADD_RE = new RegExp(
+  '\\b(' + WRITE_TARGET_ADD_VERBS.join('|') + ')\\b[^.;:!?]{0,40}?\\bto\\s+'
+  + '(?:the\\s+|your\\s+|this\\s+|its\\s+|their\\s+|a\\s+|an\\s+)?'
+  + '([A-Za-z0-9][^.;:!?,()]{0,60})', 'gi');
+
+function trimWriteTarget(raw) {
+  var kept = [];
+  var parts = String(raw == null ? '' : raw).trim().split(/\s+/);
+  for (var i = 0; i < parts.length; i++) {
+    var bare = parts[i].replace(/^[^A-Za-z0-9]+/, '').replace(/[^A-Za-z0-9'’]+$/, '');
+    if (!bare) break;
+    if (WRITE_TARGET_STOP[bare.toLowerCase()]) break;
+    kept.push(bare);
+    if (kept.length >= WRITE_TARGET_MAX_TOKENS) break;
+  }
+  return kept.join(' ');
+}
+
+function extractWriteTargets(actionText) {
+  var src = String(actionText == null ? '' : actionText);
+  if (!src) return [];
+  var out = [];
+  function scan(re) {
+    re.lastIndex = 0;
+    var m;
+    while ((m = re.exec(src)) !== null) {
+      if (!WRITE_TARGET_CLAUSE_HEAD.test(src.slice(0, m.index))) continue;
+      var target = trimWriteTarget(m[2]);
+      if (!target) continue;
+      // An all-caps multi-word capture is the verbatim string the player
+      // writes, never the thing they write it on.
+      if (/^[A-Z0-9][A-Z0-9 '’-]*$/.test(target) && target.split(/\s+/).length > 1) continue;
+      if (WRITE_TARGET_DEICTIC.test(target)) continue;
+      // A NAMED surface carries a capital somewhere. Lower-case captures are
+      // "one slot", "first box", "the last exercise completed" — descriptions
+      // of a place on a page, not the name of a printed component.
+      if (!/[A-Z]/.test(target)) continue;
+      out.push({ verb: m[1].toLowerCase(), target: target, span: m[0].trim().replace(/\s+/g, ' ') });
+    }
+  }
+  scan(WRITE_TARGET_DIRECT_RE);
+  scan(WRITE_TARGET_ADD_RE);
+  return out;
+}
+
+function writeTargetResolves(index, target) {
+  var primary = toSlugWords(target);
+  if (!primary) return true;
+  var toks = primary.split(' ').filter(Boolean);
+  var tries = [primary];
+  if (toks.length > 1 && WRITE_TARGET_NAME_SUFFIXES[toks[toks.length - 1]]) {
+    tries.push(toks.slice(0, -1).join(' '));
+  }
+  if (toks.length > 1 && WRITE_TARGET_NAME_PREFIXES[toks[0]]) {
+    tries.push(toks.slice(1).join(' '));
+  }
+  var kinds = index.kinds || {};
+  var kindNames = Object.keys(kinds);
+  var t, k, name;
+  for (t = 0; t < tries.length; t++) {
+    for (k = 0; k < kindNames.length; k++) {
+      if (kinds[kindNames[k]][tries[t]]) return true;
+    }
+  }
+  // The loose tier, deliberately last: an indexed name inside the capture, or
+  // the capture inside an indexed name ("VALE Stress Track" ⊃ "vale stress").
+  for (t = 0; t < tries.length; t++) {
+    var padded = ' ' + tries[t] + ' ';
+    for (k = 0; k < kindNames.length; k++) {
+      var bucket = kinds[kindNames[k]];
+      for (name in bucket) {
+        if (!Object.prototype.hasOwnProperty.call(bucket, name)) continue;
+        if (!name || name.length < 3) continue;
+        if (padded.indexOf(' ' + name + ' ') !== -1) return true;
+        if ((' ' + name + ' ').indexOf(padded) !== -1) return true;
+      }
+    }
+  }
+  // Every token is page furniture — "the margin", "your grid". Not a finding:
+  // no schema field holds the name of the paper.
+  var allFurniture = toks.length > 0;
+  for (var i = 0; i < toks.length; i++) {
+    if (!WRITE_TARGET_FURNITURE[toks[i]]) { allFurniture = false; break; }
+  }
+  return allFurniture;
+}
+
+export function collectOracleWriteTargetFindings(booklet) {
+  var findings = [];
+  var doc = booklet || {};
+  if (!Array.isArray(doc.weeks) || !doc.weeks.length) return findings;
+  var index;
+  try { index = buildSurfaceIndex(doc); } catch (e) { return findings; }
+  if (!index || !index.kinds) return findings;
+
+  var seen = {};
+  doc.weeks.forEach(function (week, wi) {
+    if (!week) return;
+    var wk = Number(week.weekNumber);
+    if (!Number.isFinite(wk) || wk < 1) wk = wi + 1;
+    var oracle = ((week.fieldOps || {}).oracleTable) || null;
+    if (!oracle || !Array.isArray(oracle.entries)) return;
+    oracle.entries.forEach(function (entry) {
+      if (!entry || typeof entry !== 'object') return;
+      extractWriteTargets(entry.paperAction).forEach(function (hit) {
+        if (writeTargetResolves(index, hit.target)) return;
+        // One finding per (week, surface name): a book that repeats the same
+        // unreachable target across ten rolls has ONE defect, and ten copies
+        // of one sentence is how a report-class channel gets ignored.
+        var key = wk + ' ' + toSlugWords(hit.target);
+        if (seen[key]) return;
+        seen[key] = true;
+        findings.push({
+          week: wk,
+          target: hit.target,
+          message: 'Week ' + wk + ' oracle → a paper action says "' + hit.span + '", and nothing '
+            + 'this book prints is called "' + hit.target + '" — no clock, component, map node, '
+            + 'cipher, fragment, door or ending of that name exists anywhere in the artifact. The '
+            + 'player rolls, reads an instruction to mark something, and has no surface to mark. '
+            + 'Either print the surface under exactly this name, or write the action against a '
+            + 'surface the book already carries. Reported, not refused: this reads a name out of '
+            + 'an instruction sentence, and an instruction may legitimately name the margin, a '
+            + 'journal or the workout log — surfaces no schema field holds.'
+        });
+      });
+    });
+  });
+  return findings;
+}
+
+/**
  * orientationFloorErrors(rulesSpread, where) -> string[]
  *
  * ── THE ESTABLISHMENT FLOOR (W3, 2026-08-18) ────────────────────────────────
@@ -7572,6 +7796,12 @@ export function validateAssembledBooklet(booklet, options) {
     if (opts.generationFloors) errors.push(m); else warnings.push(m);
   });
   collectVoiceTicFindings(booklet).forEach(function (f) { warnings.push(f.message); });
+  // DR-32, report-class on BOTH paths (no D19 split): the matcher reads a
+  // surface name out of an instruction sentence, and its false-positive rate
+  // on the `add … to X` idiom is UNMEASURED — the corpus holds no book that
+  // uses that idiom and prints the surface. A fuzzy arm warns. Promotion owes
+  // a corpus with the positive case in it, and is an author call.
+  collectOracleWriteTargetFindings(booklet).forEach(function (f) { warnings.push(f.message); });
   collectLicensedMovePlacementFindings(booklet).forEach(function (f) { warnings.push(f.message); });
   // Posted manifests are promises, not preferences — broken ones are errors.
   collectManifestPointerErrors(booklet).forEach(function (m) { errors.push(m); });
