@@ -146,7 +146,13 @@ export var STAGE_BUDGETS = {
   // still the hard cap, and the stage validators still reject over-budget
   // prose (OUTPUT_BUDGETS, D150) — a ceiling has never been what keeps a
   // stage's prose short.
-  layerBible: { maxTokens: 24000, timeoutMs: 600000 },
+  // Raised 600000 → 900000 on live author evidence (2026-08-17, D191): the
+  // Foundation stage "always takes a long time" on the bridge door, where the
+  // frontier default runs adaptive thinking BEFORE output (D184's noted
+  // interaction) — a 10-minute attempt-1 was a timeout coin flip that cost the
+  // full 10 minutes on every loss. First ladder row re-derived from frontier
+  // evidence per directive 10c; the others move only when a run shows theirs.
+  layerBible: { maxTokens: 24000, timeoutMs: 900000 },
   campaign:   { maxTokens: 56000, timeoutMs: 600000 },
   // MEASURED AGAIN, one model later (D159): a shell attempt reported 28.1k
   // output against this row's 32000 — 88% consumed — and came back with
