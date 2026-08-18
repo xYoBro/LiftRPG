@@ -4216,6 +4216,68 @@
     'earned, never by cadence alone.'
   ];
 
+  // ── THE VOICE SKELETON (the voice die, ratified 2026-08-17; landed W3) ───
+  // THE TAUGHT HALF of the five voice identity axes. The die draws one value on
+  // each and hands them to this stage as GIVENS (formatSeedAssignmentBlock);
+  // this section is what tells the model what an assignment on these axes MEANS
+  // and where the answer is written down. The D136/D149 two-halves idiom: the
+  // floor that reads `meta.narrativeVoice.voiceSkeleton` and the sentences that
+  // teach it land together, and neither is allowed to move alone
+  // (floorTeachingRegistry + voiceSkeletonMenuParity in validate.mjs).
+  //
+  // STRUCTURE, NEVER FLAVOR — stated to the model in those words, because the
+  // failure mode of a voice die is a model that reads it as a mood board and
+  // produces pastiche. Genre stays brief-funded.
+  window.INST_VOICE_SKELETON = [
+    '## The voice skeleton (meta.narrativeVoice.voiceSkeleton)',
+    'Your default prose hand is the same hand in every book you write. That is',
+    'the one thing this book cannot be. The five choices below are the SKELETON',
+    'of the narrating voice — shapes the hand makes, not moods it has — and this',
+    'book\'s are assigned to it, the way its shell and its board are.',
+    '',
+    'Write all five under `meta.narrativeVoice.voiceSkeleton`:',
+    '- `person`: first-singular | first-plural | second | third-close | document-voice',
+    '  Who narrates and how close. `document-voice` means no narrator at all —',
+    '  the prose is only what its documents would say.',
+    '- `sentenceRegime`: clipped | measured | long-breath | tidal',
+    '  `clipped` is short declaratives. `measured` is a middle band held steady.',
+    '  `long-breath` builds through subordinate clauses. `tidal` ALTERNATES on',
+    '  purpose — a long build, then a short break — which is a different hand',
+    '  from `measured`, not a louder one.',
+    '- `fragmentLicense`: forbidden | sparing | habitual',
+    '  `forbidden` means every sentence carries a verb. `sparing` allows',
+    '  fragments only at stress points. `habitual` makes the fragment this',
+    '  hand\'s signature.',
+    '- `punctuationSignature`: dash-hand | semicolon-hand | colon-hand | parenthetical-hand | bare-hand',
+    '  The joint this hand uses, with the others kept rare. `bare-hand` is',
+    '  commas and periods only, and it is a hand — not the absence of one.',
+    '- `paragraphRegime`: single-breath | standard | massed',
+    '  `single-breath` is 1-2 sentence paragraphs, white space as pacing.',
+    '  `standard` is 3-5. `massed` is long blocks where density is the texture.',
+    '',
+    '### This binds the NARRATOR only',
+    'In-world writers still differ from the narrator and from each other, and a',
+    'found document keeps its own dress. A government form is not written in',
+    '`tidal` because the narrator is. The skeleton is the hand that writes the',
+    'book AROUND the documents.',
+    '',
+    '### These are structure, never flavor',
+    'None of these values names a mood, a lexicon, an image palette or a genre.',
+    'Do not translate them into any of those. Genre and texture come from the',
+    'creative brief and from nowhere else; a skeleton dressed as a mood is',
+    'pastiche with a die roll on it.',
+    '',
+    '### If you depart from an assignment, NAME THE VALUE YOU TOOK',
+    'Taking the assignment needs no argument — the assignment IS the reason.',
+    'Departing needs one sentence in `meta.narrativeVoice.voiceRationale` that',
+    'writes the ASSIGNED value out in full and says what this book does instead',
+    'and why the brief required it. A choice that is neither the assignment nor',
+    'a brief-quoted departure is a DEFAULT, and a default is what this die',
+    'exists to remove. Silence is not a third option: an assignment must be',
+    'ANSWERED, adopted or declined in writing.',
+    ''
+  ];
+
   // ── The knowing stage (§11 Wave 1.5) ────────────────────────────────────
   // The SUPPLY side of the funding rule. INST_VOICE_DISCIPLINE's knowing
   // demand tells prose stages to select from authored particulars; this
@@ -4931,7 +4993,7 @@
     // is how its page is PUT TOGETHER (VISION §8: layout IS the identity), and
     // a model that fixes the press and then composes the page in a different
     // sitting writes two objects. Same stage-only ruling, same reason.
-    'shell':          { schemas: ['META', 'THEME', 'DESIGN_LANGUAGE', 'ARRANGEMENT', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'SHELL_CHOICE', 'SEED_ASSIGNMENT', 'SURFACE_REFS', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'RULES_TEACH', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'ARRANGEMENT', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES', 'SHELL_SELF_CHECK'] },
+    'shell':          { schemas: ['META', 'THEME', 'DESIGN_LANGUAGE', 'ARRANGEMENT', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'SHELL_CHOICE', 'SEED_ASSIGNMENT', 'SURFACE_REFS', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'VOICE_SKELETON', 'RULES_TEACH', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'ARRANGEMENT', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES', 'SHELL_SELF_CHECK'] },
     // Knowing: the world's process particulars, authored once after the
     // skeleton/shell and consumed by every prose stage (§11 Wave 1.5). It
     // writes no prose, so it carries no VOICE_DISCIPLINE — it carries the

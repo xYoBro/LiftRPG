@@ -31,6 +31,11 @@ import {
   DAILY_CALL_LIMIT,
   DOCUMENT_TYPE_ENUM,
   VALID_ARCHETYPES,
+  VOICE_PERSON_REGIMES,
+  VOICE_SENTENCE_REGIMES,
+  VOICE_FRAGMENT_LICENSES,
+  VOICE_PUNCTUATION_SIGNATURES,
+  VOICE_PARAGRAPH_REGIMES,
   CRITIC_SCORE_THRESHOLD,
   CRITIC_MAX_ROUNDS,
   CRITIC_MAX_REVISIONS_PER_ROUND,
@@ -575,7 +580,33 @@ var STRUCTURED_SCHEMA_SHELL = {
             person: { type: 'string', enum: ['first', 'second', 'third'] },
             tense: { type: 'string', enum: ['past', 'present'] },
             narratorStance: { type: 'string' },
-            voiceRationale: { type: 'string' }
+            voiceRationale: { type: 'string' },
+            // THE VOICE SKELETON'S WIRE SLOT (W3). Enum-constrained here and
+            // free-string in the artifact schema, which is the standing split:
+            // the transport is where a closed menu can be ENFORCED, and the
+            // artifact contract must keep accepting books written before the
+            // menu existed. Menus by reference (D124) — a literal list here
+            // would drift in the one direction that matters, the die still
+            // offering what the transport stopped taking.
+            //
+            // NOT IN `required`, and that is the report-class ruling made
+            // structural rather than an oversight: the obedience floor on these
+            // axes warns and never blocks, so forcing the field on the wire
+            // would be a harder demand than the floor behind it. The slot has
+            // to EXIST — a field the prompt demands and the transport has no
+            // room for is the defect A2 just fixed on rulesSpread.orientation.
+            voiceSkeleton: {
+              type: 'object',
+              properties: {
+                person: { type: 'string', enum: VOICE_PERSON_REGIMES },
+                sentenceRegime: { type: 'string', enum: VOICE_SENTENCE_REGIMES },
+                fragmentLicense: { type: 'string', enum: VOICE_FRAGMENT_LICENSES },
+                punctuationSignature: { type: 'string', enum: VOICE_PUNCTUATION_SIGNATURES },
+                paragraphRegime: { type: 'string', enum: VOICE_PARAGRAPH_REGIMES }
+              },
+              required: ['person', 'sentenceRegime', 'fragmentLicense',
+                'punctuationSignature', 'paragraphRegime']
+            }
           },
           required: ['person', 'tense', 'narratorStance']
         },

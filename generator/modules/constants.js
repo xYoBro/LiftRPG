@@ -420,6 +420,15 @@ import {
   GENERATION_COMPANION_MENU,
   VALID_CLOCK_TYPES,
   VALID_ARCHETYPES,
+  // The voice die's five menus (W3). Re-exported here for the same reason
+  // every enum above is: the generator tree reads its vocabularies through
+  // this module, and a consumer importing straight from contract-constants
+  // would be a second door onto one source.
+  VOICE_PERSON_REGIMES,
+  VOICE_SENTENCE_REGIMES,
+  VOICE_FRAGMENT_LICENSES,
+  VOICE_PUNCTUATION_SIGNATURES,
+  VOICE_PARAGRAPH_REGIMES,
   THEME_ARCHETYPE_ALIASES,
   ORACLE_ROLL_BANDS,
   VALID_PAYLOAD_TYPES as PAYLOAD_TYPE_LIST,
@@ -493,6 +502,15 @@ export {
   GENERATION_COMPANION_MENU,
   VALID_CLOCK_TYPES,
   VALID_ARCHETYPES,
+  // The voice die's five menus (W3). Re-exported here for the same reason
+  // every enum above is: the generator tree reads its vocabularies through
+  // this module, and a consumer importing straight from contract-constants
+  // would be a second door onto one source.
+  VOICE_PERSON_REGIMES,
+  VOICE_SENTENCE_REGIMES,
+  VOICE_FRAGMENT_LICENSES,
+  VOICE_PUNCTUATION_SIGNATURES,
+  VOICE_PARAGRAPH_REGIMES,
   THEME_ARCHETYPE_ALIASES,
   ORACLE_ROLL_BANDS,
   VALID_SHELL_FAMILIES,

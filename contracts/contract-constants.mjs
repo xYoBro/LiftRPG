@@ -430,6 +430,63 @@ export var VOICE_SPEC_LIMITS = {
   maxLicensedMoves: 1
 };
 
+// ── THE VOICE SKELETON (the voice die, ratified 2026-08-17; landed W3) ───────
+//
+// WHAT THIS CURES. Emulation is the modal voice. Book identity explains ~10% of
+// style variance across the corpus (VOICE.md's measured enemy) — the model's
+// default hand dominates every book, and voice was the only major identity
+// register with no die: `meta.literaryRegister` is model-chosen, and neither it
+// nor `meta.narrativeVoice` appears in IDENTITY_AXES. Showing a menu removes
+// the excuse for a default, never the default itself (the measured lesson one
+// screen down at `ludicInstrument`): 87,000 characters of shell prompt named
+// the arsenal in full and the model still produced the default book.
+//
+// SEED THE SKELETON, NEVER THE FLAVOR. Every value below is STRUCTURAL — a
+// shape the hand makes — and none is a mood, a lexicon or an image palette.
+// Seeded flavor-words are pastiche with a die roll; seeded structure is a hand.
+// Genre stays brief-funded through the Chameleon Lens, which is why no value
+// here names one.
+//
+// EVERY VALUE IS MEASURABLE by scripts/measure-voice-sameness.mjs today, save
+// the paragraph regime, whose feature (sentences per paragraph) is a named
+// addition the ratification recorded honestly rather than assumed.
+//
+// THE COHERENCE RULE (the axis-collision law): the draw is per-book and binds
+// the NARRATING hand only. The multi-hand law stands — in-world writers differ
+// from the narrator and from each other, and a found document keeps its own
+// dress (a government form is not written in `tidal`).
+
+// V1 — narrating person and distance. Who is speaking, and how close.
+export var VOICE_PERSON_REGIMES = [
+  'first-singular', 'first-plural', 'second', 'third-close', 'document-voice'
+];
+
+// V2 — sentence-length regime. `tidal` is deliberate alternation (high variance
+// against a mid mean), which is a different hand from `measured`, not a louder
+// one.
+export var VOICE_SENTENCE_REGIMES = [
+  'clipped', 'measured', 'long-breath', 'tidal'
+];
+
+// V3 — fragment license. Already a machine-tell measure (verbless-sentence
+// detection exists); this is what gives it a die instead of a ban.
+export var VOICE_FRAGMENT_LICENSES = [
+  'forbidden', 'sparing', 'habitual'
+];
+
+// V4 — punctuation signature. The em-dash is on the machine-tell watch list, so
+// `dash-hand` is the LICENSED EXCEPTION proving the ban is a default and not a
+// cage. `bare-hand` is a real hand, not the absence of one.
+export var VOICE_PUNCTUATION_SIGNATURES = [
+  'dash-hand', 'semicolon-hand', 'colon-hand', 'parenthetical-hand', 'bare-hand'
+];
+
+// V5 — paragraph regime. `massed` is density-law compatible: fullness is
+// matter, never rules sprawl.
+export var VOICE_PARAGRAPH_REGIMES = [
+  'single-breath', 'standard', 'massed'
+];
+
 // ── Theme archetypes ─────────────────────────────────────────────────────────
 
 export var VALID_ARCHETYPES = [
@@ -2395,6 +2452,61 @@ export var IDENTITY_AXES = [
   { id: 'ludicInstrument', label: 'playSpine.composition[].entry', path: 'meta.playSpine.composition',
     menu: LUDIC_DISCRETIONARY_ENTRIES, kind: 'objectMember', itemKey: 'entry', answerRequired: true,
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell'] },
+  // ── THE VOICE SKELETON AXES (the voice die, ratified 2026-08-17; W3) ─────
+  // Five axes, one per structural dimension of the narrating hand. The menus
+  // are up at VOICE_PERSON_REGIMES and its siblings; the reasoning for the
+  // menu design is stated there and not repeated.
+  //
+  // REPORT-CLASS, AND THAT FLAG IS NEW HERE (`reportOnly`). Every other row on
+  // this table is checked by a BLOCKING floor at its stage gate. These five are
+  // not, by the ratification's own terms and by D19: the obedience question on
+  // a voice axis is answerable only against measured prose, the bands that
+  // would decide it are to be calibrated from corpus percentiles rather than
+  // invented, and a blocking floor on an uncalibrated band would fail books for
+  // a shape nobody has measured yet. `seedObedienceFloorErrors` reads the flag
+  // and routes these findings to warnings; the fourth referee
+  // (auditIdentitySources) reports default-center as it does for every axis,
+  // which is where the evidence for a future promotion will come from.
+  // Promotion to blocking is an author ruling on measured evidence — it is not
+  // a flag flip somebody makes because the warnings got noisy.
+  //
+  // ANSWER-REQUIRED, THOUGH. The harvest axis's shape (D151): silence and an
+  // assignment declined in writing are different answers, and only silence is
+  // the finding. Under report-class that costs a warning, not a run.
+  //
+  // SHELL SEAT ONLY, and this is the routing rather than a preference. The
+  // voice skeleton is taught by INST_VOICE_SKELETON, which STAGE_SCHEMA_MAP
+  // routes to `shell`; S+F's compiler seat (generateSkeletonPrompt, in
+  // generator.js) carries no voice-skeleton doctrine, so a book written there
+  // would be measured against axes its own prompt never named. That is the
+  // derived-or-strict trap even when the verdict is only a warning, because the
+  // warning would be true of the system and not of the book. Widening to
+  // `skeleton` is one prompt edit in generator.js and is reported, not assumed.
+  //
+  // THE EVIDENCE RAIL is `voiceRationale`, which already exists on
+  // narrativeVoice and already means "why this voice" — the departure arm needs
+  // a field where a book can say what it did instead, and inventing a second
+  // one beside a field that already says exactly that would be the D93 defect.
+  { id: 'voicePerson', label: 'narrativeVoice.voiceSkeleton.person',
+    path: 'meta.narrativeVoice.voiceSkeleton.person',
+    menu: VOICE_PERSON_REGIMES, kind: 'scalar', answerRequired: true, reportOnly: true,
+    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shell'] },
+  { id: 'voiceSentenceRegime', label: 'narrativeVoice.voiceSkeleton.sentenceRegime',
+    path: 'meta.narrativeVoice.voiceSkeleton.sentenceRegime',
+    menu: VOICE_SENTENCE_REGIMES, kind: 'scalar', answerRequired: true, reportOnly: true,
+    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shell'] },
+  { id: 'voiceFragmentLicense', label: 'narrativeVoice.voiceSkeleton.fragmentLicense',
+    path: 'meta.narrativeVoice.voiceSkeleton.fragmentLicense',
+    menu: VOICE_FRAGMENT_LICENSES, kind: 'scalar', answerRequired: true, reportOnly: true,
+    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shell'] },
+  { id: 'voicePunctuationSignature', label: 'narrativeVoice.voiceSkeleton.punctuationSignature',
+    path: 'meta.narrativeVoice.voiceSkeleton.punctuationSignature',
+    menu: VOICE_PUNCTUATION_SIGNATURES, kind: 'scalar', answerRequired: true, reportOnly: true,
+    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shell'] },
+  { id: 'voiceParagraphRegime', label: 'narrativeVoice.voiceSkeleton.paragraphRegime',
+    path: 'meta.narrativeVoice.voiceSkeleton.paragraphRegime',
+    menu: VOICE_PARAGRAPH_REGIMES, kind: 'scalar', answerRequired: true, reportOnly: true,
+    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shell'] },
   { id: 'productionTexture', label: 'designLanguage.productionTexture', path: 'meta.designLanguage.productionTexture',
     menu: VALID_PRODUCTION_TEXTURES, kind: 'scalar',
     evidencePath: 'meta.designLanguage.designEvidence', stages: ['shell'] },

@@ -2196,7 +2196,20 @@ function readEvidenceAt(unit, dotPath) {
   return typeof node === 'string' ? node : '';
 }
 
-export function seedObedienceFloorErrors(unit, where, stage, seedAssignments) {
+// ── REPORT-CLASS AXES (`reportOnly`, W3) ────────────────────────────────────
+// One collector, two projections. The five voice-skeleton axes are checked by
+// exactly the same arms as every other axis and their findings are routed to
+// WARNINGS rather than errors, because the obedience question on a voice axis
+// is answerable only against measured prose and the bands that would decide it
+// are still to be calibrated from corpus percentiles (D19: policy heuristics
+// WARN, contract violations block).
+//
+// SPLIT AS A PROJECTION, NOT AS A SECOND FLOOR (D93). The arms — the
+// mandatory-answer arm, the departure arm, the evidence test — are written once
+// and read twice. A parallel `seedObedienceWarnings` with its own copy of the
+// logic would be two answers to "did the book obey the die?", and the two would
+// stop agreeing on the first amendment either one received.
+function collectSeedObedienceFindings(unit, where, stage, seedAssignments) {
   if (!seedAssignments || typeof seedAssignments !== 'object') return [];
   var axes = identityAxesForStage(stage);
   if (!axes.length) return [];
@@ -2217,13 +2230,14 @@ export function seedObedienceFloorErrors(unit, where, stage, seedAssignments) {
     if (unanswered) {
       if (!axis.answerRequired) continue;
       if (evidenceNames(readEvidenceAt(unit, axis.evidencePath), assigned)) continue;
-      errors.push((where || 'Stage') + ' → ' + axis.label + ' answers nothing: the system '
+      errors.push({ axis: axis, reportOnly: !!axis.reportOnly, message:
+        (where || 'Stage') + ' → ' + axis.label + ' answers nothing: the system '
         + 'assigned `' + assigned + '` and the book neither declares it nor says why not. '
         + 'An assignment must be ANSWERED. Build it and name it in `' + axis.path + '`, or '
         + 'decline it in `' + axis.evidencePath + '` — write `' + assigned + '` there with '
         + 'the one sentence saying what this book does instead. Declining is legitimate and '
         + 'common; a book that composes with none of them is a legitimate book. Saying nothing '
-        + 'is a third source, and under the two-source law there is no third.');
+        + 'is a third source, and under the two-source law there is no third.' });
       continue;
     }
 
@@ -2239,16 +2253,39 @@ export function seedObedienceFloorErrors(unit, where, stage, seedAssignments) {
     var funded = chosen.some(function (value) { return evidenceNames(evidence, value); });
     if (funded) continue;
 
-    errors.push((where || 'Stage') + ' → ' + axis.label + ' is '
+    errors.push({ axis: axis, reportOnly: !!axis.reportOnly, message:
+      (where || 'Stage') + ' → ' + axis.label + ' is '
       + (chosen.length ? '`' + chosen.join('`, `') + '`' : 'empty')
       + ', but the system assigned `' + assigned + '` and `' + axis.evidencePath
       + '` does not name what you chose instead. Under the two-source law every identity '
       + 'choice is BRIEF-FUNDED (quote the brief phrase that requires it, in that field) or '
       + 'SEED-ASSIGNED (write `' + assigned + '` exactly). This is neither, which makes it a '
       + 'default. Take the assignment, or name your choice in `' + axis.evidencePath
-      + '` alongside the words in the brief that earned it.');
+      + '` alongside the words in the brief that earned it.' });
   }
   return errors;
+}
+
+/**
+ * The BLOCKING projection. Everything the die assigned that the book neither
+ * took nor answered for, on an axis whose obedience is a contract question.
+ */
+export function seedObedienceFloorErrors(unit, where, stage, seedAssignments) {
+  return collectSeedObedienceFindings(unit, where, stage, seedAssignments)
+    .filter(function (f) { return !f.reportOnly; })
+    .map(function (f) { return f.message; });
+}
+
+/**
+ * The REPORT projection. Same arms, same evidence, WARNING class — the caller
+ * puts these on `warnings` and delivery is never blocked by them (D19).
+ * Separate function rather than a flag on the one above, so a caller cannot
+ * accidentally concat report-class findings onto its blocking list.
+ */
+export function seedObedienceFloorWarnings(unit, where, stage, seedAssignments) {
+  return collectSeedObedienceFindings(unit, where, stage, seedAssignments)
+    .filter(function (f) { return f.reportOnly; })
+    .map(function (f) { return f.message; });
 }
 
 export function artifactIntentFloorErrors(meta, where, brief, seedAssignments) {
@@ -2996,6 +3033,18 @@ export function validateShellSchema(shell, expectedOptions) {
     // context, which is the same condition under which the stage was shown no
     // GIVENS at all.
     errors = errors.concat(seedObedienceFloorErrors(shell, 'Shell', 'shell',
+      (expectedOptions || {}).seedAssignments));
+
+    // ── The obedience floor's REPORT half (the voice die, W3) ──
+    // Same arms, same evidence, WARNING class. The five voice-skeleton axes are
+    // marked `reportOnly` on IDENTITY_AXES: they are drawn, shown to this seat
+    // (INST_VOICE_SKELETON is routed to `shell`) and CHECKED here, and a book
+    // that ignores the die is reported rather than refused — because the bands
+    // that would settle a voice obedience question are still to be calibrated
+    // from the corpus, and blocking on an uncalibrated band fails books for a
+    // shape nobody has measured. Promotion to blocking is an author ruling on
+    // measured evidence, not a flag flip.
+    warnings = warnings.concat(seedObedienceFloorWarnings(shell, 'Shell', 'shell',
       (expectedOptions || {}).seedAssignments));
 
     // ── The rules page teaches THIS game's vocabulary (W1) ──
