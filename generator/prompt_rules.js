@@ -512,15 +512,10 @@
   // Used by the single-prompt path (SCHEMA_SPEC) which needs all sections
   window.SCHEMA_TAIL = [].concat(SCHEMA_COVER_RULES, [''], SCHEMA_ENDINGS);
 
-  window.SCHEMA_WEEK_PLAN = [
-    '## weekPlan (object)',
-    '- `weekNumber` (integer)',
-    '- `title` (string)',
-    '- `narrativeIntent` (string): 1-sentence summary of the focus',
-    '- `mechanicSurfaces` (string[]): which diegetic mechanics apply',
-    '- `requiredFragmentMentions` (string[]): fragment IDs to tease',
-    '- `mapProgressionState` (string): brief note on how map shifts'
-  ];
+  // SCHEMA_WEEK_PLAN deleted (author-ruled 2026-08-18, DR-39/D203's proposal):
+  // campaign-plan-era leftover with no stage; routing it would have created a
+  // second description of the plan's week shape beside STRUCTURED_SCHEMA_CAMPAIGN
+  // — the exact two-descriptions defect D203 removed. The sketch lives in git log.
 
   window.SCHEMA_SINGLE_WEEK = [
     '## week (object)',
@@ -4813,11 +4808,10 @@
     '- Maps showing no state evolution between weeks — add at least one unlock, closure, or annotation change per week'
   ];
 
-  window.INST_QUALITY_STANDARD = [
-    '## Quality Standard',
-    '- Every content field must earn its space. Atmospheric filler that could be removed without changing the plot, game state, or character understanding is a failure.',
-    '- If any document, oracle entry, or story prompt feels transplantable to a different booklet, it is generic. Rewrite with Core Noun Roster references.'
-  ];
+  // INST_QUALITY_STANDARD deleted (author-ruled 2026-08-18, DR-39/D203's
+  // proposal): both demands already live at the printing stages —
+  // INST_ANTI_GENERIC carries the transplant test and the self-verification
+  // block restates it. Routing would have paid prompt budget to say it twice.
 
   window.INST_RULES_TEACH = [
     '## Rules Page Requirements',
