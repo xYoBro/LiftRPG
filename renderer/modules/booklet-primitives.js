@@ -108,6 +108,68 @@ function renderNarrativePayload(payload) {
   return wrap;
 }
 
+/**
+ * THE INTERLUDE MAP'S HEIGHT — why this is done in JS and not in a stylesheet.
+ *
+ * A map body is an SVG with a square viewBox and `width:100%`, so its rendered
+ * HEIGHT is a function of the width it is given. In a week's field-ops page it
+ * shares a half-width row and draws about 232px tall; alone on an interlude
+ * page it gets the whole content column and draws ~470px. The first delivered
+ * book's P.30 put a five-ring approach map under 330px of prose on a 739px
+ * page and lost 304px of it off the bottom fold — the renderer's own
+ * diagnostics said `w5-interlude, 303px, unresolved` and it shipped anyway
+ * (D172 read, defect 1).
+ *
+ * The solver could not save it. The interlude atom's estimate is a flat
+ * `FULL_PAGE_HEIGHT` with minHeight === preferredHeight, i.e. zero declared
+ * shrink potential, and the interlude render ignores density entirely, so
+ * there was no density at which the page fitted and nothing for the density
+ * ladder to spend. Raising the estimate would only have moved the lie.
+ *
+ * `.interlude-page` is already a flex column with `overflow:hidden`, so the
+ * fix is to let the payload be the flexible item it should always have been:
+ * the prose takes what it needs, the diagram takes the rest, and the SVG's own
+ * `preserveAspectRatio="xMidYMid meet"` scales the drawing down to fit rather
+ * than running past the fold. That is not truncation (D77) — a vector diagram
+ * drawn smaller loses no ink.
+ *
+ * The chain is set INLINE, on this payload only, rather than as a rule in
+ * booklet.css, for two reasons: `min-height:0` on `.map-content` globally would
+ * change every map on every week page, and an inline style is the one channel
+ * that cannot disagree between the measurement harness and the render — both
+ * build this exact DOM from this exact function.
+ *
+ * THE FLOOR IS NOT OVERRIDDEN. `.map-rings` keeps its 196px min-height (and
+ * `.map-maze` its 214px): those are the pencil floors for a board the player
+ * writes on, so a page with too little room left still overflows, still lands
+ * in `unresolvedOverflow`, and is still reported. Crushing the writing surface
+ * to make a gate green is the thing this file is not allowed to do.
+ */
+function makeMapPayloadFlexible(wrap, section) {
+  wrap.style.flex = '1 1 auto';
+  wrap.style.minHeight = '0';
+  wrap.style.display = 'flex';
+  wrap.style.flexDirection = 'column';
+  wrap.style.overflow = 'hidden';
+
+  section.style.flex = '1 1 auto';
+  section.style.minHeight = '0';
+  section.style.display = 'flex';
+  section.style.flexDirection = 'column';
+
+  // `.map-content` is the zone's inner column; without min-height:0 a flex item
+  // refuses to shrink below its content's min-content height, which for a
+  // square SVG is the full column width.
+  const content = section.querySelector('.map-content');
+  if (content) {
+    content.style.flex = '1 1 auto';
+    content.style.minHeight = '0';
+    content.style.display = 'flex';
+    content.style.flexDirection = 'column';
+  }
+  return wrap;
+}
+
 function renderInterludePayload(model) {
   const payload = model.payload;
   if (!payload) return null;
@@ -124,11 +186,12 @@ function renderInterludePayload(model) {
   }
   if (type === 'map' && payload.mapState) {
     const wrap = make('div', 'interlude-payload interlude-map-payload');
-    wrap.appendChild(renderMapSection({
+    const section = renderMapSection({
       ...payload.mapState,
       family: payload.mapState.family || inferMapFamily(payload.mapState.mapType || '')
-    }));
-    return wrap;
+    });
+    wrap.appendChild(section);
+    return makeMapPayloadFlexible(wrap, section);
   }
   if (type === 'clock' && Array.isArray(payload.gameplayClocks) && payload.gameplayClocks.length) {
     const wrap = make('div', 'interlude-payload interlude-clock-payload');
@@ -162,11 +225,12 @@ function renderInterludePayload(model) {
   }
   if (payload.mapState) {
     const wrap = make('div', 'interlude-payload interlude-map-payload');
-    wrap.appendChild(renderMapSection({
+    const section = renderMapSection({
       ...payload.mapState,
       family: payload.mapState.family || inferMapFamily(payload.mapState.mapType || '')
-    }));
-    return wrap;
+    });
+    wrap.appendChild(section);
+    return makeMapPayloadFlexible(wrap, section);
   }
   if (Array.isArray(payload.gameplayClocks) && payload.gameplayClocks.length) {
     const wrap = make('div', 'interlude-payload interlude-clock-payload');
@@ -273,6 +337,58 @@ export function renderRulesLeftPage(model) {
   return page;
 }
 
+/**
+ * The seal mark on the sealed page — a DRAWN lock, not an OS emoji.
+ *
+ * It used to be the literal character `🔒`, which the every-page read (D172,
+ * P.03) caught on a letterpress binder: a colour Apple-emoji glyph, at 28pt,
+ * on a monochrome page whose every other mark is a hairline rule. It is also
+ * the one mark in the book whose appearance depended on the reader's operating
+ * system rather than on the theme — B&W print is not negotiable here
+ * (`docs/craft/VISUAL.md`: hue is never load-bearing) and an emoji font is not
+ * one of the four vendored faces.
+ *
+ * Sized in `em` so it occupies the same 28pt box `.sealed-lock` already gave
+ * the glyph (no CSS change, no measurement change), and stroked in
+ * `currentColor` so it takes the archetype's ink like every other rule.
+ */
+function makeSealedLock() {
+  const wrap = make('div', 'sealed-lock');
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '1em');
+  svg.setAttribute('height', '1em');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.4');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('role', 'presentation');
+
+  // The shackle: a half-round bail rising out of the body.
+  const shackle = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  shackle.setAttribute('d', 'M8 10V7a4 4 0 0 1 8 0v3');
+  shackle.setAttribute('stroke-linecap', 'round');
+  svg.appendChild(shackle);
+
+  // The body, and the keyhole the player never gets a key for.
+  const body = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  body.setAttribute('x', '4.5');
+  body.setAttribute('y', '10');
+  body.setAttribute('width', '15');
+  body.setAttribute('height', '10.5');
+  body.setAttribute('rx', '1.5');
+  svg.appendChild(body);
+
+  const keyhole = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  keyhole.setAttribute('cx', '12');
+  keyhole.setAttribute('cy', '15.2');
+  keyhole.setAttribute('r', '1.5');
+  svg.appendChild(keyhole);
+
+  wrap.appendChild(svg);
+  return wrap;
+}
+
 export function renderSealedPage(model) {
   const scaffold = createBoundedPage('rules-right', 'rules-right sealed-page', {
     boundaryRole: 'sealed',
@@ -282,7 +398,7 @@ export function renderSealedPage(model) {
   const frame = scaffold.frame;
   frame.setAttribute('data-shell-family', model.artifactIdentity && model.artifactIdentity.shellFamily || 'field-survey');
 
-  frame.appendChild(make('div', 'sealed-lock', '🔒'));
+  frame.appendChild(makeSealedLock());
   if (model.artifactIdentity && model.artifactIdentity.shellFamily === 'classified-packet') {
     frame.appendChild(renderClassifiedSealCard(model));
   }
@@ -429,6 +545,40 @@ export function renderUnlockedEndingPage(model) {
   return page;
 }
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+/**
+ * `meta.generatedAt` reaches the back cover as whatever the pipeline stamped —
+ * on the first delivered book that was `2026-08-17T00:00:00Z`, printed raw in
+ * the colophon of a hand-set-looking binder (D172 read, P.40). A machine
+ * timestamp is the one thing on that page that could not exist inside any
+ * fiction (Design Principle 1), and the seconds and the `T` carry no
+ * information a reader wants.
+ *
+ * Typeset only the shape we can read with certainty: a leading ISO calendar
+ * date. Anything else — an in-world date, a horizon, a season, an authored
+ * phrase — is passed through untouched, because this field is also a place a
+ * book may legitimately say "Third Horizon, year eleven".
+ *
+ * Parsed off the STRING, never through `new Date()`: `2026-08-17T00:00:00Z`
+ * put through a local-timezone Date renders as 16 August west of Greenwich,
+ * which would make the printed date differ by machine and every visual
+ * baseline non-deterministic.
+ */
+function typesetGeneratedAt(raw) {
+  const value = String(raw || '').trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})(?:[T ]|$)/.exec(value);
+  if (!iso) return value;
+  const year = Number(iso[1]);
+  const month = Number(iso[2]);
+  const day = Number(iso[3]);
+  if (!(month >= 1 && month <= 12) || !(day >= 1 && day <= 31)) return value;
+  return day + ' ' + MONTH_NAMES[month - 1] + ' ' + year;
+}
+
 export function renderBackCover(model) {
   const scaffold = createBoundedPage('back-cover', 'back-cover', {
     boundaryRole: 'back-cover',
@@ -440,7 +590,7 @@ export function renderBackCover(model) {
   frame.appendChild(make('p', 'back-cover-colophon', model.colophon));
   if (model.generatedAt || model.weekCount || model.totalSessions) {
     const meta = make('div', 'back-cover-meta');
-    if (model.generatedAt) meta.appendChild(make('div', '', model.generatedAt));
+    if (model.generatedAt) meta.appendChild(make('div', '', typesetGeneratedAt(model.generatedAt)));
     if (model.weekCount || model.totalSessions) {
       meta.appendChild(make('div', '', 'Weeks ' + model.weekCount + ' · Sessions ' + model.totalSessions));
     }

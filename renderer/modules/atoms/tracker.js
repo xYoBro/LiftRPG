@@ -15,6 +15,10 @@
 
 import { registerAtom } from '../engine/atom-registry.js';
 import { make } from '../dom.js';
+// The return box's line count and markup have ONE home — see the block above
+// `returnBoxLineCount()` in field-ops-primitives.js. This atom is AUDIT 112's
+// twin renderer of the same component, so it borrows rather than re-derives.
+import { buildReturnBoxSurface, returnBoxLineCount } from '../field-ops-primitives.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -30,6 +34,9 @@ const COMPANION_TYPES = new Set([
 
 /** Fallback week count for a percentile-stat with no authored values. */
 const PERCENTILE_STAT_DEFAULT_WEEKS = 6;
+
+/** `.companion-dash-line` height (18px) + `.companion-dashboard` gap (6px). */
+const RETURN_BOX_LINE_PX = 24;
 
 /**
  * The printed roll-under rule. The stat decorates the story layer only — the
@@ -62,7 +69,15 @@ const COMPANION_HEIGHTS = {
   },
   'stress-track':   ()      => 60,
   'inventory-grid': (slots) => 28 + Math.ceil(Math.max(1, slots) / 2) * 30,
-  'return-box':     ()      => 80,
+  // CROSS-FILE CONTRACT — priced against `buildReturnBoxSurface()` in
+  // field-ops-primitives.js and the two booklet.css rules it reuses:
+  // `.companion-return-box` (min-height 44px framed slot) plus a
+  // `.companion-dashboard` of N `.companion-dash-line` (18px each, 6px flex
+  // gap), separated from the box by `.companion-component`'s own 6px gap.
+  // So each ruled line costs 18 + 6 = 24px, and the first one also pays the
+  // sibling gap, which the retained 80px base already covers. Move the line
+  // count, the line height, or the gap and this figure moves with them.
+  'return-box':     (slots, data) => 80 + returnBoxLineCount(data) * RETURN_BOX_LINE_PX,
   'usage-die':      ()      => 60,
   'token-sheet':    ()      => 120,
   'overlay-window': ()      => 160,
@@ -352,12 +367,12 @@ function buildInventoryGrid(data) {
 }
 
 /**
- * return-box: small deposit box for a clue or card value.
+ * return-box: the deposit slot, then the ruled lines it is written on.
+ * Markup and line count both come from field-ops-primitives.js so this path
+ * and the companion-section path cannot print different surfaces.
  */
-function buildReturnBox() {
-  const box = make('div', 'companion-return-box');
-  box.appendChild(make('div', 'companion-return-slot'));
-  return box;
+function buildReturnBox(data) {
+  return buildReturnBoxSurface(data);
 }
 
 /**
@@ -484,7 +499,7 @@ function renderCompanionComponent(data) {
     case 'dashboard':      visual = buildDashboard(data);     break;
     case 'stress-track':   visual = buildStressTrack(data);   break;
     case 'inventory-grid': visual = buildInventoryGrid(data); break;
-    case 'return-box':     visual = buildReturnBox();          break;
+    case 'return-box':     visual = buildReturnBox(data);      break;
     case 'usage-die':      visual = buildUsageDie();           break;
     case 'token-sheet':    visual = buildTokenSheet(data);     break;
     case 'overlay-window': visual = buildOverlayWindow(data);  break;
@@ -492,7 +507,11 @@ function renderCompanionComponent(data) {
     default:               visual = buildDashboard(data);      break;
   }
 
-  el.appendChild(visual);
+  // The return box is the one surface that is two sibling nodes rather than
+  // one — it borrows `.companion-component`'s own 6px flex gap instead of a
+  // wrapper class no stylesheet matches.
+  if (Array.isArray(visual)) visual.forEach((node) => el.appendChild(node));
+  else el.appendChild(visual);
   return el;
 }
 

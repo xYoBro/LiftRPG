@@ -19,6 +19,82 @@ function parseDashboardBoxGrid(text) {
   return { rows, cols };
 }
 
+// ── The return box's ruled lines — ONE HOME, THREE READERS ──────────────────
+//
+// The return box is a WRITING surface: the book tells the player to write the
+// counterfoil and rule the line closed. It used to render as a 44px framed
+// void with a single 34px bar across the top — the letterbox slot and nothing
+// to write on. The first delivered book said "Three ruled lines on the shed
+// wall" over exactly one dash (D172 read, P.11 / P.24).
+//
+// The count comes from the most trustworthy channel available, in order:
+// a declared numeric slot count, then the component's own prose, then the
+// writable floor. Prose parsing is not a new liberty — `parseDashboardBoxGrid`
+// above already reads "two rows of four boxes" out of a dashboard body, and
+// this is the same idiom held to the same ceiling.
+//
+// THE MIRROR: `atoms/tracker.js` renders the same component on the other path
+// (AUDIT 112's twin) and its COMPANION_HEIGHTS['return-box'] estimate is priced
+// against the geometry below. All three import THIS function rather than
+// re-deriving a count, because a render that draws four lines against an
+// estimate that priced one is the silent-clipping class.
+const RETURN_LINE_PATTERN = /(\w+)\s+(?:ruled\s+|blank\s+|write-in\s+)?lines?\b/i;
+/** A write-in surface with fewer lines than this is not a write-in surface. */
+export const RETURN_BOX_DEFAULT_LINES = 3;
+/** Same ceiling parseDashboardBoxGrid holds: prose is a hint, not an authority. */
+const RETURN_BOX_MAX_LINES = 8;
+
+/**
+ * How many ruled lines a return box prints.
+ *
+ * @param {object} source companion component or atom data
+ * @returns {number} 1..RETURN_BOX_MAX_LINES
+ */
+export function returnBoxLineCount(source) {
+  const item = source || {};
+  // Structured first: `slots` is a number on the atom path and an array on the
+  // model path, so only a real number counts — Number([]) is 0 and Number of a
+  // one-element array is that element, both of which would be silent nonsense.
+  const declared = [item.slotCount, item.slots, item.lines]
+    .find((value) => typeof value === 'number' && Number.isFinite(value) && value >= 1);
+  if (declared) return Math.min(Math.round(declared), RETURN_BOX_MAX_LINES);
+
+  const prose = String(item.body || item.instruction || '');
+  const match = prose.match(RETURN_LINE_PATTERN);
+  if (match) {
+    const parsed = WORD_NUMS[match[1].toLowerCase()] || parseInt(match[1], 10);
+    if (parsed >= 1 && parsed <= RETURN_BOX_MAX_LINES) return parsed;
+  }
+
+  return RETURN_BOX_DEFAULT_LINES;
+}
+
+/**
+ * The return box: the slot it goes through, then the lines it is ruled on.
+ *
+ * Returns the two nodes SEPARATELY, for the card to append as siblings, rather
+ * than wrapping them: `.companion-component` is already a flex column with a
+ * 6px gap, so the pair spaces itself. A wrapper would need its own rule, and a
+ * class no stylesheet matches is silent by construction — the defect this
+ * project keeps re-learning. Both classes used here already exist and already
+ * carry the geometry (`.companion-return-box` 44px framed slot,
+ * `.companion-dash-line` an 18px dashed rule), which is what makes the
+ * estimate in atoms/tracker.js checkable against a ruler.
+ *
+ * @returns {HTMLElement[]} nodes to append, in order
+ */
+export function buildReturnBoxSurface(source) {
+  const deposit = make('div', 'companion-return-box');
+  deposit.appendChild(make('div', 'companion-return-slot'));
+
+  const lines = make('div', 'companion-dashboard');
+  const count = returnBoxLineCount(source);
+  for (let index = 0; index < count; index += 1) {
+    lines.appendChild(make('div', 'companion-dash-line'));
+  }
+  return [deposit, lines];
+}
+
 function polarPoint(cx, cy, radius, angleDegrees) {
   const radians = (angleDegrees - 90) * (Math.PI / 180);
   return {
@@ -1377,9 +1453,7 @@ export function renderCompanionComponent(component) {
   } else if (component.family === 'overlay-window') {
     card.appendChild(renderOverlay(component));
   } else if (component.family === 'return-box') {
-    const deposit = make('div', 'companion-return-box');
-    deposit.appendChild(make('div', 'companion-return-slot'));
-    card.appendChild(deposit);
+    buildReturnBoxSurface(component).forEach((node) => card.appendChild(node));
   } else if ((component.slots || []).length) {
     const slots = make('div', 'companion-slot-grid');
     component.slots.forEach((slot) => {
@@ -1477,6 +1551,28 @@ export function renderBossPage(model) {
     frame.appendChild(mechanism);
   }
 
+  // ── THE RENDER CONTRACT: SOLVABILITY DATA IS NON-PRINTING ────────────────
+  //
+  // `bossEncounter.componentInputs` is the MACHINE's copy of the five answers.
+  // It is not authored content: `assembly.js` recomputes it from the weeks'
+  // collected components and overwrites whatever the model wrote there
+  // ("componentInputs corrected: model had […], computed […]"), and
+  // `utils.js deriveBookletPassword()` decodes it through the reference table
+  // to get the password that unlocks the ending. It exists so the machine can
+  // prove the puzzle is solvable and so the unlock can be verified — for the
+  // reader it is the answer key, printed on the page that asks the question.
+  //
+  // The first delivered book shipped with 9/13/16/12/25 set beside the write-in
+  // boxes on its boss page (the D172 every-page read, P.28): six weeks of
+  // cipher work answered in the margin. The label and the box stay — those are
+  // the player's surface — and the value never renders.
+  //
+  // The rule this states, for anything added to this page later: a field the
+  // pipeline DERIVES rather than authors may not print. The password obeys it
+  // already, by a different mechanism (`sanitizeBossTextForDisplay()` scrubs
+  // the derived password out of every prose seat before it reaches the DOM);
+  // `convergenceProof` and `passwordRevealInstruction` DO print because they
+  // are authored prose about the method, already scrubbed by that same seam.
   if ((model.componentInputs || []).length) {
     const components = make('div', 'boss-components');
     components.appendChild(make('div', 'boss-components-label', model.componentLabel || 'Recorded Inputs'));
@@ -1485,7 +1581,6 @@ export function renderBossPage(model) {
       const row = make('div', 'boss-component-item');
       row.appendChild(make('div', 'boss-component-week', item.weekLabel));
       row.appendChild(make('div', 'boss-component-box'));
-      row.appendChild(make('div', 'boss-component-value', item.value));
       list.appendChild(row);
     });
     components.appendChild(list);
