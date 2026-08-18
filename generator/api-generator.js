@@ -36,6 +36,7 @@ import {
   VOICE_FRAGMENT_LICENSES,
   VOICE_PUNCTUATION_SIGNATURES,
   VOICE_PARAGRAPH_REGIMES,
+  VOICE_RESTRAINT_POSITIONS,
   CRITIC_SCORE_THRESHOLD,
   CRITIC_MAX_ROUNDS,
   CRITIC_MAX_REVISIONS_PER_ROUND,
@@ -602,10 +603,11 @@ var STRUCTURED_SCHEMA_SHELL = {
                 sentenceRegime: { type: 'string', enum: VOICE_SENTENCE_REGIMES },
                 fragmentLicense: { type: 'string', enum: VOICE_FRAGMENT_LICENSES },
                 punctuationSignature: { type: 'string', enum: VOICE_PUNCTUATION_SIGNATURES },
-                paragraphRegime: { type: 'string', enum: VOICE_PARAGRAPH_REGIMES }
+                paragraphRegime: { type: 'string', enum: VOICE_PARAGRAPH_REGIMES },
+                restraint: { type: 'string', enum: VOICE_RESTRAINT_POSITIONS }
               },
               required: ['person', 'sentenceRegime', 'fragmentLicense',
-                'punctuationSignature', 'paragraphRegime']
+                'punctuationSignature', 'paragraphRegime', 'restraint']
             }
           },
           required: ['person', 'tense', 'narratorStance']
@@ -3355,7 +3357,8 @@ async function generateSingleFragmentAdaptive(settings, builders, config) {
       // held to a looser bar is the stale-mirror class in miniature.
       return validateFragmentsStage({ fragments: result ? [result] : [] },
         registryEntry ? [registryEntry] : [],
-        { generationFloors: true, brief: config.brief || '' });   // W3-ARM fragment-single
+        { generationFloors: true, brief: config.brief || '',
+          componentInputs: config.componentValues || undefined });   // W3-ARM fragment-single · W7-ARM seal-single
     },
     buildPrompt: function (retryState) {
       return builders.singleFragment(
@@ -3457,7 +3460,8 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
       },
       validate: function (result) {
         return validateFragmentsStage(result, config.registry,
-          { generationFloors: true, brief: config.brief || '' });   // W3-ARM fragment-batch
+          { generationFloors: true, brief: config.brief || '',
+            componentInputs: config.componentValues || undefined });   // W3-ARM fragment-batch · W7-ARM seal-batch
       },
       buildPrompt: function (retryState) {
         return builders.fragmentBatch(
@@ -4954,6 +4958,10 @@ async function runApiPipeline(options) {
       // the book.
       gameRulebook: gameRulebook,
       brief: brief,   // W3-ARM fragment-config
+      // W7-ARM seal-config: the collected component values ride the fragment
+      // config so the answer-bearing-seal floor (D200 ruling 3) can see them.
+      // Populated by the week loop above; fragments always generate after it.
+      componentValues: allComponentValues,
       label: batchLabel,
       stageKey: 'fragments',
       stageIndex: stageNum,
@@ -6409,7 +6417,8 @@ async function runSkeletonFleshPipeline(options) {
           return 'Fragments: missing or empty fragments array';
         }
         return validateFragmentsStage(result, fullFragRegistry,
-          { generationFloors: true, brief: brief || '' });   // W3-ARM fragment-sf
+          { generationFloors: true, brief: brief || '',
+            componentInputs: allComponentValuesSF.map(String) });   // W3-ARM fragment-sf · W7-ARM seal-sf
       }
     });
 
