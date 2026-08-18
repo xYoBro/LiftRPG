@@ -13,6 +13,12 @@ import { renderFoundDocument } from '../document-primitives.js';
 import { densityVariant } from '../engine/density-util.js';
 import { wrappedLines } from '../utils.js';
 import { advancePx, advanceRatio, readTypeMetrics } from '../type-metrics.js';
+// THE FORM CHANNEL (ARRANGEMENT §2 axis 5 / §3 clause 2 — the arithmetic
+// travels WITH the variant). Not on the density ladder below and never joining
+// it: the ladder mirrors booklet.css by hand, while the band's numbers are
+// EMITTED from this module into form-variants.css, so there is nothing to
+// mirror and nothing that can drift.
+import { fragmentTaughtBandHeightPx } from '../form-metrics/fragment-doc-forms.mjs';
 
 // ---------------------------------------------------------------------------
 // Ladder mirror  ⇄  booklet.css fragment blocks
@@ -311,7 +317,16 @@ function docKind(model) {
   return String(model.documentClass || '').trim().toLowerCase();
 }
 
-/** Modelled block height for one fragment at one ladder tier. */
+/**
+ * Modelled block height for one fragment at one ladder tier.
+ *
+ * The taught form's routing band is added at the top and is DENSITY-INVARIANT
+ * by construction (absolute px — see the form module's header), so it is a
+ * constant rather than a ladder row. It is also why the form is safe on this
+ * atom at all: fragment page-ownership is decided by CHARACTER COUNT
+ * (STANDALONE_MIN_CHARS / PAGE_CHAR_BUDGET in the adapter, D150), and a band
+ * that never wraps cannot move a document across that boundary.
+ */
 function fragmentHeightAt(model, tier, shellFamily, metrics) {
   const kind = docKind(model);
   const isPacket = shellFamily === 'classified-packet';
@@ -325,6 +340,11 @@ function fragmentHeightAt(model, tier, shellFamily, metrics) {
   const textWidth = DOC_WIDTH_PX - DOC_INSET_X;
 
   if (isPacket && PACKET_STAMP_CLASSES.includes(kind)) height += PACKET_STAMP_PX;
+
+  // The routing band — below the seal, above the type slug, exactly where
+  // renderFoundDocument() builds it. Zero in the bare form, which is what makes
+  // an undeclared book byte-identical to the pre-form engine.
+  if (model.form === 'taught') height += fragmentTaughtBandHeightPx();
 
   // Seal band — first real child, above the type slug. Zero when the fragment
   // carries no seal, which is every fragment in the corpus: the dormancy

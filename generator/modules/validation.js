@@ -130,6 +130,12 @@ import {
   // would drift into failing books for a look the engine actually wears.
   VALID_ARRANGEMENT_GRAMMARS,
   ARRANGEMENT_AXES,
+  // ARRANGEMENT §2 axis 5 — the FORM channel's vocabulary and its family table.
+  // Same reason, one channel over: the floor must refuse exactly the plans
+  // `resolveAtomForms()` drops, and it must ask about exactly the families the
+  // adapter stamps. Both are derived from these two, never listed here.
+  VALID_FORM_PLANS,
+  ATOM_FORM_FAMILIES,
   // D144 — the single home for "does this brief name a body that runs on
   // procedure?". Imported rather than re-implemented: a private copy here and
   // the prompt's byte-quoted term list would answer the same question in two
@@ -2665,9 +2671,10 @@ export function arrangementFloorErrors(meta, where) {
   if (!spec || typeof spec !== 'object' || Array.isArray(spec)) {
     errors.push(prefix + ' is absent — a page is authored, not accumulated, and a book that '
       + 'declares no arrangement is published in whichever layout the engine happens to have. '
-      + 'Declare grammar, sectionFurniture, tableTreatment, annotationPattern, leitmotif and '
-      + 'arrangementEvidence, deriving each from words the brief actually contains. '
-      + 'Grammars: ' + VALID_ARRANGEMENT_GRAMMARS.join(' | '));
+      + 'Declare grammar, sectionFurniture, tableTreatment, annotationPattern, leitmotif, '
+      + 'atomForms and arrangementEvidence, deriving each from words the brief actually '
+      + 'contains. Grammars: ' + VALID_ARRANGEMENT_GRAMMARS.join(' | ')
+      + '. Form plans: ' + VALID_FORM_PLANS.join(' | '));
     return errors;
   }
 
@@ -2700,6 +2707,49 @@ export function arrangementFloorErrors(meta, where) {
       errors.push(prefix + '.' + axis.field + ' "' + value + '" is not a value this engine '
         + 'draws, so it would be dropped and the book would silently wear its grammar\'s: '
         + axis.menu.join(' | '));
+    }
+  }
+
+  // ── THE FORM AXES (ARRANGEMENT §2 axis 5 / §3) ──────────────────────────
+  //
+  // The five axes above PAINT; these MEASURE. They are floored at the same seat
+  // and in the same shape for the arrangement floor's own reason — the
+  // declaration lives inside `meta.arrangement`, so it is taught wherever this
+  // object is taught, and a floor may check what its seat was shown.
+  //
+  // WHAT BLOCKS: presence of the object, presence of every family's plan, and
+  // membership. Membership is sharper here than anywhere else on this floor:
+  // `resolveAtomForms()` DROPS an off-menu plan and the family silently takes
+  // `bare`, which is today's exact component — so a book that misauthored
+  // `"taught-shed-middle"` renders as if it had chosen the quiet answer and
+  // looks entirely deliberate. That is invisible misauthoring, and the stage
+  // gate is the last place a retry can fix it cheaply.
+  //
+  // THE FAMILIES ARE ITERATED, never listed: a family added to
+  // ATOM_FORM_FAMILIES gains its floor here in the same edit that gives it a
+  // schema key, a die axis and a gate arm.
+  var forms = spec.atomForms;
+  if (!forms || typeof forms !== 'object' || Array.isArray(forms)) {
+    errors.push(prefix + '.atomForms is absent — say how each component TEACHES itself and '
+      + 'when it stops. One plan per family (' + ATOM_FORM_FAMILIES.map(function (f) {
+        return f.id;
+      }).join(', ') + '), each one of: ' + VALID_FORM_PLANS.join(' | ')
+      + '. A book that declares none prints every component in its bare form, which is a real '
+      + 'answer but never an unmade decision');
+  } else {
+    for (var fi = 0; fi < ATOM_FORM_FAMILIES.length; fi++) {
+      var famRow = ATOM_FORM_FAMILIES[fi];
+      var raw = forms[famRow.id];
+      var plan = String(raw === undefined || raw === null ? '' : raw).trim();
+      if (!plan) {
+        errors.push(prefix + '.atomForms.' + famRow.id + ' is unset — state the ' + famRow.label
+          + '\'s form plan explicitly, even when it is "bare-throughout": '
+          + VALID_FORM_PLANS.join(' | '));
+      } else if (VALID_FORM_PLANS.indexOf(plan) === -1) {
+        errors.push(prefix + '.atomForms.' + famRow.id + ' "' + plan + '" is not a plan this '
+          + 'engine resolves, so it would be dropped and the ' + famRow.label + ' would silently '
+          + 'print bare while the book read as having chosen: ' + VALID_FORM_PLANS.join(' | '));
+      }
     }
   }
 

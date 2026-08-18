@@ -861,13 +861,33 @@
       tableTreatment: { type: 'string' },
       annotationPattern: { type: 'string' },
       leitmotif: { type: 'string' },
+      // ── AXIS 5, THE FORM CHANNEL (ARRANGEMENT §2 axis 5 / §3) ────────────
+      // THE F04 CLASS, and the reason this slot exists at all (D195's measured
+      // lesson): a field the prose DEMANDS and the gate ENFORCES, with no slot
+      // on the structured transport, blocks every attempt — the model cannot
+      // emit a key its own output schema has no room for, and each retry
+      // re-fails identically. Prose, gate and transport land together.
+      //
+      // TYPES, NOT MENUS, on the five axes above's precedent: the plans are
+      // stated in the prose section and parity-asserted both ways, the floor
+      // rejects a stray plan with a message naming the whole menu, and a
+      // fourth copy of the vocabulary is a fourth thing to drift (D124).
+      atomForms: {
+        type: 'object',
+        properties: {
+          sessionCard: { type: 'string' },
+          oracleTable: { type: 'string' },
+          fragmentDoc: { type: 'string' }
+        },
+        required: ['sessionCard', 'oracleTable', 'fragmentDoc']
+      },
       arrangementEvidence: { type: 'string' }
     },
-    // All six, because the prompt marks all six REQUIRED and the floor blocks
-    // on all six. A transport schema asking for fewer steers the model toward a
-    // unit its own stage gate refuses.
+    // All seven, because the prompt marks all seven REQUIRED and the floor
+    // blocks on all seven. A transport schema asking for fewer steers the model
+    // toward a unit its own stage gate refuses.
     required: ['grammar', 'sectionFurniture', 'tableTreatment', 'annotationPattern',
-      'leitmotif', 'arrangementEvidence']
+      'leitmotif', 'atomForms', 'arrangementEvidence']
   };
 
   var STRUCTURED_PLAY_SPINE = {
@@ -2553,12 +2573,21 @@
     '  "underline-file" — how the page points at itself and teaches.',
     '- `leitmotif` (REQUIRED): "none" | "rounded-chip" | "cut-corner" | "double-rule" — the one',
     '  gesture that repeats across all three axes above.',
+    '- `atomForms` (REQUIRED, object): the FORM PLAN for each component the player writes on —',
+    '  how much teaching chrome it carries, and when it stops carrying it. Three keys, all',
+    '  REQUIRED: `sessionCard`, `oracleTable`, `fragmentDoc`. Each value is exactly one of:',
+    '  "bare-throughout" | "taught-shed-early" | "taught-shed-mid" | "taught-throughout".',
+    '  The shed point is worked out from the length of YOUR book — you choose the rhythm, not',
+    '  the week number, so one plan reads correctly whatever the block length turns out to be.',
+    '  State all three explicitly, including every "bare-throughout".',
     '- `arrangementEvidence` (REQUIRED, string, 1-2 sentences): the brief\'s own words these',
     '  choices came from. If you departed from an assignment you were given, name the value you',
     '  took here.',
     '',
     'State all four axes explicitly even when they agree with your chosen grammar. The grammar',
-    'names the family; the four fields are what this book actually wears.'
+    'names the family; the four fields are what this book actually wears. `atomForms` is a',
+    'separate question from all of them: the four axes are how the page is DRAWN, and the form',
+    'plans are how much of the page is spent TEACHING.'
   ];
 
   window.INST_ARRANGEMENT = [
@@ -2610,9 +2639,32 @@
     '  a page that reads as designed and one that reads as assembled. "none" is a real answer',
     '  for a book whose whole character is restraint.',
     '',
-    'THE PENCIL OUTRANKS EVERY AXIS. No furniture, table or annotation choice may cost a',
-    'write-in surface its space or draw inside a box a pencil fills. If an axis and the pencil',
-    'collide, the pencil wins.',
+    'THE FORM PLANS — how much of the page teaches, and for how long:',
+    '- A component has two forms. BARE is the surface alone: the boxes, the rules, nothing',
+    '  explaining itself. TAUGHT adds chrome that says how the surface is used — the session',
+    '  card numbers its steps and prints the marking rule beside the strip it governs, the',
+    '  oracle frames its how-to-roll line as an instrument instead of a caption, and a found',
+    '  document gets a routing band naming what it is in your world\'s own filing words.',
+    '- Mothership ships two character sheets, Basic and Advanced: the same character, one sheet',
+    '  walking you through it and one assuming you know. That pair is the whole idea. A book',
+    '  that teaches on every page treats a player who has run the whole block like a stranger; a',
+    '  book that never teaches abandons them in week one.',
+    '- THE SHEDDING LAW: teach while the load is light, get out of the way when the week is',
+    '  heavy. "taught-shed-early" and "taught-shed-mid" are the two ways to do that; the engine',
+    '  works the actual shed point out from how long this book runs.',
+    '- Choose per component, not once. These three surfaces are met at different rates: a',
+    '  session card is filled in several times a week, an oracle is rolled on once a week, and a',
+    '  found document may be the only one of its kind the player ever sees. A component the',
+    '  player meets rarely can justify teaching throughout; one they meet daily should shed.',
+    '- "bare-throughout" is a real answer, and the same kind of real answer "ruled-journal" is:',
+    '  choose it because this world would never annotate itself — an archive that explains its',
+    '  own forms is not an archive — never because it is the least work.',
+    '- Say what chose these in `arrangementEvidence`, the same as every axis above.',
+    '',
+    'THE PENCIL OUTRANKS EVERY AXIS. No furniture, table, annotation or form choice may cost a',
+    'write-in surface its space or draw inside a box a pencil fills. Teaching chrome is ADDED',
+    'above the write-in surfaces, never bought out of them. If an axis and the pencil collide,',
+    'the pencil wins.',
     '',
     'BLACK AND WHITE, AGAIN. Weight, fill and pattern carry every signal here. Nothing on this',
     'axis set may depend on colour.'

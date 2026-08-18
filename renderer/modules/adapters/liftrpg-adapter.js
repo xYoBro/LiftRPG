@@ -18,12 +18,18 @@ import { PAGE_BUDGET } from '../engine/page-spec.js';
 // to the page it names. One parameterized resolver (D93) — this file must not
 // grow a second parser for a grammar contract-constants.mjs already owns.
 // THE FORM CHANNEL'S DECLARATION SURFACE (ARRANGEMENT §2 axis 5 / §3).
-// `resolveAtomForms` reads `meta.arrangement.atomForms`; `sessionCardFormForWeek`
-// applies THE SHEDDING LAW — the declared form through `shedAfterWeek`, `bare`
-// after it. Both live in contract-constants for the reason every resolver does
-// (D93): the adapter is one reader, not the owner.
+// `resolveAtomForms` reads `meta.arrangement.atomForms` — one FORM PLAN per
+// family; `atomFormForPosition` applies THE SHEDDING LAW, turning the plan's
+// rhythm into the form ONE instance wears, given that instance's ordinal and
+// how many the book has. Both live in contract-constants for the reason every
+// resolver does (D93): the adapter is one reader, not the owner.
+//
+// SHELL_CITATION_STYLES rides along for the found document's taught form: its
+// routing band is labelled in the shell's OWN citation vocabulary, and this is
+// the layer that knows the shell. A renderer that reached for that table itself
+// would be Layer 0 learning domain identity.
 import {
-  parseSurfaceRef, resolveAtomForms, sessionCardFormForWeek,
+  parseSurfaceRef, resolveAtomForms, atomFormForPosition, SHELL_CITATION_STYLES,
 } from '../../../contracts/contract-constants.mjs';
 import { resolveWeekMechanicProfile } from '../mechanic-registry.js';
 import {
@@ -261,7 +267,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
     // wrote; a renderer that composed its own would print the same teaching in
     // every book, which is the sameness these axes exist to break.
     const cardFormSpec = {
-      form: sessionCardFormForWeek(atomForms, week.weekNumber),
+      form: atomFormForPosition(atomForms, 'sessionCard', week.weekNumber, totalWeeks),
       markInstruction: (week.reckoning && week.reckoning.conversion) || '',
       rulesPointer: ((data.meta || {}).economy || {}).currencyLabel || '',
     };
@@ -427,6 +433,17 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
             weekIndex: wi,
             totalWeeks,
             artifactIdentity,
+            // THE ONE CHANNEL (ARRANGEMENT §3 clause 3), the session card's
+            // idiom exactly: `data` is the field BOTH routes carry, so the
+            // estimate and the render read one answer. Resolved per WEEK
+            // because the shedding law is a point on the book's own timeline —
+            // the oracle is a weekly surface, so its shed unit is the week's.
+            //
+            // `rulesPointer` is the economy's AUTHORED noun, printed as the
+            // band's chip. The renderer composes nothing: a chip it wrote
+            // itself would say the same thing in every book.
+            formVariant: atomFormForPosition(atomForms, 'oracleTable', week.weekNumber, totalWeeks),
+            rulesPointer: ((data.meta || {}).economy || {}).currencyLabel || '',
           },
         }));
       }
@@ -748,6 +765,20 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
 
   // ── Fragments ───────────────────────────────────────────────
   const fragments = data.fragments || [];
+  // THE FOUND DOCUMENT'S SHED UNIT (ATOM_FORM_FAMILIES: `fragment`, not
+  // `week`). Fragments hang off the book root with no week reference in the
+  // schema and are seated together in `supplements`, so a week ordinal would be
+  // a number this file invented. Their printed order IS their sequence, and it
+  // is a real one: the reader meets the first documents first, so teaching the
+  // early ones and shedding the late ones is the same pedagogy the weekly
+  // families get, measured in the unit this family actually has.
+  //
+  // The routing band's label comes from the shell's own citation vocabulary —
+  // the words the book opted into when it declared its shell, and the same
+  // table the point-of-use prompt teaches from (D106). Resolved here because
+  // this is the layer that knows the shell.
+  const fragmentRouteLabel = ((SHELL_CITATION_STYLES[shellFamily]
+    || SHELL_CITATION_STYLES['field-survey'] || {}).labelVocabulary || [])[0] || '';
   for (let fi = 0; fi < fragments.length; fi++) {
     const frag = fragments[fi];
     const weight = fragmentWeight(frag);
@@ -766,6 +797,11 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
       data: {
         ...frag,
         artifactIdentity,
+        // THE ONE CHANNEL again, riding the fragment object itself because that
+        // is what `buildFragmentModel()` reads on BOTH routes — the atom builds
+        // the model to estimate and builds it again to render.
+        formVariant: atomFormForPosition(atomForms, 'fragmentDoc', fi + 1, fragments.length),
+        routeLabel: fragmentRouteLabel,
       },
     }));
   }

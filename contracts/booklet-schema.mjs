@@ -86,7 +86,8 @@ import {
   VALID_TABLE_TREATMENTS,
   VALID_ANNOTATION_PATTERNS,
   VALID_LEITMOTIF_GESTURES,
-  VALID_SESSION_CARD_FORMS
+  VALID_FORM_PLANS,
+  ATOM_FORM_FAMILIES
 } from './contract-constants.mjs';
 
 var G = SPATIAL_GUARDRAILS;
@@ -302,31 +303,29 @@ var arrangement = {
     arrangementEvidence: { type: 'string' },
     // ── Axis 5, the FORM channel (ARRANGEMENT §2 axis 5 / §3) ───────────────
     // Additive-optional, like every other arrangement surface: no declaration
-    // means every session card takes `bare`, which is today's exact card. The
-    // SHEDDING LAW rides here too — `shedAfterWeek` is the last 1-based week
-    // that keeps the declared form, after which the card sheds to `bare`.
-    // Absent means the form holds for the whole book. The shed point is an
-    // authored decision under the two-source law (§8), which is why it is a
-    // number the book states and not a constant the engine picks.
+    // means every component takes `bare`, which is today's exact page.
+    //
+    // ONE CLOSED SCALAR PER FAMILY — a FORM PLAN, which is a form and a shed
+    // rhythm in one word (`VALID_FORM_PLANS`). The SHEDDING LAW rides inside
+    // the plan: `resolveFormPlan(plan, span)` turns the rhythm into the last
+    // 1-based position that keeps the taught form, where `span` is the number
+    // of instances the family has in THIS book. That is the only place the
+    // book's length is known, and it is the reason the plan is a rhythm rather
+    // than the integer it resolves to — "shed after 3" means a different thing
+    // in a four-week book than a twelve-week one, and a compiler seat that
+    // holds no weeks yet could neither author nor be checked against it.
+    //
+    // The families and the unit each one's shed is measured in live in
+    // ATOM_FORM_FAMILIES; this object's keys are derived from it and asserted
+    // against it, so a family cannot exist in one place and not the other.
     atomForms: {
       type: 'object',
       required: [],
       additionalProperties: false,
-      properties: {
-        sessionCard: {
-          type: 'object',
-          // `form` required when the object is present — the manifestPointer
-          // idiom. A shed schedule with no form is a rule about nothing.
-          required: ['form'],
-          additionalProperties: false,
-          properties: {
-            form: { enum: VALID_SESSION_CARD_FORMS },
-            shedAfterWeek: { type: 'integer', minimum: 0 },
-            _x: xt
-          }
-        },
-        _x: xt
-      }
+      properties: ATOM_FORM_FAMILIES.reduce(function (props, family) {
+        props[family.id] = { enum: VALID_FORM_PLANS };
+        return props;
+      }, { _x: xt })
     },
     _x: xt
   }

@@ -10,6 +10,10 @@ import {
   inferMapFamily
 } from './mechanic-registry.js?v=48';
 import { normalizeD100Language, resolveArtifactIdentity } from './booklet-models.js?v=48';
+// THE FORM CHANNEL's one home for this family (ARRANGEMENT §3). No `?v=`: the
+// form-metrics modules are `.mjs` so Node can import them too, and a
+// cache-busted specifier would make them two modules in one runtime.
+import { resolveOracleTableForm } from './form-metrics/oracle-table-forms.mjs';
 import {
   VALID_EDGE_SEMANTICS,
   DEFAULT_EDGE_SEMANTICS,
@@ -394,13 +398,28 @@ export function buildCipherModel(cipher, weeklyComponent, mechanicProfile = null
   };
 }
 
-export function buildOracleModel(oracle) {
+/**
+ * @param {object} oracle the week's authored oracle table
+ * @param {object} [formSpec] THE FORM CHANNEL (ARRANGEMENT §3 clause 3 — one
+ *   channel). `{ form, rulesPointer }`, projected out of `atom.data` by the
+ *   atom so the estimate and the render read the SAME two fields. OPTIONAL:
+ *   absent or malformed resolves to `bare`, which is today's exact table, so
+ *   every existing caller is byte-identical without one.
+ *
+ *   `rulesPointer` is an AUTHORED string (the economy's own `currencyLabel`) —
+ *   the model composes no teaching of its own here, because a renderer that
+ *   wrote its own sentence would print the same one in every book.
+ */
+export function buildOracleModel(oracle, formSpec) {
   if (!oracle) return null;
+  const spec = (formSpec && typeof formSpec === 'object') ? formSpec : {};
   return {
     title: oracle.title || 'Oracle',
     instruction: normalizeD100Language(oracle.instruction || ''),
     mode: oracle.mode || '',
-    entries: normalizeEntries(oracle.entries)
+    entries: normalizeEntries(oracle.entries),
+    form: resolveOracleTableForm(spec.form),
+    rulesPointer: String(spec.rulesPointer || '').trim()
   };
 }
 

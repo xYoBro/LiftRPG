@@ -1,5 +1,9 @@
 import { getDocumentAtom } from './atom-registry.js?v=48';
 import { splitParagraphs } from './utils.js?v=48';
+// THE FORM CHANNEL's one home for this family (ARRANGEMENT §3). No `?v=`: the
+// form-metrics modules are `.mjs` so Node can import them too, and a
+// cache-busted specifier would make them two modules in one runtime.
+import { resolveFragmentDocForm } from './form-metrics/fragment-doc-forms.mjs';
 
 function normalizeDesignSpec(fragment) {
   const designSpec = fragment.designSpec || {};
@@ -161,7 +165,23 @@ export function buildFragmentModel(fragment) {
     seal: normalizeSeal(fragment),
     partIndex: fragment.partIndex || 0,
     partCount: fragment.partCount || 0,
-    artifactIdentity: fragment.artifactIdentity || {}
+    artifactIdentity: fragment.artifactIdentity || {},
+    // ── THE FORM CHANNEL (ARRANGEMENT §2 axis 5 / §3 clause 3) ──────────────
+    // Projected HERE rather than through a second parameter, because both
+    // routes already come through this model: `atoms/fragment-doc.js` builds it
+    // to estimate and builds it again to render. One projection, one answer —
+    // a sibling field the renderer read and the estimate did not would be the
+    // divergence the prime invariant forbids, built in on purpose.
+    //
+    // An absent or malformed value resolves to `bare`, today's exact document,
+    // so every existing caller (including buildDocumentPageModel below) is
+    // byte-identical without one.
+    //
+    // `routeLabel` is the shell's own citation word, handed down by the adapter
+    // from SHELL_CITATION_STYLES — the vocabulary the book opted into when it
+    // declared its shell. The renderer chooses no word of its own here.
+    form: resolveFragmentDocForm(fragment.formVariant),
+    routeLabel: String(fragment.routeLabel || '').trim()
   };
 }
 

@@ -12,6 +12,16 @@ import { buildOracleModel } from '../field-ops-models.js';
 import { renderOracleSection } from '../field-ops-primitives.js';
 import { densityVariant } from '../engine/density-util.js';
 import { advancePx, advanceRatio, readTypeMetrics } from '../type-metrics.js';
+// THE FORM CHANNEL (ARRANGEMENT §2 axis 5 / §3 clause 2 — the arithmetic
+// travels WITH the variant). The taught band's geometry is not on the density
+// ladder below and never joins it: the ladder is a hand-mirrored table of
+// booklet.css's numbers, and the band's numbers are EMITTED from this module
+// into form-variants.css, so there is nothing here to mirror.
+import {
+  resolveOracleTableForm,
+  bandLineCount,
+  oracleTaughtBandHeightPx
+} from '../form-metrics/oracle-table-forms.mjs';
 
 // ---------------------------------------------------------------------------
 // Ladder mirror  ⇄  booklet.css oracle blocks
@@ -207,8 +217,17 @@ function entryHeight(entry, tier, entryWidthPx, adv) {
   return stack + tier.padV + ENTRY_BORDER_PX;
 }
 
-/** Modelled zone height for one oracle table at one ladder tier. */
-function oracleHeightAt(oracle, tier, metrics) {
+/**
+ * Modelled zone height for one oracle table at one ladder tier.
+ *
+ * @param {string} form THE FORM CHANNEL, already normalised by the caller. In
+ *   `taught` the authored instruction is MOVED into the framed band rather than
+ *   printed as a plain line, so this function drops the instruction term and
+ *   adds the band's — exactly what renderOracleSection() builds. Charging both
+ *   would over-reserve every taught table by a line and a margin; charging the
+ *   plain term while the band prints would under-reserve, which clips.
+ */
+function oracleHeightAt(oracle, tier, metrics, form) {
   // THE FACE EACH ADVANCE IS ABOUT. `.oracle-case-num`, `.oracle-header` and
   // the `.frag-ref` chip are mono; `.oracle-text` and `.oracle-instruction`
   // read `--serif` (booklet.css 4749, 740). The classified-packet shell re-faces
@@ -231,7 +250,13 @@ function oracleHeightAt(oracle, tier, metrics) {
   height += Math.max(1, Math.ceil(titleChars * adv.header / ZONE_WIDTH_PX)) * HEADER_LINE_PX
     + tier.headerPadB + ENTRY_BORDER_PX + tier.headerMB;
 
-  if (oracle.instruction) {
+  if (form === 'taught') {
+    // The band, whatever the tier: its geometry is absolute px by construction
+    // (see the form module's header), so it is density-invariant and the ladder
+    // has no say in it. The instruction lives INSIDE it and is therefore not
+    // charged again as a plain line.
+    height += oracleTaughtBandHeightPx(bandLineCount(oracle.instruction));
+  } else if (oracle.instruction) {
     const instrChars = String(oracle.instruction).length;
     height += Math.max(1, Math.ceil(instrChars * adv.instr / ZONE_WIDTH_PX)) * INSTR_LINE_PX
       + tier.instrMB;
@@ -266,10 +291,17 @@ registerAtom('oracle-table', {
    */
   estimate(data, density, context) {
     const metrics = readTypeMetrics(context);
-    const oracle = (data || {}).oracle || {};
+    const atomData = data || {};
+    const oracle = atomData.oracle || {};
+    // THE ONE CHANNEL (ARRANGEMENT §3 clause 3). `data` is the field BOTH
+    // routes carry: estimate() is handed `atom.data` alone (page-planner.js and
+    // density-solver.js both call it that way) while render() receives the
+    // whole descriptor. Reading the form off anything else would make it
+    // visible to one half and invisible to the other.
+    const form = resolveOracleTableForm(atomData.formVariant);
     return {
-      minHeight:       oracleHeightAt(oracle, LADDER.tight, metrics),
-      preferredHeight: oracleHeightAt(oracle, ladderFor(density), metrics),
+      minHeight:       oracleHeightAt(oracle, LADDER.tight, metrics, form),
+      preferredHeight: oracleHeightAt(oracle, ladderFor(density), metrics, form),
     };
   },
 
@@ -278,7 +310,13 @@ registerAtom('oracle-table', {
     const oracle = data.oracle || {};
     const artifactIdentity = data.artifactIdentity || {};
 
-    const oracleModel = buildOracleModel(oracle);
+    // The SAME projection the estimate reads. The form attribute itself is
+    // stamped by renderOracleSection(), beside the chrome it selects — see the
+    // note there on why it cannot be stamped here.
+    const oracleModel = buildOracleModel(oracle, {
+      form: data.formVariant,
+      rulesPointer: data.rulesPointer,
+    });
     const el = renderOracleSection(oracleModel);
     el.setAttribute('data-shell-family', artifactIdentity.shellFamily || 'field-survey');
     el.setAttribute('data-board-state-mode', artifactIdentity.boardStateMode || 'survey-grid');

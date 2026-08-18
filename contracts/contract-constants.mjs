@@ -918,41 +918,86 @@ export function resolveArrangement(spec) {
 // conversation, not a wave. `ATOM_FORM_SET_CAP` is that cap with a reader.
 export var ATOM_FORM_SET_CAP = 4;
 
-// `bare` is TODAY'S EXACT CARD and stamps no attribute, which is what makes the
-// pre-form render provably unchanged (the D179 demotion idiom: declaring
+// `bare` is TODAY'S EXACT COMPONENT and stamps no attribute, which is what makes
+// the pre-form render provably unchanged (the D179 demotion idiom: declaring
 // nothing — and declaring the default — moves no pixel). `taught` is the
-// Mothership Basic sheet's form: numbered steps, the marking instruction
-// printed beside the field it fills, a pointer to where the rules live.
+// Mothership Basic sheet's form, read per family: numbered steps beside the
+// fields they fill (session card), a framed how-to-roll band (oracle table), a
+// labelled routing band in the shell's own citation vocabulary (found document).
 export var VALID_SESSION_CARD_FORMS = ['bare', 'taught'];
 export var DEFAULT_SESSION_CARD_FORM = 'bare';
+export var VALID_ORACLE_TABLE_FORMS = ['bare', 'taught'];
+export var DEFAULT_ORACLE_TABLE_FORM = 'bare';
+export var VALID_FRAGMENT_DOC_FORMS = ['bare', 'taught'];
+export var DEFAULT_FRAGMENT_DOC_FORM = 'bare';
 
 /**
- * resolveAtomForms(spec) -> { sessionCard: { form, shedAfterWeek? } } | null
+ * THE FORM FAMILIES — every atom family that has a form set, with the unit its
+ * shed is measured in.
  *
- * SINGLE HOME (D93) for `meta.arrangement.atomForms`. The adapter resolves the
- * declaration once per book and stamps the answer on every session-card atom,
- * so phase-1 estimation and the renderer read the SAME answer — variant
- * contract clause 3 (one channel).
+ * Derived-from, never listed-beside: the declaration schema, the die's axes,
+ * the floor's per-family checks, the prompt's menu and the gate's arms all walk
+ * this table. A family added here and nowhere else is a family every one of
+ * those surfaces picks up; a family added to one of them alone is impossible.
  *
- * `null` for an absent or unreadable declaration, and it is load-bearing in
- * exactly the way `resolveArrangement()`'s null is: no declaration means every
- * card takes `bare`, which is byte-identical to the pre-form engine. An
- * off-menu form is DROPPED rather than defaulted-with-a-shed, because a book
- * that misauthored the form name must not silently acquire a shed schedule.
+ * `unit` is load-bearing and is the reason this is a table rather than three
+ * copies of one rule. The session card and the oracle table are WEEKLY — the
+ * adapter emits one per week and the shed is a point on the book's own timeline
+ * (ARRANGEMENT §2 axis 5's own words). A found document is NOT weekly: the
+ * schema hangs `fragments` off the book root with no week reference at all, and
+ * the adapter seats every fragment in the `supplements` section. Its ordinal in
+ * printed order is therefore the only sequence it has, and it is a real one —
+ * the reader meets the first documents first, so teaching the early ones and
+ * shedding the late ones is the same pedagogy the weekly families get.
  */
-export function resolveAtomForms(spec) {
-  if (!spec || typeof spec !== 'object') return null;
-  var declared = spec.sessionCard;
-  if (!declared || typeof declared !== 'object') return null;
-  var form = String(declared.form || '').trim();
-  if (VALID_SESSION_CARD_FORMS.indexOf(form) === -1) return null;
-  var out = { form: form };
-  var shed = declared.shedAfterWeek;
-  if (typeof shed === 'number' && isFinite(shed) && shed >= 0 && Math.floor(shed) === shed) {
-    out.shedAfterWeek = shed;
-  }
-  return { sessionCard: out };
-}
+export var ATOM_FORM_FAMILIES = [
+  { id: 'sessionCard', label: 'session card', atomType: 'session-card',
+    forms: VALID_SESSION_CARD_FORMS, defaultForm: DEFAULT_SESSION_CARD_FORM, unit: 'week' },
+  { id: 'oracleTable', label: 'oracle table', atomType: 'oracle-table',
+    forms: VALID_ORACLE_TABLE_FORMS, defaultForm: DEFAULT_ORACLE_TABLE_FORM, unit: 'week' },
+  { id: 'fragmentDoc', label: 'found document', atomType: 'fragment-doc',
+    forms: VALID_FRAGMENT_DOC_FORMS, defaultForm: DEFAULT_FRAGMENT_DOC_FORM, unit: 'fragment' }
+];
+
+/**
+ * THE FORM PLAN MENU — what a book declares, and what the die assigns.
+ *
+ * A plan is a FORM PLUS A SHED RHYTHM, and it is one closed scalar rather than
+ * `{form, shedAfterWeek}` for two measured reasons:
+ *
+ *   1. THE DIE. Every axis needs a die (the two-source law, ARRANGEMENT §8) and
+ *      the die's machinery — `drawSeedAssignments`, `readAxisValue`, the
+ *      obedience floor, the quality referee — reads ONE scalar at ONE path from
+ *      a closed menu. An integer shed week could be assigned but never checked:
+ *      classifying `{form:'taught', shedAfterWeek:3}` back into a rhythm needs
+ *      the book's length, and the compiler seats that own this declaration have
+ *      no weeks yet. Every reader would have to be re-plumbed with a span for
+ *      one axis, and a floor that cannot classify reports a pass.
+ *   2. THE SPAN IS THE POINT. "Shed at week 3" means a different thing in a
+ *      4-week book than in a 12-week one, and the model authoring it is
+ *      guessing at a book it has not written. A rhythm is length-relative by
+ *      construction: the resolver below turns it into the integer, once, where
+ *      the length is actually known.
+ *
+ * The shed point stays AUTHORED-OR-ASSIGNED under the two-source law — what
+ * moved is the vocabulary the author writes it in, from an integer nobody could
+ * check to a rhythm everybody reads the same way.
+ */
+export var VALID_FORM_PLANS = [
+  'bare-throughout', 'taught-shed-early', 'taught-shed-mid', 'taught-throughout'
+];
+export var DEFAULT_FORM_PLAN = 'bare-throughout';
+
+/**
+ * What each plan MEANS, byte-quoted into the prompt (the D124 idiom) and read
+ * by nothing else. One sentence per plan, in the model's own decision terms.
+ */
+export var FORM_PLAN_GUIDANCE = {
+  'bare-throughout': 'the component carries no teaching chrome anywhere. Today\'s book, chosen — right when the surface is self-evident or the world would never annotate itself.',
+  'taught-shed-early': 'taught for the first quarter of the run, bare after. The strongest reading of the shedding law: teach while the load is light, then get out of the way.',
+  'taught-shed-mid': 'taught to the midpoint, bare after. A longer apprenticeship, for a component whose reading is not obvious the first time.',
+  'taught-throughout': 'taught on every instance. For a component the player meets rarely enough that it never becomes second nature.'
+};
 
 /**
  * THE SHEDDING LAW (ARRANGEMENT §2 axis 5, ratified 2026-08-17), as arithmetic.
@@ -963,22 +1008,80 @@ export function resolveAtomForms(spec) {
  * and it pairs with the seam law (§5): teach while the load is light; get out
  * of the way when the week is heavy.
  *
- * A pure function of the declaration and the week's ordinal, so the chunker,
- * the estimate and the renderer cannot reach three answers. `weekNumber` is
- * 1-based (the schema's own `week.weekNumber`). No `shedAfterWeek` means the
- * declared form holds for the whole book — the shed point is an AUTHORED
- * decision under the two-source law (§8), never a constant this file guesses.
+ * resolveFormPlan(plan, span) -> { plan, form, shedAfter }
  *
- * @param {object|null} atomForms output of resolveAtomForms()
- * @param {number} weekNumber 1-based
- * @returns {string} a member of VALID_SESSION_CARD_FORMS
+ * SINGLE HOME (D93) for the rhythm→integer step. `span` is how many instances
+ * the family has in this book (weeks, or fragments — see ATOM_FORM_FAMILIES).
+ * `shedAfter` is the last 1-based position that keeps the taught form, or
+ * `null` when the plan never sheds.
+ *
+ * THE CLAMP IS PART OF THE MEANING, not a guard: a shed plan always leaves at
+ * least one position on each side, so a book that declares a shed PRINTS both
+ * forms. A shed that produces one form only is a declaration that did nothing,
+ * and the gate asserts exactly that on the rendered page.
  */
-export function sessionCardFormForWeek(atomForms, weekNumber) {
-  var declared = atomForms && atomForms.sessionCard;
-  if (!declared || !declared.form) return DEFAULT_SESSION_CARD_FORM;
-  if (typeof declared.shedAfterWeek !== 'number') return declared.form;
-  var n = (typeof weekNumber === 'number' && isFinite(weekNumber)) ? weekNumber : 1;
-  return n > declared.shedAfterWeek ? DEFAULT_SESSION_CARD_FORM : declared.form;
+export function resolveFormPlan(plan, span) {
+  var name = String(plan == null ? '' : plan).trim();
+  if (VALID_FORM_PLANS.indexOf(name) === -1) name = DEFAULT_FORM_PLAN;
+  var n = (typeof span === 'number' && isFinite(span) && span > 0) ? Math.floor(span) : 1;
+  if (name === 'bare-throughout') return { plan: name, form: 'bare', shedAfter: null };
+  if (name === 'taught-throughout') return { plan: name, form: 'taught', shedAfter: null };
+  var fraction = name === 'taught-shed-early' ? 0.25 : 0.5;
+  var point = Math.max(1, Math.round(n * fraction));
+  return { plan: name, form: 'taught', shedAfter: Math.min(point, Math.max(1, n - 1)) };
+}
+
+/**
+ * resolveAtomForms(spec) -> { sessionCard?: plan, oracleTable?: plan, fragmentDoc?: plan } | null
+ *
+ * SINGLE HOME (D93) for `meta.arrangement.atomForms`. The adapter resolves the
+ * declaration once per book and stamps the answer on every atom of every family
+ * it names, so phase-1 estimation and the renderer read the SAME answer —
+ * variant contract clause 3 (one channel).
+ *
+ * `null` for an absent or unreadable declaration, and it is load-bearing in
+ * exactly the way `resolveArrangement()`'s null is: no declaration means every
+ * component takes `bare`, which is byte-identical to the pre-form engine. An
+ * off-menu plan is DROPPED for that family rather than defaulted to a shed,
+ * because a book that misauthored a plan name must not silently acquire a shed
+ * schedule — and the other families' declarations still stand, because a typo
+ * in one field is not a reason to discard three.
+ */
+export function resolveAtomForms(spec) {
+  if (!spec || typeof spec !== 'object' || Array.isArray(spec)) return null;
+  var out = null;
+  for (var i = 0; i < ATOM_FORM_FAMILIES.length; i++) {
+    var family = ATOM_FORM_FAMILIES[i].id;
+    var plan = String(spec[family] == null ? '' : spec[family]).trim();
+    if (VALID_FORM_PLANS.indexOf(plan) === -1) continue;
+    if (!out) out = {};
+    out[family] = plan;
+  }
+  return out;
+}
+
+/**
+ * atomFormForPosition(atomForms, family, position, span) -> form
+ *
+ * The form ONE instance wears. A pure function of the declaration and the
+ * instance's own ordinal, so the chunker, the estimate and the renderer cannot
+ * reach three answers. `position` is 1-based in the family's own unit (the
+ * week's `weekNumber`, or the fragment's printed ordinal).
+ *
+ * @returns {string} a member of the family's own form menu
+ */
+export function atomFormForPosition(atomForms, family, position, span) {
+  var row = null;
+  for (var i = 0; i < ATOM_FORM_FAMILIES.length; i++) {
+    if (ATOM_FORM_FAMILIES[i].id === family) { row = ATOM_FORM_FAMILIES[i]; break; }
+  }
+  if (!row) return DEFAULT_SESSION_CARD_FORM;
+  var plan = atomForms && atomForms[family];
+  if (!plan) return row.defaultForm;
+  var resolved = resolveFormPlan(plan, span);
+  if (resolved.form === 'bare' || resolved.shedAfter === null) return resolved.form;
+  var n = (typeof position === 'number' && isFinite(position)) ? position : 1;
+  return n > resolved.shedAfter ? row.defaultForm : resolved.form;
 }
 
 // ── Artifact identity ────────────────────────────────────────────────────────
@@ -2938,7 +3041,39 @@ export var IDENTITY_AXES = [
     path: 'weeks[].fieldOps.mapState.mapType',
     menu: VALID_MAP_TYPES, kind: 'dominant',
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['campaign-plan'], familyDecides: true }
-];
+// ── THE FORM AXES (ARRANGEMENT §2 axis 5 / §3, phase B) ─────────────────────
+// The five arrangement axes above PAINT. These three MEASURE, and they are on
+// this table for the reason ARRANGEMENT §8 gives for the paint axes: *every
+// axis needs a die, not just a list.* D206 built the channel that makes the
+// shape variable and no book varied, because nothing assigned a form and no
+// prompt asked for one — the same measured shape as the game-kind menus, which
+// were shown in full inside an 87,000-character prompt and still produced the
+// default book. A list without a die is a list the model reads past.
+//
+// DERIVED FROM ATOM_FORM_FAMILIES, never listed beside it. A family added to
+// that table gains its die, its prompt slice, its floor and its gate arm in one
+// edit; a family added here alone is impossible. Same idiom, same reason, as
+// the demoted-companion menu (D124).
+//
+// BOTH COMPILER SEATS, matching the arrangement axes directly above rather than
+// the design-language axes: the declaration lives inside `meta.arrangement`, so
+// it rides SCHEMA_ARRANGEMENT/INST_ARRANGEMENT to whichever seats they reach,
+// and `arrangementFloorErrors` blocks at both. Teach where you check.
+//
+// NO `answerRequired` FLAG, for the arrangement axes' own reason: the
+// arrangement floor blocks on an absent plan before the obedience floor is ever
+// asked, so silence is not a third path here.
+].concat(ATOM_FORM_FAMILIES.map(function (family) {
+  return {
+    id: 'atomForm' + family.id.charAt(0).toUpperCase() + family.id.slice(1),
+    label: 'arrangement.atomForms.' + family.id,
+    path: 'meta.arrangement.atomForms.' + family.id,
+    menu: VALID_FORM_PLANS,
+    kind: 'scalar',
+    evidencePath: 'meta.arrangement.arrangementEvidence',
+    stages: ['shell', 'skeleton']
+  };
+}));
 
 // The stages that own at least one axis. Derived so a new axis with a new stage
 // cannot be handed to a model and then checked by nobody.

@@ -1288,7 +1288,41 @@ export function renderOracleSection(oracle) {
   const section = make('div', 'oracle-zone');
   section.setAttribute('data-oracle-mode', oracle.mode || '');
   section.appendChild(make('header', 'oracle-header', oracle.title || 'Oracle'));
-  if (oracle.instruction) section.appendChild(make('div', 'oracle-instruction', oracle.instruction));
+
+  // ── THE FORM CHANNEL (ARRANGEMENT §2 axis 5 / §3) ─────────────────────────
+  //
+  // The attribute is stamped HERE, beside the chrome it selects, rather than in
+  // the atom: every rule in the emitted stylesheet hangs off this element, and
+  // stamping it one layer away from the DOM it governs is how a form ends up
+  // resolving, reading as present, and drawing nothing.
+  //
+  // `bare` stamps NOTHING — the D179 presence fence, and the property that makes
+  // a book which declares no form byte-identical to the pre-form engine.
+  //
+  // THE INSTRUCTION IS MOVED, NOT COPIED. In the taught form the authored
+  // instruction is the band's text and no `.oracle-instruction` is built, so
+  // nothing on the page says it twice. Both branches print the SAME authored
+  // string; the renderer writes no sentence of its own.
+  const taught = oracle.form === 'taught';
+  if (taught) {
+    section.setAttribute('data-form-variant', 'taught');
+    const band = make('div', 'oracle-teach-band');
+    const head = make('div', 'oracle-teach-head');
+    head.appendChild(make('span', 'oracle-teach-rule'));
+    // The pointer chip: the book's own name for what this table pays in.
+    // Absent when the book named nothing — a chip with no noun in it is chrome
+    // about nothing.
+    if (oracle.rulesPointer) {
+      head.appendChild(make('span', 'oracle-teach-pointer', oracle.rulesPointer));
+    }
+    band.appendChild(head);
+    if (oracle.instruction) {
+      band.appendChild(make('div', 'oracle-teach-text', oracle.instruction));
+    }
+    section.appendChild(band);
+  } else if (oracle.instruction) {
+    section.appendChild(make('div', 'oracle-instruction', oracle.instruction));
+  }
 
   const list = make('div', 'oracle-entries');
   (oracle.entries || []).forEach((entry) => {

@@ -116,6 +116,38 @@ export function renderFoundDocument(fragmentModel) {
     doc.setAttribute('data-sealed', 'true');
     doc.appendChild(sealBand);
   }
+
+  // ── THE FORM CHANNEL (ARRANGEMENT §2 axis 5 / §3) ─────────────────────────
+  //
+  // The attribute is stamped on `.fragment-doc` because that is what every rule
+  // in the emitted stylesheet hangs off; stamping it a layer away from the DOM
+  // it governs is how a form ends up resolving, reading as present and drawing
+  // nothing. `bare` stamps NOTHING (the D179 presence fence), which is what
+  // makes a book that declares no form byte-identical to the pre-form engine.
+  //
+  // BELOW THE SEAL, ABOVE THE TYPE SLUG. The seal is a recognition object the
+  // player has to find again weeks later; nothing goes above it.
+  //
+  // EVERY STRING HERE IS THE BOOK'S. The label is the shell's own citation word
+  // (SHELL_CITATION_STYLES, handed down by the adapter), the reference is the
+  // fragment's authored id, and the chip is its authored filed citation. The
+  // renderer writes no sentence — one that did would print the same teaching in
+  // every book, which is the sameness this axis exists to break.
+  if (fragmentModel.form === 'taught') {
+    doc.setAttribute('data-form-variant', 'taught');
+    const band = make('div', 'fragment-route-band');
+    if (fragmentModel.routeLabel) {
+      band.appendChild(make('span', 'fragment-route-label', fragmentModel.routeLabel));
+    }
+    if (fragmentModel.id) {
+      band.appendChild(make('span', 'fragment-route-ref', fragmentModel.id));
+    }
+    band.appendChild(make('span', 'fragment-route-rule'));
+    const citedAs = (fragmentModel.citeRef || {}).citedAs;
+    if (citedAs) band.appendChild(make('span', 'fragment-route-cite', citedAs));
+    doc.appendChild(band);
+  }
+
   doc.appendChild(make('div', 'fragment-doc-type', fragmentModel.documentType));
   if (fragmentModel.continuationLabel) {
     doc.appendChild(make('div', 'fragment-doc-continuation', fragmentModel.continuationLabel));
