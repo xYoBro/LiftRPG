@@ -5940,8 +5940,15 @@
         '- Requirement: ' + f.requirement
       ];
       if (hasBudget(f)) {
-        row.push('- Budget: ' + f.cap + ' characters. Yours is ' + f.length + ' — '
+        // The HARD numeric target (D194): models cannot count characters, so a
+        // bare cap invites grazing (2449 against 2400, live). The target is
+        // ~88% of the cap - deep enough that a miscount still lands under.
+        var hardTarget = Math.floor(f.cap * 0.88);
+        row.push('- Budget: ' + f.cap + ' characters. Yours is ' + f.length + ' \u2014 '
           + Math.max(1, (f.length - f.cap)) + ' too many.');
+        row.push('- RETURN AT MOST ' + hardTarget + ' CHARACTERS for this field. Cut whole'
+          + ' sentences until you are clearly under \u2014 do not compress words or shave'
+          + ' punctuation to graze the cap.');
       }
       if (f.presence) {
         // No "current text" block, deliberately: there is no current text, and

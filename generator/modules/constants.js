@@ -246,7 +246,11 @@ export var STAGE_BUDGETS = {
 // cannot count characters at all, which a re-roll does not fix either.
 // A constant, not a literal at the call site: the D97 law applied to rounds
 // the same way D166 applied it to attempts.
-export var DELTA_REPAIR_MAX_ROUNDS = 2;
+// 2 -> 4 on live evidence (D194, the proving run's finale): the trim CONVERGES
+// (2580 -> 2449 across calls) but models cannot count characters, so two
+// rounds ended 49 over and re-rolled a whole stage. Each round is a ~4k-token
+// 30-second call - four rounds cost under 2% of the re-roll they prevent.
+export var DELTA_REPAIR_MAX_ROUNDS = 4;
 
 // Retry escalation: each attempt gets more wall clock than the last, and a
 // truncated attempt gets its token ceiling raised to MAX_OUTPUT_TOKENS.
