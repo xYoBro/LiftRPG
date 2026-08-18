@@ -893,7 +893,46 @@
         type: 'array',
         items: {
           type: 'object',
-          properties: { entry: { type: 'string' }, role: { type: 'string' } },
+          properties: {
+            // ── THE ACCEPTANCE SET, ON THE WIRE (DR-43 / D217's F04 finding) ──
+            // This field was a bare `{type:'string'}` while the composition
+            // floor rejected anything outside LUDIC_LIBRARY, which made all
+            // thirteen implemented systems transport-unreal: the one stage that
+            // decides what the game IS could answer `entry: "faction-clock"`
+            // and the transport would carry it happily to a gate that fails the
+            // whole stage. The retry then re-rolls a 30k-token unit over a
+            // choice the schema could have refused for free.
+            //
+            // THE EXCEPTION TO "TYPES, NOT MENUS" (the rule stated on
+            // STRUCTURED_ARRANGEMENT above), and it is a principled one rather
+            // than an inconsistency. That rule earns its keep where the floor's
+            // vocabulary is a POLICY the prompt states in prose and the schema
+            // would merely re-state — a fourth thing to drift (D124). Here the
+            // vocabulary is the CLOSED CONTENTS OF A SHELF: LUDIC_LIBRARY is
+            // derived from the implemented tier of the registry (a system is on
+            // this list because an atom prints it), the floor's message already
+            // recites the whole list, and `gateStructure` two hundred lines
+            // below has carried its enum on this same literal since D129. A
+            // model cannot invent an implement into existence, so letting it
+            // TRY is pure retry cost.
+            //
+            // BY REFERENCE, in the only sense an import-free browser IIFE
+            // allows (the D149 idiom): the literal is quoted here and
+            // spineStructuredLiteralParity() in validate.mjs byte-checks its
+            // membership and order against LUDIC_LIBRARY at build time. Add an
+            // implement to the shelf without adding it here and the build
+            // fails — which is the point, because the silent version of that
+            // mistake is a new system the designer stage is taught about and
+            // the transport refuses.
+            entry: {
+              type: 'string',
+              enum: ['reckoning-economy', 'board', 'decode-chain', 'clock-bank',
+                'companion-kit', 'oracle-pull', 'door-fork', 'sealed-cache',
+                'boss-convergence', 'ledger-audit', 'deduction-board', 'word-hunt',
+                'arithmetic-grid']
+            },
+            role: { type: 'string' }
+          },
           required: ['entry', 'role']
         }
       },
@@ -1712,6 +1751,57 @@
        'Return ONLY a JSON object of this shape:'],
       JSON.stringify(example(schema), null, 2).split('\n')
     );
+  })(SCHEMA_CANONICAL_WORKOUT);
+
+  // THE WIRE SCHEMA (DR-42). The THIRD reading of the same object, and the one
+  // that turns the taught shape from a request into a constraint: the
+  // canonicalize stage was the last paid stage on either pipeline running
+  // `schema: null`, so its field names were taught in prose and enforced by
+  // nothing. That is the F04 class one layer down from DR-39 — a shape the
+  // structured transport does not hold. `normalizeCanonicalWorkout()` answers a
+  // misnamed field by silently DROPPING it (a nameless exercise is skipped, an
+  // unparseable `sets` is omitted, a week with no shaped session vanishes), so
+  // the failure mode is a book built on a thinner program than the user typed,
+  // with nothing thrown and nothing logged. Forcing the schema makes the wrong
+  // shape unsendable rather than undetectable.
+  //
+  // DERIVED, NEVER RESTATED. Hand-writing this literal beside the object would
+  // rebuild the exact second home DR-39 tore down — with the extra cruelty that
+  // the two would be describing the same wire contract. One object, three
+  // readings: the field-name authority, the printed spec, and this.
+  //
+  // WHAT THE STRIP REMOVES AND WHY. The `example:` annotations are TEACHING —
+  // they exist so the printed spec can carry a worked value on the property
+  // node itself. `example` is not a JSON Schema keyword (draft 2019-09 spells
+  // it `examples`), and a non-keyword riding a compat `response_format`
+  // json_schema or an Anthropic tool `input_schema` is at best ignored and at
+  // worst rejected. It carries no constraint either way, so it has no business
+  // on the wire. Arrays are copied rather than aliased: two objects sharing one
+  // `required` array is a mutation seam nobody would look for.
+  //
+  // maxLength IS ABSENT and that is D162's ruling, not an oversight: this stage
+  // has no OUTPUT_BUDGETS row, and a cap here would be instruction on every
+  // transport anyway (collectBudgetBreaches is the enforcement everywhere).
+  window.STRUCTURED_SCHEMA_CANONICAL_WORKOUT = (function (schema) {
+    function wire(node) {
+      if (!node || typeof node !== 'object') return node;
+      var out = {};
+      Object.keys(node).forEach(function (key) {
+        if (key === 'example') return;
+        var value = node[key];
+        if (key === 'properties') {
+          var props = {};
+          Object.keys(value).forEach(function (p) { props[p] = wire(value[p]); });
+          out.properties = props;
+        } else if (key === 'items') {
+          out.items = wire(value);
+        } else {
+          out[key] = Array.isArray(value) ? value.slice() : value;
+        }
+      });
+      return out;
+    }
+    return wire(schema);
   })(SCHEMA_CANONICAL_WORKOUT);
 
   window.SCHEMA_SPEC = [].concat(

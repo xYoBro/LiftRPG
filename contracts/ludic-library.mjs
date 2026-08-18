@@ -720,10 +720,14 @@ export var LUDIC_UNCOMPOSABLE = LUDIC_LIBRARY_REGISTRY
 //                    validate.mjs — comment-stripped by the caller) for the
 //                    declaration surface's own key: does a floor read the
 //                    declaration back?
-//   transport-real — a walk of the vm-evaluated STRUCTURED_SCHEMA_PLAY_SPINE
-//                    at the declared path: does the structured transport
-//                    carry the surface, and is the closed choice
-//                    enum-constrained there (the F04 class)?
+//   transport-real — a walk of EVERY vm-evaluated STRUCTURED_SCHEMA_* at the
+//                    declared path: does a structured transport carry the
+//                    surface, and is the closed choice enum-constrained there
+//                    (the F04 class)? A surface no schema carries grades NO
+//                    with the unforced stage named — this column used to walk
+//                    the spine alone and grade everything else `unknown`,
+//                    which is an audit reporting its own blind spot as the
+//                    shelf's ambiguity (DR-44).
 //
 // HONESTY CAVEATS, stated here because the page repeats them: a text hit
 // proves an id is NAMED at a stage, not taught-with-a-reason — reading the
@@ -890,6 +894,35 @@ function collectSubtreeEnumKeys(node, keyName, out) {
   return out;
 }
 
+/** Walk a JSON-Schema node down a dotted path whose array levels carry `[]`.
+ *  Returns null the moment a segment does not exist. */
+function walkSchemaPath(root, segs) {
+  var node = root;
+  for (var i = 0; i < segs.length; i++) {
+    var isArr = /\[\]$/.test(segs[i]);
+    var key = segs[i].replace(/\[\]$/, '');
+    node = node && node.properties ? node.properties[key] : null;
+    if (isArr) node = node && node.items ? node.items : null;
+    if (!node) return null;
+  }
+  return node;
+}
+
+/** The grade for a node the walk FOUND, shared by the spine walk and the
+ *  whole-roster walk so one surface is never graded by two rules. */
+function gradeFoundNode(node) {
+  if (Array.isArray(node.enum)) {
+    return { v: 'yes', text: 'YES — enum-constrained on the transport (' + node.enum.length + ' values)' };
+  }
+  var enumKeys = collectSubtreeEnumKeys(node, null, []);
+  return enumKeys.length
+    ? { v: 'carried', text: 'carried — shape on the transport; enum on ' + enumKeys.map(function (k) { return '`' + k + '`'; }).join(', ') }
+    : { v: 'carried', text: 'carried — field on the transport, no enum (the floor is the enforcement)' };
+}
+
+// How many unforced stage labels the NO reason quotes before it stops listing.
+var UNFORCED_STAGE_CAP = 4;
+
 function gradeTransport(entry, evidence) {
   if (entry.tier === 'excluded-physical' || entry.tier === 'needs-new-primitive') {
     return { v: 'na', text: '—' };
@@ -898,37 +931,57 @@ function gradeTransport(entry, evidence) {
   var clean = String(entry.surface).replace(/\s*\(.*$/, '');
   var prefix = 'meta.playSpine.';
   if (clean.indexOf(prefix) !== 0) {
+    // ── OFF-SPINE SURFACES (DR-44) ─────────────────────────────────────────
+    // This used to grade `unknown — outside the spine transport this audit
+    // walks`, which is the audit reporting its own blind spot as the shelf's
+    // ambiguity. A surface declared elsewhere is walked against EVERY
+    // structured stage schema the repo defines, and the honest answer when
+    // none carries it is NO — with the reason, because "no schema has it" and
+    // "the stage that writes it forces no schema at all" are different
+    // findings and only the second is actionable.
+    //
+    // TWO READINGS OF THE PATH, deliberately. A stage schema may be rooted at
+    // the BOOK (properties.weeks[]…) or at the stage's own UNIT (the week
+    // object itself, properties.fieldOps…). Both are walked so a future
+    // unit-rooted week schema grades YES the day it lands rather than
+    // reporting a false NO that someone has to debug.
+    var segs = clean.split('.');
+    var roster = evidence.transportSchemas || {};
+    var names = Object.keys(roster).sort();
+    for (var n = 0; n < names.length; n++) {
+      var found = walkSchemaPath(roster[names[n]], segs)
+        || (segs.length > 1 ? walkSchemaPath(roster[names[n]], segs.slice(1)) : null);
+      if (found) return gradeFoundNode(found);
+    }
+    var unforced = (evidence.unforcedStages || []).slice(0, UNFORCED_STAGE_CAP);
+    var more = (evidence.unforcedStages || []).length - unforced.length;
     return {
-      v: 'unknown',
-      text: 'unknown — declared at `' + clean + '`, outside the spine transport this audit walks'
+      v: 'no',
+      text: 'NO — declared at `' + clean + '`, and none of the ' + names.length
+        + ' structured stage schemas carries it. The stages that write outside the spine run '
+        + 'UNFORCED (`schema: null`): ' + unforced.join(', ')
+        + (more > 0 ? ' (+' + more + ' more)' : '')
+        + ' — freeform text plus repair extraction, so this surface has no wire contract at all.'
     };
   }
-  var node = evidence.spineSchema;
-  var segs = clean.slice(prefix.length).split('.');
-  for (var i = 0; i < segs.length; i++) {
-    var isArr = /\[\]$/.test(segs[i]);
-    var key = segs[i].replace(/\[\]$/, '');
-    node = node && node.properties ? node.properties[key] : null;
-    if (isArr) node = node && node.items ? node.items : null;
-    if (!node) break;
-  }
+  var node = walkSchemaPath(evidence.spineSchema, clean.slice(prefix.length).split('.'));
   if (!node) {
     return { v: 'no', text: 'NO — the structured transport does not carry `' + clean + '`' };
   }
-  if (Array.isArray(node.enum)) {
-    return { v: 'yes', text: 'YES — enum-constrained on the transport (' + node.enum.length + ' values)' };
-  }
-  if (entry.tier === 'implemented') {
+  // The implemented tier all declares at `composition[].entry`, and the only
+  // honest grade for a CLOSED shelf on that field is an enum. A merely
+  // "carried" string means the acceptance set never reaches the wire — D217's
+  // F04 finding — so the sentence is kept rather than deleted with the defect:
+  // strip the enum and this row re-earns it out loud instead of quietly
+  // downgrading to "carried".
+  if (entry.tier === 'implemented' && !Array.isArray(node.enum)) {
     return {
       v: 'no',
       text: 'NO — `composition[].entry` is a bare string on the transport; the acceptance set '
         + '(LUDIC_LIBRARY) never reaches it. The F04 class.'
     };
   }
-  var enumKeys = collectSubtreeEnumKeys(node, null, []);
-  return enumKeys.length
-    ? { v: 'carried', text: 'carried — shape on the transport; enum on ' + enumKeys.map(function (k) { return '`' + k + '`'; }).join(', ') }
-    : { v: 'carried', text: 'carried — field on the transport, no enum (the floor is the enforcement)' };
+  return gradeFoundNode(node);
 }
 
 /**

@@ -5638,6 +5638,20 @@ async function runCanonicalizeStage(settings, config) {
       maxAttempts: config.trialMode ? 1 : 2,
       rateLimiter: config.rateLimiter,
       budgetEnforce: config.budgetEnforce,
+      // THE FORCED SHAPE (DR-42). The one literal, borrowed through the window
+      // hop this file uses for every prompt_rules-owned schema — a hand-written
+      // copy here would be the second home DR-39 closed, on the wire this time.
+      //
+      // The `|| null` is the same absent-means-freeform contract every other
+      // borrowed schema on this file carries: a transport with no
+      // `structuredOutput` capability (and the stub bench transport is one)
+      // falls back to freeform extraction inside callProviderStructured, so the
+      // request payload of an unforced path is unchanged by this line. The
+      // PROMPT is unchanged on every path — forcing a schema is a capability of
+      // the transport, never a format the builder knows about (D162), which is
+      // why the stub and the fault injector still route this stage by its
+      // '# LiftRPG Canonicalization Stage' prefix.
+      schema: (typeof window !== 'undefined' && window.STRUCTURED_SCHEMA_CANONICAL_WORKOUT) || null,
       buildPrompt: function (retryState) {
         return window.generateCanonicalizePrompt(rawText, { retryMode: retryState.attempt > 0 });
       }
