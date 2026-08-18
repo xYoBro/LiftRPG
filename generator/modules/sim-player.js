@@ -949,19 +949,68 @@ export function simulateBook(booklet) {
       var toNode = graph.nodes[e.to];
       return !!(fromNode && toNode && SIM_CONVERSION_KINDS[fromNode.kind] && toNode.kind === 'banked');
     };
-    var behind = required.filter(function (target) {
+    // ══ THE WHETHER/WHICH SPLIT — the mirror of validation.js Floor 11a's own
+    // split, and it must stay a mirror (D93: a floor blocking a shape the sim
+    // approves, or approving one the sim reports, is two answers to the same
+    // question at two different prices).
+    //
+    // The ratified acceptance line (item 4, 2026-08-17): "performance may shape
+    // WHICH ending and what state you carry into it — never WHETHER the seal
+    // opens." So `boss`, `assembly` and `seal:` behind the threshold are a
+    // soft-lock exactly as before, and an `ending:` behind it is a soft-lock
+    // ONLY when every ending is behind it. A differentiated finale where the
+    // strong block buys the harder close is design, not a lock — and reporting
+    // it as one is how this walker starts refusing the differentiation the book
+    // is supposed to have.
+    //
+    // FREE, defined identically on both sides: an ending is free when at least
+    // one edge into it starts at a node that is neither the gate nor reachable
+    // from it. This side additionally requires that feeder edge to be
+    // GUARANTEED, because a free route that needs a lucky roll is not a route
+    // (chance isolation, ruling 1) — that asymmetry makes the sim strictly
+    // finer than the floor, never looser, which is the only direction two
+    // readers of one relation may differ in.
+    var gateReaches = function (key) {
+      return key === gateKey || reachesFrom(graph, gateKey, key, skipConversionToWallet);
+    };
+    var kindOf = function (target) {
+      var a = target.aliases[0] || '';
+      return a.indexOf(':') === -1 ? a : a.slice(0, a.indexOf(':'));
+    };
+    var gatedTargets = required.filter(function (target) {
       return target.aliases.some(function (a) {
         return reachesFrom(graph, gateKey, a, skipConversionToWallet);
       });
-    }).map(function (target) { return target.label; });
+    });
+    var whetherBehind = gatedTargets.filter(function (t) { return kindOf(t) !== 'ending'; })
+      .map(function (t) { return t.label; });
+    var endingsBehind = gatedTargets.filter(function (t) { return kindOf(t) === 'ending'; })
+      .map(function (t) { return t.label; });
+    var freeEndings = required.filter(function (target) {
+      if (kindOf(target) !== 'ending') return false;
+      return graph.edges.some(function (e) {
+        if (e.cls !== 'guaranteed') return false;
+        if (target.aliases.indexOf(e.to) === -1) return false;
+        return !gateReaches(e.from);
+      });
+    }).map(function (t) { return t.label; });
+    var behind = whetherBehind.concat(freeEndings.length ? [] : endingsBehind);
     if (behind.length) {
       base.hard.push(finding('threshold-gated-endgame',
         'Week ' + book.threshold.week + ' sets a reckoning threshold of ' + book.threshold.value
         + ', the ' + hardBand.label + ' adherence band banks at most ' + hardBand.ticksAtThreshold
-        + ' ticks, and the spine routes ' + behind.join(', ') + ' through that reckoning. A player at'
-        + ' realistic adherence reaches the final week and finds the endgame was arithmetically'
-        + ' closed. Feed the endgame from a surface the band can reach, or lower what the gate costs.',
-        { threshold: book.threshold.value, banked: hardBand.ticksAtThreshold, behind: behind }));
+        + ' ticks, and the spine routes ' + behind.join(', ') + ' through that reckoning.'
+        + (freeEndings.length || !endingsBehind.length
+          ? ' A player at realistic adherence reaches the final week and finds the book cannot be'
+            + ' finished: performance may shape WHICH ending they reach, never WHETHER the seal opens.'
+          : ' EVERY ending sits behind it, so a player at realistic adherence finishes the program'
+            + ' and the book has no last page for them. One gated ending is the high bar; all of'
+            + ' them is a locked door.')
+        + ' Feed it from a surface the band can reach, or lower what the gate costs.',
+        {
+          threshold: book.threshold.value, banked: hardBand.ticksAtThreshold, behind: behind,
+          whetherBehind: whetherBehind, endingsBehind: endingsBehind, freeEndings: freeEndings
+        }));
     }
   }
 

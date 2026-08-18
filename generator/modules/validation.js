@@ -3463,9 +3463,15 @@ var SPINE_SINK_KINDS = {
 
 // The ENDGAME surfaces: the payoff the whole six weeks is for. A strict subset
 // of the sinks above, and the distinction is the point — a clock or a map is a
-// surface the economy may legitimately gate, while these four are what VISION
-// §4.5 says a lifter at 60% adherence must never be locked out of. Read by
-// Floor 11a, and the same set the simulated player calls `book.endgame`.
+// surface the economy may legitimately gate, while these four are the payoff
+// VISION §4.5 protects. Read by Floor 11a, and the same set the simulated
+// player calls `book.endgame`.
+//
+// THE MEMBERSHIP IS NOT UNIFORM, and Floor 11a splits it (acceptance package
+// item 4, 2026-08-17): `boss`/`assembly`/`seal` decide WHETHER the book can be
+// finished and are what a lifter at 60% adherence may never be locked out of;
+// `ending` decides WHICH close they reach, and performance is allowed to shape
+// that as long as one close stays open. Do not read this object as one class.
 var SPINE_ENDGAME_KINDS = { boss: 1, assembly: 1, ending: 1, seal: 1 };
 
 // `differsBy` must name a MECHANICAL surface, not an adjective. Reuses the D100
@@ -4552,37 +4558,89 @@ function collectSpineHarvestFloorErrors(spine, index, parsedEdges, S) {
   // the assembled book. They must move together — a floor blocking a shape the
   // sim approves, or approving one the sim reports, is two answers to the same
   // question at two different prices.
+  //
+  // ══ THE WHETHER/WHICH SPLIT (the acceptance package's item 4, ratified
+  // 2026-08-17), and this scoping is a CORRECTION of the floor as first written,
+  // not a relaxation of it. The ratified line: "performance may shape WHICH
+  // ending and what state you carry into it — never WHETHER the seal opens.
+  // Completing the program earns the final piece of the story, no matter what."
+  //
+  // The first draft refused every SPINE_ENDGAME_KINDS node behind the threshold,
+  // endings included, unconditionally — while its own error text said "anything
+  // REQUIRED". An ending is not required; the ENDINGS are. Differentiated
+  // outcomes are the standing watch's only legal home of global stakes, so a
+  // threshold-gated ending beside a reachable one is exactly the differentiation
+  // the book is supposed to have, and the unconditional refusal was forbidding
+  // it. It killed a proving run three times over one such edge.
+  //
+  // So the endgame splits into two classes and they are checked differently:
+  //   WHETHER-class — `boss`, `assembly`, `seal:` (the password path). These are
+  //     "can this book be finished at all". NEVER behind the threshold, no
+  //     exceptions, unchanged from the original floor.
+  //   WHICH-class — `ending:`. Legal behind the threshold IFF at least one other
+  //     ending is FED from outside the threshold's reach, so the player who
+  //     banks under the number still turns a last page. All endings behind it
+  //     blocks exactly as before.
+  //
+  // "FED FROM OUTSIDE" is the definition both readers implement, stated once: an
+  // `ending:` is FREE when at least one edge into it starts at a node that is
+  // neither the boss reckoning nor reachable from it. Deliberately a FEEDER test
+  // rather than "not in the closure" — an ending with no feeder at all is not
+  // free, it is unreachable, and letting it excuse a gated sibling would turn
+  // two defects into a pass.
   if (parsedEdges.length && weekCount) {
     var bossReckoningKey = ('reckoning:w' + weekCount);
     var spineAdj = {};
+    var endingFeeders = {};
     parsedEdges.forEach(function (e) {
       if (isWeeklyConversionEdge(e.from, e.to)) return;
       var a = (e.from.kind + ':' + e.from.id).toLowerCase();
       var b = (e.to.kind + ':' + e.to.id).toLowerCase();
       (spineAdj[a] || (spineAdj[a] = [])).push({ key: b, ref: e.to });
+      if (e.to.kind === 'ending') (endingFeeders[b] || (endingFeeders[b] = [])).push(a);
     });
     var seenFromGate = {};
-    var behindThreshold = [];
+    var gatedWhether = [];
+    var gatedEndings = [];
     var walk = [bossReckoningKey];
     while (walk.length) {
       var here = walk.pop();
       (spineAdj[here] || []).forEach(function (next) {
         if (seenFromGate[next.key]) return;
         seenFromGate[next.key] = 1;
-        if (SPINE_ENDGAME_KINDS[next.ref.kind]) behindThreshold.push(next.ref.raw);
+        if (next.ref.kind === 'ending') gatedEndings.push(next.ref.raw);
+        else if (SPINE_ENDGAME_KINDS[next.ref.kind]) gatedWhether.push(next.ref.raw);
         walk.push(next.key);
       });
     }
-    if (behindThreshold.length) {
-      errors.push(S + 'playSpine.economyGraph routes ' + behindThreshold.join(', ')
+    var behindTheGate = function (key) {
+      return key === bossReckoningKey || !!seenFromGate[key];
+    };
+    var freeEndings = Object.keys(endingFeeders).filter(function (k) {
+      return endingFeeders[k].some(function (feeder) { return !behindTheGate(feeder); });
+    });
+    if (gatedWhether.length) {
+      errors.push(S + 'playSpine.economyGraph routes ' + gatedWhether.join(', ')
         + ' through "reckoning:W' + weekCount + '" — the final week\'s reckoning is where the DERIVED'
         + ' threshold sits, and that number is a printed TARGET, not a lock. A player at the 60%'
         + ' adherence this book must survive banks well under it (the threshold is '
-        + Math.round(RECKONING_THRESHOLD_RATIO * 100) + '% of the attainable ticks), so anything'
-        + ' required that sits behind that reckoning is unreachable for them: they train the whole'
-        + ' block, reach the last week, and find the ending was closed since week one. Feed the'
-        + ' endgame from a surface the player\'s own work reaches directly — a cipher, an assembly,'
+        + Math.round(RECKONING_THRESHOLD_RATIO * 100) + '% of the attainable ticks), so a boss, an'
+        + ' assembly or a seal behind that reckoning is a book they cannot finish: they train the'
+        + ' whole block, reach the last week, and the ceremony was closed since week one.'
+        + ' Performance may shape WHICH ending they reach — never WHETHER the seal opens. Feed the'
+        + ' ceremony from a surface the player\'s own work reaches directly — a cipher, an assembly,'
         + ' a seal keyed earlier — and let the threshold reward rather than gate');
+    }
+    if (gatedEndings.length && !freeEndings.length) {
+      errors.push(S + 'playSpine.economyGraph routes EVERY ending (' + gatedEndings.join(', ')
+        + ') through "reckoning:W' + weekCount + '" — a threshold-gated ending is legal, and it is'
+        + ' this book\'s high bar; it may not be this book\'s only door. A player at the 60%'
+        + ' adherence this book must survive banks well under the derived threshold (it is '
+        + Math.round(RECKONING_THRESHOLD_RATIO * 100) + '% of the attainable ticks), so with every'
+        + ' ending behind it they finish the program and the book has no last page for them.'
+        + ' Completing the program earns the final piece of the story, no matter what. Feed at'
+        + ' least one ending from a surface the player\'s own work reaches directly — a cipher, an'
+        + ' assembly, a seal keyed earlier — and let the gated one be what a strong block buys');
     }
   }
 
