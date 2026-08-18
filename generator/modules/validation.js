@@ -1404,23 +1404,47 @@ function collectPuzzleFloorErrors(weekObj) {
 
   var word = fieldOps.wordGrid;
   if (word) {
-    var GW = SPATIAL_GUARDRAILS.wordSearch;
-    var gridRows = Array.isArray(word.grid) ? word.grid.length : 0;
-    var gridCols = gridRows ? String(word.grid[0] || '').length : 0;
-    var wordCount = Array.isArray(word.words) ? word.words.length : 0;
-    if (gridRows < GW.minSize || gridRows > GW.maxSize || gridCols < GW.minSize || gridCols > GW.maxSize) {
-      errors.push('fieldOps.wordGrid: a generated word search must be between '
-        + GW.minSize + 'x' + GW.minSize + ' and ' + GW.maxSize + 'x' + GW.maxSize
-        + ', and this one is ' + gridRows + 'x' + gridCols + '.');
-    }
-    if (wordCount < GW.minWords || wordCount > GW.maxWords) {
-      errors.push('fieldOps.wordGrid: a generated word search must hide between '
-        + GW.minWords + ' and ' + GW.maxWords + ' words, and this one hides ' + wordCount + '.');
-    }
+    // THE TWO KINDS CARRY DISJOINT SHAPES, so the guardrail band is branched.
+    // Running the word-search size band over a crossword would report a 0x0
+    // grid — a crossword declares no grid at all, because the loom builds it —
+    // and the model would be handed a defect it cannot act on.
+    if (word.kind === 'crossword') {
+      var GX = SPATIAL_GUARDRAILS.crossword;
+      var poolCount = Array.isArray(word.entries) ? word.entries.length : 0;
+      if (poolCount < GX.minPoolEntries || poolCount > GX.maxPoolEntries) {
+        errors.push('fieldOps.wordGrid: a generated crossword offers the loom between '
+          + GX.minPoolEntries + ' and ' + GX.maxPoolEntries
+          + ' answer/clue pairs, and this one offers ' + poolCount + '.');
+      }
+      // The loom is the floor. verifyCrossword() weaves the grid from the pool
+      // and refuses it if the weave will not carry a puzzle — solvable (every
+      // declared entry is a run of the grid), unique-in-the-crossword's sense
+      // (every run of two or more cells is a clued entry, so there is no slot
+      // the player cannot finish and no clue pointing at nothing), and
+      // key-matched (the marked squares spell the declared answer). A budget
+      // exceeded is a refusal, never a pass.
+      verifyWordGrid(word, GX).errors.forEach(function (msg) {
+        errors.push('fieldOps.wordGrid: ' + msg);
+      });
+    } else {
+      var GW = SPATIAL_GUARDRAILS.wordSearch;
+      var gridRows = Array.isArray(word.grid) ? word.grid.length : 0;
+      var gridCols = gridRows ? String(word.grid[0] || '').length : 0;
+      var wordCount = Array.isArray(word.words) ? word.words.length : 0;
+      if (gridRows < GW.minSize || gridRows > GW.maxSize || gridCols < GW.minSize || gridCols > GW.maxSize) {
+        errors.push('fieldOps.wordGrid: a generated word search must be between '
+          + GW.minSize + 'x' + GW.minSize + ' and ' + GW.maxSize + 'x' + GW.maxSize
+          + ', and this one is ' + gridRows + 'x' + gridCols + '.');
+      }
+      if (wordCount < GW.minWords || wordCount > GW.maxWords) {
+        errors.push('fieldOps.wordGrid: a generated word search must hide between '
+          + GW.minWords + ' and ' + GW.maxWords + ' words, and this one hides ' + wordCount + '.');
+      }
 
-    verifyWordGrid(word).errors.forEach(function (msg) {
-      errors.push('fieldOps.wordGrid: ' + msg);
-    });
+      verifyWordGrid(word).errors.forEach(function (msg) {
+        errors.push('fieldOps.wordGrid: ' + msg);
+      });
+    }
   }
 
   return errors;

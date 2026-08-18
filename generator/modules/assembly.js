@@ -17,7 +17,8 @@ import {
   resolveShellFamily,
   resolveFamilyBoardModes,
   DEFAULT_WORKSPACE_STYLE,
-  VALID_COMPONENT_DIALECTS
+  VALID_COMPONENT_DIALECTS,
+  SPATIAL_GUARDRAILS
 } from '../../contracts/contract-constants.mjs';
 
 // W5b — the difficulty instrument. The solvers measure how much work a puzzle
@@ -1059,11 +1060,29 @@ export function stampPuzzleDifficulty(week) {
     }
   }
   if (fo.wordGrid) {
-    var w = verifyWordGrid(fo.wordGrid);
+    var isCrossword = fo.wordGrid.kind === 'crossword';
+    var w = verifyWordGrid(fo.wordGrid, isCrossword ? SPATIAL_GUARDRAILS.crossword : undefined);
     if (w.ok && w.difficulty) {
       fo.wordGrid.difficulty = { score: w.difficulty.score, basis: w.difficulty.basis };
     } else {
       delete fo.wordGrid.difficulty;
+    }
+    // ── THE LOOM'S OUTPUT IS STAMPED HERE (W7.5) ──────────────────────────
+    // The grid is a DERIVED FIELD of the declared pool, in the same class as
+    // `difficulty` directly above and as `componentInputs`: machine-written,
+    // overwritten if the model invents one, deleted if the weave fails.
+    //
+    // Two callers weave the same grid — the week stage gate (to refuse a pool
+    // that cannot carry a puzzle, while the model can still act on the note)
+    // and this line (to record what was woven). That is safe BECAUSE
+    // `buildCrossword()` is a pure function with a total candidate ordering
+    // and no RNG: two weaves of the same pool are byte-identical, so the grid
+    // the gate proved is the grid the book prints. No seed rides the
+    // checkpoint for this and none is needed (the D149 idiom, earned rather
+    // than plumbed).
+    if (isCrossword) {
+      if (w.ok && w.skeleton) fo.wordGrid.skeleton = w.skeleton;
+      else delete fo.wordGrid.skeleton;
     }
   }
 }

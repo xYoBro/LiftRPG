@@ -3588,7 +3588,33 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 
    THE LETTER SIZE CARRIES NO GEOMETRY. The cell's height is `--wgrid-cell` and
    the glyph is centred by a line-height equal to it, so type size is look and
-   never height. That is why the ladder mirror carries no letter term. */
+   never height. That is why the ladder mirror carries no letter term.
+
+   ── THE CROSSWORD'S TOKENS (`--wgrid-xw-*`, W7.5) ──
+   A second kind in the same zone, and it needs its OWN cell because it is a
+   different job: the player WRITES a capital inside a crossword cell and RINGS
+   a word-search one. `--wgrid-cell` bottoms out at 14px, which is a fine loop
+   and an illegible letter, so the crossword runs 26 → 20px and its floor is the
+   word search's ceiling.
+
+   THE 15-COLUMN FIT: the crossword guardrail's `maxSize` is 15, and 15 × 26px
+   plus 14 × 1px gap is 404px inside the 432px modelled column. A cell above
+   27px would run the widest legal weave off the paper — which the page's
+   vertical budget cannot see, so the number is checked in the atom's ladder
+   header rather than trusted.
+
+   `--wgrid-xw-clue-cols` is two, holding ONE LIST EACH (across, then down).
+   Three columns would put a clue SENTENCE in a ~140px measure; flowing both
+   lists together would lose the distinction the player needs to say "six
+   across". Two fixed columns with `align-items:start` makes the region one grid
+   row whose height is max(across, down) — arithmetic the estimate computes,
+   never a track count the container decides.
+
+   The corner number carries NO geometry for the same reason the letter does
+   not: it is absolutely positioned inside its cell (the `.fgrid-target`
+   precedent), so `--wgrid-xw-num-size` is look only and is not in the mirror.
+   The list HEAD borrows `--wgrid-instr-*` — same quiet-label register, never
+   wraps, and one number with one reason to move deserves one author. */
 .wgrid-zone{
   --wgrid-cell:20px;
   --wgrid-gap:1px;
@@ -3600,6 +3626,12 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   --wgrid-instr-size:5.9pt;
   --wgrid-instr-leading:1.3;
   --wgrid-block-gap:6px;
+  --wgrid-xw-cell:26px;
+  --wgrid-xw-num-size:4.6pt;
+  --wgrid-xw-clue-size:6.3pt;
+  --wgrid-xw-clue-leading:1.3;
+  --wgrid-xw-clue-gap:3px;
+  --wgrid-xw-clue-cols:2;
   display:flex;
   flex-direction:column;
 }
@@ -3646,6 +3678,117 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   font-size:var(--wgrid-word-size);
   line-height:var(--wgrid-word-leading);
   letter-spacing:.04em;
+  color:var(--ink);
+  overflow-wrap:anywhere;
+}
+
+/* ── The crossword — the woven grid (W7.5) ──
+   The same zone, the other kind. Everything the player is handed comes from
+   `skeleton.mask`, `skeleton.entries` and `skeleton.marked`; `skeleton.fill` is
+   the answer key and has no selector here because it has no element (D198).
+
+   A cell is a WRITE-IN APERTURE, which is why it borrows the `.cgrid-cell`
+   idiom — a hairline border, paper inside, box-sizing:border-box so the border
+   costs no height — rather than the letter cell's borderless box. Reads in B&W
+   at every archetype: a block is ink, a shaded square is fog, an aperture is
+   paper, and the three are distinguishable with the hue thrown away. */
+.wgrid-xw-board{
+  display:flex;
+  flex-direction:column;
+  gap:var(--wgrid-gap);
+  align-self:flex-start;
+}
+.wgrid-xw-row{
+  display:flex;
+  gap:var(--wgrid-gap);
+  /* THE ABSORPTION LAW (D198): a row of fixed-height cells may not be squashed
+     to make its parent fit. If it is, the planner is told a height that is not
+     the truth and the board prints over what follows it. */
+  flex-shrink:0;
+}
+.wgrid-xw-cell{
+  position:relative;
+  flex:0 0 var(--wgrid-xw-cell);
+  width:var(--wgrid-xw-cell);
+  height:var(--wgrid-xw-cell);
+  border:1px solid var(--rule);
+  background:var(--paper);
+  box-sizing:border-box;
+  overflow:hidden;
+}
+/* NOT DRAWN AT ALL — and this is the difference between a crisscross and a
+   dense crossword, made visible.
+
+   An American-style crossword is ~100% filled, so its handful of black squares
+   read as punctuation inside a field of apertures. THE LOOM DOES NOT BUILD
+   THAT: a book's own vocabulary affords ~38-45% fill (SPATIAL_GUARDRAILS
+   .crossword, measured), which means the majority of the bounding box is
+   ground. Painting that ground solid inverts the figure — the first W7.5 render
+   put 64% ink on the page and read as a black slab with a few holes in it, not
+   as something a person wants to pick up a pencil for. It also fails the
+   printing half of the same law: two-thirds of a page in flat black is a toner
+   sink on a home printer and a smear on a photocopier.
+
+   So the ground is PAPER and the shape floats on it, which is how crisscross
+   and word-fit puzzles have always been printed. The interlocking figure is
+   drawn by the apertures' own hairlines and needs no background to be legible.
+
+   GEOMETRY IS UNTOUCHED: the border stays 1px and `box-sizing:border-box`
+   keeps it inside the cell, so this is a colour change only and the ladder
+   mirror is unaffected. Drawing, never geometry. */
+.wgrid-xw-block{
+  background:transparent;
+  border-color:transparent;
+}
+/* A writable cell the seal will ask about. Shaded, never marked with the
+   letter it will hold. */
+.wgrid-xw-marked{
+  background:var(--fog);
+}
+/* The entry number, in the corner of the cell its clue starts in. Absolutely
+   positioned so it cannot push the aperture around — the `.fgrid-target`
+   precedent, and the reason no number size appears in the ladder mirror. */
+.wgrid-xw-num{
+  position:absolute;
+  top:0;
+  left:1px;
+  font-family:var(--font-mono);
+  font-size:var(--wgrid-xw-num-size);
+  line-height:1.1;
+  color:var(--ink);
+}
+/* Two fixed columns, ONE LIST EACH. `align-items:start` is load-bearing: it is
+   what makes the region's height max(across, down) rather than both columns
+   stretched to the taller — which is the height the estimate charges. */
+.wgrid-xw-clues{
+  margin:var(--wgrid-block-gap) 0 0;
+  display:grid;
+  grid-template-columns:repeat(var(--wgrid-xw-clue-cols),1fr);
+  gap:var(--wgrid-xw-clue-gap);
+  align-items:start;
+  border-top:1px solid var(--rule);
+  padding-top:var(--wgrid-xw-clue-gap);
+}
+.wgrid-xw-list{
+  display:flex;
+  flex-direction:column;
+  gap:var(--wgrid-xw-clue-gap);
+  min-width:0;
+}
+/* The direction, in the schema's own word. The estimate charges this at
+   `--wgrid-instr-*`, so those two sizes move together on purpose. */
+.wgrid-xw-list-head{
+  font-family:var(--font-mono);
+  font-size:var(--wgrid-instr-size);
+  line-height:var(--wgrid-instr-leading);
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.wgrid-xw-clue{
+  font-family:var(--font-body);
+  font-size:var(--wgrid-xw-clue-size);
+  line-height:var(--wgrid-xw-clue-leading);
   color:var(--ink);
   overflow-wrap:anywhere;
 }
@@ -8250,12 +8393,19 @@ body[data-demo-view="true"] .reader-unlock{
   --cgrid-block-gap:3px;
 }
 
-/* ── Word-grid density ladder (W5b) ──
+/* ── Word-grid density ladder (W5b · W7.5) ──
    Token resets only, same law as the cipher's and the constrained grid's. The
    board's cell shrinks to a 14px pencil floor and stops; the rest of the
    shrink is the word list's leading and the block gaps. The word list's COLUMN
    COUNT never moves — an estimate that has to guess how many columns a grid
-   produced is an estimate that guesses the row count too.
+   produced is an estimate that guesses the row count too. Neither does the
+   crossword's clue-column count, for the same reason.
+
+   THE TWO CELLS SHRINK ON SEPARATE LADDERS AND BOTTOM OUT IN DIFFERENT PLACES,
+   because they are floors on two different hands: 14px is the smallest ring a
+   player can draw around a letter, 20px the smallest box they can write one
+   into. Collapsing them onto one token would take whichever floor is lower and
+   silently apply it to the surface that cannot afford it.
 
    CROSS-FILE CONTRACT: every number in the three blocks below is mirrored in
    the LADDER table of renderer/modules/atoms/word-grid.js (tier keys match
@@ -8263,6 +8413,7 @@ body[data-demo-view="true"] .reader-unlock{
 .wgrid-zone[data-density-variant="compact"]{
   --wgrid-cell:18px;
   --wgrid-block-gap:5px;
+  --wgrid-xw-cell:24px;
 }
 .wgrid-zone[data-density-variant="dense"]{
   --wgrid-cell:16px;
@@ -8272,6 +8423,11 @@ body[data-demo-view="true"] .reader-unlock{
   --wgrid-instr-size:5.5pt;
   --wgrid-instr-leading:1.22;
   --wgrid-block-gap:4px;
+  --wgrid-xw-cell:22px;
+  --wgrid-xw-num-size:4.4pt;
+  --wgrid-xw-clue-size:5.9pt;
+  --wgrid-xw-clue-leading:1.24;
+  --wgrid-xw-clue-gap:2px;
 }
 .wgrid-zone[data-density-variant="tight"]{
   --wgrid-cell:14px;
@@ -8282,6 +8438,11 @@ body[data-demo-view="true"] .reader-unlock{
   --wgrid-instr-size:5.2pt;
   --wgrid-instr-leading:1.16;
   --wgrid-block-gap:3px;
+  --wgrid-xw-cell:20px;
+  --wgrid-xw-num-size:4.2pt;
+  --wgrid-xw-clue-size:5.6pt;
+  --wgrid-xw-clue-leading:1.18;
+  --wgrid-xw-clue-gap:2px;
 }
 
 /* ── Hint-band density ladder (W5b) ──

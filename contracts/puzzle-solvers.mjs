@@ -85,6 +85,13 @@ export var PUZZLE_SOLVER_BUDGETS = {
   nonogramLinePlacements: 50000,
   // Word search: cell comparisons the finder is allowed across all words.
   wordSearchComparisons: 4000000,
+  // Crossword: cell tests the loom is allowed across the whole weave. MEASURED
+  // rather than guessed — 240 weaves off the demo booklet's own 2,293-word
+  // vocabulary, pools of 12-30 at 13x13 and 15x15, spent 259-938 tests each.
+  // 400,000 is roughly two-and-a-half orders of magnitude of headroom, and a
+  // pool that wants more is a pool whose grid the player would not enjoy
+  // either. Exceeding it is a REFUSAL, never a pass.
+  crosswordPlacements: 400000,
   // ── The filled grids (the arsenal wave) ─────────────────────────────────
   // Search nodes expanded across the whole uniqueness proof, one budget per
   // family because the searches are shaped differently. A 9x9 sudoku at the
@@ -1132,6 +1139,701 @@ export function verifyWordSearch(puzzle) {
     basis: 'search-load',
     comparisons: counters.comparisons,
     awkwardDirections: awkward
+  };
+  out.ok = true;
+  return out;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// THE CROSSWORD — THE LOOM  (W7.5 · VISION §4.2 · D148's ratified split)
+// ════════════════════════════════════════════════════════════════════════════
+// THE SPLIT THIS SECTION EXISTS TO EXECUTE: **the loom builds the grid; the
+// model writes the clues** — solvability is code's guarantee, voice is the
+// model's. VISION §4.2 pre-authorises dense crosswords on exactly this split,
+// author-ratified at D148 and re-confirmed 2026-08-18.
+//
+// ── THIS AMENDS THIS FILE'S OWN HEADER, AND SAYS SO ─────────────────────────
+// The header above states "It is not a puzzle GENERATOR… a constructor would
+// make the engine an author." That sentence was written before the split was
+// ratified and it is now too broad. The distinction that survives, and the one
+// the ruling actually draws:
+//
+//   The model authors every ANSWER and every CLUE. That is the content, the
+//   voice, and the whole of what a reader experiences as written.
+//   The loom computes only the LAYOUT — which letters land in which cells so
+//   that the declared answers interlock. That is arithmetic, in the same class
+//   as pagination: nobody calls the page planner an author because it decides
+//   which spread a fragment falls on.
+//
+// A crossword is the one family where that division is FORCED rather than
+// chosen. A model asked to author a grid emits a letter matrix that does not
+// interlock, and the failure is not fixable by a Correction Directive because
+// the model cannot see its own grid. So the alternative to a loom is not "the
+// model authors it"; the alternative is no crossword.
+//
+// ── THE POOL MODEL, AND WHY IT IS NOT "PLACE ALL N" ─────────────────────────
+// The model declares a POOL of answer/clue pairs; the loom weaves the largest
+// legal grid it can and the printed clue list is exactly the placed subset.
+// Unplaced entries are dropped, not refused.
+//
+// This was MEASURED, not assumed, against the demo booklet's own assembled
+// vocabulary (2,293 words of the book's real nouns and labels):
+//   place-all-N : 8 of 18 pools of 10+ words wove at all. Most runs refused,
+//                 and the refusal was unfixable — "your words share no
+//                 letters" is not a note a model can act on.
+//   pool model  : 240 of 240 weaves succeeded and verified. From a pool of
+//                 16-24 the loom places 8-15 entries at 13x13 to 15x15.
+// The pool model is therefore the only one that makes the refusal ACTIONABLE,
+// which is the D132 Correction Directive law: the model is told what to fix in
+// terms it can fix.
+//
+// ── DENSITY: WHAT THE ROSTER AFFORDS, MEASURED ──────────────────────────────
+// §4.2's own words are "density honest to what the roster affords", and this is
+// the number that sentence protects. A book's own vocabulary affords a
+// CRISSCROSS: ~38-45% of the bounding box filled, ~15-20% of placed letters in
+// two entries. An American-style dense crossword is ~100% filled with every
+// letter checked, and reaching it needs a large dictionary this engine
+// deliberately does not ship and could not use brief-blind anyway.
+//
+// SO DENSITY IS REPORTED, NEVER FLOORED. There is no minimum fill percentage
+// here, and inventing one off these draws would be exactly the D198
+// counter-guard defect — machinery derived from a measurement artifact. What
+// IS floored is structural and boolean: every entry crosses at least one
+// other, the grid is one connected component, and every white run of two or
+// more cells is a declared entry. Those are what "the crossings are the lock"
+// actually means.
+//
+// ── WHY THE VERIFIER IS NOT THE LOOM'S BOOKKEEPING ──────────────────────────
+// verifyCrossword() re-derives everything from the finished MASK and FILL and
+// never consults the loom's placement list to decide what is true. It is the
+// same mirror discipline the word search's independent finder is built on, and
+// it earned its place on its first run: it caught a loom defect (a down word
+// laid along another down word's span merges with it, so the shorter entry
+// stops being a run of its own and its clue points at a slot that is not
+// there). The loom now refuses collinear overlap; the verifier is why anyone
+// knew to.
+//
+// ── THE TWO HALVES OF THE SKELETON, AND D198 ────────────────────────────────
+// The skeleton the loom writes is DERIVED DATA THAT MUST PRINT — the first
+// such field in this schema — so it is split structurally rather than by
+// discipline:
+//   mask    '#' block / '.' writable, plus the entry numbers  → THE PUZZLE,
+//           printed. This is what the player is handed.
+//   fill    the solved letters                                 → THE ANSWER
+//           KEY, never printed, the same class as a word search's placements.
+// The renderer reads `mask` and `entries` and has no reason to touch `fill`.
+// That separation is what keeps D198's rule ("solvability data is
+// non-printing") true by construction instead of by a comment.
+
+/** The two axes. A crossword has no diagonals and no reversals — an entry
+ *  reads left-to-right or top-to-bottom, which is what lets a single number in
+ *  a cell's corner serve both an across and a down clue. */
+export var CROSSWORD_DIRECTIONS = ['across', 'down'];
+
+/** Entry-relative extraction. The model cannot author grid coordinates — the
+ *  grid does not exist when it writes — so a marked-square answer is declared
+ *  as "the Nth letter of the Mth entry" and the loom converts those to cells. */
+function crosswordShapeErrors(puzzle, guard) {
+  var errors = [];
+  var who = label(puzzle);
+  var entries = asArray(puzzle.entries);
+
+  if (entries.length < guard.minPoolEntries) {
+    errors.push(who + ': a crossword pool needs at least ' + guard.minPoolEntries
+      + ' answer/clue pairs and this one offers ' + entries.length
+      + '. The loom weaves what interlocks and drops the rest, so a thin pool is a thin grid.');
+    return errors;
+  }
+  if (entries.length > guard.maxPoolEntries) {
+    errors.push(who + ': a crossword pool may offer at most ' + guard.maxPoolEntries
+      + ' answer/clue pairs and this one offers ' + entries.length + '.');
+  }
+
+  var seen = {};
+  for (var i = 0; i < entries.length; i++) {
+    var entry = entries[i] || {};
+    var answer = normalizeAnswer(entry.answer);
+    var at = who + ': entry ' + (i + 1);
+    if (/[^A-Z]/.test(String(entry.answer || '').toUpperCase().replace(/[^A-Z0-9]/g, ''))) {
+      errors.push(at + ' ("' + String(entry.answer) + '") contains a digit; crossword answers are A-Z only.');
+    }
+    if (answer.length < guard.wordMinChars) {
+      errors.push(at + ' ("' + answer + '") is shorter than ' + guard.wordMinChars
+        + ' letters — a two-letter entry is filler, not a clue.');
+    }
+    if (answer.length > guard.wordMaxChars) {
+      errors.push(at + ' ("' + answer + '") is longer than ' + guard.wordMaxChars
+        + ' letters, which cannot be crossed inside a ' + guard.maxSize + '-cell grid.');
+    }
+    if (seen[answer]) errors.push(at + ' repeats "' + answer + '" — each answer appears once.');
+    seen[answer] = true;
+    if (!String(entry.clue || '').trim()) {
+      errors.push(at + ' ("' + answer + '") has no clue. The loom builds the grid; the model writes the clues.');
+    }
+  }
+
+  var from = puzzle.answerFrom || {};
+  if (from.mode !== 'word' && from.mode !== 'marked') {
+    errors.push(who + ': answerFrom.mode is "' + String(from.mode)
+      + '" — a crossword reads its answer as "marked" (letters picked out of the solved entries) '
+      + 'or "word" (one entry from the list). "leftovers" belongs to the word search: a crossword '
+      + 'has no uncovered letters.');
+  }
+  if (from.mode === 'word') {
+    var idx = Number(from.index);
+    if (!(idx >= 1 && idx <= entries.length && Math.floor(idx) === idx)) {
+      errors.push(who + ': answerFrom.index is ' + String(from.index) + ' but the pool has '
+        + entries.length + ' entries (index is 1-based).');
+    }
+  }
+  if (from.mode === 'marked') {
+    var picks = asArray(from.picks);
+    if (!picks.length) {
+      errors.push(who + ': answerFrom.mode is "marked" but no picks are declared. '
+        + 'Each pick names an entry and a letter position: { entry, letter }, both 1-based.');
+    }
+    for (var p = 0; p < picks.length; p++) {
+      var pick = picks[p] || {};
+      var e = Number(pick.entry);
+      var l = Number(pick.letter);
+      if (!(e >= 1 && e <= entries.length && Math.floor(e) === e)) {
+        errors.push(who + ': pick ' + (p + 1) + ' names entry ' + String(pick.entry)
+          + ' but the pool has ' + entries.length + ' entries.');
+        continue;
+      }
+      var text = normalizeAnswer((entries[e - 1] || {}).answer);
+      if (!(l >= 1 && l <= text.length && Math.floor(l) === l)) {
+        errors.push(who + ': pick ' + (p + 1) + ' wants letter ' + String(pick.letter)
+          + ' of "' + text + '", which has ' + text.length + ' letters.');
+      }
+    }
+  }
+  if (!normalizeAnswer(puzzle.answer)) {
+    errors.push(who + ': the answer is empty once normalised.');
+  }
+  return errors;
+}
+
+/**
+ * buildCrossword(entries, dim) -> { ok, errors, skeleton, stats }
+ *
+ * THE LOOM. A deterministic multi-pass crisscross weave with NO RNG: the
+ * candidate ordering is total, so two calls with the same pool and the same
+ * dim are byte-identical. That is what lets the stage gate and assembly both
+ * build it and get the same grid without a seed riding the checkpoint — the
+ * D149 idiom, earned rather than plumbed.
+ *
+ * `dim` is the SEARCH BOUND, not the printed size. The weave is cropped to its
+ * bounding box afterwards, so the printed grid is only as large as the words
+ * made it and the model never has to choose a dimension it cannot picture.
+ */
+export function buildCrossword(entries, dim) {
+  var out = { ok: false, errors: [], skeleton: null, stats: null };
+  var pool = asArray(entries);
+  var words = [];
+  for (var i = 0; i < pool.length; i++) {
+    words.push({ idx: i, text: normalizeAnswer((pool[i] || {}).answer) });
+  }
+  // Longest first; ties broken lexicographically then by declaration order, so
+  // the ordering is TOTAL and the weave reproducible.
+  var order = words.slice().sort(function (a, b) {
+    if (b.text.length !== a.text.length) return b.text.length - a.text.length;
+    if (a.text < b.text) return -1;
+    if (a.text > b.text) return 1;
+    return a.idx - b.idx;
+  });
+
+  var cells = {};
+  var placements = [];
+  var counters = { considered: 0 };
+
+  function at(r, c) { return cells[r + ',' + c]; }
+
+  function fits(text, r0, c0, dir) {
+    var dr = dir === 'down' ? 1 : 0;
+    var dc = dir === 'across' ? 1 : 0;
+    var len = text.length;
+    var endR = r0 + dr * (len - 1);
+    var endC = c0 + dc * (len - 1);
+    if (r0 < 0 || c0 < 0 || endR >= dim || endC >= dim) return -1;
+    // The cells immediately before and after must be empty, or this entry runs
+    // into a neighbour and the two read as one undeclared word.
+    if (at(r0 - dr, c0 - dc) !== undefined) return -1;
+    if (at(endR + dr, endC + dc) !== undefined) return -1;
+
+    // A crossing must be PERPENDICULAR. An entry laid along another entry's own
+    // axis merges with it: the shorter stops being a run of its own, so the
+    // numbering has no cell to hang on and the player holds a clue for a slot
+    // that is not there. The verifier caught this class; the loom refuses it.
+    for (var q = 0; q < placements.length; q++) {
+      var other = placements[q];
+      if (other.dir !== dir) continue;
+      if (dir === 'across') {
+        if (other.row !== r0) continue;
+        if (other.col <= c0 + len && c0 <= other.col + other.len) return -1;
+      } else {
+        if (other.col !== c0) continue;
+        if (other.row <= r0 + len && r0 <= other.row + other.len) return -1;
+      }
+    }
+
+    var crossings = 0;
+    for (var k = 0; k < len; k++) {
+      var r = r0 + dr * k;
+      var c = c0 + dc * k;
+      var existing = at(r, c);
+      counters.considered++;
+      if (counters.considered > PUZZLE_SOLVER_BUDGETS.crosswordPlacements) return -2;
+      if (existing !== undefined) {
+        if (existing !== text.charAt(k)) return -1;
+        crossings++;
+      } else if (dir === 'across') {
+        // An empty cell may not carry perpendicular neighbours, or placing here
+        // spells a second word alongside this one that nothing clued.
+        if (at(r - 1, c) !== undefined || at(r + 1, c) !== undefined) return -1;
+      } else if (at(r, c - 1) !== undefined || at(r, c + 1) !== undefined) {
+        return -1;
+      }
+    }
+    return crossings;
+  }
+
+  function commit(w, r0, c0, dir) {
+    var dr = dir === 'down' ? 1 : 0;
+    var dc = dir === 'across' ? 1 : 0;
+    for (var k = 0; k < w.text.length; k++) {
+      cells[(r0 + dr * k) + ',' + (c0 + dc * k)] = w.text.charAt(k);
+    }
+    placements.push({ idx: w.idx, row: r0, col: c0, dir: dir, len: w.text.length });
+  }
+
+  var first = order[0];
+  if (!first || !first.text.length) {
+    out.errors.push('the pool holds no usable answer.');
+    return out;
+  }
+  if (first.text.length > dim) {
+    out.errors.push('the longest answer "' + first.text + '" is ' + first.text.length
+      + ' letters and cannot be crossed inside a ' + dim + '-cell grid.');
+    return out;
+  }
+  commit(first, Math.floor(dim / 2), Math.floor((dim - first.text.length) / 2), 'across');
+
+  var remaining = order.slice(1);
+  var progress = true;
+  while (progress && remaining.length) {
+    progress = false;
+    for (var qi = 0; qi < remaining.length; qi++) {
+      var w = remaining[qi];
+      if (!w.text.length) { remaining.splice(qi, 1); qi--; continue; }
+      var best = null;
+      for (var pi = 0; pi < placements.length; pi++) {
+        var p = placements[pi];
+        var pdr = p.dir === 'down' ? 1 : 0;
+        var pdc = p.dir === 'across' ? 1 : 0;
+        var dir = p.dir === 'across' ? 'down' : 'across';
+        for (var pk = 0; pk < p.len; pk++) {
+          var pr = p.row + pdr * pk;
+          var pc = p.col + pdc * pk;
+          var letter = at(pr, pc);
+          for (var wk = 0; wk < w.text.length; wk++) {
+            if (w.text.charAt(wk) !== letter) continue;
+            var r0 = dir === 'down' ? pr - wk : pr;
+            var c0 = dir === 'across' ? pc - wk : pc;
+            var score = fits(w.text, r0, c0, dir);
+            if (score === -2) {
+              out.errors.push('the weave exceeded the solver budget of '
+                + PUZZLE_SOLVER_BUDGETS.crosswordPlacements + ' placements — shorten the pool. '
+                + 'A budget exceeded is a refusal, never a pass.');
+              return out;
+            }
+            if (score < 1) continue;
+            // Prefer more crossings, then a more central landing, then the
+            // earliest (row, col) — a total order, so no tie survives.
+            var centre = Math.abs(r0 - dim / 2) + Math.abs(c0 - dim / 2);
+            var cand = { r: r0, c: c0, dir: dir, score: score, centre: centre };
+            if (!best
+              || cand.score > best.score
+              || (cand.score === best.score && cand.centre < best.centre)
+              || (cand.score === best.score && cand.centre === best.centre
+                && (cand.r < best.r || (cand.r === best.r && cand.c < best.c)))) {
+              best = cand;
+            }
+          }
+        }
+      }
+      if (best) {
+        commit(w, best.r, best.c, best.dir);
+        remaining.splice(qi, 1);
+        qi--;
+        progress = true;
+      }
+    }
+  }
+
+  // Crop to the bounding box: the printed grid is as large as the words made
+  // it and no larger.
+  var minR = Infinity; var maxR = -Infinity; var minC = Infinity; var maxC = -Infinity;
+  Object.keys(cells).forEach(function (key) {
+    var parts = key.split(',');
+    var r = Number(parts[0]);
+    var c = Number(parts[1]);
+    if (r < minR) minR = r;
+    if (r > maxR) maxR = r;
+    if (c < minC) minC = c;
+    if (c > maxC) maxC = c;
+  });
+  var rows = maxR - minR + 1;
+  var cols = maxC - minC + 1;
+
+  var mask = [];
+  var fill = [];
+  for (var rr = 0; rr < rows; rr++) {
+    var maskLine = '';
+    var fillLine = '';
+    for (var cc = 0; cc < cols; cc++) {
+      var value = at(rr + minR, cc + minC);
+      maskLine += value === undefined ? '#' : '.';
+      fillLine += value === undefined ? '#' : value;
+    }
+    mask.push(maskLine);
+    fill.push(fillLine);
+  }
+
+  out.ok = true;
+  out.skeleton = {
+    rows: rows,
+    cols: cols,
+    mask: mask,
+    fill: fill,
+    entries: placements.map(function (p) {
+      return {
+        index: p.idx + 1,
+        row: p.row - minR + 1,
+        col: p.col - minC + 1,
+        direction: p.dir
+      };
+    })
+  };
+  out.stats = {
+    considered: counters.considered,
+    placed: placements.length,
+    dropped: remaining.map(function (x) { return x.idx + 1; })
+  };
+  return out;
+}
+
+/**
+ * inspectCrosswordSkeleton(skeleton, answers, who) -> string[]
+ *
+ * THE STRUCTURAL PROOF, extracted so it can be AIMED AT A GRID NOBODY WOVE.
+ *
+ * WHY THIS IS A SEPARATE EXPORT, and it is a FINDING rather than a preference.
+ * These checks were written inside verifyCrossword() and mutation testing found
+ * three of them UNPROVABLE there: the loom cannot produce an unclued run, an
+ * island, or a free-standing entry, so deleting any of those checks changed
+ * nothing any fixture could see. A check no test can fail is indistinguishable
+ * from a check that is not there — and these three ARE the crossword's whole
+ * definition of correct, so leaving them unprovable was not an option.
+ *
+ * Pulling them out makes them a reader that can be handed a HAND-BUILT broken
+ * skeleton, which is what check-generation-floors.mjs now does. They keep their
+ * original job too, and that job is proven: mutating the loom's adjacency rule
+ * makes this function fail, which is exactly the loom regression the second
+ * reader exists to catch.
+ *
+ * `answers` is indexed 1-based by `skeleton.entries[].index`, matching the pool.
+ * Reads `fill` because it is proving the SOLUTION consistent — this is the gate
+ * side, never the render side.
+ */
+export function inspectCrosswordSkeleton(skeleton, answers, who) {
+  var errors = [];
+  var sk = skeleton || {};
+  var pool = asArray(answers);
+  who = who || 'crossword';
+
+  function cell(r, c) {
+    if (r < 1 || c < 1 || r > sk.rows || c > sk.cols) return '#';
+    return sk.fill[r - 1].charAt(c - 1);
+  }
+
+  // ── Every white run of 2+ cells is a declared entry, and vice versa ───────
+  // This is the crossword's real correctness property and the analogue of the
+  // constrained grids' uniqueness clause: an unclued slot is a puzzle the
+  // player cannot finish, and a clue with no slot is one they cannot start.
+  var runs = {};
+  var runList = [];
+  for (var r = 1; r <= sk.rows; r++) {
+    for (var c = 1; c <= sk.cols; c++) {
+      if (cell(r, c) === '#') continue;
+      if (cell(r, c - 1) === '#' && cell(r, c + 1) !== '#') {
+        var across = '';
+        var k = c;
+        while (cell(r, k) !== '#') { across += cell(r, k); k++; }
+        runs[r + ':' + c + ':across'] = across;
+        runList.push({ row: r, col: c, direction: 'across', text: across });
+      }
+      if (cell(r - 1, c) === '#' && cell(r + 1, c) !== '#') {
+        var down = '';
+        var k2 = r;
+        while (cell(k2, c) !== '#') { down += cell(k2, c); k2++; }
+        runs[r + ':' + c + ':down'] = down;
+        runList.push({ row: r, col: c, direction: 'down', text: down });
+      }
+    }
+  }
+
+  var declared = {};
+  for (var e = 0; e < sk.entries.length; e++) {
+    var slot = sk.entries[e];
+    var key = slot.row + ':' + slot.col + ':' + slot.direction;
+    declared[key] = normalizeAnswer((pool[slot.index - 1] || {}).answer);
+    if (runs[key] === undefined) {
+      errors.push(who + ': entry "' + declared[key] + '" is placed at row ' + slot.row
+        + ', column ' + slot.col + ' ' + slot.direction + ', but no run of the grid starts there '
+        + '— the clue points at a slot the player cannot see.');
+    } else if (runs[key] !== declared[key]) {
+      errors.push(who + ': the grid spells "' + runs[key] + '" at row ' + slot.row
+        + ', column ' + slot.col + ' ' + slot.direction + ' but the entry declares "'
+        + declared[key] + '".');
+    }
+  }
+  for (var rl = 0; rl < runList.length; rl++) {
+    var run = runList[rl];
+    var runKey = run.row + ':' + run.col + ':' + run.direction;
+    if (declared[runKey] === undefined) {
+      errors.push(who + ': the grid contains an unclued word "' + run.text + '" reading '
+        + run.direction + ' from row ' + run.row + ', column ' + run.col
+        + ' — every run of two or more cells must be an entry the player has a clue for.');
+    }
+  }
+  if (errors.length) return errors;
+
+  // ── Every entry crosses at least one other; the grid is one component ─────
+  var crossedLetters = 0;
+  var filledCells = 0;
+  for (var cr = 1; cr <= sk.rows; cr++) {
+    for (var cc2 = 1; cc2 <= sk.cols; cc2++) {
+      if (cell(cr, cc2) === '#') continue;
+      filledCells++;
+      var horizontal = cell(cr, cc2 - 1) !== '#' || cell(cr, cc2 + 1) !== '#';
+      var vertical = cell(cr - 1, cc2) !== '#' || cell(cr + 1, cc2) !== '#';
+      if (horizontal && vertical) crossedLetters++;
+    }
+  }
+  for (var se = 0; se < sk.entries.length; se++) {
+    var ent = sk.entries[se];
+    var edr = ent.direction === 'down' ? 1 : 0;
+    var edc = ent.direction === 'across' ? 1 : 0;
+    var text = declared[ent.row + ':' + ent.col + ':' + ent.direction];
+    var crosses = 0;
+    for (var ek = 0; ek < text.length; ek++) {
+      var er = ent.row + edr * ek;
+      var ec = ent.col + edc * ek;
+      var perpendicular = ent.direction === 'across'
+        ? (cell(er - 1, ec) !== '#' || cell(er + 1, ec) !== '#')
+        : (cell(er, ec - 1) !== '#' || cell(er, ec + 1) !== '#');
+      if (perpendicular) crosses++;
+    }
+    if (!crosses) {
+      errors.push(who + ': entry "' + text + '" crosses nothing — it sits in the grid as a '
+        + 'free-standing word, so its letters are checked by no other answer and the crossings '
+        + 'are not the lock they are supposed to be.');
+    }
+  }
+  if (errors.length) return errors;
+
+  var seen = {};
+  var stack = [];
+  for (var fr = 1; fr <= sk.rows && !stack.length; fr++) {
+    for (var fc = 1; fc <= sk.cols && !stack.length; fc++) {
+      if (cell(fr, fc) !== '#') { stack.push([fr, fc]); seen[fr + ':' + fc] = true; }
+    }
+  }
+  var reached = 0;
+  var steps = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  while (stack.length) {
+    var node = stack.pop();
+    reached++;
+    for (var s = 0; s < steps.length; s++) {
+      var nr = node[0] + steps[s][0];
+      var nc = node[1] + steps[s][1];
+      if (cell(nr, nc) === '#' || seen[nr + ':' + nc]) continue;
+      seen[nr + ':' + nc] = true;
+      stack.push([nr, nc]);
+    }
+  }
+  if (reached !== filledCells) {
+    errors.push(who + ': the grid falls into more than one island (' + reached + ' of '
+      + filledCells + ' cells connect) — a crossword is one interlocking shape.');
+    return errors;
+  }
+
+
+  return errors;
+}
+
+/**
+ * verifyCrossword(puzzle) -> { ok, errors, difficulty, coverage, skeleton }
+ *
+ * Builds the grid, then proves it FROM THE FINISHED MASK — never from the
+ * loom's placement bookkeeping. See the section header on why the two readers
+ * are deliberately independent.
+ */
+export function verifyCrossword(puzzle, guardrails) {
+  var out = { ok: false, errors: [], difficulty: null, coverage: null, skeleton: null };
+  var p = puzzle || {};
+  var who = label(p);
+  var guard = guardrails || {};
+
+  // ── A GATE THAT CANNOT SEE ITS EVIDENCE MUST NOT REPORT A PASS ───────────
+  // This file cannot import the constants, so the bands arrive as an argument
+  // — which means a caller that forgets them is a real, reachable mistake. And
+  // it would be SILENT in the worst direction: `entries.length < undefined` is
+  // false, so every band check would pass, and `buildCrossword(pool, undefined)`
+  // compares against NaN, so every bounds test would pass too and the loom
+  // would weave on an unbounded plane. A vacuous gate that says "ok" is worse
+  // than no gate. Refuse instead, loudly, and name the caller's mistake.
+  var required = ['minSize', 'maxSize', 'minPoolEntries', 'maxPoolEntries',
+    'minPlacedEntries', 'wordMinChars', 'wordMaxChars'];
+  var absent = [];
+  for (var gi = 0; gi < required.length; gi++) {
+    if (typeof guard[required[gi]] !== 'number') absent.push(required[gi]);
+  }
+  if (absent.length) {
+    out.errors.push(who + ': verifyCrossword was called without its guardrails ('
+      + absent.join(', ') + ' missing). Pass SPATIAL_GUARDRAILS.crossword — this is a '
+      + 'CALLER defect, not a puzzle defect, and it is refused rather than waved through '
+      + 'because every band check would otherwise pass vacuously.');
+    return out;
+  }
+
+  out.errors = crosswordShapeErrors(p, guard);
+  if (out.errors.length) return out;
+
+  var pool = asArray(p.entries);
+  var built = buildCrossword(pool, guard.maxSize);
+  if (!built.ok) {
+    out.errors.push(who + ': the loom could not weave a grid — ' + built.errors.join(' '));
+    return out;
+  }
+  var sk = built.skeleton;
+  var placed = built.stats.placed;
+  if (placed < guard.minPlacedEntries) {
+    out.errors.push(who + ': the loom placed only ' + placed + ' of ' + pool.length
+      + ' answers and a crossword needs at least ' + guard.minPlacedEntries
+      + '. The entries that interlock are the ones that share letters — offer more '
+      + 'answers, and shorter ones, so the weave has crossings to find.');
+    return out;
+  }
+
+  var structural = inspectCrosswordSkeleton(sk, pool, who);
+  if (structural.length) {
+    out.errors = out.errors.concat(structural);
+    return out;
+  }
+
+  function cell(r, c) {
+    if (r < 1 || c < 1 || r > sk.rows || c > sk.cols) return '#';
+    return sk.fill[r - 1].charAt(c - 1);
+  }
+
+  // ── The density MEASUREMENT, which is reported and never floored ──────────
+  // Separate from the structural proof above on purpose: that function decides
+  // whether the grid is a crossword at all, and these two numbers only describe
+  // how dense the one it produced turned out to be. §4.2 asks for density
+  // "honest to what the roster affords", and honest here means measured and
+  // published rather than demanded — see this section's header.
+  var crossedLetters = 0;
+  var filledCells = 0;
+  for (var mr = 1; mr <= sk.rows; mr++) {
+    for (var mc = 1; mc <= sk.cols; mc++) {
+      if (cell(mr, mc) === '#') continue;
+      filledCells++;
+      var horizontal = cell(mr, mc - 1) !== '#' || cell(mr, mc + 1) !== '#';
+      var vertical = cell(mr - 1, mc) !== '#' || cell(mr + 1, mc) !== '#';
+      if (horizontal && vertical) crossedLetters++;
+    }
+  }
+
+  // ── Numbering, and the key the marked squares spell ───────────────────────
+  var numbers = {};
+  var next = 0;
+  for (var nr2 = 1; nr2 <= sk.rows; nr2++) {
+    for (var nc2 = 1; nc2 <= sk.cols; nc2++) {
+      if (cell(nr2, nc2) === '#') continue;
+      var startsAcross = cell(nr2, nc2 - 1) === '#' && cell(nr2, nc2 + 1) !== '#';
+      var startsDown = cell(nr2 - 1, nc2) === '#' && cell(nr2 + 1, nc2) !== '#';
+      if (startsAcross || startsDown) {
+        next++;
+        numbers[nr2 + ':' + nc2] = next;
+      }
+    }
+  }
+  for (var ne = 0; ne < sk.entries.length; ne++) {
+    sk.entries[ne].number = numbers[sk.entries[ne].row + ':' + sk.entries[ne].col];
+  }
+
+  var from = p.answerFrom || {};
+  var derived = '';
+  var marked = [];
+  if (from.mode === 'word') {
+    derived = normalizeAnswer((pool[Number(from.index) - 1] || {}).answer);
+    var placedIndexes = {};
+    sk.entries.forEach(function (slot2) { placedIndexes[slot2.index] = true; });
+    if (!placedIndexes[Number(from.index)]) {
+      out.errors.push(who + ': answerFrom names entry ' + from.index + ' ("' + derived
+        + '"), which the loom could not place — the key must be an answer the player can reach. '
+        + 'Pick an entry the grid holds, or use "marked".');
+      return out;
+    }
+  } else {
+    var byIndex = {};
+    sk.entries.forEach(function (slot3) { byIndex[slot3.index] = slot3; });
+    var picks = asArray(from.picks);
+    for (var pk2 = 0; pk2 < picks.length; pk2++) {
+      var pick = picks[pk2] || {};
+      var host = byIndex[Number(pick.entry)];
+      if (!host) {
+        out.errors.push(who + ': pick ' + (pk2 + 1) + ' reads a letter out of entry ' + pick.entry
+          + ' ("' + normalizeAnswer((pool[Number(pick.entry) - 1] || {}).answer)
+          + '"), which the loom could not place — every marked square must sit in the grid.');
+        return out;
+      }
+      var offset = Number(pick.letter) - 1;
+      var mr = host.row + (host.direction === 'down' ? offset : 0);
+      var mc = host.col + (host.direction === 'across' ? offset : 0);
+      derived += cell(mr, mc);
+      marked.push({ row: mr, col: mc });
+    }
+  }
+
+  if (normalizeAnswer(derived) !== normalizeAnswer(p.answer)) {
+    out.errors.push(who + ': the marked squares read "' + derived + '" but the puzzle declares '
+      + 'the answer "' + String(p.answer) + '" — the key must be what the solved grid actually '
+      + 'produces.');
+    return out;
+  }
+
+  sk.marked = marked;
+  out.skeleton = sk;
+  out.coverage = {
+    cells: sk.rows * sk.cols,
+    filled: filledCells,
+    placed: placed,
+    dropped: built.stats.dropped.length,
+    fillPercent: Math.round((filledCells / (sk.rows * sk.cols)) * 100),
+    crossedLetterPercent: Math.round((crossedLetters / Math.max(1, filledCells)) * 100)
+  };
+  // A crossword gets HARDER as fewer of its letters are checked by a second
+  // entry: an unchecked letter is one the player has no confirmation for. The
+  // proxy is therefore the unchecked share, plus the size of the board to be
+  // held in the head at once.
+  out.difficulty = {
+    score: Math.round((100 - out.coverage.crossedLetterPercent) / 10) + placed,
+    basis: 'crossing-support',
+    crossedLetterPercent: out.coverage.crossedLetterPercent,
+    placed: placed
   };
   out.ok = true;
   return out;
@@ -2855,9 +3557,13 @@ export function verifyConstrainedGrid(grid) {
   };
 }
 
-export function verifyWordGrid(wordGrid) {
+export function verifyWordGrid(wordGrid, guardrails) {
   var g = wordGrid || {};
   if (g.kind === 'word-search') return verifyWordSearch(g);
+  // The crossword needs its guardrails passed in: this file cannot import
+  // contract-constants.mjs (dependency-free by construction, so it runs at both
+  // gates), and the pool bands are generation policy that lives there.
+  if (g.kind === 'crossword') return verifyCrossword(g, guardrails);
   return {
     ok: false,
     errors: [label(g) + ': wordGrid.kind is "' + String(g.kind)

@@ -73,6 +73,7 @@ import {
   VALID_SEQUENCE_ANSWER_MODES,
   VALID_WORD_GRID_KINDS,
   VALID_WORD_SEARCH_DIRECTIONS,
+  VALID_CROSSWORD_DIRECTIONS,
   VALID_WORD_GRID_ANSWER_MODES,
   LAYOUT_INTENSITY_BOUNDS,
   VALID_PRODUCTION_TEXTURES,
@@ -1868,17 +1869,39 @@ export var BOOKLET_SCHEMA = {
       ]
     },
 
-    // ── wordGrid (W5b) ──────────────────────────────────────────────────────
+    // ── wordGrid (W5b · crossword added W7.5) ───────────────────────────────
+    // TWO PRINTED OBJECTS UNDER ONE SEAT.
+    //
     // A word search: a printed letter grid, a word list, and a declared
     // placement per word. The placements are the ANSWER KEY — never printed —
     // and they are what lets the gate prove every word is genuinely in the
     // grid the player holds and that the leftover letters really do spell the
-    // key. Crisscross and the dense crossword stay in the registry's tier 3
-    // until their own solver floors can be real.
+    // key.
+    //
+    // A crossword: a POOL of answer/clue pairs and NOTHING ELSE from the model.
+    // VISION §4.2's ratified split is the reason the shape is lopsided — the
+    // loom builds the grid, the model writes the clues — so there is no
+    // author-supplied geometry here for the gate to disagree with.
+    // `buildCrossword()` weaves it and `skeleton` below is what it wrote.
+    //
+    // The two kinds carry disjoint fields, so the required list is CONDITIONAL
+    // (the constrainedGrid idiom immediately above). Writing one flat required
+    // list that satisfied both would mean requiring neither, which is how a
+    // schema stops being a contract.
     wordGrid: {
       type: 'object',
-      required: ['kind', 'title', 'grid', 'words', 'answer', 'answerFrom'],
+      required: ['kind', 'title', 'answer', 'answerFrom'],
       additionalProperties: false,
+      allOf: [
+        {
+          if: { properties: { kind: { const: 'word-search' } }, required: ['kind'] },
+          then: { required: ['grid', 'words'] }
+        },
+        {
+          if: { properties: { kind: { const: 'crossword' } }, required: ['kind'] },
+          then: { required: ['entries'] }
+        }
+      ],
       properties: {
         kind: { enum: VALID_WORD_GRID_KINDS },
         title: nonEmptyString,
@@ -1908,6 +1931,80 @@ export var BOOKLET_SCHEMA = {
             }
           }
         },
+        // ── The crossword's whole authored surface ───────────────────────────
+        // A pool of candidates. The loom weaves what interlocks and DROPS the
+        // rest, so this is a supply, not a placement demand — and the printed
+        // clue list is exactly the subset `skeleton.entries` names.
+        entries: {
+          type: 'array',
+          minItems: G.crossword.minPoolEntries,
+          maxItems: G.crossword.maxPoolEntries,
+          items: {
+            type: 'object',
+            required: ['answer', 'clue'],
+            additionalProperties: false,
+            properties: {
+              answer: { type: 'string', minLength: G.crossword.wordMinChars,
+                maxLength: G.crossword.wordMaxChars, pattern: '^[A-Za-z]+$' },
+              clue: nonEmptyString
+            }
+          }
+        },
+        // ── MACHINE-WRITTEN. The loom's output, stamped by assembly.js ───────
+        // THE TWO HALVES, SPLIT STRUCTURALLY RATHER THAN BY DISCIPLINE (D198):
+        //   mask + entries + marked  → THE PUZZLE. Printed. This is the shape
+        //                              the player is handed and the numbers
+        //                              their clues hang on.
+        //   fill                     → THE ANSWER KEY. Never printed, the same
+        //                              class as a word search's placements.
+        // The renderer reads `mask` and `entries` and has no reason to touch
+        // `fill`, which is what keeps "solvability data is non-printing" true
+        // by construction instead of by a comment.
+        //
+        // This is the first DERIVED field in this schema that MUST print, and
+        // that is why the split exists at all: D198's rule was written for an
+        // answer key, and a crossword skeleton is the case that proves the rule
+        // needed the qualifier it always carried at the render site.
+        skeleton: {
+          type: 'object',
+          required: ['rows', 'cols', 'mask', 'fill', 'entries'],
+          additionalProperties: false,
+          properties: {
+            rows: { type: 'integer', minimum: 1, maximum: G.crossword.maxSize },
+            cols: { type: 'integer', minimum: 1, maximum: G.crossword.maxSize },
+            // '#' is a block, '.' is a cell the player writes in.
+            mask: { type: 'array', items: { type: 'string', pattern: '^[#.]+$' } },
+            fill: { type: 'array', items: { type: 'string', pattern: '^[A-Z#]+$' } },
+            entries: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['index', 'row', 'col', 'direction'],
+                additionalProperties: false,
+                properties: {
+                  // 1-based into `entries` above — which pool answer this slot holds.
+                  index: { type: 'integer', minimum: 1 },
+                  row: { type: 'integer', minimum: 1 },
+                  col: { type: 'integer', minimum: 1 },
+                  direction: { enum: VALID_CROSSWORD_DIRECTIONS },
+                  number: { type: 'integer', minimum: 1 }
+                }
+              }
+            },
+            marked: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['row', 'col'],
+                additionalProperties: false,
+                properties: {
+                  row: { type: 'integer', minimum: 1 },
+                  col: { type: 'integer', minimum: 1 }
+                }
+              }
+            }
+          }
+        },
         answer: nonEmptyString,
         answerFrom: {
           type: 'object',
@@ -1915,7 +2012,23 @@ export var BOOKLET_SCHEMA = {
           additionalProperties: false,
           properties: {
             mode: { enum: VALID_WORD_GRID_ANSWER_MODES },
-            index: { type: 'integer', minimum: 1 }
+            index: { type: 'integer', minimum: 1 },
+            // The marked-square extraction, declared ENTRY-RELATIVE: the model
+            // writes the pool before the grid exists and cannot name a cell it
+            // has never seen. The loom converts these to coordinates.
+            picks: {
+              type: 'array',
+              minItems: 1,
+              items: {
+                type: 'object',
+                required: ['entry', 'letter'],
+                additionalProperties: false,
+                properties: {
+                  entry: { type: 'integer', minimum: 1 },
+                  letter: { type: 'integer', minimum: 1 }
+                }
+              }
+            }
           }
         },
         difficulty: { $ref: '#/$defs/puzzleDifficulty' }

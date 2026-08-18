@@ -2499,7 +2499,14 @@ export var LUDIC_LIBRARY = [
   // KenKen have their solvers. It is a SEPARATE entry from the deduction board
   // because it asks a different verb — the player adds, rather than eliminates
   // — and these entries are named for what they play.
-  'arithmetic-grid'     // kakuro and KenKen, every filling proven unique
+  'arithmetic-grid',    // kakuro and KenKen, every filling proven unique
+  // W7.5 — the last puzzle family off tier 3, on VISION §4.2's ratified split
+  // (D148): THE LOOM BUILDS THE GRID, THE MODEL WRITES THE CLUES. A separate
+  // entry from `word-hunt` for the same reason `arithmetic-grid` is separate
+  // from `deduction-board` — the verb differs. A search asks the player to
+  // LOOK; a crossword asks them to WRITE, which is why §4.2 names it the
+  // natural implement for meta-stories where the reader is the character.
+  'interlocking-word-grid'  // the woven crossword; every crossing machine-proven
 ];
 
 // ── The harvest patterns, as an acceptance set (D144) ───────────────────────
@@ -2548,7 +2555,11 @@ export var LUDIC_LIBRARY_ATOMS = {
   // the thing a composition is choosing between.
   'deduction-board': ['constrained-grid'],
   'word-hunt': ['word-grid'],
-  'arithmetic-grid': ['constrained-grid']
+  'arithmetic-grid': ['constrained-grid'],
+  // The same two-entries-one-atom shape as the pair above, and the same
+  // justification: `word-grid` is the printed object, while looking for words
+  // already on the page and writing words into an empty shape are two plays.
+  'interlocking-word-grid': ['word-grid']
 };
 
 // ── THE FURNITURE AND THE INSTRUMENTS (D170) ────────────────────────────────
@@ -2805,11 +2816,18 @@ export var VALID_LEGACY_MOVES = [
 // puzzle the gate cannot refuse, and an unrefusable puzzle is one the player
 // discovers is broken at the gym.
 //
-// THE DENSE CROSSWORD IS DELIBERATELY ABSENT. The registry entry names it; this
-// enum does not, because a family whose solver has not been written is a family
-// the schema must not accept. When one lands, it is one enum value, one solver
-// branch, and one prompt menu row — which is exactly what the arsenal wave did
-// for the three filled grids below, closing the W5b deferral that named them.
+// THE CROSSWORD IS ABSENT FROM *THIS* ENUM AND ALWAYS WILL BE — it is a WORD
+// grid, not a constrained grid, and it lives in `VALID_WORD_GRID_KINDS` below.
+// The distinction is the printed object: these seven hand the player a matrix
+// of constraints, while a crossword hands them an interlocking shape and a
+// clue list. Two negative fixtures in check-generation-floors.mjs still use the
+// literal 'crossword' to prove THIS enum refuses an unknown kind, and that
+// remains honest precisely because the value belongs to the other family.
+//
+// The prediction that comment used to make came true exactly as written: when
+// the crossword landed at W7.5 it was one enum value, one solver branch and one
+// prompt menu row — the same shape the arsenal wave used for the three filled
+// grids below, closing the W5b deferral that named them.
 //
 // `sudoku`, `kakuro` and `kenken` share one printed object (a matrix the player
 // writes DIGITS into) and therefore one answer rule; they do not share a
@@ -2911,16 +2929,46 @@ export var VALID_LOGIC_ANSWER_MODES = ['cell', 'initials'];
 // Shade the cells, read the characters that landed inside the picture.
 export var VALID_NONOGRAM_ANSWER_MODES = ['grid-letters'];
 
-export var VALID_WORD_GRID_KINDS = ['word-search'];
+// Two printed objects, and they are as different as a maze is from a cipher:
+// a SEARCH hands the player a full letter board and asks them to ring what is
+// already there, while a CROSSWORD hands them an empty interlocking shape and
+// asks them to write. They share this enum because they share a schema seat
+// (`fieldOps.wordGrid`) and an atom, not because they share a mechanic.
+//
+// `crossword` landed at W7.5 on VISION §4.2's ratified split — THE LOOM BUILDS
+// THE GRID, THE MODEL WRITES THE CLUES (D148). The model authors a POOL of
+// answer/clue pairs and nothing else; `buildCrossword()` in
+// contracts/puzzle-solvers.mjs weaves the grid and `verifyCrossword()` proves
+// it. There is no author-supplied geometry anywhere in this family, which is
+// why the schema carries no grid for a crossword to disagree with.
+export var VALID_WORD_GRID_KINDS = ['word-search', 'crossword'];
 
 // The eight reading directions of a word search. Order is quiet → loud in the
 // sense the difficulty proxy uses: the first three read forwards, the rest
 // read backwards or on a diagonal and cost more to scan.
 export var VALID_WORD_SEARCH_DIRECTIONS = ['E', 'S', 'SE', 'NE', 'W', 'N', 'SW', 'NW'];
 
-//   leftovers   the uncovered cells, row by row — the classic
+// A crossword's two axes, and the contrast with the eight above is the point:
+// a search may read backwards and diagonally because the player is SCANNING,
+// while a crossword entry reads left-to-right or top-to-bottom because the
+// player is WRITING and a single number in a cell's corner has to serve both
+// the across and the down clue that start there.
+//
+// MIRRORED BY `CROSSWORD_DIRECTIONS` in contracts/puzzle-solvers.mjs, which
+// cannot import this file (dependency-free by construction so it runs at both
+// gates). `puzzleSolverVocabularyParity()` in validate.mjs holds the two equal.
+export var VALID_CROSSWORD_DIRECTIONS = ['across', 'down'];
+
+//   leftovers   the uncovered cells, row by row — the classic (word search only:
+//               a crossword has no uncovered letters, and the solver says so)
 //   word        one entry from the list, named by 1-based index
-export var VALID_WORD_GRID_ANSWER_MODES = ['leftovers', 'word'];
+//   marked      the classic crossword extraction — shaded squares, read in
+//               order, spell the key. Declared ENTRY-RELATIVE as
+//               `picks: [{ entry, letter }]` rather than as grid coordinates,
+//               because the model writes the pool before the grid exists and
+//               cannot name a cell it has never seen. The loom converts the
+//               picks to cells once the weave is done.
+export var VALID_WORD_GRID_ANSWER_MODES = ['leftovers', 'word', 'marked'];
 
 // ── The two-source law: seed-assigned identity (VISION §11, D146) ───────────
 //
@@ -3770,6 +3818,44 @@ export var SPATIAL_GUARDRAILS = {
     minWords: 4,
     maxWords: 10,
     wordMinChars: 3,
+    wordMaxChars: 12
+  },
+  // ── The crossword (W7.5 · VISION §4.2 · the loom) ─────────────────────────
+  // EVERY NUMBER HERE WAS MEASURED, not chosen. The instrument was 240 weaves
+  // of the demo booklet's own assembled vocabulary (2,293 words), pools of
+  // 12-30 at both usable sizes; `LUDIC_CROSSWORD_FINDINGS` in
+  // contracts/ludic-library.mjs holds the earlier prototype's numbers and this
+  // wave's confirm them.
+  //
+  // NOTE WHAT IS ABSENT: there is no minimum fill or crossing PERCENTAGE. A
+  // book's own roster affords ~38-45% fill and ~15-20% checked letters — a
+  // crisscross, not an American-style dense grid — and §4.2's own words are
+  // "density honest to what the roster affords". Flooring a percentage off
+  // these draws would be machinery derived from a measurement artifact, which
+  // is the D198 counter-guard. The structural floors do the work instead, and
+  // they are booleans the solver proves: every entry crosses another, the grid
+  // is one connected shape, every run of two or more cells is a clued entry.
+  crossword: {
+    // The 11x11 collapse is a HARD floor, not a tuning failure: a 12-letter
+    // answer cannot be crossed inside an 11-cell grid, so the first placement
+    // fills the board and nothing else fits.
+    minSize: 13,
+    // The search bound AND the render ceiling. The weave is cropped to its
+    // bounding box afterwards, so the printed grid is usually smaller.
+    maxSize: 15,
+    // The POOL the model authors. The loom weaves what interlocks and drops
+    // the rest, so this is a supply of candidates, never a placement demand —
+    // "place all N" refused 10 of 18 realistic pools and the refusal was not
+    // actionable, which is why the pool model is the one that shipped.
+    minPoolEntries: 12,
+    maxPoolEntries: 24,
+    // What the weave must actually yield to be a puzzle. Observed worst case
+    // from a conforming pool was 8 placed; this sits two under, because the
+    // floor exists to refuse a non-puzzle rather than to enforce a quality
+    // target the prompt already teaches.
+    minPlacedEntries: 6,
+    wordMinChars: 3,
+    // Must stay below minSize or the longest answer cannot be crossed.
     wordMaxChars: 12
   },
   // ── The filled grids (the arsenal wave) ───────────────────────────────────

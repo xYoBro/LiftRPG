@@ -174,6 +174,26 @@ var IMPLEMENTED_DETAIL = {
     outputs: 'A word the seal or the assembly wants — either one from the list, or the letters no word covered.',
     locks: 'Machine-verified placement; a word the board does not contain is refused, and in leftovers mode an answer the uncovered letters do not spell is refused.'
   },
+  // PROMOTED OUT OF TIER 3 AT W7.5, on VISION §4.2's ratified split (D148):
+  // THE LOOM BUILDS THE GRID, THE MODEL WRITES THE CLUES. The tier-3 entry sat
+  // on one blocker for two waves — "a constraint-satisfaction problem over a
+  // dictionary this engine does not ship" — and that framing was the thing that
+  // was wrong. The engine needs no dictionary, because it is not FILLING a
+  // pre-drawn shape from a lexicon; it is WEAVING a shape around a pool of
+  // answers the model already authored. Those are different problems, and the
+  // second one a 400,000-placement budget finishes in about 600 tests.
+  //
+  // DENSITY IS REPORTED, NOT PROMISED. A book's own vocabulary affords a
+  // crisscross — ~38-45% fill, ~15-20% of letters checked by a second entry —
+  // which is §4.2's "density honest to what the roster affords" answered with a
+  // number rather than a hope. See LUDIC_CROSSWORD_FINDINGS below.
+  'interlocking-word-grid': {
+    label: 'The interlocking word grid (crossword)',
+    inputs: 'A pool of answer/clue pairs drawn from the book’s own world, and nothing else — the model authors no geometry.',
+    process: 'The loom weaves the answers that interlock into a numbered grid and drops the rest; the player writes answers into a shape whose crossings check each other, and the marked squares spell the key. A verifier re-derives everything from the finished grid and refuses a weave that will not carry a puzzle.',
+    outputs: 'A word or letter string the seal, the assembly or a priced spend reads.',
+    locks: 'The crossings are the lock. `verifyCrossword()` in contracts/puzzle-solvers.mjs refuses a grid where any run of two or more cells is unclued, any entry crosses nothing, the shape falls into islands, or the marked squares do not spell the declared answer. A search budget exceeded is a refusal, never a pass.'
+  },
   'ledger-audit': {
     label: 'The ledger audit',
     inputs: 'The player’s own logged numbers, movement by movement.',
@@ -423,19 +443,20 @@ var NEEDS_PRIMITIVE = [
   // The deferral is not re-listed as a queued entry. One family, one entry, one
   // tier, exactly as `printed-hint-band` was handled below.
   // W5b PROMOTED the search half out of this tier — it is `word-hunt` on the
-  // implemented shelf. What stayed is the INTERLOCKING half, and the reason is
-  // again the solver: verifying a board that already exists is a scan, while
-  // proving a crisscross or a crossword is fillable-and-unique is a
-  // constraint-satisfaction problem over a dictionary this engine does not
-  // ship and would have to be brief-blind to use.
-  {
-    id: 'interlocking-word-grid', label: 'Interlocking word grids (crisscross, dense crossword)',
-    inputs: 'A word list and a blank interlocking skeleton with numbered entries.',
-    process: 'The player writes words into a shape whose crossings constrain each other; the marked squares spell the answer.',
-    outputs: 'A word or letter string the seal wants.',
-    locks: 'The crossings are the lock. Nothing ships unless a solver proves the skeleton admits exactly one filling from the printed list.',
-    needs: 'A crossing solver plus a blank-skeleton print surface, which is a different geometry from the word board word-grid.js draws. DEFERRED BY RULING at W5b (crisscross was licensed "only if it lands clean"; it did not — the print surface and the uniqueness proof are both new work, not a variant of the search). STILL QUEUED after the arsenal wave, but no longer on an unknown: the wave built the loom as a prototype and MEASURED what it affords, so the next attempt starts from numbers instead of hope. See LUDIC_CROSSWORD_FINDINGS below.'
-  },
+  // implemented shelf. W7.5 PROMOTED THE INTERLOCKING HALF, and it is
+  // `interlocking-word-grid` there. Neither is re-listed here as a queued
+  // entry: one family, one entry, one tier, exactly as `printed-hint-band` and
+  // `arithmetic-grid` were handled.
+  //
+  // WHAT THE DEFERRAL GOT WRONG, recorded because the framing is the lesson.
+  // Two waves read the blocker as "proving a crossword fillable-and-unique is a
+  // constraint-satisfaction problem over a dictionary this engine does not ship
+  // and would have to be brief-blind to use." That describes FILLING a
+  // pre-drawn shape from a lexicon, which is indeed hard and is not what the
+  // ratified split asks for. Weaving a shape AROUND answers the model already
+  // wrote is a different problem, and it finishes in about 600 placement tests.
+  // The entry sat in tier 3 for two waves on the strength of a sentence that
+  // was solving the wrong problem.
   // `printed-hint-band` LANDED IN W5b and left this tier: the band is
   // renderer/modules/atoms/hint-band.js, with its own estimate term and its own
   // parsed ladder mirror, and the tier-2 `hint-ladder` entry above now carries
@@ -527,20 +548,56 @@ export var LUDIC_CROSSWORD_FINDINGS = {
   // least 13 on a side, and 15 is where it becomes comfortable.
   minimumUsableDim: 13,
   comfortableDim: 15,
-  // What remains to build, in the order the next wave would do it.
+  // ── What the SHIPPED loom measures (W7.5) ─────────────────────────────────
+  // Bands rather than points, because the figure moves with the pool. Held as
+  // strings because they are quoted into an emitted page and a reader wants the
+  // range, not a false average. The shipped loom is STRICTER than the prototype
+  // — it refuses perpendicular adjacency and collinear overlap, both of which
+  // spell words nobody clued — so its fill is LOWER than the prototype's
+  // 49-51%. That is the correction, not a regression.
+  shippedFillPercentBand: '38-45%',
+  shippedCrossedLetterBand: '15-20%',
+  // THE GATE THE FAMILY DOES NOT CLEAR, recorded in the contract rather than
+  // only in a wave report. See the emitted arsenal page for the long form.
+  transportRealCaveat: 'NO for the puzzle data: fieldOps.wordGrid is authored at week-final, '
+    + 'which has no structured wire schema (there is no STRUCTURED_SCHEMA_WEEK). DR-59, shared '
+    + 'by every week-declared surface. The LIBRARY ENTRY is transport-real at the shell seat.',
+  // ── W7.5: EVERY ROW BELOW WAS BUILT, and the numbers were re-measured ─────
+  // The prototype's headline held. Re-measured against the same book with the
+  // shipped loom — which is STRICTER than the prototype, because it refuses the
+  // perpendicular-adjacency and collinear-overlap cases that would otherwise
+  // spell undeclared words — 240 of 240 weaves succeeded and verified, from
+  // pools of 12-30 at both usable sizes:
+  //     fill 38-45%   ·   checked letters 15-20%   ·   259-938 placement tests
+  // The fill figure is LOWER than the prototype's 49-51% and that is the
+  // correction, not a regression: a laxer adjacency rule fills more cells by
+  // spelling words nobody clued.
+  built: [
+    'The loom is buildCrossword() in contracts/puzzle-solvers.mjs — deterministic, '
+      + 'no RNG, dependency-free so it runs in the browser doors and in Node.',
+    'The schema surface is wordGrid.kind "crossword": entries [{ answer, clue }] '
+      + 'authored by the model, and a machine-written `skeleton` the loom writes.',
+    'THE SEAM MOVED, and the prototype\'s plan was wrong about it. The note below '
+      + 'said the loom should run at ASSEMBLY. It runs at the WEEK STAGE GATE '
+      + 'instead — assembly still stamps the skeleton, but the gate is where the '
+      + 'weave has to be proved, because a refusal after the stage gate has passed '
+      + 'is a refusal the model can no longer act on. The D132 Correction Directive '
+      + 'law decides this, and it decides it against the earlier plan.',
+    'The print surface is the word-grid atom\'s crossword branch, with its own '
+      + 'ladder mirror.',
+    'The floor is verifyCrossword(): every run of two or more cells is a clued '
+      + 'entry, every entry crosses another, the shape is one connected island, '
+      + 'and the marked squares spell the declared answer.'
+  ],
+  // THE ONE ROW THAT DID NOT LAND, named rather than quietly dropped.
   remaining: [
-    'The loom promoted from prototype into contracts/, with a self-test.',
-    'A schema surface: entries [{ answer, clue }] authored by the model, and a '
-      + 'derived skeleton (layout, numbering, placements) the loom writes.',
-    'The seam: the loom runs at ASSEMBLY, where derived fields are already '
-      + 'computed, so the grid is a derived field of the declared entries.',
-    'A print surface — which is now MOSTLY BUILT: the arsenal wave\'s kakuro '
-      + 'render already draws a block/white cell matrix, and a crossword '
-      + 'skeleton is that plus entry numbers.',
-    'The floor: grid valid, every declared answer placed, crossings consistent, '
-      + 'and every answer findable in the book\'s own printed text — the '
-      + 'book-referential half of the ruling, which is what stops a clue whose '
-      + 'answer the reader has no way to know.'
+    'The book-referential half: every answer findable in the book\'s own printed '
+      + 'text. The prompt TEACHES it ("a crossword answer the reader has no way to '
+      + 'know is not a puzzle, it is a quiz") and nothing CHECKS it. The instrument '
+      + 'exists — buildSurfaceIndex in validation.js is what collectOracleWriteTarget'
+      + 'Findings resolves against — but wiring it is a floor of its own with its own '
+      + 'false-positive question (an answer may legitimately be a world noun the book '
+      + 'names only in prose the index does not walk). Unfloored, and stated so.'
   ]
 };
 
