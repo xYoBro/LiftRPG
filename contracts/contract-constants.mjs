@@ -1566,6 +1566,30 @@ export var OUTPUT_BUDGETS = {
 export var WEEK_STAKES_MIN_CHARS = 40;
 export var WEEK_STAKES_MAX_CHARS = 240;
 
+// ── THE ESTABLISHMENT BAND (W3, 2026-08-18) ─────────────────────────────────
+// `rulesSpread.orientation` is the plain-words setup printed above the
+// procedure: what is happening, and who is in it. The first delivered book
+// taught its rules against a fiction the reader was never given — documents
+// performed at a stranger who did not know where he was or who anyone was.
+//
+// THE BANDS ARE THE DEMAND, for the stakesLine's reason exactly. Under the
+// situation floor the field is satisfiable with a logline, which is the thing
+// it exists to replace; over the ceiling it stops being an establishing
+// paragraph and becomes the first chapter. Under three cast rows a book has no
+// cast, it has a protagonist; over eight the page stops being scannable at the
+// moment of use, which is the one thing an orientation cannot afford.
+//
+// ONE HOME, TWO READERS (D93): `orientationFloorErrors` in validation.js and
+// the prompt's own numbers, held together by `orientationBandParity()` in
+// validate.mjs — the prompt states these bands to the model, so a constant
+// moved alone would demand a shape the model was taught to avoid.
+export var ORIENTATION_LIMITS = {
+  situationMinChars: 200,
+  situationMaxChars: 700,
+  castMin: 3,
+  castMax: 8
+};
+
 // ── The eight questions (PLAY.md §3.1) ──────────────────────────────────────
 // THE SINGLE HOME of what the rulebook must answer, and of which answers are
 // load-bearing. Three readers that cannot see each other:

@@ -141,6 +141,7 @@ import {
   // is: SCHEMA_SINGLE_WEEK states these two integers to the model as literals,
   // and a private copy here would fail weeks for a band the model was told
   // differently.
+  ORIENTATION_LIMITS,
   WEEK_STAKES_MIN_CHARS,
   WEEK_STAKES_MAX_CHARS,
   RULEBOOK_KIND_WORDS,
@@ -2686,6 +2687,96 @@ export function rulesTeachingFloorErrors(rulesSpread, gameRulebook, where) {
 }
 
 /**
+ * orientationFloorErrors(rulesSpread, where) -> string[]
+ *
+ * ── THE ESTABLISHMENT FLOOR (W3, 2026-08-18) ────────────────────────────────
+ *
+ * The first delivered book taught its procedure against a fiction the reader
+ * was never given: documents performed at a stranger who did not know where he
+ * was, who anyone was, or what had already happened. Every gate was green,
+ * because no gate asked whether the book had said.
+ *
+ * W1 built the surface — `rulesSpread.orientation` in the artifact schema, in
+ * both prose prompt surfaces, and in the renderer — and deliberately withheld
+ * the floor. This is that floor, and the wire slot that makes it answerable
+ * (STRUCTURED_SCHEMA_SHELL gained `orientation` in the same change; without it
+ * the structured transports had no field to answer in, and a floor demanding a
+ * value the transport cannot carry blocks the pipeline forever).
+ *
+ * THE SHELL SEAT ONLY, and the asymmetry is the routing rather than a
+ * preference — the design-language floor's reasoning below, unchanged.
+ * INST_RULES_TEACH is routed to the `shell` stage alone (STAGE_SCHEMA_MAP), and
+ * S+F's own rules seat (`generateFleshRulesPrompt`) carries no rules-teaching
+ * doctrine at all: it does not name the field, the bands, or the cast shape. A
+ * floor there would block that pipeline on a surface its prompt never mentions,
+ * and the retry would re-fail identically.
+ *
+ * PRESENCE IS THE FIRST DEMAND AND THE BANDS ARE THE SECOND. A `situation`
+ * under the floor is a logline, which is the thing this field exists to
+ * replace; a cast under three rows is a protagonist, not a cast. The bands live
+ * in ORIENTATION_LIMITS and are quoted to the model in the same numbers
+ * (orientationBandParity in validate.mjs holds the pair together).
+ */
+export function orientationFloorErrors(rulesSpread, where) {
+  var errors = [];
+  if (!rulesSpread || typeof rulesSpread !== 'object') return errors;
+  var prefix = (where || 'Stage') + ' → rulesSpread.orientation';
+  var orientation = rulesSpread.orientation;
+  if (!orientation || typeof orientation !== 'object') {
+    errors.push(prefix + ' is absent. Before the procedure, the book has to say what is '
+      + 'happening and who is in it, in plain words: `situation` ('
+      + ORIENTATION_LIMITS.situationMinChars + '-' + ORIENTATION_LIMITS.situationMaxChars
+      + ' characters, present tense, outside the fiction\'s voice) and `cast` ('
+      + ORIENTATION_LIMITS.castMin + '-' + ORIENTATION_LIMITS.castMax
+      + ' entries of { name, role }). A reader who has not been told where he is cannot '
+      + 'follow a single document that follows, and every rule on this page is taught '
+      + 'against a fiction he was never given.');
+    return errors;
+  }
+  var situation = String(orientation.situation || '').trim();
+  if (!situation) {
+    errors.push(prefix + '.situation is empty — say what is happening here, in plain words, '
+      + 'in the present tense: where we are, what has gone wrong or is at stake, and what the '
+      + 'reader is doing about it over the coming weeks. Withhold the ANSWERS, never the SETUP.');
+  } else if (situation.length < ORIENTATION_LIMITS.situationMinChars
+      || situation.length > ORIENTATION_LIMITS.situationMaxChars) {
+    errors.push(prefix + '.situation is ' + situation.length + ' characters; it must be '
+      + ORIENTATION_LIMITS.situationMinChars + '-' + ORIENTATION_LIMITS.situationMaxChars
+      + '. Shorter than that is a logline — the thing this field exists to replace. Longer '
+      + 'and it has stopped being the establishing paragraph and become the first chapter, '
+      + 'which is not what a reader standing at the front of the book can use.');
+  }
+  var cast = Array.isArray(orientation.cast) ? orientation.cast : null;
+  if (!cast) {
+    errors.push(prefix + '.cast is absent or not an array — name the people, offices or bodies '
+      + 'this book is about, ' + ORIENTATION_LIMITS.castMin + '-' + ORIENTATION_LIMITS.castMax
+      + ' of them. Every in-world author of a document belongs here.');
+    return errors;
+  }
+  if (cast.length < ORIENTATION_LIMITS.castMin || cast.length > ORIENTATION_LIMITS.castMax) {
+    errors.push(prefix + '.cast has ' + cast.length + ' entries; it must have '
+      + ORIENTATION_LIMITS.castMin + '-' + ORIENTATION_LIMITS.castMax
+      + '. Fewer than ' + ORIENTATION_LIMITS.castMin + ' is a protagonist, not a cast, and the '
+      + 'documents will be signed by names the reader never met. More than '
+      + ORIENTATION_LIMITS.castMax + ' and the page stops being scannable at the one moment it '
+      + 'has to be — the moment a reader is looking someone up.');
+  }
+  var malformed = [];
+  cast.forEach(function (member, i) {
+    if (!member || typeof member !== 'object') { malformed.push('[' + i + '] is not an object'); return; }
+    if (!String(member.name || '').trim()) malformed.push('[' + i + '] has no name');
+    if (!String(member.role || '').trim()) malformed.push('[' + i + '] has no role');
+  });
+  if (malformed.length) {
+    errors.push(prefix + '.cast has entries a reader cannot use: ' + malformed.slice(0, 4).join('; ')
+      + '. Every row is { name (spelled exactly as the weeks and fragments spell it), role '
+      + '(2-6 words, what they are) } — a row missing either is a line of the lookup table '
+      + 'that answers nothing when it is looked up.');
+  }
+  return errors;
+}
+
+/**
  * briefTranscriptionFloorErrors(units, brief, where) -> string[]
  *
  * ── THE BRIEF IS INPUT, NEVER COPY (W1, 2026-08-18) ─────────────────────────
@@ -2914,6 +3005,14 @@ export function validateShellSchema(shell, expectedOptions) {
     // is answerable at the seat it is asked of.
     errors = errors.concat(rulesTeachingFloorErrors(shell.rulesSpread,
       (expectedOptions || {}).gameRulebook, 'Shell'));
+
+    // ── The book says where you are before it says what to do (W3) ──
+    // No options rail and no silence condition: unlike the rulebook floors
+    // above, this one reads only the unit the gate was handed. The demand is
+    // unconditional because the answer is — every book has a situation and a
+    // cast, and a book that declines to say so has declined to be legible, not
+    // declined a feature. Shell seat only; see the floor's own header.
+    errors = errors.concat(orientationFloorErrors(shell.rulesSpread, 'Shell'));
 
     // ── The design-language floor (W6's close) ──
     // Here and ONLY here, and the asymmetry with every floor beside it is a

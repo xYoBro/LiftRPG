@@ -821,6 +821,36 @@ var STRUCTURED_SCHEMA_SHELL = {
     rulesSpread: {
       type: 'object',
       properties: {
+        // THE ESTABLISHMENT SURFACE, ON THE WIRE (W3, arming W1's half).
+        // W1 landed `orientation` in the artifact schema, in both prose prompt
+        // surfaces and in the renderer, and stopped there — so on the
+        // structured transports, which send THIS object as the forced tool's
+        // input_schema, the field the prompt demanded was a field the model had
+        // no slot to answer in. Prose asked; the wire refused.
+        //
+        // It joins `required` below in the same edit. An optional slot beside a
+        // demanded field is precisely the state D111 measured: a mid-tier model
+        // reads "optional but demanded" as "skip", and the absence is invisible
+        // until a reader notices the book never said where he was.
+        orientation: {
+          type: 'object',
+          properties: {
+            situation: { type: 'string' },
+            cast: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  role: { type: 'string' },
+                  note: { type: 'string' }
+                },
+                required: ['name', 'role']
+              }
+            }
+          },
+          required: ['situation', 'cast']
+        },
         leftPage: {
           type: 'object',
           properties: {
@@ -849,7 +879,7 @@ var STRUCTURED_SCHEMA_SHELL = {
           required: ['title', 'instruction']
         }
       },
-      required: ['leftPage', 'rightPage']
+      required: ['orientation', 'leftPage', 'rightPage']
     },
     theme: {
       type: 'object',
