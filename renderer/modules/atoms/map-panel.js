@@ -142,7 +142,21 @@ const HEX_CAP_PX = 9;
  *  panel was `max(canvas, prompt flow)`; they are now a band BENEATH it, so it
  *  is `max(panel floor, canvas floor + prompt flow)`. Move the two numbers
  *  together — the estimate is the only reader of the canvas floor that cannot
- *  see the stylesheet. */
+ *  see the stylesheet.
+ *
+ *  THESE ARE FLOORS, NOT THE PRINTED HEIGHT (DR-54, 2026-08-18). On a page a
+ *  `player-drawn` map OWNS — `sizeHint:'full-page'` from the adapter, so
+ *  placementLocksPage() seats it alone — booklet.css grows the panel into the
+ *  page's slack (`.rp-content[data-solo-surface="map-panel"] .player-map`,
+ *  `flex:1 0 auto`) and it prints ~700px instead of 176. That is the footing
+ *  NETWORK_MIN_PX already stands on ("on a real page the network also carries
+ *  `flex:1`, so it grows into slack; 214 is its floor and what the harness
+ *  measures"), and the estimate must keep charging the FLOOR: growth consumes
+ *  free space the page already owns, so charging the grant would price a solo
+ *  map at the whole page budget and make its own page unsat. The single-atom
+ *  harness measures this same floor out of page context; the page-level pass
+ *  (measurePlacementsPage) renders the real `.rp-content` and therefore sees
+ *  the grown panel exactly as print does. */
 const PLAYER_MIN_PX = 176;
 const PLAYER_CANVAS_MIN_PX = 88;
 const PLAYER_PROMPT_PX = 12.44;

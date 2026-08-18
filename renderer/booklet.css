@@ -4147,6 +4147,46 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .rp-content[data-solo-surface="map-panel"] .map-content{
   flex:1;
 }
+/* DR-54 (2026-08-18) — THE GROW CHAIN REACHED THE PANEL AND STOPPED THERE.
+   Measured on variety-01-coastal p9 before this rule: `.rp-content`,
+   `.rp-row`, `.map-zone` and `.map-content` all grew to 732px on a page a
+   `player-drawn` map owns outright, while `.player-map` sat at its 176px floor
+   (`flex:0 1 auto`) with the canvas at 174px inside it. The one element a
+   player writes on was a fifth of the page it owned, and ~530px of the sheet
+   was void under a bordered box. VISION §8's density law and the write-in law:
+   the printed frame defers to the pencil, so on a page the map OWNS the pencil
+   gets the page.
+
+   `flex:1 0 auto`, not `1 1 auto` — SHRINK STAYS ZERO ON PURPOSE. This panel
+   is one level below `.rp-content > *`, so the absorption law's own selector
+   (D198) does not reach it, and a shrinkable panel here would squash a
+   too-tall map back inside the frame and hide the overflow from the planner —
+   the exact failure D198 closed one box up. Growing INTO granted space is
+   legal; absorbing overflow is not.
+
+   SCOPED TO THE OWNED PAGE, deliberately. `data-solo-surface` is stamped by
+   page-renderer.js only when one surface type is seated, and a `player-drawn`
+   map takes `sizeHint:'full-page'` from the adapter, so `placementLocksPage()`
+   gives it the page alone. A map sharing a row with a sibling never matches
+   this selector and keeps its 176px floor.
+
+   THE ESTIMATE DOES NOT MOVE, and that is the contract, not an omission:
+   PLAYER_MIN_PX / PLAYER_CANVAS_MIN_PX in atoms/map-panel.js are the panel's
+   FLOOR — what it costs when nobody grants it anything — and that is exactly
+   what a grown flex item must charge. `.map-network` has carried `flex:1` on
+   the same footing since it shipped; its atom comment says so in the same
+   words. Charging the grant instead would price a solo map at the whole page
+   budget and make every page carrying one unsat.
+
+   The guide grid SCALES, it does not repeat: `background-size` is
+   `calc(100% / var(--grid-columns))` × `calc(100% / var(--grid-rows))`, so the
+   board keeps its authored cell COUNT and each cell gets taller, and the
+   percent-positioned `.player-map-seed` markers keep landing on their own
+   cells — the paint-and-placement-share-one-box rule the `.player-map-canvas`
+   block states. A fixed-cell grid would break that alignment. */
+.rp-content[data-solo-surface="map-panel"] .player-map{
+  flex:1 0 auto;
+}
 .rp-content[data-solo-surface="tracker"] .companion-zone{
   border-top:none;
   padding-top:0;
