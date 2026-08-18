@@ -757,17 +757,49 @@ function renderLinearMap(mapState) {
   return wrap;
 }
 
+/**
+ * THE DRAWING SURFACE IS ITS OWN BOX (DR-12, 2026-08-18).
+ *
+ * A seed marker is placed by PERCENTAGE of the grid it belongs to — `left` is
+ * `col / --grid-columns`, `top` is `row / --grid-rows`. Percentages resolve
+ * against the nearest positioned ancestor, so while the seeds and the prompt
+ * chips shared one box, the grid the markers were placed on was not the grid
+ * the reader sees: the container grew as prompts stacked in normal flow, the
+ * percentages stretched with it, and the bottom-row markers landed in prompt
+ * space. Six of the eight sibling collisions in the sealed corpus were exactly
+ * this pair — `.player-map-seed` printed over `.player-map-prompt`, at 57–79%
+ * of the smaller glyph run, on five books and pages every other gate called
+ * clean (the collision scan is the only instrument that can see it: nothing
+ * clips, so the own-box overflow scan is blind, and the page never overflows,
+ * so the density solver is blind).
+ *
+ * THE FIX IS A POSITIONING CONTEXT, NOT A NUDGE. `.player-map-canvas` owns the
+ * dot grid, the seed markers and the coordinate space they are placed in; the
+ * prompt chips are siblings BELOW it. The markers can no longer address a
+ * region the prompts occupy, whatever the prompts do — which is the difference
+ * between removing a collision and moving it.
+ *
+ * IT ALSO STOPS THE PROMPTS EATING THE PAPER. The chips were printed on top of
+ * the surface the player is told to draw on (the pencil-only law: the surface
+ * IS the mechanism). Below it, the drawing area is honestly delimited.
+ *
+ * CROSS-FILE CONTRACT — `atoms/map-panel.js` PLAYER_CANVAS_MIN_PX mirrors the
+ * canvas `min-height` in booklet.css, because the panel is now canvas + prompt
+ * flow rather than max(canvas, prompt flow). Move them together.
+ */
 function renderPlayerMap(mapState) {
   const wrap = make('div', 'player-map');
   wrap.style.setProperty('--grid-columns', mapState.dimensions.columns);
   wrap.style.setProperty('--grid-rows', mapState.dimensions.rows);
   wrap.setAttribute('data-canvas-type', mapState.canvasType || 'dot-grid');
+  const canvas = make('div', 'player-map-canvas');
   (mapState.seedMarkers || []).forEach((marker) => {
     const seed = make('div', 'player-map-seed', marker.label || '');
     seed.style.left = 'calc((' + Math.max(0, (marker.col || 1) - 0.5) + ' / var(--grid-columns)) * 100%)';
     seed.style.top = 'calc((' + Math.max(0, (marker.row || 1) - 0.5) + ' / var(--grid-rows)) * 100%)';
-    wrap.appendChild(seed);
+    canvas.appendChild(seed);
   });
+  wrap.appendChild(canvas);
   (mapState.prompts || []).slice(0, 4).forEach((prompt) => {
     wrap.appendChild(make('div', 'player-map-prompt', prompt));
   });

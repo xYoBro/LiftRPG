@@ -4764,18 +4764,42 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   word-break:normal;
   overflow-wrap:break-word;
 }
+/* DR-12 (2026-08-18): the panel is now a COLUMN of two things — the drawing
+   canvas and the prompt chips beneath it — where it used to be one box the
+   chips were printed on top of. The seed markers are percent-positioned, so
+   sharing a box with flow content meant their coordinate space grew with the
+   prompt list and the markers landed on the chips: six of the sealed corpus's
+   eight sibling collisions, at 57–79% overlap. The rationale and the reverse
+   pointer live on renderPlayerMap() in field-ops-primitives.js.
+
+   The grid paint moved to `.player-map-canvas` WITH the markers, deliberately:
+   background-size is `100% / --grid-columns`, so paint and placement must
+   resolve against the same box or the markers stop sitting on their own cells. */
 .player-map{
   position:relative;
   min-height:176px;
+  display:flex;
+  flex-direction:column;
   border:var(--theme-hair-width,1px) var(--theme-line-style,solid) var(--theme-panel-border,var(--rule));
+  margin-bottom:4px;
+  overflow:hidden;
+}
+/* CROSS-FILE CONTRACT — `min-height` here is PLAYER_CANVAS_MIN_PX in
+   renderer/modules/atoms/map-panel.js: the panel's modelled height became
+   canvas + prompt flow, so this number is a term in the estimate. It is also
+   the floor that keeps a drawable surface when the prompt band is tall —
+   `flex:1 1 auto` lets the canvas give space back to the chips, never below
+   half the panel. Move the two together (the D71 ladder-mirror class). */
+.player-map-canvas{
+  position:relative;
+  flex:1 1 auto;
+  min-height:88px;
   background:
     linear-gradient(to right, color-mix(in srgb, var(--theme-field-rule,var(--rule)) 28%, transparent 72%) 1px, transparent 1px),
     linear-gradient(to bottom, color-mix(in srgb, var(--theme-field-rule,var(--rule)) 28%, transparent 72%) 1px, transparent 1px);
   background-size:calc(100% / var(--grid-columns, 10)) calc(100% / var(--grid-rows, 8));
-  margin-bottom:4px;
-  overflow:hidden;
 }
-.player-map[data-canvas-type="blank"]{
+.player-map[data-canvas-type="blank"] .player-map-canvas{
   background:none;
 }
 /* --grid-dot-opacity is the archetype's dot density on a draw-on-me canvas
@@ -4786,7 +4810,7 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
    NOTE (D126): no fixture in the corpus authors `canvasType: "dot-grid"`, so
    this axis carries no `carries` entry in visual-regression.spec.js — an
    honest gap, not a vacuous contract. */
-.player-map[data-canvas-type="dot-grid"]{
+.player-map[data-canvas-type="dot-grid"] .player-map-canvas{
   background:
     radial-gradient(circle, color-mix(in srgb, var(--theme-field-rule,var(--rule)) calc(var(--grid-dot-opacity,0.45) * 100%), transparent) 0 0.8px, transparent 1px);
   background-size:calc(100% / var(--grid-columns, 10)) calc(100% / var(--grid-rows, 8));
@@ -4804,6 +4828,9 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 .player-map-prompt{
   position:relative;
   z-index:1;
+  /* A chip never absorbs the panel's overflow — it is the canvas above that
+     gives space back (the absorption law's shape, one panel down). */
+  flex:0 0 auto;
   width:max-content;
   max-width:78%;
   margin:6px 0 0 6px;

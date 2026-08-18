@@ -71,6 +71,10 @@ export const OVERFLOW_PROGRESS_EPSILON_PX = 0.5;
  * the planner used one, would make the solver reason about a book nobody is
  * printing — the ladder-mirror failure mode, one layer up.
  *
+ * Since DR-25 that context also carries `slotWidthPx`, so "the same world"
+ * now means the same COLUMN as well as the same typeface. The caller passes
+ * the placement's own width-resolved context; see the call site below.
+ *
  * @param {object} atom — must have `.type`, `.data`
  * @param {number} currentDensity — current density (0.0–1.0)
  * @param {object|null} [estimateContext] — opaque; forwarded to the atom
@@ -195,7 +199,10 @@ export function resolvePageOverflow(pageAtoms, overflowPx, pageBudgetPx, options
   const potentials = pageAtoms
     .map(atom => ({
       ...atom,
-      ...atomShrinkPotential(atom, atom.density, options.estimateContext || null),
+      // The placement's own width-resolved context wins over the phase context
+      // (DR-25): a halves-row atom priced at 232px must be probed at 232px, or
+      // the two answers to "how much can this give back?" disagree.
+      ...atomShrinkPotential(atom, atom.density, atom.estimateContext || options.estimateContext || null),
     }))
     .filter(a => a.shrinkPotentialPx > 0 && a.density < MAX_DENSITY);
 

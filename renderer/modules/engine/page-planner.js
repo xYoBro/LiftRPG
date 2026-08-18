@@ -12,7 +12,7 @@
  */
 
 import { getAtomDefinition } from './atom-registry.js';
-import { PAGE_BUDGET, DEFAULT_PAGE_SPEC } from './page-spec.js';
+import { PAGE_BUDGET, DEFAULT_PAGE_SPEC, HALF_SLOT_WIDTH_PX } from './page-spec.js';
 import {
   resolvePageOverflow, MAX_REVISIONS, MAX_DENSITY, OVERFLOW_PROGRESS_EPSILON_PX,
 } from './density-solver.js';
@@ -103,6 +103,37 @@ const ESTIMATE_DENSITY = 0.6;
  * A missing context is legal everywhere and means "the calibration anchors" —
  * every atom defaults through readTypeMetrics(), so an estimate called without
  * one returns exactly the numbers it returned before this parameter existed.
+ *
+ * ── THE WIDTH CHANNEL (DR-25, 2026-08-18) ──────────────────────────────────
+ * The context now carries a second geometric fact — `slotWidthPx`, THE SAME
+ * WIDTH THE MEASUREMENT PASS WILL USE (232px for a halves row, the bounded
+ * page's 470px otherwise; ATOM-IR "Width context"). It is still opaque: this
+ * layer sets it from the placement's own column resolution and never asks what
+ * an atom does with it.
+ *
+ * WHY IT HAD TO EXIST. Before it, an atom that models wrapped text had no way
+ * to learn its column, so the planner corrected from the outside with a flat
+ * ×1.4 on every cols:1 atom. That multiplier is a proxy and it is wrong in
+ * both directions at once: a map's grid, hex, network, rings and maze bodies
+ * are FIXED geometry whose height does not move with width at all (×1.4
+ * inflates them by 40% for nothing), while a horizontal linear track's height
+ * is inversely proportional to the column and measured 1.8–2.3× the modelled
+ * height in a halves cell (map-panel.js, DR-8). One scalar cannot be both.
+ *
+ * THE DOUBLE-CORRECTION FENCE. An atom that consumed `slotWidthPx` has already
+ * priced its own column, so the external proxy must not be applied on top of
+ * it. The atom says so by returning `widthResolved: true` from `estimate()` —
+ * A MARKER, NOT A TYPE LIST. A list here would be the engine learning which
+ * domain atoms are width-sensitive, which is exactly the knowledge the Charter
+ * keeps out of Layer 1, and it would go stale silently the first time an atom
+ * gained or lost the behaviour. The marker cannot: it travels with the answer
+ * it describes.
+ *
+ * A MISSING `slotWidthPx` STILL MEANS TODAY'S BEHAVIOUR EXACTLY. An atom that
+ * ignores the field (every atom but map-panel today) returns the same numbers
+ * and still gets the ×1.4 proxy; an atom called with no context at all — a
+ * harness, a test, an external caller — cannot set the marker, so it gets the
+ * proxy too. The channel is additive-optional on both sides.
  */
 /**
  * Build the context once per planning phase, never per atom: the planner
@@ -114,21 +145,74 @@ function makeEstimateContext(options) {
   return typeMetrics ? Object.freeze({ typeMetrics }) : null;
 }
 
+/**
+ * Sentinel standing in for "no base context" so the memo below can key on an
+ * object either way. A WeakMap cannot key on null.
+ */
+const NO_BASE_CONTEXT = Object.freeze({});
+
+/** base context → (slotWidthPx → frozen width-resolved context). */
+const slotContextCache = new WeakMap();
+
+/**
+ * The width-resolved twin of a phase context, MEMOISED per (base, width).
+ *
+ * Two objects per planning phase, not two per atom: the planner estimates
+ * thousands of times and `atomShrinkPotential` estimates twice more for every
+ * atom on every overfull page. Freezing matters for the same reason the base
+ * context is frozen — an atom that mutated the context would hand the next
+ * atom a different world.
+ */
+function withSlotWidth(base, slotWidthPx) {
+  const key = base || NO_BASE_CONTEXT;
+  let byWidth = slotContextCache.get(key);
+  if (!byWidth) {
+    byWidth = new Map();
+    slotContextCache.set(key, byWidth);
+  }
+  let ctx = byWidth.get(slotWidthPx);
+  if (!ctx) {
+    ctx = Object.freeze(base ? { ...base, slotWidthPx } : { slotWidthPx });
+    byWidth.set(slotWidthPx, ctx);
+  }
+  return ctx;
+}
+
+/**
+ * The width an atom will be measured at, from the same column resolution the
+ * placement uses. Half-width is the shared mechanic layout contract when page
+ * context is available (balanced → half, dominant → full), and the
+ * definition's `footprint.cols` otherwise.
+ */
+function isHalfWidthAtom(atom, def, halfWidthTypes) {
+  return halfWidthTypes
+    ? halfWidthTypes.has(atom.type)
+    : ((def.footprint && def.footprint.cols) || 2) === 1;
+}
+
+function slotContextFor(atom, def, halfWidthTypes, estimateContext) {
+  return withSlotWidth(
+    estimateContext,
+    isHalfWidthAtom(atom, def, halfWidthTypes) ? HALF_SLOT_WIDTH_PX : PAGE_BUDGET.widthPx,
+  );
+}
+
 function estimateAtomHeight(atom, density = ESTIMATE_DENSITY, halfWidthTypes = null, estimateContext = null) {
   const def = getAtomDefinition(atom.type);
   if (def) {
-    const est = def.estimate(atom.data, density, estimateContext);
+    const isHalfWidth = isHalfWidthAtom(atom, def, halfWidthTypes);
+    const est = def.estimate(
+      atom.data, density,
+      withSlotWidth(estimateContext, isHalfWidth ? HALF_SLOT_WIDTH_PX : PAGE_BUDGET.widthPx),
+    );
     // Use minHeight for packing — lets more atoms fit per page.
     // The measurement harness refines actual height post-plan.
     //
     // Width scale factor: half-width atoms (232px vs 470px) wrap text
-    // more, increasing height by ~40%. Use the shared mechanic layout
-    // contract (halfWidthTypes) when page context is available;
-    // otherwise fall back to footprint.cols for non-mechanic atoms.
-    const isHalfWidth = halfWidthTypes
-      ? halfWidthTypes.has(atom.type)
-      : ((def.footprint && def.footprint.cols) || 2) === 1;
-    const widthScaleFactor = isHalfWidth ? 1.4 : 1.0;
+    // more, increasing height by ~40%. This is the PROXY, and it applies only
+    // to atoms that did not price their own column — see the double-correction
+    // fence above.
+    const widthScaleFactor = (isHalfWidth && !est.widthResolved) ? 1.4 : 1.0;
     return Math.round(est.minHeight * widthScaleFactor);
   }
   return SIZE_HINT_PX[atom.sizeHint] || SIZE_HINT_PX['flex'];
@@ -192,13 +276,23 @@ function createSpread(spreadIndex, spreadType, mergeKey = null) {
 
 /**
  * Create an atom placement entry for a spread's left or right page.
+ *
+ * `estimateContext` on the placement is the WIDTH-RESOLVED one this placement's
+ * own `estimatedHeight` was computed with (DR-25). The density solver estimates
+ * the same atom twice more when a page overflows, and it must do so in the same
+ * geometric world the placement was priced in — the ladder-mirror failure mode
+ * one layer up, which the solver's own header already names for typography.
+ * A placement built without one falls back to the phase context, which is
+ * exactly the pre-DR-25 behaviour.
  */
 function createPlacement(atom, density = ESTIMATE_DENSITY, halfWidthTypes = null, estimateContext = null) {
+  const def = getAtomDefinition(atom.type);
   return {
     atomId:          atom.id,
     type:            atom.type,
     density,
     estimatedHeight: estimateAtomHeight(atom, density, halfWidthTypes, estimateContext),
+    estimateContext: def ? slotContextFor(atom, def, halfWidthTypes, estimateContext) : estimateContext,
     measuredHeight:  null,
     data:            atom.data,
     sizeHint:        atom.sizeHint,
@@ -974,6 +1068,11 @@ function runRevisionLoop(spreadPlan, stack, effectiveBudget, diagnostics, unreso
               type:    p.type,
               density: p.density,
               data:    p.atom?.data,
+              // The width-resolved context this placement was priced in
+              // (DR-25). Without it the solver would re-estimate a halves-row
+              // atom at full-column width and report a shrink potential for a
+              // book nobody is printing.
+              estimateContext: p.estimateContext,
             })),
             overflowPx,
             effectiveBudget,

@@ -134,8 +134,17 @@ const HEX_ROW_PX = 26;
 const HEX_CAP_PX = 9;
 /** .player-map min-height, and the flow height of one .player-map-prompt
  *  (4.9pt mono chip + its 6px top margin). Seed markers are absolutely
- *  positioned and cost nothing. */
+ *  positioned and cost nothing.
+ *
+ *  CROSS-FILE CONTRACT (DR-12, 2026-08-18) — PLAYER_CANVAS_MIN_PX is the
+ *  `min-height` of `.player-map-canvas` in booklet.css, which that rule names
+ *  back. The prompt chips used to be printed ON the drawing surface, so the
+ *  panel was `max(canvas, prompt flow)`; they are now a band BENEATH it, so it
+ *  is `max(panel floor, canvas floor + prompt flow)`. Move the two numbers
+ *  together — the estimate is the only reader of the canvas floor that cannot
+ *  see the stylesheet. */
 const PLAYER_MIN_PX = 176;
+const PLAYER_CANVAS_MIN_PX = 88;
 const PLAYER_PROMPT_PX = 12.44;
 const PLAYER_PROMPT_MT = 6;
 const PLAYER_PROMPT_CHAR_PX = 4.0;
@@ -178,47 +187,65 @@ const RK_CODE_GAP_PX = 5;
 const RK_COL_GAP_PX = 8;
 
 /**
- * Width the map is modelled against.
+ * Width the map is modelled against WHEN NOBODY TELLS IT (the fallback).
  *
  * map-panel declares `footprint: { cols: 1 }`, so it renders full-width in the
  * dominant layout variants and at HALF_SLOT_WIDTH_PX in a `balanced` halves
  * row. Only the wrapped captions (title, note, annotation, route-key labels)
- * are width-sensitive; every body is not. Like cipher-panel, this models the
- * FULL column and lets the planner's ×1.4 half-width scale factor cover the
- * narrow case for packing — calibrating at the half width instead would be
- * multiplied by 1.4 on top and over-allocate badly. 432px is the narrowest
- * live column the archetype ladder produces (5.5in − 2 × the 0.5in maximum
- * `--page-margin` in theme.js), which is the conservative full-width basis.
+ * are width-sensitive; every body is not.
  *
- * Measured residual, stated plainly: against real renders this model is exact
- * at full width (78 maps × 4 tiers, zero under-estimates, median 1.002× and
- * worst 1.038×) and under-reads a half-width map by a median 7% — up to 71px on
- * vale's 9-route classified packet, where the note and every route-key label
- * wrap twice as often at 232px. Both consumers absorb that safely: packing uses
- * minHeight × 1.4, which still covers the widest half-width case measured, and
- * the solver's shrinkPotential (preferredHeight − minHeight) merely
- * under-promises, which costs a revision pass and never a stall.
+ * ── THE WIDTH CHANNEL LANDED (DR-25, 2026-08-18) ───────────────────────────
+ * The estimate context now carries `slotWidthPx` — the same width the
+ * measurement pass will use (232px in a halves row, 470px full). When it is
+ * present this atom models against IT and returns `widthResolved: true`, which
+ * tells the planner to skip its external ×1.4 half-width proxy. Both halves are
+ * required: consuming the width without the marker would be corrected twice,
+ * and the marker without the width would drop a correction that is still
+ * needed. The mechanism lives in `engine/page-planner.js` (the width channel
+ * header); this constant is only what happens when no channel is connected.
  *
- * ONE BODY IS THE EXCEPTION, AND IT GOT LOUDER (DR-8, 2026-08-17). Every other
- * body is width-invariant; a HORIZONTAL linear-track is the one whose height is
- * inversely proportional to the column, because narrowing it divides the same
- * label across more steps AND more lines. Measured on the four corpus tracks
- * that render in a 238px halves cell, the rendered `.map-track` is now
- * 1.8–2.3× this full-column model (169.5 / 132.3 / 144.7 / 134 / 213.8px against
- * 74 / 74 / 74 / 74 / 109), where before the wrap rule landed it was 0.99–1.4×.
- * That is the SAME model reading the same JSON: what changed is that the
- * renderer finally wraps the way this character-count model always assumed, so
- * the discrepancy moved out of the ink and into the arithmetic — which is the
- * safe half of the trade, but it is not nothing. Measured consequence across the
- * whole sealed corpus: page counts flat on all 20 fixtures, zero new
- * unresolvedOverflow (sf-c1's 2 are pre-existing and identical either side),
- * zero unsat — the solver measures and revises, so this costs revision passes,
- * never correctness. Closing it properly needs the ACTUAL column width in the
- * estimate context, which the ATOM-IR does not carry today (the engine forwards
- * `options.typeMetrics` and nothing else); that is a Layer-1 contract decision,
- * not a constant to nudge here.
+ * WHAT THE PROXY WAS GETTING WRONG, in both directions at once. Modelling at
+ * 432 and multiplying by 1.4 inflates a grid / hex / network / rings / maze
+ * body — FIXED geometry whose height does not move with width at all — by 40%
+ * for nothing, while under-reading the one body that really is width-driven.
+ *
+ * ONE BODY IS THE EXCEPTION, AND IT IS WHY THIS CHANNEL EXISTS (DR-8,
+ * 2026-08-17). A HORIZONTAL linear-track's height is inversely proportional to
+ * the column, because narrowing it divides the same label across more steps AND
+ * more lines. Measured on the corpus tracks that render in a 238px halves cell,
+ * the rendered `.map-track` was 1.8–2.3× the full-column model (169.5 / 132.3 /
+ * 144.7 / 134 / 213.8px against 74 / 74 / 74 / 74 / 109) — an under-read no
+ * flat scalar closes, because the same scalar is simultaneously wrong for every
+ * other body. Modelling at the real column closes it at the source.
+ *
+ * THE RESIDUAL, STATED PLAINLY. `slotWidthPx` is the ENGINE's slot (232 / 470),
+ * which is what the measurement harness constrains to — so estimate and
+ * measurement now agree by construction. The BROWSER's rendered `.map-content`
+ * is 224–238px in a halves cell and 466–480px full (measured across the corpus,
+ * 2026-08-18): the map's own zone padding varies by shell and archetype, so a
+ * few px of slack remain in both directions. That gap is the pre-existing
+ * measurement-vs-render divergence in `HALF_SLOT_WIDTH_PX` itself, not this
+ * atom's to close, and the measure → revise loop is its backstop.
+ *
+ * 432px was the narrowest live full column the archetype ladder produces
+ * (5.5in − 2 × the 0.5in maximum `--page-margin` in theme.js). It survives as
+ * the un-contexted fallback so an estimate called with no context returns
+ * exactly its pre-DR-25 numbers.
  */
 const MAP_WIDTH_PX = 432;
+
+/**
+ * The layout width the planner declared for this placement, or the full-column
+ * fallback. Guarded rather than trusted: a context is opaque, optional, and may
+ * come from any caller, so a missing / zero / non-finite width must mean "no
+ * channel", never a division by nothing.
+ */
+function resolveWidthPx(context) {
+  const declared = context && context.slotWidthPx;
+  return (typeof declared === 'number' && Number.isFinite(declared) && declared > 0)
+    ? declared
+    : null;
+}
 
 function ladderFor(density) {
   return LADDER[densityVariant(density) || 'base'];
@@ -288,7 +315,7 @@ function bodyHeight(map, widthPx, metrics) {
       + wrappedLines(String(prompt).length, widthPx * PLAYER_PROMPT_MAX_W,
         advancePx(PLAYER_PROMPT_CHAR_PX, PLAYER_PROMPT_FS_PX, 'mono', metrics))
         * PLAYER_PROMPT_PX, 0);
-    return Math.max(PLAYER_MIN_PX, flow);
+    return Math.max(PLAYER_MIN_PX, PLAYER_CANVAS_MIN_PX + flow);
   }
 
   // grid
@@ -329,9 +356,9 @@ function routeKeyHeight(map, tier, widthPx, metrics) {
   return RK_MARGIN_TOP_PX + tier.rkPadTop + RK_BORDER_TOP_PX + RK_LABEL_PX + tier.rkLabelMB + grid;
 }
 
-/** Modelled zone height for one map at one ladder tier. */
-function mapHeightAt(map, tier, metrics) {
-  const width = MAP_WIDTH_PX;
+/** Modelled zone height for one map at one ladder tier, at a given column. */
+function mapHeightAt(map, tier, metrics, widthPx) {
+  const width = widthPx;
 
   let height = wrappedLines(String(map.title || 'Map').length, width,
     advancePx(TITLE_CHAR_PX, TITLE_FS_PX, 'mono', metrics))
@@ -379,9 +406,16 @@ registerAtom('map-panel', {
     const metrics = readTypeMetrics(context);
     const raw = (data || {}).map || {};
     const map = { ...raw, artifactIdentity: (data || {}).artifactIdentity || raw.artifactIdentity };
+    // THE DOUBLE-CORRECTION FENCE (DR-25). `widthResolved` is set IF AND ONLY
+    // IF the width below came from the channel: it is the planner's licence to
+    // skip its ×1.4 half-width proxy, and claiming it while modelling the
+    // fallback column would drop a correction this estimate still needs.
+    const slotWidthPx = resolveWidthPx(context);
+    const widthPx = slotWidthPx === null ? MAP_WIDTH_PX : slotWidthPx;
     return {
-      minHeight:       mapHeightAt(map, LADDER.tight, metrics),
-      preferredHeight: mapHeightAt(map, ladderFor(density), metrics),
+      minHeight:       mapHeightAt(map, LADDER.tight, metrics, widthPx),
+      preferredHeight: mapHeightAt(map, ladderFor(density), metrics, widthPx),
+      widthResolved:   slotWidthPx !== null,
     };
   },
 
