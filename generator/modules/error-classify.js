@@ -176,7 +176,21 @@ export function isLikelyNetworkTransportError(err) {
     || lower.indexOf('offline') !== -1;
 }
 
+// ── The one non-heuristic class in this file (D208) ─────────────────────────
+// Everything else here INFERS from message wording; a user abort is a FACT —
+// the pipeline holds the signal that fired. The type lives here (not in
+// provider.js) precisely so the non-retry below is structural: without this,
+// "an abort is never retried" was a property of the abort message avoiding
+// timeout/schema vocabulary, pinned only by gate rows (D208's M4). This stays
+// provider-blind: 'user_abort' is canonical, no transport names it.
+export var USER_ABORT_ERROR_TYPE = 'user_abort';
+
+export function isUserAbortError(err) {
+  return !!(err && err.errorType === USER_ABORT_ERROR_TYPE);
+}
+
 export function shouldRetryStageError(err) {
+  if (isUserAbortError(err)) return false;
   if (err && err.retryable) return true;
   return isLikelyTimeoutError(err)
     || isLikelyNetworkTransportError(err)

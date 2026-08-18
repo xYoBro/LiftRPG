@@ -260,7 +260,9 @@ import {
   callProviderStructured,
   transportSupports,
   resolveStructuredPipelineSettings,
-  allowsEmptyApiKey
+  allowsEmptyApiKey,
+  isUserAbortError,
+  buildUserAbortError
 } from './modules/provider.js';
 
 // §10.4: importing this also registers window.buildWorkoutTopology and
@@ -1807,9 +1809,17 @@ async function runDeltaRepairRounds(ctx) {
     var prompt = builder(ctx.stageName, fields, buildDeltaContext(payload, targets));
     var response;
     try {
+      // The delta call is a PAID call like any other, so it carries the run's
+      // stop signal like any other (DR-23). Without it this path would poll the
+      // stop only after the request it should never have sent came back.
       response = await callProviderStructured(deltaSettings, prompt, schema || null,
-        budget.maxTokens({ attempt: 0, error: null }), ctx.stageName + ' delta repair', {});
+        budget.maxTokens({ attempt: 0, error: null }), ctx.stageName + ' delta repair',
+        { signal: runAbortSignal(deltaSettings) });
     } catch (err) {
+      // A STOP IS NOT A FAILED DELTA (DR-23). Handing this back to the ladder
+      // would re-enter the stage and buy a full re-roll of the answer the
+      // operator just cancelled. Rethrow so runJsonStage's stop branch ends it.
+      if (isUserAbortError(err)) throw err;
       // A delta call that fails for ANY transport reason (throttle included)
       // hands the attempt straight back to the ladder. The delta path is the
       // cheap optimisation, never a second place for retry policy to live.
@@ -2746,6 +2756,50 @@ function unknownKeyErrorsForStage(config, result) {
   return errors;
 }
 
+// ── THE RUN'S STOP SIGNAL (DR-23) ────────────────────────────────────────────
+//
+// ONE CARRIER, and it is `settings` — the same idiom `_systemPrompt`,
+// `_pricingRule` and `_effort` already use. Every stage that copies settings
+// (the timeout override, the effort override, the delta-repair settings) then
+// carries the run's cancellation for free, and no call site can forget it.
+//
+// ABSENT MEANS INERT, on the vision/heartbeat terms: a caller that sets no
+// signal — the eval bench, the playthrough auditor, a test page, any pipeline
+// entered from a script — makes byte-identical requests to the ones it made
+// before cancellation existed, and every check below is false.
+//
+// TWO READINGS, deliberately different in kind:
+//   · the SIGNAL travels to the transports, where it kills a socket;
+//   · `isRunAborted` is a poll, used where there is no request to kill — between
+//     attempts, after a throttle sleep, between critic rounds. A poll is the
+//     right instrument there precisely because those places spend money NEXT
+//     rather than now.
+function runAbortSignal(settings) {
+  return (settings && settings._abortSignal) || null;
+}
+
+function isRunAborted(settings) {
+  var signal = runAbortSignal(settings);
+  return !!(signal && signal.aborted);
+}
+
+// A sleep that wakes on Stop. The throttle backoff can be minutes long, and a
+// stopped run sitting out a five-minute window before noticing is a hang from
+// every angle the reader has.
+function sleepUnlessAborted(ms, signal) {
+  return new Promise(function (resolve) {
+    if (!signal) { setTimeout(resolve, ms); return; }
+    if (signal.aborted) { resolve(); return; }
+    var timer = setTimeout(function () { cleanup(); resolve(); }, ms);
+    function cleanup() {
+      clearTimeout(timer);
+      try { signal.removeEventListener('abort', onAbort); } catch (removeErr) { /* detached */ }
+    }
+    function onAbort() { cleanup(); resolve(); }
+    signal.addEventListener('abort', onAbort);
+  });
+}
+
 async function runJsonStage(settings, config) {
   // Attempt count, in ladder order: an explicit config.maxAttempts wins (the
   // trial-mode call sites set one deliberately), then the STAGE_BUDGETS row,
@@ -2757,9 +2811,37 @@ async function runJsonStage(settings, config) {
   var stageTelemetry = createStageTelemetry(config.stageKey, config.stageName);
   var rateLimitWaits = 0;
 
+  // ── THE STOP ENDS THE STAGE (DR-23) ────────────────────────────────────────
+  // Shaped like every other terminal path out of this function: it says which
+  // stage died on the `failed` channel the panel's rail is driven by, then
+  // throws. A stopped stage that emitted nothing would leave the rail rendering
+  // it as still in progress — the D110 class ("a stage nobody claims is a UI
+  // lie"), which the throttle-exhaustion arm already learned the hard way.
+  function stopStageError(sourceErr) {
+    var abortErr = isUserAbortError(sourceErr) ? sourceErr : buildUserAbortError(config.stageName);
+    stageTelemetry.errorClass = abortErr.errorType;
+    emitPipelineEvent(config.onProgress, config.stageIndex || 0,
+      config.getTotalStages ? config.getTotalStages() : 0,
+      config.stageName + ' stopped', {
+        phase: 'failed',
+        stageKey: config.stageKey || '',
+        stageName: config.stageName,
+        error: String(abortErr.message || ''),
+        errorType: abortErr.errorType,
+        telemetry: summarizeStageTelemetry(stageTelemetry)
+      });
+    return prefixStageError(config.stageName, abortErr);
+  }
+
   for (var attempt = 0; attempt < attemptCount; attempt++) {
+    // Before the rate limiter, not after: waitForSlot can park this stage for a
+    // long time, and a run stopped while queued must not wake up and buy the
+    // call it was waiting for.
+    if (isRunAborted(settings)) throw stopStageError(null);
+
     // Rate limiter: wait for slot before each API call (including retries)
     if (config.rateLimiter) await config.rateLimiter.waitForSlot();
+    if (isRunAborted(settings)) throw stopStageError(null);
 
     // Daily budget check: abort if Gemini free-tier limit reached
     if (config.budgetEnforce && isGeminiProvider(settings)) {
@@ -2824,6 +2906,10 @@ async function runJsonStage(settings, config) {
     }, attemptStreamMeta));
 
     var callOptions = {
+      // The run's stop signal reaches the wire here and only here on this path
+      // (DR-23). Set unconditionally-when-present, never capability-gated:
+      // cancelling a fetch is not a wire-format feature.
+      signal: runAbortSignal(settings),
       onStreamTick: function (tick) {
         emitStageStreamEvent(config, 'Receiving ' + config.stageName + '…', Object.assign({
           received: true,
@@ -3081,6 +3167,17 @@ async function runJsonStage(settings, config) {
       }
       return result;
     } catch (err) {
+      // ── THE OPERATOR'S STOP, READ FIRST (DR-23) ────────────────────────
+      // Ahead of the throttle branch and the retry ladder because BOTH of
+      // those spend: a throttle wait re-enters the same attempt and a retry
+      // buys another. A stopped stage is finished.
+      //
+      // The second half of the test is deliberate: an error of any other kind
+      // that lands while the run signal is already aborted is ALSO the end. A
+      // schema failure raised a millisecond before Stop would otherwise be
+      // retried, and the operator would pay for the answer they cancelled.
+      if (isUserAbortError(err) || isRunAborted(settings)) throw stopStageError(err);
+
       // ── Throttle backoff ───────────────────────────────────────────────
       // A "come back later" is not a content failure. Do not consume an
       // attempt — wait for the provider's window to reopen, then re-enter
@@ -3108,7 +3205,11 @@ async function runJsonStage(settings, config) {
             waitNumber: rateLimitWaits,
             maxWaits: THROTTLE_MAX_WAITS
           });
-        await new Promise(function(resolve) { setTimeout(resolve, backoffMs); });
+        // Wakes early on Stop (DR-23) — a stopped run must not sit out a
+        // five-minute provider window before it notices, and the loop head
+        // re-checks the signal on the way back in.
+        await sleepUnlessAborted(backoffMs, runAbortSignal(settings));
+        if (isRunAborted(settings)) throw stopStageError(null);
         attempt--;   // for-loop will increment; net effect: same attempt index
         continue;
       }
@@ -3483,6 +3584,10 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
       }
     });
   } catch (err) {
+    // A STOP ENDS THE BATCH (DR-23) — no single-fragment recovery, no
+    // deterministic recovery, no split. Every one of those three is another
+    // paid call, and this catch is the widest spend-again door in the pipeline.
+    if (isUserAbortError(err)) throw err;
     if (config.registry.length === 1 && shouldRetryStageError(err)) {
       console.warn('[LiftRPG] Falling back to single-fragment recovery after batch failure:', config.label, err.message);
       return await generateSingleFragmentAdaptive(settings, builders, config);
@@ -3638,6 +3743,14 @@ async function runConductorPass(settings, booklet, brief, ctx, stageName) {
       telemetryCollector: ctx.telemetryCollector
     });
   } catch (err) {
+    // A stop is a SKIP here, not a throw (DR-23). This pass runs after the
+    // booklet is assembled and snapshotted, and D175's delivery law says a book
+    // that exists is delivered: throwing would turn a finished, fully-paid-for
+    // artifact into a failed run. The critic loop's own stop check then declines
+    // to start, so nothing is bought after the skip.
+    if (isUserAbortError(err)) {
+      return { skipped: true, skipReason: 'the build was stopped', score: score, stopped: true };
+    }
     console.warn('[LiftRPG] The conductor\'s pass failed — the critic runs without it:', err.message);
     return { skipped: true, skipReason: 'the stage failed: ' + String((err && err.message) || err), score: score };
   }
@@ -3699,6 +3812,13 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
   });
 
   for (var round = 1; round <= maxRounds; round++) {
+    // ── THE STOP, POLLED (DR-23) ─────────────────────────────────────────
+    // Every round is a graded read plus up to three revisions — the most
+    // expensive optional spend in the pipeline, and all of it AFTER the book
+    // exists. Stop here means stop buying; it never means lose the booklet
+    // (D175). The report records that the loop was cut short so a run whose
+    // review ended early is not read back as a review that passed.
+    if (isRunAborted(settings)) { report.stopped = true; break; }
     var digestJson = JSON.stringify(buildCriticDigest(booklet));
     // Machine findings (GAP-1): everything the pipeline can MEASURE goes to the
     // critic as fact it must convert into unit-scoped failures — text-budget
@@ -3757,6 +3877,7 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
         telemetryCollector: ctx.telemetryCollector
       });
     } catch (err) {
+      if (isUserAbortError(err)) { report.stopped = true; break; }
       console.warn('[LiftRPG] Critic round ' + round + ' failed — booklet kept as-is:', err.message);
       report.error = String((err && err.message) || err);
       break;
@@ -3797,6 +3918,9 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
     var baselineErrors = validateAssembledBooklet(booklet).errors.length;
 
     for (var ti = 0; ti < targets.length; ti++) {
+      // Polled per target for the same reason the round is: each iteration is
+      // its own paid call (DR-23).
+      if (isRunAborted(settings)) { report.stopped = true; break; }
       var target = targets[ti];
       var original = getUnit(booklet, target.unitType, target.unitRef);
       if (!original) continue;
@@ -3822,6 +3946,14 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
           telemetryCollector: ctx.telemetryCollector
         });
       } catch (err) {
+        if (isUserAbortError(err)) {
+          // `break`, not `continue`: continuing would buy the next revision on
+          // a run the operator stopped (DR-23). The outer round check then ends
+          // the loop with the booklet intact.
+          report.stopped = true;
+          roundRecord.rejected.push({ unit: label, structural: structural, reason: 'stopped' });
+          break;
+        }
         console.warn('[LiftRPG] ' + label + ' revision failed — unit kept as-is:', err.message);
         roundRecord.rejected.push({ unit: label, structural: structural, reason: 'stage-error' });
         continue;
@@ -3892,7 +4024,11 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
   // come out the other side phrased exactly as it went in? A flatness finding
   // that survives its own revision is the strongest signal this system can
   // emit, and without the second read it is indistinguishable from success.
-  if (!conductor.skipped && revisedAnyWeek && !(settings && settings.conductorReread === false)) {
+  // The stop check is part of the gate, not beside it (DR-23): this is one more
+  // paid call, and "the loop is over and the booklet ships either way" is the
+  // exact condition under which buying anything more is wrong.
+  if (!conductor.skipped && revisedAnyWeek && !isRunAborted(settings)
+    && !(settings && settings.conductorReread === false)) {
     report.conductorReread = await runConductorPass(
       settings, booklet, brief, ctx, 'The Conductor\'s Pass — re-read');
   }
@@ -5425,6 +5561,11 @@ async function runCanonicalizeStage(settings, config) {
       }
     });
   } catch (error) {
+    // NEVER FATAL — except for a Stop (DR-23). "Degrade and carry on" here means
+    // carrying on into every remaining stage of the book, which is the opposite
+    // of what the operator asked for. A stop is fatal to the run by definition;
+    // it is not a transcription failure.
+    if (isUserAbortError(error)) throw error;
     // NEVER FATAL. The program is already usable as the user typed it — that is
     // what tier 3 has always done. Losing the book because a transcription
     // convenience failed would be the tail wagging the dog.

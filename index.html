@@ -4274,6 +4274,12 @@
       var currentGenerationMode = 'manual';
       var currentGeneratorSurface = 'intake';
       var activeApiRunId = 0;
+      // THE RUN'S CANCELLATION (DR-23). `activeApiRunId` answers "should I
+      // repaint?"; this answers "should this run still be spending money?" —
+      // two different questions that were one variable for as long as Stop was
+      // cosmetic. Owned by handleApiGenerate, aborted by the Stop button, and
+      // cleared only by the run that set it (a newer run owns it after that).
+      var activeApiRunAbort = null;
       var apiRunTicker = 0;
       var apiModelDiscoveryRunId = 0;
       var apiModelDiscoveryTimer = 0;
@@ -4332,6 +4338,21 @@
         } catch (error) {
           console.warn('[LiftRPG] Could not persist recoverable API booklet in UI state:', error && error.message ? error.message : error);
         }
+      }
+
+      // Is the booklet sitting on the API surface one THIS run produced? Reads
+      // the savedAt stamp every writer of `lastBooklet` sets (persistLastBooklet
+      // in api-generator.js and persistRecoverableApiBooklet above) against the
+      // run's own start. An unparseable or missing stamp answers "no": the
+      // failure path's alternative is claiming an unknown book as this run's
+      // output, and that claim is the one that misleads.
+      function bookletWrittenByThisRun() {
+        if (!api() || !api().lastBooklet) return null;
+        var startedAt = (apiRunState && apiRunState.runStartedAt) || 0;
+        if (!startedAt) return null;
+        var savedAt = Date.parse(api().lastBookletSavedAt || '');
+        if (!(savedAt >= startedAt)) return null;
+        return api().lastBooklet;
       }
 
       function getStageLabel(stageKey) {
@@ -7305,13 +7326,32 @@
       if (apiStopBtn) {
         apiStopBtn.addEventListener('click', function () {
           if (!apiRunState || apiRunState.status !== 'running') return;
-          // Invalidate the current run. This does NOT abort it: `runId` is a
-          // local of handleApiGenerate and the pipeline is handed no signal,
-          // so the request in flight runs to completion and the promise still
-          // lands. Every downstream `runId !== activeApiRunId` check is a
-          // "should I repaint?" test and never a "did this stop?" one — a
-          // stopped build one stage from done still delivers a whole booklet,
-          // and the delivery tail hands it over rather than dropping it.
+          // ── STOP IS REAL NOW (DR-23) ─────────────────────────────────────
+          // Two separate things happen here, and they answer two different
+          // questions:
+          //
+          //   activeApiRunAbort.abort() — STOP SPENDING. The signal reaches
+          //     every transport, so the request in flight is cancelled at the
+          //     socket, the stage does not retry, no throttle wait re-sends it,
+          //     and no queued stage opens a connection. (It also closes the
+          //     bridge connection, which makes the bridge kill its own child
+          //     process — armed since D138, triggered for the first time here.)
+          //
+          //   activeApiRunId++ — STOP REPAINTING. Unchanged, and still not the
+          //     same test: every downstream `runId !== activeApiRunId` check
+          //     asks whether this panel still belongs to that run.
+          //
+          // WHAT STOP STILL DOES NOT DO, by ruling (D175): drop a finished
+          // book. Cancellation only cuts network calls, so a run stopped after
+          // its last stage answered still assembles locally and still delivers
+          // — the superseded fork in the delivery tail is what hands it over,
+          // and a stop during the critic keeps the assembled booklet and stops
+          // buying revisions.
+          if (activeApiRunAbort) {
+            try { activeApiRunAbort.abort(); } catch (abortError) {
+              console.warn('[LiftRPG] Stop could not abort the run signal:', abortError);
+            }
+          }
           activeApiRunId++;
           if (apiRunState.currentStageKey && apiRunState.ledger[apiRunState.currentStageKey] === 'in progress') {
             apiRunState.ledger[apiRunState.currentStageKey] = 'invalidated';
@@ -7330,10 +7370,17 @@
           // been stopped. Same D110 defect class as the frozen headline, on the
           // one state its tests did not walk. Honest per D110: the stage that
           // was mid-flight burned tokens that are gone — only stages that
-          // FINISHED come back free.
-          apiRunState.progressCaption = 'Stopped. The stage that was still running does not come back — '
-            + 'its tokens are spent. Every stage that finished before it is saved, and building again resumes from there.';
-          pushApiLog('Build stopped by user.');
+          // FINISHED come back free. Still true with real cancellation: the
+          // provider bills for what it had already generated when the socket
+          // closed, and that partial answer is discarded.
+          // The two halves of the ledger are both pinned by run-panel.spec.js
+          // ("Stop must not claim the in-flight stage cost nothing"), and they
+          // stay pinned: cancellation changes WHY the stage is gone, never the
+          // fact that its tokens are gone with it.
+          apiRunState.progressCaption = 'Stopped. The request in flight was cancelled — what it had already '
+            + 'written is discarded and its tokens are spent, and nothing further will be sent. '
+            + 'Every stage that finished before it is saved; Retry From Checkpoint below picks up from there.';
+          pushApiLog('Build stopped by user. The request in flight was cancelled — no further calls will be made.');
           renderApiRunState();
           _apiGenerateRunning = false;
           setApiControlsDisabled(false);
@@ -9301,6 +9348,16 @@
         setGeneratorSurface('api-status', { skipFocus: true });
 
         var runId = ++activeApiRunId;
+        // ── ONE CONTROLLER PER RUN (DR-23) ─────────────────────────────────
+        // Minted beside the run id and handed to the pipeline on `settings`,
+        // which every stage already copies — so the signal reaches the delta
+        // repairs, the critic's revisions and the effort/timeout overrides
+        // without a single call site remembering to pass it. Absent-means-inert
+        // everywhere else: a caller that sets none (the bench, the auditor)
+        // makes byte-identical requests.
+        var runAbort = new AbortController();
+        activeApiRunAbort = runAbort;
+        settings._abortSignal = runAbort.signal;
         setApiControlsDisabled(true);
 
         // Fire-and-forget: refresh pricing in the background without blocking generation.
@@ -9765,8 +9822,22 @@
           // snapshotted, so a failure there is a failure of the report, not of
           // the book. A booklet that exists belongs to the user and must be
           // reachable from the panel — never only from the console.
+          // ── AND IT MUST BE *THIS* RUN'S BOOK (DR-23) ───────────────────
+          // `lastBooklet` outlives the run that wrote it — it is also restored
+          // from sessionStorage on page load. While Stop was cosmetic this was
+          // nearly unreachable, because a stopped run ran to completion and
+          // wrote its own. Real cancellation makes it ordinary: a run stopped at
+          // stage three fails here with LAST WEEK'S book still on the surface,
+          // and the panel would announce it as "a finished booklet was written
+          // to this device before this build stopped". That is a lie about the
+          // artifact, and the reader's next click would print the wrong book.
+          //
+          // The test is the timestamp the writer already stamps. A booklet the
+          // panel is not entitled to show was already cleared from the panel at
+          // run start (createApiRunState), so nothing is being dropped here that
+          // the reader could still see.
           var deliveredBooklet = (apiRunState && apiRunState.booklet)
-            || (api() && api().lastBooklet)
+            || bookletWrittenByThisRun()
             || null;
           if (runId !== activeApiRunId) {
             // Same fork as the success path, same reason: a NEWER run owns
@@ -9837,6 +9908,11 @@
           }
         } finally {
           _apiGenerateRunning = false;
+          // Release the controller only if this run still owns it. Stop leaves
+          // `_apiGenerateRunning` false immediately, so the reader can start a
+          // NEW run while this one is still unwinding — clearing unconditionally
+          // would disarm that newer run's Stop button (DR-23).
+          if (activeApiRunAbort === runAbort) activeApiRunAbort = null;
           if (runId === activeApiRunId) {
             setApiControlsDisabled(false);
             applyProviderPreset(apiProviderEl ? apiProviderEl.value : '', {

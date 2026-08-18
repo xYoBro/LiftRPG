@@ -10,6 +10,7 @@
 //   Calls:      callAnthropic, callOpenAICompat, callProvider
 //               callAnthropicStructured, callOpenAICompatStructured,
 //               callProviderStructured
+//   Cancel:     USER_ABORT_ERROR_TYPE, isUserAbortError, buildUserAbortError
 //   Pricing:    safeNumber, normalizeModelId, normalizeModelFamilyId, escapeRegex,
 //               detectProviderId, resolveModelPricing, estimateUsageCostUsd,
 //               buildUsageSnapshot, blankUsageTotals, addUsageTotals,
@@ -36,7 +37,9 @@ import {
   structuredOutputRefusalReason,
   isLikelyTruncationError,
   isLikelyJsonFailure,
-  shouldFallbackFromStructured
+  shouldFallbackFromStructured,
+  USER_ABORT_ERROR_TYPE,
+  isUserAbortError
 } from './error-classify.js';
 
 // ── Finish reason normalization (SINGLE HOME) ────────────────────────────────
@@ -297,17 +300,101 @@ export var MODEL_PRICING_RULES = [
   }
 ];
 
+// ── THE OPERATOR'S STOP (DR-23) ───────────────────────────────────────────────
+//
+// Cancellation is the one failure this pipeline inflicts on ITSELF, which is
+// why it gets a structural marker instead of a message heuristic: we hold the
+// signal, so we never have to guess what happened. `errorType: 'user_abort'` is
+// minted here beside 'timeout', 'network' and 'rate_limit' — the transport
+// layer is the single home for error SHAPING, and error-classify.js stays
+// exactly as provider-blind as it was (it reads canonical markers; it learns
+// nothing new).
+//
+// TWO PROPERTIES ARE LOAD-BEARING, and scripts/check-transport-errors.mjs pins
+// both in both directions:
+//
+//   1. A stopped request is NOT retryable and NOT a throttle. A stop that
+//      reached the ladder as a timeout would be retried, or waited out and
+//      re-sent — the operator would pay for the stage they just cancelled,
+//      which is the entire defect DR-23 exists to end.
+//   2. A stopped request never degrades to the freeform fallback. That
+//      fallback is a SECOND paid call; making it after Stop is the same defect
+//      wearing D162's hatch.
+//
+// The message deliberately avoids every word the heuristic classifiers match
+// ('timeout', 'timed out', 'aborterror', 'stalled', 'json', 'parse',
+// 'expected '), and the gate asserts the classifiers' verdicts rather than the
+// wording — so the sentence cannot drift into a retry by accident.
+// The TYPE and the fact-check moved to error-classify.js at D208 so the
+// non-retry is structural (shouldRetryStageError's first line) rather than a
+// wording property. Re-exported here so every existing importer keeps working.
+export { USER_ABORT_ERROR_TYPE, isUserAbortError };
+
+export function buildUserAbortError(label) {
+  var who = label ? String(label) + ' ' : '';
+  var err = new Error('The build was stopped before the ' + who
+    + 'request finished. Nothing further was sent.');
+  err.errorType = USER_ABORT_ERROR_TYPE;
+  err.retryable = false;
+  err.userAborted = true;
+  return err;
+}
+
+// MANUAL CHAINING, DELIBERATELY — not `AbortSignal.any()`.
+//
+// `AbortSignal.any()` is recent (Chrome 116 / Safari 17.4 / Firefox 124) and
+// this app is vendored so it runs offline on whatever engine the reader has; a
+// Stop button that silently does nothing on an older browser is worse than no
+// Stop button. It also buys nothing here: a composed signal cannot say WHICH
+// source fired, so every reader would still have to ask `external.aborted` to
+// tell a stop from a timeout — which is exactly what the callers below do.
+//
+// Returns an unlink function. Callers MUST call it (the `finally` arms below):
+// a run makes dozens of calls against one long-lived run signal, and a listener
+// left on it per request is a leak that grows with the length of the book.
+function linkAbortSignal(externalSignal, controller) {
+  if (!externalSignal || typeof externalSignal.addEventListener !== 'function') {
+    return function () {};
+  }
+  function onAbort() {
+    try { controller.abort(); } catch (abortErr) { /* already aborted */ }
+  }
+  if (externalSignal.aborted) { onAbort(); return function () {}; }
+  externalSignal.addEventListener('abort', onAbort);
+  return function () {
+    try { externalSignal.removeEventListener('abort', onAbort); } catch (removeErr) { /* detached */ }
+  };
+}
+
 // ── Core transport ────────────────────────────────────────────────────────────
 
 // Wraps fetch() with an AbortController so long-running requests don't hang
 // silently. Default 10 minutes; override via settings.requestTimeoutMs.
+//
+// `options.signal` is the RUN's stop signal (DR-23) and is optional: absent, and
+// this function behaves and requests exactly as it did before cancellation
+// existed. Present, it is composed with the timeout controller rather than
+// replacing it — the timeout is a promise to the reader and a stop is a promise
+// to their wallet, and both have to hold at once.
 export function fetchWithTimeout(url, options, timeoutMs) {
   var ms = timeoutMs || DEFAULT_TIMEOUT_MS;
+  var externalSignal = options && options.signal;
+  // FAIL BEFORE THE MONEY. A call queued behind a rate limiter or a retry
+  // backoff when the operator hit Stop must not reach the network at all —
+  // unspent tokens are the whole point of cancellation.
+  if (externalSignal && externalSignal.aborted) {
+    return Promise.reject(buildUserAbortError());
+  }
   var controller = new AbortController();
   var timer = setTimeout(function () { controller.abort(); }, ms);
+  var unlink = linkAbortSignal(externalSignal, controller);
   var merged = Object.assign({}, options, { signal: controller.signal });
   return fetch(url, merged)
     .catch(function (err) {
+      // THE STOP OUTRANKS EVERY OTHER READING of an aborted fetch, including a
+      // timeout that fired in the same tick. Only one of the two answers is
+      // free: a timeout is retryable, a stop is not.
+      if (externalSignal && externalSignal.aborted) throw buildUserAbortError();
       var msg = String(err.message || err || '').toLowerCase();
       // Catch both Chrome AbortError and Safari's "Fetch is aborted" TypeError
       if (err.name === 'AbortError' || msg.indexOf('abort') !== -1) {
@@ -337,7 +424,7 @@ export function fetchWithTimeout(url, options, timeoutMs) {
       }
       throw err;
     })
-    .finally(function () { clearTimeout(timer); });
+    .finally(function () { clearTimeout(timer); unlink(); });
 }
 
 export function normalizeUrl(url) {
@@ -1398,8 +1485,15 @@ export function buildAnthropicOutputConfig(effort) {
 // The caller's per-stage timeout is ADVISORY on a streaming path: it becomes
 // the overall cap, clamped so a healthy long stream is never killed early and
 // a runaway is never unbounded.
-function createStreamGuard(label, requestedTimeoutMs) {
+//
+// The run's stop signal (DR-23) is composed in here rather than replacing the
+// guard: an operator's Stop and a dead socket are different facts about the same
+// request and both have to stay reportable. An external abort deliberately
+// leaves `phase` EMPTY, so `toTimeoutError` returns null for it and the caller
+// shapes the stop — the phase vocabulary stays exactly what it always meant.
+function createStreamGuard(label, requestedTimeoutMs, externalSignal) {
   var controller = new AbortController();
+  var unlink = linkAbortSignal(externalSignal, controller);
   var phase = '';
   var phaseMs = 0;
   var silenceTimer = null;
@@ -1436,6 +1530,7 @@ function createStreamGuard(label, requestedTimeoutMs) {
       if (overallTimer) clearTimeout(overallTimer);
       silenceTimer = null;
       overallTimer = null;
+      unlink();
     },
     // Maps a thrown fetch/read failure onto a classified pipeline error.
     // Returns null when the error is not one this guard is responsible for.
@@ -1577,7 +1672,11 @@ function parseSseJson(raw, label) {
 // streaming transport routes through here, so timeout semantics, HTTP-error
 // shaping, and network-error classification are identical across formats.
 async function runStreamingRequest(spec) {
-  var guard = createStreamGuard(spec.label, spec.timeoutMs);
+  // FAIL BEFORE THE MONEY (DR-23), same rule as fetchWithTimeout's: a stage that
+  // was queued behind a rate limiter or a backoff when the operator hit Stop
+  // never opens a socket.
+  if (spec.signal && spec.signal.aborted) throw buildUserAbortError(spec.label);
+  var guard = createStreamGuard(spec.label, spec.timeoutMs, spec.signal);
   var emitTick = createStreamTickEmitter(spec.onStreamTick);
   guard.start();
   try {
@@ -1636,6 +1735,12 @@ async function runStreamingRequest(spec) {
     }
     return streamed;
   } catch (err) {
+    // THE STOP IS READ FIRST. If the operator's signal is aborted, this request
+    // is over for that reason whatever else raced it — and only that reading is
+    // free: a timeout retries, a throttle waits and re-sends, a stop does
+    // neither. Ordering this after the guard would let a watchdog that fired in
+    // the same tick buy another attempt against a build nobody wants any more.
+    if (spec.signal && spec.signal.aborted) throw buildUserAbortError(spec.label);
     var timeoutError = guard.toTimeoutError(err);
     if (timeoutError) throw timeoutError;
     if (err && err.name === 'TypeError' && !err.status) throw buildNetworkError(err);
@@ -1867,7 +1972,7 @@ async function readAnthropicStream(response, onActivity, onTick) {
   };
 }
 
-export async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs, pricingRule, systemPrompt, images, onStreamTick, effort) {
+export async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs, pricingRule, systemPrompt, images, onStreamTick, effort, signal) {
   var resolvedMax = clampAnthropicMaxTokens(model, maxTokens || MAX_OUTPUT_TOKENS);
   var payload = {
     model: model,
@@ -1895,6 +2000,7 @@ export async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs,
     payload: payload,
     timeoutMs: timeoutMs,
     onStreamTick: onStreamTick,
+    signal: signal,
     consume: readAnthropicStream
   });
 
@@ -1965,7 +2071,7 @@ function rejectsStreamOptions(err) {
     || message.indexOf('invalid parameter') !== -1;
 }
 
-export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens, timeoutMs, pricingRule, images, onStreamTick) {
+export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens, timeoutMs, pricingRule, images, onStreamTick, signal) {
   var url = buildOpenAICompatUrl(baseUrl);
   var endpointKey = normalizeUrl(baseUrl);
   var headers = buildOpenAICompatHeaders(apiKey);
@@ -1985,6 +2091,7 @@ export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens
       payload: buildPayload(includeUsage),
       timeoutMs: timeoutMs,
       onStreamTick: onStreamTick,
+      signal: signal,
       consume: readOpenAICompatStream
     });
   }
@@ -2158,7 +2265,7 @@ registerTransport({
       settings.apiKey, settings.model, prompt,
       opts.maxTokens, opts.timeoutMs,
       settings._pricingRule, settings._systemPrompt,
-      opts.images, opts.onStreamTick, settings._effort
+      opts.images, opts.onStreamTick, settings._effort, opts.signal
     );
   },
   callStructured: function (settings, prompt, schema, maxTokens, stageName, opts) {
@@ -2166,7 +2273,7 @@ registerTransport({
       settings.apiKey, settings.model, prompt, schema,
       maxTokens, opts.timeoutMs,
       settings._pricingRule, settings._systemPrompt,
-      stageName, opts.onStreamTick, settings._effort
+      stageName, opts.onStreamTick, settings._effort, opts.signal
     );
   }
 });
@@ -2189,13 +2296,13 @@ registerTransport({
     return callOpenAICompat(
       settings.apiKey, settings.baseUrl, settings.model, prompt,
       opts.maxTokens, opts.timeoutMs, settings._pricingRule,
-      opts.images, opts.onStreamTick
+      opts.images, opts.onStreamTick, opts.signal
     );
   },
   callStructured: function (settings, prompt, schema, maxTokens, stageName, opts) {
     return callOpenAICompatStructured(
       settings.apiKey, settings.baseUrl, settings.model, prompt, schema,
-      maxTokens, opts.timeoutMs, stageName, settings._pricingRule
+      maxTokens, opts.timeoutMs, stageName, settings._pricingRule, opts.signal
     );
   }
 });
@@ -2247,7 +2354,35 @@ export async function callProvider(settings, prompt, maxTokens, options) {
     && adapter && adapter.capabilities && adapter.capabilities.streaming) {
     opts.onStreamTick = options.onStreamTick;
   }
+  // THE RUN'S STOP SIGNAL (DR-23), on the same absent-means-inert terms. Unlike
+  // vision and the heartbeat it is NOT capability-gated: cancellation is a
+  // property of `fetch`, not of a wire format, so every adapter present and
+  // future gets it — an adapter that ignores the key simply cannot be stopped,
+  // and that is a defect in the adapter, not a reason to withhold the signal.
+  // It never touches a request payload: a call made without one is byte-identical.
+  var runSignal = resolveRunSignal(settings, options);
+  if (runSignal) opts.signal = runSignal;
   return adapter.call(settings, prompt, opts);
+}
+
+// ONE HOME, TWO ROUTES IN, ONE PRECEDENCE (DR-23).
+//
+// The explicit `options.signal` is the route a call site declares. The
+// `settings._abortSignal` carrier is the SAFETY NET, and it exists because the
+// failure mode is already on the record: the delta-repair call site built its
+// own options object and shipped without the signal, so a stopped run would
+// have sat waiting for a request it should never have sent. That defect was
+// found by reading, and nothing in this repo would have failed if it had not
+// been. Reading the carrier here makes the omission unreachable — a paid call
+// cannot be made from a settings object without carrying that run's stop.
+//
+// Precedence is stated rather than implied: an explicit signal wins, so a caller
+// that deliberately scopes a sub-call to its own controller still can. There is
+// no case where the two disagree today.
+function resolveRunSignal(settings, options) {
+  return (options && options.signal)
+    || (settings && settings._abortSignal)
+    || null;
 }
 
 // Capability probe for callers that used to branch on `format === 'anthropic'`.
@@ -2301,7 +2436,7 @@ export function transportSupports(settings, capability) {
 // the cap binds the same way it binds on a compat `strict: false` json_schema:
 // as instruction. Enforcement stays with collectBudgetBreaches at the stage
 // validator. Two readings of one OUTPUT_BUDGETS row, unchanged by this wave.
-export async function callAnthropicStructured(apiKey, model, prompt, schema, maxTokens, timeoutMs, pricingRule, systemPrompt, stageName, onStreamTick, effort) {
+export async function callAnthropicStructured(apiKey, model, prompt, schema, maxTokens, timeoutMs, pricingRule, systemPrompt, stageName, onStreamTick, effort, signal) {
   var resolvedMax = clampAnthropicMaxTokens(model, maxTokens || MAX_OUTPUT_TOKENS);
   var toolName = buildStructuredStageName(stageName);
   var payload = {
@@ -2347,6 +2482,7 @@ export async function callAnthropicStructured(apiKey, model, prompt, schema, max
     payload: payload,
     timeoutMs: timeoutMs,
     onStreamTick: onStreamTick,
+    signal: signal,
     consume: readAnthropicStream
   });
 
@@ -2404,9 +2540,12 @@ export async function callAnthropicStructured(apiKey, model, prompt, schema, max
   }
 }
 
-export async function callOpenAICompatStructured(apiKey, baseUrl, model, prompt, schema, maxTokens, timeoutMs, stageName, pricingRule) {
+export async function callOpenAICompatStructured(apiKey, baseUrl, model, prompt, schema, maxTokens, timeoutMs, stageName, pricingRule, signal) {
   var resp = await fetchWithTimeout(buildOpenAICompatUrl(baseUrl), {
     method: 'POST',
+    // The run's stop signal (DR-23). Composed with the timeout controller inside
+    // fetchWithTimeout — never replacing it.
+    signal: signal,
     headers: buildOpenAICompatHeaders(apiKey),
     body: JSON.stringify(buildOpenAICompatChatPayload(model, prompt, maxTokens, {
       response_format: {
@@ -2557,10 +2696,18 @@ export async function callProviderStructured(settings, prompt, schema, maxTokens
     && adapter.capabilities && adapter.capabilities.streaming) {
     structuredOpts.onStreamTick = options.onStreamTick;
   }
+  var runSignalForStage = resolveRunSignal(settings, options);
+  if (runSignalForStage) structuredOpts.signal = runSignalForStage;
 
   try {
     return await adapter.callStructured(settings, prompt, schema, maxTokens, stageName, structuredOpts);
   } catch (err) {
+    // A STOPPED STAGE NEVER DEGRADES (DR-23). The fallback below is a SECOND
+    // PAID CALL, and making it after the operator hit Stop is the exact defect
+    // cancellation exists to end. Checked structurally and first, ahead of the
+    // hatch's own predicate — the marker is a fact we hold, not a reading of a
+    // provider's prose.
+    if (isUserAbortError(err)) throw err;
     if (!shouldFallbackFromStructured(err) || isLikelyTruncationError(err)) throw err;
     // ── THE DEGRADATION ANNOUNCES ITSELF (D162's recorded-open) ──────────────
     // Dropping a stage from a forced schema to freeform text plus repair
