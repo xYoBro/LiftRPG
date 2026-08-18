@@ -2773,6 +2773,40 @@ function normalizeClockName(name) {
   return teachingNormalize(name);
 }
 
+/**
+ * statedEndingCount(text) -> number | null
+ *
+ * THE COUNT A BOOK SAYS OUT LOUD. `null` means no count was claimed, which is a
+ * different thing from a count of zero and must stay distinguishable: a win
+ * condition that never states a number is making no promise, and a gate that
+ * invented one would be writing the design instead of checking it.
+ *
+ * ONE HOME, TWO READERS (D93): the rulebook stage gate and the assembled pass
+ * both ask "how many endings did this book promise?", and two spellings of that
+ * question would be two answers.
+ *
+ * Words and digits both, because a designer writes "three endings" and a schema
+ * writes "3 endings" and the promise is identical. Bounded at twelve: past that
+ * the phrase is a page count or a year, not an ending count.
+ */
+var ENDING_COUNT_WORDS = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
+  seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12
+};
+
+function statedEndingCount(text) {
+  var raw = String(text == null ? '' : text);
+  if (!raw) return null;
+  var re = /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,2})\s+(?:different\s+|possible\s+|distinct\s+)?endings\b/i;
+  var m = re.exec(raw);
+  if (!m) return null;
+  var token = String(m[1]).toLowerCase();
+  var n = Object.prototype.hasOwnProperty.call(ENDING_COUNT_WORDS, token)
+    ? ENDING_COUNT_WORDS[token] : parseInt(token, 10);
+  if (!n || n < 1 || n > 12) return null;
+  return n;
+}
+
 function collectClockReachabilityFindings(weekObj, weekNumber, playSpine, gameRulebook) {
   var findings = [];
   var wk = Number(weekNumber);
@@ -4254,6 +4288,40 @@ export function validateGameRulebookStage(result, options) {
       }
     });
   });
+
+  // ── THE ENDING COUNT IS ONE NUMBER (W3 — the read's defect 12) ──────────
+  // The first delivered book's win condition promised "one of the three
+  // endings" while three different surfaces held three different counts. The
+  // half a machine can settle HERE, before a word of prose is written, is the
+  // rulebook's own internal one: the number the answer states out loud against
+  // the number of `ending:` refs the same object lists for the walker. A book
+  // that disagrees with itself at the design stage disagrees with itself on
+  // every page written from it.
+  //
+  // SILENT WHEN NO NUMBER IS CLAIMED. A win condition that never states a count
+  // is making no claim, and inventing one to check would be the gate writing
+  // the design. Only a stated numeral is a promise.
+  {
+    var claimed = statedEndingCount((rulebook.winCondition || {}).answer);
+    if (claimed !== null) {
+      var endingRefs = {};
+      ((rulebook.winCondition || {}).requires || []).forEach(function (ref) {
+        var parsed = parseSurfaceRef(ref);
+        if (parsed.valid && parsed.kind === 'ending' && parsed.id) {
+          endingRefs[String(parsed.id).trim().toLowerCase()] = true;
+        }
+      });
+      var refCount = Object.keys(endingRefs).length;
+      if (refCount && refCount !== claimed) {
+        errors.push(S + 'gameRulebook.winCondition says the player reaches one of ' + claimed
+          + ' endings, and `requires` names ' + refCount + ' distinct `ending:` ref'
+          + (refCount === 1 ? '' : 's') + '. Those are the same number written twice — the prose'
+          + ' is what the player is promised and the refs are what the walker aims at, and a book'
+          + ' that disagrees with itself here will print that disagreement on the page a reader'
+          + ' finishes on. Say one number, in both places.');
+      }
+    }
+  }
 
   if (!String(((rulebook.economy || {}).currency) || '').trim()) {
     errors.push(S + 'gameRulebook.economy.currency is empty — the economy owes the name this'

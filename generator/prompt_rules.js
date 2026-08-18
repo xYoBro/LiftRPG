@@ -1370,6 +1370,10 @@
     '  - `answer` (string): how you win, in ordinary words.',
     '  - `requires` (array of surface refs): the surfaces the player must reach or hold to have',
     '    won. These become nodes in the economy graph a later stage writes.',
+    // THE TAUGHT HALF of the ending-count parity floor (W3, D186 idiom).
+    '  - If `answer` states how many endings there are, `requires` must name exactly that many',
+    '    distinct `ending:` refs. The number a player is promised and the number the walker',
+    '    aims at are one number written twice — say it once, and write it in both places.',
     '- `coreVerbs` (object)',
     '  - `answer` (string): what the player physically does with a pencil in this book.',
     '  - `verbs` (array, 3-5 items): `{ verb, on }`. `verb` is one word or a short phrase',

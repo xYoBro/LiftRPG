@@ -532,6 +532,51 @@ export function collectIdentitySourceFindings(booklet, report) {
   return audit.defaults.length;
 }
 
+// ── THE ARSENAL GAP HARVEST (DR-28 / VISION §4.0; W3) ───────────────────────
+//
+// `gameRulebook.unprintableWants` is the honest-when-lacking law at the design
+// level: the rulebook records what the brief wanted that this system cannot
+// print. The first delivered book named four — a shuffled deck, a genuinely
+// sealed envelope, a physical object with a date on it, an undo — and every one
+// of them was written down, banked, and read by nobody.
+//
+// That is the whole point of the field, wasted. §4.2's arsenal exists to be
+// EXTENDED, and the only evidence anyone has about what to build next is the
+// list of things books kept asking for and could not have. Collected here, it
+// becomes a standing register across runs instead of a paragraph in one book.
+//
+// REPORT-ONLY, FOREVER, until an author ruling says otherwise (D19). Wanting
+// something the medium cannot do is not a defect — it is the design being
+// honest, which is precisely the behaviour a blocking floor would punish. There
+// is no weakSpot, no blocking area, and no threshold: a book with four entries
+// is not worse than a book with none, and a gate that implied otherwise would
+// teach the model to stop writing them down.
+export function collectUnprintableWantFindings(booklet, report) {
+  var rulebook = (((booklet || {}).meta) || {}).gameRulebook;
+  var wants = rulebook && Array.isArray(rulebook.unprintableWants)
+    ? rulebook.unprintableWants : null;
+  if (!wants) {
+    // No rulebook, or a rulebook that declared none. Both are legitimate and
+    // neither is a finding — the register simply has nothing from this book.
+    report.unprintableWants = [];
+    return 0;
+  }
+  var entries = wants
+    .map(function (entry) { return String(entry == null ? '' : entry).trim(); })
+    .filter(Boolean);
+  report.unprintableWants = entries;
+  if (!entries.length) return 0;
+  report.warnings.push('Arsenal gap harvest: this book named ' + entries.length
+    + ' thing' + (entries.length === 1 ? '' : 's') + ' its brief wanted and the printed medium '
+    + 'cannot give (gameRulebook.unprintableWants). These are feature evidence, not defects — '
+    + 'the book being honest about its own ceiling. Collected across runs they are the only '
+    + 'measured answer to what the arsenal should grow next.');
+  entries.forEach(function (entry, i) {
+    report.warnings.push('Unprintable want ' + (i + 1) + ': ' + entry);
+  });
+  return entries.length;
+}
+
 // ── The page-fill report (VISION §8's density law; the depth wave) ──────────
 // The depth wave raised three prose caps because the surfaces they govern were
 // printing half-empty pages. A raised cap is a PERMISSION, not an outcome: the
@@ -751,6 +796,11 @@ export function generateQualityReport(booklet) {
   // warnings and an `identitySources` block, and never a weakSpot — so
   // QUALITY_BLOCKING_AREAS cannot be taught to block on it by accident.
   collectIdentitySourceFindings(booklet, report);
+  // DR-28's harvest. Report-only and never a weakSpot — see the collector's own
+  // header: a book that names four things the medium cannot do is being honest,
+  // not failing, and a gate that implied otherwise would teach the model to
+  // stop writing them down.
+  collectUnprintableWantFindings(booklet, report);
   // The density law's lens (VISION §8, the depth wave). Report-class on the
   // same terms: warnings and a `pageFill` block, never a weakSpot, never a
   // score input — a raised cap is a permission and this is how anyone finds
