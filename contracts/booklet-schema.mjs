@@ -1175,7 +1175,34 @@ export var BOOKLET_SCHEMA = {
             person: { type: 'string' },
             tense: { type: 'string' },
             narratorStance: { type: 'string' },
-            voiceRationale: { type: 'string' }
+            voiceRationale: { type: 'string' },
+            // ── THE VOICE SKELETON (the voice die, ratified 2026-08-17; W3) ─
+            // The five STRUCTURAL dimensions of the narrating hand, drawn per
+            // book by the identity die. Distinct from `person` directly above,
+            // which is free prose ("second person, present tense") and stays
+            // exactly as it was: this is the closed-menu answer the die asks
+            // for, and conflating the two would have made every corpus book's
+            // free-text person a menu violation.
+            //
+            // ADDITIVE-OPTIONAL, by the D103/D178 precedent and by the
+            // ratification's own report-class-first ruling. No corpus fixture
+            // carries one; the obedience floor is WARNING-class on these axes,
+            // so absence is reported and never blocks. Values are not enum-
+            // pinned HERE for D129's reason — the menus live in
+            // contract-constants and the die draws from them; a second copy in
+            // the schema is the drift D124 names.
+            voiceSkeleton: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                person: { type: 'string' },
+                sentenceRegime: { type: 'string' },
+                fragmentLicense: { type: 'string' },
+                punctuationSignature: { type: 'string' },
+                paragraphRegime: { type: 'string' },
+                _x: xt
+              }
+            }
           }
         },
         literaryRegister: literaryRegister,
