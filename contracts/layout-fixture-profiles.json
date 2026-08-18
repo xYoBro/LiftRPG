@@ -702,7 +702,6 @@
       "assembly",
       "ending-locked",
       "post-padding-0",
-      "post-padding-1",
       "back-cover"
     ]
   },
@@ -844,8 +843,6 @@
       "assembly",
       "ending-locked",
       "post-padding-0",
-      "post-padding-1",
-      "post-padding-2",
       "back-cover"
     ]
   },
@@ -887,7 +884,7 @@
       "boss",
       "fragment-page"
     ],
-    "browserPageCount": 36,
+    "browserPageCount": 40,
     "printedAtomOrder": [
       "cover",
       "rules-left",
@@ -972,6 +969,8 @@
       "frag-10",
       "assembly",
       "ending-locked",
+      "post-padding-0",
+      "post-padding-1",
       "back-cover"
     ]
   },
