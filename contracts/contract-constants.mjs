@@ -487,6 +487,93 @@ export var VOICE_PARAGRAPH_REGIMES = [
   'single-breath', 'standard', 'massed'
 ];
 
+// ── V6 — THE RESTRAINT BAND (ratified 2026-08-18; the voice-axis draft, Part 2)
+//
+// WHAT THIS CURES (VISION §7: restraint governs the SOUND of the prose, never
+// its supply). The figurative budget was a UNIVERSAL CONSTANT — "at most ONE
+// figurative comparison or verbal turn per ~200 words, zero is normal" — stated
+// to every prose stage of every book. A universal constant on a taste register
+// is the prose-law analogue of the Height Law: protective, and freezing. The
+// King in Yellow probe cannot pass it; decadent prose whose whole register is
+// figurative excess is unwritable at one turn per two hundred words, and no
+// brief, however explicit, could buy its way past a number with no door in it.
+//
+// THE CURE IS THE TWO-SOURCE LAW (§11), not a raised constant. The budget
+// becomes a BAND with a floor and a ceiling, and a book's position in it has
+// exactly two legitimate sources: BRIEF-FUNDED (the brief's own words earn the
+// density — "lush", "purple", "baroque", cited in `voiceRationale`) or
+// SEED-ASSIGNED (the restraint die, drawn across the ladder like every other
+// identity axis). Neither source and the book sits at the DEFAULT CENTER, and
+// the fourth referee reports that as a default the way it reports every other
+// uncited choice.
+//
+// AN ORDINAL LADDER, AND THE ORDER IS LOAD-BEARING — VALID_DYNAMIC_MARKINGS'
+// law (D129) applies here for the same reason: the positions are a monotonic
+// scale, the prompt quotes them in order, and alphabetising this array would
+// silently reorder a scale into a menu. `plain` is the CENTER and its rate is
+// today's universal constant unchanged (one turn per ~200 words = 5 per 1000),
+// so a book that neither cites nor obeys is written exactly as every book
+// before this ruling was. That is the demotion proof: the band's default is
+// pixel-identical to the constant it replaced.
+//
+// THE FLOOR IS NOT ZERO. `austere` is 1 per 1000, not 0, because a hard zero
+// is not restraint but a different instrument — a total ban is what the
+// machine-tell list is for, and a ban stated as a budget teaches the model that
+// budgets are bans.
+//
+// REPORT-CLASS, BY RULING (D19). Nothing below arms a blocking floor. The
+// obedience question on a restraint axis is answerable only against measured
+// prose, and this repo has no figurative-turn counter to measure it with (see
+// the honest note in the round report). Promotion is an author call on measured
+// evidence — never a flag flip because the warnings got noisy.
+//
+// THE MACHINE-TELL BAN LIST IS UNTOUCHED AND STAYS UNIVERSAL. No band, no
+// license, no genre exception reaches it. The ban list is precisely what makes
+// high figuration writable without slop, and a `lush` book obeys every one of
+// its clauses. Restraint governs how OFTEN the prose turns; the ban list
+// governs which turns are never available. Two axes, no overlap.
+export var VOICE_RESTRAINT_LADDER = [
+  { position: 'austere', turnsPer1000Words: 1 },
+  { position: 'plain', turnsPer1000Words: 5 },
+  { position: 'figured', turnsPer1000Words: 12 },
+  { position: 'lush', turnsPer1000Words: 25 }
+];
+
+// DERIVED, never a second list (D124). The die draws from this; the prompt
+// quotes this; the schema's transport enum reads this.
+export var VOICE_RESTRAINT_POSITIONS = VOICE_RESTRAINT_LADDER.map(function (row) {
+  return row.position;
+});
+
+// ONE SOURCE, BOTH BOUNDS — the OUTPUT_BUDGETS idiom the draft named, applied
+// to a band whose bounds are the ladder's own ends rather than two more
+// literals. A row added to the ladder moves the band by construction.
+export var VOICE_RESTRAINT_BAND = {
+  minTurnsPer1000Words: VOICE_RESTRAINT_LADDER[0].turnsPer1000Words,
+  maxTurnsPer1000Words: VOICE_RESTRAINT_LADDER[VOICE_RESTRAINT_LADDER.length - 1].turnsPer1000Words,
+  defaultPosition: 'plain'
+};
+
+/**
+ * restraintTurnBudget(position) -> number
+ *
+ * Turns per 1000 words at this position. An absent or unknown position is the
+ * band's default centre, which is the pre-ruling universal constant.
+ *
+ * SINGLE HOME (D93). Readers: the prompt's band table (parity-asserted) and the
+ * defaults referee. A second implementation would be a second answer to "how
+ * figurative is this book allowed to be?".
+ */
+export function restraintTurnBudget(position) {
+  var key = String(position == null ? '' : position).trim().toLowerCase();
+  for (var i = 0; i < VOICE_RESTRAINT_LADDER.length; i++) {
+    if (VOICE_RESTRAINT_LADDER[i].position === key) {
+      return VOICE_RESTRAINT_LADDER[i].turnsPer1000Words;
+    }
+  }
+  return restraintTurnBudget(VOICE_RESTRAINT_BAND.defaultPosition);
+}
+
 // ── Theme archetypes ─────────────────────────────────────────────────────────
 
 export var VALID_ARCHETYPES = [
@@ -1647,6 +1734,84 @@ export var ORIENTATION_LIMITS = {
   castMax: 8
 };
 
+// ── THE ASSEMBLY-PAGE DISCLOSURE LAW (author ruling, 2026-08-18) ────────────
+// The delivered book's `rulesSpread.rightPage.instruction` was a walkthrough:
+// "box 1 from fragment F.03 in week one, box 2 from the week-two cipher grid
+// once the stone's date is decoded, box 3 from any row of the week-three oracle
+// table, box 4 from the white space between four traced borders, box 5 from
+// beneath the last digit of your week-five reckoning total". Every glyph's
+// location AND method, disclosed on page four, duplicating the point-of-use
+// instructions the week pages already carry. The author: "it gives too much
+// information."
+//
+// THE DISTINCTION: a MANIFEST is licensed (VISION §2, "posted manifests naming
+// future finds") — how many boxes there are, one per week, and when. A
+// WALKTHROUGH is not. The file posts WHAT is to be found and WHEN; the week
+// posts WHERE and HOW.
+//
+// THE DISCRIMINATOR IS ENUMERATION, NOT LENGTH — and that is a correction to
+// the ruling's proposed mechanism, measured before it was written. The ruling
+// scoped "a length band per box entry". There ARE no per-box entries: the
+// surface is ONE optional string (`rulesSpread.rightPage.instruction`), so
+// there is nothing per-box to band. And length does not separate the two shapes
+// at all. Measured over 22 corpus fixtures plus both delivered books:
+//
+//   the offending walkthrough              577 chars   5 box ordinals named
+//   the first book's legal manifest        569 chars   1 box ordinal named
+//   corpus range                        96-1408 chars  0 box ordinals named
+//
+// A length band tight enough to catch 577 fails four clean corpus fixtures; a
+// band loose enough to spare them misses the defect entirely. What DOES
+// separate them cleanly is the per-box roll call: a manifest states a count
+// once ("one box per week, five in all"), a walkthrough addresses each box in
+// turn and hangs a source on it. Distinct box ordinals named is therefore the
+// arm, and on those 24 books it is 0 findings, 1 finding, and the defect.
+//
+// THREE IS THE FLOOR because two ordinals can be a legitimate boundary
+// statement ("box 1 is filled in week one; box 5 at the reckoning"). Three is a
+// roll call. Conservative by ruling — a single-value coincidence must never
+// block (the D144 idiom).
+//
+// ONE HOME, TWO READERS: `assemblyDisclosureFloorErrors` in validation.js
+// (blocking at the shell gate, where `rulesSpread` is authored) and
+// INST_RULES_TEACH's own sentence, held together by the floor-teaching registry.
+export var ASSEMBLY_DISCLOSURE_MAX_BOX_POINTERS = 2;
+
+// The ordinal words a box can be addressed by. Digits are handled numerically.
+// One home so the floor and the reference page cannot disagree about what
+// counts as addressing a box.
+export var ASSEMBLY_BOX_ORDINAL_WORDS = [
+  'one', 'two', 'three', 'four', 'five', 'six',
+  'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'
+];
+
+/**
+ * countAssemblyBoxPointers(text) -> number
+ *
+ * How many DISTINCT boxes this prose addresses individually. `box 1` and
+ * `box one` are the same box; `boxes 1-5` is a range statement and is NOT a
+ * roll call, so it is deliberately not matched.
+ *
+ * SINGLE HOME (D93): the floor in validation.js and the harness that proves it.
+ */
+export function countAssemblyBoxPointers(text) {
+  var haystack = String(text == null ? '' : text).toLowerCase();
+  if (!haystack) return 0;
+  var seen = {};
+  // `box`/`boxes` followed by a digit or an ordinal word, allowing an optional
+  // determiner ("box number 3", "in box three").
+  var re = /\bbox(?:es)?\s+(?:number\s+)?([a-z]+|\d{1,2})\b/g;
+  var m;
+  while ((m = re.exec(haystack)) !== null) {
+    var token = m[1];
+    var index = /^\d+$/.test(token)
+      ? Number(token)
+      : ASSEMBLY_BOX_ORDINAL_WORDS.indexOf(token) + 1;
+    if (index > 0) seen[index] = true;
+  }
+  return Object.keys(seen).length;
+}
+
 // ── The eight questions (PLAY.md §3.1) ──────────────────────────────────────
 // THE SINGLE HOME of what the rulebook must answer, and of which answers are
 // load-bearing. Three readers that cannot see each other:
@@ -1755,6 +1920,91 @@ export var RULEBOOK_KIND_WORDS = {
 export var VALID_CONVERGENCE_PATTERNS = [
   'sequential-assembly', 'reordering', 'red-herring', 'dual-source'
 ];
+
+// ── DR-33: THE DECLARED CONVENTION (author ruling, 2026-08-18) ──────────────
+// THE RULING: "a password's last step may be a declared convention; undeclared
+// non-derivation is a defect."
+//
+// A CORRECTION TO THE RULING'S OWN WIRING, recorded because it is the whole
+// reason this block is four lines instead of a new enum. The ruling was scoped
+// as an additive `convergencePattern` on `bossEncounter.decodingKey`, a closed
+// menu of `['in-order', 'anagram']`. That field ALREADY EXISTS one screen up,
+// at `meta.artifactIntent.convergencePattern`, with a four-value menu that
+// already contains both of the ruling's conventions:
+//
+//   in-order  ≡  sequential-assembly, red-herring, dual-source  (the boss page
+//               lists the values in WEEK ORDER and that reading is the password;
+//               red-herring filters READINGS and dual-source varies SOURCES —
+//               neither touches the order of the collected record)
+//   anagram   ≡  reordering                                     (the week-order
+//               string is deliberately the WRONG word)
+//
+// A second field would have been a second home for one question, in a second
+// vocabulary, with no answer to "which wins when they disagree" — D93's defect
+// with an enum on top. It would also have needed its own menu-parity pass,
+// while the existing field already has one (validate.mjs, both directions,
+// against INST_CONVERGENCE_DESIGN's `### \`pattern\`` headings).
+//
+// So the conventions are DERIVED FROM THE EXISTING MENU rather than listed
+// beside it (the D124 idiom: a derived set cannot drift; a copied one drifts in
+// the one direction that matters). Extending the menu by future ruling adds a
+// row HERE, and a pattern with no row fails `convergenceDerivationParity()` in
+// validate.mjs rather than silently defaulting to the lenient reading.
+export var CONVERGENCE_DERIVATION_MODES = {
+  'sequential-assembly': 'in-order',
+  'reordering': 'anagram',
+  'red-herring': 'in-order',
+  'dual-source': 'in-order'
+};
+
+// THE DEFAULT IS THE STRICT ONE, and that is the ruling's own words: undeclared
+// non-derivation is a DEFECT, so silence must select the reading that catches
+// it. A book that declares nothing is held to exact derivation.
+export var DEFAULT_CONVERGENCE_DERIVATION_MODE = 'in-order';
+
+/**
+ * convergenceDerivationMode(pattern) -> 'in-order' | 'anagram'
+ *
+ * SINGLE HOME (D93). Two readers that cannot see each other: the corpus audit in
+ * scripts/validate.mjs (report-class) and the boss-stage floor in validation.js
+ * (blocking). An unknown or absent pattern reads as the strict default.
+ */
+export function convergenceDerivationMode(pattern) {
+  var key = String(pattern == null ? '' : pattern).trim().toLowerCase();
+  return CONVERGENCE_DERIVATION_MODES[key] || DEFAULT_CONVERGENCE_DERIVATION_MODE;
+}
+
+// THE TEACHING HALF OF THE ANAGRAM CONVENTION, and it is deliberately GENEROUS.
+// A declared convention is only a convention if the PLAYER is told it: an
+// anagram nobody is asked to rearrange is indistinguishable, at the table, from
+// a mis-derivation. So the check is presence of a rearrange instruction in the
+// boss's own reveal prose — and it is a wide net on purpose, because the cost
+// of a miss is blocking a book that taught the reorder in words this list did
+// not anticipate, and the cost of a false pass is one warning.
+//
+// Matched case-insensitively as substrings, so `reorder` covers `reordered`,
+// `reordering` and `re-order` is carried separately (the hyphen breaks the
+// stem). One home, two readers — the same pair as the mode table above.
+export var CONVERGENCE_REARRANGE_TERMS = [
+  'rearrange', 're-arrange', 'reorder', 're-order', 'reordering',
+  'anagram', 'true order', 'reading order', 'correct order', 'right order',
+  'wrong order', 'wrong reading', 'out of order', 'shuffle', 'unscramble',
+  'scrambled', 'in a different order', 'not in week order'
+];
+
+/**
+ * teachesRearrangement(text) -> boolean
+ *
+ * Does this prose tell the player the collected letters are not yet the word?
+ */
+export function teachesRearrangement(text) {
+  var haystack = String(text == null ? '' : text).toLowerCase();
+  if (!haystack) return false;
+  for (var i = 0; i < CONVERGENCE_REARRANGE_TERMS.length; i++) {
+    if (haystack.indexOf(CONVERGENCE_REARRANGE_TERMS[i]) !== -1) return true;
+  }
+  return false;
+}
 
 // ── The triptych's audit trail (Wave 2) ─────────────────────────────────────
 // `artifactIntent._x.rejectedReadings` records the two candidate readings that
@@ -2506,6 +2756,24 @@ export var IDENTITY_AXES = [
   { id: 'voiceParagraphRegime', label: 'narrativeVoice.voiceSkeleton.paragraphRegime',
     path: 'meta.narrativeVoice.voiceSkeleton.paragraphRegime',
     menu: VOICE_PARAGRAPH_REGIMES, kind: 'scalar', answerRequired: true, reportOnly: true,
+    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shell'] },
+  // THE RESTRAINT DIE (ratified 2026-08-18 — the voice-axis draft's Part 2).
+  // The sixth voice axis, and the only one that is not a shape the hand makes
+  // but a RATE it makes them at. It rides this table for the reason Part 2
+  // gives: a book's position in the figurative band has two legitimate sources
+  // and a die is one of them, so without a row here the band would have exactly
+  // one funded source and every uncited book would sit at the centre by
+  // default — which is the universal constant back again, wearing a band.
+  //
+  // EVERY FLAG MATCHES THE FIVE ABOVE, deliberately, because this axis is
+  // report-class for a stronger reason than they are: they at least have an
+  // instrument (measure-voice-sameness.mjs computes every feature the five are
+  // judged on). There is no figurative-turn counter in this repo at all, so
+  // `reportOnly` here is not "the band is uncalibrated" but "nothing measures
+  // it yet". Promotion owes an instrument first, then an author ruling.
+  { id: 'voiceRestraint', label: 'narrativeVoice.voiceSkeleton.restraint',
+    path: 'meta.narrativeVoice.voiceSkeleton.restraint',
+    menu: VOICE_RESTRAINT_POSITIONS, kind: 'scalar', answerRequired: true, reportOnly: true,
     evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shell'] },
   { id: 'productionTexture', label: 'designLanguage.productionTexture', path: 'meta.designLanguage.productionTexture',
     menu: VALID_PRODUCTION_TEXTURES, kind: 'scalar',

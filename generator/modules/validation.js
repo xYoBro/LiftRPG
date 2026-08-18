@@ -50,6 +50,18 @@ import {
   VALID_ARC_FAMILIES,
   VALID_MECHANIC_GRAMMAR_FAMILIES,
   VALID_CONVERGENCE_PATTERNS,
+  // DR-33 (2026-08-18) — the declared convention. The mode table is DERIVED
+  // from VALID_CONVERGENCE_PATTERNS one line up, and the rearrange matcher is
+  // the teaching half's machine reader. Both live with the contract because
+  // scripts/validate.mjs's corpus audit asks the same two questions this file's
+  // boss floor asks, and two implementations would be two answers to "did this
+  // chain converge?".
+  convergenceDerivationMode,
+  teachesRearrangement,
+  // The assembly-page disclosure law (2026-08-18). One counter, two readers:
+  // the shell floor below and the harness that proves it.
+  ASSEMBLY_DISCLOSURE_MAX_BOX_POINTERS,
+  countAssemblyBoxPointers,
   FAMILY_CLUSTERS,
   REJECTED_READING_AXES,
   resolveNeighborFamilies,
@@ -1264,6 +1276,83 @@ function collectLudicWeekOwedErrors(weekObj, owed) {
 }
 
 /**
+ * collectConvergenceChainFloorErrors(boss, componentInputs) -> string[]
+ *
+ * ── DERIVE OR DECLARE (author ruling DR-33, 2026-08-18) ─────────────────────
+ *
+ * THE RULING: "a password's last step may be a declared convention; undeclared
+ * non-derivation is a defect." The chain is the one rule in the book that can
+ * fail silently and take the whole ending with it — nothing else in the system
+ * notices that the values the player collects do not spell the word the last
+ * page asks for. The 2026-08-09 coherence audit found seven of nineteen
+ * fixtures with broken chains and ZERO gates fired on any of them.
+ *
+ * THE SEAT IS THE BOSS WEEK, and that is where the evidence already is. The
+ * gate is handed `expectedOptions.componentInputs` — the real collected values,
+ * in week order, on every seat of both pipelines — and the boss unit carries
+ * its own reveal prose. Nothing new has to be armed for this floor to fire.
+ *
+ * IT IS DELIBERATELY PATTERN-BLIND, and that is a correction to the ruling's
+ * proposed wiring rather than a shortcut. `meta.artifactIntent.convergencePattern`
+ * is the declaration's one home (see CONVERGENCE_DERIVATION_MODES), but it does
+ * not ride the week gate's options, and it is the WEAKER evidence anyway: a
+ * `reordering` declaration in `meta` is a claim the player never sees. What the
+ * player can actually do is decided by two things on the boss page — the word it
+ * states, and whether it tells them to rearrange. So this floor asks THOSE, and
+ * a book whose meta says `reordering` while its boss page teaches no reorder is
+ * caught here exactly as it should be. The corpus audit in scripts/validate.mjs
+ * reads the declaration too, because there it is reporting on finished books
+ * rather than gating a stage.
+ *
+ * THREE CONDITIONS BEFORE IT SPEAKS, so it can only fire where the claim is
+ * unambiguous: a standard A1Z26 table (the week gate already errors otherwise),
+ * inputs that are all integers 1-26, and a password actually STATED on the boss
+ * page in the form the doctrine demands. A boss that states no password makes
+ * no claim, and inventing one to check would be the gate writing the design.
+ */
+function collectConvergenceChainFloorErrors(boss, componentInputs) {
+  if (!boss || typeof boss !== 'object') return [];
+  var inputs = Array.isArray(componentInputs) ? componentInputs : null;
+  if (!inputs || !inputs.length) return [];               // no evidence ⇒ silent (D144)
+  var table = (boss.decodingKey || {}).referenceTable;
+  if (!table || !isStandardAlphaTable(table)) return [];  // the week gate owns that
+  var numeric = inputs.map(function (v) { return Number(v); });
+  for (var i = 0; i < numeric.length; i++) {
+    var n = numeric[i];
+    if (isNaN(n) || n !== Math.floor(n) || n < 1 || n > 26) return [];
+  }
+  var derived = String(decodeA1Z26(numeric) || '').toUpperCase();
+  if (!derived) return [];
+  var reveal = [boss.passwordRevealInstruction, boss.convergenceProof, boss.narrative]
+    .filter(Boolean).join('\n');
+  var statedMatch = reveal.match(/\bpassword\s+is\s+([A-Za-z0-9-]{3,})\b/);
+  if (!statedMatch) return [];                            // no claim ⇒ no check
+  var stated = statedMatch[1].toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!stated || stated === derived) return [];           // the in-order reading: nothing owed
+
+  var sortLetters = function (s) { return String(s || '').split('').sort().join(''); };
+  if (sortLetters(stated) !== sortLetters(derived)) {
+    return ['Boss convergence: the collected values decode to "' + derived + '" through this '
+      + 'book\'s own table, and the boss page states the password is "' + stated + '" — which '
+      + 'is not the same letters in any order. The player collects exactly what the booklet '
+      + 'asked for, follows the booklet\'s own table, and arrives at a word the last page '
+      + 'rejects. A password\'s last step may be a declared convention; this is not a '
+      + 'convention, it is a chain that does not converge. Either state "' + derived + '", or '
+      + 'change the weekly values so they decode to "' + stated + '".'];
+  }
+  if (!teachesRearrangement(reveal)) {
+    return ['Boss convergence: the collected values decode to "' + derived + '" and the boss '
+      + 'page states the password is "' + stated + '" — the same letters in a different ORDER. '
+      + 'That is a legitimate convention, but it is only a convention if the player is TOLD: '
+      + 'nothing in the reveal, the proof or the narrative tells them to rearrange the letters. '
+      + 'An anagram nobody is asked to unscramble is indistinguishable, at the table, from a '
+      + 'mis-derivation. Say on the page that the week-order reading is the wrong one and what '
+      + 'establishes the true order.'];
+  }
+  return [];
+}
+
+/**
  * Per-week structural validation. Runs after each week is generated
  * in the pipeline, before proceeding to the next stage.
  * Returns { valid: boolean, errors: string[] }
@@ -1683,6 +1772,17 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
       // enforcement (enforceDeterministicFields) overwrites it with the correct
       // collected weeklyComponent values. Don't validate what we're going to
       // overwrite anyway; it just burns retries for nothing.
+      //
+      // ── DERIVE OR DECLARE (DR-33) ──
+      // What is NOT overwritten, and what nothing before this asked: whether
+      // the word the boss page states is reachable from those values at all.
+      // The gate reads the OPTIONS' inputs (the real collected record) rather
+      // than the unit's copy, precisely because the unit's copy is about to be
+      // replaced. Armed on both pipelines already — see the floor's header.
+      if (floorsOn(expectedOptions)) {
+        errors = errors.concat(
+          collectConvergenceChainFloorErrors(boss, expectedOptions.componentInputs));
+      }
     }
 
     var approvedBossFragmentIds = Array.isArray(expectedOptions.approvedFragmentIds)
@@ -2972,6 +3072,245 @@ export function orientationFloorErrors(rulesSpread, where) {
 }
 
 /**
+ * collectAnswerBearingFragmentFindings(fragments, componentInputs)
+ *   -> { errors: string[], warnings: string[] }
+ *
+ * ── THE ANSWER-BEARING SEAL (author ruling, 2026-08-18 — the doc-11 class) ──
+ *
+ * A fragment whose body reveals the convergence answers must carry a seal. Not
+ * because the document is illegitimate — a confirmation slip or a supervisor's
+ * duplicate is often the best document in the book — but because a document
+ * that prints every collected value ends the game the moment it is read, and
+ * the player has no way to know that BEFORE reading it. The seal is the honour
+ * system, not a lock: the pleasure is the flip and the deciding. A player who
+ * is warned can choose; a player who is not has been robbed of a choice nobody
+ * offered them.
+ *
+ * TWO ARMS, SPLIT BY CONFIDENCE (the D144 idiom — be conservative, and never
+ * let a single-value coincidence block):
+ *
+ *   ERROR   every one of the book's componentInputs appears as a distinct
+ *           number-token, AND they appear CLOSE TOGETHER. That is the collected
+ *           record reproduced as a list, and there is no reading of it that is
+ *           not disclosure.
+ *   WARNING all of them appear, but scattered through the document. A world
+ *           whose values are its own nouns — node numbers, berth numbers, ring
+ *           ordinals — will name them all across a page of prose without ever
+ *           handing over the chain, so this reports and never blocks.
+ *
+ * NUMBER-TOKENS, NOT SUBSTRINGS, and that distinction is the whole difference
+ * between a gate and a nuisance: the token test matches "7" and not "17",
+ * "1975" or "F.07". A substring scan over five small integers finds them in
+ * every date, every case number and every page reference in the corpus.
+ *
+ * THE PROXIMITY WINDOW IS MEASURED, NOT CHOSEN, and it is what makes the exact
+ * arm safe to block on. Swept over 22 corpus fixtures plus both delivered
+ * books, exactly six fragments contain their book's whole collected record.
+ * Their tightest windows, and what each one actually is:
+ *
+ *   sf-c10-strong-convergence F.08     14   "will always be 8, 5, 18, 15, 14."
+ *   The-Air-Gapped-Choir F.6           15   "31 / 09 / 14 / 22", one line
+ *   The-Air-Gapped-Choir F.8           33   TOP/RIGHT/BOTTOM/LEFT = all four
+ *   the delivered book's F.11          59   ← THE DOCUMENT THIS RULING NAMES
+ *   ── the gap ──────────────────────────────────────────────────────────────
+ *   sf-haiku45-c5-trial-1 F.05        122   an intake-statistics memo whose
+ *                                           ordinary counts happen to be the
+ *                                           book's five small integers
+ *   The-Air-Gapped-Choir F.2          189   four nodes named across a page of
+ *                                           narrative — the world's own
+ *                                           vocabulary, not a disclosure
+ *
+ * Every genuine hand-over is a LIST, and a list of five values is about one
+ * printed line; every coincidence is prose, and prose spreads. 90 is one line
+ * of type, and it sits near the middle of a 59-to-122 gap rather than hard
+ * against either edge — 31 characters of margin below, 32 above.
+ *
+ * BOTH SIDES OF THAT SWEEP WERE EARNED BY A FAILING HARNESS ROW, not assumed.
+ * The token rule originally excluded any following `.`, to keep `F.14` from
+ * matching `14` — which also excluded a value that merely ENDS A SENTENCE, so a
+ * document could list the whole record and go unseen for using full stops. The
+ * blocking row in check-generation-floors.mjs caught it; the rule now excludes
+ * only a DOTTED IDENTIFIER (`.` followed by more word characters), and the
+ * corrected sweep is the table above.
+ *
+ * THE PASSWORD-AS-A-WORD ARM WAS DROPPED, and it is worth writing down because
+ * the ruling proposed it: "or the full derived password string". Measured, it
+ * is a false-positive factory — a good password is a word FROM the world, so
+ * the demo booklet (password "HERON") flagged five fragments for mentioning the
+ * bird that gives the book its name. A password the fiction never says is a
+ * worse password; a gate that punishes the better one is the wrong gate.
+ *
+ * SILENT WITHOUT ITS EVIDENCE (D144's ungated-caller idiom). A gate handed no
+ * componentInputs cannot know what the answers are, and inventing them would be
+ * the gate writing the design.
+ *
+ * A SEAL SATISFIES IT ENTIRELY. `seal` is required-both-fields by the artifact
+ * schema, so its presence IS the declaration of the key hint and the release
+ * condition; this floor asks only that it is there.
+ */
+var ANSWER_DISCLOSURE_WINDOW_CHARS = 90;
+
+function collectAnswerBearingFragmentFindings(fragments, componentInputs) {
+  var out = { errors: [], warnings: [] };
+  var list = Array.isArray(fragments) ? fragments : [];
+  if (!list.length) return out;
+  var inputs = (Array.isArray(componentInputs) ? componentInputs : [])
+    .map(function (v) { return String(v == null ? '' : v).trim(); })
+    .filter(Boolean);
+  if (inputs.length < 2) return out;                      // no evidence ⇒ silent
+
+  // Every offset at which this value stands as its own token.
+  //
+  // THE TRAILING RULE IS NARROWER THAN A DOT BAN, and the harness row that
+  // caught it is why: excluding any following `.` also excluded a value that
+  // simply ENDS A SENTENCE ("...and 14."), so a document could list the whole
+  // record and go unseen for using full stops. What must be excluded is a
+  // DOTTED IDENTIFIER — `F.14`, `1.14` — where the dot is followed by more
+  // word characters. Sentence punctuation is not part of the token.
+  function tokenOffsets(body, value) {
+    var token = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var re = new RegExp('(^|[^\\w.])' + token + '(?!\\w|\\.\\w)', 'g');
+    var offsets = [];
+    var m;
+    while ((m = re.exec(body)) !== null) {
+      offsets.push(m.index + m[1].length);
+      re.lastIndex = m.index + 1;                         // allow adjacent matches
+    }
+    return offsets;
+  }
+
+  list.forEach(function (fragment) {
+    if (!fragment || typeof fragment !== 'object') return;
+    var body = String(fragment.content || fragment.body || fragment.contentHtml || '');
+    if (!body) return;
+    var id = String(fragment.id || '?');
+    if (fragment.seal && typeof fragment.seal === 'object'
+        && String(fragment.seal.unlockCondition || '').trim()) return;
+
+    var found = [];
+    for (var i = 0; i < inputs.length; i++) {
+      var offsets = tokenOffsets(body, inputs[i]);
+      if (!offsets.length) return;                        // not every value: not this floor's case
+      found.push(offsets);
+    }
+
+    // The tightest span containing one occurrence of every value: anchor on
+    // each occurrence of the first value and take the nearest of each other.
+    var tightest = Infinity;
+    found[0].forEach(function (anchor) {
+      var lo = anchor;
+      var hi = anchor;
+      for (var k = 1; k < found.length; k++) {
+        var best = found[k][0];
+        var bestDistance = Math.abs(best - anchor);
+        found[k].forEach(function (offset) {
+          var distance = Math.abs(offset - anchor);
+          if (distance < bestDistance) { bestDistance = distance; best = offset; }
+        });
+        lo = Math.min(lo, best);
+        hi = Math.max(hi, best);
+      }
+      tightest = Math.min(tightest, hi - lo);
+    });
+
+    if (tightest <= ANSWER_DISCLOSURE_WINDOW_CHARS) {
+      out.errors.push('Fragment ' + id + ' reproduces the collected record: all ' + inputs.length
+        + ' of the values the player is meant to gather appear together, within ' + tightest
+        + ' characters, and no seal is declared. A document that confirms the chain answers is '
+        + 'sealed by honour: give it a `seal` with a `keyHint` (what the player will recognise '
+        + 'when they may open it) and an `unlockCondition` naming an earlier printed surface. '
+        + 'Unsealed, it ends the game the first time it is read, and the player had no way to '
+        + 'know that before reading it.');
+    } else {
+      out.warnings.push('Fragment ' + id + ' names all ' + inputs.length + ' collected values, '
+        + 'but spread over ' + tightest + ' characters rather than listed together, and declares '
+        + 'no seal. Scattered like that it is far more likely to be the world using its own '
+        + 'numbers than a document handing over the chain, so this reports rather than blocks. '
+        + 'If it is meant to confirm the answers, seal it.');
+    }
+  });
+  return out;
+}
+
+/**
+ * collectAnswerBearingFragmentFloorErrors(fragments, componentInputs)
+ *
+ * The blocking projection of the findings above. Split for the same reason
+ * collectSeedObedienceFindings is split from its two projections (W3): one body
+ * of evidence, two severities, and the census counts the demands once.
+ */
+export function collectAnswerBearingFragmentFloorErrors(fragments, componentInputs) {
+  return collectAnswerBearingFragmentFindings(fragments, componentInputs).errors;
+}
+
+/**
+ * collectAnswerBearingFragmentWarnings(fragments, componentInputs)
+ */
+export function collectAnswerBearingFragmentWarnings(fragments, componentInputs) {
+  return collectAnswerBearingFragmentFindings(fragments, componentInputs).warnings;
+}
+
+/**
+ * assemblyDisclosureFloorErrors(rulesSpread, where) -> string[]
+ *
+ * ── THE ASSEMBLY-PAGE DISCLOSURE LAW (author ruling, 2026-08-18) ────────────
+ *
+ * The delivered book's `rulesSpread.rightPage.instruction` was a walkthrough:
+ * every glyph's location AND method, disclosed on page four, duplicating the
+ * point-of-use instructions the week pages already carry. The author's verdict:
+ * "it gives too much information."
+ *
+ * THE DISTINCTION THE RULING DRAWS. A MANIFEST is licensed by VISION §2's
+ * "posted manifests naming future finds" — a count, one per week, and what
+ * happens when they are all filled. A WALKTHROUGH is not. The file posts WHAT
+ * is to be found and WHEN; the week posts WHERE and HOW.
+ *
+ * WHY THE ARM IS AN ENUMERATION COUNT AND NOT A LENGTH BAND — measured before
+ * it was written, and it corrects the shape the ruling proposed. There are no
+ * per-box entries to band: the surface is ONE optional string. And length does
+ * not separate the two shapes. Over 22 corpus fixtures plus both delivered
+ * books, the offending walkthrough is 577 characters and the first book's
+ * perfectly legal manifest is 569, while clean corpus fixtures run to 1408. A
+ * band tight enough to catch 577 fails four clean fixtures; a band loose enough
+ * to spare them catches nothing.
+ *
+ * What separates them cleanly is the ROLL CALL. A manifest states a count once;
+ * a walkthrough addresses each box in turn and hangs a source on it. Distinct
+ * box ordinals named: corpus 0, first book 1, the defect 5.
+ *
+ * CONSERVATIVE BY RULING (the D144 idiom): the threshold is three, because two
+ * ordinals can be a legitimate boundary statement ("box 1 is filled in week
+ * one; the last at the reckoning"). A single mention can never block.
+ *
+ * SHELL SEAT ONLY, for orientationFloorErrors' reason exactly: INST_RULES_TEACH
+ * is routed to `shell` alone, so this is the only seat whose prompt names the
+ * surface. Silent when there is no rightPage instruction — the field is
+ * optional in the artifact contract and this floor is about what it SAYS, never
+ * about whether it exists.
+ */
+export function assemblyDisclosureFloorErrors(rulesSpread, where) {
+  var errors = [];
+  if (!rulesSpread || typeof rulesSpread !== 'object') return errors;
+  var rightPage = rulesSpread.rightPage;
+  if (!rightPage || typeof rightPage !== 'object') return errors;
+  var instruction = String(rightPage.instruction || '').trim();
+  if (!instruction) return errors;
+  var pointers = countAssemblyBoxPointers(instruction);
+  if (pointers > ASSEMBLY_DISCLOSURE_MAX_BOX_POINTERS) {
+    errors.push((where || 'Stage') + ' → rulesSpread.rightPage.instruction addresses '
+      + pointers + ' boxes individually, and the tracker page may name at most '
+      + ASSEMBLY_DISCLOSURE_MAX_BOX_POINTERS + ' that way. This page posts a MANIFEST — how '
+      + 'many boxes there are, that one is filled per week, and what happens when they are '
+      + 'all filled. Telling the player up front which surface each box comes from and what '
+      + 'must be done to read it is a WALKTHROUGH: it spends the discovery of the whole block '
+      + 'on the rules page, and it repeats instructions the week pages already give at the '
+      + 'moment they are usable. State the count and the cadence here; the method belongs at '
+      + 'point of use, on the week that owns it.');
+  }
+  return errors;
+}
+
+/**
  * briefTranscriptionFloorErrors(units, brief, where) -> string[]
  *
  * ── THE BRIEF IS INPUT, NEVER COPY (W1, 2026-08-18) ─────────────────────────
@@ -3220,6 +3559,12 @@ export function validateShellSchema(shell, expectedOptions) {
     // cast, and a book that declines to say so has declined to be legible, not
     // declined a feature. Shell seat only; see the floor's own header.
     errors = errors.concat(orientationFloorErrors(shell.rulesSpread, 'Shell'));
+
+    // ── The file posts WHAT and WHEN; the week posts WHERE and HOW ──
+    // Same seat, same unit, same silence rule as the orientation floor above.
+    // Silent when the tracker page carries no instruction at all: the field is
+    // optional in the artifact contract, and this floor is about what it SAYS.
+    errors = errors.concat(assemblyDisclosureFloorErrors(shell.rulesSpread, 'Shell'));
 
     // ── The design-language floor (W6's close) ──
     // Here and ONLY here, and the asymmetry with every floor beside it is a
@@ -7623,8 +7968,38 @@ export function validateAssembledBooklet(booklet, options) {
       var derivedPassword = decodeA1Z26(
         (boss.componentInputs || []).map(function (v) { return Number(v); })
       );
+      // ── DR-33: THE DECLARED CONVENTION (author ruling, 2026-08-18) ────────
+      // This comparison was unconditional, and that made `reordering` a pattern
+      // the pipeline offers and then refuses: a reordering book's demoPassword
+      // is by definition NOT the week-order reading, so every one of them
+      // errored here even when it obeyed the reordering doctrine perfectly. The
+      // ruling settles it — a password's last step may be a DECLARED
+      // convention. Under `reordering` the demand becomes multiset equality
+      // (the same letters, any order) plus the reveal teaching the rearrange;
+      // under every other pattern, and under silence, exact equality stands
+      // unchanged, which is the ruling's other half: undeclared non-derivation
+      // is a defect.
+      var derivationMode = convergenceDerivationMode(
+        (meta.artifactIntent || {}).convergencePattern);
       if (derivedPassword && meta.demoPassword) {
-        if (meta.demoPassword !== derivedPassword) {
+        var demoUpper = String(meta.demoPassword).toUpperCase();
+        var sortChars = function (s) { return String(s || '').split('').sort().join(''); };
+        if (derivationMode === 'anagram') {
+          if (sortChars(demoUpper) !== sortChars(derivedPassword)) {
+            errors.push('meta.demoPassword "' + meta.demoPassword + '" is not a rearrangement of '
+              + 'the derived A1Z26 letters "' + derivedPassword + '" — convergencePattern is '
+              + '"' + ((meta.artifactIntent || {}).convergencePattern) + '", which licenses a '
+              + 'different ORDER and nothing else. The player cannot reach this word from the '
+              + 'values the booklet had them collect.');
+          } else if (!teachesRearrangement([
+            boss.passwordRevealInstruction, boss.convergenceProof, boss.narrative
+          ].filter(Boolean).join('\n'))) {
+            errors.push('meta.demoPassword "' + meta.demoPassword + '" rearranges the derived '
+              + 'letters "' + derivedPassword + '" and the boss page never tells the player to '
+              + 'rearrange anything. A convention is only declared if the PAGE declares it — an '
+              + 'anagram nobody is asked to unscramble is a mis-derivation at the table.');
+          }
+        } else if (meta.demoPassword !== derivedPassword) {
           errors.push('meta.demoPassword "' + meta.demoPassword + '" does not match derived A1Z26 password "' + derivedPassword + '"');
         }
       }
@@ -7645,8 +8020,14 @@ export function validateAssembledBooklet(booklet, options) {
       // convergencePattern, so this can only fire on a booklet that opted in.
       // The phrase is a PRESENCE check against the doctrine's required
       // wording (INST_CONVERGENCE_DESIGN), not a second password derivation.
-      var declaredPattern = String(((meta.artifactIntent || {}).convergencePattern) || '').toLowerCase();
-      if (declaredPattern === 'reordering') {
+      //
+      // DR-33 RETARGETED THE TEST, not the arm: this asked `=== 'reordering'`
+      // directly, which made it a SECOND reader of "which patterns rearrange?"
+      // beside the mode table the ruling introduced. One home, two readers
+      // (D93) — the pattern-to-mode question is answered in one place now, so a
+      // future pattern that rearranges cannot be taught to one of these arms
+      // and not the other. Behaviour on today's four-value menu is identical.
+      if (convergenceDerivationMode((meta.artifactIntent || {}).convergencePattern) === 'anagram') {
         var bossReveal = [
           boss.passwordRevealInstruction, boss.narrative, boss.convergenceProof
         ].filter(Boolean).join('\n');
@@ -7680,6 +8061,16 @@ export function validateAssembledBooklet(booklet, options) {
         }
       }
     }
+
+    // ── The answer-bearing seal, assembled seat (the doc-11 class) ──
+    // THE ONE SEAT THAT HAS THE WHOLE PICTURE: the fragments, the collected
+    // record and the finished password are all on this object, so this arm
+    // needs nothing armed. It is telemetry rather than a gate (this validator
+    // logs and the booklet is delivered regardless), which is exactly why the
+    // fragment-stage seat above exists and owes its arming.
+    var answerFindings = collectAnswerBearingFragmentFindings(booklet.fragments, inputs);
+    answerFindings.errors.forEach(function (m) { errors.push(m); });
+    answerFindings.warnings.forEach(function (m) { warnings.push(m); });
 
     // binaryChoice → binaryChoiceAcknowledgement cross-check
     if (hasBinaryChoice) {
@@ -8188,6 +8579,19 @@ export function validateFragmentsStage(result, expectedRegistry, options) {
         };
       }), (options || {}).brief, 'Fragments');
     if (copiedBrief.length > 0) return fragmentVerdict(copiedBrief);
+
+    // ── The answer-bearing seal, fragment seat (the doc-11 class) ──
+    // Silent with no `componentInputs`/`demoPassword` on the options (D144's
+    // ungated-caller idiom). THIS SEAT IS NOT YET ARMED: neither pipeline puts
+    // the collected values on the fragment stage's config, so today this fires
+    // only through the assembled path, which HAS the whole booklet. Arming it
+    // is two option properties at the two fragment seats in api-generator.js —
+    // reported to the orchestrator, and deliberately not claimed here, because
+    // a registry row with an `armedBy` that does not resolve is the disarmed
+    // state W1 shipped by accident (D199).
+    var answersOut = collectAnswerBearingFragmentFloorErrors(
+      result.fragments, (options || {}).componentInputs);
+    if (answersOut.length > 0) return fragmentVerdict(answersOut);
   }
   var expected = (expectedRegistry || []).map(function (entry) { return normalizeId(entry.id); }).filter(Boolean);
   if (!expected.length) return fragmentVerdict([]);

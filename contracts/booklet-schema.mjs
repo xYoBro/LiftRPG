@@ -1200,6 +1200,14 @@ export var BOOKLET_SCHEMA = {
                 fragmentLicense: { type: 'string' },
                 punctuationSignature: { type: 'string' },
                 paragraphRegime: { type: 'string' },
+                // V6, the restraint band (ratified 2026-08-18). Same additive-
+                // optional, same free-string-here ruling as its five siblings:
+                // the menu lives in contract-constants, the die draws from it,
+                // and the transport is where it is enum-pinned. A book that
+                // declares no position is written at the band's default centre,
+                // which is the universal constant this band replaced — so the
+                // sealed corpus is unmoved by construction.
+                restraint: { type: 'string' },
                 _x: xt
               }
             }

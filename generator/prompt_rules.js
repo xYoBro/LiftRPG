@@ -2061,7 +2061,26 @@
     '- Build at least three linked fragment functions into the booklet: one artifact that changes action, one that changes interpretation, and one that deepens character stakes.',
     '- Let at least one incident, place, procedure, or relationship echo across multiple document perspectives.',
     '- Treat fragments as threaded evidence, found packets, route instructions, contradictory accounts, or emotional aftershocks, not only lore drops.',
-    '- Use redactions only when they do narrative work.'
+    '- Use redactions only when they do narrative work.',
+    '',
+    // ── THE ANSWER-BEARING SEAL (author ruling, 2026-08-18) ──────────────────
+    // THE TWO HALVES OF ONE RULE. The floor is
+    // collectAnswerBearingFragmentFloorErrors in validation.js; this sentence
+    // is its teaching. A document that hands the player the whole convergence
+    // in week one is not a spoiler risk the player chose — it is one the book
+    // made for them.
+    '',
+    '### A document that confirms the chain\\\'s answers is sealed by honour',
+    'A fragment MAY carry the answers — a confirmation slip, a duplicate ledger, a supervisor\\\'s',
+    'copy of the whole record. That is a real document and often the best one in the book.',
+    'But a document that prints EVERY collected value, or the finished password itself, ends',
+    'the game the moment it is read, and the player has no way to know that before reading it.',
+    'So: declare its seal and its release week. Give that fragment a `seal` object —',
+    '`keyHint` (what the player will recognise when they may open it) and `unlockCondition`',
+    '(what must already be true, naming an EARLIER printed surface). The seal is the honour',
+    'system, not a lock: the pleasure is the flip and the deciding, and a player who is warned',
+    'can choose. A player who is not warned has been robbed of a choice nobody offered them.',
+    'Carrying every answer with no seal declared is a blocking error.'
   ];
 
   window.INST_CIPHER_DESIGN = [
@@ -2227,6 +2246,25 @@
     'Whatever the pattern, the password-record layout is fixed (one box per week, one final',
     'assembly row) and `convergenceProof` stays strict. A pattern changes what the player must',
     'UNDERSTAND, never what the booklet must PRINT.',
+    '',
+    // ── DERIVE OR DECLARE (author ruling DR-33, 2026-08-18) ──────────────────
+    // THE TWO HALVES OF ONE RULE (the D136 F04 idiom). The floor is
+    // collectConvergenceChainFloorErrors in validation.js, blocking at the boss
+    // week gate; this is the sentence that teaches it. Landing either alone
+    // either blocks a book for a shape nobody asked for, or asks for a shape
+    // nothing checks.
+    '### Derive or declare (this is checked at the boss week, and it blocks)',
+    'The letters the collected values decode to, read in week order, are THE DERIVATION.',
+    'If the password you state on the boss page is that string, nothing more is owed.',
+    'If it is NOT that string, exactly one thing makes it legal: the password must be a',
+    'REARRANGEMENT of those same letters, and the boss page must TELL THE PLAYER to rearrange',
+    'them — in plain words, on the page, in the reveal or the proof. That is the declared',
+    'convention.',
+    'A password that is neither the week-order reading nor a rearrangement of it is a chain',
+    'the player cannot walk: they collect the values the booklet asked for, follow the',
+    'booklet\\\'s own table, and arrive at a word the last page rejects. An anagram nobody is',
+    'told to unscramble is the same failure wearing a puzzle.',
+    'Undeclared non-derivation is a defect, not a style.',
   ];
 
   window.INST_INTERLUDES = [
@@ -4174,10 +4212,26 @@
     'Do not complete the inference for the reader. Record the two facts and walk',
     'on; the reader makes the connection and credits the writer with it.',
     '',
-    '### The figurative budget',
-    'At most ONE figurative comparison or verbal turn per ~200 words. Zero is',
-    'normal and often correct. A storyPrompt (220-character budget) therefore has',
-    'NO figurative allowance at all; a fragment body spends at most one.',
+    // ── THE BAND, NOT THE CONSTANT (ratified 2026-08-18) ────────────────────
+    // This was "at most ONE per ~200 words" for every book ever generated — a
+    // universal constant on a taste register, which is the Height Law's defect
+    // applied to prose: protective, and freezing. It is now a BAND whose
+    // position is set per book by the restraint axis (VOICE_RESTRAINT_LADDER).
+    // `plain` is the old constant unchanged, so a book that declares nothing is
+    // written exactly as every book before this ruling was.
+    '### The figurative budget (a band, set by `voiceSkeleton.restraint`)',
+    'Your rate of figurative comparison or verbal turn is the position this book',
+    'was assigned or earned, per 1000 words of prose:',
+    '  `austere` 1 · `plain` 5 · `figured` 12 · `lush` 25',
+    'If no position is declared, write at `plain` — one turn per ~200 words, which',
+    'is where this book\'s budget sat before the band existed. Zero is always a',
+    'legitimate outcome for any individual passage at any position.',
+    'The budget is a RATE OVER PROSE, so short surfaces spend nothing: a',
+    'storyPrompt (220-character budget) has no figurative allowance at any',
+    'position, and a fragment body spends at most one below `figured`.',
+    'A higher position never buys thinner material, shorter documents or fewer',
+    'true particulars — restraint governs the SOUND of the prose, never its',
+    'supply. Every universal ban above holds unchanged at every position.',
     '',
     '### Two-pass order (run both, in this order, inside every prose field)',
     '1. Procedural draft: information only, zero figurative language, correct',
@@ -4272,6 +4326,31 @@
     '- `paragraphRegime`: single-breath | standard | massed',
     '  `single-breath` is 1-2 sentence paragraphs, white space as pacing.',
     '  `standard` is 3-5. `massed` is long blocks where density is the texture.',
+    // ── V6, THE RESTRAINT BAND (ratified 2026-08-18) ─────────────────────────
+    // The band's numbers are VOICE_RESTRAINT_LADDER in contract-constants.mjs
+    // and are parity-asserted against this table both directions (D124), so a
+    // rate moved on one side alone fails the build.
+    '- `restraint`: austere | plain | figured | lush',
+    '  HOW OFTEN this book turns a phrase, as figurative turns per 1000 words of',
+    '  prose. `austere` is 1 — the plainest register the form has. `plain` is 5,',
+    '  which is one turn per ~200 words. `figured` is 12. `lush` is 25, and it is',
+    '  a real position, not a warning: a brief whose whole register is figurative',
+    '  excess is written here and nowhere else.',
+    '  This axis is an ORDINAL SCALE, low to high. It sets a rate, never a mood.',
+    '',
+    '### Restraint governs the sound of the prose, never its supply',
+    'A high position buys MORE TURNS. It does not buy thinner material, shorter',
+    'documents, vaguer particulars or fewer true facts. Every budget, every count',
+    'and every knowing demand is unchanged at `lush`; what changes is how often',
+    'the prose is allowed to reach. A book that answers a rich brief with less',
+    'writing has failed it in the opposite direction.',
+    '',
+    '### The ban list is NOT in the band',
+    'Every universal machine-tell stays banned at every position, `lush` included.',
+    'There is no genre exception, no licence and no budget that reaches them. The',
+    'ban list is exactly what makes a high position writable without slop: it',
+    'removes the moves that are pastiche in ANY register, so a figurative book is',
+    'figurative in its own hand instead of in the default one.',
     '',
     '### This binds the NARRATOR only',
     'In-world writers still differ from the narrator and from each other, and a',
@@ -4683,7 +4762,30 @@
     '  Each item: { `name` (as it is printed everywhere else in the book), `role` (2-6',
     '  words, what they are), `note` (optional, at most 12 words: what they want, or what',
     '  they are hiding) }. Every in-world author of a document belongs here. Names must',
-    '  match the spelling used in the weeks and fragments exactly.'
+    '  match the spelling used in the weeks and fragments exactly.',
+    '',
+    // ── THE DISCLOSURE LAW (author ruling, 2026-08-18) ───────────────────────
+    // The delivered book's rightPage.instruction walked the player through
+    // every glyph's location AND method on page four — duplicating the
+    // point-of-use instructions the week pages already carry. The author: "it
+    // gives too much information."
+    '### rulesSpread.rightPage.instruction — a MANIFEST, never a walkthrough',
+    'The file posts WHAT is to be found and WHEN. The week posts WHERE and HOW.',
+    'The tracker page states the SHAPE of the collection and nothing more: how many boxes',
+    'there are, that one is filled per week, and what happens once they are all filled.',
+    '- LEGAL: "One box per week, one for every week of the block. Fill each at that week\'s',
+    '  close. When they are all filled, convert them on the boss page and write the word in',
+    '  the final row."',
+    '- NOT LEGAL: addressing the boxes one at a time and hanging a source on each — e.g.',
+    '  "box 1 from fragment F.03 in week one, box 2 from the cipher grid once the date is',
+    '  decoded, box 3 from any row of the week-three oracle...". That is a walkthrough. It',
+    '  spends the discovery of the whole block on the rules page, and it repeats instructions',
+    '  the week pages already give at the moment they are usable.',
+    'You may name a count. You may say one per week. You may NOT tell the player, up front,',
+    'which surface each individual box comes from or what must be done to read it. Naming',
+    'three or more boxes individually on this page is a blocking error.',
+    'The METHOD lives at point of use, on the week that owns it — where the player is',
+    'standing when they need it, and nowhere earlier.'
   ];
 
   window.INSTRUCTIONS = [].concat(
