@@ -527,6 +527,16 @@
       lines.push('- Convergence pattern: ' + intent.convergencePattern);
     }
 
+    // THE MODE, CARRIED TO EVERY SEAT THIS CONTRACT REACHES (the settlement
+    // doctrine). The ending seat is the one that must conform to it, and this
+    // is the projection that seat already receives — so the mode arrives by
+    // the route the arc family and convergence pattern already travel rather
+    // than through a fourth hand-built given.
+    if (intent.endingMode) {
+      lines.push('- Ending mode: ' + intent.endingMode
+        + ' — the finale settles in THIS mode; declare it on every ending\'s `settlement.mode`');
+    }
+
     if (ecology.dominant && ecology.dominant.length > 0) {
       lines.push('- Document ecology dominant: ' + ecology.dominant.join(', '));
     }
@@ -3043,6 +3053,13 @@
       // the default pipeline was getting neither.
       window.INST_ENDING_STANDARD.join('\n'),
       '',
+      // THE SETTLEMENT DOCTRINE (2026-08-18), hand-routed for the reason
+      // VOICE_DISCIPLINE and ENDING_STANDARD above it are: these builders
+      // bypass STAGE_SCHEMA_MAP, so a section routed to the 'ending' stage
+      // never reaches them. The settlement floor BLOCKS at this seat, and a
+      // blocking demand no prompt states is an ambush, not a floor (D187).
+      window.INST_ENDING_SETTLEMENT.join('\n'),
+      '',
       // The third instance of the same gap (D150). `endingBody` is BLOCKING at
       // this stage, and this builder stated no length at all — so the default
       // pipeline could be rejected for a cap it was never shown, which is the
@@ -3099,6 +3116,13 @@
       window.INST_VOICE_DISCIPLINE.join('\n'),
       '',
       window.INST_ENDING_STANDARD.join('\n'),
+      '',
+      // THE SETTLEMENT DOCTRINE (2026-08-18), hand-routed for the reason
+      // VOICE_DISCIPLINE and ENDING_STANDARD above it are: these builders
+      // bypass STAGE_SCHEMA_MAP, so a section routed to the 'ending' stage
+      // never reaches them. The settlement floor BLOCKS at this seat, and a
+      // blocking demand no prompt states is an ambush, not a floor (D187).
+      window.INST_ENDING_SETTLEMENT.join('\n'),
       '',
       // …and the length demand, which neither ending builder carried (D150).
       // This is the builder the pipeline calls BY DEFAULT, so it is where the

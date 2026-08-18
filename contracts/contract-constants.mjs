@@ -2355,6 +2355,62 @@ export function teachesRearrangement(text) {
   return false;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// THE SETTLEMENT DOCTRINE (author directive, 2026-08-18 — the gameplay round)
+// ════════════════════════════════════════════════════════════════════════════
+// THE AUTHOR'S SENTENCE: "The sealed ending is the most expensive content in
+// any book (the reader pays weeks of training for the password), and its
+// narrative WEIGHT becomes a design input, canonical never confected."
+//
+// The ending is THE SETTLEMENT of every debt the book incurred. It spends what
+// the reader earned; it differs by WHICH ending was reached; and it passes THE
+// FINISHER TEST — an ending a non-player could enjoy equally has paid off
+// nothing, because nothing in it was bought with the weeks.
+//
+// EVIDENCE ON FILE: book 2 shipped one ending, and the proving-night read found
+// the game thinnest exactly where the payoff should have been thickest.
+//
+// ── THE MODE MENU, AND WHY IT IS A DIE AXIS ────────────────────────────────
+// THE TWIST CLAUSE says settlement must never read as tidy resolution, and that
+// a twist is settlement's most demanding form — it pays debts the reader did
+// not know they held, and needs SEEDED evidence to invert. The obvious wrong
+// turn from there is to demand a twist, and the author closed it in advance:
+// "I wouldn't want every story to end in a twist."
+//
+// So the MODE rides the two-source law like every other identity choice
+// (VISION §11): brief-funded, or seed-assigned across the FULL menu, never a
+// default in EITHER direction. All-twist is the sameness defect wearing a
+// dramatic hat; the plain fully-earned revelation chosen on purpose is exactly
+// as designed as the inversion. That is why this is an IDENTITY_AXES row
+// (below) and not a floor demanding a shape.
+export var VALID_ENDING_MODES = ['revelation', 'twist', 'ambiguous-by-design'];
+
+// ── THE DISPOSITIONS: ADDRESSED, NEVER "ANSWERED" ──────────────────────────
+// D70's resolution law says a forward promise that resolves to nothing is
+// invalidity. The naive extension of it to the finale would demand every
+// promise ANSWERED, which is a demand for tidy resolution — the exact reading
+// the twist clause forbids, and one that would fail `ambiguous-by-design`
+// books for being what they declared themselves to be.
+//
+// So a debt is ADDRESSED, in one of three ways, and the menu is the whole
+// difference between a settlement floor and a tidiness floor:
+//
+//   paid         the ending gives the reader the thing the promise owed
+//   transformed  the promise is met by changing what it meant — the midpoint
+//                law's change-interpretation rule, applied at the finale
+//   inverted     the promise is paid by being turned over: what the reader
+//                thought they held, they did not. THE TWIST'S disposition, and
+//                the only one that owes seeded evidence, because an inversion
+//                with nothing planted behind it is not a twist, it is a
+//                retraction.
+export var VALID_SETTLEMENT_DISPOSITIONS = ['paid', 'transformed', 'inverted'];
+
+// A BAND, not a floor (the POINTER_BUDGETS idiom, D150). Below the minimum the
+// declaration is ceremony — one debt named is an ending that settled nothing
+// and said so in the right shape. Above the maximum it is a receipt: a finale
+// itemising nine promises is a table of contents, not a payoff.
+export var SETTLEMENT_DEBT_BUDGET = { min: 2, max: 6 };
+
 // ── The triptych's audit trail (Wave 2) ─────────────────────────────────────
 // `artifactIntent._x.rejectedReadings` records the two candidate readings that
 // lost. It lives under `_x` because the artifact contract has no opinion on
@@ -3007,6 +3063,26 @@ export var IDENTITY_AXES = [
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'homePull', label: 'homePull', path: 'meta.artifactIntent.homePull',
     menu: VALID_HOME_PULLS, kind: 'scalar', answerRequired: true,
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
+  // THE MODE DIE (the settlement doctrine, 2026-08-18). VISION §14.1 says the
+  // endgame PATTERN is part of what varies per book, and until this row the
+  // only thing varying was the password's arithmetic (convergencePattern) —
+  // how the reader OPENS the ending, never what the ending DOES to them.
+  //
+  // ANSWER-REQUIRED, ADOPTION OPTIONAL — the harvest axis's shape (D151), and
+  // for the reason the author stated when the twist clause was written: "I
+  // wouldn't want every story to end in a twist." A die that could only ever
+  // ratchet toward inversion would install a house ending, which is the
+  // sameness defect this table exists to break. Declining costs one sentence
+  // in `selectionReason`, and a declined twist is a book that chose the plain
+  // revelation ON PURPOSE — which is the point.
+  //
+  // BLOCKING, not reportOnly: unlike the voice axes there IS an instrument
+  // here — `endings[].settlement.mode` is declared, machine-readable, and
+  // conformance-checked at the ending seat, so an assignment landing on this
+  // axis can be observed all the way to the artifact.
+  { id: 'endingMode', label: 'endingMode', path: 'meta.artifactIntent.endingMode',
+    menu: VALID_ENDING_MODES, kind: 'scalar', answerRequired: true,
     evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
   { id: 'documentEcologyDominant', label: 'documentEcology.dominant',
     path: 'meta.artifactIntent.documentEcology.dominant',

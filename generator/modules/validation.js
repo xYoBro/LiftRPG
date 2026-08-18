@@ -58,6 +58,13 @@ import {
   // chain converge?".
   convergenceDerivationMode,
   teachesRearrangement,
+  // The settlement doctrine (2026-08-18). The mode menu, the disposition menu
+  // and the debt band live with the contract for the reason stated above: the
+  // prompt is built from these arrays and the floor is checked against them,
+  // so a menu the model was shown and a menu the gate accepts cannot diverge.
+  VALID_ENDING_MODES,
+  VALID_SETTLEMENT_DISPOSITIONS,
+  SETTLEMENT_DEBT_BUDGET,
   // The assembly-page disclosure law (2026-08-18). One counter, two readers:
   // the shell floor below and the harness that proves it.
   ASSEMBLY_DISCLOSURE_MAX_BOX_POINTERS,
@@ -735,6 +742,174 @@ export function validateEndingsContinuity(endingsOutput, context) {
     }
   });
 
+  return errors;
+}
+
+// ── THE SETTLEMENT FLOOR (the settlement doctrine, 2026-08-18) ──────────────
+//
+// WHAT THIS GATE CAN AND CANNOT DO, stated first so nobody later mistakes it
+// for more than it is. It CANNOT grade whether an ending lands. Literary weight
+// is not decidable by a validator, and a floor that pretended to grade it would
+// be the overclaiming gate the severity doctrine warns about — ignored inside a
+// week, and worse than no gate.
+//
+// What it CAN do is the DR-33 declared-convention idiom, which is the whole
+// design: the ending DECLARES what it settles and in what mode, and the gate
+// checks conformance to that declaration — presence, shape, menu membership,
+// and the one structural implication the twist clause carries (an inversion
+// owes seeded evidence). The book is held to its own word, never to a house
+// preference.
+//
+// THE ONE ARM THAT IS NOT SELF-REFERENTIAL, and the reason this is a floor
+// rather than an essay the model grades itself on: `owed` is a SURFACE REF,
+// resolved against the book's own printed inventory through buildSurfaceIndex —
+// one home, two readers (D93). A settlement whose debts name nothing the book
+// prints is a settlement of debts the book never incurred, and that is
+// decidable. Without an armed index the arm stays silent by the D144
+// ungated-caller rule: a gate must never invent the evidence it checks.
+//
+// D70's resolution law is EXTENDED here, not restated. That law says a forward
+// promise resolving to nothing is invalidity. The naive extension to the finale
+// would demand every promise ANSWERED — a demand for tidy resolution, which is
+// exactly what the twist clause forbids and what would fail an
+// `ambiguous-by-design` book for being what it declared. So the demand is
+// ADDRESSED: paid, transformed, or inverted.
+export function endingSettlementFloorErrors(ending, where, options) {
+  options = options || {};
+  var errors = [];
+  var settlement = (ending || {}).settlement;
+
+  if (!settlement || typeof settlement !== 'object' || Array.isArray(settlement)) {
+    errors.push(where + ' declares no `settlement` — the sealed ending is the most expensive'
+      + ' content in the book and must state what it settles: { mode, debts[] }');
+    return errors;
+  }
+
+  var mode = String(settlement.mode == null ? '' : settlement.mode).trim();
+  if (!mode) {
+    errors.push(where + '.settlement declares no `mode` — an ending is checked against its own'
+      + ' declaration, so an undeclared mode is an ending nothing can be checked against ('
+      + VALID_ENDING_MODES.join(' | ') + ')');
+  } else if (VALID_ENDING_MODES.indexOf(mode) === -1) {
+    errors.push(where + '.settlement.mode "' + mode + '" is not an ending mode ('
+      + VALID_ENDING_MODES.join(' | ') + ')');
+  }
+
+  // THE BOOK'S OWN WORD, when the seat was armed with it. The mode is decided
+  // at the compiler seat and rides the intent contract to this one; an ending
+  // settling in a mode the book never declared has re-rolled a die the run
+  // already threw. Armed-only: an ungated caller stays silent (D144).
+  var bookMode = String(options.endingMode == null ? '' : options.endingMode).trim();
+  if (bookMode && mode && VALID_ENDING_MODES.indexOf(mode) !== -1 && mode !== bookMode) {
+    errors.push(where + '.settlement.mode is "' + mode + '" but this book declared endingMode "'
+      + bookMode + '" — the finale settles in the mode the book chose, or the choice was theatre');
+  }
+
+  var debts = Array.isArray(settlement.debts) ? settlement.debts : [];
+  if (debts.length < SETTLEMENT_DEBT_BUDGET.min) {
+    errors.push(where + '.settlement settles only ' + debts.length + ' debt(s); at least '
+      + SETTLEMENT_DEBT_BUDGET.min + ' — the reader paid weeks of training for this page and'
+      + ' an ending that settles nothing is an ending a non-player could enjoy equally');
+  }
+  if (debts.length > SETTLEMENT_DEBT_BUDGET.max) {
+    errors.push(where + '.settlement lists ' + debts.length + ' debts; at most '
+      + SETTLEMENT_DEBT_BUDGET.max + ' — past that the finale is a receipt, not a payoff');
+  }
+
+  var invertedCount = 0;
+  debts.forEach(function (debt, di) {
+    var at = where + '.settlement.debts[' + di + ']';
+    var row = debt || {};
+
+    var owed = String(row.owed == null ? '' : row.owed).trim();
+    var parsedOwed = parseSurfaceRef(owed);
+    if (!parsedOwed.valid) {
+      errors.push(at + '.owed "' + owed + '" does not name a surface (expected `kind:id`, e.g.'
+        + ' `fragment: F.03` or `clock: the tide`) — a debt naming nothing this book prints is'
+        + ' a debt the book never incurred');
+    } else if (options.surfaceIndex) {
+      var res = surfaceRefResolves(options.surfaceIndex, owed);
+      if (!res.ok) errors.push(at + '.owed "' + owed + '" ' + res.reason);
+    }
+
+    var disposition = String(row.disposition == null ? '' : row.disposition).trim();
+    if (VALID_SETTLEMENT_DISPOSITIONS.indexOf(disposition) === -1) {
+      errors.push(at + '.disposition "' + disposition + '" is not a disposition ('
+        + VALID_SETTLEMENT_DISPOSITIONS.join(' | ') + ') — a promise is ADDRESSED, and'
+        + ' transformed and inverted settle a debt as truly as paid does');
+    }
+
+    if (!String(row.how == null ? '' : row.how).trim()) {
+      errors.push(at + '.how says nothing about how this debt was settled');
+    }
+
+    if (disposition === 'inverted') {
+      invertedCount += 1;
+      // THE TWIST'S COST OF ENTRY. An inversion with nothing planted behind it
+      // is a retraction, not a reversal — the author's own words, and the one
+      // structural implication of the twist clause a machine can decide.
+      var seeded = String(row.seededAt == null ? '' : row.seededAt).trim();
+      var parsedSeed = parseSurfaceRef(seeded);
+      if (!parsedSeed.valid) {
+        errors.push(at + ' inverts "' + owed + '" without naming where the evidence was seeded'
+          + ' — `seededAt` must be a surface ref; an inversion with nothing planted behind it'
+          + ' is a retraction, not a reversal');
+      } else if (options.surfaceIndex) {
+        var seedRes = surfaceRefResolves(options.surfaceIndex, seeded);
+        if (!seedRes.ok) errors.push(at + '.seededAt "' + seeded + '" ' + seedRes.reason);
+      }
+    }
+  });
+
+  // CONFORMANCE, IN THE ONE DIRECTION THAT IS DECIDABLE. A declared twist that
+  // inverts nothing did not do what it said. The converse is deliberately NOT
+  // checked: a revelation carrying an inversion is not a defect, and forbidding
+  // it would make the menu a cage rather than a choice.
+  if (mode === 'twist' && invertedCount === 0) {
+    errors.push(where + '.settlement declares mode "twist" but no debt is `inverted` — a twist'
+      + ' pays debts the reader did not know they held; an ending that only pays forward is a'
+      + ' revelation, and declaring it a twist makes the declaration unreadable');
+  }
+
+  return errors;
+}
+
+/**
+ * endingSettlementSetFloorErrors(endings, where, options) -> string[]
+ *
+ * THE WHICH-DIFFERENTIATION ARM. Book 2 shipped ONE ending and the proving-night
+ * read found the game thinnest where the payoff should have been thickest — so
+ * this arm is deliberately SILENT on a one-ending book rather than demanding
+ * more endings, which is a product decision nobody has made.
+ *
+ * What it decides: two endings that settle the same debts the same ways are one
+ * ending printed twice, however different the adjectives. That comparison is
+ * exact — it is a set of (owed, disposition) pairs — which is why the demand is
+ * "differ in WHAT THEY SETTLE" rather than "differ in register", a thing no
+ * validator can see.
+ */
+export function endingSettlementSetFloorErrors(endings, where, options) {
+  var list = Array.isArray(endings) ? endings : [];
+  if (list.length < 2) return [];
+  var errors = [];
+  var seen = {};
+  list.forEach(function (ending, ei) {
+    var settlement = (ending || {}).settlement;
+    var debts = (settlement && Array.isArray(settlement.debts)) ? settlement.debts : [];
+    if (!debts.length) return;
+    var signature = debts.map(function (d) {
+      return String((d || {}).owed || '').trim().toLowerCase()
+        + ' ' + String((d || {}).disposition || '').trim().toLowerCase();
+    }).sort().join('|');
+    var label = String((ending || {}).variant || ('#' + (ei + 1)));
+    if (seen[signature]) {
+      errors.push(where + ': endings "' + seen[signature] + '" and "' + label + '" settle the'
+        + ' same debts the same ways — multiple endings must differ in WHAT THEY SETTLE, never'
+        + ' in flavour; two endings paying the same debts are one ending printed twice');
+    } else {
+      seen[signature] = label;
+    }
+  });
   return errors;
 }
 

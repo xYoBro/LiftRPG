@@ -28,6 +28,8 @@ import {
   VALID_ARC_FAMILIES,
   VALID_MECHANIC_GRAMMAR_FAMILIES,
   VALID_CONVERGENCE_PATTERNS,
+  VALID_ENDING_MODES,
+  VALID_SETTLEMENT_DISPOSITIONS,
   DOCUMENT_TYPE_ENUM,
   VALID_MAP_TYPES,
   VALID_EDGE_SEMANTICS,
@@ -180,6 +182,14 @@ var artifactIntent = {
     // because it is a closed menu, optional like everything else in this block
     // because no corpus fixture carries an artifactIntent at all.
     convergencePattern: { enum: VALID_CONVERGENCE_PATTERNS },
+    // THE MODE DIE'S LANDING FIELD (the settlement doctrine, 2026-08-18).
+    // convergencePattern above says how the reader OPENS the ending; this says
+    // what the ending DOES to them. Enum-gated and optional for exactly the
+    // reasons stated on that line — closed menu, and no corpus fixture carries
+    // an artifactIntent at all. Generation policy is where it becomes an
+    // answer the book owes: the IDENTITY_AXES row is `answerRequired`, so the
+    // shell and skeleton seats block on silence.
+    endingMode: { enum: VALID_ENDING_MODES },
     reading: artifactIntentReading,
     selectionReason: { type: 'string' },
     _x: xt
@@ -2421,7 +2431,56 @@ export var BOOKLET_SCHEMA = {
             finalLine: { type: 'string' }
           }
         },
-        designSpec: { type: ['object', 'string'] }
+        designSpec: { type: ['object', 'string'] },
+        // ── THE SETTLEMENT DECLARATION (the settlement doctrine, 2026-08-18)
+        // What this ending SETTLES, declared so a machine can check the shape
+        // of the payoff without pretending to grade its weight.
+        //
+        // NOT A PRINTED SURFACE. Nothing renders this — it is the ending's own
+        // statement of what it spent, the way `meta.playSpine` is the book's
+        // statement of what it built. It is sealed material for the
+        // cold-reader probe for the same reason: a reader shown the settlement
+        // is answering the finisher test from the design instead of the page.
+        //
+        // OPTIONAL HERE, REQUIRED AT THE STAGE GATE — the D111/D178 idiom, and
+        // the reason is the corpus: no fixture in content/ carries a
+        // settlement, and requiring one here would retro-fail sealed evidence
+        // to enforce a prompt rule.
+        settlement: {
+          type: 'object',
+          required: ['mode', 'debts'],
+          additionalProperties: false,
+          properties: {
+            // WHICH KIND OF SETTLEMENT THIS ENDING IS. Checked against ITSELF
+            // at the gate (the DR-33 declared-convention idiom): the floor
+            // asks whether the ending did what it said it would do, never
+            // whether a literary judge would call it a twist.
+            mode: { enum: VALID_ENDING_MODES },
+            debts: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['owed', 'disposition', 'how'],
+                additionalProperties: false,
+                properties: {
+                  // A SURFACE REF (`fragment: F.07`, `clock: the tide`), not
+                  // free prose, and that is the whole reason this declaration
+                  // has teeth instead of being a self-graded essay: the gate
+                  // resolves it against the book's own printed inventory
+                  // (buildSurfaceIndex — one home, D93). A debt naming
+                  // nothing the book prints is a debt the book never incurred.
+                  owed: { type: 'string' },
+                  disposition: { enum: VALID_SETTLEMENT_DISPOSITIONS },
+                  how: { type: 'string' },
+                  // REQUIRED ONLY OF AN INVERSION, at the gate. A twist needs
+                  // seeded evidence to invert; an inversion with nothing
+                  // planted behind it is a retraction, not a reversal.
+                  seededAt: { type: 'string' }
+                }
+              }
+            }
+          }
+        }
       }
     }
   }

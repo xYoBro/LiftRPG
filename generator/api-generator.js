@@ -155,6 +155,13 @@ import {
   deriveWeeklySurfaceLedger,
   classifyValidationErrors,
   collectBudgetBreaches,
+  // The settlement doctrine (2026-08-18). buildSurfaceIndex is imported for the
+  // ONE arm of the settlement floor that is not self-referential: a debt names
+  // a surface the book actually prints, resolved against the same inventory the
+  // spine floors and the sim player read (one home, D93).
+  endingSettlementFloorErrors,
+  endingSettlementSetFloorErrors,
+  buildSurfaceIndex,
   collectPercentileStatFindings,
   collectMarkStripFindings,
   collectNounRosterFindings,
@@ -727,6 +734,13 @@ var STRUCTURED_SCHEMA_SHELL = {
             },
             homePull: { type: 'string' },
             convergencePattern: { type: 'string' },
+            // The mode die's landing field (the settlement doctrine). TYPE,
+            // NOT MENU, for the reason stated at the head of this block: the
+            // menus are stated to the model in the prompt and enforced by the
+            // skeleton literal, and validate.mjs diffs the contract against
+            // prompt_rules.js rather than against this file. A third copy of
+            // the menu here would be a third thing to drift.
+            endingMode: { type: 'string' },
             // `tone` and `briefEvidence` are the two the floor BLOCKS on: the
             // tone is what the critic's register axis grades this book against,
             // and the evidence is what makes the reading auditable at all. The
@@ -768,7 +782,7 @@ var STRUCTURED_SCHEMA_SHELL = {
             }
           },
           required: ['briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily',
-            'documentEcology', 'exclusions', 'homePull', 'convergencePattern', 'reading',
+            'documentEcology', 'exclusions', 'homePull', 'convergencePattern', 'endingMode', 'reading',
             'selectionReason', '_x']
         },
         // ── The authored design language (W6, landed with the floor) ────────
@@ -5270,6 +5284,28 @@ async function runApiPipeline(options) {
         // so they address the ENDING OBJECT the stage actually returns — the
         // payload the merge lands on. partitionDeltaRepairOn re-checks that
         // against the real payload before spending anything.
+        // THE SETTLEMENT FLOOR, ARMED (the settlement doctrine). The index is
+        // built from what this run has BANKED by the time the finale is
+        // written — the weeks and the fragments — which is exactly the printed
+        // inventory a debt may name. Built here rather than hoisted so it
+        // reflects the state at the moment the gate runs.
+        // AUTHORED weeks (`finalWeeks`), never the plan: buildSurfaceIndex has
+        // an authored-not-planned rule, and a debt naming a surface the plan
+        // proposed but no week printed is exactly the miss this arm exists to
+        // catch.
+        var settlementIndexSource = {
+          weeks: finalWeeks,
+          fragments: (assembledFragmentsOutput && assembledFragmentsOutput.fragments) || [],
+          endings: [result]
+        };
+        var settlementErrors = endingSettlementFloorErrors(result, 'Ending', {
+          endingMode: ((shellContext || {}).artifactIntent || {}).endingMode,
+          surfaceIndex: buildSurfaceIndex(settlementIndexSource)
+        });
+        if (settlementErrors.length > 0) {
+          return { valid: false, errors: settlementErrors };
+        }
+
         var endingBreaches = collectBudgetBreaches({ endings: [result] });
         if (endingBreaches.length > 0) {
           return {
@@ -6884,6 +6920,29 @@ async function runSkeletonFleshPipeline(options) {
         collectBudgetBreaches({ endings: endingsArray }).forEach(function (b) {
           errors.push('Over budget: ' + b.message);
         });
+
+        // THE SETTLEMENT FLOOR, ARMED (the settlement doctrine). This is the
+        // seat where WHICH-differentiation is actually decidable: the bundled
+        // builder returns every variant in one call, so the set arm can compare
+        // them. The multi-stage twin writes one ending per call and can only
+        // check the ending in front of it.
+        var settlementIndexSourceSF = {
+          weeks: weekOutputs,
+          fragments: allFragments,
+          endings: endingsArray
+        };
+        var settlementIndexSF = buildSurfaceIndex(settlementIndexSourceSF);
+        var settlementModeSF = ((skeleton || {}).meta || {}).artifactIntent
+          ? (((skeleton || {}).meta || {}).artifactIntent || {}).endingMode
+          : ((skeleton || {}).artifactIntent || {}).endingMode;
+        endingsArray.forEach(function (ending, ei) {
+          endingSettlementFloorErrors(ending, 'Ending "' + ((ending || {}).variant || ei) + '"', {
+            endingMode: settlementModeSF,
+            surfaceIndex: settlementIndexSF
+          }).forEach(function (message) { errors.push(message); });
+        });
+        endingSettlementSetFloorErrors(endingsArray, 'Endings')
+          .forEach(function (message) { errors.push(message); });
         return errors.length > 0 ? errors.join('; ') : '';
       }
     });

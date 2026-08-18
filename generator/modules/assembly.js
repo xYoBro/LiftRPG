@@ -545,6 +545,11 @@ export function formatIdentityContractLines(contract) {
     if (intent.mechanicGrammarFamily) lines.push('- Do not change mechanicGrammarFamily: ' + intent.mechanicGrammarFamily);
     if (intent.arcFamily) lines.push('- Do not change arcFamily: ' + intent.arcFamily);
     if (intent.convergencePattern) lines.push('- Do not change convergencePattern: ' + intent.convergencePattern);
+    // The mode die's answer is a planning decision like the three above: a
+    // revision that quietly re-modes the finale has re-rolled a die the run
+    // already threw, and the settlement declarations downstream would then be
+    // conforming to a mode nothing assigned.
+    if (intent.endingMode) lines.push('- Do not change endingMode: ' + intent.endingMode);
   }
   return lines;
 }

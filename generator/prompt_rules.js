@@ -616,7 +616,8 @@
     'Generate exactly ONE ending variant.',
     '- `variant` (string)',
     '- `content`: { documentType, body, finalLine }',
-    '- `designSpec` (object): { paperTone, primaryTypeface }'
+    '- `designSpec` (object): { paperTone, primaryTypeface }',
+    '- `settlement` (object): { mode, debts: [{ owed, disposition, how, seededAt? }] } — see The Settlement'
   ];
 
   // ── Skeleton Schema (Skeleton+Flesh pipeline) ──────────────────────────
@@ -664,6 +665,8 @@
     '  - `exclusions` (object): { mechanicExclusions: string[], documentExclusions: string[], arcExclusions: string[] }',
     '  - `homePull` (string): story | game | investigation | mixed',
     '  - `convergencePattern` (string): the endgame shape — sequential-assembly | reordering | red-herring | dual-source',
+    '  - `endingMode` (string): what the ending DOES to the reader — revelation | twist | ambiguous-by-design',
+    '    convergencePattern is how the reader OPENS the ending; this is what they find. See The Settlement.',
     '  - `reading` (object): the recorded reading — your interpretation of the brief, written down.',
     '    { tone, register, povFrame, impliedSetting, emotionalArc, genreTemplate, ludicReading, briefEvidence }',
     '    All free strings in your own words; these are a record, not a menu.',
@@ -777,6 +780,11 @@
         exclusions: { mechanicExclusions: ['', ''], documentExclusions: [''], arcExclusions: [''] },
         homePull: '',
         convergencePattern: '',
+        // BLANKED for the reason every closed menu on this example is blanked
+        // (D47/D144): a shown enum member is an instruction, not an
+        // illustration, and this is the one axis where a shown value would
+        // install the house ending the mode die exists to prevent.
+        endingMode: '',
         // The recorded reading is the model's own words, and a filled-in sample
         // would function as an exemplar to copy — the same bleed, one level
         // down.
@@ -1201,6 +1209,7 @@
               // a declared pattern, optional in booklet-schema.mjs because no
               // corpus fixture carries an artifactIntent at all.
               convergencePattern: { type: 'string', enum: ['sequential-assembly', 'reordering', 'red-herring', 'dual-source'] },
+              endingMode: { type: 'string', enum: ['revelation', 'twist', 'ambiguous-by-design'] },
               // The recorded reading (§10.1). Required HERE by generation
               // policy — this literal is the machine-enforced contract handed
               // to the transport, and an optional reading is a reading the
@@ -1251,7 +1260,7 @@
                 required: ['rejectedReadings']
               }
             },
-            required: ['briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily', 'documentEcology', 'exclusions', 'homePull', 'convergencePattern', 'reading', 'selectionReason', '_x']
+            required: ['briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily', 'documentEcology', 'exclusions', 'homePull', 'convergencePattern', 'endingMode', 'reading', 'selectionReason', '_x']
           },
           playSpine: STRUCTURED_PLAY_SPINE,
           // The arrangement grammar, on the transport at BOTH seats. The shell
@@ -5101,6 +5110,64 @@
     '  acts on; a blank with no rule is a question nobody asked.'
   ];
 
+  // ── THE SETTLEMENT DOCTRINE (author directive, 2026-08-18) ───────────────
+  // ONE SECTION, TWO SEATS, because it is one rule: the shell seat CHOOSES the
+  // mode and the ending seat SETTLES in it. Splitting it would put the menu in
+  // two homes (D93) and let the two halves drift into a book whose finale
+  // conforms to a mode nothing assigned.
+  //
+  // OFF the ceiling-bound single-prompt bundle by the SHELL_CHOICE/
+  // DESIGN_LANGUAGE precedent (D139/D144) — stage-routed only.
+  window.INST_ENDING_SETTLEMENT = [
+    '## The Settlement',
+    '- The sealed ending is the most expensive content in this book. The reader pays weeks of',
+    '  real training for the password that opens it. Write it as the SETTLEMENT of every debt',
+    '  the book incurred, not as a summary of what happened.',
+    '- Settling a debt means: resolving a question the story left open, landing the consequence',
+    '  of the darkest moment, or saying out loud what the fragments only implied.',
+    '',
+    '### THE FINISHER TEST',
+    '- An ending a non-player could enjoy equally has paid off nothing. If a stranger who never',
+    '  trained, never marked a strip and never decoded a fragment would get the same thing from',
+    '  this page that the player gets, then nothing on it was bought with the weeks. Rewrite it.',
+    '- Multiple endings must differ in WHAT THEY SETTLE, never in flavour. Two endings that pay',
+    '  the same debts in different adjectives are one ending printed twice.',
+    '',
+    '### THE MODE — choose it, do not default to it',
+    '- `meta.artifactIntent.endingMode` is one of: `revelation` | `twist` | `ambiguous-by-design`.',
+    '- Settlement must never read as tidy resolution. A twist is settlement\'s MOST DEMANDING',
+    '  form: it pays debts the reader did not know they held, and it needs evidence seeded',
+    '  earlier in the book to invert. An inversion with nothing planted behind it is a',
+    '  retraction, not a reversal.',
+    '- AND THE OTHER DIRECTION, which matters exactly as much: not every story should end in a',
+    '  twist. All-twist is sameness wearing a dramatic hat. A plain, fully-earned revelation',
+    '  CHOSEN ON PURPOSE is exactly as designed as an inversion. `ambiguous-by-design` is a',
+    '  third real answer, not a way of declining to decide.',
+    '- So the mode is brief-funded or die-assigned, never a habit. Whichever you take, the',
+    '  ending conforms to the mode the book declared — you are checked against your OWN',
+    '  declaration, not against a house preference.',
+    '',
+    '### THE SETTLEMENT DECLARATION (`settlement` on every ending object)',
+    '- Every ending declares a `settlement`: `{ mode, debts[] }`. It is NOT printed — it is your',
+    '  statement of what this ending spent, the way the play spine states what the book built.',
+    '- `mode` repeats the book\'s declared ending mode.',
+    '- `debts` names 2-6 things this ending settles. Each debt is',
+    '  `{ owed, disposition, how }` (plus `seededAt` when inverting):',
+    '  * `owed` — a SURFACE REF naming what the book already printed and left owing:',
+    '    `fragment:F.03`, `clock:<clock name>`, `week:W4`, `session:W4.2`, `boss`, `banked`.',
+    '    Same grammar as the spine\'s refs — week and session refs are `W<n>`, never bare numbers.',
+    '    A debt naming nothing this book prints is a debt the book never incurred.',
+    '  * `disposition` — `paid` (the ending gives what was owed) | `transformed` (the ending',
+    '    changes what it meant) | `inverted` (what the reader thought they held, they did not).',
+    '    A promise must be ADDRESSED, never merely answered in one direction — `transformed`',
+    '    and `inverted` settle a debt as truly as `paid` does.',
+    '  * `how` — one sentence, concrete, in the book\'s own nouns.',
+    '  * `seededAt` — REQUIRED on every `inverted` debt: the surface ref where you planted the',
+    '    evidence that makes the inversion land. This is the twist\'s cost of entry.',
+    '- If you declared `twist`, at least one debt must be `inverted`. If you declared',
+    '  `revelation` or `ambiguous-by-design`, inversions are allowed but never required.'
+  ];
+
   window.INST_ENDING_STANDARD = [
     '## Ending Standard',
     '- The ending is a found document first, not a summary.',
@@ -5699,7 +5766,7 @@
     // is how its page is PUT TOGETHER (VISION §8: layout IS the identity), and
     // a model that fixes the press and then composes the page in a different
     // sitting writes two objects. Same stage-only ruling, same reason.
-    'shell':          { schemas: ['META', 'THEME', 'DESIGN_LANGUAGE', 'ARRANGEMENT', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'SHELL_CHOICE', 'SEED_ASSIGNMENT', 'SURFACE_REFS', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'VOICE_SKELETON', 'RULES_TEACH', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'ARRANGEMENT', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES', 'SHELL_SELF_CHECK'] },
+    'shell':          { schemas: ['META', 'THEME', 'DESIGN_LANGUAGE', 'ARRANGEMENT', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'SHELL_CHOICE', 'SEED_ASSIGNMENT', 'SURFACE_REFS', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'ENDING_SETTLEMENT', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'VOICE_SKELETON', 'RULES_TEACH', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'ARRANGEMENT', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES', 'SHELL_SELF_CHECK'] },
     // Knowing: the world's process particulars, authored once after the
     // skeleton/shell and consumed by every prose stage (§11 Wave 1.5). It
     // writes no prose, so it carries no VOICE_DISCIPLINE — it carries the
@@ -5750,7 +5817,7 @@
     // answers with an envelope, which is a shape no validator here accepts.
     // JSON hygiene reaches this stage through OUTPUT_RULES, which is where it
     // belongs.
-    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'CONVERGENCE_DESIGN', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'ANTI_GENERIC', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
+    'ending':         { schemas: ['SINGLE_ENDING'],                             instructions: ['ENDING_STANDARD', 'ENDING_SETTLEMENT', 'CONVERGENCE_DESIGN', 'VOICE_DISCIPLINE', 'LAYERED_ARC', 'ANTI_GENERIC', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SELF_VERIFICATION'] },
     // Conductor: the dedicated read of the play-order sequence, after assembly
     // and ahead of the critic's first round. It carries NOTHING else on
     // purpose. No VOICE_DISCIPLINE (it writes no prose and is shown none), no
@@ -6310,7 +6377,16 @@
       'Return a single JSON object:',
       '{ "variant": "' + variant + '",',
       '  "content": { "documentType": "string", "body": "string (the ending prose)", "finalLine": "string (closing line)" },',
-      '  "designSpec": { "paperTone": "string", "primaryTypeface": "string" } }',
+      '  "designSpec": { "paperTone": "string", "primaryTypeface": "string" },',
+      // THE WIRE SLOT for the settlement declaration. A prose demand with no
+      // slot in the shape the model is told to return is the W5a defect: the
+      // seat is asked for a field its output schema never mentions, and the
+      // floor then blocks a model that answered the schema it was given.
+      '  "settlement": { "mode": "revelation | twist | ambiguous-by-design",',
+      '                  "debts": [ { "owed": "surface ref, e.g. fragment:F.03",',
+      '                               "disposition": "paid | transformed | inverted",',
+      '                               "how": "one sentence",',
+      '                               "seededAt": "surface ref — REQUIRED when inverted" } ] } }',
       '',
       '## Quality Requirements',
       '- The ending must feel EARNED — reference specific events, characters, and discoveries from the weeks.',
@@ -6328,7 +6404,16 @@
       'Each ending object:',
       '{ "variant": "string",',
       '  "content": { "documentType": "string", "body": "string (the ending prose)", "finalLine": "string (closing line)" },',
-      '  "designSpec": { "paperTone": "string", "primaryTypeface": "string" } }',
+      '  "designSpec": { "paperTone": "string", "primaryTypeface": "string" },',
+      // THE WIRE SLOT for the settlement declaration. A prose demand with no
+      // slot in the shape the model is told to return is the W5a defect: the
+      // seat is asked for a field its output schema never mentions, and the
+      // floor then blocks a model that answered the schema it was given.
+      '  "settlement": { "mode": "revelation | twist | ambiguous-by-design",',
+      '                  "debts": [ { "owed": "surface ref, e.g. fragment:F.03",',
+      '                               "disposition": "paid | transformed | inverted",',
+      '                               "how": "one sentence",',
+      '                               "seededAt": "surface ref — REQUIRED when inverted" } ] } }',
       '',
       '## Quality Requirements',
       '- Each ending must feel EARNED — reference specific events, characters, and discoveries from the weeks.',
