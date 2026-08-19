@@ -2577,8 +2577,22 @@
         ? capText(armed.briefChannel(blend), 3200)
         : truncateText(armed.briefChannel(blend), 2000),
       '',
-      options.retryMode
-        ? 'Retry mode: keep every answer to plain declarative sentences and make sure the JSON completes cleanly. Do not shorten below the word floors — a thin answer is what failed.\n'
+      // D228: the retry line used to assert "a thin answer is what failed" —
+      // a hardcoded guess that MISDIAGNOSED every unknown-key rejection as a
+      // length failure and fed the exact anxiety that caused the invented
+      // annotation keys (proving-run 3 died twice on it). The real errors now
+      // ride in; the fallback asserts no cause.
+      options.retryMode && options.retryError
+        ? 'Retry: your previous attempt was rejected for exactly this —\n'
+          + capText(String(options.retryError), 1400) + '\n'
+          + 'Fix exactly what is quoted above and change nothing else. Do not rename a rejected'
+          + ' key — any key the shape does not declare fails whatever it is called. Keep every'
+          + ' answer inside its word band and make sure the JSON completes cleanly.\n'
+        : '',
+      options.retryMode && !options.retryError
+        ? 'Retry mode: keep every answer to plain declarative sentences, inside its word band,'
+          + ' emitting ONLY the keys the shape declares, and make sure the JSON completes'
+          + ' cleanly.\n'
         : '',
       'Return ONLY the JSON object. No markdown fences, no commentary.'
     ];

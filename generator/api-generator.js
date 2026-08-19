@@ -2777,7 +2777,9 @@ function unknownKeyErrorsForStage(config, result) {
       if (String(p).split(/[.[]/).some(function (seg) { return seg.charAt(0) === '_'; })) return;
       errors.push('Unknown key "' + joinUnknownKeyPath(label, p)
         + '" — the booklet schema rejects any key it does not declare outside the `_x` '
-        + 'namespace. Remove the field, or move it under `_x` if it is genuinely extra.');
+        + 'namespace, REGARDLESS of its name: renaming it fails again. Delete the key '
+        + 'entirely (do not annotate answers at all), or move it under `_x` if it is '
+        + 'genuinely extra data.');
     });
   });
   return errors;
@@ -4450,6 +4452,12 @@ async function runApiPipeline(options) {
     buildPrompt: function (retryState) {
       return builders.gameRulebook(workout, brief, {
         retryMode: retryState.attempt > 0,
+        // D228: the gate's own error text is the one channel proven to reach
+        // the model on a retry — dropping it left the builder guessing at the
+        // cause, and its guess ("a thin answer") fed the annotation-key class.
+        retryError: retryState.error
+          ? String((retryState.error && retryState.error.message) || retryState.error)
+          : '',
         weekCount: weekCount,
         divergenceSeed: divergenceSeed
       });
@@ -6308,6 +6316,12 @@ async function runSkeletonFleshPipeline(options) {
     buildPrompt: function (retryState) {
       return builders.gameRulebook(workout, brief, {
         retryMode: retryState.attempt > 0,
+        // D228: the gate's own error text is the one channel proven to reach
+        // the model on a retry — dropping it left the builder guessing at the
+        // cause, and its guess ("a thin answer") fed the annotation-key class.
+        retryError: retryState.error
+          ? String((retryState.error && retryState.error.message) || retryState.error)
+          : '',
         weekCount: weekCount,
         divergenceSeed: divergenceSeed
       });

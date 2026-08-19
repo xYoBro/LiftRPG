@@ -1462,10 +1462,12 @@
     '- `passwordPath` (object)',
     '  - `answer` (string): how the password to the sealed ending is earned.',
     '  - `elements` (array of surface refs): where the pieces come from, one ref per source.',
-    '- `sessionShape` (object) — `answer` (string) only.',
-    '- `weekShape` (object) — `answer` (string) only.',
-    '- `whatGoesBadly` (object) — `answer` (string) only.',
-    '- `teachingOrder` (object) — `answer` (string) only.',
+    '- `sessionShape` (object) — `answer` (string) and NO other key.',
+    '- `weekShape` (object) — `answer` (string) and NO other key.',
+    '- `whatGoesBadly` (object) — `answer` (string) and NO other key.',
+    '- `teachingOrder` (object) — `answer` (string) and NO other key.',
+    '  These four carry `answer` and nothing else — a sibling key of any name beside an answer',
+    '  (`answer_note`, `answer_length_ok`, anything) fails the whole stage.',
     '- `unprintableWants` (array of strings, may be empty): anything this design wanted that this',
     '  system cannot print. Say it plainly rather than substituting something printable and',
     '  calling it the same thing.',
@@ -1478,7 +1480,14 @@
     '- At most 1800 words across all eight answers combined. This is a design document, not a',
     '  chapter: it should be shorter than one week of the book\'s prose.',
     'Both bounds are enforced and both cost a retry. A one-line answer is the failure this floor',
-    'exists to catch; a rulebook long enough to hide in is a rulebook nobody checked.'
+    'exists to catch; a rulebook long enough to hide in is a rulebook nobody checked.',
+    // The motive absorber (D228): three models across three runs answered this
+    // band's pressure by ANNOTATING length compliance in invented sibling keys
+    // (`answer_length_note`, `answer_note`, `answer_length_ok`) — the machine
+    // does the counting, and saying so here removes the reason to annotate.
+    'The machine counts every word itself. Never report, assert, or annotate lengths anywhere in',
+    'the object — no note, ok, placeholder, or helper keys. If an answer feels thin, write the',
+    'answer longer; never write ABOUT its length.'
   ];
 
   // Structured output schema for the game rulebook stage (OpenAI json_schema /
