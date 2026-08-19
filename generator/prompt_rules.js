@@ -3842,6 +3842,17 @@
     'Your own world-names go beside these, never instead of them: call it the Tide Ledger all you',
     'like, but say once that it is a track, or the machine cannot tell the player was ever told.',
     '',
+    // The teaching half of D197's schema-derived unknown-key gate (D227): the
+    // habit this forbids killed proving-run 3's first stage twice on the
+    // bridge, where no wire schema can force the shape — attempt 1 invented
+    // `answer_note` siblings, and after a repair prompt naming them, attempt 2
+    // invented `answer_placeholder`. The gate is generic, so no named floor
+    // ever owed this sentence; it is written now, at the seat that paid for it.
+    'THE SCHEMA IS CLOSED. Emit exactly the keys the shape above names — nothing else, at any',
+    'depth. Do not add annotation, note, placeholder, length, or helper keys beside your answers',
+    '(`answer_note`, `answer_placeholder`, and anything like them are rejected whole). An answer',
+    'field carries the answer itself and nothing else.',
+    '',
     'Return ONLY the JSON object. No commentary, no markdown fences.'
   ];
 
