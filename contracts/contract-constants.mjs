@@ -3411,6 +3411,27 @@ export function seedHash(text) {
  * "what did the die say?" a second time in its own dialect, and the floor and
  * the prompt would quietly stop agreeing about the same book.
  */
+// THE AVALANCHE FINALIZER (D231). FNV-1a's low bits are a closed channel —
+// the multiplier is odd, so the low k bits of the state never feel the high
+// bits — and every small-menu axis drew `hash % 4` from that starved channel
+// with near-identical inputs. Measured on 5,000 random seed pairs: 3% collided
+// on ALL EIGHT surface-identity axes at once (10,000× the independent rate),
+// in a bimodal all-or-nothing pattern — seeds fell into a handful of large
+// equivalence classes, and every generated book drew its face from those few.
+// Marginally uniform, jointly degenerate: per-axis frequency tests pass while
+// the joint draw is the sameness engine itself. fmix32 (MurmurHash3's
+// finalizer) gives every output bit dependence on every state bit, making the
+// axes jointly independent. Scoped HERE, not in seedHash — seedHash has other
+// consumers (draw-inputs.mjs) whose mappings this must not silently move.
+function avalanche32(h) {
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+
 export function drawSeedAssignments(seedValue) {
   var value = String(seedValue == null ? '' : seedValue).trim();
   if (!value) return null;
@@ -3418,7 +3439,7 @@ export function drawSeedAssignments(seedValue) {
   for (var i = 0; i < IDENTITY_AXES.length; i++) {
     var axis = IDENTITY_AXES[i];
     if (!axis.menu || !axis.menu.length) continue;
-    out[axis.id] = axis.menu[seedHash(value + ' ' + axis.id) % axis.menu.length];
+    out[axis.id] = axis.menu[avalanche32(seedHash(value + ' ' + axis.id)) % axis.menu.length];
   }
   return out;
 }
