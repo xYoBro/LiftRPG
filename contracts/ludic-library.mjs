@@ -88,7 +88,7 @@ var IMPLEMENTED_DETAIL = {
     inputs: 'Session markStrip ticks; the week’s reckoning conversion; the derived boss threshold.',
     process: 'Ticks tally at the week’s Reckoning, convert to the named currency, and bank; banked value prices every spend the spine declares.',
     outputs: 'A filled strip, a tallied panel, a running Banked figure, and whatever the spend opens.',
-    locks: 'Nothing spends before its first Reckoning; the boss threshold gates the endgame ceremony only when the spine routes required content through it.'
+    locks: 'Nothing spends before its first Reckoning; the boss threshold is a printed TARGET — it may pick WHICH ending the player reaches, never WHETHER the endgame opens, and a spine that routes required content through it is blocked (D130).'
   },
   'board': {
     label: 'The board',

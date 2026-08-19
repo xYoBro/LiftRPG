@@ -1258,13 +1258,14 @@ function buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState,
 }
 
 function shouldEchoFailedOutputForRetry(stageName) {
-  var label = String(stageName || '');
-  if (/^Layer Codex$/i.test(label)) return false;
-  if (/^Story Plan$/i.test(label)) return false;
-  if (/^Booklet Setup$/i.test(label)) return false;
-  if (/^Week\s+\d+/i.test(label)) return false;
-  if (/^Fragments batch/i.test(label)) return false;
-  if (/^Fragment\s+/i.test(label)) return false;
+  // D230 (closes DR-63): every stage echoes. The old exclusion list (Layer
+  // Codex, Story Plan, Booklet Setup, Weeks, Fragments) made the five biggest
+  // seats retry BLIND while the directive ordered "Do NOT regenerate from
+  // scratch. Fix only the listed errors" — an instruction impossible to obey
+  // without the output it references. Measured cost on proving-run 3: the
+  // shell re-invented the same illegal threshold gate on three consecutive
+  // blind rolls, 457.8K tokens in. Echoing a failed output costs a fraction
+  // of one blind re-roll of any of these stages.
   return true;
 }
 
@@ -1303,7 +1304,11 @@ function buildSmartRetryDirective(stageName, attempt, err) {
 
   if (echoFailedOutput) {
     var compact = compactJsonString(failedOutput);
-    if (compact.length > 6000) compact = compact.slice(0, 6000) + '... [truncated]';
+    // D230: 24000 chars (~6k tokens), up from 6000 — a truncated echo of a big
+    // stage (the shell serializes ~15-25k) cut off before its economyGraph is
+    // worse than none; the full echo still costs a fraction of one blind
+    // re-roll of the stage it repairs.
+    if (compact.length > 24000) compact = compact.slice(0, 24000) + '... [truncated]';
     lines.push('### Your Previous Output');
     lines.push('```json');
     lines.push(compact);

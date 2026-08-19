@@ -4311,7 +4311,7 @@
   // blocking defect.
   window.ARSENAL_DIGEST = [
     'THE IMPLEMENTED SYSTEMS — the composition menu. Each line: what feeds it, what it does, what it yields, what locks it.',
-    '- `reckoning-economy` (The reckoning economy) — IN: Session markStrip ticks; the week’s reckoning conversion; the derived boss threshold. DOES: Ticks tally at the week’s Reckoning, convert to the named currency, and bank; banked value prices every spend the spine declares. GIVES: A filled strip, a tallied panel, a running Banked figure, and whatever the spend opens. LOCKS: Nothing spends before its first Reckoning; the boss threshold gates the endgame ceremony only when the spine routes required content through it.',
+    '- `reckoning-economy` (The reckoning economy) — IN: Session markStrip ticks; the week’s reckoning conversion; the derived boss threshold. DOES: Ticks tally at the week’s Reckoning, convert to the named currency, and bank; banked value prices every spend the spine declares. GIVES: A filled strip, a tallied panel, a running Banked figure, and whatever the spend opens. LOCKS: Nothing spends before its first Reckoning; the boss threshold is a printed TARGET — it may pick WHICH ending the player reaches, never WHETHER the endgame opens, and a spine that routes required content through it is blocked (D130).',
     '- `board` (The board) — IN: Banked value or a key; the region or node the player names. DOES: Marking the map opens a region permanently — six geometries under eight board-state modes, add-only in every one. GIVES: A mutated map the player returns to every week; new regions legal to reference in prose. LOCKS: A region is unreachable until an edge feeds it; the map never un-marks, so an opened region cannot be spent twice.',
     '- `decode-chain` (The decode chain) — IN: The week’s cipher body plus the extraction instruction; prior play state for the cross-reference families. DOES: The player performs the extraction with a pencil; the result is a word, coordinate, or index the book reads back. GIVES: A decoded value that feeds a seal, a password element, or the boss assembly. LOCKS: A cipher whose key is a fragment the player has not met yet cannot be solved — keys land strictly before locks.',
     '- `clock-bank` (The clock bank) — IN: Outcomes, spends, misses, and the passage of weeks. DOES: Segments tick on fill, drain, race, or tug-of-war clocks; a full clock fires its declared consequence. GIVES: Visible pressure the player reads at a glance, and the state change a filled clock triggers. LOCKS: A clock nothing reads is a mute source and blocks at the week floor; ambient clocks must be declared ambient.',
@@ -4426,6 +4426,20 @@
     '  only the kinds those rules already name, and put anything else in `honestGaps`.',
     'If the graph you would honestly write disagrees with the rules, the RULES WIN and the graph',
     'changes to serve them. That is what rules-first means.',
+    '',
+    // D230: the floor's teaching half at the graph-writing seat. Three shell
+    // attempts in proving-run 3 routed the endgame through the reckoning
+    // threshold against a rulebook that explicitly forbade it — the soft-lock
+    // floor (D130) taught the law only in its ERROR text, after the money was
+    // spent. The old reckoning-economy LOCKS line even read as permission.
+    '### THE ENDGAME ROUTING LAW (blocking)',
+    'The reckoning threshold is a printed TARGET, never a lock. Route NOTHING required through',
+    'it: no boss, no assembly, no seal, and never every ending. The tally may pick WHICH ending',
+    'the player signs — it may never decide WHETHER the endgame opens. Feed the ceremony and at',
+    'least one ending from surfaces the player\'s own work reaches directly (a cipher, an',
+    'assembly, a seal keyed earlier); a threshold-gated ending is legal only as the high bar a',
+    'strong block buys, never the only door. A graph that gates required content on the',
+    'threshold is blocked at this stage — at 60% adherence the book must still finish.',
     '',
     '### The seven declarations',
     '- `composition` (array, 2-4 items): `{ entry, role }`.',
