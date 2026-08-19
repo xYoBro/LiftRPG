@@ -1594,6 +1594,13 @@
     '- `cadence` (object, optional but strongly wanted) — how often the player takes this edge.',
     '  - `mode` (string): exactly one of `weekly`, `once`, `window`, `late`.',
     '  - `introWeek` (integer ≥ 1): the week the edge\'s surface starts appearing.',
+    // D229: the closed-schema line the rulebook seat paid three runs to learn,
+    // written here BEFORE this seat's first live run — its framing verb is
+    // "enrich", its gate blocks invented siblings, and that pairing is the
+    // exact trap the annotation class walks into.
+    'An edge carries exactly the fields listed above and NO other key, at any depth. Never',
+    'annotate: a note, explanation, or compliance key of any name beside these fields fails',
+    'the whole stage. The machine checks the promises itself — say the cadence, not why.',
     '',
     '## What each cadence PROMISES, and what is then checked against your pages',
     'A cadence is not a label. It is a promise about which weeks print the surface this edge',

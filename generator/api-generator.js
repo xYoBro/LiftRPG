@@ -4452,12 +4452,6 @@ async function runApiPipeline(options) {
     buildPrompt: function (retryState) {
       return builders.gameRulebook(workout, brief, {
         retryMode: retryState.attempt > 0,
-        // D228: the gate's own error text is the one channel proven to reach
-        // the model on a retry — dropping it left the builder guessing at the
-        // cause, and its guess ("a thin answer") fed the annotation-key class.
-        retryError: retryState.error
-          ? String((retryState.error && retryState.error.message) || retryState.error)
-          : '',
         weekCount: weekCount,
         divergenceSeed: divergenceSeed
       });
@@ -6316,12 +6310,6 @@ async function runSkeletonFleshPipeline(options) {
     buildPrompt: function (retryState) {
       return builders.gameRulebook(workout, brief, {
         retryMode: retryState.attempt > 0,
-        // D228: the gate's own error text is the one channel proven to reach
-        // the model on a retry — dropping it left the builder guessing at the
-        // cause, and its guess ("a thin answer") fed the annotation-key class.
-        retryError: retryState.error
-          ? String((retryState.error && retryState.error.message) || retryState.error)
-          : '',
         weekCount: weekCount,
         divergenceSeed: divergenceSeed
       });
