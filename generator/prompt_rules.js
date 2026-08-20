@@ -669,6 +669,20 @@
     '  segments: a pie or bar cut into wedges. beads: a counted string. gauge: a dial reading.',
     '  tally: scored marks in fives. Choose the one this world would actually use to keep a count;',
     '  it changes no geometry and no rule, only whose hand drew the instrument.',
+    // ── THE MENU THE MODEL WAS REQUIRED TO PICK FROM AND NEVER SHOWN ────────
+    // `attachmentStrategy` is REQUIRED on this stage's wire schema, is closed
+    // to three values by booklet-schema.mjs (VALID_ATTACHMENT_STRATEGIES), and
+    // was taught on NO live prompt surface — measured 2026-08-20 while arming
+    // the per-stage constraint sweep: 71 of the schema's 72 closed enums had
+    // every value present in this file, and this was the one that did not.
+    // A required field with a closed menu nobody states is the run-3 ambush
+    // shape exactly, and `enumMenusAreTaught()` in validate.mjs now fails the
+    // build on the next one. Quoted from the constant, both directions asserted.
+    '  `attachmentStrategy` is REQUIRED and is a CLOSED enum: "split-technical" | "single-dominant"',
+    '  | "narrative-support". It is how this artifact carries its technical apparatus —',
+    '  split-technical: the working surfaces sit apart from the prose, in their own section.',
+    '  single-dominant: one surface dominates and everything else serves it.',
+    '  narrative-support: the working surfaces are folded into the prose they belong to.',
     '  Plus optional: artifactBlend?, authorialMode?, documentEcology?, materialCulture?, openingMode?, rulesDeliveryMode?, revealShape?, unlockLogic?',
     '- `artifactIntent` (object, required): The compiled planning contract from the Artifact Intent Compiler.',
     '  Required fields:',
