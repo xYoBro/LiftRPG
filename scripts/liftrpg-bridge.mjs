@@ -128,7 +128,10 @@ import http from 'node:http';
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+// execFileSync is SELF-TEST ONLY (the feature-name reconciliation below asks
+// the installed codex what names it still knows). Nothing on a request path
+// runs synchronously — this server must never block on a child.
+import { spawn, execFileSync } from 'node:child_process';
 
 const DEFAULT_PORT = 8090;
 const HOST = '127.0.0.1';                       // loopback only. Not a setting.
@@ -1081,12 +1084,92 @@ function generate({ prompt, system, schema, model, maxTokens, onDelta, onActivit
 //   it will simply fail loudly at the API.
 function codexBin() { return process.env.LIFTRPG_BRIDGE_CODEX_BIN || 'codex'; }
 
+// ── A GENERATION STAGE HAS NO HANDS (2026-08-20) ─────────────────────────────
+// EARNED BY A CRASH REPORT, not by a review. Mid-generation on the author's
+// proving run, macOS logged a fresh **Google Chrome** process in coalition
+// `com.openai.codex` (responsible process ChatGPT), aborted 0.4s after launch
+// in TransformProcessType/RegisterApplication — a GUI app launched from a
+// sandboxed non-GUI context. The model, asked for a page of prose, went and
+// opened a browser on the author's machine.
+//
+// THE ROOT CAUSE WAS AN ASYMMETRY BETWEEN THE TWO BACKENDS, not a codex bug.
+// The claude path has always been declawed: `--tools ''` in BASE_CLI_ARGS makes
+// it one turn, prompt in, text out. The codex path sent `exec … -s read-only`
+// and stopped there — and `-s read-only` constrains WRITES, not tool USE. The
+// agentic harness stayed fully armed behind it: shell, MCP apps, plugins,
+// skills, browser control, web search. A read-only sandbox is not a read-only
+// model.
+//
+// ── MEASURED ON codex-cli 0.145.0, 2026-08-20 (four probes, same prompt) ─────
+// The prompt was "List the files in the current working directory." in a temp
+// dir holding two marker files. What each posture actually did:
+//
+//   1. THE SHIPPING ARGS (exec --json --skip-git-repo-check
+//      --ignore-user-config -s read-only) — the model EXECUTED
+//        {"type":"item.completed","item":{"type":"command_execution",
+//         "command":"/bin/zsh -lc \"rg --files …\"","exit_code":0,
+//         "aggregated_output":"./MARKER_BETA.txt\\n./MARKER_ALPHA.txt\\n"}}
+//      34,995 input tokens. The defect, reproduced on demand.
+//   2. `--disable shell_tool` AND FRIENDS, BUT NOT THE TOOL SURFACES — the
+//      shell went away and the model went SHOPPING: an `mcp_tool_call` to
+//      server `codex`, tool `list_mcp_resources`, enumerating the plugin
+//      connectors. **107,829 input tokens** — three times the baseline. Taking
+//      one tool away and leaving the rest made the call worse, which is the
+//      whole argument against a partial posture.
+//   3. + apps/plugins/hooks/skills/etc — no shell, no MCP, but a `web_search`
+//      item still fired. 26,634 tokens. (`-c tools.web_search=false` was tried
+//      first and is A DEAD KEY: `[tools]` carries `web_search` in some builds,
+//      but THIS binary reads the top-level `web_search`, and it takes a MODE
+//      STRING, not a bool — `-c web_search=false` dies with
+//      "invalid type: unit variant, expected string only in `web_search`".)
+//   4. THE POSTURE BELOW, verbatim — ZERO tool items of any kind, 21,794 input
+//      tokens (~13k under the shipping baseline), and the model said so in
+//      words: "I can't complete either live check in this session: shell
+//      directory listing and network/news access are unavailable. I won't
+//      invent the files or a headline." Refusing rather than fabricating is the
+//      correct posture for a stage whose only job is prose.
+//
+// ── THE BRITTLENESS THIS BUYS, STATED RATHER THAN HIDDEN ─────────────────────
+// `--disable` HARD-ERRORS on a name the installed binary does not know:
+//   $ codex exec --disable no_such_feature_xyz
+//   Error: Unknown feature flag: no_such_feature_xyz     (no call is made)
+// So a codex upgrade that renames or retires ONE of these names takes the whole
+// door down — every stage, immediately. That is the FAIL-LOUD direction and is
+// chosen deliberately: the alternative (a tolerant flag, if one existed) would
+// silently re-arm the harness that opened Chrome. `generateCodex` detects that
+// stderr and refuses with a 400 naming the flag, so it fails fast instead of
+// burning the escalation ladder, and `--self-test` checks every name below
+// against `codex features list` on the installed binary.
+//
+// THE LIST IS THE PROVEN CONFIGURATION, NOT A CURATED ONE. Probe 4 ran exactly
+// these names; per-flag necessity is UNMEASURED, so nothing here should be
+// trimmed on a reading — trim it with a probe or not at all.
+const CODEX_AGENTIC_DISABLES = [
+  // Execution — the hands themselves.
+  'shell_tool', 'unified_exec', 'shell_snapshot',
+  // GUI and browser control — the family that launched Chrome mid-stage.
+  'browser_use', 'browser_use_external', 'browser_use_full_cdp_access',
+  'in_app_browser', 'computer_use',
+  // Third-party tool surfaces — MCP apps, plugins, hooks, skills. This is the
+  // group probe 2 proved cannot be left behind.
+  'apps', 'plugins', 'remote_plugin', 'plugin_sharing', 'hooks',
+  'skill_search', 'skill_mcp_dependency_install',
+  // Everything else that produces something other than text on this turn.
+  'image_generation', 'multi_agent', 'code_mode_host', 'tool_suggest', 'goals'
+];
+
 const CODEX_BASE_ARGS = [
   'exec',
   '--json',                 // NDJSON events on stdout — what makes this parseable
   '--skip-git-repo-check',  // MANDATORY: children spawn in os.tmpdir(), not a repo
   '--ignore-user-config',   // see note 2 above — without it every call 400s here
-  '-s', 'read-only'         // a generation stage writes nothing to the machine
+  '--ignore-rules',         // no local execpolicy .rules file steers a paid stage
+  '-s', 'read-only',        // a generation stage writes nothing to the machine
+  // The mode string, not a bool — see the dead-key note above. `disabled` is a
+  // member of this binary's WebSearchMode enum (disabled|indexed|live|custom|
+  // explicitRequestOnly|proactive); an off-menu value is rejected at startup.
+  '-c', 'web_search="disabled"',
+  ...CODEX_AGENTIC_DISABLES.flatMap((feature) => ['--disable', feature])
 ];
 
 // The only model id this door advertises. Everything else is a request that
@@ -1295,6 +1378,22 @@ function generateCodex({ prompt, system, schema, model, maxTokens, onActivity, o
         return reject(Object.assign(
           new Error('Codex CLI: ' + fatal),
           { status: throttled ? 429 : (fatalStatus || 502), rateLimited: throttled }));
+      }
+      // THE WAY THIS DOOR BREAKS NOW, named at the site that breaks. A codex
+      // upgrade that retires one of CODEX_AGENTIC_DISABLES makes every call die
+      // before the model runs, and the generic message below ("returned no
+      // assistant message") would send the reader hunting for a model problem.
+      // 400, not 502: the client retries `429 || >= 500`, and no number of
+      // retries will teach the binary a flag it does not have.
+      const unknownFlag = /Unknown feature flag:\s*(\S+)/.exec(stderr);
+      if (!text && unknownFlag) {
+        return reject(Object.assign(
+          new Error('Codex CLI rejected the no-hands posture: unknown feature flag "'
+            + unknownFlag[1] + '". The installed codex no longer knows that name — '
+            + 'reconcile CODEX_AGENTIC_DISABLES in liftrpg-bridge.mjs against '
+            + '`codex features list` before running again. The bridge refuses rather than '
+            + 'generating with the agentic harness re-armed (it opened a browser once).'),
+          { status: 400 }));
       }
       if (!text) {
         return reject(Object.assign(
@@ -2378,6 +2477,9 @@ async function selfTest() {
   const fakeCodex = path.join(dir, 'fake-codex.cjs');
   fs.writeFileSync(fakeCodex, FAKE_CODEX_CLI);
   fs.chmodSync(fakeCodex, 0o755);
+  // Captured BEFORE the override, so the reconciliation row below can still
+  // reach a real binary (and still honours an operator-set path).
+  const realCodexBin = process.env.LIFTRPG_BRIDGE_CODEX_BIN || 'codex';
   process.env.LIFTRPG_BRIDGE_CODEX_BIN = fakeCodex;
   const codexPost = (body, scenario) => {
     process.env.BRIDGE_CODEX_SCENARIO = scenario || 'ok';
@@ -2438,6 +2540,39 @@ async function selfTest() {
       argv.includes('--skip-git-repo-check'));
     ok('codex: --ignore-user-config is sent (the config-pinned model 400s)',
       argv.includes('--ignore-user-config'));
+    // ── THE NO-HANDS POSTURE (2026-08-20) ───────────────────────────────────
+    // Pinned here because argv is the only place it is visible: the crash that
+    // earned these flags left no trace in this repo at all — it was a macOS
+    // crash report for Google Chrome, spawned by a model that was supposed to
+    // be writing prose. The reasoning and the four probes are on CODEX_BASE_ARGS.
+    const disableArgs = argv.reduce((acc, a, i) => (a === '--disable' ? acc.concat(argv[i + 1]) : acc), []);
+    ok('codex: every named agentic feature is disabled at the spawn',
+      CODEX_AGENTIC_DISABLES.length > 0
+        && CODEX_AGENTIC_DISABLES.every((f) => disableArgs.includes(f))
+        && disableArgs.length === CODEX_AGENTIC_DISABLES.length,
+      disableArgs.join(','));
+    // The three families, named separately, because a future edit that keeps
+    // the list non-empty while dropping one family would pass the row above.
+    ok('codex: the shell and exec tools are off (a generation stage has no hands)',
+      ['shell_tool', 'unified_exec', 'shell_snapshot'].every((f) => disableArgs.includes(f)),
+      disableArgs.join(','));
+    ok('codex: the browser and GUI family is off (this one launched Chrome mid-run)',
+      ['browser_use', 'browser_use_external', 'browser_use_full_cdp_access',
+        'in_app_browser', 'computer_use'].every((f) => disableArgs.includes(f)),
+      disableArgs.join(','));
+    // Probe 2's finding: disabling the shell alone sent the model shopping in
+    // MCP-land and TRIPLED the input tokens. This family is not optional.
+    ok('codex: the third-party tool surface (apps/plugins/hooks/skills) is off',
+      ['apps', 'plugins', 'remote_plugin', 'plugin_sharing', 'hooks',
+        'skill_search', 'skill_mcp_dependency_install'].every((f) => disableArgs.includes(f)),
+      disableArgs.join(','));
+    // A MODE STRING, not a bool, and not the `tools.web_search` key that reads
+    // like the right one and is inert on this binary.
+    ok('codex: web search is disabled by config value, not by hope',
+      argv.some((a, i) => a === '-c' && argv[i + 1] === 'web_search="disabled"'),
+      argv.join(' '));
+    ok('codex: --ignore-rules is sent (no local execpolicy steers a paid stage)',
+      argv.includes('--ignore-rules'));
     ok('codex: no --model is sent for the default sentinel',
       argv.indexOf('-m') === -1 && argv.indexOf('--model') === -1, argv.join(' '));
     // No system-prompt flag exists, so the system message must be IN the prompt
@@ -2455,6 +2590,38 @@ async function selfTest() {
     ok('codex: a schemaless request sends no --output-schema and stages no file',
       !argv.includes('--output-schema') && !seen.schemaText,
       argv.join(' '));
+  }
+
+  // 11a-ii. THE ONE THING A FAKE CLI CANNOT PROVE: are those names still REAL?
+  // `--disable` on an unknown name is a hard error before any call is made
+  // ("Error: Unknown feature flag: …"), so a codex upgrade that retires one
+  // takes the whole door down. Every other row above would stay green through
+  // that — they check what the bridge SENDS, and the bridge would keep sending
+  // it faithfully. This row is the only one that asks the installed binary.
+  //
+  // Cheap and offline: `codex features list` reads the local feature registry
+  // and makes no API call, so it costs no subscription spend.
+  {
+    let known = null;
+    try {
+      known = execFileSync(realCodexBin, ['features', 'list'],
+        { encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch (_e) { known = null; }
+    if (known === null) {
+      // A SKIP THAT STATES ITS REASON. A silent skip is indistinguishable from
+      // a pass, and this row's whole job is to be the thing that notices.
+      console.log('  SKIP  codex: the disabled feature names still exist on the installed CLI'
+        + ' — `' + realCodexBin + ' features list` did not run here (no codex on this machine,'
+        + ' or it failed). Re-run this self-test on the machine that owns the bridge.');
+    } else {
+      const registry = new Set(known.split('\n')
+        .map((line) => line.trim().split(/\s+/)[0]).filter(Boolean));
+      const missing = CODEX_AGENTIC_DISABLES.filter((f) => !registry.has(f));
+      ok('codex: every disabled feature name still exists on the installed CLI',
+        missing.length === 0,
+        missing.length ? 'unknown to this codex: ' + missing.join(', ')
+          + ' — reconcile CODEX_AGENTIC_DISABLES or the door dies on every call' : '');
+    }
   }
 
   // ── THE SCHEMA-FORCING REFUSAL (2026-08-20) ────────────────────────────────
