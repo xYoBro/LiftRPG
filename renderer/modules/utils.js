@@ -398,6 +398,124 @@ export function getDemoPassword(meta) {
   return '';
 }
 
+// ── THE SPELLED-OUT PASSWORD (proving run 3, 2026-08-19) ────────────────────
+// The bare and quoted passes below match the derived password as a CONTIGUOUS
+// string, so neither can see it written one letter at a time. Proving run 3's
+// boss page printed
+//
+//   "…they read 16, 18, 25, 15, 18. By the table: P, R, Y, O, R. The
+//    week-order reading is [REDACTED] and no rearrangement is asked for."
+//
+// — the answer key in plain sight, two clauses from a redaction that worked.
+// Five single-letter tokens joined by ", " never contain the substring
+// "PRYOR", so `\bPRYOR\b` could not fire on them.
+//
+// THE THIRD FORM matches the password's own letters, IN ORDER, each standing
+// alone, joined by a SHORT run of characters that contains no letter of its own
+// (optionally with an "and"/"then" connector). It is a structural match against
+// a value the machine already derived — never prose comprehension. Four
+// properties keep the false-positive rate at the floor:
+//
+//   1. every letter must be a whole token — each one is boundary-anchored on
+//      BOTH sides, so a letter glued to another word character is not an
+//      enumeration ("TOP, R, Y, O, R" and "H5E" are both misses);
+//   2. separators carry NO LETTERS, which is what stops the printed A1Z26
+//      reference table ("1=A 2=B 3=C … 26=Z") from matching itself — see the
+//      widening note below for why that, and not the digit ban, was ever the
+//      property doing the work;
+//   3. separators are capped, so the pattern cannot span a sentence and
+//      harvest coincidentally-aligned initials;
+//   4. the WHOLE password must appear — a 5-letter word needs 5 standalone
+//      letters in exact order, a shape English prose does not produce by
+//      accident.
+//
+// THE ANNOTATED DECODE (the public demo, 2026-08-20). The separator originally
+// banned digits as well as letters, on the stated theory that the digit ban was
+// what spared the reference table. It was not, and the ban cost a live leak:
+// the demo book's own boss page (public/liftrpg-eastern-shore.json, week 6)
+// prints its derivation as
+//
+//   "8=H, 5=E, 18=R, 15=O, 14=N. Read in order they spell [REDACTED]."
+//
+// — the answer key annotated with the gauge readings it came from, printing
+// beside a redaction that fired correctly on the contiguous word two clauses
+// later. Its separators (", 5=", ", 18=") carry the reading numbers, so the
+// digit ban read a five-entry password derivation as if it were a twenty-six
+// entry alphabet table.
+//
+// WHICH PROPERTY ACTUALLY SPARES THE TABLE — measured, not reasoned, because
+// the first draft of this comment reasoned it and was wrong. Mutating the gap
+// against the reference-table control in
+// tests/playwright/rendered-quality-contracts.spec.js gives:
+//
+//   letters banned, cap 6   (shipped)          table survives
+//   letters ALLOWED, cap 6                     table survives
+//   letters banned, cap 60                     table survives
+//   letters allowed, cap 60                    table EATEN
+//
+// TWO independent properties each spare it, and the digit ban was neither of
+// them. (a) The LETTER ban: a table interleaves the whole alphabet, so a match
+// would have to STEP OVER the intervening entries' letters, which a separator
+// admitting none cannot do at any cap. (b) The CAP: a password's letters sit
+// many entries apart in a table, so the run between them is far longer than a
+// gap. The cap is 6 because a two-digit index with its punctuation and spacing
+// (", 18= ") is six characters — sized to the annotated decode, not to the
+// table. The digit ban was load-bearing for nothing and cost the demo's leak.
+//
+// The consequence for the gate: only a wholesale loosening — letters admitted
+// AND the cap lifted together — turns the table control red, and it does (the
+// fourth row above is a run, not a prediction). A future edit that relaxes one
+// property alone will pass that control, so the reasoning above is the only
+// thing standing behind the other one.
+//
+// RESIDUAL, from property (a)'s own logic and deliberately not chased: a
+// password whose letters are a run of alphabetically CONSECUTIVE letters
+// ("ABC", "RST") would match a printed alphabet table, because there
+// consecutive entries need no letter stepped over and sit inside the cap. No
+// such string is a word, the minimum length is 3, and no corpus password is
+// close — building a guard for it would be machinery from n=0, which is the
+// counter-guard the root-cause law names. Stated here so the next reader
+// inherits the reasoning rather than the gap.
+//
+// CASE-INSENSITIVE, unlike the bare pass, and that is not drift. The bare pass
+// is case-SENSITIVE on purpose (the reasoning is written out in
+// tests/playwright/rendered-quality-contracts.spec.js): the corpus's passwords
+// ARE the books' own words — CARGO, RECORD, QUIET, HERON — so matching "cargo"
+// in running prose would redact the language instead of the answer. The
+// enumerated form is never a word; it is the decode performed on the page. The
+// word/token distinction that ruling protects does not reach it.
+//
+// KNOWN LIMIT, stated rather than chased: a PARTIAL split ("P, RYOR"), a
+// paraphrase, or a description that identifies the word without writing it
+// reaches the page untouched. A general "does this prose spell a hidden word"
+// detector is not tractable without false positives on coincidental alignment,
+// and the half that keeps the shape from being AUTHORED lives in the boss
+// convergence doctrine in prompt_rules.js.
+//
+// ONE HOME IF IT EVER GAINS A SECOND READER: nothing at generation time uses
+// this today (see the report for why no blocking floor was added). If one is
+// ever wanted it moves to contracts/contract-constants.mjs beside decodeA1Z26,
+// which both trees already import — it does not get a second implementation in
+// generator/modules/validation.js (D93).
+const SPELLED_PASSWORD_MIN_LEN = 3;
+const SPELLED_PASSWORD_MAX_LEN = 24;
+const SPELLED_GAP = '[^A-Za-z]{1,6}';
+const SPELLED_SEPARATOR = SPELLED_GAP + '(?:(?:and|then)' + SPELLED_GAP + ')?';
+
+function spelledPasswordPattern(upper) {
+  if (!upper) return null;
+  if (upper.length < SPELLED_PASSWORD_MIN_LEN) return null;
+  if (upper.length > SPELLED_PASSWORD_MAX_LEN) return null;
+  // `upper` is already [A-Z0-9] after normalisePassword(); the escape is
+  // belt-and-braces so a future widening of that character set cannot inject
+  // pattern syntax here.
+  const letters = upper.split('').map((ch) => ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  // Every letter is boundary-anchored on both sides, not just the two ends:
+  // the gap now admits digits, so `\b` at the joins is the only thing left
+  // holding property 1 — without it "H5E" would read as an enumeration.
+  return new RegExp('\\b' + letters.join('\\b' + SPELLED_SEPARATOR + '\\b') + '\\b', 'gi');
+}
+
 export function sanitizeBossTextForDisplay(text, password) {
   const raw = String(text || '');
   const upper = normalisePassword(password || '');
@@ -406,13 +524,19 @@ export function sanitizeBossTextForDisplay(text, password) {
   const escaped = upper.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const quoted = new RegExp('([\'"])' + escaped + '\\1', 'g');
   const bare = new RegExp('\\b' + escaped + '\\b', 'g');
+  const spelled = spelledPasswordPattern(upper);
 
-  return raw
+  const scrubbed = raw
     .replace(/enter this password,\s*(['"])?[A-Z0-9-]{3,16}\1?/gi, 'enter the reconstructed password')
     .replace(/the resultant name is your final password/gi, 'the resultant name is the final designation')
     .replace(/to expose\s+(['"])?[A-Z0-9-]{3,16}\1?/gi, 'to expose the hidden author')
     .replace(quoted, "'[REDACTED]'")
     .replace(bare, '[REDACTED]');
+
+  // Runs last on purpose: "[REDACTED]" contains no standalone letters, so an
+  // earlier redaction can neither be re-matched nor bridged across by this
+  // pass, and the ordering stays free of a hidden coupling.
+  return spelled ? scrubbed.replace(spelled, '[REDACTED]') : scrubbed;
 }
 
 function derivePasswordFromBossRevealText(boss) {
