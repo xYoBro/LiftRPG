@@ -11,6 +11,7 @@ import { registerAtom } from '../engine/atom-registry.js';
 import { buildMapModel } from '../field-ops-models.js';
 import { renderMapSection } from '../field-ops-primitives.js';
 import { densityVariant } from '../engine/density-util.js';
+import { HALF_SLOT_WIDTH_PX } from '../engine/page-spec.js';
 import { wrappedLines } from '../utils.js';
 import { advancePx, readTypeMetrics } from '../type-metrics.js';
 
@@ -433,10 +434,37 @@ registerAtom('map-panel', {
     };
   },
 
-  render(atom, density) {
+  /**
+   * ── THE WIDTH CHANNEL REACHES RENDER (DR-49, 2026-08-19) ─────────────────
+   * The same `context.slotWidthPx` the estimate above reads, resolved by the
+   * same `resolveWidthPx()` and defaulting to the same `MAP_WIDTH_PX` — one
+   * function, one fallback, two phases. DR-25 stopped at the estimate because
+   * estimation is the phase that models wrapped text; the node-graph body
+   * needs the column at DRAW time, because it lays its cards out in a 0–100
+   * normalized space while their footprint is fixed in real pixels, and a
+   * separation constant expressed in that space is only right at one width
+   * (`field-ops-primitives.js`, THE NODE FOOTPRINT).
+   *
+   * NO `widthResolved` TWIN HERE. That marker exists to fence the planner's
+   * ×1.4 estimate proxy off a self-priced estimate; render has no proxy to
+   * fence, so the render path needs the width and nothing else.
+   *
+   * `halvesCell` is the second fact and it is NOT derivable from the width
+   * downstream: `.rp-row-cell .map-node` caps a card at 54px, and the only
+   * thing that knows a placement is in a halves cell is the slot the engine
+   * declared for it. Asked here, where `HALF_SLOT_WIDTH_PX` is the engine
+   * constant both the planner and `renderRowInto()` set it from.
+   */
+  render(atom, density, context) {
     const data = atom.data || {};
     const map = data.map || {};
     const artifactIdentity = data.artifactIdentity || {};
+
+    const slotWidthPx = resolveWidthPx(context);
+    const layout = {
+      widthPx:    slotWidthPx === null ? MAP_WIDTH_PX : slotWidthPx,
+      halvesCell: slotWidthPx !== null && slotWidthPx <= HALF_SLOT_WIDTH_PX,
+    };
 
     const mapModel = buildMapModel({
       ...map,
@@ -446,7 +474,7 @@ registerAtom('map-panel', {
     // Set identity attributes on the zone for zone-level CSS rules, and mirror
     // them onto the inner .map-content so CSS selectors targeting
     // .map-content[data-shell-family] (solo-surface contexts) still match.
-    const el = renderMapSection(mapModel);
+    const el = renderMapSection(mapModel, layout);
     const shellFamily   = artifactIdentity.shellFamily   || 'field-survey';
     const boardState    = artifactIdentity.boardStateMode || 'survey-grid';
     const attachStrat   = artifactIdentity.attachmentStrategy || 'split-technical';

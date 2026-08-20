@@ -3252,11 +3252,35 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
 
    The one exception below (`[data-solo-surface="map-panel"] .rp-row--full`)
    out-specifies this on purpose: a solo map GROWS to fill the page, and with
-   `flex-basis: 0` its shrink factor can never engage anyway. */
+   `flex-basis: 0` its shrink factor can never engage anyway.
+
+   ── THE SAME LAW, ONE CONTAINER UP (DR-50, 2026-08-19) ───────────────────
+   W5 stopped `.rp-content` from squashing its CHILDREN. It did not stop
+   `.rp-content` itself from being sized below its own content, because
+   `flex: 1 1 0` hands a flex item whatever the frame has left over and
+   `min-height: 0` removes the floor that would have refused it. So the page
+   frame absorbed the overflow instead: on sf-haiku45-c5-trial-1 p.7 the rows
+   came to 730px, the frame granted 709px, and the 21px difference painted
+   `.clock-consequence` straight through the week footer's "Week 1 of 6".
+   Invisible to every gate: `.rp-content` is `overflow: visible`, so
+   measureInternalOverflowPx() (which only counts CLIPPING boxes) skips it,
+   and the frame's own scrollHeight was 2px over — the planner was told the
+   page fit and re-planned nothing. D198's sentence, verbatim, at the
+   container the law had not reached.
+
+   `flex: 1 0 auto` is the whole fix, and it is D223's shape: GROW into
+   granted space is legal, shrink stays 0. `.rp-content` is the only growable
+   child of every page frame that builds one, so on a page that fits, basis
+   `auto` + grow 1 resolves to exactly the same used height that basis 0 +
+   grow 1 did — byte-identical layout, no free space distributed differently.
+   On a page that does NOT fit, the content keeps its height, the footer is
+   pushed past the frame, and the overflow reaches the planner as
+   `frame.scrollHeight - frame.clientHeight`, which is what the measure →
+   revise loop exists to answer. */
 .rp-content {
   display: flex;
   flex-direction: column;
-  flex: 1 1 0;
+  flex: 1 0 auto;
   min-height: 0;
   gap: 5px;
 }
@@ -4781,6 +4805,11 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   width:100%;
   height:100%;
 }
+/* CROSS-FILE CONTRACT (2026-08-20) — the 46px inset is mirrored by
+   NETWORK_RAIL_INSET_PX in modules/field-ops-primitives.js. Both layers are
+   inset together, so they still share one coordinate space; what the inset
+   changes is how many real pixels a coordinate unit is worth, which is what the
+   edge-label placement converts a card's footprint through. */
 .map-network[data-has-rail="true"] .map-network-svg,
 .map-network[data-has-rail="true"] .map-network-nodes{
   left:46px;
@@ -4857,6 +4886,15 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   stroke-width:2;
   stroke-dasharray:none;
 }
+/* CROSS-FILE CONTRACT (2026-08-20) — this `font-size` and the
+   `[data-ptp-density="dense"|"packed"]` override further down are mirrored by
+   EDGE_LABEL_FONT_UNITS in modules/field-ops-primitives.js, which turns them
+   into the box the edge-label placement search keeps clear of the node cards.
+   The value is in SVG user units (the viewBox is 0 0 100 100), so it IS the
+   label's height in coordinate units. Move it here without moving it there and
+   the search reserves a box the browser does not paint — labels go back to
+   printing under the opaque node layer, which is the defect this pairing was
+   created to end. */
 .map-edge-label{
   font-family:var(--mono);
   font-size:2.1px;
@@ -4867,6 +4905,14 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   stroke-width:.9px;
   stroke-linejoin:round;
 }
+/* CROSS-FILE CONTRACT (DR-49) — the `max-width` on this block, on
+   `.rp-row-cell .map-node`, on the two `[data-ptp-density]` blocks below, and
+   `.map-network`'s `min-height` above are mirrored by NODE_BOX_PX /
+   NODE_BOX_ROW_CELL_MAX_W_PX / NETWORK_BOX_MIN_HEIGHT_PX in
+   modules/field-ops-primitives.js, which converts them into the separation
+   the node relaxation keeps between cards. Move a number here without moving
+   it there and cards silently print on top of each other — the relaxation
+   works in normalized 0–100 units and the footprint is in these pixels. */
 .map-node{
   position:absolute;
   transform:translate(-50%, -50%);

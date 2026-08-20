@@ -85,3 +85,39 @@ export const COLUMN_GAP_PX = 6;
  * floor((470 - 6) / 2) = 232
  */
 export const HALF_SLOT_WIDTH_PX = Math.floor((PAGE_BUDGET.widthPx - COLUMN_GAP_PX) / 2);
+
+// ---------------------------------------------------------------------------
+// The render-phase width channel (DR-49)
+// ---------------------------------------------------------------------------
+
+/** slotWidthPx → frozen render context. Two entries in practice (232 / 470). */
+const renderContextCache = new Map();
+
+/**
+ * The render context for a placement occupying `slotWidthPx`.
+ *
+ * ONE HOME, TWO READERS — `measurement-harness.js` (which resolves the slot
+ * from `getMechanicSlotWidthPx()`) and `page-renderer.js` (which resolves it
+ * from the same `resolvePageRowPlan()` row type). Both hand the atom the same
+ * number for the same placement, which is what keeps a width-sensitive
+ * renderer measuring and printing the same object.
+ *
+ * `null` means "full width" — the harness's bounded-page path and the
+ * renderer's full rows both put the atom in the page's own column, so the
+ * page budget IS the slot. It is spelled here rather than at the call sites so
+ * "what does no slot mean" has one answer.
+ *
+ * Frozen for the reason the estimate context is frozen: an atom that mutated
+ * it would hand the next atom a different world.
+ */
+export function renderContextForSlot(slotWidthPx) {
+  const width = (typeof slotWidthPx === 'number' && Number.isFinite(slotWidthPx) && slotWidthPx > 0)
+    ? slotWidthPx
+    : PAGE_BUDGET.widthPx;
+  let ctx = renderContextCache.get(width);
+  if (!ctx) {
+    ctx = Object.freeze({ slotWidthPx: width });
+    renderContextCache.set(width, ctx);
+  }
+  return ctx;
+}

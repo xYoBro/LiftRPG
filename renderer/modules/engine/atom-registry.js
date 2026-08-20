@@ -52,9 +52,36 @@ const registry = new Map();
  *
  * @param {string} type — unique type name (e.g. 'session-card', 'cover')
  * @param {object} definition — atom definition containing at minimum
- *   `estimate(data, density)` and `render(atom, density)` functions.
- *   Optional fields: `defaultSizeHint`, `canShare`, `pageAffinity`.
+ *   `estimate(data, density, context)` and `render(atom, density, context)`
+ *   functions. Optional fields: `defaultSizeHint`, `canShare`, `pageAffinity`.
  * @throws {Error} if `estimate` or `render` functions are missing
+ *
+ * ── THE CONTEXT PARAMETER, ON BOTH PHASES (DR-25 estimate · DR-49 render) ──
+ * `context` is an OPAQUE, OPTIONAL bag of layout facts the engine resolves and
+ * forwards without reading: `typeMetrics` (D121) and `slotWidthPx` (DR-25).
+ * The engine sets it; what an atom does with it is the atom's business.
+ *
+ * It is additive-optional on BOTH sides and on BOTH phases. An atom that
+ * ignores the parameter returns exactly what it returned before the parameter
+ * existed, and a caller that supplies none — a harness, a test, a legacy
+ * primitive — gets an atom's declared fallbacks. That is the only reason it
+ * could be threaded through `render()` at all without re-proving every atom.
+ *
+ * WHY RENDER NEEDED IT TOO. DR-25 gave the ESTIMATE its column and stopped
+ * there, because estimation is the phase that models wrapped text. But an atom
+ * that LAYS CONTENT OUT in a normalized coordinate space needs the same fact at
+ * draw time: `field-ops-primitives.js`'s node-graph relaxation kept its cards
+ * apart by a constant expressed in 0–100 map units while the cards' footprint
+ * is fixed in real pixels, so the guard was correct at a full column and
+ * separated by less than half a card's width in a halves cell — three pairs of
+ * node cards printed on top of each other across the sealed corpus (DR-49).
+ * A width-blind constant in a normalized space is only ever right at one width.
+ *
+ * MEASUREMENT AND RENDER MUST BE HANDED THE SAME CONTEXT. Both paths resolve
+ * the slot from `resolvePageRowPlan()` (D210's one row plan), so an atom that
+ * draws differently at two widths draws the SAME way in the harness and on the
+ * page. Handing render a width the harness did not use would reintroduce the
+ * measurement⇄render divergence the Charter exists to prevent.
  */
 export function registerAtom(type, definition) {
   if (!type || typeof type !== 'string') {

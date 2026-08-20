@@ -284,14 +284,25 @@ export function buildBossPageModel(data, week, options = 'standard') {
   const splitNarrative = splitLongNarrativeParagraphs(narrativeParagraphs);
   const mechanismParagraphs = splitParagraphs(sanitizeBossTextForDisplay(boss.mechanismDescription || '', derivedPassword));
   const splitInstruction = splitLongInstruction(sanitizeBossTextForDisplay(decodingKey.instruction || '', derivedPassword), 170);
-  const continuationAppendixParagraphs = hasConvergenceAppendix
-    ? []
-    : splitParagraphs(sanitizeBossTextForDisplay(boss.convergenceProof || '', derivedPassword));
+  // THE PROOF'S OWN PARAGRAPHS, COUNTED (2026-08-20). `.boss-proof` prints
+  // under a slot budget, and the renderer cannot tell which of these paragraphs
+  // is the authored `convergenceProof` and which is spillover the appendix
+  // swept up — so the count travels with the list. Without it the box fills its
+  // slots with narrative and instruction tails and the paragraph that explains
+  // the password derivation, appended last, never reaches the page: read off
+  // `the-lumina-protocol` p.41 on 2026-08-20. See renderBossPage()'s note.
+  //
+  // TRAILING BY CONSTRUCTION: the proof is the last thing pushed on the
+  // appendix path and the whole list on the other, so "the last N" is the
+  // proof in both cases. A push added after this one breaks that and must
+  // move the count with it.
+  const proofParagraphs = splitParagraphs(sanitizeBossTextForDisplay(boss.convergenceProof || '', derivedPassword));
+  const continuationAppendixParagraphs = hasConvergenceAppendix ? [] : proofParagraphs.slice();
   if (hasConvergenceAppendix) {
     continuationAppendixParagraphs.push.apply(continuationAppendixParagraphs, splitNarrative.tail);
     if (splitInstruction.tail) continuationAppendixParagraphs.push(splitInstruction.tail);
     continuationAppendixParagraphs.push.apply(continuationAppendixParagraphs, mechanismParagraphs.slice(1));
-    continuationAppendixParagraphs.push.apply(continuationAppendixParagraphs, splitParagraphs(sanitizeBossTextForDisplay(boss.convergenceProof || '', derivedPassword)));
+    continuationAppendixParagraphs.push.apply(continuationAppendixParagraphs, proofParagraphs);
   }
 
   return {
@@ -313,7 +324,13 @@ export function buildBossPageModel(data, week, options = 'standard') {
       value: formatComponentInputValue(item)
     })),
     componentLabel: shellFamily === 'classified-packet' ? 'Recovered Inputs' : 'Recorded Inputs',
-    convergenceLabel: shellFamily === 'classified-packet' ? 'Incident Name' : 'Final Word',
+    // Mirrors SHELL_FAMILY_COPY['classified-packet'].finalLabel in
+    // booklet-models.js: the assembly ladder and the convergence page must call
+    // the assembled password the same thing, or the player is told to build two
+    // different objects. Structural, never genre-literal — the shell is drawn by
+    // the die independently of what the book is about (D149), so a packet over a
+    // pastoral brief may not be told it is naming an "incident".
+    convergenceLabel: shellFamily === 'classified-packet' ? 'Final Designation' : 'Final Word',
     passwordRevealInstruction: sanitizeBossTextForDisplay(
       boss.passwordRevealInstruction || 'When the final word is assembled, enter it at liftrpg.co to unlock the ending.',
       derivedPassword
@@ -322,9 +339,11 @@ export function buildBossPageModel(data, week, options = 'standard') {
     convergenceProof: (!isContinuation && hasConvergenceAppendix) ? '' : sanitizeBossTextForDisplay(boss.convergenceProof || '', derivedPassword),
     convergenceProofParagraphs: isContinuation
       ? continuationAppendixParagraphs
-      : (hasConvergenceAppendix
-        ? []
-        : splitParagraphs(sanitizeBossTextForDisplay(boss.convergenceProof || '', derivedPassword))),
+      : (hasConvergenceAppendix ? [] : proofParagraphs.slice()),
+    // How many of the TRAILING paragraphs above are the authored proof.
+    convergenceProofCoreCount: (isContinuation || !hasConvergenceAppendix)
+      ? proofParagraphs.length
+      : 0,
     binaryChoiceAcknowledgement: isContinuation
       ? (boss.binaryChoiceAcknowledgement || null)
       : (hasConvergenceAppendix ? null : (boss.binaryChoiceAcknowledgement || null))

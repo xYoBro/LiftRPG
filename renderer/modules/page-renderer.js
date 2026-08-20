@@ -8,6 +8,7 @@ import {
   isMechanicPlacement,
 } from './mechanic-layout.js';
 import { getShellDecorator } from './shell-decorator-registry.js';
+import { renderContextForSlot, HALF_SLOT_WIDTH_PX } from './engine/page-spec.js';
 
 // Decorator registration — import barrel for side effects.
 // This ensures any code path that reaches renderPageFromPlacements()
@@ -96,21 +97,30 @@ function resolveMechanicCopy(shellAttrs) {
 /**
  * Render a row (from groupPlacementsIntoRows) into a container element.
  *
+ * THE WIDTH CHANNEL, RENDER PHASE (DR-49). The row type IS the slot: a halves
+ * row cell is `HALF_SLOT_WIDTH_PX`, everything else is the page column. This is
+ * the same question `getMechanicSlotWidthPx()` answers for the measurement
+ * side, off the same `resolvePageRowPlan()` (D210's one row plan) — so the
+ * width an atom is MEASURED at and the width it is HANDED here cannot come
+ * apart. Reading `row.type` rather than re-deriving is the point: a second
+ * derivation is the copy nobody sees fail.
+ *
  * @param {HTMLElement} container
  * @param {{ type: string, placements: Array }} row
  */
 function renderRowInto(container, row) {
   if (row.type === 'halves') {
     const rowEl = make('div', 'rp-row rp-row--halves');
+    const cellContext = renderContextForSlot(HALF_SLOT_WIDTH_PX);
     row.placements.forEach(function (placement) {
       const cell = make('div', 'rp-row-cell');
-      renderPlacementInto(cell, placement);
+      renderPlacementInto(cell, placement, cellContext);
       rowEl.appendChild(cell);
     });
     container.appendChild(rowEl);
   } else {
     const rowEl = make('div', 'rp-row rp-row--full');
-    renderPlacementInto(rowEl, row.placements[0]);
+    renderPlacementInto(rowEl, row.placements[0], renderContextForSlot(null));
     container.appendChild(rowEl);
   }
 }
@@ -144,14 +154,21 @@ function stampAtomIdentity(element, atomId) {
   element.setAttribute('data-atom-id', atomId);
 }
 
-export function renderPlacementInto(target, placement) {
+// `renderContext` is DR-49's optional third argument (see the contract on
+// registerAtom). Omitting it means the page column — the same thing an atom
+// with no channel connected has always assumed.
+export function renderPlacementInto(target, placement, renderContext = null) {
   const def = getAtomDefinition(placement.type);
   if (!def) {
     console.warn('[render-v2] No atom definition for type:', placement.type);
     return;
   }
 
-  const rendered = def.render(placement.atom, placement.density);
+  const rendered = def.render(
+    placement.atom,
+    placement.density,
+    renderContext || renderContextForSlot(null),
+  );
   const atomId = placement.atomId == null ? '' : String(placement.atomId);
 
   if (rendered.classList && rendered.classList.contains('booklet-page')) {
@@ -378,7 +395,9 @@ export function renderPageFromPlacements(placements, spreadType, planIndex) {
   if (placements.length === 1) {
     const def = getAtomDefinition(placements[0].type);
     if (def) {
-      const rendered = def.render(placements[0].atom, placements[0].density);
+      const rendered = def.render(
+        placements[0].atom, placements[0].density, renderContextForSlot(null),
+      );
       if (rendered.classList && rendered.classList.contains('booklet-page')) {
         rendered.setAttribute('data-plan-index', String(planIndex));
         rendered.setAttribute('data-engine', 'v2');

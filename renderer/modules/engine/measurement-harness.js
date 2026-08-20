@@ -13,6 +13,7 @@ import { make } from '../dom.js';
 import { createBoundedPage } from '../page-shell.js';
 import { renderPageFromPlacements } from '../page-renderer.js';
 import { getAtomDefinition } from './atom-registry.js';
+import { renderContextForSlot } from './page-spec.js';
 
 function clipsVerticalOverflow(style) {
   const overflowY = style.overflowY || '';
@@ -153,7 +154,11 @@ export function measureAtom(stack, atom, density, slotWidthPx = null) {
       flexDirection: 'column',
       position:      'relative',
     });
-    const rendered = def.render(atom, density);
+    // THE WIDTH CHANNEL, RENDER PHASE (DR-49). The atom is handed the same
+    // slot the harness is about to constrain it to — and `page-renderer.js`
+    // hands it the same number off the same row plan, so an atom that lays
+    // content out against its column measures and prints identically.
+    const rendered = def.render(atom, density, renderContextForSlot(slotWidthPx));
     if (rendered.style && rendered.style.flex) rendered.style.flex = '';
     slot.appendChild(rendered);
     stack.appendChild(slot);
@@ -183,7 +188,8 @@ export function measureAtom(stack, atom, density, slotWidthPx = null) {
     // Keep display:flex and flex-direction:column from CSS —
     // only override height to auto so frame grows to fit content.
   });
-  const rendered = def.render(atom, density);
+  // No slot ⇒ the bounded page's own column is the slot (renderContextForSlot).
+  const rendered = def.render(atom, density, renderContextForSlot(null));
   // If the atom renderer returned a full page element (has .booklet-page class),
   // move its inner frame into the measurement context rather than just its children.
   // Moving the frame itself preserves the frame's class list and data-layout-variant

@@ -1,5 +1,6 @@
 import { make } from './dom.js?v=48';
 import { createBoundedPage } from './page-shell.js?v=48';
+import { PAGE_BUDGET } from './engine/page-spec.js';
 import {
   resolveWorkspaceStyle,
   resolveWorkspaceCellCount,
@@ -478,27 +479,283 @@ function ptpDensityTier(nodeCount) {
 }
 
 // ---------------------------------------------------------------------------
+// THE NODE FOOTPRINT — real pixels (DR-49)
+// ---------------------------------------------------------------------------
+/**
+ * CROSS-FILE CONTRACT — ladder mirror ⇄ `renderer/booklet.css`: the base
+ * `.map-node` block, the `.rp-row-cell .map-node` narrow-context cap and the
+ * `.map-network[data-ptp-density="dense"|"packed"] .map-node` blocks, plus
+ * `.map-network { min-height: 214px }`. booklet.css carries the reverse
+ * pointer. **Change them together or the relaxation under-separates and node
+ * cards print on top of each other.**
+ *
+ * WHY THIS TABLE HAD TO EXIST (DR-49, 2026-08-19). `relaxNodePositions()` kept
+ * cards apart by `minSep = 9` — a constant in the 0–100 normalized coordinate
+ * space the nodes are laid out in. A card's footprint is not in that space: it
+ * is fixed in real pixels by the CSS below. At a full column the two happen to
+ * agree (9 units of a ~420–466px box is ~40px, near a card's width), which is
+ * why 29 of the corpus's 35 full-width networks are clean. In a halves cell the
+ * box is 236×212, so 9 units is 21px horizontally against a 54px card — the
+ * guard separated by LESS THAN HALF a card and three pairs printed on top of
+ * each other (sf-c10-strong-convergence pages 8 and 29, one of them a live
+ * `element-collision-scan.mjs` finding). A separation constant expressed in a
+ * normalized space is only ever correct at one width.
+ *
+ * `w` IS AUTHORITATIVE, `h` IS MEASURED. The widths are the CSS `max-width`
+ * for the tier, and the corpus reaches them: across 331 rendered cards the
+ * per-tier median card width EQUALS the max on every tier. A card's HEIGHT has
+ * no CSS constant — it is padding + name lines + gap + meta, so it is measured,
+ * not derived: these are the corpus p90 rounded up (standard 38.3, dense 34.8,
+ * packed 22.9, measured 2026-08-19). A three-line name reaches 50px and is
+ * deliberately not covered — sizing the guard to the tallest card in the corpus
+ * would be a witness to one book rather than an instrument.
+ */
+const NODE_BOX_PX = {
+  standard: { w: 66, h: 40 },
+  dense:    { w: 54, h: 36 },
+  packed:   { w: 46, h: 28 },
+};
+
+/** `.rp-row-cell .map-node { max-width: 54px }` — the halves-cell cap. */
+const NODE_BOX_ROW_CELL_MAX_W_PX = 54;
+
+/**
+ * How much of the frame's WIDTH one edge label's run may occupy, and how close
+ * to the frame edge its ends may come — both in coordinate units, which is the
+ * one axis that maps linearly onto the box under `preserveAspectRatio="none"`.
+ *
+ * These are containment bounds, not typography: a label narrower than the
+ * frame is unaffected, and the only thing they change is that a long one stops
+ * at the margin instead of printing off the paper.
+ */
+const EDGE_LABEL_MAX_RUN_UNITS = 46;
+const EDGE_LABEL_FRAME_MARGIN_UNITS = 2;
+
+// ---------------------------------------------------------------------------
+// THE EDGE LABEL IS A BOX, NOT A POINT (2026-08-20)
+// ---------------------------------------------------------------------------
+/**
+ * CROSS-FILE CONTRACT — ladder mirror ⇄ `renderer/booklet.css`: the
+ * `.map-edge-label` `font-size` (2.1px) and the
+ * `.map-network[data-ptp-density="dense"|"packed"] .map-edge-label` override
+ * (1.8px), plus `.map-network[data-has-rail="true"] .map-network-svg`'s 46px
+ * left inset. booklet.css carries the reverse pointer. **Change a number there
+ * without changing it here and the avoidance below reserves a box that is not
+ * the one the browser paints** — which is the same failure as no avoidance at
+ * all, only harder to see.
+ *
+ * WHY THIS EXISTS. `labelCollidesWithNode()` — the retired predicate this
+ * replaces — asked whether the label's ANCHOR POINT was within a single radial
+ * threshold (6 or 8 coordinate units) of a node's CENTRE. Three things are
+ * wrong with that question, and each one produced a defect read off a rendered
+ * page on 2026-08-20:
+ *
+ *   1. A label is a RUN, not a point. `variety-02-homecoming` p.8/p.13: every
+ *      route word ("Corridor", "North Pass", "East Hall", "Dock Access") is
+ *      anchored in clear air between two cards and then runs UNDER them — the
+ *      node layer is opaque HTML painted over this SVG — so the page prints
+ *      `rrido`, `orth Pa`, `st Ha`. The anchor passed a test the ink failed.
+ *   2. A radius cannot describe a rectangle in a box that is not square, and
+ *      this box never is (236×212 and 420×617 are both in the corpus). This is
+ *      DR-49's own finding — it fixed the node⇄node test and left the
+ *      label⇄node one radial. `the-lumina-protocol` p.8 ("R2" sunk into OLD
+ *      CITY LIBRARY) and p.34 ("R1" showing only its "1") are that half.
+ *   3. The response to a hit was BINARY — suppress if a route key exists, else
+ *      paint it anyway wherever the first candidate landed. On a hub topology
+ *      every spoke's label sits near the hub, so every label failed the radial
+ *      test at once: `the-lumina-protocol` p.26 prints ONE of ten route codes
+ *      (R9) over ten drawn routes, under a Route Key listing R1–R10. A key
+ *      whose codes never appear on the map is worse than no key.
+ *
+ * So: the label gets a real box, the cards get real boxes, and a hit is
+ * answered by MOVING the label — suppression is the last resort, not the first.
+ */
+const EDGE_LABEL_FONT_UNITS = { standard: 2.1, dense: 1.8, packed: 1.8 };
+
+/**
+ * `.map-network[data-has-rail="true"] .map-network-svg { left: 46px; width:
+ * calc(100% - 46px) }` — the instrumentation rail's inset. The SVG and the node
+ * layer are inset together, so the two share one coordinate space; what changes
+ * is that a coordinate unit is narrower in real pixels than the column implies.
+ */
+const NETWORK_RAIL_INSET_PX = 46;
+
+/**
+ * Mono advance as a fraction of the em, and the line box as a multiple of it.
+ * The advance is used only to CHOOSE a run length; the run that is reserved is
+ * the run that is painted, because `textLength` forces it exactly. So an error
+ * here costs a few percent of glyph stretch, never a wrong collision box.
+ */
+const EDGE_LABEL_ADVANCE_EM = 0.62;
+const EDGE_LABEL_LINE_EM = 1.25;
+
+/** Air around the label's own ink before it counts as touching something. */
+const EDGE_LABEL_PAD_X_UNITS = 0.9;
+const EDGE_LABEL_PAD_Y_UNITS = 0.5;
+
+/**
+ * The candidate ladder, in preference order. Progress runs from mid-edge
+ * outwards (the mid-edge label is the readable one; the ends are where a label
+ * starts to look like it belongs to a node instead of a route), the sign
+ * alternates by edge index so two edges between the same pair of cards do not
+ * stack, and the offset scales multiply the shell's base perpendicular offset.
+ *
+ * 7 × 2 × 4 = 56 candidates per edge, each one an arithmetic test — the whole
+ * search costs less than the DOM node it places.
+ */
+const EDGE_LABEL_PROGRESSIONS = [0.5, 0.38, 0.62, 0.3, 0.7, 0.22, 0.78];
+const EDGE_LABEL_OFFSET_SCALES = [1, 1.7, 2.5, 3.4, 0.4];
+
+/**
+ * However hard the search is pushing, a label stops belonging to its own line
+ * somewhere. 14 units is a seventh of the frame — past that, a reader would
+ * have to guess which edge the word is for, and a guessed label is worth less
+ * than a nudged one.
+ */
+const EDGE_LABEL_MAX_OFFSET_UNITS = 14;
+
+/**
+ * A label is dropped only when it would still be sitting on a card after all 56
+ * candidates AND the route key exists to carry the word. Expressed as a
+ * fraction of the label's own area, so a clipped corner prints (and is legible)
+ * while a label buried under a card does not pretend to be readable.
+ */
+const EDGE_LABEL_SUPPRESS_OVERLAP_RATIO = 0.3;
+
+/** Centre-to-centre box overlap area. Both boxes are centred on their point. */
+function boxOverlapArea(ax, ay, aw, ah, bx, by, bw, bh) {
+  const ox = Math.min(ax + aw / 2, bx + bw / 2) - Math.max(ax - aw / 2, bx - bw / 2);
+  if (ox <= 0) return 0;
+  const oy = Math.min(ay + ah / 2, by + bh / 2) - Math.max(ay - ah / 2, by - bh / 2);
+  if (oy <= 0) return 0;
+  return ox * oy;
+}
+
+/**
+ * `.map-network { min-height: 214px }` less its 1px border either side — the
+ * content box `.map-network-nodes` stretches to, and the ONLY vertical fact
+ * this layer can know.
+ *
+ * THE RESIDUAL, STATED PLAINLY. `.map-network` also carries `flex: 1`, so on a
+ * tall page it GROWS: measured 212px in a halves cell (the floor exactly) and
+ * 258–617px full-width. Nothing reaches render with the grown height — it is
+ * decided by flex at layout time, after this code has run — so the guard prices
+ * the floor. That is conservative in the safe direction: on a grown box the
+ * vertical threshold buys MORE air than a card needs, never less, and the
+ * insets plus the per-pass clamp bound how far that can push anything. Closing
+ * it honestly means a height channel, which does not exist and which the
+ * estimate could not fill either (it charges `NETWORK_MIN_PX`, this same floor).
+ */
+const NETWORK_BOX_MIN_HEIGHT_PX = 212;
+
+/**
+ * The per-axis separation two node cards owe each other, in coordinate units.
+ *
+ * The conversion is the whole fix: a footprint in pixels divided by the box it
+ * is drawn in, times 100. Feed it the real column and the guard is right at
+ * every width instead of at one.
+ */
+function nodeSeparationUnits(tier, layout) {
+  const box = NODE_BOX_PX[tier] || NODE_BOX_PX.standard;
+  const widthPx = (layout && layout.widthPx > 0) ? layout.widthPx : PAGE_BUDGET.widthPx;
+  const cardW = (layout && layout.halvesCell)
+    ? Math.min(box.w, NODE_BOX_ROW_CELL_MAX_W_PX)
+    : box.w;
+  return {
+    x: (cardW / widthPx) * 100,
+    y: (box.h / NETWORK_BOX_MIN_HEIGHT_PX) * 100,
+  };
+}
+
+/**
+ * A node card's footprint in coordinate units, for the LABEL's use.
+ *
+ * Deliberately not `nodeSeparationUnits()`: that one prices the column the
+ * relaxation runs in and is DR-49's landed contract, untouched here. This one
+ * subtracts the rail, because a rail-bearing map draws in a narrower box and a
+ * card therefore occupies MORE of it.
+ *
+ * THE RESIDUAL IS DR-49'S, AND IT IS WHY THERE ARE TWO BOXES. The vertical
+ * divisor is a height nothing reaches render with: `.map-network` carries
+ * `flex: 1`, so the real box is 212px in a halves cell (the min-height exactly,
+ * measured) but 258–617px full-width. Pricing a card against the floor
+ * therefore makes it up to ~2.7× taller than it prints on a full-width map.
+ *
+ * One assumption cannot serve both questions the search asks, because the safe
+ * direction reverses between them:
+ *
+ *   · "where should this label go?" — over-price the card. A phantom conflict
+ *     costs a nudge nobody needed. `avoid` answers this, against the floor.
+ *   · "is this label so buried it should not print at all?" — UNDER-price it.
+ *     Deleting a legible label is the worse error by far, and it is the error
+ *     that shipped: on `the-lumina-protocol` p.26 the floor-priced box found no
+ *     air anywhere near a 12-card hub and dropped seven of ten route codes off
+ *     a map whose Route Key lists all ten. `bury` answers this, against the
+ *     tallest box the corpus measured.
+ *
+ * In a halves cell the two are IDENTICAL by construction — the measured height
+ * there IS the floor — so the generous reading is granted only where the
+ * evidence says the box really does grow. The x axis is exact in both.
+ */
+const NETWORK_BOX_MAX_MEASURED_HEIGHT_PX = 617;
+
+function nodeBoxUnitsForLabels(tier, layout, hasRail) {
+  const box = NODE_BOX_PX[tier] || NODE_BOX_PX.standard;
+  const columnPx = (layout && layout.widthPx > 0) ? layout.widthPx : PAGE_BUDGET.widthPx;
+  const drawPx = Math.max(80, columnPx - (hasRail ? NETWORK_RAIL_INSET_PX : 0));
+  const halvesCell = !!(layout && layout.halvesCell);
+  const cardW = halvesCell ? Math.min(box.w, NODE_BOX_ROW_CELL_MAX_W_PX) : box.w;
+  const w = (cardW / drawPx) * 100;
+  const tallestPx = halvesCell
+    ? NETWORK_BOX_MIN_HEIGHT_PX
+    : NETWORK_BOX_MAX_MEASURED_HEIGHT_PX;
+  return {
+    avoid: { w, h: (box.h / NETWORK_BOX_MIN_HEIGHT_PX) * 100 },
+    bury: { w, h: (box.h / tallestPx) * 100 },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Deterministic collision-avoidance relaxation
 // Pushes overlapping nodes apart in bounded passes. Same input → same output.
 // ---------------------------------------------------------------------------
-function relaxNodePositions(nodes, insets, passes) {
-  const minSep = 9;  // minimum separation in SVG units (≈ node box footprint)
+/**
+ * TWO AXES, NOT A RADIUS. Cards are rectangles, and two rectangles miss each
+ * other the moment EITHER axis clears — so the test is a box overlap, and the
+ * push is the minimum translation that ends it. The retired radial test asked
+ * one question with one threshold for both axes, which cannot be right in a
+ * box that is not square (236×212 and 420×617 are both in the corpus) and
+ * which fired on pairs that were already clear on one axis.
+ *
+ * The axis is chosen by PENETRATION AS A FRACTION OF ITS OWN FOOTPRINT, so the
+ * choice is isotropic in real pixels even though the two axes have different
+ * scales. Ties and exact coincidences resolve by a fixed direction, so the
+ * function stays a pure function of its input: same nodes → same positions.
+ */
+function relaxNodePositions(nodes, insets, passes, sep) {
+  const sepX = sep.x;
+  const sepY = sep.y;
   for (let pass = 0; pass < passes; pass++) {
     let moved = false;
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const dx = nodes[j]._x - nodes[i]._x;
         const dy = nodes[j]._y - nodes[i]._y;
-        const dist = Math.hypot(dx, dy);
-        if (dist >= minSep || dist === 0) continue;
-        // Deterministic push: half the deficit to each node along the connecting axis
-        const overlap = (minSep - dist) / 2;
-        const ux = dx / dist;
-        const uy = dy / dist;
-        nodes[i]._x -= ux * overlap;
-        nodes[i]._y -= uy * overlap;
-        nodes[j]._x += ux * overlap;
-        nodes[j]._y += uy * overlap;
+        const penX = sepX - Math.abs(dx);
+        const penY = sepY - Math.abs(dy);
+        // Clear on either axis ⇒ the boxes cannot overlap. Nothing to do.
+        if (penX <= 0 || penY <= 0) continue;
+        if (penX / sepX <= penY / sepY) {
+          const push = penX / 2;
+          const dir = dx === 0 ? 1 : Math.sign(dx);
+          nodes[i]._x -= dir * push;
+          nodes[j]._x += dir * push;
+        } else {
+          const push = penY / 2;
+          const dir = dy === 0 ? 1 : Math.sign(dy);
+          nodes[i]._y -= dir * push;
+          nodes[j]._y += dir * push;
+        }
         moved = true;
       }
     }
@@ -512,13 +769,97 @@ function relaxNodePositions(nodes, insets, passes) {
 }
 
 // ---------------------------------------------------------------------------
-// Check if a candidate label position is too close to any node center
+// THE MAZE'S predicate — a point against a radius (D151)
 // ---------------------------------------------------------------------------
+/**
+ * The node-graph path no longer uses this: see the box note above for the three
+ * defects the radial test produced there, and `placeEdgeLabel()` for what
+ * replaced it.
+ *
+ * It stays because `renderMazeMap()`'s corridor labels are its other caller,
+ * and that arm is NOT fixed by this wave. The maze prints its passage names in
+ * a different geometry — anchored beside a vertical leg, centred above a
+ * horizontal one — against cells this file has no pixel footprint table for, so
+ * converting it would be a second unmeasured guess rather than a second fix.
+ *
+ * THE CLASS IS THEREFORE STILL LIVE HERE, and stated so that the next reader
+ * does not have to rediscover it: a maze corridor label is placed by asking
+ * whether its ANCHOR POINT is within one radius of a cell's CENTRE, in a
+ * coordinate space that is not square, and the answer to a hit is a single
+ * flip to the other side rather than a search. `content/geometry-01-tidewall`
+ * is the only fixture in the corpus that exercises it.
+ */
 function labelCollidesWithNode(lx, ly, nodes, threshold) {
   for (let i = 0; i < nodes.length; i++) {
     if (Math.hypot(lx - nodes[i]._x, ly - nodes[i]._y) < threshold) return true;
   }
   return false;
+}
+
+// ---------------------------------------------------------------------------
+// Place one edge label clear of the node cards and of the labels already placed
+// ---------------------------------------------------------------------------
+/**
+ * Walks the candidate ladder and returns the first position whose box touches
+ * nothing; failing that, the least-bad one, with the overlap it could not
+ * avoid so the caller can decide whether it is still worth printing.
+ *
+ * Node overlap is weighted above label overlap because a card is opaque — it
+ * ERASES the glyphs under it — while two labels that graze each other are both
+ * still readable. Pure function of its arguments: same map, same placements.
+ */
+function placeEdgeLabel(spec, nodes, nodeBox, placedLabels) {
+  let best = null;
+  const cardOverlap = (x, y, card) => {
+    let total = 0;
+    for (let n = 0; n < nodes.length; n++) {
+      total += boxOverlapArea(
+        x, y, spec.boxW, spec.boxH,
+        nodes[n]._x, nodes[n]._y, card.w, card.h,
+      );
+    }
+    return total;
+  };
+  // Offset OUTERMOST: every position ALONG the edge is tried at one
+  // perpendicular displacement before the next displacement is tried at all. A
+  // label that has walked along its own line still reads as that line's label;
+  // one shoved sideways starts to look like it belongs to a different edge, so
+  // sliding is spent first and pushing out last. (The ladder's final entry is
+  // deliberately BELOW the base offset — a tuck close to the line, tried only
+  // when everything roomier has failed.)
+  for (let oi = 0; oi < EDGE_LABEL_OFFSET_SCALES.length; oi++) {
+    const offset = Math.min(
+      EDGE_LABEL_MAX_OFFSET_UNITS,
+      spec.baseOffset * EDGE_LABEL_OFFSET_SCALES[oi],
+    );
+    for (let pi = 0; pi < EDGE_LABEL_PROGRESSIONS.length; pi++) {
+      const progress = EDGE_LABEL_PROGRESSIONS[pi];
+      for (let si = 0; si < 2; si++) {
+        const sign = si === 0 ? spec.preferredSign : -spec.preferredSign;
+        const x = spec.clampX(spec.fromX + (spec.dx * progress) + (spec.normalX * offset * sign));
+        const y = spec.clampY(spec.fromY + (spec.dy * progress) + (spec.normalY * offset * sign));
+
+        const nodeOverlap = cardOverlap(x, y, nodeBox.avoid);
+        let labelOverlap = 0;
+        for (let l = 0; l < placedLabels.length; l++) {
+          const other = placedLabels[l];
+          labelOverlap += boxOverlapArea(
+            x, y, spec.boxW, spec.boxH,
+            other.x, other.y, other.w, other.h,
+          );
+        }
+        if (nodeOverlap === 0 && labelOverlap === 0) {
+          return { x, y, buriedOverlap: 0, clear: true };
+        }
+        const penalty = (nodeOverlap * 3) + labelOverlap;
+        if (!best || penalty < best.penalty) best = { x, y, penalty, clear: false };
+      }
+    }
+  }
+  // Nothing was clear under the cautious card. Whether it is worth printing is
+  // asked of the generous one — see nodeBoxUnitsForLabels().
+  best.buriedOverlap = cardOverlap(best.x, best.y, nodeBox.bury);
+  return best;
 }
 
 // ---------------------------------------------------------------------------
@@ -534,7 +875,13 @@ function compactNodeLabel(label, maxLen) {
   return raw.slice(0, maxLen - 1).trim() + '\u2026';
 }
 
-function renderPointMap(mapState) {
+/**
+ * @param {object} mapState
+ * @param {{widthPx:number, halvesCell:boolean}|null} layout — DR-49's render
+ *   width channel. Absent (the legacy `booklet-primitives.js` interlude path)
+ *   means the page column, which is where an interlude map renders anyway.
+ */
+function renderPointMap(mapState, layout) {
   const wrap = make('div', 'map-network');
   const shellFamily = ((mapState.artifactIdentity || {}).shellFamily || '').toLowerCase();
   // Constellation mode: same geometry, different reading. An edge stops being a
@@ -561,10 +908,38 @@ function renderPointMap(mapState) {
     wrap.appendChild(rail);
   }
 
+  // ── TWO COORDINATE SYSTEMS, ONE BOX (DR-49's second half) ────────────────
+  // The node cards are HTML, positioned `left: _x%; top: _y%` of
+  // `.map-network-nodes` — a plain CSS percentage of the REAL box, resolved
+  // per axis. This SVG draws the edges BETWEEN those cards from the same `_x`
+  // / `_y` numbers, so it must resolve them the same way or the lines connect
+  // nothing.
+  //
+  // `xMidYMid meet` did the opposite: it locked the 0–100 viewBox to a SQUARE
+  // scaled by min(width, height) and centred that square in the box, so the
+  // two systems agreed only at dead centre and diverged with distance from it.
+  // Measured across the sealed corpus (2026-08-19): every line endpoint sat a
+  // median 3.7–8.2px from its card in a near-square halves cell (236×212), and
+  // a median of 19–71px away on the full-width networks, which are 419.9×550–617
+  // — a 5:7 box. That is not a nudge: on `the-conclave-s-legacy` p.14 all four
+  // routes float in the middle of the frame while all five nodes sit stranded
+  // at the top and bottom edges, touching nothing. A player cannot read which
+  // node connects to which, which is the entire job of a node graph. 35 of the
+  // corpus's 41 networks render at that aspect.
+  //
+  // `none` maps u → u% of width and v → v% of height — the CSS percentage
+  // resolution, exactly. The cost is a non-uniform scale on the SVG's own
+  // paint: stroke thickness now varies with a line's angle, and the `<text>`
+  // labels stretch with the box. Both were judged on rendered pages before
+  // this shipped (see the DR-49 report) — and the labels already carry
+  // `textLength` + `lengthAdjust="spacingAndGlyphs"`, so deliberate horizontal
+  // fitting is this component's existing idiom, not a new artefact. Geometry
+  // that is RIGHT beats paint that is uniform: an edge that misses its node
+  // says something false about the game.
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('class', 'map-network-svg');
   svg.setAttribute('viewBox', '0 0 100 100');
-  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svg.setAttribute('preserveAspectRatio', 'none');
 
   const nodes = (mapState.nodes || []).map((node) => ({ ...node }));
   const nodeCount = nodes.length;
@@ -603,7 +978,7 @@ function renderPointMap(mapState) {
 
   // Deterministic collision-avoidance relaxation (3 passes for standard, 5 for dense/packed)
   const relaxPasses = tier === 'standard' ? 3 : 5;
-  relaxNodePositions(nodes, insets, relaxPasses);
+  relaxNodePositions(nodes, insets, relaxPasses, nodeSeparationUnits(tier, layout));
 
   // Maximum label length per tier
   const nodeLabelMax = tier === 'packed' ? 18 : tier === 'dense' ? 24 : 40;
@@ -615,7 +990,13 @@ function renderPointMap(mapState) {
   const edgeLabelThreshold = hasRouteKey
     ? (tier === 'packed' ? 6 : tier === 'dense' ? 10 : 999)
     : 999; // no route key → always attempt inline labels
-  const nodeCollisionRadius = tier === 'packed' ? 6 : 8;
+
+  // The two boxes the label placement reasons about: a card's footprint, and
+  // the running list of labels already on this map. The list is what stops a
+  // hub topology from stacking every spoke's label in one place.
+  const labelNodeBox = nodeBoxUnitsForLabels(tier, layout, useInstrumentationRail);
+  const labelFontUnits = EDGE_LABEL_FONT_UNITS[tier] || EDGE_LABEL_FONT_UNITS.standard;
+  const placedLabels = [];
 
   (mapState.edges || []).forEach((edge, edgeIndex) => {
     const from = nodesById[edge.from];
@@ -650,39 +1031,71 @@ function renderPointMap(mapState) {
         ? (isDeferredRoute ? 6.4 : 4.8)
         : (relational ? 4.8 : 3.2);
 
-      // Try multiple positions along the edge to avoid node overlap
-      const candidateProgressions = shellFamily === 'classified-packet'
-        ? [isDeferredRoute
-            ? (edgeIndex % 2 === 0 ? 0.24 : 0.78)
-            : (edgeIndex % 2 === 0 ? 0.36 : 0.6)]
-        : [0.5, 0.35, 0.65, 0.25, 0.75];
-
       const labelText = shellFamily === 'classified-packet'
         ? buildRouteCode(edgeIndex)
         : compactRouteLabel(edge.label, distance < 22 ? 12 : 16);
-      const textLength = Math.max(10, Math.min(distance * 0.9, labelText.length * 3.6));
 
-      let bestX = 0, bestY = 0, placed = false;
-      for (let ci = 0; ci < candidateProgressions.length; ci++) {
-        const progress = candidateProgressions[ci];
-        const cx = (from._x || 0) + (dx * progress) + (normalX * labelOffset * offsetSign);
-        const cy = (from._y || 0) + (dy * progress) + (normalY * labelOffset * offsetSign);
-        if (!labelCollidesWithNode(cx, cy, nodes, nodeCollisionRadius)) {
-          bestX = cx;
-          bestY = cy;
-          placed = true;
-          break;
-        }
-        if (ci === 0) { bestX = cx; bestY = cy; } // fallback to first candidate
-      }
+      // THE RUN IS THE TEXT'S OWN WIDTH (2026-08-20). `textLength` +
+      // `lengthAdjust="spacingAndGlyphs"` does not resize type — it FORCES the
+      // run to the number given, stretching letterforms and the air between
+      // them to reach it. The retired arithmetic charged 3.6 units per
+      // character against a ~1.3-unit mono advance and floored the whole run at
+      // 10 units, so every label was painted at roughly three times the width
+      // its glyphs need: "R9" spanning a tenth of the frame on
+      // `the-lumina-protocol` p.26, `variety-02-homecoming`'s p.8 routes
+      // reading as spaced-out display type ("L o c k e d") laid across two
+      // cards. Two costs, one cause — a stretched label is less legible AND
+      // three times as likely to have a card under some part of it. Sizing the
+      // run to the advance is therefore half of the occlusion fix, not a
+      // cosmetic aside.
+      //
+      // THE RUN MAY STILL NOT LEAVE THE FRAME (DR-49). The ceiling and the
+      // margin below are unchanged and remain pure X arithmetic: under
+      // `preserveAspectRatio="none"` the x axis maps straight onto the box
+      // width, so a run wider than the frame prints off the paper.
+      const naturalRun = labelText.length * labelFontUnits * EDGE_LABEL_ADVANCE_EM;
+      const textLength = Math.min(EDGE_LABEL_MAX_RUN_UNITS, Math.max(2, naturalRun));
+      const boxW = textLength + (EDGE_LABEL_PAD_X_UNITS * 2);
+      const boxH = (labelFontUnits * EDGE_LABEL_LINE_EM) + (EDGE_LABEL_PAD_Y_UNITS * 2);
+      // Containment runs INSIDE the search, not after it: a position judged
+      // clear and then clamped into the frame is a position nothing checked.
+      const halfW = boxW / 2;
+      const halfH = boxH / 2;
+      const clampX = (x) => Math.max(
+        EDGE_LABEL_FRAME_MARGIN_UNITS + halfW,
+        Math.min(100 - EDGE_LABEL_FRAME_MARGIN_UNITS - halfW, x),
+      );
+      const clampY = (y) => Math.max(
+        EDGE_LABEL_FRAME_MARGIN_UNITS + halfH,
+        Math.min(100 - EDGE_LABEL_FRAME_MARGIN_UNITS - halfH, y),
+      );
 
-      // Only suppress an individual label if all candidates collide AND
-      // an alternate route key surface exists to carry the information.
-      // Without a route key, always render the label (best-effort position).
-      if (placed || !hasRouteKey) {
+      const spot = placeEdgeLabel({
+        fromX: from._x || 0,
+        fromY: from._y || 0,
+        dx,
+        dy,
+        normalX,
+        normalY,
+        baseOffset: labelOffset,
+        preferredSign: offsetSign,
+        boxW,
+        boxH,
+        clampX,
+        clampY,
+      }, nodes, labelNodeBox, placedLabels);
+
+      // Suppression is now the LAST resort and needs both halves: the search
+      // found nowhere clear, the label is still substantially under a card, and
+      // a route key exists to carry the word anyway. Without a route key a
+      // best-effort position always prints — a fragment of a word beats a route
+      // with no name at all.
+      const buried = !spot.clear
+        && (spot.buriedOverlap / (boxW * boxH)) >= EDGE_LABEL_SUPPRESS_OVERLAP_RATIO;
+      if (!buried || !hasRouteKey) {
         const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        label.setAttribute('x', String(bestX));
-        label.setAttribute('y', String(bestY));
+        label.setAttribute('x', String(spot.x));
+        label.setAttribute('y', String(spot.y));
         label.setAttribute('text-anchor', 'middle');
         label.setAttribute('dominant-baseline', 'middle');
         label.setAttribute('class', 'map-edge-label');
@@ -690,6 +1103,7 @@ function renderPointMap(mapState) {
         label.setAttribute('lengthAdjust', 'spacingAndGlyphs');
         label.textContent = labelText;
         svg.appendChild(label);
+        placedLabels.push({ x: spot.x, y: spot.y, w: boxW, h: boxH });
       }
     }
   });
@@ -1105,7 +1519,14 @@ function renderMazeMap(mapState) {
   return wrap;
 }
 
-export function renderMapSection(mapState) {
+/**
+ * @param {object} mapState
+ * @param {{widthPx:number, halvesCell:boolean}|null} [layout] — DR-49's render
+ *   width channel, forwarded to the only body that lays content out in a
+ *   normalized coordinate space (the node network). Every other body is either
+ *   fixed geometry or flows in CSS and needs nothing.
+ */
+export function renderMapSection(mapState, layout = null) {
   // .map-zone is the peer of .cipher-zone and .oracle-zone in the zone contract.
   // All zone-level CSS (classified-packet, boardStateMode variants, data-layout-variant
   // rules) targets .map-zone.  The inner .map-content holds the map type content.
@@ -1116,7 +1537,7 @@ export function renderMapSection(mapState) {
   section.appendChild(make('div', 'map-title', mapState.title || 'Map'));
 
   if (mapState.mapType === 'point-to-point' || mapState.mapType === 'node-graph') {
-    section.appendChild(renderPointMap(mapState));
+    section.appendChild(renderPointMap(mapState, layout));
     const routeKey = renderRouteKey(mapState);
     if (routeKey) section.appendChild(routeKey);
   } else if (mapState.mapType === 'linear-track') {
@@ -1548,6 +1969,68 @@ export function renderCompanionComponent(component) {
   return card;
 }
 
+// ---------------------------------------------------------------------------
+// THE CONVERGENCE NOTES BOX'S SLOT BUDGET (2026-08-20)
+// ---------------------------------------------------------------------------
+/**
+ * WHAT WAS WRONG. This box printed `paragraphs.slice(0, 2)` — a bare count cap
+ * with no marker, no diagnostic and no relation to the space on the page. On
+ * the classified-packet path `buildBossPageModel()` assembles the list as
+ * [narrative tail, instruction tail, mechanism remainder, convergenceProof], so
+ * the two slots went to spillover and the authored proof — the paragraph that
+ * tells the player how the password derives, and the only reason the box is
+ * called Convergence Notes — was dropped every time. Read off
+ * `the-lumina-protocol` p.41 on 2026-08-20, on a page with ~450px of blank
+ * paper under it. Nothing was competing for the space.
+ *
+ * WHY THE CAP IS STILL HERE, and this is the part measured rather than
+ * reasoned. Printing every paragraph was tried first and CLIPS: with no cap,
+ * `.page-frame` overflows by 67px on `what-the-soil-remembers` p.54, 82px on
+ * `Persephone` p.41 and 22px on `liftrpg-eastern-shore` p.26 — a silent drop
+ * traded for a silent clip, which is the worse of the two (D198's whole
+ * discipline). A boss page is a full-page, unsplittable atom with no
+ * continuation route past the appendix, and `atoms/boss-encounter.js` prices
+ * the followup page's whole density ladder at 30px — it cannot absorb 82.
+ *
+ * AND NO LOCAL NUMBER PREDICTS THE FIT — measured across nine corpus boss
+ * pages, which is why this is a slot budget and not a character budget: the
+ * box fits at 2377 chars / 295px on `the-conclave-s-legacy` p.38 and clips at
+ * 1727 chars / 228px on `liftrpg-eastern-shore` p.26, because what is left
+ * over depends on the rest of the page, which this function cannot see. Three
+ * slots clips Persephone; two clips nothing in the corpus. So: two.
+ *
+ * WHAT CHANGED IS WHICH TWO. The proof's own paragraphs take the slots first —
+ * they are the trailing `convergenceProofCoreCount` of the list — and the
+ * leading spillover fills whatever is left, in document order, so the box still
+ * reads in the order it was written.
+ *
+ * WHAT THIS DOES NOT FIX, stated at the site: a book whose proof runs past two
+ * paragraphs still loses the rest, and a page with room to spare still stops at
+ * two. Both need something this layer does not have — a continuation route for
+ * the appendix, or a followup ladder with real shrink in it.
+ */
+const CONVERGENCE_PROOF_SLOTS = 2;
+
+function selectConvergenceProofParagraphs(model) {
+  const paragraphs = model.convergenceProofParagraphs || [];
+  if (paragraphs.length <= CONVERGENCE_PROOF_SLOTS) return paragraphs;
+
+  const coreCount = Math.max(0, Math.min(
+    Number(model.convergenceProofCoreCount) || 0,
+    paragraphs.length,
+  ));
+  // No count declared (an older model shape) ⇒ the pre-2026-08-20 behaviour,
+  // which is exactly "the leading slots" — never worse than what shipped.
+  if (coreCount <= 0) return paragraphs.slice(0, CONVERGENCE_PROOF_SLOTS);
+
+  const core = paragraphs.slice(paragraphs.length - coreCount).slice(0, CONVERGENCE_PROOF_SLOTS);
+  const leadRoom = CONVERGENCE_PROOF_SLOTS - core.length;
+  const lead = leadRoom > 0
+    ? paragraphs.slice(0, paragraphs.length - coreCount).slice(0, leadRoom)
+    : [];
+  return lead.concat(core);
+}
+
 export function renderBossPage(model) {
   const scaffold = createBoundedPage('boss', 'boss-right', {
     boundaryRole: 'boss',
@@ -1635,10 +2118,25 @@ export function renderBossPage(model) {
   //
   // The rule this states, for anything added to this page later: a field the
   // pipeline DERIVES rather than authors may not print. The password obeys it
-  // already, by a different mechanism (`sanitizeBossTextForDisplay()` scrubs
-  // the derived password out of every prose seat before it reaches the DOM);
+  // by a different mechanism (`sanitizeBossTextForDisplay()` scrubs the derived
+  // password out of every prose seat before it reaches the DOM);
   // `convergenceProof` and `passwordRevealInstruction` DO print because they
-  // are authored prose about the method, already scrubbed by that same seam.
+  // are authored prose about the method, passed through that same seam.
+  //
+  // WHAT THAT SEAM COVERS, AND WHAT IT DOES NOT (corrected 2026-08-19; the
+  // sentence above used to read "already scrubbed by that same seam", which
+  // claimed more than the seam does). It matches the derived password as a
+  // token: bare, quoted, and — since this correction — spelled out one letter
+  // at a time with separators. It is not prose comprehension and it is not a
+  // guarantee. A partial split ("P, RYOR"), a paraphrase, or a sentence that
+  // identifies the word without writing it all reach the page.
+  //
+  // The earning defect: proving run 3's boss page printed
+  // "By the table: P, R, Y, O, R." one clause away from a [REDACTED] that
+  // worked — a live scrub, and the answer key on the page anyway. The seam is
+  // the last line of defence, not the only one; the half that keeps the shape
+  // from being authored at all is the convergence doctrine in prompt_rules.js
+  // (INST_CONVERGENCE_DESIGN, "ONE PROHIBITION, EVERY PATTERN").
   if ((model.componentInputs || []).length) {
     const components = make('div', 'boss-components');
     components.appendChild(make('div', 'boss-components-label', model.componentLabel || 'Recorded Inputs'));
@@ -1668,7 +2166,7 @@ export function renderBossPage(model) {
   if ((model.convergenceProofParagraphs || []).length) {
     const proof = make('div', 'boss-proof');
     proof.appendChild(make('div', 'boss-proof-label', 'Convergence Notes'));
-    model.convergenceProofParagraphs.slice(0, 2).forEach((paragraph) => {
+    selectConvergenceProofParagraphs(model).forEach((paragraph) => {
       proof.appendChild(make('p', '', paragraph));
     });
     (appendixGrid || frame).appendChild(proof);
